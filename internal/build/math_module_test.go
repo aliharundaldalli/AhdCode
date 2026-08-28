@@ -69,16 +69,15 @@ write(apply(Math.round, 3.5))
 			expected: "[1.0, 2.0, 3.0]\n4.0\n<Function sqrt>\n4.0\n",
 		},
 		{
-			name: "default seed golden sequence",
+			name: "entropy-initialized random remains in range",
 			sources: map[string]string{"main.ahd": `bring Math
-write(Math.random())
-write(Math.random())
-write(Math.random())
+value: Real := Math.random()
+write(value >= 0.0 and value < 1.0)
 `},
-			expected: "0.4121990632081577\n0.4686510900868295\n0.5840201876345011\n",
+			expected: "true\n",
 		},
 		{
-			name: "explicit default seed is identical",
+			name: "explicit seed 557 preserves its golden sequence",
 			sources: map[string]string{"main.ahd": `bring Math
 Math.seed(557)
 write(Math.random())
@@ -116,7 +115,7 @@ write(expected == Math.random())
 			name:  "shared sequence across modules",
 			entry: "Main.ahd",
 			sources: map[string]string{
-				"A.ahd":    "bring Math\nfirst: Real := Math.random()",
+				"A.ahd":    "bring Math\nMath.seed(557)\nfirst: Real := Math.random()",
 				"B.ahd":    "bring Math\nsecond: Real := Math.random()",
 				"Main.ahd": "bring Math\nfrom A bring first\nfrom B bring second\nwrite(first)\nwrite(second)\nwrite(Math.random())",
 			},
@@ -174,8 +173,8 @@ func TestMathWrongTypesStopAtSemanticDiagnostics(t *testing.T) {
 	}
 }
 
-func TestMathFreshExecutionsResetAndGeneratedOutputIsDeterministic(t *testing.T) {
-	directory := writeSources(t, map[string]string{"main.ahd": "bring Math\nwrite(Math.random())\nwrite(Math.randomInt(1, 10))"})
+func TestMathExplicitSeedExecutionsAndGeneratedOutputAreDeterministic(t *testing.T) {
+	directory := writeSources(t, map[string]string{"main.ahd": "bring Math\nMath.seed(557)\nwrite(Math.random())\nwrite(Math.randomInt(1, 10))"})
 	entry := filepath.Join(directory, "main.ahd")
 	output := filepath.Join(t.TempDir(), "program")
 	path, result := BuildProgram(entry, output)
@@ -191,7 +190,7 @@ func TestMathFreshExecutionsResetAndGeneratedOutputIsDeterministic(t *testing.T)
 		return string(bytes)
 	}
 	if first, second := run(), run(); first != second || first != "0.4121990632081577\n3\n" {
-		t.Fatalf("fresh execution outputs = %q and %q", first, second)
+		t.Fatalf("explicitly seeded execution outputs = %q and %q", first, second)
 	}
 	first := Compile(entry)
 	second := Compile(entry)

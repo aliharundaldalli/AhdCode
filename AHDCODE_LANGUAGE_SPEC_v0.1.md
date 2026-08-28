@@ -2657,20 +2657,23 @@ Every Math result obeys the finite-`Real` contract. A runtime operation never
 exposes `NaN` or infinity: undefined results become `DomainError`, and
 out-of-range finite mathematics becomes `OverflowError`.
 
-### 35.3 Deterministic random sequence
+### 35.3 Pseudo-random sequence and explicit seeding
 
 There is one shared Math pseudo-random sequence per native program execution.
-Every fresh execution starts exactly as if the program had called:
+At each fresh execution AhdCode reads exactly eight bytes from the operating
+system's cryptographically secure entropy source and interprets them as one
+little-endian unsigned 64-bit initial state. Failure to obtain those bytes is a
+startup failure; the runtime never silently substitutes a fixed seed, time,
+process identity, or clock value. Two unseeded executions are not required to
+match and are not required to differ, because an entropy collision remains
+theoretically possible. The initial seed is not exposed through a public API.
 
-```ahd
-Math.seed(557)
-```
-
-An explicit `seed(557)` therefore resets to the default state. Every signed
-Int64 seed is valid and maps to the internal `uint64` state by its two's-
-complement bit pattern. Calls made while initializing different modules and in
-the entry module advance this same sequence in actual runtime order. The
-generator is never seeded from time, OS entropy, process identity, or a clock.
+`Math.seed(value)` explicitly resets the shared state. Every signed Int64 seed
+is valid and maps to the internal `uint64` state by its two's-complement bit
+pattern. Reseeding with the same value reproduces the exact same sequence, so
+explicit seeding is the supported mechanism for reproducible tests and
+simulations. Calls made while initializing different modules and in the entry
+module advance the same sequence in actual runtime order.
 
 v0.1 pins SplitMix64. For state `s`, one output performs the following unsigned
 64-bit wrapping operations exactly:
@@ -2683,8 +2686,10 @@ z = (z xor (z >> 27)) * 0x94d049bb133111eb
 z = z xor (z >> 31)
 ```
 
-This algorithm and its sequence are part of the v0.1 reproducibility contract
-across Go versions, operating systems, and supported architectures. It is not
+This algorithm and every explicitly seeded sequence are part of the v0.1
+reproducibility contract across Go versions, operating systems, and supported
+architectures. OS entropy initializes the state only; `Math.random`,
+`Math.randomInt`, and `List.shuffle` remain pseudo-random and are not
 cryptographically secure.
 
 `random()` advances once and constructs a `Real` in `0.0 <= result < 1.0` from

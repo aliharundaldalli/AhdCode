@@ -8,7 +8,10 @@ package ahdruntime
 
 import (
 	"bufio"
+	cryptorand "crypto/rand"
+	"encoding/binary"
 	"fmt"
+	"io"
 	"math"
 	"os"
 	"sort"
@@ -1181,16 +1184,36 @@ func ahdMathFiniteResult(name string, value float64) float64 {
 }
 
 const (
-	ahdMathDefaultSeed   int64  = 557
 	ahdSplitMixIncrement uint64 = 0x9e3779b97f4a7c15
 	ahdSplitMixFactor1   uint64 = 0xbf58476d1ce4e5b9
 	ahdSplitMixFactor2   uint64 = 0x94d049bb133111eb
 )
 
+// ahdMathStateFromEntropy reads exactly one 64-bit seed in little-endian byte
+// order. Accepting the reader here keeps startup entropy handling isolated and
+// deterministic under test without exposing a public seed API.
+func ahdMathStateFromEntropy(reader io.Reader) (uint64, error) {
+	var seed [8]byte
+	if _, err := io.ReadFull(reader, seed[:]); err != nil {
+		return 0, fmt.Errorf("read 8 bytes of OS entropy: %w", err)
+	}
+	return binary.LittleEndian.Uint64(seed[:]), nil
+}
+
+func ahdMathStartupState(reader io.Reader, errorOutput io.Writer, exit func(int)) uint64 {
+	state, err := ahdMathStateFromEntropy(reader)
+	if err != nil {
+		fmt.Fprintln(errorOutput, "AhdCode runtime: Math RNG initialization failed:", err)
+		exit(1)
+		return 0
+	}
+	return state
+}
+
 var ahdMathGenerator = struct {
 	sync.Mutex
 	state uint64
-}{state: uint64(ahdMathDefaultSeed)}
+}{state: ahdMathStartupState(cryptorand.Reader, os.Stderr, os.Exit)}
 
 // AhdMathSeed resets the one process-wide Math sequence. Converting the signed
 // seed to uint64 is the specified two's-complement state mapping.

@@ -1462,21 +1462,29 @@ Numeric runtime behavior:
 - `exp` and every other Math operation preserve finite Real and never expose
   NaN/Inf.
 
-The runtime owns one shared SplitMix64 generator per native process. Initial
-state is the two's-complement uint64 representation of seed `557`. Pin the
-increment `0x9e3779b97f4a7c15` and mixing factors
-`0xbf58476d1ce4e5b9`/`0x94d049bb133111eb` exactly. `seed(Int)` resets that state;
-there is no entropy/time reseeding. `random()` consumes one output and converts
-its high 53 bits with `float64(raw >> 11) * 2^-53`, which cannot produce 1.0.
+The runtime owns one shared SplitMix64 generator per native process. At process
+startup, read exactly eight bytes from Go's `crypto/rand.Reader` and interpret
+them as a little-endian uint64 state. Isolate this in a reader-parameterized
+internal helper for deterministic success/failure tests. An entropy read
+failure must stop startup with a clear diagnostic; never fall back to seed
+`557`, time, PID, or a clock. Do not expose the sampled seed. Pin the increment
+`0x9e3779b97f4a7c15` and mixing factors
+`0xbf58476d1ce4e5b9`/`0x94d049bb133111eb` exactly. `seed(Int)` resets that state
+with the existing two's-complement mapping. `random()` consumes one output and
+converts its high 53 bits with `float64(raw >> 11) * 2^-53`, which cannot
+produce 1.0.
 
 `randomInt(min, max)` has inclusive bounds. Reversed bounds raise `DomainError`;
 equal bounds return without consuming state. Use unsigned span arithmetic and
 rejection sampling, not raw modulo, including intervals crossing zero and the
-full Int64 domain. This generator is deterministic and reproducible, not
-cryptographically secure. Tests must pin seed 557, seed 42, negative seeds,
-process reset, cross-module shared order, extreme inclusive bounds, no-consume
-singleton behavior, catchable errors, semantic-only rejections, and identical
-generated output across repeated compilations.
+full Int64 domain. Explicitly seeded sequences are deterministic and
+reproducible; the entropy-initialized startup sequence is not. Neither mode is
+cryptographically secure. Tests must pin explicit seeds 557 and 42, negative
+seeds, reseeding, cross-module shared order, extreme inclusive bounds,
+no-consume singleton behavior, entropy success/failure, catchable errors,
+semantic-only rejections, and identical generated output across repeated
+compilations. Never require two unseeded executions to differ; collisions are
+possible.
 
 `List<T>.shuffle()` is a core typed List operation backed by this exact same
 generator state, not a second RNG. Lower it to an in-place descending

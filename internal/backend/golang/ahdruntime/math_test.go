@@ -1,10 +1,49 @@
 package ahdruntime
 
 import (
+	"bytes"
+	"errors"
 	"math"
 	"reflect"
+	"strings"
 	"testing"
+	"testing/iotest"
 )
+
+const mathTestSeed int64 = 557
+
+func TestMathStartupStateReadsExactlyEightEntropyBytesLittleEndian(t *testing.T) {
+	reader := bytes.NewReader([]byte{1, 2, 3, 4, 5, 6, 7, 8, 9})
+	state, err := ahdMathStateFromEntropy(reader)
+	if err != nil {
+		t.Fatalf("entropy initialization failed: %v", err)
+	}
+	if state != 0x0807060504030201 {
+		t.Fatalf("entropy state = %#x, want little-endian %#x", state, uint64(0x0807060504030201))
+	}
+	if reader.Len() != 1 {
+		t.Fatalf("entropy initialization consumed %d bytes, want exactly 8", 9-reader.Len())
+	}
+}
+
+func TestMathStartupEntropyFailureIsClear(t *testing.T) {
+	want := errors.New("entropy unavailable")
+	if _, err := ahdMathStateFromEntropy(iotest.ErrReader(want)); !errors.Is(err, want) {
+		t.Fatalf("entropy error = %v, want wrapped source failure", err)
+	}
+	var errorOutput bytes.Buffer
+	exitCode := 0
+	state := ahdMathStartupState(iotest.ErrReader(want), &errorOutput, func(code int) {
+		exitCode = code
+	})
+	if state != 0 || exitCode != 1 {
+		t.Fatalf("failed startup returned state %#x and exit %d, want zero and exit 1", state, exitCode)
+	}
+	message := errorOutput.String()
+	if !strings.Contains(message, "Math RNG initialization failed") || !strings.Contains(message, want.Error()) {
+		t.Fatalf("startup failure = %q, want clear Math RNG entropy diagnostic", message)
+	}
+}
 
 func TestMathRoundFloorAndCeil(t *testing.T) {
 	if AhdMathRound(3.4) != 3 || AhdMathRound(3.5) != 4 || AhdMathRound(-3.5) != -4 {
@@ -40,7 +79,7 @@ func TestClassicMathFunctionsAndErrors(t *testing.T) {
 }
 
 func TestSplitMix64GoldenRandomSequences(t *testing.T) {
-	defer AhdMathSeed(ahdMathDefaultSeed)
+	defer AhdMathSeed(mathTestSeed)
 	tests := []struct {
 		seed int64
 		want []float64
@@ -61,7 +100,7 @@ func TestSplitMix64GoldenRandomSequences(t *testing.T) {
 }
 
 func TestMathSeedResetAndRandomIntContract(t *testing.T) {
-	defer AhdMathSeed(ahdMathDefaultSeed)
+	defer AhdMathSeed(mathTestSeed)
 	AhdMathSeed(42)
 	first := AhdMathRandom()
 	AhdMathSeed(42)
@@ -96,7 +135,7 @@ func TestMathSeedResetAndRandomIntContract(t *testing.T) {
 }
 
 func TestMathRandomIntDeterministicBucketSanity(t *testing.T) {
-	defer AhdMathSeed(ahdMathDefaultSeed)
+	defer AhdMathSeed(mathTestSeed)
 	AhdMathSeed(557)
 	counts := make([]int, 7)
 	const samples = 70000
@@ -111,7 +150,7 @@ func TestMathRandomIntDeterministicBucketSanity(t *testing.T) {
 }
 
 func TestListShuffleUsesDeterministicFisherYates(t *testing.T) {
-	defer AhdMathSeed(ahdMathDefaultSeed)
+	defer AhdMathSeed(mathTestSeed)
 
 	AhdMathSeed(42)
 	values := AhdNewList(int64(1), int64(2), int64(3), int64(4), int64(5))
@@ -125,10 +164,10 @@ func TestListShuffleUsesDeterministicFisherYates(t *testing.T) {
 	}
 
 	AhdMathSeed(557)
-	defaultValues := AhdNewList(int64(1), int64(2), int64(3), int64(4), int64(5))
-	defaultValues.Shuffle()
-	if want := []int64{5, 2, 3, 1, 4}; !reflect.DeepEqual(defaultValues.Snapshot(), want) {
-		t.Fatalf("default-seed shuffle = %v, want %v", defaultValues.Snapshot(), want)
+	seed557Values := AhdNewList(int64(1), int64(2), int64(3), int64(4), int64(5))
+	seed557Values.Shuffle()
+	if want := []int64{5, 2, 3, 1, 4}; !reflect.DeepEqual(seed557Values.Snapshot(), want) {
+		t.Fatalf("seed 557 shuffle = %v, want %v", seed557Values.Snapshot(), want)
 	}
 
 	frozen := AhdNewList(int64(1), int64(2))
@@ -143,7 +182,7 @@ func TestListShuffleUsesDeterministicFisherYates(t *testing.T) {
 }
 
 func TestListShuffleSharesMathStateAndSkipsTrivialLists(t *testing.T) {
-	defer AhdMathSeed(ahdMathDefaultSeed)
+	defer AhdMathSeed(mathTestSeed)
 
 	AhdMathSeed(42)
 	expectedAfterEmpty := AhdMathRandom()
