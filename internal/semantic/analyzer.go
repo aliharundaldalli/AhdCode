@@ -139,7 +139,7 @@ func (a *analyzer) installBuiltins() {
 	errorType := &types.ClassSymbol{ModuleID: "builtin:core", Name: "Error", Parent: objectType}
 	object := &Symbol{Name: "Object", Kind: ClassSymbol, Class: objectType, Type: types.Class{Symbol: objectType, Reference: true}, ModuleRoot: true, Builtin: true, InitialNull: NonNull, Members: make(map[string]*Symbol)}
 	errorSymbol := &Symbol{Name: "Error", Kind: ClassSymbol, Class: errorType, Type: types.Class{Symbol: errorType, Reference: true}, ModuleRoot: true, Builtin: true, InitialNull: NonNull, Members: make(map[string]*Symbol)}
-	errorSymbol.Members["message"] = &Symbol{Name: "message", Kind: MemberSymbol, Type: types.String, Builtin: true, InitialNull: NonNull}
+	errorSymbol.Members["message"] = &Symbol{Name: "message", Kind: MemberSymbol, Type: types.String, Builtin: true, InitialNull: NonNull, OwnerClass: errorType, OriginModuleID: "builtin:core"}
 	a.addBuiltin(object)
 	a.addBuiltin(errorSymbol)
 	a.classes[object.Name] = object

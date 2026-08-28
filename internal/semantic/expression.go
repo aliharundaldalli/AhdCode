@@ -347,6 +347,7 @@ func (a *analyzer) analyzeFunctionValueIdentifier(identifier *ast.IdentifierExpr
 		a.result.NullStates[identifier] = info.nullState
 		return info
 	}
+	a.result.ResolvedSymbols[identifier] = symbol
 	if symbol.Alias != nil {
 		symbol = symbol.Alias
 	}

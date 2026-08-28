@@ -1408,6 +1408,8 @@ Do not rely on generated Go accidentally behaving correctly.
 
 The IR should make AhdCode-specific operations explicit where useful, especially checked arithmetic, runtime null checks, deep freeze, snapshot iteration, class identity, and structured error flow. Do not expose IR as public AhdCode syntax.
 
+Use a backend-oriented structured typed IR rather than copying the syntax AST or prematurely forcing SSA. Lowering must consume semantic side tables for resolved symbols, concrete callables, overload choices, null state, and canonical Class identity. Make accepted `Int -> Real` widening explicit, normalize named/default arguments to parameter order, distinguish ordinary calls from Class construction, and preserve single-evaluation lvalue targets. Represent post-check `until`, shallow-snapshot `for`, no-fallthrough `state`, and always-run `ultimately` semantics explicitly. Stable IR identities and debug output must not depend on Go pointer addresses or map iteration order. Validate structural IR invariants before any backend consumes the result.
+
 Add golden codegen tests where useful.
 
 ---
