@@ -335,6 +335,26 @@ Vault: Class<Secret> := {
 	requireClean(t, subclass)
 }
 
+func TestCrossModuleStructureAttributeModifiersArePreserved(t *testing.T) {
+	models := `Example: Class<> := {
+    structure: Attributes := (
+        id: Constant Int
+        temporary: Local Int
+    )
+}`
+	_, constant := compileMemory(t, map[string]string{
+		"/Models.ahd": models,
+		"/Main.ahd":   "from Models bring Example\nexample: Example := Example(id: 1, temporary: 9)\nexample.id = 2",
+	}, "/Main.ahd")
+	requireCode(t, constant, "SEM009")
+
+	_, local := compileMemory(t, map[string]string{
+		"/Models.ahd": models,
+		"/Main.ahd":   "from Models bring Example\nexample: Example := Example(id: 1, temporary: 9)\nwrite(example.temporary)",
+	}, "/Main.ahd")
+	requireCode(t, local, "SEM019")
+}
+
 func TestFileResolverCanonicalizesAliases(t *testing.T) {
 	directory := t.TempDir()
 	realPath := filepath.Join(directory, "Main.ahd")

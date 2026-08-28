@@ -143,7 +143,7 @@ func (a *analyzer) analyzeStructure(declaration *ast.StructureDecl, class *Symbo
 		if parameterIndex >= len(callable.Signature.Parameters) {
 			break
 		}
-		if hasModifier(parameter.Modifiers, ast.ModifierGlobal) || hasModifier(parameter.Modifiers, ast.ModifierConstant) {
+		if hasModifier(parameter.Modifiers, ast.ModifierGlobal) {
 			a.error(codeScopeModifier, fmt.Sprintf("structure parameter %q is implicitly Local", parameter.Name), parameter.Span(), "use Local only to exclude a structure parameter from instance attributes")
 		}
 		if _, exists := structureScope.local(parameter.Name); exists {

@@ -104,7 +104,13 @@ func (generator *generator) emitAssign(writer *emitter, value *ir.AssignStmt) {
 			return
 		}
 		nullable := generator.nullFields[value.Target.Field]
-		writer.line(generator.expr(value.Target.Receiver) + "." + generator.fieldName(value.Target.Field) + "_set(" + generator.value(value.Value, field.Type, nullable) + ")")
+		assigned := generator.value(value.Value, field.Type, nullable)
+		if field.Constant {
+			// Constant reference attributes freeze their reachable graph at the
+			// initialization boundary, just like Constant bindings.
+			assigned = "AhdFreeze(" + assigned + ")"
+		}
+		writer.line(generator.expr(value.Target.Receiver) + "." + generator.fieldName(value.Target.Field) + "_set(" + assigned + ")")
 	case ir.IndexTarget:
 		generator.emitIndexAssign(writer, value)
 	default:

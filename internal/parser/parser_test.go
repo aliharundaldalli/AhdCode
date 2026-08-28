@@ -280,7 +280,9 @@ func TestClassesStructureAndMethods(t *testing.T) {
 Student: Class<Person> := {
     structure: Attributes := (
         SuperClass.attributes
-        age: Int
+        age: Constant Int
+        password: Local String
+        secret: Confidential String
     )
     describe: Override Function := () -> String {
         return attribute.name
@@ -296,8 +298,13 @@ Student: Class<Person> := {
 		t.Fatalf("Student Class = %#v", student)
 	}
 	structure := student.Members[0].(*ast.StructureDecl)
-	if len(structure.Parameters) != 2 || !structure.Parameters[0].InheritedAttributes {
+	if len(structure.Parameters) != 4 || !structure.Parameters[0].InheritedAttributes {
 		t.Fatalf("structure parameters = %#v", structure.Parameters)
+	}
+	if !hasModifier(structure.Parameters[1].Modifiers, ast.ModifierConstant) ||
+		!hasModifier(structure.Parameters[2].Modifiers, ast.ModifierLocal) ||
+		!hasModifier(structure.Parameters[3].Modifiers, ast.ModifierConfidential) {
+		t.Fatalf("structure modifiers were not preserved: %#v", structure.Parameters)
 	}
 	method := student.Members[1].(*ast.FunctionDecl)
 	if method.Flavor != ast.FunctionOverride {

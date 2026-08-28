@@ -440,7 +440,7 @@ func (a *analyzer) buildConstructor(declaration *ast.StructureDecl, class *Symbo
 		}
 		memberSymbol := &Symbol{
 			Name: parameter.Name, Kind: MemberSymbol, Type: typeValue, Span: parameter.Span(), InitialNull: nullState,
-			Confidential: hasModifier(parameter.Modifiers, ast.ModifierConfidential), OwnerClass: class.Class,
+			Constant: hasModifier(parameter.Modifiers, ast.ModifierConstant), Confidential: hasModifier(parameter.Modifiers, ast.ModifierConfidential), OwnerClass: class.Class,
 			OriginModuleID: a.environment.ModuleID,
 		}
 		class.Members[parameter.Name] = memberSymbol

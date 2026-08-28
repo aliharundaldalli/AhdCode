@@ -754,7 +754,7 @@ Implement lexical scopes.
 Rules:
 
 - only direct module-root declarations omit a scope modifier;
-- Function and structure parameters are implicitly Local;
+- Function and structure parameters are lexically local automatically; explicit `Local` on a structure parameter instead means constructor-local-only and suppresses the instance attribute. Preserve `Constant` and `Confidential` as generated-attribute modifiers on every non-`Local` structure parameter;
 - `for` variables and `except ... as error` bindings are implicitly Local and scoped to their bodies;
 - every explicit declaration in an executable lexical scope below module root uses `Local`, including module-level control-flow blocks;
 - nested blocks may access enclosing Local bindings in the same callable without `Global`;

@@ -494,6 +494,38 @@ write(point.tag)
 	}
 }
 
+func TestStructureAttributeModifiersReachTypedIR(t *testing.T) {
+	result := lowerSources(t, map[string]string{"/Main.ahd": `Example: Class<> := {
+    structure: Attributes := (
+        id: Constant Int
+        name: String
+        temporary: Local Int
+        secret: Confidential Int
+    )
+}
+`}, "/Main.ahd")
+	current := moduleIR(t, result.Compilation, "Main")
+	if len(current.Classes) != 1 {
+		t.Fatalf("Classes = %#v", current.Classes)
+	}
+	fields := make(map[string]ir.Field)
+	for _, field := range current.Classes[0].Fields {
+		fields[field.Name] = field
+	}
+	if id, ok := fields["id"]; !ok || !id.Constant {
+		t.Fatalf("id field = %#v, want Constant", id)
+	}
+	if name, ok := fields["name"]; !ok || name.Constant {
+		t.Fatalf("name field = %#v, want mutable", name)
+	}
+	if _, exists := fields["temporary"]; exists {
+		t.Fatal("Local structure parameter reached IR as a field")
+	}
+	if secret, ok := fields["secret"]; !ok || !secret.Confidential {
+		t.Fatalf("secret field = %#v, want Confidential", secret)
+	}
+}
+
 func TestGlobalsRecordDeclarationOrder(t *testing.T) {
 	result := lowerSources(t, map[string]string{"/Main.ahd": `zebra: String := "z"
 alpha: String := zebra

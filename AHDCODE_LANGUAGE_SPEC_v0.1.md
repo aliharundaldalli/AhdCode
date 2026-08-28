@@ -716,7 +716,7 @@ Using either form with a `Real` or any non-`Int` value is a compile-time type er
 
 ### 9.1 Parameters
 
-Function and structure parameters are local automatically and do not use the `Local` modifier at the binding site. A `for` iteration variable and an `except ... as error` binding are also implicitly Local.
+Function and structure parameters are lexically local automatically. Function parameters do not use the `Local` modifier at the binding site. On a structure parameter, explicit `Local` has a separate Class-layout meaning: the constructor input remains lexically local but does not become an instance attribute. A `for` iteration variable and an `except ... as error` binding are also implicitly Local.
 
 ### 9.2 Local declarations
 
@@ -1263,6 +1263,8 @@ structure: Attributes := (
 ```
 
 All non-`Local` entries automatically become instance attributes.
+
+`Constant` and `Confidential` on a non-`Local` structure entry apply to the generated instance attribute; they are not lexical-scope modifiers. A Constant reference attribute deep-freezes its reachable object graph when the constructor initializes it. `Global` is not valid on a structure parameter.
 
 Class methods use:
 
