@@ -729,10 +729,11 @@ func (generator *generator) builtinCall(value *ir.CallExpr) string {
 		}
 		return "AhdWrite(" + generator.text(argument(0)) + ")"
 	case "take":
+		// The two public forms stay distinct: take() writes no prompt at all.
 		if argument(0) == nil {
-			return `AhdTake("", false)`
+			return "AhdTake()"
 		}
-		return "AhdTake(" + generator.value(argument(0), ir.Type{Kind: ir.StringType}, false) + ", true)"
+		return "AhdTakePrompt(" + generator.value(argument(0), ir.Type{Kind: ir.StringType}, false) + ")"
 	case "len":
 		return generator.length(argument(0), meta.Span)
 	case "clear":

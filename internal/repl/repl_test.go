@@ -98,3 +98,34 @@ func TestNumericConversionsAndPowerUseTheSharedPipeline(t *testing.T) {
 		t.Fatalf("REPL errors:\n%s", errors.String())
 	}
 }
+
+// TestTakeInsideTheSessionSeesEndOfInput pins the v0.1 REPL decision: each
+// replay runs with an isolated, already-exhausted runtime input, so take never
+// consumes the session's own command stream.
+func TestTakeInsideTheSessionSeesEndOfInput(t *testing.T) {
+	input := strings.Join([]string{
+		`name: String := take("Name: ")`,
+		`write("[{name}]")`,
+		`write(len(name))`,
+		"this line must stay a REPL command",
+		"",
+	}, "\n")
+	var output, errors bytes.Buffer
+	Run(strings.NewReader(input), &output, &errors, "AhdCode v0.1")
+	text := output.String()
+	// The prompt is written, and the read reaches end of input immediately, so
+	// the session yields an empty String rather than the next command.
+	if !strings.Contains(text, "Name: ") {
+		t.Fatalf("the take prompt was not written: %q", text)
+	}
+	if !strings.Contains(text, "[]") {
+		t.Fatalf("take inside the REPL did not read an empty String: %q", text)
+	}
+	if !strings.Contains(text, "\n0\n") && !strings.Contains(text, "> 0\n") {
+		t.Fatalf("the String read inside the REPL was not empty: %q", text)
+	}
+	// The following line is still treated as a command, not as program input.
+	if !strings.Contains(errors.String(), "error") {
+		t.Fatalf("a later REPL line was consumed as program input: %q", errors.String())
+	}
+}

@@ -648,12 +648,7 @@ func (a *analyzer) analyzeBuiltinCall(call *ast.CallExpr, symbol *Symbol, argume
 		}
 		return expressionInfo{typeValue: types.Nothing, nullState: NonNull}
 	case "take":
-		if len(arguments) > 1 {
-			a.error(codeCallArguments, fmt.Sprintf("take expects at most 1 prompt argument; received %d", len(arguments)), call.Span(), "call take() or take(prompt)")
-		} else if len(arguments) == 1 && !arguments[0].invalid() && arguments[0].typeValue.Kind() != types.StringKind {
-			a.typeMismatch(call.Arguments[0].Span(), types.String, arguments[0].typeValue, "take prompt")
-		}
-		return expressionInfo{typeValue: types.String, nullState: NonNull}
+		return a.analyzeTakeCall(call, arguments)
 	case "str":
 		if len(arguments) != 1 {
 			a.error(codeCallArguments, fmt.Sprintf("str expects 1 argument; received %d", len(arguments)), call.Span(), "pass exactly one non-Nothing value")
@@ -751,6 +746,36 @@ func (a *analyzer) analyzeClearCall(call *ast.CallExpr, arguments []expressionIn
 		a.error(codeConstantAssignment, fmt.Sprintf("cannot clear Constant %q", target.Name), call.Arguments[0].Span(), "clear mutates the collection in place; declare it without Constant")
 	}
 	return expressionInfo{typeValue: types.Nothing, nullState: NonNull}
+}
+
+// analyzeTakeCall checks the terminal input built-in. Its two forms are
+// take() -> String and take(prompt: String) -> String; the returned text is
+// never parsed or coerced into another type.
+func (a *analyzer) analyzeTakeCall(call *ast.CallExpr, arguments []expressionInfo) expressionInfo {
+	result := expressionInfo{typeValue: types.String, nullState: NonNull}
+	if len(arguments) > 1 {
+		a.error(codeCallArguments, fmt.Sprintf("take expects at most 1 prompt argument; received %d", len(arguments)), call.Span(), "call take() or take(prompt)")
+		return result
+	}
+	if len(arguments) == 0 {
+		return result
+	}
+	if call.Arguments[0].Name != "" {
+		a.error(codeCallArguments, "take does not accept a named argument", call.Arguments[0].Span(), "pass the prompt positionally")
+		return result
+	}
+	prompt := arguments[0]
+	if prompt.invalid() {
+		return result
+	}
+	if prompt.nullState != NonNull {
+		a.nullableError("take prompt", call.Arguments[0].Value, prompt.nullState)
+		return result
+	}
+	if prompt.typeValue.Kind() != types.StringKind {
+		a.typeMismatch(call.Arguments[0].Span(), types.String, prompt.typeValue, "take prompt")
+	}
+	return result
 }
 
 // renderable reports whether a value has canonical str text. Nothing is not a

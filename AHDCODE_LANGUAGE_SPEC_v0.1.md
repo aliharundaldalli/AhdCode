@@ -2108,13 +2108,58 @@ Core slicing has no step syntax. Stepped selection belongs in a library function
 
 ## 35. Core Terminal I/O
 
-Input:
+### 35.1 take
+
+`take` is the terminal input function. It has exactly two forms:
+
+```text
+take()               -> String
+take(prompt: String) -> String
+```
+
+Both read exactly one line from standard input and return it as a `String`.
+
+```ahd
+name: String := take()
+```
 
 ```ahd
 name: String := take("Name: ")
 ```
 
-Output:
+The prompt form writes the prompt first, without adding a newline of its own,
+and the prompt is visible before the program blocks for input. The prompt is
+never part of the returned text. The prompt argument must be a `NonNull`
+`String`.
+
+The returned `String` excludes the line terminator, in both the `LF` and `CRLF`
+forms. Ordinary whitespace inside the entered text is preserved:
+
+| stdin | result |
+|---|---|
+| `Ali\n` | `"Ali"` |
+| `  Ali  \n` | `"  Ali  "` |
+| `\n` | `""` |
+| end of input | `""` |
+
+`take` never parses or converts what it reads. AhdCode stays strictly typed, so
+numeric input goes through the ordinary conversions:
+
+```ahd
+age: Int := int(take("Age: "))
+value: Real := real(take())
+```
+
+This is invalid, because a `String` is not implicitly an `Int`:
+
+```ahd
+age: Int := take()
+```
+
+`take` is the only terminal input function in v0.1. There is no `takeInt`,
+`takeReal`, `input`, or `readLine`.
+
+### 35.2 write
 
 ```ahd
 write("Hello {name}")

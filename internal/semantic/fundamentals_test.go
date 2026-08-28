@@ -180,3 +180,51 @@ func TestWriteAndTakeArity(t *testing.T) {
 		})
 	}
 }
+
+// TestTakeFormsAndPromptRules covers the v0.1 terminal input contract:
+// take() -> String and take(prompt: String) -> String, with no implicit
+// conversion of the text that is read.
+func TestTakeFormsAndPromptRules(t *testing.T) {
+	tests := []struct {
+		name string
+		text string
+		code string
+	}{
+		{"take with no prompt", "text: String := take()", ""},
+		{"take with a prompt", `text: String := take("Text: ")`, ""},
+		{"take with an interpolated prompt", "label: String := \"Name\"\ntext: String := take(\"{label}: \")", ""},
+		{"take with a String binding prompt", "label: String := \"Name: \"\ntext: String := take(label)", ""},
+		{"int of take", "number: Int := int(take())", ""},
+		{"int of a prompted take", `number: Int := int(take("Number: "))`, ""},
+		{"real of take", "decimal: Real := real(take())", ""},
+		{"take does not yield Int", "number: Int := take()", codeTypeMismatch},
+		{"take does not yield Real", "decimal: Real := take()", codeTypeMismatch},
+		{"take does not yield Bool", "flag: Bool := take()", codeTypeMismatch},
+		{"an Int prompt is rejected", "text: String := take(5)", codeTypeMismatch},
+		{"a Bool prompt is rejected", "text: String := take(true)", codeTypeMismatch},
+		{"a List prompt is rejected", "text: String := take([1])", codeTypeMismatch},
+		{"two prompts are rejected", `text: String := take("A", "B")`, codeCallArguments},
+		{"a named prompt is rejected", `text: String := take(prompt: "A")`, codeCallArguments},
+		{"a null prompt is rejected", "text: String := take(null)", codeNullableUse},
+		{"a nullable prompt binding is rejected", "prompt: String := null\ntext: String := take(prompt)", codeNullableUse},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			_, result := analyzeText(t, test.text)
+			if test.code == "" {
+				requireSemanticClean(t, result)
+				return
+			}
+			requireSemanticCode(t, result, test.code)
+		})
+	}
+}
+
+// TestNullableTakePromptIsReportedOnce keeps the null-state rejection a single
+// focused diagnostic.
+func TestNullableTakePromptIsReportedOnce(t *testing.T) {
+	_, result := analyzeText(t, "prompt: String := null\ntext: String := take(prompt)")
+	if len(result.Diagnostics) != 1 {
+		t.Fatalf("expected exactly one diagnostic; received %+v", result.Diagnostics)
+	}
+}

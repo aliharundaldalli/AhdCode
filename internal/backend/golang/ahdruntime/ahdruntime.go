@@ -317,20 +317,26 @@ func AhdWrite(text string) {
 	_ = ahdOut.WriteByte('\n')
 }
 
-// AhdTake writes an optional prompt and reads one line of terminal input. The
-// line terminator is removed. End of input yields an empty String.
-func AhdTake(prompt string, hasPrompt bool) string {
-	if hasPrompt {
-		_, _ = ahdOut.WriteString(prompt)
-	}
+// AhdTake reads one line of terminal input.
+func AhdTake() string { return ahdReadLine() }
+
+// AhdTakePrompt writes a prompt, without adding a newline, and then reads one
+// line of terminal input. The prompt is never part of the returned String.
+func AhdTakePrompt(prompt string) string {
+	_, _ = ahdOut.WriteString(prompt)
+	return ahdReadLine()
+}
+
+// ahdReadLine is the single terminal read behind both take forms. Pending
+// output is flushed first so a prompt is visible before the process blocks.
+// Only the line terminator is removed, in both the LF and CRLF forms; ordinary
+// whitespace in the entered text is preserved. End of input yields an empty
+// String.
+func ahdReadLine() string {
 	AhdFlush()
-	line, err := ahdIn.ReadString('\n')
+	line, _ := ahdIn.ReadString('\n')
 	line = strings.TrimSuffix(line, "\n")
-	line = strings.TrimSuffix(line, "\r")
-	if err != nil && line == "" {
-		return ""
-	}
-	return line
+	return strings.TrimSuffix(line, "\r")
 }
 
 // ---------------------------------------------------------------------------

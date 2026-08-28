@@ -1334,6 +1334,27 @@ Matrix
 Complex
 ```
 
+## take
+
+`take` has exactly two public forms, `take() -> String` and
+`take(prompt: String) -> String`, checked through the ordinary builtin call
+path: at most one argument, positional only, and a `NonNull` `String` prompt.
+The returned text is never implicitly converted, so numeric input is written as
+`int(take(...))` or `real(take(...))`.
+
+Both forms share one runtime read. `AhdTake` and `AhdTakePrompt` delegate to
+`ahdReadLine`, which flushes pending output before reading so a prompt cannot
+sit in an unflushed buffer while the process blocks, reads one line from the
+shared stdin reader, and removes only the terminator in its `LF` and `CRLF`
+forms. Ordinary whitespace is preserved and end of input yields an empty
+String. The two forms stay distinct in generated code: `take()` writes no
+prompt at all rather than writing an empty one.
+
+The v0.1 REPL gives each replay an isolated, already-exhausted runtime input,
+so `take` inside a session reads end of input instead of consuming the next
+REPL command. That is a deliberate decision of the replay architecture, not a
+limitation of `take`.
+
 ## between
 
 Python range semantics, name is `between`. Implemented in v0.1 as a predeclared

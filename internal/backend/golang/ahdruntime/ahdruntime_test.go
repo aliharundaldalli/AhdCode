@@ -1,6 +1,7 @@
 package ahdruntime
 
 import (
+	"bufio"
 	"math"
 	"runtime"
 	"strings"
@@ -574,4 +575,83 @@ func ahdHeapInUse() uint64 {
 	var stats runtime.MemStats
 	runtime.ReadMemStats(&stats)
 	return stats.HeapInuse
+}
+
+// withTerminal redirects the runtime terminal streams for one read, so the two
+// take forms can be exercised directly.
+func withTerminal(t *testing.T, input string, body func()) string {
+	t.Helper()
+	previousIn, previousOut := ahdIn, ahdOut
+	var captured strings.Builder
+	ahdIn = bufio.NewReader(strings.NewReader(input))
+	ahdOut = bufio.NewWriter(&captured)
+	defer func() {
+		ahdIn, ahdOut = previousIn, previousOut
+	}()
+	body()
+	AhdFlush()
+	return captured.String()
+}
+
+func TestTakeReadsOneLine(t *testing.T) {
+	cases := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{"an LF terminator is removed", "Ali\n", "Ali"},
+		{"a CRLF terminator is removed", "Ali\r\n", "Ali"},
+		{"ordinary whitespace is preserved", "  Ali\t \n", "  Ali\t "},
+		{"an empty line yields an empty String", "\n", ""},
+		{"end of input yields an empty String", "", ""},
+		{"a final line without a terminator is read", "Ali", "Ali"},
+		{"only the first line is read", "one\ntwo\n", "one"},
+	}
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			var value string
+			written := withTerminal(t, testCase.input, func() { value = AhdTake() })
+			if value != testCase.expected {
+				t.Fatalf("take read %q; want %q", value, testCase.expected)
+			}
+			if written != "" {
+				t.Fatalf("take without a prompt wrote %q", written)
+			}
+		})
+	}
+}
+
+func TestTakePromptWritesWithoutANewline(t *testing.T) {
+	var value string
+	written := withTerminal(t, "Ali\n", func() { value = AhdTakePrompt("Name: ") })
+	if written != "Name: " {
+		t.Fatalf("prompt output was %q", written)
+	}
+	if value != "Ali" {
+		t.Fatalf("prompted take read %q", value)
+	}
+	// The prompt is never part of the returned text.
+	if strings.Contains(value, "Name") {
+		t.Fatal("the prompt leaked into the returned String")
+	}
+}
+
+func TestConsecutiveTakesReadConsecutiveLines(t *testing.T) {
+	var first, second, third string
+	withTerminal(t, "one\ntwo\n", func() {
+		first, second, third = AhdTake(), AhdTake(), AhdTake()
+	})
+	if first != "one" || second != "two" || third != "" {
+		t.Fatalf("consecutive reads were %q, %q, %q", first, second, third)
+	}
+}
+
+func TestTakeFlushesPendingOutputBeforeReading(t *testing.T) {
+	written := withTerminal(t, "x\n", func() {
+		AhdWrite("before")
+		_ = AhdTakePrompt("Prompt: ")
+	})
+	if written != "before\nPrompt: " {
+		t.Fatalf("terminal output was %q", written)
+	}
 }
