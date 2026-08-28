@@ -146,7 +146,7 @@ func (a *analyzer) installBuiltins() {
 	a.classes[errorSymbol.Name] = errorSymbol
 	a.classByType[objectType] = object
 	a.classByType[errorType] = errorSymbol
-	for _, name := range []string{"write", "str"} {
+	for _, name := range []string{"write", "take", "str", "len", "clear"} {
 		a.addBuiltin(&Symbol{Name: name, Kind: BuiltinSymbol, Type: types.Function{}, ModuleRoot: true, Builtin: true, InitialNull: NonNull})
 	}
 }

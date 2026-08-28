@@ -1,0 +1,215 @@
+package build
+
+import (
+	"errors"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
+
+	backend "ahdcode/internal/backend/golang"
+	"ahdcode/internal/diagnostics"
+	"ahdcode/internal/ir"
+	"ahdcode/internal/lowering"
+	"ahdcode/internal/module"
+	"ahdcode/internal/source"
+)
+
+// Result carries every stage's outcome for one compilation.
+type Result struct {
+	Compilation *module.CompilationResult
+	IR          *ir.Compilation
+	Program     *backend.GeneratedProgram
+	Diagnostics []diagnostics.Diagnostic
+	Files       map[source.FileID]source.File
+}
+
+// HasErrors reports whether compilation failed.
+func (result Result) HasErrors() bool {
+	for _, item := range result.Diagnostics {
+		if item.Severity == diagnostics.SeverityError {
+			return true
+		}
+	}
+	return false
+}
+
+// Compile runs the full frontend, lowering, IR validation, and Go generation
+// chain for one entry module. Each stage consumes the previous stage's
+// decisions instead of repeating them.
+func Compile(entryPath string) Result {
+	compiler := module.NewCompiler(module.FileResolver{}, module.FileLoader{})
+	compilation := compiler.Compile(entryPath)
+	result := Result{Compilation: &compilation, Files: make(map[source.FileID]source.File)}
+	for _, current := range compilation.Modules {
+		if current != nil && current.File.ID != 0 {
+			result.Files[current.File.ID] = current.File
+		}
+	}
+	for _, item := range compilation.Diagnostics {
+		result.Diagnostics = append(result.Diagnostics, item.Diagnostic)
+	}
+	if compilation.HasErrors() {
+		return result
+	}
+	lowered := lowering.LowerCompilation(compilation)
+	result.Diagnostics = append(result.Diagnostics, lowered.Diagnostics...)
+	if lowered.HasErrors() || lowered.Compilation == nil {
+		return result
+	}
+	result.IR = lowered.Compilation
+	program, generated := backend.Generate(lowered.Compilation)
+	result.Diagnostics = append(result.Diagnostics, generated...)
+	if result.HasErrors() {
+		return result
+	}
+	result.Program = program
+	return result
+}
+
+// Workspace is a controlled temporary directory holding one generated Go
+// program. Generated sources never touch the user's source tree.
+type Workspace struct {
+	Directory string
+	toolchain string
+}
+
+const workspaceModule = "module ahdcodeprogram\n\ngo 1.25\n"
+
+// NewWorkspace materializes a generated program in a private directory.
+func NewWorkspace(program *backend.GeneratedProgram) (*Workspace, []diagnostics.Diagnostic) {
+	toolchain, err := FindGoToolchain()
+	if err != nil {
+		return nil, []diagnostics.Diagnostic{{
+			Code: backend.CodeMissingToolchain, Severity: diagnostics.SeverityError,
+			Message: "the Go toolchain is required to build AhdCode programs: " + err.Error(),
+			Hint:    "install Go and make the go command reachable from PATH",
+		}}
+	}
+	directory, err := os.MkdirTemp("", "ahdcode-build-")
+	if err != nil {
+		return nil, []diagnostics.Diagnostic{workspaceFailure("could not create a temporary build workspace: " + err.Error())}
+	}
+	workspace := &Workspace{Directory: directory, toolchain: toolchain}
+	if err := os.WriteFile(filepath.Join(directory, "go.mod"), []byte(workspaceModule), 0o600); err != nil {
+		workspace.Close()
+		return nil, []diagnostics.Diagnostic{workspaceFailure("could not write the generated go.mod: " + err.Error())}
+	}
+	for _, file := range program.Files {
+		if err := os.WriteFile(filepath.Join(directory, file.Name), []byte(file.Content), 0o600); err != nil {
+			workspace.Close()
+			return nil, []diagnostics.Diagnostic{workspaceFailure("could not write generated source " + file.Name + ": " + err.Error())}
+		}
+	}
+	return workspace, nil
+}
+
+func workspaceFailure(message string) diagnostics.Diagnostic {
+	return diagnostics.Diagnostic{
+		Code: backend.CodeWorkspaceFailure, Severity: diagnostics.SeverityError, Message: message,
+		Hint: "check the temporary directory permissions and available disk space",
+	}
+}
+
+// Close removes the temporary workspace.
+func (workspace *Workspace) Close() {
+	if workspace == nil || workspace.Directory == "" {
+		return
+	}
+	_ = os.RemoveAll(workspace.Directory)
+}
+
+// BuildExecutable compiles the generated program to a native executable.
+// Process arguments are passed directly; no shell interpolation occurs.
+func (workspace *Workspace) BuildExecutable(outputPath string) []diagnostics.Diagnostic {
+	absolute, err := filepath.Abs(outputPath)
+	if err != nil {
+		return []diagnostics.Diagnostic{workspaceFailure("could not resolve the output path: " + err.Error())}
+	}
+	command := exec.Command(workspace.toolchain, "build", "-trimpath", "-o", absolute, ".")
+	command.Dir = workspace.Directory
+	command.Env = append(os.Environ(), "GOTOOLCHAIN=local")
+	output, err := command.CombinedOutput()
+	if err == nil {
+		return nil
+	}
+	message := strings.TrimSpace(string(output))
+	if message == "" {
+		message = err.Error()
+	}
+	return []diagnostics.Diagnostic{{
+		Code: backend.CodeBuildFailure, Severity: diagnostics.SeverityError,
+		Message: "go build failed for the generated program:\n" + message,
+		Hint:    "this is a code generation defect; report the failing AhdCode program",
+	}}
+}
+
+// DefaultOutputPath is the conventional executable name for an entry module.
+func DefaultOutputPath(entryPath string) string {
+	base := filepath.Base(entryPath)
+	name := strings.TrimSuffix(base, filepath.Ext(base))
+	if name == "" {
+		name = "program"
+	}
+	directory, err := os.Getwd()
+	if err != nil {
+		return name
+	}
+	return filepath.Join(directory, name)
+}
+
+// BuildProgram compiles one entry module into a native executable at
+// outputPath. An empty outputPath uses the conventional default.
+func BuildProgram(entryPath, outputPath string) (string, Result) {
+	result := Compile(entryPath)
+	if result.HasErrors() || result.Program == nil {
+		return "", result
+	}
+	if outputPath == "" {
+		outputPath = DefaultOutputPath(entryPath)
+	}
+	workspace, failures := NewWorkspace(result.Program)
+	if len(failures) != 0 {
+		result.Diagnostics = append(result.Diagnostics, failures...)
+		return "", result
+	}
+	defer workspace.Close()
+	result.Diagnostics = append(result.Diagnostics, workspace.BuildExecutable(outputPath)...)
+	if result.HasErrors() {
+		return "", result
+	}
+	return outputPath, result
+}
+
+// RunProgram builds one entry module into a temporary executable and runs it,
+// propagating its standard streams and exit code.
+func RunProgram(entryPath string, arguments []string, stdin *os.File, stdout, stderr *os.File) (int, Result) {
+	result := Compile(entryPath)
+	if result.HasErrors() || result.Program == nil {
+		return 1, result
+	}
+	workspace, failures := NewWorkspace(result.Program)
+	if len(failures) != 0 {
+		result.Diagnostics = append(result.Diagnostics, failures...)
+		return 1, result
+	}
+	defer workspace.Close()
+	executable := filepath.Join(workspace.Directory, "ahdcode-program")
+	result.Diagnostics = append(result.Diagnostics, workspace.BuildExecutable(executable)...)
+	if result.HasErrors() {
+		return 1, result
+	}
+	command := exec.Command(executable, arguments...)
+	command.Stdin = stdin
+	command.Stdout = stdout
+	command.Stderr = stderr
+	if err := command.Run(); err != nil {
+		var exit *exec.ExitError
+		if errors.As(err, &exit) {
+			return exit.ExitCode(), result
+		}
+		result.Diagnostics = append(result.Diagnostics, workspaceFailure("could not run the generated executable: "+err.Error()))
+		return 1, result
+	}
+	return 0, result
+}

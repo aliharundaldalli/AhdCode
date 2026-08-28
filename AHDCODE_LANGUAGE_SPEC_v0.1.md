@@ -1701,14 +1701,20 @@ write
 take
 ```
 
-Planned early Fundamentals functions include:
+Available Fundamentals functions:
 
 ```text
 str
+len
+clear
+```
+
+Planned early Fundamentals functions include:
+
+```text
 int
 real
 bool
-len
 max
 min
 sum
@@ -1779,6 +1785,79 @@ A named Function value is represented as:
 ```
 
 `Nothing` is not accepted by `str`.
+
+### 34.2 len
+
+`len` reports the size of a sized value.
+
+```text
+len(String)     -> Int
+len(List<T>)    -> Int
+len(Pair<K,V>)  -> Int
+```
+
+`len(String)` counts characters, not bytes. `len(List<T>)` counts elements and `len(Pair<K,V>)` counts entries.
+
+`len` does not accept scalar numeric types, `Bool`, `Class` instances, `Function` values, or `Nothing`. A nullable value must be `NonNull` before `len` is applied.
+
+```ahd
+write(len("añb"))
+```
+
+=> `3`
+
+### 34.3 clear
+
+`clear` empties a collection in place.
+
+```text
+clear(List<T>)    -> Nothing
+clear(Pair<K,V>)  -> Nothing
+```
+
+`clear` does not create a new object. Object identity is unchanged, so every alias of the collection observes the emptied state.
+
+```ahd
+a: List<Int> := [1, 2, 3]
+b: List<Int> := a
+
+clear(a)
+
+write(len(b))
+```
+
+=> `0`
+
+The same reference semantics apply to `Pair`:
+
+```ahd
+scores: Pair<String, Int> := {
+    "Ali": 85
+}
+
+alias: Pair<String, Int> := scores
+
+clear(scores)
+
+write(len(alias))
+```
+
+=> `0`
+
+`clear` does not accept `String`, scalar types, `Class` instances, `Function` values, `null`, or `Nothing`. Strings are immutable, so an empty String is produced by rebinding rather than by `clear`.
+
+A nullable `List` or `Pair` must be `NonNull` before `clear` is applied.
+
+Clearing a directly known `Constant` target is a compile-time mutation error, because `clear` mutates the collection rather than rebinding it:
+
+```ahd
+values: Constant List<Int> := [1, 2, 3]
+clear(values)
+```
+
+is invalid.
+
+`clear` returns `Nothing`, so its result cannot be bound or used as a value.
 
 Planned later Fundamentals/data-structure features may include:
 

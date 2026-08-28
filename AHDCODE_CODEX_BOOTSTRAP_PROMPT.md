@@ -1412,6 +1412,89 @@ Use a backend-oriented structured typed IR rather than copying the syntax AST or
 
 Add golden codegen tests where useful.
 
+## Implemented Go backend architecture (Milestone G)
+
+The Go backend is an implementation detail. None of the representations below are AhdCode language surface and none of them belong in the public specification.
+
+```text
+ir.Compilation
+      |
+      v
+internal/backend/golang.Generate
+      |
+      v
+GeneratedProgram (ahdcode_program.go + ahdcode_runtime.go)
+      |
+      v
+internal/build temporary workspace
+      |
+      v
+go build
+      |
+      v
+native executable
+```
+
+`internal/backend/golang/ahdruntime` holds the runtime as an ordinary compiled Go package, so the repository's own `go build`, `go vet`, and tests check it. Its source is embedded verbatim and emitted into every generated program with only its package clause rewritten to `main`. The runtime depends on the Go standard library alone.
+
+### Deterministic name mangling
+
+Generated identifiers are derived from stable IR identities, never from raw AhdCode spelling:
+
+```text
+gv_<readable>_<digest>   module global
+lv_<readable>_<digest>   local, parameter, receiver, iteration binding
+fn_<readable>_<digest>   Function and method
+ct_<readable>_<digest>   constructor
+Cl_<readable>_<digest>   Class struct
+Fd_<readable>_<digest>   Class field
+md_<readable>_<digest>   module initialization
+```
+
+The readable fragment is decorative and ASCII-filtered; uniqueness comes from a 64-bit FNV-1a digest of the full `ModuleID`/`SymbolID`/`CallableID`/`ClassID`/`FieldID`. A Go keyword, a Unicode identifier, or a cross-module name collision therefore cannot corrupt the generated program. Every runtime identifier is prefixed `Ahd`, which no mangled identifier can produce.
+
+### Type representation
+
+```text
+Int          -> int64
+Real         -> float64
+String       -> string
+Bool         -> bool
+Nothing      -> no value
+List<E>      -> *AhdList[rep(E, nullable)]
+Pair<K,V>    -> *AhdPair[rep(K, non-null), rep(V, nullable)]
+Class C      -> *Cl_C
+Function sig -> func(...) ...
+```
+
+A scalar storage slot is boxed as `*T` when its declaration allows null, or when any assignment in the compilation stores a possibly-null value into it. Reference types are already nil-able, so both representations coincide. Collection elements and Pair values always use the nullable representation because element access is `MaybeNull` in the frontend null-state model; Pair keys are never null.
+
+Function parameters and results use the non-null representation, because `ir.Signature` carries no per-parameter or return null-state. A concrete Function whose parameter or return is nullable is reported as an unsupported backend node rather than miscompiled.
+
+### Runtime semantics preserved by helpers
+
+- checked `Int` arithmetic with overflow, modulo-by-zero, and negative-exponent errors;
+- `Real` arithmetic that rejects division by zero and non-finite or undefined results instead of exposing `Inf`/`NaN`;
+- `AhdList`, pointer-backed so `clear` and indexed writes are observed by every alias;
+- `AhdPair`, insertion-ordered, where updating an existing key keeps its position and re-adding a removed key appends;
+- shallow iteration snapshots for `for` over List elements, String characters, and Pair keys;
+- canonical `str` rendering, including quoted nested Strings and `<ClassName>` instance text;
+- character-based String indexing, slicing, and `len`.
+
+Implementation decisions that the specification leaves open are: `%` follows truncated (dividend-signed) remainder semantics; `take` returns the input line without its terminator and yields an empty String at end of input; `same` on `List` and `Pair` compares object identity.
+
+### Control flow
+
+`until` is emitted as a Go loop whose condition is checked at the top of every iteration after the first, so the body always runs once and `continue` still reaches the condition check. `state` evaluates its subject into one temporary and lowers to a `switch` without fall-through. Compound assignment and `++`/`--` evaluate their receiver and index exactly once through explicit temporaries.
+
+### Backend diagnostics
+
+`BCK001` unsupported IR node, `BCK002` invalid runtime representation, `BCK003` code generation failure, `BCK004` generated-source formatting failure, `BCK005` `go build` failure, `BCK006` missing Go toolchain, `BCK007` build workspace failure. A backend never panics, never emits a silently wrong program, and never silently ignores a node it cannot lower.
+
+### Build pipeline
+
+`internal/build` discovers the Go toolchain through `PATH` first and only then through well-known install locations, materializes the generated program in a private temporary workspace with its own `go.mod`, and invokes `go build` through argument-safe process invocation with no shell string concatenation. The workspace is removed afterwards and the user's source tree is never written to.
+
 ---
 
 # PHASE 24 — REPL

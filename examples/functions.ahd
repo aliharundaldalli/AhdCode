@@ -1,0 +1,19 @@
+add: Function := (
+    a: Int
+    b: Int
+) -> Int {
+    return a + b
+}
+
+factorial: Function := (
+    n: Int
+) -> Int {
+    if n <= 1 {
+        return 1
+    }
+
+    return n * factorial(n - 1)
+}
+
+write(add(5, 7))
+write(factorial(10))

@@ -113,6 +113,11 @@ func chooseExpected(expected, fallback ir.Type) ir.Type {
 }
 
 func (lowerer *moduleLowerer) lowerIdentifier(identifier *ast.IdentifierExpr, base ir.ExprBase) ir.Expr {
+	// The implicit attribute receiver is a Class-callable binding rather than a
+	// declared Symbol, so it is resolved before the ordinary Symbol lookup.
+	if identifier.Name == "attribute" && lowerer.currentReceiver != "" {
+		return &ir.LoadExpr{ExprBase: ir.ExprBase{Span: identifier.Span(), Type: ir.Type{Kind: ir.ClassType, Class: lowerer.currentOwner}, NullState: ir.NonNull}, Symbol: lowerer.currentReceiver}
+	}
 	symbol := lowerer.semantic.ResolvedSymbols[identifier]
 	if symbol == nil {
 		lowerer.compilation.error(CodeMissingSemantic, "identifier has no resolved Symbol", identifier.Span())
@@ -123,9 +128,6 @@ func (lowerer *moduleLowerer) lowerIdentifier(identifier *ast.IdentifierExpr, ba
 	}
 	if base.Type.Kind == ir.FunctionType && base.Type.Signature == nil && symbol.Callable != nil {
 		base.Type.Signature = lowerSignature(symbol.Callable.Signature)
-	}
-	if identifier.Name == "attribute" && lowerer.currentReceiver != "" {
-		return &ir.LoadExpr{ExprBase: ir.ExprBase{Span: identifier.Span(), Type: ir.Type{Kind: ir.ClassType, Class: lowerer.currentOwner}, NullState: ir.NonNull}, Symbol: lowerer.currentReceiver}
 	}
 	if symbol.Kind == semantic.ClassSymbol && symbol.Class != nil {
 		return &ir.ClassRefExpr{ExprBase: base, Class: classID(symbol.Class)}
@@ -144,6 +146,9 @@ func (lowerer *moduleLowerer) lowerIdentifier(identifier *ast.IdentifierExpr, ba
 
 func (lowerer *moduleLowerer) lowerBinary(expression *ast.BinaryExpr, base ir.ExprBase) ir.Expr {
 	var left, right ir.Expr
+	if expression.Operator == "has" || expression.Operator == "has not" {
+		return lowerer.lowerMemberDesignator(expression, base)
+	}
 	if isNullAST(expression.Left) {
 		right = lowerer.lowerExpr(expression.Right)
 		left = lowerer.lowerExprExpected(expression.Left, right.ExprMeta().Type)
@@ -154,11 +159,43 @@ func (lowerer *moduleLowerer) lowerBinary(expression *ast.BinaryExpr, base ir.Ex
 		left = lowerer.lowerExpr(expression.Left)
 		right = lowerer.lowerExpr(expression.Right)
 	}
+	if left == nil || right == nil {
+		lowerer.compilation.error(CodeUnsupportedNode, "binary operand did not lower to a typed expression", expression.Span())
+		return nil
+	}
 	leftType, rightType := left.ExprMeta().Type, right.ExprMeta().Type
 	op := typedBinaryOp(expression.Operator, leftType, rightType, base.Type)
 	if needsRealOperands(expression.Operator, leftType, rightType, base.Type) {
 		left = explicitWiden(left)
 		right = explicitWiden(right)
+	}
+	return &ir.BinaryExpr{ExprBase: base, Op: op, Left: left, Right: right}
+}
+
+// lowerMemberDesignator keeps the has/has not right operand as the resolved
+// member name decided by semantic analysis instead of a lexical binding load.
+func (lowerer *moduleLowerer) lowerMemberDesignator(expression *ast.BinaryExpr, base ir.ExprBase) ir.Expr {
+	left := lowerer.lowerExpr(expression.Left)
+	if left == nil {
+		lowerer.compilation.error(CodeUnsupportedNode, "has operand did not lower to a typed expression", expression.Span())
+		return nil
+	}
+	var right ir.Expr
+	if identifier, ok := expression.Right.(*ast.IdentifierExpr); ok {
+		right = &ir.LiteralExpr{
+			ExprBase: ir.ExprBase{Span: identifier.Span(), Type: ir.Type{Kind: ir.StringType}, NullState: ir.NonNull},
+			Kind:     ir.StringLiteral, Value: identifier.Name,
+		}
+	} else {
+		right = lowerer.lowerExpr(expression.Right)
+	}
+	if right == nil {
+		lowerer.compilation.error(CodeUnsupportedNode, "has member designator did not lower", expression.Span())
+		return nil
+	}
+	op := ir.BinaryOp("Has")
+	if expression.Operator == "has not" {
+		op = "HasNot"
 	}
 	return &ir.BinaryExpr{ExprBase: base, Op: op, Left: left, Right: right}
 }
@@ -195,9 +232,11 @@ func needsRealOperands(operator string, left, right, result ir.Type) bool {
 	return false
 }
 
+// isComparison excludes same on purpose: same is strict type plus value, so
+// widening its operands would change the result.
 func isComparison(operator string) bool {
 	switch operator {
-	case "<", "<=", ">", ">=", "==", "!=", "same":
+	case "<", "<=", ">", ">=", "==", "!=":
 		return true
 	}
 	return false
@@ -234,6 +273,9 @@ func typedBinaryOp(operator string, left, right, result ir.Type) ir.BinaryOp {
 	case "+":
 		if result.Kind == ir.StringType {
 			return "StringConcat"
+		}
+		if result.Kind == ir.ListType {
+			return "ListConcat"
 		}
 		if numeric == "Int" {
 			return "CheckedIntAdd"
@@ -323,6 +365,12 @@ func (lowerer *moduleLowerer) lowerCall(call *ast.CallExpr, base ir.ExprBase) ir
 		symbol = symbol.Alias
 	}
 	if symbol != nil && symbol.Builtin && symbol.Name == "str" && len(call.Arguments) == 1 {
+		// str(null) is normative and has no declared type context to lower, so
+		// the specified canonical text is folded here rather than guessed by a
+		// backend.
+		if isNullAST(call.Arguments[0].Value) {
+			return &ir.LiteralExpr{ExprBase: base, Kind: ir.StringLiteral, Value: "null"}
+		}
 		return &ir.ToStringExpr{ExprBase: base, Value: lowerer.lowerExpr(call.Arguments[0].Value)}
 	}
 	selected := lowerer.semantic.SelectedCallables[call]

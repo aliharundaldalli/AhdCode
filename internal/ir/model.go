@@ -19,9 +19,13 @@ type Module struct {
 }
 
 type Global struct {
-	Span         source.Span
-	ID           SymbolID
-	Name         string
+	Span source.Span
+	ID   SymbolID
+	Name string
+	// Order is the module-source declaration index. Globals are stored sorted
+	// by ID for deterministic output, so initialization order lives here
+	// instead of in slice position.
+	Order        int
 	Type         Type
 	Constant     bool
 	Confidential bool

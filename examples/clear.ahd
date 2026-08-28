@@ -1,0 +1,17 @@
+numbers: List<Int> := [1, 2, 3]
+alias: List<Int> := numbers
+
+clear(numbers)
+
+write(len(alias))
+
+scores: Pair<String, Int> := {
+    "Ali": 85
+    "Ayşe": 92
+}
+
+shared: Pair<String, Int> := scores
+
+clear(scores)
+
+write(len(shared))

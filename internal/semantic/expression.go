@@ -494,7 +494,19 @@ func (info expressionInfo) symbolCallable() *Callable {
 func (a *analyzer) analyzeBuiltinCall(call *ast.CallExpr, symbol *Symbol, arguments []expressionInfo) expressionInfo {
 	switch symbol.Name {
 	case "write":
+		if len(arguments) != 1 {
+			a.error(codeCallArguments, fmt.Sprintf("write expects 1 argument; received %d", len(arguments)), call.Span(), "pass exactly one non-Nothing value")
+		} else if arguments[0].typeValue.Kind() == types.NothingKind {
+			a.error(codeCallArguments, "write does not accept Nothing", call.Arguments[0].Span(), "pass a value with a textual representation")
+		}
 		return expressionInfo{typeValue: types.Nothing, nullState: NonNull}
+	case "take":
+		if len(arguments) > 1 {
+			a.error(codeCallArguments, fmt.Sprintf("take expects at most 1 prompt argument; received %d", len(arguments)), call.Span(), "call take() or take(prompt)")
+		} else if len(arguments) == 1 && arguments[0].typeValue.Kind() != types.StringKind {
+			a.typeMismatch(call.Arguments[0].Span(), types.String, arguments[0].typeValue, "take prompt")
+		}
+		return expressionInfo{typeValue: types.String, nullState: NonNull}
 	case "str":
 		if len(arguments) != 1 {
 			a.error(codeCallArguments, fmt.Sprintf("str expects 1 argument; received %d", len(arguments)), call.Span(), "pass exactly one non-Nothing value")
@@ -502,8 +514,60 @@ func (a *analyzer) analyzeBuiltinCall(call *ast.CallExpr, symbol *Symbol, argume
 			a.error(codeCallArguments, "str does not accept Nothing", call.Arguments[0].Span(), "pass a value with a textual representation")
 		}
 		return expressionInfo{typeValue: types.String, nullState: NonNull}
+	case "len":
+		return a.analyzeLenCall(call, arguments)
+	case "clear":
+		return a.analyzeClearCall(call, arguments)
 	}
 	return expressionInfo{typeValue: types.Invalid, nullState: MaybeNull}
+}
+
+// analyzeLenCall accepts only the v0.1 sized Fundamentals types.
+func (a *analyzer) analyzeLenCall(call *ast.CallExpr, arguments []expressionInfo) expressionInfo {
+	if len(arguments) != 1 {
+		a.error(codeCallArguments, fmt.Sprintf("len expects 1 argument; received %d", len(arguments)), call.Span(), "pass exactly one String, List, or Pair value")
+		return expressionInfo{typeValue: types.Int, nullState: NonNull}
+	}
+	argument := arguments[0]
+	switch argument.typeValue.Kind() {
+	case types.StringKind, types.ListKind, types.PairKind:
+	case types.InvalidKind:
+	default:
+		a.error(codeCallArguments, fmt.Sprintf("len does not accept %s", types.Display(argument.typeValue)), call.Arguments[0].Span(), "pass a String, List, or Pair value")
+	}
+	if argument.nullState != NonNull {
+		a.nullableError("len", call.Arguments[0].Value, argument.nullState)
+	}
+	return expressionInfo{typeValue: types.Int, nullState: NonNull}
+}
+
+// analyzeClearCall enforces the v0.1 in-place collection-emptying contract.
+func (a *analyzer) analyzeClearCall(call *ast.CallExpr, arguments []expressionInfo) expressionInfo {
+	if len(arguments) != 1 {
+		a.error(codeCallArguments, fmt.Sprintf("clear expects 1 argument; received %d", len(arguments)), call.Span(), "pass exactly one List or Pair value")
+		return expressionInfo{typeValue: types.Nothing, nullState: NonNull}
+	}
+	argument := arguments[0]
+	switch argument.typeValue.Kind() {
+	case types.ListKind, types.PairKind, types.InvalidKind:
+	default:
+		a.error(codeCallArguments, fmt.Sprintf("clear does not accept %s", types.Display(argument.typeValue)), call.Arguments[0].Span(), "pass a List or Pair value")
+		return expressionInfo{typeValue: types.Nothing, nullState: NonNull}
+	}
+	if argument.nullState != NonNull {
+		a.nullableError("clear", call.Arguments[0].Value, argument.nullState)
+	}
+	if target := argument.symbol; target != nil && constantTarget(target) {
+		a.error(codeConstantAssignment, fmt.Sprintf("cannot clear Constant %q", target.Name), call.Arguments[0].Span(), "clear mutates the collection in place; declare it without Constant")
+	}
+	return expressionInfo{typeValue: types.Nothing, nullState: NonNull}
+}
+
+func constantTarget(symbol *Symbol) bool {
+	if symbol.Alias != nil {
+		return symbol.Constant || constantTarget(symbol.Alias)
+	}
+	return symbol.Constant
 }
 
 func (a *analyzer) validateCallArguments(call *ast.CallExpr, callable *Callable, arguments []expressionInfo) {

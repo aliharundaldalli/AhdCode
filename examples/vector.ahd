@@ -1,0 +1,24 @@
+Vector: Class<> := {
+    structure: Attributes := (
+        x: Real
+        y: Real
+    )
+
+    dot: Function := (
+        other: Vector
+    ) -> Real {
+        return attribute.x * other.x + attribute.y * other.y
+    }
+}
+
+a: Vector := Vector(
+    x: 2.0
+    y: 3.0
+)
+
+b: Vector := Vector(
+    x: 4.0
+    y: 5.0
+)
+
+write(a.dot(b))

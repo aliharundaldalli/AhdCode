@@ -35,9 +35,12 @@ const (
 
 type BindingStmt struct {
 	StmtBase
-	Symbol      SymbolID
-	Name        string
-	Type        Type
+	Symbol SymbolID
+	Name   string
+	Type   Type
+	// NullState is the declared storage null-state of the binding slot. It is
+	// declaration-level metadata, not the flow-sensitive state of a use site.
+	NullState   NullState
 	Constant    bool
 	Storage     Storage
 	Initializer Expr

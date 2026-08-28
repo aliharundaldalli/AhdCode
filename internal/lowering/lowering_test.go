@@ -429,3 +429,88 @@ func TestDumpIsDeterministicAndFailedFrontendIsControlled(t *testing.T) {
 		t.Fatalf("failed lowering = %#v", failed)
 	}
 }
+
+func TestConstructorInitializesAttributesExplicitly(t *testing.T) {
+	result := lowerSources(t, map[string]string{"/Main.ahd": `Point: Class<> := {
+    structure: Attributes := (
+        x: Int
+        label: Local String
+    ) {
+        attribute.tag: String := label
+    }
+}
+
+point: Point := Point(x: 1, label: "p")
+write(point.tag)
+`}, "/Main.ahd")
+	current := moduleIR(t, result.Compilation, "Main")
+	var constructor *ir.Function
+	for _, function := range current.Functions {
+		if function.Kind == ir.ConstructorFunction {
+			constructor = function
+		}
+	}
+	if constructor == nil {
+		t.Fatal("expected a constructor FunctionIR")
+	}
+	if len(constructor.Body.Statements) < 2 {
+		t.Fatalf("expected explicit attribute initialization; received %s", ir.Dump(result.Compilation))
+	}
+	assignment, ok := constructor.Body.Statements[0].(*ir.AssignStmt)
+	if !ok || assignment.Target.Kind != ir.FieldTarget {
+		t.Fatalf("expected a field assignment first; received %T", constructor.Body.Statements[0])
+	}
+	if !strings.HasSuffix(string(assignment.Target.Field), "::field::x") {
+		t.Fatalf("the structure parameter did not initialize its attribute: %s", assignment.Target.Field)
+	}
+	// A Local structure parameter declares no attribute, so it must not be
+	// assigned as one.
+	for _, statement := range constructor.Body.Statements {
+		if item, isAssign := statement.(*ir.AssignStmt); isAssign && strings.HasSuffix(string(item.Target.Field), "::field::label") {
+			t.Fatal("a Local structure parameter must not become an attribute")
+		}
+	}
+}
+
+func TestGlobalsRecordDeclarationOrder(t *testing.T) {
+	result := lowerSources(t, map[string]string{"/Main.ahd": `zebra: String := "z"
+alpha: String := zebra
+write(alpha)
+`}, "/Main.ahd")
+	current := moduleIR(t, result.Compilation, "Main")
+	if globalIR(t, current, "zebra").Order != 0 || globalIR(t, current, "alpha").Order != 1 {
+		t.Fatal("globals do not record their module declaration order")
+	}
+}
+
+func TestHasLowersToAResolvedMemberDesignator(t *testing.T) {
+	result := lowerSources(t, map[string]string{"/Main.ahd": `Box: Class<> := {
+    structure: Attributes := (
+        value: Int
+    )
+}
+
+box: Box := Box(value: 1)
+write(str(box has value))
+`}, "/Main.ahd")
+	dump := ir.Dump(result.Compilation)
+	if !strings.Contains(dump, `Has(`) || !strings.Contains(dump, `string("value")`) {
+		t.Fatalf("has did not lower to a member designator: %s", dump)
+	}
+}
+
+func TestSameDoesNotWidenItsOperands(t *testing.T) {
+	result := lowerSources(t, map[string]string{"/Main.ahd": "write(str(5 same 5.0))\n"}, "/Main.ahd")
+	dump := ir.Dump(result.Compilation)
+	if strings.Contains(dump, "IdentitySame(convert") {
+		t.Fatalf("same widened its operands: %s", dump)
+	}
+}
+
+func TestListConcatenationIsTypedAsAListOperation(t *testing.T) {
+	result := lowerSources(t, map[string]string{"/Main.ahd": "values: List<Int> := [1] + [2]\nwrite(len(values))\n"}, "/Main.ahd")
+	dump := ir.Dump(result.Compilation)
+	if !strings.Contains(dump, "ListConcat(") {
+		t.Fatalf("List concatenation was not typed as a List operation: %s", dump)
+	}
+}

@@ -14,11 +14,13 @@ func (lowerer *moduleLowerer) lowerModule() *ir.Module {
 		result.Dependencies = append(result.Dependencies, ir.ModuleID(dependency))
 	}
 	result.Init.Span = lowerer.module.Parsed.Program.Span()
+	globalOrder := 0
 	for _, statement := range lowerer.module.Parsed.Program.Statements {
 		switch value := statement.(type) {
 		case *ast.VariableDecl:
 			if symbol := lowerer.semantic.ResolvedSymbols[value]; symbol != nil && symbol.ModuleRoot && symbol.Alias == nil {
-				result.Globals = append(result.Globals, lowerer.lowerGlobal(value, symbol))
+				result.Globals = append(result.Globals, lowerer.lowerGlobal(value, symbol, globalOrder))
+				globalOrder++
 			}
 		case *ast.FunctionDecl:
 			if function := lowerer.lowerFunction(value, nil); function != nil {
@@ -43,10 +45,10 @@ func (lowerer *moduleLowerer) lowerModule() *ir.Module {
 	return result
 }
 
-func (lowerer *moduleLowerer) lowerGlobal(declaration *ast.VariableDecl, symbol *semantic.Symbol) *ir.Global {
+func (lowerer *moduleLowerer) lowerGlobal(declaration *ast.VariableDecl, symbol *semantic.Symbol, order int) *ir.Global {
 	typeValue := lowerType(symbol.Type)
 	return &ir.Global{
-		Span: declaration.Span(), ID: lowerer.compilation.registry.symbolID(lowerer.module, symbol), Name: symbol.Name,
+		Span: declaration.Span(), ID: lowerer.compilation.registry.symbolID(lowerer.module, symbol), Name: symbol.Name, Order: order,
 		Type: typeValue, Constant: symbol.Constant, Confidential: symbol.Confidential,
 		NullState: lowerNull(symbol.InitialNull), Initializer: lowerer.lowerExprExpected(declaration.Initializer, typeValue),
 	}
@@ -209,9 +211,46 @@ func (lowerer *moduleLowerer) lowerConstructor(declaration *ast.StructureDecl, c
 		function.Parameters = append(function.Parameters, item)
 		parameterIndex++
 	}
-	function.Body = lowerer.lowerBlock(declaration.Body)
+	function.Body = lowerer.attributeInitialization(declaration, class, function)
+	body := lowerer.lowerBlock(declaration.Body)
+	function.Body.Statements = append(function.Body.Statements, body.Statements...)
 	lowerer.currentReturn, lowerer.currentReceiver, lowerer.currentOwner = previousReturn, previousReceiver, previousOwner
 	return function
+}
+
+// attributeInitialization makes the frontend decision "a non-Local structure
+// parameter declares the like-named instance attribute" explicit in the IR, so
+// the backend never has to infer field initialization from parameter names.
+func (lowerer *moduleLowerer) attributeInitialization(declaration *ast.StructureDecl, class *semantic.Symbol, function *ir.Function) ir.Block {
+	block := ir.Block{Span: declaration.Span()}
+	parameterIndex := 0
+	for index := range declaration.Parameters {
+		parameter := &declaration.Parameters[index]
+		if parameter.InheritedAttributes {
+			continue
+		}
+		if parameterIndex >= len(function.Parameters) {
+			break
+		}
+		lowered := function.Parameters[parameterIndex]
+		parameterIndex++
+		member := class.Members[parameter.Name]
+		if member == nil || member.Kind != semantic.MemberSymbol || member.OwnerClass != class.Class {
+			continue
+		}
+		field := fieldID(member)
+		if field == "" {
+			continue
+		}
+		receiver := &ir.LoadExpr{ExprBase: ir.ExprBase{Span: parameter.Span(), Type: ir.Type{Kind: ir.ClassType, Class: function.Owner}, NullState: ir.NonNull}, Symbol: function.Receiver}
+		value := &ir.LoadExpr{ExprBase: ir.ExprBase{Span: parameter.Span(), Type: lowered.Type, NullState: lowered.NullState}, Symbol: lowered.ID}
+		block.Statements = append(block.Statements, &ir.AssignStmt{
+			StmtBase: ir.StmtBase{Span: parameter.Span()},
+			Target:   ir.Target{Kind: ir.FieldTarget, Type: lowered.Type, Field: field, Receiver: receiver},
+			Value:    value,
+		})
+	}
+	return block
 }
 
 func (lowerer *moduleLowerer) lowerSyntheticConstructor(class *semantic.Symbol) *ir.Function {

@@ -135,19 +135,28 @@ func (lowerer *moduleLowerer) lowerVariable(declaration *ast.VariableDecl) ir.St
 	typeValue := lowerType(symbol.Type)
 	return &ir.BindingStmt{
 		StmtBase: ir.StmtBase{Span: declaration.Span()}, Symbol: lowerer.compilation.registry.symbolID(lowerer.module, symbol), Name: symbol.Name,
-		Type: typeValue, Constant: symbol.Constant, Storage: ir.LocalStorage, Initializer: lowerer.lowerExprExpected(declaration.Initializer, typeValue),
+		Type: typeValue, NullState: lowerNull(symbol.InitialNull), Constant: symbol.Constant, Storage: ir.LocalStorage,
+		Initializer: lowerer.lowerExprExpected(declaration.Initializer, typeValue),
 	}
 }
 
 func (lowerer *moduleLowerer) lowerTarget(expression ast.Expr) ir.Target {
 	typeValue := lowerType(lowerer.semantic.ExpressionTypes[expression])
+	// A declaration target has no recorded expression type; the resolved
+	// declaration Symbol already carries the frontend's decision.
+	declaredType := func(symbol *semantic.Symbol) ir.Type {
+		if ir.IsValidType(typeValue) || symbol == nil {
+			return typeValue
+		}
+		return lowerType(symbol.Type)
+	}
 	switch value := expression.(type) {
 	case *ast.IdentifierExpr:
 		symbol := lowerer.semantic.ResolvedSymbols[value]
-		return ir.Target{Kind: ir.SymbolTarget, Type: typeValue, Symbol: lowerer.compilation.registry.symbolID(lowerer.module, symbol)}
+		return ir.Target{Kind: ir.SymbolTarget, Type: declaredType(symbol), Symbol: lowerer.compilation.registry.symbolID(lowerer.module, symbol)}
 	case *ast.MemberExpr:
 		symbol := lowerer.semantic.ResolvedSymbols[value]
-		return ir.Target{Kind: ir.FieldTarget, Type: typeValue, Field: fieldID(symbol), Receiver: lowerer.lowerExpr(value.Object)}
+		return ir.Target{Kind: ir.FieldTarget, Type: declaredType(symbol), Field: fieldID(symbol), Receiver: lowerer.lowerExpr(value.Object)}
 	case *ast.IndexExpr:
 		return ir.Target{Kind: ir.IndexTarget, Type: typeValue, Receiver: lowerer.lowerExpr(value.Object), Index: lowerer.lowerExprExpected(value.Index, ir.Type{Kind: ir.IntType})}
 	default:
