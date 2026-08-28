@@ -8,13 +8,11 @@ factorial: Function := (
     return n * factorial(n - 1)
 }
 
-
 double: Function := (
     value: Int
 ) -> Int {
     return value * 2
 }
-
 
 applyTwice: Function := (
     operation: Function
@@ -23,7 +21,6 @@ applyTwice: Function := (
     first: Local Int := operation(value)
     return operation(first)
 }
-
 
 describeNumber: Function := (
     value: Int
@@ -36,7 +33,6 @@ describeNumber: Overload Function := (
 ) -> String {
     return "Real: {value}"
 }
-
 
 Counter: Class<> := {
     structure: Attributes := (
@@ -66,7 +62,6 @@ Counter: Class<> := {
     }
 }
 
-
 write("=== CONSTANT / POWER ===")
 
 base: Constant Int := 5
@@ -78,7 +73,6 @@ mutableBase: Int := 7
 mutableExponent: Int := 5
 
 write(mutableBase ^ mutableExponent)
-
 
 write("=== ARITHMETIC ===")
 
@@ -92,22 +86,18 @@ write(x / y)
 write(y % x)
 write(x ^ 2)
 
-
 write("=== RECURSION ===")
 
 write(factorial(6))
-
 
 write("=== CALLBACK ===")
 
 write(applyTwice(double, 3))
 
-
 write("=== OVERLOAD ===")
 
 write(describeNumber(25))
 write(describeNumber(25.0))
-
 
 write("=== CLASS ===")
 
@@ -127,7 +117,6 @@ alias.increment()
 write(alias.describe())
 write(counter.describe())
 
-
 write("=== CLASS + IF ===")
 
 if counter.current() == 8 {
@@ -136,7 +125,6 @@ if counter.current() == 8 {
 else {
     write("Sayaç beklenmeyen değerde")
 }
-
 
 write("=== STATE ===")
 
@@ -154,7 +142,6 @@ state counter.current() {
     }
 }
 
-
 write("=== LIST ALIAS + CLEAR ===")
 
 numbers: List<Int> := [1, 2, 3]
@@ -165,7 +152,6 @@ clear(sameNumbers)
 write("sameNumbers: {sameNumbers}")
 write(len(numbers))
 
-
 write("=== UNTIL ===")
 
 i: Int := 0
@@ -175,13 +161,11 @@ until i == 3 {
     write("until: {i}")
 }
 
-
 write("=== STRING / UNICODE FOR ===")
 
 for character in "añb" {
     write(character)
 }
-
 
 write("=== INTERPOLATION ===")
 
@@ -191,6 +175,5 @@ version: Real := 0.1
 write("{language} v{version}")
 write("factorial(5) = {factorial(5)}")
 write("counter = {counter.current()}")
-
 
 write("=== DONE ===")

@@ -1528,6 +1528,8 @@ Numeric result rules include:
 
 No other `%` operand combination is valid. `/` always produces `Real`, including `Int / Int`.
 
+`Int % Int` uses truncated-division, dividend-signed remainder semantics. The quotient is truncated toward zero, not floored. Consequently `-5 % 2` is `-1`, `5 % -2` is `1`, and `-5 % -2` is `-1`. For a nonzero divisor it is consistent with `a = trunc(a / b) * b + (a % b)`. This is not Python floor-mod semantics. A zero divisor raises the catchable `DivisionByZeroError`.
+
 Power result types depend only on operand types; Constant status, compile-time evaluation, exponent sign, and optional optimizer/range analysis do not affect the result type. `Int ^ Int` uses checked Int arithmetic. A negative Int exponent raises `DomainError` during evaluation, and a result outside the signed 64-bit Int range raises `OverflowError`. It is not converted to `Real`.
 
 `Int ^= Int` is valid for every Int right operand. A negative exponent raises `DomainError` and overflow raises `OverflowError` during evaluation. `Int ^= Real` is invalid because the operation produces `Real`, which cannot be assigned implicitly to an Int target. `Real ^= Int` and `Real ^= Real` are valid.
@@ -1564,6 +1566,8 @@ Strict type + value/state.
 ```
 
 For class: exact runtime type + same instance.
+
+For `List` and `Pair`, `==`/`!=` perform deep value comparison, while `same` performs object/reference identity comparison. Two distinct collections with equal contents compare equal with `==` but false with `same`; aliases of the same collection compare true with `same`.
 
 ### is / is not
 
@@ -1980,13 +1984,15 @@ AhdCode must not be a thin Python/JavaScript eval wrapper or regex-only translat
 
 ---
 
-## 39. Planned CLI
+## 39. CLI and interactive toolchain
 
 ```bash
 ahdcode
 ```
 
 REPL.
+
+The REPL uses the same lexer, parser, semantic checker, lowering, backend, and runtime behavior as file compilation. It is not a separate mini-language. Session declarations persist, and ordinary same-scope declaration rules remain in force: entering `x: Int := 5` and later `x: Int := 7` is a duplicate declaration error. Reassignment is written `x = 7`. A failed semantic check or catchable runtime Error does not discard the last successfully committed session state or terminate the REPL.
 
 ```bash
 ahdcode run hello.ahd
@@ -2004,7 +2010,9 @@ Build native executable through Go backend.
 ahdcode format hello.ahd
 ```
 
-Canonical formatter.
+Canonical in-place formatter. `ahdcode format --check hello.ahd` performs the same validation and canonicalization comparison without modifying the file; it succeeds only when the source is already canonical.
+
+`ahdcode --help` describes the supported commands and `ahdcode --version` prints the canonical v0.1 version string. Unknown commands and flags fail without invoking a shell or treating arguments as source text.
 
 ---
 

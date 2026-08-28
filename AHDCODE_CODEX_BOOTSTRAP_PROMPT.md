@@ -1481,7 +1481,7 @@ Function parameters and results use the non-null representation, because `ir.Sig
 - canonical `str` rendering, including quoted nested Strings and `<ClassName>` instance text;
 - character-based String indexing, slicing, and `len`.
 
-Implementation decisions that the specification leaves open are: `%` follows truncated (dividend-signed) remainder semantics; `take` returns the input line without its terminator and yields an empty String at end of input; `same` on `List` and `Pair` compares object identity.
+Normative runtime decisions are: `%` follows truncated-division, dividend-signed remainder semantics; `take` returns the input line without its terminator and yields an empty String at end of input; `List`/`Pair` `==` is deep value equality while `same` compares object identity.
 
 ### Control flow
 
@@ -1503,6 +1503,8 @@ Use the same lexer/parser/semantic engine as files.
 
 Do not create a second incompatible mini-language.
 
+Persist successful session declarations and statements through the shared compilation pipeline. Ordinary declaration semantics do not change in the REPL: duplicate same-scope `:=` is an error and mutation uses `=`. Failed semantic input or a catchable runtime Error must leave the last successful session state available.
+
 Target:
 
 ```text
@@ -1514,7 +1516,7 @@ ahd> write(x^2)
 25
 ```
 
-A partial REPL is acceptable during development if unsupported constructs fail cleanly.
+The v0.1 REPL must support ordinary core declarations, Functions, Classes, multiline constructs, mutation, and recoverable semantic/runtime failures through the shared compilation path. Do not weaken declaration rules for interactive convenience.
 
 ---
 

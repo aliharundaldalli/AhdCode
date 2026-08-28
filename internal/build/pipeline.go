@@ -2,6 +2,7 @@ package build
 
 import (
 	"errors"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -184,6 +185,13 @@ func BuildProgram(entryPath, outputPath string) (string, Result) {
 // RunProgram builds one entry module into a temporary executable and runs it,
 // propagating its standard streams and exit code.
 func RunProgram(entryPath string, arguments []string, stdin *os.File, stdout, stderr *os.File) (int, Result) {
+	return RunProgramIO(entryPath, arguments, stdin, stdout, stderr)
+}
+
+// RunProgramIO is the stream-generic form used by the REPL and tests. It keeps
+// file compilation and interactive execution on the exact same compiler,
+// lowering, backend, native-build, and runtime path.
+func RunProgramIO(entryPath string, arguments []string, stdin io.Reader, stdout, stderr io.Writer) (int, Result) {
 	result := Compile(entryPath)
 	if result.HasErrors() || result.Program == nil {
 		return 1, result

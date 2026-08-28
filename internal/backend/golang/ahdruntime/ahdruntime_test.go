@@ -88,6 +88,9 @@ func TestIntModuloAndPowerEdges(t *testing.T) {
 	if AhdIntModulo(7, 3) != 1 || AhdIntModulo(-7, 3) != -1 {
 		t.Fatal("Int modulo does not follow truncated remainder semantics")
 	}
+	if AhdIntModulo(-5, 2) != -1 || AhdIntModulo(5, -2) != 1 || AhdIntModulo(-5, -2) != -1 {
+		t.Fatal("Int modulo must keep the dividend sign")
+	}
 	if AhdIntModulo(math.MinInt64, -1) != 0 {
 		t.Fatal("the signed minimum modulo -1 must be 0")
 	}
