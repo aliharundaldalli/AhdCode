@@ -654,6 +654,60 @@ func ahdResolveRange(start int64, hasStart bool, end int64, hasEnd bool, length 
 }
 
 // ---------------------------------------------------------------------------
+// Lazy integer iteration
+// ---------------------------------------------------------------------------
+
+// AhdRange is the lazy integer iteration produced by between. Its whole state
+// is the current value, the excluded stop, and the step, so iterating any
+// range costs O(1) memory no matter how many values it yields. It never
+// materializes a List.
+type AhdRange struct {
+	current  int64
+	stop     int64
+	step     int64
+	finished bool
+}
+
+// AhdBetween builds a lazy integer iteration. A zero step cannot make progress
+// and is a DomainError rather than a silently substituted step of one.
+func AhdBetween(start, stop, step int64) *AhdRange {
+	if step == 0 {
+		AhdRaiseClass(AhdClassDomainError, "between requires a non-zero step")
+	}
+	return &AhdRange{current: start, stop: stop, step: step}
+}
+
+// Next yields the next Int of the iteration. It computes each value on demand
+// and stops before any step that would leave the signed 64-bit range, so a
+// range near the Int boundaries terminates instead of wrapping.
+func (iteration *AhdRange) Next() (int64, bool) {
+	if iteration == nil || iteration.finished {
+		return 0, false
+	}
+	if iteration.step > 0 && iteration.current >= iteration.stop {
+		iteration.finished = true
+		return 0, false
+	}
+	if iteration.step < 0 && iteration.current <= iteration.stop {
+		iteration.finished = true
+		return 0, false
+	}
+	value := iteration.current
+	// A step that would overflow can only move past a stop that already fits in
+	// Int, so the iteration is complete rather than in error.
+	if iteration.step > 0 && iteration.current > math.MaxInt64-iteration.step {
+		iteration.finished = true
+		return value, true
+	}
+	if iteration.step < 0 && iteration.current < math.MinInt64-iteration.step {
+		iteration.finished = true
+		return value, true
+	}
+	iteration.current += iteration.step
+	return value, true
+}
+
+// ---------------------------------------------------------------------------
 // List: reference semantics with stable object identity
 // ---------------------------------------------------------------------------
 

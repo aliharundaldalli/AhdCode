@@ -129,6 +129,9 @@ const (
 	ListElements     IterationKind = "ListElements"
 	StringCharacters IterationKind = "StringCharacters"
 	PairKeys         IterationKind = "PairKeys"
+	// IntRange iterates a lazy integer range. It has no backing collection, so
+	// it needs no shallow snapshot.
+	IntRange IterationKind = "IntRange"
 )
 
 type ForStmt struct {
@@ -138,8 +141,10 @@ type ForStmt struct {
 	Name          string
 	Kind          IterationKind
 	Iterable      Expr
-	Snapshot      bool
-	Body          Block
+	// Snapshot marks the shallow copy taken at loop entry. Collection
+	// iteration always snapshots; a lazy range has no collection to copy.
+	Snapshot bool
+	Body     Block
 }
 
 func (*ForStmt) IRStatement() {}

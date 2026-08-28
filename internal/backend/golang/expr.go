@@ -743,9 +743,36 @@ func (generator *generator) builtinCall(value *ir.CallExpr) string {
 		return generator.expr(argument(0)) + ".Clear()"
 	case "List.add", "List.eject", "Pair.eject":
 		return generator.collectionMutation(name, value)
+	case "between":
+		return generator.between(value)
 	default:
 		return generator.unsupported("Fundamentals function "+name, meta.Span)
 	}
+}
+
+// between builds the lazy integer iteration. Missing arguments take the
+// specified defaults: start 0 and step 1.
+func (generator *generator) between(value *ir.CallExpr) string {
+	meta := value.ExprMeta()
+	if len(value.Arguments) < 1 || len(value.Arguments) > 3 {
+		generator.fail(CodeGenerationFailure, "between has an unexpected argument count", meta.Span, "the IR call is malformed")
+		return "nil"
+	}
+	bound := func(index int) string {
+		if index >= len(value.Arguments) || value.Arguments[index].Value == nil {
+			generator.fail(CodeGenerationFailure, "between argument is missing", meta.Span, "the IR call is malformed")
+			return "int64(0)"
+		}
+		return generator.value(value.Arguments[index].Value, ir.Type{Kind: ir.IntType}, false)
+	}
+	start, stop, step := "int64(0)", bound(0), "int64(1)"
+	if len(value.Arguments) > 1 {
+		start, stop = bound(0), bound(1)
+	}
+	if len(value.Arguments) > 2 {
+		step = bound(2)
+	}
+	return "AhdBetween(" + start + ", " + stop + ", " + step + ")"
 }
 
 // collectionMutation lowers a built-in List or Pair mutation. The receiver is

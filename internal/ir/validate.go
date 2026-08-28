@@ -191,8 +191,13 @@ func (v *validator) validateBlock(block Block, returnType *Type) {
 			}
 			v.validateExpr(value.Iterable)
 			v.validateBlock(value.Body, returnType)
-			if !value.Snapshot {
+			// A lazy range carries no collection, so only collection iteration
+			// requires the shallow snapshot marker.
+			if !value.Snapshot && value.Kind != IntRange {
 				v.error(CodeMalformedNode, "for loop lacks snapshot semantics", value.Span)
+			}
+			if value.Snapshot && value.Kind == IntRange {
+				v.error(CodeMalformedNode, "a lazy range must not be snapshotted", value.Span)
 			}
 		case *StateStmt:
 			if value.Temp == "" || !value.NoFallthrough {

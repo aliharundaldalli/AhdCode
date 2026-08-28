@@ -68,16 +68,12 @@ func (lowerer *moduleLowerer) lowerStatement(statement ast.Stmt) ir.Statement {
 		if iteration != nil {
 			iterationType = lowerType(iteration.Type)
 		}
-		kind := ir.ListElements
-		switch lowerer.semantic.ExpressionTypes[value.Iterable].(type) {
-		case types.Pair:
-			kind = ir.PairKeys
-		default:
-			if lowerer.semantic.ExpressionTypes[value.Iterable] != nil && lowerer.semantic.ExpressionTypes[value.Iterable].Kind() == types.StringKind {
-				kind = ir.StringCharacters
-			}
+		kind := iterationKindOf(lowerer.semantic.ExpressionTypes[value.Iterable])
+		return &ir.ForStmt{
+			StmtBase: ir.StmtBase{Span: value.Span()}, Iteration: lowerer.compilation.registry.symbolID(lowerer.module, iteration),
+			IterationType: iterationType, Name: value.Name, Kind: kind, Iterable: iterable,
+			Snapshot: kind != ir.IntRange, Body: lowerer.lowerBlock(value.Body),
 		}
-		return &ir.ForStmt{StmtBase: ir.StmtBase{Span: value.Span()}, Iteration: lowerer.compilation.registry.symbolID(lowerer.module, iteration), IterationType: iterationType, Name: value.Name, Kind: kind, Iterable: iterable, Snapshot: true, Body: lowerer.lowerBlock(value.Body)}
 	case *ast.StateStmt:
 		stateType := lowerType(lowerer.semantic.ExpressionTypes[value.Value])
 		result := &ir.StateStmt{StmtBase: ir.StmtBase{Span: value.Span()}, Temp: ir.TempID(fmt.Sprintf("%s::state@%d", lowerer.module.ID, value.Span().Start.Offset)), Value: lowerer.lowerExpr(value.Value), NoFallthrough: true}
@@ -117,6 +113,25 @@ func (lowerer *moduleLowerer) lowerStatement(statement ast.Stmt) ir.Statement {
 		lowerer.compilation.error(CodeUnsupportedNode, fmt.Sprintf("nested declaration %T reached lowering", statement), statement.Span())
 	}
 	return nil
+}
+
+// iterationKindOf carries the frontend's iterable decision into the IR. A lazy
+// range is iteration state rather than a collection, so it has its own kind.
+func iterationKindOf(iterable types.Type) ir.IterationKind {
+	if iterable == nil {
+		return ir.ListElements
+	}
+	switch iterable.(type) {
+	case types.Pair:
+		return ir.PairKeys
+	case types.Range:
+		return ir.IntRange
+	default:
+		if iterable.Kind() == types.StringKind {
+			return ir.StringCharacters
+		}
+		return ir.ListElements
+	}
 }
 
 func (lowerer *moduleLowerer) lowerVariable(declaration *ast.VariableDecl) ir.Statement {

@@ -2,8 +2,10 @@ package ahdruntime
 
 import (
 	"math"
+	"runtime"
 	"strings"
 	"testing"
+	"unsafe"
 )
 
 // stubError stands in for a generated Error Class so the runtime can be tested
@@ -471,4 +473,105 @@ func TestFrozenCollectionsRejectAddAndEject(t *testing.T) {
 	if scores.Len() != 1 {
 		t.Fatal("a rejected Pair mutation must not take effect")
 	}
+}
+
+// collectRange drains a lazy range so its yielded values can be compared.
+func collectRange(iteration *AhdRange) []int64 {
+	var values []int64
+	for {
+		value, ok := iteration.Next()
+		if !ok {
+			return values
+		}
+		values = append(values, value)
+	}
+}
+
+func TestBetweenYieldsPythonStyleRanges(t *testing.T) {
+	cases := []struct {
+		name              string
+		start, stop, step int64
+		expected          []int64
+	}{
+		{"stop only", 0, 5, 1, []int64{0, 1, 2, 3, 4}},
+		{"start and stop", 1, 5, 1, []int64{1, 2, 3, 4}},
+		{"positive step", 0, 10, 2, []int64{0, 2, 4, 6, 8}},
+		{"negative step", 5, 0, -1, []int64{5, 4, 3, 2, 1}},
+		{"unreachable stop counting down", 0, 5, -1, nil},
+		{"unreachable stop counting up", 5, 0, 1, nil},
+		{"equal start and stop", 3, 3, 1, nil},
+	}
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			values := collectRange(AhdBetween(testCase.start, testCase.stop, testCase.step))
+			if len(values) != len(testCase.expected) {
+				t.Fatalf("yielded %v; want %v", values, testCase.expected)
+			}
+			for index := range values {
+				if values[index] != testCase.expected[index] {
+					t.Fatalf("yielded %v; want %v", values, testCase.expected)
+				}
+			}
+		})
+	}
+}
+
+func TestBetweenRejectsAZeroStep(t *testing.T) {
+	expectRaise(t, AhdClassDomainError, func() { AhdBetween(0, 10, 0) })
+}
+
+// TestBetweenTerminatesAtTheIntBoundaries checks that a step which would leave
+// the signed 64-bit range ends the iteration instead of wrapping into an
+// endless loop.
+func TestBetweenTerminatesAtTheIntBoundaries(t *testing.T) {
+	cases := []struct {
+		name              string
+		start, stop, step int64
+		expected          []int64
+	}{
+		{"positive boundary", math.MaxInt64 - 2, math.MaxInt64, 1, []int64{math.MaxInt64 - 2, math.MaxInt64 - 1}},
+		{"overflowing positive step", math.MaxInt64 - 1, math.MaxInt64, 2, []int64{math.MaxInt64 - 1}},
+		{"negative boundary", math.MinInt64 + 2, math.MinInt64, -1, []int64{math.MinInt64 + 2, math.MinInt64 + 1}},
+		{"underflowing negative step", math.MinInt64 + 1, math.MinInt64, -2, []int64{math.MinInt64 + 1}},
+		{"start at the minimum", math.MinInt64, math.MinInt64 + 2, 1, []int64{math.MinInt64, math.MinInt64 + 1}},
+	}
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			values := collectRange(AhdBetween(testCase.start, testCase.stop, testCase.step))
+			if len(values) != len(testCase.expected) {
+				t.Fatalf("yielded %v; want %v", values, testCase.expected)
+			}
+			for index := range values {
+				if values[index] != testCase.expected[index] {
+					t.Fatalf("yielded %v; want %v", values, testCase.expected)
+				}
+			}
+		})
+	}
+}
+
+// TestBetweenIsLazy asserts the non-allocation contract directly: a range over
+// the whole Int domain must be constructible and steppable, which is only
+// possible because no values are materialized.
+func TestBetweenIsLazy(t *testing.T) {
+	iteration := AhdBetween(math.MinInt64, math.MaxInt64, 1)
+	before := ahdHeapInUse()
+	for index := 0; index < 1000; index++ {
+		if _, ok := iteration.Next(); !ok {
+			t.Fatal("a range over the whole Int domain ended early")
+		}
+	}
+	if growth := ahdHeapInUse() - before; growth > 1<<20 {
+		t.Fatalf("stepping a lazy range allocated %d bytes", growth)
+	}
+	// The state is only the current value, the stop, and the step.
+	if unsafe.Sizeof(*iteration) > 32 {
+		t.Fatalf("a lazy range carries %d bytes of state", unsafe.Sizeof(*iteration))
+	}
+}
+
+func ahdHeapInUse() uint64 {
+	var stats runtime.MemStats
+	runtime.ReadMemStats(&stats)
+	return stats.HeapInuse
 }

@@ -102,7 +102,10 @@ func (*UntilStmt) statementNode() {}
 
 type ForStmt struct {
 	Base
-	Name     string
+	Name string
+	// Type is the optional explicit iteration binding type. The binding stays
+	// implicitly Local, so no scope modifier is accepted here.
+	Type     *TypeRef
 	Iterable Expr
 	Body     *Block
 }

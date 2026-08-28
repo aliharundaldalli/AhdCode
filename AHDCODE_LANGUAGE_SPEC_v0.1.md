@@ -1543,7 +1543,30 @@ for character in "AhdCode" {
 
 Pair yields keys in insertion order.
 
-### 24.1 Snapshot iteration
+`between` yields `Int` values; see §32.
+
+### 24.1 Iteration binding type
+
+The iteration binding may carry an explicit type:
+
+```ahd
+for value: Int in values {
+    write(value)
+}
+```
+
+The annotation is optional. Both canonical forms are:
+
+```text
+for name in iterable
+for name: Type in iterable
+```
+
+The binding is always implicitly `Local`, so no scope modifier is written; `for value: Local Int in ...` is invalid.
+
+An explicit type is a compile-time constraint: it must be the type the iterable yields. Iterating a `List<String>` as `for value: Int` is a compile-time error, and no unrelated element type is silently converted.
+
+### 24.2 Snapshot iteration
 
 At loop start, AhdCode takes a shallow snapshot of the iterable's iteration view.
 
@@ -1756,27 +1779,83 @@ High to low conceptually:
 
 ## 32. between
 
-Fundamentals provides `between` with Python-like range semantics.
+`between` is available in v0.1. It is predeclared and needs no `bring`.
+
+It has Python-like integer range semantics and accepts one to three `Int`
+arguments:
+
+```text
+between(stop)
+between(start, stop)
+between(start, stop, step)
+```
+
+`start` defaults to `0` and `step` defaults to `1`. Stop is always excluded.
 
 ```ahd
-between(5)
+for value in between(5) {
+    write(value)
+}
 ```
 
 => `0 1 2 3 4`
 
 ```ahd
-between(0, 5)
+for value in between(1, 5) {
+    write(value)
+}
 ```
 
-=> `0 1 2 3 4`
+=> `1 2 3 4`
 
 ```ahd
-between(0, 10, 2)
+for value in between(0, 10, 2) {
+    write(value)
+}
 ```
 
 => `0 2 4 6 8`
 
-Stop is excluded. Zero step is an error.
+A negative step counts down:
+
+```ahd
+for value in between(5, 0, -1) {
+    write(value)
+}
+```
+
+=> `5 4 3 2 1`
+
+When the step cannot reach the stop, the iteration is empty. Both
+`between(0, 5, -1)` and `between(5, 0, 1)` yield nothing.
+
+A zero step makes no progress and raises a catchable `DomainError`. It is never
+silently treated as a step of `1`.
+
+### 32.1 Lazy iteration
+
+`between` does not produce a `List`. It is a lazy iteration whose whole state is
+its current value, its stop, and its step, so iterating any range uses constant
+memory regardless of how many values it yields:
+
+```ahd
+for value in between(1, 10000000) {
+    write(value)
+}
+```
+
+allocates no collection. Each value is computed on demand, so `break` stops
+immediately and `continue` advances to the next value without materializing the
+remainder. Because there is no backing collection, the shallow snapshot rule of
+§24.2 does not apply to it.
+
+Iteration stops before any step that would leave the signed 64-bit `Int` range,
+so a range near the `Int` boundaries terminates rather than wrapping.
+
+The only public contract of a `between` value is that iterating it yields `Int`.
+v0.1 defines no type syntax for it and no other operations on it: it cannot be
+indexed, sliced, mutated, cleared, converted to a `List`, or rendered with
+`str`.
 
 ---
 
@@ -1843,6 +1922,7 @@ int
 real
 len
 clear
+between
 ```
 
 Planned early Fundamentals functions include:
@@ -1854,7 +1934,6 @@ min
 sum
 abs
 round
-between
 swap
 combine
 merge

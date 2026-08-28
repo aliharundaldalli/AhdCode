@@ -1336,7 +1336,21 @@ Complex
 
 ## between
 
-Python range semantics, name is `between`.
+Python range semantics, name is `between`. Implemented in v0.1 as a predeclared
+builtin taking one to three `Int` arguments, with `start` defaulting to `0` and
+`step` to `1`, stop excluded, negative steps supported, and a zero step raising
+a catchable `DomainError`.
+
+`between` must stay lazy. It never lowers to a `List`: semantic analysis gives
+it the compiler-internal `types.Range` type, `types.IterationYield` reports that
+it yields `Int`, lowering marks the loop `ir.IntRange` with `Snapshot` false,
+and the backend drives the `AhdRange` runtime value, whose entire state is
+`current`, `stop`, and `step`. Iterating any range is therefore O(1) in memory.
+`Next` stops before a step that would leave the signed 64-bit range, so a range
+near the `Int` boundaries terminates instead of wrapping into an endless loop.
+
+`types.Range` is compiler-internal: no AhdCode type syntax denotes it, `str` and
+`write` reject it, and no collection operation applies to it.
 
 ## swap
 
@@ -1472,6 +1486,22 @@ Function parameters and results use the non-null representation, because `ir.Sig
 - character-based String indexing, slicing, and `len`.
 
 Normative runtime decisions are: `%` follows truncated-division, dividend-signed remainder semantics; `take` returns the input line without its terminator and yields an empty String at end of input; `List`/`Pair` `==` is deep value equality while `same` compares object identity.
+
+### Iteration binding types and the iterable contract
+
+`for` accepts an optional binding type: `for name in iterable` and
+`for name: Type in iterable`. The parser only records the optional `TypeRef`;
+the binding stays implicitly Local and a scope modifier in that position is a
+parse error rather than an unknown type name.
+
+One semantic function answers "what does this expression yield when iterated?":
+`types.IterationYield` maps `List<T>` to `T`, `String` to `String`,
+`Pair<K,V>` to `K`, and `Range` to `Int`, and reports whether the type is
+iterable at all. `analyzeFor` uses it for both inference and the explicit
+annotation check, so a new iterable kind is added in one place rather than
+being hard-coded across the parser, semantic layer, and backend. An explicit
+annotation must equal the yielded type; the frontend never inserts a
+conversion into an iteration binding.
 
 ### Built-in collection mutation
 
@@ -1721,7 +1751,7 @@ Do not dump one giant patch.
 - bring
 - minimal Fundamentals
 - take/write
-- between/swap/combine
+- between (implemented lazily), swap/combine
 - end-to-end IR/runtime/codegen integration
 
 ## Milestone I — Toolchain

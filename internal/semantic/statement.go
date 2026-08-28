@@ -384,19 +384,19 @@ func (a *analyzer) analyzeFor(statement *ast.ForStmt, current *scope, flow flowS
 	if !iterable.invalid() && iterable.nullState != NonNull {
 		a.nullableError("for iteration", statement.Iterable, iterable.nullState)
 	}
-	elementType := types.Invalid
-	switch value := iterable.typeValue.(type) {
-	case types.List:
-		elementType = value.Element
-	case types.Pair:
-		elementType = value.Key
-	default:
-		if iterable.invalid() {
-			// The primary child diagnostic already describes the failure.
-		} else if iterable.typeValue.Kind() == types.StringKind {
-			elementType = types.String
-		} else {
-			a.error(codeOperatorType, fmt.Sprintf("type %s is not iterable", types.Display(iterable.typeValue)), statement.Iterable.Span(), "iterate a List, Pair, or String")
+	elementType, iterableType := types.IterationYield(iterable.typeValue)
+	if !iterableType && !iterable.invalid() {
+		a.error(codeOperatorType, fmt.Sprintf("type %s is not iterable", types.Display(iterable.typeValue)), statement.Iterable.Span(), "iterate a List, Pair, String, or between(...)")
+	}
+	// An explicit binding type constrains the yielded type; the binding itself
+	// stays implicitly Local.
+	if statement.Type != nil {
+		declared := a.resolveType(statement.Type)
+		if !types.IsInvalid(declared) && !types.IsInvalid(elementType) && !types.Equal(declared, elementType) {
+			a.error(codeTypeMismatch, fmt.Sprintf("iteration variable expects %s; iterable yields %s", types.Display(declared), types.Display(elementType)), statement.Type.Span(), "declare the type the iterable yields, or omit the type")
+		}
+		if !types.IsInvalid(declared) {
+			elementType = declared
 		}
 	}
 	iteration := &Symbol{Name: statement.Name, Kind: ForSymbol, Type: elementType, Span: statement.Span(), InitialNull: NonNull}

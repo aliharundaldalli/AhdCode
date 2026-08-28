@@ -325,6 +325,16 @@ func (generator *generator) emitFor(writer *emitter, value *ir.ForStmt) {
 		writer.line(snapshot + " := AhdStringChars(" + generator.value(value.Iterable, ir.Type{Kind: ir.StringType}, false) + ")")
 		writer.open("for _, " + item + " := range " + snapshot + " {")
 		writer.line(current.name + " := " + generator.coerce(item, ir.ExprBase{Type: ir.Type{Kind: ir.StringType}, NullState: ir.NonNull}, current.typeInfo, current.nullable))
+	case ir.IntRange:
+		// A lazy range computes each value on demand; nothing is materialized.
+		present := generator.temporaryName()
+		writer.line(snapshot + " := " + generator.expr(value.Iterable))
+		writer.open("for {")
+		writer.line(item + ", " + present + " := " + snapshot + ".Next()")
+		writer.open("if !" + present + " {")
+		writer.line("break")
+		writer.close("}")
+		writer.line(current.name + " := " + generator.coerce(item, ir.ExprBase{Type: ir.Type{Kind: ir.IntType}, NullState: ir.NonNull}, current.typeInfo, current.nullable))
 	default:
 		generator.unsupported("iteration kind "+string(value.Kind), value.Span)
 		return

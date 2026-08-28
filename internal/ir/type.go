@@ -25,6 +25,9 @@ const (
 	PairType     TypeKind = "Pair"
 	FunctionType TypeKind = "Function"
 	ClassType    TypeKind = "Class"
+	// RangeType is the lazy integer iteration produced by between. It has no
+	// AhdCode type syntax and exists only as iteration state.
+	RangeType TypeKind = "Range"
 )
 
 // Type is a pointer-address-independent semantic type representation.

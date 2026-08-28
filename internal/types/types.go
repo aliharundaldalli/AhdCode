@@ -18,6 +18,9 @@ const (
 	PairKind
 	FunctionKind
 	ClassKind
+	// RangeKind is the compiler-internal type of a lazy integer iteration
+	// produced by between. It has no AhdCode syntax in v0.1.
+	RangeKind
 )
 
 func (kind Kind) String() string {
@@ -40,6 +43,8 @@ func (kind Kind) String() string {
 		return "Function"
 	case ClassKind:
 		return "Class"
+	case RangeKind:
+		return "Int range"
 	default:
 		return "<invalid>"
 	}
@@ -64,6 +69,17 @@ var (
 	Bool    Type = Basic{BoolKind}
 	Nothing Type = Basic{NothingKind}
 )
+
+// Range is the lazy integer iteration produced by between. It is a
+// compiler-internal type: no AhdCode type syntax denotes it, and its only
+// public contract is that iterating it yields Int.
+type Range struct{}
+
+func (Range) Kind() Kind     { return RangeKind }
+func (Range) String() string { return "Int range" }
+
+// IntRange is the single Range value; the type carries no parameters.
+var IntRange Type = Range{}
 
 type List struct{ Element Type }
 
@@ -139,6 +155,28 @@ func Display(value Type) string {
 }
 
 func IsInvalid(value Type) bool { return value == nil || value.Kind() == InvalidKind }
+
+// IterationYield reports the type an expression yields when iterated with for,
+// and whether the type is iterable at all. It is the one place that answers
+// that question for every iterable kind.
+func IterationYield(value Type) (Type, bool) {
+	if value == nil {
+		return Invalid, false
+	}
+	switch typed := value.(type) {
+	case List:
+		return typed.Element, true
+	case Pair:
+		return typed.Key, true
+	case Range:
+		return Int, true
+	default:
+		if value.Kind() == StringKind {
+			return String, true
+		}
+		return Invalid, false
+	}
+}
 
 // IsPairKey reports whether a type may be used as a v0.1 Pair key. Keys are
 // limited to the stable simple scalar types; Real, Class instances, Function

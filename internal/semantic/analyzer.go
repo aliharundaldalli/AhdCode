@@ -182,7 +182,7 @@ func (a *analyzer) installBuiltins() {
 		a.classes[name] = symbol
 		a.classByType[identity] = symbol
 	}
-	for _, name := range []string{"write", "take", "str", "int", "real", "len", "clear"} {
+	for _, name := range []string{"write", "take", "str", "int", "real", "len", "clear", "between"} {
 		a.addBuiltin(&Symbol{Name: name, Kind: BuiltinSymbol, Type: types.Function{}, ModuleRoot: true, Builtin: true, InitialNull: NonNull})
 	}
 }

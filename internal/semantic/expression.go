@@ -643,8 +643,8 @@ func (a *analyzer) analyzeBuiltinCall(call *ast.CallExpr, symbol *Symbol, argume
 	case "write":
 		if len(arguments) != 1 {
 			a.error(codeCallArguments, fmt.Sprintf("write expects 1 argument; received %d", len(arguments)), call.Span(), "pass exactly one non-Nothing value")
-		} else if arguments[0].typeValue.Kind() == types.NothingKind {
-			a.error(codeCallArguments, "write does not accept Nothing", call.Arguments[0].Span(), "pass a value with a textual representation")
+		} else if !renderable(arguments[0].typeValue) {
+			a.error(codeCallArguments, fmt.Sprintf("write does not accept %s", types.Display(arguments[0].typeValue)), call.Arguments[0].Span(), "pass a value with a textual representation")
 		}
 		return expressionInfo{typeValue: types.Nothing, nullState: NonNull}
 	case "take":
@@ -657,8 +657,8 @@ func (a *analyzer) analyzeBuiltinCall(call *ast.CallExpr, symbol *Symbol, argume
 	case "str":
 		if len(arguments) != 1 {
 			a.error(codeCallArguments, fmt.Sprintf("str expects 1 argument; received %d", len(arguments)), call.Span(), "pass exactly one non-Nothing value")
-		} else if arguments[0].typeValue.Kind() == types.NothingKind {
-			a.error(codeCallArguments, "str does not accept Nothing", call.Arguments[0].Span(), "pass a value with a textual representation")
+		} else if !renderable(arguments[0].typeValue) {
+			a.error(codeCallArguments, fmt.Sprintf("str does not accept %s", types.Display(arguments[0].typeValue)), call.Arguments[0].Span(), "pass a value with a textual representation")
 		}
 		return expressionInfo{typeValue: types.String, nullState: NonNull}
 	case "int":
@@ -669,6 +669,8 @@ func (a *analyzer) analyzeBuiltinCall(call *ast.CallExpr, symbol *Symbol, argume
 		return a.analyzeLenCall(call, arguments)
 	case "clear":
 		return a.analyzeClearCall(call, arguments)
+	case "between":
+		return a.analyzeBetweenCall(call, arguments)
 	}
 	return expressionInfo{typeValue: types.Invalid, nullState: MaybeNull}
 }
@@ -749,6 +751,59 @@ func (a *analyzer) analyzeClearCall(call *ast.CallExpr, arguments []expressionIn
 		a.error(codeConstantAssignment, fmt.Sprintf("cannot clear Constant %q", target.Name), call.Arguments[0].Span(), "clear mutates the collection in place; declare it without Constant")
 	}
 	return expressionInfo{typeValue: types.Nothing, nullState: NonNull}
+}
+
+// renderable reports whether a value has canonical str text. Nothing is not a
+// value, and a lazy range is iteration state rather than a rendered value.
+func renderable(value types.Type) bool {
+	switch value.Kind() {
+	case types.NothingKind, types.RangeKind:
+		return false
+	default:
+		return true
+	}
+}
+
+// analyzeBetweenCall checks the lazy integer iteration built-in. It takes one
+// to three Int arguments and yields Int values when iterated; it never
+// produces a List.
+func (a *analyzer) analyzeBetweenCall(call *ast.CallExpr, arguments []expressionInfo) expressionInfo {
+	result := expressionInfo{typeValue: types.IntRange, nullState: NonNull}
+	if len(arguments) < 1 || len(arguments) > 3 {
+		a.error(codeCallArguments, fmt.Sprintf("between expects 1 to 3 arguments; received %d", len(arguments)), call.Span(), "call between(stop), between(start, stop), or between(start, stop, step)")
+		return result
+	}
+	for index, argument := range arguments {
+		if index >= len(call.Arguments) {
+			break
+		}
+		if call.Arguments[index].Name != "" {
+			a.error(codeCallArguments, "between does not accept named arguments", call.Arguments[index].Span(), "pass between arguments positionally")
+			continue
+		}
+		if argument.nullState != NonNull {
+			a.nullableError("between", call.Arguments[index].Value, argument.nullState)
+			continue
+		}
+		if argument.typeValue.Kind() != types.IntKind {
+			a.typeMismatch(call.Arguments[index].Span(), types.Int, argument.typeValue, betweenArgumentName(index, len(arguments)))
+		}
+	}
+	return result
+}
+
+func betweenArgumentName(index, count int) string {
+	if count == 1 {
+		return "between stop"
+	}
+	switch index {
+	case 0:
+		return "between start"
+	case 1:
+		return "between stop"
+	default:
+		return "between step"
+	}
 }
 
 func constantTarget(symbol *Symbol) bool {

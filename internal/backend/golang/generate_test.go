@@ -530,3 +530,41 @@ func TestConstantReferenceBindingsFreezeTheirGraph(t *testing.T) {
 		t.Fatal("a Constant reference binding did not deep-freeze its graph")
 	}
 }
+
+// TestBetweenDoesNotMaterializeAList asserts the non-allocation contract at the
+// code-generation level: a range loop must drive the lazy runtime value and
+// must never build a List.
+func TestBetweenDoesNotMaterializeAList(t *testing.T) {
+	program := generate(t, `for value in between(1, 10000000) {
+    write(value)
+}
+`)
+	generated := programSource(t, program)
+	if !strings.Contains(generated, "AhdBetween(") || !strings.Contains(generated, ".Next()") {
+		t.Fatalf("a range loop did not drive the lazy iteration:\n%s", generated)
+	}
+	if strings.Contains(generated, "AhdNewList") || strings.Contains(generated, "AhdList[") {
+		t.Fatalf("a range loop materialized a List:\n%s", generated)
+	}
+	if strings.Contains(generated, ".Snapshot()") {
+		t.Fatalf("a lazy range must not be snapshotted:\n%s", generated)
+	}
+}
+
+func TestBetweenDefaultsAreExplicitInGeneratedSource(t *testing.T) {
+	program := generate(t, "for value in between(5) {\n    write(value)\n}\n")
+	if !strings.Contains(programSource(t, program), "AhdBetween(int64(0), int64(5), int64(1))") {
+		t.Fatalf("between defaults were not applied:\n%s", programSource(t, program))
+	}
+}
+
+func TestCollectionIterationStillSnapshots(t *testing.T) {
+	program := generate(t, `values: List<Int> := [1]
+for value in values {
+    write(value)
+}
+`)
+	if !strings.Contains(programSource(t, program), ".Snapshot()") {
+		t.Fatal("collection iteration lost its shallow snapshot")
+	}
+}

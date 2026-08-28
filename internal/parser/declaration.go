@@ -101,6 +101,17 @@ func (p *parser) parseDeclaration(start source.Position, target ast.Expr, scope 
 	}
 }
 
+// isDeclarationModifier reports the scope and visibility modifier keywords, so
+// a position that forbids them can say so directly.
+func isDeclarationModifier(kind token.Kind) bool {
+	switch kind {
+	case token.KeywordLocal, token.KeywordGlobal, token.KeywordConstant, token.KeywordConfidential:
+		return true
+	default:
+		return false
+	}
+}
+
 func (p *parser) parseDeclarationModifiers() ([]ast.Modifier, ast.FunctionFlavor) {
 	var modifiers []ast.Modifier
 	flavor := ast.FunctionBase

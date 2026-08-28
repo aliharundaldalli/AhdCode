@@ -71,6 +71,8 @@ func (generator *generator) plainType(value ir.Type) string {
 		return generator.interfaceName(value.Class)
 	case ir.FunctionType:
 		return generator.functionType(value.Signature)
+	case ir.RangeType:
+		return "*AhdRange"
 	default:
 		return ""
 	}

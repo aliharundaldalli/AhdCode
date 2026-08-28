@@ -57,11 +57,24 @@ func (p *parser) parseUntil() ast.Stmt {
 func (p *parser) parseFor() ast.Stmt {
 	start := p.advance().Span.Start
 	name := p.expect(token.Identifier, "expected iteration variable after for")
+	var typeRef *ast.TypeRef
+	if p.match(token.Colon) {
+		// The iteration binding is implicitly Local, so a scope modifier here is
+		// a syntax error rather than an unknown type name. Recover by dropping
+		// the modifiers so the declared type still parses.
+		if isDeclarationModifier(p.current().Kind) {
+			p.errorCurrent(codeInvalidControlSyntax, "for iteration bindings are implicitly Local", "write for name: Type in iterable")
+			for isDeclarationModifier(p.current().Kind) {
+				p.advance()
+			}
+		}
+		typeRef = p.parseTypeRef()
+	}
 	p.expect(token.KeywordIn, "expected in after iteration variable")
 	iterable := p.parseExpression(0)
 	body := p.parseBlock()
 	return &ast.ForStmt{
-		Base: p.base(start, body.Span().End), Name: name.Value, Iterable: iterable, Body: body,
+		Base: p.base(start, body.Span().End), Name: name.Value, Type: typeRef, Iterable: iterable, Body: body,
 	}
 }
 

@@ -33,6 +33,8 @@ func lowerType(value types.Type) ir.Type {
 		return ir.Type{Kind: ir.FunctionType, Signature: lowerSignature(typed.Signature)}
 	case types.Class:
 		return ir.Type{Kind: ir.ClassType, Class: classID(typed.Symbol), Reference: typed.Reference}
+	case types.Range:
+		return ir.Type{Kind: ir.RangeType}
 	default:
 		return ir.Type{Kind: ir.InvalidType}
 	}

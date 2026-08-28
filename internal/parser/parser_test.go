@@ -461,3 +461,33 @@ func parseTextAllowLexErrors(text string) Result {
 	file := source.NewFile(1, "malformed.ahd", text)
 	return Parse(file, lexer.Lex(file).Tokens)
 }
+
+func TestForBindingTypeIsOptional(t *testing.T) {
+	result := parseText(t, "for value in values {\n}\nfor value: Int in values {\n}\n")
+	if result.HasErrors() {
+		t.Fatalf("parser diagnostics: %+v", result.Diagnostics)
+	}
+	inferred, ok := result.Program.Statements[0].(*ast.ForStmt)
+	if !ok || inferred.Type != nil || inferred.Name != "value" {
+		t.Fatalf("untyped for = %#v", result.Program.Statements[0])
+	}
+	typed, ok := result.Program.Statements[1].(*ast.ForStmt)
+	if !ok || typed.Type == nil || typed.Type.Name != "Int" {
+		t.Fatalf("typed for = %#v", result.Program.Statements[1])
+	}
+}
+
+func TestForBindingRejectsAScopeModifier(t *testing.T) {
+	result := parseText(t, "for value: Local Int in values {\n}\n")
+	if !result.HasErrors() {
+		t.Fatal("a for binding is implicitly Local and must reject a scope modifier")
+	}
+	if len(result.Diagnostics) != 1 {
+		t.Fatalf("expected one focused diagnostic; received %+v", result.Diagnostics)
+	}
+	// Recovery must still produce the declared type rather than cascading.
+	statement, ok := result.Program.Statements[0].(*ast.ForStmt)
+	if !ok || statement.Type == nil || statement.Type.Name != "Int" {
+		t.Fatalf("recovered for = %#v", result.Program.Statements[0])
+	}
+}

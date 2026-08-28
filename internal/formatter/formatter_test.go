@@ -133,3 +133,25 @@ func TestValidExampleCorpusRemainsSemanticAndIdempotent(t *testing.T) {
 		})
 	}
 }
+
+func TestFormatterRendersIterationBindingTypes(t *testing.T) {
+	cases := map[string]string{
+		"typed for":   "for j: Int in between(1,100) {\nwrite(j)\n}\n",
+		"untyped for": "for j in between(1,100) {\nwrite(j)\n}\n",
+	}
+	expected := map[string]string{
+		"typed for":   "for j: Int in between(1, 100) {\n    write(j)\n}\n",
+		"untyped for": "for j in between(1, 100) {\n    write(j)\n}\n",
+	}
+	for name, source := range cases {
+		t.Run(name, func(t *testing.T) {
+			first := formatText(t, source)
+			if first != expected[name] {
+				t.Fatalf("formatted output\n want %q\n have %q", expected[name], first)
+			}
+			if second := formatText(t, first); second != first {
+				t.Fatalf("formatting is not idempotent\n first %q\n again %q", first, second)
+			}
+		})
+	}
+}
