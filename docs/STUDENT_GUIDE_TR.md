@@ -9,10 +9,13 @@ deneyin.
 
 ## 1. AhdCode nedir?
 
-AhdCode; okunabilir sözdizimi, açık niyet ve öngörülebilir davranış hedefleyen,
-statik olarak denetlenen genel amaçlı bir programlama dilidir. Derleyici,
-program çalışmadan önce tür uyuşmazlığı veya güvenli olmayan `null` kullanımı
-gibi birçok hatayı yakalar.
+AhdCode; okunabilir kod ve öngörülebilir davranış hedefleyen genel amaçlı bir
+programlama dilidir. Derleyici, programı çalıştırmadan önce kontrol eder. Bu
+sayede yanlış türde değer kullanmak veya `null` olabilecek bir değere güvenmeden
+erişmek gibi birçok hatayı erkenden gösterir.
+
+> **Teknik not:** Program çalışmadan önce tür kontrolü yapılmasına static
+> checking denir.
 
 v0.1 öğrenme ve deney aşamasındadır. Küçük CLI programları yazabilir, bunları
 doğrudan çalıştırabilir veya native executable olarak derleyebilirsiniz.
@@ -51,10 +54,29 @@ Merhaba AhdCode
 Küçük deneme: `name` değerini kendi adınızla değiştirip programı yeniden
 çalıştırın.
 
+### Formatter ve REPL
+
+Kodunuz çalışsa bile boşluklar veya satır düzeni dağınık olabilir. Formatter,
+dosyayı AhdCode'un ortak yazım biçimine getirir ve yorumlarınızı korur:
+
+```bash
+ahdcode format hello.ahd
+ahdcode format --check hello.ahd
+```
+
+İlk komut dosyayı düzenler. İkinci komut dosyayı değiştirmeden biçimin zaten
+doğru olup olmadığını kontrol eder.
+
+Dosya oluşturmadan küçük denemeler yapmak için yalnız `ahdcode` yazarak REPL'i
+açabilirsiniz. Başarılı komutlar oturumda tutulur. Hatalı bir komut, daha önce
+çalışan durumu silmez. REPL her başarılı durumu yeniden çalıştırdığı için
+rastgele işlemlerde `Math.seed(...)` kullanın. `take` ile etkileşimli input
+okumayı ise REPL yerine bir `.ahd` dosyasında deneyin.
+
 ## 3. Değişken tanımlama: `:=` ve `=`
 
-`:=` yeni bir binding tanımlar. `=` ise daha önce tanımlanmış, değiştirilebilir
-bir binding'in değerini günceller.
+`:=` yeni bir değişken oluşturur. `=` ise daha önce oluşturduğunuz ve
+değiştirilebilen bir değişkene yeni bir değer verir.
 
 ```ahd
 score: Int := 70
@@ -71,9 +93,11 @@ Beklenen çıktı:
 85
 ```
 
-İlk satırda yalnız `=` kullanmak hatadır; çünkü henüz değiştirilecek bir
-binding yoktur. Aynı scope içinde ikinci kez `:=` kullanmak da yeni bir
-tanımlama çakışması oluşturur.
+İlk satırda yalnız `=` kullanmak hatadır; çünkü `score` henüz oluşturulmamıştır.
+Aynı blok içinde ikinci kez `:=` kullanmak da aynı değişkeni yeniden oluşturmaya
+çalışacağı için hatadır.
+
+> **Teknik not:** Bir adın kullanılabildiği bölgeye scope (kapsam) denir.
 
 ## 4. Temel türler
 
@@ -103,9 +127,11 @@ Beklenen çıktı:
 Ayşe, 19, 87.5, true
 ```
 
-Dil izin verdiği yerlerde `Int`, güvenli biçimde `Real` değerine genişleyebilir.
-Ancak değiştirilebilir generic koleksiyonlar invariant'tır: `List<Int>`,
-`List<Real>` yerine kullanılamaz.
+Dil izin verdiği yerlerde bir `Int` değeri güvenli biçimde `Real` olarak
+kullanılabilir. Fakat `List<Int>` ile `List<Real>` farklı türlerdir. Bir
+`List<Int>` değerini doğrudan `List<Real>` gereken yere veremezsiniz.
+
+> **Teknik not:** Generic koleksiyonların bu davranışına invariance denir.
 
 ## 5. Ekrana yazma ve kullanıcıdan veri alma
 
@@ -189,8 +215,12 @@ Geçti
 
 ## 8. `while`, `until` ve `for`
 
-`while` gövdeye girmeden önce koşulu kontrol eder. `until` ise **post-check**
-döngüdür: gövdesi en az bir kez çalışır, sonra koşul `true` olduğunda durur.
+`while`, içindeki kodu çalıştırmadan önce koşula bakar. `until` bunun ters
+sırasını kullanır: önce içindeki kodu çalıştırır, koşula daha sonra bakar.
+Bu yüzden bir `until` gövdesi en az bir kez çalışır ve koşul `true` olduğunda
+durur.
+
+> **Teknik not:** `while` bir pre-check, `until` ise post-check loop'tur.
 
 ```ahd
 count: Int := 0
@@ -222,8 +252,9 @@ for 20
 for 30
 ```
 
-Executable bir nested scope içinde yeni binding tanımlarken `Local` gerekir.
-`break` en yakın döngüyü bitirir, `continue` bir sonraki adıma geçer.
+Bir `if` veya döngünün iç bloğunda yeni bir değişken oluşturursanız `Local`
+yazmanız gerekir. `break` en yakın döngüyü bitirir, `continue` bir sonraki adıma
+geçer.
 
 ## 9. `between` ile sayı aralığı
 
@@ -246,10 +277,29 @@ Beklenen çıktı:
 
 Negatif adım desteklenir. Sıfır adım `DomainError` üretir.
 
+`for` değişkeninin türünü çoğu zaman yazmanız gerekmez; derleyici türü dolaşılan
+değerlerden bulur. İsterseniz türü açıkça da yazabilirsiniz:
+
+```text
+for value in values
+for value: Int in values
+```
+
+Her iki biçimde de `value` yalnız döngünün içinde oluşturulur. Bu yüzden başına
+`Local` yazılmaz. Aşağıdaki biçim geçersizdir:
+
+```text
+for value: Local Int in values
+```
+
+> **Teknik not:** Türü derleyicinin bulmasına type inference denir. `for`
+> değişkeni kendiliğinden Local kabul edilir.
+
 ## 10. Function yazma ve çağırma
 
-v0.1'de Function'lar adlandırılır; nested Function ve lambda yoktur.
-Parametrelerin ve dönüş değerinin türü açıkça yazılır.
+v0.1'de her Function'ın bir adı vardır. Bir Function'ın içinde yeni bir
+Function tanımlayamazsınız ve lambda kullanamazsınız. Parametrelerin ve dönüş
+değerinin türü açıkça yazılır.
 
 ```ahd
 greet: Function := (
@@ -312,11 +362,52 @@ Merhaba Ayşe
 İlk `showStatus` çağrısında çıplak `return`, alttaki `write` satırına ulaşılmasını
 engeller. `hello` ise gövdenin sonuna doğal biçimde ulaşarak tamamlanır.
 
+### Aynı isimli birden fazla Function: overload
+
+Aynı Function adı için farklı parametre türlerine sahip birden fazla sürüm
+tanımlayabilirsiniz. İlk sürüm normal `Function`, sonraki sürüm `Overload
+Function` olarak yazılır:
+
+```ahd
+describe: Function := (
+    value: Int
+) -> String {
+    return "Int {value}"
+}
+
+describe: Overload Function := (
+    value: Real
+) -> String {
+    return "Real {value}"
+}
+
+write(describe(2))
+write(describe(2.5))
+```
+
+Beklenen çıktı:
+
+```text
+Int 2
+Real 2.5
+```
+
+Derleyici önce parametre türü tam uyan sürümü seçer. Gerekirse güvenli
+`Int`-to-`Real` geçişini kullanabilir. İki sürüm eşit derecede uygunsa çağrı
+belirsiz olur ve derleme durur. Yalnız dönüş türü, sürüm seçmek için yeterli
+değildir.
+
+> **Teknik not:** Bu seçime overload resolution denir. Kullanıcı tarafındaki
+> `Function` dinamik değildir; derleyici çağrının kullanacağı tek sürümü program
+> çalışmadan önce belirlemelidir.
+
 ## 11. `Local` ve `Global`
 
-Function parametreleri zaten kendi lexical scope'undadır. Executable nested
-scope içinde oluşturduğunuz yeni binding'e `Local` yazarsınız. Bir Function,
-module root'taki binding'e erişecekse gerekli `Global` bildirimini yapar.
+Function parametrelerini Function içinde doğrudan kullanabilirsiniz; başlarına
+`Local` yazılmaz. Function, `if`, `for` veya `while` gibi bir iç blokta yeni bir
+değişken oluşturuyorsanız `Local` yazın. Dosyanın en üst seviyesinde oluşturulan
+bir değişkeni Function içinde kullanmak içinse `Global` ile bunu açıkça
+belirtin.
 
 ```ahd
 counter: Int := 0
@@ -339,8 +430,13 @@ Beklenen çıktı:
 2
 ```
 
-`Global` yeni bir değer oluşturmaz; Function'a module-root binding'ini
-kullandığını açıkça bildirir.
+Bu örnekte `counter` dosyanın en üst seviyesinde oluşturulur. Function içindeki
+`counter: Global Int` satırı yeni bir sayaç oluşturmaz; var olan `counter`
+değişkenini kullanacağını söyler. `next` yalnız Function içinde oluşturulduğu
+için `Local` kullanır.
+
+> **Teknik not:** Bu kurallar değişkenlerin hangi kapsamda (scope)
+> kullanılabildiğini belirler. `Global` gizli bir kopya oluşturmaz.
 
 ## 12. String işlemleri
 
@@ -376,8 +472,9 @@ Yararlı diğer işlemler: `upper`, `capitalize`, `startsWith`, `endsWith` ve
 
 ## 13. List ile çalışma
 
-List sıralıdır, ilk indeks `0`'dır ve negatif indeks destekler. List bir
-reference object'tir; aynı List'i gösteren alias'lar değişikliği görür.
+List sıralıdır, ilk indeks `0`'dır ve negatif indeks destekler. İki değişkeni
+aynı List'e bağlarsanız ikisi de aynı koleksiyonu gösterir. Birinden yaptığınız
+değişiklik diğerinden de görünür.
 
 ```ahd
 numbers: List<Int> := [10, 20, 30]
@@ -402,14 +499,22 @@ true
 Geçersiz sıradan indeksleme `IndexError` üretir. `List.index(value)` ise değer
 bulunmadığında `DomainError` üretir; bunlar farklı durumlardır.
 
-`Constant List<T>` yalnız binding'i değil, erişilebilen reference yapısını da
-deep-freeze eder. Bir alias üzerinden değiştirme de engellenir. Mutable generic
-koleksiyonların invariant olduğunu unutmayın.
+> **Teknik not:** İki değişkenin aynı List'i paylaşmasına reference semantics,
+> ikinci değişkene de alias denir.
+
+`Constant List<T>` içindeki List'in değiştirilmesini engeller. List'in içinde
+başka List, Pair veya Class nesneleri varsa onlara ulaşarak değişiklik yapmak da
+engellenir. Başka bir değişken aynı List'i gösterse bile bu kuralı aşamaz.
+
+> **Teknik not:** Ulaşılabilen bütün paylaşılan yapının dondurulmasına
+> deep-freeze denir. Ayrıca `List<Int>` ile `List<Real>` doğrudan birbirinin
+> yerine kullanılamaz; bu kural generic invariance olarak adlandırılır.
 
 ## 14. `sort`, `reverse` ve `shuffle`
 
-Bu üç işlem yeni List üretmez; mevcut List'i yerinde değiştirir. Bu nedenle
-alias aynı değişimi görür.
+Bu üç işlem yeni bir List üretmez; elinizdeki List'in sırasını değiştirir. Aynı
+List'i başka bir değişken de gösteriyorsa yeni sırayı o değişkenden de
+görürsünüz.
 
 ```ahd
 bring Math
@@ -438,11 +543,16 @@ Beklenen çıktı, explicit seed nedeniyle her çalıştırmada aynıdır:
 [2, 4, 1, 3]
 ```
 
-`shuffle`, `Math.random` ve `Math.randomInt` ile aynı program-geneli
-pseudo-random state'i tüketir. Seed verilmemiş native process başlangıcında bu
-state OS entropy ile başlatılır; sonuçlar tekrarlanabilir değildir. Güvenlik
-amaçlı rastgelelik için uygun değildir. Boş veya tek elemanlı List'i shuffle
-etmek random state tüketmez.
+`Math.seed(42)` kullandığınızda aynı karıştırma sonucunu yeniden
+üretebilirsiniz. `shuffle`, `Math.random` ve `Math.randomInt` aynı rastgele sayı
+dizisini sırayla kullanır; bu çağrılardan biri yapılınca dizide bir sonraki
+adıma geçilir. Seed vermezseniz yeni program çalışması başlangıç değerini
+işletim sisteminden alır ve sonuçları tekrarlamak garanti edilmez. Bu
+rastgelelik güvenlik amaçları için uygun değildir. Boş veya tek elemanlı List'i
+karıştırmak diziyi ilerletmez.
+
+> **Teknik not:** Bu ortak dizi pseudo-random number generator (RNG) state'i
+> ile tutulur. Seed verilmemiş başlangıçta state, OS entropy ile oluşturulur.
 
 ## 15. `map`, `filter` ve Function callback'leri
 
@@ -506,10 +616,13 @@ Ayşe: 92
 Veli: 78
 ```
 
-Pair da reference object'tir; alias mutation'ı görür. Eksik anahtar `KeyError`
-üretir. Bir anahtarı güncellemek sırasını değiştirmez; silip yeniden eklemek
-onu sona taşır. `Constant Pair` erişilebilen reference graph'ını deep-freeze
-eder.
+İki değişken aynı Pair'i gösteriyorsa birinden yaptığınız değişiklik diğerinden
+de görünür. Eksik anahtar `KeyError` üretir. Bir anahtarı güncellemek sırasını
+değiştirmez; silip yeniden eklemek onu sona taşır. `Constant Pair`, Pair'in ve
+onun içinden ulaşılabilen paylaşılan değerlerin değiştirilmesini engeller.
+
+> **Teknik not:** List'te olduğu gibi burada da reference semantics ve
+> deep-freeze kuralları geçerlidir.
 
 ## 17. Class ve attributes
 
@@ -539,15 +652,69 @@ Beklenen çıktı:
 #42 Ali
 ```
 
-`Constant` attribute değiştirilemez; reference değer taşıyorsa deep-freeze
-uygulanır. `Local` structure girdisi yalnız constructor içinde kullanılır ve
-attribute olmaz. `Confidential` members sıradan dış erişime kapalıdır.
+`Constant` attribute daha sonra değiştirilemez. Bir List, Pair veya Class
+nesnesi taşıyorsa içinden ulaşılabilen paylaşılan yapı da dondurulur. `Local`
+structure girdisi yalnız constructor içinde kullanılır ve attribute olmaz.
+`Confidential` members Class dışındaki sıradan erişime kapalıdır.
+
+> **Teknik not:** `Constant` reference değerlerine uygulanan bu geniş dondurma
+> davranışına deep-freeze denir.
+
+### Parent ve child Class
+
+Bir Class, başka bir Class'ın özelliklerini alabilir. Önce parent Class'ı,
+sonra onu genişleten child Class'ı okuyun:
+
+```ahd
+Person: Class<> := {
+    structure: Attributes := (
+        name: String
+    )
+
+    describe: Function := (
+    ) -> String {
+        return "Kişi {attribute.name}"
+    }
+}
+
+Student: Class<Person> := {
+    structure: Attributes := (
+        SuperClass.attributes
+        number: Int
+    )
+
+    describe: Override Function := (
+    ) -> String {
+        return "{SuperClass.describe()} #{attribute.number}"
+    }
+}
+
+student: Student := Student(name: "Ayşe", number: 7)
+person: Person := student
+write(person.describe())
+```
+
+Beklenen çıktı:
+
+```text
+Kişi Ayşe #7
+```
+
+`Student`, `Person`'ın child Class'ıdır. `SuperClass.attributes`, parent
+Class'ın constructor girdilerini taşır. `Override`, inherited method'un bilinçli
+olarak değiştirildiğini söyler. `SuperClass.describe()` parent sürümünü çağırır.
+`person` değişkeninin türü `Person` olsa bile gerçek nesne `Student` olduğu için
+`Student.describe` çalışır.
+
+> **Teknik not:** Parent türündeki bir değişkende child nesne tutmaya upcasting,
+> gerçek nesneye uygun method'un seçilmesine dynamic dispatch denir.
 
 ## 18. `null` güvenliği
 
-`null` ayrı bir nullable type değildir; bir değerin mevcut olmama state'idir.
-Derleyici bir binding'in `Null`, `MaybeNull` veya `NonNull` durumunu akışa göre
-izler.
+`null`, “bu değişkenin türünü biliyoruz ama şu anda bir değeri yok” anlamına
+gelir. `String` veya `Student` gibi türlerin yanında yazılan ayrı bir `null`
+türü yoktur. Derleyici bir değerin kesinlikle var mı, kesinlikle `null` mı,
+yoksa `null` olma ihtimali mi var diye programın akışını takip eder.
 
 ```ahd
 message: String := null
@@ -567,15 +734,24 @@ Beklenen çıktı:
 HAZIR
 ```
 
-Kontrol yapılmadan belki-null bir değerde member access, çağrı veya indeksleme
-derleme hatasıdır. List elemanları ve Pair değerleri null olabileceği için
-okuduktan sonra refinement gerekebilir. `Constant` null ile başlatılamaz.
+`null` olma ihtimali bulunan bir değerde kontrol yapmadan member access, çağrı
+veya indeksleme kullanmak derleme hatasıdır. `message != null` kontrolünden
+sonra derleyici değerin o blokta var olduğunu bilir. List elemanları ve Pair
+değerleri de `null` olabileceği için onları okuduktan sonra benzer bir kontrol
+gerekebilir. `Constant` bir değişken `null` ile başlatılamaz.
+
+> **Teknik not:** Bu üç olasılık belgelerde `Null`, `MaybeNull` ve `NonNull`
+> olarak adlandırılır. Kontrolden sonra derleyicinin bilgisinin kesinleşmesine
+> null refinement denir.
 
 ## 19. `attempt`, `except`, `ultimately` ve `toss`
 
-Runtime errors yakalanabilir Class değerleridir. `attempt` korunan kodu,
-`except` eşleşen hatayı, `ultimately` ise sonuç ne olursa olsun son adımı
-çalıştırır. `toss` bir Error yükseltir.
+`attempt` içindeki kod bir hata üretirse uygun `except` bloğu çalışabilir.
+`ultimately`, hata olsa da olmasa da son adımı çalıştırır. `toss` ile siz de
+bilerek bir Error oluşturabilirsiniz.
+
+> **Teknik not:** AhdCode'da çalışma zamanı hataları yakalanabilen Class
+> değerleridir.
 
 ```ahd
 requirePositive: Function := (
@@ -668,9 +844,13 @@ Beklenen çıktı:
 2
 ```
 
-Aynı seed aynı pseudo-random diziyi yeniden üretir. `Math.random()` değeri
-`0.0 <= value < 1.0` aralığındadır. Seed verilmezse native process başlangıcı
-OS entropy kullanır. Bu generator cryptographic güvenlik sağlamaz.
+Aynı seed'i yeniden verirseniz aynı rastgele sayı dizisini yeniden elde
+edersiniz. `Math.random()` değeri `0.0 <= value < 1.0` aralığındadır. Seed
+vermezseniz her yeni program çalışması başlangıç değerini işletim sisteminden
+alır. Bu sayı üreticisi güvenlik veya şifreleme amacıyla kullanılmamalıdır.
+
+> **Teknik not:** Üretilen dizi pseudo-random'dır. Seed verilmemiş başlangıç
+> değeri OS entropy'den alınır.
 
 ## 22. Küçük birleşik uygulama: not özeti
 
@@ -736,11 +916,11 @@ Küçük deneme: Geçersiz bir not girip `except` kolunun mesajını gözlemleyi
 
 ## 23. Başlangıçta sık yapılan hatalar
 
-- Yeni binding için `=` değil `:=` kullanın.
+- Yeni değişken için `=` değil `:=` kullanın.
 - `if value` yazmayın; koşulu `value > 0` gibi bir `Bool` expression yapın.
-- Executable nested scope'taki yeni declaration'a `Local` ekleyin.
-- Function içinden module-root binding kullanırken gereken `Global` bildirimini
-  yazın.
+- Function veya başka bir iç bloktaki yeni değişkene `Local` ekleyin.
+- Function içinden dosyanın en üst seviyesindeki bir değişkeni kullanırken
+  gereken `Global` bildirimini yazın.
 - `until` gövdesinin en az bir kez çalıştığını unutmayın.
 - `between` stop değerini içermez.
 - List'in ilk indeksinin `0` olduğunu unutmayın; negatif indeksler sondan
@@ -772,8 +952,9 @@ Tam çözümleri hemen aramak yerine her programı küçük adımlarla kurun.
    dönüştüren, sonra ilk karakteri büyüten bir Function yazın.
 8. **Öğrenci-not Pair'i:** İsimleri notlara bağlayın, bir notu güncelleyin ve
    ekleme sırasıyla yazdırın.
-9. **Deterministic zar:** `Math.seed(42)` sonrası inclusive `randomInt(1, 6)`
-   ile on zar atışı üretin ve aynı programın tekrarlandığını doğrulayın.
+9. **Tekrarlanabilir zar:** `Math.seed(42)` sonrasında iki sınırı da içeren
+   `randomInt(1, 6)` ile on zar atışı üretin. Programı yeniden çalıştırıp aynı
+   sonuçları aldığınızı doğrulayın.
 10. **Class tabanlı kayıt:** `name` ve `Constant number` attribute'ları olan bir
     `Student` Class'ı ve özet döndüren bir method yazın.
 

@@ -8,10 +8,13 @@ in order, run each example, and try the small changes suggested along the way.
 
 ## 1. What is AhdCode?
 
-AhdCode is a statically checked general-purpose language designed around
-readable syntax, explicit intent, and predictable behavior. Before a program
-runs, the compiler can catch many mistakes, including incompatible types and
-unsafe use of a possibly absent value.
+AhdCode is a general-purpose language designed for readable code and
+predictable behavior. The compiler checks your program before running it. This
+catches many mistakes early, such as using the wrong kind of value or trusting
+a value that might be `null`.
+
+> **Technical note:** Checking types before the program runs is called static
+> checking.
 
 Version 0.1 is an experimental learning release. It can run small CLI programs
 directly or compile them into native executables.
@@ -49,10 +52,30 @@ Hello AhdCode
 
 Try it: replace `AhdCode` with your own name and run the file again.
 
+### Formatter and REPL
+
+Your program may work even when its spacing and line layout are untidy. The
+formatter rewrites the file into AhdCode's shared style while preserving your
+comments:
+
+```bash
+ahdcode format hello.ahd
+ahdcode format --check hello.ahd
+```
+
+The first command updates the file. The second checks the style without
+changing anything.
+
+Run `ahdcode` by itself to open the REPL for small experiments without a file.
+Successful commands remain in the session. A failed command does not erase the
+last working state. Because the REPL replays successful work, use
+`Math.seed(...)` for random operations. Test interactive input with `take` in a
+`.ahd` file rather than in the REPL.
+
 ## 3. Declaring and changing variables: `:=` and `=`
 
-Use `:=` to declare a new binding. Use `=` to change the value of an existing
-mutable binding.
+Use `:=` to create a new variable. Use `=` to give a new value to a variable
+that already exists and can be changed.
 
 ```ahd
 score: Int := 70
@@ -69,9 +92,11 @@ Expected output:
 85
 ```
 
-Using only `=` on the first line is an error because there is no existing
-binding to mutate. Using `:=` a second time in the same scope would instead
-try to create a conflicting declaration.
+Using only `=` on the first line is an error because `score` has not been
+created yet. Using `:=` a second time in the same block would try to create the
+same variable again, which is also an error.
+
+> **Technical note:** The region where a name can be used is called its scope.
 
 ## 4. Core types
 
@@ -81,7 +106,7 @@ These are the types you will meet most often at the beginning:
 |---|---|---|
 | `Int` | Signed 64-bit integer | `42` |
 | `Real` | Finite floating-point number | `3.5` |
-| `String` | Immutable Unicode text | `"Ayşe"` |
+| `String` | Unicode text that is not changed in place | `"Ayşe"` |
 | `Bool` | Logical value | `true`, `false` |
 | `List<T>` | Ordered mutable collection of values | `[1, 2]` |
 | `Pair<K, V>` | Insertion-ordered key/value collection | `{"Ali": 90}` |
@@ -101,9 +126,11 @@ Expected output:
 Ayşe, 19, 87.5, true
 ```
 
-An `Int` can safely widen to `Real` where the language permits it. Mutable
-generic collections are invariant, however: a `List<Int>` is not a
-`List<Real>`.
+An `Int` can safely be used as a `Real` where the language permits it. However,
+`List<Int>` and `List<Real>` are different types. You cannot directly pass a
+`List<Int>` where a `List<Real>` is required.
+
+> **Technical note:** This rule for generic collections is called invariance.
 
 ## 5. Output and input with `write` and `take`
 
@@ -188,9 +215,13 @@ Passed
 
 ## 8. Loops with `while`, `until`, and `for`
 
-`while` checks its condition before entering the body. `until` is a
-**post-check** loop: its body runs at least once, and then the loop stops when
-the condition becomes `true`.
+`while` checks its condition before running the code inside it. `until` uses
+the opposite order: it runs its body first and checks the condition afterward.
+Its body therefore runs at least once, and the loop stops when the condition
+becomes `true`.
+
+> **Technical note:** `while` is a pre-check loop, while `until` is a
+> post-check loop.
 
 ```ahd
 count: Int := 0
@@ -222,8 +253,8 @@ for 20
 for 30
 ```
 
-A declaration inside an executable nested scope needs `Local`. `break` exits
-the nearest loop, and `continue` moves to its next iteration.
+When you create a variable inside an `if` or loop block, write `Local`. `break`
+exits the nearest loop, and `continue` moves to its next iteration.
 
 ## 9. Integer ranges with `between`
 
@@ -246,10 +277,29 @@ Expected output:
 
 Negative steps are supported. A zero step raises `DomainError`.
 
+You usually do not need to write the type of a `for` variable; the compiler can
+learn it from the values being visited. You may also write the type explicitly:
+
+```text
+for value in values
+for value: Int in values
+```
+
+In both forms, `value` is created only for the loop. Do not add `Local` to it.
+This form is invalid:
+
+```text
+for value: Local Int in values
+```
+
+> **Technical note:** Letting the compiler determine the type is called type
+> inference. A `for` variable is already treated as Local.
+
 ## 10. Writing and calling Functions
 
-Functions are named in v0.1; there are no nested Functions or lambdas. Each
-parameter and return value has an explicit type.
+Every Function has a name in v0.1. You cannot declare a new Function inside
+another Function, and there are no lambdas. Each parameter and return value
+has an explicit type.
 
 ```ahd
 greet: Function := (
@@ -312,11 +362,52 @@ Hello Ayşe
 The bare `return` in the first `showStatus` call prevents the later `write`
 from running. `hello` completes naturally by reaching the end of its body.
 
+### More than one Function with the same name: overloads
+
+You can define several versions of one Function name when their parameter
+types differ. Write the first as an ordinary `Function` and the later version
+as an `Overload Function`:
+
+```ahd
+describe: Function := (
+    value: Int
+) -> String {
+    return "Int {value}"
+}
+
+describe: Overload Function := (
+    value: Real
+) -> String {
+    return "Real {value}"
+}
+
+write(describe(2))
+write(describe(2.5))
+```
+
+Expected output:
+
+```text
+Int 2
+Real 2.5
+```
+
+The compiler first chooses a version whose parameter type matches exactly. It
+may use the safe `Int`-to-`Real` conversion when needed. If two versions are
+equally good, the call is ambiguous and compilation stops. A return type alone
+cannot select a version.
+
+> **Technical note:** This selection is called overload resolution. A
+> user-written `Function` is not dynamic; before the program runs, the compiler
+> must determine the one version each call will use.
+
 ## 11. `Local` and `Global`
 
-Function parameters already belong to the Function's lexical scope. New
-bindings inside executable nested scopes use `Local`. When a Function needs a
-module-root binding, it declares the required access with `Global`.
+You can use Function parameters directly inside the Function; do not add
+`Local` to them. Write `Local` when you create a variable inside a Function or
+an inner block such as `if`, `for`, or `while`. To use a variable created at
+the top level of the file from inside a Function, declare that access with
+`Global`.
 
 ```ahd
 counter: Int := 0
@@ -339,12 +430,20 @@ Expected output:
 2
 ```
 
-`Global` does not create another value. It explicitly connects the Function
-to the existing module-root binding.
+Here, `counter` is created at the top level of the file. The line
+`counter: Global Int` does not create another counter; it tells the Function to
+use the existing variable. `next` is created only inside the Function, so it
+uses `Local`.
+
+> **Technical note:** These rules describe a variable's scope: the parts of
+> the program where it can be used. `Global` does not make a hidden copy.
 
 ## 12. String operations
 
-String is immutable and indexed by Unicode character rather than UTF-8 byte.
+A String is not changed in place. Indexes count Unicode characters rather than
+UTF-8 bytes.
+
+> **Technical note:** A value that is not changed in place is called immutable.
 
 ```ahd
 text: String := "  Ali,Veli,Ayşe  "
@@ -377,8 +476,8 @@ raises `IndexError`.
 ## 13. Working with Lists
 
 A List is ordered, its first index is `0`, and negative indexes are supported.
-List is a reference object, so aliases that refer to the same List observe its
-mutation.
+If two variables are connected to the same List, they both see the same
+collection. A change made through one variable is visible through the other.
 
 ```ahd
 numbers: List<Int> := [10, 20, 30]
@@ -403,14 +502,23 @@ true
 Ordinary invalid indexing raises `IndexError`. In contrast,
 `List.index(value)` raises `DomainError` when the value is absent.
 
-A `Constant List<T>` deep-freezes the reachable reference structure, not just
-the binding. Mutation through an alias is blocked as well. Remember that
-mutable generic collections are invariant.
+> **Technical note:** Sharing the same List this way is called reference
+> semantics. A second name for the same List is often called an alias.
+
+A `Constant List<T>` cannot be changed. If it contains other Lists, Pairs, or
+Class objects, you also cannot reach through it and change those shared
+objects. Another variable that points to the same List cannot bypass this
+rule.
+
+> **Technical note:** Freezing the whole reachable shared structure is called
+> deep-freeze. Also, `List<Int>` and `List<Real>` cannot directly replace each
+> other; this rule is called generic invariance.
 
 ## 14. `sort`, `reverse`, and `shuffle`
 
-These operations mutate the original List instead of creating a new one.
-Aliases therefore see the same change.
+These operations do not create a new List. They change the order of the List
+you already have. If another variable points to that List, it sees the new
+order too.
 
 ```ahd
 bring Math
@@ -439,11 +547,16 @@ Because the seed is explicit, the expected output is reproducible:
 [2, 4, 1, 3]
 ```
 
-`shuffle` consumes the same program-wide pseudo-random state as `Math.random`
-and `Math.randomInt`. Without an explicit seed, a fresh native process starts
-that state from operating-system entropy, so its sequence is not reproducible.
-This generator is not suitable for cryptographic use. Shuffling an empty or
-singleton List consumes no random state.
+With `Math.seed(42)`, you can reproduce the same shuffle later. `shuffle`,
+`Math.random`, and `Math.randomInt` all use one shared sequence of random
+values. Calling any of them advances that sequence. Without a seed, each new
+program run gets its starting value from the operating system, so repeating
+the result is not guaranteed. Do not use this randomness for security. An
+empty or singleton shuffle does not advance the sequence.
+
+> **Technical note:** The shared sequence is managed by pseudo-random number
+> generator (RNG) state. An unseeded run initializes that state from operating-
+> system entropy.
 
 ## 15. `map`, `filter`, and Function callbacks
 
@@ -507,10 +620,13 @@ Ayşe: 92
 Veli: 78
 ```
 
-Pair is also a reference object, so aliases observe mutation. A missing key
-raises `KeyError`. Updating a key keeps its position; removing and re-adding it
-moves it to the end. A `Constant Pair` deep-freezes its reachable reference
-graph.
+If two variables point to the same Pair, a change through one is visible
+through the other. A missing key raises `KeyError`. Updating a key keeps its
+position; removing and re-adding it moves it to the end. A `Constant Pair`
+prevents changes to the Pair and to shared values reached through it.
+
+> **Technical note:** The same reference-semantics and deep-freeze rules used
+> by List apply here.
 
 ## 17. Class and attributes
 
@@ -540,16 +656,72 @@ Expected output:
 #42 Ali
 ```
 
-A `Constant` attribute cannot be changed and deep-freezes a reference value.
-A `Local` structure input is constructor-local and does not become an
-attribute. `Confidential` members are unavailable through ordinary external
-access.
+A `Constant` attribute cannot be changed later. If it holds a List, Pair, or
+Class object, the shared structure reached through it is frozen too. A `Local`
+structure input is used only while constructing the object and does not become
+an attribute. `Confidential` members are unavailable through ordinary access
+from outside the Class.
+
+> **Technical note:** The wider freezing behavior for a `Constant` reference
+> value is called deep-freeze.
+
+### Parent and child Classes
+
+One Class can receive the features of another Class. Read the parent Class
+first, followed by the child that extends it:
+
+```ahd
+Person: Class<> := {
+    structure: Attributes := (
+        name: String
+    )
+
+    describe: Function := (
+    ) -> String {
+        return "Person {attribute.name}"
+    }
+}
+
+Student: Class<Person> := {
+    structure: Attributes := (
+        SuperClass.attributes
+        number: Int
+    )
+
+    describe: Override Function := (
+    ) -> String {
+        return "{SuperClass.describe()} #{attribute.number}"
+    }
+}
+
+student: Student := Student(name: "Ayşe", number: 7)
+person: Person := student
+write(person.describe())
+```
+
+Expected output:
+
+```text
+Person Ayşe #7
+```
+
+`Student` is a child of `Person`. `SuperClass.attributes` carries the parent's
+constructor inputs forward. `Override` says that an inherited method is being
+replaced intentionally. `SuperClass.describe()` calls the parent's version.
+Although the variable `person` has type `Person`, the actual object is a
+`Student`, so `Student.describe` runs.
+
+> **Technical note:** Keeping a child object in a parent-typed variable is
+> called upcasting. Choosing the method for the actual object is called dynamic
+> dispatch.
 
 ## 18. Null safety
 
-`null` is not a separate nullable type. It is the state in which a value is
-absent. The compiler follows whether a binding is `Null`, `MaybeNull`, or
-`NonNull` as control flows through the program.
+`null` means “this variable has a known type, but it has no value right now.”
+There is no separate `null` type written beside types such as `String` or
+`Student`. As the program moves through different branches, the compiler
+tracks whether a value is definitely present, definitely `null`, or possibly
+`null`.
 
 ```ahd
 message: String := null
@@ -569,16 +741,23 @@ Expected output:
 READY
 ```
 
-Member access, calls, and indexing on a maybe-null value are compile-time
-errors until a check refines it. List elements and Pair values can be null, so
-a value read from them may need refinement. A `Constant` cannot be initialized
-with null.
+Member access, calls, and indexing are compile-time errors when the value might
+be `null`. After a check such as `message != null`, the compiler knows the
+value is present inside that block. List elements and Pair values can also be
+null, so values read from them may need the same kind of check. A `Constant`
+cannot be initialized with null.
+
+> **Technical note:** Documentation names the three possibilities `Null`,
+> `MaybeNull`, and `NonNull`. The compiler learning more after a check is
+> called null refinement.
 
 ## 19. Errors with `attempt`, `except`, `ultimately`, and `toss`
 
-Runtime errors are catchable Class values. `attempt` protects a block,
-`except` handles a matching error, `ultimately` runs regardless of the result,
-and `toss` raises an Error.
+If code inside `attempt` produces an error, a suitable `except` block can run.
+`ultimately` performs a final step whether or not there was an error. Use
+`toss` when your own code needs to raise an Error deliberately.
+
+> **Technical note:** AhdCode runtime errors are catchable Class values.
 
 ```ahd
 requirePositive: Function := (
@@ -673,10 +852,13 @@ Expected output:
 2
 ```
 
-The same seed reproduces the same pseudo-random sequence. `Math.random()`
-returns a value with `0.0 <= value < 1.0`. Without a seed, native process
-startup uses operating-system entropy. This generator is not cryptographically
-secure.
+Using the same seed again reproduces the same sequence of random values.
+`Math.random()` returns a value with `0.0 <= value < 1.0`. Without a seed, each
+new program run gets its starting value from the operating system. This number
+generator must not be used for security or encryption.
+
+> **Technical note:** The sequence is pseudo-random. An unseeded run takes its
+> starting value from operating-system entropy.
 
 ## 22. A small combined application: grade summary
 
@@ -742,12 +924,13 @@ Try it: enter one invalid grade and observe the `except` branch.
 
 ## 23. Common beginner mistakes
 
-- Use `:=`, not `=`, when introducing a binding.
+- Use `:=`, not `=`, when creating a variable.
 - Do not write `if value`; produce a `Bool` with a comparison such as
   `value > 0`.
-- Add `Local` to a new declaration in an executable nested scope.
-- Declare the required `Global` access when a Function uses a module-root
-  binding.
+- Add `Local` when creating a variable inside a Function or another inner
+  block.
+- Declare the required `Global` access when a Function uses a variable from
+  the top level of the file.
 - Remember that an `until` body always runs at least once.
 - Remember that `between` excludes its stop.
 - List indexing starts at `0`; negative indexes count from the end.
@@ -779,8 +962,9 @@ immediately.
    lowercase, and then capitalizes its first character.
 8. **Student-score Pair:** Associate names with scores, update one score, and
    print entries in insertion order.
-9. **Deterministic dice:** Call `Math.seed(42)`, generate ten rolls with
-   inclusive `randomInt(1, 6)`, and confirm that another run repeats them.
+9. **Repeatable dice:** Call `Math.seed(42)`, generate ten rolls with
+   `randomInt(1, 6)`, which includes both bounds, and confirm that another run
+   repeats them.
 10. **Class-based record:** Create a `Student` Class with `name` and a
     `Constant number` attribute plus a method that returns a summary.
 
