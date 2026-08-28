@@ -274,6 +274,44 @@ A call must use either all positional arguments or all named arguments; it
 cannot mix the two forms. A Function that does not return a value uses the
 return type `Nothing`.
 
+In a Function returning `Nothing`, a bare `return` ends the Function
+immediately without returning a value. When no early exit is needed, writing
+`return` is optional; reaching the end of the Function body is enough.
+
+```ahd
+showStatus: Function := (
+    score: Int
+) -> Nothing {
+    if score < 0 {
+        write("Invalid score")
+        return
+    }
+
+    write("Score: {score}")
+}
+
+hello: Function := (
+    name: String
+) -> Nothing {
+    write("Hello {name}")
+}
+
+showStatus(-5)
+showStatus(80)
+hello("Ayşe")
+```
+
+Expected output:
+
+```text
+Invalid score
+Score: 80
+Hello Ayşe
+```
+
+The bare `return` in the first `showStatus` call prevents the later `write`
+from running. `hello` completes naturally by reaching the end of its body.
+
 ## 11. `Local` and `Global`
 
 Function parameters already belong to the Function's lexical scope. New

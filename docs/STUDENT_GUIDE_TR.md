@@ -274,6 +274,44 @@ Bir çağrı tamamen positional veya tamamen named olmalıdır; iki biçim aynı
 çağrıda karıştırılmaz. Değer döndürmeyen bir Function'ın dönüş türü
 `Nothing`'dir.
 
+`Nothing` döndüren bir Function'da çıplak `return`, değer döndürmeden Function'ı
+hemen bitirir. Erken çıkış gerekmiyorsa `return` yazmak zorunlu değildir;
+Function gövdesinin sonuna ulaşması yeterlidir.
+
+```ahd
+showStatus: Function := (
+    score: Int
+) -> Nothing {
+    if score < 0 {
+        write("Geçersiz puan")
+        return
+    }
+
+    write("Puan: {score}")
+}
+
+hello: Function := (
+    name: String
+) -> Nothing {
+    write("Merhaba {name}")
+}
+
+showStatus(-5)
+showStatus(80)
+hello("Ayşe")
+```
+
+Beklenen çıktı:
+
+```text
+Geçersiz puan
+Puan: 80
+Merhaba Ayşe
+```
+
+İlk `showStatus` çağrısında çıplak `return`, alttaki `write` satırına ulaşılmasını
+engeller. `hello` ise gövdenin sonuna doğal biçimde ulaşarak tamamlanır.
+
 ## 11. `Local` ve `Global`
 
 Function parametreleri zaten kendi lexical scope'undadır. Executable nested
