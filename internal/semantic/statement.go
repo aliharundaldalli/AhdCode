@@ -266,9 +266,11 @@ func (a *analyzer) analyzeMemberDeclaration(declaration *ast.VariableDecl, curre
 
 func (a *analyzer) analyzeAssignment(statement *ast.AssignmentStmt, current *scope, flow flowState) flowState {
 	target := a.analyzeExpression(statement.Target, current, flow)
-	if target.symbol == nil && !target.invalid() {
-		if _, ok := statement.Target.(*ast.IndexExpr); !ok {
-			a.error(codeInvalidTarget, "assignment target does not resolve to a mutable binding or member", statement.Target.Span(), "assign an identifier, member, or index")
+	if target.symbol == nil {
+		if !target.invalid() {
+			if _, ok := statement.Target.(*ast.IndexExpr); !ok {
+				a.error(codeInvalidTarget, "assignment target does not resolve to a mutable binding or member", statement.Target.Span(), "assign an identifier, member, or index")
+			}
 		}
 	} else if target.symbol.Constant {
 		a.error(codeConstantAssignment, fmt.Sprintf("Constant %q cannot be reassigned", target.symbol.Name), statement.Target.Span(), "remove the assignment or declare a mutable binding")

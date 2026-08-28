@@ -597,6 +597,20 @@ func TestFrontendErrorsStopBeforeCodeGeneration(t *testing.T) {
 	}
 }
 
+func TestUndefinedAssignmentStopsBeforeCodeGeneration(t *testing.T) {
+	directory := writeSources(t, map[string]string{"main.ahd": "score = 10\n"})
+	path, result := BuildProgram(filepath.Join(directory, "main.ahd"), filepath.Join(t.TempDir(), "program"))
+	if path != "" || !result.HasErrors() {
+		t.Fatal("expected undefined assignment to stop on a frontend error")
+	}
+	if result.Program != nil {
+		t.Fatal("no Go program may be generated from an undefined assignment")
+	}
+	if len(result.Diagnostics) != 1 || result.Diagnostics[0].Code != "SEM001" {
+		t.Fatalf("diagnostics = %+v, want one SEM001", result.Diagnostics)
+	}
+}
+
 func TestUnsupportedNodeStopsTheBuildWithABackendDiagnostic(t *testing.T) {
 	directory := writeSources(t, map[string]string{"main.ahd": `describe: Function := (
     action: Function

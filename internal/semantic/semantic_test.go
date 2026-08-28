@@ -66,6 +66,41 @@ func TestAssignmentCompatibility(t *testing.T) {
 	}
 }
 
+func TestUndefinedMutationTargetsReportUnknownName(t *testing.T) {
+	for _, text := range []string{
+		"missing = 1",
+		"missing += 1",
+		"missing -= 1",
+		"missing *= 2",
+		"missing /= 2",
+		"missing %= 2",
+		"missing ^= 2",
+		"missing++",
+		"missing--",
+		"++missing",
+		"--missing",
+	} {
+		t.Run(text, func(t *testing.T) {
+			_, result := analyzeText(t, text)
+			if len(result.Diagnostics) != 1 || result.Diagnostics[0].Code != codeUnknownName {
+				t.Fatalf("diagnostics for %q = %+v, want one %s", text, result.Diagnostics, codeUnknownName)
+			}
+		})
+	}
+}
+
+func TestValidMutationTargetsRemainAccepted(t *testing.T) {
+	_, result := analyzeText(t, `score: Int := 5
+score = 10
+score += 2
+score -= 1
+score *= 2
+score++
+score--
+write(score)`)
+	requireSemanticClean(t, result)
+}
+
 func TestConditionsRequireBool(t *testing.T) {
 	_, bad := analyzeText(t, "if 5 {\n}")
 	requireSemanticCode(t, bad, codeConditionType)
