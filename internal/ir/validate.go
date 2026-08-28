@@ -408,6 +408,39 @@ func (v *validator) typeAssignable(actual, target Type) bool {
 func (v *validator) requireType(value Type, span source.Span) {
 	if !IsValidType(value) {
 		v.error(CodeMissingType, "IR node has no concrete type", span)
+		return
+	}
+	v.requirePairKeys(value, span)
+}
+
+// requirePairKeys defensively rejects a Pair type whose key has no v0.1 key
+// representation. The frontend already enforces this, so reaching it means the
+// IR was built without that check.
+func (v *validator) requirePairKeys(value Type, span source.Span) {
+	switch value.Kind {
+	case PairType:
+		if value.Key != nil && !IsPairKeyType(*value.Key) {
+			v.error(CodeMalformedNode, fmt.Sprintf("Pair key type %s is not a valid v0.1 key type", value.Key), span)
+			return
+		}
+		if value.Key != nil {
+			v.requirePairKeys(*value.Key, span)
+		}
+		if value.Value != nil {
+			v.requirePairKeys(*value.Value, span)
+		}
+	case ListType:
+		if value.Element != nil {
+			v.requirePairKeys(*value.Element, span)
+		}
+	case FunctionType:
+		if value.Signature == nil {
+			return
+		}
+		for _, parameter := range value.Signature.Parameters {
+			v.requirePairKeys(parameter.Type, span)
+		}
+		v.requirePairKeys(value.Signature.Return, span)
 	}
 }
 func (v *validator) requireSymbol(id SymbolID, span source.Span) {

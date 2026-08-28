@@ -1465,13 +1465,30 @@ Function parameters and results use the non-null representation, because `ir.Sig
 
 - checked `Int` arithmetic with overflow, modulo-by-zero, and negative-exponent errors;
 - `Real` arithmetic that rejects division by zero and non-finite or undefined results instead of exposing `Inf`/`NaN`;
-- `AhdList`, pointer-backed so `clear` and indexed writes are observed by every alias;
-- `AhdPair`, insertion-ordered, where updating an existing key keeps its position and re-adding a removed key appends;
+- `AhdList`, pointer-backed so `clear`, `add`, `eject`, and indexed writes are observed by every alias;
+- `AhdPair`, insertion-ordered, where updating an existing key keeps its position and re-adding an ejected key appends;
 - shallow iteration snapshots for `for` over List elements, String characters, and Pair keys;
 - canonical `str` rendering, including quoted nested Strings and `<ClassName>` instance text;
 - character-based String indexing, slicing, and `len`.
 
 Normative runtime decisions are: `%` follows truncated-division, dividend-signed remainder semantics; `take` returns the input line without its terminator and yields an empty String at end of input; `List`/`Pair` `==` is deep value equality while `same` compares object identity.
+
+### Built-in collection mutation
+
+`list.add`, `list.eject`, and `pair.eject` are typed language operations, not
+dynamic member calls. Semantic analysis recognizes them from the receiver type
+in `analyzeCollectionCall`, records the chosen operation in
+`Result.CollectionCalls`, and statically checks the receiver null-state and the
+argument type against the receiver's element or key type. Lowering emits a
+`CallExpr` whose `Callable` is `builtin:core::List.add`,
+`builtin:core::List.eject`, or `builtin:core::Pair.eject`, and whose `Callee`
+is the already-lowered receiver, so the target is evaluated exactly once. The
+backend maps those three callables onto the `AhdList.Add`, `AhdList.Eject`, and
+`AhdPair.Eject` runtime helpers; it never inspects member-name strings. Each
+helper goes through the same `requireMutable` guard as `clear`, so the Constant
+deep-freeze contract covers them without additional backend logic. A Class may
+still declare its own `add` or `eject` method, because the receiver type
+decides which path applies.
 
 ### Control flow
 

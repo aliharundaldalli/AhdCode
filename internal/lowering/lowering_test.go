@@ -568,3 +568,38 @@ func TestListConcatenationIsTypedAsAListOperation(t *testing.T) {
 		t.Fatalf("List concatenation was not typed as a List operation: %s", dump)
 	}
 }
+
+func TestCollectionMutationsLowerToBuiltinOperations(t *testing.T) {
+	result := lowerSources(t, map[string]string{"/Main.ahd": `values: List<Int> := []
+scores: Pair<String, Int> := {}
+values.add(1)
+values.eject(0)
+scores.eject("a")
+`}, "/Main.ahd")
+	dump := ir.Dump(result.Compilation)
+	for _, expected := range []string{"builtin:core::List.add", "builtin:core::List.eject", "builtin:core::Pair.eject"} {
+		if !strings.Contains(dump, expected) {
+			t.Fatalf("collection mutation did not lower to %s:\n%s", expected, dump)
+		}
+	}
+}
+
+func TestEmptyCollectionLiteralsLowerWithTheirDeclaredType(t *testing.T) {
+	result := lowerSources(t, map[string]string{"/Main.ahd": `values: List<Int> := []
+scores: Pair<String, Int> := {}
+rows: List<List<Int>> := [
+    []
+]
+`}, "/Main.ahd")
+	main := moduleIR(t, result.Compilation, "Main")
+	if got := globalIR(t, main, "values").Type.String(); got != "List<Int>" {
+		t.Fatalf("empty List global type = %s", got)
+	}
+	if got := globalIR(t, main, "scores").Type.String(); got != "Pair<String, Int>" {
+		t.Fatalf("empty Pair global type = %s", got)
+	}
+	dump := ir.Dump(result.Compilation)
+	if strings.Contains(dump, "Invalid") {
+		t.Fatalf("a contextually typed empty literal left an Invalid type in the IR:\n%s", dump)
+	}
+}

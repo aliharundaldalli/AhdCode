@@ -43,6 +43,9 @@ type analyzer struct {
 
 	loopDepth        int
 	moduleInferences []*Symbol
+	// reportedPairKeys keeps one invalid Pair key diagnostic per type
+	// reference, because a declaration's type is resolved more than once.
+	reportedPairKeys map[source.Span]bool
 }
 
 // Analyzer is the reusable parser.Result -> semantic.Result entry point.
@@ -77,6 +80,8 @@ func analyzeWithEnvironment(parsed parser.Result, environment Environment) Resul
 		functionNodes: make(map[*ast.FunctionDecl]*Callable),
 		functionOwner: make(map[*ast.FunctionDecl]*Symbol),
 		flow:          make(flowState),
+
+		reportedPairKeys: make(map[source.Span]bool),
 	}
 	a.result.ResolvedSymbols = make(map[ast.Node]*Symbol)
 	a.result.ExpressionTypes = make(map[ast.Expr]types.Type)
@@ -85,6 +90,7 @@ func analyzeWithEnvironment(parsed parser.Result, environment Environment) Resul
 	a.result.SelectedFunctionValues = make(map[ast.Expr]*Callable)
 	a.result.OverloadResolutions = make(map[*ast.CallExpr]ResolutionTrace)
 	a.result.SuperCalls = make(map[ast.Expr]bool)
+	a.result.CollectionCalls = make(map[*ast.CallExpr]CollectionOperation)
 	a.module = newScope(nil, moduleScope)
 	a.installBuiltins()
 	if parsed.Program == nil {
@@ -528,7 +534,8 @@ func (a *analyzer) resolveType(reference *ast.TypeRef) types.Type {
 			a.error(codeInvalidType, "Pair requires exactly two type arguments", reference.Span(), fmt.Sprintf("received %d", len(reference.Arguments)))
 			return types.Pair{Key: types.Invalid, Value: types.Invalid}
 		}
-		return types.Pair{Key: a.resolveType(reference.Arguments[0]), Value: a.resolveType(reference.Arguments[1])}
+		key := a.resolveType(reference.Arguments[0])
+		return types.Pair{Key: a.checkedPairKey(key, reference.Arguments[0].Span()), Value: a.resolveType(reference.Arguments[1])}
 	default:
 		if class := a.classes[reference.Name]; class != nil {
 			if len(reference.Arguments) != 0 {
@@ -540,6 +547,20 @@ func (a *analyzer) resolveType(reference *ast.TypeRef) types.Type {
 		a.error(codeInvalidType, fmt.Sprintf("unknown type %q", reference.Name), reference.Span(), "declare the Class or use an AhdCode built-in type")
 		return types.Invalid
 	}
+}
+
+// checkedPairKey enforces the v0.1 Pair key type rule. A rejected key degrades
+// to Invalid so later assignability checks do not cascade a second diagnostic
+// about the same declaration.
+func (a *analyzer) checkedPairKey(key types.Type, span source.Span) types.Type {
+	if types.IsInvalid(key) || types.IsPairKey(key) {
+		return key
+	}
+	if !a.reportedPairKeys[span] {
+		a.reportedPairKeys[span] = true
+		a.error(codeInvalidPairKey, fmt.Sprintf("Pair key type must be String, Int, or Bool; received %s", types.Display(key)), span, "use a String, Int, or Bool key type")
+	}
+	return types.Invalid
 }
 
 func (a *analyzer) classSymbolFor(identity *types.ClassSymbol) *Symbol {

@@ -139,6 +139,21 @@ func Display(value Type) string {
 }
 
 func IsInvalid(value Type) bool { return value == nil || value.Kind() == InvalidKind }
+
+// IsPairKey reports whether a type may be used as a v0.1 Pair key. Keys are
+// limited to the stable simple scalar types; Real, Class instances, Function
+// values, collections, and null are not Pair keys.
+func IsPairKey(value Type) bool {
+	if value == nil {
+		return false
+	}
+	switch value.Kind() {
+	case StringKind, IntKind, BoolKind:
+		return true
+	default:
+		return false
+	}
+}
 func IsNumeric(value Type) bool {
 	return value != nil && (value.Kind() == IntKind || value.Kind() == RealKind)
 }

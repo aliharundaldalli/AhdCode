@@ -35,4 +35,7 @@ const (
 	CodeCircularDependency  = "SEM032"
 	CodeFailedDependency    = "SEM033"
 	CodeNamespaceMember     = "SEM034"
+	codeInvalidPairKey      = "SEM035"
+	codeDuplicatePairKey    = "SEM036"
+	codeCollectionInference = "SEM037"
 )

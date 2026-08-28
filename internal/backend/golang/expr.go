@@ -741,8 +741,36 @@ func (generator *generator) builtinCall(value *ir.CallExpr) string {
 			return "nil"
 		}
 		return generator.expr(argument(0)) + ".Clear()"
+	case "List.add", "List.eject", "Pair.eject":
+		return generator.collectionMutation(name, value)
 	default:
 		return generator.unsupported("Fundamentals function "+name, meta.Span)
+	}
+}
+
+// collectionMutation lowers a built-in List or Pair mutation. The receiver is
+// the call's callee, so the operation evaluates its target exactly once.
+func (generator *generator) collectionMutation(name string, value *ir.CallExpr) string {
+	meta := value.ExprMeta()
+	if value.Callee == nil || len(value.Arguments) != 1 || value.Arguments[0].Value == nil {
+		generator.fail(CodeGenerationFailure, name+" has no receiver or argument", meta.Span, "the IR call is malformed")
+		return "nil"
+	}
+	receiver := value.Callee.ExprMeta().Type
+	argument := value.Arguments[0].Value
+	switch name {
+	case "List.add":
+		if receiver.Element == nil {
+			return generator.unsupported("adding to an untyped List", meta.Span)
+		}
+		return generator.expr(value.Callee) + ".Add(" + generator.value(argument, *receiver.Element, true) + ")"
+	case "List.eject":
+		return generator.expr(value.Callee) + ".Eject(" + generator.value(argument, ir.Type{Kind: ir.IntType}, false) + ")"
+	default:
+		if receiver.Key == nil {
+			return generator.unsupported("ejecting from an untyped Pair", meta.Span)
+		}
+		return generator.expr(value.Callee) + ".Eject(" + generator.value(argument, *receiver.Key, false) + ")"
 	}
 }
 

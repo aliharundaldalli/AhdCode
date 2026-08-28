@@ -118,6 +118,19 @@ type ModuleInterface struct {
 	ExportNames []string
 }
 
+// CollectionOperation is one built-in collection mutation. These are typed
+// language operations rather than dynamic member calls.
+type CollectionOperation string
+
+const (
+	// ListAdd appends one element to the end of a List.
+	ListAdd CollectionOperation = "List.add"
+	// ListEject removes the element at an index, which may be negative.
+	ListEject CollectionOperation = "List.eject"
+	// PairEject removes one key and its value from a Pair.
+	PairEject CollectionOperation = "Pair.eject"
+)
+
 // Environment supplies already-resolved dependency interfaces to one semantic
 // analysis run. Filesystem/module graph work stays outside this package.
 type Environment struct {
@@ -140,6 +153,9 @@ type Result struct {
 	// SuperCalls marks member expressions written as SuperClass.member, which
 	// bind the current instance but call the parent implementation directly.
 	SuperCalls map[ast.Expr]bool
+	// CollectionCalls records the built-in List and Pair mutation operations,
+	// so lowering never has to rediscover them from member names.
+	CollectionCalls map[*ast.CallExpr]CollectionOperation
 }
 
 func (result Result) HasErrors() bool {

@@ -380,7 +380,46 @@ func comparisonPrefix(left, right ir.Type) string {
 	}
 }
 
+// lowerCollectionCall lowers a built-in List or Pair mutation. The receiver is
+// carried as the callee so the operation keeps one evaluated target.
+func (lowerer *moduleLowerer) lowerCollectionCall(call *ast.CallExpr, operation semantic.CollectionOperation, base ir.ExprBase) ir.Expr {
+	member, ok := call.Callee.(*ast.MemberExpr)
+	if !ok {
+		lowerer.compilation.error(CodeMissingSemantic, "collection mutation has no receiver", call.Span())
+		return nil
+	}
+	receiver := lowerer.lowerExpr(member.Object)
+	if receiver == nil {
+		return nil
+	}
+	argumentType := ir.Type{Kind: ir.IntType}
+	receiverType := receiver.ExprMeta().Type
+	switch operation {
+	case semantic.ListAdd:
+		if receiverType.Element != nil {
+			argumentType = *receiverType.Element
+		}
+	case semantic.PairEject:
+		if receiverType.Key != nil {
+			argumentType = *receiverType.Key
+		}
+	}
+	result := &ir.CallExpr{
+		ExprBase: base, Callable: ir.CallableID("builtin:core::" + string(operation)),
+		Callee: receiver, ReturnNull: ir.NonNull,
+	}
+	for index, argument := range call.Arguments {
+		result.Arguments = append(result.Arguments, ir.Argument{
+			ParameterIndex: index, Value: lowerer.lowerExprExpected(argument.Value, argumentType),
+		})
+	}
+	return result
+}
+
 func (lowerer *moduleLowerer) lowerCall(call *ast.CallExpr, base ir.ExprBase) ir.Expr {
+	if operation, known := lowerer.semantic.CollectionCalls[call]; known {
+		return lowerer.lowerCollectionCall(call, operation, base)
+	}
 	symbol := lowerer.semantic.ResolvedSymbols[call.Callee]
 	if symbol != nil && symbol.Alias != nil {
 		symbol = symbol.Alias

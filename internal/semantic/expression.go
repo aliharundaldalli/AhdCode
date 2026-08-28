@@ -3,6 +3,7 @@ package semantic
 import (
 	"fmt"
 	"math/big"
+	"strconv"
 
 	"ahdcode/internal/source"
 	"ahdcode/internal/syntax/ast"
@@ -49,6 +50,16 @@ func (a *analyzer) analyzeExpressionExpected(expression ast.Expr, current *scope
 		return info
 	case *ast.IdentifierExpr:
 		return a.analyzeFunctionValueIdentifier(value, current, flow, expected)
+	case *ast.ListExpr:
+		info := a.analyzeListExpected(value, current, flow, expected)
+		a.result.ExpressionTypes[expression] = info.typeValue
+		a.result.NullStates[expression] = info.nullState
+		return info
+	case *ast.PairExpr:
+		info := a.analyzePairExpected(value, current, flow, expected)
+		a.result.ExpressionTypes[expression] = info.typeValue
+		a.result.NullStates[expression] = info.nullState
+		return info
 	default:
 		return a.analyzeExpression(expression, current, flow)
 	}
@@ -414,6 +425,11 @@ func (a *analyzer) analyzeFunctionValueIdentifier(identifier *ast.IdentifierExpr
 }
 
 func (a *analyzer) analyzeCallExpected(call *ast.CallExpr, current *scope, flow flowState, expected types.Type) expressionInfo {
+	// The built-in collection mutations are typed language operations, so they
+	// are resolved before ordinary callee analysis rather than as members.
+	if info, handled := a.analyzeCollectionCall(call, current, flow); handled {
+		return info
+	}
 	callee := a.analyzeExpression(call.Callee, current, flow)
 	if callee.invalid() {
 		// Analyze arguments for independent diagnostics, but do not report that
@@ -476,6 +492,106 @@ func (a *analyzer) analyzeCallExpected(call *ast.CallExpr, current *scope, flow 
 	a.validateCallArguments(call, callable, arguments)
 	a.result.SelectedCallables[call] = callable
 	return expressionInfo{typeValue: callable.Signature.Return, nullState: callable.ReturnNull}
+}
+
+// collectionOperationFor names the built-in mutation a member call selects, if
+// any. The receiver type decides, so a Class may still declare its own add or
+// eject method.
+func collectionOperationFor(receiver types.Type, name string) (CollectionOperation, bool) {
+	switch receiver.Kind() {
+	case types.ListKind:
+		switch name {
+		case "add":
+			return ListAdd, true
+		case "eject":
+			return ListEject, true
+		}
+	case types.PairKind:
+		if name == "eject" {
+			return PairEject, true
+		}
+	}
+	return "", false
+}
+
+// analyzeCollectionCall type-checks a built-in List or Pair mutation. Each one
+// mutates the receiver in place and produces Nothing.
+func (a *analyzer) analyzeCollectionCall(call *ast.CallExpr, current *scope, flow flowState) (expressionInfo, bool) {
+	member, ok := call.Callee.(*ast.MemberExpr)
+	if !ok {
+		return expressionInfo{}, false
+	}
+	receiver := a.analyzeExpression(member.Object, current, flow)
+	operation, known := collectionOperationFor(receiver.typeValue, member.Name)
+	if !known {
+		return expressionInfo{}, false
+	}
+	a.result.CollectionCalls[call] = operation
+	a.result.ExpressionTypes[call.Callee] = types.Nothing
+	a.result.NullStates[call.Callee] = NonNull
+	if receiver.nullState != NonNull {
+		a.nullableError(string(operation), member.Object, receiver.nullState)
+	}
+	expectedArgument := collectionArgumentType(operation, receiver.typeValue)
+	arguments := a.analyzeCollectionArguments(call, current, flow, expectedArgument)
+	nothing := expressionInfo{typeValue: types.Nothing, nullState: NonNull}
+	if len(arguments) != 1 {
+		a.error(codeCallArguments, fmt.Sprintf("%s expects 1 argument; received %d", operation, len(arguments)), call.Span(), collectionArgumentHint(operation))
+		return nothing, true
+	}
+	if call.Arguments[0].Name != "" {
+		a.error(codeCallArguments, fmt.Sprintf("%s does not accept a named argument", operation), call.Arguments[0].Span(), collectionArgumentHint(operation))
+		return nothing, true
+	}
+	argument := arguments[0]
+	if argument.nullState != NonNull && operation != ListAdd {
+		a.nullableError(string(operation), call.Arguments[0].Value, argument.nullState)
+		return nothing, true
+	}
+	if argument.nullState == Null {
+		return nothing, true
+	}
+	if !types.Assignable(expectedArgument, argument.typeValue) {
+		a.typeMismatch(call.Arguments[0].Span(), expectedArgument, argument.typeValue, string(operation)+" argument")
+	}
+	return nothing, true
+}
+
+func (a *analyzer) analyzeCollectionArguments(call *ast.CallExpr, current *scope, flow flowState, expected types.Type) []expressionInfo {
+	arguments := make([]expressionInfo, 0, len(call.Arguments))
+	for _, argument := range call.Arguments {
+		arguments = append(arguments, a.analyzeExpressionExpected(argument.Value, current, flow, expected))
+	}
+	return arguments
+}
+
+// collectionArgumentType is the statically required argument type of one
+// built-in mutation.
+func collectionArgumentType(operation CollectionOperation, receiver types.Type) types.Type {
+	switch operation {
+	case ListAdd:
+		if list, ok := receiver.(types.List); ok {
+			return list.Element
+		}
+	case ListEject:
+		return types.Int
+	case PairEject:
+		if pair, ok := receiver.(types.Pair); ok {
+			return pair.Key
+		}
+	}
+	return types.Invalid
+}
+
+func collectionArgumentHint(operation CollectionOperation) string {
+	switch operation {
+	case ListAdd:
+		return "pass one element of the List element type"
+	case ListEject:
+		return "pass one Int index, which may be negative"
+	default:
+		return "pass one key of the Pair key type"
+	}
 }
 
 func (a *analyzer) analyzeCallArguments(call *ast.CallExpr, current *scope, flow flowState, callable *Callable) []expressionInfo {
@@ -903,9 +1019,18 @@ func (a *analyzer) analyzeSlice(slice *ast.SliceExpr, current *scope, flow flowS
 }
 
 func (a *analyzer) analyzeList(list *ast.ListExpr, current *scope, flow flowState) expressionInfo {
+	return a.analyzeListExpected(list, current, flow, nil)
+}
+
+// analyzeListExpected infers a List literal from its elements, and falls back
+// to the surrounding expected type only when the literal carries no element
+// type of its own. Successful inference is never overridden, so generic
+// invariance is unaffected.
+func (a *analyzer) analyzeListExpected(list *ast.ListExpr, current *scope, flow flowState, expected types.Type) expressionInfo {
+	expectedElement := expectedListElement(expected)
 	elementType := types.Invalid
 	for _, element := range list.Elements {
-		info := a.analyzeExpression(element, current, flow)
+		info := a.analyzeCollectionEntry(element, current, flow, expectedElement)
 		if info.nullState == Null {
 			continue
 		}
@@ -923,18 +1048,168 @@ func (a *analyzer) analyzeList(list *ast.ListExpr, current *scope, flow flowStat
 			a.typeMismatch(element.Span(), elementType, info.typeValue, "List element")
 		}
 	}
+	if types.IsInvalid(elementType) {
+		elementType = expectedElement
+		if types.IsInvalid(elementType) && !declaredCollectionRejected(expected) {
+			a.error(codeCollectionInference, "List element type cannot be inferred", list.Span(), "declare the collection type, as in values: List<Int> := []")
+		}
+	}
 	return expressionInfo{typeValue: types.List{Element: elementType}, nullState: NonNull}
 }
 
+// analyzeCollectionEntry analyzes one literal entry. A collection context is
+// propagated so a nested empty literal is contextually typed; every other
+// expression is analyzed exactly as before.
+func (a *analyzer) analyzeCollectionEntry(expression ast.Expr, current *scope, flow flowState, expected types.Type) expressionInfo {
+	switch expected.(type) {
+	case types.List, types.Pair:
+		return a.analyzeExpressionExpected(expression, current, flow, expected)
+	default:
+		return a.analyzeExpression(expression, current, flow)
+	}
+}
+
+// expectedListElement is the element type a List literal may adopt from its
+// surrounding context.
+func expectedListElement(expected types.Type) types.Type {
+	if declared, ok := expected.(types.List); ok {
+		return declared.Element
+	}
+	return types.Invalid
+}
+
+// declaredCollectionRejected reports whether the surrounding collection type
+// is itself already in error, so an uninferable literal stays quiet instead of
+// restating the same root cause.
+func declaredCollectionRejected(expected types.Type) bool {
+	switch declared := expected.(type) {
+	case types.List:
+		return types.IsInvalid(declared.Element)
+	case types.Pair:
+		return types.IsInvalid(declared.Key) || types.IsInvalid(declared.Value)
+	default:
+		return false
+	}
+}
+
 func (a *analyzer) analyzePair(pair *ast.PairExpr, current *scope, flow flowState) expressionInfo {
+	return a.analyzePairExpected(pair, current, flow, nil)
+}
+
+// analyzePairExpected checks a Pair literal against the v0.1 key rules: keys
+// use only the stable simple scalar types, and one literal may not repeat a
+// key. When the declared type already reported an invalid key type, the
+// literal degrades quietly instead of restating the same root cause.
+func (a *analyzer) analyzePairExpected(pair *ast.PairExpr, current *scope, flow flowState, expected types.Type) expressionInfo {
+	expectedKey, expectedValue := expectedPairTypes(expected)
 	keyType, valueType := types.Invalid, types.Invalid
+	rejectedKey := false
+	seen := make(map[string]source.Span)
 	for _, entry := range pair.Entries {
+		// A Pair key is always a simple scalar, so only the value position
+		// carries a collection context.
 		key := a.analyzeExpression(entry.Key, current, flow)
-		value := a.analyzeExpression(entry.Value, current, flow)
+		value := a.analyzeCollectionEntry(entry.Value, current, flow, expectedValue)
+		if key.nullState == Null {
+			a.error(codeInvalidPairKey, "a Pair key must not be null", entry.Key.Span(), "use a NonNull String, Int, or Bool key")
+			rejectedKey = true
+			continue
+		}
 		keyType = a.mergeLiteralType(keyType, key.typeValue, entry.Key)
 		valueType = a.mergeLiteralType(valueType, value.typeValue, entry.Value)
+		a.checkDuplicatePairKey(entry.Key, seen)
+	}
+	if !types.IsInvalid(keyType) && !types.IsPairKey(keyType) {
+		if !declaredPairKeyRejected(expected) {
+			a.error(codeInvalidPairKey, fmt.Sprintf("Pair key type must be String, Int, or Bool; received %s", types.Display(keyType)), pair.Span(), "use String, Int, or Bool keys")
+		}
+		keyType = types.Invalid
+	}
+	// An empty literal adopts the surrounding expected type. A literal that has
+	// entries keeps whatever its keys resolved to, so a rejected key is not
+	// masked by the declared type.
+	if len(pair.Entries) == 0 {
+		keyType, valueType = expectedKey, expectedValue
+		if (types.IsInvalid(keyType) || types.IsInvalid(valueType)) && !declaredCollectionRejected(expected) {
+			a.error(codeCollectionInference, "Pair key and value types cannot be inferred", pair.Span(), "declare the collection type, as in scores: Pair<String, Int> := {}")
+		}
+		return expressionInfo{typeValue: types.Pair{Key: keyType, Value: valueType}, nullState: NonNull}
+	}
+	// A value position may hold only null values, which carry no type of their
+	// own; the declared value type then applies.
+	if types.IsInvalid(valueType) {
+		valueType = expectedValue
+	}
+	// An already-reported key keeps the declared key type so the rejection is
+	// not restated as an assignability mismatch.
+	if rejectedKey && types.IsInvalid(keyType) {
+		keyType = expectedKey
 	}
 	return expressionInfo{typeValue: types.Pair{Key: keyType, Value: valueType}, nullState: NonNull}
+}
+
+// expectedPairTypes are the key and value types a Pair literal may adopt from
+// its surrounding context.
+func expectedPairTypes(expected types.Type) (types.Type, types.Type) {
+	if declared, ok := expected.(types.Pair); ok {
+		return declared.Key, declared.Value
+	}
+	return types.Invalid, types.Invalid
+}
+
+// declaredPairKeyRejected reports whether the declared Pair type already
+// rejected its key type, which degrades that key to Invalid.
+func declaredPairKeyRejected(expected types.Type) bool {
+	declared, ok := expected.(types.Pair)
+	return ok && types.IsInvalid(declared.Key)
+}
+
+// checkDuplicatePairKey rejects a key that repeats an earlier key in the same
+// literal. Keys are compared by their compile-time value, so equivalent
+// spellings of one Int are the same key.
+func (a *analyzer) checkDuplicatePairKey(expression ast.Expr, seen map[string]source.Span) {
+	constant, failure := a.evaluateConstant(expression)
+	if failure != constOK || constant == nil {
+		return
+	}
+	identity, ok := pairKeyIdentity(constant)
+	if !ok {
+		return
+	}
+	if previous, exists := seen[identity]; exists {
+		a.error(codeDuplicatePairKey, fmt.Sprintf("duplicate Pair key %s in one Pair literal", pairKeyText(constant)), expression.Span(), fmt.Sprintf("the same key is already given at line %d, column %d", previous.Start.Line, previous.Start.Column))
+		return
+	}
+	seen[identity] = expression.Span()
+}
+
+// pairKeyIdentity is the canonical compile-time identity of a Pair key. Only
+// the v0.1 key types have one.
+func pairKeyIdentity(constant *constantValue) (string, bool) {
+	switch constant.typeValue.Kind() {
+	case types.StringKind:
+		return "String\x00" + constant.text, true
+	case types.IntKind:
+		if constant.integer == nil {
+			return "", false
+		}
+		return "Int\x00" + constant.integer.String(), true
+	case types.BoolKind:
+		return "Bool\x00" + strconv.FormatBool(constant.boolean), true
+	default:
+		return "", false
+	}
+}
+
+func pairKeyText(constant *constantValue) string {
+	switch constant.typeValue.Kind() {
+	case types.StringKind:
+		return strconv.Quote(constant.text)
+	case types.IntKind:
+		return constant.integer.String()
+	default:
+		return strconv.FormatBool(constant.boolean)
+	}
 }
 
 func (a *analyzer) mergeLiteralType(current, next types.Type, expression ast.Expr) types.Type {

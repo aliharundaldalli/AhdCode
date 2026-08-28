@@ -85,3 +85,68 @@ func TestDeterministicDebugDump(t *testing.T) {
 		t.Fatal("dump contains formatting failure")
 	}
 }
+
+// TestInvalidPairKeyTypeIsRejected checks the defensive IR guard: the frontend
+// enforces the Pair key rule, and a hand-built IR that violates it must not
+// reach a backend.
+func TestInvalidPairKeyTypeIsRejected(t *testing.T) {
+	realType := Type{Kind: RealType}
+	stringType := Type{Kind: StringType}
+	intType := Type{Kind: IntType}
+	pairOf := func(key, value Type) Type {
+		return Type{Kind: PairType, Key: &key, Value: &value}
+	}
+	cases := map[string]Type{
+		"Real key":            pairOf(realType, stringType),
+		"nested Real key":     {Kind: ListType, Element: pointerTo(pairOf(realType, intType))},
+		"Class key":           pairOf(Type{Kind: ClassType, Class: "m::class::C"}, intType),
+		"Pair key":            pairOf(pairOf(stringType, intType), intType),
+		"Real key in a value": pairOf(stringType, pairOf(realType, intType)),
+	}
+	for name, declared := range cases {
+		t.Run(name, func(t *testing.T) {
+			compilation := &Compilation{
+				Entry: "m",
+				Modules: []*Module{{
+					ID: "m", Name: "Main",
+					Globals: []*Global{{ID: "g", Name: "g", Type: declared, NullState: NonNull}},
+				}},
+			}
+			found := false
+			for _, diagnostic := range Validate(compilation) {
+				if diagnostic.Code == CodeMalformedNode {
+					found = true
+				}
+			}
+			if !found {
+				t.Fatalf("expected %s for an invalid Pair key type", CodeMalformedNode)
+			}
+		})
+	}
+}
+
+func TestValidPairKeyTypesPassValidation(t *testing.T) {
+	intType := Type{Kind: IntType}
+	for name, key := range map[string]Type{
+		"String": {Kind: StringType},
+		"Int":    {Kind: IntType},
+		"Bool":   {Kind: BoolType},
+	} {
+		t.Run(name, func(t *testing.T) {
+			keyCopy := key
+			declared := Type{Kind: PairType, Key: &keyCopy, Value: &intType}
+			compilation := &Compilation{
+				Entry: "m",
+				Modules: []*Module{{
+					ID: "m", Name: "Main",
+					Globals: []*Global{{ID: "g", Name: "g", Type: declared, NullState: NonNull}},
+				}},
+			}
+			if diagnostics := Validate(compilation); len(diagnostics) != 0 {
+				t.Fatalf("unexpected diagnostics for a %s key: %+v", name, diagnostics)
+			}
+		})
+	}
+}
+
+func pointerTo(value Type) *Type { return &value }

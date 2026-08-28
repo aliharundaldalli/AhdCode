@@ -711,6 +711,21 @@ func (list *AhdList[T]) Set(index int64, value T) {
 	list.items[ahdResolveIndex(index, int64(len(list.items)))] = value
 }
 
+// Add appends one element, mutating the List in place so every alias observes
+// the new element.
+func (list *AhdList[T]) Add(value T) {
+	list.requireMutable()
+	list.items = append(list.items, value)
+}
+
+// Eject removes the element at a possibly negative index, mutating the List in
+// place. An out-of-range index is an IndexError.
+func (list *AhdList[T]) Eject(index int64) {
+	list.requireMutable()
+	position := ahdResolveIndex(index, int64(len(list.items)))
+	list.items = append(list.items[:position], list.items[position+1:]...)
+}
+
 // Clear empties the List in place, preserving object identity.
 func (list *AhdList[T]) Clear() {
 	list.requireMutable()
@@ -847,6 +862,16 @@ func (pair *AhdPair[K, V]) Has(key K) bool {
 	pair.require()
 	_, exists := pair.values[key]
 	return exists
+}
+
+// Eject removes one key and its value, mutating the Pair in place. A missing
+// key is a KeyError. Re-adding an ejected key appends it as a new final entry.
+func (pair *AhdPair[K, V]) Eject(key K) {
+	pair.requireMutable()
+	if _, exists := pair.values[key]; !exists {
+		AhdRaiseClass(AhdClassKeyError, "Pair has no key "+ahdKeyText(key))
+	}
+	pair.Remove(key)
 }
 
 // Remove deletes a key, keeping the order of the remaining keys.

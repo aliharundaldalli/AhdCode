@@ -139,6 +139,17 @@ func IsValidType(value Type) bool {
 	}
 }
 
+// IsPairKeyType reports whether a lowered type is a valid v0.1 Pair key. It
+// mirrors the frontend rule so a backend never has to trust an unchecked IR.
+func IsPairKeyType(value Type) bool {
+	switch value.Kind {
+	case StringType, IntType, BoolType:
+		return true
+	default:
+		return false
+	}
+}
+
 type NullState string
 
 const (

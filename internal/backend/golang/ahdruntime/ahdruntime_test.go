@@ -412,3 +412,63 @@ func TestNumericConversions(t *testing.T) {
 		t.Fatal("Real arithmetic is wrong")
 	}
 }
+
+func TestListAddAndEjectMutateInPlace(t *testing.T) {
+	values := AhdNewList[*int64](AhdBox(int64(10)), AhdBox(int64(20)))
+	alias := values
+	values.Add(AhdBox(int64(30)))
+	if alias.Len() != 3 || *alias.At(2) != 30 {
+		t.Fatal("add did not mutate the shared List")
+	}
+	values.Eject(1)
+	if alias.Len() != 2 || *alias.At(1) != 30 {
+		t.Fatal("eject did not remove the indexed element in place")
+	}
+	values.Eject(-1)
+	if alias.Len() != 1 || *alias.At(0) != 10 {
+		t.Fatal("negative eject did not remove the final element")
+	}
+	expectRaise(t, AhdClassIndexError, func() { values.Eject(5) })
+	expectRaise(t, AhdClassIndexError, func() { AhdNewList[*int64]().Eject(0) })
+	expectRaise(t, AhdClassNullError, func() {
+		var absent *AhdList[*int64]
+		absent.Add(nil)
+	})
+}
+
+func TestPairEjectMutatesInPlaceAndKeepsOrder(t *testing.T) {
+	scores := AhdNewPair[string, *int64]()
+	scores.Set("Ali", AhdBox(int64(85)))
+	scores.Set("Ayse", AhdBox(int64(92)))
+	alias := scores
+	scores.Eject("Ali")
+	if alias.Len() != 1 || alias.Has("Ali") {
+		t.Fatal("eject did not remove the key from the shared Pair")
+	}
+	scores.Set("Ali", AhdBox(int64(100)))
+	if keys := alias.Keys(); strings.Join(keys, ",") != "Ayse,Ali" {
+		t.Fatalf("a re-added key was not appended: %v", keys)
+	}
+	expectRaise(t, AhdClassKeyError, func() { scores.Eject("missing") })
+	expectRaise(t, AhdClassNullError, func() {
+		var absent *AhdPair[string, *int64]
+		absent.Eject("a")
+	})
+}
+
+func TestFrozenCollectionsRejectAddAndEject(t *testing.T) {
+	values := AhdNewList[*int64](AhdBox(int64(1)))
+	AhdFreeze(values)
+	expectRaise(t, AhdClassConstantError, func() { values.Add(AhdBox(int64(2))) })
+	expectRaise(t, AhdClassConstantError, func() { values.Eject(0) })
+	if values.Len() != 1 {
+		t.Fatal("a rejected mutation must not take effect")
+	}
+
+	scores := AhdBuildPair([]string{"a"}, []*int64{AhdBox(int64(1))})
+	AhdFreeze(scores)
+	expectRaise(t, AhdClassConstantError, func() { scores.Eject("a") })
+	if scores.Len() != 1 {
+		t.Fatal("a rejected Pair mutation must not take effect")
+	}
+}

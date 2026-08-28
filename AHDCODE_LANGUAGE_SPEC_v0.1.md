@@ -945,6 +945,54 @@ numbers[-3:]
 
 Slice-step syntax is not part of v0.1.
 
+### 12.4 Mutation
+
+`List<T>` has exactly two built-in mutation operations:
+
+```text
+add(value: T)      -> Nothing
+eject(index: Int)  -> Nothing
+```
+
+`add` appends one element to the end.
+
+```ahd
+values: List<Int> := [
+    10
+    20
+]
+
+values.add(30)
+```
+
+produces:
+
+```text
+[10, 20, 30]
+```
+
+`eject` removes the element at an index.
+
+```ahd
+values: List<Int> := [
+    10
+    20
+    30
+]
+
+values.eject(1)
+```
+
+produces:
+
+```text
+[10, 30]
+```
+
+`eject` accepts the same negative indexing as ordinary List indexing, so `values.eject(-1)` removes the final element. An out-of-range index raises `IndexError`. `eject` does not return the removed element in v0.1.
+
+Both operations mutate the existing List object rather than producing a new one, so every alias observes the change. Both return `Nothing` and therefore cannot be used as values. The receiver must be `NonNull`, the argument follows ordinary element assignability, and a `Constant` or otherwise frozen List rejects both.
+
 ---
 
 ## 13. Pair
@@ -1043,6 +1091,61 @@ Removing a key and later adding it again appends it as a new final entry.
 ### 13.6 Duplicate keys in literals
 
 Duplicate keys inside a single Pair literal are compile-time errors.
+
+### 13.7 Mutation
+
+`Pair<K, V>` is inserted into and updated through index assignment, and has one
+built-in removal operation:
+
+```text
+pair[key] = value
+eject(key: K)      -> Nothing
+```
+
+```ahd
+scores: Pair<String, Int> := {}
+
+scores["Ali"] = 85
+scores["Ayşe"] = 92
+```
+
+Assigning an absent key appends a new entry at the end. Assigning a key that
+already exists updates its value without moving it.
+
+`eject` removes one key and its value.
+
+```ahd
+scores.eject("Ali")
+```
+
+produces:
+
+```text
+{"Ayşe": 92}
+```
+
+Ejecting a key that is not present raises `KeyError`. Combined with §13.5, an
+ejected key that is added again becomes a new final entry:
+
+```ahd
+scores["Ali"] = 85
+scores["Ayşe"] = 92
+scores.eject("Ali")
+scores["Ali"] = 100
+```
+
+leaves the order:
+
+```text
+Ayşe
+Ali
+```
+
+There is no `pair.add`. `eject` mutates the existing Pair object, so every alias
+observes the change; it returns `Nothing` and cannot be used as a value. The
+receiver must be `NonNull`, the key follows the ordinary Pair key rules of
+§13.3, and a `Constant` or otherwise frozen Pair rejects insertion, update, and
+`eject`.
 
 ---
 
