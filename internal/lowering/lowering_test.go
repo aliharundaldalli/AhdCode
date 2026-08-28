@@ -44,6 +44,21 @@ func globalIR(t *testing.T, module *ir.Module, name string) *ir.Global {
 	return nil
 }
 
+// globalInitializer returns the module-root initializer of one global. A
+// module-root binding declares storage separately from the statement that
+// initializes it, so the initializer lives in the module statement stream.
+func globalInitializer(t *testing.T, module *ir.Module, name string) ir.Expr {
+	t.Helper()
+	for _, statement := range module.Init.Statements {
+		binding, ok := statement.(*ir.BindingStmt)
+		if ok && binding.Storage == ir.ModuleStorage && binding.Name == name {
+			return binding.Initializer
+		}
+	}
+	t.Fatalf("module-root initializer for %s not found", name)
+	return nil
+}
+
 func functionIR(t *testing.T, module *ir.Module, name string) *ir.Function {
 	t.Helper()
 	for _, function := range module.Functions {
@@ -71,40 +86,40 @@ runtimePower: Function := (exponent: Int) -> Int {
     return 2 ^ exponent
 }`}, "/Main.ahd")
 	main := moduleIR(t, result.Compilation, "Main")
-	if _, ok := globalIR(t, main, "a").Initializer.(*ir.ConvertExpr); !ok {
-		t.Fatalf("Real initializer = %T, want ConvertExpr", globalIR(t, main, "a").Initializer)
+	if _, ok := globalInitializer(t, main, "a").(*ir.ConvertExpr); !ok {
+		t.Fatalf("Real initializer = %T, want ConvertExpr", globalInitializer(t, main, "a"))
 	}
-	explicitReal := globalIR(t, main, "explicitReal").Initializer.(*ir.ConvertExpr)
+	explicitReal := globalInitializer(t, main, "explicitReal").(*ir.ConvertExpr)
 	if explicitReal.From.Kind != ir.IntType || explicitReal.Type.Kind != ir.RealType {
 		t.Fatalf("real conversion = %s -> %s", explicitReal.From, explicitReal.Type)
 	}
-	explicitInt := globalIR(t, main, "explicitInt").Initializer.(*ir.ConvertExpr)
+	explicitInt := globalInitializer(t, main, "explicitInt").(*ir.ConvertExpr)
 	if explicitInt.From.Kind != ir.RealType || explicitInt.Type.Kind != ir.IntType {
 		t.Fatalf("int conversion = %s -> %s", explicitInt.From, explicitInt.Type)
 	}
-	parsedReal := globalIR(t, main, "parsedReal").Initializer.(*ir.ConvertExpr)
+	parsedReal := globalInitializer(t, main, "parsedReal").(*ir.ConvertExpr)
 	if parsedReal.From.Kind != ir.StringType || parsedReal.Type.Kind != ir.RealType {
 		t.Fatalf("parsed Real conversion = %s -> %s", parsedReal.From, parsedReal.Type)
 	}
-	parsedInt := globalIR(t, main, "parsedInt").Initializer.(*ir.ConvertExpr)
+	parsedInt := globalInitializer(t, main, "parsedInt").(*ir.ConvertExpr)
 	if parsedInt.From.Kind != ir.StringType || parsedInt.Type.Kind != ir.IntType {
 		t.Fatalf("parsed Int conversion = %s -> %s", parsedInt.From, parsedInt.Type)
 	}
-	minimum := globalIR(t, main, "minimum").Initializer.(*ir.UnaryExpr)
+	minimum := globalInitializer(t, main, "minimum").(*ir.UnaryExpr)
 	if minimum.Op != "CheckedIntNegate" || minimum.Operand.(*ir.LiteralExpr).Value != "9223372036854775808" {
 		t.Fatalf("minimum Int lowering = %#v", minimum)
 	}
-	if add := globalIR(t, main, "b").Initializer.(*ir.BinaryExpr); add.Op != "CheckedIntAdd" {
+	if add := globalInitializer(t, main, "b").(*ir.BinaryExpr); add.Op != "CheckedIntAdd" {
 		t.Fatalf("Int add op = %s", add.Op)
 	}
-	mixed := globalIR(t, main, "c").Initializer.(*ir.BinaryExpr)
+	mixed := globalInitializer(t, main, "c").(*ir.BinaryExpr)
 	if mixed.Op != "RealAdd" {
 		t.Fatalf("mixed op = %s", mixed.Op)
 	}
 	if _, ok := mixed.Left.(*ir.ConvertExpr); !ok {
 		t.Fatalf("mixed left = %T, want ConvertExpr", mixed.Left)
 	}
-	division := globalIR(t, main, "d").Initializer.(*ir.BinaryExpr)
+	division := globalInitializer(t, main, "d").(*ir.BinaryExpr)
 	if division.Op != "RealDivide" {
 		t.Fatalf("division op = %s", division.Op)
 	}
@@ -114,10 +129,10 @@ runtimePower: Function := (exponent: Int) -> Int {
 	if _, right := division.Right.(*ir.ConvertExpr); !right {
 		t.Fatal("division right was not widened")
 	}
-	if power := globalIR(t, main, "power").Initializer.(*ir.BinaryExpr); power.Op != "CheckedIntPower" {
+	if power := globalInitializer(t, main, "power").(*ir.BinaryExpr); power.Op != "CheckedIntPower" {
 		t.Fatalf("constant power op = %s", power.Op)
 	}
-	if power := globalIR(t, main, "negativePower").Initializer.(*ir.BinaryExpr); power.Op != "CheckedIntPower" {
+	if power := globalInitializer(t, main, "negativePower").(*ir.BinaryExpr); power.Op != "CheckedIntPower" {
 		t.Fatalf("negative power op = %s", power.Op)
 	}
 	runtime := functionIR(t, main, "runtimePower")
@@ -145,22 +160,22 @@ defaulted: Int := create(name: "Veli")
 exact: Int := calculate(5)
 callback: Int := use(calculate, 5)`}, "/Main.ahd")
 	main := moduleIR(t, result.Compilation, "Main")
-	named := globalIR(t, main, "named").Initializer.(*ir.CallExpr)
+	named := globalInitializer(t, main, "named").(*ir.CallExpr)
 	if named.Arguments[0].ParameterName != "name" || named.Arguments[1].ParameterName != "age" {
 		t.Fatalf("named args not canonical: %#v", named.Arguments)
 	}
-	defaulted := globalIR(t, main, "defaulted").Initializer.(*ir.CallExpr)
+	defaulted := globalInitializer(t, main, "defaulted").(*ir.CallExpr)
 	if !defaulted.Arguments[1].UsesDefault || defaulted.Arguments[1].Value != nil {
 		t.Fatalf("default arg = %#v", defaulted.Arguments[1])
 	}
 	if functionIR(t, main, "create").Parameters[1].Default == nil {
 		t.Fatal("callee default expression was not preserved")
 	}
-	exact := globalIR(t, main, "exact").Initializer.(*ir.CallExpr)
+	exact := globalInitializer(t, main, "exact").(*ir.CallExpr)
 	if !strings.Contains(string(exact.Callable), "value:Int") || strings.Contains(string(exact.Callable), "Real") {
 		t.Fatalf("selected overload ID = %s", exact.Callable)
 	}
-	callback := globalIR(t, main, "callback").Initializer.(*ir.CallExpr)
+	callback := globalInitializer(t, main, "callback").(*ir.CallExpr)
 	if _, ok := callback.Arguments[0].Value.(*ir.FunctionValueExpr); !ok {
 		t.Fatalf("callback value = %T", callback.Arguments[0].Value)
 	}
@@ -189,15 +204,15 @@ defaultAnswer: Int := identity()`,
 		t.Fatalf("module order = %#v", result.Compilation.Modules)
 	}
 	main := moduleIR(t, result.Compilation, "Main")
-	construction := globalIR(t, main, "student").Initializer.(*ir.ConstructExpr)
+	construction := globalInitializer(t, main, "student").(*ir.ConstructExpr)
 	if !strings.Contains(string(construction.Class), "mem:/Models.ahd::class::Student") {
 		t.Fatalf("ClassID = %s", construction.Class)
 	}
-	call := globalIR(t, main, "answer").Initializer.(*ir.CallExpr)
+	call := globalInitializer(t, main, "answer").(*ir.CallExpr)
 	if !strings.Contains(string(call.Callable), "mem:/Math.ahd") {
 		t.Fatalf("external CallableID = %s", call.Callable)
 	}
-	defaultCall := globalIR(t, main, "defaultAnswer").Initializer.(*ir.CallExpr)
+	defaultCall := globalInitializer(t, main, "defaultAnswer").(*ir.CallExpr)
 	if len(defaultCall.Arguments) != 1 || !defaultCall.Arguments[0].UsesDefault {
 		t.Fatalf("imported default call = %#v", defaultCall.Arguments)
 	}
@@ -218,40 +233,40 @@ tail: List<Real> := items[1:]
 scores: Pair<String, Int> := {"Ali": 90}
 score: Int := scores["Ali"]`}, "/Main.ahd")
 	main := moduleIR(t, result.Compilation, "Main")
-	nullValue := globalIR(t, main, "student").Initializer.(*ir.NullExpr)
+	nullValue := globalInitializer(t, main, "student").(*ir.NullExpr)
 	if nullValue.Type.Kind != ir.ClassType || nullValue.Type.Class == "" {
 		t.Fatalf("typed null = %#v", nullValue.Type)
 	}
-	comparison := globalIR(t, main, "present").Initializer.(*ir.BinaryExpr)
+	comparison := globalInitializer(t, main, "present").(*ir.BinaryExpr)
 	if comparison.Right.(*ir.NullExpr).Type.Class != nullValue.Type.Class {
 		t.Fatal("null comparison lost typed context")
 	}
-	text := globalIR(t, main, "greeting").Initializer.(*ir.StringExpr)
+	text := globalInitializer(t, main, "greeting").(*ir.StringExpr)
 	if len(text.Parts) != 2 {
 		t.Fatalf("string parts = %#v", text.Parts)
 	}
 	if _, ok := text.Parts[1].ToString.(*ir.ToStringExpr); !ok {
 		t.Fatalf("interpolation part = %T", text.Parts[1].ToString)
 	}
-	list := globalIR(t, main, "items").Initializer.(*ir.ListExpr)
+	list := globalInitializer(t, main, "items").(*ir.ListExpr)
 	if list.ElementType.Kind != ir.RealType {
 		t.Fatalf("List type = %s", list.ElementType)
 	}
 	if _, ok := list.Elements[0].(*ir.ConvertExpr); !ok {
 		t.Fatalf("List widening = %T", list.Elements[0])
 	}
-	if _, ok := globalIR(t, main, "first").Initializer.(*ir.IndexExpr); !ok {
-		t.Fatalf("index expression = %T", globalIR(t, main, "first").Initializer)
+	if _, ok := globalInitializer(t, main, "first").(*ir.IndexExpr); !ok {
+		t.Fatalf("index expression = %T", globalInitializer(t, main, "first"))
 	}
-	if slice, ok := globalIR(t, main, "tail").Initializer.(*ir.SliceExpr); !ok || slice.End != nil {
-		t.Fatalf("slice expression = %#v", globalIR(t, main, "tail").Initializer)
+	if slice, ok := globalInitializer(t, main, "tail").(*ir.SliceExpr); !ok || slice.End != nil {
+		t.Fatalf("slice expression = %#v", globalInitializer(t, main, "tail"))
 	}
-	pair := globalIR(t, main, "scores").Initializer.(*ir.PairExpr)
+	pair := globalInitializer(t, main, "scores").(*ir.PairExpr)
 	if pair.KeyType.Kind != ir.StringType || pair.ValueType.Kind != ir.IntType {
 		t.Fatalf("Pair types = %s/%s", pair.KeyType, pair.ValueType)
 	}
-	if _, ok := globalIR(t, main, "score").Initializer.(*ir.IndexExpr); !ok {
-		t.Fatalf("Pair index expression = %T", globalIR(t, main, "score").Initializer)
+	if _, ok := globalInitializer(t, main, "score").(*ir.IndexExpr); !ok {
+		t.Fatalf("Pair index expression = %T", globalInitializer(t, main, "score"))
 	}
 }
 
@@ -384,8 +399,8 @@ person: Person := student`}, "/Main.ahd")
 	if person == nil || student == nil || student.Parent != person.ID || !student.Confidential {
 		t.Fatalf("Class identities/visibility = Person %#v, Student %#v", person, student)
 	}
-	if load, ok := globalIR(t, main, "person").Initializer.(*ir.LoadExpr); !ok || load.Type.Class != student.ID {
-		t.Fatalf("subtype initializer = %#v", globalIR(t, main, "person").Initializer)
+	if load, ok := globalInitializer(t, main, "person").(*ir.LoadExpr); !ok || load.Type.Class != student.ID {
+		t.Fatalf("subtype initializer = %#v", globalInitializer(t, main, "person"))
 	}
 }
 
@@ -526,14 +541,38 @@ func TestStructureAttributeModifiersReachTypedIR(t *testing.T) {
 	}
 }
 
-func TestGlobalsRecordDeclarationOrder(t *testing.T) {
-	result := lowerSources(t, map[string]string{"/Main.ahd": `zebra: String := "z"
+// TestModuleEffectsKeepSourceOrder checks that a module-root initializer is a
+// statement at its own source position, so module-level effects are not
+// reordered around it.
+func TestModuleEffectsKeepSourceOrder(t *testing.T) {
+	result := lowerSources(t, map[string]string{"/Main.ahd": `write("A")
+zebra: String := "z"
+write("B")
 alpha: String := zebra
-write(alpha)
+write("C")
 `}, "/Main.ahd")
 	current := moduleIR(t, result.Compilation, "Main")
-	if globalIR(t, current, "zebra").Order != 0 || globalIR(t, current, "alpha").Order != 1 {
-		t.Fatal("globals do not record their module declaration order")
+	// Storage is declared for every module-root binding.
+	if len(current.Globals) != 2 {
+		t.Fatalf("module declares %d globals", len(current.Globals))
+	}
+	var order []string
+	for _, statement := range current.Init.Statements {
+		switch value := statement.(type) {
+		case *ir.BindingStmt:
+			if value.Storage != ir.ModuleStorage {
+				t.Fatalf("module-root binding %s has %s storage", value.Name, value.Storage)
+			}
+			order = append(order, "init:"+value.Name)
+		case *ir.ExprStmt:
+			order = append(order, "statement")
+		default:
+			t.Fatalf("unexpected module statement %T", statement)
+		}
+	}
+	expected := []string{"statement", "init:zebra", "statement", "init:alpha", "statement"}
+	if strings.Join(order, ",") != strings.Join(expected, ",") {
+		t.Fatalf("module effects run as %v; want %v", order, expected)
 	}
 }
 

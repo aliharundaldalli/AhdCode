@@ -366,11 +366,12 @@ func TestIndexedCompoundAssignmentEvaluatesItsTargetOnce(t *testing.T) {
 		Entry: "mem:/Main.ahd",
 		Modules: []*ir.Module{{
 			ID: "mem:/Main.ahd", Name: "Main",
-			Globals: []*ir.Global{{
-				ID: "values", Name: "values", Type: listType, NullState: ir.NonNull,
-				Initializer: &ir.ListExpr{ExprBase: ir.ExprBase{Type: listType, NullState: ir.NonNull}, ElementType: intType, Elements: []ir.Expr{literal("1")}},
-			}},
+			Globals: []*ir.Global{{ID: "values", Name: "values", Type: listType, NullState: ir.NonNull}},
 			Init: ir.Block{Statements: []ir.Statement{
+				&ir.BindingStmt{
+					Symbol: "values", Name: "values", Type: listType, NullState: ir.NonNull, Storage: ir.ModuleStorage,
+					Initializer: &ir.ListExpr{ExprBase: ir.ExprBase{Type: listType, NullState: ir.NonNull}, ElementType: intType, Elements: []ir.Expr{literal("1")}},
+				},
 				&ir.CompoundAssignStmt{
 					Target: ir.Target{Kind: ir.IndexTarget, Type: intType, Receiver: load(), Index: literal("0")},
 					Op:     "CheckedIntAdd", Value: literal("10"),

@@ -19,7 +19,7 @@ func Dump(compilation *Compilation) string {
 		}
 		fmt.Fprintf(&out, "module %s deps=[%s]\n", module.ID, joinModuleIDs(module.Dependencies))
 		for _, global := range module.Globals {
-			fmt.Fprintf(&out, "  global %s : %s = %s\n", global.ID, global.Type, printExpr(global.Initializer))
+			fmt.Fprintf(&out, "  global %s : %s\n", global.ID, global.Type)
 		}
 		for _, class := range module.Classes {
 			builtin := ""
@@ -83,7 +83,7 @@ func printStatement(out *strings.Builder, statement Statement, indent string) {
 	case *ExprStmt:
 		fmt.Fprintf(out, "expr %s\n", printExpr(value.Value))
 	case *BindingStmt:
-		fmt.Fprintf(out, "bind %s : %s = %s\n", value.Symbol, value.Type, printExpr(value.Initializer))
+		fmt.Fprintf(out, "bind[%s] %s : %s = %s\n", value.Storage, value.Symbol, value.Type, printExpr(value.Initializer))
 	case *AssignStmt:
 		fmt.Fprintf(out, "assign %s = %s\n", printTarget(value.Target), printExpr(value.Value))
 	case *CompoundAssignStmt:

@@ -87,7 +87,6 @@ func (v *validator) validateModule(module *Module) {
 			continue
 		}
 		v.requireType(global.Type, global.Span)
-		v.validateExpr(global.Initializer)
 	}
 	for _, class := range module.Classes {
 		if class == nil {

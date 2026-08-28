@@ -228,7 +228,10 @@ func (generator *generator) bindSlots() {
 	generator.walkCompilation(func(statement ir.Statement) {
 		switch value := statement.(type) {
 		case *ir.BindingStmt:
-			generator.slots[value.Symbol] = storage{name: mangleNamed(localPrefix, value.Name, string(value.Symbol)), typeInfo: value.Type, nullable: generator.nullSymbols[value.Symbol]}
+			// A module-root binding already has its package-level storage.
+			if value.Storage != ir.ModuleStorage {
+				generator.slots[value.Symbol] = storage{name: mangleNamed(localPrefix, value.Name, string(value.Symbol)), typeInfo: value.Type, nullable: generator.nullSymbols[value.Symbol]}
+			}
 		case *ir.ForStmt:
 			generator.slots[value.Iteration] = storage{name: mangleNamed(localPrefix, value.Name, string(value.Iteration)), typeInfo: value.IterationType}
 		case *ir.AttemptStmt:
@@ -575,22 +578,10 @@ func (generator *generator) initializerName(function *ir.Function) string {
 func (generator *generator) emitModuleInit(writer *emitter, module *ir.Module) {
 	writer.line("// Module " + module.Name + " initialization.")
 	writer.open("func " + generator.moduleInitName(module) + "() {")
-	ordered := append([]*ir.Global(nil), module.Globals...)
-	sort.SliceStable(ordered, func(left, right int) bool { return ordered[left].Order < ordered[right].Order })
 	previousFrames, previousResult := generator.frames, generator.result
 	generator.frames, generator.result = nil, ""
-	for _, global := range ordered {
-		if global == nil || global.Initializer == nil {
-			continue
-		}
-		current := generator.slots[global.ID]
-		value := generator.value(global.Initializer, current.typeInfo, current.nullable)
-		if global.Constant {
-			// A Constant reference binding deep-freezes its object graph.
-			value = "AhdFreeze(" + value + ")"
-		}
-		writer.line(current.name + " = " + value)
-	}
+	// Module-root initializers are part of the statement stream, so module
+	// effects run in source order.
 	generator.emitBlock(writer, module.Init)
 	generator.frames, generator.result = previousFrames, previousResult
 	writer.close("}")

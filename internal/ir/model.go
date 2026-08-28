@@ -18,19 +18,17 @@ type Module struct {
 	Init         Block
 }
 
+// Global is the storage declaration of one module-root binding. It carries no
+// initializer: the initializer executes as a ModuleStorage BindingStmt inside
+// Module.Init, at its source position among the other module-level statements.
 type Global struct {
-	Span source.Span
-	ID   SymbolID
-	Name string
-	// Order is the module-source declaration index. Globals are stored sorted
-	// by ID for deterministic output, so initialization order lives here
-	// instead of in slice position.
-	Order        int
+	Span         source.Span
+	ID           SymbolID
+	Name         string
 	Type         Type
 	Constant     bool
 	Confidential bool
 	NullState    NullState
-	Initializer  Expr
 }
 
 type Parameter struct {

@@ -15,13 +15,16 @@ func (lowerer *moduleLowerer) lowerModule() *ir.Module {
 		result.Dependencies = append(result.Dependencies, ir.ModuleID(dependency))
 	}
 	result.Init.Span = lowerer.module.Parsed.Program.Span()
-	globalOrder := 0
 	for _, statement := range lowerer.module.Parsed.Program.Statements {
 		switch value := statement.(type) {
 		case *ast.VariableDecl:
+			// A module-root binding declares storage, and initializes it where
+			// it is written, so module-level effects keep source order.
 			if symbol := lowerer.semantic.ResolvedSymbols[value]; symbol != nil && symbol.ModuleRoot && symbol.Alias == nil {
-				result.Globals = append(result.Globals, lowerer.lowerGlobal(value, symbol, globalOrder))
-				globalOrder++
+				result.Globals = append(result.Globals, lowerer.lowerGlobal(value, symbol))
+				if initialization := lowerer.lowerGlobalInitialization(value, symbol); initialization != nil {
+					result.Init.Statements = append(result.Init.Statements, initialization)
+				}
 			}
 		case *ast.FunctionDecl:
 			if function := lowerer.lowerFunction(value, nil); function != nil {
@@ -46,12 +49,27 @@ func (lowerer *moduleLowerer) lowerModule() *ir.Module {
 	return result
 }
 
-func (lowerer *moduleLowerer) lowerGlobal(declaration *ast.VariableDecl, symbol *semantic.Symbol, order int) *ir.Global {
-	typeValue := lowerType(symbol.Type)
+func (lowerer *moduleLowerer) lowerGlobal(declaration *ast.VariableDecl, symbol *semantic.Symbol) *ir.Global {
 	return &ir.Global{
-		Span: declaration.Span(), ID: lowerer.compilation.registry.symbolID(lowerer.module, symbol), Name: symbol.Name, Order: order,
-		Type: typeValue, Constant: symbol.Constant, Confidential: symbol.Confidential,
-		NullState: lowerNull(symbol.InitialNull), Initializer: lowerer.lowerExprExpected(declaration.Initializer, typeValue),
+		Span: declaration.Span(), ID: lowerer.compilation.registry.symbolID(lowerer.module, symbol), Name: symbol.Name,
+		Type: lowerType(symbol.Type), Constant: symbol.Constant, Confidential: symbol.Confidential,
+		NullState: lowerNull(symbol.InitialNull),
+	}
+}
+
+// lowerGlobalInitialization places a module-root initializer in the module
+// statement stream, so its effects happen in source order relative to the
+// other module-level statements.
+func (lowerer *moduleLowerer) lowerGlobalInitialization(declaration *ast.VariableDecl, symbol *semantic.Symbol) ir.Statement {
+	if declaration.Initializer == nil {
+		return nil
+	}
+	typeValue := lowerType(symbol.Type)
+	return &ir.BindingStmt{
+		StmtBase: ir.StmtBase{Span: declaration.Span()},
+		Symbol:   lowerer.compilation.registry.symbolID(lowerer.module, symbol), Name: symbol.Name,
+		Type: typeValue, NullState: lowerNull(symbol.InitialNull), Constant: symbol.Constant,
+		Storage: ir.ModuleStorage, Initializer: lowerer.lowerExprExpected(declaration.Initializer, typeValue),
 	}
 }
 

@@ -6,7 +6,13 @@ import (
 )
 
 func TestValidatorRejectsMalformedIRWithoutPanic(t *testing.T) {
-	compilation := &Compilation{Entry: "main", Modules: []*Module{{ID: "main", Globals: []*Global{{ID: "x", Type: Type{Kind: IntType}, Initializer: &ConvertExpr{ExprBase: ExprBase{Type: Type{Kind: IntType}}, From: Type{Kind: BoolType}, Value: &LiteralExpr{ExprBase: ExprBase{Type: Type{Kind: BoolType}}, Kind: BoolLiteral, Value: "true"}}}}}}}
+	compilation := &Compilation{Entry: "main", Modules: []*Module{{
+		ID: "main", Globals: []*Global{{ID: "x", Type: Type{Kind: IntType}}},
+		Init: Block{Statements: []Statement{&BindingStmt{
+			Symbol: "x", Name: "x", Type: Type{Kind: IntType}, Storage: ModuleStorage,
+			Initializer: &ConvertExpr{ExprBase: ExprBase{Type: Type{Kind: IntType}}, From: Type{Kind: BoolType}, Value: &LiteralExpr{ExprBase: ExprBase{Type: Type{Kind: BoolType}}, Kind: BoolLiteral, Value: "true"}},
+		}}},
+	}}}
 	diagnostics := Validate(compilation)
 	if len(diagnostics) == 0 {
 		t.Fatal("malformed IR was accepted")
@@ -76,8 +82,14 @@ func TestValidatorChecksArgumentTypesDefaultsReturnValuesAndClassCallables(t *te
 }
 
 func TestDeterministicDebugDump(t *testing.T) {
-	compilation := &Compilation{Entry: "main", Modules: []*Module{{ID: "main", Globals: []*Global{{ID: "main::x", Name: "x", Type: Type{Kind: IntType}, Initializer: &LiteralExpr{ExprBase: ExprBase{Type: Type{Kind: IntType}, NullState: NonNull}, Kind: IntLiteral, Value: "5"}}}}}}
-	want := "entry main\nmodule main deps=[]\n  global main::x : Int = int(\"5\")\n"
+	compilation := &Compilation{Entry: "main", Modules: []*Module{{
+		ID: "main", Globals: []*Global{{ID: "main::x", Name: "x", Type: Type{Kind: IntType}}},
+		Init: Block{Statements: []Statement{&BindingStmt{
+			Symbol: "main::x", Name: "x", Type: Type{Kind: IntType}, Storage: ModuleStorage,
+			Initializer: &LiteralExpr{ExprBase: ExprBase{Type: Type{Kind: IntType}, NullState: NonNull}, Kind: IntLiteral, Value: "5"},
+		}}},
+	}}}
+	want := "entry main\nmodule main deps=[]\n  global main::x : Int\n  init {\n    bind[Module] main::x : Int = int(\"5\")\n  }\n"
 	if got := Dump(compilation); got != want {
 		t.Fatalf("dump:\n%s\nwant:\n%s", got, want)
 	}

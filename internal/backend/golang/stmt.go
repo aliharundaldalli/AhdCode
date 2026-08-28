@@ -79,6 +79,9 @@ func (generator *generator) emitBinding(writer *emitter, value *ir.BindingStmt) 
 		return
 	}
 	if value.Initializer == nil {
+		if value.Storage == ir.ModuleStorage {
+			return
+		}
 		writer.line("var " + current.name + " " + rendered)
 		writer.line("_ = " + current.name)
 		return
@@ -87,6 +90,12 @@ func (generator *generator) emitBinding(writer *emitter, value *ir.BindingStmt) 
 	if value.Constant {
 		// A Constant reference binding deep-freezes its object graph.
 		initializer = "AhdFreeze(" + initializer + ")"
+	}
+	if value.Storage == ir.ModuleStorage {
+		// Module storage is declared once at package level; this statement is
+		// only its initialization, at its source position.
+		writer.line(current.name + " = " + initializer)
+		return
 	}
 	writer.line("var " + current.name + " " + rendered + " = " + initializer)
 	writer.line("_ = " + current.name)
