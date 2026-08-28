@@ -666,6 +666,10 @@ func (a *analyzer) analyzeBuiltinCall(call *ast.CallExpr, symbol *Symbol, argume
 		return a.analyzeClearCall(call, arguments)
 	case "between":
 		return a.analyzeBetweenCall(call, arguments)
+	case "abs":
+		return a.analyzeAbsCall(call, arguments)
+	case "sum", "min", "max":
+		return a.analyzeNumericListCall(call, symbol.Name, arguments)
 	}
 	return expressionInfo{typeValue: types.Invalid, nullState: MaybeNull}
 }
@@ -776,6 +780,80 @@ func (a *analyzer) analyzeTakeCall(call *ast.CallExpr, arguments []expressionInf
 		a.typeMismatch(call.Arguments[0].Span(), types.String, prompt.typeValue, "take prompt")
 	}
 	return result
+}
+
+// analyzeAbsCall checks the numeric magnitude built-in. Its two overloads are
+// abs(Int) -> Int and abs(Real) -> Real; the result type is exactly the
+// argument type, so no numeric widening is introduced by the call itself.
+func (a *analyzer) analyzeAbsCall(call *ast.CallExpr, arguments []expressionInfo) expressionInfo {
+	invalid := expressionInfo{typeValue: types.Invalid, nullState: MaybeNull}
+	if !a.checkBuiltinArity(call, "abs", arguments, 1, "call abs with exactly one Int or Real value") {
+		return invalid
+	}
+	argument := arguments[0]
+	if argument.invalid() {
+		return invalid
+	}
+	if argument.nullState != NonNull {
+		a.nullableError("abs", call.Arguments[0].Value, argument.nullState)
+		return invalid
+	}
+	switch argument.typeValue.Kind() {
+	case types.IntKind:
+		return expressionInfo{typeValue: types.Int, nullState: NonNull}
+	case types.RealKind:
+		return expressionInfo{typeValue: types.Real, nullState: NonNull}
+	}
+	a.error(codeCallArguments, fmt.Sprintf("abs does not accept %s", types.Display(argument.typeValue)), call.Arguments[0].Span(), "pass an Int or Real value; AhdCode applies no implicit conversion")
+	return invalid
+}
+
+// analyzeNumericListCall checks the numeric List reductions. Each one has the
+// two overloads List<Int> -> Int and List<Real> -> Real, reads the List
+// without mutating it, and never treats List<Int> as List<Real>.
+func (a *analyzer) analyzeNumericListCall(call *ast.CallExpr, name string, arguments []expressionInfo) expressionInfo {
+	invalid := expressionInfo{typeValue: types.Invalid, nullState: MaybeNull}
+	hint := "call " + name + " with exactly one List<Int> or List<Real> value"
+	if !a.checkBuiltinArity(call, name, arguments, 1, hint) {
+		return invalid
+	}
+	argument := arguments[0]
+	if argument.invalid() {
+		return invalid
+	}
+	if argument.nullState != NonNull {
+		a.nullableError(name, call.Arguments[0].Value, argument.nullState)
+		return invalid
+	}
+	if list, ok := argument.typeValue.(types.List); ok {
+		switch list.Element.Kind() {
+		case types.IntKind:
+			return expressionInfo{typeValue: types.Int, nullState: NonNull}
+		case types.RealKind:
+			return expressionInfo{typeValue: types.Real, nullState: NonNull}
+		case types.InvalidKind:
+			return invalid
+		}
+	}
+	a.error(codeCallArguments, fmt.Sprintf("%s does not accept %s", name, types.Display(argument.typeValue)), call.Arguments[0].Span(), hint)
+	return invalid
+}
+
+// checkBuiltinArity applies the shared call shape of the Fundamentals
+// entry points: an exact positional argument count and no named argument,
+// because a built-in operation publishes no parameter names.
+func (a *analyzer) checkBuiltinArity(call *ast.CallExpr, name string, arguments []expressionInfo, count int, hint string) bool {
+	if len(arguments) != count {
+		a.error(codeCallArguments, fmt.Sprintf("%s expects %d argument; received %d", name, count, len(arguments)), call.Span(), hint)
+		return false
+	}
+	for _, argument := range call.Arguments {
+		if argument.Name != "" {
+			a.error(codeCallArguments, fmt.Sprintf("%s does not accept a named argument", name), argument.Span(), hint)
+			return false
+		}
+	}
+	return true
 }
 
 // renderable reports whether a value has canonical str text. Nothing is not a

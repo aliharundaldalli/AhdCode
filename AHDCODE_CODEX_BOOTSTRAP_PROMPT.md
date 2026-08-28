@@ -1302,9 +1302,14 @@ int
 real
 len
 clear
+between
+abs
+sum
+min
+max
 ```
 
-These functions, together with core terminal functions `write` and `take`, are predeclared and need no `bring`. `int` accepts `Real` (truncate toward zero) or strict signed ASCII-decimal `String`; `real` accepts `Int` (safe widening) or strict decimal `String` with optional fraction and `e`/`E` exponent. Both String forms trim surrounding Unicode whitespace, reject underscores and non-decimal bases, raise `DomainError` for invalid text, and raise `OverflowError` for out-of-range results. `real(String)` rejects `NaN` and infinity text. Do not turn these entry points into general coercion. Do not add `bool(...)`, truthiness, or other planned Fundamentals until their contracts are normatively specified.
+These functions, together with core terminal functions `write` and `take`, are predeclared and need no `bring`. `int` accepts `Real` (truncate toward zero) or strict signed ASCII-decimal `String`; `real` accepts `Int` (safe widening) or strict decimal `String` with optional fraction and `e`/`E` exponent. Both String forms trim surrounding Unicode whitespace, reject underscores and non-decimal bases, raise `DomainError` for invalid text, and raise `OverflowError` for out-of-range results. `real(String)` rejects `NaN` and infinity text. Do not turn these entry points into general coercion. Do not add `bool(...)`, `round(...)`, `swap(...)`, `combine(...)`, `merge(...)`, `jump(...)`, `copy(...)`, `deepCopy(...)`, truthiness, or any other planned Fundamentals until their contracts are normatively specified.
 
 ## Canonical str
 
@@ -1372,6 +1377,38 @@ near the `Int` boundaries terminates instead of wrapping into an endless loop.
 
 `types.Range` is compiler-internal: no AhdCode type syntax denotes it, `str` and
 `write` reject it, and no collection operation applies to it.
+
+## abs, sum, min, max
+
+The numeric Fundamentals are ordinary typed builtins, checked through the same
+builtin call path as `len` and `clear` and lowered as ordinary
+`builtin:core::` calls. They are not dynamic or `Any` helpers, and the backend
+never special-cases source text at a call site.
+
+Each has exactly two public overloads, selected by the argument type alone:
+
+```text
+abs(Int)  -> Int      sum(List<Int>)  -> Int      min/max(List<Int>)  -> Int
+abs(Real) -> Real     sum(List<Real>) -> Real     min/max(List<Real>) -> Real
+```
+
+The result type is exactly the argument's element type, so `List<Int>` is never
+treated as `List<Real>` and generic invariance is unchanged. `String`, `Bool`,
+`Pair`, `Class`, `Function`, `Nothing`, and scalar arguments to the reductions
+are rejected at compile time, and the argument must be `NonNull`. Like `take`
+and the collection mutations, these entry points publish no parameter names, so
+a named argument is rejected. There are no vararg forms in v0.1.
+
+Runtime behavior lives in checked runtime helpers — `AhdAbsInt`, `AhdAbsReal`,
+`AhdSumInt`, `AhdSumReal`, `AhdMinInt`, `AhdMaxInt`, `AhdMinReal`,
+`AhdMaxReal` — rather than in per-call-site generated loops. `abs` of the
+minimum `Int` raises `OverflowError` instead of wrapping, and `abs(-0.0)` is
+`0.0`. `Int` summation uses checked `Int` arithmetic and `Real` summation uses
+the finite-`Real` rules, so neither wraps nor produces `Inf`/`NaN`. `sum` of an
+empty `List` is `0` or `0.0`; `min` and `max` of an empty `List` raise a
+catchable `DomainError`. A `null` element raises a catchable `NullError` rather
+than counting as zero. All three reductions are pure reads: they never mutate,
+reorder, or copy the argument, so a `NonNull` `Constant` `List` is valid.
 
 ## swap
 

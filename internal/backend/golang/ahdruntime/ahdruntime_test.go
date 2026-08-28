@@ -655,3 +655,46 @@ func TestTakeFlushesPendingOutputBeforeReading(t *testing.T) {
 		t.Fatalf("terminal output was %q", written)
 	}
 }
+
+func TestAbsoluteValueKeepsCheckedArithmetic(t *testing.T) {
+	if AhdAbsInt(5) != 5 || AhdAbsInt(-5) != 5 || AhdAbsInt(0) != 0 {
+		t.Fatal("Int magnitude is wrong")
+	}
+	if AhdAbsInt(math.MinInt64+1) != math.MaxInt64 {
+		t.Fatal("the magnitude near the Int minimum is wrong")
+	}
+	if AhdAbsReal(2.5) != 2.5 || AhdAbsReal(-2.5) != 2.5 {
+		t.Fatal("Real magnitude is wrong")
+	}
+	if zero := AhdAbsReal(math.Copysign(0, -1)); math.Signbit(zero) {
+		t.Fatal("the magnitude of -0.0 must be 0.0")
+	}
+	expectRaise(t, AhdClassOverflowError, func() { AhdAbsInt(math.MinInt64) })
+}
+
+func TestNumericListReductions(t *testing.T) {
+	ints := AhdNewList(AhdBox(int64(8)), AhdBox(int64(3)), AhdBox(int64(12)))
+	if AhdSumInt(ints) != 23 || AhdMinInt(ints) != 3 || AhdMaxInt(ints) != 12 {
+		t.Fatal("Int reductions are wrong")
+	}
+	if ints.Len() != 3 {
+		t.Fatal("a reduction must not modify its List")
+	}
+	reals := AhdNewList(AhdBox(3.5), AhdBox(-2.0), AhdBox(8.25))
+	if AhdSumReal(reals) != 9.75 || AhdMinReal(reals) != -2.0 || AhdMaxReal(reals) != 8.25 {
+		t.Fatal("Real reductions are wrong")
+	}
+	if AhdSumInt(AhdNewList[*int64]()) != 0 || AhdSumReal(AhdNewList[*float64]()) != 0.0 {
+		t.Fatal("an empty List must sum to the additive identity")
+	}
+	expectRaise(t, AhdClassDomainError, func() { AhdMinInt(AhdNewList[*int64]()) })
+	expectRaise(t, AhdClassDomainError, func() { AhdMaxReal(AhdNewList[*float64]()) })
+	expectRaise(t, AhdClassNullError, func() { AhdSumInt(AhdNewList(AhdBox(int64(1)), nil)) })
+	expectRaise(t, AhdClassNullError, func() { AhdMinReal(AhdNewList[*float64](nil)) })
+	expectRaise(t, AhdClassOverflowError, func() {
+		AhdSumInt(AhdNewList(AhdBox(int64(math.MaxInt64)), AhdBox(int64(1))))
+	})
+	expectRaise(t, AhdClassOverflowError, func() {
+		AhdSumReal(AhdNewList(AhdBox(1.0e308), AhdBox(1.0e308)))
+	})
+}

@@ -1923,16 +1923,16 @@ real
 len
 clear
 between
+abs
+sum
+min
+max
 ```
 
 Planned early Fundamentals functions include:
 
 ```text
 bool
-max
-min
-sum
-abs
 round
 swap
 combine
@@ -2071,6 +2071,142 @@ clear(values)
 is invalid.
 
 `clear` returns `Nothing`, so its result cannot be bound or used as a value.
+
+### 34.4 abs
+
+`abs` is the numeric magnitude.
+
+```text
+abs(Int)   -> Int
+abs(Real)  -> Real
+```
+
+The result type is exactly the argument type, so `abs` introduces no numeric widening of its own.
+
+```ahd
+write(abs(5))
+write(abs(-5))
+write(abs(2.5))
+write(abs(-2.5))
+```
+
+=>
+
+```text
+5
+5
+2.5
+2.5
+```
+
+`abs` does not accept `String`, `Bool`, `List`, `Pair`, `Class` instances, `Function` values, `null`, or `Nothing`. There is no implicit `String` conversion: `abs(int("-5"))` is written explicitly. A nullable value must be `NonNull` before `abs` is applied.
+
+The minimum `Int` has no `Int` magnitude, so it follows the ordinary checked-arithmetic contract rather than wrapping:
+
+```ahd
+write(abs(-9223372036854775808))
+```
+
+raises the catchable `OverflowError`.
+
+`abs(Real)` preserves the finite-`Real` rules and produces `0.0` for `-0.0`.
+
+### 34.5 sum, min, and max
+
+`sum`, `min`, and `max` reduce a numeric `List`.
+
+```text
+sum(List<Int>)   -> Int
+sum(List<Real>)  -> Real
+
+min(List<Int>)   -> Int
+min(List<Real>)  -> Real
+
+max(List<Int>)   -> Int
+max(List<Real>)  -> Real
+```
+
+v0.1 has no vararg form: each takes exactly one `List`.
+
+```ahd
+values: List<Int> := [8, 3, 12, 5]
+
+write(sum(values))
+write(min(values))
+write(max(values))
+```
+
+=>
+
+```text
+28
+3
+12
+```
+
+```ahd
+values: List<Real> := [3.5, -2.0, 8.25]
+
+write(sum(values))
+write(min(values))
+write(max(values))
+```
+
+=>
+
+```text
+9.75
+-2.0
+8.25
+```
+
+`List` generic invariance is unchanged: `List<Int>` is not a `List<Real>`, and no element is converted. `List<Bool>`, `List<String>`, `Pair`, `String`, and scalar values are rejected. The `List` argument must be `NonNull`.
+
+`sum` of an empty `List` is the additive identity of its element type:
+
+```ahd
+ints: List<Int> := []
+reals: List<Real> := []
+
+write(sum(ints))
+write(sum(reals))
+```
+
+=>
+
+```text
+0
+0.0
+```
+
+`min` and `max` have no such identity, so an empty `List` raises the catchable `DomainError`:
+
+```text
+DomainError: min requires a non-empty List
+DomainError: max requires a non-empty List
+```
+
+A `null` element encountered during a reduction raises the catchable `NullError` rather than being treated as zero or skipped.
+
+`Int` summation uses checked `Int` arithmetic, so an overflowing total raises `OverflowError`. `Real` summation follows the finite-`Real` rules and never silently produces a non-finite total.
+
+The three reductions are pure reads. They do not mutate, reorder, or copy the argument, object identity is unchanged, and a `NonNull` `Constant` `List` is therefore a valid argument:
+
+```ahd
+values: Constant List<Int> := [4, 1, 9]
+
+write(sum(values))
+write(min(values))
+write(max(values))
+```
+
+=>
+
+```text
+14
+1
+9
+```
 
 Planned later Fundamentals/data-structure features may include:
 

@@ -746,9 +746,58 @@ func (generator *generator) builtinCall(value *ir.CallExpr) string {
 		return generator.collectionMutation(name, value)
 	case "between":
 		return generator.between(value)
+	case "abs":
+		return generator.absoluteValue(value)
+	case "sum", "min", "max":
+		return generator.numericReduction(name, value)
 	default:
 		return generator.unsupported("Fundamentals function "+name, meta.Span)
 	}
+}
+
+// absoluteValue selects the abs overload from the checked result type, so the
+// Int form keeps checked Int arithmetic and the Real form keeps the
+// finite-Real contract.
+func (generator *generator) absoluteValue(value *ir.CallExpr) string {
+	meta := value.ExprMeta()
+	argument := value.Arguments[0].Value
+	if len(value.Arguments) != 1 || argument == nil {
+		generator.fail(CodeGenerationFailure, "abs has no argument", meta.Span, "the IR call is malformed")
+		return "nil"
+	}
+	switch meta.Type.Kind {
+	case ir.IntType:
+		return "AhdAbsInt(" + generator.value(argument, ir.Type{Kind: ir.IntType}, false) + ")"
+	case ir.RealType:
+		return "AhdAbsReal(" + generator.value(argument, ir.Type{Kind: ir.RealType}, false) + ")"
+	default:
+		return generator.unsupported("abs of "+meta.Type.String(), meta.Span)
+	}
+}
+
+// numericReduction lowers sum, min, and max to their checked runtime helper.
+// The receiver List is read in place, so the call never copies or mutates it.
+func (generator *generator) numericReduction(name string, value *ir.CallExpr) string {
+	meta := value.ExprMeta()
+	if len(value.Arguments) != 1 || value.Arguments[0].Value == nil {
+		generator.fail(CodeGenerationFailure, name+" has no argument", meta.Span, "the IR call is malformed")
+		return "nil"
+	}
+	argument := value.Arguments[0].Value
+	list := argument.ExprMeta().Type
+	if list.Kind != ir.ListType || list.Element == nil {
+		return generator.unsupported(name+" of "+list.String(), meta.Span)
+	}
+	helper := ""
+	switch list.Element.Kind {
+	case ir.IntType:
+		helper = "Int"
+	case ir.RealType:
+		helper = "Real"
+	default:
+		return generator.unsupported(name+" of "+list.String(), meta.Span)
+	}
+	return "Ahd" + strings.ToUpper(name[:1]) + name[1:] + helper + "(" + generator.expr(argument) + ")"
 }
 
 // between builds the lazy integer iteration. Missing arguments take the

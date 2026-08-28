@@ -847,6 +847,110 @@ func AhdListEqual[T any](left, right *AhdList[T], equal func(T, T) bool) bool {
 }
 
 // ---------------------------------------------------------------------------
+// Numeric Fundamentals: abs and the List reductions
+// ---------------------------------------------------------------------------
+
+// AhdAbsInt is the Int magnitude. The minimum Int has no Int magnitude, so it
+// reports the ordinary checked-arithmetic overflow rather than wrapping.
+func AhdAbsInt(value int64) int64 {
+	if value < 0 {
+		return AhdIntNegate(value)
+	}
+	return value
+}
+
+// AhdAbsReal is the Real magnitude. It preserves the finite-Real contract and
+// turns -0.0 into 0.0.
+func AhdAbsReal(value float64) float64 { return math.Abs(value) }
+
+// ahdElement reads one element of a numeric List. A null element is an error
+// rather than a zero, so a reduction never invents a value.
+func ahdElement[T any](value *T, name string) T {
+	if value == nil {
+		AhdRaiseClass(AhdClassNullError, name+" does not accept a null List element")
+	}
+	return *value
+}
+
+func ahdRequireElements[T any](list *AhdList[*T], name string) {
+	list.require()
+	if len(list.items) == 0 {
+		AhdRaiseClass(AhdClassDomainError, name+" requires a non-empty List")
+	}
+}
+
+// AhdSumInt adds every element of a List<Int> with checked Int arithmetic. An
+// empty List sums to the additive identity 0, and the List is not modified.
+func AhdSumInt(list *AhdList[*int64]) int64 {
+	list.require()
+	total := int64(0)
+	for _, item := range list.items {
+		total = AhdIntAdd(total, ahdElement(item, "sum"))
+	}
+	return total
+}
+
+// AhdSumReal adds every element of a List<Real> with checked Real arithmetic,
+// so a non-finite total is an error rather than Inf or NaN. An empty List sums
+// to 0.0, and the List is not modified.
+func AhdSumReal(list *AhdList[*float64]) float64 {
+	list.require()
+	total := 0.0
+	for _, item := range list.items {
+		total = AhdRealAdd(total, ahdElement(item, "sum"))
+	}
+	return total
+}
+
+// AhdMinInt is the least element of a non-empty List<Int>.
+func AhdMinInt(list *AhdList[*int64]) int64 {
+	ahdRequireElements(list, "min")
+	result := ahdElement(list.items[0], "min")
+	for _, item := range list.items[1:] {
+		if value := ahdElement(item, "min"); value < result {
+			result = value
+		}
+	}
+	return result
+}
+
+// AhdMaxInt is the greatest element of a non-empty List<Int>.
+func AhdMaxInt(list *AhdList[*int64]) int64 {
+	ahdRequireElements(list, "max")
+	result := ahdElement(list.items[0], "max")
+	for _, item := range list.items[1:] {
+		if value := ahdElement(item, "max"); value > result {
+			result = value
+		}
+	}
+	return result
+}
+
+// AhdMinReal is the least element of a non-empty List<Real>.
+func AhdMinReal(list *AhdList[*float64]) float64 {
+	ahdRequireElements(list, "min")
+	result := ahdElement(list.items[0], "min")
+	for _, item := range list.items[1:] {
+		if value := ahdElement(item, "min"); value < result {
+			result = value
+		}
+	}
+	return result
+}
+
+// AhdMaxReal is the greatest element of a non-empty List<Real>.
+func AhdMaxReal(list *AhdList[*float64]) float64 {
+	ahdRequireElements(list, "max")
+	result := ahdElement(list.items[0], "max")
+	for _, item := range list.items[1:] {
+		if value := ahdElement(item, "max"); value > result {
+			result = value
+		}
+	}
+	return result
+}
+
+// ---------------------------------------------------------------------------
 // Pair: reference semantics with insertion order
 // ---------------------------------------------------------------------------
 
