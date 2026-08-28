@@ -30,7 +30,7 @@ func TestPersistentSessionMutationErrorsAndDeclarations(t *testing.T) {
 		"write(x)",
 	}, "\n") + "\n"
 	var output, errors bytes.Buffer
-	if code := Run(strings.NewReader(input), &output, &errors, "AhdCode v0.1"); code != 0 {
+	if code := Run(strings.NewReader(input), &output, &errors, "AhdCode v0.1.2"); code != 0 {
 		t.Fatalf("REPL exit = %d", code)
 	}
 	if !strings.Contains(output.String(), "25\n") || strings.Count(output.String(), "7\n") != 2 {
@@ -76,7 +76,7 @@ except DivisionByZeroError as error {
 }
 `
 	var output, errors bytes.Buffer
-	Run(strings.NewReader(input), &output, &errors, "AhdCode v0.1")
+	Run(strings.NewReader(input), &output, &errors, "AhdCode v0.1.2")
 	if !strings.Contains(output.String(), "5\n") || !strings.Contains(output.String(), "9\n") || !strings.Contains(output.String(), "block\n") || !strings.Contains(output.String(), "first\nsecond\n") || !strings.Contains(output.String(), "else\n") || !strings.Contains(output.String(), "caught\n") {
 		t.Fatalf("REPL output:\n%s\nerrors:\n%s", output.String(), errors.String())
 	}
@@ -88,7 +88,7 @@ except DivisionByZeroError as error {
 func TestNumericConversionsAndPowerUseTheSharedPipeline(t *testing.T) {
 	input := "write(real(2))\nwrite(real(\"-2.5e-4\"))\nwrite(int(\"  +42  \"))\nwrite(real(2) ^ -3)\nwrite(2 ^ -3)\nwrite(int(3.7))\nwrite(int(\"3.0\"))\n"
 	var output, errors bytes.Buffer
-	if code := Run(strings.NewReader(input), &output, &errors, "AhdCode v0.1"); code != 0 {
+	if code := Run(strings.NewReader(input), &output, &errors, "AhdCode v0.1.2"); code != 0 {
 		t.Fatalf("REPL exit = %d", code)
 	}
 	if !strings.Contains(output.String(), "2.0\n") || !strings.Contains(output.String(), "-0.00025\n") || !strings.Contains(output.String(), "42\n") || !strings.Contains(output.String(), "0.125\n") || !strings.Contains(output.String(), "3\n") {
@@ -111,7 +111,7 @@ func TestTakeInsideTheSessionSeesEndOfInput(t *testing.T) {
 		"",
 	}, "\n")
 	var output, errors bytes.Buffer
-	Run(strings.NewReader(input), &output, &errors, "AhdCode v0.1")
+	Run(strings.NewReader(input), &output, &errors, "AhdCode v0.1.2")
 	text := output.String()
 	// The prompt is written, and the read reaches end of input immediately, so
 	// the session yields an empty String rather than the next command.
