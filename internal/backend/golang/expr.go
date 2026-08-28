@@ -71,6 +71,9 @@ func (generator *generator) expr(expression ir.Expr) string {
 		if current, known := generator.slots[value.Symbol]; known {
 			return current.name
 		}
+		if strings.HasPrefix(string(value.Callable), "builtin:Math::") {
+			return generator.mathFunctionValue(value)
+		}
 		function := generator.functions[value.Callable]
 		if function == nil {
 			return generator.unsupported("a Function value with no generated callable", meta.Span)
@@ -489,6 +492,9 @@ func (generator *generator) text(expression ir.Expr) string {
 	if function, ok := expression.(*ir.FunctionValueExpr); ok {
 		// The canonical text of a Function value is its declared name, so a
 		// value with no statically known declaration has no representation.
+		if strings.HasPrefix(string(function.Callable), "builtin:Math::") {
+			return "AhdStrFunction(" + strconv.Quote(strings.TrimPrefix(string(function.Callable), "builtin:Math::")) + ")"
+		}
 		declared := generator.functions[function.Callable]
 		if declared == nil {
 			return generator.unsupported("canonical text for a Function value with no declared name", meta.Span)
@@ -653,6 +659,9 @@ func (generator *generator) call(value *ir.CallExpr) string {
 	if strings.HasPrefix(string(value.Callable), "builtin:core::") {
 		return generator.builtinCall(value)
 	}
+	if strings.HasPrefix(string(value.Callable), "builtin:Math::") {
+		return generator.mathCall(value)
+	}
 	if method, ok := value.Callee.(*ir.MemberExpr); ok && method.Kind == ir.MethodMember {
 		function := generator.functions[method.Callable]
 		if function == nil {
@@ -687,6 +696,123 @@ func (generator *generator) call(value *ir.CallExpr) string {
 		return call
 	}
 	return generator.coerce(call, ir.ExprBase{Type: signature.Return, NullState: ir.MaybeNull}, meta.Type, naturalNullable(value))
+}
+
+// mathCall lowers the explicitly imported Math standard module. Semantic
+// analysis has already selected the exact callable and inserted ordinary
+// Int-to-Real widening, so this layer only maps stable builtin identities to
+// runtime helpers.
+func (generator *generator) mathCall(value *ir.CallExpr) string {
+	meta := value.ExprMeta()
+	name := strings.TrimPrefix(string(value.Callable), "builtin:Math::")
+	arguments := make([]string, len(value.Arguments))
+	for index, argument := range value.Arguments {
+		if argument.Value == nil {
+			generator.fail(CodeGenerationFailure, "Math."+name+" has a missing argument", meta.Span, "the IR call is malformed")
+			arguments[index] = "0"
+			continue
+		}
+		arguments[index] = generator.expr(argument.Value)
+	}
+	if result, known := mathRuntimeCall(name, arguments); known {
+		return result
+	}
+	return generator.unsupported("Math function "+name, meta.Span)
+}
+
+// mathFunctionValue adapts a standard-module callable to AhdCode's uniform
+// nullable Function-value representation. The selected signature remains the
+// source of parameter/result types, including an overloaded round value.
+func (generator *generator) mathFunctionValue(value *ir.FunctionValueExpr) string {
+	meta := value.ExprMeta()
+	if meta.Type.Signature == nil {
+		return generator.unsupported("a Math Function value without a concrete signature", meta.Span)
+	}
+	name := strings.TrimPrefix(string(value.Callable), "builtin:Math::")
+	parameters := make([]string, len(meta.Type.Signature.Parameters))
+	arguments := make([]string, len(meta.Type.Signature.Parameters))
+	for index, parameter := range meta.Type.Signature.Parameters {
+		parameterName := "argument" + itoa(index)
+		parameters[index] = parameterName + " " + generator.goType(parameter.Type, true)
+		arguments[index] = generator.coerce(parameterName,
+			ir.ExprBase{Type: parameter.Type, NullState: ir.MaybeNull}, parameter.Type, false)
+	}
+	call, known := mathRuntimeCall(name, arguments)
+	if !known {
+		return generator.unsupported("Math Function value "+name, meta.Span)
+	}
+	result := ""
+	body := call
+	if meta.Type.Signature.Return.Kind != ir.NothingType {
+		result = " " + generator.goType(meta.Type.Signature.Return, true)
+		body = "return " + generator.coerce(call,
+			ir.ExprBase{Type: meta.Type.Signature.Return, NullState: ir.NonNull}, meta.Type.Signature.Return, true)
+	}
+	return "func(" + strings.Join(parameters, ", ") + ")" + result + " { " + body + " }"
+}
+
+func mathRuntimeCall(name string, arguments []string) (string, bool) {
+	call := func(helper string) (string, bool) {
+		return helper + "(" + strings.Join(arguments, ", ") + ")", true
+	}
+	switch name {
+	case "round":
+		if len(arguments) == 1 {
+			return call("AhdMathRound")
+		}
+		if len(arguments) == 2 {
+			return call("AhdMathRoundDigits")
+		}
+	case "floor":
+		if len(arguments) == 1 {
+			return call("AhdMathFloor")
+		}
+	case "ceil":
+		if len(arguments) == 1 {
+			return call("AhdMathCeil")
+		}
+	case "sqrt":
+		if len(arguments) == 1 {
+			return call("AhdMathSqrt")
+		}
+	case "sin":
+		if len(arguments) == 1 {
+			return call("AhdMathSin")
+		}
+	case "cos":
+		if len(arguments) == 1 {
+			return call("AhdMathCos")
+		}
+	case "tan":
+		if len(arguments) == 1 {
+			return call("AhdMathTan")
+		}
+	case "log":
+		if len(arguments) == 1 {
+			return call("AhdMathLog")
+		}
+	case "log10":
+		if len(arguments) == 1 {
+			return call("AhdMathLog10")
+		}
+	case "exp":
+		if len(arguments) == 1 {
+			return call("AhdMathExp")
+		}
+	case "seed":
+		if len(arguments) == 1 {
+			return call("AhdMathSeed")
+		}
+	case "random":
+		if len(arguments) == 0 {
+			return call("AhdMathRandom")
+		}
+	case "randomInt":
+		if len(arguments) == 2 {
+			return call("AhdMathRandomInt")
+		}
+	}
+	return "", false
 }
 
 func (generator *generator) arguments(function *ir.Function, arguments []ir.Argument, span source.Span) []string {

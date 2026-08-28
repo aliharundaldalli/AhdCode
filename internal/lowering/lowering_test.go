@@ -191,9 +191,9 @@ func TestCrossModuleConstructionAndCallableIdentities(t *testing.T) {
 		"/Models.ahd": `Student: Class<> := {
     structure: Attributes := (name: String)
 }`,
-		"/Math.ahd": `identity: Function := (value: Int := 7) -> Int { return value }`,
+		"/Helpers.ahd": `identity: Function := (value: Int := 7) -> Int { return value }`,
 		"/Main.ahd": `from Models bring Student
-from Math bring identity
+from Helpers bring identity
 student: Student := Student(name: "Ali")
 answer: Int := identity(5)
 defaultAnswer: Int := identity()`,
@@ -209,15 +209,43 @@ defaultAnswer: Int := identity()`,
 		t.Fatalf("ClassID = %s", construction.Class)
 	}
 	call := globalInitializer(t, main, "answer").(*ir.CallExpr)
-	if !strings.Contains(string(call.Callable), "mem:/Math.ahd") {
+	if !strings.Contains(string(call.Callable), "mem:/Helpers.ahd") {
 		t.Fatalf("external CallableID = %s", call.Callable)
 	}
 	defaultCall := globalInitializer(t, main, "defaultAnswer").(*ir.CallExpr)
 	if len(defaultCall.Arguments) != 1 || !defaultCall.Arguments[0].UsesDefault {
 		t.Fatalf("imported default call = %#v", defaultCall.Arguments)
 	}
-	if functionIR(t, moduleIR(t, result.Compilation, "Math"), "identity").Parameters[0].Default == nil {
+	if functionIR(t, moduleIR(t, result.Compilation, "Helpers"), "identity").Parameters[0].Default == nil {
 		t.Fatal("dependency default expression missing from CompilationIR")
+	}
+}
+
+func TestMathStandardModuleLowersStableBuiltinIdentities(t *testing.T) {
+	result := lowerSources(t, map[string]string{
+		"/Main.ahd": `bring Math
+pi: Real := Math.PI
+root: Real := Math.sqrt(25)
+rounded: Real := Math.round(3.14159, 2)`,
+	}, "/Main.ahd")
+	if len(result.Compilation.Modules) != 3 || result.Compilation.Modules[0].ID != BuiltinModuleID || result.Compilation.Modules[1].ID != "builtin:Math" {
+		t.Fatalf("Math module order = %#v", result.Compilation.Modules)
+	}
+	main := moduleIR(t, result.Compilation, "Main")
+	pi, ok := globalInitializer(t, main, "pi").(*ir.LiteralExpr)
+	if !ok || pi.Kind != ir.RealLiteral || pi.Value != "3.141592653589793" {
+		t.Fatalf("Math.PI lowering = %#v", pi)
+	}
+	root := globalInitializer(t, main, "root").(*ir.CallExpr)
+	if root.Callable != "builtin:Math::sqrt" || len(root.Arguments) != 1 {
+		t.Fatalf("Math.sqrt lowering = %#v", root)
+	}
+	if _, widened := root.Arguments[0].Value.(*ir.ConvertExpr); !widened {
+		t.Fatalf("Math.sqrt Int widening = %T", root.Arguments[0].Value)
+	}
+	rounded := globalInitializer(t, main, "rounded").(*ir.CallExpr)
+	if rounded.Callable != "builtin:Math::round" || len(rounded.Arguments) != 2 {
+		t.Fatalf("Math.round lowering = %#v", rounded)
 	}
 }
 

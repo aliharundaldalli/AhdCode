@@ -1309,7 +1309,7 @@ min
 max
 ```
 
-These functions, together with core terminal functions `write` and `take`, are predeclared and need no `bring`. `int` accepts `Real` (truncate toward zero) or strict signed ASCII-decimal `String`; `real` accepts `Int` (safe widening) or strict decimal `String` with optional fraction and `e`/`E` exponent. Both String forms trim surrounding Unicode whitespace, reject underscores and non-decimal bases, raise `DomainError` for invalid text, and raise `OverflowError` for out-of-range results. `real(String)` rejects `NaN` and infinity text. Do not turn these entry points into general coercion. Do not add `bool(...)`, `round(...)`, `swap(...)`, `combine(...)`, `merge(...)`, `jump(...)`, `copy(...)`, `deepCopy(...)`, truthiness, or any other planned Fundamentals until their contracts are normatively specified.
+These functions, together with core terminal functions `write` and `take`, are predeclared and need no `bring`. `int` accepts `Real` (truncate toward zero) or strict signed ASCII-decimal `String`; `real` accepts `Int` (safe widening) or strict decimal `String` with optional fraction and `e`/`E` exponent. Both String forms trim surrounding Unicode whitespace, reject underscores and non-decimal bases, raise `DomainError` for invalid text, and raise `OverflowError` for out-of-range results. `real(String)` rejects `NaN` and infinity text. Do not turn these entry points into general coercion. Do not add `bool(...)`, `swap(...)`, `combine(...)`, `merge(...)`, `jump(...)`, `copy(...)`, `deepCopy(...)`, truthiness, or any other planned Fundamentals until their contracts are normatively specified.
 
 ## Canonical str
 
@@ -1425,6 +1425,58 @@ Length mismatch => error.
 ## jump
 
 Provides stepped selection that core slicing intentionally omits.
+
+---
+
+# PHASE 21B — Math standard module
+
+`Math` is the explicit compiler-registered standard module with canonical
+identity `builtin:Math`. It is never implicitly predeclared: source must use
+`bring Math` or an existing `from Math bring ...` form. Register it through the
+ordinary `Compiler.Builtins -> ModuleInterface -> NamespaceSymbol` path; do not
+add a second import mechanism or filesystem fallback, and never allow a sibling
+`Math.ahd` to shadow it.
+
+The exact v0.1 exports are `PI`, `E`, `round`, `floor`, `ceil`, `sqrt`, `sin`,
+`cos`, `tan`, `log`, `log10`, `exp`, `seed`, `random`, and `randomInt`. `PI` and
+`E` are immutable typed Real constants. `abs`, `sum`, `min`, and `max` remain
+Fundamentals, and exponentiation remains `^`; do not add Math aliases or
+`pow`. Parameters publish ordinary callable metadata and preserve the existing
+NonNull and `Int -> Real` rules. No String/Bool coercion, dynamic escape hatch,
+new syntax, or lambda is involved.
+
+Lowering consumes the resolved standard-module Symbol/Callable identity and
+emits stable `builtin:Math::<name>` calls. Compiler-supplied constants carry a
+canonical typed literal in semantic metadata, so namespace and selective
+imports lower without fake filesystem globals. The Go backend maps only those
+stable identities to runtime helpers; it must not inspect source member text.
+
+Numeric runtime behavior:
+
+- `round(Real)` and `round(Real, Int)` return Real and use half-away-from-zero;
+- decimal digits are restricted to `0..15`, otherwise `DomainError`;
+- `floor`/`ceil` return Int and raise `OverflowError` outside Int64;
+- trigonometry uses radians;
+- `log` is natural, `log10` is base ten, and both require positive input;
+- negative `sqrt` is `DomainError`;
+- `exp` and every other Math operation preserve finite Real and never expose
+  NaN/Inf.
+
+The runtime owns one shared SplitMix64 generator per native process. Initial
+state is the two's-complement uint64 representation of seed `557`. Pin the
+increment `0x9e3779b97f4a7c15` and mixing factors
+`0xbf58476d1ce4e5b9`/`0x94d049bb133111eb` exactly. `seed(Int)` resets that state;
+there is no entropy/time reseeding. `random()` consumes one output and converts
+its high 53 bits with `float64(raw >> 11) * 2^-53`, which cannot produce 1.0.
+
+`randomInt(min, max)` has inclusive bounds. Reversed bounds raise `DomainError`;
+equal bounds return without consuming state. Use unsigned span arithmetic and
+rejection sampling, not raw modulo, including intervals crossing zero and the
+full Int64 domain. This generator is deterministic and reproducible, not
+cryptographically secure. Tests must pin seed 557, seed 42, negative seeds,
+process reset, cross-module shared order, extreme inclusive bounds, no-consume
+singleton behavior, catchable errors, semantic-only rejections, and identical
+generated output across repeated compilations.
 
 ---
 

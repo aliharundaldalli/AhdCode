@@ -49,6 +49,12 @@ func LowerCompilation(compilation module.CompilationResult) Result {
 	// depend on it without an implicit backend contract.
 	result.Modules = append(result.Modules, builtinModule())
 	for _, current := range ordered {
+		if current.Source.Builtin {
+			result.Modules = append(result.Modules, &ir.Module{
+				ID: ir.ModuleID(current.ID), Name: current.Source.Name, SourcePath: current.Source.Path,
+			})
+			continue
+		}
 		lowerer := &moduleLowerer{compilation: engine, module: current, semantic: current.Semantic}
 		result.Modules = append(result.Modules, lowerer.lowerModule())
 	}

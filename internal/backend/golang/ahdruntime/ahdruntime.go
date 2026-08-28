@@ -14,6 +14,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"unicode"
 )
 
@@ -1059,6 +1060,177 @@ func AhdListSortKeyReal[T any](list *AhdList[T], key func(T) *float64) { ahdSort
 
 // AhdListSortKeyString orders a List by a String key.
 func AhdListSortKeyString[T any](list *AhdList[T], key func(T) *string) { ahdSortByKey(list, key) }
+
+// ---------------------------------------------------------------------------
+// Math standard module
+// ---------------------------------------------------------------------------
+
+// AhdMathRound rounds to an integral Real. math.Round is explicitly the
+// half-away-from-zero operation required by AhdCode, not bankers rounding.
+func AhdMathRound(value float64) float64 {
+	ahdMathRequireFinite("round", value)
+	return math.Round(value)
+}
+
+// AhdMathRoundDigits rounds to 0..15 decimal places. When scaling a very large
+// finite value would overflow, its float64 spacing is already much wider than
+// the requested decimal place, so the value is returned unchanged.
+func AhdMathRoundDigits(value float64, digits int64) float64 {
+	ahdMathRequireFinite("round", value)
+	if digits < 0 || digits > 15 {
+		AhdRaiseClass(AhdClassDomainError, "Math.round digits must be in 0..15")
+	}
+	factor := math.Pow10(int(digits))
+	if math.Abs(value) > math.MaxFloat64/factor {
+		return value
+	}
+	return math.Round(value*factor) / factor
+}
+
+// AhdMathFloor returns the greatest Int not greater than value.
+func AhdMathFloor(value float64) int64 { return ahdMathIntegral("floor", math.Floor(value)) }
+
+// AhdMathCeil returns the least Int not less than value.
+func AhdMathCeil(value float64) int64 { return ahdMathIntegral("ceil", math.Ceil(value)) }
+
+func ahdMathIntegral(name string, value float64) int64 {
+	ahdMathRequireFinite(name, value)
+	limit := math.Ldexp(1, 63)
+	if value < -limit || value >= limit {
+		AhdRaiseClass(AhdClassOverflowError, "Math."+name+" result does not fit Int")
+	}
+	return int64(value)
+}
+
+// AhdMathSqrt computes the principal square root.
+func AhdMathSqrt(value float64) float64 {
+	ahdMathRequireFinite("sqrt", value)
+	if value < 0 {
+		AhdRaiseClass(AhdClassDomainError, "Math.sqrt requires a non-negative value")
+	}
+	return ahdMathFiniteResult("sqrt", math.Sqrt(value))
+}
+
+// AhdMathSin, AhdMathCos, and AhdMathTan use radians.
+func AhdMathSin(value float64) float64 {
+	ahdMathRequireFinite("sin", value)
+	return ahdMathFiniteResult("sin", math.Sin(value))
+}
+
+func AhdMathCos(value float64) float64 {
+	ahdMathRequireFinite("cos", value)
+	return ahdMathFiniteResult("cos", math.Cos(value))
+}
+
+func AhdMathTan(value float64) float64 {
+	ahdMathRequireFinite("tan", value)
+	return ahdMathFiniteResult("tan", math.Tan(value))
+}
+
+// AhdMathLog is the natural logarithm; AhdMathLog10 is base ten.
+func AhdMathLog(value float64) float64 {
+	ahdMathRequireFinite("log", value)
+	if value <= 0 {
+		AhdRaiseClass(AhdClassDomainError, "Math.log requires a value greater than zero")
+	}
+	return ahdMathFiniteResult("log", math.Log(value))
+}
+
+func AhdMathLog10(value float64) float64 {
+	ahdMathRequireFinite("log10", value)
+	if value <= 0 {
+		AhdRaiseClass(AhdClassDomainError, "Math.log10 requires a value greater than zero")
+	}
+	return ahdMathFiniteResult("log10", math.Log10(value))
+}
+
+// AhdMathExp computes e^value and preserves AhdCode's finite-Real contract.
+func AhdMathExp(value float64) float64 {
+	ahdMathRequireFinite("exp", value)
+	return ahdMathFiniteResult("exp", math.Exp(value))
+}
+
+func ahdMathRequireFinite(name string, value float64) {
+	if math.IsNaN(value) {
+		AhdRaiseClass(AhdClassDomainError, "Math."+name+" received NaN")
+	}
+	if math.IsInf(value, 0) {
+		AhdRaiseClass(AhdClassOverflowError, "Math."+name+" received a non-finite value")
+	}
+}
+
+func ahdMathFiniteResult(name string, value float64) float64 {
+	if math.IsNaN(value) {
+		AhdRaiseClass(AhdClassDomainError, "Math."+name+" produced an undefined result")
+	}
+	if math.IsInf(value, 0) {
+		AhdRaiseClass(AhdClassOverflowError, "Math."+name+" result exceeds finite Real range")
+	}
+	return value
+}
+
+const (
+	ahdMathDefaultSeed   int64  = 557
+	ahdSplitMixIncrement uint64 = 0x9e3779b97f4a7c15
+	ahdSplitMixFactor1   uint64 = 0xbf58476d1ce4e5b9
+	ahdSplitMixFactor2   uint64 = 0x94d049bb133111eb
+)
+
+var ahdMathGenerator = struct {
+	sync.Mutex
+	state uint64
+}{state: uint64(ahdMathDefaultSeed)}
+
+// AhdMathSeed resets the one process-wide Math sequence. Converting the signed
+// seed to uint64 is the specified two's-complement state mapping.
+func AhdMathSeed(seed int64) {
+	ahdMathGenerator.Lock()
+	ahdMathGenerator.state = uint64(seed)
+	ahdMathGenerator.Unlock()
+}
+
+// ahdSplitMix64 advances and mixes the generator state using the pinned v0.1
+// SplitMix64 transition. The caller holds ahdMathGenerator's lock.
+func ahdSplitMix64() uint64 {
+	ahdMathGenerator.state += ahdSplitMixIncrement
+	value := ahdMathGenerator.state
+	value = (value ^ (value >> 30)) * ahdSplitMixFactor1
+	value = (value ^ (value >> 27)) * ahdSplitMixFactor2
+	return value ^ (value >> 31)
+}
+
+// AhdMathRandom constructs [0,1) from the high 53 bits of one raw output.
+func AhdMathRandom() float64 {
+	ahdMathGenerator.Lock()
+	raw := ahdSplitMix64()
+	ahdMathGenerator.Unlock()
+	return float64(raw>>11) * (1.0 / (1 << 53))
+}
+
+// AhdMathRandomInt returns an unbiased value from the inclusive interval. A
+// singleton interval consumes no generator output. Rejection sampling avoids
+// modulo bias, and a zero uint64 span denotes all 2^64 signed Int values.
+func AhdMathRandomInt(minimum, maximum int64) int64 {
+	if minimum > maximum {
+		AhdRaiseClass(AhdClassDomainError, "Math.randomInt minimum must not exceed maximum")
+	}
+	if minimum == maximum {
+		return minimum
+	}
+	span := uint64(maximum) - uint64(minimum) + 1
+	ahdMathGenerator.Lock()
+	defer ahdMathGenerator.Unlock()
+	if span == 0 {
+		return int64(uint64(minimum) + ahdSplitMix64())
+	}
+	threshold := -span % span
+	for {
+		raw := ahdSplitMix64()
+		if raw >= threshold {
+			return int64(uint64(minimum) + raw%span)
+		}
+	}
+}
 
 // ---------------------------------------------------------------------------
 // Numeric Fundamentals: abs and the List reductions

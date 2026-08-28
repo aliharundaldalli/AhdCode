@@ -50,6 +50,8 @@ func (a *analyzer) analyzeExpressionExpected(expression ast.Expr, current *scope
 		return info
 	case *ast.IdentifierExpr:
 		return a.analyzeFunctionValueIdentifier(value, current, flow, expected)
+	case *ast.MemberExpr:
+		return a.analyzeFunctionValueMember(value, current, flow, expected)
 	case *ast.ListExpr:
 		info := a.analyzeListExpected(value, current, flow, expected)
 		a.result.ExpressionTypes[expression] = info.typeValue
@@ -63,6 +65,41 @@ func (a *analyzer) analyzeExpressionExpected(expression ast.Expr, current *scope
 	default:
 		return a.analyzeExpression(expression, current, flow)
 	}
+}
+
+// analyzeFunctionValueMember applies the ordinary callback context to an
+// overloaded Function reached through a namespace or Class member. Direct
+// calls still use call overload resolution; this path is only for taking the
+// member itself as a Function value.
+func (a *analyzer) analyzeFunctionValueMember(member *ast.MemberExpr, current *scope, flow flowState, expected types.Type) expressionInfo {
+	info := a.analyzeMember(member, current, flow)
+	symbol := info.symbol
+	if symbol == nil {
+		a.result.ExpressionTypes[member] = info.typeValue
+		a.result.NullStates[member] = info.nullState
+		return info
+	}
+	if symbol.Alias != nil {
+		symbol = symbol.Alias
+	}
+	if symbol.OverloadSet == nil {
+		a.result.ExpressionTypes[member] = info.typeValue
+		a.result.NullStates[member] = info.nullState
+		return info
+	}
+	expectedFunction, hasExpectedFunction := expected.(types.Function)
+	if !hasExpectedFunction || expectedFunction.Signature == nil {
+		a.error(codeAmbiguousOverload, fmt.Sprintf("overloaded Function value %q has no selecting context", symbol.Name), member.Span(), "provide a concrete callback context that selects exactly one overload")
+		info.typeValue = types.Invalid
+	} else if selected := a.selectFunctionValue(symbol.OverloadSet, expectedFunction.Signature, member); selected != nil {
+		info.typeValue = types.Function{Signature: selected.Signature}
+		a.result.SelectedFunctionValues[member] = selected
+	} else {
+		info.typeValue = types.Invalid
+	}
+	a.result.ExpressionTypes[member] = info.typeValue
+	a.result.NullStates[member] = info.nullState
+	return info
 }
 
 func (a *analyzer) analyzeExpressionWithMagnitude(expression ast.Expr, current *scope, flow flowState, allowMinMagnitude bool) expressionInfo {

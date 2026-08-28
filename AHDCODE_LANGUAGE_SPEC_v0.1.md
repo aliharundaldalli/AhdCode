@@ -2232,7 +2232,6 @@ Planned early Fundamentals functions include:
 
 ```text
 bool
-round
 swap
 combine
 merge
@@ -2541,9 +2540,150 @@ Core slicing has no step syntax. Stepped selection belongs in a library function
 
 ---
 
-## 35. Core Terminal I/O
+## 35. Math Standard Module
 
-### 35.1 take
+`Math` is a compiler-registered standard module. It is not predeclared like
+Fundamentals and must be imported through the ordinary module syntax:
+
+```ahd
+bring Math
+
+write(Math.sqrt(25.0))
+write(Math.PI)
+```
+
+`from Math bring sqrt` and the existing selective or `bring all` forms work
+through the same module-interface rules as source modules. The canonical module
+identity is `builtin:Math`; a sibling `Math.ahd` cannot shadow it. Every Math
+argument must be `NonNull`. A parameter written as `Real` accepts only `Real`
+and the existing implicit `Int -> Real` widening—never `String`, `Bool`, or a
+new coercion.
+
+The exact v0.1 public surface is:
+
+```text
+PI: Constant Real
+E:  Constant Real
+
+round(Real)      -> Real
+round(Real, Int) -> Real
+floor(Real)      -> Int
+ceil(Real)       -> Int
+
+sqrt(Real)  -> Real
+sin(Real)   -> Real
+cos(Real)   -> Real
+tan(Real)   -> Real
+log(Real)   -> Real
+log10(Real) -> Real
+exp(Real)   -> Real
+
+seed(Int)           -> Nothing
+random()            -> Real
+randomInt(Int, Int) -> Int
+```
+
+`PI` and `E` are immutable float64 mathematical constants. They are ordinary
+readable namespace members but cannot be assigned or updated. `abs`, `sum`,
+`min`, and `max` remain Fundamentals; `Math` does not alias them. There is no
+`Math.pow`; exponentiation uses `^`.
+
+### 35.1 Rounding and integral bounds
+
+`round(value)` returns an integral `Real`. Exact halves round away from zero:
+
+```text
+Math.round(3.4)   -> 3.0
+Math.round(3.5)   -> 4.0
+Math.round(-3.5)  -> -4.0
+```
+
+The two-argument form rounds to `digits` decimal places. `digits` must be in
+`0..15`; otherwise it raises the catchable `DomainError`. The deterministic
+float64 procedure multiplies by `10^digits`, applies half-away-from-zero
+rounding, then divides by the same factor. If scaling a finite value would
+overflow, the value is returned unchanged because its float64 spacing already
+exceeds the requested decimal precision.
+
+```text
+Math.round(3.14159, 2) -> 3.14
+Math.round(2.675, 2)   -> 2.68
+```
+
+`floor` and `ceil` return `Int` and follow their mathematical definitions for
+positive and negative values. A result outside signed Int64 raises catchable
+`OverflowError`; it never wraps.
+
+### 35.2 Classic mathematics
+
+`sqrt` returns the principal square root. A negative input raises
+`DomainError`. `sin`, `cos`, and `tan` use radians; v0.1 has no degree mode.
+`log` is the natural logarithm and `log10` is base ten. Both require a value
+strictly greater than zero and otherwise raise `DomainError`. `exp` raises
+`OverflowError` if its result exceeds the finite `Real` range.
+
+Every Math result obeys the finite-`Real` contract. A runtime operation never
+exposes `NaN` or infinity: undefined results become `DomainError`, and
+out-of-range finite mathematics becomes `OverflowError`.
+
+### 35.3 Deterministic random sequence
+
+There is one shared Math pseudo-random sequence per native program execution.
+Every fresh execution starts exactly as if the program had called:
+
+```ahd
+Math.seed(557)
+```
+
+An explicit `seed(557)` therefore resets to the default state. Every signed
+Int64 seed is valid and maps to the internal `uint64` state by its two's-
+complement bit pattern. Calls made while initializing different modules and in
+the entry module advance this same sequence in actual runtime order. The
+generator is never seeded from time, OS entropy, process identity, or a clock.
+
+v0.1 pins SplitMix64. For state `s`, one output performs the following unsigned
+64-bit wrapping operations exactly:
+
+```text
+s = s + 0x9e3779b97f4a7c15
+z = s
+z = (z xor (z >> 30)) * 0xbf58476d1ce4e5b9
+z = (z xor (z >> 27)) * 0x94d049bb133111eb
+z = z xor (z >> 31)
+```
+
+This algorithm and its sequence are part of the v0.1 reproducibility contract
+across Go versions, operating systems, and supported architectures. It is not
+cryptographically secure.
+
+`random()` advances once and constructs a `Real` in `0.0 <= result < 1.0` from
+the high 53 output bits:
+
+```text
+float64(z >> 11) * 2^-53
+```
+
+The first values for seed `557` are pinned as:
+
+```text
+0.4121990632081577
+0.4686510900868295
+0.5840201876345011
+```
+
+`randomInt(min, max)` uses inclusive bounds. `min > max` raises `DomainError`.
+When `min == max`, it returns that value without consuming generator state.
+For every other interval it uses rejection sampling before reducing modulo the
+unsigned interval width, so the result has no modulo bias. Span arithmetic is
+unsigned and supports intervals crossing zero and both Int64 boundaries. A
+width of zero denotes the complete `2^64`-value Int64 domain and maps one raw
+output across that full ordered interval.
+
+---
+
+## 36. Core Terminal I/O
+
+### 36.1 take
 
 `take` is the terminal input function. It has exactly two forms:
 
@@ -2594,7 +2734,7 @@ age: Int := take()
 `take` is the only terminal input function in v0.1. There is no `takeInt`,
 `takeReal`, `input`, or `readLine`.
 
-### 35.2 write
+### 36.2 write
 
 ```ahd
 write("Hello {name}")
@@ -2602,7 +2742,7 @@ write("Hello {name}")
 
 ---
 
-## 36. Runtime Numerical Safety
+## 37. Runtime Numerical Safety
 
 AhdCode prefers explicit errors over surprising low-level numeric behavior.
 
@@ -2615,7 +2755,7 @@ Complex mathematics belongs to a Complex facility later.
 
 ---
 
-## 37. Unsupported v0.1 Features
+## 38. Unsupported v0.1 Features
 
 Intentionally excluded:
 
@@ -2646,7 +2786,7 @@ Intentionally excluded:
 
 ---
 
-## 38. Planned Compiler Pipeline
+## 39. Planned Compiler Pipeline
 
 ```text
 AhdCode source (.ahd)
@@ -2676,7 +2816,7 @@ AhdCode must not be a thin Python/JavaScript eval wrapper or regex-only translat
 
 ---
 
-## 39. CLI and interactive toolchain
+## 40. CLI and interactive toolchain
 
 ```bash
 ahdcode
@@ -2708,7 +2848,7 @@ Canonical in-place formatter. `ahdcode format --check hello.ahd` performs the sa
 
 ---
 
-## 40. Example Program
+## 41. Example Program
 
 ```ahd
 PI: Constant Real := 3.14159
@@ -2733,7 +2873,7 @@ else {
 
 ---
 
-## 41. Example Class
+## 42. Example Class
 
 ```ahd
 Person: Class<> := {
@@ -2767,7 +2907,7 @@ Student: Class<Person> := {
 
 ---
 
-## 42. Implementation Rule: Do Not Invent Semantics Silently
+## 43. Implementation Rule: Do Not Invent Semantics Silently
 
 When the specification is ambiguous:
 
@@ -2781,7 +2921,7 @@ In particular, do not resolve uncertainty by introducing hidden `Any`, dynamic F
 
 ---
 
-## 43. v0.1 Definition of Done
+## 44. v0.1 Definition of Done
 
 Core v0.1 is meaningfully alive when:
 

@@ -110,7 +110,7 @@ func stableSymbolID(current *module.Module, symbol *semantic.Symbol) ir.SymbolID
 		if symbol.Kind == semantic.ClassSymbol && symbol.Class != nil {
 			return ir.SymbolID(classID(symbol.Class) + "::symbol")
 		}
-		return ir.SymbolID("builtin:core::symbol::" + symbol.Name)
+		return ir.SymbolID(builtinOrigin(symbol) + "::symbol::" + symbol.Name)
 	}
 	if symbol.OwnerClass != nil {
 		return ir.SymbolID(string(classID(symbol.OwnerClass)) + "::member::" + symbol.Name)
@@ -131,6 +131,9 @@ func stableCallableID(current *module.Module, symbol *semantic.Symbol, callable 
 	}
 	if constructor && symbol != nil && symbol.Class != nil {
 		return ir.CallableID(string(classID(symbol.Class)) + "::constructor::" + signatureKey(callable.Signature))
+	}
+	if symbol != nil && symbol.Builtin && symbol.Kind == semantic.FunctionSymbol {
+		return ir.CallableID(builtinOrigin(symbol) + "::" + symbol.Name)
 	}
 	if callable.Declaration == nil && callable.Structure == nil && (symbol == nil || symbol.Kind != semantic.FunctionSymbol) {
 		return ir.CallableID("signature:" + signatureKey(callable.Signature))
@@ -160,7 +163,7 @@ func (r *registry) symbolID(current *module.Module, symbol *semantic.Symbol) ir.
 func (r *registry) callableID(current *module.Module, symbol *semantic.Symbol, callable *semantic.Callable, constructor bool) ir.CallableID {
 	if callable == nil || callable.Signature == nil {
 		if symbol != nil && symbol.Builtin {
-			return ir.CallableID("builtin:core::" + symbol.Name)
+			return ir.CallableID(builtinOrigin(symbol) + "::" + symbol.Name)
 		}
 		return ""
 	}
@@ -173,6 +176,13 @@ func (r *registry) callableID(current *module.Module, symbol *semantic.Symbol, c
 		return id
 	}
 	return ir.CallableID("signature:" + signatureKey(callable.Signature))
+}
+
+func builtinOrigin(symbol *semantic.Symbol) string {
+	if symbol != nil && strings.HasPrefix(symbol.OriginModuleID, "builtin:") {
+		return symbol.OriginModuleID
+	}
+	return "builtin:core"
 }
 
 func classID(symbol *types.ClassSymbol) ir.ClassID {

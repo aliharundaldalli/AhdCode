@@ -126,6 +126,9 @@ func (lowerer *moduleLowerer) lowerIdentifier(identifier *ast.IdentifierExpr, ba
 	if symbol.Alias != nil {
 		symbol = symbol.Alias
 	}
+	if literal := lowerBuiltinLiteral(symbol, base); literal != nil {
+		return literal
+	}
 	if base.Type.Kind == ir.FunctionType && base.Type.Signature == nil && symbol.Callable != nil {
 		base.Type.Signature = lowerSignature(symbol.Callable.Signature)
 	}
@@ -529,6 +532,9 @@ func (lowerer *moduleLowerer) lowerMember(member *ast.MemberExpr, base ir.ExprBa
 		return lowerer.lowerSuperMember(member, resolved, base)
 	}
 	if objectSymbol := lowerer.semantic.ResolvedSymbols[member.Object]; objectSymbol != nil && objectSymbol.Kind == semantic.NamespaceSymbol {
+		if literal := lowerBuiltinLiteral(resolved, base); literal != nil {
+			return literal
+		}
 		if resolved.Kind == semantic.ClassSymbol && resolved.Class != nil {
 			return &ir.ClassRefExpr{ExprBase: base, Class: classID(resolved.Class)}
 		}
@@ -547,4 +553,20 @@ func (lowerer *moduleLowerer) lowerMember(member *ast.MemberExpr, base ir.ExprBa
 		return &ir.MemberExpr{ExprBase: base, Kind: ir.MethodMember, Object: object, Callable: lowerer.compilation.registry.callableID(lowerer.module, resolved, callable, false)}
 	}
 	return &ir.MemberExpr{ExprBase: base, Kind: ir.FieldMember, Object: object, Field: fieldID(resolved)}
+}
+
+func lowerBuiltinLiteral(symbol *semantic.Symbol, base ir.ExprBase) ir.Expr {
+	if symbol == nil || symbol.BuiltinLiteral == "" {
+		return nil
+	}
+	kind := ir.RealLiteral
+	switch base.Type.Kind {
+	case ir.IntType:
+		kind = ir.IntLiteral
+	case ir.BoolType:
+		kind = ir.BoolLiteral
+	case ir.StringType:
+		kind = ir.StringLiteral
+	}
+	return &ir.LiteralExpr{ExprBase: base, Kind: kind, Value: symbol.BuiltinLiteral}
 }

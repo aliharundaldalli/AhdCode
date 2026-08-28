@@ -104,7 +104,11 @@ type Symbol struct {
 	// nil entry. Inherited entries come from the parent construction contract.
 	ConstructorAttributes []*Symbol
 	ConstValue            *constantValue
-	inference             *functionInference
+	// BuiltinLiteral is the canonical source-independent scalar representation
+	// of a compiler-supplied Constant. It lets lowering materialize standard
+	// module constants without inventing filesystem-backed storage.
+	BuiltinLiteral string
+	inference      *functionInference
 }
 
 // ModuleInterface is an in-memory, compile-time-only public contract. Identity

@@ -26,7 +26,7 @@ type Compiler struct {
 }
 
 func NewCompiler(resolver ModuleResolver, loader SourceLoader) *Compiler {
-	return &Compiler{Resolver: resolver, Loader: loader, Builtins: make(map[string]*semantic.ModuleInterface)}
+	return &Compiler{Resolver: resolver, Loader: loader, Builtins: semantic.StandardModuleInterfaces()}
 }
 
 func (compiler *Compiler) Compile(entryPath string) CompilationResult {
