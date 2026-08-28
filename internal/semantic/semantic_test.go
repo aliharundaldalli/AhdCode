@@ -278,13 +278,26 @@ answer: Real := square("x")`)
 	requireSemanticCode(t, nothingReturn, codeReturnType)
 }
 
-func TestFunctionValueNeverFallsBackToDynamicCall(t *testing.T) {
+func TestCallbackFunctionParameterInference(t *testing.T) {
 	_, result := analyzeText(t, `calculate: Function := (
     operation: Function
 ) -> Int {
     return operation(1)
 }`)
-	requireSemanticCode(t, result, codePendingFeature)
+	requireSemanticClean(t, result)
+	var calculate *Symbol
+	for _, symbol := range result.Symbols {
+		if symbol.Name == "calculate" && symbol.Kind == FunctionSymbol {
+			calculate = symbol
+		}
+	}
+	if calculate == nil {
+		t.Fatal("calculate symbol not found")
+	}
+	callback, ok := calculate.Callable.Signature.Parameters[0].Type.(types.Function)
+	if !ok || callback.Signature == nil || len(callback.Signature.Parameters) != 1 || callback.Signature.Parameters[0].Type.Kind() != types.IntKind || callback.Signature.Return.Kind() != types.IntKind {
+		t.Fatalf("inferred callback = %#v", callback.Signature)
+	}
 }
 
 func TestClassConstructionMembersAndTypeOperators(t *testing.T) {
@@ -502,15 +515,20 @@ message: String := greet(name: "A", name: "B")`)
 	requireSemanticCode(t, duplicate, codeCallArguments)
 }
 
-func TestOverloadHasNoDynamicFallback(t *testing.T) {
-	_, result := analyzeText(t, `convert: Function := (value: Int) -> Int {
+func TestExactOverloadWinsOverWidening(t *testing.T) {
+	parsed, result := analyzeText(t, `convert: Function := (value: Int) -> Int {
     return value
 }
 convert: Overload Function := (value: Real) -> Real {
     return value
 }
 answer: Int := convert(1)`)
-	requireSemanticCode(t, result, codePendingFeature)
+	requireSemanticClean(t, result)
+	call := parsed.Program.Statements[2].(*ast.VariableDecl).Initializer.(*ast.CallExpr)
+	selected := result.SelectedCallables[call]
+	if selected == nil || selected.Signature.Parameters[0].Type.Kind() != types.IntKind {
+		t.Fatalf("selected overload = %#v", selected)
+	}
 }
 
 func TestReturnNullMetadataAndNullableCallResult(t *testing.T) {

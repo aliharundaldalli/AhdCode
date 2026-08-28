@@ -117,19 +117,23 @@ func (a *analyzer) analyzeVariableDeclaration(declaration *ast.VariableDecl, cur
 	}
 	a.result.ResolvedSymbols[declaration] = symbol
 	a.result.ResolvedSymbols[identifier] = symbol
+	if function, ok := typeValue.(types.Function); ok && function.Signature == nil && symbol.inference == nil {
+		symbol.inference = newFunctionInference(nil, -1)
+		a.trackInference(symbol, current)
+	}
 
 	if declaration.Initializer == nil {
 		a.error(codeTypeMismatch, fmt.Sprintf("declaration %q requires an initializer", declaration.Name), declaration.Span(), "use := followed by a compatible value")
 		flow[symbol] = MaybeNull
 		return flow
 	}
-	initializer := a.analyzeExpression(declaration.Initializer, current, flow)
+	initializer := a.analyzeExpressionExpected(declaration.Initializer, current, flow, typeValue)
 	if initializer.nullState != Null && !types.Assignable(typeValue, initializer.typeValue) {
 		a.typeMismatch(declaration.Initializer.Span(), typeValue, initializer.typeValue, fmt.Sprintf("initializer of %s", declaration.Name))
 	}
 	if targetFunction, ok := typeValue.(types.Function); ok && targetFunction.Signature == nil {
 		if resolvedFunction, ok := initializer.typeValue.(types.Function); ok && resolvedFunction.Signature != nil {
-			symbol.Type = resolvedFunction
+			a.constrainConcreteFunction(symbol, resolvedFunction.Signature, declaration.Initializer.Span())
 		}
 	}
 	symbol.InitialNull = initializer.nullState
@@ -222,12 +226,19 @@ func (a *analyzer) analyzeMemberDeclaration(declaration *ast.VariableDecl, curre
 	a.result.Symbols = append(a.result.Symbols, memberSymbol)
 	a.result.ResolvedSymbols[declaration] = memberSymbol
 	a.result.ResolvedSymbols[member] = memberSymbol
+	if function, ok := typeValue.(types.Function); ok && function.Signature == nil {
+		memberSymbol.inference = newFunctionInference(nil, -1)
+		a.trackInference(memberSymbol, current)
+	}
 	if declaration.Initializer != nil {
-		initializer := a.analyzeExpression(declaration.Initializer, current, flow)
+		initializer := a.analyzeExpressionExpected(declaration.Initializer, current, flow, typeValue)
 		if initializer.nullState != Null && !types.Assignable(typeValue, initializer.typeValue) {
 			a.typeMismatch(declaration.Initializer.Span(), typeValue, initializer.typeValue, fmt.Sprintf("initializer of member %s", member.Name))
 		}
 		memberSymbol.InitialNull = initializer.nullState
+		if function, ok := initializer.typeValue.(types.Function); ok && function.Signature != nil {
+			a.constrainConcreteFunction(memberSymbol, function.Signature, declaration.Initializer.Span())
+		}
 	}
 	return flow
 }
@@ -241,7 +252,16 @@ func (a *analyzer) analyzeAssignment(statement *ast.AssignmentStmt, current *sco
 	} else if target.symbol.Constant {
 		a.error(codeConstantAssignment, fmt.Sprintf("Constant %q cannot be reassigned", target.symbol.Name), statement.Target.Span(), "remove the assignment or declare a mutable binding")
 	}
-	value := a.analyzeExpression(statement.Value, current, flow)
+	expected := target.typeValue
+	if target.symbol != nil && target.symbol.inference != nil && target.symbol.inference.fixed != nil {
+		expected = types.Function{Signature: target.symbol.inference.fixed}
+	}
+	value := a.analyzeExpressionExpected(statement.Value, current, flow, expected)
+	if target.symbol != nil && target.symbol.inference != nil {
+		if function, ok := value.typeValue.(types.Function); ok && function.Signature != nil {
+			a.constrainConcreteFunction(target.symbol, function.Signature, statement.Value.Span())
+		}
+	}
 	resultType := value.typeValue
 	resultNull := value.nullState
 	if statement.Operator != "=" {

@@ -20,6 +20,28 @@ func (a *analyzer) analyzeExpression(expression ast.Expr, current *scope, flow f
 	return a.analyzeExpressionWithMagnitude(expression, current, flow, false)
 }
 
+func (a *analyzer) analyzeExpressionExpected(expression ast.Expr, current *scope, flow flowState, expected types.Type) expressionInfo {
+	if expression == nil {
+		return expressionInfo{typeValue: types.Invalid, nullState: MaybeNull}
+	}
+	switch value := expression.(type) {
+	case *ast.GroupExpr:
+		info := a.analyzeExpressionExpected(value.Expression, current, flow, expected)
+		a.result.ExpressionTypes[expression] = info.typeValue
+		a.result.NullStates[expression] = info.nullState
+		return info
+	case *ast.CallExpr:
+		info := a.analyzeCallExpected(value, current, flow, expected)
+		a.result.ExpressionTypes[expression] = info.typeValue
+		a.result.NullStates[expression] = info.nullState
+		return info
+	case *ast.IdentifierExpr:
+		return a.analyzeFunctionValueIdentifier(value, current, flow, expected)
+	default:
+		return a.analyzeExpression(expression, current, flow)
+	}
+}
+
 func (a *analyzer) analyzeExpressionWithMagnitude(expression ast.Expr, current *scope, flow flowState, allowMinMagnitude bool) expressionInfo {
 	if expression == nil {
 		return expressionInfo{typeValue: types.Invalid, nullState: MaybeNull}
@@ -50,7 +72,7 @@ func (a *analyzer) analyzeExpressionWithMagnitude(expression ast.Expr, current *
 	case *ast.BinaryExpr:
 		info = a.analyzeBinary(value, current, flow)
 	case *ast.CallExpr:
-		info = a.analyzeCall(value, current, flow)
+		info = a.analyzeCallExpected(value, current, flow, nil)
 	case *ast.MemberExpr:
 		info = a.analyzeMember(value, current, flow)
 	case *ast.IndexExpr:
@@ -317,13 +339,60 @@ func (a *analyzer) binaryOperatorType(operator string, left, right types.Type, r
 	return types.Invalid
 }
 
-func (a *analyzer) analyzeCall(call *ast.CallExpr, current *scope, flow flowState) expressionInfo {
-	callee := a.analyzeExpression(call.Callee, current, flow)
-	arguments := make([]expressionInfo, 0, len(call.Arguments))
-	for _, argument := range call.Arguments {
-		arguments = append(arguments, a.analyzeExpression(argument.Value, current, flow))
+func (a *analyzer) analyzeFunctionValueIdentifier(identifier *ast.IdentifierExpr, current *scope, flow flowState, expected types.Type) expressionInfo {
+	info := a.analyzeIdentifier(identifier, current, flow)
+	symbol := info.symbol
+	if symbol == nil {
+		a.result.ExpressionTypes[identifier] = info.typeValue
+		a.result.NullStates[identifier] = info.nullState
+		return info
 	}
+	if symbol.Alias != nil {
+		symbol = symbol.Alias
+	}
+	expectedFunction, hasExpectedFunction := expected.(types.Function)
+	if symbol.inference != nil && hasExpectedFunction && expectedFunction.Signature != nil {
+		a.constrainConcreteFunction(symbol, expectedFunction.Signature, identifier.Span())
+		info.typeValue = expectedFunction
+	}
+	if symbol.OverloadSet == nil {
+		a.result.ExpressionTypes[identifier] = info.typeValue
+		a.result.NullStates[identifier] = info.nullState
+		return info
+	}
+	candidates := symbol.OverloadSet.Candidates
+	if len(candidates) == 1 {
+		selected := candidates[0]
+		if hasExpectedFunction && expectedFunction.Signature != nil {
+			if _, ok := functionValueScore(selected.Signature, expectedFunction.Signature); !ok {
+				a.typeMismatch(identifier.Span(), expectedFunction, types.Function{Signature: selected.Signature}, fmt.Sprintf("Function value %s", identifier.Name))
+			}
+		}
+		info.typeValue = types.Function{Signature: selected.Signature}
+		info.symbol = symbol
+		a.result.SelectedFunctionValues[identifier] = selected
+		a.result.ExpressionTypes[identifier] = info.typeValue
+		a.result.NullStates[identifier] = info.nullState
+		return info
+	}
+	if !hasExpectedFunction || expectedFunction.Signature == nil {
+		a.error(codeAmbiguousOverload, fmt.Sprintf("overloaded Function value %q has no selecting context", identifier.Name), identifier.Span(), "provide a concrete callback context that selects exactly one overload")
+		info.typeValue = types.Invalid
+	} else if selected := a.selectFunctionValue(symbol.OverloadSet, expectedFunction.Signature, identifier); selected != nil {
+		info.typeValue = types.Function{Signature: selected.Signature}
+		a.result.SelectedFunctionValues[identifier] = selected
+	} else {
+		info.typeValue = types.Invalid
+	}
+	a.result.ExpressionTypes[identifier] = info.typeValue
+	a.result.NullStates[identifier] = info.nullState
+	return info
+}
+
+func (a *analyzer) analyzeCallExpected(call *ast.CallExpr, current *scope, flow flowState, expected types.Type) expressionInfo {
+	callee := a.analyzeExpression(call.Callee, current, flow)
 	if callee.symbol != nil && callee.symbol.Builtin {
+		arguments := a.analyzeCallArguments(call, current, flow, nil)
 		return a.analyzeBuiltinCall(call, callee.symbol, arguments)
 	}
 	if class, ok := callee.typeValue.(types.Class); ok && class.Reference {
@@ -331,7 +400,9 @@ func (a *analyzer) analyzeCall(call *ast.CallExpr, current *scope, flow flowStat
 		if symbol == nil {
 			return expressionInfo{typeValue: types.Invalid, nullState: MaybeNull}
 		}
+		arguments := a.analyzeCallArguments(call, current, flow, symbol.Constructor)
 		a.validateCallArguments(call, symbol.Constructor, arguments)
+		a.result.SelectedCallables[call] = symbol.Constructor
 		return expressionInfo{typeValue: types.Class{Symbol: class.Symbol}, nullState: NonNull, symbol: symbol}
 	}
 	function, ok := callee.typeValue.(types.Function)
@@ -342,19 +413,68 @@ func (a *analyzer) analyzeCall(call *ast.CallExpr, current *scope, flow flowStat
 	if callee.nullState != NonNull {
 		a.nullableError("call", call.Callee, callee.nullState)
 	}
+	resolvedSymbol := callee.symbol
+	if resolvedSymbol != nil && resolvedSymbol.Alias != nil {
+		resolvedSymbol = resolvedSymbol.Alias
+	}
+	if resolvedSymbol != nil && resolvedSymbol.OverloadSet != nil && len(resolvedSymbol.OverloadSet.Candidates) > 1 {
+		arguments := a.analyzeCallArguments(call, current, flow, nil)
+		selected := a.resolveOverloadCall(call, resolvedSymbol.OverloadSet, arguments)
+		if selected == nil {
+			return expressionInfo{typeValue: types.Invalid, nullState: MaybeNull}
+		}
+		a.result.SelectedCallables[call] = selected
+		return expressionInfo{typeValue: selected.Signature.Return, nullState: selected.ReturnNull}
+	}
 	callable := callee.symbolCallable()
 	if callable == nil && function.Signature != nil {
-		callable = &Callable{Signature: function.Signature, ReturnNull: NonNull}
+		callable = &Callable{Signature: function.Signature, ParameterNull: nonNullParameters(len(function.Signature.Parameters)), ReturnNull: NonNull}
 	}
 	if callable == nil || callable.Signature == nil {
-		a.error(codePendingFeature, "Function binding has no single inferred callable signature", call.Callee.Span(), "full Function signature inference is deferred; no dynamic call fallback was used")
+		arguments := a.analyzeCallArguments(call, current, flow, nil)
+		if resolvedSymbol != nil {
+			return a.constrainFunctionCall(resolvedSymbol, call, arguments, expected)
+		}
+		a.error(codeFunctionInference, "Function call has no inferable binding", call.Callee.Span(), "bind the callable to one concrete Function signature")
 		return expressionInfo{typeValue: types.Invalid, nullState: MaybeNull}
 	}
-	selected := a.selectCallable(call, callable, arguments)
-	if selected == nil {
-		return expressionInfo{typeValue: types.Invalid, nullState: MaybeNull}
+	arguments := a.analyzeCallArguments(call, current, flow, callable)
+	a.validateCallArguments(call, callable, arguments)
+	a.result.SelectedCallables[call] = callable
+	return expressionInfo{typeValue: callable.Signature.Return, nullState: callable.ReturnNull}
+}
+
+func (a *analyzer) analyzeCallArguments(call *ast.CallExpr, current *scope, flow flowState, callable *Callable) []expressionInfo {
+	arguments := make([]expressionInfo, 0, len(call.Arguments))
+	for index, argument := range call.Arguments {
+		var expected types.Type
+		if callable != nil && callable.Signature != nil {
+			if parameterIndex := callParameterIndex(call, callable.Signature, index); parameterIndex >= 0 {
+				expected = callable.Signature.Parameters[parameterIndex].Type
+			}
+		}
+		arguments = append(arguments, a.analyzeExpressionExpected(argument.Value, current, flow, expected))
 	}
-	return expressionInfo{typeValue: selected.Signature.Return, nullState: selected.ReturnNull}
+	return arguments
+}
+
+func callParameterIndex(call *ast.CallExpr, signature *types.Signature, argumentIndex int) int {
+	if argumentIndex < 0 || argumentIndex >= len(call.Arguments) || signature == nil {
+		return -1
+	}
+	name := call.Arguments[argumentIndex].Name
+	if name == "" {
+		if argumentIndex < len(signature.Parameters) {
+			return argumentIndex
+		}
+		return -1
+	}
+	for index, parameter := range signature.Parameters {
+		if parameter.Name == name {
+			return index
+		}
+	}
+	return -1
 }
 
 func (info expressionInfo) symbolCallable() *Callable {
@@ -381,26 +501,6 @@ func (a *analyzer) analyzeBuiltinCall(call *ast.CallExpr, symbol *Symbol, argume
 		return expressionInfo{typeValue: types.String, nullState: NonNull}
 	}
 	return expressionInfo{typeValue: types.Invalid, nullState: MaybeNull}
-}
-
-func (a *analyzer) selectCallable(call *ast.CallExpr, base *Callable, arguments []expressionInfo) *Callable {
-	candidates := []*Callable{base}
-	candidates = append(candidates, base.Overloads...)
-	if len(candidates) == 1 {
-		a.validateCallArguments(call, candidates[0], arguments)
-		return candidates[0]
-	}
-	var matches []*Callable
-	for _, candidate := range candidates {
-		if a.callArgumentsCompatible(call, candidate, arguments, false) {
-			matches = append(matches, candidate)
-		}
-	}
-	if len(matches) != 1 {
-		a.error(codePendingFeature, fmt.Sprintf("overload call requires one exact signature; found %d", len(matches)), call.Span(), "full overload ranking is deferred; no dynamic dispatch was used")
-		return nil
-	}
-	return matches[0]
 }
 
 func (a *analyzer) validateCallArguments(call *ast.CallExpr, callable *Callable, arguments []expressionInfo) {
@@ -442,7 +542,7 @@ func (a *analyzer) callArgumentsCompatible(call *ast.CallExpr, callable *Callabl
 			if diagnose {
 				a.error(codeNullableUse, fmt.Sprintf("argument for %s may be null", parameters[parameterIndex].Name), argument.Span(), "refine or assign the value to NonNull before this call")
 			}
-		} else if arguments[index].nullState != Null && !types.Assignable(parameters[parameterIndex].Type, arguments[index].typeValue) {
+		} else if _, compatible := conversionQuality(parameters[parameterIndex].Type, arguments[index].typeValue); arguments[index].nullState != Null && !compatible {
 			valid = false
 			if diagnose {
 				a.typeMismatch(argument.Span(), parameters[parameterIndex].Type, arguments[index].typeValue, fmt.Sprintf("argument %s", parameters[parameterIndex].Name))

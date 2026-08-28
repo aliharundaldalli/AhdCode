@@ -24,6 +24,7 @@ type callableContext struct {
 	returnType types.Type
 	class      *Symbol
 	returnNull []NullState
+	inferences []*Symbol
 }
 
 type analyzer struct {
@@ -39,7 +40,8 @@ type analyzer struct {
 	functionNodes map[*ast.FunctionDecl]*Callable
 	functionOwner map[*ast.FunctionDecl]*Symbol
 
-	loopDepth int
+	loopDepth        int
+	moduleInferences []*Symbol
 }
 
 // Analyzer is the reusable parser.Result -> semantic.Result entry point.
@@ -65,6 +67,9 @@ func (*Analyzer) Analyze(parsed parser.Result) Result {
 	a.result.ResolvedSymbols = make(map[ast.Node]*Symbol)
 	a.result.ExpressionTypes = make(map[ast.Expr]types.Type)
 	a.result.NullStates = make(map[ast.Expr]NullState)
+	a.result.SelectedCallables = make(map[*ast.CallExpr]*Callable)
+	a.result.SelectedFunctionValues = make(map[ast.Expr]*Callable)
+	a.result.OverloadResolutions = make(map[*ast.CallExpr]ResolutionTrace)
 	a.module = newScope(nil, moduleScope)
 	a.installBuiltins()
 	if parsed.Program == nil {
@@ -85,6 +90,7 @@ func (*Analyzer) Analyze(parsed parser.Result) Result {
 		outcome := a.analyzeStatement(statement, a.module, a.flow)
 		a.flow = outcome.flow
 	}
+	a.finalizeInferences(a.moduleInferences)
 
 	a.result.Diagnostics = a.bag.Items()
 	return a.result
@@ -263,7 +269,19 @@ func (a *analyzer) registerFunction(declaration *ast.FunctionDecl, targetScope *
 	}
 	if existing != nil {
 		if existing.Kind == FunctionSymbol && declaration.Flavor == ast.FunctionOverload {
-			existing.Callable.Overloads = append(existing.Callable.Overloads, callable)
+			if existing.OverloadSet == nil {
+				existing.OverloadSet = &OverloadSet{Name: existing.Name, Candidates: []*Callable{existing.Callable}}
+			}
+			for _, candidate := range existing.OverloadSet.Candidates {
+				if sameOverloadKey(candidate.Signature, callable.Signature) {
+					a.error(codeInvalidOverload, fmt.Sprintf("overload %q duplicates parameter signature %s", declaration.Name, formatSignature(callable.Signature)), declaration.Span(), "overloads must differ by parameter count and/or parameter type; return type alone cannot distinguish them")
+					a.functionNodes[declaration] = callable
+					a.functionOwner[declaration] = existing
+					a.result.ResolvedSymbols[declaration] = existing
+					return
+				}
+			}
+			existing.OverloadSet.Candidates = append(existing.OverloadSet.Candidates, callable)
 			a.functionNodes[declaration] = callable
 			a.functionOwner[declaration] = existing
 			a.result.ResolvedSymbols[declaration] = existing
@@ -278,6 +296,7 @@ func (a *analyzer) registerFunction(declaration *ast.FunctionDecl, targetScope *
 		ModuleRoot: owner == nil, InitialNull: NonNull,
 		Constant: true, Confidential: hasModifier(declaration.Modifiers, ast.ModifierConfidential),
 	}
+	symbol.OverloadSet = &OverloadSet{Name: symbol.Name, Candidates: []*Callable{callable}}
 	if owner != nil {
 		owner.Members[symbol.Name] = symbol
 	} else {
@@ -287,6 +306,18 @@ func (a *analyzer) registerFunction(declaration *ast.FunctionDecl, targetScope *
 	a.functionOwner[declaration] = symbol
 	a.result.ResolvedSymbols[declaration] = symbol
 	a.result.Symbols = append(a.result.Symbols, symbol)
+}
+
+func sameOverloadKey(left, right *types.Signature) bool {
+	if left == nil || right == nil || len(left.Parameters) != len(right.Parameters) {
+		return false
+	}
+	for index := range left.Parameters {
+		if !types.Equal(left.Parameters[index].Type, right.Parameters[index].Type) {
+			return false
+		}
+	}
+	return true
 }
 
 func (a *analyzer) callableFromFunction(declaration *ast.FunctionDecl) *Callable {

@@ -79,11 +79,18 @@ func (a *analyzer) analyzeFunction(declaration *ast.FunctionDecl, class *Symbol)
 		}
 		typeValue := callable.Signature.Parameters[index].Type
 		symbol := &Symbol{Name: parameter.Name, Kind: ParameterSymbol, Type: typeValue, Span: parameter.Span(), InitialNull: callable.ParameterNull[index]}
+		if function, ok := typeValue.(types.Function); ok && function.Signature == nil {
+			symbol.inference = newFunctionInference(callable.Signature, index)
+		}
 		functionScope.symbols[symbol.Name] = symbol
 		flow[symbol] = symbol.InitialNull
 		a.result.Symbols = append(a.result.Symbols, symbol)
+		a.trackInference(symbol, functionScope)
 		if parameter.Default != nil {
-			value := a.analyzeExpression(parameter.Default, functionScope, flow)
+			value := a.analyzeExpressionExpected(parameter.Default, functionScope, flow, typeValue)
+			if function, ok := value.typeValue.(types.Function); ok && function.Signature != nil && symbol.inference != nil {
+				a.constrainConcreteFunction(symbol, function.Signature, parameter.Default.Span())
+			}
 			if value.nullState != Null && !types.Assignable(typeValue, value.typeValue) {
 				a.typeMismatch(parameter.Default.Span(), typeValue, value.typeValue, fmt.Sprintf("default value of %s", parameter.Name))
 			}
@@ -95,6 +102,7 @@ func (a *analyzer) analyzeFunction(declaration *ast.FunctionDecl, class *Symbol)
 		}
 	}
 	outcome := a.analyzeBlock(declaration.Body, functionScope, flow, nil)
+	a.finalizeInferences(context.inferences)
 	if callable.Signature.Return.Kind() != types.NothingKind && !outcome.returns {
 		a.error(codeMissingReturn, fmt.Sprintf("Function %q does not return %s on every reachable path", declaration.Name, types.Display(callable.Signature.Return)), declaration.Span(), "add a compatible return to every reachable path")
 	}
@@ -138,13 +146,18 @@ func (a *analyzer) analyzeStructure(declaration *ast.StructureDecl, class *Symbo
 		}
 		typeValue := callable.Signature.Parameters[parameterIndex].Type
 		nullState := callable.ParameterNull[parameterIndex]
+		callableParameterIndex := parameterIndex
 		parameterIndex++
 		symbol := &Symbol{Name: parameter.Name, Kind: ParameterSymbol, Type: typeValue, Span: parameter.Span(), InitialNull: nullState}
+		if function, ok := typeValue.(types.Function); ok && function.Signature == nil {
+			symbol.inference = newFunctionInference(callable.Signature, callableParameterIndex)
+		}
 		structureScope.symbols[symbol.Name] = symbol
 		flow[symbol] = nullState
 		a.result.Symbols = append(a.result.Symbols, symbol)
+		a.trackInference(symbol, structureScope)
 		if parameter.Default != nil {
-			value := a.analyzeExpression(parameter.Default, structureScope, flow)
+			value := a.analyzeExpressionExpected(parameter.Default, structureScope, flow, typeValue)
 			if value.nullState != Null && !types.Assignable(typeValue, value.typeValue) {
 				a.typeMismatch(parameter.Default.Span(), typeValue, value.typeValue, fmt.Sprintf("default value of %s", parameter.Name))
 			}
@@ -156,6 +169,7 @@ func (a *analyzer) analyzeStructure(declaration *ast.StructureDecl, class *Symbo
 	if declaration.Body != nil {
 		a.analyzeBlock(declaration.Body, structureScope, flow, nil)
 	}
+	a.finalizeInferences(context.inferences)
 }
 
 func (a *analyzer) installClassImplicitBindings(current *scope, class *Symbol) {
@@ -194,7 +208,7 @@ func (a *analyzer) analyzeReturn(statement *ast.ReturnStmt, current *scope, flow
 		a.error(codeReturnType, fmt.Sprintf("Function must return %s", types.Display(context.returnType)), statement.Span(), "return a compatible value")
 		return
 	}
-	value := a.analyzeExpression(statement.Value, current, flow)
+	value := a.analyzeExpressionExpected(statement.Value, current, flow, context.returnType)
 	if value.nullState != Null && !types.Assignable(context.returnType, value.typeValue) {
 		a.typeMismatch(statement.Value.Span(), context.returnType, value.typeValue, "return value")
 	}

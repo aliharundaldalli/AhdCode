@@ -23,4 +23,9 @@ const (
 	codeConstantRange       = "SEM020"
 	codeControlContext      = "SEM021"
 	codePendingFeature      = "SEM022"
+	codeFunctionInference   = "SEM023"
+	codeConflictingFunction = "SEM024"
+	codeInvalidOverload     = "SEM025"
+	codeNoMatchingOverload  = "SEM026"
+	codeAmbiguousOverload   = "SEM027"
 )

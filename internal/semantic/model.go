@@ -46,9 +46,30 @@ type Callable struct {
 	Signature     *types.Signature
 	ParameterNull []NullState
 	ReturnNull    NullState
-	Overloads     []*Callable
 	Declaration   *ast.FunctionDecl
 	Structure     *ast.StructureDecl
+}
+
+// OverloadSet is distinct from a single Function type. Candidates remain
+// concrete callables and declaration order has no ranking meaning.
+type OverloadSet struct {
+	Name       string
+	Candidates []*Callable
+}
+
+// CandidateDecision records an overload applicability result without exposing
+// raw Go/internal type dumps.
+type CandidateDecision struct {
+	Signature  string
+	Applicable bool
+	Reason     string
+	Widenings  int
+	Defaults   int
+}
+
+type ResolutionTrace struct {
+	Candidates []CandidateDecision
+	Selected   string
 }
 
 // Symbol is a resolved semantic declaration. Alias points from an explicit
@@ -66,19 +87,24 @@ type Symbol struct {
 	InitialNull  NullState
 	Alias        *Symbol
 	Callable     *Callable
+	OverloadSet  *OverloadSet
 	Class        *types.ClassSymbol
 	Members      map[string]*Symbol
 	Constructor  *Callable
 	ConstValue   *constantValue
+	inference    *functionInference
 }
 
 // Result is a side-table semantic model; Analyze never mutates the AST.
 type Result struct {
-	Diagnostics     []diagnostics.Diagnostic
-	Symbols         []*Symbol
-	ResolvedSymbols map[ast.Node]*Symbol
-	ExpressionTypes map[ast.Expr]types.Type
-	NullStates      map[ast.Expr]NullState
+	Diagnostics            []diagnostics.Diagnostic
+	Symbols                []*Symbol
+	ResolvedSymbols        map[ast.Node]*Symbol
+	ExpressionTypes        map[ast.Expr]types.Type
+	NullStates             map[ast.Expr]NullState
+	SelectedCallables      map[*ast.CallExpr]*Callable
+	SelectedFunctionValues map[ast.Expr]*Callable
+	OverloadResolutions    map[*ast.CallExpr]ResolutionTrace
 }
 
 func (result Result) HasErrors() bool {
