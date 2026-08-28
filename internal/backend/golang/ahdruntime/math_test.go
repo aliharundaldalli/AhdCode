@@ -2,6 +2,7 @@ package ahdruntime
 
 import (
 	"math"
+	"reflect"
 	"testing"
 )
 
@@ -106,5 +107,73 @@ func TestMathRandomIntDeterministicBucketSanity(t *testing.T) {
 		if count < 9600 || count > 10400 {
 			t.Fatalf("bucket %d count = %d; deterministic sequence is visibly biased", bucket, count)
 		}
+	}
+}
+
+func TestListShuffleUsesDeterministicFisherYates(t *testing.T) {
+	defer AhdMathSeed(ahdMathDefaultSeed)
+
+	AhdMathSeed(42)
+	values := AhdNewList(int64(1), int64(2), int64(3), int64(4), int64(5))
+	alias := values
+	values.Shuffle()
+	if want := []int64{2, 3, 1, 5, 4}; !reflect.DeepEqual(values.Snapshot(), want) {
+		t.Fatalf("seed 42 shuffle = %v, want %v", values.Snapshot(), want)
+	}
+	if !reflect.DeepEqual(alias.Snapshot(), values.Snapshot()) {
+		t.Fatal("a List alias did not observe shuffle's in-place mutation")
+	}
+
+	AhdMathSeed(557)
+	defaultValues := AhdNewList(int64(1), int64(2), int64(3), int64(4), int64(5))
+	defaultValues.Shuffle()
+	if want := []int64{5, 2, 3, 1, 4}; !reflect.DeepEqual(defaultValues.Snapshot(), want) {
+		t.Fatalf("default-seed shuffle = %v, want %v", defaultValues.Snapshot(), want)
+	}
+
+	frozen := AhdNewList(int64(1), int64(2))
+	AhdFreeze(frozen)
+	AhdMathSeed(42)
+	wantAfterFrozen := AhdMathRandom()
+	AhdMathSeed(42)
+	expectRaise(t, AhdClassConstantError, frozen.Shuffle)
+	if got := AhdMathRandom(); got != wantAfterFrozen {
+		t.Fatal("a rejected frozen List shuffle consumed Math RNG state")
+	}
+}
+
+func TestListShuffleSharesMathStateAndSkipsTrivialLists(t *testing.T) {
+	defer AhdMathSeed(ahdMathDefaultSeed)
+
+	AhdMathSeed(42)
+	expectedAfterEmpty := AhdMathRandom()
+	AhdMathSeed(42)
+	AhdNewList[int64]().Shuffle()
+	if got := AhdMathRandom(); got != expectedAfterEmpty {
+		t.Fatal("empty List shuffle consumed Math RNG state")
+	}
+
+	AhdMathSeed(42)
+	expectedAfterSingleton := AhdMathRandom()
+	AhdMathSeed(42)
+	AhdNewList(int64(7)).Shuffle()
+	if got := AhdMathRandom(); got != expectedAfterSingleton {
+		t.Fatal("singleton List shuffle consumed Math RNG state")
+	}
+
+	AhdMathSeed(42)
+	wantBefore := AhdMathRandom()
+	for maximum := int64(4); maximum > 0; maximum-- {
+		AhdMathRandomInt(0, maximum)
+	}
+	wantAfter := AhdMathRandomInt(1, 10)
+
+	AhdMathSeed(42)
+	gotBefore := AhdMathRandom()
+	values := AhdNewList(int64(1), int64(2), int64(3), int64(4), int64(5))
+	values.Shuffle()
+	gotAfter := AhdMathRandomInt(1, 10)
+	if gotBefore != wantBefore || gotAfter != wantAfter {
+		t.Fatalf("shared Math sequence around shuffle = (%v, %d), want (%v, %d)", gotBefore, gotAfter, wantBefore, wantAfter)
 	}
 }

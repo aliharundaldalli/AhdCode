@@ -930,6 +930,8 @@ func (generator *generator) listOperation(name string, value *ir.CallExpr) strin
 	switch name {
 	case "reverse":
 		return generator.expr(receiver) + ".Reverse()"
+	case "shuffle":
+		return generator.expr(receiver) + ".Shuffle()"
 	case "count", "index":
 		if len(value.Arguments) != 1 || value.Arguments[0].Value == nil {
 			generator.fail(CodeGenerationFailure, "List."+name+" has no argument", meta.Span, "the IR call is malformed")

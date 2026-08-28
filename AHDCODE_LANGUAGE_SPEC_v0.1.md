@@ -1099,7 +1099,7 @@ Slice-step syntax is not part of v0.1.
 
 ### 12.4 Mutation
 
-`List<T>` has exactly two built-in mutation operations:
+`List<T>` has exactly these two element insertion/removal operations:
 
 ```text
 add(value: T)      -> Nothing
@@ -1147,12 +1147,13 @@ Both operations mutate the existing List object rather than producing a new one,
 
 ### 12.5 Ordering
 
-`List<T>` has two ordering operations, and both rewrite the receiver in place:
+`List<T>` has three ordering operations, and all rewrite the receiver in place:
 
 ```text
 sort()                     -> Nothing
 sort(key: Function(T) -> K) -> Nothing
 reverse()                  -> Nothing
+shuffle()                  -> Nothing
 ```
 
 Like `add` and `eject`, they mutate the existing object, so every alias observes the new order, they return `Nothing`, and a `Constant` or otherwise frozen List rejects them. They publish no parameter names.
@@ -1173,6 +1174,36 @@ write(alias)
 ```text
 [3, 2, 1]
 ```
+
+`shuffle` performs an unbiased in-place Fisher–Yates permutation. It walks
+from the final element toward the second element and, for each index `i`, swaps
+that element with an index selected uniformly from the inclusive interval
+`0..i`. It uses the exact shared deterministic Math random sequence described
+in §35.3; `shuffle`, `Math.random`, and `Math.randomInt` therefore advance one
+common state in call order. `shuffle` does not require `bring Math`, but
+`Math.seed(...)` may be used to reset the shared sequence before it.
+
+```ahd
+bring Math
+
+Math.seed(42)
+values: List<Int> := [1, 2, 3, 4, 5]
+values.shuffle()
+
+write(values)
+```
+
+=>
+
+```text
+[2, 3, 1, 5, 4]
+```
+
+An empty or single-element List remains unchanged and consumes no random
+generator output. `shuffle` rearranges elements without inspecting or copying
+them, so nullable elements retain their ordinary List semantics. The receiver
+must still be `NonNull`, and a `Constant` or otherwise deep-frozen List rejects
+the mutation before random state is consumed.
 
 The natural form of `sort` orders ascending and is stable. Its element type must be `Int`, `Real`, or `String`; any other element type — including `Bool`, a `Class`, a `Pair`, or a nested `List` — is a compile-time rejection rather than a silent conversion to text. A `null` element has no natural order and raises the catchable `NullError`, leaving the List unchanged.
 

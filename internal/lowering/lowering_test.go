@@ -701,6 +701,7 @@ write(text.index("a"))
 values.sort()
 values.sort(double)
 values.reverse()
+values.shuffle()
 write(values.count(1))
 write(values.index(1))
 write(values.map(double))
@@ -712,7 +713,7 @@ write(values.filter(isEven))
 		"builtin:core::String.capitalize", "builtin:core::String.split", "builtin:core::String.replace",
 		"builtin:core::String.contains", "builtin:core::String.startsWith", "builtin:core::String.endsWith",
 		"builtin:core::String.count", "builtin:core::String.index",
-		"builtin:core::List.sort", "builtin:core::List.reverse", "builtin:core::List.count",
+		"builtin:core::List.sort", "builtin:core::List.reverse", "builtin:core::List.shuffle", "builtin:core::List.count",
 		"builtin:core::List.index", "builtin:core::List.map", "builtin:core::List.filter",
 	} {
 		if !strings.Contains(dump, expected) {

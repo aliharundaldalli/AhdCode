@@ -577,7 +577,7 @@ var stringOperationNames = map[string]TypeOperation{
 }
 
 var listOperationNames = map[string]TypeOperation{
-	"add": ListAdd, "eject": ListEject, "sort": ListSort, "reverse": ListReverse,
+	"add": ListAdd, "eject": ListEject, "sort": ListSort, "reverse": ListReverse, "shuffle": ListShuffle,
 	"count": ListCount, "index": ListIndex, "map": ListMap, "filter": ListFilter,
 }
 
@@ -637,7 +637,7 @@ func (a *analyzer) analyzeTypeOperation(call *ast.CallExpr, member *ast.MemberEx
 	switch operation {
 	case ListAdd, ListEject, PairEject:
 		return a.analyzeCollectionMutation(call, operation, receiver, current, flow), true
-	case ListReverse:
+	case ListReverse, ListShuffle:
 		a.requireTypeOperationArity(call, operation, receiver.typeValue, 0, current, flow)
 		return expressionInfo{typeValue: types.Nothing, nullState: NonNull}, true
 	case ListSort:
@@ -657,7 +657,7 @@ func typeOperationFailure(operation TypeOperation, receiver types.Type) expressi
 		return expressionInfo{typeValue: shape.result, nullState: NonNull}
 	}
 	switch operation {
-	case ListAdd, ListEject, PairEject, ListSort, ListReverse:
+	case ListAdd, ListEject, PairEject, ListSort, ListReverse, ListShuffle:
 		return expressionInfo{typeValue: types.Nothing, nullState: NonNull}
 	case ListCount, ListIndex:
 		return expressionInfo{typeValue: types.Int, nullState: NonNull}
@@ -685,6 +685,8 @@ func typeOperationHint(operation TypeOperation, receiver types.Type) string {
 		return "pass one key of the Pair key type"
 	case ListReverse:
 		return "call reverse with no argument"
+	case ListShuffle:
+		return "call shuffle with no argument"
 	case ListSort:
 		return "call sort with no argument, or with one key Function"
 	case ListCount, ListIndex:

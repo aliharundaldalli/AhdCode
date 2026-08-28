@@ -1478,6 +1478,13 @@ process reset, cross-module shared order, extreme inclusive bounds, no-consume
 singleton behavior, catchable errors, semantic-only rejections, and identical
 generated output across repeated compilations.
 
+`List<T>.shuffle()` is a core typed List operation backed by this exact same
+generator state, not a second RNG. Lower it to an in-place descending
+Fisher–Yates pass whose selection at index `i` is the unbiased equivalent of
+`randomInt(0, i)`. Empty and singleton Lists consume no output. Apply the
+ordinary List `NonNull` receiver and `requireMutable` deep-freeze guards before
+advancing the generator.
+
 ---
 
 # PHASE 22 — take / write
@@ -1633,7 +1640,7 @@ The frozen v0.1 surface is:
 ```text
 String  trim lower upper capitalize split replace
         contains startsWith endsWith count index
-List    add eject sort reverse count index map filter
+List    add eject sort reverse shuffle count index map filter
 Pair    eject
 ```
 
@@ -1656,12 +1663,17 @@ written, which is deliberately not Python's behavior. `split`, `replace`,
 `DomainError`, and `index` reports a **character** index — never a UTF-8 byte
 offset — and raises `DomainError` rather than returning `-1`.
 
-`sort`, `reverse`, `add`, and `eject` mutate the receiver in place through the
+`sort`, `reverse`, `shuffle`, `add`, and `eject` mutate the receiver in place through the
 same `requireMutable` guard as `clear`, so the Constant deep-freeze contract
 covers them with no extra backend logic. `count`, `index`, `map`, and `filter`
 are pure reads and accept a Constant receiver. `map` and `filter` iterate a
 shallow snapshot taken at entry, matching the `for` snapshot rule, and return a
 new mutable List.
+
+`shuffle` uses the one process-wide Math SplitMix64 state and performs an
+unbiased descending Fisher–Yates pass. Each nontrivial step selects uniformly
+from `0..i` through the same rejection-sampling rule as `Math.randomInt`.
+Empty and singleton Lists remain unchanged and consume no state.
 
 Sorting has two forms and no others. The natural form requires an `Int`,
 `Real`, or `String` element type and is rejected statically for anything else;

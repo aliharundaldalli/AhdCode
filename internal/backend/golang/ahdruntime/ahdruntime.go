@@ -931,6 +931,17 @@ func (list *AhdList[T]) Reverse() {
 	}
 }
 
+// Shuffle permutes the List in place with an unbiased descending
+// Fisher-Yates pass. AhdMathRandomInt owns all generator advancement, so this
+// operation shares the exact Math RNG sequence with random and randomInt.
+func (list *AhdList[T]) Shuffle() {
+	list.requireMutable()
+	for index := len(list.items) - 1; index > 0; index-- {
+		selected := int(AhdMathRandomInt(0, int64(index)))
+		list.items[index], list.items[selected] = list.items[selected], list.items[index]
+	}
+}
+
 // AhdListCount counts equal elements with the ordinary AhdCode == semantics.
 func AhdListCount[T any](list *AhdList[T], value T, equal func(T, T) bool) int64 {
 	list.require()

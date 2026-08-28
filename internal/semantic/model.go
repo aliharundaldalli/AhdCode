@@ -139,6 +139,8 @@ const (
 	ListSort TypeOperation = "List.sort"
 	// ListReverse reverses a List in place.
 	ListReverse TypeOperation = "List.reverse"
+	// ListShuffle permutes a List in place using the shared Math RNG.
+	ListShuffle TypeOperation = "List.shuffle"
 	// ListCount counts equal elements without mutating the List.
 	ListCount TypeOperation = "List.count"
 	// ListIndex is the first index of an equal element.
@@ -176,7 +178,7 @@ const (
 // receiver, so the Constant rules apply to it.
 func listOperationMutates(operation TypeOperation) bool {
 	switch operation {
-	case ListAdd, ListEject, ListSort, ListReverse:
+	case ListAdd, ListEject, ListSort, ListReverse, ListShuffle:
 		return true
 	default:
 		return false

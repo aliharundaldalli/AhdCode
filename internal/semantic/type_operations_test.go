@@ -85,6 +85,7 @@ func TestListOperationsHaveExactSignatures(t *testing.T) {
 		ok   bool
 	}{
 		{"reverse", "values: List<Int> := [1]\nvalues.reverse()", true},
+		{"shuffle", "values: List<Int> := [1]\nvalues.shuffle()", true},
 		{"sort Int", "values: List<Int> := [1]\nvalues.sort()", true},
 		{"sort Real", "values: List<Real> := [1.0]\nvalues.sort()", true},
 		{"sort String", `values: List<String> := ["a"]` + "\nvalues.sort()", true},
@@ -95,10 +96,13 @@ func TestListOperationsHaveExactSignatures(t *testing.T) {
 		{"sort rejects a nested List", "values: List<List<Int>> := [[1]]\nvalues.sort()", false},
 		{"sort rejects a Pair element", `values: List<Pair<String, Int>> := [{"a": 1}]` + "\nvalues.sort()", false},
 		{"reverse takes no argument", "values: List<Int> := [1]\nvalues.reverse(1)", false},
+		{"shuffle takes no argument", "values: List<Int> := [1]\nvalues.shuffle(1)", false},
+		{"shuffle rejects a named argument", "values: List<Int> := [1]\nvalues.shuffle(value: 1)", false},
+		{"shuffle returns Nothing", "values: List<Int> := [1]\nwrite(values.shuffle())", false},
 		{"count needs the element type", `values: List<Int> := [1]` + "\ntotal: Int := values.count(\"a\")", false},
 		{"index needs the element type", `values: List<Int> := [1]` + "\nposition: Int := values.index(\"a\")", false},
 		{"count rejects a named argument", "values: List<Int> := [1]\ntotal: Int := values.count(value: 1)", false},
-		{"an unknown List member is not an operation", "values: List<Int> := [1]\nvalues.shuffle()", false},
+		{"an unknown List member is not an operation", "values: List<Int> := [1]\nvalues.rotate()", false},
 
 		{"map keeps the callback result type", callbackPreamble + "values: List<Int> := [1]\nresult: List<Int> := values.map(double)", true},
 		{"map may change the element type", callbackPreamble + "values: List<Int> := [1]\nresult: List<String> := values.map(describe)", true},
@@ -187,12 +191,13 @@ result: List<Int> := values.map(report)
 // for both String and List operations.
 func TestTypeOperationReceiversRequireNonNull(t *testing.T) {
 	rejected := map[string]string{
-		"null String receiver": "text: String := null\nvalue: String := text.trim()",
-		"null List receiver":   "values: List<Int> := null\ntotal: Int := values.count(5)",
-		"null sort receiver":   "values: List<Int> := null\nvalues.sort()",
-		"null map receiver":    callbackPreamble + "values: List<Int> := null\nresult: List<Int> := values.map(double)",
-		"null String argument": "needle: String := null\nvalue: Bool := \"abc\".contains(needle)",
-		"null List argument":   "wanted: Int := null\nvalues: List<Int> := [1]\ntotal: Int := values.count(wanted)",
+		"null String receiver":  "text: String := null\nvalue: String := text.trim()",
+		"null List receiver":    "values: List<Int> := null\ntotal: Int := values.count(5)",
+		"null sort receiver":    "values: List<Int> := null\nvalues.sort()",
+		"null shuffle receiver": "values: List<Int> := null\nvalues.shuffle()",
+		"null map receiver":     callbackPreamble + "values: List<Int> := null\nresult: List<Int> := values.map(double)",
+		"null String argument":  "needle: String := null\nvalue: Bool := \"abc\".contains(needle)",
+		"null List argument":    "wanted: Int := null\nvalues: List<Int> := [1]\ntotal: Int := values.count(wanted)",
 	}
 	for name, text := range rejected {
 		t.Run(name, func(t *testing.T) {
@@ -200,7 +205,7 @@ func TestTypeOperationReceiversRequireNonNull(t *testing.T) {
 			requireSemanticCode(t, result, codeNullableUse)
 		})
 	}
-	refined := "text: String := null\nif text != null {\n    write(text.trim())\n}\nvalues: List<Int> := null\nif values != null {\n    values.sort()\n    write(values.count(1))\n}\n"
+	refined := "text: String := null\nif text != null {\n    write(text.trim())\n}\nvalues: List<Int> := null\nif values != null {\n    values.sort()\n    values.shuffle()\n    write(values.count(1))\n}\n"
 	_, result := analyzeText(t, refined)
 	requireSemanticClean(t, result)
 }
@@ -211,6 +216,7 @@ func TestConstantListsAllowReadsAndRejectMutations(t *testing.T) {
 	for _, text := range []string{
 		"values: Constant List<Int> := [3, 1]\nvalues.sort()",
 		"values: Constant List<Int> := [3, 1]\nvalues.reverse()",
+		"values: Constant List<Int> := [3, 1]\nvalues.shuffle()",
 		callbackPreamble + "values: Constant List<Int> := [3, 1]\nvalues.sort(double)",
 	} {
 		_, result := analyzeText(t, text)
