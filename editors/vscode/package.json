@@ -1,0 +1,84 @@
+{
+  "name": "ahdcode",
+  "displayName": "AhdCode",
+  "description": "Run AhdCode files and provide minimal syntax highlighting.",
+  "version": "0.1.1",
+  "publisher": "ahdcode-local",
+  "license": "UNLICENSED",
+  "private": true,
+  "engines": {
+    "vscode": "^1.107.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "keywords": [
+    "AhdCode",
+    "language"
+  ],
+  "activationEvents": [
+    "onLanguage:ahdcode",
+    "onCommand:ahdcode.runFile"
+  ],
+  "main": "./extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "ahdcode",
+        "aliases": [
+          "AhdCode",
+          "ahdcode"
+        ],
+        "extensions": [
+          ".ahd"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "ahdcode",
+        "scopeName": "source.ahdcode",
+        "path": "./syntaxes/ahdcode.tmLanguage.json"
+      }
+    ],
+    "commands": [
+      {
+        "command": "ahdcode.runFile",
+        "title": "Run AhdCode File",
+        "icon": "$(play)"
+      }
+    ],
+    "menus": {
+      "editor/title": [
+        {
+          "command": "ahdcode.runFile",
+          "when": "resourceLangId == ahdcode",
+          "group": "navigation"
+        }
+      ]
+    },
+    "keybindings": [
+      {
+        "command": "ahdcode.runFile",
+        "key": "f6",
+        "when": "editorTextFocus && editorLangId == ahdcode"
+      }
+    ],
+    "configuration": {
+      "title": "AhdCode",
+      "properties": {
+        "ahdcode.executablePath": {
+          "type": "string",
+          "default": "",
+          "scope": "window",
+          "description": "Absolute path to the AhdCode executable. Leave empty to find ahdcode on PATH."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "package": "npx --yes @vscode/vsce package"
+  }
+}

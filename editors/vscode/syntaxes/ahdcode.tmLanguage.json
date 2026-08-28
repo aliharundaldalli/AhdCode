@@ -1,0 +1,111 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "AhdCode",
+  "scopeName": "source.ahdcode",
+  "patterns": [
+    { "include": "#comments" },
+    { "include": "#tripleStrings" },
+    { "include": "#strings" },
+    { "include": "#numbers" },
+    { "include": "#keywords" },
+    { "include": "#typesAndModifiers" },
+    { "include": "#constants" }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.double-slash.ahdcode",
+          "match": "//.*$"
+        },
+        {
+          "name": "comment.block.ahdcode",
+          "begin": "/\\*",
+          "end": "\\*/"
+        }
+      ]
+    },
+    "tripleStrings": {
+      "patterns": [
+        {
+          "name": "string.quoted.triple.double.ahdcode",
+          "begin": "(?<!\\\\)\\\"\\\"\\\"",
+          "end": "(?<!\\\\)\\\"\\\"\\\""
+        },
+        {
+          "name": "string.quoted.triple.single.ahdcode",
+          "begin": "(?<!\\\\)'''",
+          "end": "(?<!\\\\)'''"
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.ahdcode",
+          "begin": "\"",
+          "end": "\"",
+          "patterns": [
+            { "name": "constant.character.escape.ahdcode", "match": "\\\\(?:[\\\\nrt0\"'{}]|u\\{[0-9A-Fa-f]+\\})" }
+          ]
+        },
+        {
+          "name": "string.quoted.single.ahdcode",
+          "begin": "'",
+          "end": "'",
+          "patterns": [
+            { "name": "constant.character.escape.ahdcode", "match": "\\\\(?:[\\\\nrt0\"'{}]|u\\{[0-9A-Fa-f]+\\})" }
+          ]
+        }
+      ]
+    },
+    "numbers": {
+      "patterns": [
+        {
+          "name": "constant.numeric.real.ahdcode",
+          "match": "(?<![\\p{L}\\p{N}_])(?:[0-9](?:_?[0-9])*)\\.(?:[0-9](?:_?[0-9])*)(?:[eE][+-]?[0-9](?:_?[0-9])*)?(?![\\p{L}\\p{N}_])"
+        },
+        {
+          "name": "constant.numeric.real.ahdcode",
+          "match": "(?<![\\p{L}\\p{N}_])[0-9](?:_?[0-9])*[eE][+-]?[0-9](?:_?[0-9])*(?![\\p{L}\\p{N}_])"
+        },
+        {
+          "name": "constant.numeric.integer.ahdcode",
+          "match": "(?<![\\p{L}\\p{N}_])(?:0[xX][0-9A-Fa-f](?:_?[0-9A-Fa-f])*|0[bB][01](?:_?[01])*|0[oO][0-7](?:_?[0-7])*|[0-9](?:_?[0-9])*)(?![\\p{L}\\p{N}_])"
+        }
+      ]
+    },
+    "keywords": {
+      "patterns": [
+        {
+          "name": "keyword.control.ahdcode",
+          "match": "\\b(?:if|else|while|until|for|break|continue|state|condition|attempt|except|ultimately|toss|return|bring|from|all|in|and|or|not)\\b"
+        },
+        {
+          "name": "storage.type.function.ahdcode",
+          "match": "\\b(?:Function|Overload|Override|Class|Attributes)\\b"
+        }
+      ]
+    },
+    "typesAndModifiers": {
+      "patterns": [
+        {
+          "name": "storage.type.ahdcode",
+          "match": "\\b(?:Int|Real|String|Bool|Nothing|List|Pair)\\b"
+        },
+        {
+          "name": "storage.modifier.ahdcode",
+          "match": "\\b(?:Local|Global|Constant|Confidential)\\b"
+        }
+      ]
+    },
+    "constants": {
+      "patterns": [
+        {
+          "name": "constant.language.ahdcode",
+          "match": "\\b(?:true|false|null)\\b"
+        }
+      ]
+    }
+  }
+}
