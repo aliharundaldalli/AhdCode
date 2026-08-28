@@ -1251,6 +1251,12 @@ Test numeric boundaries.
 
 # PHASE 20 — bring / modules
 
+v0.1 local module resolution is deliberately minimal: a normalized single identifier `ModuleName` resolves to sibling `ModuleName.ahd` relative to the importing source. Do not add dotted paths, search paths, package roots, or path syntax. Registered built-in module names resolve through the built-in registry and are not shadowed by local files.
+
+Implementation must canonicalize resolved source identities before graph/cache lookup so spelling aliases do not analyze one physical module twice. Keep canonical filesystem identity, dependency traversal state, graph caching, and invalidation policy out of the public language contract. The resolver and source loader must remain injectable so in-memory tests and built-in interfaces use the same module-graph pipeline without direct filesystem calls inside semantic analysis.
+
+Represent namespace imports with an explicit semantic module/namespace symbol, not as a Class or runtime Object. Analyze each reachable canonical module at most once, preserve an explicit resolving/resolved/failed state, and reject dependency cycles with their dependency chain. Successful modules expose a deterministic compile-time-only interface containing public symbol types, constants, concrete callable and overload metadata, null-state summaries, and canonical Class/member metadata. Do not serialize AST pointers, runtime values, or Go pointer addresses as identities; failed modules must not publish a successful interface.
+
 Implement:
 
 ```ahd

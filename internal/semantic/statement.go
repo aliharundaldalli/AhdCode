@@ -57,7 +57,8 @@ func (a *analyzer) analyzeStatement(statement ast.Stmt, current *scope, flow flo
 	case *ast.AttemptStmt:
 		return a.analyzeAttempt(value, current, flow)
 	case *ast.BringStmt:
-		// Module loading and cross-module metadata are intentionally deferred.
+		// Imports are installed before declaration/type predeclaration so later
+		// statements use the same ordinary scope and overload machinery.
 	case *ast.FunctionDecl:
 		a.analyzeFunction(value, current.callableClass())
 	case *ast.ClassDecl:
@@ -108,9 +109,11 @@ func (a *analyzer) analyzeVariableDeclaration(declaration *ast.VariableDecl, cur
 		symbol = &Symbol{
 			Name: declaration.Name, Kind: BindingSymbol, Type: typeValue,
 			Span: declaration.Span(), Declaration: declaration,
-			Constant:     hasModifier(declaration.Modifiers, ast.ModifierConstant),
-			Confidential: hasModifier(declaration.Modifiers, ast.ModifierConfidential),
-			ModuleRoot:   current.kind == moduleScope, InitialNull: MaybeNull,
+			Constant:       hasModifier(declaration.Modifiers, ast.ModifierConstant),
+			Confidential:   hasModifier(declaration.Modifiers, ast.ModifierConfidential),
+			ModuleRoot:     current.kind == moduleScope,
+			InitialNull:    MaybeNull,
+			OriginModuleID: a.environment.ModuleID,
 		}
 		current.symbols[symbol.Name] = symbol
 		a.result.Symbols = append(a.result.Symbols, symbol)
@@ -221,6 +224,7 @@ func (a *analyzer) analyzeMemberDeclaration(declaration *ast.VariableDecl, curre
 	memberSymbol := &Symbol{
 		Name: member.Name, Kind: MemberSymbol, Type: typeValue, Span: member.Span(), Declaration: declaration,
 		Constant: hasModifier(declaration.Modifiers, ast.ModifierConstant), Confidential: hasModifier(declaration.Modifiers, ast.ModifierConfidential), InitialNull: MaybeNull,
+		OwnerClass: class.Class, OriginModuleID: a.environment.ModuleID,
 	}
 	class.Members[member.Name] = memberSymbol
 	a.result.Symbols = append(a.result.Symbols, memberSymbol)
@@ -441,7 +445,7 @@ func classAssignableTo(value, target *types.ClassSymbol) bool {
 	visited := make(map[*types.ClassSymbol]bool)
 	for current := value; current != nil && !visited[current]; current = current.Parent {
 		visited[current] = true
-		if current == target {
+		if types.SameClassIdentity(current, target) {
 			return true
 		}
 	}

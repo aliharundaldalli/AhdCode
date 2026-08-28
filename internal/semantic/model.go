@@ -38,6 +38,7 @@ const (
 	ForSymbol
 	ExceptSymbol
 	BuiltinSymbol
+	NamespaceSymbol
 )
 
 // Callable preserves concrete signatures and null-state metadata separately;
@@ -75,24 +76,47 @@ type ResolutionTrace struct {
 // Symbol is a resolved semantic declaration. Alias points from an explicit
 // Global declaration to its module-root binding.
 type Symbol struct {
-	Name         string
-	Kind         SymbolKind
-	Type         types.Type
-	Span         source.Span
-	Declaration  ast.Node
-	Constant     bool
-	Confidential bool
-	ModuleRoot   bool
-	Builtin      bool
-	InitialNull  NullState
-	Alias        *Symbol
-	Callable     *Callable
-	OverloadSet  *OverloadSet
-	Class        *types.ClassSymbol
-	Members      map[string]*Symbol
-	Constructor  *Callable
-	ConstValue   *constantValue
-	inference    *functionInference
+	Name           string
+	Kind           SymbolKind
+	Type           types.Type
+	Span           source.Span
+	Declaration    ast.Node
+	Constant       bool
+	Confidential   bool
+	ModuleRoot     bool
+	Builtin        bool
+	InitialNull    NullState
+	Alias          *Symbol
+	Callable       *Callable
+	OverloadSet    *OverloadSet
+	Namespace      *ModuleInterface
+	Class          *types.ClassSymbol
+	OwnerClass     *types.ClassSymbol
+	OriginModuleID string
+	Members        map[string]*Symbol
+	Constructor    *Callable
+	ConstValue     *constantValue
+	inference      *functionInference
+}
+
+// ModuleInterface is an in-memory, compile-time-only public contract. Identity
+// is canonical and never derived from pointer addresses.
+type ModuleInterface struct {
+	ModuleID    string
+	Name        string
+	Exports     map[string]*Symbol
+	Symbols     map[string]*Symbol // includes Confidential entries for access diagnostics
+	Classes     map[string]*Symbol // canonical identity -> Class metadata, including ancestry support
+	ExportNames []string
+}
+
+// Environment supplies already-resolved dependency interfaces to one semantic
+// analysis run. Filesystem/module graph work stays outside this package.
+type Environment struct {
+	ModuleID      string
+	ModuleName    string
+	Imports       map[string]*ModuleInterface
+	FailedImports map[string]bool
 }
 
 // Result is a side-table semantic model; Analyze never mutates the AST.

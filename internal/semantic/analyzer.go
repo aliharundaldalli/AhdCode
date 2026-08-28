@@ -28,7 +28,8 @@ type callableContext struct {
 }
 
 type analyzer struct {
-	bag diagnostics.Bag
+	bag         diagnostics.Bag
+	environment Environment
 
 	result Result
 	module *scope
@@ -56,7 +57,20 @@ func Analyze(parsed parser.Result) Result { return NewAnalyzer().Analyze(parsed)
 // Analyze consumes a parser result and produces side-table semantic data. It
 // tolerates recovered/Bad AST nodes and does not mutate parser output.
 func (*Analyzer) Analyze(parsed parser.Result) Result {
+	return analyzeWithEnvironment(parsed, Environment{})
+}
+
+func AnalyzeWithEnvironment(parsed parser.Result, environment Environment) Result {
+	return NewAnalyzer().AnalyzeWithEnvironment(parsed, environment)
+}
+
+func (*Analyzer) AnalyzeWithEnvironment(parsed parser.Result, environment Environment) Result {
+	return analyzeWithEnvironment(parsed, environment)
+}
+
+func analyzeWithEnvironment(parsed parser.Result, environment Environment) Result {
 	a := &analyzer{
+		environment:   environment,
 		classes:       make(map[string]*Symbol),
 		classByType:   make(map[*types.ClassSymbol]*Symbol),
 		classNodes:    make(map[*ast.ClassDecl]*Symbol),
@@ -77,6 +91,7 @@ func (*Analyzer) Analyze(parsed parser.Result) Result {
 		return a.result
 	}
 
+	a.installImports(parsed.Program)
 	a.predeclareClasses(parsed.Program)
 	a.resolveClassParents(parsed.Program)
 	a.predeclareFunctions(parsed.Program)
@@ -111,7 +126,7 @@ func (a *analyzer) predeclareModuleConstants(program *ast.Program) {
 			Name: declaration.Name, Kind: BindingSymbol, Type: typeValue,
 			Span: declaration.Span(), Declaration: declaration, Constant: true,
 			Confidential: hasModifier(declaration.Modifiers, ast.ModifierConfidential),
-			ModuleRoot:   true, InitialNull: NonNull,
+			ModuleRoot:   true, InitialNull: NonNull, OriginModuleID: a.environment.ModuleID,
 		}
 		a.module.symbols[symbol.Name] = symbol
 		a.result.ResolvedSymbols[declaration] = symbol
@@ -120,8 +135,8 @@ func (a *analyzer) predeclareModuleConstants(program *ast.Program) {
 }
 
 func (a *analyzer) installBuiltins() {
-	objectType := &types.ClassSymbol{Name: "Object"}
-	errorType := &types.ClassSymbol{Name: "Error", Parent: objectType}
+	objectType := &types.ClassSymbol{ModuleID: "builtin:core", Name: "Object"}
+	errorType := &types.ClassSymbol{ModuleID: "builtin:core", Name: "Error", Parent: objectType}
 	object := &Symbol{Name: "Object", Kind: ClassSymbol, Class: objectType, Type: types.Class{Symbol: objectType, Reference: true}, ModuleRoot: true, Builtin: true, InitialNull: NonNull, Members: make(map[string]*Symbol)}
 	errorSymbol := &Symbol{Name: "Error", Kind: ClassSymbol, Class: errorType, Type: types.Class{Symbol: errorType, Reference: true}, ModuleRoot: true, Builtin: true, InitialNull: NonNull, Members: make(map[string]*Symbol)}
 	errorSymbol.Members["message"] = &Symbol{Name: "message", Kind: MemberSymbol, Type: types.String, Builtin: true, InitialNull: NonNull}
@@ -151,13 +166,14 @@ func (a *analyzer) predeclareClasses(program *ast.Program) {
 			a.error(codeRedeclaration, fmt.Sprintf("%q is already declared in module scope", declaration.Name), declaration.Span(), fmt.Sprintf("previous declaration is %s", types.Display(existing.Type)))
 			continue
 		}
-		identity := &types.ClassSymbol{Name: declaration.Name}
+		identity := &types.ClassSymbol{ModuleID: a.environment.ModuleID, Name: declaration.Name}
 		symbol := &Symbol{
 			Name: declaration.Name, Kind: ClassSymbol,
 			Type: types.Class{Symbol: identity, Reference: true}, Class: identity,
 			Span: declaration.Span(), Declaration: declaration, ModuleRoot: true,
-			Confidential: hasModifier(declaration.Modifiers, ast.ModifierConfidential),
-			InitialNull:  NonNull, Members: make(map[string]*Symbol),
+			Confidential:   hasModifier(declaration.Modifiers, ast.ModifierConfidential),
+			OriginModuleID: a.environment.ModuleID,
+			InitialNull:    NonNull, Members: make(map[string]*Symbol),
 		}
 		a.module.symbols[symbol.Name] = symbol
 		a.classes[symbol.Name] = symbol
@@ -185,6 +201,8 @@ func (a *analyzer) resolveClassParents(program *ast.Program) {
 			if parent == nil {
 				a.error(codeInvalidType, fmt.Sprintf("unknown parent Class %q", declaration.Parent.Name), declaration.Parent.Span(), "declare the parent Class in this module or bring it from another module")
 				parent = object
+			} else {
+				a.result.ResolvedSymbols[declaration.Parent] = parent
 			}
 		}
 		if parent == symbol {
@@ -245,7 +263,7 @@ func (a *analyzer) predeclareClassMembers(program *ast.Program) {
 					if parameter.Default != nil {
 						nullState = a.initializerNullState(parameter.Default)
 					}
-					memberSymbol := &Symbol{Name: parameter.Name, Kind: MemberSymbol, Type: typeValue, Span: parameter.Span(), InitialNull: nullState, Confidential: hasModifier(parameter.Modifiers, ast.ModifierConfidential)}
+					memberSymbol := &Symbol{Name: parameter.Name, Kind: MemberSymbol, Type: typeValue, Span: parameter.Span(), InitialNull: nullState, Confidential: hasModifier(parameter.Modifiers, ast.ModifierConfidential), OwnerClass: class.Class, OriginModuleID: a.environment.ModuleID}
 					class.Members[parameter.Name] = memberSymbol
 					a.result.Symbols = append(a.result.Symbols, memberSymbol)
 				}
@@ -295,6 +313,10 @@ func (a *analyzer) registerFunction(declaration *ast.FunctionDecl, targetScope *
 		Span: declaration.Span(), Declaration: declaration, Callable: callable,
 		ModuleRoot: owner == nil, InitialNull: NonNull,
 		Constant: true, Confidential: hasModifier(declaration.Modifiers, ast.ModifierConfidential),
+		OriginModuleID: a.environment.ModuleID,
+	}
+	if owner != nil {
+		symbol.OwnerClass = owner.Class
 	}
 	symbol.OverloadSet = &OverloadSet{Name: symbol.Name, Candidates: []*Callable{callable}}
 	if owner != nil {
@@ -386,11 +408,28 @@ func (a *analyzer) resolveType(reference *ast.TypeRef) types.Type {
 			if len(reference.Arguments) != 0 {
 				a.error(codeInvalidType, fmt.Sprintf("Class %s does not accept type arguments", reference.Name), reference.Span(), "remove generic arguments")
 			}
+			a.result.ResolvedSymbols[reference] = class
 			return types.Class{Symbol: class.Class}
 		}
 		a.error(codeInvalidType, fmt.Sprintf("unknown type %q", reference.Name), reference.Span(), "declare the Class or use an AhdCode built-in type")
 		return types.Invalid
 	}
+}
+
+func (a *analyzer) classSymbolFor(identity *types.ClassSymbol) *Symbol {
+	if identity == nil {
+		return nil
+	}
+	if symbol := a.classByType[identity]; symbol != nil {
+		return symbol
+	}
+	for candidate, symbol := range a.classByType {
+		if types.SameClassIdentity(candidate, identity) {
+			a.classByType[identity] = symbol
+			return symbol
+		}
+	}
+	return nil
 }
 
 func (a *analyzer) error(code, message string, span source.Span, hint string) {

@@ -131,7 +131,7 @@ func (a *analyzer) analyzeIdentifier(identifier *ast.IdentifierExpr, current *sc
 		a.error(codeUnknownName, fmt.Sprintf("unknown name %q", identifier.Name), identifier.Span(), "declare the binding in a visible lexical scope")
 		return expressionInfo{typeValue: types.Invalid, nullState: MaybeNull}
 	}
-	if owner == a.module && current.callable != nil && !symbol.Builtin && symbol.Kind != ClassSymbol && current.callable.symbol != symbol {
+	if owner == a.module && current.callable != nil && !symbol.Builtin && symbol.Kind != ClassSymbol && symbol.Kind != NamespaceSymbol && current.callable.symbol != symbol {
 		a.error(codeHiddenGlobal, fmt.Sprintf("module binding %q requires an explicit Global declaration", identifier.Name), identifier.Span(), fmt.Sprintf("add %s: Global %s in this callable", identifier.Name, types.Display(symbol.Type)))
 	}
 	typeValue := symbol.Type
@@ -396,7 +396,7 @@ func (a *analyzer) analyzeCallExpected(call *ast.CallExpr, current *scope, flow 
 		return a.analyzeBuiltinCall(call, callee.symbol, arguments)
 	}
 	if class, ok := callee.typeValue.(types.Class); ok && class.Reference {
-		symbol := a.classByType[class.Symbol]
+		symbol := a.classSymbolFor(class.Symbol)
 		if symbol == nil {
 			return expressionInfo{typeValue: types.Invalid, nullState: MaybeNull}
 		}
@@ -428,7 +428,9 @@ func (a *analyzer) analyzeCallExpected(call *ast.CallExpr, current *scope, flow 
 	}
 	callable := callee.symbolCallable()
 	if callable == nil && function.Signature != nil {
-		callable = &Callable{Signature: function.Signature, ParameterNull: nonNullParameters(len(function.Signature.Parameters)), ReturnNull: NonNull}
+		// A concrete type without callable metadata can occur at an external
+		// interface boundary. Missing return-state information is conservative.
+		callable = &Callable{Signature: function.Signature, ParameterNull: nonNullParameters(len(function.Signature.Parameters)), ReturnNull: MaybeNull}
 	}
 	if callable == nil || callable.Signature == nil {
 		arguments := a.analyzeCallArguments(call, current, flow, nil)
@@ -562,6 +564,28 @@ func (a *analyzer) callArgumentsCompatible(call *ast.CallExpr, callable *Callabl
 
 func (a *analyzer) analyzeMember(member *ast.MemberExpr, current *scope, flow flowState) expressionInfo {
 	object := a.analyzeExpression(member.Object, current, flow)
+	if object.symbol != nil && object.symbol.Kind == NamespaceSymbol && object.symbol.Namespace != nil {
+		resolved, exists := object.symbol.Namespace.Symbols[member.Name]
+		if !exists {
+			a.error(CodeNamespaceMember, fmt.Sprintf("module %s has no symbol %q", object.symbol.Namespace.Name, member.Name), member.Span(), "use a symbol exported by the module")
+			return expressionInfo{typeValue: types.Invalid, nullState: MaybeNull}
+		}
+		if resolved.Confidential {
+			a.error(CodeConfidentialAccess, fmt.Sprintf("symbol %q in module %s is Confidential", member.Name, object.symbol.Namespace.Name), member.Span(), "access only public module exports")
+			return expressionInfo{typeValue: types.Invalid, nullState: MaybeNull}
+		}
+		resolved = object.symbol.Namespace.Exports[member.Name]
+		if resolved == nil {
+			a.error(CodeNamespaceMember, fmt.Sprintf("module %s does not export symbol %q", object.symbol.Namespace.Name, member.Name), member.Span(), "use a public symbol exported by the module")
+			return expressionInfo{typeValue: types.Invalid, nullState: MaybeNull}
+		}
+		a.result.ResolvedSymbols[member] = resolved
+		typeValue := resolved.Type
+		if resolved.Kind == ClassSymbol {
+			typeValue = types.Class{Symbol: resolved.Class, Reference: true}
+		}
+		return expressionInfo{typeValue: typeValue, nullState: resolved.InitialNull, symbol: resolved}
+	}
 	if object.nullState != NonNull {
 		a.nullableError("member access", member.Object, object.nullState)
 	}
@@ -570,13 +594,23 @@ func (a *analyzer) analyzeMember(member *ast.MemberExpr, current *scope, flow fl
 		a.error(codeInvalidMember, fmt.Sprintf("type %s has no Class members", types.Display(object.typeValue)), member.Span(), fmt.Sprintf("cannot access member %q", member.Name))
 		return expressionInfo{typeValue: types.Invalid, nullState: MaybeNull}
 	}
-	classSymbol := a.classByType[class.Symbol]
+	classSymbol := a.classSymbolFor(class.Symbol)
 	resolved := a.lookupMember(classSymbol, member.Name)
 	if resolved == nil {
 		a.error(codeInvalidMember, fmt.Sprintf("Class %s has no member %q", class.Symbol.Name, member.Name), member.Span(), "declare the attribute or method in the Class hierarchy")
 		return expressionInfo{typeValue: types.Invalid, nullState: MaybeNull}
 	}
+	if resolved.Confidential && !a.canAccessConfidentialMember(current, resolved.OwnerClass) {
+		a.error(CodeConfidentialAccess, fmt.Sprintf("Class member %q is Confidential", member.Name), member.Span(), "access Confidential members only from their defining Class or a subclass")
+		return expressionInfo{typeValue: types.Invalid, nullState: MaybeNull}
+	}
+	a.result.ResolvedSymbols[member] = resolved
 	return expressionInfo{typeValue: resolved.Type, nullState: resolved.InitialNull, symbol: resolved}
+}
+
+func (a *analyzer) canAccessConfidentialMember(current *scope, owner *types.ClassSymbol) bool {
+	return owner != nil && current != nil && current.callable != nil && current.callable.class != nil &&
+		classAssignableTo(current.callable.class.Class, owner)
 }
 
 func (a *analyzer) lookupMember(class *Symbol, name string) *Symbol {
@@ -589,7 +623,7 @@ func (a *analyzer) lookupMember(class *Symbol, name string) *Symbol {
 		if current.Class == nil || current.Class.Parent == nil {
 			break
 		}
-		current = a.classByType[current.Class.Parent]
+		current = a.classSymbolFor(current.Class.Parent)
 	}
 	return nil
 }

@@ -28,4 +28,11 @@ const (
 	codeInvalidOverload     = "SEM025"
 	codeNoMatchingOverload  = "SEM026"
 	codeAmbiguousOverload   = "SEM027"
+	CodeModuleNotFound      = "SEM028"
+	CodeExportNotFound      = "SEM029"
+	CodeConfidentialAccess  = "SEM030"
+	CodeImportCollision     = "SEM031"
+	CodeCircularDependency  = "SEM032"
+	CodeFailedDependency    = "SEM033"
+	CodeNamespaceMember     = "SEM034"
 )

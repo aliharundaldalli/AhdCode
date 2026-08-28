@@ -32,7 +32,7 @@ func (a *analyzer) validateOverride(declaration *ast.FunctionDecl, class *Symbol
 		}
 		return
 	}
-	parent := a.classByType[class.Class.Parent]
+	parent := a.classSymbolFor(class.Class.Parent)
 	inherited := a.lookupMember(parent, declaration.Name)
 	if declaration.Flavor == ast.FunctionOverride {
 		if inherited == nil || inherited.Callable == nil {

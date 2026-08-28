@@ -1652,6 +1652,14 @@ Stop is excluded. Zero step is an error.
 
 AhdCode uses `bring`, not `import`.
 
+### 33.1 v0.1 module-name resolution
+
+A v0.1 module reference is exactly the single case-sensitive identifier already accepted by the `bring` grammar. For a local module, `ModuleName` resolves to the file `ModuleName.ahd` in the directory containing the importing source file. Identifier normalization follows the ordinary AhdCode NFKC identifier rule before resolution.
+
+v0.1 has no dotted module paths, relative-path syntax, package-root search, configurable source search path, or implicit directory-module convention. Those features require a later explicit language revision rather than an implementation-specific search heuristic.
+
+Compiler-registered built-in module names resolve through the built-in module registry. A local file cannot shadow a registered built-in module name. Module-name and filename matching remains case-sensitive.
+
 ```ahd
 bring Mathematics
 ```

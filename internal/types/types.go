@@ -110,8 +110,9 @@ func (function Function) String() string {
 // deliberately free of semantic-package symbols so module metadata can reuse
 // it later without a package cycle.
 type ClassSymbol struct {
-	Name   string
-	Parent *ClassSymbol
+	ModuleID string
+	Name     string
+	Parent   *ClassSymbol
 }
 
 type Class struct {
@@ -163,7 +164,7 @@ func Equal(left, right Type) bool {
 		return equalSignature(leftValue.Signature, rightValue.Signature)
 	case Class:
 		rightValue, ok := right.(Class)
-		return ok && leftValue.Symbol == rightValue.Symbol && leftValue.Reference == rightValue.Reference
+		return ok && sameClassIdentity(leftValue.Symbol, rightValue.Symbol) && leftValue.Reference == rightValue.Reference
 	default:
 		return true
 	}
@@ -209,10 +210,24 @@ func Assignable(target, value Type) bool {
 		visited := make(map[*ClassSymbol]bool)
 		for current := valueClass.Symbol; current != nil && !visited[current]; current = current.Parent {
 			visited[current] = true
-			if current == targetClass.Symbol {
+			if sameClassIdentity(current, targetClass.Symbol) {
 				return true
 			}
 		}
 	}
 	return false
+}
+
+// SameClassIdentity compares canonical cross-module Class identity. Legacy
+// single-file symbols without a ModuleID retain pointer identity.
+func SameClassIdentity(left, right *ClassSymbol) bool { return sameClassIdentity(left, right) }
+
+func sameClassIdentity(left, right *ClassSymbol) bool {
+	if left == nil || right == nil {
+		return left == right
+	}
+	if left.ModuleID == "" || right.ModuleID == "" {
+		return left == right
+	}
+	return left.ModuleID == right.ModuleID && left.Name == right.Name
 }
