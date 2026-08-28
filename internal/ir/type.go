@@ -105,7 +105,9 @@ func EqualSignature(left, right *Signature) bool {
 		return false
 	}
 	for index := range left.Parameters {
-		if left.Parameters[index].Name != right.Parameters[index].Name || left.Parameters[index].HasDefault != right.Parameters[index].HasDefault || !EqualType(left.Parameters[index].Type, right.Parameters[index].Type) {
+		// Names are retained for named-argument lowering and diagnostics, but do
+		// not distinguish callable types.
+		if left.Parameters[index].HasDefault != right.Parameters[index].HasDefault || !EqualType(left.Parameters[index].Type, right.Parameters[index].Type) {
 			return false
 		}
 	}

@@ -178,8 +178,11 @@ func equalSignature(left, right *Signature) bool {
 		return false
 	}
 	for index := range left.Parameters {
-		if left.Parameters[index].Name != right.Parameters[index].Name ||
-			left.Parameters[index].HasDefault != right.Parameters[index].HasDefault ||
+		// Parameter names belong to the callable declaration and named-call
+		// surface, not to Function type identity. Keep them on the signature for
+		// diagnostics and argument binding, but compare only semantic type
+		// properties here.
+		if left.Parameters[index].HasDefault != right.Parameters[index].HasDefault ||
 			!Equal(left.Parameters[index].Type, right.Parameters[index].Type) {
 			return false
 		}

@@ -195,6 +195,42 @@ callback: Int := use(calculate, 5)`,
 	}
 }
 
+func TestCrossModuleCallbackMetadataIgnoresParameterSpelling(t *testing.T) {
+	_, result := compileMemory(t, map[string]string{
+		"/Numbers.ahd": `triple: Function := (
+    value: Int
+) -> Int {
+    return value * 3
+}`,
+		"/Engine.ahd": `applyTwice: Function := (
+    operation: Function
+    value: Int
+) -> Int {
+    first: Local Int := operation(value)
+    return operation(first)
+}`,
+		"/Main.ahd": `bring Engine
+from Numbers bring triple
+operation: Function := triple
+first: Int := Engine.applyTwice(operation, 2)
+second: Int := Engine.applyTwice(triple, 3)`,
+	}, "/Main.ahd")
+	requireClean(t, result)
+
+	triple := moduleNamed(t, result, "Numbers").Interface.Exports["triple"].Callable
+	applyTwice := moduleNamed(t, result, "Engine").Interface.Exports["applyTwice"].Callable
+	callback, ok := applyTwice.Signature.Parameters[0].Type.(types.Function)
+	if triple == nil || !ok || callback.Signature == nil {
+		t.Fatalf("cross-module callback metadata is incomplete: triple=%#v callback=%#v", triple, callback)
+	}
+	if triple.Signature.Parameters[0].Name != "value" || callback.Signature.Parameters[0].Name != "" {
+		t.Fatalf("test did not retain distinct declaration metadata: triple=%#v callback=%#v", triple.Signature, callback.Signature)
+	}
+	if !types.Equal(types.Function{Signature: triple.Signature}, callback) {
+		t.Fatal("equivalent cross-module Function types conflict on parameter spelling")
+	}
+}
+
 func TestCrossModuleClassIdentitySubtypeAndMembers(t *testing.T) {
 	_, result := compileMemory(t, map[string]string{
 		"/Models.ahd": `Person: Class<> := {

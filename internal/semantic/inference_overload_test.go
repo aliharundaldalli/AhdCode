@@ -20,6 +20,49 @@ operation: Function := add`)
 	}
 }
 
+func TestFunctionValueConstraintsIgnoreParameterNames(t *testing.T) {
+	_, result := analyzeText(t, `first: Function := (x: Int) -> Int {
+    return x
+}
+second: Function := (y: Int) -> Int {
+    return y
+}
+operation: Function := first
+operation = second`)
+	requireSemanticClean(t, result)
+}
+
+func TestFunctionValueConstraintsStillCheckParameterAndReturnTypes(t *testing.T) {
+	tests := []string{
+		`first: Function := (x: Int) -> Int { return x }
+second: Function := (x: Real) -> Int { return int(x) }
+operation: Function := first
+operation = second`,
+		`first: Function := (x: Int) -> Int { return x }
+second: Function := (x: Int) -> Real { return x }
+operation: Function := first
+operation = second`,
+	}
+	for _, source := range tests {
+		_, result := analyzeText(t, source)
+		requireSemanticCode(t, result, codeConflictingFunction)
+	}
+}
+
+func TestDirectNamedCallStillUsesDeclaredParameterName(t *testing.T) {
+	_, valid := analyzeText(t, `triple: Function := (value: Int) -> Int {
+    return value * 3
+}
+answer: Int := triple(value: 2)`)
+	requireSemanticClean(t, valid)
+
+	_, invalid := analyzeText(t, `triple: Function := (value: Int) -> Int {
+    return value * 3
+}
+answer: Int := triple(x: 2)`)
+	requireSemanticCode(t, invalid, codeCallArguments)
+}
+
 func TestRepeatedCompatibleCallbackConstraintsMerge(t *testing.T) {
 	_, result := analyzeText(t, `use: Function := (operation: Function, x: Int) -> Int {
     a: Local Int := operation(x)
