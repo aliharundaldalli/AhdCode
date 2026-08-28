@@ -2,27 +2,26 @@
 
 English version: [English Student Guide](STUDENT_GUIDE_EN.md)
 
-Bu rehber, daha önce hiç program yazmamış olsanız bile küçük AhdCode komut
-satırı programları kurabilmeniz için hazırlanmıştır. Bölümleri sırayla okuyun,
-örnekleri çalıştırın ve her bölümün sonundaki küçük değişiklikleri kendiniz
-deneyin.
+Bu rehber, daha önce hiç programlama deneyiminiz olmasa bile küçük AhdCode
+komut satırı programları geliştirmenize yardımcı olur. Bölümleri sırayla okuyun,
+her örneği çalıştırın ve yol boyunca önerilen küçük değişiklikleri deneyin.
 
 ## 1. AhdCode nedir?
 
-AhdCode; okunabilir kod ve öngörülebilir davranış hedefleyen genel amaçlı bir
-programlama dilidir. Derleyici, programı çalıştırmadan önce kontrol eder. Bu
-sayede yanlış türde değer kullanmak veya `null` olabilecek bir değere güvenmeden
-erişmek gibi birçok hatayı erkenden gösterir.
+AhdCode, okunabilir kod ve öngörülebilir davranış için tasarlanmış genel amaçlı
+bir dildir. Derleyici, programınızı çalıştırmadan önce kontrol eder. Bu sayede,
+yanlış türde bir değer kullanmak veya `null` olabilecek bir değere güvenmek gibi
+birçok hata erkenden yakalanır.
 
-> **Teknik not:** Program çalışmadan önce tür kontrolü yapılmasına static
+> **Teknik not:** Program çalışmadan önce türlerin kontrol edilmesine static
 > checking denir.
 
-v0.1 öğrenme ve deney aşamasındadır. Küçük CLI programları yazabilir, bunları
-doğrudan çalıştırabilir veya native executable olarak derleyebilirsiniz.
+0.1 sürümü deneysel bir öğrenim sürümüdür. Küçük CLI (komut satırı) programlarını
+doğrudan çalıştırabilir veya onları tek başına çalışan yerel bir uygulamaya çevirebilir.
 
-## 2. Kurulum ve ilk program
+## 2. Kurulum ve ilk programınız
 
-AhdCode'u kaynaktan kurmak için Go 1.25 veya daha yeni bir sürüm gerekir:
+AhdCode'u kaynak kodundan derlemek için şu an Go 1.25 veya daha yeni bir sürüm gerekir:
 
 ```bash
 cd AhdCode
@@ -51,66 +50,72 @@ Beklenen çıktı:
 Merhaba AhdCode
 ```
 
-Küçük deneme: `name` değerini kendi adınızla değiştirip programı yeniden
-çalıştırın.
+Deneme sırası sizde: `AhdCode` kelimesini kendi adınızla değiştirin ve dosyayı
+yeniden çalıştırın.
 
-### Formatter ve REPL
+## 3. Kod yazımının temelleri
 
-Kodunuz çalışsa bile boşluklar veya satır düzeni dağınık olabilir. Formatter,
-dosyayı AhdCode'un ortak yazım biçimine getirir ve yorumlarınızı korur:
+Her AhdCode programı bir `.ahd` dosyasına yazılır. Satırların sonuna noktalı virgül (`;`) koymanıza gerek yoktur, her komut genellikle kendi satırında yer alır. Kod blokları süslü parantez `{` ve `}` arasına yazılır.
 
-```bash
-ahdcode format hello.ahd
-ahdcode format --check hello.ahd
-```
-
-İlk komut dosyayı düzenler. İkinci komut dosyayı değiştirmeden biçimin zaten
-doğru olup olmadığını kontrol eder.
-
-Dosya oluşturmadan küçük denemeler yapmak için yalnız `ahdcode` yazarak REPL'i
-açabilirsiniz. Başarılı komutlar oturumda tutulur. Hatalı bir komut, daha önce
-çalışan durumu silmez. REPL her başarılı durumu yeniden çalıştırdığı için
-rastgele işlemlerde `Math.seed(...)` kullanın. `take` ile etkileşimli input
-okumayı ise REPL yerine bir `.ahd` dosyasında deneyin.
-
-## 3. Değişken tanımlama: `:=` ve `=`
-
-`:=` yeni bir değişken oluşturur. `=` ise daha önce oluşturduğunuz ve
-değiştirilebilen bir değişkene yeni bir değer verir.
+Kendiniz veya diğer yazılımcılar için not bırakmak isterseniz, satırın başına `#` koyabilirsiniz. Derleyici bu yorum satırlarını (comments) yok sayar.
 
 ```ahd
-score: Int := 70
+// Bu bir yorum satırıdır. Derleyici bunu görmezden gelir.
+write("Bu satır çalışır")
+```
+
+Bir değeri hatırlamanız gerektiğinde bir "değişken" (variable) oluşturursunuz. Değişken isimleri (identifiers) bir harfle başlamalıdır; harf, sayı ve alt çizgi (`_`) içerebilir.
+
+### Değişken tanımlama ve değiştirme: `:=` ve `=`
+
+Yeni bir değişken oluşturmak için `:=` kullanın. Daha önce oluşturulmuş ve
+değiştirilebilen bir değişkene yeni bir değer vermek için ise `=` kullanın.
+
+```ahd
+score: Int := 10
+name: String := "Ayşe"
+
 write(score)
 
-score = 85
+score = 20
 write(score)
 ```
 
 Beklenen çıktı:
 
 ```text
-70
-85
+10
+20
 ```
 
-İlk satırda yalnız `=` kullanmak hatadır; çünkü `score` henüz oluşturulmamıştır.
-Aynı blok içinde ikinci kez `:=` kullanmak da aynı değişkeni yeniden oluşturmaya
-çalışacağı için hatadır.
+İlk satırda yalnızca `=` kullanmak bir hatadır çünkü `score` henüz
+oluşturulmamıştır. Örneğin, önceden tanımlanmamış bir değişkene `score = 10` yazmak derleyici tarafından reddedilir. Aynı blok içinde ikinci kez `:=` kullanmak, aynı
+değişkeni tekrar oluşturmaya çalışmak demektir; bu da bir hatadır.
 
-> **Teknik not:** Bir adın kullanılabildiği bölgeye scope (kapsam) denir.
+AhdCode türü açıkça yazmanızı bekler (yukarıdaki `Int` ve `String` gibi):
+
+```ahd
+age: Int := 19
+// Derleyici age'in her zaman bir Int olarak kalmasını sağlar.
+```
+
+> **Teknik not:** Bir değişken adının kullanılabileceği bölgeye onun "scope"u (kapsamı) denir. Türün derleyici tarafından otomatik bulunmasına ise "type inference" denir.
 
 ## 4. Temel türler
 
-Başlangıçta en çok şu türleri kullanacaksınız:
+Başlangıçta en sık karşılaşacağınız türler şunlardır:
 
 | Tür | Anlamı | Örnek |
 |---|---|---|
 | `Int` | İşaretli 64-bit tam sayı | `42` |
-| `Real` | Sonlu ondalıklı sayı | `3.5` |
-| `String` | Değiştirilemeyen Unicode metin | `"Ayşe"` |
+| `Real` | Kesirli/ondalıklı sayı (floating-point) | `3.5` |
+| `String` | Değiştirilemeyen (immutable) metin | `"Ayşe"` |
 | `Bool` | Mantıksal değer | `true`, `false` |
 | `List<T>` | Sıralı ve değiştirilebilir değer koleksiyonu | `[1, 2]` |
-| `Pair<K, V>` | Ekleme sırasını koruyan anahtar/değer koleksiyonu | `{"Ali": 90}` |
+| `Pair<K, V>` | Ekleme sırasını koruyan anahtar/değer sözlüğü | `{"Ali": 90}` |
+| `Function` | Tekrar kullanılabilen kod bloğu | |
+| `Class` | Özel veri yapısı (custom data structure) | |
+| `Nothing` | Değer döndürmeyen bir fonksiyonun türü | |
 
 ```ahd
 student: String := "Ayşe"
@@ -127,20 +132,177 @@ Beklenen çıktı:
 Ayşe, 19, 87.5, true
 ```
 
-Dil izin verdiği yerlerde bir `Int` değeri güvenli biçimde `Real` olarak
+Dilin izin verdiği yerlerde bir `Int`, güvenle bir `Real` olarak
 kullanılabilir. Fakat `List<Int>` ile `List<Real>` farklı türlerdir. Bir
 `List<Int>` değerini doğrudan `List<Real>` gereken yere veremezsiniz.
 
-> **Teknik not:** Generic koleksiyonların bu davranışına invariance denir.
+> **Teknik not:** Generic türler (koleksiyonlar) için geçerli olan bu katı kurala invariance denir.
 
-## 5. Ekrana yazma ve kullanıcıdan veri alma
+AhdCode'da `null` tek başına bir tür değildir, bir değişkenin bulunabileceği bir "durum"dur (state). Bunu Null Güvenliği (Null Safety) bölümünde işleyeceğiz.
 
-`write(value)` değeri ve ardından yeni satır yazar. `take()` bir satır metin
-okur; `take(prompt)` önce kısa bir istem gösterir. `take` her zaman `String`
-döndürür.
+## 5. Operatörler
+
+AhdCode standart matematiksel ve mantıksal operatörleri destekler.
+
+### Aritmetik
+- `+` toplama
+- `-` çıkarma
+- `*` çarpma
+- `/` bölme (her zaman `Real` döndürür, yani `5 / 2` sonucu `2.5`'tir)
+- `%` kalan (mod alma, yalnızca `Int` değerlerle çalışır)
+- `^` üs alma (sağdan birleşimlidir, yani `2 ^ 3 ^ 2`, `2 ^ (3 ^ 2)` anlamına gelir)
 
 ```ahd
-name: String := take("Ad: ")
+write(10 + 5)
+write(10 / 4)
+write(10 % 3)
+write(2 ^ 3)
+```
+
+Beklenen çıktı:
+```text
+15
+2.5
+1
+8
+```
+
+AhdCode tam sayı (integer) matematiğini taşmalara karşı kontrol eder (overflow). Eğer bir sonuç bir `Int`'e sığmayacak kadar büyük veya küçükse, program yanlış sayılar üretmek yerine `OverflowError` vererek güvenli bir şekilde durur.
+
+> **Dikkat:** Bölme işlemi `/` her zaman bir `Real` (kesirli sayı) döndürür. Tam sayı bölmesi istiyorsanız `int(a / b)` kullanmalısınız.
+
+### Atama ve bileşik atama (Compound assignment)
+Değişkenleri matematiksel işlemlerle doğrudan güncelleyebilirsiniz:
+- `+=`, `-=`, `*=`, `/=`, `%=`, `^=`
+
+```ahd
+score: Int := 10
+score += 5
+write(score)
+```
+
+> **Dikkat:** `/` her zaman `Real` döndürdüğü için, `Int` bir değişken üzerinde `/=` kullanamazsınız. Eğer `score` bir `Int` ise `score /= 2` geçersizdir. Yalnızca `Real` değişkenler için geçerlidir.
+
+### Birer artırma ve azaltma
+Bir `Int` değişkenini tam olarak `1` artırmak veya azaltmak için `++` veya `--` kullanın. Bunlar kendi satırlarında tek başına durmalıdır; başka bir işlemin veya atamanın içinde kullanılamazlar.
+
+```ahd
+count: Int := 0
+count++
+write(count)
+```
+
+### Karşılaştırma ve eşitlik
+- `==` eşittir (iki değerin içeriği aynı mı diye bakar)
+- `!=` eşit değildir
+- `<` küçüktür
+- `<=` küçük eşittir
+- `>` büyüktür
+- `>=` büyük eşittir
+
+### Mantıksal operatörler
+- `and` (ikisi de doğruysa `true` üretir)
+- `or` (en az biri doğruysa `true` üretir)
+- `not` (doğruyu yanlışa, yanlışı doğruya çevirir)
+
+```ahd
+age: Int := 20
+hasTicket: Bool := true
+
+if age >= 18 and hasTicket {
+    write("Hoş geldiniz!")
+}
+```
+
+## 6. Metinler (Strings)
+
+Bir `String` metin tutar. AhdCode Unicode'u tam olarak destekler; bu da herhangi bir dildeki harflerin ve emojilerin sorunsuz çalıştığı anlamına gelir. String'ler değiştirilemezdir (immutable): Bir String oluşturulduktan sonra yerinde güncellenemez. String'ler üzerindeki işlemler yeni bir String döndürür.
+
+Metinleri üç şekilde yazabilirsiniz:
+1. `"Çift tırnak"`
+2. `'Tek tırnak'`
+3. `"""Üçlü tırnak"""` (çok satırlı metinler için)
+
+```ahd
+greeting: String := "Merhaba"
+letter: String := 'A'
+poem: String := """
+Güller kırmızı,
+Menekşeler mavi.
+"""
+```
+
+### Kaçış karakterleri ve değer yerleştirme (Interpolation)
+Tırnak işaretleri veya yeni satır (`\n`) gibi özel karakterler için ters eğik çizgi `\` kullanın (`\"`).
+Süslü parantez `{ }` kullanarak değişkenleri doğrudan bir metnin içine yerleştirebilirsiniz. Buna interpolation denir.
+
+```ahd
+name: String := "Ali"
+write("Merhaba, {name}!")
+```
+
+### String API (Metotlar)
+AhdCode, metinler için birçok faydalı metot sunar:
+
+```ahd
+text: String := "  Ali,Veli,Ayşe  "
+clean: String := text.trim()
+
+write(clean.lower())
+write(clean.upper())
+write(clean.capitalize())
+write(clean.split(","))
+write(clean.replace("Veli", "Can"))
+write(clean.contains("Ayşe"))
+write(clean.startsWith("Ali"))
+write(clean.endsWith("Can"))
+write(clean.count("i"))
+write("a✓b✓".index("✓"))
+```
+
+Beklenen çıktı:
+
+```text
+ali,veli,ayşe
+ALI,VELI,AYŞE
+Ali,veli,ayşe
+["Ali", "Veli", "Ayşe"]
+Ali,Can,Ayşe
+true
+true
+false
+1
+1
+```
+
+Aranan metni bulamayan bir `String.index` araması `DomainError` hatası üretir.
+
+### İndeksleme ve Uzunluk
+Köşeli parantez `[ ]` kullanarak tek bir karaktere erişebilir veya `len()` ile metnin kaç karakterden oluştuğunu bulabilirsiniz. İndeksler `0`'dan başlar. Metnin sonundan geriye doğru saymak için negatif indeksler kullanabilirsiniz (`-1` son karakterdir).
+
+```ahd
+word: String := "AhdCode"
+write(len(word))
+write(word[0])
+write(word[-1])
+```
+
+Beklenen çıktı:
+```text
+7
+A
+e
+```
+
+Geçersiz bir sıradan indeksleme işlemi `IndexError` üretir.
+
+## 7. Girdi, çıktı ve dönüşümler
+
+`write(value)` bir değeri yazdırır ve ardından yeni bir satıra geçer. `take()`
+kullanıcıdan bir satırlık metin okur; `take(prompt)` ise metin okumadan önce ekrana kısa bir mesaj (istem) gösterir. `take` her zaman bir `String` döndürür.
+
+```ahd
+name: String := take("İsim: ")
 age: Int := int(take("Yaş: "))
 
 write("{name} {age} yaşında")
@@ -149,16 +311,14 @@ write("{name} {age} yaşında")
 Örnek etkileşim:
 
 ```text
-Ad: Ali
+İsim: Ali
 Yaş: 20
 Ali 20 yaşında
 ```
 
-Küçük deneme: Şehir için üçüncü bir `take` çağrısı ekleyin.
+### `int`, `real` ve `str` ile dönüşümler
 
-## 6. `int`, `real` ve `str` dönüşümleri
-
-Bu adlar her modülde hazırdır; `bring` gerekmez.
+Bu fonksiyonlar her modülde, hiçbir içeri aktarma (bring) yapmadan mevcuttur.
 
 ```ahd
 write(int(3.7))
@@ -180,22 +340,24 @@ Beklenen çıktı:
 true
 ```
 
-`int(Real)` sıfıra doğru keser. `int(String)` çevresindeki boşluğu temizler,
-isteğe bağlı `+`/`-` işaretini ve yalnız ondalık rakamları kabul eder. Ondalık
-nokta, exponent, underscore ve taban öneki kabul etmez. `real(String)` ondalık
-tam sayı, kesir ve exponent kabul eder; `NaN` veya infinity kabul etmez.
-Geçersiz metin `DomainError`, aralık dışı sonuç `OverflowError` üretir.
+`int(Real)` ondalık kısmı keser (sıfıra doğru yuvarlar).
 
-## 7. `if`, `else` ve `Bool` koşulları
+`int(String)` metnin başındaki ve sonundaki boşlukları yoksayar ve yalnızca isteğe bağlı bir `+` veya `-` işareti ve ardından rakamları kabul eder. Ondalık nokta, üs (exponent), alt çizgi veya taban (base) ön eklerini kabul **etmez**.
 
-AhdCode'da koşul mutlaka `Bool` olmalıdır. Sıfır, boş String veya boş List için
-truthiness yoktur.
+`real(String)` ondalık tam sayıları, kesirleri ve üsleri kabul eder; ancak `NaN` veya sonsuzluk (infinity) kabul etmez.
+
+Geçersiz bir metin `DomainError` üretir; çok büyük bir sayı ise `OverflowError` üretir. AhdCode metinleri sayılara otomatik dönüştürmez; bunu `int()` veya `real()` ile açıkça siz yapmalısınız.
+
+## 8. Koşullar: `if` ve `state`
+
+### `if` ve `else`
+AhdCode'da her koşul mutlaka bir `Bool` olmalıdır. Sıfır, boş bir String veya boş bir List için otomatik doğru/yanlış kabulü (truthiness) yoktur.
 
 ```ahd
 score: Int := 72
 
 if score >= 85 {
-    write("Pekiyi")
+    write("Mükemmel")
 }
 else if score >= 50 {
     write("Geçti")
@@ -211,16 +373,44 @@ Beklenen çıktı:
 Geçti
 ```
 
-`if score` geçersizdir; `if score > 0` gibi açık bir karşılaştırma yazın.
+`if score` geçersizdir çünkü `score` bir `Int`'tir, `Bool` değil. `if score > 0` gibi açık bir karşılaştırma yazmalısınız.
 
-## 8. `while`, `until` ve `for`
+### `state`, `condition` ve `default`
+Bir değeri birçok belirli eşleşmeyle karşılaştırmanız gerektiğinde `state` kullanın. Bu, peş peşe yazılmış birçok `else if` zincirinden daha temizdir.
 
-`while`, içindeki kodu çalıştırmadan önce koşula bakar. `until` bunun ters
-sırasını kullanır: önce içindeki kodu çalıştırır, koşula daha sonra bakar.
-Bu yüzden bir `until` gövdesi en az bir kez çalışır ve koşul `true` olduğunda
-durur.
+```ahd
+status: String := "active"
 
-> **Teknik not:** `while` bir pre-check, `until` ise post-check loop'tur.
+state status {
+    condition "active" {
+        write("Hesap aktif")
+    }
+    condition "blocked" {
+        write("Hesap engelli")
+    }
+    condition default {
+        write("Bilinmeyen durum")
+    }
+}
+```
+
+Beklenen çıktı:
+```text
+Hesap aktif
+```
+
+`state` bloğu yalnızca eşleşen ilk `condition` bloğunu çalıştırır. Sonraki koşula "düşmez" (no fall-through), bu yüzden `break` yazmanıza gerek yoktur. Eğer hiçbir koşul eşleşmezse `condition default` çalışır.
+
+> **Dikkat:** `state`, `condition` veya `default` kelimelerini "değişken" sanmayın. Bunlar aynı `if` ve `else` gibi programın akışını kontrol eden anahtar kelimelerdir.
+
+## 9. Döngüler: `while`, `until` ve `for`
+
+Döngüler, kodu tekrar tekrar çalıştırmanızı sağlar.
+
+### `while` ve `until`
+`while`, içindeki kodu çalıştırmadan önce koşulunu kontrol eder. `until` ise
+tam tersini yapar: Önce gövdeyi çalıştırır, koşulu daha sonra kontrol eder.
+Bu yüzden gövdesi en az bir kez çalışır ve koşul `true` olduğunda döngü durur.
 
 ```ahd
 count: Int := 0
@@ -234,10 +424,6 @@ until count == 4 {
     count++
     write("until {count}")
 }
-
-for value in [10, 20, 30] {
-    write("for {value}")
-}
 ```
 
 Beklenen çıktı:
@@ -247,19 +433,36 @@ while 0
 while 1
 until 3
 until 4
-for 10
-for 20
-for 30
 ```
 
-Bir `if` veya döngünün iç bloğunda yeni bir değişken oluşturursanız `Local`
-yazmanız gerekir. `break` en yakın döngüyü bitirir, `continue` bir sonraki adıma
-geçer.
+> **Teknik not:** `while` bir pre-check (önceden kontrol eden), `until` ise post-check (sonradan kontrol eden) loop'tur.
 
-## 9. `between` ile sayı aralığı
+### `break` ve `continue`
+Bir döngüyü `break` ile erken durdurabilir veya `continue` ile mevcut turun geri kalanını atlayıp doğrudan bir sonraki tura geçebilirsiniz.
 
-`between(start, stop)` başlangıcı içerir, bitişi **içermez**. Üçüncü argüman
-adım büyüklüğüdür.
+```ahd
+count: Int := 0
+while count < 10 {
+    count++
+    if count == 2 {
+        continue
+    }
+    if count == 4 {
+        break
+    }
+    write("sayaç {count}")
+}
+```
+
+Beklenen çıktı:
+```text
+sayaç 1
+sayaç 3
+```
+
+### `for` ve `between`
+Bir koleksiyondaki öğelerin veya belirli bir sayı aralığının üzerinden geçmek (loop yapmak) için `for` kullanın.
+`between(start, stop)`, başlangıcı içeren ve bitişi **dışlayan** (exclude) bir aralık oluşturur. Üçüncü bir argüman adım (step) değerini ayarlar.
 
 ```ahd
 for value in between(1, 6, 2) {
@@ -275,31 +478,40 @@ Beklenen çıktı:
 5
 ```
 
-Negatif adım desteklenir. Sıfır adım `DomainError` üretir.
+Negatif adımlar desteklenir (ör. `between(10, 0, -2)` geriye doğru sayar). Sıfır adımı (zero step) sonsuz döngü yaratacağından `DomainError` üretir. `between` oldukça verimlidir; bellekte devasa bir List oluşturmaz, sadece sayıları anlık (lazy) olarak üretir.
 
-`for` değişkeninin türünü çoğu zaman yazmanız gerekmez; derleyici türü dolaşılan
-değerlerden bulur. İsterseniz türü açıkça da yazabilirsiniz:
+Bir `for` değişkeninin türünü genellikle yazmanıza gerek yoktur; derleyici türü
+ziyaret edilen değerlerden kendi öğrenebilir. Ancak isterseniz türü açıkça yazabilirsiniz:
 
-```text
-for value in values
-for value: Int in values
+```ahd
+for value in [10, 20, 30] {
+    write(value)
+}
+
+for value: Int in [10, 20, 30] {
+    write(value)
+}
 ```
 
-Her iki biçimde de `value` yalnız döngünün içinde oluşturulur. Bu yüzden başına
-`Local` yazılmaz. Aşağıdaki biçim geçersizdir:
+Her iki kullanımda da `value` yalnızca o döngü için oluşturulur. Zaten o döngüye özeldir (Local). Başlangıcına `Local` eklemeyin.
+Şu kullanım geçersizdir:
 
-```text
-for value: Local Int in values
+```ahd
+// GEÇERSİZ:
+for value: Int in [10, 20] {
+    // This example intentionally fails to compile in v0.1 tests 
+    // because Local Int is not valid syntax here.
+}
 ```
 
-> **Teknik not:** Türü derleyicinin bulmasına type inference denir. `for`
-> değişkeni kendiliğinden Local kabul edilir.
+> **Teknik not:** Türün derleyici tarafından bulunmasına type inference denir. `for` değişkenleri varsayılan olarak zaten Local kabul edilir. Listeler için "snapshot iteration" (anlık görüntü iterasyonu) kullanılır; yani döngünün başında var olan değerler üzerinden ilerlenir.
 
-## 10. Function yazma ve çağırma
 
-v0.1'de her Function'ın bir adı vardır. Bir Function'ın içinde yeni bir
-Function tanımlayamazsınız ve lambda kullanamazsınız. Parametrelerin ve dönüş
-değerinin türü açıkça yazılır.
+## 10. Fonksiyon yazmak ve çağırmak
+
+v0.1'de her fonksiyonun bir adı olmalıdır. Bir fonksiyonun içine başka bir yeni
+fonksiyon tanımlayamazsınız ve isimsiz fonksiyonlar (lambdas) yoktur. Her
+parametrenin ve döndürülen değerin (return value) türü açıkça belirtilir.
 
 ```ahd
 greet: Function := (
@@ -320,24 +532,24 @@ Merhaba Öğrenci Ali
 Merhaba Dr Ayşe
 ```
 
-Bir çağrı tamamen positional veya tamamen named olmalıdır; iki biçim aynı
-çağrıda karıştırılmaz. Değer döndürmeyen bir Function'ın dönüş türü
-`Nothing`'dir.
+Bir fonksiyon çağrılırken, değerleri ya tamamen sırayla (positional) ya da
+tamamen isim vererek (named) göndermelisiniz; iki şekli aynı çağrıda
+karıştıramazsınız. `title`'ın varsayılan bir değeri (`"Öğrenci"`) olduğu için fonksiyonu çağırırken onu girmek isteğe bağlıdır.
 
-`Nothing` döndüren bir Function'da çıplak `return`, değer döndürmeden Function'ı
-hemen bitirir. Erken çıkış gerekmiyorsa `return` yazmak zorunlu değildir;
-Function gövdesinin sonuna ulaşması yeterlidir.
+Hiçbir değer döndürmeyen bir fonksiyon `Nothing` dönüş türünü kullanır. `Nothing` döndüren bir fonksiyonda, yalın bir `return` ifadesi herhangi bir
+değer üretmeden fonksiyonu anında bitirir. Fonksiyondan erken çıkmak
+gerekmiyorsa `return` yazmak isteğe bağlıdır; kodun doğal olarak sonuna ulaşması yeterlidir (natural fall-through).
 
 ```ahd
 showStatus: Function := (
     score: Int
 ) -> Nothing {
     if score < 0 {
-        write("Geçersiz puan")
+        write("Geçersiz not")
         return
     }
 
-    write("Puan: {score}")
+    write("Not: {score}")
 }
 
 hello: Function := (
@@ -354,19 +566,46 @@ hello("Ayşe")
 Beklenen çıktı:
 
 ```text
-Geçersiz puan
-Puan: 80
+Geçersiz not
+Not: 80
 Merhaba Ayşe
 ```
 
-İlk `showStatus` çağrısında çıplak `return`, alttaki `write` satırına ulaşılmasını
-engeller. `hello` ise gövdenin sonuna doğal biçimde ulaşarak tamamlanır.
+İlk `showStatus` çağrısındaki yalın `return`, sonraki `write` satırının
+çalışmasını engeller. `hello` ise gövdesinin sonuna ulaşarak doğal şekilde
+tamamlanır.
 
-### Aynı isimli birden fazla Function: overload
+### Öz yineleme (Recursion)
+Fonksiyonlar kendi kendilerini çağırabilirler. Buna öz yineleme (recursion) denir. Fonksiyonun sonsuza kadar çalışmaması için kendisini çağırmayı durduracak bir koşul yazdığınızdan emin olmalısınız.
 
-Aynı Function adı için farklı parametre türlerine sahip birden fazla sürüm
-tanımlayabilirsiniz. İlk sürüm normal `Function`, sonraki sürüm `Overload
-Function` olarak yazılır:
+```ahd
+countdown: Function := (
+    n: Int
+) -> Nothing {
+    if n <= 0 {
+        write("Ateşle!")
+        return
+    }
+    write(n)
+    countdown(n - 1)
+}
+
+countdown(3)
+```
+
+Beklenen çıktı:
+```text
+3
+2
+1
+Ateşle!
+```
+
+### Aynı isimde birden fazla fonksiyon: Overloads
+
+Parametre türleri farklı olduğu sürece aynı fonksiyon adı için birkaç farklı
+versiyon tanımlayabilirsiniz. İlkini normal `Function`, sonrakileri ise
+`Overload Function` olarak yazın:
 
 ```ahd
 describe: Function := (
@@ -392,22 +631,23 @@ Int 2
 Real 2.5
 ```
 
-Derleyici önce parametre türü tam uyan sürümü seçer. Gerekirse güvenli
-`Int`-to-`Real` geçişini kullanabilir. İki sürüm eşit derecede uygunsa çağrı
-belirsiz olur ve derleme durur. Yalnız dönüş türü, sürüm seçmek için yeterli
-değildir.
+Derleyici her zaman öncelikle parametre türünün tam eşleştiği (exact match) versiyonu
+seçer. Gerektiğinde güvenli `Int`'ten `Real`'e çeviriyi (widening) kullanabilir. Ayrıca birden çok fonksiyon uyuyorsa, daha az varsayılan parametre kullanan versiyonu tercih eder. Eğer iki versiyon aynı derecede uygun görünüyorsa, çağrı belirsizdir
+(ambiguous) ve derleme işlemi hata verip durur. Sadece dönüş türünün farklı
+olması, hangi versiyonun seçileceğini belirlemeye yetmez.
 
-> **Teknik not:** Bu seçime overload resolution denir. Kullanıcı tarafındaki
-> `Function` dinamik değildir; derleyici çağrının kullanacağı tek sürümü program
-> çalışmadan önce belirlemelidir.
+> **Teknik not:** Bu seçim işlemine "overload resolution" (aşırı yükleme
+> çözümlemesi) denir. Fonksiyonlar dinamik değildir; program çalışmadan önce
+> derleyicinin her çağrının hangi versiyonu kullanacağını kesin olarak
+> belirlemesi gerekir.
 
 ## 11. `Local` ve `Global`
 
-Function parametrelerini Function içinde doğrudan kullanabilirsiniz; başlarına
-`Local` yazılmaz. Function, `if`, `for` veya `while` gibi bir iç blokta yeni bir
-değişken oluşturuyorsanız `Local` yazın. Dosyanın en üst seviyesinde oluşturulan
-bir değişkeni Function içinde kullanmak içinse `Global` ile bunu açıkça
-belirtin.
+Fonksiyonun parametrelerini fonksiyonun içinde doğrudan kullanabilirsiniz;
+başlarına `Local` eklemeyin. Fonksiyonun veya `if`, `for`, `while` gibi bir iç
+bloğun içinde yeni bir değişken oluştururken `Local` yazın. Dosyanın en üst
+seviyesinde oluşturulmuş bir değişkeni fonksiyonun içinden kullanmak için ise o
+erişimi `Global` ile beyan edin.
 
 ```ahd
 counter: Int := 0
@@ -430,98 +670,25 @@ Beklenen çıktı:
 2
 ```
 
-Bu örnekte `counter` dosyanın en üst seviyesinde oluşturulur. Function içindeki
-`counter: Global Int` satırı yeni bir sayaç oluşturmaz; var olan `counter`
-değişkenini kullanacağını söyler. `next` yalnız Function içinde oluşturulduğu
-için `Local` kullanır.
+Burada `counter` dosyanın en üst seviyesinde oluşturulmuştur. `counter: Global Int`
+satırı yeni bir sayaç oluşturmaz; sadece fonksiyona mevcut değişkeni
+kullanmasını söyler. `next` ise yalnızca fonksiyonun içinde oluşturulur, bu
+yüzden `Local` kullanır.
 
-> **Teknik not:** Bu kurallar değişkenlerin hangi kapsamda (scope)
-> kullanılabildiğini belirler. `Global` gizli bir kopya oluşturmaz.
+> **Teknik not:** Bu kurallar bir değişkenin "scope"unu, yani programın hangi
+> kısımlarında kullanılabileceğini tanımlar. `Global` gizli bir kopya
+> oluşturmaz, doğrudan modül kökündeki asıl değişkene işaret eder.
 
-## 12. String işlemleri
+## 12. Listelerle çalışmak (List)
 
-String değiştirilemez ve Unicode karakterlerine göre indekslenir; UTF-8 byte
-sayısına göre değil.
+`List`, sıralı bir değer koleksiyonudur. İlk indeks `0`'dır ve negatif indeksler sondan geriye sayar (`-1` son öğedir).
 
-```ahd
-text: String := "  Ali,Veli,Ayşe  "
-clean: String := text.trim()
-
-write(clean.lower())
-write(clean.split(","))
-write(clean.replace("Veli", "Can"))
-write(clean.contains("Ayşe"))
-write("A✓B" [1])
-write("a✓b✓".index("✓"))
-```
-
-Beklenen çıktı:
-
-```text
-ali,veli,ayşe
-["Ali", "Veli", "Ayşe"]
-Ali,Can,Ayşe
-true
-✓
-1
-```
-
-Yararlı diğer işlemler: `upper`, `capitalize`, `startsWith`, `endsWith` ve
-`count`. `String.index` aranan metni bulamazsa `-1` değil `DomainError`
-üretir. Sıradan geçersiz String indeksi `IndexError` üretir.
-
-## 13. List ile çalışma
-
-List sıralıdır, ilk indeks `0`'dır ve negatif indeks destekler. İki değişkeni
-aynı List'e bağlarsanız ikisi de aynı koleksiyonu gösterir. Birinden yaptığınız
-değişiklik diğerinden de görünür.
-
-```ahd
-numbers: List<Int> := [10, 20, 30]
-alias: List<Int> := numbers
-
-alias[0] = 99
-numbers.add(40)
-
-write(numbers)
-write(numbers[-1])
-write(numbers same alias)
-```
-
-Beklenen çıktı:
-
-```text
-[99, 20, 30, 40]
-40
-true
-```
-
-Geçersiz sıradan indeksleme `IndexError` üretir. `List.index(value)` ise değer
-bulunmadığında `DomainError` üretir; bunlar farklı durumlardır.
-
-> **Teknik not:** İki değişkenin aynı List'i paylaşmasına reference semantics,
-> ikinci değişkene de alias denir.
-
-`Constant List<T>` içindeki List'in değiştirilmesini engeller. List'in içinde
-başka List, Pair veya Class nesneleri varsa onlara ulaşarak değişiklik yapmak da
-engellenir. Başka bir değişken aynı List'i gösterse bile bu kuralı aşamaz.
-
-> **Teknik not:** Ulaşılabilen bütün paylaşılan yapının dondurulmasına
-> deep-freeze denir. Ayrıca `List<Int>` ile `List<Real>` doğrudan birbirinin
-> yerine kullanılamaz; bu kural generic invariance olarak adlandırılır.
-
-## 14. `sort`, `reverse` ve `shuffle`
-
-Bu üç işlem yeni bir List üretmez; elinizdeki List'in sırasını değiştirir. Aynı
-List'i başka bir değişken de gösteriyorsa yeni sırayı o değişkenden de
-görürsünüz.
-
+### Ekleme, sıralama ve ters çevirme
 ```ahd
 bring Math
 
-values: List<Int> := [4, 1, 3, 2]
-alias: List<Int> := values
-
+values: List<Int> := [4, 1, 3]
+values.add(2)
 values.sort()
 write(values)
 
@@ -531,33 +698,60 @@ write(values)
 Math.seed(42)
 values.shuffle()
 write(values)
-write(alias)
 ```
-
-Beklenen çıktı, explicit seed nedeniyle her çalıştırmada aynıdır:
-
+Tohum (seed) açıkça belirtildiği için çıktı her seferinde aynıdır:
 ```text
 [1, 2, 3, 4]
 [4, 3, 2, 1]
 [2, 4, 1, 3]
-[2, 4, 1, 3]
 ```
 
-`Math.seed(42)` kullandığınızda aynı karıştırma sonucunu yeniden
-üretebilirsiniz. `shuffle`, `Math.random` ve `Math.randomInt` aynı rastgele sayı
-dizisini sırayla kullanır; bu çağrılardan biri yapılınca dizide bir sonraki
-adıma geçilir. Seed vermezseniz yeni program çalışması başlangıç değerini
-işletim sisteminden alır ve sonuçları tekrarlamak garanti edilmez. Bu
-rastgelelik güvenlik amaçları için uygun değildir. Boş veya tek elemanlı List'i
-karıştırmak diziyi ilerletmez.
+Bu işlemler (`sort`, `reverse`, `shuffle`) yeni bir List oluşturmaz. Sahip olduğunuz List'in sırasını doğrudan yerinde değiştirirler. `sort` doğal artan sıralamayı kullanır.
 
-> **Teknik not:** Bu ortak dizi pseudo-random number generator (RNG) state'i
-> ile tutulur. Seed verilmemiş başlangıçta state, OS entropy ile oluşturulur.
+### Temizleme, Çıkarma ve Dilimleme (Slicing)
+Bir List'ten öğeleri silebilirsiniz. `eject(index)` belirtilen indeksteki öğeyi yerinde siler. `clear(list)` tüm koleksiyonu boşaltır.
 
-## 15. `map`, `filter` ve Function callback'leri
+```ahd
+letters: List<String> := ["A", "B", "C", "D"]
+letters.eject(1)
+write(letters)
 
-v0.1'de lambda yoktur; callback olarak named Function değeri verilir. `map` ve
-`filter` yeni List döndürür, kaynak List'i değiştirmez.
+clear(letters)
+write(letters)
+```
+Beklenen çıktı:
+```text
+["A", "C", "D"]
+[]
+```
+
+Bir List'in bir kısmını `[başlangıç:bitiş]` (slice) kullanarak alabilirsiniz. Bu yeni bir List döndürür.
+```ahd
+nums: List<Int> := [10, 20, 30, 40, 50]
+slice: List<Int> := nums[1:4]
+write(slice)
+```
+Beklenen çıktı:
+```text
+[20, 30, 40]
+```
+
+### Arama ve Sayma
+`count(value)` bir değerin List'te kaç kez geçtiğini döndürür. `index(value)` değerin ilk bulunduğu konumu bulur.
+```ahd
+data: List<Int> := [7, 8, 7, 9]
+write(data.count(7))
+write(data.index(8))
+```
+Beklenen çıktı:
+```text
+2
+1
+```
+> **Dikkat:** Eğer `index()` değeri bulamazsa `-1` döndürmez. `DomainError` fırlatır.
+
+### Map, Filter ve Özel Sıralama (Keyed Sort)
+v0.1 sürümünde isimsiz fonksiyon (lambda) yoktur, bu yüzden "callback"ler isimlendirilmiş Function değerleridir. `map` ve `filter` yeni Listeler döndürür ve kaynaklarını değiştirmezler. `sort(keyFunction)`, Listeyi sizin fonksiyonunuzun ürettiği sonuçlara göre sıralar (bu kararlı -stable- bir sıralamadır).
 
 ```ahd
 double: Function := (
@@ -572,27 +766,67 @@ isEven: Function := (
     return value % 2 == 0
 }
 
-values: List<Int> := [1, 2, 3, 4]
+absSort: Function := (
+    value: Int
+) -> Int {
+    return abs(value)
+}
+
+values: List<Int> := [3, -1, 4, -2]
 doubled: List<Int> := values.map(double)
 evens: List<Int> := values.filter(isEven)
 
-write(values)
+values.sort(absSort)
+
 write(doubled)
 write(evens)
+write(values)
 ```
 
 Beklenen çıktı:
 
 ```text
-[1, 2, 3, 4]
-[2, 4, 6, 8]
-[2, 4]
+[6, -2, 8, -4]
+[4, -2]
+[-1, -2, 3, 4]
 ```
 
-## 16. Pair ile çalışma
+## 13. Referans davranışı (Reference Behavior)
 
-`Pair<K, V>` anahtar/değer eşlemesi tutar ve ekleme sırasını korur. v0.1'de
-anahtar türü yalnız `String`, `Int` veya `Bool` olabilir.
+Eğer iki değişken aynı List'e bağlıysa, ikisi de aynı koleksiyonu görür. Bir
+değişken üzerinden yapılan değişiklik, diğerinden de görülür.
+
+```ahd
+numbers: List<Int> := [10, 20, 30]
+alias: List<Int> := numbers
+
+alias[0] = 99
+numbers.add(40)
+
+write(numbers)
+write(alias)
+write(numbers same alias)
+write(numbers == alias)
+```
+
+Beklenen çıktı:
+
+```text
+[99, 20, 30, 40]
+[99, 20, 30, 40]
+true
+true
+```
+
+`same` anahtar kelimesi, her iki değişkenin bellekte tam olarak aynı nesneyi gösterip göstermediğini kontrol eder. `==` ise içeriklerinin tamamen aynı olup olmadığına bakar. Bu durumda, aynı nesneyi paylaştıkları için ikisi de doğrudur.
+
+> **Teknik not:** Aynı List'i bu şekilde paylaşmaya "reference semantics" (referans semantiği) denir. Aynı nesne için kullanılan ikinci bir embracesisme genellikle "alias" (takma ad) denir.
+
+## 14. Pair ile çalışmak
+
+`Pair<K, V>` (çift), değerleri anahtarlarla (keys) eşleştirerek saklar ve
+ekleme sırasını korur. v0.1'de anahtar türü yalnızca `String`, `Int` veya
+`Bool` olabilir.
 
 ```ahd
 scores: Pair<String, Int> := {
@@ -616,18 +850,73 @@ Ayşe: 92
 Veli: 78
 ```
 
-İki değişken aynı Pair'i gösteriyorsa birinden yaptığınız değişiklik diğerinden
-de görünür. Eksik anahtar `KeyError` üretir. Bir anahtarı güncellemek sırasını
-değiştirmez; silip yeniden eklemek onu sona taşır. `Constant Pair`, Pair'in ve
-onun içinden ulaşılabilen paylaşılan değerlerin değiştirilmesini engeller.
+Eğer iki değişken aynı Pair'e işaret ediyorsa, biri üzerinden yapılan
+değişiklik diğerinden de görülür (Referans Davranışı). Olmayan bir anahtarı aramak `KeyError` üretir. Var olan bir
+anahtarın değerini güncellemek, o anahtarın sıradaki yerini korur; onu silip
+yeniden eklemek ise listenin en sonuna taşır. Bir anahtarı `eject(key)` ile silebilir veya `clear(pair)` ile tüm Pair'i boşaltabilirsiniz.
 
-> **Teknik not:** List'te olduğu gibi burada da reference semantics ve
-> deep-freeze kuralları geçerlidir.
+```ahd
+scores: Pair<String, Int> := {"Ali": 85}
+scores.eject("Ali")
+clear(scores)
+```
 
-## 17. Class ve attributes
+## 15. Sabitler (Constant)
 
-Bir Class'ın constructor girdileri `structure: Attributes` bölümünde yazılır.
-`Local` olmayan structure girdileri instance attribute olur.
+Bir `Constant` koleksiyon değiştirilemez. Eğer onu değiştirmeye çalışırsanız derleyici hata verecektir.
+
+```ahd
+locked: Constant List<Int> := [1, 2, 3]
+// locked.add(4) // Bu bir hata olurdu
+```
+
+Eğer bir `Constant List` içinde başka Listeler, Pair'ler veya Class nesneleri barındırıyorsa, bu paylaşılan nesnelere o List üzerinden ulaşıp onları da değiştiremezsiniz. Bu nesneyi gösteren başka bir değişken (alias) bu kuralı çiğneyemez.
+
+> **Teknik not:** Ulaşılabilen tüm paylaşılan yapının dondurulmasına
+> "deep-freeze" (derin dondurma) denir. Bir `Constant` değer, başlangıç
+> (ilk) değer olarak `null` ile başlatılamaz.
+
+## 16. Null güvenliği (Null safety)
+
+`null`, "bu değişkenin belirli bir türü var ama şu an herhangi bir değere sahip
+değil" anlamına gelir. `String` veya `Student` gibi türlerin yanına yazılan
+ayrı bir `null` türü yoktur. Program kodun farklı yollarından ilerledikçe
+derleyici, bir değerin "kesinlikle var", "kesinlikle `null`" veya
+"belki `null`" (possibly null) olup olmadığını anbean takip eder.
+
+```ahd
+message: String := null
+
+if message == null {
+    message = "hazır"
+}
+
+if message != null and message.contains("azı") {
+    write(message.upper())
+}
+```
+
+Beklenen çıktı:
+
+```text
+HAZIR
+```
+
+Eğer değerin `null` olma ihtimali varsa, onun üyelerine erişmek (member
+access), fonksiyon gibi çağırmak veya indekslemek (indexing) derleme
+zamanında bir hatadır. `message != null` gibi bir kontrol yapıldıktan sonra, derleyici artık o bloğun içinde değerin kesin olarak var olduğunu bilir. Listeler ve Pair değerleri de `null` olabilir, bu yüzden onlardan okunan değerlerin de aynı şekilde kontrol edilmesi gerekebilir.
+
+Eğer `null` olabilecek bir değeri önceden kontrol etmeden kullanmaya çalışırsanız derleme zamanında bir hata alırsınız.
+
+> **Teknik not:** Dokümantasyon, bu üç ihtimale `Null`, `MaybeNull` ve
+> `NonNull` adını verir. Bir kontrol yaptıktan sonra derleyicinin değer hakkında
+> daha kesin bilgi sahibi olmasına "null refinement" denir.
+
+
+## 17. Sınıflar (Class) ve Özellikler (Attributes)
+
+Bir Sınıf (Class), özel bir veri yapısı tanımlar ve birbiriyle ilgili
+fonksiyonları (metotları) bir araya getirir. Sınıfı oluşturmak için gereken girdiler `structure: Attributes` kısmında tanımlanır. Başına `Local` yazılmayan her yapı girdisi otomatik olarak bir örnek özelliğine (instance attribute) dönüşür.
 
 ```ahd
 Student: Class<> := {
@@ -652,18 +941,15 @@ Beklenen çıktı:
 #42 Ali
 ```
 
-`Constant` attribute daha sonra değiştirilemez. Bir List, Pair veya Class
-nesnesi taşıyorsa içinden ulaşılabilen paylaşılan yapı da dondurulur. `Local`
-structure girdisi yalnız constructor içinde kullanılır ve attribute olmaz.
-`Confidential` members Class dışındaki sıradan erişime kapalıdır.
+`Constant` olarak tanımlanan bir özellik daha sonra değiştirilemez. Başına `Local` eklenen
+bir yapı girdisi yalnızca nesne oluşturulurken kullanılır ve bir özelliğe
+dönüşmez. Başına `Confidential` (gizli) eklenen üyelere ise sınıfın dışından
+normal yollarla erişilemez.
 
-> **Teknik not:** `Constant` reference değerlerine uygulanan bu geniş dondurma
-> davranışına deep-freeze denir.
+### Üst ve alt Sınıflar (Parent / Child)
 
-### Parent ve child Class
-
-Bir Class, başka bir Class'ın özelliklerini alabilir. Önce parent Class'ı,
-sonra onu genişleten child Class'ı okuyun:
+Bir Sınıf, başka bir Sınıfın özelliklerini devralabilir. Önce üst Sınıfı
+(parent), ardından onu genişleten alt Sınıfı (child) okuyun:
 
 ```ahd
 Person: Class<> := {
@@ -700,58 +986,35 @@ Beklenen çıktı:
 Kişi Ayşe #7
 ```
 
-`Student`, `Person`'ın child Class'ıdır. `SuperClass.attributes`, parent
-Class'ın constructor girdilerini taşır. `Override`, inherited method'un bilinçli
-olarak değiştirildiğini söyler. `SuperClass.describe()` parent sürümünü çağırır.
-`person` değişkeninin türü `Person` olsa bile gerçek nesne `Student` olduğu için
-`Student.describe` çalışır.
+`Student`, `Person`'ın bir alt Sınıfıdır. `SuperClass.attributes`, üst Sınıfın oluşturulması için gereken
+girdileri aynen alt sınıfa da aktarır. `Override` kelimesi, üst sınıftan
+miras alınan bir metodun kasten değiştirildiğini (üzerine yazıldığını)
+belirtir. `SuperClass.describe()` ise üst Sınıfın kendi versiyonunu çağırır.
 
-> **Teknik not:** Parent türündeki bir değişkende child nesne tutmaya upcasting,
-> gerçek nesneye uygun method'un seçilmesine dynamic dispatch denir.
+Her ne kadar `person` değişkeninin türü `Person` olsa da, o değişkenin
+tuttuğu gerçek nesne bir `Student` olduğu için `Student.describe` çalışır.
 
-## 18. `null` güvenliği
-
-`null`, “bu değişkenin türünü biliyoruz ama şu anda bir değeri yok” anlamına
-gelir. `String` veya `Student` gibi türlerin yanında yazılan ayrı bir `null`
-türü yoktur. Derleyici bir değerin kesinlikle var mı, kesinlikle `null` mı,
-yoksa `null` olma ihtimali mi var diye programın akışını takip eder.
-
+Bir nesnenin asıl (gerçek) türünü kontrol etmek için `is` anahtar kelimesini kullanabilirsiniz:
 ```ahd
-message: String := null
+Person: Class<> := { structure: Attributes := ( name: String ) }
+Student: Class<Person> := { structure: Attributes := ( SuperClass.attributes ) }
 
-if message == null {
-    message = "hazır"
-}
-
-if message != null and message.contains("haz") {
-    write(message.upper())
+person: Person := Student(name: "Ayşe")
+if person is Student {
+    write("Bu kişi bir öğrenci!")
 }
 ```
 
-Beklenen çıktı:
+> **Teknik not:** Bir alt Sınıf nesnesini üst Sınıf türündeki bir değişkende
+> tutmaya "upcasting" denir. Hangi metodun çalışacağının, nesnenin asıl türüne
+> bakılarak çalışma anında seçilmesine ise "dynamic dispatch" denir.
 
-```text
-HAZIR
-```
+## 18. Hata yönetimi (`attempt`, `except`, `ultimately` ve `toss`)
 
-`null` olma ihtimali bulunan bir değerde kontrol yapmadan member access, çağrı
-veya indeksleme kullanmak derleme hatasıdır. `message != null` kontrolünden
-sonra derleyici değerin o blokta var olduğunu bilir. List elemanları ve Pair
-değerleri de `null` olabileceği için onları okuduktan sonra benzer bir kontrol
-gerekebilir. `Constant` bir değişken `null` ile başlatılamaz.
-
-> **Teknik not:** Bu üç olasılık belgelerde `Null`, `MaybeNull` ve `NonNull`
-> olarak adlandırılır. Kontrolden sonra derleyicinin bilgisinin kesinleşmesine
-> null refinement denir.
-
-## 19. `attempt`, `except`, `ultimately` ve `toss`
-
-`attempt` içindeki kod bir hata üretirse uygun `except` bloğu çalışabilir.
-`ultimately`, hata olsa da olmasa da son adımı çalıştırır. `toss` ile siz de
-bilerek bir Error oluşturabilirsiniz.
-
-> **Teknik not:** AhdCode'da çalışma zamanı hataları yakalanabilen Class
-> değerleridir.
+Eğer `attempt` (dene) içindeki kod bir hata üretirse, o hataya uygun bir
+`except` (hariç) bloğu devreye girebilir. `ultimately` (en nihayetinde) bloğu
+ise, bir hata oluşsun veya oluşmasın her zaman en son adım olarak çalışır. Kendi
+kodunuz kasten bir Hata (Error) üretmek istediğinde `toss` (fırlat) kullanın.
 
 ```ahd
 requirePositive: Function := (
@@ -760,7 +1023,6 @@ requirePositive: Function := (
     if value <= 0 {
         toss (DomainError("değer pozitif olmalı"))
     }
-
     return value
 }
 
@@ -769,7 +1031,10 @@ attempt {
     write(result)
 }
 except DomainError as error {
-    write("Yakalandı: {error.message}")
+    write("Domain hatası: {error.message}")
+}
+except IndexError as error {
+    write("İndeks hatası: {error.message}")
 }
 ultimately {
     write("Bitti")
@@ -779,17 +1044,22 @@ ultimately {
 Beklenen çıktı:
 
 ```text
-Yakalandı: değer pozitif olmalı
+Domain hatası: değer pozitif olmalı
 Bitti
 ```
 
-Yaygın türler arasında `DomainError`, `IndexError`, `KeyError`,
-`OverflowError`, `DivisionByZeroError`, `NullError` ve `ConstantError` bulunur.
+Dilin sunduğu yaygın hata türleri arasında `DomainError`, `IndexError`, `KeyError`,
+`OverflowError`, `DivisionByZeroError`, `NullError` ve `ConstantError`
+bulunur. Farklı hatalara farklı şekilde tepki verebilmek için birden fazla `except` bloğu kullanabilirsiniz.
 
-## 20. `bring` ve modüller
+> **Teknik not:** AhdCode çalışma zamanı (runtime) hataları, yakalanabilen
+> (catchable) normal Sınıf (Class) değerleridir.
 
-Yerel modül, import eden dosyayla aynı klasördeki `.ahd` dosyasıdır. Örneğin
-`Greeting` adı `Greeting.ahd` dosyasını bulur.
+## 19. Modüller ve `bring`
+
+Yerel bir modül, onu içe aktaran (import) dosyayla aynı klasörde bulunan bir
+`.ahd` dosyasıdır. Örneğin, `Greeting` (Selamlama) modül adı `Greeting.ahd`
+dosyasını temsil eder.
 
 `Greeting.ahd`:
 
@@ -815,169 +1085,303 @@ write(greet("Ayşe"))
 Modülden merhaba, Ayşe
 ```
 
-`bring Greeting` namespace'i getirir ve çağrı `Greeting.greet("Ayşe")` olur.
-`from Greeting bring greet` adı doğrudan getirir. Selective multiline import ve
-`bring all` da desteklenir; `all` yalnız public, `Confidential` olmayan adları
-getirir. Import çakışmaları ve circular dependencies hatadır.
+Bir modülden öğeleri içe aktarmanın (import) birkaç yolu vardır:
+- `bring Greeting` bir "isim uzayını" (namespace) içe aktarır, çağrı `Greeting.greet("Ayşe")` şekline dönüşür.
+- `from Greeting bring greet` öğenin ismini doğrudan kullanılabilir hale getirir.
+- `from Greeting bring ( greet, farewell )` aynı anda birden fazla ismi farklı satırlarda okunaklı şekilde içe aktarmanızı sağlar.
+- `bring all from Greeting` modüldeki gizli (`Confidential`) olmayan (public) tüm isimleri içe aktarır.
 
-## 21. Math modülü
+Aynı isimleri taşıyan çakışan içe aktarımlar (import collisions) ve döngüsel bağlılıklar (circular dependencies) derleme hatasıdır.
 
-`Math` açıkça import edilir. `randomInt(min, max)` iki sınırı da **içerir**.
+## 20. Temel işlevler modülü (Fundamentals)
+
+Aşağıdaki isimler her modülde zaten hazır bulunur ve onları kullanmak için
+`bring` ile içe aktarmanıza gerek yoktur. Bunlar standart girdi/çıktı, metin
+dönüşümleri ve sayısal işlemleri kapsar.
+
+```text
+write take str int real len clear between abs sum min max
+```
+
+| Fonksiyon | Davranış |
+|---|---|
+| `write(value)` | bir değeri yazdırır ve ardından yeni bir satıra geçer |
+| `take()` / `take(prompt)` | kullanıcıdan bir satır metin (String) okur |
+| `str(value)` | nesnenin metin karşılığını üretir |
+| `int(Real)` | ondalık kısmı kesip atar (sıfıra doğru yuvarlar) |
+| `int(String)` | karakterleri sadece işareti ve sayıları olan bir tam sayıya çevirir |
+| `real(Int)` | tam sayıyı ondalıklı sayıya çevirir (widening) |
+| `real(String)` | ondalıklı sayı içeren metni dönüştürür |
+| `len(value)` | String'deki karakter, List'teki eleman, Pair'deki çift sayısını verir |
+| `clear(collection)` | List'i veya Pair'i yerinde tamamen boşaltır |
+| `between(...)` | bitiş noktasını dışlayan anlık (lazy) bir sayı aralığı üretir |
+| `abs(number)` | sayının mutlak değerini (magnitude) hesaplar |
+| `sum(list)` | listedeki sayıları toplar; boş bir List `0` veya `0.0` verir |
+| `min(list)` / `max(list)` | listedeki en küçük/büyük sayıyı bulur; List boşsa `DomainError` fırlatır |
+
+`abs`, `sum`, `min` ve `max` hem `Int` hem de `Real` türleri üzerinde çalışır. `clear` mevcut koleksiyonu yerinde (in place) boşaltır, bu yüzden aynı koleksiyona işaret eden diğer tüm değişkenler (alias'lar) onu boş olarak görür. Sayısal hesaplama işlemleri (`sum`, `min`, `max`) List'i değiştirmez (pure reads), bu nedenle `Constant List` üzerinde de güvenle çalışırlar.
+
+## 21. Matematik modülü (Math)
+
+`Math` modülü gelişmiş matematiksel işlemler ve rastgele (random) sayı üretim fonksiyonları sunar. Kullanmadan önce açıkça içe aktarılmalıdır.
+
+### Fonksiyonlar ve Sabitler
 
 ```ahd
 bring Math
 
+write(Math.PI)
 write(Math.sqrt(81))
 write(Math.round(3.14159, 2))
-
-Math.seed(42)
-write(Math.randomInt(1, 6))
-write(Math.randomInt(1, 6))
 ```
 
 Beklenen çıktı:
 
 ```text
+3.141592653589793
 9.0
 3.14
-2
-2
 ```
 
-Aynı seed'i yeniden verirseniz aynı rastgele sayı dizisini yeniden elde
-edersiniz. `Math.random()` değeri `0.0 <= value < 1.0` aralığındadır. Seed
-vermezseniz her yeni program çalışması başlangıç değerini işletim sisteminden
-alır. Bu sayı üreticisi güvenlik veya şifreleme amacıyla kullanılmamalıdır.
+`round` (yuvarla) bir `Real` döndürür ve tam buçuklu sayıları sıfırdan
+uzaklaşacak şekilde yuvarlar. İsteğe bağlı olarak aldığı "basamak" (digits)
+argümanı `0..15` arasıyla sınırlıdır. `floor` (aşağı yuvarla) ve `ceil`
+(yukarı yuvarla) bir `Int` döndürür. Trigonometrik fonksiyonlar (`sin`, `cos`, `tan`) radyan kullanır. `log` doğal logaritmadır; `log10` ise 10 tabanındadır. Üs alma işlemi için `^` operatörünü kullanın, dilde `Math.pow` yoktur.
 
-> **Teknik not:** Üretilen dizi pseudo-random'dır. Seed verilmemiş başlangıç
-> değeri OS entropy'den alınır.
-
-## 22. Küçük birleşik uygulama: not özeti
-
-Bu uygulama input, String, List, Function, loop, koşul, numeric reduction ve
-error handling'i bir araya getirir:
+### Rastgele sayı durumu (Random state)
 
 ```ahd
-checkGrade: Function := (
-    grade: Int
-) -> Int {
-    if grade < 0 or grade > 100 {
-        toss (DomainError("not 0 ile 100 arasında olmalı"))
-    }
+bring Math
 
-    return grade
-}
+Math.seed(42)
+write(Math.randomInt(1, 6))
+write(Math.random())
+```
+`randomInt(min, max)` verilen **iki sınırı da içerir**. `random()` ise `0.0 <= value < 1.0` aralığında bir değer üretir.
 
-name: String := take("Öğrenci: ").trim().capitalize()
-grades: List<Int> := []
+Aynı tohum (seed) değerini yeniden verirseniz, aynı rastgele sayı dizisini tekrar elde edersiniz. Eğer bir tohum (`Math.seed`) vermezseniz, her yeni program çalışması başlangıç değerini işletim sisteminden (OS) alır. Bu rastgele sayı üreticisi, güvenlik veya şifreleme amacıyla kesinlikle **kullanılmamalıdır**.
 
-for index in between(1, 4) {
-    attempt {
-        grade: Local Int := checkGrade(int(take("Not {index}: ")))
-        grades.add(grade)
-    }
-    except DomainError as error {
-        write("Geçersiz giriş: {error.message}")
-    }
-}
+`Math.random`, `Math.randomInt` ve `List.shuffle` işlemleri, programın
+genelindeki bu tek, paylaşılan durumu tüketir. Sınırları aynı olan (örneğin
+`randomInt(5, 5)`) çağrılar ile boş/tek öğeli bir List üzerinde yapılan `shuffle`
+(karıştırma) işlemi rastgelelik durumunu tüketmez.
 
-if len(grades) > 0 {
-    average: Local Real := sum(grades) / len(grades)
-    write("{name}: {average}")
-    write("En düşük: {min(grades)}")
-    write("En yüksek: {max(grades)}")
+> **Teknik not:** Üretilen dizi sözde rastgeledir (pseudo-random). Tohum
+> (seed) verilmemiş bir çalışmada başlangıç değeri işletim sisteminin
+> entropisinden alınır.
 
-    if average >= 50.0 {
-        write("Geçti")
-    }
-    else {
-        write("Kaldı")
-    }
-}
-else {
-    write("Geçerli not girilmedi")
-}
+
+## 22. Kod biçimlendirici (Formatter)
+
+Programınızdaki boşluklar veya satır düzeni dağınık olsa bile kodunuz
+çalışabilir. Ancak kod biçimlendirici (formatter), yazdığınız yorum satırlarını koruyarak dosyanızı AhdCode'un ortak standart stiline göre yeniden düzenler:
+
+```bash
+ahdcode format hello.ahd
+ahdcode format --check hello.ahd
 ```
 
-`ali`, `90`, `80`, `70` girişleriyle örnek etkileşim:
+İlk komut dosyayı doğrudan düzenleyerek günceller (bu işlem "idempotent"tir: tekrar tekrar çalıştırsanız da aynı sonucu verir ve fazladan değişiklik yapmaz). İkinci komut ise sadece dosyanın stilini kontrol eder, hiçbir şeyi değiştirmez. Bu komut, ekip projelerinde kod stilinin düzgün olduğundan emin olmak için kullanışlıdır.
+
+## 23. Komut satırı (CLI)
+
+AhdCode basit bir komut satırı arayüzüyle gelir.
+
+- `ahdcode run file.ahd`: Bir programı doğrudan çalıştırır.
+- `ahdcode build file.ahd`: Programı, AhdCode derleyicisine ihtiyaç duymadan kendi başına çalışabilen yerel bir uygulamaya (native executable) dönüştürür.
+- `ahdcode format file.ahd`: Dosyayı standart stile göre biçimlendirir.
+- `ahdcode --help`: Tüm komutlar için yardım ekranını gösterir.
+- `ahdcode --version`: Mevcut derleyici sürümünü gösterir.
+
+## 24. Etkileşimli kabuk (REPL)
+
+Küçük denemeler yapmak için `ahdcode` komutunu tek başına çalıştırarak
+REPL'i (Oku-Değerlendir-Yazdır Döngüsü) açabilirsiniz. Bunun için bir `.ahd`
+dosyasına ihtiyacınız yoktur.
+
+REPL, dosya derleyicisi ile birebir aynı kuralları kullanır. Başarılı komutlar oturum (session) boyunca hafızada kalır. Başarısız bir komut son çalışan durumu silmez, bu yüzden rahatça tekrar deneyebilirsiniz.
 
 ```text
-Öğrenci: ali
-Not 1: 90
-Not 2: 80
-Not 3: 70
-Ali: 80.0
-En düşük: 70
-En yüksek: 90
-Geçti
+> x: Int := 5
+> x: Int := 7
+error: duplicate declaration
+> x = 7
+> write(x)
+7
 ```
 
-Küçük deneme: Geçersiz bir not girip `except` kolunun mesajını gözlemleyin.
+> **Dikkat:** REPL'de yeni satırlar girdiğinizde arka planda başarılı kodlar baştan itibaren tekrar çalıştırılabilir (replayed). Eğer `Math.seed(...)` kullanmıyorsanız, bu durum rastgele sayıların değişmesine yol açabilir. Bu yüzden kullanıcı girişi (`take`) gibi etkileşimli denemeleri REPL yerine bir `.ahd` dosyası oluşturup orada test edin.
 
-## 23. Başlangıçta sık yapılan hatalar
+## 25. Başlangıçta sık yapılan hatalar
 
-- Yeni değişken için `=` değil `:=` kullanın.
-- `if value` yazmayın; koşulu `value > 0` gibi bir `Bool` expression yapın.
-- Function veya başka bir iç bloktaki yeni değişkene `Local` ekleyin.
-- Function içinden dosyanın en üst seviyesindeki bir değişkeni kullanırken
-  gereken `Global` bildirimini yazın.
-- `until` gövdesinin en az bir kez çalıştığını unutmayın.
-- `between` stop değerini içermez.
-- List'in ilk indeksinin `0` olduğunu unutmayın; negatif indeksler sondan
-  erişir.
-- `List.index`/`String.index` bulunamayan aramada `DomainError`, sıradan geçersiz
-  indeksleme ise `IndexError` üretir.
-- `sort`, `reverse` ve `shuffle` kaynak List'i değiştirir; `map` ve `filter`
-  değiştirmez.
-- Callback için lambda yazmayın; named Function değeri kullanın.
-- Named ve positional argument'ları aynı çağrıda karıştırmayın.
-- Belki-null bir değeri member access veya index öncesinde kontrol edin.
+İşte karşılaşabileceğiniz yaygın hatalar ve onları düzeltme yolları:
 
-## 24. Alıştırmalar
+**1. Değişken tanımlamadan `=` kullanmak**
+- Yanlış: `score = 10`
+- Neden: Bir değişkene değer atamadan önce onu oluşturmalısınız.
+- Doğru: `score: Int := 10`
+
+**2. Aynı değişkeni iki kez tanımlamak (Duplicate declaration)**
+- Yanlış: `score: Int := 10 \n score: Int := 20`
+- Neden: `score` o blokta zaten mevcut.
+- Doğru: `score: Int := 10 \n score = 20`
+
+**3. İç bloklarda `Local` eksikliği**
+- Yanlış: `if true { result: Int := 1 }`
+- Neden: `if` gibi iç bloklarda oluşturulan yeni değişkenlerde `Local` gereklidir.
+- Doğru: `if true { result: Local Int := 1 }`
+
+**4. `for` döngüsünde yanlış `Local` kullanımı**
+- Yanlış: `for item: Local Int in items`
+- Neden: `for` değişkeni zaten tasarımsal olarak yereldir.
+- Doğru: `for item: Int in items`
+
+**5. Modül seviyesindeki değişken için `Global` eksikliği**
+- Yanlış: `count: Int := 0 \n f: Function := () -> Nothing { count = 1 }`
+- Neden: Modül kökündeki değişkeni değiştirmek için açıkça `Global` ile beyan etmelisiniz.
+- Doğru: `f: Function := () -> Nothing { count: Global Int \n count = 1 }`
+
+**6. Truthiness (Otomatik doğru/yanlış kabulü)**
+- Yanlış: `if 1 { write("Evet") }`
+- Neden: Koşullar kesinlikle `Bool` türünde olmalıdır.
+- Doğru: `if 1 > 0 { write("Evet") }`
+
+**7. Güvensiz `null` kullanımı**
+- Yanlış: `name: String := null \n write(name.upper())`
+- Neden: `name` null olabilir ve bu bir çökmeye yol açabilir. Derleyici buna izin vermez.
+- Doğru: `if name != null { write(name.upper()) }`
+
+**8. Positional ve named (isimli) parametreleri karıştırmak**
+- Yanlış: `greet("Ali", title: "Dr")`
+- Neden: Ya tüm argümanları sırasıyla ya da hepsini isimleriyle kullanmalısınız.
+- Doğru: `greet(name: "Ali", title: "Dr")`
+
+**9. Overload (Aşırı yükleme) belirsizliği**
+- Yanlış: Varsayılan (default) değerlere sahip hem `f(Int)` hem de `f(Real)` fonksiyonunuz varken, kodu sadece `f()` diye çağırmak.
+- Neden: Derleyici hangisini kastettiğinizi tahmin edemez (ambiguous).
+- Doğru: Eşleşmenin tam (exact) olması için çağrıda argümanları verin.
+
+**10. List'e yanlış türde eleman koymak**
+- Yanlış: `list: List<Int> := [1, 2.5]`
+- Neden: `2.5` bir `Real`dir, `Int` değil.
+- Doğru: `List<Real> := [1.0, 2.5]` kullanın veya `int(2.5)` ile dönüştürün.
+
+**11. Sabiti (Constant) değiştirmeye çalışmak**
+- Yanlış: `locked: Constant List<Int> := [1] \n locked[0] = 2`
+- Neden: Sabitler yerinde değiştirilemez.
+- Doğru: Eğer değiştirmeyi amaçlıyorsanız başındaki `Constant` kelimesini kaldırın.
+
+**12. `between`'de sıfır adımı (Zero step)**
+- Yanlış: `between(1, 10, 0)`
+- Neden: Sıfır adımlı bir döngü sonsuza kadar devam eder, bu yüzden `between` bunu reddeder.
+- Doğru: `between(1, 10, 1)`
+
+**13. Geçersiz sayı dönüşümü**
+- Yanlış: `int("3.14")`
+- Neden: `int()` dönüşümü çok katıdır ve ondalık nokta kabul etmez.
+- Doğru: `int(real("3.14"))`
+
+**14. `Real` üzerinde `%` kullanmak**
+- Yanlış: `5.5 % 2.0`
+- Neden: `%` (kalan) operatörü sadece `Int` ile çalışır.
+- Doğru: `Int` değerler kullanın, örneğin `5 % 2`.
+
+**15. `Int` değişkenine bölme ataması yapmak**
+- Yanlış: `count: Int := 4 \n count /= 2`
+- Neden: `/` işlemi `Real` döndürür ve bir `Real` doğrudan `Int` değişkene atanamaz.
+- Doğru: `count = int(count / 2)`
+
+**16. Eksik modül dosyası**
+- Yanlış: Aynı klasörde modül dosyası olmadığı halde `bring Greeting` yazmak. (`Math` gömülüdür, ancak sizin modülleriniz için dosya bulunmalıdır).
+- Neden: Modüller içe aktarılan kodla aynı klasörde (kardeş dosya) olmalıdır.
+- Doğru: `Greeting.ahd` dosyasının projenizde aynı klasörde olduğundan emin olun.
+
+**17. `Override` kelimesinin yanlış kullanımı**
+- Yanlış: Üst Sınıfta (parent Class) olmayan bir metoda `Override` yazmak.
+- Neden: `Override` kesin olarak "üst sınıftaki mevcut bir metodu değiştiriyorum" demektir.
+- Doğru: Eğer yepyeni bir metot ekliyorsanız `Override` kelimesini silin.
+
+**18. Geçersiz `return`**
+- Yanlış: `-> Nothing` yazan bir fonksiyonun içinde `return "Bitti"` kullanmak.
+- Neden: Fonksiyon geriye "hiçbir şey" döndüreceğine söz vermişti.
+- Doğru: Sadece yalın bir `return` kullanın.
+
+**19. Metni (String) yerinde değiştirmeye çalışmak**
+- Yanlış: `name[0] = 'B'`
+- Neden: Metinler (Strings) değiştirilemezdir (immutable).
+- Doğru: Yeni bir karakter değiştirmek için `replace` kullanın veya yeni bir metin oluşturun.
+
+**20. Tekrarlanabilir olmayan (Unseeded) rastgele sayılar beklemek**
+- Yanlış: `Math.seed()` kullanmadığınız halde `Math.randomInt(1,6)` kodunun her çalışmada aynı kalmasını beklemek.
+- Neden: Tohum (seed) verilmemiş rastgelelik, OS entropisini kullanır ve tekrarlanamaz.
+- Doğru: Zar atmadan önce `Math.seed(42)` gibi bir tohum değeri verin.
+
+## 26. Küçük Projeler
+
+Bu küçük projeler rehberde öğretilenleri bir araya getirir. Onları tek başınıza kurmayı deneyin!
+
+1. **Not Ortalaması Hesaplayıcı**: Kullanıcıdan 5 not isteyin. Onları bir `List<Int>` içine koyun. Geçersiz notları (0'dan küçük veya 100'den büyük) listeden çıkarın (filter). Kalan notların ortalamasını, minimum ve maksimum değerini, son olarak da öğrencinin geçip (ortalama >= 50) geçmediğini yazdırın.
+2. **Basit Hesap Makinesi**: İki sayı ve bir operatör (`+`, `-`, `*`, `/`) almak için `take()` kullanın. İşlemi seçmek için operatör üzerinde `state` kullanın ve sonucu yazdırın. Sıfıra bölünme ihtimalini `attempt`/`except` ile yönetin.
+3. **Sayı İstatistikleri**: `Math.randomInt(1, 100)` ile 100 adet rastgele sayı üretin. Bunlardan kaç tanesinin tek, kaç tanesinin çift olduğunu sayın (count) ve listeyi sıralayın. Bir sayının asal olup olmadığını kontrol eden bir fonksiyon yazın ve listeyi sadece asalları gösterecek şekilde filtreleyin (filter).
+4. **Kelime Analizi**: Kullanıcıdan bir cümle girmesini isteyin. Kelimeleri ayırmak için `split(" ")` kullanın. Kelime sayısını bulun, en uzun kelimeyi bulun ve her kelimenin kendi uzunluğuyla eşleştiği bir `Pair<String, Int>` oluşturun.
+5. **Menülü Program**: Bir `until` döngüsü kullanarak küçük bir banka simülasyonu yapın. Bir menü gösterin: 1. Para Yatır, 2. Para Çek, 3. Bakiye, 0. Çıkış. Bakiyeyi bir `Int` içinde saklayın ve kullanıcı 0 girene kadar programı döndürün.
+6. **Sınıflarla (Class) Öğrenci Kaydı**: Bir `Student` sınıfı ve bir `Course` (Kurs) sınıfı oluşturun. Course içinde bir `List<Student>` bulunsun. Kursa yeni bir öğrenci eklemek için bir metot, kursun genel not ortalamasını hesaplamak için başka bir metot yazın.
+7. **Tohumlu (Seeded) Rastgele Oyun**: `Math.seed()` kullanarak 1 ile 100 arasında "gizli bir sayı" üretin. Kullanıcıdan sayıyı tahmin etmesini isteyin. Doğru tahmin edene kadar "daha yüksek" veya "daha düşük" diye yönlendirin. Tohum kullanıldığı için, gizli sayı programı her çalıştırdığınızda aynı olacaktır—test yapmak için mükemmel!
+
+## 27. Alıştırmalar
 
 Tam çözümleri hemen aramak yerine her programı küçük adımlarla kurun.
 
-1. **Ad ve yaş:** Kullanıcıdan adını ve yaşını alın; gelecek yıl kaç yaşında
-   olacağını yazın.
-2. **Santigrat dönüşümü:** Santigrat değerini `Real` olarak okuyup Fahrenheit
-   karşılığını hesaplayın.
-3. **Tek veya çift:** Bir `Int` okuyun ve `%` kullanarak tek/çift mesajı yazın.
-4. **Not ortalaması:** Üç notu List'e ekleyin; `sum` ve `len` ile ortalamasını
-   bulun.
-5. **En düşük ve en yüksek:** Bir not List'inde `min` ve `max` sonuçlarını
-   gösterin; boş List durumunu önleyin.
-6. **Basit menü döngüsü:** `until` ile en az bir kez görünen ve kullanıcı `0`
-   girince duran küçük bir menü kurun.
-7. **String normalizasyonu:** Çevresindeki boşluğu temizleyip adı küçük harfe
-   dönüştüren, sonra ilk karakteri büyüten bir Function yazın.
-8. **Öğrenci-not Pair'i:** İsimleri notlara bağlayın, bir notu güncelleyin ve
-   ekleme sırasıyla yazdırın.
-9. **Tekrarlanabilir zar:** `Math.seed(42)` sonrasında iki sınırı da içeren
-   `randomInt(1, 6)` ile on zar atışı üretin. Programı yeniden çalıştırıp aynı
-   sonuçları aldığınızı doğrulayın.
-10. **Class tabanlı kayıt:** `name` ve `Constant number` attribute'ları olan bir
-    `Student` Class'ı ve özet döndüren bir method yazın.
+### Başlangıç Seviyesi
+1. Kullanıcıdan adını ve yaşını alın; gelecek yıl kaç yaşında olacağını yazdırın.
+2. Santigrat değerini `Real` olarak okuyup Fahrenheit karşılığını hesaplayın (`C * 9/5 + 32`).
+3. Bir `Int` okuyun ve `%` kullanarak tek veya çift olduğunu yazdırın.
+4. `until` ile en az bir kez görünen ve kullanıcı `0` girince duran küçük bir menü kurun.
+5. Çevresindeki boşluğu temizleyip adı küçük harfe dönüştüren, sonra ilk karakteri büyüten bir Fonksiyon yazın.
+6. Boş bir `List<Int>` oluşturun, içine 3 sayı ekleyin ve `sum` (toplam) ile `len` (uzunluk) yazdırın.
+7. `between(10, 0, -1)` üzerinde dönerek geriye doğru bir sayaç yazdırın.
 
-## 25. Çözüm İpuçları
+### Orta Seviye
+8. Bir cümle okuyun ve içindeki tüm boşlukları alt çizgi (underscore) ile değiştirin.
+9. Bir not List'inde `min` ve `max` sonuçlarını gösterin; ancak List'in boş olma ihtimalini önceden kontrol edin.
+10. Bir `Pair` kullanarak isimleri notlara bağlayın, bir notu güncelleyin ve tüm kayıtları yazdırın.
+11. `Math.seed(42)` fonksiyonunu çağırın, `randomInt(1, 6)` ile on kez zar atın. Programı yeniden çalıştırdığınızda tamamen aynı 10 sonucu aldığınızı doğrulayın.
+12. Bir List'teki tüm sayıların karesini almak için `map` kullanın.
+13. `name` ve `Constant number` özellikleri olan bir `Student` sınıfı (Class) ve bir özet döndüren metot yazın.
+14. Bir sayının faktöriyelini hesaplayan öz yinelemeli (recursive) bir fonksiyon yazın.
+
+### İleri Seviye (Challenge)
+15. Kullanıcı girdiğinde ortaya çıkabilecek geçersiz sayı harflerini `int()` ile dönüştürürken `DomainError` almayı önlemek için `attempt` kullanın.
+16. Bir `List<String>` listesindeki metinleri, uzunluklarına (length) göre sıralamak için bir `keyFunction` kullanıp `sort` çağrısı yapın.
+17. Bir `Shape` (Şekil) üst Sınıfı (parent Class) oluşturun, sonra alan hesaplamasını yapan `Override` bir metoda sahip bir `Circle` (Daire) alt sınıfı oluşturun.
+18. Parametre olarak bir `String` alan ve metnin içindeki her karakterin kaç defa geçtiğini sayan bir `Pair` döndüren bir fonksiyon yazın.
+19. `break` ve `continue` kullanarak çok geniş bir aralık içindeki ilk 5 çift sayıyı bulun, ancak 3'e bölünenleri `continue` ile atlayın.
+20. Dikdörtgen alanı hesaplayan bir fonksiyona sahip `MathUtils.ahd` adında bir modül oluşturun ve bir `main.ahd` içinden `bring` ile çağırarak kullanın.
+
+## 28. Çözüm İpuçları
 
 1. `take` sonucu String'dir; yaş için `int(...)` ve yeni yaş için `+ 1` kullanın.
-2. Formülü küçük parçalara ayırın; `real(take(...))` ile başlayın ve Real
-   literal'ları kullanın.
+2. Formülü küçük parçalara ayırın; `real(take(...))` ile başlayın ve Real sayılarını kullanın.
 3. `value % 2 == 0` bir `Bool` üretir.
-4. Boş `List<Int>` için türü açıkça yazın; her girdiyi `add` ile ekleyin.
-5. `min` ve `max` boş List'te `DomainError` üretir; önce `len(grades) > 0`
-   kontrolü yapın.
-6. `until` post-check olduğu için menü yazısını gövdenin başına koyabilirsiniz.
-7. `trim`, `lower` ve `capitalize` işlemlerini bir dönüş expression'ında
-   zincirlemeyi deneyin.
-8. `Pair<String, Int>` kullanın; Pair üzerinde `for` anahtarları ekleme sırasıyla
-   verir.
-9. Seed'i atışlardan önce bir kez ayarlayın; stop-inclusive olduğu için sınırlar
-   doğrudan `1, 6` olabilir.
-10. Curated Class örneğindeki `structure: Attributes`, named construction ve
-    `attribute.name` kullanımını model alın.
+4. `until` post-check (sonradan kontrol) olduğu için menü yazısını gövdenin başına koyabilirsiniz.
+5. `trim`, `lower` ve `capitalize` işlemlerini tek bir dönüş (return) satırında zincirlemeyi deneyin.
+6. Boş `List<Int>` için türü açıkça yazın; her girdiyi `add` ile ekleyin.
+7. Negatif adımlar geriye doğru sayar; `between`'in stop (bitiş) değerini içermediğini unutmayın.
+8. `String.replace(" ", "_")` kullanın.
+9. `min` ve `max` boş List'te `DomainError` üretir; önce `len(grades) > 0` kontrolü yapın.
+10. `Pair<String, Int>` kullanın; Pair üzerinde `for` anahtarları ekleme sırasıyla verir.
+11. Tohumu (seed) zarları atmadan hemen önce bir kez ayarlayın. Sınırlar bitişi içerdiği için doğrudan `1, 6` kullanabilirsiniz.
+12. Sizin yazdığınız callback fonksiyonu `value * value` döndürmelidir.
+13. Başlangıçtaki sınıf örneğini `structure: Attributes` için model olarak alın.
+14. Rekürsif (öz yinelemeli) fonksiyonun taban şartı `n <= 1` olmalı ve 1 döndürmelidir.
+15. `int(take())` kısmını `attempt` içine koyun ve `except DomainError` yakalayın.
+16. Anahtar (key) fonksiyonunuz bir `String` parametresi almalı ve `len(value)` döndürmelidir.
+17. Alan için `Math.PI * (yarıçap ^ 2)` kullanın.
+18. String'in içindeki her harfi döngüye alın, Pair'in içinde var mı diye kontrol edip sayısını 1 artırın.
+19. `if i % 3 == 0 { continue }`. `if count == 5 { break }`.
+20. `from MathUtils bring alanHesapla` kullanabilirsiniz.
 
-## 26. Sonraki adımlar ve teknik belgeler
+## 29. Sonraki adımlar ve teknik belgeler
 
 Bu rehberi tamamladıktan sonra dilin ayrıntılarını şu belgelerden
 derinleştirebilirsiniz:
@@ -1002,3 +1406,5 @@ derinleştirebilirsiniz:
 
 Çalışan daha fazla örnek için [curated v0.1 examples](../examples/v0.1/README.md)
 klasörünü inceleyin.
+
+
