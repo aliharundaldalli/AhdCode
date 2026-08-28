@@ -1,0 +1,26 @@
+package semantic
+
+const (
+	codeUnknownName         = "SEM001"
+	codeRedeclaration       = "SEM002"
+	codeInvalidType         = "SEM003"
+	codeTypeMismatch        = "SEM004"
+	codeScopeModifier       = "SEM005"
+	codeMissingLocal        = "SEM006"
+	codeHiddenGlobal        = "SEM007"
+	codeInvalidGlobal       = "SEM008"
+	codeConstantAssignment  = "SEM009"
+	codeConstantInitializer = "SEM010"
+	codeNullableUse         = "SEM011"
+	codeConditionType       = "SEM012"
+	codeOperatorType        = "SEM013"
+	codeInvalidTarget       = "SEM014"
+	codeNotCallable         = "SEM015"
+	codeCallArguments       = "SEM016"
+	codeReturnType          = "SEM017"
+	codeMissingReturn       = "SEM018"
+	codeInvalidMember       = "SEM019"
+	codeConstantRange       = "SEM020"
+	codeControlContext      = "SEM021"
+	codePendingFeature      = "SEM022"
+)
