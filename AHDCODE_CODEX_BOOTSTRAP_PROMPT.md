@@ -1203,6 +1203,21 @@ Implement:
 
 Pair does not use `has`.
 
+`has` resolves against the object's **runtime** Class, never the static type of
+the left expression. Each generated Class descriptor publishes the member names
+that Class itself declares — attributes and the methods it introduces — and
+inherited names are reached through the descriptor's `Parent` link rather than
+copied, so an override never restates the name its ancestor published. The
+backend emits `AhdHasMember(instance, "name")`, which reads
+`value.AhdClassOf()` and walks that chain; it must not fold the answer from the
+static IR Class. This is a lookup over published names, not reflection: never
+use Go reflection here.
+
+The right operand stays an unquoted member designator that lowers to a String
+literal, is never evaluated as a binding, and executes nothing. The left
+expression is emitted once, and `has not` is the negation of the same call
+rather than a second lookup path.
+
 ---
 
 # PHASE 18 — Boolean semantics

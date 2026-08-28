@@ -381,32 +381,23 @@ func (generator *generator) classMembership(value *ir.BinaryExpr, negated bool) 
 	return code
 }
 
-// memberExistence resolves has / has not from the Class declaration recorded
-// in the IR rather than from any runtime reflection.
+// memberExistence resolves has / has not against the object's exact runtime
+// Class descriptor and its Parent chain, not against the static Class of the
+// left expression, so an instance upcast to a parent type still reports the
+// members its real Class declares. has not is the exact negation of the same
+// lookup, and the left expression is emitted once.
 func (generator *generator) memberExistence(value *ir.BinaryExpr, negated bool) string {
 	meta := value.ExprMeta()
 	literal, ok := value.Right.(*ir.LiteralExpr)
 	instance := value.Left.ExprMeta().Type
-	if !ok || literal.Kind != ir.StringLiteral || instance.Kind != ir.ClassType {
+	if !ok || literal.Kind != ir.StringLiteral || instance.Kind != ir.ClassType || instance.Reference {
 		return generator.unsupported("a Class member existence test with these operands", meta.Span)
 	}
-	exists := false
-	if class := generator.classes[instance.Class]; class != nil {
-		for _, field := range class.Fields {
-			if field.Name == literal.Value {
-				exists = true
-			}
-		}
-		for _, method := range class.Methods {
-			if function := generator.functions[method]; function != nil && function.Name == literal.Value {
-				exists = true
-			}
-		}
-	}
+	code := "AhdHasMember(" + generator.expr(value.Left) + ", " + quote(literal.Value) + ")"
 	if negated {
-		exists = !exists
+		return "(!" + code + ")"
 	}
-	return "AhdConstBool(" + generator.expr(value.Left) + ", " + strconv.FormatBool(exists) + ")"
+	return code
 }
 
 // ---------------------------------------------------------------------------

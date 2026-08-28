@@ -128,8 +128,45 @@ func (generator *generator) emitDescriptor(writer *emitter, current *layout) {
 	if current.parent != nil {
 		parent = generator.descriptorName(current.parent.class.ID)
 	}
-	writer.line("var " + name + " = &AhdClass{Name: " + quote(current.class.Name) + ", Parent: " + parent + "}")
+	writer.line("var " + name + " = &AhdClass{Name: " + quote(current.class.Name) + ", Parent: " + parent +
+		", Members: " + renderNames(current.memberNames()) + "}")
 	writer.blank()
+}
+
+// memberNames is the sorted set of member names this Class itself declares.
+// An override reuses the slot its ancestor introduced, so it is not repeated
+// here: the Parent chain already publishes that name.
+func (current *layout) memberNames() []string {
+	names := make([]string, 0, len(current.ownFields)+len(current.ownSlots))
+	seen := make(map[string]bool, len(names))
+	add := func(name string) {
+		if name == "" || seen[name] {
+			return
+		}
+		seen[name] = true
+		names = append(names, name)
+	}
+	for _, field := range current.ownFields {
+		add(field.Name)
+	}
+	for _, entry := range current.ownSlots {
+		if entry.impl != nil {
+			add(entry.impl.Name)
+		}
+	}
+	sort.Strings(names)
+	return names
+}
+
+func renderNames(names []string) string {
+	if len(names) == 0 {
+		return "nil"
+	}
+	quoted := make([]string, len(names))
+	for index, name := range names {
+		quoted[index] = quote(name)
+	}
+	return "[]string{" + strings.Join(quoted, ", ") + "}"
 }
 
 func (generator *generator) emitInterface(writer *emitter, current *layout) {

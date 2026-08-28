@@ -612,11 +612,18 @@ func TestHasLowersToAResolvedMemberDesignator(t *testing.T) {
 }
 
 box: Box := Box(value: 1)
+value: Int := 7
 write(str(box has value))
+write(str(box has not missing))
 `}, "/Main.ahd")
 	dump := ir.Dump(result.Compilation)
 	if !strings.Contains(dump, `Has(`) || !strings.Contains(dump, `string("value")`) {
 		t.Fatalf("has did not lower to a member designator: %s", dump)
+	}
+	// A module binding of the same name must not turn the designator into a
+	// value load, and has not lowers through the same designator path.
+	if !strings.Contains(dump, `HasNot(`) || !strings.Contains(dump, `string("missing")`) {
+		t.Fatalf("has not did not lower to a member designator: %s", dump)
 	}
 }
 

@@ -27,9 +27,14 @@ import (
 
 // AhdClass is the canonical runtime identity of one AhdCode Class. Descriptors
 // are compared by pointer, never by name.
+//
+// Members lists only the member names this Class itself declares. Inherited
+// names are reached through Parent rather than copied, so one descriptor never
+// restates its ancestors.
 type AhdClass struct {
-	Name   string
-	Parent *AhdClass
+	Name    string
+	Parent  *AhdClass
+	Members []string
 }
 
 // The language-supplied Class catalog. Generated code aliases these
@@ -37,7 +42,7 @@ type AhdClass struct {
 // identity.
 var (
 	AhdClassObject              = &AhdClass{Name: "Object"}
-	AhdClassError               = &AhdClass{Name: "Error", Parent: AhdClassObject}
+	AhdClassError               = &AhdClass{Name: "Error", Parent: AhdClassObject, Members: []string{"message"}}
 	AhdClassConstantError       = &AhdClass{Name: "ConstantError", Parent: AhdClassError}
 	AhdClassDivisionByZeroError = &AhdClass{Name: "DivisionByZeroError", Parent: AhdClassError}
 	AhdClassDomainError         = &AhdClass{Name: "DomainError", Parent: AhdClassError}
@@ -95,6 +100,25 @@ func AhdIsClass(value AhdInstance, target *AhdClass) bool {
 	for current := value.AhdClassOf(); current != nil; current = current.Parent {
 		if current == target {
 			return true
+		}
+	}
+	return false
+}
+
+// AhdHasMember implements has / has not. It reads the value's exact runtime
+// Class rather than the static type of the expression, then walks the Parent
+// chain, so an instance upcast to a parent type still reports the members its
+// real Class declares. It is a lookup over published member names, not
+// reflection over the Go object.
+func AhdHasMember(value AhdInstance, name string) bool {
+	if value == nil {
+		return false
+	}
+	for current := value.AhdClassOf(); current != nil; current = current.Parent {
+		for _, member := range current.Members {
+			if member == name {
+				return true
+			}
 		}
 	}
 	return false

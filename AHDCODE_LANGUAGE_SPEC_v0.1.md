@@ -2066,6 +2066,30 @@ Class/object member existence only.
 
 Not used for Pair.
 
+`has` inspects the object's **actual runtime Class and its inheritance chain**, not the static type of the expression it is written against. An instance held in a variable of a parent type therefore still reports the members its real Class declares.
+
+```ahd
+person: Person := Student(name: "Ali", number: 42)
+
+write(person has name)     // inherited attribute
+write(person has describe) // inherited method
+write(person has number)   // attribute of the runtime Class
+write(person has study)    // method of the runtime Class
+write(person has nickname) // no such member
+```
+
+=>
+
+```text
+true
+true
+true
+true
+false
+```
+
+Attributes and methods are both members, an overridden method is a member of both Classes, and an ordinary parent instance never gains a subclass member. The right operand is an unquoted member designator: it names a member, is never evaluated as a binding, and executes nothing. The left expression is evaluated exactly once. `has not` is the exact logical negation of the same lookup.
+
 ---
 
 ## 30. Boolean Operators and Short-Circuit

@@ -855,3 +855,37 @@ func TestListMapAndFilterUseASnapshot(t *testing.T) {
 		AhdListFilter(values, func(item *int64) *bool { return nil })
 	})
 }
+
+func TestHasMemberWalksTheRuntimeClassChain(t *testing.T) {
+	person := &AhdClass{Name: "Person", Parent: AhdClassObject, Members: []string{"describe", "name"}}
+	student := &AhdClass{Name: "Student", Parent: person, Members: []string{"number", "study"}}
+	instance := &stubError{}
+	instance.AhdSetClass(student)
+
+	for _, name := range []string{"name", "describe", "number", "study"} {
+		if !AhdHasMember(instance, name) {
+			t.Fatalf("member %q must be reachable through the runtime Class chain", name)
+		}
+	}
+	for _, name := range []string{"nickname", "Name", ""} {
+		if AhdHasMember(instance, name) {
+			t.Fatalf("member %q must not be reported", name)
+		}
+	}
+
+	parent := &stubError{}
+	parent.AhdSetClass(person)
+	if !AhdHasMember(parent, "name") || AhdHasMember(parent, "number") {
+		t.Fatal("a parent instance must not gain the members of a subclass")
+	}
+
+	// The built-in Error catalog publishes message through the Parent chain.
+	failure := &stubError{}
+	failure.AhdSetClass(AhdClassValueError)
+	if !AhdHasMember(failure, "message") || AhdHasMember(failure, "code") {
+		t.Fatal("a built-in Error must publish exactly message")
+	}
+	if AhdHasMember(nil, "name") {
+		t.Fatal("a nil instance has no members")
+	}
+}

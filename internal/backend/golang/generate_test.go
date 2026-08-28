@@ -569,3 +569,56 @@ for value in values {
 		t.Fatal("collection iteration lost its shallow snapshot")
 	}
 }
+
+func TestClassDescriptorsPublishTheirOwnMembers(t *testing.T) {
+	program := generate(t, `Person: Class<> := {
+    structure: Attributes := (
+        name: String
+    )
+
+    describe: Function := (
+    ) -> String {
+        return attribute.name
+    }
+}
+
+Student: Class<Person> := {
+    structure: Attributes := (
+        SuperClass.attributes
+        number: Int
+    )
+
+    describe: Override Function := (
+    ) -> String {
+        return attribute.name
+    }
+
+    study: Function := (
+    ) -> Nothing {
+        return
+    }
+}
+
+person: Person := Student(name: "Ali", number: 1)
+write(person has number)
+write(person has not nickname)
+`)
+	generated := programSource(t, program)
+	if !strings.Contains(generated, `Members: []string{"describe", "name"}`) {
+		t.Fatalf("the Person descriptor does not publish its own members:\n%s", generated)
+	}
+	// An override reuses the slot its parent introduced, so the child does not
+	// restate the inherited name; the Parent chain already publishes it.
+	if !strings.Contains(generated, `Members: []string{"number", "study"}`) {
+		t.Fatalf("the Student descriptor does not publish exactly its own members:\n%s", generated)
+	}
+	if !strings.Contains(generated, "AhdHasMember(") {
+		t.Fatalf("has did not lower to the runtime member lookup:\n%s", generated)
+	}
+	if strings.Contains(generated, "AhdConstBool(gv_person") {
+		t.Fatalf("has was still folded to a compile-time constant:\n%s", generated)
+	}
+	if !strings.Contains(generated, `(!AhdHasMember(`) {
+		t.Fatalf("has not did not negate the same lookup:\n%s", generated)
+	}
+}
