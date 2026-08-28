@@ -698,3 +698,160 @@ func TestNumericListReductions(t *testing.T) {
 		AhdSumReal(AhdNewList(AhdBox(1.0e308), AhdBox(1.0e308)))
 	})
 }
+
+func TestStringOperationsAreUnicodeAndImmutable(t *testing.T) {
+	text := "  Ali Harun  "
+	if AhdStringTrim(text) != "Ali Harun" || text != "  Ali Harun  " {
+		t.Fatal("trim must not modify its receiver")
+	}
+	if AhdStringTrim("\t x \n") != "x" || AhdStringTrim(" x　") != "x" || AhdStringTrim("") != "" {
+		t.Fatal("trim must remove Unicode whitespace at both ends only")
+	}
+	if AhdStringLower("AhdCode") != "ahdcode" || AhdStringUpper("AhdCode") != "AHDCODE" {
+		t.Fatal("case conversion is wrong")
+	}
+	if AhdStringCapitalize("ali HARUN") != "Ali HARUN" || AhdStringCapitalize("aHD") != "AHD" || AhdStringCapitalize("") != "" {
+		t.Fatal("capitalize must uppercase only the first character")
+	}
+	if AhdStringCapitalize("ünlü") != "Ünlü" {
+		t.Fatal("capitalize must work on a multi-byte first character")
+	}
+	if AhdStringReplace("banana", "na", "X") != "baXX" || AhdStringReplace("abc", "b", "") != "ac" {
+		t.Fatal("replace is wrong")
+	}
+	if !AhdStringStartsWith("abc", "") || !AhdStringStartsWith("abc", "ab") || AhdStringStartsWith("abc", "b") {
+		t.Fatal("startsWith is wrong")
+	}
+	if !AhdStringEndsWith("abc", "") || !AhdStringEndsWith("abc", "bc") || AhdStringEndsWith("abc", "ab") {
+		t.Fatal("endsWith is wrong")
+	}
+	if AhdStringCount("banana", "a") != 3 || AhdStringCount("banana", "na") != 2 || AhdStringCount("banana", "x") != 0 {
+		t.Fatal("count must count non-overlapping occurrences")
+	}
+	if AhdStringIndex("banana", "na") != 2 || AhdStringIndex("a✓b✓", "✓") != 1 || AhdStringIndex("a✓b✓", "b") != 2 {
+		t.Fatal("index must report a character index, not a byte offset")
+	}
+	expectRaise(t, AhdClassDomainError, func() { AhdStringSplit("abc", "") })
+	expectRaise(t, AhdClassDomainError, func() { AhdStringReplace("abc", "", "x") })
+	expectRaise(t, AhdClassDomainError, func() { AhdStringCount("abc", "") })
+	expectRaise(t, AhdClassDomainError, func() { AhdStringIndex("abc", "") })
+	expectRaise(t, AhdClassDomainError, func() { AhdStringIndex("abc", "z") })
+}
+
+func TestStringSplitPreservesEmptyFields(t *testing.T) {
+	parts := AhdStringSplit("a,,b,", ",")
+	if parts.Len() != 4 {
+		t.Fatalf("split length = %d, want 4", parts.Len())
+	}
+	if *parts.At(0) != "a" || *parts.At(1) != "" || *parts.At(2) != "b" || *parts.At(3) != "" {
+		t.Fatal("split must preserve empty fields")
+	}
+	single := AhdStringSplit("", ",")
+	if single.Len() != 1 || *single.At(0) != "" {
+		t.Fatal("splitting an empty String must yield one empty field")
+	}
+}
+
+func TestListReverseAndSearchOperations(t *testing.T) {
+	list := AhdNewList(AhdBox(int64(5)), AhdBox(int64(7)), AhdBox(int64(5)))
+	if AhdListCount(list, AhdBox(int64(5)), AhdEqNull(AhdEqInt)) != 2 {
+		t.Fatal("count is wrong")
+	}
+	if AhdListIndex(list, AhdBox(int64(7)), AhdEqNull(AhdEqInt)) != 1 {
+		t.Fatal("index must report the first match")
+	}
+	if list.Len() != 3 {
+		t.Fatal("count and index must not modify the List")
+	}
+	expectRaise(t, AhdClassDomainError, func() {
+		AhdListIndex(list, AhdBox(int64(99)), AhdEqNull(AhdEqInt))
+	})
+	list.Reverse()
+	if *list.At(0) != 5 || *list.At(1) != 7 || *list.At(2) != 5 {
+		t.Fatal("reverse is wrong")
+	}
+	ordered := AhdNewList(AhdBox(int64(3)), AhdBox(int64(1)), AhdBox(int64(2)))
+	ordered.Reverse()
+	if *ordered.At(0) != 2 || *ordered.At(1) != 1 || *ordered.At(2) != 3 {
+		t.Fatal("reverse must reverse in place")
+	}
+}
+
+func TestListSortIsStableAndAtomic(t *testing.T) {
+	ints := AhdNewList(AhdBox(int64(8)), AhdBox(int64(3)), AhdBox(int64(12)))
+	AhdListSortInt(ints)
+	if *ints.At(0) != 3 || *ints.At(2) != 12 {
+		t.Fatal("natural Int sort is wrong")
+	}
+	words := AhdNewList(AhdBox("pear"), AhdBox("apple"))
+	AhdListSortString(words)
+	if *words.At(0) != "apple" {
+		t.Fatal("natural String sort is wrong")
+	}
+	reals := AhdNewList(AhdBox(3.5), AhdBox(-2.0))
+	AhdListSortReal(reals)
+	if *reals.At(0) != -2.0 {
+		t.Fatal("natural Real sort is wrong")
+	}
+	withNull := AhdNewList(AhdBox(int64(3)), nil)
+	expectRaise(t, AhdClassNullError, func() { AhdListSortInt(withNull) })
+	if *withNull.At(0) != 3 || withNull.At(1) != nil {
+		t.Fatal("a rejected sort must leave the List unchanged")
+	}
+	keys := 0
+	values := AhdNewList(AhdBox(int64(3)), AhdBox(int64(1)), AhdBox(int64(2)))
+	AhdListSortKeyInt(values, func(item *int64) *int64 {
+		keys++
+		negated := -*item
+		return &negated
+	})
+	if keys != 3 {
+		t.Fatalf("key evaluations = %d, want one per element", keys)
+	}
+	if *values.At(0) != 3 || *values.At(1) != 2 || *values.At(2) != 1 {
+		t.Fatal("keyed sort is wrong")
+	}
+	expectRaise(t, AhdClassNullError, func() {
+		AhdListSortKeyInt(values, func(item *int64) *int64 { return nil })
+	})
+	if *values.At(0) != 3 {
+		t.Fatal("a raising key Function must leave the order unchanged")
+	}
+}
+
+func TestListMapAndFilterUseASnapshot(t *testing.T) {
+	source := AhdNewList(AhdBox(int64(1)), AhdBox(int64(2)), AhdBox(int64(3)))
+	doubled := AhdListMap(source, func(item *int64) *int64 {
+		source.Add(AhdBox(int64(99)))
+		value := *item * 2
+		return &value
+	})
+	if doubled.Len() != 3 || *doubled.At(0) != 2 || *doubled.At(2) != 6 {
+		t.Fatal("map must iterate the snapshot taken at entry")
+	}
+	if source.Len() != 6 {
+		t.Fatal("the callback's own mutations must still apply to the source")
+	}
+	texts := AhdListMap(AhdNewList(AhdBox(int64(1))), func(item *int64) *string {
+		value := "n"
+		return &value
+	})
+	if texts.Len() != 1 || *texts.At(0) != "n" {
+		t.Fatal("map must produce the callback result type")
+	}
+	values := AhdNewList(AhdBox(int64(1)), AhdBox(int64(2)), AhdBox(int64(3)))
+	evens := AhdListFilter(values, func(item *int64) *bool {
+		keep := *item%2 == 0
+		return &keep
+	})
+	if evens.Len() != 1 || *evens.At(0) != 2 || values.Len() != 3 {
+		t.Fatal("filter must build a new List without mutating the source")
+	}
+	evens.Add(AhdBox(int64(9)))
+	if evens.Len() != 2 {
+		t.Fatal("a filtered List must be mutable")
+	}
+	expectRaise(t, AhdClassNullError, func() {
+		AhdListFilter(values, func(item *int64) *bool { return nil })
+	})
+}

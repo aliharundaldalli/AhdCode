@@ -642,3 +642,74 @@ rows: List<List<Int>> := [
 		t.Fatalf("a contextually typed empty literal left an Invalid type in the IR:\n%s", dump)
 	}
 }
+
+func TestStringAndListOperationsLowerToBuiltinIdentities(t *testing.T) {
+	result := lowerSources(t, map[string]string{"/Main.ahd": `double: Function := (
+    x: Int
+) -> Int {
+    return x * 2
+}
+
+isEven: Function := (
+    x: Int
+) -> Bool {
+    return x % 2 == 0
+}
+
+text: String := "a,b"
+values: List<Int> := [3, 1]
+
+write(text.trim())
+write(text.lower())
+write(text.upper())
+write(text.capitalize())
+write(text.split(","))
+write(text.replace("a", "b"))
+write(text.contains("a"))
+write(text.startsWith("a"))
+write(text.endsWith("b"))
+write(text.count("a"))
+write(text.index("a"))
+values.sort()
+values.sort(double)
+values.reverse()
+write(values.count(1))
+write(values.index(1))
+write(values.map(double))
+write(values.filter(isEven))
+`}, "/Main.ahd")
+	dump := ir.Dump(result.Compilation)
+	for _, expected := range []string{
+		"builtin:core::String.trim", "builtin:core::String.lower", "builtin:core::String.upper",
+		"builtin:core::String.capitalize", "builtin:core::String.split", "builtin:core::String.replace",
+		"builtin:core::String.contains", "builtin:core::String.startsWith", "builtin:core::String.endsWith",
+		"builtin:core::String.count", "builtin:core::String.index",
+		"builtin:core::List.sort", "builtin:core::List.reverse", "builtin:core::List.count",
+		"builtin:core::List.index", "builtin:core::List.map", "builtin:core::List.filter",
+	} {
+		if !strings.Contains(dump, expected) {
+			t.Fatalf("type operation did not lower to %s:\n%s", expected, dump)
+		}
+	}
+}
+
+func TestUserClassMethodsShadowNoBuiltinOperation(t *testing.T) {
+	result := lowerSources(t, map[string]string{"/Main.ahd": `Report: Class<> := {
+    structure: Attributes := (
+        title: String
+    )
+
+    count: Function := (
+    ) -> Int {
+        return 7
+    }
+}
+
+report: Report := Report("t")
+write(report.count())
+`}, "/Main.ahd")
+	dump := ir.Dump(result.Compilation)
+	if strings.Contains(dump, "builtin:core::List.count") || strings.Contains(dump, "builtin:core::String.count") {
+		t.Fatalf("a Class method lowered to a built-in type operation:\n%s", dump)
+	}
+}

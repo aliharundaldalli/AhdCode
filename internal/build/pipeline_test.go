@@ -78,6 +78,35 @@ func buildAndRun(t *testing.T, entry, stdin string) (string, string, int) {
 	return out.String(), errorOutput.String(), code
 }
 
+// runProgramCases builds and runs each acceptance case as a native
+// executable and checks its real streams and exit code.
+func runProgramCases(t *testing.T, cases []program) {
+	t.Helper()
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+			entry := testCase.entry
+			if entry == "" {
+				entry = "main.ahd"
+			}
+			directory := writeSources(t, testCase.sources)
+			out, errorOutput, code := buildAndRun(t, filepath.Join(directory, entry), testCase.stdin)
+			if out != testCase.expected {
+				t.Fatalf("stdout mismatch\n want %q\n have %q\n stderr: %s", testCase.expected, out, errorOutput)
+			}
+			if code != testCase.exitCode {
+				t.Fatalf("exit code mismatch: want %d, have %d (stderr: %s)", testCase.exitCode, code, errorOutput)
+			}
+			if testCase.errorClass != "" && !strings.HasPrefix(errorOutput, testCase.errorClass+": ") {
+				t.Fatalf("expected an uncaught %s on stderr; received %q", testCase.errorClass, errorOutput)
+			}
+			if testCase.exitCode != 0 && strings.Contains(errorOutput, "goroutine ") {
+				t.Fatalf("a Go stack trace leaked into program output: %q", errorOutput)
+			}
+		})
+	}
+}
+
 func TestAcceptanceProgramsRunAsNativeExecutables(t *testing.T) {
 	cases := []program{
 		{

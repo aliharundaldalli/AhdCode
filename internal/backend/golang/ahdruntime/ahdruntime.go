@@ -11,8 +11,10 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
+	"unicode"
 )
 
 // ---------------------------------------------------------------------------
@@ -601,6 +603,80 @@ func AhdStringChars(text string) []string {
 	return result
 }
 
+// AhdStringTrim removes leading and trailing Unicode whitespace and preserves
+// every interior character.
+func AhdStringTrim(text string) string { return strings.TrimSpace(text) }
+
+// AhdStringLower is deterministic, locale-independent Unicode lowercasing.
+func AhdStringLower(text string) string { return strings.ToLower(text) }
+
+// AhdStringUpper is deterministic, locale-independent Unicode uppercasing.
+func AhdStringUpper(text string) string { return strings.ToUpper(text) }
+
+// AhdStringCapitalize uppercases the first character and leaves the remainder
+// exactly as written.
+func AhdStringCapitalize(text string) string {
+	runes := []rune(text)
+	if len(runes) == 0 {
+		return text
+	}
+	return string(unicode.ToUpper(runes[0])) + string(runes[1:])
+}
+
+// AhdStringSplit divides a String on every non-overlapping occurrence of a
+// non-empty separator, preserving empty fields.
+func AhdStringSplit(text, separator string) *AhdList[*string] {
+	if separator == "" {
+		AhdRaiseClass(AhdClassDomainError, "split requires a non-empty separator")
+	}
+	parts := strings.Split(text, separator)
+	items := make([]*string, len(parts))
+	for index := range parts {
+		field := parts[index]
+		items[index] = &field
+	}
+	return &AhdList[*string]{items: items}
+}
+
+// AhdStringReplace rewrites every non-overlapping occurrence of a non-empty
+// search text. The replacement may be empty.
+func AhdStringReplace(text, old, replacement string) string {
+	if old == "" {
+		AhdRaiseClass(AhdClassDomainError, "replace requires a non-empty search text")
+	}
+	return strings.ReplaceAll(text, old, replacement)
+}
+
+// AhdStringStartsWith reports a prefix match.
+func AhdStringStartsWith(text, prefix string) bool { return strings.HasPrefix(text, prefix) }
+
+// AhdStringEndsWith reports a suffix match.
+func AhdStringEndsWith(text, suffix string) bool { return strings.HasSuffix(text, suffix) }
+
+// AhdStringCount counts non-overlapping occurrences. An empty search text has
+// no occurrence count in AhdCode, so it is rejected rather than defined as one
+// match per position.
+func AhdStringCount(text, needle string) int64 {
+	if needle == "" {
+		AhdRaiseClass(AhdClassDomainError, "count requires a non-empty search text")
+	}
+	return int64(strings.Count(text, needle))
+}
+
+// AhdStringIndex is the first character index of a search text. The result is
+// an AhdCode character index, never a UTF-8 byte offset, and a missing text is
+// an error rather than a sentinel index.
+func AhdStringIndex(text, needle string) int64 {
+	if needle == "" {
+		AhdRaiseClass(AhdClassDomainError, "index requires a non-empty search text")
+	}
+	position := strings.Index(text, needle)
+	if position < 0 {
+		AhdRaiseClass(AhdClassDomainError, "index did not find the search text")
+	}
+	return int64(len([]rune(text[:position])))
+}
+
 // AhdStringLen counts characters, not bytes.
 func AhdStringLen(text string) int64 { return int64(len([]rune(text))) }
 
@@ -845,6 +921,144 @@ func AhdListEqual[T any](left, right *AhdList[T], equal func(T, T) bool) bool {
 	}
 	return true
 }
+
+// Reverse reverses the List in place, so every alias observes the new order.
+func (list *AhdList[T]) Reverse() {
+	list.requireMutable()
+	for left, right := 0, len(list.items)-1; left < right; left, right = left+1, right-1 {
+		list.items[left], list.items[right] = list.items[right], list.items[left]
+	}
+}
+
+// AhdListCount counts equal elements with the ordinary AhdCode == semantics.
+func AhdListCount[T any](list *AhdList[T], value T, equal func(T, T) bool) int64 {
+	list.require()
+	total := int64(0)
+	for _, item := range list.items {
+		if equal(item, value) {
+			total++
+		}
+	}
+	return total
+}
+
+// AhdListIndex is the first index of an equal element. A value the List does
+// not contain is an error rather than a sentinel index.
+func AhdListIndex[T any](list *AhdList[T], value T, equal func(T, T) bool) int64 {
+	list.require()
+	for index, item := range list.items {
+		if equal(item, value) {
+			return int64(index)
+		}
+	}
+	AhdRaiseClass(AhdClassDomainError, "index did not find the value in the List")
+	return 0
+}
+
+// AhdListMap builds a new List from a Function applied left to right to a
+// shallow snapshot, so a callback that mutates the source cannot change what
+// is iterated. The source List is never modified.
+func AhdListMap[T any, U any](list *AhdList[T], transform func(T) U) *AhdList[U] {
+	items := list.Snapshot()
+	result := make([]U, 0, len(items))
+	for _, item := range items {
+		result = append(result, transform(item))
+	}
+	return &AhdList[U]{items: result}
+}
+
+// AhdListFilter builds a new List of the snapshot elements a predicate keeps.
+// The predicate must produce a real Bool: AhdCode has no truthiness, so a null
+// result is an error.
+func AhdListFilter[T any](list *AhdList[T], keep func(T) *bool) *AhdList[T] {
+	items := list.Snapshot()
+	result := make([]T, 0, len(items))
+	for _, item := range items {
+		if ahdPredicate(keep(item)) {
+			result = append(result, item)
+		}
+	}
+	return &AhdList[T]{items: result}
+}
+
+func ahdPredicate(value *bool) bool {
+	if value == nil {
+		AhdRaiseClass(AhdClassNullError, "filter predicate returned null")
+	}
+	return *value
+}
+
+func ahdSortKey[K any](value *K) K {
+	if value == nil {
+		AhdRaiseClass(AhdClassNullError, "sort key Function returned null")
+	}
+	return *value
+}
+
+// ahdOrdered is the set of key types the v0.1 ordering supports.
+type ahdOrdered interface{ ~int64 | ~float64 | ~string }
+
+// ahdSortNatural orders a scalar List ascending and stably. Every element is
+// read before the receiver is rewritten, so a null element leaves the original
+// order untouched.
+func ahdSortNatural[T ahdOrdered](list *AhdList[*T]) {
+	list.requireMutable()
+	items := list.items
+	sorted := make([]*T, len(items))
+	for index, item := range items {
+		sorted[index] = ahdElementPointer(item, "sort")
+	}
+	sort.SliceStable(sorted, func(left, right int) bool { return *sorted[left] < *sorted[right] })
+	list.items = sorted
+}
+
+func ahdElementPointer[T any](value *T, name string) *T {
+	if value == nil {
+		AhdRaiseClass(AhdClassNullError, name+" does not accept a null List element")
+	}
+	return value
+}
+
+// ahdSortByKey orders a List ascending and stably by a key Function. Every key
+// is computed, left to right and exactly once per element, before the receiver
+// is rewritten, so a key Function that raises leaves the original order
+// unchanged.
+func ahdSortByKey[T any, K ahdOrdered](list *AhdList[T], key func(T) *K) {
+	list.requireMutable()
+	items := list.items
+	keys := make([]K, len(items))
+	for index, item := range items {
+		keys[index] = ahdSortKey(key(item))
+	}
+	order := make([]int, len(items))
+	for index := range order {
+		order[index] = index
+	}
+	sort.SliceStable(order, func(left, right int) bool { return keys[order[left]] < keys[order[right]] })
+	sorted := make([]T, len(items))
+	for position, index := range order {
+		sorted[position] = items[index]
+	}
+	list.items = sorted
+}
+
+// AhdListSortInt orders a List<Int> ascending in place.
+func AhdListSortInt(list *AhdList[*int64]) { ahdSortNatural(list) }
+
+// AhdListSortReal orders a List<Real> ascending in place.
+func AhdListSortReal(list *AhdList[*float64]) { ahdSortNatural(list) }
+
+// AhdListSortString orders a List<String> ascending in place.
+func AhdListSortString(list *AhdList[*string]) { ahdSortNatural(list) }
+
+// AhdListSortKeyInt orders a List by an Int key.
+func AhdListSortKeyInt[T any](list *AhdList[T], key func(T) *int64) { ahdSortByKey(list, key) }
+
+// AhdListSortKeyReal orders a List by a Real key.
+func AhdListSortKeyReal[T any](list *AhdList[T], key func(T) *float64) { ahdSortByKey(list, key) }
+
+// AhdListSortKeyString orders a List by a String key.
+func AhdListSortKeyString[T any](list *AhdList[T], key func(T) *string) { ahdSortByKey(list, key) }
 
 // ---------------------------------------------------------------------------
 // Numeric Fundamentals: abs and the List reductions

@@ -425,12 +425,31 @@ func (a *analyzer) analyzeFunctionValueIdentifier(identifier *ast.IdentifierExpr
 }
 
 func (a *analyzer) analyzeCallExpected(call *ast.CallExpr, current *scope, flow flowState, expected types.Type) expressionInfo {
-	// The built-in collection mutations are typed language operations, so they
-	// are resolved before ordinary callee analysis rather than as members.
-	if info, handled := a.analyzeCollectionCall(call, current, flow); handled {
-		return info
+	if member, ok := call.Callee.(*ast.MemberExpr); ok {
+		// A member receiver is analyzed exactly once. Its statically known type
+		// decides whether the call is a built-in type operation or an ordinary
+		// member call, so neither path re-analyzes the receiver expression.
+		receiver := a.analyzeExpression(member.Object, current, flow)
+		if info, handled := a.analyzeTypeOperation(call, member, receiver, current, flow); handled {
+			return info
+		}
+		return a.analyzeCallWithCallee(call, a.recordMember(member, a.analyzeMemberOf(member, receiver, current, flow)), current, flow, expected)
 	}
-	callee := a.analyzeExpression(call.Callee, current, flow)
+	return a.analyzeCallWithCallee(call, a.analyzeExpression(call.Callee, current, flow), current, flow, expected)
+}
+
+// recordMember stores the side-table entries the expression dispatcher would
+// have written for a member analyzed directly by the call path.
+func (a *analyzer) recordMember(member *ast.MemberExpr, info expressionInfo) expressionInfo {
+	a.result.ExpressionTypes[member] = info.typeValue
+	a.result.NullStates[member] = info.nullState
+	if info.symbol != nil {
+		a.result.ResolvedSymbols[member] = info.symbol
+	}
+	return info
+}
+
+func (a *analyzer) analyzeCallWithCallee(call *ast.CallExpr, callee expressionInfo, current *scope, flow flowState, expected types.Type) expressionInfo {
 	if callee.invalid() {
 		// Analyze arguments for independent diagnostics, but do not report that
 		// an already-invalid callee is also non-callable.
@@ -494,18 +513,17 @@ func (a *analyzer) analyzeCallExpected(call *ast.CallExpr, current *scope, flow 
 	return expressionInfo{typeValue: callable.Signature.Return, nullState: callable.ReturnNull}
 }
 
-// collectionOperationFor names the built-in mutation a member call selects, if
-// any. The receiver type decides, so a Class may still declare its own add or
-// eject method.
-func collectionOperationFor(receiver types.Type, name string) (CollectionOperation, bool) {
+// typeOperationFor names the built-in operation a member call selects, if any.
+// The statically known receiver type decides, so a Class may still declare its
+// own add, map, or index method.
+func typeOperationFor(receiver types.Type, name string) (TypeOperation, bool) {
 	switch receiver.Kind() {
+	case types.StringKind:
+		operation, known := stringOperationNames[name]
+		return operation, known
 	case types.ListKind:
-		switch name {
-		case "add":
-			return ListAdd, true
-		case "eject":
-			return ListEject, true
-		}
+		operation, known := listOperationNames[name]
+		return operation, known
 	case types.PairKind:
 		if name == "eject" {
 			return PairEject, true
@@ -514,50 +532,329 @@ func collectionOperationFor(receiver types.Type, name string) (CollectionOperati
 	return "", false
 }
 
-// analyzeCollectionCall type-checks a built-in List or Pair mutation. Each one
-// mutates the receiver in place and produces Nothing.
-func (a *analyzer) analyzeCollectionCall(call *ast.CallExpr, current *scope, flow flowState) (expressionInfo, bool) {
-	member, ok := call.Callee.(*ast.MemberExpr)
-	if !ok {
-		return expressionInfo{}, false
-	}
-	receiver := a.analyzeExpression(member.Object, current, flow)
-	operation, known := collectionOperationFor(receiver.typeValue, member.Name)
+var stringOperationNames = map[string]TypeOperation{
+	"trim": StringTrim, "lower": StringLower, "upper": StringUpper,
+	"capitalize": StringCapitalize, "split": StringSplit, "replace": StringReplace,
+	"contains": StringContains, "startsWith": StringStartsWith, "endsWith": StringEndsWith,
+	"count": StringCount, "index": StringIndex,
+}
+
+var listOperationNames = map[string]TypeOperation{
+	"add": ListAdd, "eject": ListEject, "sort": ListSort, "reverse": ListReverse,
+	"count": ListCount, "index": ListIndex, "map": ListMap, "filter": ListFilter,
+}
+
+// stringOperationShape is the fixed call shape of one String operation. Every
+// argument is a NonNull String, and String itself is never mutated.
+type stringOperationShape struct {
+	arguments int
+	result    types.Type
+	hint      string
+}
+
+var stringOperationShapes = map[TypeOperation]stringOperationShape{
+	StringTrim:       {0, types.String, "call trim with no argument"},
+	StringLower:      {0, types.String, "call lower with no argument"},
+	StringUpper:      {0, types.String, "call upper with no argument"},
+	StringCapitalize: {0, types.String, "call capitalize with no argument"},
+	StringSplit:      {1, types.List{Element: types.String}, "pass one non-empty String separator"},
+	StringReplace:    {2, types.String, "pass the searched String and its replacement"},
+	StringContains:   {1, types.Bool, "pass one String to search for"},
+	StringStartsWith: {1, types.Bool, "pass one String prefix"},
+	StringEndsWith:   {1, types.Bool, "pass one String suffix"},
+	StringCount:      {1, types.Int, "pass one non-empty String to count"},
+	StringIndex:      {1, types.Int, "pass one non-empty String to locate"},
+}
+
+// analyzeTypeOperation type-checks one built-in String, List, or Pair
+// operation. The receiver is already analyzed, so it is evaluated and
+// diagnosed exactly once.
+func (a *analyzer) analyzeTypeOperation(call *ast.CallExpr, member *ast.MemberExpr, receiver expressionInfo, current *scope, flow flowState) (expressionInfo, bool) {
+	operation, known := typeOperationFor(receiver.typeValue, member.Name)
 	if !known {
 		return expressionInfo{}, false
 	}
-	a.result.CollectionCalls[call] = operation
+	a.result.TypeOperations[call] = operation
 	a.result.ExpressionTypes[call.Callee] = types.Nothing
 	a.result.NullStates[call.Callee] = NonNull
 	if receiver.nullState != NonNull {
 		a.nullableError(string(operation), member.Object, receiver.nullState)
 	}
-	expectedArgument := collectionArgumentType(operation, receiver.typeValue)
-	arguments := a.analyzeCollectionArguments(call, current, flow, expectedArgument)
+	if listOperationMutates(operation) {
+		if target := receiver.symbol; target != nil && constantTarget(target) {
+			a.error(codeConstantAssignment, fmt.Sprintf("cannot %s Constant %q", member.Name, target.Name), member.Object.Span(), fmt.Sprintf("%s mutates the List in place; declare it without Constant", member.Name))
+		}
+	}
+	for _, argument := range call.Arguments {
+		if argument.Name != "" {
+			// A built-in type operation publishes no parameter names, which is
+			// the same call shape the other built-in operations use.
+			a.error(codeCallArguments, fmt.Sprintf("%s does not accept a named argument", operation), argument.Span(), typeOperationHint(operation, receiver.typeValue))
+			a.analyzeTypeOperationArguments(call, current, flow, nil)
+			return typeOperationFailure(operation, receiver.typeValue), true
+		}
+	}
+	if shape, isString := stringOperationShapes[operation]; isString {
+		return a.analyzeStringOperation(call, operation, shape, current, flow), true
+	}
+	switch operation {
+	case ListAdd, ListEject, PairEject:
+		return a.analyzeCollectionMutation(call, operation, receiver, current, flow), true
+	case ListReverse:
+		a.requireTypeOperationArity(call, operation, receiver.typeValue, 0, current, flow)
+		return expressionInfo{typeValue: types.Nothing, nullState: NonNull}, true
+	case ListSort:
+		return a.analyzeListSort(call, receiver, current, flow), true
+	case ListCount, ListIndex:
+		return a.analyzeListSearch(call, operation, receiver, current, flow), true
+	default:
+		return a.analyzeListTransform(call, operation, receiver, current, flow), true
+	}
+}
+
+// typeOperationFailure is the result an already-rejected operation reports. It
+// keeps the statically known result type where the operation has one, so a
+// rejection does not cascade into derivative diagnostics.
+func typeOperationFailure(operation TypeOperation, receiver types.Type) expressionInfo {
+	if shape, known := stringOperationShapes[operation]; known {
+		return expressionInfo{typeValue: shape.result, nullState: NonNull}
+	}
+	switch operation {
+	case ListAdd, ListEject, PairEject, ListSort, ListReverse:
+		return expressionInfo{typeValue: types.Nothing, nullState: NonNull}
+	case ListCount, ListIndex:
+		return expressionInfo{typeValue: types.Int, nullState: NonNull}
+	case ListFilter:
+		return expressionInfo{typeValue: receiver, nullState: NonNull}
+	default:
+		return expressionInfo{typeValue: types.Invalid, nullState: MaybeNull}
+	}
+}
+
+func typeOperationHint(operation TypeOperation, receiver types.Type) string {
+	if shape, known := stringOperationShapes[operation]; known {
+		return shape.hint
+	}
+	element := types.Invalid
+	if list, ok := receiver.(types.List); ok {
+		element = list.Element
+	}
+	switch operation {
+	case ListAdd:
+		return "pass one element of the List element type"
+	case ListEject:
+		return "pass one Int index, which may be negative"
+	case PairEject:
+		return "pass one key of the Pair key type"
+	case ListReverse:
+		return "call reverse with no argument"
+	case ListSort:
+		return "call sort with no argument, or with one key Function"
+	case ListCount, ListIndex:
+		return "pass one " + types.Display(element) + " value"
+	case ListMap:
+		return "pass one Function taking " + types.Display(element)
+	default:
+		return "pass one Function taking " + types.Display(element) + " and returning Bool"
+	}
+}
+
+// requireTypeOperationArity reports an argument-count mismatch and still
+// analyzes the written arguments, so their own diagnostics are independent.
+func (a *analyzer) requireTypeOperationArity(call *ast.CallExpr, operation TypeOperation, receiver types.Type, count int, current *scope, flow flowState) bool {
+	if len(call.Arguments) == count {
+		return true
+	}
+	a.error(codeCallArguments, fmt.Sprintf("%s expects %d argument(s); received %d", operation, count, len(call.Arguments)), call.Span(), typeOperationHint(operation, receiver))
+	a.analyzeTypeOperationArguments(call, current, flow, nil)
+	return false
+}
+
+// analyzeStringOperation checks the immutable String operations. Every
+// argument is a NonNull String and the receiver is never modified.
+func (a *analyzer) analyzeStringOperation(call *ast.CallExpr, operation TypeOperation, shape stringOperationShape, current *scope, flow flowState) expressionInfo {
+	result := expressionInfo{typeValue: shape.result, nullState: NonNull}
+	if !a.requireTypeOperationArity(call, operation, types.String, shape.arguments, current, flow) {
+		return result
+	}
+	arguments := a.analyzeTypeOperationArguments(call, current, flow, types.String)
+	for index, argument := range arguments {
+		if argument.invalid() {
+			continue
+		}
+		if argument.nullState != NonNull {
+			a.nullableError(string(operation), call.Arguments[index].Value, argument.nullState)
+			continue
+		}
+		if argument.typeValue.Kind() != types.StringKind {
+			a.typeMismatch(call.Arguments[index].Span(), types.String, argument.typeValue, string(operation)+" argument")
+		}
+	}
+	return result
+}
+
+// analyzeCollectionMutation checks the in-place List and Pair mutations.
+func (a *analyzer) analyzeCollectionMutation(call *ast.CallExpr, operation TypeOperation, receiver expressionInfo, current *scope, flow flowState) expressionInfo {
 	nothing := expressionInfo{typeValue: types.Nothing, nullState: NonNull}
-	if len(arguments) != 1 {
-		a.error(codeCallArguments, fmt.Sprintf("%s expects 1 argument; received %d", operation, len(arguments)), call.Span(), collectionArgumentHint(operation))
-		return nothing, true
+	expectedArgument := collectionArgumentType(operation, receiver.typeValue)
+	if !a.requireTypeOperationArity(call, operation, receiver.typeValue, 1, current, flow) {
+		return nothing
 	}
-	if call.Arguments[0].Name != "" {
-		a.error(codeCallArguments, fmt.Sprintf("%s does not accept a named argument", operation), call.Arguments[0].Span(), collectionArgumentHint(operation))
-		return nothing, true
-	}
-	argument := arguments[0]
+	argument := a.analyzeTypeOperationArguments(call, current, flow, expectedArgument)[0]
 	if argument.nullState != NonNull && operation != ListAdd {
 		a.nullableError(string(operation), call.Arguments[0].Value, argument.nullState)
-		return nothing, true
+		return nothing
 	}
-	if argument.nullState == Null {
-		return nothing, true
+	if argument.nullState == Null || argument.invalid() {
+		return nothing
 	}
 	if !types.Assignable(expectedArgument, argument.typeValue) {
 		a.typeMismatch(call.Arguments[0].Span(), expectedArgument, argument.typeValue, string(operation)+" argument")
 	}
-	return nothing, true
+	return nothing
 }
 
-func (a *analyzer) analyzeCollectionArguments(call *ast.CallExpr, current *scope, flow flowState, expected types.Type) []expressionInfo {
+// analyzeListSearch checks count and index. Both read the List with the
+// ordinary == semantics and never mutate it.
+func (a *analyzer) analyzeListSearch(call *ast.CallExpr, operation TypeOperation, receiver expressionInfo, current *scope, flow flowState) expressionInfo {
+	result := expressionInfo{typeValue: types.Int, nullState: NonNull}
+	element := listElement(receiver.typeValue)
+	if !a.requireTypeOperationArity(call, operation, receiver.typeValue, 1, current, flow) {
+		return result
+	}
+	argument := a.analyzeTypeOperationArguments(call, current, flow, element)[0]
+	if argument.invalid() {
+		return result
+	}
+	if argument.nullState != NonNull {
+		a.nullableError(string(operation), call.Arguments[0].Value, argument.nullState)
+		return result
+	}
+	if !types.Assignable(element, argument.typeValue) {
+		a.typeMismatch(call.Arguments[0].Span(), element, argument.typeValue, string(operation)+" argument")
+	}
+	return result
+}
+
+// analyzeListSort checks both sort forms. The natural form orders comparable
+// scalar elements; the key form orders by an Int, Real, or String key.
+func (a *analyzer) analyzeListSort(call *ast.CallExpr, receiver expressionInfo, current *scope, flow flowState) expressionInfo {
+	nothing := expressionInfo{typeValue: types.Nothing, nullState: NonNull}
+	element := listElement(receiver.typeValue)
+	if len(call.Arguments) == 0 {
+		if element.Kind() != types.InvalidKind && !sortableKey(element) {
+			a.error(codeCallArguments, fmt.Sprintf("sort does not order %s", types.Display(receiver.typeValue)), call.Span(), "sort List<Int>, List<Real>, or List<String>, or pass a key Function")
+		}
+		return nothing
+	}
+	if !a.requireTypeOperationArity(call, ListSort, receiver.typeValue, 1, current, flow) {
+		return nothing
+	}
+	signature, ok := a.analyzeListCallback(call, ListSort, element, nil, current, flow)
+	if !ok {
+		return nothing
+	}
+	if !sortableKey(signature.Return) {
+		a.error(codeCallArguments, fmt.Sprintf("sort key Function returns %s", types.Display(signature.Return)), call.Arguments[0].Span(), "return Int, Real, or String from the key Function")
+	}
+	return nothing
+}
+
+// analyzeListTransform checks map and filter. Both read a snapshot of the
+// receiver and build a new List, so a Constant receiver is valid.
+func (a *analyzer) analyzeListTransform(call *ast.CallExpr, operation TypeOperation, receiver expressionInfo, current *scope, flow flowState) expressionInfo {
+	element := listElement(receiver.typeValue)
+	failure := typeOperationFailure(operation, receiver.typeValue)
+	if !a.requireTypeOperationArity(call, operation, receiver.typeValue, 1, current, flow) {
+		return failure
+	}
+	expectedReturn := types.Type(nil)
+	if operation == ListFilter {
+		expectedReturn = types.Bool
+	}
+	signature, ok := a.analyzeListCallback(call, operation, element, expectedReturn, current, flow)
+	if !ok {
+		return failure
+	}
+	if operation == ListFilter {
+		if signature.Return.Kind() != types.BoolKind {
+			a.typeMismatch(call.Arguments[0].Span(), types.Bool, signature.Return, "filter predicate result")
+		}
+		return expressionInfo{typeValue: receiver.typeValue, nullState: NonNull}
+	}
+	if signature.Return.Kind() == types.NothingKind {
+		a.error(codeCallArguments, "map requires a Function that returns a value", call.Arguments[0].Span(), "return a value from the mapped Function")
+		return failure
+	}
+	return expressionInfo{typeValue: types.List{Element: signature.Return}, nullState: NonNull}
+}
+
+// analyzeListCallback checks one Function argument of a List operation. The
+// callback must take exactly the element type, because List is invariant and
+// no element is converted on the way into the call.
+func (a *analyzer) analyzeListCallback(call *ast.CallExpr, operation TypeOperation, element, expectedReturn types.Type, current *scope, flow flowState) (*types.Signature, bool) {
+	var expected types.Type
+	if element.Kind() != types.InvalidKind {
+		expected = types.Function{Signature: &types.Signature{
+			Parameters: []types.Parameter{{Name: "value", Type: element}}, Return: expectedReturn,
+		}}
+	}
+	reported := a.bag.Len()
+	info := a.analyzeExpressionExpected(call.Arguments[0].Value, current, flow, expected)
+	if info.invalid() || a.bag.Len() != reported {
+		// The argument already reported its own incompatibility; a second
+		// derivative diagnostic about the same callback adds nothing.
+		return nil, false
+	}
+	if info.nullState != NonNull {
+		a.nullableError(string(operation), call.Arguments[0].Value, info.nullState)
+		return nil, false
+	}
+	function, isFunction := info.typeValue.(types.Function)
+	if !isFunction || function.Signature == nil {
+		a.typeMismatch(call.Arguments[0].Span(), types.Function{}, info.typeValue, string(operation)+" argument")
+		return nil, false
+	}
+	signature := function.Signature
+	if len(signature.Parameters) != 1 || !types.Equal(signature.Parameters[0].Type, element) {
+		a.error(codeCallArguments, fmt.Sprintf("%s requires a Function taking exactly one %s", operation, types.Display(element)), call.Arguments[0].Span(), typeOperationHint(operation, types.List{Element: element}))
+		return nil, false
+	}
+	if operation != ListMap && a.callbackReturnsNull(call.Arguments[0].Value, info) {
+		a.error(codeNullableUse, fmt.Sprintf("Function argument for %s may return null", operation), call.Arguments[0].Span(), "return a NonNull value from the callback, or refine the result before returning it")
+		return nil, false
+	}
+	return signature, true
+}
+
+// callbackReturnsNull reports whether the selected callback is known to return
+// a possibly-null result.
+func (a *analyzer) callbackReturnsNull(expression ast.Expr, info expressionInfo) bool {
+	provided := a.result.SelectedFunctionValues[expression]
+	if provided == nil {
+		provided = concreteCallable(info)
+	}
+	return provided != nil && provided.ReturnNull != NonNull
+}
+
+// sortableKey names the element and key types the natural ordering supports.
+func sortableKey(value types.Type) bool {
+	switch value.Kind() {
+	case types.IntKind, types.RealKind, types.StringKind:
+		return true
+	default:
+		return false
+	}
+}
+
+func listElement(receiver types.Type) types.Type {
+	if list, ok := receiver.(types.List); ok {
+		return list.Element
+	}
+	return types.Invalid
+}
+
+func (a *analyzer) analyzeTypeOperationArguments(call *ast.CallExpr, current *scope, flow flowState, expected types.Type) []expressionInfo {
 	arguments := make([]expressionInfo, 0, len(call.Arguments))
 	for _, argument := range call.Arguments {
 		arguments = append(arguments, a.analyzeExpressionExpected(argument.Value, current, flow, expected))
@@ -567,7 +864,7 @@ func (a *analyzer) analyzeCollectionArguments(call *ast.CallExpr, current *scope
 
 // collectionArgumentType is the statically required argument type of one
 // built-in mutation.
-func collectionArgumentType(operation CollectionOperation, receiver types.Type) types.Type {
+func collectionArgumentType(operation TypeOperation, receiver types.Type) types.Type {
 	switch operation {
 	case ListAdd:
 		if list, ok := receiver.(types.List); ok {
@@ -581,17 +878,6 @@ func collectionArgumentType(operation CollectionOperation, receiver types.Type) 
 		}
 	}
 	return types.Invalid
-}
-
-func collectionArgumentHint(operation CollectionOperation) string {
-	switch operation {
-	case ListAdd:
-		return "pass one element of the List element type"
-	case ListEject:
-		return "pass one Int index, which may be negative"
-	default:
-		return "pass one key of the Pair key type"
-	}
 }
 
 func (a *analyzer) analyzeCallArguments(call *ast.CallExpr, current *scope, flow flowState, callable *Callable) []expressionInfo {
@@ -1012,7 +1298,13 @@ func parameterCallableNull(callable *Callable, index int) NullState {
 }
 
 func (a *analyzer) analyzeMember(member *ast.MemberExpr, current *scope, flow flowState) expressionInfo {
-	object := a.analyzeExpression(member.Object, current, flow)
+	return a.analyzeMemberOf(member, a.analyzeExpression(member.Object, current, flow), current, flow)
+}
+
+// analyzeMemberOf resolves one member against an already-analyzed receiver, so
+// a call site can decide between a built-in type operation and an ordinary
+// member without analyzing the receiver expression twice.
+func (a *analyzer) analyzeMemberOf(member *ast.MemberExpr, object expressionInfo, current *scope, flow flowState) expressionInfo {
 	if object.invalid() {
 		return expressionInfo{typeValue: types.Invalid, nullState: MaybeNull}
 	}

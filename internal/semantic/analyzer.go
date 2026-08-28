@@ -90,7 +90,7 @@ func analyzeWithEnvironment(parsed parser.Result, environment Environment) Resul
 	a.result.SelectedFunctionValues = make(map[ast.Expr]*Callable)
 	a.result.OverloadResolutions = make(map[*ast.CallExpr]ResolutionTrace)
 	a.result.SuperCalls = make(map[ast.Expr]bool)
-	a.result.CollectionCalls = make(map[*ast.CallExpr]CollectionOperation)
+	a.result.TypeOperations = make(map[*ast.CallExpr]TypeOperation)
 	a.module = newScope(nil, moduleScope)
 	a.installBuiltins()
 	if parsed.Program == nil {

@@ -2,7 +2,10 @@
 // code generation.
 package types
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 // Kind identifies the semantic shape of a Type.
 type Kind uint8
@@ -119,7 +122,11 @@ func (function Function) String() string {
 	if function.Signature == nil {
 		return "Function"
 	}
-	return "Function<resolved>"
+	parts := make([]string, len(function.Signature.Parameters))
+	for index, parameter := range function.Signature.Parameters {
+		parts[index] = Display(parameter.Type)
+	}
+	return "Function(" + strings.Join(parts, ", ") + ") -> " + Display(function.Signature.Return)
 }
 
 // ClassSymbol is the identity carried by class instance/reference types. It is

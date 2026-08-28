@@ -751,7 +751,121 @@ func (generator *generator) builtinCall(value *ir.CallExpr) string {
 	case "sum", "min", "max":
 		return generator.numericReduction(name, value)
 	default:
+		if strings.HasPrefix(name, "String.") {
+			return generator.stringOperation(strings.TrimPrefix(name, "String."), value)
+		}
+		if strings.HasPrefix(name, "List.") {
+			return generator.listOperation(strings.TrimPrefix(name, "List."), value)
+		}
 		return generator.unsupported("Fundamentals function "+name, meta.Span)
+	}
+}
+
+// stringOperation lowers one built-in String operation. String is immutable,
+// so every one of these produces a new value from the receiver.
+func (generator *generator) stringOperation(name string, value *ir.CallExpr) string {
+	meta := value.ExprMeta()
+	if value.Callee == nil {
+		generator.fail(CodeGenerationFailure, "String."+name+" has no receiver", meta.Span, "the IR call is malformed")
+		return "nil"
+	}
+	text := ir.Type{Kind: ir.StringType}
+	parts := []string{generator.value(value.Callee, text, false)}
+	for _, argument := range value.Arguments {
+		if argument.Value == nil {
+			generator.fail(CodeGenerationFailure, "String."+name+" has a missing argument", meta.Span, "the IR call is malformed")
+			return "nil"
+		}
+		parts = append(parts, generator.value(argument.Value, text, false))
+	}
+	helpers := map[string]string{
+		"trim": "AhdStringTrim", "lower": "AhdStringLower", "upper": "AhdStringUpper",
+		"capitalize": "AhdStringCapitalize", "split": "AhdStringSplit", "replace": "AhdStringReplace",
+		"contains": "AhdStringContains", "startsWith": "AhdStringStartsWith", "endsWith": "AhdStringEndsWith",
+		"count": "AhdStringCount", "index": "AhdStringIndex",
+	}
+	helper, known := helpers[name]
+	if !known {
+		return generator.unsupported("String operation "+name, meta.Span)
+	}
+	return helper + "(" + strings.Join(parts, ", ") + ")"
+}
+
+// listOperation lowers one built-in List operation that is not an in-place
+// element mutation. Each one evaluates its receiver exactly once.
+func (generator *generator) listOperation(name string, value *ir.CallExpr) string {
+	meta := value.ExprMeta()
+	receiver := value.Callee
+	if receiver == nil || receiver.ExprMeta().Type.Kind != ir.ListType || receiver.ExprMeta().Type.Element == nil {
+		generator.fail(CodeGenerationFailure, "List."+name+" has no typed receiver", meta.Span, "the IR call is malformed")
+		return "nil"
+	}
+	element := *receiver.ExprMeta().Type.Element
+	switch name {
+	case "reverse":
+		return generator.expr(receiver) + ".Reverse()"
+	case "count", "index":
+		if len(value.Arguments) != 1 || value.Arguments[0].Value == nil {
+			generator.fail(CodeGenerationFailure, "List."+name+" has no argument", meta.Span, "the IR call is malformed")
+			return "nil"
+		}
+		helper := "AhdListCount"
+		if name == "index" {
+			helper = "AhdListIndex"
+		}
+		return helper + "(" + generator.expr(receiver) + ", " + generator.value(value.Arguments[0].Value, element, true) +
+			", " + generator.equalFunc(element, true, meta.Span) + ")"
+	case "map", "filter":
+		if len(value.Arguments) != 1 || value.Arguments[0].Value == nil {
+			generator.fail(CodeGenerationFailure, "List."+name+" has no callback", meta.Span, "the IR call is malformed")
+			return "nil"
+		}
+		helper := "AhdListMap"
+		if name == "filter" {
+			helper = "AhdListFilter"
+		}
+		return helper + "(" + generator.expr(receiver) + ", " + generator.expr(value.Arguments[0].Value) + ")"
+	case "sort":
+		return generator.listSort(value, element)
+	default:
+		return generator.unsupported("List operation "+name, meta.Span)
+	}
+}
+
+// listSort selects the natural or keyed ordering. The element type decides the
+// natural form and the key Function's return type decides the keyed form, so
+// no ordering is ever inferred from rendered text.
+func (generator *generator) listSort(value *ir.CallExpr, element ir.Type) string {
+	meta := value.ExprMeta()
+	if len(value.Arguments) == 0 {
+		helper, known := orderedHelper("AhdListSort", element)
+		if !known {
+			return generator.unsupported("sort of List<"+element.String()+">", meta.Span)
+		}
+		return helper + "(" + generator.expr(value.Callee) + ")"
+	}
+	key := value.Arguments[0].Value
+	if len(value.Arguments) != 1 || key == nil || key.ExprMeta().Type.Signature == nil {
+		generator.fail(CodeGenerationFailure, "List.sort has no concrete key Function", meta.Span, "the IR call is malformed")
+		return "nil"
+	}
+	helper, known := orderedHelper("AhdListSortKey", key.ExprMeta().Type.Signature.Return)
+	if !known {
+		return generator.unsupported("sort by a "+key.ExprMeta().Type.Signature.Return.String()+" key", meta.Span)
+	}
+	return helper + "(" + generator.expr(value.Callee) + ", " + generator.expr(key) + ")"
+}
+
+func orderedHelper(prefix string, value ir.Type) (string, bool) {
+	switch value.Kind {
+	case ir.IntType:
+		return prefix + "Int", true
+	case ir.RealType:
+		return prefix + "Real", true
+	case ir.StringType:
+		return prefix + "String", true
+	default:
+		return "", false
 	}
 }
 

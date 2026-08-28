@@ -380,45 +380,60 @@ func comparisonPrefix(left, right ir.Type) string {
 	}
 }
 
-// lowerCollectionCall lowers a built-in List or Pair mutation. The receiver is
-// carried as the callee so the operation keeps one evaluated target.
-func (lowerer *moduleLowerer) lowerCollectionCall(call *ast.CallExpr, operation semantic.CollectionOperation, base ir.ExprBase) ir.Expr {
+// lowerTypeOperation lowers a built-in String, List, or Pair operation. The
+// receiver is carried as the callee so the operation keeps one evaluated
+// target.
+func (lowerer *moduleLowerer) lowerTypeOperation(call *ast.CallExpr, operation semantic.TypeOperation, base ir.ExprBase) ir.Expr {
 	member, ok := call.Callee.(*ast.MemberExpr)
 	if !ok {
-		lowerer.compilation.error(CodeMissingSemantic, "collection mutation has no receiver", call.Span())
+		lowerer.compilation.error(CodeMissingSemantic, "type operation has no receiver", call.Span())
 		return nil
 	}
 	receiver := lowerer.lowerExpr(member.Object)
 	if receiver == nil {
 		return nil
 	}
-	argumentType := ir.Type{Kind: ir.IntType}
-	receiverType := receiver.ExprMeta().Type
-	switch operation {
-	case semantic.ListAdd:
-		if receiverType.Element != nil {
-			argumentType = *receiverType.Element
-		}
-	case semantic.PairEject:
-		if receiverType.Key != nil {
-			argumentType = *receiverType.Key
-		}
-	}
+	argumentType, typed := typeOperationArgument(operation, receiver.ExprMeta().Type)
 	result := &ir.CallExpr{
 		ExprBase: base, Callable: ir.CallableID("builtin:core::" + string(operation)),
 		Callee: receiver, ReturnNull: ir.NonNull,
 	}
 	for index, argument := range call.Arguments {
-		result.Arguments = append(result.Arguments, ir.Argument{
-			ParameterIndex: index, Value: lowerer.lowerExprExpected(argument.Value, argumentType),
-		})
+		// A callback argument already carries its own concrete Function type,
+		// so only value arguments are lowered against an expected type.
+		value := lowerer.lowerExpr(argument.Value)
+		if typed {
+			value = lowerer.lowerExprExpected(argument.Value, argumentType)
+		}
+		result.Arguments = append(result.Arguments, ir.Argument{ParameterIndex: index, Value: value})
 	}
 	return result
 }
 
+// typeOperationArgument is the expected lowered type of a value argument, and
+// reports false for the operations whose argument is a Function value.
+func typeOperationArgument(operation semantic.TypeOperation, receiver ir.Type) (ir.Type, bool) {
+	switch operation {
+	case semantic.ListAdd, semantic.ListCount, semantic.ListIndex:
+		if receiver.Element != nil {
+			return *receiver.Element, true
+		}
+	case semantic.PairEject:
+		if receiver.Key != nil {
+			return *receiver.Key, true
+		}
+	case semantic.ListEject:
+		return ir.Type{Kind: ir.IntType}, true
+	case semantic.StringSplit, semantic.StringReplace, semantic.StringContains,
+		semantic.StringStartsWith, semantic.StringEndsWith, semantic.StringCount, semantic.StringIndex:
+		return ir.Type{Kind: ir.StringType}, true
+	}
+	return ir.Type{Kind: ir.InvalidType}, false
+}
+
 func (lowerer *moduleLowerer) lowerCall(call *ast.CallExpr, base ir.ExprBase) ir.Expr {
-	if operation, known := lowerer.semantic.CollectionCalls[call]; known {
-		return lowerer.lowerCollectionCall(call, operation, base)
+	if operation, known := lowerer.semantic.TypeOperations[call]; known {
+		return lowerer.lowerTypeOperation(call, operation, base)
 	}
 	symbol := lowerer.semantic.ResolvedSymbols[call.Callee]
 	if symbol != nil && symbol.Alias != nil {

@@ -118,18 +118,66 @@ type ModuleInterface struct {
 	ExportNames []string
 }
 
-// CollectionOperation is one built-in collection mutation. These are typed
-// language operations rather than dynamic member calls.
-type CollectionOperation string
+// TypeOperation is one built-in operation on a language type. These are typed
+// language operations selected by the statically known receiver type rather
+// than dynamic member lookups, so a user Class may still declare its own
+// methods with the same names.
+type TypeOperation string
 
 const (
 	// ListAdd appends one element to the end of a List.
-	ListAdd CollectionOperation = "List.add"
+	ListAdd TypeOperation = "List.add"
 	// ListEject removes the element at an index, which may be negative.
-	ListEject CollectionOperation = "List.eject"
+	ListEject TypeOperation = "List.eject"
 	// PairEject removes one key and its value from a Pair.
-	PairEject CollectionOperation = "Pair.eject"
+	PairEject TypeOperation = "Pair.eject"
+	// ListSort orders a List in place, naturally or by a key Function.
+	ListSort TypeOperation = "List.sort"
+	// ListReverse reverses a List in place.
+	ListReverse TypeOperation = "List.reverse"
+	// ListCount counts equal elements without mutating the List.
+	ListCount TypeOperation = "List.count"
+	// ListIndex is the first index of an equal element.
+	ListIndex TypeOperation = "List.index"
+	// ListMap builds a new List from a Function applied to a snapshot.
+	ListMap TypeOperation = "List.map"
+	// ListFilter builds a new List of the elements a predicate keeps.
+	ListFilter TypeOperation = "List.filter"
+
+	// StringTrim removes leading and trailing Unicode whitespace.
+	StringTrim TypeOperation = "String.trim"
+	// StringLower is locale-independent Unicode lowercase.
+	StringLower TypeOperation = "String.lower"
+	// StringUpper is locale-independent Unicode uppercase.
+	StringUpper TypeOperation = "String.upper"
+	// StringCapitalize uppercases only the first character.
+	StringCapitalize TypeOperation = "String.capitalize"
+	// StringSplit divides a String on every occurrence of a separator.
+	StringSplit TypeOperation = "String.split"
+	// StringReplace rewrites every occurrence of a search text.
+	StringReplace TypeOperation = "String.replace"
+	// StringContains reports substring membership.
+	StringContains TypeOperation = "String.contains"
+	// StringStartsWith reports a prefix match.
+	StringStartsWith TypeOperation = "String.startsWith"
+	// StringEndsWith reports a suffix match.
+	StringEndsWith TypeOperation = "String.endsWith"
+	// StringCount counts non-overlapping occurrences of a search text.
+	StringCount TypeOperation = "String.count"
+	// StringIndex is the first character index of a search text.
+	StringIndex TypeOperation = "String.index"
 )
+
+// listOperationMutates reports whether one List operation rewrites its
+// receiver, so the Constant rules apply to it.
+func listOperationMutates(operation TypeOperation) bool {
+	switch operation {
+	case ListAdd, ListEject, ListSort, ListReverse:
+		return true
+	default:
+		return false
+	}
+}
 
 // Environment supplies already-resolved dependency interfaces to one semantic
 // analysis run. Filesystem/module graph work stays outside this package.
@@ -153,9 +201,9 @@ type Result struct {
 	// SuperCalls marks member expressions written as SuperClass.member, which
 	// bind the current instance but call the parent implementation directly.
 	SuperCalls map[ast.Expr]bool
-	// CollectionCalls records the built-in List and Pair mutation operations,
+	// TypeOperations records the built-in String, List, and Pair operations,
 	// so lowering never has to rediscover them from member names.
-	CollectionCalls map[*ast.CallExpr]CollectionOperation
+	TypeOperations map[*ast.CallExpr]TypeOperation
 }
 
 func (result Result) HasErrors() bool {

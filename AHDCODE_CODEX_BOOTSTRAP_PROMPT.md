@@ -1561,22 +1561,70 @@ being hard-coded across the parser, semantic layer, and backend. An explicit
 annotation must equal the yielded type; the frontend never inserts a
 conversion into an iteration binding.
 
-### Built-in collection mutation
+### Built-in type operations
 
-`list.add`, `list.eject`, and `pair.eject` are typed language operations, not
-dynamic member calls. Semantic analysis recognizes them from the receiver type
-in `analyzeCollectionCall`, records the chosen operation in
-`Result.CollectionCalls`, and statically checks the receiver null-state and the
-argument type against the receiver's element or key type. Lowering emits a
-`CallExpr` whose `Callable` is `builtin:core::List.add`,
-`builtin:core::List.eject`, or `builtin:core::Pair.eject`, and whose `Callee`
-is the already-lowered receiver, so the target is evaluated exactly once. The
-backend maps those three callables onto the `AhdList.Add`, `AhdList.Eject`, and
-`AhdPair.Eject` runtime helpers; it never inspects member-name strings. Each
-helper goes through the same `requireMutable` guard as `clear`, so the Constant
-deep-freeze contract covers them without additional backend logic. A Class may
-still declare its own `add` or `eject` method, because the receiver type
-decides which path applies.
+The String and List APIs are **typed language operations**, not Fundamentals
+functions and not dynamic member calls. One mechanism carries all of them.
+
+Semantic analysis resolves each from the statically known receiver type in
+`analyzeTypeOperation` and records the choice in `Result.TypeOperations`. The
+call path analyzes a member receiver exactly once and then decides between a
+built-in operation and an ordinary member, so neither path re-analyzes or
+re-diagnoses the receiver. Lowering emits a `CallExpr` whose `Callable` is the
+operation identity — `builtin:core::String.trim`, `builtin:core::List.map`, and
+so on — and whose `Callee` is the already-lowered receiver, so the target is
+evaluated exactly once. The backend maps those identities onto runtime helpers
+and never inspects member-name strings or generated source text.
+
+The frozen v0.1 surface is:
+
+```text
+String  trim lower upper capitalize split replace
+        contains startsWith endsWith count index
+List    add eject sort reverse count index map filter
+Pair    eject
+```
+
+Do not add aliases (`append`, `push`, `remove`, `findIndex`, `foreach`,
+`select`, `where`, `transform`), `reduce`, a comparator or descending `sort`,
+or a parameterless whitespace `split`. A Class may still declare its own
+methods with any of these names, because the receiver type decides which path
+applies.
+
+Every one of these operations publishes no parameter names, so a named argument
+is rejected — the same call shape `take` and the collection mutations already
+use. Receiver and value arguments must be `NonNull`.
+
+`String` is immutable: every String operation returns a new value. `trim` uses
+Unicode whitespace at both ends only; `lower`/`upper` are deterministic,
+locale-independent Unicode simple case mappings with no locale parameter;
+`capitalize` uppercases the first character and leaves the remainder exactly as
+written, which is deliberately not Python's behavior. `split`, `replace`,
+`count`, and `index` reject an empty search text or separator with a catchable
+`DomainError`, and `index` reports a **character** index — never a UTF-8 byte
+offset — and raises `DomainError` rather than returning `-1`.
+
+`sort`, `reverse`, `add`, and `eject` mutate the receiver in place through the
+same `requireMutable` guard as `clear`, so the Constant deep-freeze contract
+covers them with no extra backend logic. `count`, `index`, `map`, and `filter`
+are pure reads and accept a Constant receiver. `map` and `filter` iterate a
+shallow snapshot taken at entry, matching the `for` snapshot rule, and return a
+new mutable List.
+
+Sorting has two forms and no others. The natural form requires an `Int`,
+`Real`, or `String` element type and is rejected statically for anything else;
+never stringify values to make them ordered. The key form takes a declared
+Function of one element returning `Int`, `Real`, or `String` — v0.1 has no
+lambda syntax, and the existing concrete Function type system is sufficient.
+Both forms are stable and ascending. The key form is atomic: every key is
+computed exactly once per element, left to right, before the receiver is
+rewritten, so a raising key Function leaves the original order unchanged. A
+`null` key or a `null` predicate result is a runtime `NullError`; a callback
+that may return null is rejected statically for `sort` and `filter`, but not
+for `map`, whose result elements are nullable by definition.
+
+Callback parameter types must match the element type exactly, because `List` is
+invariant and no element is converted on the way into the call.
 
 ### Control flow
 

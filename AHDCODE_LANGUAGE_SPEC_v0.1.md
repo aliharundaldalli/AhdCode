@@ -469,6 +469,158 @@ An ordinary quoted string cannot contain a physical newline, including inside it
 
 The interpolation expression may produce any value accepted by `str`, but may not produce `Nothing`. Its textual conversion has the same semantics as `str(expression)` and does not introduce general String-number coercion for operators such as `+`.
 
+### 6.3 String operations
+
+`String` is immutable. Every operation below returns a new value and never modifies its receiver, so the receiver of one may be the result of another. The receiver and every argument must be `NonNull`.
+
+```text
+trim()                            -> String
+lower()                           -> String
+upper()                           -> String
+capitalize()                      -> String
+split(separator: String)          -> List<String>
+replace(old: String, new: String) -> String
+contains(text: String)            -> Bool
+startsWith(prefix: String)        -> Bool
+endsWith(suffix: String)          -> Bool
+count(text: String)               -> Int
+index(text: String)               -> Int
+```
+
+These are typed operations on the `String` type, selected by the receiver's static type. They are not Fundamentals functions, they publish no parameter names, and a named argument is rejected. A `Class` may still declare its own methods with these names, because the receiver type decides.
+
+`trim` removes Unicode whitespace from the beginning and the end only; interior whitespace is preserved.
+
+```ahd
+write("[{"  Ali  ".trim()}]")
+write("[{"\t Ali Harun \n".trim()}]")
+```
+
+=>
+
+```text
+[Ali]
+[Ali Harun]
+```
+
+`lower` and `upper` are deterministic, locale-independent Unicode simple case mappings. v0.1 has no locale configuration and no Turkish-locale special casing.
+
+```ahd
+write("AhdCode".lower())
+write("AhdCode".upper())
+```
+
+=>
+
+```text
+ahdcode
+AHDCODE
+```
+
+`capitalize` uppercases the first character and leaves the remainder exactly as written. It is not Python's capitalize: the rest of the text is never lowercased. An empty String stays empty.
+
+```ahd
+write("ali HARUN".capitalize())
+write("aHD".capitalize())
+```
+
+=>
+
+```text
+Ali HARUN
+AHD
+```
+
+Normalization is written explicitly:
+
+```ahd
+write("ali HARUN".lower().capitalize())
+```
+
+=>
+
+```text
+Ali harun
+```
+
+`split` divides on every non-overlapping occurrence of the separator and preserves empty fields. The separator must not be empty; an empty separator raises the catchable `DomainError`. v0.1 has no parameterless whitespace-splitting form.
+
+```ahd
+write("a,b,c".split(","))
+write("a,,b,".split(","))
+write("".split(","))
+```
+
+=>
+
+```text
+["a", "b", "c"]
+["a", "", "b", ""]
+[""]
+```
+
+`replace` rewrites every non-overlapping occurrence, left to right. The searched text must not be empty and raises `DomainError` when it is; the replacement may be empty.
+
+```ahd
+write("banana".replace("na", "X"))
+write("abc".replace("b", ""))
+```
+
+=>
+
+```text
+baXX
+ac
+```
+
+`contains`, `startsWith`, and `endsWith` follow ordinary String mathematics, so an empty search text matches:
+
+```ahd
+write("abc".contains(""))
+write("abc".startsWith(""))
+write("abc".endsWith(""))
+```
+
+=>
+
+```text
+true
+true
+true
+```
+
+`count` counts non-overlapping occurrences. AhdCode does not adopt the length-plus-one rule for an empty search text: an empty text raises `DomainError`.
+
+```ahd
+write("banana".count("a"))
+write("banana".count("na"))
+write("banana".count("x"))
+```
+
+=>
+
+```text
+3
+2
+0
+```
+
+`index` returns the first occurrence as an AhdCode **character** index, never a UTF-8 byte offset.
+
+```ahd
+write("banana".index("na"))
+write("a✓b✓".index("✓"))
+```
+
+=>
+
+```text
+2
+1
+```
+
+`index` has no sentinel result. A search text the receiver does not contain raises the catchable `DomainError`, and so does an empty search text.
+
 ---
 
 ## 7. Nothing and null
@@ -992,6 +1144,153 @@ produces:
 `eject` accepts the same negative indexing as ordinary List indexing, so `values.eject(-1)` removes the final element. An out-of-range index raises `IndexError`. `eject` does not return the removed element in v0.1.
 
 Both operations mutate the existing List object rather than producing a new one, so every alias observes the change. Both return `Nothing` and therefore cannot be used as values. The receiver must be `NonNull`, the argument follows ordinary element assignability, and a `Constant` or otherwise frozen List rejects both.
+
+### 12.5 Ordering
+
+`List<T>` has two ordering operations, and both rewrite the receiver in place:
+
+```text
+sort()                     -> Nothing
+sort(key: Function(T) -> K) -> Nothing
+reverse()                  -> Nothing
+```
+
+Like `add` and `eject`, they mutate the existing object, so every alias observes the new order, they return `Nothing`, and a `Constant` or otherwise frozen List rejects them. They publish no parameter names.
+
+`reverse` reverses the current order.
+
+```ahd
+values: List<Int> := [1, 2, 3]
+alias: List<Int> := values
+
+values.reverse()
+
+write(alias)
+```
+
+=>
+
+```text
+[3, 2, 1]
+```
+
+The natural form of `sort` orders ascending and is stable. Its element type must be `Int`, `Real`, or `String`; any other element type — including `Bool`, a `Class`, a `Pair`, or a nested `List` — is a compile-time rejection rather than a silent conversion to text. A `null` element has no natural order and raises the catchable `NullError`, leaving the List unchanged.
+
+```ahd
+values: List<Int> := [8, 3, 12, 5]
+
+values.sort()
+
+write(values)
+```
+
+=>
+
+```text
+[3, 5, 8, 12]
+```
+
+The key form orders by the result of a Function of one element. The key type `K` must be exactly `Int`, `Real`, or `String`; a `Bool` key is rejected, as is a key Function that may return `null`. v0.1 has no comparator form and no descending parameter, because a descending order is written with a negated or reversed key.
+
+```ahd
+gradeOf: Function := (
+    student: Student
+) -> Int {
+    return student.grade
+}
+
+students.sort(gradeOf)
+```
+
+The key form is stable and atomic. Every key is computed exactly once per element, left to right, before the receiver is rewritten, so a key Function that raises propagates its error and leaves the original order unchanged. The receiver expression is evaluated exactly once. A key Function that returns `null` at run time raises `NullError`.
+
+### 12.6 Searching
+
+```text
+count(value: T) -> Int
+index(value: T) -> Int
+```
+
+Both are pure reads: they never mutate, reorder, or copy the receiver, so a `NonNull` `Constant` List is a valid receiver. Both compare with the ordinary deep `==` semantics rather than the `same` object identity, and both require a `NonNull` argument.
+
+```ahd
+values: List<Int> := [5, 7, 5, 9]
+
+write(values.count(5))
+write(values.index(5))
+```
+
+=>
+
+```text
+2
+0
+```
+
+`index` reports the first match and has no sentinel result: a value the List does not contain raises the catchable `DomainError` rather than returning `-1`.
+
+### 12.7 map and filter
+
+```text
+map(transform: Function(T) -> U)   -> List<U>
+filter(keep: Function(T) -> Bool)  -> List<T>
+```
+
+Both build a new mutable List and never modify the receiver, so a `Constant` List is a valid receiver. Both iterate a shallow snapshot taken when the operation starts, which is the same rule `for` follows, and invoke the callback left to right exactly once per snapshot element. A callback error propagates normally.
+
+v0.1 has no lambda syntax; a callback is an ordinary declared Function, and its parameter type must be exactly the element type because `List` is invariant.
+
+```ahd
+double: Function := (
+    x: Int
+) -> Int {
+    return x * 2
+}
+
+numbers: List<Int> := [1, 2, 3]
+doubled: List<Int> := numbers.map(double)
+```
+
+=>
+
+```text
+[2, 4, 6]
+```
+
+`map` may change the element type:
+
+```ahd
+describe: Function := (
+    x: Int
+) -> String {
+    return "Sayi: {x}"
+}
+
+texts: List<String> := numbers.map(describe)
+```
+
+A mapped Function must return a value; a `Nothing` result is rejected.
+
+`filter` requires a real `Bool` predicate. AhdCode has no truthiness, so a non-`Bool` result is a compile-time rejection and a `null` result at run time raises `NullError`.
+
+```ahd
+isEven: Function := (
+    x: Int
+) -> Bool {
+    return x % 2 == 0
+}
+
+values: List<Int> := [1, 2, 3, 4]
+evens: List<Int> := values.filter(isEven)
+```
+
+=>
+
+```text
+[2, 4]
+```
+
+A List element is nullable, so a `null` element is passed to the callback as written rather than silently skipped. When the callback parameter is `NonNull`, that element raises the ordinary `NullError` at the call boundary.
 
 ---
 
@@ -2341,6 +2640,9 @@ Intentionally excluded:
 - traits/interfaces/mixins
 - decorators/annotations
 - multiple inheritance
+- `reduce` and other fold operations
+- comparator or descending forms of `sort`
+- List/String operation aliases such as `append`, `push`, `remove`, `findIndex`, `foreach`, `select`, `where`, and `transform`
 
 ---
 
