@@ -797,7 +797,7 @@ Function calls, mutable binding references, member or index access, List/Pair/Cl
 
 A cycle in the dependency graph of Constant initializers is a compile-time error.
 
-This definition is normative wherever the language requires compile-time knowledge, including the exponent rule that determines whether `Int ^ Int` produces `Int` or `Real` and whether `Int ^=` is valid.
+This definition is normative wherever the language requires compile-time knowledge. Power typing does not depend on constant-expression evaluation.
 
 ---
 
@@ -1521,16 +1521,16 @@ Numeric result rules include:
 | `Int` | `/` | `Int` or `Real` | `Real` |
 | `Real` | `/` | `Int` or `Real` | `Real` |
 | `Int` | `%` | `Int` | `Int` |
-| `Int` | `^` | compile-time constant non-negative `Int` | `Int` |
-| `Int` | `^` | compile-time constant negative `Int` | `Real` |
-| `Int` | `^` | `Int` not known at compile time | `Real` |
+| `Int` | `^` | `Int` | `Int` |
 | `Real` | `^` | `Int` | `Real` |
 | `Int` | `^` | `Real` | `Real` |
 | `Real` | `^` | `Real` | `Real` |
 
 No other `%` operand combination is valid. `/` always produces `Real`, including `Int / Int`.
 
-The `Int ^ Int` result decision uses constant-expression evaluation only. It does not depend on optional optimizer range analysis. An `Int ^=` assignment is valid only when its exponent is a compile-time constant expression whose value is non-negative; otherwise it is a compile-time type error.
+Power result types depend only on operand types; Constant status, compile-time evaluation, exponent sign, and optional optimizer/range analysis do not affect the result type. `Int ^ Int` uses checked Int arithmetic. A negative Int exponent raises `DomainError` during evaluation, and a result outside the signed 64-bit Int range raises `OverflowError`. It is not converted to `Real`.
+
+`Int ^= Int` is valid for every Int right operand. A negative exponent raises `DomainError` and overflow raises `OverflowError` during evaluation. `Int ^= Real` is invalid because the operation produces `Real`, which cannot be assigned implicitly to an Int target. `Real ^= Int` and `Real ^= Real` are valid.
 
 Other built-in meanings include:
 

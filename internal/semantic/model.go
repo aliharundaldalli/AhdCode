@@ -76,27 +76,35 @@ type ResolutionTrace struct {
 // Symbol is a resolved semantic declaration. Alias points from an explicit
 // Global declaration to its module-root binding.
 type Symbol struct {
-	Name           string
-	Kind           SymbolKind
-	Type           types.Type
-	Span           source.Span
-	Declaration    ast.Node
-	Constant       bool
-	Confidential   bool
-	ModuleRoot     bool
-	Builtin        bool
-	InitialNull    NullState
-	Alias          *Symbol
-	Callable       *Callable
-	OverloadSet    *OverloadSet
-	Namespace      *ModuleInterface
-	Class          *types.ClassSymbol
-	OwnerClass     *types.ClassSymbol
-	OriginModuleID string
-	Members        map[string]*Symbol
-	Constructor    *Callable
-	ConstValue     *constantValue
-	inference      *functionInference
+	Name         string
+	Kind         SymbolKind
+	Type         types.Type
+	Span         source.Span
+	Declaration  ast.Node
+	Constant     bool
+	Confidential bool
+	ModuleRoot   bool
+	Builtin      bool
+	// SuperClassBinding marks the implicit SuperClass binding installed inside
+	// a Class callable. It designates the parent implementation rather than an
+	// ordinary Class reference value.
+	SuperClassBinding bool
+	InitialNull       NullState
+	Alias             *Symbol
+	Callable          *Callable
+	OverloadSet       *OverloadSet
+	Namespace         *ModuleInterface
+	Class             *types.ClassSymbol
+	OwnerClass        *types.ClassSymbol
+	OriginModuleID    string
+	Members           map[string]*Symbol
+	Constructor       *Callable
+	// ConstructorAttributes records, per constructor parameter, the instance
+	// attribute that parameter initializes. A Local structure parameter has a
+	// nil entry. Inherited entries come from the parent construction contract.
+	ConstructorAttributes []*Symbol
+	ConstValue            *constantValue
+	inference             *functionInference
 }
 
 // ModuleInterface is an in-memory, compile-time-only public contract. Identity
@@ -129,6 +137,9 @@ type Result struct {
 	SelectedCallables      map[*ast.CallExpr]*Callable
 	SelectedFunctionValues map[ast.Expr]*Callable
 	OverloadResolutions    map[*ast.CallExpr]ResolutionTrace
+	// SuperCalls marks member expressions written as SuperClass.member, which
+	// bind the current instance but call the parent implementation directly.
+	SuperCalls map[ast.Expr]bool
 }
 
 func (result Result) HasErrors() bool {

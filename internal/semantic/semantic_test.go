@@ -160,7 +160,15 @@ func TestConstantValidation(t *testing.T) {
 	_, nullConstant := analyzeText(t, "id: Constant Int := null")
 	requireSemanticCode(t, nullConstant, codeConstantInitializer)
 
-	_, nonscalar := analyzeText(t, "values: Constant List<Int> := [1, 2]")
+	// A Constant reference binding deep-freezes its object graph; only a
+	// Constant scalar requires a compile-time constant expression.
+	_, frozenList := analyzeText(t, "values: Constant List<Int> := [1, 2]")
+	requireSemanticClean(t, frozenList)
+
+	_, frozenAlias := analyzeText(t, "source: List<Int> := [1, 2]\nvalues: Constant List<Int> := source")
+	requireSemanticClean(t, frozenAlias)
+
+	_, nonscalar := analyzeText(t, "size: Constant Int := len([1, 2])")
 	requireSemanticCode(t, nonscalar, codeConstantInitializer)
 
 	_, cyclic := analyzeText(t, "A: Constant Int := B\nB: Constant Int := A")
@@ -184,28 +192,37 @@ func TestCompoundAssignments(t *testing.T) {
 	requireSemanticCode(t, realModulo, codeOperatorType)
 }
 
-func TestPowerConstantExponentRules(t *testing.T) {
+func TestPowerTypesDependOnlyOnOperandTypes(t *testing.T) {
 	parsed, result := analyzeText(t, `base: Int := 2
 exponent: Int := 3
 known: Int := base ^ (1 + 1)
-negative: Real := base ^ -1
-unknown: Real := base ^ exponent`)
+negative: Int := base ^ -1
+unknown: Int := base ^ exponent
+constantBase: Constant Int := 5
+constantExponent: Constant Int := 7
+constantResult: Int := constantBase ^ constantExponent
+mixedResult: Int := base ^ constantExponent
+realLeft: Real := 2.0 ^ exponent
+realRight: Real := base ^ 2.0`)
 	requireSemanticClean(t, result)
 	knownInitializer := parsed.Program.Statements[2].(*ast.VariableDecl).Initializer
 	negativeInitializer := parsed.Program.Statements[3].(*ast.VariableDecl).Initializer
 	unknownInitializer := parsed.Program.Statements[4].(*ast.VariableDecl).Initializer
-	if result.ExpressionTypes[knownInitializer].Kind() != types.IntKind || result.ExpressionTypes[negativeInitializer].Kind() != types.RealKind || result.ExpressionTypes[unknownInitializer].Kind() != types.RealKind {
+	if result.ExpressionTypes[knownInitializer].Kind() != types.IntKind || result.ExpressionTypes[negativeInitializer].Kind() != types.IntKind || result.ExpressionTypes[unknownInitializer].Kind() != types.IntKind {
 		t.Fatalf("power types = %s, %s, %s", result.ExpressionTypes[knownInitializer], result.ExpressionTypes[negativeInitializer], result.ExpressionTypes[unknownInitializer])
 	}
 
-	_, badBinding := analyzeText(t, "base: Int := 2\nexponent: Int := 3\nresult: Int := base ^ exponent")
-	requireSemanticCode(t, badBinding, codeTypeMismatch)
+	_, mutableBinding := analyzeText(t, "base: Int := 5\nexponent: Int := 7\nresult: Int := base ^ exponent")
+	requireSemanticClean(t, mutableBinding)
 
-	_, goodUpdate := analyzeText(t, "base: Int := 2\nbase ^= 3")
+	_, goodUpdate := analyzeText(t, "base: Int := 2\nexponent: Int := 3\nbase ^= exponent")
 	requireSemanticClean(t, goodUpdate)
 
-	_, badUpdate := analyzeText(t, "base: Int := 2\nexponent: Int := 3\nbase ^= exponent")
+	_, badUpdate := analyzeText(t, "base: Int := 2\nexponent: Real := 3.0\nbase ^= exponent")
 	requireSemanticCode(t, badUpdate, codeTypeMismatch)
+
+	_, realUpdates := analyzeText(t, "base: Real := 2.0\nintExponent: Int := 3\nrealExponent: Real := 0.5\nbase ^= intExponent\nbase ^= realExponent")
+	requireSemanticClean(t, realUpdates)
 }
 
 func TestOperatorRulesAndUpdates(t *testing.T) {

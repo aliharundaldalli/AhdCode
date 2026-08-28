@@ -206,7 +206,7 @@ func TestCrossModuleClassIdentitySubtypeAndMembers(t *testing.T) {
 		"/Main.ahd": `from Models bring Person
 Student: Class<Person> := {
 }
-person: Person := Student()
+person: Person := Student(name: "Ada")
 name: String := Person(name: "Ali").name`,
 	}, "/Main.ahd")
 	requireClean(t, result)

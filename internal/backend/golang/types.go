@@ -66,7 +66,9 @@ func (generator *generator) plainType(value ir.Type) string {
 		if value.Class == "" {
 			return ""
 		}
-		return "*" + generator.className(value.Class)
+		// A Class instance is represented by its generated interface, so a
+		// subclass value keeps one object identity when it is upcast.
+		return generator.interfaceName(value.Class)
 	case ir.FunctionType:
 		return generator.functionType(value.Signature)
 	default:
@@ -74,16 +76,17 @@ func (generator *generator) plainType(value ir.Type) string {
 	}
 }
 
-// functionType maps a concrete Function signature. Signature-level null-state
-// is not part of the IR Function type contract, so Function values use the
-// non-null representation for their parameters and result.
+// functionType is the uniform Go type of a Function value. Its scalar
+// parameters and result always use the nullable representation, because an IR
+// Function type carries no per-parameter or return null-state; a concrete
+// callable is adapted to this shape when it is taken as a value.
 func (generator *generator) functionType(signature *ir.Signature) string {
 	if signature == nil {
 		return ""
 	}
 	parts := make([]string, 0, len(signature.Parameters))
 	for _, parameter := range signature.Parameters {
-		rendered := generator.goType(parameter.Type, false)
+		rendered := generator.goType(parameter.Type, true)
 		if rendered == "" {
 			return ""
 		}
@@ -93,7 +96,7 @@ func (generator *generator) functionType(signature *ir.Signature) string {
 	if signature.Return.Kind == ir.NothingType {
 		return result
 	}
-	returned := generator.goType(signature.Return, false)
+	returned := generator.goType(signature.Return, true)
 	if returned == "" {
 		return ""
 	}
@@ -101,9 +104,54 @@ func (generator *generator) functionType(signature *ir.Signature) string {
 }
 
 func (generator *generator) className(id ir.ClassID) string {
-	return mangle(classPrefix, string(id))
+	return mangleNamed(classPrefix, generator.classDisplayName(id), string(id))
+}
+
+func (generator *generator) interfaceName(id ir.ClassID) string {
+	return mangleNamed(interfacePrefix, generator.classDisplayName(id), string(id))
+}
+
+func (generator *generator) descriptorName(id ir.ClassID) string {
+	return mangleNamed(descriptorPrefix, generator.classDisplayName(id), string(id))
+}
+
+func (generator *generator) classDisplayName(id ir.ClassID) string {
+	if class := generator.classes[id]; class != nil {
+		return class.Name
+	}
+	return string(id)
 }
 
 func (generator *generator) fieldName(id ir.FieldID) string {
-	return mangle(fieldPrefix, string(id))
+	name := string(id)
+	if field, known := generator.fields[id]; known {
+		name = field.Name
+	}
+	return mangleNamed(fieldPrefix, name, string(id))
+}
+
+// slotName is the interface method that implements one dispatch slot. It is
+// derived from the callable that introduced the slot, so a parent method and
+// every override share one Go method name.
+func (generator *generator) slotName(id ir.CallableID) string {
+	root := generator.slotRoot(id)
+	name := string(root)
+	if function := generator.functions[root]; function != nil {
+		name = function.Name
+	}
+	return mangleNamed(slotPrefix, name, string(root))
+}
+
+// slotRoot walks the recorded Override chain to the callable that introduced
+// the dispatch slot.
+func (generator *generator) slotRoot(id ir.CallableID) ir.CallableID {
+	seen := make(map[ir.CallableID]bool)
+	for {
+		function := generator.functions[id]
+		if function == nil || function.Overrides == "" || seen[id] {
+			return id
+		}
+		seen[id] = true
+		id = function.Overrides
+	}
 }

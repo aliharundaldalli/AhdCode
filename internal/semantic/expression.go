@@ -131,7 +131,12 @@ func (a *analyzer) analyzeIdentifier(identifier *ast.IdentifierExpr, current *sc
 		a.error(codeUnknownName, fmt.Sprintf("unknown name %q", identifier.Name), identifier.Span(), "declare the binding in a visible lexical scope")
 		return expressionInfo{typeValue: types.Invalid, nullState: MaybeNull}
 	}
-	if owner == a.module && current.callable != nil && !symbol.Builtin && symbol.Kind != ClassSymbol && symbol.Kind != NamespaceSymbol && current.callable.symbol != symbol {
+	// Global governs module state. A module-root Function, Class, or namespace
+	// declaration is a callable or type declaration rather than a binding, so
+	// it needs no Global declaration to be used inside a callable.
+	if owner == a.module && current.callable != nil && !symbol.Builtin &&
+		symbol.Kind != ClassSymbol && symbol.Kind != NamespaceSymbol && symbol.Kind != FunctionSymbol &&
+		current.callable.symbol != symbol {
 		a.error(codeHiddenGlobal, fmt.Sprintf("module binding %q requires an explicit Global declaration", identifier.Name), identifier.Span(), fmt.Sprintf("add %s: Global %s in this callable", identifier.Name, types.Display(symbol.Type)))
 	}
 	typeValue := symbol.Type
@@ -226,7 +231,7 @@ func (a *analyzer) analyzeBinary(expression *ast.BinaryExpr, current *scope, flo
 	if right.nullState != NonNull {
 		a.nullableError(operator, expression.Right, right.nullState)
 	}
-	resultType := a.binaryOperatorType(operator, left.typeValue, right.typeValue, expression.Right)
+	resultType := a.binaryOperatorType(operator, left.typeValue, right.typeValue)
 	if types.IsInvalid(resultType) {
 		a.operatorError(operator, left.typeValue, right.typeValue, expression.Span())
 	}
@@ -253,7 +258,9 @@ func (a *analyzer) analyzeEqualityLike(expression *ast.BinaryExpr, left, right e
 		constant, _ := a.evaluateConstant(expression)
 		return expressionInfo{typeValue: types.Bool, nullState: NonNull, constant: constant}
 	}
-	compatible := types.Equal(left.typeValue, right.typeValue) || (types.IsNumeric(left.typeValue) && types.IsNumeric(right.typeValue))
+	compatible := types.Equal(left.typeValue, right.typeValue) ||
+		(types.IsNumeric(left.typeValue) && types.IsNumeric(right.typeValue)) ||
+		relatedClasses(left.typeValue, right.typeValue)
 	if !compatible {
 		a.operatorError(operator, left.typeValue, right.typeValue, expression.Span())
 	}
@@ -283,7 +290,7 @@ func (a *analyzer) analyzeMembership(expression *ast.BinaryExpr, left, right exp
 	return expressionInfo{typeValue: types.Bool, nullState: NonNull}
 }
 
-func (a *analyzer) binaryOperatorType(operator string, left, right types.Type, rightExpression ast.Expr) types.Type {
+func (a *analyzer) binaryOperatorType(operator string, left, right types.Type) types.Type {
 	if operator == "+" && left.Kind() == types.StringKind && right.Kind() == types.StringKind {
 		return types.String
 	}
@@ -305,11 +312,7 @@ func (a *analyzer) binaryOperatorType(operator string, left, right types.Type, r
 	}
 	if operator == "^" {
 		if left.Kind() == types.IntKind && right.Kind() == types.IntKind {
-			constant, failure := a.evaluateConstant(rightExpression)
-			if failure == constOK && constant != nil && constant.integer != nil && constant.integer.Sign() >= 0 {
-				return types.Int
-			}
-			return types.Real
+			return types.Int
 		}
 		if types.IsNumeric(left) && types.IsNumeric(right) {
 			return types.Real
@@ -353,7 +356,7 @@ func (a *analyzer) analyzeFunctionValueIdentifier(identifier *ast.IdentifierExpr
 	}
 	expectedFunction, hasExpectedFunction := expected.(types.Function)
 	if symbol.inference != nil && hasExpectedFunction && expectedFunction.Signature != nil {
-		a.constrainConcreteFunction(symbol, expectedFunction.Signature, identifier.Span())
+		a.constrainConcreteFunction(symbol, expectedFunction.Signature, nil, identifier.Span())
 		info.typeValue = expectedFunction
 	}
 	if symbol.OverloadSet == nil {
@@ -392,7 +395,9 @@ func (a *analyzer) analyzeFunctionValueIdentifier(identifier *ast.IdentifierExpr
 
 func (a *analyzer) analyzeCallExpected(call *ast.CallExpr, current *scope, flow flowState, expected types.Type) expressionInfo {
 	callee := a.analyzeExpression(call.Callee, current, flow)
-	if callee.symbol != nil && callee.symbol.Builtin {
+	// Only the built-in Fundamentals functions use the builtin call path; a
+	// built-in Class is constructed like any other Class.
+	if callee.symbol != nil && callee.symbol.Builtin && callee.symbol.Kind == BuiltinSymbol {
 		arguments := a.analyzeCallArguments(call, current, flow, nil)
 		return a.analyzeBuiltinCall(call, callee.symbol, arguments)
 	}
@@ -614,6 +619,11 @@ func (a *analyzer) callArgumentsCompatible(call *ast.CallExpr, callable *Callabl
 			if diagnose {
 				a.typeMismatch(argument.Span(), parameters[parameterIndex].Type, arguments[index].typeValue, fmt.Sprintf("argument %s", parameters[parameterIndex].Name))
 			}
+		} else if !a.callableNullContractSatisfied(callable, parameterIndex, argument.Value, arguments[index]) {
+			valid = false
+			if diagnose {
+				a.error(codeNullableUse, fmt.Sprintf("Function argument for %s may return null, but the callback contract is NonNull", parameters[parameterIndex].Name), argument.Span(), "return a NonNull value from the callback, or refine the result before returning it")
+			}
 		}
 	}
 	for index, parameter := range parameters {
@@ -627,8 +637,41 @@ func (a *analyzer) callArgumentsCompatible(call *ast.CallExpr, callable *Callabl
 	return valid
 }
 
+// callableNullContractSatisfied keeps a callback's null-state contract intact
+// across a call boundary: a Function argument may not return null where the
+// parameter contract promises a NonNull result.
+func (a *analyzer) callableNullContractSatisfied(callable *Callable, index int, expression ast.Expr, info expressionInfo) bool {
+	if callable == nil || index >= len(callable.Signature.Parameters) {
+		return true
+	}
+	if _, ok := callable.Signature.Parameters[index].Type.(types.Function); !ok {
+		return true
+	}
+	expected := parameterCallableNull(callable, index)
+	if expected != NonNull {
+		return true
+	}
+	provided := a.result.SelectedFunctionValues[expression]
+	if provided == nil {
+		provided = concreteCallable(info)
+	}
+	return provided == nil || provided.ReturnNull == NonNull
+}
+
+// parameterCallableNull is the return null-state the parameter's own callable
+// contract promises, when that contract is known.
+func parameterCallableNull(callable *Callable, index int) NullState {
+	if callable.Structure == nil && callable.Declaration == nil {
+		return MaybeNull
+	}
+	return NonNull
+}
+
 func (a *analyzer) analyzeMember(member *ast.MemberExpr, current *scope, flow flowState) expressionInfo {
 	object := a.analyzeExpression(member.Object, current, flow)
+	if object.symbol != nil && object.symbol.SuperClassBinding {
+		return a.analyzeSuperMember(member, object)
+	}
 	if object.symbol != nil && object.symbol.Kind == NamespaceSymbol && object.symbol.Namespace != nil {
 		resolved, exists := object.symbol.Namespace.Symbols[member.Name]
 		if !exists {
@@ -676,6 +719,35 @@ func (a *analyzer) analyzeMember(member *ast.MemberExpr, current *scope, flow fl
 func (a *analyzer) canAccessConfidentialMember(current *scope, owner *types.ClassSymbol) bool {
 	return owner != nil && current != nil && current.callable != nil && current.callable.class != nil &&
 		classAssignableTo(current.callable.class.Class, owner)
+}
+
+// relatedClasses reports whether two Class instance types share an ancestry,
+// so a parent-typed and a child-typed reference to one object compare.
+func relatedClasses(left, right types.Type) bool {
+	leftClass, leftOK := left.(types.Class)
+	rightClass, rightOK := right.(types.Class)
+	if !leftOK || !rightOK || leftClass.Reference || rightClass.Reference {
+		return false
+	}
+	return classAssignableTo(leftClass.Symbol, rightClass.Symbol) || classAssignableTo(rightClass.Symbol, leftClass.Symbol)
+}
+
+// analyzeSuperMember resolves SuperClass.member to the parent implementation
+// while keeping the current instance as the receiver.
+func (a *analyzer) analyzeSuperMember(member *ast.MemberExpr, object expressionInfo) expressionInfo {
+	parent := a.classSymbolFor(object.symbol.Class)
+	resolved := a.lookupMember(parent, member.Name)
+	if resolved == nil {
+		a.error(codeInvalidMember, fmt.Sprintf("parent Class has no member %q", member.Name), member.Span(), "call a member declared by the direct superclass or one of its ancestors")
+		return expressionInfo{typeValue: types.Invalid, nullState: MaybeNull}
+	}
+	if resolved.Kind != FunctionSymbol {
+		a.error(codeInvalidMember, fmt.Sprintf("SuperClass.%s is not a parent Function", member.Name), member.Span(), "use attribute.%s for inherited attribute access")
+		return expressionInfo{typeValue: types.Invalid, nullState: MaybeNull}
+	}
+	a.result.ResolvedSymbols[member] = resolved
+	a.result.SuperCalls[member] = true
+	return expressionInfo{typeValue: resolved.Type, nullState: resolved.InitialNull, symbol: resolved}
 }
 
 func (a *analyzer) lookupMember(class *Symbol, name string) *Symbol {

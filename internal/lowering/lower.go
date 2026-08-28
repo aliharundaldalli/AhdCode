@@ -45,6 +45,9 @@ func LowerCompilation(compilation module.CompilationResult) Result {
 	}
 	engine.registry = newRegistry(ordered)
 	result := &ir.Compilation{Entry: ir.ModuleID(compilation.Entry)}
+	// The language-supplied Class catalog is emitted first so every module can
+	// depend on it without an implicit backend contract.
+	result.Modules = append(result.Modules, builtinModule())
 	for _, current := range ordered {
 		lowerer := &moduleLowerer{compilation: engine, module: current, semantic: current.Semantic}
 		result.Modules = append(result.Modules, lowerer.lowerModule())

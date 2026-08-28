@@ -29,8 +29,8 @@ const (
 	runtimeFileName = "ahdcode_runtime.go"
 )
 
-// slot describes the Go storage representation chosen for one IR symbol.
-type slot struct {
+// storage describes the Go representation chosen for one IR symbol.
+type storage struct {
 	name     string
 	typeInfo ir.Type
 	nullable bool
@@ -41,12 +41,22 @@ type generator struct {
 	classes     map[ir.ClassID]*ir.Class
 	functions   map[ir.CallableID]*ir.Function
 	fields      map[ir.FieldID]ir.Field
-	slots       map[ir.SymbolID]slot
+	slots       map[ir.SymbolID]storage
 	nullSymbols map[ir.SymbolID]bool
 	nullFields  map[ir.FieldID]bool
+	layouts     map[ir.ClassID]*layout
+	layoutOrder []*ir.Class
+	adapters    map[ir.CallableID]string
 	diagnostics []diagnostics.Diagnostic
 	temporary   int
-	loop        int
+	// frames tracks the enclosing loop and attempt structure so break,
+	// continue, and return transfer through error handling correctly.
+	frames []frame
+	// result is the function-level variable that carries a return value out of
+	// an attempt closure.
+	result         string
+	resultType     ir.Type
+	resultNullable bool
 }
 
 // Generate lowers a validated IR compilation into deterministic Go source.
@@ -60,12 +70,14 @@ func Generate(compilation *ir.Compilation) (*GeneratedProgram, []diagnostics.Dia
 		classes:     make(map[ir.ClassID]*ir.Class),
 		functions:   make(map[ir.CallableID]*ir.Function),
 		fields:      make(map[ir.FieldID]ir.Field),
-		slots:       make(map[ir.SymbolID]slot),
+		slots:       make(map[ir.SymbolID]storage),
 		nullSymbols: make(map[ir.SymbolID]bool),
 		nullFields:  make(map[ir.FieldID]bool),
+		adapters:    make(map[ir.CallableID]string),
 	}
 	generator.buildIndex()
 	generator.planRepresentations()
+	generator.buildLayouts()
 	program := generator.emitProgram()
 	if generator.hasErrors() {
 		return nil, generator.diagnostics
@@ -196,19 +208,19 @@ func (generator *generator) bindSlots() {
 			if global == nil {
 				continue
 			}
-			generator.slots[global.ID] = slot{name: mangle(globalPrefix, string(global.ID)), typeInfo: global.Type, nullable: generator.nullSymbols[global.ID]}
+			generator.slots[global.ID] = storage{name: mangleNamed(globalPrefix, global.Name, string(global.ID)), typeInfo: global.Type, nullable: generator.nullSymbols[global.ID]}
 		}
 		for _, function := range module.Functions {
 			if function == nil {
 				continue
 			}
 			if function.Receiver != "" {
-				generator.slots[function.Receiver] = slot{name: mangle(localPrefix, string(function.Receiver)), typeInfo: ir.Type{Kind: ir.ClassType, Class: function.Owner}}
+				generator.slots[function.Receiver] = storage{name: "attribute", typeInfo: ir.Type{Kind: ir.ClassType, Class: function.Owner}}
 			}
 			for _, parameter := range function.Parameters {
-				generator.slots[parameter.ID] = slot{name: mangle(localPrefix, string(parameter.ID)), typeInfo: parameter.Type}
-				if parameter.NullState != ir.NonNull || generator.nullSymbols[parameter.ID] {
-					generator.fail(CodeUnsupportedNode, fmt.Sprintf("nullable Function parameter %q has no Go representation in this milestone", parameter.Name), parameter.Span, "a Function signature carries no per-parameter null-state in the IR contract; keep parameters NonNull")
+				generator.slots[parameter.ID] = storage{
+					name: mangleNamed(localPrefix, parameter.Name, string(parameter.ID)), typeInfo: parameter.Type,
+					nullable: parameter.NullState != ir.NonNull,
 				}
 			}
 		}
@@ -216,9 +228,19 @@ func (generator *generator) bindSlots() {
 	generator.walkCompilation(func(statement ir.Statement) {
 		switch value := statement.(type) {
 		case *ir.BindingStmt:
-			generator.slots[value.Symbol] = slot{name: mangle(localPrefix, string(value.Symbol)), typeInfo: value.Type, nullable: generator.nullSymbols[value.Symbol]}
+			generator.slots[value.Symbol] = storage{name: mangleNamed(localPrefix, value.Name, string(value.Symbol)), typeInfo: value.Type, nullable: generator.nullSymbols[value.Symbol]}
 		case *ir.ForStmt:
-			generator.slots[value.Iteration] = slot{name: mangle(localPrefix, string(value.Iteration)), typeInfo: value.IterationType}
+			generator.slots[value.Iteration] = storage{name: mangleNamed(localPrefix, value.Name, string(value.Iteration)), typeInfo: value.IterationType}
+		case *ir.AttemptStmt:
+			for _, handler := range value.Handlers {
+				if handler.Binding == "" {
+					continue
+				}
+				generator.slots[handler.Binding] = storage{
+					name:     mangleNamed(localPrefix, "error", string(handler.Binding)),
+					typeInfo: ir.Type{Kind: ir.ClassType, Class: handler.Class},
+				}
+			}
 		}
 	})
 }
@@ -283,71 +305,71 @@ func (generator *generator) emitProgram() string {
 	writer.blank()
 	writer.line("package main")
 	writer.blank()
+	generator.emitClassDeclarations(writer)
 	for _, module := range generator.compilation.Modules {
-		if module == nil {
-			continue
+		if module != nil {
+			generator.emitGlobals(writer, module)
 		}
-		generator.emitClasses(writer, module)
 	}
-	for _, module := range generator.compilation.Modules {
-		if module == nil {
-			continue
-		}
-		generator.emitGlobals(writer, module)
-	}
+	// Bodies are generated first so every Function value adapter they need is
+	// registered before the adapters themselves are written.
+	bodies := &emitter{}
 	for _, module := range generator.compilation.Modules {
 		if module == nil {
 			continue
 		}
 		for _, function := range module.Functions {
-			generator.emitFunction(writer, module.Name, function)
+			generator.emitFunction(bodies, module.Name, function)
 		}
 	}
 	for _, module := range generator.compilation.Modules {
-		if module == nil {
-			continue
+		if module != nil {
+			generator.emitModuleInit(bodies, module)
 		}
-		generator.emitModuleInit(writer, module)
 	}
+	generator.emitAdapters(writer)
+	writer.raw(bodies.String())
+	generator.emitInstaller(writer)
 	writer.open("func main() {")
-	writer.open("AhdMain(func() {")
+	writer.open("AhdMain(ahdInstall, func() {")
 	for _, module := range generator.compilation.Modules {
-		if module == nil {
-			continue
+		if module != nil {
+			writer.line(generator.moduleInitName(module) + "()")
 		}
-		writer.line(generator.moduleInitName(module) + "()")
 	}
 	writer.close("})")
 	writer.close("}")
 	return writer.String()
 }
 
-func (generator *generator) emitClasses(writer *emitter, module *ir.Module) {
-	for _, class := range module.Classes {
-		if class == nil {
+// emitInstaller registers the generated constructors of the language-supplied
+// Error classes, so a runtime check raises a real AhdCode Error instance that
+// an ordinary except clause can match.
+func (generator *generator) emitInstaller(writer *emitter) {
+	writer.line("// ahdInstall wires the language-supplied Error catalog into the runtime.")
+	writer.open("func ahdInstall() {")
+	for _, class := range generator.layoutOrder {
+		if !class.Builtin || !generator.descendsFromError(class.ID) {
 			continue
 		}
-		if class.Parent != "" && !isBuiltinClass(class.Parent) {
-			generator.fail(CodeUnsupportedNode, fmt.Sprintf("Class %s declares inheritance, which the Go backend defers", class.Name), class.Span, "Class inheritance and its runtime dispatch are deferred to a later milestone")
+		constructor := generator.functions[class.Constructor]
+		if constructor == nil {
 			continue
 		}
-		writer.line("// Class " + class.Name + " of module " + module.Name + ".")
-		writer.open("type " + generator.className(class.ID) + " struct {")
-		for _, field := range class.Fields {
-			rendered := generator.goType(field.Type, generator.nullFields[field.ID])
-			if rendered == "" {
-				generator.fail(CodeInvalidRepresentation, fmt.Sprintf("Class field %s has no Go representation", field.Name), class.Span, "use a v0.1 representable field type")
-				continue
-			}
-			writer.line(generator.fieldName(field.ID) + " " + rendered)
-		}
-		writer.close("}")
-		writer.blank()
+		writer.line("AhdRegisterError(" + generator.descriptorName(class.ID) + ", func(message string) AhdInstance { return " +
+			generator.callableName(constructor) + "(message) })")
 	}
+	writer.close("}")
+	writer.blank()
 }
 
-func isBuiltinClass(id ir.ClassID) bool {
-	return strings.HasPrefix(string(id), "builtin:")
+func (generator *generator) descendsFromError(id ir.ClassID) bool {
+	for current := generator.layouts[id]; current != nil; current = current.parent {
+		if current.class.Builtin && current.class.Name == "Error" {
+			return true
+		}
+	}
+	return false
 }
 
 func (generator *generator) emitGlobals(writer *emitter, module *ir.Module) {
@@ -375,60 +397,156 @@ func (generator *generator) emitFunction(writer *emitter, moduleName string, fun
 	if function == nil {
 		return
 	}
-	if function.Owner != "" {
-		if class := generator.classes[function.Owner]; class != nil && class.Parent != "" && !isBuiltinClass(class.Parent) {
-			return
-		}
+	if function.Kind == ir.ConstructorFunction {
+		generator.emitConstructor(writer, moduleName, function)
+		return
 	}
 	parameters := make([]string, 0, len(function.Parameters)+1)
-	// A constructor allocates its own receiver; every other method receives it.
-	if function.Receiver != "" && function.Kind != ir.ConstructorFunction {
-		receiver := generator.slots[function.Receiver]
-		parameters = append(parameters, receiver.name+" *"+generator.className(function.Owner))
+	if function.Receiver != "" {
+		parameters = append(parameters, generator.slots[function.Receiver].name+" "+generator.interfaceName(function.Owner))
 	}
 	for _, parameter := range function.Parameters {
 		current := generator.slots[parameter.ID]
-		rendered := generator.goType(parameter.Type, false)
+		rendered := generator.goType(parameter.Type, current.nullable)
 		if rendered == "" {
 			generator.fail(CodeInvalidRepresentation, fmt.Sprintf("parameter %s has no Go representation", parameter.Name), parameter.Span, "use a v0.1 representable parameter type")
 			continue
 		}
 		parameters = append(parameters, current.name+" "+rendered)
 	}
-	name := generator.callableName(function)
 	result := ""
-	switch {
-	case function.Kind == ir.ConstructorFunction:
-		result = " *" + generator.className(function.Owner)
-	case function.Signature.Return.Kind != ir.NothingType:
-		rendered := generator.goType(function.Signature.Return, false)
+	if function.Signature.Return.Kind != ir.NothingType {
+		rendered := generator.goType(function.Signature.Return, function.ReturnNull != ir.NonNull)
 		if rendered == "" {
 			generator.fail(CodeInvalidRepresentation, "Function return type has no Go representation", function.Span, "use a v0.1 representable return type")
 			return
 		}
 		result = " " + rendered
 	}
-	if function.ReturnNull != ir.NonNull && function.Signature.Return.Kind != ir.NothingType {
-		generator.fail(CodeUnsupportedNode, fmt.Sprintf("Function %q may return null, which has no Go representation in this milestone", function.Name), function.Span, "a Function signature carries no return null-state in the IR contract; return a NonNull value")
-		return
-	}
 	writer.line("// " + string(function.Kind) + " " + function.Name + " of module " + moduleName + ".")
-	writer.open("func " + name + "(" + strings.Join(parameters, ", ") + ")" + result + " {")
-	if function.Kind == ir.ConstructorFunction {
-		receiver := generator.slots[function.Receiver]
-		writer.line(receiver.name + " := &" + generator.className(function.Owner) + "{}")
-	}
-	generator.emitBlock(writer, function.Body)
-	switch {
-	case function.Kind == ir.ConstructorFunction:
-		writer.line("return " + generator.slots[function.Receiver].name)
-	case function.Signature.Return.Kind != ir.NothingType && !endsWithReturn(function.Body):
-		// Go terminating-statement analysis is narrower than the AhdCode
-		// definite-return rule, so an explicit unreachable tail is emitted.
-		writer.line("return AhdUnreachable[" + generator.goType(function.Signature.Return, false) + "]()")
-	}
+	writer.open("func " + generator.callableName(function) + "(" + strings.Join(parameters, ", ") + ")" + result + " {")
+	generator.emitFunctionBody(writer, function)
 	writer.close("}")
 	writer.blank()
+}
+
+// emitFunctionBody writes a callable body, reserving the return carrier that
+// an attempt closure uses to transfer a pending return out of itself.
+func (generator *generator) emitFunctionBody(writer *emitter, function *ir.Function) {
+	previousFrames, previousResult, previousType, previousNullable := generator.frames, generator.result, generator.resultType, generator.resultNullable
+	generator.frames, generator.result = nil, ""
+	generator.resultType, generator.resultNullable = function.Signature.Return, function.ReturnNull != ir.NonNull
+	if function.Signature.Return.Kind != ir.NothingType && containsAttempt(function.Body) {
+		generator.result = generator.temporaryName()
+		writer.line("var " + generator.result + " " + generator.goType(function.Signature.Return, function.ReturnNull != ir.NonNull))
+		writer.line("_ = " + generator.result)
+	}
+	generator.emitBlock(writer, function.Body)
+	if function.Signature.Return.Kind != ir.NothingType && !endsWithReturn(function.Body) {
+		// Go terminating-statement analysis is narrower than the AhdCode
+		// definite-return rule, so an explicit unreachable tail is emitted.
+		writer.line("return AhdUnreachable[" + generator.goType(function.Signature.Return, function.ReturnNull != ir.NonNull) + "]()")
+	}
+	generator.frames, generator.result, generator.resultType, generator.resultNullable = previousFrames, previousResult, previousType, previousNullable
+}
+
+// emitConstructor writes the allocating constructor and the initializer that
+// runs the inherited construction contract before this Class initializes its
+// own attributes.
+func (generator *generator) emitConstructor(writer *emitter, moduleName string, function *ir.Function) {
+	interfaceType := generator.interfaceName(function.Owner)
+	parameters := make([]string, 0, len(function.Parameters))
+	arguments := make([]string, 0, len(function.Parameters))
+	for _, parameter := range function.Parameters {
+		current := generator.slots[parameter.ID]
+		rendered := generator.goType(parameter.Type, current.nullable)
+		if rendered == "" {
+			generator.fail(CodeInvalidRepresentation, fmt.Sprintf("parameter %s has no Go representation", parameter.Name), parameter.Span, "use a v0.1 representable parameter type")
+			continue
+		}
+		parameters = append(parameters, current.name+" "+rendered)
+		arguments = append(arguments, current.name)
+	}
+	receiver := generator.slots[function.Receiver].name
+	writer.line("// Initializer of Class " + function.Name + " of module " + moduleName + ".")
+	writer.open("func " + generator.initializerName(function) + "(" + strings.Join(append([]string{receiver + " " + interfaceType}, parameters...), ", ") + ") {")
+	writer.line("_ = " + receiver)
+	if function.ParentConstructor != "" {
+		parent := generator.functions[function.ParentConstructor]
+		if parent == nil {
+			generator.fail(CodeGenerationFailure, "constructor references an unknown parent constructor", function.Span, "the IR references a callable with no declaration")
+		} else {
+			forwarded := []string{receiver}
+			for _, index := range function.ParentArguments {
+				if index < 0 || index >= len(arguments) {
+					generator.fail(CodeGenerationFailure, "parent constructor argument index is out of range", function.Span, "the IR constructor contract is malformed")
+					continue
+				}
+				forwarded = append(forwarded, arguments[index])
+			}
+			writer.line(generator.initializerName(parent) + "(" + strings.Join(forwarded, ", ") + ")")
+		}
+	}
+	previousFrames, previousResult := generator.frames, generator.result
+	generator.frames, generator.result = nil, ""
+	generator.emitBlock(writer, function.Body)
+	generator.frames, generator.result = previousFrames, previousResult
+	writer.close("}")
+	writer.blank()
+
+	writer.line("// Constructor of Class " + function.Name + " of module " + moduleName + ".")
+	writer.open("func " + generator.callableName(function) + "(" + strings.Join(parameters, ", ") + ") " + interfaceType + " {")
+	writer.line("instance := &" + generator.className(function.Owner) + "{}")
+	writer.line("instance.AhdSetClass(" + generator.descriptorName(function.Owner) + ")")
+	writer.line(generator.initializerName(function) + "(" + strings.Join(append([]string{"instance"}, arguments...), ", ") + ")")
+	writer.line("return instance")
+	writer.close("}")
+	writer.blank()
+}
+
+// emitAdapters writes one uniform Function value per callable taken as a
+// value. A Function type carries no null-state, so the adapter boxes and
+// unboxes between the uniform shape and the concrete callable signature.
+func (generator *generator) emitAdapters(writer *emitter) {
+	names := make([]ir.CallableID, 0, len(generator.adapters))
+	for id := range generator.adapters {
+		names = append(names, id)
+	}
+	sort.Slice(names, func(left, right int) bool { return names[left] < names[right] })
+	for _, id := range names {
+		function := generator.functions[id]
+		if function == nil {
+			continue
+		}
+		parameters := make([]string, 0, len(function.Parameters))
+		arguments := make([]string, 0, len(function.Parameters))
+		for index, parameter := range function.Parameters {
+			name := "argument" + itoa(index)
+			parameters = append(parameters, name+" "+generator.goType(parameter.Type, true))
+			arguments = append(arguments, generator.coerce(name,
+				ir.ExprBase{Type: parameter.Type, NullState: ir.MaybeNull}, parameter.Type, parameter.NullState != ir.NonNull))
+		}
+		result := ""
+		body := generator.callableName(function) + "(" + strings.Join(arguments, ", ") + ")"
+		if function.Signature.Return.Kind != ir.NothingType {
+			result = " " + generator.goType(function.Signature.Return, true)
+			body = "return " + generator.coerce(body,
+				ir.ExprBase{Type: function.Signature.Return, NullState: function.ReturnNull}, function.Signature.Return, true)
+		}
+		writer.line("// Function value of " + function.Name + ".")
+		writer.line("func " + generator.adapters[id] + "(" + strings.Join(parameters, ", ") + ")" + result + " { " + body + " }")
+		writer.blank()
+	}
+}
+
+// adapterName registers the uniform Function value wrapper of a callable.
+func (generator *generator) adapterName(function *ir.Function) string {
+	if name, known := generator.adapters[function.ID]; known {
+		return name
+	}
+	name := mangleNamed(adapterPrefix, function.Name, string(function.ID))
+	generator.adapters[function.ID] = name
+	return name
 }
 
 func endsWithReturn(block ir.Block) bool {
@@ -450,22 +568,31 @@ func (generator *generator) callableName(function *ir.Function) string {
 	return mangleNamed(functionPrefix, function.Name, string(function.ID))
 }
 
+func (generator *generator) initializerName(function *ir.Function) string {
+	return mangleNamed(initializerPrefix, function.Name, string(function.ID))
+}
+
 func (generator *generator) emitModuleInit(writer *emitter, module *ir.Module) {
 	writer.line("// Module " + module.Name + " initialization.")
 	writer.open("func " + generator.moduleInitName(module) + "() {")
 	ordered := append([]*ir.Global(nil), module.Globals...)
 	sort.SliceStable(ordered, func(left, right int) bool { return ordered[left].Order < ordered[right].Order })
+	previousFrames, previousResult := generator.frames, generator.result
+	generator.frames, generator.result = nil, ""
 	for _, global := range ordered {
-		if global == nil {
+		if global == nil || global.Initializer == nil {
 			continue
 		}
 		current := generator.slots[global.ID]
-		if global.Initializer == nil {
-			continue
+		value := generator.value(global.Initializer, current.typeInfo, current.nullable)
+		if global.Constant {
+			// A Constant reference binding deep-freezes its object graph.
+			value = "AhdFreeze(" + value + ")"
 		}
-		writer.line(current.name + " = " + generator.value(global.Initializer, current.typeInfo, current.nullable))
+		writer.line(current.name + " = " + value)
 	}
 	generator.emitBlock(writer, module.Init)
+	generator.frames, generator.result = previousFrames, previousResult
 	writer.close("}")
 	writer.blank()
 }

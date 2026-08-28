@@ -1,0 +1,196 @@
+factorial: Function := (
+    n: Int
+) -> Int {
+    if n <= 1 {
+        return 1
+    }
+
+    return n * factorial(n - 1)
+}
+
+
+double: Function := (
+    value: Int
+) -> Int {
+    return value * 2
+}
+
+
+applyTwice: Function := (
+    operation: Function
+    value: Int
+) -> Int {
+    first: Local Int := operation(value)
+    return operation(first)
+}
+
+
+describeNumber: Function := (
+    value: Int
+) -> String {
+    return "Int: {value}"
+}
+
+describeNumber: Overload Function := (
+    value: Real
+) -> String {
+    return "Real: {value}"
+}
+
+
+Counter: Class<> := {
+    structure: Attributes := (
+        name: String
+        value: Int
+    )
+
+    increment: Function := (
+    ) -> Nothing {
+        attribute.value++
+    }
+
+    add: Function := (
+        amount: Int
+    ) -> Nothing {
+        attribute.value += amount
+    }
+
+    current: Function := (
+    ) -> Int {
+        return attribute.value
+    }
+
+    describe: Function := (
+    ) -> String {
+        return "{attribute.name}: {attribute.value}"
+    }
+}
+
+
+write("=== CONSTANT / POWER ===")
+
+base: Constant Int := 5
+exponent: Constant Int := 7
+
+write(base ^ exponent)
+
+mutableBase: Int := 7
+mutableExponent: Int := 5
+
+write(mutableBase ^ mutableExponent)
+
+
+write("=== ARITHMETIC ===")
+
+x: Int := 5
+y: Int := 7
+
+write(x + y)
+write(x - y)
+write(x * y)
+write(x / y)
+write(y % x)
+write(x ^ 2)
+
+
+write("=== RECURSION ===")
+
+write(factorial(6))
+
+
+write("=== CALLBACK ===")
+
+write(applyTwice(double, 3))
+
+
+write("=== OVERLOAD ===")
+
+write(describeNumber(25))
+write(describeNumber(25.0))
+
+
+write("=== CLASS ===")
+
+counter: Counter := Counter(
+    name: "Ana sayaç"
+    value: 2
+)
+
+write(counter.describe())
+
+counter.add(5)
+write(counter.describe())
+
+alias: Counter := counter
+alias.increment()
+
+write(alias.describe())
+write(counter.describe())
+
+
+write("=== CLASS + IF ===")
+
+if counter.current() == 8 {
+    write("Sayaç doğru: {counter.current()}")
+}
+else {
+    write("Sayaç beklenmeyen değerde")
+}
+
+
+write("=== STATE ===")
+
+state counter.current() {
+    condition 7 {
+        write("state: seven")
+    }
+
+    condition 8 {
+        write("state: eight")
+    }
+
+    condition default {
+        write("state: other")
+    }
+}
+
+
+write("=== LIST ALIAS + CLEAR ===")
+
+numbers: List<Int> := [1, 2, 3]
+sameNumbers: List<Int> := numbers
+
+write(len(numbers))
+clear(sameNumbers)
+write("sameNumbers: {sameNumbers}")
+write(len(numbers))
+
+
+write("=== UNTIL ===")
+
+i: Int := 0
+
+until i == 3 {
+    i++
+    write("until: {i}")
+}
+
+
+write("=== STRING / UNICODE FOR ===")
+
+for character in "añb" {
+    write(character)
+}
+
+
+write("=== INTERPOLATION ===")
+
+language: String := "AhdCode"
+version: Real := 0.1
+
+write("{language} v{version}")
+write("factorial(5) = {factorial(5)}")
+write("counter = {counter.current()}")
+
+
+write("=== DONE ===")

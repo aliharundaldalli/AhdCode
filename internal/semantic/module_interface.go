@@ -67,6 +67,9 @@ func cloneInterfaceSymbol(symbol *Symbol, memo map[*Symbol]*Symbol) *Symbol {
 	memo[symbol] = cloned
 	cloned.Callable = cloneCallable(symbol.Callable)
 	cloned.Constructor = cloneCallable(symbol.Constructor)
+	for _, attribute := range symbol.ConstructorAttributes {
+		cloned.ConstructorAttributes = append(cloned.ConstructorAttributes, cloneInterfaceSymbol(attribute, memo))
+	}
 	if symbol.OverloadSet != nil {
 		cloned.OverloadSet = &OverloadSet{Name: symbol.OverloadSet.Name}
 		for _, callable := range symbol.OverloadSet.Candidates {

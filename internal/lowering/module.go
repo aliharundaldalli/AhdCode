@@ -6,6 +6,7 @@ import (
 	"ahdcode/internal/ir"
 	"ahdcode/internal/semantic"
 	"ahdcode/internal/syntax/ast"
+	"ahdcode/internal/types"
 )
 
 func (lowerer *moduleLowerer) lowerModule() *ir.Module {
@@ -75,6 +76,7 @@ func (lowerer *moduleLowerer) lowerFunction(declaration *ast.FunctionDecl, owner
 		function.Kind = ir.MethodFunction
 		function.Owner = classID(owner.Class)
 		function.Receiver = ir.SymbolID(string(callableID) + "::receiver")
+		function.Overrides = lowerer.overriddenCallable(owner, declaration.Name, callable)
 	}
 	previousReturn, previousReceiver, previousOwner := lowerer.currentReturn, lowerer.currentReceiver, lowerer.currentOwner
 	lowerer.currentReturn, lowerer.currentReceiver, lowerer.currentOwner = function.Signature.Return, function.Receiver, function.Owner
@@ -99,6 +101,38 @@ func (lowerer *moduleLowerer) lowerFunction(declaration *ast.FunctionDecl, owner
 	function.Body = lowerer.lowerBlock(declaration.Body)
 	lowerer.currentReturn, lowerer.currentReceiver, lowerer.currentOwner = previousReturn, previousReceiver, previousOwner
 	return function
+}
+
+// overriddenCallable records the parent method this declaration replaces. The
+// dispatch slot is therefore an explicit IR fact rather than a backend guess.
+func (lowerer *moduleLowerer) overriddenCallable(owner *semantic.Symbol, name string, callable *semantic.Callable) ir.CallableID {
+	if owner.Class == nil || owner.Class.Parent == nil {
+		return ""
+	}
+	for parent := lowerer.classSymbol(owner.Class.Parent); parent != nil; parent = lowerer.classSymbol(parent.Class.Parent) {
+		member := parent.Members[name]
+		if member != nil && member.Kind == semantic.FunctionSymbol && member.Callable != nil &&
+			callableSignaturesMatch(member.Callable, callable) {
+			return lowerer.compilation.registry.callableID(lowerer.module, member, member.Callable, false)
+		}
+		if parent.Class == nil || parent.Class.Parent == nil {
+			break
+		}
+	}
+	return ""
+}
+
+func callableSignaturesMatch(left, right *semantic.Callable) bool {
+	if left == nil || right == nil {
+		return false
+	}
+	return ir.EqualSignature(lowerSignature(left.Signature), lowerSignature(right.Signature))
+}
+
+// classSymbol resolves canonical Class identity to its semantic Symbol, in
+// this module or in an already-analyzed dependency.
+func (lowerer *moduleLowerer) classSymbol(identity *types.ClassSymbol) *semantic.Symbol {
+	return lowerer.compilation.registry.classSymbol(identity)
 }
 
 func callableForDeclaration(symbol *semantic.Symbol, declaration *ast.FunctionDecl) *semantic.Callable {
@@ -176,77 +210,166 @@ func (lowerer *moduleLowerer) lowerClass(declaration *ast.ClassDecl) (*ir.Class,
 }
 
 func (lowerer *moduleLowerer) lowerConstructor(declaration *ast.StructureDecl, class *semantic.Symbol) *ir.Function {
+	function := lowerer.newConstructor(class, declaration)
+	if function == nil {
+		return nil
+	}
+	previousReturn, previousReceiver, previousOwner := lowerer.currentReturn, lowerer.currentReceiver, lowerer.currentOwner
+	lowerer.currentReturn, lowerer.currentReceiver, lowerer.currentOwner = function.Signature.Return, function.Receiver, function.Owner
+	if declaration != nil {
+		for index := range declaration.Parameters {
+			parameter := &declaration.Parameters[index]
+			if parameter.InheritedAttributes || parameter.Default == nil {
+				continue
+			}
+			for position := range function.Parameters {
+				if function.Parameters[position].Name == parameter.Name {
+					function.Parameters[position].Default = lowerer.lowerExprExpected(parameter.Default, function.Parameters[position].Type)
+					break
+				}
+			}
+		}
+	}
+	function.Body = lowerer.attributeInitialization(class, function)
+	if declaration != nil {
+		body := lowerer.lowerBlock(declaration.Body)
+		function.Body.Statements = append(function.Body.Statements, body.Statements...)
+	}
+	lowerer.currentReturn, lowerer.currentReceiver, lowerer.currentOwner = previousReturn, previousReceiver, previousOwner
+	return function
+}
+
+// newConstructor builds the constructor shell from the frontend's expanded
+// construction contract, including the parent slots that SuperClass.attributes
+// contributed.
+func (lowerer *moduleLowerer) newConstructor(class *semantic.Symbol, declaration *ast.StructureDecl) *ir.Function {
 	callable := class.Constructor
 	if callable == nil || callable.Signature == nil {
 		return nil
 	}
 	id := lowerer.compilation.registry.callableID(lowerer.module, class, callable, true)
+	span := class.Span
+	if declaration != nil {
+		span = declaration.Span()
+	}
 	function := &ir.Function{
-		Span: declaration.Span(), ID: id, Symbol: lowerer.compilation.registry.symbolID(lowerer.module, class), Name: class.Name,
+		Span: span, ID: id, Symbol: lowerer.compilation.registry.symbolID(lowerer.module, class), Name: class.Name,
 		Kind: ir.ConstructorFunction, Owner: classID(class.Class), Receiver: ir.SymbolID(string(id) + "::receiver"),
 		Signature: *lowerSignature(callable.Signature), ReturnNull: ir.NonNull,
 	}
-	previousReturn, previousReceiver, previousOwner := lowerer.currentReturn, lowerer.currentReceiver, lowerer.currentOwner
-	lowerer.currentReturn, lowerer.currentReceiver, lowerer.currentOwner = function.Signature.Return, function.Receiver, function.Owner
-	parameterIndex := 0
+	declared := declaredParameters(declaration)
+	for index, parameter := range callable.Signature.Parameters {
+		parameterType := lowerType(parameter.Type)
+		item := ir.Parameter{ID: "", Name: parameter.Name, Type: parameterType, NullState: ir.NonNull}
+		if index < len(callable.ParameterNull) {
+			item.NullState = lowerNull(callable.ParameterNull[index])
+		}
+		if source := declared[parameter.Name]; source != nil {
+			item.Span = source.Span()
+			item.ID = lowerer.compilation.registry.symbolID(lowerer.module, findSymbol(lowerer.semantic, semantic.ParameterSymbol, parameter.Name, source.Span()))
+		}
+		if item.ID == "" {
+			item.ID = ir.SymbolID(string(function.ID) + "::parameter::" + parameter.Name)
+		}
+		function.Parameters = append(function.Parameters, item)
+	}
+	lowerer.linkParentConstructor(class, function, declaration)
+	return function
+}
+
+func declaredParameters(declaration *ast.StructureDecl) map[string]*ast.Parameter {
+	result := make(map[string]*ast.Parameter)
+	if declaration == nil {
+		return result
+	}
 	for index := range declaration.Parameters {
 		parameter := &declaration.Parameters[index]
-		if parameter.InheritedAttributes {
-			continue
+		if !parameter.InheritedAttributes {
+			result[parameter.Name] = parameter
 		}
-		if parameterIndex >= len(callable.Signature.Parameters) {
-			break
-		}
-		semanticParameter := findSymbol(lowerer.semantic, semantic.ParameterSymbol, parameter.Name, parameter.Span())
-		parameterType := lowerType(callable.Signature.Parameters[parameterIndex].Type)
-		id := lowerer.compilation.registry.symbolID(lowerer.module, semanticParameter)
-		if id == "" {
-			id = ir.SymbolID(string(function.ID) + "::parameter::" + parameter.Name)
-		}
-		item := ir.Parameter{Span: parameter.Span(), ID: id, Name: parameter.Name, Type: parameterType, NullState: ir.NonNull}
-		if parameterIndex < len(callable.ParameterNull) {
-			item.NullState = lowerNull(callable.ParameterNull[parameterIndex])
-		}
-		item.Default = lowerer.lowerExprExpected(parameter.Default, parameterType)
-		function.Parameters = append(function.Parameters, item)
-		parameterIndex++
 	}
-	function.Body = lowerer.attributeInitialization(declaration, class, function)
-	body := lowerer.lowerBlock(declaration.Body)
-	function.Body.Statements = append(function.Body.Statements, body.Statements...)
-	lowerer.currentReturn, lowerer.currentReceiver, lowerer.currentOwner = previousReturn, previousReceiver, previousOwner
-	return function
+	return result
+}
+
+// linkParentConstructor records which of this constructor's parameters feed
+// the parent construction contract, so the backend runs the parent structure
+// body instead of re-deriving inherited initialization.
+func (lowerer *moduleLowerer) linkParentConstructor(class *semantic.Symbol, function *ir.Function, declaration *ast.StructureDecl) {
+	if class.Class == nil || class.Class.Parent == nil {
+		return
+	}
+	parent := lowerer.classSymbol(class.Class.Parent)
+	if parent == nil || parent.Constructor == nil || parent.Constructor.Signature == nil {
+		return
+	}
+	inherits := declaration == nil
+	if declaration != nil {
+		for index := range declaration.Parameters {
+			if declaration.Parameters[index].InheritedAttributes {
+				inherits = true
+			}
+		}
+	}
+	if !inherits {
+		return
+	}
+	count := len(parent.Constructor.Signature.Parameters)
+	offset := inheritedOffset(declaration, count, len(function.Parameters))
+	if offset < 0 || offset+count > len(function.Parameters) {
+		return
+	}
+	function.ParentConstructor = lowerer.compilation.registry.callableID(lowerer.module, parent, parent.Constructor, true)
+	for index := 0; index < count; index++ {
+		function.ParentArguments = append(function.ParentArguments, offset+index)
+	}
+}
+
+// inheritedOffset is the parameter index at which the parent slots were
+// spliced into the expanded constructor signature.
+func inheritedOffset(declaration *ast.StructureDecl, count, total int) int {
+	if declaration == nil {
+		if count > total {
+			return -1
+		}
+		return 0
+	}
+	offset := 0
+	for index := range declaration.Parameters {
+		if declaration.Parameters[index].InheritedAttributes {
+			return offset
+		}
+		offset++
+	}
+	return -1
 }
 
 // attributeInitialization makes the frontend decision "a non-Local structure
 // parameter declares the like-named instance attribute" explicit in the IR, so
 // the backend never has to infer field initialization from parameter names.
-func (lowerer *moduleLowerer) attributeInitialization(declaration *ast.StructureDecl, class *semantic.Symbol, function *ir.Function) ir.Block {
-	block := ir.Block{Span: declaration.Span()}
-	parameterIndex := 0
-	for index := range declaration.Parameters {
-		parameter := &declaration.Parameters[index]
-		if parameter.InheritedAttributes {
+// Inherited slots are left to the parent constructor.
+func (lowerer *moduleLowerer) attributeInitialization(class *semantic.Symbol, function *ir.Function) ir.Block {
+	block := ir.Block{Span: function.Span}
+	inherited := make(map[int]bool, len(function.ParentArguments))
+	for _, index := range function.ParentArguments {
+		inherited[index] = true
+	}
+	for index, parameter := range function.Parameters {
+		if inherited[index] || index >= len(class.ConstructorAttributes) {
 			continue
 		}
-		if parameterIndex >= len(function.Parameters) {
-			break
-		}
-		lowered := function.Parameters[parameterIndex]
-		parameterIndex++
-		member := class.Members[parameter.Name]
-		if member == nil || member.Kind != semantic.MemberSymbol || member.OwnerClass != class.Class {
+		member := class.ConstructorAttributes[index]
+		if member == nil {
 			continue
 		}
 		field := fieldID(member)
 		if field == "" {
 			continue
 		}
-		receiver := &ir.LoadExpr{ExprBase: ir.ExprBase{Span: parameter.Span(), Type: ir.Type{Kind: ir.ClassType, Class: function.Owner}, NullState: ir.NonNull}, Symbol: function.Receiver}
-		value := &ir.LoadExpr{ExprBase: ir.ExprBase{Span: parameter.Span(), Type: lowered.Type, NullState: lowered.NullState}, Symbol: lowered.ID}
+		receiver := &ir.LoadExpr{ExprBase: ir.ExprBase{Span: parameter.Span, Type: ir.Type{Kind: ir.ClassType, Class: function.Owner}, NullState: ir.NonNull}, Symbol: function.Receiver}
+		value := &ir.LoadExpr{ExprBase: ir.ExprBase{Span: parameter.Span, Type: parameter.Type, NullState: parameter.NullState}, Symbol: parameter.ID}
 		block.Statements = append(block.Statements, &ir.AssignStmt{
-			StmtBase: ir.StmtBase{Span: parameter.Span()},
-			Target:   ir.Target{Kind: ir.FieldTarget, Type: lowered.Type, Field: field, Receiver: receiver},
+			StmtBase: ir.StmtBase{Span: parameter.Span},
+			Target:   ir.Target{Kind: ir.FieldTarget, Type: parameter.Type, Field: field, Receiver: receiver},
 			Value:    value,
 		})
 	}
@@ -254,7 +377,5 @@ func (lowerer *moduleLowerer) attributeInitialization(declaration *ast.Structure
 }
 
 func (lowerer *moduleLowerer) lowerSyntheticConstructor(class *semantic.Symbol) *ir.Function {
-	callable := class.Constructor
-	id := lowerer.compilation.registry.callableID(lowerer.module, class, callable, true)
-	return &ir.Function{ID: id, Symbol: lowerer.compilation.registry.symbolID(lowerer.module, class), Name: class.Name, Kind: ir.ConstructorFunction, Owner: classID(class.Class), Receiver: ir.SymbolID(string(id) + "::receiver"), Signature: *lowerSignature(callable.Signature), ReturnNull: ir.NonNull}
+	return lowerer.lowerConstructor(nil, class)
 }

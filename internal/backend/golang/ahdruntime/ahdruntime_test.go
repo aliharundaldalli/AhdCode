@@ -6,19 +6,64 @@ import (
 	"testing"
 )
 
-func expectRaise(t *testing.T, class string, body func()) {
+// stubError stands in for a generated Error Class so the runtime can be tested
+// without a generated program.
+type stubError struct {
+	AhdBase
+	message string
+}
+
+func (value *stubError) AhdErrorMessage() string { return value.message }
+
+func (value *stubError) AhdFreezeGraph(visited map[AhdFreezable]bool) {
+	if !AhdEnterFreeze(value, visited) {
+		return
+	}
+	value.AhdMarkFrozen()
+}
+
+func init() {
+	for _, class := range []*AhdClass{
+		AhdClassError, AhdClassConstantError, AhdClassDivisionByZeroError, AhdClassDomainError,
+		AhdClassIndexError, AhdClassKeyError, AhdClassNullError, AhdClassOverflowError, AhdClassValueError,
+	} {
+		target := class
+		AhdRegisterError(target, func(message string) AhdInstance {
+			instance := &stubError{message: message}
+			instance.AhdSetClass(target)
+			return instance
+		})
+	}
+}
+
+// cyclicNode builds a reference cycle so the freeze walk can be shown to
+// terminate.
+type cyclicNode struct {
+	AhdBase
+	peer AhdFreezable
+}
+
+func (node *cyclicNode) AhdFreezeGraph(visited map[AhdFreezable]bool) {
+	if !AhdEnterFreeze(node, visited) {
+		return
+	}
+	node.AhdMarkFrozen()
+	AhdFreezeChild(node.peer, visited)
+}
+
+func expectRaise(t *testing.T, class *AhdClass, body func()) {
 	t.Helper()
 	defer func() {
 		recovered := recover()
 		if recovered == nil {
-			t.Fatalf("expected an AhdCode %s", class)
+			t.Fatalf("expected an AhdCode %s", class.Name)
 		}
-		failure, ok := recovered.(*AhdError)
+		signal, ok := recovered.(*AhdSignal)
 		if !ok {
-			t.Fatalf("expected an AhdError; received %v", recovered)
+			t.Fatalf("expected an AhdSignal; received %v", recovered)
 		}
-		if failure.Class != class {
-			t.Fatalf("expected %s; received %s", class, failure.Class)
+		if signal.Instance.AhdClassOf() != class {
+			t.Fatalf("expected %s; received %s", class.Name, signal.Instance.AhdClassOf().Name)
 		}
 	}()
 	body()
@@ -31,12 +76,12 @@ func TestCheckedIntArithmeticRejectsOverflow(t *testing.T) {
 	if AhdIntNegate(math.MinInt64+1) != math.MaxInt64 {
 		t.Fatal("Int negation is wrong")
 	}
-	expectRaise(t, "OverflowError", func() { AhdIntAdd(math.MaxInt64, 1) })
-	expectRaise(t, "OverflowError", func() { AhdIntSubtract(math.MinInt64, 1) })
-	expectRaise(t, "OverflowError", func() { AhdIntMultiply(math.MaxInt64, 2) })
-	expectRaise(t, "OverflowError", func() { AhdIntMultiply(math.MinInt64, -1) })
-	expectRaise(t, "OverflowError", func() { AhdIntNegate(math.MinInt64) })
-	expectRaise(t, "OverflowError", func() { AhdIntPower(10, 100) })
+	expectRaise(t, AhdClassOverflowError, func() { AhdIntAdd(math.MaxInt64, 1) })
+	expectRaise(t, AhdClassOverflowError, func() { AhdIntSubtract(math.MinInt64, 1) })
+	expectRaise(t, AhdClassOverflowError, func() { AhdIntMultiply(math.MaxInt64, 2) })
+	expectRaise(t, AhdClassOverflowError, func() { AhdIntMultiply(math.MinInt64, -1) })
+	expectRaise(t, AhdClassOverflowError, func() { AhdIntNegate(math.MinInt64) })
+	expectRaise(t, AhdClassOverflowError, func() { AhdIntPower(10, 100) })
 }
 
 func TestIntModuloAndPowerEdges(t *testing.T) {
@@ -49,17 +94,17 @@ func TestIntModuloAndPowerEdges(t *testing.T) {
 	if AhdIntPower(2, 10) != 1024 || AhdIntPower(5, 0) != 1 {
 		t.Fatal("Int power is wrong")
 	}
-	expectRaise(t, "DivisionByZeroError", func() { AhdIntModulo(1, 0) })
-	expectRaise(t, "DomainError", func() { AhdIntPower(2, -1) })
+	expectRaise(t, AhdClassDivisionByZeroError, func() { AhdIntModulo(1, 0) })
+	expectRaise(t, AhdClassDomainError, func() { AhdIntPower(2, -1) })
 }
 
 func TestRealArithmeticRejectsNonFiniteResults(t *testing.T) {
 	if AhdRealDivide(5, 2) != 2.5 {
 		t.Fatal("Real division is wrong")
 	}
-	expectRaise(t, "DivisionByZeroError", func() { AhdRealDivide(1, 0) })
-	expectRaise(t, "OverflowError", func() { AhdRealMultiply(math.MaxFloat64, 10) })
-	expectRaise(t, "DomainError", func() { AhdRealPower(-1, 0.5) })
+	expectRaise(t, AhdClassDivisionByZeroError, func() { AhdRealDivide(1, 0) })
+	expectRaise(t, AhdClassOverflowError, func() { AhdRealMultiply(math.MaxFloat64, 10) })
+	expectRaise(t, AhdClassDomainError, func() { AhdRealPower(-1, 0.5) })
 }
 
 func TestCanonicalRealText(t *testing.T) {
@@ -95,8 +140,9 @@ func TestCanonicalCollectionText(t *testing.T) {
 	if AhdStrFunction("double") != "<Function double>" {
 		t.Fatal("Function text is wrong")
 	}
-	type instance struct{}
-	if AhdStrRef[instance]("Student")(&instance{}) != "<Student>" || AhdStrRef[instance]("Student")(nil) != "null" {
+	student := &stubError{}
+	student.AhdSetClass(&AhdClass{Name: "Student"})
+	if AhdStrRefInstance[AhdInstance](student) != "<Student>" || AhdStrRefInstance[AhdInstance](nil) != "null" {
 		t.Fatal("Class instance text is wrong")
 	}
 }
@@ -124,8 +170,8 @@ func TestListKeepsIdentityAcrossAliases(t *testing.T) {
 	if len(snapshot) != 3 {
 		t.Fatal("the iteration snapshot is not shallow-copied")
 	}
-	expectRaise(t, "IndexError", func() { AhdNewList[*int64]().At(0) })
-	expectRaise(t, "NullError", func() { var absent *AhdList[*int64]; absent.Len() })
+	expectRaise(t, AhdClassIndexError, func() { AhdNewList[*int64]().At(0) })
+	expectRaise(t, AhdClassNullError, func() { var absent *AhdList[*int64]; absent.Len() })
 }
 
 func TestPairPreservesInsertionOrder(t *testing.T) {
@@ -149,8 +195,8 @@ func TestPairPreservesInsertionOrder(t *testing.T) {
 	if alias.Len() != 0 {
 		t.Fatal("clear did not empty the Pair in place")
 	}
-	expectRaise(t, "KeyError", func() { pair.Get("missing") })
-	expectRaise(t, "NullError", func() { var absent *AhdPair[string, *int64]; absent.Len() })
+	expectRaise(t, AhdClassKeyError, func() { pair.Get("missing") })
+	expectRaise(t, AhdClassNullError, func() { var absent *AhdPair[string, *int64]; absent.Len() })
 }
 
 func TestStringOperationsAreCharacterBased(t *testing.T) {
@@ -172,15 +218,15 @@ func TestStringOperationsAreCharacterBased(t *testing.T) {
 	if !AhdStringContains("cat", "a") || AhdStringContains("cat", "z") {
 		t.Fatal("String membership is wrong")
 	}
-	expectRaise(t, "ValueError", func() { AhdStringRepeat("a", -1) })
-	expectRaise(t, "IndexError", func() { AhdStringAt("a", 5) })
+	expectRaise(t, AhdClassValueError, func() { AhdStringRepeat("a", -1) })
+	expectRaise(t, AhdClassIndexError, func() { AhdStringAt("a", 5) })
 }
 
 func TestNullBoxing(t *testing.T) {
 	if *AhdBox(int64(5)) != 5 || AhdNonNull(AhdBox("x")) != "x" {
 		t.Fatal("boxing is wrong")
 	}
-	expectRaise(t, "NullError", func() { AhdNonNull[int64](nil) })
+	expectRaise(t, AhdClassNullError, func() { AhdNonNull[int64](nil) })
 }
 
 func TestEqualityHelpers(t *testing.T) {
@@ -201,12 +247,15 @@ func TestEqualityHelpers(t *testing.T) {
 	if AhdSameDifferent(int64(5), 5.0) {
 		t.Fatal("statically distinct types can never be the same value")
 	}
-	type instance struct{}
-	value := &instance{}
-	if !AhdEqRef[instance]()(value, value) || AhdEqRef[instance]()(value, &instance{}) {
+	person := &AhdClass{Name: "Person"}
+	value := &stubError{}
+	value.AhdSetClass(person)
+	other := &stubError{}
+	other.AhdSetClass(person)
+	if !AhdEqRef[AhdInstance]()(value, value) || AhdEqRef[AhdInstance]()(value, other) {
 		t.Fatal("reference identity is wrong")
 	}
-	if !AhdIsType(value, true) || AhdIsType[instance](nil, true) {
+	if !AhdIsClass(value, person) || AhdIsClass(nil, person) {
 		t.Fatal("Class membership is wrong")
 	}
 	if !AhdConstBool(1, true) || AhdConstBool(1, false) {
@@ -220,8 +269,101 @@ func TestEqualityHelpers(t *testing.T) {
 	}
 }
 
-func TestUnreachableReturnIsAnError(t *testing.T) {
-	expectRaise(t, "ReturnError", func() { _ = AhdUnreachable[int64]() })
+func TestClassMembershipFollowsInheritance(t *testing.T) {
+	animal := &AhdClass{Name: "Animal"}
+	dog := &AhdClass{Name: "Dog", Parent: animal}
+	instance := &stubError{}
+	instance.AhdSetClass(dog)
+	if !AhdIsClass(instance, dog) || !AhdIsClass(instance, animal) {
+		t.Fatal("inheritance-aware Class membership is wrong")
+	}
+	if AhdIsClass(instance, &AhdClass{Name: "Cat"}) {
+		t.Fatal("unrelated Class membership must be false")
+	}
+	other := &stubError{}
+	other.AhdSetClass(animal)
+	if AhdSameInstance(instance, other) || !AhdSameInstance(instance, instance) {
+		t.Fatal("same must compare exact runtime Class and object identity")
+	}
+	if !AhdEqInstance(instance, instance) || AhdEqInstance(instance, other) {
+		t.Fatal("Class equality must be reference identity")
+	}
+}
+
+func TestErrorSignalsAreIsolatedFromGoPanics(t *testing.T) {
+	instance := &stubError{message: "boom"}
+	instance.AhdSetClass(AhdClassError)
+	expectRaise(t, AhdClassError, func() { AhdToss(instance) })
+	expectRaise(t, AhdClassNullError, func() { AhdToss(nil) })
+
+	signal := &AhdSignal{Instance: instance, Message: "boom"}
+	if !AhdMatches(signal, AhdClassError) || AhdMatches(signal, AhdClassKeyError) {
+		t.Fatal("except matching is wrong")
+	}
+	if AhdSignalOf(nil) != nil {
+		t.Fatal("no recovered value must yield no signal")
+	}
+	if got := AhdSignalOf(signal); got != signal {
+		t.Fatal("an AhdCode signal must be recovered as itself")
+	}
+	// An ordinary Go panic is never handled as an AhdCode Error.
+	func() {
+		defer func() {
+			if recover() == nil {
+				t.Error("an ordinary Go panic must not be converted into an AhdCode error")
+			}
+		}()
+		_ = AhdSignalOf("ordinary go panic")
+	}()
+	if signal.Error() != "Error: boom" {
+		t.Fatalf("signal text is %q", signal.Error())
+	}
+}
+
+func TestDeepFreezeIsIdempotentAndTerminatesOnCycles(t *testing.T) {
+	inner := AhdNewList[*int64](AhdBox(int64(1)))
+	outer := AhdNewList[*AhdList[*int64]](inner)
+	AhdFreeze(outer)
+	expectRaise(t, AhdClassConstantError, func() { inner.Clear() })
+	expectRaise(t, AhdClassConstantError, func() { outer.Clear() })
+	// Freezing again must not fail or loop.
+	AhdFreeze(outer)
+
+	first, second := &cyclicNode{}, &cyclicNode{}
+	first.AhdSetClass(AhdClassObject)
+	second.AhdSetClass(AhdClassObject)
+	first.peer, second.peer = second, first
+	AhdFreeze(first)
+	AhdFreeze(first)
+	if !first.AhdFrozen() || !second.AhdFrozen() {
+		t.Fatal("a cyclic graph was not fully frozen")
+	}
+
+	pair := AhdBuildPair([]string{"a"}, []*AhdList[*int64]{AhdNewList[*int64]()})
+	AhdFreeze(pair)
+	expectRaise(t, AhdClassConstantError, func() { pair.Set("b", nil) })
+	expectRaise(t, AhdClassConstantError, func() { pair.Remove("a") })
+	expectRaise(t, AhdClassConstantError, func() { pair.Clear() })
+
+	instance := &stubError{}
+	instance.AhdSetClass(AhdClassError)
+	AhdFreeze(instance)
+	if !instance.AhdFrozen() {
+		t.Fatal("a Class instance was not frozen")
+	}
+	expectRaise(t, AhdClassConstantError, func() { instance.AhdRequireMutable() })
+	if instance.AhdMarkFrozen() {
+		t.Fatal("freezing is not idempotent")
+	}
+}
+
+func TestFrozenListRejectsIndexedWrites(t *testing.T) {
+	values := AhdNewList[*int64](AhdBox(int64(1)))
+	AhdFreeze(values)
+	expectRaise(t, AhdClassConstantError, func() { values.Set(0, AhdBox(int64(2))) })
+	if *values.At(0) != 1 {
+		t.Fatal("a rejected mutation must not take effect")
+	}
 }
 
 func TestIntToRealWidening(t *testing.T) {

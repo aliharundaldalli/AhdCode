@@ -212,26 +212,23 @@ func TestClearKeepsListIdentity(t *testing.T) {
 
 func TestUnsupportedNodesProduceBackendDiagnostics(t *testing.T) {
 	cases := map[string]string{
-		"error handling": `attempt {
-    write("body")
-}
-except Error as error {
-    write(error.message)
-}
-`,
-		"inheritance": `Animal: Class<> := {
-    structure: Attributes := (
-        name: String
-    )
+		// A Function value reaching str without a declared name has no
+		// canonical text, so it is reported rather than approximated.
+		"anonymous Function text": `describe: Function := (
+    action: Function
+    value: Int
+) -> String {
+    result: Local Int := action(value)
+    return "{str(action)}={result}"
 }
 
-Dog: Class<Animal> := {
-    structure: Attributes := (
-        tag: String
-    )
+double: Function := (
+    n: Int
+) -> Int {
+    return n * 2
 }
 
-write("ready")
+write(describe(double, 2))
 `,
 	}
 	for name, text := range cases {
@@ -244,6 +241,59 @@ write("ready")
 				t.Fatalf("expected %s; received %v", CodeUnsupportedNode, codes(produced))
 			}
 		})
+	}
+}
+
+func TestErrorHandlingAndInheritanceAreGenerated(t *testing.T) {
+	program := generate(t, `Failure: Class<Error> := {
+    structure: Attributes := (
+        SuperClass.attributes
+    )
+}
+
+Animal: Class<> := {
+    structure: Attributes := (
+        name: String
+    )
+
+    speak: Function := (
+    ) -> String {
+        return "..."
+    }
+}
+
+Dog: Class<Animal> := {
+    structure: Attributes := (
+        SuperClass.attributes
+    )
+
+    speak: Override Function := (
+    ) -> String {
+        return "{SuperClass.speak()} woof"
+    }
+}
+
+attempt {
+    toss Failure(message: "boom")
+}
+except Error as error {
+    write(error.message)
+}
+ultimately {
+    write(Dog(name: "Rex").speak())
+}
+`)
+	generated := programSource(t, program)
+	for _, expected := range []string{"AhdSignalOf(recover())", "AhdMatches(signal,", "AhdToss(", "defer func()"} {
+		if !strings.Contains(generated, expected) {
+			t.Fatalf("error handling did not generate %q", expected)
+		}
+	}
+	if !strings.Contains(generated, "AhdRegisterError(") {
+		t.Fatal("the built-in Error catalog was not installed")
+	}
+	if !strings.Contains(generated, "AhdInstance") {
+		t.Fatal("Class instances do not carry runtime identity")
 	}
 }
 
@@ -342,5 +392,141 @@ func TestIndexedCompoundAssignmentEvaluatesItsTargetOnce(t *testing.T) {
 	}
 	if !strings.Contains(generated, ".Set(ahdTemporary") || !strings.Contains(generated, ".At(ahdTemporary") {
 		t.Fatalf("indexed updates did not read and write through one bound target:\n%s", generated)
+	}
+}
+
+func TestClassGenerationIsDeterministic(t *testing.T) {
+	compilation := lower(t, map[string]string{"/Main.ahd": `Person: Class<> := {
+    structure: Attributes := (
+        name: String
+    )
+
+    describe: Function := (
+    ) -> String {
+        return "Person {attribute.name}"
+    }
+}
+
+Student: Class<Person> := {
+    structure: Attributes := (
+        SuperClass.attributes
+        number: Int
+    )
+
+    describe: Override Function := (
+    ) -> String {
+        return "{SuperClass.describe()} #{attribute.number}"
+    }
+}
+
+Failure: Class<Error> := {
+    structure: Attributes := (
+        SuperClass.attributes
+    )
+}
+
+attempt {
+    write(Student(name: "Ada", number: 1).describe())
+    toss Failure(message: "x")
+}
+except Error as error {
+    write(error.message)
+}
+ultimately {
+    write("done")
+}
+`})
+	first, firstDiagnostics := Generate(compilation)
+	second, secondDiagnostics := Generate(compilation)
+	if len(firstDiagnostics) != 0 || len(secondDiagnostics) != 0 {
+		t.Fatalf("unexpected diagnostics: %v %v", codes(firstDiagnostics), codes(secondDiagnostics))
+	}
+	for index := range first.Files {
+		if first.Files[index].Content != second.Files[index].Content {
+			t.Fatalf("Class and error generation is not deterministic for %s", first.Files[index].Name)
+		}
+	}
+}
+
+func TestOverrideSharesOneDispatchSlot(t *testing.T) {
+	program := generate(t, `Animal: Class<> := {
+    structure: Attributes := (
+        name: String
+    )
+
+    speak: Function := (
+    ) -> String {
+        return "..."
+    }
+}
+
+Dog: Class<Animal> := {
+    structure: Attributes := (
+        SuperClass.attributes
+    )
+
+    speak: Override Function := (
+    ) -> String {
+        return "woof"
+    }
+}
+
+animal: Animal := Dog(name: "Rex")
+write(animal.speak())
+`)
+	generated := programSource(t, program)
+	slots := make(map[string]bool)
+	for _, line := range strings.Split(generated, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if !strings.HasPrefix(trimmed, "func (object *Cl_") {
+			continue
+		}
+		if cut := strings.Index(trimmed, ") Mt_"); cut >= 0 {
+			rest := trimmed[cut+2:]
+			slots[rest[:strings.Index(rest, "(")]] = true
+		}
+	}
+	if len(slots) != 1 {
+		t.Fatalf("an override must share the parent dispatch slot; found %v", slots)
+	}
+}
+
+func TestInheritedFieldsAreOneStorageLocation(t *testing.T) {
+	program := generate(t, `Person: Class<> := {
+    structure: Attributes := (
+        name: String
+    )
+}
+
+Student: Class<Person> := {
+    structure: Attributes := (
+        SuperClass.attributes
+        number: Int
+    )
+}
+
+	student: Student := Student(name: "Ada", number: 1)
+write(student.name)
+`)
+	generated := programSource(t, program)
+	storageLocations := 0
+	for _, line := range strings.Split(generated, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "Fd_name_") && !strings.Contains(trimmed, "(") && strings.HasSuffix(trimmed, " string") {
+			storageLocations++
+		}
+	}
+	if storageLocations != 1 {
+		t.Fatalf("an inherited attribute was duplicated into the subclass:\n%s", generated)
+	}
+	if !strings.Contains(generated, "Cl_Person_") {
+		t.Fatal("the subclass struct does not embed its parent")
+	}
+}
+
+func TestConstantReferenceBindingsFreezeTheirGraph(t *testing.T) {
+	program := generate(t, "source: List<Int> := [1]\nfrozen: Constant List<Int> := source\nwrite(len(frozen))\n")
+	if !strings.Contains(programSource(t, program), "AhdFreeze(") {
+		t.Fatal("a Constant reference binding did not deep-freeze its graph")
 	}
 }

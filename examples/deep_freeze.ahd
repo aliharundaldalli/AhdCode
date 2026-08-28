@@ -1,0 +1,26 @@
+inner: List<Int> := [1, 2]
+outer: List<List<Int>> := [inner]
+
+alias: List<Int> := inner
+frozen: Constant List<List<Int>> := outer
+
+
+attempt {
+    clear(alias)
+}
+except ConstantError as error {
+    write("alias mutation rejected")
+}
+
+
+attempt {
+    clear(outer)
+}
+except ConstantError as error {
+    write("nested mutation rejected")
+}
+
+
+mutable: List<Int> := [1, 2, 3]
+write(len(mutable))
+write(len(inner))

@@ -67,7 +67,7 @@ func (generator *generator) expr(expression ir.Expr) string {
 		return generator.coerce(current.name, ir.ExprBase{Type: current.typeInfo, NullState: nullState(current.nullable)}, meta.Type, naturalNullable(expression))
 	case *ir.FunctionValueExpr:
 		// A Function-typed binding resolves to its storage slot; a declared
-		// callable resolves to the generated Go function.
+		// callable resolves to its uniform Function value adapter.
 		if current, known := generator.slots[value.Symbol]; known {
 			return current.name
 		}
@@ -75,7 +75,7 @@ func (generator *generator) expr(expression ir.Expr) string {
 		if function == nil {
 			return generator.unsupported("a Function value with no generated callable", meta.Span)
 		}
-		return generator.callableName(function)
+		return generator.adapterName(function)
 	case *ir.ConvertExpr:
 		if value.From.Kind == ir.IntType && meta.Type.Kind == ir.RealType {
 			return "AhdIntToReal(" + generator.value(value.Value, ir.Type{Kind: ir.IntType}, false) + ")"
@@ -308,10 +308,15 @@ func (generator *generator) equality(value *ir.BinaryExpr, negated bool) string 
 func (generator *generator) same(value *ir.BinaryExpr) string {
 	meta := value.ExprMeta()
 	left, right := value.Left.ExprMeta().Type, value.Right.ExprMeta().Type
+	if left.Kind == ir.ClassType && right.Kind == ir.ClassType {
+		// Class same compares exact runtime Class and object identity, which a
+		// static parent type must not weaken.
+		return "AhdSameInstance(" + generator.expr(value.Left) + ", " + generator.expr(value.Right) + ")"
+	}
 	if !ir.EqualType(left, right) {
 		return "AhdSameDifferent(" + generator.expr(value.Left) + ", " + generator.expr(value.Right) + ")"
 	}
-	if left.Kind == ir.ListType || left.Kind == ir.PairType || left.Kind == ir.ClassType {
+	if left.Kind == ir.ListType || left.Kind == ir.PairType {
 		return "(" + generator.expr(value.Left) + " == " + generator.expr(value.Right) + ")"
 	}
 	nullable := naturalNullable(value.Left) || naturalNullable(value.Right)
@@ -346,16 +351,18 @@ func (generator *generator) membership(value *ir.BinaryExpr, negated bool) strin
 	return code
 }
 
-// classMembership resolves is / is not statically. Class inheritance is
-// deferred, so exact Class identity decides membership for a non-null value.
+// classMembership resolves is / is not through canonical Class identity at
+// runtime, so inheritance participates in type membership.
 func (generator *generator) classMembership(value *ir.BinaryExpr, negated bool) string {
 	meta := value.ExprMeta()
-	instance := value.Left.ExprMeta().Type
 	reference, ok := value.Right.(*ir.ClassRefExpr)
-	if !ok || instance.Kind != ir.ClassType {
+	if !ok || value.Left.ExprMeta().Type.Kind != ir.ClassType {
 		return generator.unsupported("a Class membership test with these operands", meta.Span)
 	}
-	code := "AhdIsType(" + generator.expr(value.Left) + ", " + strconv.FormatBool(instance.Class == reference.Class) + ")"
+	if generator.layouts[reference.Class] == nil {
+		return generator.unsupported("a Class membership test against an undeclared Class", meta.Span)
+	}
+	code := "AhdIsClass(" + generator.expr(value.Left) + ", " + generator.descriptorName(reference.Class) + ")"
 	if negated {
 		return "(!" + code + ")"
 	}
@@ -423,12 +430,7 @@ func (generator *generator) renderFunc(value ir.Type, nullable, nested bool, spa
 		key, item := generator.goType(*value.Key, false), generator.goType(*value.Value, true)
 		return "AhdStrPair[" + key + ", " + item + "](" + generator.renderFunc(*value.Key, false, true, span) + ", " + generator.renderFunc(*value.Value, true, true, span) + ")"
 	case ir.ClassType:
-		class := generator.classes[value.Class]
-		name := string(value.Class)
-		if class != nil {
-			name = class.Name
-		}
-		return "AhdStrRef[" + generator.className(value.Class) + "](" + strconv.Quote(name) + ")"
+		return "AhdStrRefInstance[" + generator.interfaceName(value.Class) + "]"
 	default:
 		return generator.unsupported("canonical text for "+value.String(), span)
 	}
@@ -462,7 +464,7 @@ func (generator *generator) equalFunc(value ir.Type, nullable bool, span source.
 		key, item := generator.goType(*value.Key, false), generator.goType(*value.Value, true)
 		return "AhdEqPair[" + key + ", " + item + "](" + generator.equalFunc(*value.Value, true, span) + ")"
 	case ir.ClassType:
-		return "AhdEqRef[" + generator.className(value.Class) + "]()"
+		return "AhdEqRef[" + generator.interfaceName(value.Class) + "]()"
 	default:
 		return generator.unsupported("equality for "+value.String(), span)
 	}
@@ -476,11 +478,13 @@ func (generator *generator) equalFunc(value ir.Type, nullable bool, span source.
 func (generator *generator) text(expression ir.Expr) string {
 	meta := expression.ExprMeta()
 	if function, ok := expression.(*ir.FunctionValueExpr); ok {
-		name := string(function.Callable)
-		if declared := generator.functions[function.Callable]; declared != nil {
-			name = declared.Name
+		// The canonical text of a Function value is its declared name, so a
+		// value with no statically known declaration has no representation.
+		declared := generator.functions[function.Callable]
+		if declared == nil {
+			return generator.unsupported("canonical text for a Function value with no declared name", meta.Span)
 		}
-		return "AhdStrFunction(" + strconv.Quote(name) + ")"
+		return "AhdStrFunction(" + strconv.Quote(declared.Name) + ")"
 	}
 	nullable := naturalNullable(expression)
 	return generator.renderFunc(meta.Type, nullable, false, meta.Span) + "(" + generator.expr(expression) + ")"
@@ -589,30 +593,41 @@ func (generator *generator) member(value *ir.MemberExpr) string {
 			generator.fail(CodeGenerationFailure, "unknown FieldID "+string(value.Field), meta.Span, "the IR references a field with no declaration")
 			return "nil"
 		}
-		access := generator.expr(value.Object) + "." + generator.fieldName(value.Field)
+		access := generator.expr(value.Object) + "." + generator.fieldName(value.Field) + "_get()"
 		return generator.coerce(access, ir.ExprBase{Type: field.Type, NullState: nullState(generator.nullFields[value.Field])}, meta.Type, naturalNullable(value))
 	}
 	function := generator.functions[value.Callable]
 	if function == nil {
 		return generator.unsupported("a method value with no generated callable", meta.Span)
 	}
-	// A method used as a Function value binds its receiver exactly once.
+	// A method used as a Function value binds its receiver exactly once and
+	// adopts the uniform Function value shape.
 	parameters := make([]string, 0, len(function.Parameters))
-	arguments := make([]string, 0, len(function.Parameters)+1)
-	arguments = append(arguments, "bound")
+	arguments := make([]string, 0, len(function.Parameters))
 	for index, parameter := range function.Parameters {
 		name := "argument" + strconv.Itoa(index)
-		parameters = append(parameters, name+" "+generator.goType(parameter.Type, false))
-		arguments = append(arguments, name)
+		parameters = append(parameters, name+" "+generator.goType(parameter.Type, true))
+		arguments = append(arguments, generator.coerce(name,
+			ir.ExprBase{Type: parameter.Type, NullState: ir.MaybeNull}, parameter.Type, parameter.NullState != ir.NonNull))
 	}
 	result := ""
-	body := generator.callableName(function) + "(" + strings.Join(arguments, ", ") + ")"
+	body := generator.methodCall("bound", value.Direct, function, arguments)
 	if function.Signature.Return.Kind != ir.NothingType {
-		result = " " + generator.goType(function.Signature.Return, false)
-		body = "return " + body
+		result = " " + generator.goType(function.Signature.Return, true)
+		body = "return " + generator.coerce(body,
+			ir.ExprBase{Type: function.Signature.Return, NullState: function.ReturnNull}, function.Signature.Return, true)
 	}
 	closure := "func(" + strings.Join(parameters, ", ") + ")" + result + " { " + body + " }"
-	return "func(bound *" + generator.className(function.Owner) + ") " + generator.functionType(&function.Signature) + " { return " + closure + " }(" + generator.expr(value.Object) + ")"
+	return "func(bound " + generator.interfaceName(function.Owner) + ") " + generator.functionType(&function.Signature) + " { return " + closure + " }(" + generator.expr(value.Object) + ")"
+}
+
+// methodCall dispatches through the Class interface, except for a
+// SuperClass.member call, which names the parent implementation directly.
+func (generator *generator) methodCall(receiver string, direct bool, function *ir.Function, arguments []string) string {
+	if direct {
+		return generator.callableName(function) + "(" + strings.Join(append([]string{receiver}, arguments...), ", ") + ")"
+	}
+	return receiver + "." + generator.slotName(function.ID) + "(" + strings.Join(arguments, ", ") + ")"
 }
 
 func (generator *generator) construct(value *ir.ConstructExpr) string {
@@ -634,8 +649,7 @@ func (generator *generator) call(value *ir.CallExpr) string {
 		if function == nil {
 			return generator.unsupported("a method call with no generated callable", meta.Span)
 		}
-		arguments := append([]string{generator.expr(method.Object)}, generator.arguments(function, value.Arguments, meta.Span)...)
-		return generator.callableName(function) + "(" + strings.Join(arguments, ", ") + ")"
+		return generator.methodCall(generator.expr(method.Object), method.Direct, function, generator.arguments(function, value.Arguments, meta.Span))
 	}
 	if function := generator.functions[value.Callable]; function != nil {
 		return generator.callableName(function) + "(" + strings.Join(generator.arguments(function, value.Arguments, meta.Span), ", ") + ")"
@@ -657,9 +671,13 @@ func (generator *generator) call(value *ir.CallExpr) string {
 		if index < len(signature.Parameters) {
 			target = signature.Parameters[index].Type
 		}
-		parts = append(parts, generator.value(argument.Value, target, false))
+		parts = append(parts, generator.value(argument.Value, target, true))
 	}
-	return generator.expr(value.Callee) + "(" + strings.Join(parts, ", ") + ")"
+	call := generator.expr(value.Callee) + "(" + strings.Join(parts, ", ") + ")"
+	if signature.Return.Kind == ir.NothingType {
+		return call
+	}
+	return generator.coerce(call, ir.ExprBase{Type: signature.Return, NullState: ir.MaybeNull}, meta.Type, naturalNullable(value))
 }
 
 func (generator *generator) arguments(function *ir.Function, arguments []ir.Argument, span source.Span) []string {
@@ -678,7 +696,7 @@ func (generator *generator) arguments(function *ir.Function, arguments []ir.Argu
 			generator.fail(CodeGenerationFailure, "argument for parameter "+parameter.Name+" has no value", span, "the IR call is malformed")
 			continue
 		}
-		parts = append(parts, generator.value(source, parameter.Type, false))
+		parts = append(parts, generator.value(source, parameter.Type, parameter.NullState != ir.NonNull))
 	}
 	return parts
 }

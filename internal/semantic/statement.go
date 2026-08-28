@@ -136,7 +136,7 @@ func (a *analyzer) analyzeVariableDeclaration(declaration *ast.VariableDecl, cur
 	}
 	if targetFunction, ok := typeValue.(types.Function); ok && targetFunction.Signature == nil {
 		if resolvedFunction, ok := initializer.typeValue.(types.Function); ok && resolvedFunction.Signature != nil {
-			a.constrainConcreteFunction(symbol, resolvedFunction.Signature, declaration.Initializer.Span())
+			a.constrainConcreteFunction(symbol, resolvedFunction.Signature, concreteCallable(initializer), declaration.Initializer.Span())
 		}
 	}
 	symbol.InitialNull = initializer.nullState
@@ -144,7 +144,13 @@ func (a *analyzer) analyzeVariableDeclaration(declaration *ast.VariableDecl, cur
 
 	if symbol.Constant {
 		if initializer.nullState != NonNull {
-			a.error(codeConstantInitializer, fmt.Sprintf("Constant %q cannot be null", symbol.Name), declaration.Initializer.Span(), "initialize Constant with a NonNull scalar constant expression")
+			a.error(codeConstantInitializer, fmt.Sprintf("Constant %q cannot be null", symbol.Name), declaration.Initializer.Span(), "initialize Constant with a NonNull value")
+			return flow
+		}
+		// A Constant reference binding deep-freezes the referenced object graph
+		// instead of requiring a compile-time scalar constant expression. The
+		// constant-expression rule stays scalar-only, as specified.
+		if isReferenceType(typeValue) {
 			return flow
 		}
 		constant, failure := a.evaluateConstant(declaration.Initializer)
@@ -162,6 +168,17 @@ func (a *analyzer) analyzeVariableDeclaration(declaration *ast.VariableDecl, cur
 		}
 	}
 	return flow
+}
+
+// isReferenceType reports the v0.1 reference-semantics types, for which
+// Constant means deep freeze rather than a compile-time scalar value.
+func isReferenceType(value types.Type) bool {
+	switch value.Kind() {
+	case types.ListKind, types.PairKind, types.ClassKind, types.FunctionKind:
+		return true
+	default:
+		return false
+	}
 }
 
 func (a *analyzer) analyzeGlobalDeclaration(declaration *ast.VariableDecl, current *scope, flow flowState) flowState {
@@ -241,7 +258,7 @@ func (a *analyzer) analyzeMemberDeclaration(declaration *ast.VariableDecl, curre
 		}
 		memberSymbol.InitialNull = initializer.nullState
 		if function, ok := initializer.typeValue.(types.Function); ok && function.Signature != nil {
-			a.constrainConcreteFunction(memberSymbol, function.Signature, declaration.Initializer.Span())
+			a.constrainConcreteFunction(memberSymbol, function.Signature, concreteCallable(initializer), declaration.Initializer.Span())
 		}
 	}
 	return flow
@@ -263,7 +280,7 @@ func (a *analyzer) analyzeAssignment(statement *ast.AssignmentStmt, current *sco
 	value := a.analyzeExpressionExpected(statement.Value, current, flow, expected)
 	if target.symbol != nil && target.symbol.inference != nil {
 		if function, ok := value.typeValue.(types.Function); ok && function.Signature != nil {
-			a.constrainConcreteFunction(target.symbol, function.Signature, statement.Value.Span())
+			a.constrainConcreteFunction(target.symbol, function.Signature, concreteCallable(value), statement.Value.Span())
 		}
 	}
 	resultType := value.typeValue
@@ -276,7 +293,7 @@ func (a *analyzer) analyzeAssignment(statement *ast.AssignmentStmt, current *sco
 			a.nullableError(statement.Operator, statement.Value, value.nullState)
 		}
 		operator := statement.Operator[:len(statement.Operator)-1]
-		resultType = a.binaryOperatorType(operator, target.typeValue, value.typeValue, statement.Value)
+		resultType = a.binaryOperatorType(operator, target.typeValue, value.typeValue)
 		resultNull = NonNull
 		if types.IsInvalid(resultType) {
 			a.operatorError(statement.Operator, target.typeValue, value.typeValue, statement.Span())
@@ -412,7 +429,10 @@ func (a *analyzer) analyzeState(statement *ast.StateStmt, current *scope, flow f
 func (a *analyzer) analyzeAttempt(statement *ast.AttemptStmt, current *scope, flow flowState) statementOutcome {
 	body := a.analyzeBlock(statement.Body, current, flow.clone(), nil)
 	exits := []flowState{body.flow}
-	allReturn := body.returns && len(statement.Excepts) > 0
+	// An attempt exits definitely when its body returns and every handler
+	// returns. With no handler, a raised error propagates, which is an exit
+	// rather than a fall-through.
+	allReturn := body.returns
 	for _, clause := range statement.Excepts {
 		typeValue := a.resolveType(clause.Type)
 		class, ok := typeValue.(types.Class)

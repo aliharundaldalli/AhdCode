@@ -15,19 +15,54 @@ import (
 type registry struct {
 	symbols   map[*semantic.Symbol]ir.SymbolID
 	callables map[*semantic.Callable]ir.CallableID
+	// classes indexes every Class declaration in the compilation by canonical
+	// identity so cross-module inheritance keeps one Class Symbol.
+	classes map[string]*semantic.Symbol
 }
 
 func newRegistry(modules []*module.Module) *registry {
-	result := &registry{symbols: make(map[*semantic.Symbol]ir.SymbolID), callables: make(map[*semantic.Callable]ir.CallableID)}
+	result := &registry{
+		symbols: make(map[*semantic.Symbol]ir.SymbolID), callables: make(map[*semantic.Callable]ir.CallableID),
+		classes: make(map[string]*semantic.Symbol),
+	}
 	for _, current := range modules {
 		if current == nil {
 			continue
 		}
 		for _, symbol := range current.Semantic.Symbols {
 			result.registerSymbol(current, symbol)
+			result.registerClass(symbol)
 		}
 	}
 	return result
+}
+
+func (r *registry) registerClass(symbol *semantic.Symbol) {
+	if symbol == nil || symbol.Kind != semantic.ClassSymbol || symbol.Class == nil || symbol.SuperClassBinding {
+		return
+	}
+	target := symbol
+	if target.Alias != nil {
+		target = target.Alias
+	}
+	key := classIdentityKey(target.Class)
+	if existing := r.classes[key]; existing == nil || len(existing.Members) < len(target.Members) {
+		r.classes[key] = target
+	}
+}
+
+func (r *registry) classSymbol(identity *types.ClassSymbol) *semantic.Symbol {
+	if identity == nil {
+		return nil
+	}
+	return r.classes[classIdentityKey(identity)]
+}
+
+func classIdentityKey(identity *types.ClassSymbol) string {
+	if identity == nil {
+		return ""
+	}
+	return identity.ModuleID + "::" + identity.Name
 }
 
 func (r *registry) registerSymbol(current *module.Module, symbol *semantic.Symbol) {

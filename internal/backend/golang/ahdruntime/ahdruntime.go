@@ -16,20 +16,203 @@ import (
 )
 
 // ---------------------------------------------------------------------------
+// Class identity
+// ---------------------------------------------------------------------------
+
+// AhdClass is the canonical runtime identity of one AhdCode Class. Descriptors
+// are compared by pointer, never by name.
+type AhdClass struct {
+	Name   string
+	Parent *AhdClass
+}
+
+// The language-supplied Class catalog. Generated code aliases these
+// descriptors so a runtime check and an AhdCode except clause agree on
+// identity.
+var (
+	AhdClassObject              = &AhdClass{Name: "Object"}
+	AhdClassError               = &AhdClass{Name: "Error", Parent: AhdClassObject}
+	AhdClassConstantError       = &AhdClass{Name: "ConstantError", Parent: AhdClassError}
+	AhdClassDivisionByZeroError = &AhdClass{Name: "DivisionByZeroError", Parent: AhdClassError}
+	AhdClassDomainError         = &AhdClass{Name: "DomainError", Parent: AhdClassError}
+	AhdClassIndexError          = &AhdClass{Name: "IndexError", Parent: AhdClassError}
+	AhdClassKeyError            = &AhdClass{Name: "KeyError", Parent: AhdClassError}
+	AhdClassNullError           = &AhdClass{Name: "NullError", Parent: AhdClassError}
+	AhdClassOverflowError       = &AhdClass{Name: "OverflowError", Parent: AhdClassError}
+	AhdClassValueError          = &AhdClass{Name: "ValueError", Parent: AhdClassError}
+)
+
+// AhdInstance is every AhdCode Class instance. The generated interface of each
+// Class embeds it, so identity, freezing, and Class membership work uniformly.
+type AhdInstance interface {
+	AhdClassOf() *AhdClass
+	AhdFreezeGraph(visited map[AhdFreezable]bool)
+}
+
+// AhdBase is embedded in the root of every generated Class struct.
+type AhdBase struct {
+	ahdClass  *AhdClass
+	ahdFrozen bool
+}
+
+// AhdClassOf returns the exact runtime Class of an instance.
+func (base *AhdBase) AhdClassOf() *AhdClass { return base.ahdClass }
+
+// AhdSetClass stamps the exact runtime Class during construction.
+func (base *AhdBase) AhdSetClass(class *AhdClass) { base.ahdClass = class }
+
+// AhdFrozen reports whether the instance is part of a deep-frozen graph.
+func (base *AhdBase) AhdFrozen() bool { return base.ahdFrozen }
+
+// AhdMarkFrozen freezes the instance itself and reports whether this call was
+// the transition, so a graph walk visits each object once.
+func (base *AhdBase) AhdMarkFrozen() bool {
+	if base.ahdFrozen {
+		return false
+	}
+	base.ahdFrozen = true
+	return true
+}
+
+// AhdRequireMutable rejects mutation of a deep-frozen object.
+func (base *AhdBase) AhdRequireMutable() {
+	if base.ahdFrozen {
+		AhdRaiseClass(AhdClassConstantError, "cannot mutate a Constant object")
+	}
+}
+
+// AhdIsClass reports Class membership, including inheritance.
+func AhdIsClass(value AhdInstance, target *AhdClass) bool {
+	if value == nil || target == nil {
+		return false
+	}
+	for current := value.AhdClassOf(); current != nil; current = current.Parent {
+		if current == target {
+			return true
+		}
+	}
+	return false
+}
+
+// AhdEqInstance is Class reference identity.
+func AhdEqInstance(left, right AhdInstance) bool { return left == right }
+
+// AhdSameInstance is strict same: exact runtime Class and the same object.
+func AhdSameInstance(left, right AhdInstance) bool {
+	if left == nil || right == nil {
+		return left == nil && right == nil
+	}
+	return left.AhdClassOf() == right.AhdClassOf() && left == right
+}
+
+// AhdStrInstance renders the canonical Class instance text.
+func AhdStrInstance(value AhdInstance) string {
+	if value == nil {
+		return "null"
+	}
+	class := value.AhdClassOf()
+	if class == nil {
+		return "<Object>"
+	}
+	return "<" + class.Name + ">"
+}
+
+// AhdRequireInstance reads a nullable Class reference the frontend proved
+// non-null.
+func AhdRequireInstance[T any](value T, present bool) T {
+	if !present {
+		AhdRaiseClass(AhdClassNullError, "value is null")
+	}
+	return value
+}
+
+// ---------------------------------------------------------------------------
 // Runtime errors
 // ---------------------------------------------------------------------------
 
-// AhdError is the value raised by every AhdCode runtime failure.
-type AhdError struct {
-	Class   string
-	Message string
+// AhdSignal is the isolated control value used to raise an AhdCode Error. An
+// ordinary Go panic is never an AhdSignal, so a compiler or runtime defect can
+// never be caught by an AhdCode except clause.
+type AhdSignal struct {
+	Instance AhdInstance
+	Message  string
 }
 
-func (failure *AhdError) Error() string { return failure.Class + ": " + failure.Message }
+func (signal *AhdSignal) Error() string {
+	return ahdSignalClassName(signal) + ": " + signal.Message
+}
 
-// AhdRaise raises an AhdCode runtime error.
-func AhdRaise(class, message string) {
-	panic(&AhdError{Class: class, Message: message})
+func ahdSignalClassName(signal *AhdSignal) string {
+	if signal == nil || signal.Instance == nil || signal.Instance.AhdClassOf() == nil {
+		return "Error"
+	}
+	return signal.Instance.AhdClassOf().Name
+}
+
+// ahdErrorConstructors lets a runtime check raise a real AhdCode Error
+// instance. Generated code installs the built-in Error constructors before the
+// program body runs; lookups are by descriptor pointer, never by iteration.
+var ahdErrorConstructors = map[*AhdClass]func(string) AhdInstance{}
+
+// AhdRegisterError installs the generated constructor of one built-in Error.
+func AhdRegisterError(class *AhdClass, construct func(string) AhdInstance) {
+	ahdErrorConstructors[class] = construct
+}
+
+// AhdRaiseClass raises a built-in AhdCode runtime Error.
+func AhdRaiseClass(class *AhdClass, message string) {
+	construct := ahdErrorConstructors[class]
+	if construct == nil {
+		panic("ahdcode: built-in Error class " + class.Name + " has no registered constructor")
+	}
+	panic(&AhdSignal{Instance: construct(message), Message: message})
+}
+
+// AhdErrorInstance is an AhdCode Error instance, which always carries a
+// message attribute inherited from the built-in Error Class.
+type AhdErrorInstance interface {
+	AhdInstance
+	AhdErrorMessage() string
+}
+
+// AhdToss raises an AhdCode Error instance written by user code.
+func AhdToss(instance AhdInstance) {
+	if instance == nil {
+		AhdRaiseClass(AhdClassNullError, "cannot toss a null Error")
+	}
+	message := ""
+	if carrier, ok := instance.(AhdErrorInstance); ok {
+		message = carrier.AhdErrorMessage()
+	}
+	panic(&AhdSignal{Instance: instance, Message: message})
+}
+
+// Control outcomes of an attempt body. They transfer a pending return, break,
+// or continue across the error-handling boundary without skipping ultimately.
+const (
+	AhdOutcomeNormal   = 0
+	AhdOutcomeReturn   = 1
+	AhdOutcomeBreak    = 2
+	AhdOutcomeContinue = 3
+)
+
+// AhdSignalOf converts a recovered value into an AhdCode error signal. An
+// ordinary Go panic is re-raised unchanged rather than being handled as an
+// AhdCode Error.
+func AhdSignalOf(recovered any) *AhdSignal {
+	if recovered == nil {
+		return nil
+	}
+	signal, ok := recovered.(*AhdSignal)
+	if !ok {
+		panic(recovered)
+	}
+	return signal
+}
+
+// AhdMatches reports whether an error signal is handled by one except clause.
+func AhdMatches(signal *AhdSignal, class *AhdClass) bool {
+	return signal != nil && AhdIsClass(signal.Instance, class)
 }
 
 var ahdOut = bufio.NewWriter(os.Stdout)
@@ -40,9 +223,10 @@ func AhdFlush() {
 	_ = ahdOut.Flush()
 }
 
-// AhdMain runs a generated program body and turns an uncaught AhdCode runtime
-// error into a diagnostic exit instead of a Go panic trace.
-func AhdMain(body func()) {
+// AhdMain runs a generated program body and turns an uncaught AhdCode error
+// into a diagnostic exit instead of a Go panic trace.
+func AhdMain(install func(), body func()) {
+	install()
 	failed := false
 	func() {
 		defer func() {
@@ -50,13 +234,13 @@ func AhdMain(body func()) {
 			if recovered == nil {
 				return
 			}
-			failure, ok := recovered.(*AhdError)
+			signal, ok := recovered.(*AhdSignal)
 			if !ok {
 				AhdFlush()
 				panic(recovered)
 			}
 			AhdFlush()
-			fmt.Fprintln(os.Stderr, "AhdCode runtime error: "+failure.Class+": "+failure.Message)
+			fmt.Fprintln(os.Stderr, ahdSignalClassName(signal)+": "+signal.Message)
 			failed = true
 		}()
 		body()
@@ -65,6 +249,47 @@ func AhdMain(body func()) {
 	if failed {
 		os.Exit(1)
 	}
+}
+
+// ---------------------------------------------------------------------------
+// Constant deep freeze
+// ---------------------------------------------------------------------------
+
+// AhdFreezable is every runtime object that participates in the Constant
+// deep-freeze graph: List, Pair, and Class instances.
+type AhdFreezable interface {
+	AhdFreezeGraph(visited map[AhdFreezable]bool)
+}
+
+// AhdFreeze deep-freezes the object graph reachable from a Constant binding.
+// The traversal is idempotent and terminates on cyclic graphs.
+func AhdFreeze[T any](value T) T {
+	if target, ok := any(value).(AhdFreezable); ok && target != nil {
+		target.AhdFreezeGraph(make(map[AhdFreezable]bool))
+	}
+	return value
+}
+
+// AhdFreezeChild continues a freeze walk into one reachable value. Values with
+// no reference identity, such as scalars, are skipped.
+func AhdFreezeChild[T any](value T, visited map[AhdFreezable]bool) {
+	if child, ok := any(value).(AhdFreezable); ok && child != nil {
+		child.AhdFreezeGraph(visited)
+	}
+}
+
+// AhdEnterFreeze reports whether a graph walk should descend into an object it
+// has not visited yet.
+func AhdEnterFreeze(target AhdFreezable, visited map[AhdFreezable]bool) bool {
+	if target == nil || visited[target] {
+		return false
+	}
+	visited[target] = true
+	return true
+}
+
+func ahdRejectMutation() {
+	AhdRaiseClass(AhdClassConstantError, "cannot mutate a Constant object")
 }
 
 // ---------------------------------------------------------------------------
@@ -77,7 +302,7 @@ func AhdBox[T any](value T) *T { return &value }
 // AhdNonNull reads a nullable slot that the frontend proved non-null.
 func AhdNonNull[T any](value *T) T {
 	if value == nil {
-		AhdRaise("NullError", "value is null")
+		AhdRaiseClass(AhdClassNullError, "value is null")
 	}
 	return *value
 }
@@ -113,7 +338,7 @@ func AhdTake(prompt string, hasPrompt bool) string {
 // ---------------------------------------------------------------------------
 
 func ahdOverflow() {
-	AhdRaise("OverflowError", "Int arithmetic overflowed signed 64-bit range")
+	AhdRaiseClass(AhdClassOverflowError, "Int arithmetic overflowed signed 64-bit range")
 }
 
 // AhdIntAdd adds two Int values without silent wrap-around.
@@ -160,7 +385,7 @@ func AhdIntNegate(value int64) int64 {
 // AhdIntModulo is Int remainder with a zero-divisor error.
 func AhdIntModulo(left, right int64) int64 {
 	if right == 0 {
-		AhdRaise("DivisionByZeroError", "Int modulo by zero")
+		AhdRaiseClass(AhdClassDivisionByZeroError, "Int modulo by zero")
 	}
 	if right == -1 {
 		return 0
@@ -171,7 +396,7 @@ func AhdIntModulo(left, right int64) int64 {
 // AhdIntPower raises an Int to a non-negative Int power without silent wrap.
 func AhdIntPower(base, exponent int64) int64 {
 	if exponent < 0 {
-		AhdRaise("DomainError", "Int power requires a non-negative exponent")
+		AhdRaiseClass(AhdClassDomainError, "Int power requires a non-negative exponent")
 	}
 	result := int64(1)
 	current := base
@@ -194,10 +419,10 @@ func AhdIntPower(base, exponent int64) int64 {
 
 func ahdRealCheck(result float64, operation string) float64 {
 	if math.IsInf(result, 0) {
-		AhdRaise("OverflowError", "Real "+operation+" produced a non-finite result")
+		AhdRaiseClass(AhdClassOverflowError, "Real "+operation+" produced a non-finite result")
 	}
 	if math.IsNaN(result) {
-		AhdRaise("DomainError", "Real "+operation+" is not defined for these operands")
+		AhdRaiseClass(AhdClassDomainError, "Real "+operation+" is not defined for these operands")
 	}
 	return result
 }
@@ -218,7 +443,7 @@ func AhdRealMultiply(left, right float64) float64 {
 // AhdRealDivide divides two Real values; a zero divisor is an error.
 func AhdRealDivide(left, right float64) float64 {
 	if right == 0 {
-		AhdRaise("DivisionByZeroError", "division by zero")
+		AhdRaiseClass(AhdClassDivisionByZeroError, "division by zero")
 	}
 	return ahdRealCheck(left/right, "division")
 }
@@ -241,10 +466,10 @@ func AhdIntToReal(value int64) float64 { return float64(value) }
 // AhdStringRepeat implements String * Int.
 func AhdStringRepeat(text string, count int64) string {
 	if count < 0 {
-		AhdRaise("ValueError", "String repeat count must not be negative")
+		AhdRaiseClass(AhdClassValueError, "String repeat count must not be negative")
 	}
 	if count > math.MaxInt32 {
-		AhdRaise("ValueError", "String repeat count is too large")
+		AhdRaiseClass(AhdClassValueError, "String repeat count is too large")
 	}
 	return strings.Repeat(text, int(count))
 }
@@ -282,7 +507,7 @@ func ahdResolveIndex(index, length int64) int64 {
 		position += length
 	}
 	if position < 0 || position >= length {
-		AhdRaise("IndexError", "index "+strconv.FormatInt(index, 10)+" is out of range for length "+strconv.FormatInt(length, 10))
+		AhdRaiseClass(AhdClassIndexError, "index "+strconv.FormatInt(index, 10)+" is out of range for length "+strconv.FormatInt(length, 10))
 	}
 	return position
 }
@@ -324,7 +549,26 @@ func ahdResolveRange(start int64, hasStart bool, end int64, hasEnd bool, length 
 // AhdList is the pointer-backed runtime representation of List<T>. Aliases
 // share one AhdList value, so in-place mutation is observed by every alias.
 type AhdList[T any] struct {
-	items []T
+	items  []T
+	frozen bool
+}
+
+// AhdFreezeGraph deep-freezes this List and every reachable element.
+func (list *AhdList[T]) AhdFreezeGraph(visited map[AhdFreezable]bool) {
+	if list == nil || !AhdEnterFreeze(list, visited) {
+		return
+	}
+	list.frozen = true
+	for _, item := range list.items {
+		AhdFreezeChild(item, visited)
+	}
+}
+
+func (list *AhdList[T]) requireMutable() {
+	list.require()
+	if list.frozen {
+		ahdRejectMutation()
+	}
 }
 
 // AhdNewList builds a List from its literal elements.
@@ -334,7 +578,7 @@ func AhdNewList[T any](items ...T) *AhdList[T] {
 
 func (list *AhdList[T]) require() {
 	if list == nil {
-		AhdRaise("NullError", "List value is null")
+		AhdRaiseClass(AhdClassNullError, "List value is null")
 	}
 }
 
@@ -352,13 +596,13 @@ func (list *AhdList[T]) At(index int64) T {
 
 // Set writes a possibly negative index.
 func (list *AhdList[T]) Set(index int64, value T) {
-	list.require()
+	list.requireMutable()
 	list.items[ahdResolveIndex(index, int64(len(list.items)))] = value
 }
 
 // Clear empties the List in place, preserving object identity.
 func (list *AhdList[T]) Clear() {
-	list.require()
+	list.requireMutable()
 	list.items = nil
 }
 
@@ -425,6 +669,27 @@ func AhdListEqual[T any](left, right *AhdList[T], equal func(T, T) bool) bool {
 type AhdPair[K comparable, V any] struct {
 	keys   []K
 	values map[K]V
+	frozen bool
+}
+
+// AhdFreezeGraph deep-freezes this Pair and every reachable key and value.
+func (pair *AhdPair[K, V]) AhdFreezeGraph(visited map[AhdFreezable]bool) {
+	if pair == nil || !AhdEnterFreeze(pair, visited) {
+		return
+	}
+	pair.require()
+	pair.frozen = true
+	for _, key := range pair.keys {
+		AhdFreezeChild(key, visited)
+		AhdFreezeChild(pair.values[key], visited)
+	}
+}
+
+func (pair *AhdPair[K, V]) requireMutable() {
+	pair.require()
+	if pair.frozen {
+		ahdRejectMutation()
+	}
 }
 
 // AhdNewPair builds an empty Pair.
@@ -434,7 +699,7 @@ func AhdNewPair[K comparable, V any]() *AhdPair[K, V] {
 
 func (pair *AhdPair[K, V]) require() {
 	if pair == nil {
-		AhdRaise("NullError", "Pair value is null")
+		AhdRaiseClass(AhdClassNullError, "Pair value is null")
 	}
 	if pair.values == nil {
 		pair.values = make(map[K]V)
@@ -449,7 +714,7 @@ func (pair *AhdPair[K, V]) Len() int64 {
 
 // Set inserts or updates a key without moving an existing key.
 func (pair *AhdPair[K, V]) Set(key K, value V) {
-	pair.require()
+	pair.requireMutable()
 	if _, exists := pair.values[key]; !exists {
 		pair.keys = append(pair.keys, key)
 	}
@@ -461,7 +726,7 @@ func (pair *AhdPair[K, V]) Get(key K) V {
 	pair.require()
 	value, exists := pair.values[key]
 	if !exists {
-		AhdRaise("KeyError", "Pair has no key "+ahdKeyText(key))
+		AhdRaiseClass(AhdClassKeyError, "Pair has no key "+ahdKeyText(key))
 	}
 	return value
 }
@@ -475,7 +740,7 @@ func (pair *AhdPair[K, V]) Has(key K) bool {
 
 // Remove deletes a key, keeping the order of the remaining keys.
 func (pair *AhdPair[K, V]) Remove(key K) bool {
-	pair.require()
+	pair.requireMutable()
 	if _, exists := pair.values[key]; !exists {
 		return false
 	}
@@ -491,7 +756,7 @@ func (pair *AhdPair[K, V]) Remove(key K) bool {
 
 // Clear empties the Pair in place, preserving object identity.
 func (pair *AhdPair[K, V]) Clear() {
-	pair.require()
+	pair.requireMutable()
 	pair.keys = nil
 	pair.values = make(map[K]V)
 }
@@ -556,10 +821,10 @@ func AhdStrQuoted(value string) string { return ahdQuote(value) }
 // An integral Real keeps a trailing .0 and negative zero is preserved.
 func AhdStrReal(value float64) string {
 	if math.IsNaN(value) {
-		AhdRaise("DomainError", "Real value is not a number")
+		AhdRaiseClass(AhdClassDomainError, "Real value is not a number")
 	}
 	if math.IsInf(value, 0) {
-		AhdRaise("OverflowError", "Real value is not finite")
+		AhdRaiseClass(AhdClassOverflowError, "Real value is not finite")
 	}
 	return ahdFormatReal(value)
 }
@@ -596,14 +861,12 @@ func AhdStrNull[T any](render func(T) string) func(*T) string {
 	}
 }
 
-// AhdStrRef renders a reference-typed value as its canonical Class text.
-func AhdStrRef[T any](name string) func(*T) string {
-	return func(value *T) string {
-		if value == nil {
-			return "null"
-		}
-		return "<" + name + ">"
+// AhdStrRefInstance renders a nullable Class reference in canonical text.
+func AhdStrRefInstance[T AhdInstance](value T) string {
+	if any(value) == nil {
+		return "null"
 	}
+	return AhdStrInstance(value)
 }
 
 // AhdStrFunction renders a named Function value.
@@ -687,9 +950,9 @@ func AhdEqNull[T any](equal func(T, T) bool) func(*T, *T) bool {
 	}
 }
 
-// AhdEqRef compares reference identity.
-func AhdEqRef[T any]() func(*T, *T) bool {
-	return func(left, right *T) bool { return left == right }
+// AhdEqRef compares Class reference identity.
+func AhdEqRef[T comparable]() func(T, T) bool {
+	return func(left, right T) bool { return left == right }
 }
 
 // AhdEqList lifts an element equality to deep List equality.
@@ -704,9 +967,6 @@ func AhdEqPair[K comparable, V any](equal func(V, V) bool) func(*AhdPair[K, V], 
 
 // AhdSameDifferent evaluates both operands of a statically type-distinct same.
 func AhdSameDifferent[A any, B any](left A, right B) bool { return false }
-
-// AhdIsType reports Class membership for a possibly null instance.
-func AhdIsType[T any](value *T, matches bool) bool { return value != nil && matches }
 
 // AhdConstBool evaluates a value for its effects and yields a statically
 // resolved Bool result, such as Class member existence.
@@ -724,9 +984,9 @@ func AhdBuildPair[K comparable, V any](keys []K, values []V) *AhdPair[K, V] {
 	return result
 }
 
-// AhdUnreachable reports a Function that ended without returning a value.
+// AhdUnreachable reports a Function that ended without returning a value. The
+// frontend proves definite return, so reaching it indicates a compiler defect
+// rather than a user program error.
 func AhdUnreachable[T any]() T {
-	AhdRaise("ReturnError", "Function ended without returning a value")
-	var zero T
-	return zero
+	panic("ahdcode: Function ended without returning a value")
 }

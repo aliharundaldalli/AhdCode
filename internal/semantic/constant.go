@@ -200,7 +200,9 @@ func evaluateNumericConstant(operator string, left, right *constantValue) (*cons
 			result.Rem(left.integer, right.integer)
 		case "^":
 			if right.integer.Sign() < 0 {
-				return &constantValue{typeValue: types.Real, real: math.Pow(toFloat(left), toFloat(right))}, constOK
+				// Int power remains Int regardless of exponent sign. A negative
+				// exponent is a runtime DomainError, never a folded Real value.
+				return nil, constInvalid
 			}
 			if !right.integer.IsInt64() || right.integer.Int64() > 10000 {
 				return &constantValue{typeValue: types.Int, integer: new(big.Int), overflow: true}, constOK

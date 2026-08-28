@@ -1,0 +1,100 @@
+Rectangle: Class<> := {
+    structure: Attributes := (
+        name: String
+        width: Real
+        height: Real
+    )
+
+    area: Function := (
+    ) -> Real {
+        return attribute.width * attribute.height
+    }
+
+    perimeter: Function := (
+    ) -> Real {
+        return 2.0 * (attribute.width + attribute.height)
+    }
+
+    scale: Function := (
+        factor: Real
+    ) -> Nothing {
+        attribute.width = attribute.width * factor
+        attribute.height = attribute.height * factor
+    }
+
+    describe: Function := (
+    ) -> String {
+        return "{attribute.name}: {attribute.width} x {attribute.height}"
+    }
+
+    isSquare: Function := (
+    ) -> Bool {
+        return attribute.width == attribute.height
+    }
+}
+
+
+totalArea: Function := (
+    first: Rectangle
+    second: Rectangle
+) -> Real {
+    return first.area() + second.area()
+}
+
+
+largerArea: Function := (
+    first: Rectangle
+    second: Rectangle
+) -> Real {
+    if first.area() >= second.area() {
+        return first.area()
+    }
+
+    return second.area()
+}
+
+
+first: Rectangle := Rectangle(
+    name: "Birinci dikdörtgen"
+    width: 4.0
+    height: 5.0
+)
+
+second: Rectangle := Rectangle(
+    name: "İkinci dikdörtgen"
+    width: 3.0
+    height: 3.0
+)
+
+
+write(first.describe())
+write(second.describe())
+
+write("Birinci alan: {first.area()}")
+write("Birinci çevre: {first.perimeter()}")
+
+write("İkinci alan: {second.area()}")
+write("İkinci kare mi: {second.isSquare()}")
+
+write("Toplam alan: {totalArea(first, second)}")
+write("Büyük alan: {largerArea(first, second)}")
+
+
+write("--- Birinci nesne büyütülüyor ---")
+
+first.scale(2.0)
+
+write(first.describe())
+write("Yeni alan: {first.area()}")
+write("Yeni çevre: {first.perimeter()}")
+
+
+write("--- Reference semantics testi ---")
+
+alias: Rectangle := first
+
+alias.scale(0.5)
+
+write("Alias: {alias.describe()}")
+write("Original: {first.describe()}")
+write("Original alan: {first.area()}")

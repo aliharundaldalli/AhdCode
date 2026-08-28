@@ -89,7 +89,7 @@ func (a *analyzer) analyzeFunction(declaration *ast.FunctionDecl, class *Symbol)
 		if parameter.Default != nil {
 			value := a.analyzeExpressionExpected(parameter.Default, functionScope, flow, typeValue)
 			if function, ok := value.typeValue.(types.Function); ok && function.Signature != nil && symbol.inference != nil {
-				a.constrainConcreteFunction(symbol, function.Signature, parameter.Default.Span())
+				a.constrainConcreteFunction(symbol, function.Signature, concreteCallable(value), parameter.Default.Span())
 			}
 			if value.nullState != Null && !types.Assignable(typeValue, value.typeValue) {
 				a.typeMismatch(parameter.Default.Span(), typeValue, value.typeValue, fmt.Sprintf("default value of %s", parameter.Name))
@@ -122,9 +122,8 @@ func (a *analyzer) analyzeStructure(declaration *ast.StructureDecl, class *Symbo
 		return
 	}
 	callable := class.Constructor
-	if callable == nil {
-		callable = a.callableFromStructure(declaration)
-		class.Constructor = callable
+	if callable == nil || callable.Signature == nil {
+		return
 	}
 	structureScope := newScope(a.module, callableScope)
 	context := &callableContext{kind: structureCallable, callable: callable, returnType: types.Nothing, class: class}
@@ -132,10 +131,17 @@ func (a *analyzer) analyzeStructure(declaration *ast.StructureDecl, class *Symbo
 	a.installClassImplicitBindings(structureScope, class)
 	flow := a.flow.clone()
 	parameterIndex := 0
+	inherited := a.inheritedParameterCount(class)
 	for index := range declaration.Parameters {
 		parameter := &declaration.Parameters[index]
 		if parameter.InheritedAttributes {
+			// SuperClass.attributes occupies the parent parameter slots that
+			// buildConstructor already spliced into this signature.
+			parameterIndex += inherited
 			continue
+		}
+		if parameterIndex >= len(callable.Signature.Parameters) {
+			break
 		}
 		if hasModifier(parameter.Modifiers, ast.ModifierGlobal) || hasModifier(parameter.Modifiers, ast.ModifierConstant) {
 			a.error(codeScopeModifier, fmt.Sprintf("structure parameter %q is implicitly Local", parameter.Name), parameter.Span(), "use Local only to exclude a structure parameter from instance attributes")
@@ -172,11 +178,24 @@ func (a *analyzer) analyzeStructure(declaration *ast.StructureDecl, class *Symbo
 	a.finalizeInferences(context.inferences)
 }
 
+// inheritedParameterCount is the number of parent construction parameters that
+// one SuperClass.attributes marker contributes.
+func (a *analyzer) inheritedParameterCount(class *Symbol) int {
+	if class == nil || class.Class == nil || class.Class.Parent == nil {
+		return 0
+	}
+	parent := a.classSymbolFor(class.Class.Parent)
+	if parent == nil || parent.Constructor == nil || parent.Constructor.Signature == nil {
+		return 0
+	}
+	return len(parent.Constructor.Signature.Parameters)
+}
+
 func (a *analyzer) installClassImplicitBindings(current *scope, class *Symbol) {
 	attribute := &Symbol{Name: "attribute", Kind: ParameterSymbol, Type: types.Class{Symbol: class.Class}, Builtin: true, InitialNull: NonNull}
 	current.symbols[attribute.Name] = attribute
 	if class.Class.Parent != nil {
-		superClass := &Symbol{Name: "SuperClass", Kind: ClassSymbol, Type: types.Class{Symbol: class.Class.Parent, Reference: true}, Class: class.Class.Parent, Builtin: true, InitialNull: NonNull}
+		superClass := &Symbol{Name: "SuperClass", Kind: ClassSymbol, Type: types.Class{Symbol: class.Class.Parent, Reference: true}, Class: class.Class.Parent, Builtin: true, InitialNull: NonNull, SuperClassBinding: true}
 		current.symbols[superClass.Name] = superClass
 	}
 }

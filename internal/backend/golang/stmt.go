@@ -33,7 +33,7 @@ func (generator *generator) emitStatement(writer *emitter, statement ir.Statemen
 		generator.emitIf(writer, value)
 	case *ir.WhileStmt:
 		writer.open("for " + generator.value(value.Condition, ir.Type{Kind: ir.BoolType}, false) + " {")
-		generator.emitBlock(writer, value.Body)
+		generator.withFrame(frame{kind: loopFrame}, func() { generator.emitBlock(writer, value.Body) })
 		writer.close("}")
 	case *ir.DoUntilStmt:
 		generator.emitDoUntil(writer, value)
@@ -44,13 +44,13 @@ func (generator *generator) emitStatement(writer *emitter, statement ir.Statemen
 	case *ir.ReturnStmt:
 		generator.emitReturn(writer, value)
 	case *ir.BreakStmt:
-		writer.line("break")
+		generator.emitTransfer(writer, "AhdOutcomeBreak", "break", nil)
 	case *ir.ContinueStmt:
-		writer.line("continue")
+		generator.emitTransfer(writer, "AhdOutcomeContinue", "continue", nil)
 	case *ir.AttemptStmt:
-		generator.unsupported("attempt / except / ultimately error handling", value.Span)
+		generator.emitAttempt(writer, value)
 	case *ir.TossStmt:
-		generator.unsupported("toss error raising", value.Span)
+		generator.emitToss(writer, value)
 	default:
 		generator.unsupported(fmt.Sprintf("IR statement %T", statement), statement.StatementSpan())
 	}
@@ -83,7 +83,12 @@ func (generator *generator) emitBinding(writer *emitter, value *ir.BindingStmt) 
 		writer.line("_ = " + current.name)
 		return
 	}
-	writer.line("var " + current.name + " " + rendered + " = " + generator.value(value.Initializer, current.typeInfo, current.nullable))
+	initializer := generator.value(value.Initializer, current.typeInfo, current.nullable)
+	if value.Constant {
+		// A Constant reference binding deep-freezes its object graph.
+		initializer = "AhdFreeze(" + initializer + ")"
+	}
+	writer.line("var " + current.name + " " + rendered + " = " + initializer)
 	writer.line("_ = " + current.name)
 }
 
@@ -99,7 +104,7 @@ func (generator *generator) emitAssign(writer *emitter, value *ir.AssignStmt) {
 			return
 		}
 		nullable := generator.nullFields[value.Target.Field]
-		writer.line(generator.expr(value.Target.Receiver) + "." + generator.fieldName(value.Target.Field) + " = " + generator.value(value.Value, field.Type, nullable))
+		writer.line(generator.expr(value.Target.Receiver) + "." + generator.fieldName(value.Target.Field) + "_set(" + generator.value(value.Value, field.Type, nullable) + ")")
 	case ir.IndexTarget:
 		generator.emitIndexAssign(writer, value)
 	default:
@@ -193,10 +198,10 @@ func (generator *generator) emitTargetUpdate(writer *emitter, target ir.Target, 
 		nullable := generator.nullFields[target.Field]
 		writer.open("{")
 		writer.line(receiver + " := " + generator.expr(target.Receiver))
-		access := receiver + "." + generator.fieldName(target.Field)
-		read := generator.coerce(access, ir.ExprBase{Type: field.Type, NullState: nullState(nullable)}, target.Type, false)
+		name := generator.fieldName(target.Field)
+		read := generator.coerce(receiver+"."+name+"_get()", ir.ExprBase{Type: field.Type, NullState: nullState(nullable)}, target.Type, false)
 		updated := combine(read)
-		writer.line(access + " = " + generator.coerce(updated, ir.ExprBase{Type: target.Type, NullState: ir.NonNull}, field.Type, nullable))
+		writer.line(receiver + "." + name + "_set(" + generator.coerce(updated, ir.ExprBase{Type: target.Type, NullState: ir.NonNull}, field.Type, nullable) + ")")
 		writer.close("}")
 	case ir.IndexTarget:
 		container := target.Receiver.ExprMeta().Type
@@ -273,7 +278,7 @@ func (generator *generator) emitDoUntil(writer *emitter, value *ir.DoUntilStmt) 
 	writer.close("}")
 	writer.close("}")
 	writer.line(first + " = false")
-	generator.emitBlock(writer, value.Body)
+	generator.withFrame(frame{kind: loopFrame}, func() { generator.emitBlock(writer, value.Body) })
 	writer.close("}")
 }
 
@@ -319,7 +324,7 @@ func (generator *generator) emitFor(writer *emitter, value *ir.ForStmt) {
 		return
 	}
 	writer.line("_ = " + current.name)
-	generator.emitBlock(writer, value.Body)
+	generator.withFrame(frame{kind: loopFrame}, func() { generator.emitBlock(writer, value.Body) })
 	writer.close("}")
 }
 
@@ -360,12 +365,179 @@ func (generator *generator) emitState(writer *emitter, value *ir.StateStmt) {
 	writer.close("}")
 }
 
+// emitReturn transfers a return out of every enclosing attempt so no
+// ultimately block is skipped and the return expression evaluates once.
 func (generator *generator) emitReturn(writer *emitter, value *ir.ReturnStmt) {
-	if value.Value == nil {
+	var carried string
+	if value.Value != nil {
+		carried = generator.value(value.Value, value.ReturnType, generator.resultNullable)
+	}
+	generator.emitTransfer(writer, "AhdOutcomeReturn", "return", &carried)
+}
+
+// emitTransfer routes break, continue, and return through the innermost
+// enclosing attempt when one exists, and emits ordinary Go control flow
+// otherwise.
+func (generator *generator) emitTransfer(writer *emitter, outcome, plain string, carried *string) {
+	target := -1
+	for index := len(generator.frames) - 1; index >= 0; index-- {
+		current := generator.frames[index]
+		if current.kind == attemptFrame {
+			target = index
+			break
+		}
+		if current.kind == loopFrame && outcome != "AhdOutcomeReturn" {
+			break
+		}
+	}
+	if target < 0 {
+		if carried == nil {
+			writer.line(plain)
+			return
+		}
+		if *carried == "" {
+			writer.line("return")
+			return
+		}
+		writer.line("return " + *carried)
+		return
+	}
+	if carried != nil && *carried != "" && generator.result != "" {
+		writer.line(generator.result + " = " + *carried)
+	}
+	frame := generator.frames[target]
+	if frame.deferred {
+		writer.line(frame.outcome + " = " + outcome)
 		writer.line("return")
 		return
 	}
-	writer.line("return " + generator.value(value.Value, value.ReturnType, false))
+	writer.line("return " + outcome)
+}
+
+// emitToss raises an AhdCode Error instance. The runtime signal type is
+// isolated, so an ordinary Go panic can never be handled as an AhdCode Error.
+func (generator *generator) emitToss(writer *emitter, value *ir.TossStmt) {
+	if value.Value == nil {
+		generator.fail(CodeGenerationFailure, "toss has no Error value", value.Span, "the IR node is incomplete")
+		return
+	}
+	writer.line("AhdToss(" + generator.expr(value.Value) + ")")
+}
+
+// emitAttempt lowers structured error handling. The body runs in a closure
+// whose result carries any pending control transfer, the handler defer matches
+// except clauses by Class ancestry, and the ultimately defer is registered
+// first so it always runs last.
+func (generator *generator) emitAttempt(writer *emitter, value *ir.AttemptStmt) {
+	outcome := generator.temporaryName()
+	result := generator.temporaryName()
+	writer.open(result + " := func() (" + outcome + " int) {")
+	if value.Ultimately != nil {
+		writer.open("defer func() {")
+		generator.withFrame(frame{kind: attemptFrame, outcome: outcome, deferred: true}, func() {
+			generator.emitBlock(writer, *value.Ultimately)
+		})
+		writer.close("}()")
+	}
+	if len(value.Handlers) != 0 {
+		writer.open("defer func() {")
+		writer.line("signal := AhdSignalOf(recover())")
+		writer.open("if signal == nil {")
+		writer.line("return")
+		writer.close("}")
+		for _, handler := range value.Handlers {
+			generator.emitHandler(writer, handler, outcome, value.Span)
+		}
+		writer.line("panic(signal)")
+		writer.close("}()")
+	}
+	generator.withFrame(frame{kind: attemptFrame, outcome: outcome}, func() {
+		generator.emitBlock(writer, value.Body)
+	})
+	writer.line("return AhdOutcomeNormal")
+	writer.close("}()")
+	generator.emitOutcomeDispatch(writer, result)
+}
+
+func (generator *generator) emitHandler(writer *emitter, handler ir.ErrorHandler, outcome string, span source.Span) {
+	if handler.Class == "" {
+		generator.fail(CodeGenerationFailure, "except clause has no Error ClassID", span, "the IR node is incomplete")
+		return
+	}
+	if generator.layouts[handler.Class] == nil {
+		generator.fail(CodeGenerationFailure, "except clause names an unknown Class "+string(handler.Class), span, "the IR references a Class with no declaration")
+		return
+	}
+	writer.open("if AhdMatches(signal, " + generator.descriptorName(handler.Class) + ") {")
+	if handler.Binding != "" {
+		current := generator.slots[handler.Binding]
+		writer.line(current.name + " := signal.Instance.(" + generator.interfaceName(handler.Class) + ")")
+		writer.line("_ = " + current.name)
+	}
+	generator.withFrame(frame{kind: attemptFrame, outcome: outcome, deferred: true}, func() {
+		generator.emitBlock(writer, handler.Body)
+	})
+	writer.line("return")
+	writer.close("}")
+}
+
+// emitOutcomeDispatch re-issues a control transfer that crossed the attempt
+// boundary, in the context that encloses the attempt.
+func (generator *generator) emitOutcomeDispatch(writer *emitter, result string) {
+	carried := ""
+	if generator.result != "" {
+		carried = generator.result
+	}
+	writer.open("if " + result + " == AhdOutcomeReturn {")
+	generator.emitTransfer(writer, "AhdOutcomeReturn", "return", &carried)
+	writer.close("}")
+	// A loop transfer is dispatched only where one can occur; an attempt
+	// outside every loop can never produce a break or continue outcome.
+	if generator.canTransferLoop() {
+		writer.open("if " + result + " == AhdOutcomeBreak {")
+		generator.emitTransfer(writer, "AhdOutcomeBreak", "break", nil)
+		writer.close("}")
+		writer.open("if " + result + " == AhdOutcomeContinue {")
+		generator.emitTransfer(writer, "AhdOutcomeContinue", "continue", nil)
+		writer.close("}")
+	}
+}
+
+type frameKind uint8
+
+const (
+	loopFrame frameKind = iota
+	attemptFrame
+)
+
+// frame records one enclosing loop or attempt, so a control transfer knows
+// whether it is ordinary Go control flow or an outcome handed out of a closure.
+type frame struct {
+	kind     frameKind
+	outcome  string
+	deferred bool
+}
+
+// canTransferLoop reports whether a break or continue can leave the current
+// position, either into an enclosing loop or through an enclosing attempt.
+func (generator *generator) canTransferLoop() bool {
+	return len(generator.frames) != 0
+}
+
+func (generator *generator) withFrame(current frame, body func()) {
+	generator.frames = append(generator.frames, current)
+	body()
+	generator.frames = generator.frames[:len(generator.frames)-1]
+}
+
+func containsAttempt(block ir.Block) bool {
+	found := false
+	walkBlock(block, func(statement ir.Statement) {
+		if _, ok := statement.(*ir.AttemptStmt); ok {
+			found = true
+		}
+	})
+	return found
 }
 
 func (generator *generator) temporaryName() string {

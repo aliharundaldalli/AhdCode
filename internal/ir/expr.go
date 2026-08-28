@@ -120,9 +120,12 @@ const (
 
 type MemberExpr struct {
 	ExprBase
-	Kind     MemberKind
-	Object   Expr
-	Field    FieldID
+	Kind   MemberKind
+	Object Expr
+	Field  FieldID
+	// Direct suppresses dynamic dispatch: the named Callable is invoked on the
+	// receiver exactly as written, which is how SuperClass.member is resolved.
+	Direct   bool
 	Callable CallableID
 }
 

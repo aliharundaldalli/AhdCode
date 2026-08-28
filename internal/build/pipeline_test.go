@@ -21,6 +21,8 @@ type program struct {
 	stdin    string
 	expected string
 	exitCode int
+	// errorClass is the AhdCode Error class an uncaught failure must report.
+	errorClass string
 }
 
 func writeSources(t *testing.T, sources map[string]string) string {
@@ -489,16 +491,18 @@ write(html)
 			expected: "Name: Hello Ali\n",
 		},
 		{
-			name:     "int overflow is a runtime error",
-			sources:  map[string]string{"main.ahd": "big: Int := 9223372036854775807\nwrite(big + 1)\n"},
-			expected: "",
-			exitCode: 1,
+			name:       "int overflow is a runtime error",
+			sources:    map[string]string{"main.ahd": "big: Int := 9223372036854775807\nwrite(big + 1)\n"},
+			expected:   "",
+			exitCode:   1,
+			errorClass: "OverflowError",
 		},
 		{
-			name:     "division by zero is a runtime error",
-			sources:  map[string]string{"main.ahd": "zero: Real := 0.0\nwrite(1.0 / zero)\n"},
-			expected: "",
-			exitCode: 1,
+			name:       "division by zero is a runtime error",
+			sources:    map[string]string{"main.ahd": "zero: Real := 0.0\nwrite(1.0 / zero)\n"},
+			expected:   "",
+			exitCode:   1,
+			errorClass: "DivisionByZeroError",
 		},
 	}
 	for _, testCase := range cases {
@@ -516,8 +520,11 @@ write(html)
 			if code != testCase.exitCode {
 				t.Fatalf("exit code mismatch: want %d, have %d (stderr: %s)", testCase.exitCode, code, errorOutput)
 			}
-			if testCase.exitCode != 0 && !strings.Contains(errorOutput, "AhdCode runtime error") {
-				t.Fatalf("expected an AhdCode runtime error on stderr; received %q", errorOutput)
+			if testCase.errorClass != "" && !strings.HasPrefix(errorOutput, testCase.errorClass+": ") {
+				t.Fatalf("expected an uncaught %s on stderr; received %q", testCase.errorClass, errorOutput)
+			}
+			if testCase.exitCode != 0 && strings.Contains(errorOutput, "goroutine ") {
+				t.Fatalf("a Go stack trace leaked into program output: %q", errorOutput)
 			}
 		})
 	}
@@ -562,12 +569,21 @@ func TestFrontendErrorsStopBeforeCodeGeneration(t *testing.T) {
 }
 
 func TestUnsupportedNodeStopsTheBuildWithABackendDiagnostic(t *testing.T) {
-	directory := writeSources(t, map[string]string{"main.ahd": `attempt {
-    write("body")
+	directory := writeSources(t, map[string]string{"main.ahd": `describe: Function := (
+    action: Function
+    value: Int
+) -> String {
+    result: Local Int := action(value)
+    return "{str(action)}={result}"
 }
-except Error as error {
-    write(error.message)
+
+double: Function := (
+    n: Int
+) -> Int {
+    return n * 2
 }
+
+write(describe(double, 2))
 `})
 	path, result := BuildProgram(filepath.Join(directory, "main.ahd"), filepath.Join(t.TempDir(), "program"))
 	if path != "" {

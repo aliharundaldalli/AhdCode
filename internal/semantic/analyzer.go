@@ -84,6 +84,7 @@ func analyzeWithEnvironment(parsed parser.Result, environment Environment) Resul
 	a.result.SelectedCallables = make(map[*ast.CallExpr]*Callable)
 	a.result.SelectedFunctionValues = make(map[ast.Expr]*Callable)
 	a.result.OverloadResolutions = make(map[*ast.CallExpr]ResolutionTrace)
+	a.result.SuperCalls = make(map[ast.Expr]bool)
 	a.module = newScope(nil, moduleScope)
 	a.installBuiltins()
 	if parsed.Program == nil {
@@ -134,20 +135,56 @@ func (a *analyzer) predeclareModuleConstants(program *ast.Program) {
 	}
 }
 
+// BuiltinRuntimeErrorNames lists the Error subclasses that AhdCode runtime
+// checks raise. They are ordinary Class<Error> types, so ordinary except
+// clauses match them.
+var BuiltinRuntimeErrorNames = []string{
+	"ConstantError",
+	"DivisionByZeroError",
+	"DomainError",
+	"IndexError",
+	"KeyError",
+	"NullError",
+	"OverflowError",
+	"ValueError",
+}
+
 func (a *analyzer) installBuiltins() {
 	objectType := &types.ClassSymbol{ModuleID: "builtin:core", Name: "Object"}
 	errorType := &types.ClassSymbol{ModuleID: "builtin:core", Name: "Error", Parent: objectType}
 	object := &Symbol{Name: "Object", Kind: ClassSymbol, Class: objectType, Type: types.Class{Symbol: objectType, Reference: true}, ModuleRoot: true, Builtin: true, InitialNull: NonNull, Members: make(map[string]*Symbol)}
+	object.Constructor = &Callable{Signature: &types.Signature{Return: types.Nothing}, ReturnNull: NonNull}
 	errorSymbol := &Symbol{Name: "Error", Kind: ClassSymbol, Class: errorType, Type: types.Class{Symbol: errorType, Reference: true}, ModuleRoot: true, Builtin: true, InitialNull: NonNull, Members: make(map[string]*Symbol)}
 	errorSymbol.Members["message"] = &Symbol{Name: "message", Kind: MemberSymbol, Type: types.String, Builtin: true, InitialNull: NonNull, OwnerClass: errorType, OriginModuleID: "builtin:core"}
+	errorSymbol.Constructor = builtinErrorConstructor()
+	errorSymbol.ConstructorAttributes = []*Symbol{errorSymbol.Members["message"]}
 	a.addBuiltin(object)
 	a.addBuiltin(errorSymbol)
 	a.classes[object.Name] = object
 	a.classes[errorSymbol.Name] = errorSymbol
 	a.classByType[objectType] = object
 	a.classByType[errorType] = errorSymbol
+	for _, name := range BuiltinRuntimeErrorNames {
+		identity := &types.ClassSymbol{ModuleID: "builtin:core", Name: name, Parent: errorType}
+		symbol := &Symbol{
+			Name: name, Kind: ClassSymbol, Class: identity, Type: types.Class{Symbol: identity, Reference: true},
+			ModuleRoot: true, Builtin: true, InitialNull: NonNull, Members: make(map[string]*Symbol),
+			Constructor: builtinErrorConstructor(),
+		}
+		symbol.ConstructorAttributes = []*Symbol{errorSymbol.Members["message"]}
+		a.addBuiltin(symbol)
+		a.classes[name] = symbol
+		a.classByType[identity] = symbol
+	}
 	for _, name := range []string{"write", "take", "str", "len", "clear"} {
 		a.addBuiltin(&Symbol{Name: name, Kind: BuiltinSymbol, Type: types.Function{}, ModuleRoot: true, Builtin: true, InitialNull: NonNull})
+	}
+}
+
+func builtinErrorConstructor() *Callable {
+	return &Callable{
+		Signature:     &types.Signature{Parameters: []types.Parameter{{Name: "message", Type: types.String}}, Return: types.Nothing},
+		ParameterNull: []NullState{NonNull}, ReturnNull: NonNull,
 	}
 }
 
@@ -239,12 +276,11 @@ func (a *analyzer) predeclareFunctions(program *ast.Program) {
 	}
 }
 
+// predeclareClassMembers visits Class declarations parent-before-child so a
+// subclass structure can expand SuperClass.attributes from a constructor that
+// is already complete.
 func (a *analyzer) predeclareClassMembers(program *ast.Program) {
-	for _, statement := range program.Statements {
-		declaration, ok := statement.(*ast.ClassDecl)
-		if !ok {
-			continue
-		}
+	for _, declaration := range a.inheritanceOrder(program) {
 		class := a.classNodes[declaration]
 		if class == nil {
 			continue
@@ -252,27 +288,13 @@ func (a *analyzer) predeclareClassMembers(program *ast.Program) {
 		for _, member := range declaration.Members {
 			switch value := member.(type) {
 			case *ast.StructureDecl:
-				class.Constructor = a.callableFromStructure(value)
-				for index := range value.Parameters {
-					parameter := &value.Parameters[index]
-					if parameter.InheritedAttributes || hasModifier(parameter.Modifiers, ast.ModifierLocal) {
-						continue
-					}
-					typeValue := a.resolveType(parameter.Type)
-					nullState := NonNull
-					if parameter.Default != nil {
-						nullState = a.initializerNullState(parameter.Default)
-					}
-					memberSymbol := &Symbol{Name: parameter.Name, Kind: MemberSymbol, Type: typeValue, Span: parameter.Span(), InitialNull: nullState, Confidential: hasModifier(parameter.Modifiers, ast.ModifierConfidential), OwnerClass: class.Class, OriginModuleID: a.environment.ModuleID}
-					class.Members[parameter.Name] = memberSymbol
-					a.result.Symbols = append(a.result.Symbols, memberSymbol)
-				}
+				a.buildConstructor(value, class)
 			case *ast.FunctionDecl:
 				a.registerFunction(value, nil, class)
 			}
 		}
 		if class.Constructor == nil {
-			class.Constructor = &Callable{Signature: &types.Signature{Return: types.Class{Symbol: class.Class}}, ReturnNull: NonNull}
+			a.inheritConstructor(class)
 		}
 	}
 }
@@ -354,18 +376,122 @@ func (a *analyzer) callableFromFunction(declaration *ast.FunctionDecl) *Callable
 	return &Callable{Signature: &types.Signature{Parameters: parameters, Return: returnType}, ParameterNull: parameterNull, ReturnNull: NonNull, Declaration: declaration}
 }
 
-func (a *analyzer) callableFromStructure(declaration *ast.StructureDecl) *Callable {
+// inheritanceOrder returns the module Class declarations with every local
+// parent placed before its children. Declaration order is preserved between
+// unrelated classes so the result stays deterministic.
+func (a *analyzer) inheritanceOrder(program *ast.Program) []*ast.ClassDecl {
+	var declarations []*ast.ClassDecl
+	owner := make(map[*types.ClassSymbol]*ast.ClassDecl)
+	for _, statement := range program.Statements {
+		declaration, ok := statement.(*ast.ClassDecl)
+		if !ok {
+			continue
+		}
+		declarations = append(declarations, declaration)
+		if class := a.classNodes[declaration]; class != nil && class.Class != nil {
+			owner[class.Class] = declaration
+		}
+	}
+	var ordered []*ast.ClassDecl
+	state := make(map[*ast.ClassDecl]int)
+	var visit func(*ast.ClassDecl)
+	visit = func(declaration *ast.ClassDecl) {
+		if declaration == nil || state[declaration] != 0 {
+			return
+		}
+		state[declaration] = 1
+		if class := a.classNodes[declaration]; class != nil && class.Class != nil && class.Class.Parent != nil {
+			visit(owner[class.Class.Parent])
+		}
+		state[declaration] = 2
+		ordered = append(ordered, declaration)
+	}
+	for _, declaration := range declarations {
+		visit(declaration)
+	}
+	return ordered
+}
+
+// buildConstructor expands SuperClass.attributes in place and records which
+// instance attribute each constructor parameter initializes.
+func (a *analyzer) buildConstructor(declaration *ast.StructureDecl, class *Symbol) {
 	var parameters []types.Parameter
 	var parameterNull []NullState
+	var attributes []*Symbol
 	for index := range declaration.Parameters {
 		parameter := &declaration.Parameters[index]
 		if parameter.InheritedAttributes {
+			inheritedParameters, inheritedNull, inheritedAttributes := a.inheritedConstructor(class, parameter.Span())
+			parameters = append(parameters, inheritedParameters...)
+			parameterNull = append(parameterNull, inheritedNull...)
+			attributes = append(attributes, inheritedAttributes...)
 			continue
 		}
-		parameters = append(parameters, types.Parameter{Name: parameter.Name, Type: a.resolveType(parameter.Type), HasDefault: parameter.Default != nil})
+		typeValue := a.resolveType(parameter.Type)
+		parameters = append(parameters, types.Parameter{Name: parameter.Name, Type: typeValue, HasDefault: parameter.Default != nil})
 		parameterNull = append(parameterNull, NonNull)
+		if hasModifier(parameter.Modifiers, ast.ModifierLocal) {
+			attributes = append(attributes, nil)
+			continue
+		}
+		nullState := NonNull
+		if parameter.Default != nil {
+			nullState = a.initializerNullState(parameter.Default)
+		}
+		memberSymbol := &Symbol{
+			Name: parameter.Name, Kind: MemberSymbol, Type: typeValue, Span: parameter.Span(), InitialNull: nullState,
+			Confidential: hasModifier(parameter.Modifiers, ast.ModifierConfidential), OwnerClass: class.Class,
+			OriginModuleID: a.environment.ModuleID,
+		}
+		class.Members[parameter.Name] = memberSymbol
+		a.result.Symbols = append(a.result.Symbols, memberSymbol)
+		attributes = append(attributes, memberSymbol)
 	}
-	return &Callable{Signature: &types.Signature{Parameters: parameters, Return: types.Nothing}, ParameterNull: parameterNull, ReturnNull: NonNull, Structure: declaration}
+	class.Constructor = &Callable{
+		Signature:     &types.Signature{Parameters: parameters, Return: types.Nothing},
+		ParameterNull: parameterNull, ReturnNull: NonNull, Structure: declaration,
+	}
+	class.ConstructorAttributes = attributes
+}
+
+// inheritedConstructor returns the parent structure parameters that
+// SuperClass.attributes contributes to a subclass constructor.
+func (a *analyzer) inheritedConstructor(class *Symbol, span source.Span) ([]types.Parameter, []NullState, []*Symbol) {
+	if class.Class == nil || class.Class.Parent == nil {
+		a.error(codeInvalidMember, "SuperClass.attributes requires a parent Class", span, "declare the Class with an explicit parent")
+		return nil, nil, nil
+	}
+	parent := a.classSymbolFor(class.Class.Parent)
+	if parent == nil || parent.Constructor == nil || parent.Constructor.Signature == nil {
+		return nil, nil, nil
+	}
+	parameters := append([]types.Parameter(nil), parent.Constructor.Signature.Parameters...)
+	nullStates := append([]NullState(nil), parent.Constructor.ParameterNull...)
+	for len(nullStates) < len(parameters) {
+		nullStates = append(nullStates, NonNull)
+	}
+	attributes := append([]*Symbol(nil), parent.ConstructorAttributes...)
+	for len(attributes) < len(parameters) {
+		attributes = append(attributes, nil)
+	}
+	return parameters, nullStates, attributes
+}
+
+// inheritConstructor gives a subclass without its own structure the parent
+// construction contract, so inherited attributes stay initializable.
+func (a *analyzer) inheritConstructor(class *Symbol) {
+	if class.Class != nil && class.Class.Parent != nil {
+		if parent := a.classSymbolFor(class.Class.Parent); parent != nil && parent.Constructor != nil && parent.Constructor.Signature != nil {
+			class.Constructor = &Callable{
+				Signature:     cloneSignature(parent.Constructor.Signature),
+				ParameterNull: append([]NullState(nil), parent.Constructor.ParameterNull...),
+				ReturnNull:    NonNull,
+			}
+			class.ConstructorAttributes = append([]*Symbol(nil), parent.ConstructorAttributes...)
+			return
+		}
+	}
+	class.Constructor = &Callable{Signature: &types.Signature{Return: types.Class{Symbol: class.Class}}, ReturnNull: NonNull}
 }
 
 func (a *analyzer) resolveType(reference *ast.TypeRef) types.Type {

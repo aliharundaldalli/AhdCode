@@ -1,0 +1,43 @@
+Person: Class<> := {
+    structure: Attributes := (
+        name: String
+    )
+
+    describe: Function := (
+    ) -> String {
+        return "Person: {attribute.name}"
+    }
+}
+
+
+Student: Class<Person> := {
+    structure: Attributes := (
+        SuperClass.attributes
+        number: Int
+    )
+
+    describe: Override Function := (
+    ) -> String {
+        return "Student: {attribute.name} #{attribute.number} ({SuperClass.describe()})"
+    }
+}
+
+
+person: Person := Person(
+    name: "Ada"
+)
+
+student: Student := Student(
+    name: "Ada"
+    number: 7
+)
+
+upcast: Person := student
+
+write(person.describe())
+write(student.describe())
+write(upcast.describe())
+
+write(str(student is Person))
+write(str(upcast is Student))
+write(str(upcast same student))

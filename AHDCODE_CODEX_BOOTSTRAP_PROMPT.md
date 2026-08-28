@@ -670,20 +670,20 @@ Local/Global/Confidential modifiers
 - Int -> Real is safe widening.
 - Real -> Int is not implicit.
 - `/` returns Real.
-- For `Int ^ Int`, the exponent must be a compile-time constant expression to produce Int: a non-negative constant gives Int, a negative constant gives Real, and a value not known at compile time gives Real.
+- `Int ^ Int` always produces Int. Its type does not depend on Constant status, compile-time evaluation, or exponent sign. A negative exponent raises `DomainError` during evaluation and overflow raises `OverflowError`.
 - `Real ^ Int`, `Int ^ Real`, and `Real ^ Real` return Real.
 - `^` is right-associative.
 - `%` is valid only as `Int % Int -> Int`.
 - `++` and `--` accept only Int and only as standalone statements.
 - `Real /= Int` and `Real /= Real` are valid; every `Int /= ...` form is a compile-time type error.
-- `Int ^=` is valid only when the exponent is a compile-time constant expression with a non-negative value.
+- `Int ^= Int` is valid for every Int right operand; negative exponents and overflow use the checked runtime error behavior. `Int ^= Real` remains invalid.
 - `int()` truncates toward zero.
 
 ## Compile-time constant expressions
 
 A constant expression is compile-time evaluable and scalar. Permit only scalar literals, parentheses, unary `+`/`-`/`not`, pure built-in scalar operators, and references to scalar Constant bindings whose initializers are constant expressions. Reject Function calls, mutable binding references, member/index access, List/Pair/Class construction, interpolation, and cyclic Constant dependencies.
 
-Use this exact definition for signed Int range checking and for the `Int ^ Int`/`Int ^=` exponent rules. Do not make the result depend on optional optimizer or range-analysis proofs.
+Use this exact definition for signed Int range checking and other compile-time language requirements. Power typing depends only on operand types, never on optional optimizer or range-analysis proofs.
 
 ## null
 
@@ -1137,8 +1137,7 @@ Implement exactly the current built-in semantics.
 - + - * / % ^
 - ^ is exponentiation
 - right-associative
-- `Int ^ Int -> Int` only when the exponent is a compile-time constant expression with a non-negative value
-- `Int ^ Int -> Real` when the constant exponent is negative or the exponent is not known at compile time
+- `Int ^ Int -> Int` for every Int exponent
 - `Real ^ Int -> Real`
 - `Int ^ Real -> Real`
 - `Real ^ Real -> Real`
@@ -1152,7 +1151,8 @@ Implement exactly the current built-in semantics.
 - `Real /= Int|Real` is valid
 - `Int /= ...` is a compile-time type error
 - `%=` requires an Int target and Int right operand
-- `Int ^=` is valid only with a compile-time constant non-negative exponent
+- `Int ^= Int` is valid for every Int exponent; negative exponent raises `DomainError` and overflow raises `OverflowError` during evaluation
+- `Int ^= Real` is invalid
 
 ## ++ / --
 - prefix and postfix spellings accepted;

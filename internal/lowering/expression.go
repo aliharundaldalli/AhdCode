@@ -200,6 +200,27 @@ func (lowerer *moduleLowerer) lowerMemberDesignator(expression *ast.BinaryExpr, 
 	return &ir.BinaryExpr{ExprBase: base, Op: op, Left: left, Right: right}
 }
 
+// lowerSuperMember keeps SuperClass.member bound to the current instance while
+// naming the parent implementation directly.
+func (lowerer *moduleLowerer) lowerSuperMember(member *ast.MemberExpr, resolved *semantic.Symbol, base ir.ExprBase) ir.Expr {
+	if lowerer.currentReceiver == "" || lowerer.currentOwner == "" {
+		lowerer.compilation.error(CodeMissingSemantic, "SuperClass is valid only inside a Class callable", member.Span())
+		return nil
+	}
+	callable := resolved.Callable
+	if selected := lowerer.semantic.SelectedFunctionValues[member]; selected != nil {
+		callable = selected
+	}
+	object := &ir.LoadExpr{
+		ExprBase: ir.ExprBase{Span: member.Span(), Type: ir.Type{Kind: ir.ClassType, Class: lowerer.currentOwner}, NullState: ir.NonNull},
+		Symbol:   lowerer.currentReceiver,
+	}
+	return &ir.MemberExpr{
+		ExprBase: base, Kind: ir.MethodMember, Object: object, Direct: true,
+		Callable: lowerer.compilation.registry.callableID(lowerer.module, resolved, callable, false),
+	}
+}
+
 func isNullAST(expression ast.Expr) bool {
 	literal, ok := expression.(*ast.LiteralExpr)
 	return ok && literal.Kind == ast.NullLiteral
@@ -442,6 +463,9 @@ func (lowerer *moduleLowerer) lowerMember(member *ast.MemberExpr, base ir.ExprBa
 	if resolved == nil {
 		lowerer.compilation.error(CodeMissingSemantic, "member has no resolved Symbol", member.Span())
 		return nil
+	}
+	if lowerer.semantic.SuperCalls[member] {
+		return lowerer.lowerSuperMember(member, resolved, base)
 	}
 	if objectSymbol := lowerer.semantic.ResolvedSymbols[member.Object]; objectSymbol != nil && objectSymbol.Kind == semantic.NamespaceSymbol {
 		if resolved.Kind == semantic.ClassSymbol && resolved.Class != nil {

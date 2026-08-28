@@ -15,8 +15,13 @@ const (
 	localPrefix       = "lv"
 	functionPrefix    = "fn"
 	classPrefix       = "Cl"
+	interfacePrefix   = "If"
+	descriptorPrefix  = "cd"
+	slotPrefix        = "Mt"
 	fieldPrefix       = "Fd"
 	constructorPrefix = "ct"
+	initializerPrefix = "ci"
+	adapterPrefix     = "fv"
 	initPrefix        = "md"
 )
 

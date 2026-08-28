@@ -62,8 +62,17 @@ type Function struct {
 	ReturnNull   NullState
 	Confidential bool
 	Override     bool
-	Parameters   []Parameter
-	Body         Block
+	// Overrides is the parent method this method replaces. It carries the
+	// frontend's Override decision so a backend never has to rediscover the
+	// dispatch slot from names.
+	Overrides CallableID
+	// ParentConstructor and ParentArguments describe how a constructor
+	// initializes its inherited attribute slots. ParentArguments holds this
+	// constructor's parameter indices, in parent parameter order.
+	ParentConstructor CallableID
+	ParentArguments   []int
+	Parameters        []Parameter
+	Body              Block
 }
 
 type Field struct {
@@ -82,7 +91,10 @@ type Class struct {
 	Name         string
 	Parent       ClassID
 	Confidential bool
-	Fields       []Field
-	Constructor  CallableID
-	Methods      []CallableID
+	// Builtin marks a Class supplied by the language rather than declared in
+	// AhdCode source, such as Object, Error, and the runtime Error subclasses.
+	Builtin     bool
+	Fields      []Field
+	Constructor CallableID
+	Methods     []CallableID
 }

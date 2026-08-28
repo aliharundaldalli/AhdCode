@@ -1,0 +1,60 @@
+InvalidAgeError: Class<Error> := {
+    structure: Attributes := (
+        SuperClass.attributes
+        age: Int
+    )
+}
+
+
+checkAge: Function := (
+    age: Int
+) -> Nothing {
+    if age < 0 {
+        toss InvalidAgeError(
+            message: "too young"
+            age: age
+        )
+    }
+
+    write("age {age} accepted")
+}
+
+
+attempt {
+    checkAge(-1)
+}
+except InvalidAgeError as error {
+    write("handled: {error.message}")
+}
+
+
+attempt {
+    remainder: Local Int := 1 % 0
+    write(remainder)
+}
+except DivisionByZeroError as error {
+    write("caught DivisionByZeroError")
+}
+
+
+answer: Function := (
+) -> Int {
+    attempt {
+        return 42
+    }
+    ultimately {
+        write("cleanup")
+    }
+}
+
+write(answer())
+
+
+attempt {
+    toss Error(
+        message: "propagates to the caller"
+    )
+}
+except Error as error {
+    write("uncaught is reported by the runtime")
+}

@@ -22,7 +22,11 @@ func Dump(compilation *Compilation) string {
 			fmt.Fprintf(&out, "  global %s : %s = %s\n", global.ID, global.Type, printExpr(global.Initializer))
 		}
 		for _, class := range module.Classes {
-			fmt.Fprintf(&out, "  class %s parent=%s ctor=%s\n", class.ID, class.Parent, class.Constructor)
+			builtin := ""
+			if class.Builtin {
+				builtin = " builtin"
+			}
+			fmt.Fprintf(&out, "  class %s parent=%s ctor=%s%s\n", class.ID, class.Parent, class.Constructor, builtin)
 			for _, field := range class.Fields {
 				fmt.Fprintf(&out, "    field %s : %s\n", field.ID, field.Type)
 			}
@@ -56,6 +60,12 @@ func printFunction(out *strings.Builder, function *Function) {
 		}
 	}
 	fmt.Fprintf(out, ") -> %s null=%s ", function.Signature.Return, function.ReturnNull)
+	if function.Overrides != "" {
+		fmt.Fprintf(out, "overrides=%s ", function.Overrides)
+	}
+	if function.ParentConstructor != "" {
+		fmt.Fprintf(out, "parent-ctor=%s%v ", function.ParentConstructor, function.ParentArguments)
+	}
 	printBlock(out, function.Body, "  ")
 }
 
@@ -179,6 +189,9 @@ func printExpr(expression Expr) string {
 	case *MemberExpr:
 		if value.Kind == FieldMember {
 			return "field(" + printExpr(value.Object) + "," + string(value.Field) + ")"
+		}
+		if value.Direct {
+			return "direct-method(" + printExpr(value.Object) + "," + string(value.Callable) + ")"
 		}
 		return "method(" + printExpr(value.Object) + "," + string(value.Callable) + ")"
 	case *IndexExpr:

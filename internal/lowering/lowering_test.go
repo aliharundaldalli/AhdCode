@@ -62,8 +62,8 @@ b: Int := 2 + 3
 c: Real := 2 + 3.5
 d: Real := 5 / 2
 power: Int := 2 ^ 3
-negativePower: Real := 2 ^ -1
-runtimePower: Function := (exponent: Int) -> Real {
+negativePower: Int := 2 ^ -1
+runtimePower: Function := (exponent: Int) -> Int {
     return 2 ^ exponent
 }`}, "/Main.ahd")
 	main := moduleIR(t, result.Compilation, "Main")
@@ -97,12 +97,12 @@ runtimePower: Function := (exponent: Int) -> Real {
 	if power := globalIR(t, main, "power").Initializer.(*ir.BinaryExpr); power.Op != "CheckedIntPower" {
 		t.Fatalf("constant power op = %s", power.Op)
 	}
-	if power := globalIR(t, main, "negativePower").Initializer.(*ir.BinaryExpr); power.Op != "RealPower" {
+	if power := globalIR(t, main, "negativePower").Initializer.(*ir.BinaryExpr); power.Op != "CheckedIntPower" {
 		t.Fatalf("negative power op = %s", power.Op)
 	}
 	runtime := functionIR(t, main, "runtimePower")
 	ret := runtime.Body.Statements[0].(*ir.ReturnStmt)
-	if operation := ret.Value.(*ir.BinaryExpr); operation.Op != "RealPower" {
+	if operation := ret.Value.(*ir.BinaryExpr); operation.Op != "CheckedIntPower" {
 		t.Fatalf("runtime power op = %s", operation.Op)
 	}
 }
@@ -163,7 +163,9 @@ student: Student := Student(name: "Ali")
 answer: Int := identity(5)
 defaultAnswer: Int := identity()`,
 	}, "/Main.ahd")
-	if len(result.Compilation.Modules) != 3 || result.Compilation.Modules[2].Name != "Main" {
+	// The built-in Class catalog module precedes the user modules, which stay
+	// in dependency order with the entry module last.
+	if len(result.Compilation.Modules) != 4 || result.Compilation.Modules[0].ID != BuiltinModuleID || result.Compilation.Modules[3].Name != "Main" {
 		t.Fatalf("module order = %#v", result.Compilation.Modules)
 	}
 	main := moduleIR(t, result.Compilation, "Main")
@@ -377,7 +379,7 @@ func TestClassMemberMethodCompoundTargetAndTossAreResolved(t *testing.T) {
 }
 Failure: Class<Error> := {}
 fail: Function := () -> Nothing {
-    toss Failure()
+    toss Failure(message: "x")
 }`}, "/Main.ahd")
 	main := moduleIR(t, result.Compilation, "Main")
 	var box *ir.Class

@@ -22,6 +22,10 @@ type functionInference struct {
 	conflict   bool
 	reported   bool
 	fixed      *types.Signature
+	// fixedNull is the concrete callable that fixed the signature. Its
+	// null-state contract must survive inference so a callback call keeps the
+	// null-state of the callable actually assigned to it.
+	fixedNull  *Callable
 	calls      []*ast.CallExpr
 	owner      *types.Signature
 	ownerIndex int
@@ -49,10 +53,10 @@ func (a *analyzer) constrainFunctionCall(symbol *Symbol, call *ast.CallExpr, arg
 		symbol.inference = inference
 	}
 	if inference.fixed != nil {
-		callable := &Callable{Signature: inference.fixed, ReturnNull: NonNull, ParameterNull: nonNullParameters(len(inference.fixed.Parameters))}
+		callable := inferredCallable(inference)
 		a.validateCallArguments(call, callable, arguments)
 		a.result.SelectedCallables[call] = callable
-		return expressionInfo{typeValue: inference.fixed.Return, nullState: NonNull, symbol: symbol}
+		return expressionInfo{typeValue: inference.fixed.Return, nullState: callable.ReturnNull, symbol: symbol}
 	}
 	if !inference.arityKnown {
 		inference.parameters = make([]inferredParameter, len(arguments))
@@ -139,7 +143,26 @@ func mergeReturnConstraint(current, next types.Type) (types.Type, bool) {
 	return types.Invalid, false
 }
 
-func (a *analyzer) constrainConcreteFunction(symbol *Symbol, signature *types.Signature, span source.Span) {
+// inferredCallable rebuilds the callable contract of an inferred Function
+// binding, preserving the null-state of the concrete callable assigned to it.
+func inferredCallable(inference *functionInference) *Callable {
+	callable := &Callable{
+		Signature: inference.fixed, ReturnNull: NonNull,
+		ParameterNull: nonNullParameters(len(inference.fixed.Parameters)),
+	}
+	if inference.fixedNull == nil {
+		return callable
+	}
+	callable.ReturnNull = inference.fixedNull.ReturnNull
+	for index := range callable.ParameterNull {
+		if index < len(inference.fixedNull.ParameterNull) {
+			callable.ParameterNull[index] = inference.fixedNull.ParameterNull[index]
+		}
+	}
+	return callable
+}
+
+func (a *analyzer) constrainConcreteFunction(symbol *Symbol, signature *types.Signature, concrete *Callable, span source.Span) {
 	if symbol == nil || signature == nil {
 		return
 	}
@@ -170,6 +193,20 @@ func (a *analyzer) constrainConcreteFunction(symbol *Symbol, signature *types.Si
 		return
 	}
 	inference.fixed = signature
+	inference.fixedNull = concrete
+}
+
+// concreteCallable extracts the callable contract behind a Function-typed
+// expression, so its null-state survives assignment into an inferred binding.
+func concreteCallable(info expressionInfo) *Callable {
+	if info.symbol == nil {
+		return nil
+	}
+	symbol := info.symbol
+	if symbol.Alias != nil {
+		symbol = symbol.Alias
+	}
+	return symbol.Callable
 }
 
 func (a *analyzer) inferenceConflict(symbol *Symbol, span source.Span, detail string) {
@@ -213,17 +250,23 @@ func (a *analyzer) finalizeInferences(symbols []*Symbol) {
 			signature = &types.Signature{Parameters: parameters, Return: inference.returnType}
 		}
 		symbol.Type = types.Function{Signature: signature}
+		concrete := &Callable{Signature: signature, ParameterNull: nonNullParameters(len(signature.Parameters)), ReturnNull: NonNull}
+		if inference.fixed != nil {
+			concrete = inferredCallable(inference)
+		}
 		if symbol.Callable == nil {
-			symbol.Callable = &Callable{Signature: signature, ParameterNull: nonNullParameters(len(signature.Parameters)), ReturnNull: NonNull}
+			symbol.Callable = concrete
 		} else {
 			symbol.Callable.Signature = signature
+			symbol.Callable.ParameterNull = concrete.ParameterNull
+			symbol.Callable.ReturnNull = concrete.ReturnNull
 		}
 		if inference.owner != nil && inference.ownerIndex >= 0 && inference.ownerIndex < len(inference.owner.Parameters) {
 			inference.owner.Parameters[inference.ownerIndex].Type = symbol.Type
 		}
 		for _, call := range inference.calls {
 			a.result.ExpressionTypes[call] = signature.Return
-			a.result.NullStates[call] = NonNull
+			a.result.NullStates[call] = symbol.Callable.ReturnNull
 			a.result.SelectedCallables[call] = symbol.Callable
 		}
 	}

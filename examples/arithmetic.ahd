@@ -2,6 +2,11 @@ x: Int := 5
 y: Int := 7
 
 write(x + y)
+write(x - y)
+write(x * y)
+write(y % x)
 write(x / y)
 write(x ^ 2)
+write(y ^ x)
+write(x ^ y)
 write(x % y)

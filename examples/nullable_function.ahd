@@ -1,0 +1,55 @@
+Student: Class<> := {
+    structure: Attributes := (
+        name: String
+    )
+}
+
+
+find: Function := (
+    id: Int
+) -> Student {
+    if id == 1 {
+        return Student(name: "Ada")
+    }
+
+    return null
+}
+
+
+halfOfEven: Function := (
+    value: Int
+) -> Int {
+    if value % 2 == 0 {
+        quotient: Local Int := 0
+        remaining: Local Int := value
+        while remaining > 1 {
+            quotient++
+            remaining = remaining - 2
+        }
+
+        return quotient
+    }
+
+    return null
+}
+
+
+found: Student := find(1)
+if found != null {
+    write("found {found.name}")
+}
+
+missing: Student := find(2)
+if missing == null {
+    write("nothing found")
+}
+
+even: Int := halfOfEven(20)
+if even != null {
+    write(even)
+}
+
+odd: Int := halfOfEven(3)
+if odd == null {
+    write("no value")
+}

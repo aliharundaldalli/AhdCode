@@ -80,6 +80,11 @@ func (p *parser) parsePrefix() ast.Expr {
 	case token.Identifier:
 		p.advance()
 		return &ast.IdentifierExpr{Base: ast.Base{Range: item.Span}, Name: item.Value, Raw: item.Lexeme}
+	case token.KeywordObject, token.KeywordError:
+		// The built-in Class names are usable wherever a declared Class name is,
+		// including construction and type membership.
+		p.advance()
+		return &ast.IdentifierExpr{Base: ast.Base{Range: item.Span}, Name: item.Kind.String(), Raw: item.Lexeme}
 	case token.StringStart:
 		return p.parseString()
 	case token.LeftParen:
