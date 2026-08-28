@@ -256,15 +256,26 @@ write("Ali" in scores)
 **`has` ve `has not` kullanımı:**
 Bunlar yalnızca bir Sınıf (Class) nesnesinin belirli bir üyeye sahip olup olmadığını kontrol etmek için kullanılır. Sağ taraf bir String değil, doğrudan üyenin adı olmalıdır.
 
+Bir değişkenin türü üst Sınıf olsa bile içinde tuttuğu gerçek nesne bir alt Sınıf olabilir. Teknik olarak `has`, değişkenin yazılı türüne değil, nesnenin çalışma anındaki gerçek Sınıfına bakar. Ayrıca üst Sınıftan miras alınan (inherited) üyeler de var kabul edilir.
+
 ```ahd
-Student: Class<> := {
+Person: Class<> := {
     structure: Attributes := ( name: String )
 }
-student: Student := Student(name: "Ali")
+Student: Class<Person> := {
+    structure: Attributes := (
+        SuperClass.attributes
+        number: Int
+    )
+}
 
-write(student has name)
-write(student has not nickname)
+person: Person := Student(name: "Ali", number: 42)
+
+write(person has number) // true
+write(person has not nickname) // true
 ```
+
+*Not: `person is Student` bu nesnenin bir `Student` olup olmadığını sorarken, `person has number` bu nesnenin `number` adında bir üyesi olup olmadığını sorar.*
 
 ### Mantıksal operatörler
 - `and` (ikisi de doğruysa `true` üretir)

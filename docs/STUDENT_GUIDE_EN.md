@@ -265,15 +265,26 @@ write("Ali" in scores)
 **Using `has` and `has not`:**
 These are used exclusively to check if a Class object has a specific member. The right side must be the actual name of the member, not a String.
 
+`has` checks the object's actual Class at runtime, so storing a Student in a Person variable does not hide Student-only members from `has`. Inherited members from parent Classes also count as existing.
+
 ```ahd
-Student: Class<> := {
+Person: Class<> := {
     structure: Attributes := ( name: String )
 }
-student: Student := Student(name: "Ali")
+Student: Class<Person> := {
+    structure: Attributes := (
+        SuperClass.attributes
+        number: Int
+    )
+}
 
-write(student has name)
-write(student has not nickname)
+person: Person := Student(name: "Ali", number: 42)
+
+write(person has number) // true
+write(person has not nickname) // true
 ```
+
+*Note: `person is Student` asks "Is this object a Student?", while `person has number` asks "Does this object have a member named number?".*
 
 ### Logical operators
 - `and` (true if both are true)

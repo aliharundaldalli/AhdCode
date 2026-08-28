@@ -2066,6 +2066,8 @@ Class/object member existence only.
 
 Not used for Pair.
 
+The left operand must be a non-null Class object according to the standard null-safety rules.
+
 `has` inspects the object's **actual runtime Class and its inheritance chain**, not the static type of the expression it is written against. An instance held in a variable of a parent type therefore still reports the members its real Class declares.
 
 ```ahd
@@ -2089,6 +2091,8 @@ false
 ```
 
 Attributes and methods are both members, an overridden method is a member of both Classes, and an ordinary parent instance never gains a subclass member. The right operand is an unquoted member designator: it names a member, is never evaluated as a binding, and executes nothing. The left expression is evaluated exactly once. `has not` is the exact logical negation of the same lookup.
+
+`has` checks **member existence**, not access permission. A `Confidential` member counts as existing, so `object has secret` returns `true` if the member exists. This does **not** bypass access rules; `object.secret` remains restricted according to the normal `Confidential` contract.
 
 ---
 
