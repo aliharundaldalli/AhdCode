@@ -1,10 +1,37 @@
 # AhdCode v0.1 Türkçe Öğrenci Rehberi
 
-English version: [English Student Guide](STUDENT_GUIDE_EN.md)
+Bu rehber, programlamaya yeni başlayanlar için tasarlanmıştır. Sizi günlük bir dil kullanarak adım adım AhdCode diliyle tanıştıracak ve yazacağınız ilk kod satırından itibaren size yol gösterecektir.
 
-Bu rehber, daha önce hiç programlama deneyiminiz olmasa bile küçük AhdCode
-komut satırı programları geliştirmenize yardımcı olur. Bölümleri sırayla okuyun,
-her örneği çalıştırın ve yol boyunca önerilen küçük değişiklikleri deneyin.
+## İçindekiler
+- [1. AhdCode nedir?](#1-ahdcode-nedir)
+- [2. Kurulum ve ilk programınız](#2-kurulum-ve-ilk-programınız)
+- [3. Kod yazımının temelleri](#3-kod-yazımının-temelleri)
+- [4. Temel türler](#4-temel-türler)
+- [5. Operatörler](#5-operatörler)
+- [6. Metinler (Strings)](#6-metinler-strings)
+- [7. Girdi, çıktı ve dönüşümler](#7-girdi-çıktı-ve-dönüşümler)
+- [8. Koşullar: if ve state](#8-koşullar-if-ve-state)
+- [9. Döngüler: while, until ve for](#9-döngüler-while-until-ve-for)
+- [10. Fonksiyon yazmak ve çağırmak](#10-fonksiyon-yazmak-ve-çağırmak)
+- [11. Local ve Global](#11-local-ve-global)
+- [12. Listelerle çalışmak (List)](#12-listelerle-çalışmak-list)
+- [13. Referans davranışı (Reference Behavior)](#13-referans-davranışı-reference-behavior)
+- [14. Pair ile çalışmak](#14-pair-ile-çalışmak)
+- [15. Sabitler (Constant)](#15-sabitler-constant)
+- [16. Null güvenliği (Null safety)](#16-null-güvenliği-null-safety)
+- [17. Sınıflar (Class) ve Özellikler (Attributes)](#17-sınıflar-class-ve-özellikler-attributes)
+- [18. Hata yönetimi (`attempt`, `except`, `ultimately` ve `toss`)](#18-hata-yönetimi-attempt-except-ultimately-ve-toss)
+- [19. Modüller ve bring](#19-modüller-ve-bring)
+- [20. Temel işlevler modülü (Fundamentals)](#20-temel-işlevler-modülü-fundamentals)
+- [21. Matematik modülü (Math)](#21-matematik-modülü-math)
+- [22. Kod biçimlendirici (Formatter)](#22-kod-biçimlendirici-formatter)
+- [23. Komut satırı (CLI)](#23-komut-satırı-cli)
+- [24. Etkileşimli kabuk (REPL)](#24-etkileşimli-kabuk-repl)
+- [25. Başlangıçta sık yapılan hatalar](#25-başlangıçta-sık-yapılan-hatalar)
+- [26. Küçük Projeler](#26-küçük-projeler)
+- [27. Alıştırmalar](#27-alıştırmalar)
+- [28. Çözüm İpuçları](#28-çözüm-ipuçları)
+- [29. Sonraki adımlar ve teknik belgeler](#29-sonraki-adımlar-ve-teknik-belgeler)
 
 ## 1. AhdCode nedir?
 
@@ -57,14 +84,14 @@ yeniden çalıştırın.
 
 Her AhdCode programı bir `.ahd` dosyasına yazılır. Satırların sonuna noktalı virgül (`;`) koymanıza gerek yoktur, her komut genellikle kendi satırında yer alır. Kod blokları süslü parantez `{` ve `}` arasına yazılır.
 
-Kendiniz veya diğer yazılımcılar için not bırakmak isterseniz, satırın başına `#` koyabilirsiniz. Derleyici bu yorum satırlarını (comments) yok sayar.
+Kendiniz veya diğer yazılımcılar için not bırakmak isterseniz, tek satırlık yorumlar için satıra `//` ile başlayabilirsiniz. Daha uzun notlar için `/*` ile başlayıp `*/` ile biten çok satırlı yorumlar (multiline comments) kullanabilirsiniz. Derleyici bu yorum satırlarını yok sayar. (Not: çok satırlı yorumlar iç içe geçemez).
 
 ```ahd
 // Bu bir yorum satırıdır. Derleyici bunu görmezden gelir.
 write("Bu satır çalışır")
 ```
 
-Bir değeri hatırlamanız gerektiğinde bir "değişken" (variable) oluşturursunuz. Değişken isimleri (identifiers) bir harfle başlamalıdır; harf, sayı ve alt çizgi (`_`) içerebilir.
+Bir değeri hatırlamanız gerektiğinde bir "değişken" (variable) oluşturursunuz. Değişken isimleri (identifiers) bir harf veya `_` ile başlayabilir. Sonraki karakterlerde harfler, sayılar ve `_` kullanılabilir.
 
 ### Değişken tanımlama ve değiştirme: `:=` ve `=`
 
@@ -192,13 +219,52 @@ count++
 write(count)
 ```
 
-### Karşılaştırma ve eşitlik
-- `==` eşittir (iki değerin içeriği aynı mı diye bakar)
+### Karşılaştırma, Kimlik ve Üyelik (Comparison, Identity, and Membership)
+
+- `==` eşittir (iki değerin içeriği kendi türüne göre aynı mı diye bakar)
 - `!=` eşit değildir
 - `<` küçüktür
 - `<=` küçük eşittir
 - `>` büyüktür
 - `>=` büyük eşittir
+
+AhdCode ayrıca kimlik, tür ve üyelik kontrolleri için şu operatörleri sunar:
+
+- `same` iki değişkenin bellekte tam olarak aynı nesneye işaret edip etmediğine bakar (kimlik).
+- `is` / `is not` bir nesnenin belirli bir Sınıf (Class) türünden olup olmadığını kontrol eder.
+- `in` / `not in` bir değerin bir koleksiyon veya String içinde bulunup bulunmadığını kontrol eder.
+- `has` / `has not` bir Sınıf nesnesinin belirli bir üyeye (özellik veya metot) sahip olup olmadığını kontrol eder.
+
+**`in` ve `not in` kullanımı:**
+Bir değerin bir `List`'te, bir metin parçasının bir `String`'de veya bir anahtarın (key) bir `Pair`'de olup olmadığını kontrol edebilirsiniz. `Pair` için `in` değerleri (values) değil, yalnızca anahtarları arar.
+
+```ahd
+numbers: List<Int> := [10, 20, 30]
+write(20 in numbers)
+write(99 not in numbers)
+
+text: String := "AhdCode"
+write("Code" in text)
+
+scores: Pair<String, Int> := {
+    "Ali": 90
+    "Ayşe": 95
+}
+write("Ali" in scores)
+```
+
+**`has` ve `has not` kullanımı:**
+Bunlar yalnızca bir Sınıf (Class) nesnesinin belirli bir üyeye sahip olup olmadığını kontrol etmek için kullanılır. Sağ taraf bir String değil, doğrudan üyenin adı olmalıdır.
+
+```ahd
+Student: Class<> := {
+    structure: Attributes := ( name: String )
+}
+student: Student := Student(name: "Ali")
+
+write(student has name)
+write(student has not nickname)
+```
 
 ### Mantıksal operatörler
 - `and` (ikisi de doğruysa `true` üretir)
@@ -498,9 +564,8 @@ Her iki kullanımda da `value` yalnızca o döngü için oluşturulur. Zaten o d
 
 ```ahd
 // GEÇERSİZ:
-for value: Int in [10, 20] {
-    // This example intentionally fails to compile in v0.1 tests 
-    // because Local Int is not valid syntax here.
+for value: Local Int in [10, 20] {
+    write(value)
 }
 ```
 
@@ -820,7 +885,7 @@ true
 
 `same` anahtar kelimesi, her iki değişkenin bellekte tam olarak aynı nesneyi gösterip göstermediğini kontrol eder. `==` ise içeriklerinin tamamen aynı olup olmadığına bakar. Bu durumda, aynı nesneyi paylaştıkları için ikisi de doğrudur.
 
-> **Teknik not:** Aynı List'i bu şekilde paylaşmaya "reference semantics" (referans semantiği) denir. Aynı nesne için kullanılan ikinci bir embracesisme genellikle "alias" (takma ad) denir.
+> **Teknik not:** Aynı List'i bu şekilde paylaşmaya "reference semantics" (referans semantiği) denir. Aynı nesneyi gösteren ikinci bir değişken adına genellikle "alias" (takma ad) denir.
 
 ## 14. Pair ile çalışmak
 
@@ -863,18 +928,16 @@ clear(scores)
 
 ## 15. Sabitler (Constant)
 
-Bir `Constant` koleksiyon değiştirilemez. Eğer onu değiştirmeye çalışırsanız derleyici hata verecektir.
+Bir `Constant` koleksiyon değiştirilemez. Eğer onu doğrudan değiştirmeye çalışırsanız derleme aşamasında reddedilir.
 
 ```ahd
 locked: Constant List<Int> := [1, 2, 3]
-// locked.add(4) // Bu bir hata olurdu
+// locked[0] = 99 // Bu bir derleme zamanı hatasına neden olur
 ```
 
-Eğer bir `Constant List` içinde başka Listeler, Pair'ler veya Class nesneleri barındırıyorsa, bu paylaşılan nesnelere o List üzerinden ulaşıp onları da değiştiremezsiniz. Bu nesneyi gösteren başka bir değişken (alias) bu kuralı çiğneyemez.
+Ulaşılabilir tüm nesne ağı derin dondurulur (deep-frozen). Eğer bir `Constant` içinde başka koleksiyonlar veya nesneler varsa, bu iç nesneler de dondurulur. Halihazırda dondurulmuş bir nesneyi, Constant olarak işaretlenmemiş başka bir değişken (alias/takma ad) üzerinden değiştirmeye çalışırsanız, program çalışırken (runtime) bir `ConstantError` üretebilir.
 
-> **Teknik not:** Ulaşılabilen tüm paylaşılan yapının dondurulmasına
-> "deep-freeze" (derin dondurma) denir. Bir `Constant` değer, başlangıç
-> (ilk) değer olarak `null` ile başlatılamaz.
+> **Teknik not:** Bir `Constant` değer, başlangıç değeri olarak `null` alamaz.
 
 ## 16. Null güvenliği (Null safety)
 
@@ -1048,9 +1111,29 @@ Domain hatası: değer pozitif olmalı
 Bitti
 ```
 
-Dilin sunduğu yaygın hata türleri arasında `DomainError`, `IndexError`, `KeyError`,
+Dilin sunduğu yaygın hata türleri arasında `DomainError`, `ValueError`, `IndexError`, `KeyError`,
 `OverflowError`, `DivisionByZeroError`, `NullError` ve `ConstantError`
 bulunur. Farklı hatalara farklı şekilde tepki verebilmek için birden fazla `except` bloğu kullanabilirsiniz.
+
+Ayrıca yerleşik `Error` sınıfından miras alarak kendi özel hatalarınızı oluşturabilirsiniz:
+
+```ahd
+InvalidAgeError: Class<Error> := {
+    structure: Attributes := (
+        message: String
+    )
+}
+
+attempt {
+    age: Local Int := -5
+    if age < 0 {
+        toss (InvalidAgeError("Yaş negatif olamaz"))
+    }
+}
+except InvalidAgeError as error {
+    write("Özel hata yakalandı: {error.message}")
+}
+```
 
 > **Teknik not:** AhdCode çalışma zamanı (runtime) hataları, yakalanabilen
 > (catchable) normal Sınıf (Class) değerleridir.
@@ -1089,7 +1172,7 @@ Bir modülden öğeleri içe aktarmanın (import) birkaç yolu vardır:
 - `bring Greeting` bir "isim uzayını" (namespace) içe aktarır, çağrı `Greeting.greet("Ayşe")` şekline dönüşür.
 - `from Greeting bring greet` öğenin ismini doğrudan kullanılabilir hale getirir.
 - `from Greeting bring ( greet, farewell )` aynı anda birden fazla ismi farklı satırlarda okunaklı şekilde içe aktarmanızı sağlar.
-- `bring all from Greeting` modüldeki gizli (`Confidential`) olmayan (public) tüm isimleri içe aktarır.
+- `from Greeting bring all` modüldeki gizli (`Confidential`) olmayan (public) tüm isimleri içe aktarır.
 
 Aynı isimleri taşıyan çakışan içe aktarımlar (import collisions) ve döngüsel bağlılıklar (circular dependencies) derleme hatasıdır.
 
@@ -1143,10 +1226,18 @@ Beklenen çıktı:
 3.14
 ```
 
-`round` (yuvarla) bir `Real` döndürür ve tam buçuklu sayıları sıfırdan
-uzaklaşacak şekilde yuvarlar. İsteğe bağlı olarak aldığı "basamak" (digits)
-argümanı `0..15` arasıyla sınırlıdır. `floor` (aşağı yuvarla) ve `ceil`
-(yukarı yuvarla) bir `Int` döndürür. Trigonometrik fonksiyonlar (`sin`, `cos`, `tan`) radyan kullanır. `log` doğal logaritmadır; `log10` ise 10 tabanındadır. Üs alma işlemi için `^` operatörünü kullanın, dilde `Math.pow` yoktur.
+Kullanabileceğiniz tüm Math özellikleri şunlardır:
+
+| Öğe | Açıklama |
+|---|---|
+| `PI`, `E` | Matematiksel sabitler. |
+| `round`, `floor`, `ceil` | `round(değer, basamak)` tam buçuklu sayıları sıfırdan uzaklaşacak şekilde yuvarlar; basamak isteğe bağlıdır (0..15). `floor` ve `ceil` ise `Int` döndürür. |
+| `sqrt`, `exp` | Karekök ve üstel fonksiyon ($e^x$). |
+| `sin`, `cos`, `tan` | Radyan kullanan trigonometrik fonksiyonlar. |
+| `log`, `log10` | Doğal logaritma ve 10 tabanında logaritma. |
+| `seed`, `random`, `randomInt` | Rastgele sayı üretim fonksiyonları. |
+
+Üs alma işlemi için `^` operatörünü kullanın, dilde `Math.pow` yoktur. Ayrıca `abs`, `sum`, `min` ve `max` gibi fonksiyonlar Math değil, Temel İşlevler (Fundamentals) modülündedir.
 
 ### Rastgele sayı durumu (Random state)
 
@@ -1312,7 +1403,7 @@ error: duplicate declaration
 - Doğru: Yeni bir karakter değiştirmek için `replace` kullanın veya yeni bir metin oluşturun.
 
 **20. Tekrarlanabilir olmayan (Unseeded) rastgele sayılar beklemek**
-- Yanlış: `Math.seed()` kullanmadığınız halde `Math.randomInt(1,6)` kodunun her çalışmada aynı kalmasını beklemek.
+- Yanlış: `Math.seed(42)` kullanmadığınız halde `Math.randomInt(1,6)` kodunun her çalışmada aynı kalmasını beklemek.
 - Neden: Tohum (seed) verilmemiş rastgelelik, OS entropisini kullanır ve tekrarlanamaz.
 - Doğru: Zar atmadan önce `Math.seed(42)` gibi bir tohum değeri verin.
 
@@ -1326,7 +1417,7 @@ Bu küçük projeler rehberde öğretilenleri bir araya getirir. Onları tek ba�
 4. **Kelime Analizi**: Kullanıcıdan bir cümle girmesini isteyin. Kelimeleri ayırmak için `split(" ")` kullanın. Kelime sayısını bulun, en uzun kelimeyi bulun ve her kelimenin kendi uzunluğuyla eşleştiği bir `Pair<String, Int>` oluşturun.
 5. **Menülü Program**: Bir `until` döngüsü kullanarak küçük bir banka simülasyonu yapın. Bir menü gösterin: 1. Para Yatır, 2. Para Çek, 3. Bakiye, 0. Çıkış. Bakiyeyi bir `Int` içinde saklayın ve kullanıcı 0 girene kadar programı döndürün.
 6. **Sınıflarla (Class) Öğrenci Kaydı**: Bir `Student` sınıfı ve bir `Course` (Kurs) sınıfı oluşturun. Course içinde bir `List<Student>` bulunsun. Kursa yeni bir öğrenci eklemek için bir metot, kursun genel not ortalamasını hesaplamak için başka bir metot yazın.
-7. **Tohumlu (Seeded) Rastgele Oyun**: `Math.seed()` kullanarak 1 ile 100 arasında "gizli bir sayı" üretin. Kullanıcıdan sayıyı tahmin etmesini isteyin. Doğru tahmin edene kadar "daha yüksek" veya "daha düşük" diye yönlendirin. Tohum kullanıldığı için, gizli sayı programı her çalıştırdığınızda aynı olacaktır—test yapmak için mükemmel!
+7. **Tohumlu (Seeded) Rastgele Oyun**: `Math.seed(42)` kullanarak 1 ile 100 arasında "gizli bir sayı" üretin. Kullanıcıdan sayıyı tahmin etmesini isteyin. Doğru tahmin edene kadar "daha yüksek" veya "daha düşük" diye yönlendirin. Tohum kullanıldığı için, gizli sayı programı her çalıştırdığınızda aynı olacaktır—test yapmak için mükemmel!
 
 ## 27. Alıştırmalar
 

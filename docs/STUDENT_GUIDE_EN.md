@@ -1,5 +1,38 @@
 # AhdCode v0.1 English Student Guide
 
+This guide is designed for beginners. It will walk you through the AhdCode language step-by-step using everyday language, starting from your very first line of code.
+
+## Table of Contents
+- [1. What is AhdCode?](#1-what-is-ahdcode)
+- [2. Installation and your first program](#2-installation-and-your-first-program)
+- [3. Source basics](#3-source-basics)
+- [4. Core types](#4-core-types)
+- [5. Operators](#5-operators)
+- [6. Strings](#6-strings)
+- [7. Input, output, and conversions](#7-input-output-and-conversions)
+- [8. Conditions: if and state](#8-conditions-if-and-state)
+- [9. Loops: while, until, and for](#9-loops-while-until-and-for)
+- [10. Writing and calling Functions](#10-writing-and-calling-functions)
+- [11. Local and Global](#11-local-and-global)
+- [12. Working with Lists](#12-working-with-lists)
+- [13. Reference Behavior](#13-reference-behavior)
+- [14. Working with Pair](#14-working-with-pair)
+- [15. Constant](#15-constant)
+- [16. Null safety](#16-null-safety)
+- [17. Class and attributes](#17-class-and-attributes)
+- [18. Errors with attempt, except, ultimately, and toss](#18-errors-with-attempt-except-ultimately-and-toss)
+- [19. Modules and bring](#19-modules-and-bring)
+- [20. Fundamentals Module](#20-fundamentals-module)
+- [21. Math Module](#21-math-module)
+- [22. Formatter](#22-formatter)
+- [23. CLI](#23-cli)
+- [24. REPL](#24-repl)
+- [25. Common beginner mistakes](#25-common-beginner-mistakes)
+- [26. Mini Projects](#26-mini-projects)
+- [27. Exercises](#27-exercises)
+- [28. Solution Hints](#28-solution-hints)
+- [29. Next steps and technical documentation](#29-next-steps-and-technical-documentation)
+
 Türkçe sürüm: [Türkçe Öğrenci Rehberi](STUDENT_GUIDE_TR.md)
 
 This guide helps you build small AhdCode command-line programs even if you
@@ -58,15 +91,14 @@ Every AhdCode program is written in a `.ahd` file.
 Statements are usually written one per line. You do not need to end lines with
 semicolons. Blocks of code are wrapped in braces `{` and `}`.
 
-You can write comments for yourself or other programmers by starting a line
-with `#`. The compiler ignores comments.
+If you want to leave a note for yourself or other programmers, you can start a single-line comment with `//`. For longer notes, you can use multiline comments starting with `/*` and ending with `*/`. The compiler ignores comments. (Note: multiline comments do not nest).
 
 ```ahd
 // This is a comment. It is ignored by the compiler.
 write("This line runs")
 ```
 
-When you need to remember a value, you create a variable. An identifier (a variable's name) should start with a letter and can contain letters, numbers, and underscores.
+When you need to remember a value, you create a variable. An identifier (a variable's name) can start with a letter or `_`. Subsequent characters can contain letters, numbers, and `_`.
 
 ### Declaring and changing variables: `:=` and `=`
 
@@ -196,13 +228,52 @@ count++
 write(count)
 ```
 
-### Comparison and equality
-- `==` equals (checks if the values are the same)
+### Comparison, Identity, and Membership
+
+- `==` equals (checks if the values/content are the same according to type)
 - `!=` not equals
 - `<` less than
 - `<=` less than or equal to
 - `>` greater than
 - `>=` greater than or equal to
+
+AhdCode also provides operators for checking identity, types, and membership:
+
+- `same` checks if two variables point to the exact same object in memory.
+- `is` / `is not` check if an object is of a specific Class type.
+- `in` / `not in` check if a value exists inside a collection or a String.
+- `has` / `has not` check if a Class object has a specific member (attribute or method).
+
+**Using `in` and `not in`:**
+You can check if a value is in a `List`, a substring is in a `String`, or a key is in a `Pair`. For `Pair`, `in` checks the keys, not the values.
+
+```ahd
+numbers: List<Int> := [10, 20, 30]
+write(20 in numbers)
+write(99 not in numbers)
+
+text: String := "AhdCode"
+write("Code" in text)
+
+scores: Pair<String, Int> := {
+    "Ali": 90
+    "Ayşe": 95
+}
+write("Ali" in scores)
+```
+
+**Using `has` and `has not`:**
+These are used exclusively to check if a Class object has a specific member. The right side must be the actual name of the member, not a String.
+
+```ahd
+Student: Class<> := {
+    structure: Attributes := ( name: String )
+}
+student: Student := Student(name: "Ali")
+
+write(student has name)
+write(student has not nickname)
+```
 
 ### Logical operators
 - `and` (true if both are true)
@@ -505,9 +576,8 @@ This form is invalid:
 
 ```ahd
 // INVALID:
-for value: Int in [10, 20] {
-    // This example intentionally fails to compile in v0.1 tests 
-    // because Local Int is not valid syntax here.
+for value: Local Int in [10, 20] {
+    write(value)
 }
 ```
 
@@ -867,17 +937,16 @@ clear(scores)
 
 ## 15. Constant
 
-A `Constant` collection cannot be changed. If you try to modify it, the compiler will raise an error.
+A `Constant` collection cannot be changed. If you try to modify it directly, the compiler will reject it during checking.
 
 ```ahd
 locked: Constant List<Int> := [1, 2, 3]
-// locked.add(4) // This would be an error
+// locked[0] = 99 // This causes a compile-time error
 ```
 
-If a `Constant List` contains other Lists, Pairs, or Class objects, you also cannot reach through it and change those shared objects. Another variable that points to the same object cannot bypass this rule. 
+The entire reachable object graph is deep-frozen. If a `Constant` contains other collections or objects, those inner objects are also frozen. If you attempt to mutate an already frozen object through another variable (an alias) that isn't explicitly marked as Constant, it may produce a `ConstantError` at runtime.
 
-> **Technical note:** Freezing the whole reachable shared structure is called
-> deep-freeze. A `Constant` value cannot be initialized with `null`.
+> **Technical note:** A `Constant` value cannot be initialized with `null`.
 
 ## 16. Null safety
 
@@ -1049,8 +1118,28 @@ Domain error: value must be positive
 Finished
 ```
 
-Common built-in types include `DomainError`, `IndexError`, `KeyError`,
+Common built-in types include `DomainError`, `ValueError`, `IndexError`, `KeyError`,
 `OverflowError`, `DivisionByZeroError`, `NullError`, and `ConstantError`. You can have multiple `except` blocks to handle different errors differently.
+
+You can also create your own custom errors by inheriting from the built-in `Error` class:
+
+```ahd
+InvalidAgeError: Class<Error> := {
+    structure: Attributes := (
+        message: String
+    )
+}
+
+attempt {
+    age: Local Int := -5
+    if age < 0 {
+        toss (InvalidAgeError("Age cannot be negative"))
+    }
+}
+except InvalidAgeError as error {
+    write("Custom error caught: {error.message}")
+}
+```
 
 > **Technical note:** AhdCode runtime errors are catchable Class values.
 
@@ -1087,7 +1176,7 @@ There are several ways to import things from a module:
 - `bring Greeting` imports a namespace, making the call `Greeting.greet("Ayşe")`.
 - `from Greeting bring greet` imports the name directly.
 - `from Greeting bring ( greet, farewell )` allows you to selectively import multiple names on multiple lines.
-- `bring all from Greeting` imports all public, non-`Confidential` names.
+- `from Greeting bring all` imports all public, non-`Confidential` names.
 
 Import collisions and circular dependencies are errors.
 
@@ -1139,7 +1228,18 @@ Expected output:
 3.14
 ```
 
-`round` returns a `Real` and rounds exact halves away from zero. Its optional digits argument is restricted to `0..15`. `floor` and `ceil` return an `Int`. Trigonometric functions (`sin`, `cos`, `tan`) use radians. `log` is natural logarithm; `log10` is base ten. For exponentiation, use the `^` operator, there is no `Math.pow`. 
+Here is the complete Math surface available:
+
+| Item | Description |
+|---|---|
+| `PI`, `E` | Mathematical constants. |
+| `round`, `floor`, `ceil` | `round(value, digits)` rounds exact halves away from zero; digits is optional (0..15). `floor` and `ceil` return an `Int`. |
+| `sqrt`, `exp` | Square root and exponential function ($e^x$). |
+| `sin`, `cos`, `tan` | Trigonometric functions using radians. |
+| `log`, `log10` | Natural logarithm and base ten logarithm. |
+| `seed`, `random`, `randomInt` | Random number generation functions. |
+
+For exponentiation, use the `^` operator, there is no `Math.pow`. Functions like `abs`, `sum`, `min`, and `max` are in the Fundamentals module, not Math.
 
 ### Random State
 
@@ -1297,7 +1397,7 @@ Here are common errors you might see and how to fix them:
 - Correct: Use `replace` or build a new String.
 
 **20. Unseeded reproducible random**
-- Wrong: Expecting `Math.randomInt(1,6)` to be the same without `Math.seed()`.
+- Wrong: Expecting `Math.randomInt(1,6)` to be the same without `Math.seed(42)`.
 - Why: Unseeded random uses the OS entropy and is not reproducible.
 - Correct: Use `Math.seed(42)` before rolling.
 
@@ -1311,7 +1411,7 @@ These mini projects combine the ideas taught in this guide. Try building them on
 4. **Word Analysis**: Ask for a sentence. Use `split(" ")` to get the words. Count the number of words, find the longest word, and build a `Pair<String, Int>` that maps each word to its length.
 5. **Menu-Driven Program**: Create a banking simulation using an `until` loop. Show a menu: 1. Deposit, 2. Withdraw, 3. Balance, 0. Exit. Keep track of the balance in an `Int` and stop when the user chooses 0.
 6. **Student Record with Class**: Create a `Student` Class and a `Course` Class. A Course contains a `List<Student>`. Write a method to add a student, and a method to calculate the class average.
-7. **Seeded Random Game**: Use `Math.seed()` to generate a "secret number" between 1 and 100. Ask the user to guess it. Tell them "higher" or "lower" until they guess it. Because it is seeded, the secret number will be the same every time you run it—great for testing!
+7. **Seeded Random Game**: Use `Math.seed(42)` to generate a "secret number" between 1 and 100. Ask the user to guess it. Tell them "higher" or "lower" until they guess it. Because it is seeded, the secret number will be the same every time you run it—great for testing!
 
 ## 27. Exercises
 
