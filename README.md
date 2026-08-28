@@ -4,6 +4,8 @@
 
 # AhdCode
 
+[![CI](https://github.com/aliharundaldalli/AhdCode/actions/workflows/ci.yml/badge.svg)](https://github.com/aliharundaldalli/AhdCode/actions/workflows/ci.yml)
+
 AhdCode is an experimental statically checked general-purpose programming
 language focused on readable syntax, explicit intent, predictable semantics,
 and native compilation.
@@ -67,6 +69,8 @@ See the [CLI guide](docs/CLI.md), [formatter guide](docs/FORMATTER.md), and
 
 ## Documentation
 
+- [Türkçe Öğrenci Rehberi](docs/STUDENT_GUIDE_TR.md)
+- [English Student Guide](docs/STUDENT_GUIDE_EN.md)
 - [Getting started](docs/GETTING_STARTED.md)
 - [Language tour](docs/LANGUAGE_TOUR.md)
 - [Types and null safety](docs/TYPES_AND_NULL.md)
