@@ -4,8 +4,12 @@
   "description": "Run AhdCode files and provide minimal syntax highlighting.",
   "version": "0.1.2",
   "publisher": "ahdcode-local",
-  "license": "UNLICENSED",
+  "license": "MIT",
   "private": true,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/aliharundaldalli/AhdCode.git"
+  },
   "icon": "images/ahdcode-icon.png",
   "engines": {
     "vscode": "^1.107.0"

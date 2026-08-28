@@ -109,3 +109,7 @@ examples/v0.1/     curated working programs
 AHDCODE_LANGUAGE_SPEC_v0.1.md
                    authoritative language contract
 ```
+
+## License
+
+AhdCode is available under the [MIT License](LICENSE).
