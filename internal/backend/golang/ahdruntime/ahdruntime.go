@@ -459,6 +459,17 @@ func AhdRealNegate(value float64) float64 { return -value }
 // AhdIntToReal is the explicit Int -> Real widening conversion.
 func AhdIntToReal(value int64) float64 { return float64(value) }
 
+// AhdRealToInt truncates toward zero and preserves the checked Int contract.
+func AhdRealToInt(value float64) int64 {
+	if math.IsNaN(value) {
+		AhdRaiseClass(AhdClassDomainError, "cannot convert a non-number Real to Int")
+	}
+	if math.IsInf(value, 0) || value < -9223372036854775808.0 || value >= 9223372036854775808.0 {
+		AhdRaiseClass(AhdClassOverflowError, "Real value is outside signed 64-bit Int range")
+	}
+	return int64(math.Trunc(value))
+}
+
 // ---------------------------------------------------------------------------
 // String operations
 // ---------------------------------------------------------------------------

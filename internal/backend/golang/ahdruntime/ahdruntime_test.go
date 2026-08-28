@@ -369,10 +369,12 @@ func TestFrozenListRejectsIndexedWrites(t *testing.T) {
 	}
 }
 
-func TestIntToRealWidening(t *testing.T) {
-	if AhdIntToReal(5) != 5.0 || AhdRealNegate(2.5) != -2.5 {
+func TestNumericConversions(t *testing.T) {
+	if AhdIntToReal(5) != 5.0 || AhdRealToInt(3.7) != 3 || AhdRealToInt(-3.7) != -3 || AhdRealNegate(2.5) != -2.5 {
 		t.Fatal("Real conversion helpers are wrong")
 	}
+	expectRaise(t, AhdClassOverflowError, func() { AhdRealToInt(math.Inf(1)) })
+	expectRaise(t, AhdClassDomainError, func() { AhdRealToInt(math.NaN()) })
 	if AhdStrInt(-7) != "-7" || AhdStrBool(true) != "true" || AhdStrString("x") != "x" {
 		t.Fatal("scalar text is wrong")
 	}

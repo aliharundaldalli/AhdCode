@@ -2,6 +2,77 @@ package semantic
 
 import "testing"
 
+func TestNumericConversionsHaveExactV01Signatures(t *testing.T) {
+	tests := []struct {
+		name string
+		text string
+		ok   bool
+	}{
+		{"Real to Int", "value: Int := int(3.7)", true},
+		{"Int to Real", "value: Real := real(2)", true},
+		{"int does not parse String", `value: Int := int("1")`, false},
+		{"real does not parse String", `value: Real := real("1.5")`, false},
+		{"int does not accept Int identity", "value: Int := int(1)", false},
+		{"real does not accept Real identity", "value: Real := real(1.0)", false},
+		{"bool remains unavailable", "value: Bool := bool(1)", false},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			_, result := analyzeText(t, test.text)
+			if test.ok {
+				requireSemanticClean(t, result)
+				return
+			}
+			if !result.HasErrors() {
+				t.Fatal("expected a conversion diagnostic")
+			}
+		})
+	}
+}
+
+func TestInvalidExpressionRecoverySuppressesCascades(t *testing.T) {
+	tests := []struct {
+		name  string
+		text  string
+		names int
+	}{
+		{"unknown callee", "write(doesNotExist(2))", 1},
+		{"invalid child under power", "write(doesNotExist(2) ^ -3)", 1},
+		{"independent siblings", "write(doesNotExist(2) + anotherMissing)", 2},
+		{"unknown condition", "if missingCondition {\n}", 1},
+		{"unknown member receiver", "write(missingObject.value)", 1},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			_, result := analyzeText(t, test.text)
+			if len(result.Diagnostics) != test.names {
+				t.Fatalf("diagnostics = %+v, want exactly %d root diagnostic(s)", result.Diagnostics, test.names)
+			}
+			for _, diagnostic := range result.Diagnostics {
+				if diagnostic.Code != codeUnknownName {
+					t.Fatalf("diagnostic = %+v, want only %s", diagnostic, codeUnknownName)
+				}
+			}
+		})
+	}
+}
+
+func TestInvalidConversionHasOneSignatureDiagnostic(t *testing.T) {
+	for _, text := range []string{`write(int("1"))`, `write(real("1.5"))`, `write(int("1") + "x")`} {
+		_, result := analyzeText(t, text)
+		if len(result.Diagnostics) != 1 || result.Diagnostics[0].Code != codeCallArguments {
+			t.Fatalf("diagnostics for %q = %+v, want one %s", text, result.Diagnostics, codeCallArguments)
+		}
+	}
+}
+
+func TestUnavailableBoolConversionHasOneRootDiagnostic(t *testing.T) {
+	_, result := analyzeText(t, "write(bool(5))")
+	if len(result.Diagnostics) != 1 || result.Diagnostics[0].Code != codeUnknownName {
+		t.Fatalf("diagnostics = %+v, want one %s", result.Diagnostics, codeUnknownName)
+	}
+}
+
 func TestLenAcceptsOnlySizedValues(t *testing.T) {
 	tests := []struct {
 		name string

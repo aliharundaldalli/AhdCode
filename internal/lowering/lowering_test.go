@@ -57,6 +57,8 @@ func functionIR(t *testing.T, module *ir.Module, name string) *ir.Function {
 
 func TestNumericLoweringIsExplicitAndTyped(t *testing.T) {
 	result := lowerSources(t, map[string]string{"/Main.ahd": `a: Real := 5
+explicitReal: Real := real(2)
+explicitInt: Int := int(3.7)
 minimum: Int := -9223372036854775808
 b: Int := 2 + 3
 c: Real := 2 + 3.5
@@ -69,6 +71,14 @@ runtimePower: Function := (exponent: Int) -> Int {
 	main := moduleIR(t, result.Compilation, "Main")
 	if _, ok := globalIR(t, main, "a").Initializer.(*ir.ConvertExpr); !ok {
 		t.Fatalf("Real initializer = %T, want ConvertExpr", globalIR(t, main, "a").Initializer)
+	}
+	explicitReal := globalIR(t, main, "explicitReal").Initializer.(*ir.ConvertExpr)
+	if explicitReal.From.Kind != ir.IntType || explicitReal.Type.Kind != ir.RealType {
+		t.Fatalf("real conversion = %s -> %s", explicitReal.From, explicitReal.Type)
+	}
+	explicitInt := globalIR(t, main, "explicitInt").Initializer.(*ir.ConvertExpr)
+	if explicitInt.From.Kind != ir.RealType || explicitInt.Type.Kind != ir.IntType {
+		t.Fatalf("int conversion = %s -> %s", explicitInt.From, explicitInt.Type)
 	}
 	minimum := globalIR(t, main, "minimum").Initializer.(*ir.UnaryExpr)
 	if minimum.Op != "CheckedIntNegate" || minimum.Operand.(*ir.LiteralExpr).Value != "9223372036854775808" {

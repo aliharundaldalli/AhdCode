@@ -1264,7 +1264,7 @@ bring Mathematics
 ```
 
 ```ahd
-from Fundamentals bring all
+from Utilities bring all
 ```
 
 ```ahd
@@ -1294,27 +1294,17 @@ Do not add web folder conventions.
 
 Do not implement the entire future standard library at once.
 
-Start with enough to make terminal programming useful:
+The implemented v0.1 Fundamentals surface is:
 
 ```text
 str
 int
 real
-bool
 len
-max
-min
-sum
-abs
-round
-between
-swap
-combine
-merge
-jump
-copy
-deepCopy
+clear
 ```
+
+These functions, together with core terminal functions `write` and `take`, are predeclared and need no `bring`. `int` has the sole signature `Real -> Int` and truncates toward zero. `real` has the sole signature `Int -> Real` and performs explicit safe numeric widening. Do not parse Strings through either conversion. Do not add `bool(...)`, truthiness, or other planned Fundamentals until their contracts are normatively specified.
 
 ## Canonical str
 

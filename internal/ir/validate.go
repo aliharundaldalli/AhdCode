@@ -298,8 +298,10 @@ func (v *validator) validateExpr(expression Expr) {
 		v.validateExpr(value.Right)
 	case *ConvertExpr:
 		v.validateExpr(value.Value)
-		if value.From.Kind != IntType || value.Type.Kind != RealType {
-			v.error(CodeInvalidConversion, fmt.Sprintf("invalid implicit conversion %s -> %s", value.From, value.Type), meta.Span)
+		widening := value.From.Kind == IntType && value.Type.Kind == RealType
+		narrowing := value.From.Kind == RealType && value.Type.Kind == IntType
+		if !widening && !narrowing {
+			v.error(CodeInvalidConversion, fmt.Sprintf("invalid numeric conversion %s -> %s", value.From, value.Type), meta.Span)
 		}
 	case *CallExpr:
 		v.requireCallable(value.Callable, meta.Span)

@@ -303,9 +303,9 @@ produces:
 2.5
 ```
 
-### 5.5 int conversion
+### 5.5 Explicit numeric conversions
 
-`int(realValue)` truncates toward zero.
+The predeclared Fundamentals conversion `int` accepts exactly one `Real` and returns `Int`. It truncates toward zero.
 
 ```ahd
 int(3.7)   // 3
@@ -313,6 +313,14 @@ int(-3.7)  // -3
 ```
 
 This is conversion, not nearest-integer rounding.
+
+The predeclared Fundamentals conversion `real` accepts exactly one `Int` and returns `Real`. It is the explicit spelling of the language's safe `Int -> Real` widening conversion.
+
+```ahd
+real(2)   // 2.0
+```
+
+v0.1 does not define String parsing through `int` or `real`; `int("1")` and `real("1.5")` are compile-time call-signature errors. These conversion names do not introduce general coercion. In particular, `bool(...)` conversion and truthiness remain outside the v0.1 contract.
 
 ### 5.6 Bool
 
@@ -1675,7 +1683,7 @@ result: Real := Mathematics.sqrt(25)
 ```
 
 ```ahd
-from Fundamentals bring all
+from Utilities bring all
 ```
 
 ```ahd
@@ -1698,6 +1706,8 @@ Confidential module-level symbols are not externally bringable.
 
 ## 34. Fundamentals
 
+The functions listed as available below are predeclared in every module and do not require `bring`.
+
 Core terminal I/O:
 
 ```text
@@ -1709,6 +1719,8 @@ Available Fundamentals functions:
 
 ```text
 str
+int
+real
 len
 clear
 ```
@@ -1716,8 +1728,6 @@ clear
 Planned early Fundamentals functions include:
 
 ```text
-int
-real
 bool
 max
 min
@@ -2019,8 +2029,6 @@ Canonical in-place formatter. `ahdcode format --check hello.ahd` performs the sa
 ## 40. Example Program
 
 ```ahd
-from Fundamentals bring all
-
 PI: Constant Real := 3.14159
 
 square: Function := (
@@ -2029,7 +2037,8 @@ square: Function := (
     return x^2
 }
 
-radius: Real := real(take("Radius: "))
+radiusInput: Int := 5
+radius: Real := real(radiusInput)
 
 if radius > 0 {
     area: Local Real := PI * square(radius)

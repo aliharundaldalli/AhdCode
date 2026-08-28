@@ -80,6 +80,9 @@ func (generator *generator) expr(expression ir.Expr) string {
 		if value.From.Kind == ir.IntType && meta.Type.Kind == ir.RealType {
 			return "AhdIntToReal(" + generator.value(value.Value, ir.Type{Kind: ir.IntType}, false) + ")"
 		}
+		if value.From.Kind == ir.RealType && meta.Type.Kind == ir.IntType {
+			return "AhdRealToInt(" + generator.value(value.Value, ir.Type{Kind: ir.RealType}, false) + ")"
+		}
 		return generator.unsupported("conversion "+value.From.String()+" -> "+meta.Type.String(), meta.Span)
 	case *ir.UnaryExpr:
 		return generator.unary(value)

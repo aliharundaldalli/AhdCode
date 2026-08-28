@@ -16,6 +16,18 @@ type expressionInfo struct {
 	constant  *constantValue
 }
 
+// invalid reports the recovery state produced after a primary semantic error.
+// A null literal deliberately has Invalid as its placeholder type, but Null as
+// its state, and is therefore not an error value.
+func (info expressionInfo) invalid() bool {
+	// A namespace is a valid semantic designator whose members carry types; it
+	// intentionally has no ordinary value type of its own.
+	if info.symbol != nil && info.symbol.Kind == NamespaceSymbol {
+		return false
+	}
+	return types.IsInvalid(info.typeValue) && info.nullState != Null
+}
+
 func (a *analyzer) analyzeExpression(expression ast.Expr, current *scope, flow flowState) expressionInfo {
 	return a.analyzeExpressionWithMagnitude(expression, current, flow, false)
 }
@@ -150,6 +162,9 @@ func (a *analyzer) analyzeIdentifier(identifier *ast.IdentifierExpr, current *sc
 func (a *analyzer) analyzeUnary(expression *ast.UnaryExpr, current *scope, flow flowState) expressionInfo {
 	allowMagnitude := expression.Operator == "-"
 	operand := a.analyzeExpressionWithMagnitude(expression.Operand, current, flow, allowMagnitude)
+	if operand.invalid() {
+		return expressionInfo{typeValue: types.Invalid, nullState: MaybeNull}
+	}
 	if operand.nullState != NonNull {
 		a.nullableError(expression.Operator, expression.Operand, operand.nullState)
 	}
@@ -193,6 +208,11 @@ func (a *analyzer) analyzeBinary(expression *ast.BinaryExpr, current *scope, flo
 		}
 	} else {
 		right = a.analyzeExpression(expression.Right, current, rightFlow)
+	}
+	// Both sides are analyzed before recovery so independent sibling errors are
+	// retained. Parent checks must not diagnose consequences of an invalid child.
+	if left.invalid() || right.invalid() {
+		return expressionInfo{typeValue: types.Invalid, nullState: MaybeNull}
 	}
 
 	operator := expression.Operator
@@ -395,6 +415,12 @@ func (a *analyzer) analyzeFunctionValueIdentifier(identifier *ast.IdentifierExpr
 
 func (a *analyzer) analyzeCallExpected(call *ast.CallExpr, current *scope, flow flowState, expected types.Type) expressionInfo {
 	callee := a.analyzeExpression(call.Callee, current, flow)
+	if callee.invalid() {
+		// Analyze arguments for independent diagnostics, but do not report that
+		// an already-invalid callee is also non-callable.
+		a.analyzeCallArguments(call, current, flow, nil)
+		return expressionInfo{typeValue: types.Invalid, nullState: MaybeNull}
+	}
 	// Only the built-in Fundamentals functions use the builtin call path; a
 	// built-in Class is constructed like any other Class.
 	if callee.symbol != nil && callee.symbol.Builtin && callee.symbol.Kind == BuiltinSymbol {
@@ -508,7 +534,7 @@ func (a *analyzer) analyzeBuiltinCall(call *ast.CallExpr, symbol *Symbol, argume
 	case "take":
 		if len(arguments) > 1 {
 			a.error(codeCallArguments, fmt.Sprintf("take expects at most 1 prompt argument; received %d", len(arguments)), call.Span(), "call take() or take(prompt)")
-		} else if len(arguments) == 1 && arguments[0].typeValue.Kind() != types.StringKind {
+		} else if len(arguments) == 1 && !arguments[0].invalid() && arguments[0].typeValue.Kind() != types.StringKind {
 			a.typeMismatch(call.Arguments[0].Span(), types.String, arguments[0].typeValue, "take prompt")
 		}
 		return expressionInfo{typeValue: types.String, nullState: NonNull}
@@ -519,12 +545,39 @@ func (a *analyzer) analyzeBuiltinCall(call *ast.CallExpr, symbol *Symbol, argume
 			a.error(codeCallArguments, "str does not accept Nothing", call.Arguments[0].Span(), "pass a value with a textual representation")
 		}
 		return expressionInfo{typeValue: types.String, nullState: NonNull}
+	case "int":
+		return a.analyzeNumericConversion(call, arguments, "int", types.Real, types.Int)
+	case "real":
+		return a.analyzeNumericConversion(call, arguments, "real", types.Int, types.Real)
 	case "len":
 		return a.analyzeLenCall(call, arguments)
 	case "clear":
 		return a.analyzeClearCall(call, arguments)
 	}
 	return expressionInfo{typeValue: types.Invalid, nullState: MaybeNull}
+}
+
+// analyzeNumericConversion implements only the two explicit numeric
+// conversions fixed by the v0.1 contract. It intentionally does not parse
+// Strings or introduce truthiness through bool-like coercion.
+func (a *analyzer) analyzeNumericConversion(call *ast.CallExpr, arguments []expressionInfo, name string, input, output types.Type) expressionInfo {
+	if len(arguments) != 1 {
+		a.error(codeCallArguments, fmt.Sprintf("%s expects 1 %s argument; received %d argument(s)", name, types.Display(input), len(arguments)), call.Span(), fmt.Sprintf("call %s with exactly one %s value", name, types.Display(input)))
+		return expressionInfo{typeValue: types.Invalid, nullState: MaybeNull}
+	}
+	argument := arguments[0]
+	if argument.invalid() {
+		return expressionInfo{typeValue: types.Invalid, nullState: MaybeNull}
+	}
+	if argument.nullState != NonNull {
+		a.nullableError(name, call.Arguments[0].Value, argument.nullState)
+		return expressionInfo{typeValue: types.Invalid, nullState: MaybeNull}
+	}
+	if !types.Equal(argument.typeValue, input) {
+		a.error(codeCallArguments, fmt.Sprintf("%s expects %s; received %s", name, types.Display(input), types.Display(argument.typeValue)), call.Arguments[0].Span(), "AhdCode v0.1 numeric conversions do not parse String values or apply truthiness")
+		return expressionInfo{typeValue: types.Invalid, nullState: MaybeNull}
+	}
+	return expressionInfo{typeValue: output, nullState: NonNull}
 }
 
 // analyzeLenCall accepts only the v0.1 sized Fundamentals types.
@@ -534,6 +587,9 @@ func (a *analyzer) analyzeLenCall(call *ast.CallExpr, arguments []expressionInfo
 		return expressionInfo{typeValue: types.Int, nullState: NonNull}
 	}
 	argument := arguments[0]
+	if argument.invalid() {
+		return expressionInfo{typeValue: types.Invalid, nullState: MaybeNull}
+	}
 	switch argument.typeValue.Kind() {
 	case types.StringKind, types.ListKind, types.PairKind:
 	case types.InvalidKind:
@@ -553,6 +609,9 @@ func (a *analyzer) analyzeClearCall(call *ast.CallExpr, arguments []expressionIn
 		return expressionInfo{typeValue: types.Nothing, nullState: NonNull}
 	}
 	argument := arguments[0]
+	if argument.invalid() {
+		return expressionInfo{typeValue: types.Invalid, nullState: MaybeNull}
+	}
 	switch argument.typeValue.Kind() {
 	case types.ListKind, types.PairKind, types.InvalidKind:
 	default:
@@ -609,6 +668,9 @@ func (a *analyzer) callArgumentsCompatible(call *ast.CallExpr, callable *Callabl
 			continue
 		}
 		assigned[parameterIndex] = true
+		if arguments[index].invalid() {
+			continue
+		}
 		if arguments[index].nullState != NonNull && parameterIndex < len(callable.ParameterNull) && callable.ParameterNull[parameterIndex] == NonNull {
 			valid = false
 			if diagnose {
@@ -669,6 +731,9 @@ func parameterCallableNull(callable *Callable, index int) NullState {
 
 func (a *analyzer) analyzeMember(member *ast.MemberExpr, current *scope, flow flowState) expressionInfo {
 	object := a.analyzeExpression(member.Object, current, flow)
+	if object.invalid() {
+		return expressionInfo{typeValue: types.Invalid, nullState: MaybeNull}
+	}
 	if object.symbol != nil && object.symbol.SuperClassBinding {
 		return a.analyzeSuperMember(member, object)
 	}
@@ -768,6 +833,9 @@ func (a *analyzer) lookupMember(class *Symbol, name string) *Symbol {
 func (a *analyzer) analyzeIndex(index *ast.IndexExpr, current *scope, flow flowState) expressionInfo {
 	object := a.analyzeExpression(index.Object, current, flow)
 	position := a.analyzeExpression(index.Index, current, flow)
+	if object.invalid() || position.invalid() {
+		return expressionInfo{typeValue: types.Invalid, nullState: MaybeNull}
+	}
 	if object.nullState != NonNull {
 		a.nullableError("index", index.Object, object.nullState)
 	}
@@ -799,17 +867,25 @@ func (a *analyzer) analyzeIndex(index *ast.IndexExpr, current *scope, flow flowS
 
 func (a *analyzer) analyzeSlice(slice *ast.SliceExpr, current *scope, flow flowState) expressionInfo {
 	object := a.analyzeExpression(slice.Object, current, flow)
-	if object.nullState != NonNull {
-		a.nullableError("slice", slice.Object, object.nullState)
-	}
+	invalid := object.invalid()
 	for _, bound := range []ast.Expr{slice.Start, slice.End} {
 		if bound == nil {
 			continue
 		}
 		info := a.analyzeExpression(bound, current, flow)
+		if info.invalid() {
+			invalid = true
+			continue
+		}
 		if info.nullState != NonNull || info.typeValue.Kind() != types.IntKind {
 			a.typeMismatch(bound.Span(), types.Int, info.typeValue, "slice bound")
 		}
+	}
+	if invalid {
+		return expressionInfo{typeValue: types.Invalid, nullState: MaybeNull}
+	}
+	if object.nullState != NonNull {
+		a.nullableError("slice", slice.Object, object.nullState)
 	}
 	if _, ok := object.typeValue.(types.List); ok || object.typeValue.Kind() == types.StringKind {
 		return expressionInfo{typeValue: object.typeValue, nullState: NonNull}

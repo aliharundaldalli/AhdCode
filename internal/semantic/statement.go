@@ -266,7 +266,7 @@ func (a *analyzer) analyzeMemberDeclaration(declaration *ast.VariableDecl, curre
 
 func (a *analyzer) analyzeAssignment(statement *ast.AssignmentStmt, current *scope, flow flowState) flowState {
 	target := a.analyzeExpression(statement.Target, current, flow)
-	if target.symbol == nil {
+	if target.symbol == nil && !target.invalid() {
 		if _, ok := statement.Target.(*ast.IndexExpr); !ok {
 			a.error(codeInvalidTarget, "assignment target does not resolve to a mutable binding or member", statement.Target.Span(), "assign an identifier, member, or index")
 		}
@@ -278,6 +278,9 @@ func (a *analyzer) analyzeAssignment(statement *ast.AssignmentStmt, current *sco
 		expected = types.Function{Signature: target.symbol.inference.fixed}
 	}
 	value := a.analyzeExpressionExpected(statement.Value, current, flow, expected)
+	if target.invalid() || value.invalid() {
+		return flow
+	}
 	if target.symbol != nil && target.symbol.inference != nil {
 		if function, ok := value.typeValue.(types.Function); ok && function.Signature != nil {
 			a.constrainConcreteFunction(target.symbol, function.Signature, concreteCallable(value), statement.Value.Span())
@@ -313,6 +316,9 @@ func (a *analyzer) analyzeAssignment(statement *ast.AssignmentStmt, current *sco
 
 func (a *analyzer) analyzeIncDec(statement *ast.IncDecStmt, current *scope, flow flowState) flowState {
 	target := a.analyzeExpression(statement.Target, current, flow)
+	if target.invalid() {
+		return flow
+	}
 	if target.symbol != nil && target.symbol.Constant {
 		a.error(codeConstantAssignment, fmt.Sprintf("Constant %q cannot be updated", target.symbol.Name), statement.Target.Span(), "declare a mutable Int binding")
 	}
@@ -375,7 +381,7 @@ func (a *analyzer) analyzeUntil(statement *ast.UntilStmt, current *scope, flow f
 
 func (a *analyzer) analyzeFor(statement *ast.ForStmt, current *scope, flow flowState) statementOutcome {
 	iterable := a.analyzeExpression(statement.Iterable, current, flow)
-	if iterable.nullState != NonNull {
+	if !iterable.invalid() && iterable.nullState != NonNull {
 		a.nullableError("for iteration", statement.Iterable, iterable.nullState)
 	}
 	elementType := types.Invalid
@@ -385,7 +391,9 @@ func (a *analyzer) analyzeFor(statement *ast.ForStmt, current *scope, flow flowS
 	case types.Pair:
 		elementType = value.Key
 	default:
-		if iterable.typeValue.Kind() == types.StringKind {
+		if iterable.invalid() {
+			// The primary child diagnostic already describes the failure.
+		} else if iterable.typeValue.Kind() == types.StringKind {
 			elementType = types.String
 		} else {
 			a.error(codeOperatorType, fmt.Sprintf("type %s is not iterable", types.Display(iterable.typeValue)), statement.Iterable.Span(), "iterate a List, Pair, or String")
@@ -474,6 +482,9 @@ func classAssignableTo(value, target *types.ClassSymbol) bool {
 
 func (a *analyzer) analyzeToss(statement *ast.TossStmt, current *scope, flow flowState) {
 	value := a.analyzeExpression(statement.Value, current, flow)
+	if value.invalid() {
+		return
+	}
 	class, ok := value.typeValue.(types.Class)
 	if !ok || class.Reference || !classAssignableTo(class.Symbol, a.classes["Error"].Class) {
 		a.error(codeTypeMismatch, fmt.Sprintf("toss requires Error; received %s", types.Display(value.typeValue)), statement.Value.Span(), "toss an Error instance")
@@ -484,6 +495,9 @@ func (a *analyzer) analyzeToss(statement *ast.TossStmt, current *scope, flow flo
 }
 
 func (a *analyzer) requireBoolCondition(expression ast.Expr, info expressionInfo) {
+	if info.invalid() {
+		return
+	}
 	if info.nullState != NonNull || info.typeValue.Kind() != types.BoolKind {
 		a.error(codeConditionType, fmt.Sprintf("condition requires NonNull Bool; received %s (%s)", types.Display(info.typeValue), info.nullState), expression.Span(), "use a Bool expression as the condition")
 	}

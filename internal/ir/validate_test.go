@@ -6,7 +6,7 @@ import (
 )
 
 func TestValidatorRejectsMalformedIRWithoutPanic(t *testing.T) {
-	compilation := &Compilation{Entry: "main", Modules: []*Module{{ID: "main", Globals: []*Global{{ID: "x", Type: Type{Kind: RealType}, Initializer: &ConvertExpr{ExprBase: ExprBase{Type: Type{Kind: IntType}}, From: Type{Kind: RealType}}}}}}}
+	compilation := &Compilation{Entry: "main", Modules: []*Module{{ID: "main", Globals: []*Global{{ID: "x", Type: Type{Kind: IntType}, Initializer: &ConvertExpr{ExprBase: ExprBase{Type: Type{Kind: IntType}}, From: Type{Kind: StringType}, Value: &LiteralExpr{ExprBase: ExprBase{Type: Type{Kind: StringType}}, Kind: StringLiteral, Value: "1"}}}}}}}
 	diagnostics := Validate(compilation)
 	if len(diagnostics) == 0 {
 		t.Fatal("malformed IR was accepted")

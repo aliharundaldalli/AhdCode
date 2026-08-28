@@ -84,3 +84,17 @@ except DivisionByZeroError as error {
 		t.Fatalf("REPL errors:\n%s", errors.String())
 	}
 }
+
+func TestNumericConversionsAndPowerUseTheSharedPipeline(t *testing.T) {
+	input := "write(real(2))\nwrite(real(2) ^ -3)\nwrite(2 ^ -3)\nwrite(int(3.7))\n"
+	var output, errors bytes.Buffer
+	if code := Run(strings.NewReader(input), &output, &errors, "AhdCode v0.1"); code != 0 {
+		t.Fatalf("REPL exit = %d", code)
+	}
+	if !strings.Contains(output.String(), "2.0\n") || !strings.Contains(output.String(), "0.125\n") || !strings.Contains(output.String(), "3\n") {
+		t.Fatalf("REPL output:\n%s", output.String())
+	}
+	if !strings.Contains(errors.String(), "DomainError") {
+		t.Fatalf("REPL errors:\n%s", errors.String())
+	}
+}

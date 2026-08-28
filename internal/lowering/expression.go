@@ -394,6 +394,13 @@ func (lowerer *moduleLowerer) lowerCall(call *ast.CallExpr, base ir.ExprBase) ir
 		}
 		return &ir.ToStringExpr{ExprBase: base, Value: lowerer.lowerExpr(call.Arguments[0].Value)}
 	}
+	if symbol != nil && symbol.Builtin && len(call.Arguments) == 1 && (symbol.Name == "int" || symbol.Name == "real") {
+		argument := lowerer.lowerExpr(call.Arguments[0].Value)
+		if argument == nil {
+			return nil
+		}
+		return &ir.ConvertExpr{ExprBase: base, From: argument.ExprMeta().Type, Value: argument}
+	}
 	selected := lowerer.semantic.SelectedCallables[call]
 	if symbol != nil && symbol.Kind == semantic.ClassSymbol && symbol.Class != nil {
 		if selected == nil {
