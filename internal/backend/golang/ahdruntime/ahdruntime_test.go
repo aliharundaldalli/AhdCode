@@ -375,6 +375,36 @@ func TestNumericConversions(t *testing.T) {
 	}
 	expectRaise(t, AhdClassOverflowError, func() { AhdRealToInt(math.Inf(1)) })
 	expectRaise(t, AhdClassDomainError, func() { AhdRealToInt(math.NaN()) })
+	for text, want := range map[string]int64{
+		"0": 0, "  +42\t": 42, "-42": -42,
+		"9223372036854775807": math.MaxInt64, "-9223372036854775808": math.MinInt64,
+	} {
+		if got := AhdStringToInt(text); got != want {
+			t.Fatalf("AhdStringToInt(%q) = %d, want %d", text, got, want)
+		}
+	}
+	for _, text := range []string{"", "+", "3.0", "1e3", "1_0", "0x10", "１２"} {
+		t.Run("invalid Int "+text, func(t *testing.T) {
+			expectRaise(t, AhdClassDomainError, func() { AhdStringToInt(text) })
+		})
+	}
+	expectRaise(t, AhdClassOverflowError, func() { AhdStringToInt("9223372036854775808") })
+	expectRaise(t, AhdClassOverflowError, func() { AhdStringToInt("-9223372036854775809") })
+
+	for text, want := range map[string]float64{
+		"3": 3.0, "  +3.14\n": 3.14, "1e3": 1000.0, "1E+3": 1000.0, "-2.5e-4": -0.00025,
+	} {
+		if got := AhdStringToReal(text); got != want {
+			t.Fatalf("AhdStringToReal(%q) = %g, want %g", text, got, want)
+		}
+	}
+	for _, text := range []string{"", "+", ".5", "3.", "1e", "1_0", "0x10", "NaN", "Infinity", "inf"} {
+		t.Run("invalid Real "+text, func(t *testing.T) {
+			expectRaise(t, AhdClassDomainError, func() { AhdStringToReal(text) })
+		})
+	}
+	expectRaise(t, AhdClassOverflowError, func() { AhdStringToReal("1e309") })
+	expectRaise(t, AhdClassOverflowError, func() { AhdStringToReal("1e-4000") })
 	if AhdStrInt(-7) != "-7" || AhdStrBool(true) != "true" || AhdStrString("x") != "x" {
 		t.Fatal("scalar text is wrong")
 	}

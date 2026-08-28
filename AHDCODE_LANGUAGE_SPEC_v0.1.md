@@ -305,7 +305,7 @@ produces:
 
 ### 5.5 Explicit numeric conversions
 
-The predeclared Fundamentals conversion `int` accepts exactly one `Real` and returns `Int`. It truncates toward zero.
+The predeclared Fundamentals conversion `int` accepts exactly one `Real` or `String` and returns `Int`. A `Real` input truncates toward zero.
 
 ```ahd
 int(3.7)   // 3
@@ -314,13 +314,28 @@ int(-3.7)  // -3
 
 This is conversion, not nearest-integer rounding.
 
-The predeclared Fundamentals conversion `real` accepts exactly one `Int` and returns `Real`. It is the explicit spelling of the language's safe `Int -> Real` widening conversion.
+For `String` input, `int` trims surrounding Unicode whitespace and then accepts only this ASCII-decimal grammar:
 
-```ahd
-real(2)   // 2.0
+```text
+IntText := ("+" | "-")? digits
+digits  := ASCII digit+
 ```
 
-v0.1 does not define String parsing through `int` or `real`; `int("1")` and `real("1.5")` are compile-time call-signature errors. These conversion names do not introduce general coercion. In particular, `bool(...)` conversion and truthiness remain outside the v0.1 contract.
+There is no decimal point, exponent, underscore, or hexadecimal/binary/octal form. Invalid text raises `DomainError`; a mathematically valid decimal outside signed 64-bit range raises `OverflowError`.
+
+The predeclared Fundamentals conversion `real` accepts exactly one `Int` or `String` and returns `Real`. An `Int` input is the explicit spelling of the language's safe `Int -> Real` widening conversion.
+
+```ahd
+real(2)         // 2.0
+real("3")       // 3.0
+real("3.14")    // 3.14
+real("1e3")     // 1000.0
+real("-2.5e-4") // -0.00025
+```
+
+For `String` input, `real` trims surrounding Unicode whitespace and accepts the ordinary ASCII-decimal numeric-text grammar: an optional leading sign, one or more digits, an optional fraction with digits on both sides of `.`, and an optional `e` or `E` exponent with its own optional sign and one or more digits. Decimal integer text is accepted. Underscores, hexadecimal/binary/octal forms, `NaN`, and infinity spellings are not accepted. Invalid text raises `DomainError`; a parsed result that is non-finite or outside `float64` range raises `OverflowError`.
+
+These conversion names do not introduce general coercion. In particular, numeric operators still reject Strings, and `bool(...)` conversion and truthiness remain outside the v0.1 contract.
 
 ### 5.6 Bool
 

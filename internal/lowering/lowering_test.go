@@ -59,6 +59,8 @@ func TestNumericLoweringIsExplicitAndTyped(t *testing.T) {
 	result := lowerSources(t, map[string]string{"/Main.ahd": `a: Real := 5
 explicitReal: Real := real(2)
 explicitInt: Int := int(3.7)
+parsedReal: Real := real("2.5e1")
+parsedInt: Int := int("25")
 minimum: Int := -9223372036854775808
 b: Int := 2 + 3
 c: Real := 2 + 3.5
@@ -79,6 +81,14 @@ runtimePower: Function := (exponent: Int) -> Int {
 	explicitInt := globalIR(t, main, "explicitInt").Initializer.(*ir.ConvertExpr)
 	if explicitInt.From.Kind != ir.RealType || explicitInt.Type.Kind != ir.IntType {
 		t.Fatalf("int conversion = %s -> %s", explicitInt.From, explicitInt.Type)
+	}
+	parsedReal := globalIR(t, main, "parsedReal").Initializer.(*ir.ConvertExpr)
+	if parsedReal.From.Kind != ir.StringType || parsedReal.Type.Kind != ir.RealType {
+		t.Fatalf("parsed Real conversion = %s -> %s", parsedReal.From, parsedReal.Type)
+	}
+	parsedInt := globalIR(t, main, "parsedInt").Initializer.(*ir.ConvertExpr)
+	if parsedInt.From.Kind != ir.StringType || parsedInt.Type.Kind != ir.IntType {
+		t.Fatalf("parsed Int conversion = %s -> %s", parsedInt.From, parsedInt.Type)
 	}
 	minimum := globalIR(t, main, "minimum").Initializer.(*ir.UnaryExpr)
 	if minimum.Op != "CheckedIntNegate" || minimum.Operand.(*ir.LiteralExpr).Value != "9223372036854775808" {

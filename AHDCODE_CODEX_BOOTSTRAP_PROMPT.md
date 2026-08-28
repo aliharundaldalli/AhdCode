@@ -1304,7 +1304,7 @@ len
 clear
 ```
 
-These functions, together with core terminal functions `write` and `take`, are predeclared and need no `bring`. `int` has the sole signature `Real -> Int` and truncates toward zero. `real` has the sole signature `Int -> Real` and performs explicit safe numeric widening. Do not parse Strings through either conversion. Do not add `bool(...)`, truthiness, or other planned Fundamentals until their contracts are normatively specified.
+These functions, together with core terminal functions `write` and `take`, are predeclared and need no `bring`. `int` accepts `Real` (truncate toward zero) or strict signed ASCII-decimal `String`; `real` accepts `Int` (safe widening) or strict decimal `String` with optional fraction and `e`/`E` exponent. Both String forms trim surrounding Unicode whitespace, reject underscores and non-decimal bases, raise `DomainError` for invalid text, and raise `OverflowError` for out-of-range results. `real(String)` rejects `NaN` and infinity text. Do not turn these entry points into general coercion. Do not add `bool(...)`, truthiness, or other planned Fundamentals until their contracts are normatively specified.
 
 ## Canonical str
 

@@ -546,9 +546,9 @@ func (a *analyzer) analyzeBuiltinCall(call *ast.CallExpr, symbol *Symbol, argume
 		}
 		return expressionInfo{typeValue: types.String, nullState: NonNull}
 	case "int":
-		return a.analyzeNumericConversion(call, arguments, "int", types.Real, types.Int)
+		return a.analyzeNumericConversion(call, arguments, "int", types.Int, types.Real, types.String)
 	case "real":
-		return a.analyzeNumericConversion(call, arguments, "real", types.Int, types.Real)
+		return a.analyzeNumericConversion(call, arguments, "real", types.Real, types.Int, types.String)
 	case "len":
 		return a.analyzeLenCall(call, arguments)
 	case "clear":
@@ -560,9 +560,13 @@ func (a *analyzer) analyzeBuiltinCall(call *ast.CallExpr, symbol *Symbol, argume
 // analyzeNumericConversion implements only the two explicit numeric
 // conversions fixed by the v0.1 contract. It intentionally does not parse
 // Strings or introduce truthiness through bool-like coercion.
-func (a *analyzer) analyzeNumericConversion(call *ast.CallExpr, arguments []expressionInfo, name string, input, output types.Type) expressionInfo {
+func (a *analyzer) analyzeNumericConversion(call *ast.CallExpr, arguments []expressionInfo, name string, output types.Type, inputs ...types.Type) expressionInfo {
+	expected := types.Display(inputs[0])
+	if len(inputs) == 2 {
+		expected += " or " + types.Display(inputs[1])
+	}
 	if len(arguments) != 1 {
-		a.error(codeCallArguments, fmt.Sprintf("%s expects 1 %s argument; received %d argument(s)", name, types.Display(input), len(arguments)), call.Span(), fmt.Sprintf("call %s with exactly one %s value", name, types.Display(input)))
+		a.error(codeCallArguments, fmt.Sprintf("%s expects 1 %s argument; received %d argument(s)", name, expected, len(arguments)), call.Span(), fmt.Sprintf("call %s with exactly one %s value", name, expected))
 		return expressionInfo{typeValue: types.Invalid, nullState: MaybeNull}
 	}
 	argument := arguments[0]
@@ -573,8 +577,12 @@ func (a *analyzer) analyzeNumericConversion(call *ast.CallExpr, arguments []expr
 		a.nullableError(name, call.Arguments[0].Value, argument.nullState)
 		return expressionInfo{typeValue: types.Invalid, nullState: MaybeNull}
 	}
-	if !types.Equal(argument.typeValue, input) {
-		a.error(codeCallArguments, fmt.Sprintf("%s expects %s; received %s", name, types.Display(input), types.Display(argument.typeValue)), call.Arguments[0].Span(), "AhdCode v0.1 numeric conversions do not parse String values or apply truthiness")
+	accepted := false
+	for _, input := range inputs {
+		accepted = accepted || types.Equal(argument.typeValue, input)
+	}
+	if !accepted {
+		a.error(codeCallArguments, fmt.Sprintf("%s expects %s; received %s", name, expected, types.Display(argument.typeValue)), call.Arguments[0].Span(), "use one of the exact numeric conversion input types; AhdCode does not apply truthiness")
 		return expressionInfo{typeValue: types.Invalid, nullState: MaybeNull}
 	}
 	return expressionInfo{typeValue: output, nullState: NonNull}

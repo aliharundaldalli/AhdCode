@@ -470,6 +470,106 @@ func AhdRealToInt(value float64) int64 {
 	return int64(math.Trunc(value))
 }
 
+// AhdStringToInt parses the exact v0.1 signed ASCII-decimal Int grammar.
+func AhdStringToInt(value string) int64 {
+	text := strings.TrimSpace(value)
+	if !ahdValidIntText(text) {
+		AhdRaiseClass(AhdClassDomainError, "String is not valid decimal Int text")
+	}
+	result, err := strconv.ParseInt(text, 10, 64)
+	if err != nil {
+		if number, ok := err.(*strconv.NumError); ok && number.Err == strconv.ErrRange {
+			AhdRaiseClass(AhdClassOverflowError, "decimal String is outside signed 64-bit Int range")
+		}
+		AhdRaiseClass(AhdClassDomainError, "String is not valid decimal Int text")
+	}
+	return result
+}
+
+// AhdStringToReal parses the exact v0.1 finite ASCII-decimal Real grammar.
+func AhdStringToReal(value string) float64 {
+	text := strings.TrimSpace(value)
+	if !ahdValidRealText(text) {
+		AhdRaiseClass(AhdClassDomainError, "String is not valid decimal Real text")
+	}
+	result, err := strconv.ParseFloat(text, 64)
+	if err != nil {
+		if number, ok := err.(*strconv.NumError); ok && number.Err == strconv.ErrRange {
+			AhdRaiseClass(AhdClassOverflowError, "decimal String is outside finite Real range")
+		}
+		AhdRaiseClass(AhdClassDomainError, "String is not valid decimal Real text")
+	}
+	if math.IsInf(result, 0) {
+		AhdRaiseClass(AhdClassOverflowError, "decimal String is outside finite Real range")
+	}
+	if math.IsNaN(result) {
+		AhdRaiseClass(AhdClassDomainError, "String is not valid decimal Real text")
+	}
+	if result == 0 && ahdNonzeroRealSignificand(text) {
+		AhdRaiseClass(AhdClassOverflowError, "decimal String is outside finite Real range")
+	}
+	return result
+}
+
+func ahdValidIntText(text string) bool {
+	index := ahdAfterSign(text)
+	end, digits := ahdDecimalDigits(text, index)
+	return digits && end == len(text)
+}
+
+func ahdValidRealText(text string) bool {
+	index := ahdAfterSign(text)
+	var digits bool
+	index, digits = ahdDecimalDigits(text, index)
+	if !digits {
+		return false
+	}
+	if index < len(text) && text[index] == '.' {
+		index++
+		var fraction bool
+		index, fraction = ahdDecimalDigits(text, index)
+		if !fraction {
+			return false
+		}
+	}
+	if index < len(text) && (text[index] == 'e' || text[index] == 'E') {
+		index++
+		if index < len(text) && (text[index] == '+' || text[index] == '-') {
+			index++
+		}
+		var exponent bool
+		index, exponent = ahdDecimalDigits(text, index)
+		if !exponent {
+			return false
+		}
+	}
+	return index == len(text)
+}
+
+func ahdAfterSign(text string) int {
+	if len(text) > 0 && (text[0] == '+' || text[0] == '-') {
+		return 1
+	}
+	return 0
+}
+
+func ahdDecimalDigits(text string, index int) (int, bool) {
+	start := index
+	for index < len(text) && text[index] >= '0' && text[index] <= '9' {
+		index++
+	}
+	return index, index > start
+}
+
+func ahdNonzeroRealSignificand(text string) bool {
+	for index := ahdAfterSign(text); index < len(text) && text[index] != 'e' && text[index] != 'E'; index++ {
+		if text[index] >= '1' && text[index] <= '9' {
+			return true
+		}
+	}
+	return false
+}
+
 // ---------------------------------------------------------------------------
 // String operations
 // ---------------------------------------------------------------------------

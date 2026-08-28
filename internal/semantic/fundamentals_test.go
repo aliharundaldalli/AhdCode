@@ -10,8 +10,8 @@ func TestNumericConversionsHaveExactV01Signatures(t *testing.T) {
 	}{
 		{"Real to Int", "value: Int := int(3.7)", true},
 		{"Int to Real", "value: Real := real(2)", true},
-		{"int does not parse String", `value: Int := int("1")`, false},
-		{"real does not parse String", `value: Real := real("1.5")`, false},
+		{"String to Int", `value: Int := int("1")`, true},
+		{"String to Real", `value: Real := real("1.5")`, true},
 		{"int does not accept Int identity", "value: Int := int(1)", false},
 		{"real does not accept Real identity", "value: Real := real(1.0)", false},
 		{"bool remains unavailable", "value: Bool := bool(1)", false},
@@ -58,7 +58,7 @@ func TestInvalidExpressionRecoverySuppressesCascades(t *testing.T) {
 }
 
 func TestInvalidConversionHasOneSignatureDiagnostic(t *testing.T) {
-	for _, text := range []string{`write(int("1"))`, `write(real("1.5"))`, `write(int("1") + "x")`} {
+	for _, text := range []string{`write(int(true))`, `write(real(false))`, `write(int(1) + "x")`} {
 		_, result := analyzeText(t, text)
 		if len(result.Diagnostics) != 1 || result.Diagnostics[0].Code != codeCallArguments {
 			t.Fatalf("diagnostics for %q = %+v, want one %s", text, result.Diagnostics, codeCallArguments)

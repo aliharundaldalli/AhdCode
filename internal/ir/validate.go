@@ -300,7 +300,8 @@ func (v *validator) validateExpr(expression Expr) {
 		v.validateExpr(value.Value)
 		widening := value.From.Kind == IntType && value.Type.Kind == RealType
 		narrowing := value.From.Kind == RealType && value.Type.Kind == IntType
-		if !widening && !narrowing {
+		stringConversion := value.From.Kind == StringType && (value.Type.Kind == IntType || value.Type.Kind == RealType)
+		if !widening && !narrowing && !stringConversion {
 			v.error(CodeInvalidConversion, fmt.Sprintf("invalid numeric conversion %s -> %s", value.From, value.Type), meta.Span)
 		}
 	case *CallExpr:
