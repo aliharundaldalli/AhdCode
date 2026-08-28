@@ -1,0 +1,13 @@
+text: String := "  Ali,Veli,Ayşe  "
+clean: String := text.trim()
+
+write(clean.lower())
+write(clean.upper())
+write(clean.capitalize())
+write(clean.split(","))
+write(clean.replace("Veli", "Can"))
+write(clean.contains("Ayşe"))
+write(clean.startsWith("Ali"))
+write(clean.endsWith("Ayşe"))
+write(clean.count("i"))
+write(clean.index("Veli"))

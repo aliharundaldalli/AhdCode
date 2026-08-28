@@ -1,0 +1,15 @@
+count: Int := 0
+
+while count < 2 {
+    write("while {count}")
+    count++
+}
+
+until count == 4 {
+    count++
+    write("until {count}")
+}
+
+for value in between(1, 6, 2) {
+    write("for {value}")
+}

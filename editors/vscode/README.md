@@ -2,6 +2,10 @@
 
 This minimal extension adds AhdCode file recognition, lightweight syntax highlighting, and a **Run AhdCode File** play button to VS Code-compatible editors.
 
+The extension supplies AhdCode package branding and light/dark language icons.
+An active third-party File Icon Theme may override the language icon; file
+recognition and all run actions continue to work normally.
+
 ## Run the active file
 
 Open a saved `.ahd` file and use one of:
@@ -49,20 +53,20 @@ This runs `@vscode/vsce package` and creates a local `.vsix`; it does not publis
 Install in VS Code from the Command Palette with **Extensions: Install from VSIX...**, or with:
 
 ```bash
-code --install-extension ahdcode-0.1.1.vsix
+code --install-extension ahdcode-0.1.2.vsix
 ```
 
 Google Antigravity IDE 1.107 exposes the same local VSIX CLI operation:
 
 ```bash
-antigravity-ide --install-extension ahdcode-0.1.1.vsix
+antigravity-ide --install-extension ahdcode-0.1.2.vsix
 ```
 
 On macOS, if those launchers are not on PATH, use the application-bundled launchers:
 
 ```bash
-/Applications/Visual\ Studio\ Code.app/Contents/Resources/app/bin/code --install-extension ahdcode-0.1.1.vsix
-/Applications/Antigravity\ IDE.app/Contents/Resources/app/bin/antigravity-ide --install-extension ahdcode-0.1.1.vsix
+/Applications/Visual\ Studio\ Code.app/Contents/Resources/app/bin/code --install-extension ahdcode-0.1.2.vsix
+/Applications/Antigravity\ IDE.app/Contents/Resources/app/bin/antigravity-ide --install-extension ahdcode-0.1.2.vsix
 ```
 
 The same package is used by both editors. The extension API baseline is VS Code 1.107, matching the tested Antigravity standalone extension host.

@@ -1,0 +1,31 @@
+bring Math
+
+double: Function := (
+    value: Int
+) -> Int {
+    return value * 2
+}
+
+isEven: Function := (
+    value: Int
+) -> Bool {
+    return value % 2 == 0
+}
+
+values: List<Int> := [3, 1, 4, 2]
+alias: List<Int> := values
+
+write(values.map(double))
+write(values.filter(isEven))
+
+values.add(5)
+values.eject(1)
+values.sort()
+values.reverse()
+
+Math.seed(42)
+values.shuffle()
+
+write(values)
+write(alias)
+write(values same alias)

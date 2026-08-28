@@ -2,10 +2,11 @@
   "name": "ahdcode",
   "displayName": "AhdCode",
   "description": "Run AhdCode files and provide minimal syntax highlighting.",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "publisher": "ahdcode-local",
   "license": "UNLICENSED",
   "private": true,
+  "icon": "images/ahdcode-icon.png",
   "engines": {
     "vscode": "^1.107.0"
   },
@@ -32,7 +33,11 @@
         "extensions": [
           ".ahd"
         ],
-        "configuration": "./language-configuration.json"
+        "configuration": "./language-configuration.json",
+        "icon": {
+          "light": "./icons/ahdcode-file-light.png",
+          "dark": "./icons/ahdcode-file-dark.png"
+        }
       }
     ],
     "grammars": [

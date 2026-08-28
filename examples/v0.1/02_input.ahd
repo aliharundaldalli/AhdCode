@@ -1,0 +1,4 @@
+name: String := take("Name: ")
+age: Int := int(take("Age: "))
+
+write("{name} is {age}")

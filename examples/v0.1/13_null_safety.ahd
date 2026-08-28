@@ -1,0 +1,9 @@
+message: String := null
+
+if message == null {
+    message = "ready"
+}
+
+if message != null and message.contains("read") {
+    write(message.upper())
+}

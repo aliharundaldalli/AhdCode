@@ -1,0 +1,5 @@
+greet: Function := (
+    name: String
+) -> String {
+    return "Hello from a module, {name}"
+}

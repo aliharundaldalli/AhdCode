@@ -1,0 +1,6 @@
+grades: List<Real> := [88.0, 92.5, 79.5]
+average: Real := sum(grades) / len(grades)
+
+write("Average: {average}")
+write("Lowest: {min(grades)}")
+write("Highest: {max(grades)}")

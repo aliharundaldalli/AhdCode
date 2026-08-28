@@ -1,0 +1,3 @@
+from Greeting bring greet
+
+write(greet("Ayşe"))

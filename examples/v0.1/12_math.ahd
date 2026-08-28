@@ -1,0 +1,10 @@
+bring Math
+
+write(Math.PI)
+write(Math.sqrt(81))
+write(Math.round(3.14159, 2))
+write(Math.sin(0))
+
+Math.seed(42)
+write(Math.random())
+write(Math.randomInt(1, 10))

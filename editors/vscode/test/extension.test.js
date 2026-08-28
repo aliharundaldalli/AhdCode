@@ -193,7 +193,8 @@ test("findExecutable resolves ahdcode from PATH", async () => {
 test("manifest exposes the portable command, menu, keybinding, and language", () => {
   const manifest = require("../package.json");
   assert.equal(manifest.main, "./extension.js");
-  assert.equal(manifest.version, "0.1.1");
+  assert.equal(manifest.version, "0.1.2");
+  assert.equal(manifest.icon, "images/ahdcode-icon.png");
   assert.equal(manifest.engines.vscode, "^1.107.0");
   assert.equal(manifest.contributes.commands[0].command, "ahdcode.runFile");
   assert.equal(manifest.contributes.commands[0].icon, "$(play)");
@@ -201,4 +202,43 @@ test("manifest exposes the portable command, menu, keybinding, and language", ()
   assert.equal(manifest.contributes.keybindings[0].key, "f6");
   assert.equal(manifest.contributes.keybindings[0].when, "editorTextFocus && editorLangId == ahdcode");
   assert.deepEqual(manifest.contributes.languages[0].extensions, [".ahd"]);
+  assert.deepEqual(manifest.contributes.languages[0].icon, {
+    light: "./icons/ahdcode-file-light.png",
+    dark: "./icons/ahdcode-file-dark.png",
+  });
+  for (const relative of [
+    manifest.icon,
+    manifest.contributes.languages[0].icon.light,
+    manifest.contributes.languages[0].icon.dark,
+  ]) {
+    assert.equal(fs.existsSync(path.join(__dirname, "..", relative)), true);
+  }
+});
+
+test("TextMate grammar follows the frozen v0.1 lexical surface", () => {
+  const grammar = require("../syntaxes/ahdcode.tmLanguage.json");
+  const numberPatterns = grammar.repository.numbers.patterns.map(
+    ({ match }) => new RegExp(match, "u"),
+  );
+  const matchesNumber = (text) => numberPatterns.some((pattern) => pattern.test(text));
+
+  assert.equal(matchesNumber("123"), true);
+  assert.equal(matchesNumber("1.25"), true);
+  assert.equal(matchesNumber("1e3"), true);
+  assert.equal(matchesNumber("0x10"), false);
+  assert.equal(matchesNumber("1_000"), false);
+
+  const escape = new RegExp(
+    grammar.repository.strings.patterns[0].patterns[0].match,
+    "u",
+  );
+  assert.equal(escape.test("\\n"), true);
+  assert.equal(escape.test("\\{"), true);
+  assert.equal(escape.test("\\0"), false);
+  assert.equal(escape.test("\\u{41}"), false);
+
+  const grammarText = JSON.stringify(grammar);
+  for (const word of ["default", "same", "is", "has", "structure", "attribute", "SuperClass"]) {
+    assert.equal(grammarText.includes(word), true);
+  }
 });

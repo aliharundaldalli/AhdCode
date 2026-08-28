@@ -46,7 +46,7 @@
           "begin": "\"",
           "end": "\"",
           "patterns": [
-            { "name": "constant.character.escape.ahdcode", "match": "\\\\(?:[\\\\nrt0\"'{}]|u\\{[0-9A-Fa-f]+\\})" }
+            { "name": "constant.character.escape.ahdcode", "match": "\\\\[nrt\\\\\"'{}]" }
           ]
         },
         {
@@ -54,7 +54,7 @@
           "begin": "'",
           "end": "'",
           "patterns": [
-            { "name": "constant.character.escape.ahdcode", "match": "\\\\(?:[\\\\nrt0\"'{}]|u\\{[0-9A-Fa-f]+\\})" }
+            { "name": "constant.character.escape.ahdcode", "match": "\\\\[nrt\\\\\"'{}]" }
           ]
         }
       ]
@@ -63,15 +63,15 @@
       "patterns": [
         {
           "name": "constant.numeric.real.ahdcode",
-          "match": "(?<![\\p{L}\\p{N}_])(?:[0-9](?:_?[0-9])*)\\.(?:[0-9](?:_?[0-9])*)(?:[eE][+-]?[0-9](?:_?[0-9])*)?(?![\\p{L}\\p{N}_])"
+          "match": "(?<![\\p{L}\\p{N}_])[0-9]+\\.[0-9]+(?:[eE][+-]?[0-9]+)?(?![\\p{L}\\p{N}_])"
         },
         {
           "name": "constant.numeric.real.ahdcode",
-          "match": "(?<![\\p{L}\\p{N}_])[0-9](?:_?[0-9])*[eE][+-]?[0-9](?:_?[0-9])*(?![\\p{L}\\p{N}_])"
+          "match": "(?<![\\p{L}\\p{N}_])[0-9]+[eE][+-]?[0-9]+(?![\\p{L}\\p{N}_])"
         },
         {
           "name": "constant.numeric.integer.ahdcode",
-          "match": "(?<![\\p{L}\\p{N}_])(?:0[xX][0-9A-Fa-f](?:_?[0-9A-Fa-f])*|0[bB][01](?:_?[01])*|0[oO][0-7](?:_?[0-7])*|[0-9](?:_?[0-9])*)(?![\\p{L}\\p{N}_])"
+          "match": "(?<![\\p{L}\\p{N}_])[0-9]+(?![\\p{L}\\p{N}_])"
         }
       ]
     },
@@ -79,7 +79,11 @@
       "patterns": [
         {
           "name": "keyword.control.ahdcode",
-          "match": "\\b(?:if|else|while|until|for|break|continue|state|condition|attempt|except|ultimately|toss|return|bring|from|all|in|and|or|not)\\b"
+          "match": "\\b(?:if|else|while|until|for|break|continue|state|condition|default|attempt|except|ultimately|toss|return|bring|from|all|as)\\b"
+        },
+        {
+          "name": "keyword.operator.word.ahdcode",
+          "match": "\\b(?:and|or|not|same|is|in|has)\\b"
         },
         {
           "name": "storage.type.function.ahdcode",
@@ -91,11 +95,15 @@
       "patterns": [
         {
           "name": "storage.type.ahdcode",
-          "match": "\\b(?:Int|Real|String|Bool|Nothing|List|Pair)\\b"
+          "match": "\\b(?:Int|Real|String|Bool|Nothing|List|Pair|Object|Error)\\b"
         },
         {
           "name": "storage.modifier.ahdcode",
           "match": "\\b(?:Local|Global|Constant|Confidential)\\b"
+        },
+        {
+          "name": "keyword.contextual.ahdcode",
+          "match": "\\b(?:structure|attribute|SuperClass)\\b"
         }
       ]
     },

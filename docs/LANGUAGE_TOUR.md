@@ -1,0 +1,104 @@
+# Language tour
+
+[Back to README](../README.md) · [Types and null](TYPES_AND_NULL.md)
+
+## Declarations and mutation
+
+`:=` creates a binding. `=` changes an existing binding.
+
+```ahd
+name: String := "Ali"
+count: Int := 3
+count = 4
+```
+
+Inside an executable nested scope, a new declaration uses `Local`:
+
+```ahd
+if count > 0 {
+    message: Local String := "Ready"
+    write(message)
+}
+```
+
+A Function that reads or mutates a module-root binding declares that access
+with `Global`:
+
+```ahd
+counter: Int := 0
+
+increase: Function := (
+) -> Nothing {
+    counter: Global Int
+    counter++
+}
+```
+
+## Values and collections
+
+```ahd
+score: Int := 90
+average: Real := 87.5
+passed: Bool := score >= 50
+student: String := "Ayşe"
+
+scores: List<Int> := [90, 85, 92]
+grades: Pair<String, Int> := {
+    "Ali": 90
+    "Ayşe": 92
+}
+```
+
+Lists and Pairs are reference objects. Aliases observe mutation. A `Constant`
+reference deep-freezes its reachable object graph.
+
+## Conditions and loops
+
+```ahd
+if passed {
+    write("Passed")
+}
+else {
+    write("Try again")
+}
+
+for value in between(1, 4) {
+    write(value)
+}
+```
+
+Only `Bool` is a condition; AhdCode has no truthiness.
+
+## Functions and Classes
+
+```ahd
+square: Function := (
+    value: Int
+) -> Int {
+    return value^2
+}
+```
+
+```ahd
+Student: Class<> := {
+    structure: Attributes := (
+        name: String
+        number: Constant Int
+    )
+
+    describe: Function := (
+    ) -> String {
+        return "{attribute.number}: {attribute.name}"
+    }
+}
+```
+
+## Errors and modules
+
+Use `attempt`, `except`, `ultimately`, and `toss` for catchable errors. Use
+`bring ModuleName` for a namespace or `from ModuleName bring name` for a direct
+symbol. Local modules are sibling files; `Math` is the explicit built-in
+standard module.
+
+Continue with [Functions](FUNCTIONS.md), [Classes](CLASSES.md),
+[Collections](COLLECTIONS.md), and [Modules](MODULES.md).

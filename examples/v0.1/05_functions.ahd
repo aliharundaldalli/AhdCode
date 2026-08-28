@@ -1,0 +1,23 @@
+greet: Function := (
+    name: String
+    title: String := "Student"
+) -> String {
+    return "Hello {title} {name}"
+}
+
+applyTwice: Function := (
+    operation: Function
+    value: Int
+) -> Int {
+    first: Local Int := operation(value)
+    return operation(first)
+}
+
+double: Function := (
+    value: Int
+) -> Int {
+    return value * 2
+}
+
+write(greet(name: "Ali", title: "Dr"))
+write(applyTwice(double, 3))

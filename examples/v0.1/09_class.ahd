@@ -1,0 +1,14 @@
+Student: Class<> := {
+    structure: Attributes := (
+        name: String
+        number: Constant Int
+    )
+
+    describe: Function := (
+    ) -> String {
+        return "#{attribute.number} {attribute.name}"
+    }
+}
+
+student: Student := Student(name: "Ali", number: 42)
+write(student.describe())

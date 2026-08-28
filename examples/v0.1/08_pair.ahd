@@ -1,0 +1,14 @@
+scores: Pair<String, Int> := {
+    "Ali": 85
+    "Ayşe": 92
+}
+
+scores["Ali"] = 90
+scores["Veli"] = 78
+scores.eject("Ayşe")
+
+for name in scores {
+    write("{name}: {scores[name]}")
+}
+
+write("Ali" in scores)

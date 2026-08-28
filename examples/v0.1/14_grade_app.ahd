@@ -1,0 +1,17 @@
+name: String := take("Student: ")
+grades: List<Int> := []
+
+for index in between(1, 4) {
+    grade: Local Int := int(take("Grade {index}: "))
+    grades.add(grade)
+}
+
+average: Real := sum(grades) / len(grades)
+write("{name}'s average: {average}")
+
+if average >= 50.0 {
+    write("Passed")
+}
+else {
+    write("Failed")
+}

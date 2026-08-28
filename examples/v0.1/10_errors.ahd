@@ -1,0 +1,20 @@
+requirePositive: Function := (
+    value: Int
+) -> Int {
+    if value <= 0 {
+        toss (DomainError("value must be positive"))
+    }
+
+    return value
+}
+
+attempt {
+    result: Local Int := requirePositive(-1)
+    write(result)
+}
+except DomainError as error {
+    write("Caught: {error.message}")
+}
+ultimately {
+    write("Finished")
+}
