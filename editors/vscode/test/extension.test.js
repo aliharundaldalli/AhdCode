@@ -198,8 +198,23 @@ test("repeated runs append to one terminal instead of clearing it", async () => 
     assert.equal(task.presentationOptions.showReuseMessage, false);
     assert.equal(task.runOptions.instanceLimit, 1);
     assert.equal(task.name, "AhdCode: Run loop.ahd");
-    assert.equal(task.definition.type, "ahdcode");
+    // The dedicated panel is keyed on task identity, so every run must present
+    // the same definition, type, source, and scope. A run that varied any of
+    // them would be a different task and would get its own terminal.
+    assert.deepEqual(task.definition, { type: "ahdcode", task: "runFile" });
+    assert.equal(task.source, "AhdCode");
+    assert.equal(task.scope, "global");
+    // The program is launched directly, never through a shell command string,
+    // so an interactive take() reads the terminal's own stdin.
+    assert.equal(task.execution instanceof ProcessExecution, true);
+    assert.equal(Array.isArray(task.execution.args), true);
   }
+  const identities = new Set(
+    state.tasks.map((task) =>
+      JSON.stringify([task.definition, task.source, task.scope, task.name]),
+    ),
+  );
+  assert.equal(identities.size, 1, "repeated runs must present one task identity");
 
   fs.rmSync(temporary, { recursive: true, force: true });
 });
@@ -218,6 +233,34 @@ test("a run of a different file still reuses the dedicated panel", async () => {
   assert.equal(state.tasks[0].presentationOptions.clear, false);
   assert.equal(state.tasks[1].presentationOptions.clear, false);
   assert.equal(state.tasks[1].execution.args[1], "/tmp/second.ahd");
+  // Only the display name follows the file; the identity that selects the
+  // dedicated terminal does not, so both files share one terminal.
+  assert.deepEqual(state.tasks[0].definition, state.tasks[1].definition);
+  assert.equal(state.tasks[0].source, state.tasks[1].source);
+  assert.equal(state.tasks[0].scope, state.tasks[1].scope);
+  assert.equal(state.tasks[0].execution.options.cwd, "/tmp");
+  assert.equal(state.tasks[1].execution.options.cwd, "/tmp");
+
+  fs.rmSync(temporary, { recursive: true, force: true });
+});
+
+test("a run never builds a shell command string", async () => {
+  const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "ahdcode-argv-"));
+  const executable = makeExecutable(temporary);
+  state.configurationPath = executable;
+  // A path carrying shell metacharacters must survive as one argv element.
+  const filePath = "/tmp/ahd tests/$(touch pwned); rm -rf * & 'quoted' \"x\".ahd";
+  state.activeTextEditor = { document: documentFor(filePath) };
+
+  await extension.runFile(vscodeMock);
+
+  assert.equal(state.errors.length, 0);
+  const task = state.tasks[0];
+  assert.equal(task.execution instanceof ProcessExecution, true);
+  assert.equal(task.execution.process, executable);
+  assert.deepEqual(task.execution.args, ["run", filePath]);
+  assert.equal(task.execution.options.cwd, "/tmp/ahd tests");
+  assert.equal(typeof task.execution.commandLine, "undefined");
 
   fs.rmSync(temporary, { recursive: true, force: true });
 });

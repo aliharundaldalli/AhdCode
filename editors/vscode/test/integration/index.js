@@ -42,8 +42,9 @@ async function run() {
     assert.equal(result.taskName, `AhdCode: Run ${path.basename(testCase.file)}`);
     assert.equal(result.definition.type, "ahdcode");
     assert.equal(result.definition.task, "runFile");
-    assert.equal(result.presentationOptions.clear, true);
+    assert.equal(result.presentationOptions.clear, false);
     assert.equal(result.runOptions.instanceLimit, 1);
+    assert.equal(result.presentationOptions.panel, vscode.TaskPanelKind.Dedicated);
     console.log(`AhdCode task completed: ${testCase.file} (exit=${result.exitCode})`);
   }
 
