@@ -377,10 +377,21 @@ func AhdLatexDocument(body, title, author string) string {
 
 // AhdLatexTable creates deterministic booktabs source. List elements retain
 // the ordinary nullable-element rule; a null row or cell raises NullError.
-func AhdLatexTable(headers *AhdList[*string], rows *AhdList[*AhdList[*string]]) string {
+func AhdLatexTable(headers *AhdList[*string], rows *AhdList[*AhdList[*string]], mathColumns *AhdList[*int64]) string {
 	headerValues := headers.Snapshot()
 	if len(headerValues) == 0 {
 		AhdRaiseClass(AhdClassValueError, "Latex.table requires at least one header")
+	}
+	// A listed column is the caller's explicit opt-in to raw LaTeX math for
+	// that column. Membership is a set, so a repeated index wraps a cell once.
+	math := make(map[int64]bool)
+	for _, column := range mathColumns.Snapshot() {
+		index := AhdNonNull(column)
+		if index < 0 || index >= int64(len(headerValues)) {
+			AhdRaiseClass(AhdClassValueError, "Latex.table math column "+strconv.FormatInt(index, 10)+
+				" is outside 0.."+strconv.FormatInt(int64(len(headerValues)-1), 10))
+		}
+		math[index] = true
 	}
 	rowValues := rows.Snapshot()
 	var result strings.Builder
@@ -404,7 +415,14 @@ func AhdLatexTable(headers *AhdList[*string], rows *AhdList[*AhdList[*string]]) 
 			if index != 0 {
 				result.WriteString(" & ")
 			}
-			result.WriteString(AhdLatexEscape(AhdNonNull(value)))
+			cell := AhdNonNull(value)
+			// A math column carries LaTeX source, so escaping it would destroy
+			// the very commands it exists to typeset.
+			if math[int64(index)] {
+				result.WriteString("\\(" + cell + "\\)")
+				continue
+			}
+			result.WriteString(AhdLatexEscape(cell))
 		}
 		result.WriteString(" \\\\\n")
 	}

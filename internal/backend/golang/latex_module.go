@@ -34,11 +34,17 @@ func (generator *generator) latexCall(value *ir.CallExpr) string {
 	case "document":
 		return "AhdLatexDocument(" + argument(0) + ", " + argument(1) + ", " + argument(2) + ")"
 	case "table":
-		if len(value.Arguments) != 2 || value.Arguments[0].Value == nil || value.Arguments[1].Value == nil {
+		if len(value.Arguments) < 2 || value.Arguments[0].Value == nil || value.Arguments[1].Value == nil {
 			generator.fail(CodeGenerationFailure, "Latex.table has a missing argument", meta.Span, "the IR call is malformed")
 			return `""`
 		}
-		return "AhdLatexTable(" + generator.expr(value.Arguments[0].Value) + ", " + generator.expr(value.Arguments[1].Value) + ")"
+		// An omitted mathColumns is an empty List, so every cell stays text.
+		columns := "AhdNewList[*int64]()"
+		if len(value.Arguments) > 2 && !value.Arguments[2].UsesDefault && value.Arguments[2].Value != nil {
+			columns = generator.expr(value.Arguments[2].Value)
+		}
+		return "AhdLatexTable(" + generator.expr(value.Arguments[0].Value) + ", " +
+			generator.expr(value.Arguments[1].Value) + ", " + columns + ")"
 	default:
 		return generator.unsupported("Latex function "+name, meta.Span)
 	}

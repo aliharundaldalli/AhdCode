@@ -63,6 +63,7 @@ func latexModuleInterface() *ModuleInterface {
 	add(latexFunction("table", latexSignature(types.String,
 		types.Parameter{Name: "headers", Type: types.List{Element: types.String}},
 		types.Parameter{Name: "rows", Type: types.List{Element: types.List{Element: types.String}}},
+		types.Parameter{Name: "mathColumns", Type: types.List{Element: types.Int}, HasDefault: true},
 	)))
 
 	sort.Strings(module.ExportNames)

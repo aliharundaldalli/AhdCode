@@ -24,7 +24,7 @@ section(title: String)                   -> String
 subsection(title: String)                -> String
 equation(source: String)                 -> String
 document(body: String, title: String = "", author: String = "") -> String
-table(headers: List<String>, rows: List<List<String>>) -> String
+table(headers: List<String>, rows: List<List<String>>, mathColumns: List<Int> = []) -> String
 
 LatexError
 ```
@@ -44,6 +44,34 @@ with no fonts installed.
 
 `table` produces deterministic `booktabs` source and escapes every cell. A row
 whose column count differs from the headers is a `ValueError`.
+
+`mathColumns` opts specific columns into inline mathematics. A cell in a listed
+column is trusted raw LaTeX and is wrapped in `\( ... \)` rather than escaped,
+so `^`, `_`, braces, and commands such as `\ln` survive. Headers are always
+ordinary escaped text, and every unlisted column keeps the existing escaping —
+there is no general raw-LaTeX bypass.
+
+```ahd
+body += L.table(
+    ["Fonksiyon", "Bigeometrik türev", "Yorum"],
+    [
+        ["g(x)=x^a", "e^a", "İlk türev sabittir"],
+        ["g(x)=e^\{a(\\ln x)^m\}", "e^\{am(\\ln x)^\{m-1\}\}", "Logaritmik aile"]
+    ],
+    [0, 1]
+)
+```
+
+AhdCode does not allow positional and named arguments in one call, so pass the
+list positionally as above, or name every argument:
+
+```ahd
+body += L.table(headers: titles, rows: values, mathColumns: [0, 1])
+```
+
+Column indexes are zero-based. A negative or out-of-range index is a
+`ValueError`, and a repeated index selects that column once rather than nesting
+delimiters. Omitting `mathColumns` leaves every cell escaped exactly as before.
 
 ## Compiling
 

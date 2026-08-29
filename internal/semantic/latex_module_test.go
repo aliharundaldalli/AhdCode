@@ -58,3 +58,35 @@ failure: LatexError := LatexError("failed")
 	userDeclaration := analyzeWithStandardModules(t, `Latex: Class<> := {}`)
 	requireSemanticClean(t, userDeclaration)
 }
+
+// TestLatexTableMathColumnsAreOptionalAndTyped pins the new argument: it is
+// optional, it is a List<Int>, and the existing two-argument call is unchanged.
+func TestLatexTableMathColumnsAreOptionalAndTyped(t *testing.T) {
+	tests := []struct {
+		name string
+		text string
+		ok   bool
+	}{
+		{"two arguments still compile", `value: String := Latex.table(["A"], [["x"]])`, true},
+		{"positional math columns", `value: String := Latex.table(["A"], [["x"]], [0])`, true},
+		{"named math columns", `value: String := Latex.table(headers: ["A"], rows: [["x"]], mathColumns: [0])`, true},
+		{"an empty column list is allowed", `value: String := Latex.table(["A"], [["x"]], [])`, true},
+
+		{"math columns must be Int", `value: String := Latex.table(["A"], [["x"]], ["0"])`, false},
+		{"math columns must be a List", `value: String := Latex.table(["A"], [["x"]], 0)`, false},
+		{"a fourth argument is rejected", `value: String := Latex.table(["A"], [["x"]], [0], [1])`, false},
+		{"table still produces String", `value: Int := Latex.table(["A"], [["x"]], [0])`, false},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			result := analyzeWithStandardModules(t, "bring Latex\n\n"+test.text)
+			if test.ok {
+				requireSemanticClean(t, result)
+				return
+			}
+			if !result.HasErrors() {
+				t.Fatal("expected a Latex.table diagnostic")
+			}
+		})
+	}
+}

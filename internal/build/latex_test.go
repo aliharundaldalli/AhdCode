@@ -227,3 +227,46 @@ func TestLatexBundleShipsAPhysicalFontForEveryMetric(t *testing.T) {
 		t.Fatal("resource manifest lists no font metrics")
 	}
 }
+
+// TestLatexMathColumnTableCompilesToPDF is the real-engine regression for
+// mathematical table cells. The table mirrors the bigeometric-derivative
+// document that exposed the gap: two math columns beside ordinary Turkish text.
+func TestLatexMathColumnTableCompilesToPDF(t *testing.T) {
+	root := os.Getenv("AHDCODE_LATEX_TEST_RUNTIME")
+	if root == "" {
+		t.Skip("set AHDCODE_LATEX_TEST_RUNTIME to a staged Tectonic + ahdcode-latex.ttb directory")
+	}
+	t.Setenv("AHDCODE_LATEX_RUNTIME", root)
+	directory := t.TempDir()
+	output := filepath.Join(directory, "bigeometrik.pdf")
+	entry := filepath.Join(directory, "main.ahd")
+	text := `bring Latex as L
+
+body: String := L.section("Bigeometrik türev")
+body += L.table(
+    ["Fonksiyon", "Bigeometrik türev", "Yorum"],
+    [
+        ["g(x)=x^a", "e^a", "İlk türev sabittir"],
+        ["g(x)=e^\{cx\}", "e^\{cx\}", "Fonksiyon sabit noktadır"],
+        ["g(x)=C", "1", "Pozitif sabitlerin türevi birdir"],
+        ["g(x)=e^\{a(\\ln x)^m\}", "e^\{am(\\ln x)^\{m-1\}\}", "Logaritmik & polinom ailesi"]
+    ],
+    [0, 1]
+)
+
+source: String := L.document(body: body, title: "Bigeometrik", author: "Ali")
+L.pdf(source: source, output: ` + strconv.Quote(output) + `)
+write("ok")
+`
+	if err := os.WriteFile(entry, []byte(text), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	stdout, stderr, code := buildAndRun(t, entry, "")
+	if code != 0 || stdout != "ok\n" {
+		t.Fatalf("math-column table failed: code=%d stdout=%q stderr=%q", code, stdout, stderr)
+	}
+	content, err := os.ReadFile(output)
+	if err != nil || len(content) < 1024 || string(content[:5]) != "%PDF-" {
+		t.Fatalf("invalid PDF: size=%d err=%v", len(content), err)
+	}
+}
