@@ -171,8 +171,53 @@ test("uses ProcessExecution argument arrays for spaces and Unicode paths", async
   assert.deepEqual(task.execution.args, ["run", filePath]);
   assert.deepEqual(task.execution.options, { cwd: "/tmp/Ahd Code Tests" });
   assert.equal(task.presentationOptions.panel, "dedicated");
-  assert.equal(task.presentationOptions.clear, true);
+  assert.equal(task.presentationOptions.clear, false);
   assert.equal(task.runOptions.instanceLimit, 1);
+
+  fs.rmSync(temporary, { recursive: true, force: true });
+});
+
+test("repeated runs append to one terminal instead of clearing it", async () => {
+  const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "ahdcode-rerun-"));
+  const executable = makeExecutable(temporary);
+  state.configurationPath = executable;
+  state.activeTextEditor = { document: documentFor("/tmp/loop.ahd") };
+
+  await extension.runFile(vscodeMock);
+  await extension.runFile(vscodeMock);
+  await extension.runFile(vscodeMock);
+
+  assert.equal(state.errors.length, 0);
+  assert.equal(state.tasks.length, 3);
+  for (const task of state.tasks) {
+    // Every run targets the same dedicated panel, so no run opens a new
+    // terminal, and none of them erases what the previous run printed.
+    assert.equal(task.presentationOptions.panel, "dedicated");
+    assert.equal(task.presentationOptions.clear, false);
+    assert.equal(task.presentationOptions.reveal, "always");
+    assert.equal(task.presentationOptions.showReuseMessage, false);
+    assert.equal(task.runOptions.instanceLimit, 1);
+    assert.equal(task.name, "AhdCode: Run loop.ahd");
+    assert.equal(task.definition.type, "ahdcode");
+  }
+
+  fs.rmSync(temporary, { recursive: true, force: true });
+});
+
+test("a run of a different file still reuses the dedicated panel", async () => {
+  const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "ahdcode-switch-"));
+  const executable = makeExecutable(temporary);
+  state.configurationPath = executable;
+
+  state.activeTextEditor = { document: documentFor("/tmp/first.ahd") };
+  await extension.runFile(vscodeMock);
+  state.activeTextEditor = { document: documentFor("/tmp/second.ahd") };
+  await extension.runFile(vscodeMock);
+
+  assert.equal(state.tasks.length, 2);
+  assert.equal(state.tasks[0].presentationOptions.clear, false);
+  assert.equal(state.tasks[1].presentationOptions.clear, false);
+  assert.equal(state.tasks[1].execution.args[1], "/tmp/second.ahd");
 
   fs.rmSync(temporary, { recursive: true, force: true });
 });

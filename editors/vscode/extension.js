@@ -72,13 +72,15 @@ async function runFile(vscodeApi = vscode, runtime = {}) {
     [],
   );
 
+  // One dedicated terminal is reused across runs, and it is never cleared, so
+  // each run appends below the previous output instead of erasing it.
   task.presentationOptions = {
     reveal: vscodeApi.TaskRevealKind.Always,
     echo: true,
     focus: false,
     panel: vscodeApi.TaskPanelKind.Dedicated,
     showReuseMessage: false,
-    clear: true,
+    clear: false,
   };
   task.runOptions = {
     instanceLimit: 1,
