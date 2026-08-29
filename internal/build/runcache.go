@@ -24,8 +24,8 @@ const runCacheVersion = "run-v1"
 // executable is a few megabytes, and an edit-run cycle reuses a handful of
 // programs, so a small bound is enough to keep the common case warm.
 const (
-	runCacheLimit = 24
-	runCacheBytes = 128 << 20
+	runCacheLimit = 16
+	runCacheBytes = 64 << 20
 )
 
 // disableRunCache lets a user or a test opt out of the executable cache and

@@ -318,6 +318,126 @@ func TestRunCacheEvictsBySize(t *testing.T) {
 	}
 }
 
+// TestRunCachePublishesAtomically checks that an entry only ever becomes
+// visible complete: publishing renames a fully built file into place, so a
+// concurrent run sees either no entry or a usable one, never a partial write.
+func TestRunCachePublishesAtomically(t *testing.T) {
+	isolateCache(t)
+	cache := openRunCache()
+	if cache == nil {
+		t.Fatal("expected an available run cache")
+	}
+	key := strings.Repeat("a", 64)
+
+	reserved, ok := cache.reserve()
+	if !ok {
+		t.Fatal("expected a reserved name")
+	}
+	if filepath.Dir(reserved) != cache.directory {
+		t.Fatalf("a reservation must live in the cache directory: %s", reserved)
+	}
+	// A reservation that was never built publishes nothing and leaves no entry.
+	if _, published := cache.publish(key, reserved); published {
+		t.Fatal("an unbuilt reservation must not publish")
+	}
+	if _, found := cache.lookup(key); found {
+		t.Fatal("a failed publish must leave no entry")
+	}
+
+	reserved, _ = cache.reserve()
+	if err := os.WriteFile(reserved, []byte("#!/bin/sh\nexit 0\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	published, ok := cache.publish(key, reserved)
+	if !ok {
+		t.Fatal("a built reservation must publish")
+	}
+	if published != cache.path(key) {
+		t.Fatalf("publish returned %s, want %s", published, cache.path(key))
+	}
+	// The build output is moved, not copied, so no partial file is left over.
+	if _, err := os.Stat(reserved); !os.IsNotExist(err) {
+		t.Fatalf("the reservation must not survive publishing: %v", err)
+	}
+	if _, found := cache.lookup(key); !found {
+		t.Fatal("a published entry must be usable")
+	}
+	if entries, _ := os.ReadDir(cache.directory); len(entries) != 1 {
+		t.Fatalf("publishing left %d files, want exactly the entry", len(entries))
+	}
+}
+
+// TestRunCachePrunesWhenPublishing checks that the bound is enforced as part
+// of publishing, so an ordinary run never leaves the cache oversized.
+func TestRunCachePrunesWhenPublishing(t *testing.T) {
+	isolateCache(t)
+	cache := openRunCache()
+	if cache == nil {
+		t.Fatal("expected an available run cache")
+	}
+	for index := 0; index < runCacheLimit+8; index++ {
+		name := filepath.Join(cache.directory, "old-"+strconv.Itoa(index))
+		if err := os.WriteFile(name, []byte("x"), 0o700); err != nil {
+			t.Fatal(err)
+		}
+		stamp := time.Unix(0, int64(index+1)*int64(time.Second))
+		if err := os.Chtimes(name, stamp, stamp); err != nil {
+			t.Fatal(err)
+		}
+	}
+	reserved, _ := cache.reserve()
+	if err := os.WriteFile(reserved, []byte("#!/bin/sh\nexit 0\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	key := strings.Repeat("b", 64)
+	if _, ok := cache.publish(key, reserved); !ok {
+		t.Fatal("expected the entry to publish")
+	}
+	entries, err := os.ReadDir(cache.directory)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) > runCacheLimit {
+		t.Fatalf("publishing left %d entries, want at most %d", len(entries), runCacheLimit)
+	}
+	// The entry just published is the most recently used, so it must survive.
+	if _, found := cache.lookup(key); !found {
+		t.Fatal("publishing evicted the entry it had just published")
+	}
+}
+
+// TestRunCachePrunesADirectoryThatIsAlreadyOversized covers a cache left too
+// large by an earlier compiler with looser bounds: the next run brings it back
+// inside the current bound rather than leaving it oversized forever.
+func TestRunCachePrunesADirectoryThatIsAlreadyOversized(t *testing.T) {
+	isolateCache(t)
+	cache := openRunCache()
+	if cache == nil {
+		t.Fatal("expected an available run cache")
+	}
+	for index := 0; index < runCacheLimit*3; index++ {
+		name := filepath.Join(cache.directory, "legacy-"+strconv.Itoa(index))
+		if err := os.WriteFile(name, []byte("x"), 0o700); err != nil {
+			t.Fatal(err)
+		}
+		stamp := time.Unix(0, int64(index+1)*int64(time.Second))
+		if err := os.Chtimes(name, stamp, stamp); err != nil {
+			t.Fatal(err)
+		}
+	}
+	directory := writeSources(t, map[string]string{"main.ahd": "write(\"hello\")\n"})
+	if out, code := runSource(t, directory, "main.ahd", ""); out != "hello\n" || code != 0 {
+		t.Fatalf("run = %q (exit %d)", out, code)
+	}
+	entries, err := os.ReadDir(cache.directory)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) > runCacheLimit {
+		t.Fatalf("an oversized cache stayed at %d entries, want at most %d", len(entries), runCacheLimit)
+	}
+}
+
 // TestCachedRunsPreserveProgramBehavior checks that everything a program can
 // observe still works when its executable came from the cache.
 func TestCachedRunsPreserveProgramBehavior(t *testing.T) {
