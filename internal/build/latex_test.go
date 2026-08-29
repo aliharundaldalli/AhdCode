@@ -1,6 +1,7 @@
 package build
 
 import (
+	"encoding/json"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -137,5 +138,92 @@ except LatexError as error {
 	stdout, stderr, code := buildAndRun(t, entry, "")
 	if code != 0 || stdout != "caught\n" || stderr != "" {
 		t.Fatalf("LatexError handling = stdout %q stderr %q code %d", stdout, stderr, code)
+	}
+}
+
+// TestLatexScriptScriptMathResolvesPhysicalFonts is the regression test for the
+// bundled font-closure defect: the minimal bundle shipped cmsy7.tfm without
+// cmsy7.pfb, so an ordinary mathematics document reached xdvipdfmx and failed
+// with "Cannot proceed without .vf or physical font for PDF output".
+//
+// The mathematics below is taken from the document that exposed the defect. Its
+// nested fractions inside \left|...\right| push symbols down to the
+// script-script size, which is what requests the smaller physical font.
+func TestLatexScriptScriptMathResolvesPhysicalFonts(t *testing.T) {
+	root := os.Getenv("AHDCODE_LATEX_TEST_RUNTIME")
+	if root == "" {
+		t.Skip("set AHDCODE_LATEX_TEST_RUNTIME to a staged Tectonic + ahdcode-latex.ttb directory")
+	}
+	t.Setenv("AHDCODE_LATEX_RUNTIME", root)
+	directory := t.TempDir()
+	output := filepath.Join(directory, "series.pdf")
+	entry := filepath.Join(directory, "main.ahd")
+	text := `bring Latex as L
+
+body: String := L.section("Sonlu Geometrik Seriler")
+body += L.escape("r gerçek bir sayı ve r ≠ 1 olmak üzere:")
+body += "\n"
+body += L.equation("S_n = \\sum_\{k=0\}^\{n\} r^k")
+body += L.equation("S_n = \\frac\{1-r^\{n+1\}\}\{1-r\}")
+body += L.equation("\\sum_\{k=0\}^\{\\infty\} r^k = \\frac\{1\}\{1-r\}, \\qquad \\left|\\frac\{1\}\{1-r\} - S_n\\right| = \\frac\{|r|^\{n+1\}\}\{|1-r|\}")
+body += L.table(
+    ["n", "S_n", "2 - S_n"],
+    [
+        ["2", "1.750000", "0.250000"],
+        ["12", "1.999756", "0.000244"]
+    ]
+)
+
+source: String := L.document(body: body, title: "Matematiksel Kısa Rapor", author: "Ali Harun Daldallı")
+L.pdf(source: source, output: ` + strconv.Quote(output) + `)
+write("ok")
+`
+	if err := os.WriteFile(entry, []byte(text), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	stdout, stderr, code := buildAndRun(t, entry, "")
+	if code != 0 || stdout != "ok\n" {
+		t.Fatalf("script-script mathematics failed: code=%d stdout=%q stderr=%q", code, stdout, stderr)
+	}
+	content, err := os.ReadFile(output)
+	if err != nil || len(content) < 1024 || string(content[:5]) != "%PDF-" {
+		t.Fatalf("invalid PDF: size=%d err=%v", len(content), err)
+	}
+}
+
+// TestLatexBundleShipsAPhysicalFontForEveryMetric keeps the closure defect from
+// returning: a metric whose Type 1 outline is absent from the bundle is exactly
+// what made xdvipdfmx fail. lcircle10, lcirclew10, and pzdr are excluded on
+// purpose — the first two are MetaFont-only picture fonts and pzdr maps to a
+// standard PDF font, so neither has a Type 1 outline to ship.
+func TestLatexBundleShipsAPhysicalFontForEveryMetric(t *testing.T) {
+	content, err := os.ReadFile(filepath.Join("..", "..", "tooling", "latex", "resources.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var resources []struct {
+		Name string `json:"name"`
+	}
+	if err := json.Unmarshal(content, &resources); err != nil {
+		t.Fatal(err)
+	}
+	outlines := make(map[string]bool)
+	var metrics []string
+	for _, item := range resources {
+		switch {
+		case strings.HasSuffix(item.Name, ".pfb"):
+			outlines[strings.TrimSuffix(item.Name, ".pfb")] = true
+		case strings.HasSuffix(item.Name, ".tfm"):
+			metrics = append(metrics, strings.TrimSuffix(item.Name, ".tfm"))
+		}
+	}
+	withoutOutline := map[string]bool{"lcircle10": true, "lcirclew10": true, "pzdr": true}
+	for _, metric := range metrics {
+		if !outlines[metric] && !withoutOutline[metric] {
+			t.Fatalf("metric %s.tfm has no physical font %s.pfb in the bundle", metric, metric)
+		}
+	}
+	if len(metrics) == 0 {
+		t.Fatal("resource manifest lists no font metrics")
 	}
 }
