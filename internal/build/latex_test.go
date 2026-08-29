@@ -270,3 +270,101 @@ write("ok")
 		t.Fatalf("invalid PDF: size=%d err=%v", len(content), err)
 	}
 }
+
+// TestLatexSansMathAlphabetCompilesToPDF is the real-engine regression for the
+// fontspec/XeTeX font path. The bundle carried only the Latin Modern roman
+// faces, so \mathsf reached the lmss family and XeTeX failed with
+// "Font TU/lmss/m/n/10=[lmsans10-regular] ... not loadable". The transpose
+// identity below is the expression from the stress document that exposed it.
+//
+// The nested superscripts matter: they push the sans alphabet down to the
+// script and scriptscript levels, which select a smaller design size of the
+// same optical-size family. Fixing only the 10pt face left 7pt still missing.
+func TestLatexSansMathAlphabetCompilesToPDF(t *testing.T) {
+	root := os.Getenv("AHDCODE_LATEX_TEST_RUNTIME")
+	if root == "" {
+		t.Skip("set AHDCODE_LATEX_TEST_RUNTIME to a staged Tectonic + ahdcode-latex.ttb directory")
+	}
+	t.Setenv("AHDCODE_LATEX_RUNTIME", root)
+	directory := t.TempDir()
+	output := filepath.Join(directory, "alphabets.pdf")
+	entry := filepath.Join(directory, "main.ahd")
+	text := `bring Latex as L
+
+body: String := L.section("Font alfabeleri")
+body += L.equation("(AB)^\{\\mathsf T\}=B^\{\\mathsf T\}A^\{\\mathsf T\}")
+body += L.equation("\\mathrm\{R\}\\quad \\mathit\{x\}\\quad \\mathbf\{v\}\\quad \\mathsf\{T\}\\quad \\mathtt\{x\}")
+body += L.equation("A^\{\\mathsf\{T\}^\{\\mathsf\{T\}\}\}\\quad x_\{\\mathtt\{a\}_\{\\mathtt\{b\}\}\}\\quad v^\{\\mathbf\{k\}^\{\\mathbf\{j\}\}\}\\quad y_\{\\mathit\{p\}_\{\\mathit\{q\}\}\}\\quad z^\{\\mathrm\{M\}^\{\\mathrm\{N\}\}\}")
+
+source: String := L.document(body: body, title: "Alfabeler", author: "AhdCode")
+L.pdf(source: source, output: ` + strconv.Quote(output) + `)
+write("ok")
+`
+	if err := os.WriteFile(entry, []byte(text), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	stdout, stderr, code := buildAndRun(t, entry, "")
+	if code != 0 || stdout != "ok\n" {
+		t.Fatalf("sans math alphabet failed: code=%d stdout=%q stderr=%q", code, stdout, stderr)
+	}
+	content, err := os.ReadFile(output)
+	if err != nil || len(content) < 1024 || string(content[:5]) != "%PDF-" {
+		t.Fatalf("invalid PDF: size=%d err=%v", len(content), err)
+	}
+}
+
+// TestLatexBundleClosesTheLatinModernFamilies guards the font path the metric
+// check above cannot see. A TFM has no bearing on fontspec: \mathsf and
+// \texttt are resolved by XeTeX against OpenType files by family and design
+// size, so a bundle can satisfy every TFM and still fail to typeset.
+func TestLatexBundleClosesTheLatinModernFamilies(t *testing.T) {
+	content, err := os.ReadFile(filepath.Join("..", "..", "tooling", "latex", "resources.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var resources []struct {
+		Name string `json:"name"`
+	}
+	if err := json.Unmarshal(content, &resources); err != nil {
+		t.Fatal(err)
+	}
+	present := make(map[string]bool)
+	for _, item := range resources {
+		if strings.HasSuffix(item.Name, ".otf") {
+			present[item.Name] = true
+		}
+	}
+	// The roman faces the generated preamble names explicitly, plus every face
+	// NFSS can select for the sans and typewriter families. The sans design
+	// sizes are what a formula needs at its script and scriptscript levels.
+	required := []string{
+		"lmroman10-regular.otf", "lmroman10-bold.otf",
+		"lmroman10-italic.otf", "lmroman10-bolditalic.otf",
+		"lmsans8-regular.otf", "lmsans8-oblique.otf",
+		"lmsans9-regular.otf", "lmsans9-oblique.otf",
+		"lmsans10-regular.otf", "lmsans10-oblique.otf",
+		"lmsans10-bold.otf", "lmsans10-boldoblique.otf",
+		"lmsans12-regular.otf", "lmsans12-oblique.otf",
+		"lmsans17-regular.otf", "lmsans17-oblique.otf",
+		"lmmono8-regular.otf", "lmmono9-regular.otf",
+		"lmmono10-regular.otf", "lmmono10-italic.otf", "lmmono12-regular.otf",
+		"lmmonolt10-regular.otf", "lmmonolt10-bold.otf",
+		"lmmonolt10-oblique.otf", "lmmonolt10-boldoblique.otf",
+	}
+	for _, name := range required {
+		if !present[name] {
+			t.Fatalf("bundle is missing %s, which fontspec selects through NFSS", name)
+		}
+	}
+	// Each family needs more than one design size, or a formula's smaller
+	// levels fall back to a face the bundle does not carry.
+	sizes := 0
+	for name := range present {
+		if strings.HasPrefix(name, "lmsans") && strings.HasSuffix(name, "-regular.otf") {
+			sizes++
+		}
+	}
+	if sizes < 5 {
+		t.Fatalf("bundle carries %d Latin Modern Sans design sizes, want every supported size", sizes)
+	}
+}

@@ -51,7 +51,14 @@ Full license texts accompany this file in the `licenses/` directory.
 3. Latin Modern fonts
 ---------------------
 
-  Component : Latin Modern (lmroman10 regular/bold/italic/bolditalic, OpenType)
+  Component : Latin Modern (OpenType), comprising the roman, sans serif, and
+              monospaced families:
+                lmroman10    regular, bold, italic, bolditalic
+                lmsans8/9/10/12/17   regular, oblique
+                lmsans10             bold, boldoblique
+                lmmono8/9/10/12      regular
+                lmmono10             italic
+                lmmonolt10           regular, bold, oblique, boldoblique
   Author    : GUST e-foundry, derived from Computer Modern by Donald E. Knuth
   License   : GUST Font License (a LPPL-1.3c–compatible font license)
                (licenses/GUST-FONT-LICENSE.txt)
@@ -59,7 +66,16 @@ Full license texts accompany this file in the `licenses/` directory.
   The GUST Font License permits redistribution and use, including within
   larger works. AhdCode ships these fonts so a document compiles identically
   on a machine with no fonts installed; the generated document preamble names
-  the bundled font files explicitly and never relies on a host system font.
+  the bundled roman font files explicitly and never relies on a host system
+  font.
+
+  The sans serif and monospaced families are redistributed because fontspec
+  and NFSS select them for the sans and typewriter math alphabets and text
+  families, such as \mathsf and \texttt. Latin Modern is an optical-size
+  family, so several design sizes of one face are required: a formula sets its
+  script and scriptscript levels at smaller sizes, which select a different
+  design size of the same family. The whole license above covers every listed
+  face; the licensing does not differ between them.
 
 
 4. Computer Modern Type 1 fonts and metrics
