@@ -95,4 +95,8 @@ type Class struct {
 	Fields      []Field
 	Constructor CallableID
 	Methods     []CallableID
+	// Operations names the additional members a compiler-supplied Class
+	// publishes through built-in type operations rather than through declared
+	// fields or methods, so member existence stays truthful for them.
+	Operations []string
 }

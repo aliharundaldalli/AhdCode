@@ -504,6 +504,13 @@ func (a *analyzer) analyzeCallWithCallee(call *ast.CallExpr, callee expressionIn
 		if symbol == nil {
 			return expressionInfo{typeValue: types.Invalid, nullState: MaybeNull}
 		}
+		if hint, supplied := timeConstructionHint(class.Symbol); supplied {
+			// A compiler-supplied Time value is produced by a Time function
+			// that validates its arguments, never by direct construction.
+			a.error(codeCallArguments, fmt.Sprintf("%s values are not constructed directly", class.Symbol.Name), call.Span(), hint)
+			a.analyzeCallArguments(call, current, flow, nil)
+			return expressionInfo{typeValue: types.Class{Symbol: class.Symbol}, nullState: NonNull}
+		}
 		arguments := a.analyzeCallArguments(call, current, flow, symbol.Constructor)
 		a.validateCallArguments(call, symbol.Constructor, arguments)
 		a.result.SelectedCallables[call] = symbol.Constructor
@@ -565,8 +572,101 @@ func typeOperationFor(receiver types.Type, name string) (TypeOperation, bool) {
 		if name == "eject" {
 			return PairEject, true
 		}
+	case types.ClassKind:
+		return timeOperationFor(receiver, name)
 	}
 	return "", false
+}
+
+// timeConstructionHint names the Time function that produces one
+// compiler-supplied value, so direct construction has an actionable message.
+func timeConstructionHint(identity *types.ClassSymbol) (string, bool) {
+	if identity == nil || identity.ModuleID != timeModuleID {
+		return "", false
+	}
+	switch identity.Name {
+	case "DateTime":
+		return "create a DateTime with Time.now() or Time.dateTime(...)", true
+	case "Duration":
+		return "create a Duration with Time.duration(...) or Time.between(...)", true
+	case "Calendar":
+		return "use Calendar members directly, as in Time.Calendar.isLeapYear(2028)", true
+	}
+	return "", false
+}
+
+// timeOperationFor names the built-in member a Time Class publishes. Only the
+// compiler-supplied Time identities match, so a user Class is never affected.
+func timeOperationFor(receiver types.Type, name string) (TypeOperation, bool) {
+	class, ok := receiver.(types.Class)
+	if !ok || class.Symbol == nil || class.Symbol.ModuleID != timeModuleID {
+		return "", false
+	}
+	// Calendar is used through its Class reference; DateTime through a value.
+	switch {
+	case class.Symbol.Name == "Calendar" && class.Reference:
+		operation, known := calendarOperationNames[name]
+		return operation, known
+	case class.Symbol.Name == "DateTime" && !class.Reference:
+		operation, known := dateTimeOperationNames[name]
+		return operation, known
+	}
+	return "", false
+}
+
+var dateTimeOperationNames = map[string]TypeOperation{
+	"before": DateTimeBefore, "after": DateTimeAfter,
+	"sameMoment": DateTimeSameMoment, "toString": DateTimeToString,
+}
+
+var calendarOperationNames = map[string]TypeOperation{
+	"isLeapYear": CalendarIsLeapYear, "daysInMonth": CalendarDaysInMonth,
+	"weekday": CalendarWeekday,
+}
+
+// timeOperationShape is the fixed call shape of one Time Class member.
+type timeOperationShape struct {
+	parameters []types.Type
+	result     types.Type
+	hint       string
+}
+
+func timeOperationShapes() map[TypeOperation]timeOperationShape {
+	instant := types.Class{Symbol: timeDateTimeClass}
+	return map[TypeOperation]timeOperationShape{
+		DateTimeBefore:      {[]types.Type{instant}, types.Bool, "pass one DateTime to compare against"},
+		DateTimeAfter:       {[]types.Type{instant}, types.Bool, "pass one DateTime to compare against"},
+		DateTimeSameMoment:  {[]types.Type{instant}, types.Bool, "pass one DateTime to compare against"},
+		DateTimeToString:    {nil, types.String, "call toString with no argument"},
+		CalendarIsLeapYear:  {[]types.Type{types.Int}, types.Bool, "pass one Int year"},
+		CalendarDaysInMonth: {[]types.Type{types.Int, types.Int}, types.Int, "pass an Int year and an Int month"},
+		CalendarWeekday:     {[]types.Type{types.Int, types.Int, types.Int}, types.Int, "pass an Int year, month, and day"},
+	}
+}
+
+// analyzeTimeOperation checks one Time Class member. Every argument type is
+// fixed, so this reuses the ordinary assignability and null-state rules.
+func (a *analyzer) analyzeTimeOperation(call *ast.CallExpr, operation TypeOperation, shape timeOperationShape, current *scope, flow flowState) expressionInfo {
+	result := expressionInfo{typeValue: shape.result, nullState: NonNull}
+	if len(call.Arguments) != len(shape.parameters) {
+		a.error(codeCallArguments, fmt.Sprintf("%s expects %d argument(s); received %d", operation, len(shape.parameters), len(call.Arguments)), call.Span(), shape.hint)
+		a.analyzeTypeOperationArguments(call, current, flow, nil)
+		return result
+	}
+	for index, expected := range shape.parameters {
+		argument := a.analyzeExpressionExpected(call.Arguments[index].Value, current, flow, expected)
+		if argument.invalid() {
+			continue
+		}
+		if argument.nullState != NonNull {
+			a.nullableError(string(operation), call.Arguments[index].Value, argument.nullState)
+			continue
+		}
+		if !types.Assignable(expected, argument.typeValue) {
+			a.typeMismatch(call.Arguments[index].Span(), expected, argument.typeValue, string(operation)+" argument")
+		}
+	}
+	return result
 }
 
 var stringOperationNames = map[string]TypeOperation{
@@ -634,6 +734,9 @@ func (a *analyzer) analyzeTypeOperation(call *ast.CallExpr, member *ast.MemberEx
 	if shape, isString := stringOperationShapes[operation]; isString {
 		return a.analyzeStringOperation(call, operation, shape, current, flow), true
 	}
+	if shape, isTime := timeOperationShapes()[operation]; isTime {
+		return a.analyzeTimeOperation(call, operation, shape, current, flow), true
+	}
 	switch operation {
 	case ListAdd, ListEject, PairEject:
 		return a.analyzeCollectionMutation(call, operation, receiver, current, flow), true
@@ -656,6 +759,9 @@ func typeOperationFailure(operation TypeOperation, receiver types.Type) expressi
 	if shape, known := stringOperationShapes[operation]; known {
 		return expressionInfo{typeValue: shape.result, nullState: NonNull}
 	}
+	if shape, known := timeOperationShapes()[operation]; known {
+		return expressionInfo{typeValue: shape.result, nullState: NonNull}
+	}
 	switch operation {
 	case ListAdd, ListEject, PairEject, ListSort, ListReverse, ListShuffle:
 		return expressionInfo{typeValue: types.Nothing, nullState: NonNull}
@@ -670,6 +776,9 @@ func typeOperationFailure(operation TypeOperation, receiver types.Type) expressi
 
 func typeOperationHint(operation TypeOperation, receiver types.Type) string {
 	if shape, known := stringOperationShapes[operation]; known {
+		return shape.hint
+	}
+	if shape, known := timeOperationShapes()[operation]; known {
 		return shape.hint
 	}
 	element := types.Invalid

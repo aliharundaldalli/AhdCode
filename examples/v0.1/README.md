@@ -31,5 +31,6 @@ ahdcode run examples/v0.1/14_grade_app.ahd
 | `12_math.ahd` | explicit Math module and seeding |
 | `13_null_safety.ahd` | flow-sensitive null refinement |
 | `14_grade_app.ahd` | compact interactive CLI application |
+| `15_time.ahd` | Time module: DateTime, Duration, Calendar, monotonic |
 
 `Greeting.ahd` is the sibling module used by `11_modules.ahd`.

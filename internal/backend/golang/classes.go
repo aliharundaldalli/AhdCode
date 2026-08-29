@@ -154,6 +154,11 @@ func (current *layout) memberNames() []string {
 			add(entry.impl.Name)
 		}
 	}
+	// A compiler-supplied Class reaches some members through built-in type
+	// operations rather than declared slots; they are published all the same.
+	for _, name := range current.class.Operations {
+		add(name)
+	}
 	sort.Strings(names)
 	return names
 }

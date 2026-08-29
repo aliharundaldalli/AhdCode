@@ -172,6 +172,20 @@ const (
 	StringCount TypeOperation = "String.count"
 	// StringIndex is the first character index of a search text.
 	StringIndex TypeOperation = "String.index"
+
+	// DateTimeBefore, DateTimeAfter, and DateTimeSameMoment order two moments
+	// without giving AhdCode operator overloading.
+	DateTimeBefore     TypeOperation = "DateTime.before"
+	DateTimeAfter      TypeOperation = "DateTime.after"
+	DateTimeSameMoment TypeOperation = "DateTime.sameMoment"
+	// DateTimeToString is the stable, locale-independent moment text.
+	DateTimeToString TypeOperation = "DateTime.toString"
+	// CalendarIsLeapYear, CalendarDaysInMonth, and CalendarWeekday are the
+	// Calendar members. They are reached through the Calendar Class reference,
+	// so the language gains no static-method concept.
+	CalendarIsLeapYear  TypeOperation = "Calendar.isLeapYear"
+	CalendarDaysInMonth TypeOperation = "Calendar.daysInMonth"
+	CalendarWeekday     TypeOperation = "Calendar.weekday"
 )
 
 // listOperationMutates reports whether one List operation rewrites its

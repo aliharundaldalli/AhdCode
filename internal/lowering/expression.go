@@ -430,6 +430,8 @@ func typeOperationArgument(operation semantic.TypeOperation, receiver ir.Type) (
 	case semantic.StringSplit, semantic.StringReplace, semantic.StringContains,
 		semantic.StringStartsWith, semantic.StringEndsWith, semantic.StringCount, semantic.StringIndex:
 		return ir.Type{Kind: ir.StringType}, true
+	case semantic.CalendarIsLeapYear, semantic.CalendarDaysInMonth, semantic.CalendarWeekday:
+		return ir.Type{Kind: ir.IntType}, true
 	}
 	return ir.Type{Kind: ir.InvalidType}, false
 }

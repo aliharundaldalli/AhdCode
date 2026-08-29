@@ -24,14 +24,15 @@ Bu rehber, programlamaya yeni başlayanlar için tasarlanmıştır. Sizi günlü
 - [19. Modüller ve bring](#19-modüller-ve-bring)
 - [20. Temel işlevler modülü (Fundamentals)](#20-temel-işlevler-modülü-fundamentals)
 - [21. Matematik modülü (Math)](#21-matematik-modülü-math)
-- [22. Kod biçimlendirici (Formatter)](#22-kod-biçimlendirici-formatter)
-- [23. Komut satırı (CLI)](#23-komut-satırı-cli)
-- [24. Etkileşimli kabuk (REPL)](#24-etkileşimli-kabuk-repl)
-- [25. Başlangıçta sık yapılan hatalar](#25-başlangıçta-sık-yapılan-hatalar)
-- [26. Küçük Projeler](#26-küçük-projeler)
-- [27. Alıştırmalar](#27-alıştırmalar)
-- [28. Çözüm İpuçları](#28-çözüm-ipuçları)
-- [29. Sonraki adımlar ve teknik belgeler](#29-sonraki-adımlar-ve-teknik-belgeler)
+- [22. Zaman modülü (Time)](#22-zaman-modülü-time)
+- [23. Kod biçimlendirici (Formatter)](#23-kod-biçimlendirici-formatter)
+- [24. Komut satırı (CLI)](#24-komut-satırı-cli)
+- [25. Etkileşimli kabuk (REPL)](#25-etkileşimli-kabuk-repl)
+- [26. Başlangıçta sık yapılan hatalar](#26-başlangıçta-sık-yapılan-hatalar)
+- [27. Küçük Projeler](#27-küçük-projeler)
+- [28. Alıştırmalar](#28-alıştırmalar)
+- [29. Çözüm İpuçları](#29-çözüm-ipuçları)
+- [30. Sonraki adımlar ve teknik belgeler](#30-sonraki-adımlar-ve-teknik-belgeler)
 
 ## 1. AhdCode nedir?
 
@@ -1273,7 +1274,182 @@ genelindeki bu tek, paylaşılan durumu tüketir. Sınırları aynı olan (örne
 > entropisinden alınır.
 
 
-## 22. Kod biçimlendirici (Formatter)
+## 22. Zaman modülü (Time)
+
+`Time` modülü programınızın saati okumasını, tarihlerle çalışmasını ve beklemesini sağlar. `Math` gibi bu modül de açıkça içe aktarılmalıdır.
+
+AhdCode'da `Time.DateTime` biçiminde tip yazımı yoktur; bu yüzden adını kullanacağınız tipleri içe aktarırsınız:
+
+```ahd
+bring Time
+from Time bring DateTime
+from Time bring Duration
+```
+
+### Şu anki tarih ve saat
+
+```ahd
+bring Time
+from Time bring DateTime
+
+current: DateTime := Time.now()
+
+write(current.year)
+write(current.month)
+write(current.day)
+```
+
+`Time.now()` bilgisayarınızın **yerel** saatini verir. Sürüm 0.1'de saat dilimi özelliği hiç yoktur, bu yüzden ayarlanacak bir şey de yoktur.
+
+Bir `DateTime` içinde okuyabileceğiniz sekiz bilgi vardır:
+
+```text
+year  month  day  hour  minute  second  millisecond  weekday
+```
+
+`weekday` Pazartesi'den başlar:
+
+| gün | sayı |
+|---|---|
+| Pazartesi | 1 |
+| Salı | 2 |
+| Çarşamba | 3 |
+| Perşembe | 4 |
+| Cuma | 5 |
+| Cumartesi | 6 |
+| Pazar | 7 |
+
+Bu değerler yalnızca okunur. `current.year = 2030` yazmak, herhangi bir `Constant` değeri değiştirmek gibi hatadır.
+
+### Kendi tarihinizi oluşturmak
+
+```ahd
+bring Time
+from Time bring DateTime
+
+birthday: DateTime := Time.dateTime(
+    year: 2028,
+    month: 2,
+    day: 29
+)
+
+write(birthday.toString())
+```
+
+Beklenen çıktı:
+
+```text
+2028-02-29 00:00:00
+```
+
+`hour`, `minute`, `second` ve `millisecond` isteğe bağlıdır ve `0` ile başlar.
+
+Var olmayan bir tarih isterseniz `ValueError` alırsınız. 2026 artık yıl olmadığı için `2026-02-29` gerçek bir gün değildir; AhdCode bunu sessizce 1 Mart'a kaydırmak yerine reddeder.
+
+`toString()` her dilde ve her bilgisayarda hep `YYYY-MM-DD HH:MM:SS` biçiminde yazar.
+
+### İki anı karşılaştırmak
+
+AhdCode tarihlerde `<` ve `>` kullanmaz. Soruyu kelimelerle sorarsınız:
+
+```ahd
+bring Time
+from Time bring DateTime
+
+morning: DateTime := Time.dateTime(year: 2026, month: 1, day: 1, hour: 9)
+evening: DateTime := Time.dateTime(year: 2026, month: 1, day: 1, hour: 21)
+
+write(morning.before(evening))
+write(morning.after(evening))
+write(morning.sameMoment(morning))
+```
+
+Beklenen çıktı:
+
+```text
+true
+false
+true
+```
+
+İki tarihin aynı anı gösterip göstermediğini sormak için `sameMoment` kullanın. `==` farklı bir şey sorar: aynı nesne olup olmadıklarını. Bu, her Sınıf (Class) için geçerli olan normal kuraldır.
+
+### Aralarında ne kadar zaman var
+
+```ahd
+bring Time
+from Time bring DateTime
+from Time bring Duration
+
+first: DateTime := Time.dateTime(year: 2026, month: 1, day: 1)
+second: DateTime := Time.dateTime(year: 2026, month: 1, day: 2)
+
+gap: Duration := Time.between(first, second)
+
+write(gap.milliseconds)
+write(gap.seconds)
+```
+
+Beklenen çıktı:
+
+```text
+86400000
+86400.0
+```
+
+`Time.between(first, second)` "second eksi first" demektir. İkisinin yerini değiştirirseniz negatif bir `Duration` elde edersiniz; bir şeyin geçmişte kaldığını anlamak için bu kullanışlıdır.
+
+`Time.duration(milliseconds: 1500)` ile doğrudan bir `Duration` da oluşturabilirsiniz.
+
+### Takvime soru sormak
+
+Bazen belirli bir tarihi değil, doğrudan takvimi merak edersiniz:
+
+```ahd
+bring Time
+
+write(Time.Calendar.isLeapYear(2028))
+write(Time.Calendar.isLeapYear(2100))
+write(Time.Calendar.daysInMonth(2028, 2))
+write(Time.Calendar.weekday(2026, 8, 29))
+```
+
+Beklenen çıktı:
+
+```text
+true
+false
+29
+6
+```
+
+Artık yıl 4'e bölünür, ancak `00` ile biten bir yılın 400'e de bölünmesi gerekir. 2000 artık yıldır, 2100 değildir.
+
+### Ölçmek ve beklemek
+
+```ahd
+bring Time
+
+start: Real := Time.monotonic()
+
+Time.sleep(500)
+
+elapsed: Real := Time.monotonic() - start
+
+write(elapsed >= 0.5)
+```
+
+Birimlere dikkat edin, bilerek farklıdır:
+
+- `Time.sleep(...)` **milisaniye** cinsinden bekler.
+- `Time.monotonic()` **saniye** cinsinden değer verir.
+
+`Time.monotonic()` tek başına bir tarih değildir ve kendi başına bir anlam taşımaz. Yalnızca iki okuma arasındaki fark olarak işe yarar; bir işin ne kadar sürdüğünü ölçmek için istediğiniz tam olarak budur.
+
+`Time.sleep(0)` hemen geri döner. Negatif bir bekleme `ValueError` verir, çünkü "eksi bir milisaniye" beklemek gerçek bir istek değildir.
+
+
+## 23. Kod biçimlendirici (Formatter)
 
 Programınızdaki boşluklar veya satır düzeni dağınık olsa bile kodunuz
 çalışabilir. Ancak kod biçimlendirici (formatter), yazdığınız yorum satırlarını koruyarak dosyanızı AhdCode'un ortak standart stiline göre yeniden düzenler:
@@ -1285,7 +1461,7 @@ ahdcode format --check hello.ahd
 
 İlk komut dosyayı doğrudan düzenleyerek günceller (bu işlem "idempotent"tir: tekrar tekrar çalıştırsanız da aynı sonucu verir ve fazladan değişiklik yapmaz). İkinci komut ise sadece dosyanın stilini kontrol eder, hiçbir şeyi değiştirmez. Bu komut, ekip projelerinde kod stilinin düzgün olduğundan emin olmak için kullanışlıdır.
 
-## 23. Komut satırı (CLI)
+## 24. Komut satırı (CLI)
 
 AhdCode basit bir komut satırı arayüzüyle gelir.
 
@@ -1295,7 +1471,7 @@ AhdCode basit bir komut satırı arayüzüyle gelir.
 - `ahdcode --help`: Tüm komutlar için yardım ekranını gösterir.
 - `ahdcode --version`: Mevcut derleyici sürümünü gösterir.
 
-## 24. Etkileşimli kabuk (REPL)
+## 25. Etkileşimli kabuk (REPL)
 
 Küçük denemeler yapmak için `ahdcode` komutunu tek başına çalıştırarak
 REPL'i (Oku-Değerlendir-Yazdır Döngüsü) açabilirsiniz. Bunun için bir `.ahd`
@@ -1314,7 +1490,7 @@ error: duplicate declaration
 
 > **Dikkat:** REPL'de yeni satırlar girdiğinizde arka planda başarılı kodlar baştan itibaren tekrar çalıştırılabilir (replayed). Eğer `Math.seed(...)` kullanmıyorsanız, bu durum rastgele sayıların değişmesine yol açabilir. Bu yüzden kullanıcı girişi (`take`) gibi etkileşimli denemeleri REPL yerine bir `.ahd` dosyası oluşturup orada test edin.
 
-## 25. Başlangıçta sık yapılan hatalar
+## 26. Başlangıçta sık yapılan hatalar
 
 İşte karşılaşabileceğiniz yaygın hatalar ve onları düzeltme yolları:
 
@@ -1418,7 +1594,7 @@ error: duplicate declaration
 - Neden: Tohum (seed) verilmemiş rastgelelik, OS entropisini kullanır ve tekrarlanamaz.
 - Doğru: Zar atmadan önce `Math.seed(42)` gibi bir tohum değeri verin.
 
-## 26. Küçük Projeler
+## 27. Küçük Projeler
 
 Bu küçük projeler rehberde öğretilenleri bir araya getirir. Onları tek başınıza kurmayı deneyin!
 
@@ -1430,7 +1606,7 @@ Bu küçük projeler rehberde öğretilenleri bir araya getirir. Onları tek ba�
 6. **Sınıflarla (Class) Öğrenci Kaydı**: Bir `Student` sınıfı ve bir `Course` (Kurs) sınıfı oluşturun. Course içinde bir `List<Student>` bulunsun. Kursa yeni bir öğrenci eklemek için bir metot, kursun genel not ortalamasını hesaplamak için başka bir metot yazın.
 7. **Tohumlu (Seeded) Rastgele Oyun**: `Math.seed(42)` kullanarak 1 ile 100 arasında "gizli bir sayı" üretin. Kullanıcıdan sayıyı tahmin etmesini isteyin. Doğru tahmin edene kadar "daha yüksek" veya "daha düşük" diye yönlendirin. Tohum kullanıldığı için, gizli sayı programı her çalıştırdığınızda aynı olacaktır—test yapmak için mükemmel!
 
-## 27. Alıştırmalar
+## 28. Alıştırmalar
 
 Tam çözümleri hemen aramak yerine her programı küçük adımlarla kurun.
 
@@ -1460,7 +1636,7 @@ Tam çözümleri hemen aramak yerine her programı küçük adımlarla kurun.
 19. `break` ve `continue` kullanarak çok geniş bir aralık içindeki ilk 5 çift sayıyı bulun, ancak 3'e bölünenleri `continue` ile atlayın.
 20. Dikdörtgen alanı hesaplayan bir fonksiyona sahip `MathUtils.ahd` adında bir modül oluşturun ve bir `main.ahd` içinden `bring` ile çağırarak kullanın.
 
-## 28. Çözüm İpuçları
+## 29. Çözüm İpuçları
 
 1. `take` sonucu String'dir; yaş için `int(...)` ve yeni yaş için `+ 1` kullanın.
 2. Formülü küçük parçalara ayırın; `real(take(...))` ile başlayın ve Real sayılarını kullanın.
@@ -1483,7 +1659,7 @@ Tam çözümleri hemen aramak yerine her programı küçük adımlarla kurun.
 19. `if i % 3 == 0 { continue }`. `if count == 5 { break }`.
 20. `from MathUtils bring alanHesapla` kullanabilirsiniz.
 
-## 29. Sonraki adımlar ve teknik belgeler
+## 30. Sonraki adımlar ve teknik belgeler
 
 Bu rehberi tamamladıktan sonra dilin ayrıntılarını şu belgelerden
 derinleştirebilirsiniz:

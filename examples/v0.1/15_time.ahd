@@ -1,0 +1,56 @@
+bring Time
+from Time bring DateTime
+from Time bring Duration
+
+// The current local date and time.
+current: DateTime := Time.now()
+
+write(current.year)
+write(current.month)
+write(current.day)
+write(current.weekday)
+
+// A civil date. hour, minute, second, and millisecond default to zero.
+opening: DateTime := Time.dateTime(
+    year: 2028,
+    month: 2,
+    day: 29,
+    hour: 9,
+    minute: 30
+)
+
+write(opening.toString())
+write(opening.before(current))
+
+// Calendar answers questions about the Gregorian calendar itself.
+write(Time.Calendar.isLeapYear(2028))
+write(Time.Calendar.isLeapYear(2100))
+write(Time.Calendar.daysInMonth(2028, 2))
+write(Time.Calendar.weekday(2026, 8, 29))
+
+// The difference between two moments is a Duration, and it is signed.
+newYear: DateTime := Time.dateTime(
+    year: 2026,
+    month: 1,
+    day: 1
+)
+
+theNextDay: DateTime := Time.dateTime(
+    year: 2026,
+    month: 1,
+    day: 2
+)
+
+ahead: Duration := Time.between(newYear, theNextDay)
+behind: Duration := Time.between(theNextDay, newYear)
+
+write(ahead.milliseconds)
+write(ahead.seconds)
+write(behind.milliseconds)
+
+// monotonic measures elapsed seconds; sleep waits in milliseconds.
+start: Real := Time.monotonic()
+Time.sleep(100)
+elapsed: Real := Time.monotonic() - start
+
+write(elapsed >= 0.1)

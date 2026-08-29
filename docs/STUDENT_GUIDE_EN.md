@@ -24,14 +24,15 @@ This guide is designed for beginners. It will walk you through the AhdCode langu
 - [19. Modules and bring](#19-modules-and-bring)
 - [20. Fundamentals Module](#20-fundamentals-module)
 - [21. Math Module](#21-math-module)
-- [22. Formatter](#22-formatter)
-- [23. CLI](#23-cli)
-- [24. REPL](#24-repl)
-- [25. Common beginner mistakes](#25-common-beginner-mistakes)
-- [26. Mini Projects](#26-mini-projects)
-- [27. Exercises](#27-exercises)
-- [28. Solution Hints](#28-solution-hints)
-- [29. Next steps and technical documentation](#29-next-steps-and-technical-documentation)
+- [22. Time Module](#22-time-module)
+- [23. Formatter](#23-formatter)
+- [24. CLI](#24-cli)
+- [25. REPL](#25-repl)
+- [26. Common beginner mistakes](#26-common-beginner-mistakes)
+- [27. Mini Projects](#27-mini-projects)
+- [28. Exercises](#28-exercises)
+- [29. Solution Hints](#29-solution-hints)
+- [30. Next steps and technical documentation](#30-next-steps-and-technical-documentation)
 
 Türkçe sürüm: [Türkçe Öğrenci Rehberi](STUDENT_GUIDE_TR.md)
 
@@ -1270,7 +1271,182 @@ Using the same seed again reproduces the same sequence of random values. Without
 > **Technical note:** The sequence is pseudo-random. An unseeded run takes its starting value from operating-system entropy.
 
 
-## 22. Formatter
+## 22. Time Module
+
+The `Time` module lets your program read the clock, work with dates, and wait. Like `Math`, it must be imported.
+
+AhdCode has no `Time.DateTime` type syntax, so you import the types you want to name:
+
+```ahd
+bring Time
+from Time bring DateTime
+from Time bring Duration
+```
+
+### The current date and time
+
+```ahd
+bring Time
+from Time bring DateTime
+
+current: DateTime := Time.now()
+
+write(current.year)
+write(current.month)
+write(current.day)
+```
+
+`Time.now()` gives you your computer's **local** time. Version 0.1 has no timezone features at all, so there is nothing to configure.
+
+A `DateTime` has eight pieces of information you can read:
+
+```text
+year  month  day  hour  minute  second  millisecond  weekday
+```
+
+`weekday` counts from Monday:
+
+| day | number |
+|---|---|
+| Monday | 1 |
+| Tuesday | 2 |
+| Wednesday | 3 |
+| Thursday | 4 |
+| Friday | 5 |
+| Saturday | 6 |
+| Sunday | 7 |
+
+These are read-only. Writing `current.year = 2030` is an error, exactly like changing any other `Constant`.
+
+### Building a date yourself
+
+```ahd
+bring Time
+from Time bring DateTime
+
+birthday: DateTime := Time.dateTime(
+    year: 2028,
+    month: 2,
+    day: 29
+)
+
+write(birthday.toString())
+```
+
+Expected output:
+
+```text
+2028-02-29 00:00:00
+```
+
+`hour`, `minute`, `second`, and `millisecond` are optional and start at `0`.
+
+If you ask for a date that does not exist, you get a `ValueError`. `2026-02-29` is not a real day, because 2026 is not a leap year, so AhdCode refuses it instead of quietly sliding to March 1.
+
+`toString()` always writes `YYYY-MM-DD HH:MM:SS`, in every language and on every computer.
+
+### Comparing two moments
+
+AhdCode does not use `<` and `>` on dates. You ask the question in words:
+
+```ahd
+bring Time
+from Time bring DateTime
+
+morning: DateTime := Time.dateTime(year: 2026, month: 1, day: 1, hour: 9)
+evening: DateTime := Time.dateTime(year: 2026, month: 1, day: 1, hour: 21)
+
+write(morning.before(evening))
+write(morning.after(evening))
+write(morning.sameMoment(morning))
+```
+
+Expected output:
+
+```text
+true
+false
+true
+```
+
+Use `sameMoment` to ask whether two dates mean the same moment. `==` asks a different question — whether they are the same object — which is the normal rule for every Class.
+
+### How much time is between them
+
+```ahd
+bring Time
+from Time bring DateTime
+from Time bring Duration
+
+first: DateTime := Time.dateTime(year: 2026, month: 1, day: 1)
+second: DateTime := Time.dateTime(year: 2026, month: 1, day: 2)
+
+gap: Duration := Time.between(first, second)
+
+write(gap.milliseconds)
+write(gap.seconds)
+```
+
+Expected output:
+
+```text
+86400000
+86400.0
+```
+
+`Time.between(first, second)` means "second minus first". Swapping the two gives a negative `Duration`, which is useful when you want to know that something is in the past.
+
+You can also make a `Duration` directly with `Time.duration(milliseconds: 1500)`.
+
+### Asking about the calendar
+
+Sometimes you only want to know something about the calendar, not about a particular date:
+
+```ahd
+bring Time
+
+write(Time.Calendar.isLeapYear(2028))
+write(Time.Calendar.isLeapYear(2100))
+write(Time.Calendar.daysInMonth(2028, 2))
+write(Time.Calendar.weekday(2026, 8, 29))
+```
+
+Expected output:
+
+```text
+true
+false
+29
+6
+```
+
+A leap year divides by 4, but a year ending in `00` must divide by 400. That is why 2000 is a leap year and 2100 is not.
+
+### Measuring and waiting
+
+```ahd
+bring Time
+
+start: Real := Time.monotonic()
+
+Time.sleep(500)
+
+elapsed: Real := Time.monotonic() - start
+
+write(elapsed >= 0.5)
+```
+
+Watch the units, because they are different on purpose:
+
+- `Time.sleep(...)` waits for a number of **milliseconds**.
+- `Time.monotonic()` reports **seconds**.
+
+`Time.monotonic()` on its own is not a date and means nothing by itself. It is only useful as a difference between two readings, which is exactly what you want for measuring how long something took.
+
+`Time.sleep(0)` returns immediately. A negative wait is a `ValueError`, because waiting "minus one millisecond" is not a real request.
+
+
+## 23. Formatter
 
 Your program may work even when its spacing and line layout are untidy. The formatter rewrites the file into AhdCode's shared style while preserving your comments:
 
@@ -1281,7 +1457,7 @@ ahdcode format --check hello.ahd
 
 The first command updates the file directly (it is idempotent: running it again changes nothing). The second command checks the style without changing anything, which is useful in team environments to ensure code style is followed.
 
-## 23. CLI
+## 24. CLI
 
 AhdCode comes with a simple command-line interface.
 
@@ -1291,7 +1467,7 @@ AhdCode comes with a simple command-line interface.
 - `ahdcode --help`: Shows help for all commands.
 - `ahdcode --version`: Shows the current compiler version.
 
-## 24. REPL
+## 25. REPL
 
 Run `ahdcode` by itself to open the REPL (Read-Eval-Print Loop) for small experiments without a file. 
 
@@ -1308,7 +1484,7 @@ error: duplicate declaration
 
 > **Watch out:** Because the REPL replays successful work when you enter new lines, random behavior might replay unless you use `Math.seed(...)` for deterministic operations. Test interactive input with `take` in a `.ahd` file rather than in the REPL.
 
-## 25. Common beginner mistakes
+## 26. Common beginner mistakes
 
 Here are common errors you might see and how to fix them:
 
@@ -1412,7 +1588,7 @@ Here are common errors you might see and how to fix them:
 - Why: Unseeded random uses the OS entropy and is not reproducible.
 - Correct: Use `Math.seed(42)` before rolling.
 
-## 26. Mini Projects
+## 27. Mini Projects
 
 These mini projects combine the ideas taught in this guide. Try building them on your own!
 
@@ -1424,7 +1600,7 @@ These mini projects combine the ideas taught in this guide. Try building them on
 6. **Student Record with Class**: Create a `Student` Class and a `Course` Class. A Course contains a `List<Student>`. Write a method to add a student, and a method to calculate the class average.
 7. **Seeded Random Game**: Use `Math.seed(42)` to generate a "secret number" between 1 and 100. Ask the user to guess it. Tell them "higher" or "lower" until they guess it. Because it is seeded, the secret number will be the same every time you run it—great for testing!
 
-## 27. Exercises
+## 28. Exercises
 
 Build each program in small steps rather than looking for a complete solution immediately.
 
@@ -1454,7 +1630,7 @@ Build each program in small steps rather than looking for a complete solution im
 19. Demonstrate `break` and `continue` by finding the first 5 even numbers in a large range, skipping numbers divisible by 3.
 20. Create a module `MathUtils.ahd` with a function for calculating the area of a rectangle, and `bring` it into a `main.ahd` file to use it.
 
-## 28. Solution Hints
+## 29. Solution Hints
 
 1. `take` returns String; convert the age with `int(...)` and add `1`.
 2. Break the formula into small parts. Start with `real(take(...))` and use Real literals.
@@ -1477,7 +1653,7 @@ Build each program in small steps rather than looking for a complete solution im
 19. `if i % 3 == 0 { continue }`. `if count == 5 { break }`.
 20. Use `from MathUtils bring calculateArea`.
 
-## 29. Next steps and technical documentation
+## 30. Next steps and technical documentation
 
 After completing this guide, continue with the detailed project documents:
 

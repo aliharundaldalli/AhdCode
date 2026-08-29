@@ -749,3 +749,55 @@ write(report.count())
 		t.Fatalf("a Class method lowered to a built-in type operation:\n%s", dump)
 	}
 }
+
+func TestTimeModuleLowersItsClassDeclarations(t *testing.T) {
+	result := lowerSources(t, map[string]string{"/Main.ahd": `bring Time
+from Time bring DateTime
+from Time bring Duration
+
+value: DateTime := Time.dateTime(year: 2026, month: 1, day: 1)
+wait: Duration := Time.duration(milliseconds: 5)
+
+write(value.year)
+write(value.before(value))
+write(wait.seconds)
+write(Time.Calendar.isLeapYear(2028))
+`}, "/Main.ahd")
+	dump := ir.Dump(result.Compilation)
+	for _, expected := range []string{
+		"builtin:Time::class::DateTime", "builtin:Time::class::Duration",
+		"builtin:Time::class::Calendar", "builtin:Time::dateTime",
+		"builtin:Time::duration", "builtin:core::DateTime.before",
+		"builtin:core::Calendar.isLeapYear",
+	} {
+		if !strings.Contains(dump, expected) {
+			t.Fatalf("Time did not lower to %s:\n%s", expected, dump)
+		}
+	}
+	if strings.Contains(dump, "Invalid") {
+		t.Fatalf("a Time declaration left an Invalid type in the IR:\n%s", dump)
+	}
+}
+
+// TestTimeClassesPublishTheirBuiltInMembers keeps member existence truthful for
+// the members reached through built-in type operations.
+func TestTimeClassesPublishTheirBuiltInMembers(t *testing.T) {
+	result := lowerSources(t, map[string]string{"/Main.ahd": "bring Time\n\nwrite(Time.Calendar.isLeapYear(2028))\n"}, "/Main.ahd")
+	for _, module := range result.Compilation.Modules {
+		if module == nil || string(module.ID) != "builtin:Time" {
+			continue
+		}
+		found := map[string][]string{}
+		for _, class := range module.Classes {
+			found[class.Name] = class.Operations
+		}
+		if len(found["DateTime"]) != 4 || len(found["Calendar"]) != 3 {
+			t.Fatalf("published operations = %v", found)
+		}
+		if len(found["Duration"]) != 0 {
+			t.Fatalf("Duration reaches its members as fields, not operations: %v", found["Duration"])
+		}
+		return
+	}
+	t.Fatal("the Time module was not lowered")
+}

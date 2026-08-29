@@ -84,6 +84,7 @@ See the [CLI guide](docs/CLI.md), [formatter guide](docs/FORMATTER.md), and
 - [String API](docs/STRING_API.md)
 - [List API](docs/LIST_API.md)
 - [Math module](docs/MATH.md)
+- [Time module](docs/TIME.md)
 - [Curated v0.1 examples](examples/v0.1/README.md)
 - [Full v0.1 language specification](AHDCODE_LANGUAGE_SPEC_v0.1.md)
 

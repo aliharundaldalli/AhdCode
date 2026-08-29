@@ -18,6 +18,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 	"unicode"
 )
 
@@ -1098,6 +1099,151 @@ func AhdListSortKeyReal[T any](list *AhdList[T], key func(T) *float64) { ahdSort
 
 // AhdListSortKeyString orders a List by a String key.
 func AhdListSortKeyString[T any](list *AhdList[T], key func(T) *string) { ahdSortByKey(list, key) }
+
+// ---------------------------------------------------------------------------
+// Time standard module
+// ---------------------------------------------------------------------------
+
+// AhdCivilTime is the calendar breakdown of one instant in the host's local
+// time. It is the only shape that crosses between the runtime clock and the
+// generated DateTime value, so no Go time type ever reaches AhdCode.
+type AhdCivilTime struct {
+	Year, Month, Day, Hour, Minute, Second, Millisecond, Weekday int64
+}
+
+// ahdMonotonicOrigin anchors the monotonic clock. Go's time.Since uses the
+// process monotonic reading, so the result never moves backwards even when the
+// wall clock is adjusted.
+var ahdMonotonicOrigin = time.Now()
+
+// ahdCivilFrom converts a local instant into the calendar fields AhdCode
+// publishes, using the Monday=1..Sunday=7 convention.
+func ahdCivilFrom(value time.Time) AhdCivilTime {
+	weekday := int64(value.Weekday())
+	if weekday == 0 {
+		weekday = 7
+	}
+	return AhdCivilTime{
+		Year: int64(value.Year()), Month: int64(value.Month()), Day: int64(value.Day()),
+		Hour: int64(value.Hour()), Minute: int64(value.Minute()), Second: int64(value.Second()),
+		Millisecond: int64(value.Nanosecond() / 1e6), Weekday: weekday,
+	}
+}
+
+// AhdTimeNow reads the current local date and time.
+func AhdTimeNow() AhdCivilTime { return ahdCivilFrom(time.Now()) }
+
+// AhdTimeMonotonic is elapsed seconds on a clock that never moves backwards.
+// Its absolute value has no calendar meaning; only differences do.
+func AhdTimeMonotonic() float64 { return time.Since(ahdMonotonicOrigin).Seconds() }
+
+// AhdTimeSleep pauses for a whole number of milliseconds. Zero returns at
+// once, and a negative request is rejected rather than clamped.
+func AhdTimeSleep(milliseconds int64) {
+	if milliseconds < 0 {
+		AhdRaiseClass(AhdClassValueError, "sleep requires a non-negative number of milliseconds")
+	}
+	if milliseconds == 0 {
+		return
+	}
+	time.Sleep(time.Duration(milliseconds) * time.Millisecond)
+}
+
+// AhdTimeCivil validates a civil date and time and returns its fields. Every
+// component is checked against the Gregorian calendar, so an impossible date
+// is an error rather than a silently rolled-over one.
+func AhdTimeCivil(year, month, day, hour, minute, second, millisecond int64) AhdCivilTime {
+	ahdRequireRange(year, 1, 9999, "year")
+	ahdRequireRange(month, 1, 12, "month")
+	ahdRequireRange(day, 1, AhdCalendarDaysInMonth(year, month), "day")
+	ahdRequireRange(hour, 0, 23, "hour")
+	ahdRequireRange(minute, 0, 59, "minute")
+	ahdRequireRange(second, 0, 59, "second")
+	ahdRequireRange(millisecond, 0, 999, "millisecond")
+	value := time.Date(int(year), time.Month(month), int(day), int(hour), int(minute), int(second),
+		int(millisecond)*1e6, time.Local)
+	return ahdCivilFrom(value)
+}
+
+func ahdRequireRange(value, low, high int64, name string) {
+	if value < low || value > high {
+		AhdRaiseClass(AhdClassValueError, name+" "+strconv.FormatInt(value, 10)+
+			" is outside "+strconv.FormatInt(low, 10)+".."+strconv.FormatInt(high, 10))
+	}
+}
+
+// ahdInstant rebuilds the local instant a DateTime denotes from its published
+// fields, so comparison and difference need no hidden state.
+func ahdInstant(year, month, day, hour, minute, second, millisecond int64) time.Time {
+	return time.Date(int(year), time.Month(month), int(day), int(hour), int(minute), int(second),
+		int(millisecond)*1e6, time.Local)
+}
+
+// AhdTimeCompare orders two DateTime values: negative, zero, or positive.
+func AhdTimeCompare(left, right time.Time) int64 {
+	switch {
+	case left.Before(right):
+		return -1
+	case left.After(right):
+		return 1
+	default:
+		return 0
+	}
+}
+
+// AhdTimeInstant is the generated code's entry point for rebuilding an instant.
+func AhdTimeInstant(year, month, day, hour, minute, second, millisecond int64) time.Time {
+	return ahdInstant(year, month, day, hour, minute, second, millisecond)
+}
+
+// AhdTimeDifference is the signed millisecond difference second minus first.
+func AhdTimeDifference(first, second time.Time) int64 {
+	return int64(second.Sub(first) / time.Millisecond)
+}
+
+// AhdTimeText is the stable, locale-independent DateTime text.
+func AhdTimeText(year, month, day, hour, minute, second int64) string {
+	return ahdPad(year, 4) + "-" + ahdPad(month, 2) + "-" + ahdPad(day, 2) + " " +
+		ahdPad(hour, 2) + ":" + ahdPad(minute, 2) + ":" + ahdPad(second, 2)
+}
+
+func ahdPad(value int64, width int) string {
+	text := strconv.FormatInt(value, 10)
+	for len(text) < width {
+		text = "0" + text
+	}
+	return text
+}
+
+// AhdDurationSeconds converts a millisecond count to fractional seconds.
+func AhdDurationSeconds(milliseconds int64) float64 { return float64(milliseconds) / 1000.0 }
+
+// AhdCalendarIsLeapYear applies the Gregorian leap rule.
+func AhdCalendarIsLeapYear(year int64) bool {
+	ahdRequireRange(year, 1, 9999, "year")
+	return year%4 == 0 && (year%100 != 0 || year%400 == 0)
+}
+
+// AhdCalendarDaysInMonth is the length of one month of one year.
+func AhdCalendarDaysInMonth(year, month int64) int64 {
+	ahdRequireRange(year, 1, 9999, "year")
+	ahdRequireRange(month, 1, 12, "month")
+	switch month {
+	case 1, 3, 5, 7, 8, 10, 12:
+		return 31
+	case 4, 6, 9, 11:
+		return 30
+	}
+	if year%4 == 0 && (year%100 != 0 || year%400 == 0) {
+		return 29
+	}
+	return 28
+}
+
+// AhdCalendarWeekday is the Monday=1..Sunday=7 weekday of a civil date.
+func AhdCalendarWeekday(year, month, day int64) int64 {
+	return AhdTimeCivil(year, month, day, 0, 0, 0, 0).Weekday
+}
 
 // ---------------------------------------------------------------------------
 // Math standard module

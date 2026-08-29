@@ -2745,9 +2745,221 @@ output across that full ordered interval.
 
 ---
 
-## 36. Core Terminal I/O
+## 36. Time Standard Module
 
-### 36.1 take
+`Time` is a compiler-registered standard module, imported exactly like `Math`
+through the ordinary module syntax:
+
+```ahd
+bring Time
+from Time bring DateTime
+from Time bring Duration
+```
+
+The canonical module identity is `builtin:Time`; a sibling `Time.ahd` cannot
+shadow it. AhdCode has no namespace-qualified type syntax, so a Time type is
+written as `DateTime` after importing it, never as `Time.DateTime`. Every Time
+argument must be `NonNull`.
+
+The exact public surface is:
+
+```text
+Time.now()                        -> DateTime
+Time.monotonic()                  -> Real
+Time.sleep(milliseconds: Int)     -> Nothing
+Time.duration(milliseconds: Int)  -> Duration
+Time.between(first: DateTime, second: DateTime) -> Duration
+Time.dateTime(
+    year: Int,
+    month: Int,
+    day: Int,
+    hour: Int = 0,
+    minute: Int = 0,
+    second: Int = 0,
+    millisecond: Int = 0
+) -> DateTime
+```
+
+### 36.1 Local time only
+
+`Time.now()` reports the host's **local** date and time, and `Time.dateTime`
+builds a local civil moment. v0.1 has no timezone API at all: no UTC
+conversion, no timezone objects or names, no fixed offsets, no DST
+configuration, and no timezone parsing or formatting.
+
+### 36.2 DateTime
+
+`DateTime` exposes eight read-only `Int` attributes:
+
+```text
+year  month  day  hour  minute  second  millisecond  weekday
+```
+
+`weekday` numbers the days from Monday:
+
+| day | value |
+|---|---|
+| Monday | 1 |
+| Tuesday | 2 |
+| Wednesday | 3 |
+| Thursday | 4 |
+| Friday | 5 |
+| Saturday | 6 |
+| Sunday | 7 |
+
+Every attribute is `Constant`, so assigning one is the ordinary Constant
+diagnostic:
+
+```ahd
+current: DateTime := Time.now()
+
+current.year = 2030
+```
+
+is invalid.
+
+`DateTime` publishes four members:
+
+```text
+before(other: DateTime)     -> Bool
+after(other: DateTime)      -> Bool
+sameMoment(other: DateTime) -> Bool
+toString()                  -> String
+```
+
+`toString` is deterministic and locale-independent, and never names a timezone:
+
+```text
+YYYY-MM-DD HH:MM:SS
+```
+
+Milliseconds are read through the `millisecond` attribute rather than through
+the text. `str(value)` renders a `DateTime` as `<DateTime>`, because §34.1
+deliberately does not print Class attributes.
+
+AhdCode has no operator overloading, so `<` and `>` do not apply to a
+`DateTime`. Ordering is written with `before` and `after`. `==` and `same`
+follow the ordinary Class rule of §29 — object identity — so two separately
+built equal moments are **not** `==`. Value comparison is `sameMoment`, and two
+`Duration` values are compared through `milliseconds`.
+
+### 36.3 Creating a DateTime
+
+`Time.dateTime` validates every component against the Gregorian calendar and
+raises `ValueError` for an impossible moment rather than rolling it over:
+
+```text
+year         1..9999
+month        1..12
+day          1..(length of that month in that year)
+hour         0..23
+minute       0..59
+second       0..59
+millisecond  0..999
+```
+
+```ahd
+Time.dateTime(year: 2028, month: 2, day: 29)
+```
+
+is valid, while `2026-02-29`, `2026-02-30`, month `13`, and hour `25` are all
+`ValueError`. `DateTime` and `Duration` are never constructed directly; they
+come only from the Time functions, which validate first.
+
+### 36.4 Duration
+
+`Duration` is elapsed time, not a calendar date. It exposes two read-only
+attributes:
+
+```text
+milliseconds Int
+seconds      Real
+```
+
+```ahd
+wait: Duration := Time.duration(milliseconds: 1500)
+
+write(wait.milliseconds)
+write(wait.seconds)
+```
+
+=>
+
+```text
+1500
+1.5
+```
+
+A `Duration` may be negative, because a signed difference is useful. A negative
+value is preserved rather than being turned into its magnitude.
+
+### 36.5 Difference between two moments
+
+`Time.between(first, second)` is `second - first`:
+
+```ahd
+a: DateTime := Time.dateTime(year: 2026, month: 1, day: 1)
+b: DateTime := Time.dateTime(year: 2026, month: 1, day: 2)
+
+write(Time.between(a, b).milliseconds)
+write(Time.between(b, a).milliseconds)
+```
+
+=>
+
+```text
+86400000
+-86400000
+```
+
+The same moment on both sides produces a zero `Duration`.
+
+### 36.6 Calendar
+
+`Time.Calendar` answers questions about the Gregorian calendar itself, without
+needing a `DateTime`:
+
+```text
+Time.Calendar.isLeapYear(year: Int)                     -> Bool
+Time.Calendar.daysInMonth(year: Int, month: Int)        -> Int
+Time.Calendar.weekday(year: Int, month: Int, day: Int)  -> Int
+```
+
+A leap year is divisible by 4, except a century year, which must be divisible
+by 400: `2028` and `2000` are leap years, `2100` and `1900` are not.
+`weekday` uses the same Monday=1..Sunday=7 numbering as the `weekday`
+attribute. An invalid year, month, or date raises `ValueError`.
+
+`Calendar` is read-only and is not constructed. v0.1 has no month or day names,
+no localization, and no calendar rendering.
+
+### 36.7 Elapsed time and waiting
+
+```ahd
+start: Real := Time.monotonic()
+
+Time.sleep(100)
+
+elapsed: Real := Time.monotonic() - start
+```
+
+`Time.monotonic()` is a **seconds** reading on a clock that never moves
+backwards. Only differences are meaningful; the absolute value has no calendar
+meaning.
+
+`Time.sleep` takes **milliseconds**. Zero returns immediately, and a negative
+request raises `ValueError` rather than being clamped to zero.
+
+### 36.8 Not in this version
+
+`Time` deliberately has no format strings, no `parse`, no ISO-8601 or RFC 3339
+reader, no month or day names, and no natural-language dates.
+
+---
+
+## 37. Core Terminal I/O
+
+### 37.1 take
 
 `take` is the terminal input function. It has exactly two forms:
 
@@ -2798,7 +3010,7 @@ age: Int := take()
 `take` is the only terminal input function in v0.1. There is no `takeInt`,
 `takeReal`, `input`, or `readLine`.
 
-### 36.2 write
+### 37.2 write
 
 ```ahd
 write("Hello {name}")
@@ -2806,7 +3018,7 @@ write("Hello {name}")
 
 ---
 
-## 37. Runtime Numerical Safety
+## 38. Runtime Numerical Safety
 
 AhdCode prefers explicit errors over surprising low-level numeric behavior.
 
@@ -2819,7 +3031,7 @@ Complex mathematics belongs to a Complex facility later.
 
 ---
 
-## 38. Unsupported v0.1 Features
+## 39. Unsupported v0.1 Features
 
 Intentionally excluded:
 
@@ -2850,7 +3062,7 @@ Intentionally excluded:
 
 ---
 
-## 39. Planned Compiler Pipeline
+## 40. Planned Compiler Pipeline
 
 ```text
 AhdCode source (.ahd)
@@ -2880,7 +3092,7 @@ AhdCode must not be a thin Python/JavaScript eval wrapper or regex-only translat
 
 ---
 
-## 40. CLI and interactive toolchain
+## 41. CLI and interactive toolchain
 
 ```bash
 ahdcode
@@ -2912,7 +3124,7 @@ Canonical in-place formatter. `ahdcode format --check hello.ahd` performs the sa
 
 ---
 
-## 41. Example Program
+## 42. Example Program
 
 ```ahd
 PI: Constant Real := 3.14159
@@ -2937,7 +3149,7 @@ else {
 
 ---
 
-## 42. Example Class
+## 43. Example Class
 
 ```ahd
 Person: Class<> := {
@@ -2971,7 +3183,7 @@ Student: Class<Person> := {
 
 ---
 
-## 43. Implementation Rule: Do Not Invent Semantics Silently
+## 44. Implementation Rule: Do Not Invent Semantics Silently
 
 When the specification is ambiguous:
 
@@ -2985,7 +3197,7 @@ In particular, do not resolve uncertainty by introducing hidden `Any`, dynamic F
 
 ---
 
-## 44. v0.1 Definition of Done
+## 45. v0.1 Definition of Done
 
 Core v0.1 is meaningfully alive when:
 

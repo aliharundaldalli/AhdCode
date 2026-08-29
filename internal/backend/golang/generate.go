@@ -47,6 +47,7 @@ type generator struct {
 	layouts     map[ir.ClassID]*layout
 	layoutOrder []*ir.Class
 	adapters    map[ir.CallableID]string
+	timeHelpers map[ir.ClassID]string
 	diagnostics []diagnostics.Diagnostic
 	temporary   int
 	// frames tracks the enclosing loop and attempt structure so break,
@@ -74,6 +75,7 @@ func Generate(compilation *ir.Compilation) (*GeneratedProgram, []diagnostics.Dia
 		nullSymbols: make(map[ir.SymbolID]bool),
 		nullFields:  make(map[ir.FieldID]bool),
 		adapters:    make(map[ir.CallableID]string),
+		timeHelpers: make(map[ir.ClassID]string),
 	}
 	generator.buildIndex()
 	generator.planRepresentations()
@@ -331,6 +333,9 @@ func (generator *generator) emitProgram() string {
 		}
 	}
 	generator.emitAdapters(writer)
+	// Bodies register the Time helpers they need, so those are written after
+	// generation and before the bodies themselves.
+	generator.emitTimeHelpers(writer)
 	writer.raw(bodies.String())
 	generator.emitInstaller(writer)
 	writer.open("func main() {")
