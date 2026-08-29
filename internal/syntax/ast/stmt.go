@@ -26,6 +26,11 @@ type VariableDecl struct {
 	Type        *TypeRef
 	Initializer Expr
 	GlobalOnly  bool
+	// Inferred marks a `name := value` declaration written without an
+	// explicit `: Type`. Type is nil in that case; the static type is the
+	// initializer's complete type and nullability, computed during semantic
+	// analysis.
+	Inferred bool
 }
 
 func (*VariableDecl) statementNode() {}

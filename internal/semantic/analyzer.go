@@ -319,7 +319,7 @@ func (a *analyzer) registerFunction(declaration *ast.FunctionDecl, targetScope *
 				existing.OverloadSet = &OverloadSet{Name: existing.Name, Candidates: []*Callable{existing.Callable}}
 			}
 			for _, candidate := range existing.OverloadSet.Candidates {
-				if sameOverloadKey(candidate.Signature, callable.Signature) {
+				if sameOverloadKey(candidate, callable) {
 					a.error(codeInvalidOverload, fmt.Sprintf("overload %q duplicates parameter signature %s", declaration.Name, formatSignature(callable.Signature)), declaration.Span(), "overloads must differ by parameter count and/or parameter type; return type alone cannot distinguish them")
 					a.functionNodes[declaration] = callable
 					a.functionOwner[declaration] = existing
@@ -358,16 +358,35 @@ func (a *analyzer) registerFunction(declaration *ast.FunctionDecl, targetScope *
 	a.result.Symbols = append(a.result.Symbols, symbol)
 }
 
-func sameOverloadKey(left, right *types.Signature) bool {
-	if left == nil || right == nil || len(left.Parameters) != len(right.Parameters) {
+// sameOverloadKey reports whether two candidates share one call shape, so a
+// second declaration would be a genuine duplicate rather than a distinct
+// overload. Nullability is part of that shape: (x: Int) and (x: Int?) accept
+// different call sites (a bare `null` argument only matches the latter) and
+// so are distinct overloads, not a duplicate.
+func sameOverloadKey(left, right *Callable) bool {
+	if left == nil || right == nil || left.Signature == nil || right.Signature == nil {
 		return false
 	}
-	for index := range left.Parameters {
-		if !types.Equal(left.Parameters[index].Type, right.Parameters[index].Type) {
+	leftParameters, rightParameters := left.Signature.Parameters, right.Signature.Parameters
+	if len(leftParameters) != len(rightParameters) {
+		return false
+	}
+	for index := range leftParameters {
+		if !types.Equal(leftParameters[index].Type, rightParameters[index].Type) {
+			return false
+		}
+		if parameterNullAt(left.ParameterNull, index) != parameterNullAt(right.ParameterNull, index) {
 			return false
 		}
 	}
 	return true
+}
+
+func parameterNullAt(states []NullState, index int) NullState {
+	if index < 0 || index >= len(states) {
+		return NonNull
+	}
+	return states[index]
 }
 
 func (a *analyzer) callableFromFunction(declaration *ast.FunctionDecl) *Callable {
@@ -376,10 +395,10 @@ func (a *analyzer) callableFromFunction(declaration *ast.FunctionDecl) *Callable
 	for index := range declaration.Parameters {
 		parameter := &declaration.Parameters[index]
 		parameters = append(parameters, types.Parameter{Name: parameter.Name, Type: a.resolveType(parameter.Type), HasDefault: parameter.Default != nil})
-		parameterNull = append(parameterNull, NonNull)
+		parameterNull = append(parameterNull, nullStateFor(parameter.Type.Nullable))
 	}
 	returnType := a.resolveType(declaration.ReturnType)
-	return &Callable{Signature: &types.Signature{Parameters: parameters, Return: returnType}, ParameterNull: parameterNull, ReturnNull: NonNull, Declaration: declaration}
+	return &Callable{Signature: &types.Signature{Parameters: parameters, Return: returnType}, ParameterNull: parameterNull, ReturnNull: nullStateFor(declaration.ReturnType.Nullable), Declaration: declaration}
 }
 
 // inheritanceOrder returns the module Class declarations with every local
@@ -435,19 +454,24 @@ func (a *analyzer) buildConstructor(declaration *ast.StructureDecl, class *Symbo
 		}
 		typeValue := a.resolveType(parameter.Type)
 		parameters = append(parameters, types.Parameter{Name: parameter.Name, Type: typeValue, HasDefault: parameter.Default != nil})
-		parameterNull = append(parameterNull, NonNull)
+		parameterNull = append(parameterNull, nullStateFor(parameter.Type.Nullable))
 		if hasModifier(parameter.Modifiers, ast.ModifierLocal) {
 			attributes = append(attributes, nil)
 			continue
 		}
-		nullState := NonNull
+		nullState := nullStateFor(parameter.Type.Nullable)
 		if parameter.Default != nil {
-			nullState = a.initializerNullState(parameter.Default)
+			defaultNull := a.initializerNullState(parameter.Default)
+			if !parameter.Type.Nullable && defaultNull != NonNull {
+				a.error(codeNullNotAllowed, fmt.Sprintf("attribute %q is not nullable; its default value may be null", parameter.Name), parameter.Default.Span(), "declare the type with a trailing ? or use a non-null default")
+			} else {
+				nullState = defaultNull
+			}
 		}
 		memberSymbol := &Symbol{
 			Name: parameter.Name, Kind: MemberSymbol, Type: typeValue, Span: parameter.Span(), InitialNull: nullState,
 			Constant: hasModifier(parameter.Modifiers, ast.ModifierConstant), Confidential: hasModifier(parameter.Modifiers, ast.ModifierConfidential), OwnerClass: class.Class,
-			OriginModuleID: a.environment.ModuleID,
+			OriginModuleID: a.environment.ModuleID, DeclaredNullable: parameter.Type.Nullable,
 		}
 		class.Members[parameter.Name] = memberSymbol
 		a.result.Symbols = append(a.result.Symbols, memberSymbol)
@@ -528,14 +552,17 @@ func (a *analyzer) resolveType(reference *ast.TypeRef) types.Type {
 			a.error(codeInvalidType, "List requires exactly one type argument", reference.Span(), fmt.Sprintf("received %d", len(reference.Arguments)))
 			return types.List{Element: types.Invalid}
 		}
-		return types.List{Element: a.resolveType(reference.Arguments[0])}
+		return types.List{Element: a.resolveType(reference.Arguments[0]), ElementNullable: reference.Arguments[0].Nullable}
 	case "Pair":
 		if len(reference.Arguments) != 2 {
 			a.error(codeInvalidType, "Pair requires exactly two type arguments", reference.Span(), fmt.Sprintf("received %d", len(reference.Arguments)))
 			return types.Pair{Key: types.Invalid, Value: types.Invalid}
 		}
 		key := a.resolveType(reference.Arguments[0])
-		return types.Pair{Key: a.checkedPairKey(key, reference.Arguments[0].Span()), Value: a.resolveType(reference.Arguments[1])}
+		if reference.Arguments[0].Nullable {
+			a.error(codeInvalidPairKey, "Pair keys may not be nullable", reference.Arguments[0].Span(), "remove the ? from the Pair key type")
+		}
+		return types.Pair{Key: a.checkedPairKey(key, reference.Arguments[0].Span()), Value: a.resolveType(reference.Arguments[1]), ValueNullable: reference.Arguments[1].Nullable}
 	default:
 		if class := a.classes[reference.Name]; class != nil {
 			if len(reference.Arguments) != 0 {

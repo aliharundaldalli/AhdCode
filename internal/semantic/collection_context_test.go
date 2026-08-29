@@ -17,8 +17,8 @@ func TestEmptyCollectionLiteralsUseTheirContext(t *testing.T) {
 		{"deeply nested empty List", "deep: List<List<List<Int>>> := [\n    [\n        []\n    ]\n    []\n]"},
 		{"empty List as a Pair value", "rows: Pair<String, List<Int>> := {\n    \"a\": []\n}"},
 		{"empty Pair as a Pair value", "rows: Pair<String, Pair<String, Int>> := {\n    \"a\": {}\n}"},
-		{"List of only null elements", "names: List<String> := [null, null]"},
-		{"Pair with a null value", "scores: Pair<String, Int> := {\n    \"a\": null\n}"},
+		{"List of only null elements", "names: List<String?> := [null, null]"},
+		{"Pair with a null value", "scores: Pair<String, Int?> := {\n    \"a\": null\n}"},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

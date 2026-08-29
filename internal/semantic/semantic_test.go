@@ -109,10 +109,13 @@ func TestConditionsRequireBool(t *testing.T) {
 }
 
 func TestNullStateAssignmentAndUse(t *testing.T) {
-	_, bad := analyzeText(t, "value: Int := null\nvalue + 1")
+	_, badDecl := analyzeText(t, "value: Int := null")
+	requireSemanticCode(t, badDecl, codeNullNotAllowed)
+
+	_, bad := analyzeText(t, "value: Int? := null\nvalue + 1")
 	requireSemanticCode(t, bad, codeNullableUse)
 
-	parsed, good := analyzeText(t, "value: Int := null\nvalue = 5\nvalue + 1")
+	parsed, good := analyzeText(t, "value: Int? := null\nvalue = 5\nvalue + 1")
 	requireSemanticClean(t, good)
 	last := parsed.Program.Statements[2].(*ast.ExprStmt).Expression.(*ast.BinaryExpr).Left
 	if good.NullStates[last] != NonNull {
@@ -126,7 +129,7 @@ func TestBranchAndShortCircuitNullRefinement(t *testing.T) {
         age: Int
     )
 }
-student: Student := null
+student: Student? := null
 if student != null and student.age >= 18 {
     write(student.age)
 }`)
@@ -587,10 +590,10 @@ func TestReturnNullMetadataAndNullableCallResult(t *testing.T) {
 	_, result := analyzeText(t, `Student: Class<> := {
     structure: Attributes := (age: Int)
 }
-find: Function := () -> Student {
+find: Function := () -> Student? {
     return null
 }
-student: Student := find()
+student: Student? := find()
 student.age`)
 	requireSemanticCode(t, result, codeNullableUse)
 	var found *Symbol
@@ -648,9 +651,9 @@ LOGIC: Constant Bool := not false and true`)
 }
 
 func TestNullableBoolAndCallableUse(t *testing.T) {
-	_, boolResult := analyzeText(t, "flag: Bool := null\nvalue: Bool := flag and true")
+	_, boolResult := analyzeText(t, "flag: Bool? := null\nvalue: Bool := flag and true")
 	requireSemanticCode(t, boolResult, codeNullableUse)
 
-	_, callResult := analyzeText(t, "operation: Function := null\noperation()")
+	_, callResult := analyzeText(t, "operation: Function? := null\noperation()")
 	requireSemanticCode(t, callResult, codeNullableUse)
 }

@@ -597,7 +597,7 @@ func TestNullableCallableProgramsRunAsNativeExecutables(t *testing.T) {
 
 find: Function := (
     id: Int
-) -> Student {
+) -> Student? {
     if id == 1 {
         return Student(name: "Ali")
     }
@@ -607,7 +607,7 @@ find: Function := (
 
 maybeNumber: Function := (
     ok: Bool
-) -> Int {
+) -> Int? {
     if ok {
         return 5
     }
@@ -615,22 +615,22 @@ maybeNumber: Function := (
     return null
 }
 
-found: Student := find(1)
+found: Student? := find(1)
 if found != null {
     write(found.name)
 }
 
-missing: Student := find(2)
+missing: Student? := find(2)
 if missing == null {
     write("missing")
 }
 
-present: Int := maybeNumber(true)
+present: Int? := maybeNumber(true)
 if present != null {
     write(present)
 }
 
-absent: Int := maybeNumber(false)
+absent: Int? := maybeNumber(false)
 if absent == null {
     write("no number")
 }
@@ -640,7 +640,7 @@ if absent == null {
 		{
 			name: "nullable Function parameter with a default",
 			sources: map[string]string{"main.ahd": `greet: Function := (
-    name: String := null
+    name: String? := null
 ) -> String {
     if name != null {
         return "Hello {name}"
@@ -659,7 +659,7 @@ write(greet(null))
 			name: "a callback keeps the nullable return of the callable assigned to it",
 			sources: map[string]string{"main.ahd": `maybeDouble: Function := (
     n: Int
-) -> Int {
+) -> Int? {
     if n > 0 {
         return n * 2
     }
@@ -669,12 +669,12 @@ write(greet(null))
 
 callback: Function := maybeDouble
 
-present: Int := callback(4)
+present: Int? := callback(4)
 if present != null {
     write(present)
 }
 
-absent: Int := callback(-1)
+absent: Int? := callback(-1)
 if absent == null {
     write("null result")
 }
@@ -705,7 +705,7 @@ write(apply(double, 21))
 			sources: map[string]string{
 				"Lookup.ahd": `find: Function := (
     id: Int
-) -> String {
+) -> String? {
     if id == 1 {
         return "one"
     }
@@ -715,12 +715,12 @@ write(apply(double, 21))
 `,
 				"main.ahd": `from Lookup bring find
 
-hit: String := find(1)
+hit: String? := find(1)
 if hit != null {
     write(hit)
 }
 
-miss: String := find(2)
+miss: String? := find(2)
 if miss == null {
     write("miss")
 }
@@ -732,7 +732,7 @@ if miss == null {
 			name: "an overloaded callable selects the concrete nullable signature",
 			sources: map[string]string{"main.ahd": `pick: Function := (
     value: Int
-) -> String {
+) -> String? {
     if value > 0 {
         return "int"
     }
@@ -746,12 +746,12 @@ pick: Overload Function := (
     return "real"
 }
 
-hit: String := pick(1)
+hit: String? := pick(1)
 if hit != null {
     write(hit)
 }
 
-miss: String := pick(0)
+miss: String? := pick(0)
 if miss == null {
     write("null int")
 }

@@ -96,6 +96,7 @@ const (
 	RightBracket
 	LeftBrace
 	RightBrace
+	Question
 )
 
 var names = [...]string{
@@ -123,6 +124,7 @@ var names = [...]string{
 	Equal: "==", NotEqual: "!=", Less: "<", LessEqual: "<=", Greater: ">",
 	GreaterEqual: ">=", Dot: ".", Comma: ",", LeftParen: "(", RightParen: ")",
 	LeftBracket: "[", RightBracket: "]", LeftBrace: "{", RightBrace: "}",
+	Question: "?",
 }
 
 func (k Kind) String() string {

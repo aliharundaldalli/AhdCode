@@ -107,6 +107,14 @@ func assessCallCandidate(call *ast.CallExpr, callable *Callable, arguments []exp
 			return score, fmt.Sprintf("argument %q expects %s, received %s", parameters[parameterIndex].Name, types.Display(parameters[parameterIndex].Type), types.Display(arguments[argumentIndex].typeValue)), false
 		}
 		score.widenings += quality
+		// A proven-NonNull argument matching a nullable parameter is a wider
+		// (less exact) match than matching a non-nullable parameter of the same
+		// type, so a same-type non-nullable overload is preferred whenever the
+		// argument is already known non-null. A null/MaybeNull argument does not
+		// get this penalty: it genuinely needs the wider, nullable parameter.
+		if arguments[argumentIndex].nullState == NonNull && parameterIndex < len(callable.ParameterNull) && callable.ParameterNull[parameterIndex] != NonNull {
+			score.widenings++
+		}
 	}
 	for index, parameter := range parameters {
 		if assigned[index] {

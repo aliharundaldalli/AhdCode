@@ -355,14 +355,14 @@ func TestCrossModuleNullableReturnMetadataIsPreserved(t *testing.T) {
 		"/Students.ahd": `Student: Class<> := {
     structure: Attributes := (name: String)
 }
-findStudent: Function := (id: Int) -> Student {
+findStudent: Function := (id: Int) -> Student? {
     return null
 }`,
 		"/Main.ahd": `from Students bring (
     Student
     findStudent
 )
-student: Student := findStudent(5)
+student: Student? := findStudent(5)
 write(student.name)`,
 	}, "/Main.ahd")
 	requireCode(t, result, "SEM011")
@@ -374,7 +374,7 @@ write(student.name)`,
 
 func TestCrossModuleBindingNullMetadataIsPreserved(t *testing.T) {
 	_, result := compileMemory(t, map[string]string{
-		"/Values.ahd": "maybe: String := null",
+		"/Values.ahd": "maybe: String? := null",
 		"/Main.ahd":   "from Values bring maybe\nwrite(maybe + \"x\")",
 	}, "/Main.ahd")
 	requireCode(t, result, "SEM011")

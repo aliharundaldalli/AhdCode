@@ -38,4 +38,6 @@ const (
 	codeInvalidPairKey      = "SEM035"
 	codeDuplicatePairKey    = "SEM036"
 	codeCollectionInference = "SEM037"
+	codeNullNotAllowed      = "SEM038"
+	codeCannotInferType     = "SEM039"
 )

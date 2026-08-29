@@ -62,9 +62,9 @@ func TestNumericFundamentalsHaveExactOverloads(t *testing.T) {
 // a MaybeNull or Null argument is rejected until it is refined NonNull.
 func TestNumericFundamentalsRequireNonNullArguments(t *testing.T) {
 	rejected := map[string]string{
-		"null List receiver for sum": "values: List<Int> := null\ntotal: Int := sum(values)",
-		"null List receiver for min": "values: List<Int> := null\nvalue: Int := min(values)",
-		"null List receiver for max": "values: List<Int> := null\nvalue: Int := max(values)",
+		"null List receiver for sum": "values: List<Int>? := null\ntotal: Int := sum(values)",
+		"null List receiver for min": "values: List<Int>? := null\nvalue: Int := min(values)",
+		"null List receiver for max": "values: List<Int>? := null\nvalue: Int := max(values)",
 		"null argument for abs":      "value: Int := 5\nmagnitude: Int := abs(null)",
 	}
 	for name, text := range rejected {
@@ -73,7 +73,7 @@ func TestNumericFundamentalsRequireNonNullArguments(t *testing.T) {
 			requireSemanticCode(t, result, codeNullableUse)
 		})
 	}
-	refined := "values: List<Int> := null\nif values != null {\n    write(sum(values))\n    write(min(values))\n    write(max(values))\n}\n"
+	refined := "values: List<Int>? := null\nif values != null {\n    write(sum(values))\n    write(min(values))\n    write(max(values))\n}\n"
 	_, result := analyzeText(t, refined)
 	requireSemanticClean(t, result)
 }

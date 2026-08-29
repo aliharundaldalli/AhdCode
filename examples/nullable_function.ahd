@@ -7,7 +7,7 @@ Student: Class<> := {
 
 find: Function := (
     id: Int
-) -> Student {
+) -> Student? {
     if id == 1 {
         return Student(name: "Ada")
     }
@@ -18,7 +18,7 @@ find: Function := (
 
 halfOfEven: Function := (
     value: Int
-) -> Int {
+) -> Int? {
     if value % 2 == 0 {
         quotient: Local Int := 0
         remaining: Local Int := value
@@ -34,22 +34,22 @@ halfOfEven: Function := (
 }
 
 
-found: Student := find(1)
+found: Student? := find(1)
 if found != null {
     write("found {found.name}")
 }
 
-missing: Student := find(2)
+missing: Student? := find(2)
 if missing == null {
     write("nothing found")
 }
 
-even: Int := halfOfEven(20)
+even: Int? := halfOfEven(20)
 if even != null {
     write(even)
 }
 
-odd: Int := halfOfEven(3)
+odd: Int? := halfOfEven(3)
 if odd == null {
     write("no value")
 }

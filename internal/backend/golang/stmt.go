@@ -139,14 +139,14 @@ func (generator *generator) emitIndexAssign(writer *emitter, value *ir.AssignStm
 			break
 		}
 		writer.line(index + " := " + generator.value(value.Target.Index, ir.Type{Kind: ir.IntType}, false))
-		writer.line(receiver + ".Set(" + index + ", " + generator.value(value.Value, *container.Element, true) + ")")
+		writer.line(receiver + ".Set(" + index + ", " + generator.value(value.Value, *container.Element, container.ElementNullable) + ")")
 	case ir.PairType:
 		if container.Key == nil || container.Value == nil {
 			generator.unsupported("indexed assignment into an untyped Pair", value.Span)
 			break
 		}
 		writer.line(index + " := " + generator.value(value.Target.Index, *container.Key, false))
-		writer.line(receiver + ".Set(" + index + ", " + generator.value(value.Value, *container.Value, true) + ")")
+		writer.line(receiver + ".Set(" + index + ", " + generator.value(value.Value, *container.Value, container.ValueNullable) + ")")
 	default:
 		generator.unsupported("indexed assignment into "+container.String(), value.Span)
 	}
@@ -319,9 +319,13 @@ func (generator *generator) emitFor(writer *emitter, value *ir.ForStmt) {
 		}
 		source = generator.expr(value.Iterable) + ".Snapshot()"
 		element = *container.Element
+		elementNullState := ir.NonNull
+		if container.ElementNullable {
+			elementNullState = ir.MaybeNull
+		}
 		writer.line(snapshot + " := " + source)
 		writer.open("for _, " + item + " := range " + snapshot + " {")
-		writer.line(current.name + " := " + generator.coerce(item, ir.ExprBase{Type: element, NullState: ir.MaybeNull}, current.typeInfo, current.nullable))
+		writer.line(current.name + " := " + generator.coerce(item, ir.ExprBase{Type: element, NullState: elementNullState}, current.typeInfo, current.nullable))
 	case ir.PairKeys:
 		if container.Key == nil {
 			generator.unsupported("iteration over an untyped Pair", value.Span)

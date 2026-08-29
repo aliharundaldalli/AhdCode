@@ -821,6 +821,29 @@ func TestRHSMustStartOnSameLineAsOperator(t *testing.T) {
 	}
 }
 
+// TestInferredDeclarationWithExplicitScopeModifier locks in the v0.1.7 fix:
+// an inferred declaration (no `: Type`) may still carry an explicit Local or
+// Global scope modifier before `:=`; the parser records it on Modifiers
+// rather than requiring/inferring the scope itself.
+func TestInferredDeclarationWithExplicitScopeModifier(t *testing.T) {
+	result := parseText(t, "x: Local := 5")
+	requireClean(t, result)
+	declaration, ok := result.Program.Statements[0].(*ast.VariableDecl)
+	if !ok || !declaration.Inferred || declaration.Type != nil {
+		t.Fatalf("declaration = %#v, want an Inferred VariableDecl with a nil Type", result.Program.Statements[0])
+	}
+	if len(declaration.Modifiers) != 1 || declaration.Modifiers[0] != ast.ModifierLocal {
+		t.Fatalf("modifiers = %#v, want [Local]", declaration.Modifiers)
+	}
+
+	bareGlobal := parseText(t, "x: Global")
+	requireClean(t, bareGlobal)
+	globalDeclaration, ok := bareGlobal.Program.Statements[0].(*ast.VariableDecl)
+	if !ok || !globalDeclaration.Inferred || !globalDeclaration.GlobalOnly || globalDeclaration.Type != nil {
+		t.Fatalf("declaration = %#v, want an Inferred GlobalOnly VariableDecl with a nil Type", bareGlobal.Program.Statements[0])
+	}
+}
+
 func TestRHSSameLineIsValidForEveryDeclarationShape(t *testing.T) {
 	result := parseText(t, strings.Join([]string{
 		"values: List<Int> := [",

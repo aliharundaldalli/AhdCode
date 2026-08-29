@@ -158,13 +158,13 @@ func TestListOperationsRunAsNativeExecutables(t *testing.T) {
 		},
 		{
 			name:       "a null element has no natural order",
-			sources:    map[string]string{"main.ahd": "values: List<Int> := [3, null, 1]\nvalues.sort()\n"},
+			sources:    map[string]string{"main.ahd": "values: List<Int?> := [3, null, 1]\nvalues.sort()\n"},
 			exitCode:   1,
 			errorClass: "NullError",
 		},
 		{
 			name:     "a rejected natural sort leaves the List unchanged",
-			sources:  map[string]string{"main.ahd": "values: List<Int> := [3, null, 1]\nattempt {\n    values.sort()\n} except NullError as error {\n    write(\"caught\")\n}\nwrite(len(values))\n"},
+			sources:  map[string]string{"main.ahd": "values: List<Int?> := [3, null, 1]\nattempt {\n    values.sort()\n} except NullError as error {\n    write(\"caught\")\n}\nwrite(len(values))\n"},
 			expected: "caught\n3\n",
 		},
 		{
@@ -226,12 +226,12 @@ func TestListOperationsRunAsNativeExecutables(t *testing.T) {
 		},
 		{
 			name:     "a null element reaches a NonNull callback parameter as a NullError",
-			sources:  map[string]string{"main.ahd": listCallbacks + "values: List<Int> := [1, null]\nattempt {\n    write(values.map(double))\n} except NullError as error {\n    write(\"caught\")\n}\n"},
+			sources:  map[string]string{"main.ahd": listCallbacks + "values: List<Int?> := [1, null]\nattempt {\n    write(values.map(double))\n} except NullError as error {\n    write(\"caught\")\n}\n"},
 			expected: "caught\n",
 		},
 		{
 			name:     "a refined nullable List receiver is accepted",
-			sources:  map[string]string{"main.ahd": "values: List<Int> := null\nvalues = [3, 1]\nif values != null {\n    values.sort()\n    write(values)\n    write(values.count(1))\n}\n"},
+			sources:  map[string]string{"main.ahd": "values: List<Int>? := null\nvalues = [3, 1]\nif values != null {\n    values.sort()\n    write(values)\n    write(values.count(1))\n}\n"},
 			expected: "[1, 3]\n1\n",
 		},
 	}

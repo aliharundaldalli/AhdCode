@@ -90,15 +90,22 @@ type Symbol struct {
 	// ordinary Class reference value.
 	SuperClassBinding bool
 	InitialNull       NullState
-	Alias             *Symbol
-	Callable          *Callable
-	OverloadSet       *OverloadSet
-	Namespace         *ModuleInterface
-	Class             *types.ClassSymbol
-	OwnerClass        *types.ClassSymbol
-	OriginModuleID    string
-	Members           map[string]*Symbol
-	Constructor       *Callable
+	// DeclaredNullable is the symbol's static, unnarrowed nullability -- true
+	// only when its declared type carried a trailing `?`. Unlike InitialNull
+	// (a flow-sensitive starting point) and the per-statement flowState (which
+	// narrows and widens as code runs), this never changes after declaration.
+	// It answers "may null legally be written here", independent of whatever
+	// the current flow analysis currently believes about the value.
+	DeclaredNullable bool
+	Alias            *Symbol
+	Callable         *Callable
+	OverloadSet      *OverloadSet
+	Namespace        *ModuleInterface
+	Class            *types.ClassSymbol
+	OwnerClass       *types.ClassSymbol
+	OriginModuleID   string
+	Members          map[string]*Symbol
+	Constructor      *Callable
 	// ConstructorAttributes records, per constructor parameter, the instance
 	// attribute that parameter initializes. A Local structure parameter has a
 	// nil entry. Inherited entries come from the parent construction contract.

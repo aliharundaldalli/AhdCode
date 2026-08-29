@@ -12,7 +12,8 @@ func TestCollectionMutationsAreStaticallyChecked(t *testing.T) {
 	}{
 		{"List add", "values: List<Int> := [1]\nvalues.add(2)", true},
 		{"List add widens Int to Real", "values: List<Real> := [1.0]\nvalues.add(1)", true},
-		{"List add a null element", "values: List<String> := [\"a\"]\nvalues.add(null)", true},
+		{"List add a null element into a non-nullable element type", "values: List<String> := [\"a\"]\nvalues.add(null)", false},
+		{"List add a null element into a nullable element type", "values: List<String?> := [\"a\"]\nvalues.add(null)", true},
 		{"List eject", "values: List<Int> := [1]\nvalues.eject(0)", true},
 		{"List eject a negative index", "values: List<Int> := [1]\nvalues.eject(-1)", true},
 		{"Pair eject", "scores: Pair<String, Int> := {\n    \"a\": 1\n}\nscores.eject(\"a\")", true},
@@ -69,10 +70,10 @@ func TestCollectionMutationsReturnNothing(t *testing.T) {
 // rule the same as every other collection operation.
 func TestCollectionMutationsRequireNonNullReceivers(t *testing.T) {
 	for name, text := range map[string]string{
-		"null List add":    "values: List<Int> := null\nvalues.add(1)",
-		"null List eject":  "values: List<Int> := null\nvalues.eject(0)",
-		"null Pair eject":  "scores: Pair<String, Int> := null\nscores.eject(\"a\")",
-		"null Pair insert": "scores: Pair<String, Int> := null\nscores[\"a\"] = 1",
+		"null List add":    "values: List<Int>? := null\nvalues.add(1)",
+		"null List eject":  "values: List<Int>? := null\nvalues.eject(0)",
+		"null Pair eject":  "scores: Pair<String, Int>? := null\nscores.eject(\"a\")",
+		"null Pair insert": "scores: Pair<String, Int>? := null\nscores[\"a\"] = 1",
 	} {
 		t.Run(name, func(t *testing.T) {
 			_, result := analyzeText(t, text)

@@ -1039,18 +1039,16 @@ func AhdStringCapitalize(text string) string {
 }
 
 // AhdStringSplit divides a String on every non-overlapping occurrence of a
-// non-empty separator, preserving empty fields.
-func AhdStringSplit(text, separator string) *AhdList[*string] {
+// non-empty separator, preserving empty fields. A split field is never null,
+// so the result is a List<String>, not a List<String?>.
+func AhdStringSplit(text, separator string) *AhdList[string] {
 	if separator == "" {
 		AhdRaiseClass(AhdClassDomainError, "split requires a non-empty separator")
 	}
 	parts := strings.Split(text, separator)
-	items := make([]*string, len(parts))
-	for index := range parts {
-		field := parts[index]
-		items[index] = &field
-	}
-	return &AhdList[*string]{items: items}
+	items := make([]string, len(parts))
+	copy(items, parts)
+	return &AhdList[string]{items: items}
 }
 
 // AhdStringReplace rewrites every non-overlapping occurrence of a non-empty
@@ -1445,6 +1443,16 @@ func ahdElementPointer[T any](value *T, name string) *T {
 	return value
 }
 
+// ahdSortNaturalNonNull is ahdSortNatural for a List<T> whose elements are
+// never null, so no per-element null check is needed at all.
+func ahdSortNaturalNonNull[T ahdOrdered](list *AhdList[T]) {
+	list.requireMutable()
+	sorted := make([]T, len(list.items))
+	copy(sorted, list.items)
+	sort.SliceStable(sorted, func(left, right int) bool { return sorted[left] < sorted[right] })
+	list.items = sorted
+}
+
 // ahdSortByKey orders a List ascending and stably by a key Function. Every key
 // is computed, left to right and exactly once per element, before the receiver
 // is rewritten, so a key Function that raises leaves the original order
@@ -1468,14 +1476,23 @@ func ahdSortByKey[T any, K ahdOrdered](list *AhdList[T], key func(T) *K) {
 	list.items = sorted
 }
 
-// AhdListSortInt orders a List<Int> ascending in place.
+// AhdListSortInt orders a List<Int?> ascending in place.
 func AhdListSortInt(list *AhdList[*int64]) { ahdSortNatural(list) }
 
-// AhdListSortReal orders a List<Real> ascending in place.
+// AhdListSortReal orders a List<Real?> ascending in place.
 func AhdListSortReal(list *AhdList[*float64]) { ahdSortNatural(list) }
 
-// AhdListSortString orders a List<String> ascending in place.
+// AhdListSortString orders a List<String?> ascending in place.
 func AhdListSortString(list *AhdList[*string]) { ahdSortNatural(list) }
+
+// AhdListSortIntNonNull orders a List<Int> ascending in place.
+func AhdListSortIntNonNull(list *AhdList[int64]) { ahdSortNaturalNonNull(list) }
+
+// AhdListSortRealNonNull orders a List<Real> ascending in place.
+func AhdListSortRealNonNull(list *AhdList[float64]) { ahdSortNaturalNonNull(list) }
+
+// AhdListSortStringNonNull orders a List<String> ascending in place.
+func AhdListSortStringNonNull(list *AhdList[string]) { ahdSortNaturalNonNull(list) }
 
 // AhdListSortKeyInt orders a List by an Int key.
 func AhdListSortKeyInt[T any](list *AhdList[T], key func(T) *int64) { ahdSortByKey(list, key) }
@@ -1855,6 +1872,13 @@ func ahdRequireElements[T any](list *AhdList[*T], name string) {
 	}
 }
 
+func ahdRequireElementsNonNull[T any](list *AhdList[T], name string) {
+	list.require()
+	if len(list.items) == 0 {
+		AhdRaiseClass(AhdClassDomainError, name+" requires a non-empty List")
+	}
+}
+
 // AhdSumInt adds every element of a List<Int> with checked Int arithmetic. An
 // empty List sums to the additive identity 0, and the List is not modified.
 func AhdSumInt(list *AhdList[*int64]) int64 {
@@ -1921,6 +1945,75 @@ func AhdMaxReal(list *AhdList[*float64]) float64 {
 	for _, item := range list.items[1:] {
 		if value := ahdElement(item, "max"); value > result {
 			result = value
+		}
+	}
+	return result
+}
+
+// AhdSumIntNonNull is AhdSumInt for a List<Int>, whose elements are never
+// null.
+func AhdSumIntNonNull(list *AhdList[int64]) int64 {
+	list.require()
+	total := int64(0)
+	for _, item := range list.items {
+		total = AhdIntAdd(total, item)
+	}
+	return total
+}
+
+// AhdSumRealNonNull is AhdSumReal for a List<Real>.
+func AhdSumRealNonNull(list *AhdList[float64]) float64 {
+	list.require()
+	total := 0.0
+	for _, item := range list.items {
+		total = AhdRealAdd(total, item)
+	}
+	return total
+}
+
+// AhdMinIntNonNull is AhdMinInt for a List<Int>.
+func AhdMinIntNonNull(list *AhdList[int64]) int64 {
+	ahdRequireElementsNonNull(list, "min")
+	result := list.items[0]
+	for _, item := range list.items[1:] {
+		if item < result {
+			result = item
+		}
+	}
+	return result
+}
+
+// AhdMaxIntNonNull is AhdMaxInt for a List<Int>.
+func AhdMaxIntNonNull(list *AhdList[int64]) int64 {
+	ahdRequireElementsNonNull(list, "max")
+	result := list.items[0]
+	for _, item := range list.items[1:] {
+		if item > result {
+			result = item
+		}
+	}
+	return result
+}
+
+// AhdMinRealNonNull is AhdMinReal for a List<Real>.
+func AhdMinRealNonNull(list *AhdList[float64]) float64 {
+	ahdRequireElementsNonNull(list, "min")
+	result := list.items[0]
+	for _, item := range list.items[1:] {
+		if item < result {
+			result = item
+		}
+	}
+	return result
+}
+
+// AhdMaxRealNonNull is AhdMaxReal for a List<Real>.
+func AhdMaxRealNonNull(list *AhdList[float64]) float64 {
+	ahdRequireElementsNonNull(list, "max")
+	result := list.items[0]
+	for _, item := range list.items[1:] {
+		if item > result {
+			result = item
 		}
 	}
 	return result

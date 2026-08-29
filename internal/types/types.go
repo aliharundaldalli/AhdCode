@@ -84,21 +84,37 @@ func (Range) String() string { return "Int range" }
 // IntRange is the single Range value; the type carries no parameters.
 var IntRange Type = Range{}
 
-type List struct{ Element Type }
+// List's element nullability is a structural part of the type itself (List<Int>
+// and List<Int?> are distinct, non-interchangeable types), unlike a binding's
+// own top-level nullability, which stays a separate flow-tracked dimension.
+type List struct {
+	Element         Type
+	ElementNullable bool
+}
 
 func (List) Kind() Kind { return ListKind }
 func (list List) String() string {
-	return fmt.Sprintf("List<%s>", Display(list.Element))
+	return fmt.Sprintf("List<%s>", displayNullable(list.Element, list.ElementNullable))
 }
 
+// Pair's value nullability is likewise structural. Keys may never be
+// nullable (see IsPairKey), so Pair carries no KeyNullable.
 type Pair struct {
-	Key   Type
-	Value Type
+	Key           Type
+	Value         Type
+	ValueNullable bool
 }
 
 func (Pair) Kind() Kind { return PairKind }
 func (pair Pair) String() string {
-	return fmt.Sprintf("Pair<%s, %s>", Display(pair.Key), Display(pair.Value))
+	return fmt.Sprintf("Pair<%s, %s>", Display(pair.Key), displayNullable(pair.Value, pair.ValueNullable))
+}
+
+func displayNullable(value Type, nullable bool) string {
+	if nullable {
+		return Display(value) + "?"
+	}
+	return Display(value)
 }
 
 // Parameter is one concrete callable signature parameter.
@@ -163,25 +179,26 @@ func Display(value Type) string {
 
 func IsInvalid(value Type) bool { return value == nil || value.Kind() == InvalidKind }
 
-// IterationYield reports the type an expression yields when iterated with for,
-// and whether the type is iterable at all. It is the one place that answers
-// that question for every iterable kind.
-func IterationYield(value Type) (Type, bool) {
+// IterationYield reports the type an expression yields when iterated with
+// for, whether that yielded value may be null, and whether the type is
+// iterable at all. It is the one place that answers those questions for
+// every iterable kind. Pair iteration yields keys, which are never nullable.
+func IterationYield(value Type) (element Type, elementNullable bool, ok bool) {
 	if value == nil {
-		return Invalid, false
+		return Invalid, false, false
 	}
 	switch typed := value.(type) {
 	case List:
-		return typed.Element, true
+		return typed.Element, typed.ElementNullable, true
 	case Pair:
-		return typed.Key, true
+		return typed.Key, false, true
 	case Range:
-		return Int, true
+		return Int, false, true
 	default:
 		if value.Kind() == StringKind {
-			return String, true
+			return String, false, true
 		}
-		return Invalid, false
+		return Invalid, false, false
 	}
 }
 
@@ -212,10 +229,10 @@ func Equal(left, right Type) bool {
 	switch leftValue := left.(type) {
 	case List:
 		rightValue, ok := right.(List)
-		return ok && Equal(leftValue.Element, rightValue.Element)
+		return ok && Equal(leftValue.Element, rightValue.Element) && leftValue.ElementNullable == rightValue.ElementNullable
 	case Pair:
 		rightValue, ok := right.(Pair)
-		return ok && Equal(leftValue.Key, rightValue.Key) && Equal(leftValue.Value, rightValue.Value)
+		return ok && Equal(leftValue.Key, rightValue.Key) && Equal(leftValue.Value, rightValue.Value) && leftValue.ValueNullable == rightValue.ValueNullable
 	case Function:
 		rightValue, ok := right.(Function)
 		if !ok {

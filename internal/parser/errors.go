@@ -11,4 +11,5 @@ const (
 	codeInvalidTypeSyntax       = "PAR008"
 	codeInvalidControlSyntax    = "PAR009"
 	codeExpectedSameLineRHS     = "PAR010"
+	codeInvalidInferredTarget   = "PAR011"
 )

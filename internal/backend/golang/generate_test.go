@@ -209,9 +209,23 @@ write(i)
 }
 
 func TestListElementsUseTheNullableRepresentation(t *testing.T) {
-	program := generate(t, "values: List<Int> := [1, null, 3]\nwrite(len(values))\n")
+	program := generate(t, "values: List<Int?> := [1, null, 3]\nwrite(len(values))\n")
 	if !strings.Contains(programSource(t, program), "*AhdList[*int64]") {
 		t.Fatal("List elements were not boxed")
+	}
+}
+
+// TestNonNullableListElementsAreUnboxed locks in v0.1.7's stricter default:
+// a List<Int> (no ?) stores unboxed int64 elements, since the type itself
+// now statically forbids a null element.
+func TestNonNullableListElementsAreUnboxed(t *testing.T) {
+	program := generate(t, "values: List<Int> := [1, 2, 3]\nwrite(len(values))\n")
+	source := programSource(t, program)
+	if !strings.Contains(source, "*AhdList[int64]") {
+		t.Fatal("non-nullable List elements were unexpectedly boxed")
+	}
+	if strings.Contains(source, "*AhdList[*int64]") {
+		t.Fatal("non-nullable List elements were boxed")
 	}
 }
 

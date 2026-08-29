@@ -112,7 +112,7 @@ func TestClearAcceptsOnlyMutableCollections(t *testing.T) {
 		{"Pair", "values: Pair<String, Int> := {\"a\": 1}\nclear(values)", ""},
 		{"String", "text: String := \"a\"\nclear(text)", codeCallArguments},
 		{"Int", "value: Int := 1\nclear(value)", codeCallArguments},
-		{"nullable List", "values: List<Int> := null\nclear(values)", codeNullableUse},
+		{"nullable List", "values: List<Int>? := null\nclear(values)", codeNullableUse},
 		{"no argument", "clear()", codeCallArguments},
 	}
 	for _, test := range tests {
@@ -206,7 +206,7 @@ func TestTakeFormsAndPromptRules(t *testing.T) {
 		{"two prompts are rejected", `text: String := take("A", "B")`, codeCallArguments},
 		{"a named prompt is rejected", `text: String := take(prompt: "A")`, codeCallArguments},
 		{"a null prompt is rejected", "text: String := take(null)", codeNullableUse},
-		{"a nullable prompt binding is rejected", "prompt: String := null\ntext: String := take(prompt)", codeNullableUse},
+		{"a nullable prompt binding is rejected", "prompt: String? := null\ntext: String := take(prompt)", codeNullableUse},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -223,7 +223,7 @@ func TestTakeFormsAndPromptRules(t *testing.T) {
 // TestNullableTakePromptIsReportedOnce keeps the null-state rejection a single
 // focused diagnostic.
 func TestNullableTakePromptIsReportedOnce(t *testing.T) {
-	_, result := analyzeText(t, "prompt: String := null\ntext: String := take(prompt)")
+	_, result := analyzeText(t, "prompt: String? := null\ntext: String := take(prompt)")
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("expected exactly one diagnostic; received %+v", result.Diagnostics)
 	}

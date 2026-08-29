@@ -314,7 +314,7 @@ func (b *builder) declarationModifiers() doc {
 func (b *builder) typeRef(t *ast.TypeRef) doc {
 	name := b.leaf()
 	if b.current().Kind != token.Less {
-		return name
+		return concat(name, b.nullableSuffix())
 	}
 	open := b.leaf()
 	skipGapSilently(b)
@@ -330,7 +330,16 @@ func (b *builder) typeRef(t *ast.TypeRef) doc {
 		skipGapSilently(b)
 	}
 	close_ := b.leaf()
-	return concat(name, open, concat(parts...), close_)
+	return concat(name, open, concat(parts...), close_, b.nullableSuffix())
+}
+
+// nullableSuffix consumes a trailing `?` marking the type just rendered as
+// nullable, if present.
+func (b *builder) nullableSuffix() doc {
+	if b.current().Kind != token.Question {
+		return concat()
+	}
+	return b.leaf()
 }
 
 // skipGapSilently advances past stray newlines with no rendering

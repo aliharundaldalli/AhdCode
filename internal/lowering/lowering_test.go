@@ -273,7 +273,7 @@ source: String := L.document(body: body, title: "Example")
 
 func TestNullInterpolationAndCollectionsAreConcrete(t *testing.T) {
 	result := lowerSources(t, map[string]string{"/Main.ahd": `Student: Class<> := {}
-student: Student := null
+student: Student? := null
 present: Bool := student != null
 name: String := "Ali"
 greeting: String := "Hello {name}"

@@ -7,6 +7,10 @@ type TypeRef struct {
 	Name          string
 	Arguments     []*TypeRef
 	ExplicitEmpty bool
+	// Nullable is true when this exact type reference was written with a
+	// trailing `?` (e.g. Int?, List<Int?>?). It only describes this node's
+	// own position; a generic argument's nullability is its own TypeRef.
+	Nullable bool
 }
 
 // Modifier is a declaration modifier as written in source.

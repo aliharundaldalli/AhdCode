@@ -80,6 +80,9 @@ func (a *analyzer) analyzeVariableDeclaration(declaration *ast.VariableDecl, cur
 	if hasModifier(declaration.Modifiers, ast.ModifierGlobal) || declaration.GlobalOnly {
 		return a.analyzeGlobalDeclaration(declaration, current, flow)
 	}
+	if declaration.Inferred {
+		return a.analyzeInferredDeclaration(declaration, current, flow)
+	}
 	identifier, isIdentifier := declaration.Target.(*ast.IdentifierExpr)
 	if current.kind == moduleScope {
 		if hasModifier(declaration.Modifiers, ast.ModifierLocal) {
@@ -109,11 +112,12 @@ func (a *analyzer) analyzeVariableDeclaration(declaration *ast.VariableDecl, cur
 		symbol = &Symbol{
 			Name: declaration.Name, Kind: BindingSymbol, Type: typeValue,
 			Span: declaration.Span(), Declaration: declaration,
-			Constant:       hasModifier(declaration.Modifiers, ast.ModifierConstant),
-			Confidential:   hasModifier(declaration.Modifiers, ast.ModifierConfidential),
-			ModuleRoot:     current.kind == moduleScope,
-			InitialNull:    MaybeNull,
-			OriginModuleID: a.environment.ModuleID,
+			Constant:         hasModifier(declaration.Modifiers, ast.ModifierConstant),
+			Confidential:     hasModifier(declaration.Modifiers, ast.ModifierConfidential),
+			ModuleRoot:       current.kind == moduleScope,
+			InitialNull:      MaybeNull,
+			DeclaredNullable: declaration.Type.Nullable,
+			OriginModuleID:   a.environment.ModuleID,
 		}
 		current.symbols[symbol.Name] = symbol
 		a.result.Symbols = append(a.result.Symbols, symbol)
@@ -139,11 +143,16 @@ func (a *analyzer) analyzeVariableDeclaration(declaration *ast.VariableDecl, cur
 			a.constrainConcreteFunction(symbol, resolvedFunction.Signature, concreteCallable(initializer), declaration.Initializer.Span())
 		}
 	}
-	symbol.InitialNull = initializer.nullState
-	flow[symbol] = initializer.nullState
+	nullOK := a.requireCompatibleNull(declaration.Type.Nullable, initializer, declaration.Initializer.Span(), fmt.Sprintf("declaration %q", symbol.Name))
+	resultNull := initializer.nullState
+	if !nullOK {
+		resultNull = NonNull
+	}
+	symbol.InitialNull = resultNull
+	flow[symbol] = resultNull
 
 	if symbol.Constant {
-		if initializer.nullState != NonNull {
+		if nullOK && initializer.nullState != NonNull {
 			a.error(codeConstantInitializer, fmt.Sprintf("Constant %q cannot be null", symbol.Name), declaration.Initializer.Span(), "initialize Constant with a NonNull value")
 			return flow
 		}
@@ -181,6 +190,75 @@ func isReferenceType(value types.Type) bool {
 	}
 }
 
+// analyzeInferredDeclaration handles `name := value` (optionally `name:
+// Local := value`, scope modifier explicit): the declaration has no
+// explicit `: Type`, so the static type -- including its nullability -- is
+// exactly the initializer's own type. A definitely-null or maybe-null
+// initializer therefore infers a nullable type (e.g. a call returning `T?`
+// infers `T?`); only a bare `null` literal, which carries no type at all,
+// is rejected with its own dedicated diagnostic. Scope intent is never
+// inferred: the same Local/module-root rule the explicit-type path enforces
+// applies here unchanged, using whatever modifiers were actually written.
+func (a *analyzer) analyzeInferredDeclaration(declaration *ast.VariableDecl, current *scope, flow flowState) flowState {
+	identifier, isIdentifier := declaration.Target.(*ast.IdentifierExpr)
+	if !isIdentifier {
+		if declaration.Initializer != nil {
+			a.analyzeExpression(declaration.Initializer, current, flow)
+		}
+		return flow
+	}
+	if current.kind == moduleScope {
+		if hasModifier(declaration.Modifiers, ast.ModifierLocal) {
+			a.error(codeScopeModifier, "module-root declarations must not use Local", declaration.Span(), "remove Local at module root")
+		}
+	} else if !hasModifier(declaration.Modifiers, ast.ModifierLocal) {
+		a.error(codeMissingLocal, fmt.Sprintf("nested declaration %q requires Local", declaration.Name), declaration.Span(), fmt.Sprintf("write %s: Local := ...", declaration.Name))
+	}
+	if declaration.Initializer == nil {
+		a.error(codeTypeMismatch, fmt.Sprintf("declaration %q requires an initializer", declaration.Name), declaration.Span(), "use := followed by a value")
+		return flow
+	}
+	initializer := a.analyzeExpression(declaration.Initializer, current, flow)
+	if types.IsInvalid(initializer.typeValue) {
+		if initializer.nullState == Null {
+			a.error(codeCannotInferType, "cannot infer a type from null", declaration.Initializer.Span(), "declare an explicit nullable type, e.g. name: T? := null")
+		}
+		return flow
+	}
+	typeValue := initializer.typeValue
+	if typeValue.Kind() == types.NothingKind {
+		a.error(codeInvalidType, "Nothing cannot be used as a value binding type", declaration.Initializer.Span(), "use Nothing only as a callable return type")
+	}
+	// The inferred type takes on exactly the initializer's own nullability --
+	// never forced to non-null, never widened to nullable beyond what the
+	// initializer already is.
+	declaredNullable := initializer.nullState != NonNull
+	resultNull := initializer.nullState
+	predeclared, exists := current.local(declaration.Name)
+	var symbol *Symbol
+	if exists && predeclared.Declaration == declaration {
+		symbol = predeclared
+	} else if exists {
+		a.error(codeRedeclaration, fmt.Sprintf("%q is already declared in this lexical scope", declaration.Name), declaration.Span(), "use = for reassignment or choose a shadowing declaration in a nested scope")
+		symbol = predeclared
+	} else {
+		symbol = &Symbol{
+			Name: declaration.Name, Kind: BindingSymbol, Type: typeValue,
+			Span: declaration.Span(), Declaration: declaration,
+			ModuleRoot:       current.kind == moduleScope,
+			InitialNull:      resultNull,
+			DeclaredNullable: declaredNullable,
+			OriginModuleID:   a.environment.ModuleID,
+		}
+		current.symbols[symbol.Name] = symbol
+		a.result.Symbols = append(a.result.Symbols, symbol)
+	}
+	a.result.ResolvedSymbols[declaration] = symbol
+	a.result.ResolvedSymbols[identifier] = symbol
+	flow[symbol] = resultNull
+	return flow
+}
+
 func (a *analyzer) analyzeGlobalDeclaration(declaration *ast.VariableDecl, current *scope, flow flowState) flowState {
 	if current.callable == nil {
 		a.error(codeInvalidGlobal, "Global declarations are valid only inside a function, method, or structure", declaration.Span(), "access module bindings directly from module-level control flow")
@@ -203,14 +281,23 @@ func (a *analyzer) analyzeGlobalDeclaration(declaration *ast.VariableDecl, curre
 		a.error(codeRedeclaration, fmt.Sprintf("%q is already declared in this lexical scope", declaration.Name), declaration.Span(), "remove the duplicate Global declaration")
 		return flow
 	}
-	declaredType := a.resolveType(declaration.Type)
-	if !types.Equal(declaredType, moduleSymbol.Type) && !(declaredType.Kind() == types.FunctionKind && moduleSymbol.Type.Kind() == types.FunctionKind) {
-		a.typeMismatch(declaration.Type.Span(), moduleSymbol.Type, declaredType, fmt.Sprintf("Global declaration %s", declaration.Name))
+	// An inferred Global (`x: Global`, no explicit type) has no declared type
+	// to validate: it adopts the module binding's type and nullability
+	// directly, exactly like an inferred ordinary declaration adopts its
+	// initializer's type. Scope intent (Global) stays explicit; only the
+	// value type is inferred.
+	if !declaration.Inferred {
+		declaredType := a.resolveType(declaration.Type)
+		if !types.Equal(declaredType, moduleSymbol.Type) && !(declaredType.Kind() == types.FunctionKind && moduleSymbol.Type.Kind() == types.FunctionKind) {
+			a.typeMismatch(declaration.Type.Span(), moduleSymbol.Type, declaredType, fmt.Sprintf("Global declaration %s", declaration.Name))
+		} else if declaration.Type.Nullable != moduleSymbol.DeclaredNullable {
+			a.error(codeTypeMismatch, fmt.Sprintf("Global declaration %s must match the module binding's nullability", declaration.Name), declaration.Type.Span(), fmt.Sprintf("declare %s: %s", declaration.Name, types.Display(moduleSymbol.Type)))
+		}
 	}
 	alias := &Symbol{
 		Name: declaration.Name, Kind: BindingSymbol, Type: moduleSymbol.Type,
 		Span: declaration.Span(), Declaration: declaration, Constant: moduleSymbol.Constant,
-		InitialNull: flow.state(moduleSymbol), Alias: moduleSymbol,
+		InitialNull: flow.state(moduleSymbol), Alias: moduleSymbol, DeclaredNullable: moduleSymbol.DeclaredNullable,
 	}
 	current.symbols[alias.Name] = alias
 	flow[alias] = flow.state(moduleSymbol)
@@ -241,7 +328,7 @@ func (a *analyzer) analyzeMemberDeclaration(declaration *ast.VariableDecl, curre
 	memberSymbol := &Symbol{
 		Name: member.Name, Kind: MemberSymbol, Type: typeValue, Span: member.Span(), Declaration: declaration,
 		Constant: hasModifier(declaration.Modifiers, ast.ModifierConstant), Confidential: hasModifier(declaration.Modifiers, ast.ModifierConfidential), InitialNull: MaybeNull,
-		OwnerClass: class.Class, OriginModuleID: a.environment.ModuleID,
+		OwnerClass: class.Class, OriginModuleID: a.environment.ModuleID, DeclaredNullable: declaration.Type.Nullable,
 	}
 	class.Members[member.Name] = memberSymbol
 	a.result.Symbols = append(a.result.Symbols, memberSymbol)
@@ -256,7 +343,11 @@ func (a *analyzer) analyzeMemberDeclaration(declaration *ast.VariableDecl, curre
 		if initializer.nullState != Null && !types.Assignable(typeValue, initializer.typeValue) {
 			a.typeMismatch(declaration.Initializer.Span(), typeValue, initializer.typeValue, fmt.Sprintf("initializer of member %s", member.Name))
 		}
+		nullOK := a.requireCompatibleNull(declaration.Type.Nullable, initializer, declaration.Initializer.Span(), fmt.Sprintf("member %q", member.Name))
 		memberSymbol.InitialNull = initializer.nullState
+		if !nullOK {
+			memberSymbol.InitialNull = NonNull
+		}
 		if function, ok := initializer.typeValue.(types.Function); ok && function.Signature != nil {
 			a.constrainConcreteFunction(memberSymbol, function.Signature, concreteCallable(initializer), declaration.Initializer.Span())
 		}
@@ -303,6 +394,8 @@ func (a *analyzer) analyzeAssignment(statement *ast.AssignmentStmt, current *sco
 		if types.IsInvalid(resultType) {
 			a.operatorError(statement.Operator, target.typeValue, value.typeValue, statement.Span())
 		}
+	} else if !a.requireCompatibleNull(targetNullable(target), value, statement.Value.Span(), "assignment target") {
+		resultNull = NonNull
 	}
 	if resultNull != Null && !types.Assignable(target.typeValue, resultType) {
 		a.typeMismatch(statement.Value.Span(), target.typeValue, resultType, fmt.Sprintf("assignment with %s", statement.Operator))
@@ -386,7 +479,7 @@ func (a *analyzer) analyzeFor(statement *ast.ForStmt, current *scope, flow flowS
 	if !iterable.invalid() && iterable.nullState != NonNull {
 		a.nullableError("for iteration", statement.Iterable, iterable.nullState)
 	}
-	elementType, iterableType := types.IterationYield(iterable.typeValue)
+	elementType, elementNullable, iterableType := types.IterationYield(iterable.typeValue)
 	if !iterableType && !iterable.invalid() {
 		a.error(codeOperatorType, fmt.Sprintf("type %s is not iterable", types.Display(iterable.typeValue)), statement.Iterable.Span(), "iterate a List, Pair, String, or between(...)")
 	}
@@ -400,8 +493,15 @@ func (a *analyzer) analyzeFor(statement *ast.ForStmt, current *scope, flow flowS
 		if !types.IsInvalid(declared) {
 			elementType = declared
 		}
+		if elementNullable && !statement.Type.Nullable {
+			a.error(codeNullNotAllowed, fmt.Sprintf("iteration variable %q is not nullable; the iterable's elements may be null", statement.Name), statement.Type.Span(), "declare the type with a trailing ?")
+		}
+		elementNullable = statement.Type.Nullable
 	}
-	iteration := &Symbol{Name: statement.Name, Kind: ForSymbol, Type: elementType, Span: statement.Span(), InitialNull: NonNull}
+	iteration := &Symbol{
+		Name: statement.Name, Kind: ForSymbol, Type: elementType, Span: statement.Span(),
+		InitialNull: nullStateFor(elementNullable), DeclaredNullable: elementNullable,
+	}
 	a.result.Symbols = append(a.result.Symbols, iteration)
 	a.loopDepth++
 	body := a.analyzeBlock(statement.Body, current, flow.clone(), map[string]*Symbol{statement.Name: iteration})

@@ -25,10 +25,10 @@ func lowerType(value types.Type) ir.Type {
 		}
 	case types.List:
 		element := lowerType(typed.Element)
-		return ir.Type{Kind: ir.ListType, Element: &element}
+		return ir.Type{Kind: ir.ListType, Element: &element, ElementNullable: typed.ElementNullable}
 	case types.Pair:
 		key, item := lowerType(typed.Key), lowerType(typed.Value)
-		return ir.Type{Kind: ir.PairType, Key: &key, Value: &item}
+		return ir.Type{Kind: ir.PairType, Key: &key, Value: &item, ValueNullable: typed.ValueNullable}
 	case types.Function:
 		return ir.Type{Kind: ir.FunctionType, Signature: lowerSignature(typed.Signature)}
 	case types.Class:

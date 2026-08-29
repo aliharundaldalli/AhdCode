@@ -31,14 +31,19 @@ const (
 )
 
 // Type is a pointer-address-independent semantic type representation.
+// ElementNullable/ValueNullable are structural: List<Int> and List<Int?> are
+// distinct, non-interchangeable types, unlike a binding's own top-level
+// nullability, which the backend tracks separately via NullState.
 type Type struct {
-	Kind      TypeKind
-	Element   *Type
-	Key       *Type
-	Value     *Type
-	Signature *Signature
-	Class     ClassID
-	Reference bool
+	Kind            TypeKind
+	Element         *Type
+	ElementNullable bool
+	Key             *Type
+	Value           *Type
+	ValueNullable   bool
+	Signature       *Signature
+	Class           ClassID
+	Reference       bool
 }
 
 type ParameterType struct {
@@ -55,9 +60,9 @@ type Signature struct {
 func (value Type) String() string {
 	switch value.Kind {
 	case ListType:
-		return fmt.Sprintf("List<%s>", typePointerString(value.Element))
+		return fmt.Sprintf("List<%s%s>", typePointerString(value.Element), nullableSuffix(value.ElementNullable))
 	case PairType:
-		return fmt.Sprintf("Pair<%s, %s>", typePointerString(value.Key), typePointerString(value.Value))
+		return fmt.Sprintf("Pair<%s, %s%s>", typePointerString(value.Key), typePointerString(value.Value), nullableSuffix(value.ValueNullable))
 	case FunctionType:
 		if value.Signature == nil {
 			return "Function<?>"
@@ -84,15 +89,22 @@ func typePointerString(value *Type) string {
 	return value.String()
 }
 
+func nullableSuffix(nullable bool) string {
+	if nullable {
+		return "?"
+	}
+	return ""
+}
+
 func EqualType(left, right Type) bool {
 	if left.Kind != right.Kind || left.Class != right.Class || left.Reference != right.Reference {
 		return false
 	}
 	switch left.Kind {
 	case ListType:
-		return equalTypePointer(left.Element, right.Element)
+		return left.ElementNullable == right.ElementNullable && equalTypePointer(left.Element, right.Element)
 	case PairType:
-		return equalTypePointer(left.Key, right.Key) && equalTypePointer(left.Value, right.Value)
+		return left.ValueNullable == right.ValueNullable && equalTypePointer(left.Key, right.Key) && equalTypePointer(left.Value, right.Value)
 	case FunctionType:
 		return EqualSignature(left.Signature, right.Signature)
 	default:

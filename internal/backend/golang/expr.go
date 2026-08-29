@@ -346,7 +346,7 @@ func (generator *generator) membership(value *ir.BinaryExpr, negated bool) strin
 			return generator.unsupported("membership in an untyped List", meta.Span)
 		}
 		element := *container.Element
-		code = "AhdListContains(" + generator.expr(value.Right) + ", " + generator.value(value.Left, element, true) + ", " + generator.equalFunc(element, true, meta.Span) + ")"
+		code = "AhdListContains(" + generator.expr(value.Right) + ", " + generator.value(value.Left, element, container.ElementNullable) + ", " + generator.equalFunc(element, container.ElementNullable, meta.Span) + ")"
 	case ir.StringType:
 		code = "AhdStringContains(" + generator.value(value.Right, ir.Type{Kind: ir.StringType}, false) + ", " + generator.value(value.Left, ir.Type{Kind: ir.StringType}, false) + ")"
 	case ir.PairType:
@@ -424,14 +424,14 @@ func (generator *generator) renderFunc(value ir.Type, nullable, nested bool, spa
 		if value.Element == nil {
 			return generator.unsupported("canonical text for an untyped List", span)
 		}
-		element := generator.goType(*value.Element, true)
-		return "AhdStrList[" + element + "](" + generator.renderFunc(*value.Element, true, true, span) + ")"
+		element := generator.goType(*value.Element, value.ElementNullable)
+		return "AhdStrList[" + element + "](" + generator.renderFunc(*value.Element, value.ElementNullable, true, span) + ")"
 	case ir.PairType:
 		if value.Key == nil || value.Value == nil {
 			return generator.unsupported("canonical text for an untyped Pair", span)
 		}
-		key, item := generator.goType(*value.Key, false), generator.goType(*value.Value, true)
-		return "AhdStrPair[" + key + ", " + item + "](" + generator.renderFunc(*value.Key, false, true, span) + ", " + generator.renderFunc(*value.Value, true, true, span) + ")"
+		key, item := generator.goType(*value.Key, false), generator.goType(*value.Value, value.ValueNullable)
+		return "AhdStrPair[" + key + ", " + item + "](" + generator.renderFunc(*value.Key, false, true, span) + ", " + generator.renderFunc(*value.Value, value.ValueNullable, true, span) + ")"
 	case ir.ClassType:
 		return "AhdStrRefInstance[" + generator.interfaceName(value.Class) + "]"
 	default:
@@ -458,14 +458,14 @@ func (generator *generator) equalFunc(value ir.Type, nullable bool, span source.
 		if value.Element == nil {
 			return generator.unsupported("equality for an untyped List", span)
 		}
-		element := generator.goType(*value.Element, true)
-		return "AhdEqList[" + element + "](" + generator.equalFunc(*value.Element, true, span) + ")"
+		element := generator.goType(*value.Element, value.ElementNullable)
+		return "AhdEqList[" + element + "](" + generator.equalFunc(*value.Element, value.ElementNullable, span) + ")"
 	case ir.PairType:
 		if value.Key == nil || value.Value == nil {
 			return generator.unsupported("equality for an untyped Pair", span)
 		}
-		key, item := generator.goType(*value.Key, false), generator.goType(*value.Value, true)
-		return "AhdEqPair[" + key + ", " + item + "](" + generator.equalFunc(*value.Value, true, span) + ")"
+		key, item := generator.goType(*value.Key, false), generator.goType(*value.Value, value.ValueNullable)
+		return "AhdEqPair[" + key + ", " + item + "](" + generator.equalFunc(*value.Value, value.ValueNullable, span) + ")"
 	case ir.ClassType:
 		return "AhdEqRef[" + generator.interfaceName(value.Class) + "]()"
 	default:
@@ -527,19 +527,21 @@ func (generator *generator) stringParts(value *ir.StringExpr) string {
 // ---------------------------------------------------------------------------
 
 func (generator *generator) listLiteral(value *ir.ListExpr) string {
-	element := generator.goType(value.ElementType, true)
+	elementNullable := value.Type.ElementNullable
+	element := generator.goType(value.ElementType, elementNullable)
 	if element == "" {
 		return generator.unsupported("a List literal of "+value.ElementType.String(), value.ExprMeta().Span)
 	}
 	parts := make([]string, 0, len(value.Elements))
 	for _, item := range value.Elements {
-		parts = append(parts, generator.value(item, value.ElementType, true))
+		parts = append(parts, generator.value(item, value.ElementType, elementNullable))
 	}
 	return "AhdNewList[" + element + "](" + strings.Join(parts, ", ") + ")"
 }
 
 func (generator *generator) pairLiteral(value *ir.PairExpr) string {
-	key, item := generator.goType(value.KeyType, false), generator.goType(value.ValueType, true)
+	valueNullable := value.Type.ValueNullable
+	key, item := generator.goType(value.KeyType, false), generator.goType(value.ValueType, valueNullable)
 	if key == "" || item == "" {
 		return generator.unsupported("a Pair literal of "+value.ExprMeta().Type.String(), value.ExprMeta().Span)
 	}
@@ -547,7 +549,7 @@ func (generator *generator) pairLiteral(value *ir.PairExpr) string {
 	values := make([]string, 0, len(value.Entries))
 	for _, entry := range value.Entries {
 		keys = append(keys, generator.value(entry.Key, value.KeyType, false))
-		values = append(values, generator.value(entry.Value, value.ValueType, true))
+		values = append(values, generator.value(entry.Value, value.ValueType, valueNullable))
 	}
 	return "AhdBuildPair([]" + key + "{" + strings.Join(keys, ", ") + "}, []" + item + "{" + strings.Join(values, ", ") + "})"
 }
@@ -926,6 +928,7 @@ func (generator *generator) listOperation(name string, value *ir.CallExpr) strin
 		generator.fail(CodeGenerationFailure, "List."+name+" has no typed receiver", meta.Span, "the IR call is malformed")
 		return "nil"
 	}
+	elementNullable := receiver.ExprMeta().Type.ElementNullable
 	element := *receiver.ExprMeta().Type.Element
 	switch name {
 	case "reverse":
@@ -941,18 +944,30 @@ func (generator *generator) listOperation(name string, value *ir.CallExpr) strin
 		if name == "index" {
 			helper = "AhdListIndex"
 		}
-		return helper + "(" + generator.expr(receiver) + ", " + generator.value(value.Arguments[0].Value, element, true) +
-			", " + generator.equalFunc(element, true, meta.Span) + ")"
+		return helper + "(" + generator.expr(receiver) + ", " + generator.value(value.Arguments[0].Value, element, elementNullable) +
+			", " + generator.equalFunc(element, elementNullable, meta.Span) + ")"
 	case "map", "filter":
 		if len(value.Arguments) != 1 || value.Arguments[0].Value == nil {
 			generator.fail(CodeGenerationFailure, "List."+name+" has no callback", meta.Span, "the IR call is malformed")
 			return "nil"
 		}
-		helper := "AhdListMap"
+		callback := value.Arguments[0].Value
 		if name == "filter" {
-			helper = "AhdListFilter"
+			// AhdListFilter's predicate result is fixed at *bool (not a free
+			// generic parameter), so the adapter must preserve the boxed
+			// representation a Function value's Bool return already uses.
+			adapter := generator.adaptElementCallback(callback, element, elementNullable, ir.Type{Kind: ir.BoolType}, true)
+			return "AhdListFilter(" + generator.expr(receiver) + ", " + adapter + ")"
 		}
-		return helper + "(" + generator.expr(receiver) + ", " + generator.expr(value.Arguments[0].Value) + ")"
+		resultType := meta.Type
+		resultElementNullable := false
+		resultElement := resultType
+		if resultType.Kind == ir.ListType && resultType.Element != nil {
+			resultElement = *resultType.Element
+			resultElementNullable = resultType.ElementNullable
+		}
+		adapter := generator.adaptElementCallback(callback, element, elementNullable, resultElement, resultElementNullable)
+		return "AhdListMap(" + generator.expr(receiver) + ", " + adapter + ")"
 	case "sort":
 		return generator.listSort(value, element)
 	default:
@@ -965,8 +980,9 @@ func (generator *generator) listOperation(name string, value *ir.CallExpr) strin
 // no ordering is ever inferred from rendered text.
 func (generator *generator) listSort(value *ir.CallExpr, element ir.Type) string {
 	meta := value.ExprMeta()
+	elementNullable := value.Callee.ExprMeta().Type.ElementNullable
 	if len(value.Arguments) == 0 {
-		helper, known := orderedHelper("AhdListSort", element)
+		helper, known := naturalSortHelper("AhdListSort", element, elementNullable)
 		if !known {
 			return generator.unsupported("sort of List<"+element.String()+">", meta.Span)
 		}
@@ -977,11 +993,42 @@ func (generator *generator) listSort(value *ir.CallExpr, element ir.Type) string
 		generator.fail(CodeGenerationFailure, "List.sort has no concrete key Function", meta.Span, "the IR call is malformed")
 		return "nil"
 	}
-	helper, known := orderedHelper("AhdListSortKey", key.ExprMeta().Type.Signature.Return)
+	keyReturn := key.ExprMeta().Type.Signature.Return
+	helper, known := orderedHelper("AhdListSortKey", keyReturn)
 	if !known {
-		return generator.unsupported("sort by a "+key.ExprMeta().Type.Signature.Return.String()+" key", meta.Span)
+		return generator.unsupported("sort by a "+keyReturn.String()+" key", meta.Span)
 	}
-	return helper + "(" + generator.expr(value.Callee) + ", " + generator.expr(key) + ")"
+	// AhdListSortKey*'s key result is fixed at *K (not a free generic
+	// parameter), so the adapter must preserve the boxed representation a
+	// Function value's scalar return already uses.
+	adapter := generator.adaptElementCallback(key, element, elementNullable, keyReturn, true)
+	return helper + "(" + generator.expr(value.Callee) + ", " + adapter + ")"
+}
+
+// adaptElementCallback wraps a Function value in a closure whose parameter
+// and result use exactly the container-element/native representation a
+// generic List/Pair runtime helper expects. A Function value's own scalar
+// parameters and result always use the boxed representation (see goType),
+// which does not necessarily match a List's element storage once List<T>
+// (non-nullable elements) and List<T?> (nullable elements) can render
+// differently; this adapter bridges the two with the same AhdBox/AhdNonNull
+// coercions used everywhere else, so Go's generic type inference sees a
+// callback whose Go type already matches the container's element type.
+func (generator *generator) adaptElementCallback(callback ir.Expr, paramType ir.Type, paramNullable bool, resultType ir.Type, resultNullable bool) string {
+	paramGo := generator.goType(paramType, paramNullable)
+	resultGo := generator.goType(resultType, resultNullable)
+	arg := generator.temporaryName()
+	boxedArg := generator.coerce(arg, ir.ExprBase{Type: paramType, NullState: nullStateFromBool(paramNullable)}, paramType, true)
+	call := generator.expr(callback) + "(" + boxedArg + ")"
+	result := generator.coerce(call, ir.ExprBase{Type: resultType, NullState: ir.MaybeNull}, resultType, resultNullable)
+	return "func(" + arg + " " + paramGo + ") " + resultGo + " { return " + result + " }"
+}
+
+func nullStateFromBool(nullable bool) ir.NullState {
+	if nullable {
+		return ir.MaybeNull
+	}
+	return ir.NonNull
 }
 
 func orderedHelper(prefix string, value ir.Type) (string, bool) {
@@ -995,6 +1042,21 @@ func orderedHelper(prefix string, value ir.Type) (string, bool) {
 	default:
 		return "", false
 	}
+}
+
+// naturalSortHelper is orderedHelper specialized for the callback-free
+// natural sort, which (unlike the keyed forms) touches the List's own
+// element storage directly and so needs the non-nullable runtime variant
+// whenever the List's elements are non-nullable.
+func naturalSortHelper(prefix string, element ir.Type, elementNullable bool) (string, bool) {
+	name, ok := orderedHelper(prefix, element)
+	if !ok {
+		return "", false
+	}
+	if !elementNullable {
+		name += "NonNull"
+	}
+	return name, true
 }
 
 // absoluteValue selects the abs overload from the checked result type, so the
@@ -1039,7 +1101,11 @@ func (generator *generator) numericReduction(name string, value *ir.CallExpr) st
 	default:
 		return generator.unsupported(name+" of "+list.String(), meta.Span)
 	}
-	return "Ahd" + strings.ToUpper(name[:1]) + name[1:] + helper + "(" + generator.expr(argument) + ")"
+	suffix := ""
+	if !list.ElementNullable {
+		suffix = "NonNull"
+	}
+	return "Ahd" + strings.ToUpper(name[:1]) + name[1:] + helper + suffix + "(" + generator.expr(argument) + ")"
 }
 
 // between builds the lazy integer iteration. Missing arguments take the
@@ -1082,7 +1148,7 @@ func (generator *generator) collectionMutation(name string, value *ir.CallExpr) 
 		if receiver.Element == nil {
 			return generator.unsupported("adding to an untyped List", meta.Span)
 		}
-		return generator.expr(value.Callee) + ".Add(" + generator.value(argument, *receiver.Element, true) + ")"
+		return generator.expr(value.Callee) + ".Add(" + generator.value(argument, *receiver.Element, receiver.ElementNullable) + ")"
 	case "List.eject":
 		return generator.expr(value.Callee) + ".Eject(" + generator.value(argument, ir.Type{Kind: ir.IntType}, false) + ")"
 	default:

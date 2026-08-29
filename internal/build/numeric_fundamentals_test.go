@@ -80,7 +80,7 @@ func TestNumericFundamentalsRunAsNativeExecutables(t *testing.T) {
 		},
 		{
 			name:       "a null element is not treated as zero",
-			sources:    map[string]string{"main.ahd": "values: List<Int> := [1, null]\nwrite(sum(values))\n"},
+			sources:    map[string]string{"main.ahd": "values: List<Int?> := [1, null]\nwrite(sum(values))\n"},
 			exitCode:   1,
 			errorClass: "NullError",
 		},
@@ -118,13 +118,13 @@ func TestNumericFundamentalsRunAsNativeExecutables(t *testing.T) {
 		},
 		{
 			name:       "min rejects a null element",
-			sources:    map[string]string{"main.ahd": "values: List<Int> := [3, null, 1]\nwrite(min(values))\n"},
+			sources:    map[string]string{"main.ahd": "values: List<Int?> := [3, null, 1]\nwrite(min(values))\n"},
 			exitCode:   1,
 			errorClass: "NullError",
 		},
 		{
 			name:       "max rejects a null element",
-			sources:    map[string]string{"main.ahd": "values: List<Real> := [1.5, null]\nwrite(max(values))\n"},
+			sources:    map[string]string{"main.ahd": "values: List<Real?> := [1.5, null]\nwrite(max(values))\n"},
 			exitCode:   1,
 			errorClass: "NullError",
 		},
@@ -150,7 +150,7 @@ func TestNumericFundamentalsRunAsNativeExecutables(t *testing.T) {
 		},
 		{
 			name:     "a refined nullable List is accepted",
-			sources:  map[string]string{"main.ahd": "values: List<Int> := null\nvalues = [2, 4]\nif values != null {\n    write(sum(values))\n}\n"},
+			sources:  map[string]string{"main.ahd": "values: List<Int>? := null\nvalues = [2, 4]\nif values != null {\n    write(sum(values))\n}\n"},
 			expected: "6\n",
 		},
 		{

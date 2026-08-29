@@ -78,7 +78,7 @@ func (a *analyzer) analyzeFunction(declaration *ast.FunctionDecl, class *Symbol)
 			continue
 		}
 		typeValue := callable.Signature.Parameters[index].Type
-		symbol := &Symbol{Name: parameter.Name, Kind: ParameterSymbol, Type: typeValue, Span: parameter.Span(), InitialNull: callable.ParameterNull[index]}
+		symbol := &Symbol{Name: parameter.Name, Kind: ParameterSymbol, Type: typeValue, Span: parameter.Span(), InitialNull: callable.ParameterNull[index], DeclaredNullable: parameter.Type.Nullable}
 		if function, ok := typeValue.(types.Function); ok && function.Signature == nil {
 			symbol.inference = newFunctionInference(callable.Signature, index)
 		}
@@ -94,10 +94,12 @@ func (a *analyzer) analyzeFunction(declaration *ast.FunctionDecl, class *Symbol)
 			if value.nullState != Null && !types.Assignable(typeValue, value.typeValue) {
 				a.typeMismatch(parameter.Default.Span(), typeValue, value.typeValue, fmt.Sprintf("default value of %s", parameter.Name))
 			}
-			if value.nullState != NonNull {
-				callable.ParameterNull[index] = MaybeNull
-				symbol.InitialNull = MaybeNull
-				flow[symbol] = MaybeNull
+			if a.requireCompatibleNull(parameter.Type.Nullable, value, parameter.Default.Span(), fmt.Sprintf("parameter %q", parameter.Name)) {
+				if value.nullState != NonNull {
+					callable.ParameterNull[index] = MaybeNull
+					symbol.InitialNull = MaybeNull
+					flow[symbol] = MaybeNull
+				}
 			}
 		}
 	}
@@ -154,7 +156,7 @@ func (a *analyzer) analyzeStructure(declaration *ast.StructureDecl, class *Symbo
 		nullState := callable.ParameterNull[parameterIndex]
 		callableParameterIndex := parameterIndex
 		parameterIndex++
-		symbol := &Symbol{Name: parameter.Name, Kind: ParameterSymbol, Type: typeValue, Span: parameter.Span(), InitialNull: nullState}
+		symbol := &Symbol{Name: parameter.Name, Kind: ParameterSymbol, Type: typeValue, Span: parameter.Span(), InitialNull: nullState, DeclaredNullable: parameter.Type.Nullable}
 		if function, ok := typeValue.(types.Function); ok && function.Signature == nil {
 			symbol.inference = newFunctionInference(callable.Signature, callableParameterIndex)
 		}
@@ -167,7 +169,7 @@ func (a *analyzer) analyzeStructure(declaration *ast.StructureDecl, class *Symbo
 			if value.nullState != Null && !types.Assignable(typeValue, value.typeValue) {
 				a.typeMismatch(parameter.Default.Span(), typeValue, value.typeValue, fmt.Sprintf("default value of %s", parameter.Name))
 			}
-			if value.nullState != NonNull {
+			if a.requireCompatibleNull(parameter.Type.Nullable, value, parameter.Default.Span(), fmt.Sprintf("parameter %q", parameter.Name)) && value.nullState != NonNull {
 				callable.ParameterNull[parameterIndex-1] = MaybeNull
 			}
 		}
@@ -231,5 +233,14 @@ func (a *analyzer) analyzeReturn(statement *ast.ReturnStmt, current *scope, flow
 	if value.nullState != Null && !types.Assignable(context.returnType, value.typeValue) {
 		a.typeMismatch(statement.Value.Span(), context.returnType, value.typeValue, "return value")
 	}
-	context.returnNull = append(context.returnNull, value.nullState)
+	returnNullable := context.callable != nil && context.callable.Declaration != nil && context.callable.Declaration.ReturnType != nil && context.callable.Declaration.ReturnType.Nullable
+	resultNull := value.nullState
+	subject := "Function return value"
+	if context.symbol != nil {
+		subject = fmt.Sprintf("Function %q return value", context.symbol.Name)
+	}
+	if !a.requireCompatibleNull(returnNullable, value, statement.Value.Span(), subject) {
+		resultNull = NonNull
+	}
+	context.returnNull = append(context.returnNull, resultNull)
 }

@@ -10,9 +10,9 @@ import (
 //
 // Scalar slots are boxed only when the declared null-state allows null.
 // Reference types are already nil-able, so both representations coincide.
-// Collection elements and Pair values always use the nullable representation
-// because element access is MaybeNull in the frontend null-state model; Pair
-// keys are never null and always use the non-null representation.
+// A List's element and a Pair's value are boxed only when the type itself
+// says so (List<T?>/Pair<K, V?>); List<T>/Pair<K, V> store unboxed values.
+// Pair keys are never null and always use the non-null representation.
 func (generator *generator) goType(value ir.Type, nullable bool) string {
 	base := generator.plainType(value)
 	if base == "" {
@@ -47,7 +47,7 @@ func (generator *generator) plainType(value ir.Type) string {
 		if value.Element == nil {
 			return ""
 		}
-		element := generator.goType(*value.Element, true)
+		element := generator.goType(*value.Element, value.ElementNullable)
 		if element == "" {
 			return ""
 		}
@@ -57,7 +57,7 @@ func (generator *generator) plainType(value ir.Type) string {
 			return ""
 		}
 		key := generator.goType(*value.Key, false)
-		item := generator.goType(*value.Value, true)
+		item := generator.goType(*value.Value, value.ValueNullable)
 		if key == "" || item == "" {
 			return ""
 		}

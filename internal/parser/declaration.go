@@ -12,6 +12,9 @@ func (p *parser) parseSimpleStatement(scope scopeKind) ast.Stmt {
 	if p.match(token.Colon) {
 		return p.parseDeclaration(start, expression, scope)
 	}
+	if p.check(token.Declare) {
+		return p.parseInferredDeclaration(start, expression, nil)
+	}
 	if isAssignmentOperator(p.current().Kind) {
 		operator := p.advance()
 		if !expressionCanAssign(expression) {
@@ -35,6 +38,30 @@ func (p *parser) parseSimpleStatement(scope scopeKind) ast.Stmt {
 		}
 	}
 	return &ast.ExprStmt{Base: p.base(start, spanEnd(expression)), Expression: expression}
+}
+
+// parseInferredDeclaration parses `name := value` (bare) or `name: Local :=
+// value` / `name: Global := value` (an explicit scope modifier with no
+// type). Either way there is no explicit `: Type`: its static type is the
+// initializer's own type, computed during semantic analysis; the parser only
+// records that this declaration asked for inference, plus whatever scope
+// modifiers were written so scope intent stays explicit.
+func (p *parser) parseInferredDeclaration(start source.Position, target ast.Expr, modifiers []ast.Modifier) ast.Stmt {
+	identifier, ok := target.(*ast.IdentifierExpr)
+	if !ok {
+		p.errorSpan(codeInvalidInferredTarget, "an inferred declaration target must be a plain identifier", target.Span(), "write name := value, or use an explicit name: Type := value declaration")
+	}
+	declareToken := p.expect(token.Declare, "expected := in declaration")
+	p.requireSameLineRHS(declareToken)
+	initializer := p.parseExpression(0)
+	name := ""
+	if ok {
+		name = identifier.Name
+	}
+	return &ast.VariableDecl{
+		Base: p.base(start, spanEnd(initializer)), Target: target, Name: name,
+		Modifiers: modifiers, Initializer: initializer, Inferred: true,
+	}
 }
 
 func (p *parser) parsePrefixUpdate() ast.Stmt {
@@ -69,6 +96,22 @@ func (p *parser) parseDeclaration(start source.Position, target ast.Expr, scope 
 	}
 
 	modifiers, flavor := p.parseDeclarationModifiers()
+	// No type name follows the modifiers: this is an inferred declaration
+	// with an explicit scope modifier (`x: Local := value`), or -- Global
+	// never takes an initializer -- a Global alias whose type is inferred
+	// from the module binding it aliases (`x: Global`). Scope intent stays
+	// explicit; only the value type is ever inferred.
+	if _, looksLikeType := syntacticTypeName(p.current()); !looksLikeType {
+		if p.check(token.Declare) {
+			return p.parseInferredDeclaration(start, target, modifiers)
+		}
+		if hasModifier(modifiers, ast.ModifierGlobal) {
+			return &ast.VariableDecl{
+				Base: p.base(start, p.previous().Span.End), Target: target, Name: name,
+				Modifiers: modifiers, Inferred: true, GlobalOnly: true,
+			}
+		}
+	}
 	typeRef := p.parseTypeRef()
 	if flavor != ast.FunctionBase && typeRef.Name != "Function" {
 		p.errorSpan(codeInvalidTypeSyntax, "Overload/Override may modify only Function declarations", typeRef.Span(), "remove the Function modifier or use Function as the declaration type")
@@ -163,6 +206,7 @@ func (p *parser) parseTypeRef() *ast.TypeRef {
 	p.advance()
 	typeRef := &ast.TypeRef{Base: ast.Base{Range: startToken.Span}, Name: name}
 	if !p.match(token.Less) {
+		p.consumeNullableSuffix(typeRef)
 		return typeRef
 	}
 	p.skipNewlines()
@@ -185,7 +229,20 @@ func (p *parser) parseTypeRef() *ast.TypeRef {
 	}
 	closing := p.expect(token.Greater, "expected > after generic type arguments")
 	typeRef.Range = source.NewSpan(p.file.ID, startToken.Span.Start, closing.Span.End)
+	p.consumeNullableSuffix(typeRef)
 	return typeRef
+}
+
+// consumeNullableSuffix consumes a trailing `?` marking this exact type
+// reference as nullable (Int?, List<Int>?, ...) and extends the node's span
+// to include it.
+func (p *parser) consumeNullableSuffix(typeRef *ast.TypeRef) {
+	if !p.check(token.Question) {
+		return
+	}
+	closing := p.advance()
+	typeRef.Nullable = true
+	typeRef.Range = source.NewSpan(p.file.ID, typeRef.Range.Start, closing.Span.End)
 }
 
 func syntacticTypeName(item token.Token) (string, bool) {

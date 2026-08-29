@@ -191,13 +191,13 @@ result: List<Int> := values.map(report)
 // for both String and List operations.
 func TestTypeOperationReceiversRequireNonNull(t *testing.T) {
 	rejected := map[string]string{
-		"null String receiver":  "text: String := null\nvalue: String := text.trim()",
-		"null List receiver":    "values: List<Int> := null\ntotal: Int := values.count(5)",
-		"null sort receiver":    "values: List<Int> := null\nvalues.sort()",
-		"null shuffle receiver": "values: List<Int> := null\nvalues.shuffle()",
-		"null map receiver":     callbackPreamble + "values: List<Int> := null\nresult: List<Int> := values.map(double)",
-		"null String argument":  "needle: String := null\nvalue: Bool := \"abc\".contains(needle)",
-		"null List argument":    "wanted: Int := null\nvalues: List<Int> := [1]\ntotal: Int := values.count(wanted)",
+		"null String receiver":  "text: String? := null\nvalue: String := text.trim()",
+		"null List receiver":    "values: List<Int>? := null\ntotal: Int := values.count(5)",
+		"null sort receiver":    "values: List<Int>? := null\nvalues.sort()",
+		"null shuffle receiver": "values: List<Int>? := null\nvalues.shuffle()",
+		"null map receiver":     callbackPreamble + "values: List<Int>? := null\nresult: List<Int> := values.map(double)",
+		"null String argument":  "needle: String? := null\nvalue: Bool := \"abc\".contains(needle)",
+		"null List argument":    "wanted: Int? := null\nvalues: List<Int> := [1]\ntotal: Int := values.count(wanted)",
 	}
 	for name, text := range rejected {
 		t.Run(name, func(t *testing.T) {
@@ -205,7 +205,7 @@ func TestTypeOperationReceiversRequireNonNull(t *testing.T) {
 			requireSemanticCode(t, result, codeNullableUse)
 		})
 	}
-	refined := "text: String := null\nif text != null {\n    write(text.trim())\n}\nvalues: List<Int> := null\nif values != null {\n    values.sort()\n    values.shuffle()\n    write(values.count(1))\n}\n"
+	refined := "text: String? := null\nif text != null {\n    write(text.trim())\n}\nvalues: List<Int>? := null\nif values != null {\n    values.sort()\n    values.shuffle()\n    write(values.count(1))\n}\n"
 	_, result := analyzeText(t, refined)
 	requireSemanticClean(t, result)
 }
@@ -236,7 +236,7 @@ write(values.filter(isEven))
 func TestCallbackReturningNullIsRejected(t *testing.T) {
 	preamble := `maybeKey: Function := (
     x: Int
-) -> Int {
+) -> Int? {
     if x > 0 {
         return null
     }
@@ -246,7 +246,7 @@ func TestCallbackReturningNullIsRejected(t *testing.T) {
 
 maybeBool: Function := (
     x: Int
-) -> Bool {
+) -> Bool? {
     return null
 }
 
@@ -258,8 +258,9 @@ maybeBool: Function := (
 		_, result := analyzeText(t, text)
 		requireSemanticCode(t, result, codeNullableUse)
 	}
-	// map has no such restriction: a List element is nullable by definition.
-	_, result := analyzeText(t, preamble+"values: List<Int> := [1]\nresult: List<Int> := values.map(maybeKey)")
+	// map has no such restriction on the callback itself: its result List
+	// simply picks up the callback's own return nullability.
+	_, result := analyzeText(t, preamble+"values: List<Int> := [1]\nresult: List<Int?> := values.map(maybeKey)")
 	requireSemanticClean(t, result)
 }
 

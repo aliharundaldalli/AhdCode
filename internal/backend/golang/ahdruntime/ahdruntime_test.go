@@ -747,11 +747,11 @@ func TestStringSplitPreservesEmptyFields(t *testing.T) {
 	if parts.Len() != 4 {
 		t.Fatalf("split length = %d, want 4", parts.Len())
 	}
-	if *parts.At(0) != "a" || *parts.At(1) != "" || *parts.At(2) != "b" || *parts.At(3) != "" {
+	if parts.At(0) != "a" || parts.At(1) != "" || parts.At(2) != "b" || parts.At(3) != "" {
 		t.Fatal("split must preserve empty fields")
 	}
 	single := AhdStringSplit("", ",")
-	if single.Len() != 1 || *single.At(0) != "" {
+	if single.Len() != 1 || single.At(0) != "" {
 		t.Fatal("splitting an empty String must yield one empty field")
 	}
 }

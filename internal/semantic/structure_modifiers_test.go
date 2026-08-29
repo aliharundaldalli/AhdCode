@@ -111,7 +111,7 @@ func TestConstantRecursiveListStructureStressAndNullSafety(t *testing.T) {
 }
 Holder: Class<> := {
     structure: Attributes := (
-        nodes: Constant List<JosephusNode>
+        nodes: Constant List<JosephusNode?>
     )
 }
 node: JosephusNode := JosephusNode(name: "one")

@@ -849,7 +849,15 @@ func (a *analyzer) analyzeCollectionMutation(call *ast.CallExpr, operation TypeO
 		return nothing
 	}
 	argument := a.analyzeTypeOperationArguments(call, current, flow, expectedArgument)[0]
-	if argument.nullState != NonNull && operation != ListAdd {
+	if operation == ListAdd {
+		elementNullable := false
+		if list, ok := receiver.typeValue.(types.List); ok {
+			elementNullable = list.ElementNullable
+		}
+		if !a.requireCompatibleNull(elementNullable, argument, call.Arguments[0].Span(), "List element") {
+			return nothing
+		}
+	} else if argument.nullState != NonNull {
 		a.nullableError(string(operation), call.Arguments[0].Value, argument.nullState)
 		return nothing
 	}
@@ -898,7 +906,7 @@ func (a *analyzer) analyzeListSort(call *ast.CallExpr, receiver expressionInfo, 
 	if !a.requireTypeOperationArity(call, ListSort, receiver.typeValue, 1, current, flow) {
 		return nothing
 	}
-	signature, ok := a.analyzeListCallback(call, ListSort, element, nil, current, flow)
+	signature, ok, _ := a.analyzeListCallback(call, ListSort, element, nil, current, flow)
 	if !ok {
 		return nothing
 	}
@@ -920,7 +928,7 @@ func (a *analyzer) analyzeListTransform(call *ast.CallExpr, operation TypeOperat
 	if operation == ListFilter {
 		expectedReturn = types.Bool
 	}
-	signature, ok := a.analyzeListCallback(call, operation, element, expectedReturn, current, flow)
+	signature, ok, returnsNull := a.analyzeListCallback(call, operation, element, expectedReturn, current, flow)
 	if !ok {
 		return failure
 	}
@@ -934,13 +942,13 @@ func (a *analyzer) analyzeListTransform(call *ast.CallExpr, operation TypeOperat
 		a.error(codeCallArguments, "map requires a Function that returns a value", call.Arguments[0].Span(), "return a value from the mapped Function")
 		return failure
 	}
-	return expressionInfo{typeValue: types.List{Element: signature.Return}, nullState: NonNull}
+	return expressionInfo{typeValue: types.List{Element: signature.Return, ElementNullable: returnsNull}, nullState: NonNull}
 }
 
 // analyzeListCallback checks one Function argument of a List operation. The
 // callback must take exactly the element type, because List is invariant and
 // no element is converted on the way into the call.
-func (a *analyzer) analyzeListCallback(call *ast.CallExpr, operation TypeOperation, element, expectedReturn types.Type, current *scope, flow flowState) (*types.Signature, bool) {
+func (a *analyzer) analyzeListCallback(call *ast.CallExpr, operation TypeOperation, element, expectedReturn types.Type, current *scope, flow flowState) (*types.Signature, bool, bool) {
 	var expected types.Type
 	if element.Kind() != types.InvalidKind {
 		expected = types.Function{Signature: &types.Signature{
@@ -952,27 +960,28 @@ func (a *analyzer) analyzeListCallback(call *ast.CallExpr, operation TypeOperati
 	if info.invalid() || a.bag.Len() != reported {
 		// The argument already reported its own incompatibility; a second
 		// derivative diagnostic about the same callback adds nothing.
-		return nil, false
+		return nil, false, false
 	}
 	if info.nullState != NonNull {
 		a.nullableError(string(operation), call.Arguments[0].Value, info.nullState)
-		return nil, false
+		return nil, false, false
 	}
 	function, isFunction := info.typeValue.(types.Function)
 	if !isFunction || function.Signature == nil {
 		a.typeMismatch(call.Arguments[0].Span(), types.Function{}, info.typeValue, string(operation)+" argument")
-		return nil, false
+		return nil, false, false
 	}
 	signature := function.Signature
 	if len(signature.Parameters) != 1 || !types.Equal(signature.Parameters[0].Type, element) {
 		a.error(codeCallArguments, fmt.Sprintf("%s requires a Function taking exactly one %s", operation, types.Display(element)), call.Arguments[0].Span(), typeOperationHint(operation, types.List{Element: element}))
-		return nil, false
+		return nil, false, false
 	}
-	if operation != ListMap && a.callbackReturnsNull(call.Arguments[0].Value, info) {
+	returnsNull := a.callbackReturnsNull(call.Arguments[0].Value, info)
+	if operation != ListMap && returnsNull {
 		a.error(codeNullableUse, fmt.Sprintf("Function argument for %s may return null", operation), call.Arguments[0].Span(), "return a NonNull value from the callback, or refine the result before returning it")
-		return nil, false
+		return nil, false, false
 	}
-	return signature, true
+	return signature, true, returnsNull
 }
 
 // callbackReturnsNull reports whether the selected callback is known to return
@@ -1569,12 +1578,12 @@ func (a *analyzer) analyzeIndex(index *ast.IndexExpr, current *scope, flow flowS
 		if position.typeValue.Kind() != types.IntKind {
 			a.typeMismatch(index.Index.Span(), types.Int, position.typeValue, "List index")
 		}
-		return expressionInfo{typeValue: collection.Element, nullState: MaybeNull}
+		return expressionInfo{typeValue: collection.Element, nullState: nullStateFor(collection.ElementNullable)}
 	case types.Pair:
 		if !types.Assignable(collection.Key, position.typeValue) {
 			a.typeMismatch(index.Index.Span(), collection.Key, position.typeValue, "Pair key")
 		}
-		return expressionInfo{typeValue: collection.Value, nullState: MaybeNull}
+		return expressionInfo{typeValue: collection.Value, nullState: nullStateFor(collection.ValueNullable)}
 	default:
 		if object.typeValue.Kind() == types.StringKind {
 			if position.typeValue.Kind() != types.IntKind {
@@ -1625,10 +1634,18 @@ func (a *analyzer) analyzeList(list *ast.ListExpr, current *scope, flow flowStat
 // type of its own. Successful inference is never overridden, so generic
 // invariance is unaffected.
 func (a *analyzer) analyzeListExpected(list *ast.ListExpr, current *scope, flow flowState, expected types.Type) expressionInfo {
-	expectedElement := expectedListElement(expected)
+	expectedElement, expectedElementNullable := expectedListElement(expected)
+	_, hasExpectedList := expected.(types.List)
 	elementType := types.Invalid
+	sawNull := false
 	for _, element := range list.Elements {
 		info := a.analyzeCollectionEntry(element, current, flow, expectedElement)
+		if info.nullState != NonNull {
+			sawNull = true
+			if hasExpectedList && !expectedElementNullable {
+				a.error(codeNullNotAllowed, "List element is not nullable; received a value that may be null", element.Span(), "declare the List with a nullable element type, e.g. List<T?>")
+			}
+		}
 		if info.nullState == Null {
 			continue
 		}
@@ -1652,7 +1669,11 @@ func (a *analyzer) analyzeListExpected(list *ast.ListExpr, current *scope, flow 
 			a.error(codeCollectionInference, "List element type cannot be inferred", list.Span(), "declare the collection type, as in values: List<Int> := []")
 		}
 	}
-	return expressionInfo{typeValue: types.List{Element: elementType}, nullState: NonNull}
+	elementNullable := sawNull
+	if hasExpectedList {
+		elementNullable = expectedElementNullable
+	}
+	return expressionInfo{typeValue: types.List{Element: elementType, ElementNullable: elementNullable}, nullState: NonNull}
 }
 
 // analyzeCollectionEntry analyzes one literal entry. A collection context is
@@ -1667,13 +1688,13 @@ func (a *analyzer) analyzeCollectionEntry(expression ast.Expr, current *scope, f
 	}
 }
 
-// expectedListElement is the element type a List literal may adopt from its
-// surrounding context.
-func expectedListElement(expected types.Type) types.Type {
+// expectedListElement is the element type (and its nullability) a List
+// literal may adopt from its surrounding context.
+func expectedListElement(expected types.Type) (types.Type, bool) {
 	if declared, ok := expected.(types.List); ok {
-		return declared.Element
+		return declared.Element, declared.ElementNullable
 	}
-	return types.Invalid
+	return types.Invalid, false
 }
 
 // declaredCollectionRejected reports whether the surrounding collection type
@@ -1699,9 +1720,11 @@ func (a *analyzer) analyzePair(pair *ast.PairExpr, current *scope, flow flowStat
 // key. When the declared type already reported an invalid key type, the
 // literal degrades quietly instead of restating the same root cause.
 func (a *analyzer) analyzePairExpected(pair *ast.PairExpr, current *scope, flow flowState, expected types.Type) expressionInfo {
-	expectedKey, expectedValue := expectedPairTypes(expected)
+	expectedKey, expectedValue, expectedValueNullable := expectedPairTypes(expected)
+	_, hasExpectedPair := expected.(types.Pair)
 	keyType, valueType := types.Invalid, types.Invalid
 	rejectedKey := false
+	sawNullValue := false
 	seen := make(map[string]source.Span)
 	for _, entry := range pair.Entries {
 		// A Pair key is always a simple scalar, so only the value position
@@ -1713,8 +1736,19 @@ func (a *analyzer) analyzePairExpected(pair *ast.PairExpr, current *scope, flow 
 			rejectedKey = true
 			continue
 		}
+		if value.nullState != NonNull {
+			sawNullValue = true
+			if hasExpectedPair && !expectedValueNullable {
+				a.error(codeNullNotAllowed, "Pair value is not nullable; received a value that may be null", entry.Value.Span(), "declare the Pair with a nullable value type, e.g. Pair<K, V?>")
+			}
+		}
 		keyType = a.mergeLiteralType(keyType, key.typeValue, entry.Key)
-		valueType = a.mergeLiteralType(valueType, value.typeValue, entry.Value)
+		// A bare null value carries no type of its own (Invalid), so it must not
+		// be merged into the inferred value type -- mirroring how a List literal
+		// skips a null element for the same reason.
+		if value.nullState != Null {
+			valueType = a.mergeLiteralType(valueType, value.typeValue, entry.Value)
+		}
 		a.checkDuplicatePairKey(entry.Key, seen)
 	}
 	if !types.IsInvalid(keyType) && !types.IsPairKey(keyType) {
@@ -1722,6 +1756,10 @@ func (a *analyzer) analyzePairExpected(pair *ast.PairExpr, current *scope, flow 
 			a.error(codeInvalidPairKey, fmt.Sprintf("Pair key type must be String, Int, or Bool; received %s", types.Display(keyType)), pair.Span(), "use String, Int, or Bool keys")
 		}
 		keyType = types.Invalid
+	}
+	valueNullable := sawNullValue
+	if hasExpectedPair {
+		valueNullable = expectedValueNullable
 	}
 	// An empty literal adopts the surrounding expected type. A literal that has
 	// entries keeps whatever its keys resolved to, so a rejected key is not
@@ -1731,7 +1769,7 @@ func (a *analyzer) analyzePairExpected(pair *ast.PairExpr, current *scope, flow 
 		if (types.IsInvalid(keyType) || types.IsInvalid(valueType)) && !declaredCollectionRejected(expected) {
 			a.error(codeCollectionInference, "Pair key and value types cannot be inferred", pair.Span(), "declare the collection type, as in scores: Pair<String, Int> := {}")
 		}
-		return expressionInfo{typeValue: types.Pair{Key: keyType, Value: valueType}, nullState: NonNull}
+		return expressionInfo{typeValue: types.Pair{Key: keyType, Value: valueType, ValueNullable: valueNullable}, nullState: NonNull}
 	}
 	// A value position may hold only null values, which carry no type of their
 	// own; the declared value type then applies.
@@ -1743,16 +1781,16 @@ func (a *analyzer) analyzePairExpected(pair *ast.PairExpr, current *scope, flow 
 	if rejectedKey && types.IsInvalid(keyType) {
 		keyType = expectedKey
 	}
-	return expressionInfo{typeValue: types.Pair{Key: keyType, Value: valueType}, nullState: NonNull}
+	return expressionInfo{typeValue: types.Pair{Key: keyType, Value: valueType, ValueNullable: valueNullable}, nullState: NonNull}
 }
 
-// expectedPairTypes are the key and value types a Pair literal may adopt from
-// its surrounding context.
-func expectedPairTypes(expected types.Type) (types.Type, types.Type) {
+// expectedPairTypes are the key type, value type, and value nullability a
+// Pair literal may adopt from its surrounding context.
+func expectedPairTypes(expected types.Type) (types.Type, types.Type, bool) {
 	if declared, ok := expected.(types.Pair); ok {
-		return declared.Key, declared.Value
+		return declared.Key, declared.Value, declared.ValueNullable
 	}
-	return types.Invalid, types.Invalid
+	return types.Invalid, types.Invalid, false
 }
 
 // declaredPairKeyRejected reports whether the declared Pair type already
