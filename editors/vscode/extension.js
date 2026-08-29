@@ -55,13 +55,23 @@ async function runFile(vscodeApi = vscode, runtime = {}) {
   }
 
   const filePath = document.uri.fsPath;
+  const workspaceFolder = vscodeApi.workspace.getWorkspaceFolder(document.uri);
+
+  // A task terminal may only start in the user's home directory when no folder
+  // is open, which would run a standalone file from the wrong directory or fail
+  // outright. Such a file runs in its own terminal instead, still launched from
+  // an argument vector rather than a shell command string.
+  if (selectRunStrategy(workspaceFolder) === STANDALONE_STRATEGY) {
+    runStandalone(vscodeApi, executable, filePath);
+    return;
+  }
+
   const taskName = `AhdCode: Run ${path.basename(filePath)}`;
   const execution = new vscodeApi.ProcessExecution(
     executable,
     ["run", filePath],
     { cwd: path.dirname(filePath) },
   );
-  const workspaceFolder = vscodeApi.workspace.getWorkspaceFolder(document.uri);
   const scope = workspaceFolder || vscodeApi.TaskScope.Global;
   const task = new vscodeApi.Task(
     { type: "ahdcode", task: "runFile" },
@@ -95,6 +105,47 @@ async function runFile(vscodeApi = vscode, runtime = {}) {
       `AhdCode could not start the run task.${detail}`,
     );
   }
+}
+
+const TASK_STRATEGY = "task";
+const STANDALONE_STRATEGY = "standalone";
+const STANDALONE_TERMINAL_NAME = "AhdCode";
+
+// selectRunStrategy decides how one run is launched. A document inside an open
+// folder keeps the dedicated task terminal; a standalone file does not, because
+// the host restricts a task terminal's working directory without a workspace.
+function selectRunStrategy(workspaceFolder) {
+  return workspaceFolder ? TASK_STRATEGY : STANDALONE_STRATEGY;
+}
+
+// standaloneTerminalOptions launches the compiler as the terminal's own
+// process. shellPath and shellArgs are an argument vector, so a path containing
+// spaces, quotes, $, ;, &, parentheses, or Unicode is never interpreted by a
+// shell, and cwd stays the source file's directory so relative paths in the
+// program still resolve the way they do on the command line.
+function standaloneTerminalOptions(executable, filePath) {
+  return {
+    name: STANDALONE_TERMINAL_NAME,
+    cwd: path.dirname(filePath),
+    shellPath: executable,
+    shellArgs: ["run", filePath],
+  };
+}
+
+// standaloneTerminal is the one terminal this fallback owns. Its process ends
+// when the program ends, so a rerun replaces it rather than reusing a dead
+// shell; only one AhdCode terminal is ever left behind.
+let standaloneTerminal;
+
+function runStandalone(vscodeApi, executable, filePath) {
+  if (standaloneTerminal) {
+    standaloneTerminal.dispose();
+    standaloneTerminal = undefined;
+  }
+  standaloneTerminal = vscodeApi.window.createTerminal(
+    standaloneTerminalOptions(executable, filePath),
+  );
+  standaloneTerminal.show(true);
 }
 
 function isRunnableDocument(document) {
@@ -163,6 +214,10 @@ function deactivate() {}
 
 module.exports = {
   activate,
+  selectRunStrategy,
+  standaloneTerminalOptions,
+  TASK_STRATEGY,
+  STANDALONE_STRATEGY,
   deactivate,
   runFile,
   findExecutable,

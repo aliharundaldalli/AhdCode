@@ -12,6 +12,8 @@ const state = {
   configurationPath: "",
   errors: [],
   tasks: [],
+  terminals: [],
+  workspaceFolder: { name: "workspace" },
   handlers: new Map(),
 };
 
@@ -50,6 +52,21 @@ const vscodeMock = {
     async showErrorMessage(message) {
       state.errors.push(message);
     },
+    createTerminal(options) {
+      const terminal = {
+        options,
+        disposed: false,
+        shown: 0,
+        dispose() {
+          this.disposed = true;
+        },
+        show() {
+          this.shown += 1;
+        },
+      };
+      state.terminals.push(terminal);
+      return terminal;
+    },
   },
   workspace: {
     getConfiguration() {
@@ -60,7 +77,7 @@ const vscodeMock = {
       };
     },
     getWorkspaceFolder() {
-      return undefined;
+      return state.workspaceFolder;
     },
   },
   tasks: {
@@ -91,6 +108,8 @@ function reset() {
   state.configurationPath = "";
   state.errors.length = 0;
   state.tasks.length = 0;
+  state.terminals.length = 0;
+  state.workspaceFolder = { name: "workspace" };
   state.handlers.clear();
 }
 
@@ -203,7 +222,7 @@ test("repeated runs append to one terminal instead of clearing it", async () => 
     // them would be a different task and would get its own terminal.
     assert.deepEqual(task.definition, { type: "ahdcode", task: "runFile" });
     assert.equal(task.source, "AhdCode");
-    assert.equal(task.scope, "global");
+    assert.equal(task.scope, state.workspaceFolder);
     // The program is launched directly, never through a shell command string,
     // so an interactive take() reads the terminal's own stdin.
     assert.equal(task.execution instanceof ProcessExecution, true);
@@ -211,7 +230,7 @@ test("repeated runs append to one terminal instead of clearing it", async () => 
   }
   const identities = new Set(
     state.tasks.map((task) =>
-      JSON.stringify([task.definition, task.source, task.scope, task.name]),
+      JSON.stringify([task.definition, task.source, task.name]),
     ),
   );
   assert.equal(identities.size, 1, "repeated runs must present one task identity");
@@ -263,6 +282,65 @@ test("a run never builds a shell command string", async () => {
   assert.equal(typeof task.execution.commandLine, "undefined");
 
   fs.rmSync(temporary, { recursive: true, force: true });
+});
+
+test("a standalone file with no workspace runs in its own terminal", async () => {
+  const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "ahdcode-standalone-"));
+  const executable = makeExecutable(temporary);
+  state.configurationPath = executable;
+  state.workspaceFolder = undefined;
+  state.activeTextEditor = { document: documentFor("/tmp/Ahd Code/öğrenci deneme.ahd") };
+
+  await extension.runFile(vscodeMock);
+
+  // A task terminal cannot choose this working directory without a workspace,
+  // so no task is created at all.
+  assert.equal(state.errors.length, 0);
+  assert.equal(state.tasks.length, 0);
+  assert.equal(state.terminals.length, 1);
+  const terminal = state.terminals[0];
+  assert.equal(terminal.options.name, "AhdCode");
+  assert.equal(terminal.options.cwd, "/tmp/Ahd Code");
+  assert.equal(terminal.options.shellPath, executable);
+  assert.deepEqual(terminal.options.shellArgs, ["run", "/tmp/Ahd Code/öğrenci deneme.ahd"]);
+  assert.equal(terminal.shown, 1);
+
+  fs.rmSync(temporary, { recursive: true, force: true });
+});
+
+test("a standalone rerun replaces its terminal instead of accumulating", async () => {
+  const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "ahdcode-standalone-rerun-"));
+  const executable = makeExecutable(temporary);
+  state.configurationPath = executable;
+  state.workspaceFolder = undefined;
+  state.activeTextEditor = { document: documentFor("/tmp/loop.ahd") };
+
+  await extension.runFile(vscodeMock);
+  await extension.runFile(vscodeMock);
+
+  assert.equal(state.terminals.length, 2);
+  // The first terminal's process has already ended, so it is disposed rather
+  // than left behind as a dead shell.
+  assert.equal(state.terminals[0].disposed, true);
+  assert.equal(state.terminals[1].disposed, false);
+
+  fs.rmSync(temporary, { recursive: true, force: true });
+});
+
+test("the standalone fallback never builds a shell command string", () => {
+  const filePath = "/tmp/ahd tests/$(touch pwned); rm -rf * & 'quoted' \"x\".ahd";
+  const options = extension.standaloneTerminalOptions("/usr/local/bin/ahdcode", filePath);
+  assert.equal(options.shellPath, "/usr/local/bin/ahdcode");
+  assert.deepEqual(options.shellArgs, ["run", filePath]);
+  assert.equal(options.cwd, "/tmp/ahd tests");
+  // shellArgs is an argument vector; there is no command line to interpret.
+  assert.equal(typeof options.commandLine, "undefined");
+  assert.equal(path.isAbsolute(options.shellArgs[1]), true);
+});
+
+test("the run strategy follows the workspace, not the file", () => {
+  assert.equal(extension.selectRunStrategy({ name: "folder" }), extension.TASK_STRATEGY);
+  assert.equal(extension.selectRunStrategy(undefined), extension.STANDALONE_STRATEGY);
 });
 
 test("findExecutable resolves ahdcode from PATH", async () => {
