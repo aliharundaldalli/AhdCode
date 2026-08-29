@@ -3,3 +3,9 @@
 editors/vscode/*.vsix
 # Build outputs
 /ahdcode
+
+# Benchmark test files
+speed*
+benchmark_*
+run_benchmarks.py
+results.json
