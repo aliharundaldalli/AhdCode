@@ -12,6 +12,22 @@ count: Int := 3
 count = 4
 ```
 
+Line breaks otherwise carry no meaning -- indentation is purely for
+readability, and `ahdcode format` (see [Formatter](FORMATTER.md)) chooses it
+for you -- but the value on the right of `:=` or `=` must start on the same
+physical line as the operator:
+
+```ahd
+scores: List<Int> := [
+    1
+    2
+]
+```
+
+is valid (`[` opens right after `:=`), while writing the `[` on its own line
+after `:=` is rejected with a dedicated error rather than a generic parse
+failure.
+
 Inside an executable nested scope, a new declaration uses `Local`:
 
 ```ahd

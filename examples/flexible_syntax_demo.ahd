@@ -1,0 +1,33 @@
+// v0.1.6: flexible commas and newlines, three natural AI-generated styles.
+
+add: Function := (x: Int, y: Int) -> Int {
+    return x + y
+}
+
+describe: Function := (
+    name: String
+    age: Int
+) -> String {
+    return "{name} is {age}"
+}
+
+values: List<Int> := [
+    1,
+    2,
+    3,
+]
+
+scores: Pair<String, Int> := {"Ali": 85, "Ayşe": 92}
+
+write(add(1, 2))
+write(add(
+    1,
+    2
+))
+write(add(
+    1
+    2
+))
+write(describe(name: "Ali", age: 25))
+write(values)
+write(scores["Ali"])

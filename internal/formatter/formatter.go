@@ -1,6 +1,27 @@
-// Package formatter implements the canonical AhdCode source formatter. Syntax
-// validity and structural layout come from the ordinary lexer/parser; exact
-// comments and string spellings come from the retained token/trivia stream.
+// Package formatter implements the canonical AhdCode source formatter.
+//
+// AhdCode's grammar accepts flexible spelling: commas between items are
+// optional wherever a newline can disambiguate them, trailing commas are
+// always optional, and indentation carries no structural meaning. This
+// package is the other half of "strict semantics, flexible spelling,
+// canonical formatting": it takes any validly parsed source and renders the
+// single recommended AhdCode style from the AST, independent of how the
+// input happened to be spelled.
+//
+// Rendering works by lowering the AST into a small Wadler/Lindig-style
+// pretty-printing document (see doc.go) and laying that document out against
+// an 80-column page. A bracketed, comma-flexible construct (call arguments,
+// List literals, Pair literals, and Function/structure parameter lists)
+// collapses onto one line, comma-separated, when it fits; otherwise it
+// breaks to one item per line with no separator and no trailing comma. Every
+// other line break is structural (statement boundaries, block braces).
+//
+// Comments and exact string/interpolation spelling survive formatting: a
+// shared token cursor walks the original token stream in lockstep with the
+// AST traversal, so trivia attached to any consumed or skipped token is
+// re-emitted at the right point. A comment appearing between the items of a
+// bracketed construct forces that construct to render broken, since a line
+// comment cannot otherwise be placed without corrupting the layout.
 package formatter
 
 import (
@@ -33,428 +54,702 @@ func (result Result) HasErrors() bool {
 func Format(file source.File) Result {
 	lexed := lexer.Lex(file)
 	parsed := parser.Parse(file, lexed.Tokens)
-	diagnostics := append(append([]diagnostics.Diagnostic(nil), lexed.Diagnostics...), parsed.Diagnostics...)
-	result := Result{Diagnostics: diagnostics}
+	diags := append(append([]diagnostics.Diagnostic(nil), lexed.Diagnostics...), parsed.Diagnostics...)
+	result := Result{Diagnostics: diags}
 	if result.HasErrors() || parsed.Program == nil {
 		return result
 	}
-	layout := collectLayout(parsed.Program, parsed.Tokens)
-	printer := tokenPrinter{file: file, tokens: parsed.Tokens, layout: layout, lineStart: true}
-	result.Text = printer.print()
+	b := &builder{file: file, tokens: parsed.Tokens}
+	root := b.program(parsed.Program)
+	rendered := strings.TrimRight(render(root, maxLineWidth), " \t\r\n")
+	if rendered == "" {
+		return result
+	}
+	result.Text = rendered + "\n"
 	return result
 }
 
-type syntaxLayout struct {
-	pairs      map[int]bool
-	unary      map[int]bool
-	typeAngles map[int]bool
-	multiline  map[int]bool
-	closing    map[int]int
+// builder walks the AST and the original token stream together: every
+// render method consumes exactly the tokens the parser would have consumed
+// for the node it is given, which keeps the shared cursor in lockstep with
+// the AST so trivia (comments) attached to any token is found at the right
+// place regardless of how the formatter chooses to lay the construct out.
+type builder struct {
+	file   source.File
+	tokens []token.Token
+	cursor int
+	// openComment is true immediately after rendering a block-comment chunk
+	// that has not yet reached its closing "*/". A multiline block comment
+	// is split by the lexer into one trivia chunk per physical line (see
+	// lexer.scanBlockComment); every chunk after the first already carries
+	// its own original leading whitespace, so it must be rejoined with a
+	// bare newline (rawNewline) rather than canonical indentation.
+	openComment bool
 }
 
-func collectLayout(program *ast.Program, tokens []token.Token) syntaxLayout {
-	layout := syntaxLayout{
-		pairs: make(map[int]bool), unary: make(map[int]bool), typeAngles: make(map[int]bool),
-		multiline: make(map[int]bool), closing: make(map[int]int),
+func (b *builder) current() token.Token {
+	if b.cursor >= len(b.tokens) {
+		return b.tokens[len(b.tokens)-1]
 	}
-	walker := layoutWalker{layout: &layout, tokens: tokens}
-	walker.program(program)
-	type delimiter struct {
-		kind   token.Kind
-		offset int
-		line   int
+	return b.tokens[b.cursor]
+}
+
+func (b *builder) advance() token.Token {
+	current := b.current()
+	if b.cursor < len(b.tokens)-1 {
+		b.cursor++
 	}
-	var stack []delimiter
-	for _, item := range tokens {
-		switch item.Kind {
-		case token.LeftParen, token.LeftBracket, token.LeftBrace:
-			stack = append(stack, delimiter{kind: item.Kind, offset: item.Span.Start.Offset, line: item.Span.Start.Line})
-		case token.RightParen, token.RightBracket, token.RightBrace:
-			if len(stack) == 0 || !matchingDelimiter(stack[len(stack)-1].kind, item.Kind) {
+	return current
+}
+
+// renderTrivia renders one comment trivia entry and reports whether it was
+// a block-comment chunk continuing a still-open multiline comment (see
+// builder.openComment).
+func (b *builder) renderTrivia(trivia token.Trivia) (doc, bool) {
+	switch trivia.Kind {
+	case token.LineCommentTrivia:
+		b.openComment = false
+		return text(strings.TrimRight(trivia.Lexeme, " \t\r")), false
+	case token.BlockCommentTrivia:
+		continuation := b.openComment && !strings.HasPrefix(trivia.Lexeme, "/*")
+		b.openComment = !strings.HasSuffix(strings.TrimRight(trivia.Lexeme, " \t\r"), "*/")
+		if continuation {
+			return concat(rawNewline(), text(trivia.Lexeme)), true
+		}
+		return text(trivia.Lexeme), false
+	default:
+		return concat(), false
+	}
+}
+
+// leadingTriviaDoc renders the current token's leading trivia (comments)
+// without advancing the cursor. A block comment stays inline; a line
+// comment (which, lexically, only ever attaches to a Newline token) forces
+// a following hard break.
+func (b *builder) leadingTriviaDoc() doc {
+	var parts []doc
+	for _, trivia := range b.current().LeadingTrivia {
+		switch trivia.Kind {
+		case token.LineCommentTrivia:
+			rendered, _ := b.renderTrivia(trivia)
+			parts = append(parts, rendered)
+		case token.BlockCommentTrivia:
+			rendered, _ := b.renderTrivia(trivia)
+			parts = append(parts, rendered, text(" "))
+		}
+	}
+	return concat(parts...)
+}
+
+// leaf consumes exactly one token, preceded by whatever leading trivia it
+// carries, and renders its original spelling.
+func (b *builder) leaf() doc {
+	trivia := b.leadingTriviaDoc()
+	consumed := b.advance()
+	return concat(trivia, text(consumed.Lexeme))
+}
+
+func isEmptyDoc(d doc) bool {
+	return (d.kind == dConcat && len(d.items) == 0) || (d.kind == dText && d.text == "")
+}
+
+// gap drains a run of Newline/Comma separator tokens starting at the
+// cursor -- tokens that carry no AST node of their own -- collecting any
+// comment trivia they carry along the way. It stops as soon as the current
+// token is neither a Newline nor a Comma, leaving the cursor there so the
+// caller's own leaf/expr consumption picks up that token's trivia normally.
+func (b *builder) gap() doc {
+	inline, standalone, _ := b.gapParts()
+	switch {
+	case isEmptyDoc(inline):
+		return standalone
+	case isEmptyDoc(standalone):
+		return inline
+	default:
+		return concat(inline, hardline(), standalone)
+	}
+}
+
+// gapParts is gap's finer-grained form: inline is a comment trailing the
+// content immediately before this gap on the same physical source line (so
+// it belongs right after that content with a single space, not a hard
+// break); standalone is every comment after that, each already preceded by
+// a hard break where more than one appears; blankBeforeNext reports whether
+// the source had a blank line right before whatever follows the gap (a
+// statement, or a closing brace), so a caller separating statements can
+// preserve up to one blank line the way the rest of this package preserves
+// comments -- readability grouping the author already expressed, not
+// structure the parser needs.
+func (b *builder) gapParts() (inline doc, standalone doc, blankBeforeNext bool) {
+	var standaloneParts []doc
+	haveInline := false
+	seenNewline := false
+	blankRun := 0
+	for b.current().Kind == token.Newline || b.current().Kind == token.Comma {
+		current := b.current()
+		hadComment := false
+		for _, trivia := range current.LeadingTrivia {
+			if trivia.Kind != token.LineCommentTrivia && trivia.Kind != token.BlockCommentTrivia {
 				continue
 			}
-			opening := stack[len(stack)-1]
-			stack = stack[:len(stack)-1]
-			layout.closing[opening.offset] = item.Span.Start.Offset
-			if opening.line != item.Span.Start.Line {
-				layout.multiline[opening.offset] = true
+			hadComment = true
+			rendered, continuation := b.renderTrivia(trivia)
+			if !seenNewline && !haveInline {
+				inline = rendered
+				haveInline = true
+				continue
+			}
+			if len(standaloneParts) > 0 && !continuation {
+				standaloneParts = append(standaloneParts, hardline())
+			}
+			standaloneParts = append(standaloneParts, rendered)
+		}
+		if current.Kind == token.Newline {
+			seenNewline = true
+			if hadComment {
+				blankRun = 0
+			} else {
+				blankRun++
 			}
 		}
+		b.advance()
 	}
-	return layout
+	return inline, concat(standaloneParts...), blankRun >= 2
 }
 
-func matchingDelimiter(open, close token.Kind) bool {
-	return open == token.LeftParen && close == token.RightParen ||
-		open == token.LeftBracket && close == token.RightBracket ||
-		open == token.LeftBrace && close == token.RightBrace
+// withGapSeparator renders the mandatory hard break between two sibling
+// constructs (statements, except clauses, if/else branches, ...), folding
+// in any comments a drained gap collected between them. When blank is true,
+// one blank line is preserved right before whatever follows: a rawNewline
+// (bare "\n", no indent padding) ends the current line so the blank line it
+// creates carries no trailing whitespace, and the hardline right after it
+// supplies the indentation for what comes next.
+func withGapSeparator(gapDoc doc, blank bool) doc {
+	trailer := hardline()
+	if blank {
+		trailer = concat(rawNewline(), hardline())
+	}
+	if isEmptyDoc(gapDoc) {
+		return trailer
+	}
+	return concat(hardline(), gapDoc, trailer)
 }
 
-type layoutWalker struct {
-	layout *syntaxLayout
-	tokens []token.Token
+// stmtSeq renders a list of statements separated by hard breaks, including
+// any comments found between them, but is not itself responsible for the
+// surrounding braces/indentation (see bracedStmts).
+func (b *builder) stmtSeq(statements []ast.Stmt) []doc {
+	var parts []doc
+	if lead := b.gap(); !isEmptyDoc(lead) {
+		parts = append(parts, lead, hardline())
+	}
+	for index, statement := range statements {
+		parts = append(parts, b.stmt(statement))
+		inline, standalone, blank := b.gapParts()
+		if !isEmptyDoc(inline) {
+			parts = append(parts, text(" "), inline)
+		}
+		if index == len(statements)-1 {
+			if !isEmptyDoc(standalone) {
+				parts = append(parts, hardline(), standalone)
+			}
+			continue
+		}
+		parts = append(parts, withGapSeparator(standalone, blank))
+	}
+	return parts
 }
 
-func (walker *layoutWalker) program(program *ast.Program) {
-	for _, statement := range program.Statements {
-		walker.statement(statement)
+// bracedStmts renders `{ ... }` around a statement list. The opening brace
+// must be the current token.
+func (b *builder) bracedStmts(statements []ast.Stmt) doc {
+	open := b.leaf()
+	if len(statements) == 0 {
+		inner := b.gap()
+		close_ := b.leaf()
+		if isEmptyDoc(inner) {
+			return concat(open, close_)
+		}
+		return concat(open, indent(concat(hardline(), inner)), hardline(), close_)
+	}
+	body := b.stmtSeq(statements)
+	close_ := b.leaf()
+	return concat(open, indent(concat(append([]doc{hardline()}, body...)...)), hardline(), close_)
+}
+
+func (b *builder) block(blk *ast.Block) doc { return b.bracedStmts(blk.Statements) }
+
+func (b *builder) program(p *ast.Program) doc {
+	return concat(b.stmtSeq(p.Statements)...)
+}
+
+// declarationModifiers consumes the Local/Global/Constant/Confidential and
+// Overload/Override modifier keywords in whatever order the source used,
+// but always renders them in that canonical order (scope/visibility first,
+// then Function flavor), mirroring parser.parseDeclarationModifiers'
+// acceptance of any interleaving.
+func (b *builder) declarationModifiers() doc {
+	var scope []doc
+	var flavor doc
+	hasFlavor := false
+	for {
+		switch b.current().Kind {
+		case token.KeywordLocal, token.KeywordGlobal, token.KeywordConstant, token.KeywordConfidential:
+			scope = append(scope, b.leaf(), text(" "))
+		case token.KeywordOverload, token.KeywordOverride:
+			flavor = concat(b.leaf(), text(" "))
+			hasFlavor = true
+		default:
+			if hasFlavor {
+				return concat(append(scope, flavor)...)
+			}
+			return concat(scope...)
+		}
 	}
 }
 
-func (walker *layoutWalker) statement(statement ast.Stmt) {
-	if statement == nil {
-		return
+// typeRef renders a type reference. Generic type arguments (List<T>,
+// Pair<K, V>, Class<Parent>) are outside the flexible-comma/canonical-break
+// rules the rest of this package implements, so they always render flat.
+func (b *builder) typeRef(t *ast.TypeRef) doc {
+	name := b.leaf()
+	if b.current().Kind != token.Less {
+		return name
 	}
-	switch value := statement.(type) {
+	open := b.leaf()
+	skipGapSilently(b)
+	var parts []doc
+	for index, argument := range t.Arguments {
+		if index > 0 {
+			parts = append(parts, text(", "))
+		}
+		parts = append(parts, b.typeRef(argument))
+		if b.current().Kind == token.Comma {
+			b.advance()
+		}
+		skipGapSilently(b)
+	}
+	close_ := b.leaf()
+	return concat(name, open, concat(parts...), close_)
+}
+
+// skipGapSilently advances past stray newlines with no rendering
+// obligation. Generic type argument lists are never broken across lines by
+// the formatter, so a comment placed inside one (a vanishingly rare and
+// discouraged pattern) is dropped rather than forcing this package to grow
+// a second line-breaking construct for that one case.
+func skipGapSilently(b *builder) {
+	for b.current().Kind == token.Newline {
+		b.advance()
+	}
+}
+
+// delimitedGroup renders a bracketed, comma/newline-flexible construct:
+// call arguments, List elements, Pair entries, or a Function/structure
+// parameter list. It collapses to one line, comma-separated, when that fits
+// within maxLineWidth (accounting for whatever precedes it and whatever
+// immediately follows up to the next unavoidable break); otherwise it
+// breaks to one item per line with no comma at all, matching the canonical
+// style. A comment found between items always forces the broken form.
+func (b *builder) delimitedGroup(itemCount int, renderItem func(index int) doc) doc {
+	open := b.leaf()
+	var body []doc
+	forced := false
+	if lead := b.gap(); !isEmptyDoc(lead) {
+		forced = true
+		body = append(body, lead, hardline())
+	}
+	for index := 0; index < itemCount; index++ {
+		if index > 0 {
+			body = append(body, ifBreak(hardline(), text(", ")))
+		}
+		body = append(body, renderItem(index))
+		if trailing := b.gap(); !isEmptyDoc(trailing) {
+			forced = true
+			body = append(body, hardline(), trailing)
+		}
+	}
+	close_ := b.leaf()
+	inner := concat(
+		open,
+		indent(concat(append([]doc{ifBreak(hardline(), text(""))}, body...)...)),
+		ifBreak(hardline(), text("")),
+		close_,
+	)
+	if forced {
+		return breakGroup(inner)
+	}
+	return group(inner)
+}
+
+func (b *builder) callArgsGroup(arguments []ast.CallArgument) doc {
+	return b.delimitedGroup(len(arguments), func(index int) doc {
+		argument := arguments[index]
+		if argument.Name == "" {
+			return b.expr(argument.Value)
+		}
+		name := b.leaf()
+		colon := b.leaf()
+		return concat(name, colon, text(" "), b.expr(argument.Value))
+	})
+}
+
+func (b *builder) listGroup(elements []ast.Expr) doc {
+	return b.delimitedGroup(len(elements), func(index int) doc { return b.expr(elements[index]) })
+}
+
+func (b *builder) pairGroup(entries []ast.PairEntry) doc {
+	return b.delimitedGroup(len(entries), func(index int) doc {
+		entry := entries[index]
+		key := b.expr(entry.Key)
+		colon := b.leaf()
+		return concat(key, colon, text(" "), b.expr(entry.Value))
+	})
+}
+
+func (b *builder) parameterGroup(parameters []ast.Parameter) doc {
+	return b.delimitedGroup(len(parameters), func(index int) doc {
+		parameter := parameters[index]
+		if parameter.InheritedAttributes {
+			object := b.leaf()
+			dot := b.leaf()
+			member := b.leaf()
+			return concat(object, dot, member)
+		}
+		name := b.leaf()
+		colon := b.leaf()
+		modifiers := b.declarationModifiers()
+		typeDoc := b.typeRef(parameter.Type)
+		result := concat(name, colon, text(" "), modifiers, typeDoc)
+		if parameter.Default == nil {
+			return result
+		}
+		declare := b.leaf()
+		return concat(result, text(" "), declare, text(" "), b.expr(parameter.Default))
+	})
+}
+
+// declHead renders the "target: [modifiers] Type" prefix shared by
+// variable, Function, Class, and structure declarations.
+func (b *builder) declHead(targetDoc doc, typeRef *ast.TypeRef) doc {
+	colon := b.leaf()
+	modifiers := b.declarationModifiers()
+	return concat(targetDoc, colon, text(" "), modifiers, b.typeRef(typeRef))
+}
+
+func (b *builder) variableDecl(v *ast.VariableDecl) doc {
+	head := b.declHead(b.expr(v.Target), v.Type)
+	if v.GlobalOnly {
+		return head
+	}
+	declare := b.leaf()
+	return concat(head, text(" "), declare, text(" "), b.expr(v.Initializer))
+}
+
+func (b *builder) functionDecl(f *ast.FunctionDecl) doc {
+	head := b.declHead(b.leaf(), &ast.TypeRef{})
+	declare := b.leaf()
+	parameters := b.parameterGroup(f.Parameters)
+	arrow := b.leaf()
+	returnType := b.typeRef(f.ReturnType)
+	body := b.block(f.Body)
+	return concat(head, text(" "), declare, text(" "), parameters, text(" "), arrow, text(" "), returnType, text(" "), body)
+}
+
+func (b *builder) classDecl(c *ast.ClassDecl) doc {
+	var arguments []*ast.TypeRef
+	if c.Parent != nil {
+		arguments = []*ast.TypeRef{c.Parent}
+	}
+	classType := &ast.TypeRef{Arguments: arguments, ExplicitEmpty: c.ExplicitRoot}
+	head := b.declHead(b.leaf(), classType)
+	declare := b.leaf()
+	body := b.bracedStmts(c.Members)
+	return concat(head, text(" "), declare, text(" "), body)
+}
+
+func (b *builder) structureDecl(s *ast.StructureDecl) doc {
+	head := b.declHead(b.leaf(), &ast.TypeRef{})
+	declare := b.leaf()
+	parameters := b.parameterGroup(s.Parameters)
+	if s.Body == nil {
+		return concat(head, text(" "), declare, text(" "), parameters)
+	}
+	return concat(head, text(" "), declare, text(" "), parameters, text(" "), b.block(s.Body))
+}
+
+func (b *builder) stateBody(conditions []ast.StateCondition) doc {
+	open := b.leaf()
+	if len(conditions) == 0 {
+		inner := b.gap()
+		close_ := b.leaf()
+		if isEmptyDoc(inner) {
+			return concat(open, close_)
+		}
+		return concat(open, indent(concat(hardline(), inner)), hardline(), close_)
+	}
+	var body []doc
+	if lead := b.gap(); !isEmptyDoc(lead) {
+		body = append(body, lead, hardline())
+	}
+	for index, condition := range conditions {
+		keyword := b.leaf()
+		var matchDoc doc
+		if condition.Default {
+			matchDoc = b.leaf()
+		} else {
+			matchDoc = b.expr(condition.Match)
+		}
+		body = append(body, keyword, text(" "), matchDoc, text(" "), b.block(condition.Body))
+		trailingGap := b.gap()
+		if index == len(conditions)-1 {
+			if !isEmptyDoc(trailingGap) {
+				body = append(body, hardline(), trailingGap)
+			}
+			continue
+		}
+		body = append(body, withGapSeparator(trailingGap, false))
+	}
+	close_ := b.leaf()
+	return concat(open, indent(concat(append([]doc{hardline()}, body...)...)), hardline(), close_)
+}
+
+func (b *builder) stmt(s ast.Stmt) doc {
+	switch v := s.(type) {
 	case *ast.ExprStmt:
-		walker.expression(value.Expression)
+		return b.expr(v.Expression)
 	case *ast.VariableDecl:
-		walker.expression(value.Target)
-		walker.typeRef(value.Type)
-		walker.expression(value.Initializer)
+		return b.variableDecl(v)
 	case *ast.AssignmentStmt:
-		walker.expression(value.Target)
-		walker.expression(value.Value)
+		target := b.expr(v.Target)
+		operator := b.leaf()
+		return concat(target, text(" "), operator, text(" "), b.expr(v.Value))
 	case *ast.IncDecStmt:
-		walker.expression(value.Target)
+		if v.Prefix {
+			operator := b.leaf()
+			return concat(operator, b.expr(v.Target))
+		}
+		target := b.expr(v.Target)
+		return concat(target, b.leaf())
 	case *ast.ReturnStmt:
-		walker.expression(value.Value)
+		keyword := b.leaf()
+		if v.Value == nil {
+			return keyword
+		}
+		return concat(keyword, text(" "), b.expr(v.Value))
 	case *ast.TossStmt:
-		walker.expression(value.Value)
+		keyword := b.leaf()
+		return concat(keyword, text(" "), b.expr(v.Value))
+	case *ast.BreakStmt:
+		return b.leaf()
+	case *ast.ContinueStmt:
+		return b.leaf()
 	case *ast.IfStmt:
-		for _, branch := range value.Branches {
-			walker.expression(branch.Condition)
-			walker.block(branch.Body)
-		}
-		walker.block(value.Else)
+		return b.ifStmt(v)
 	case *ast.WhileStmt:
-		walker.expression(value.Condition)
-		walker.block(value.Body)
+		keyword := b.leaf()
+		condition := b.expr(v.Condition)
+		return concat(keyword, text(" "), condition, text(" "), b.block(v.Body))
 	case *ast.UntilStmt:
-		walker.expression(value.Condition)
-		walker.block(value.Body)
+		keyword := b.leaf()
+		condition := b.expr(v.Condition)
+		return concat(keyword, text(" "), condition, text(" "), b.block(v.Body))
 	case *ast.ForStmt:
-		walker.expression(value.Iterable)
-		walker.block(value.Body)
+		return b.forStmt(v)
 	case *ast.StateStmt:
-		walker.expression(value.Value)
-		for _, condition := range value.Conditions {
-			walker.expression(condition.Match)
-			walker.block(condition.Body)
-		}
+		keyword := b.leaf()
+		value := b.expr(v.Value)
+		return concat(keyword, text(" "), value, text(" "), b.stateBody(v.Conditions))
 	case *ast.AttemptStmt:
-		walker.block(value.Body)
-		for _, clause := range value.Excepts {
-			walker.typeRef(clause.Type)
-			walker.block(clause.Body)
-		}
-		walker.block(value.Ultimately)
+		return b.attemptStmt(v)
+	case *ast.BringStmt:
+		return b.bringStmt(v)
 	case *ast.FunctionDecl:
-		walker.forceFirst(value.Span(), token.LeftParen)
-		walker.parameters(value.Parameters)
-		walker.typeRef(value.ReturnType)
-		walker.block(value.Body)
+		return b.functionDecl(v)
 	case *ast.ClassDecl:
-		walker.markAnglesBeforeBrace(value.Span())
-		walker.typeRef(value.Parent)
-		for _, member := range value.Members {
-			walker.statement(member)
-		}
+		return b.classDecl(v)
 	case *ast.StructureDecl:
-		walker.forceFirst(value.Span(), token.LeftParen)
-		walker.parameters(value.Parameters)
-		walker.block(value.Body)
+		return b.structureDecl(v)
+	default:
+		return b.leaf()
 	}
 }
 
-func (walker *layoutWalker) forceFirst(span source.Span, kind token.Kind) {
-	for _, item := range walker.tokens {
-		if item.Span.Start.Offset < span.Start.Offset || item.Span.End.Offset > span.End.Offset {
+func (b *builder) ifStmt(v *ast.IfStmt) doc {
+	var parts []doc
+	for index, branch := range v.Branches {
+		if index == 0 {
+			keyword := b.leaf()
+			condition := b.expr(branch.Condition)
+			parts = append(parts, keyword, text(" "), condition, text(" "), b.block(branch.Body))
 			continue
 		}
-		if item.Kind == kind {
-			walker.layout.multiline[item.Span.Start.Offset] = true
-			return
-		}
+		gapDoc := b.gap()
+		elseKeyword := b.leaf()
+		ifKeyword := b.leaf()
+		condition := b.expr(branch.Condition)
+		parts = append(parts, withGapSeparator(gapDoc, false), elseKeyword, text(" "), ifKeyword, text(" "), condition, text(" "), b.block(branch.Body))
 	}
+	if v.Else != nil {
+		gapDoc := b.gap()
+		elseKeyword := b.leaf()
+		parts = append(parts, withGapSeparator(gapDoc, false), elseKeyword, text(" "), b.block(v.Else))
+	}
+	return concat(parts...)
 }
 
-func (walker *layoutWalker) markAnglesBeforeBrace(span source.Span) {
-	for _, item := range walker.tokens {
-		if item.Span.Start.Offset < span.Start.Offset || item.Span.End.Offset > span.End.Offset {
-			continue
-		}
-		if item.Kind == token.LeftBrace {
-			return
-		}
-		if item.Kind == token.Less || item.Kind == token.Greater {
-			walker.layout.typeAngles[item.Span.Start.Offset] = true
-		}
+func (b *builder) forStmt(v *ast.ForStmt) doc {
+	keyword := b.leaf()
+	name := b.leaf()
+	var typeDoc doc
+	if v.Type != nil {
+		colon := b.leaf()
+		typeDoc = concat(colon, text(" "), b.typeRef(v.Type))
 	}
+	inKeyword := b.leaf()
+	iterable := b.expr(v.Iterable)
+	return concat(keyword, text(" "), name, typeDoc, text(" "), inKeyword, text(" "), iterable, text(" "), b.block(v.Body))
 }
 
-func (walker *layoutWalker) block(block *ast.Block) {
-	if block == nil {
-		return
-	}
-	for _, statement := range block.Statements {
-		walker.statement(statement)
-	}
-}
-
-func (walker *layoutWalker) parameters(parameters []ast.Parameter) {
-	for index := range parameters {
-		walker.typeRef(parameters[index].Type)
-		walker.expression(parameters[index].Default)
-	}
-}
-
-func (walker *layoutWalker) typeRef(value *ast.TypeRef) {
-	if value == nil {
-		return
-	}
-	for _, item := range walker.tokens {
-		if item.Span.Start.Offset < value.Span().Start.Offset || item.Span.End.Offset > value.Span().End.Offset {
-			continue
+func (b *builder) attemptStmt(v *ast.AttemptStmt) doc {
+	keyword := b.leaf()
+	parts := []doc{keyword, text(" "), b.block(v.Body)}
+	for _, except := range v.Excepts {
+		gapDoc := b.gap()
+		exceptKeyword := b.leaf()
+		typeDoc := b.typeRef(except.Type)
+		var asDoc doc
+		if except.Name != "" {
+			asKeyword := b.leaf()
+			name := b.leaf()
+			asDoc = concat(text(" "), asKeyword, text(" "), name)
 		}
-		if item.Kind == token.Less || item.Kind == token.Greater {
-			walker.layout.typeAngles[item.Span.Start.Offset] = true
-		}
+		parts = append(parts, withGapSeparator(gapDoc, false), exceptKeyword, text(" "), typeDoc, asDoc, text(" "), b.block(except.Body))
 	}
-	for _, argument := range value.Arguments {
-		walker.typeRef(argument)
+	if v.Ultimately != nil {
+		gapDoc := b.gap()
+		ultimatelyKeyword := b.leaf()
+		parts = append(parts, withGapSeparator(gapDoc, false), ultimatelyKeyword, text(" "), b.block(v.Ultimately))
 	}
+	return concat(parts...)
 }
 
-func (walker *layoutWalker) expression(expression ast.Expr) {
-	if expression == nil {
-		return
+func (b *builder) bringStmt(v *ast.BringStmt) doc {
+	if v.Namespace {
+		keyword := b.leaf()
+		module := b.leaf()
+		result := concat(keyword, text(" "), module)
+		if v.Alias == "" {
+			return result
+		}
+		asKeyword := b.leaf()
+		alias := b.leaf()
+		return concat(result, text(" "), asKeyword, text(" "), alias)
 	}
-	switch value := expression.(type) {
+	fromKeyword := b.leaf()
+	module := b.leaf()
+	bringKeyword := b.leaf()
+	prefix := concat(fromKeyword, text(" "), module, text(" "), bringKeyword, text(" "))
+	if v.All {
+		return concat(prefix, b.leaf())
+	}
+	if b.current().Kind == token.LeftParen {
+		return concat(prefix, b.delimitedGroup(len(v.Names), func(int) doc { return b.leaf() }))
+	}
+	return concat(prefix, b.leaf())
+}
+
+func (b *builder) expr(e ast.Expr) doc {
+	switch v := e.(type) {
+	case *ast.LiteralExpr:
+		return b.leaf()
+	case *ast.IdentifierExpr:
+		return b.leaf()
 	case *ast.GroupExpr:
-		walker.expression(value.Expression)
+		open := b.leaf()
+		lead := b.gap()
+		inner := b.expr(v.Expression)
+		trail := b.gap()
+		return concat(open, lead, inner, trail, b.leaf())
 	case *ast.UnaryExpr:
-		walker.layout.unary[value.Span().Start.Offset] = true
-		walker.expression(value.Operand)
+		operator := b.leaf()
+		gapDoc := b.gap()
+		operand := b.expr(v.Operand)
+		if v.Operator == "not" {
+			return concat(operator, text(" "), gapDoc, operand)
+		}
+		return concat(operator, gapDoc, operand)
 	case *ast.BinaryExpr:
-		walker.expression(value.Left)
-		walker.expression(value.Right)
+		left := b.expr(v.Left)
+		operator := b.binaryOperatorLeaf(v.Operator)
+		gapDoc := b.gap()
+		right := b.expr(v.Right)
+		return concat(left, text(" "), operator, text(" "), gapDoc, right)
 	case *ast.CallExpr:
-		walker.expression(value.Callee)
-		for _, argument := range value.Arguments {
-			walker.expression(argument.Value)
-		}
+		callee := b.expr(v.Callee)
+		return concat(callee, b.callArgsGroup(v.Arguments))
 	case *ast.MemberExpr:
-		walker.expression(value.Object)
+		object := b.expr(v.Object)
+		dot := b.leaf()
+		name := b.leaf()
+		return concat(object, dot, name)
 	case *ast.IndexExpr:
-		walker.expression(value.Object)
-		walker.expression(value.Index)
+		object := b.expr(v.Object)
+		open := b.leaf()
+		lead := b.gap()
+		index := b.expr(v.Index)
+		trail := b.gap()
+		return concat(object, open, lead, index, trail, b.leaf())
 	case *ast.SliceExpr:
-		walker.expression(value.Object)
-		walker.expression(value.Start)
-		walker.expression(value.End)
+		return b.sliceExpr(v)
 	case *ast.ListExpr:
-		for _, element := range value.Elements {
-			walker.expression(element)
-		}
+		return b.listGroup(v.Elements)
 	case *ast.PairExpr:
-		walker.layout.pairs[value.Span().Start.Offset] = true
-		for _, entry := range value.Entries {
-			walker.expression(entry.Key)
-			walker.expression(entry.Value)
-		}
+		return b.pairGroup(v.Entries)
 	case *ast.StringExpr:
-		for _, part := range value.Parts {
-			walker.expression(part.Expression)
-		}
+		return b.verbatimSpan(v.Span())
+	default:
+		return b.leaf()
 	}
 }
 
-type tokenPrinter struct {
-	file       source.File
-	tokens     []token.Token
-	layout     syntaxLayout
-	out        strings.Builder
-	indent     int
-	lineStart  bool
-	lastKind   token.Kind
-	lastOffset int
+func (b *builder) sliceExpr(v *ast.SliceExpr) doc {
+	object := b.expr(v.Object)
+	open := b.leaf()
+	parts := []doc{object, open, b.gap()}
+	if v.Start != nil {
+		parts = append(parts, b.expr(v.Start))
+	}
+	parts = append(parts, b.gap(), b.leaf())
+	parts = append(parts, b.gap())
+	if v.End != nil {
+		parts = append(parts, b.expr(v.End))
+	}
+	parts = append(parts, b.gap(), b.leaf())
+	return concat(parts...)
 }
 
-func (printer *tokenPrinter) print() string {
-	for index := 0; index < len(printer.tokens); index++ {
-		item := printer.tokens[index]
-		printer.trivia(item.LeadingTrivia)
-		if item.Kind == token.EOF {
-			break
-		}
-		if item.Kind == token.Newline {
-			printer.sourceNewline()
-			continue
-		}
-		if item.Kind == token.StringStart {
-			index = printer.string(index)
-			continue
-		}
-		printer.token(item, nextKind(printer.tokens, index+1))
-	}
-	text := strings.TrimRight(printer.out.String(), " \t\r\n")
-	if text == "" {
-		return ""
-	}
-	return text + "\n"
-}
-
-func nextKind(tokens []token.Token, index int) token.Kind {
-	if index >= len(tokens) {
-		return token.EOF
-	}
-	return tokens[index].Kind
-}
-
-func (printer *tokenPrinter) string(index int) int {
-	start := printer.tokens[index]
-	end := start.Span.End.Offset
-	for index+1 < len(printer.tokens) {
-		index++
-		end = printer.tokens[index].Span.End.Offset
-		if printer.tokens[index].Kind == token.StringEnd || printer.tokens[index].Kind == token.EOF {
-			break
-		}
-	}
-	printer.before(start)
-	printer.write(printer.file.Text[start.Span.Start.Offset:end])
-	printer.lastKind = token.StringEnd
-	printer.lastOffset = start.Span.Start.Offset
-	return index
-}
-
-func (printer *tokenPrinter) token(item token.Token, next token.Kind) {
-	offset := item.Span.Start.Offset
-	isPair := printer.layout.pairs[offset]
-	isBlockOpen := item.Kind == token.LeftBrace && !isPair
-	isMultilineOpen := (item.Kind == token.LeftParen || item.Kind == token.LeftBracket || isPair) && printer.layout.multiline[offset]
-	isClosing := item.Kind == token.RightParen || item.Kind == token.RightBracket || item.Kind == token.RightBrace
-	if isClosing {
-		opening := printer.openingOffset(offset)
-		if item.Kind == token.RightBrace && !printer.layout.pairs[opening] || printer.layout.multiline[opening] {
-			if printer.indent > 0 {
-				printer.indent--
-			}
-			printer.ensureNewline()
-		}
-	}
-	printer.before(item)
-	printer.write(item.Lexeme)
-	printer.lastKind = item.Kind
-	printer.lastOffset = offset
-	if isBlockOpen || isMultilineOpen {
-		printer.indent++
-		if next != token.Newline {
-			printer.ensureNewline()
-		}
+// binaryOperatorLeaf consumes the token(s) spelling a binary operator. Most
+// operators are one token; "is not", "has not", and "not in" are two.
+func (b *builder) binaryOperatorLeaf(operator string) doc {
+	switch operator {
+	case "is not", "has not", "not in":
+		first := b.leaf()
+		return concat(first, text(" "), b.leaf())
+	default:
+		return b.leaf()
 	}
 }
 
-func (printer *tokenPrinter) openingOffset(closing int) int {
-	for opening, end := range printer.layout.closing {
-		if end == closing {
-			return opening
-		}
+// verbatimSpan reproduces a StringExpr's exact source text -- including
+// escapes, interpolation spacing, and multiline content -- unchanged. String
+// interpolation is not part of the flexible-comma/canonical-break surface
+// this package canonicalizes, so it is reproduced rather than re-derived.
+func (b *builder) verbatimSpan(span source.Span) doc {
+	trivia := b.leadingTriviaDoc()
+	raw := b.file.Text[span.Start.Offset:span.End.Offset]
+	for b.cursor < len(b.tokens) && b.tokens[b.cursor].Span.Start.Offset < span.End.Offset {
+		b.cursor++
 	}
-	return -1
-}
-
-func (printer *tokenPrinter) before(item token.Token) {
-	if printer.lineStart {
-		printer.out.WriteString(strings.Repeat("    ", printer.indent))
-		printer.lineStart = false
-	}
-	if needsSpace(printer.lastKind, printer.lastOffset, item, printer.layout) && !endsSpace(printer.out.String()) {
-		printer.out.WriteByte(' ')
-	}
-}
-
-func needsSpace(previous token.Kind, previousOffset int, current token.Token, layout syntaxLayout) bool {
-	if previous == token.Invalid || previous == token.Newline {
-		return false
-	}
-	kind := current.Kind
-	if kind == token.RightParen || kind == token.RightBracket || kind == token.RightBrace || kind == token.Comma || kind == token.Dot || kind == token.Colon {
-		return false
-	}
-	if previous == token.LeftParen || previous == token.LeftBracket || previous == token.LeftBrace || previous == token.Dot {
-		return false
-	}
-	if (kind == token.Less || kind == token.Greater) && layout.typeAngles[current.Span.Start.Offset] ||
-		previous == token.Less && layout.typeAngles[previousOffset] {
-		return false
-	}
-	if kind == token.LeftParen && (previous == token.Identifier || previous == token.RightParen || previous == token.RightBracket || previous == token.StringEnd || previous == token.KeywordObject || previous == token.KeywordError) {
-		return false
-	}
-	if kind == token.LeftBracket && (previous == token.Identifier || previous == token.RightParen || previous == token.RightBracket) {
-		return false
-	}
-	if kind == token.Increment || kind == token.Decrement || previous == token.Increment || previous == token.Decrement {
-		return false
-	}
-	if layout.unary[previousOffset] && (previous == token.Plus || previous == token.Minus) {
-		return false
-	}
-	return true
-}
-
-func (printer *tokenPrinter) trivia(items []token.Trivia) {
-	for _, item := range items {
-		if item.Kind == token.WhitespaceTrivia {
-			continue
-		}
-		if printer.lineStart {
-			continuation := item.Kind == token.BlockCommentTrivia && !strings.HasPrefix(item.Lexeme, "/*")
-			if !continuation {
-				printer.out.WriteString(strings.Repeat("    ", printer.indent))
-			}
-			printer.lineStart = false
-		} else if !endsSpace(printer.out.String()) {
-			printer.out.WriteByte(' ')
-		}
-		printer.out.WriteString(item.Lexeme)
-	}
-}
-
-func (printer *tokenPrinter) sourceNewline() {
-	printer.newline(true)
-	printer.lastKind = token.Newline
-}
-
-func (printer *tokenPrinter) ensureNewline() { printer.newline(false) }
-
-func (printer *tokenPrinter) newline(allowBlank bool) {
-	text := strings.TrimRight(printer.out.String(), " \t")
-	printer.out.Reset()
-	printer.out.WriteString(text)
-	if strings.HasSuffix(text, "\n") {
-		if allowBlank && !strings.HasSuffix(text, "\n\n") {
-			printer.out.WriteByte('\n')
-		}
-	} else {
-		printer.out.WriteByte('\n')
-	}
-	printer.lineStart = true
-}
-
-func (printer *tokenPrinter) write(text string) {
-	printer.out.WriteString(text)
-	if strings.Contains(text, "\n") || strings.Contains(text, "\r") {
-		printer.lineStart = strings.HasSuffix(text, "\n") || strings.HasSuffix(text, "\r")
-	}
-}
-
-func endsSpace(text string) bool {
-	if text == "" {
-		return false
-	}
-	last := text[len(text)-1]
-	return last == ' ' || last == '\t' || last == '\n' || last == '\r'
+	return concat(trivia, text(raw))
 }

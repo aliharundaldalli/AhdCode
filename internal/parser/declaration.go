@@ -17,7 +17,7 @@ func (p *parser) parseSimpleStatement(scope scopeKind) ast.Stmt {
 		if !expressionCanAssign(expression) {
 			p.errorSpan(codeInvalidAssignmentTarget, "expression is not assignable", expression.Span(), "assign only to an identifier, member, or index")
 		}
-		p.skipNewlines()
+		p.requireSameLineRHS(operator)
 		value := p.parseExpression(0)
 		return &ast.AssignmentStmt{
 			Base: p.base(start, spanEnd(value)), Target: expression,
@@ -81,8 +81,8 @@ func (p *parser) parseDeclaration(start source.Position, target ast.Expr, scope 
 		}
 	}
 
-	p.expect(token.Declare, "expected := in declaration")
-	p.skipNewlines()
+	declareToken := p.expect(token.Declare, "expected := in declaration")
+	p.requireSameLineRHS(declareToken)
 
 	if name == "structure" && typeRef.Name == "Attributes" && p.check(token.LeftParen) {
 		return p.parseStructureDecl(start, scope)
@@ -301,8 +301,9 @@ func (p *parser) parseParameterList(allowInherited bool) []ast.Parameter {
 			}
 			typeRef := p.parseTypeRef()
 			var defaultValue ast.Expr
-			if p.match(token.Declare) {
-				p.skipNewlines()
+			if p.check(token.Declare) {
+				declareToken := p.advance()
+				p.requireSameLineRHS(declareToken)
 				defaultValue = p.parseExpression(0)
 				seenDefault = true
 			} else if seenDefault {

@@ -15,6 +15,21 @@ Lists are homogeneous, ordered reference objects. Negative indices are
 supported; invalid indices raise `IndexError`. A bare empty List needs an
 explicit element type.
 
+Commas between elements are optional wherever a newline already separates
+them, and a trailing comma is always allowed:
+
+```ahd
+numbers: List<Int> := [
+    1
+    2
+    3
+]
+```
+
+is the same List as `[1, 2, 3]`. `ahdcode format` (see [Formatter](FORMATTER.md))
+renders either spelling the same way: one line if it fits, otherwise one
+element per line with no trailing comma.
+
 ```ahd
 alias: List<Int> := numbers
 alias[0] = 9
@@ -38,6 +53,9 @@ write(scores["Ali"])
 Pairs preserve insertion order. Updating a key keeps its position; ejecting
 and re-adding it appends it. Missing keys raise `KeyError`. Valid key types are
 `String`, `Int`, and `Bool`; Real, Class, and null keys are not supported.
+
+Pair entries follow the same flexible-comma rule as Lists: `{"Ali": 85,
+"Ayşe": 92}` and the multiline form above are the same value.
 
 `value in scores` checks Pair keys. `has` is only for Class member existence.
 

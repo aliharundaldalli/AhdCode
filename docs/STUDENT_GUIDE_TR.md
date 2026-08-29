@@ -1519,6 +1519,49 @@ ahdcode format --check hello.ahd
 
 İlk komut dosyayı doğrudan düzenleyerek günceller (bu işlem "idempotent"tir: tekrar tekrar çalıştırsanız da aynı sonucu verir ve fazladan değişiklik yapmaz). İkinci komut ise sadece dosyanın stilini kontrol eder, hiçbir şeyi değiştirmez. Bu komut, ekip projelerinde kod stilinin düzgün olduğundan emin olmak için kullanışlıdır.
 
+### Geçerli sözdizimi ile önerilen stil
+
+AhdCode'un grameri yazım konusunda esnektir: aynı satırdaki iki öğe arasında virgül zorunludur, ama başka her yerde -- bir Fonksiyonun parametreleri, bir çağrının argümanları, bir List veya Pair'in öğeleri arasında -- virgül yalnızca iki öğe aynı satırı paylaşıyorsa gereklidir, ve sondaki virgül her zaman isteğe bağlıdır. Aşağıdaki üç çağrı aynı anlama gelir:
+
+```ahd
+add(2, 3)
+
+add(
+    2,
+    3
+)
+
+add(
+    2
+    3
+)
+```
+
+Serbest olmayan tek yerleşim kuralı şudur: `:=` veya `=` işaretinden sonraki değer, işaretle aynı satırda başlamalıdır (bkz. [Language tour](LANGUAGE_TOUR.md) belgesindeki "Declarations and mutation" bölümü).
+
+Stili elle seçmenize gerek yok -- hangisi rahatınıza geliyorsa onu yazın (ya da bir yapay zeka asistanının size verdiği hâliyle bırakın), ardından `ahdcode format` çalıştırın. Sonuç her zaman aynıdır: kısa yapılar tek satıra toplanır, sığmayanlar ise sonunda virgül olmadan her öğe kendi satırında olacak şekilde bölünür. Örneğin:
+
+```ahd
+calculate: Function := (first: Int, second: Int, description: String, flag: Bool) -> Real {
+    return first
+}
+```
+
+şu hâle gelir:
+
+```ahd
+calculate: Function := (
+    first: Int
+    second: Int
+    description: String
+    flag: Bool
+) -> Real {
+    return first
+}
+```
+
+kısa bir imza olan `check: Function := (x: Int) -> Bool { ... }` ise tek satırda kalır.
+
 ## 24. Komut satırı (CLI)
 
 AhdCode basit bir komut satırı arayüzüyle gelir.

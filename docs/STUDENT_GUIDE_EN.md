@@ -1515,6 +1515,49 @@ ahdcode format --check hello.ahd
 
 The first command updates the file directly (it is idempotent: running it again changes nothing). The second command checks the style without changing anything, which is useful in team environments to ensure code style is followed.
 
+### Valid syntax vs. recommended style
+
+AhdCode's grammar is flexible about spelling: a comma between two items on the same line is required, but everywhere else -- between a Function's parameters, a call's arguments, and a List's or Pair's entries -- a comma is only needed when two items share a line, and a trailing comma is always optional. All three of these calls mean the same thing:
+
+```ahd
+add(2, 3)
+
+add(
+    2,
+    3
+)
+
+add(
+    2
+    3
+)
+```
+
+Only one placement is not free to choose: the value after `:=` or `=` has to start on the same line as the operator (see [Declarations and mutation](LANGUAGE_TOUR.md) in the language tour).
+
+You never have to pick a style by hand -- write whichever one is comfortable (or whatever an AI assistant hands you), then run `ahdcode format`. It always produces the same result: short constructs collapse onto one line, and anything too long to fit breaks into one item per line with no trailing comma. For example,
+
+```ahd
+calculate: Function := (first: Int, second: Int, description: String, flag: Bool) -> Real {
+    return first
+}
+```
+
+becomes
+
+```ahd
+calculate: Function := (
+    first: Int
+    second: Int
+    description: String
+    flag: Bool
+) -> Real {
+    return first
+}
+```
+
+while a short signature like `check: Function := (x: Int) -> Bool { ... }` stays exactly on one line.
+
 ## 25. CLI
 
 AhdCode comes with a simple command-line interface.

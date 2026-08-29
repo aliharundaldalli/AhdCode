@@ -10,4 +10,5 @@ const (
 	codeInvalidStandaloneUpdate = "PAR007"
 	codeInvalidTypeSyntax       = "PAR008"
 	codeInvalidControlSyntax    = "PAR009"
+	codeExpectedSameLineRHS     = "PAR010"
 )

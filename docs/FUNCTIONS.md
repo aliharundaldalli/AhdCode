@@ -14,6 +14,13 @@ greet: Function := (
 }
 ```
 
+Commas between parameters are optional wherever a newline already separates
+them, and a trailing comma is always allowed -- `(name: String, title: String
+:= "Student")` on one line is the same declaration. `ahdcode format` (see
+[Formatter](FORMATTER.md)) renders whichever spelling you use in the single
+recommended style: one line if it fits, otherwise one parameter per line with
+no comma at all, as above.
+
 Calls are entirely positional or entirely named:
 
 ```ahd

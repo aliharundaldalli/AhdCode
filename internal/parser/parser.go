@@ -188,6 +188,22 @@ func (p *parser) base(start, end source.Position) ast.Base {
 	return ast.Base{Range: source.NewSpan(p.file.ID, start, end)}
 }
 
+// requireSameLineRHS enforces that the first token of an assigned expression
+// begins on the same physical line as the := or = operator introducing it.
+// Line breaks are otherwise non-semantic, but this one placement rule keeps
+// declarations and assignments visually anchored to their operator. On
+// violation it reports the exact diagnostic and skips the offending newlines
+// so parsing can recover and keep finding further errors.
+func (p *parser) requireSameLineRHS(operator token.Token) {
+	if !p.check(token.Newline) {
+		return
+	}
+	symbol := operator.Kind.String()
+	message := fmt.Sprintf("expected the assigned expression to begin after '%s' on the same line", symbol)
+	p.errorSpan(codeExpectedSameLineRHS, message, operator.Span, fmt.Sprintf("move the expression after '%s' onto the same line", symbol))
+	p.skipNewlines()
+}
+
 func (p *parser) synchronize(terminator token.Kind) {
 	for !p.atEnd() && !p.check(terminator) && !p.check(token.Newline) {
 		if p.current().Kind == token.RightBrace {
