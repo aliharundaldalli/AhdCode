@@ -81,11 +81,7 @@ const workspaceModule = "module ahdcodeprogram\n\ngo 1.25\n"
 func NewWorkspace(program *backend.GeneratedProgram) (*Workspace, []diagnostics.Diagnostic) {
 	toolchain, err := FindGoToolchain()
 	if err != nil {
-		return nil, []diagnostics.Diagnostic{{
-			Code: backend.CodeMissingToolchain, Severity: diagnostics.SeverityError,
-			Message: "the Go toolchain is required to build AhdCode programs: " + err.Error(),
-			Hint:    "install Go and make the go command reachable from PATH",
-		}}
+		return nil, []diagnostics.Diagnostic{missingToolchain(err)}
 	}
 	directory, err := os.MkdirTemp("", "ahdcode-build-")
 	if err != nil {
@@ -103,6 +99,14 @@ func NewWorkspace(program *backend.GeneratedProgram) (*Workspace, []diagnostics.
 		}
 	}
 	return workspace, nil
+}
+
+func missingToolchain(err error) diagnostics.Diagnostic {
+	return diagnostics.Diagnostic{
+		Code: backend.CodeMissingToolchain, Severity: diagnostics.SeverityError,
+		Message: "the Go toolchain is required to build AhdCode programs: " + err.Error(),
+		Hint:    "install Go and make the go command reachable from PATH",
+	}
 }
 
 func workspaceFailure(message string) diagnostics.Diagnostic {
@@ -182,6 +186,62 @@ func BuildProgram(entryPath, outputPath string) (string, Result) {
 	return outputPath, result
 }
 
+// runExecutable produces the native executable for one generated program and
+// the cleanup its workspace needs.
+//
+// An identical program is built only once. The cache key covers the complete
+// generated source, so a hit is only ever possible when the program that would
+// be built is byte-for-byte the one already built: any change to any AhdCode
+// source or imported module changes the generated text and therefore the key.
+// Compilation and diagnostics have already run in full by this point, so the
+// cache reuses the native build and nothing else.
+func runExecutable(program *backend.GeneratedProgram) (string, func(), []diagnostics.Diagnostic) {
+	nothing := func() {}
+	toolchain, err := FindGoToolchain()
+	if err != nil {
+		return "", nothing, []diagnostics.Diagnostic{missingToolchain(err)}
+	}
+	cache, key, reserved := openRunCache(), "", ""
+	if cache != nil {
+		key = cache.key(program, toolchain)
+		if executable, found := cache.lookup(key); found {
+			return executable, nothing, nil
+		}
+		if name, ok := cache.reserve(); ok {
+			reserved = name
+		}
+	}
+	workspace, failures := NewWorkspace(program)
+	if len(failures) != 0 {
+		return "", nothing, failures
+	}
+	// A miss builds straight into the cache directory when one is available,
+	// so publishing the result is a rename rather than a copy.
+	executable := reserved
+	if executable == "" {
+		executable = filepath.Join(workspace.Directory, "ahdcode-program")
+	}
+	if built := workspace.BuildExecutable(executable); len(built) != 0 {
+		workspace.Close()
+		if reserved != "" {
+			_ = os.Remove(reserved)
+		}
+		return "", nothing, built
+	}
+	if reserved == "" {
+		// Without a cache the executable lives in the workspace, so the
+		// workspace has to outlive the run.
+		return executable, workspace.Close, nil
+	}
+	workspace.Close()
+	if published, ok := cache.publish(key, reserved); ok {
+		return published, nothing, nil
+	}
+	// The build succeeded but could not be published; run it where it is and
+	// remove it afterwards rather than leaving a stray file behind.
+	return reserved, func() { _ = os.Remove(reserved) }, nil
+}
+
 // RunProgram builds one entry module into a temporary executable and runs it,
 // propagating its standard streams and exit code.
 func RunProgram(entryPath string, arguments []string, stdin *os.File, stdout, stderr *os.File) (int, Result) {
@@ -196,14 +256,9 @@ func RunProgramIO(entryPath string, arguments []string, stdin io.Reader, stdout,
 	if result.HasErrors() || result.Program == nil {
 		return 1, result
 	}
-	workspace, failures := NewWorkspace(result.Program)
-	if len(failures) != 0 {
-		result.Diagnostics = append(result.Diagnostics, failures...)
-		return 1, result
-	}
-	defer workspace.Close()
-	executable := filepath.Join(workspace.Directory, "ahdcode-program")
-	result.Diagnostics = append(result.Diagnostics, workspace.BuildExecutable(executable)...)
+	executable, cleanup, failures := runExecutable(result.Program)
+	defer cleanup()
+	result.Diagnostics = append(result.Diagnostics, failures...)
 	if result.HasErrors() {
 		return 1, result
 	}
