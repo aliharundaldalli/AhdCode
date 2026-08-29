@@ -349,6 +349,7 @@ ultimately {
     write("done")
 }
 bring Mathematics
+bring Mathematics as M
 from Fundamentals bring all
 from Mathematics bring (
     sqrt
@@ -357,7 +358,7 @@ from Mathematics bring (
 	requireClean(t, result)
 	wants := []any{
 		(*ast.IfStmt)(nil), (*ast.WhileStmt)(nil), (*ast.UntilStmt)(nil), (*ast.ForStmt)(nil),
-		(*ast.StateStmt)(nil), (*ast.AttemptStmt)(nil), (*ast.BringStmt)(nil),
+		(*ast.StateStmt)(nil), (*ast.AttemptStmt)(nil), (*ast.BringStmt)(nil), (*ast.BringStmt)(nil),
 		(*ast.BringStmt)(nil), (*ast.BringStmt)(nil),
 	}
 	if len(result.Program.Statements) != len(wants) {
@@ -366,9 +367,20 @@ from Mathematics bring (
 	if statement := result.Program.Statements[5].(*ast.AttemptStmt); len(statement.Excepts) != 1 || statement.Ultimately == nil {
 		t.Fatalf("attempt = %#v", statement)
 	}
-	imports := result.Program.Statements[8].(*ast.BringStmt)
+	alias := result.Program.Statements[7].(*ast.BringStmt)
+	if alias.Module != "Mathematics" || alias.Alias != "M" || !alias.Namespace {
+		t.Fatalf("module alias = %#v", alias)
+	}
+	imports := result.Program.Statements[9].(*ast.BringStmt)
 	if strings.Join(imports.Names, ",") != "sqrt,sin" {
 		t.Fatalf("import names = %#v", imports.Names)
+	}
+}
+
+func TestModuleAliasRequiresIdentifier(t *testing.T) {
+	result := parseText(t, "bring Time as\n")
+	if !result.HasErrors() {
+		t.Fatal("missing module alias identifier was accepted")
 	}
 }
 

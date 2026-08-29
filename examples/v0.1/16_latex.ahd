@@ -1,0 +1,35 @@
+bring Latex as L
+from Latex bring LatexError
+
+// Text helpers escape TeX-special characters for you.
+write(L.escape("100% kâr & $indirim$"))
+
+// Build a document from ordinary Strings.
+body: String := L.section("Türkçe karakter testi")
+body += "ç ğ ı İ ö ş ü Ç Ğ Ö Ş Ü\n\n"
+
+body += L.subsection("Matematik")
+body += L.equation("\\sum_\{k=1\}^\{n\} k = \\frac\{n(n+1)\}\{2\}")
+
+body += L.subsection("Tablo")
+body += L.table(
+    ["Ad", "Not"],
+    [
+        ["Ali", "90"],
+        ["Ayşe", "95"]
+    ]
+)
+
+source: String := L.document(
+    body: body,
+    title: "AhdCode Raporu",
+    author: "Ali Harun"
+)
+
+// Compiling needs the bundled engine, so a missing runtime is a LatexError.
+attempt {
+    L.pdf(source: source, output: "rapor.pdf")
+    write("rapor.pdf yazildi")
+} except LatexError as error {
+    write("PDF uretilemedi: {error.message}")
+}

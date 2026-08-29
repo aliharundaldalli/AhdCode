@@ -155,3 +155,13 @@ func TestFormatterRendersIterationBindingTypes(t *testing.T) {
 		})
 	}
 }
+
+func TestFormatterRendersModuleAliasCanonically(t *testing.T) {
+	first := formatText(t, "bring   Time   as   T\n")
+	if first != "bring Time as T\n" {
+		t.Fatalf("formatted alias = %q", first)
+	}
+	if second := formatText(t, first); second != first {
+		t.Fatalf("module alias formatting is not idempotent: %q", second)
+	}
+}

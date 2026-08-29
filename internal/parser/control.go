@@ -163,8 +163,16 @@ func (p *parser) parseBring() ast.Stmt {
 	start := p.current().Span.Start
 	if p.match(token.KeywordBring) {
 		module := p.expect(token.Identifier, "expected module name after bring")
+		alias := token.Token{}
+		if p.match(token.KeywordAs) {
+			alias = p.expect(token.Identifier, "expected alias name after as")
+		}
+		end := module.Span.End
+		if alias.Value != "" {
+			end = alias.Span.End
+		}
 		return &ast.BringStmt{
-			Base: p.base(start, module.Span.End), Module: module.Value, Namespace: true,
+			Base: p.base(start, end), Module: module.Value, Alias: alias.Value, Namespace: true,
 		}
 	}
 

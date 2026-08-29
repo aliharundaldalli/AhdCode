@@ -29,8 +29,12 @@ func (a *analyzer) installImports(program *ast.Program) {
 		a.registerInterfaceClasses(module)
 
 		if bring.Namespace {
+			bindingName := bring.Module
+			if bring.Alias != "" {
+				bindingName = bring.Alias
+			}
 			symbol := &Symbol{
-				Name: bring.Module, Kind: NamespaceSymbol, Type: types.Invalid,
+				Name: bindingName, Kind: NamespaceSymbol, Type: types.Invalid,
 				Span: bring.Span(), ModuleRoot: true, Constant: true,
 				InitialNull: NonNull, Namespace: module, OriginModuleID: a.environment.ModuleID,
 			}

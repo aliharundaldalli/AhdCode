@@ -145,7 +145,10 @@ func (*AttemptStmt) statementNode() {}
 
 type BringStmt struct {
 	Base
-	Module    string
+	Module string
+	// Alias is the optional namespace binding written by
+	// `bring Module as Alias`. It is empty for every existing bring form.
+	Alias     string
 	Namespace bool
 	All       bool
 	Names     []string

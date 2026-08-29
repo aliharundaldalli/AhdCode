@@ -8,12 +8,15 @@ package ahdruntime
 
 import (
 	"bufio"
+	"context"
 	cryptorand "crypto/rand"
 	"encoding/binary"
 	"fmt"
 	"io"
 	"math"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -52,6 +55,7 @@ var (
 	AhdClassNullError           = &AhdClass{Name: "NullError", Parent: AhdClassError}
 	AhdClassOverflowError       = &AhdClass{Name: "OverflowError", Parent: AhdClassError}
 	AhdClassValueError          = &AhdClass{Name: "ValueError", Parent: AhdClassError}
+	AhdClassLatexError          = &AhdClass{Name: "LatexError", Parent: AhdClassError}
 )
 
 // AhdInstance is every AhdCode Class instance. The generated interface of each
@@ -280,6 +284,370 @@ func AhdMain(install func(), body func()) {
 	if failed {
 		os.Exit(1)
 	}
+}
+
+// ---------------------------------------------------------------------------
+// Latex standard module
+// ---------------------------------------------------------------------------
+
+const ahdLatexLogLimit = 64 << 10
+
+// Variable only so the runtime package can exercise timeout handling without
+// making its unit test sleep for thirty seconds. Generated programs leave the
+// v0.1.5 contract value unchanged.
+var ahdLatexCompileTimeout = 30 * time.Second
+
+// AhdLatexRuntimeHint is filled by the compiler when it builds a program that
+// uses Latex. The environment override is reserved for packaging and tests;
+// neither mechanism is AhdCode language syntax.
+var AhdLatexRuntimeHint string
+
+// AhdLatexEscape escapes ordinary text for LaTeX text context. It deliberately
+// does not claim to sanitize raw mathematics.
+func AhdLatexEscape(text string) string {
+	var result strings.Builder
+	for _, character := range text {
+		switch character {
+		case '\\':
+			result.WriteString(`\textbackslash{}`)
+		case '{':
+			result.WriteString(`\{`)
+		case '}':
+			result.WriteString(`\}`)
+		case '$':
+			result.WriteString(`\$`)
+		case '&':
+			result.WriteString(`\&`)
+		case '#':
+			result.WriteString(`\#`)
+		case '%':
+			result.WriteString(`\%`)
+		case '_':
+			result.WriteString(`\_`)
+		case '^':
+			result.WriteString(`\textasciicircum{}`)
+		case '~':
+			result.WriteString(`\textasciitilde{}`)
+		default:
+			result.WriteRune(character)
+		}
+	}
+	return result.String()
+}
+
+func AhdLatexSection(title string) string {
+	return `\section{` + AhdLatexEscape(title) + "}\n"
+}
+
+func AhdLatexSubsection(title string) string {
+	return `\subsection{` + AhdLatexEscape(title) + "}\n"
+}
+
+func AhdLatexEquation(source string) string {
+	return "\\begin{equation}\n" + source + "\n\\end{equation}\n"
+}
+
+// AhdLatexDocument returns one stable complete document. Font files are named
+// explicitly so the supported baseline never depends on a system font.
+func AhdLatexDocument(body, title, author string) string {
+	var result strings.Builder
+	result.WriteString("\\documentclass{article}\n")
+	result.WriteString("\\usepackage{fontspec}\n")
+	result.WriteString("\\setmainfont{lmroman10-regular.otf}[BoldFont=lmroman10-bold.otf,ItalicFont=lmroman10-italic.otf,BoldItalicFont=lmroman10-bolditalic.otf]\n")
+	result.WriteString("\\usepackage{amsmath,amssymb,mathtools}\n")
+	result.WriteString("\\usepackage{geometry,graphicx,booktabs,array,xcolor,hyperref}\n")
+	result.WriteString("\\hypersetup{hidelinks}\n")
+	if title != "" {
+		result.WriteString("\\title{" + AhdLatexEscape(title) + "}\n")
+	}
+	if author != "" {
+		result.WriteString("\\author{" + AhdLatexEscape(author) + "}\n")
+	}
+	result.WriteString("\\date{}\n\\begin{document}\n")
+	if title != "" {
+		result.WriteString("\\maketitle\n")
+	}
+	result.WriteString(body)
+	if body != "" && !strings.HasSuffix(body, "\n") {
+		result.WriteByte('\n')
+	}
+	result.WriteString("\\end{document}\n")
+	return result.String()
+}
+
+// AhdLatexTable creates deterministic booktabs source. List elements retain
+// the ordinary nullable-element rule; a null row or cell raises NullError.
+func AhdLatexTable(headers *AhdList[*string], rows *AhdList[*AhdList[*string]]) string {
+	headerValues := headers.Snapshot()
+	if len(headerValues) == 0 {
+		AhdRaiseClass(AhdClassValueError, "Latex.table requires at least one header")
+	}
+	rowValues := rows.Snapshot()
+	var result strings.Builder
+	result.WriteString("\\begin{tabular}{")
+	result.WriteString(strings.Repeat("l", len(headerValues)))
+	result.WriteString("}\n\\toprule\n")
+	for index, value := range headerValues {
+		if index != 0 {
+			result.WriteString(" & ")
+		}
+		result.WriteString(AhdLatexEscape(AhdNonNull(value)))
+	}
+	result.WriteString(" \\\\\n\\midrule\n")
+	for _, row := range rowValues {
+		nonNullRow := AhdNonNull(row)
+		cells := nonNullRow.Snapshot()
+		if len(cells) != len(headerValues) {
+			AhdRaiseClass(AhdClassValueError, "Latex.table row column count does not match headers")
+		}
+		for index, value := range cells {
+			if index != 0 {
+				result.WriteString(" & ")
+			}
+			result.WriteString(AhdLatexEscape(AhdNonNull(value)))
+		}
+		result.WriteString(" \\\\\n")
+	}
+	result.WriteString("\\bottomrule\n\\end{tabular}\n")
+	return result.String()
+}
+
+func AhdLatexPDF(source, output string) {
+	if output == "" {
+		AhdRaiseClass(AhdClassValueError, "Latex.pdf output path must not be empty")
+	}
+	directory, err := os.MkdirTemp("", "ahdcode-latex-source-*")
+	if err != nil {
+		ahdLatexRaise("could not create a secure temporary directory: " + err.Error())
+	}
+	defer os.RemoveAll(directory)
+	input := filepath.Join(directory, "document.tex")
+	if err := os.WriteFile(input, []byte(source), 0o600); err != nil {
+		ahdLatexRaise("could not write temporary LaTeX source: " + err.Error())
+	}
+	working, err := os.Getwd()
+	if err != nil {
+		working = directory
+	}
+	ahdLatexCompile(input, working, output)
+}
+
+func AhdLatexPDFFile(input, output string) {
+	if input == "" {
+		AhdRaiseClass(AhdClassValueError, "Latex.pdfFile input path must not be empty")
+	}
+	if output == "" {
+		AhdRaiseClass(AhdClassValueError, "Latex.pdfFile output path must not be empty")
+	}
+	absolute, err := filepath.Abs(input)
+	if err != nil {
+		ahdLatexRaise("could not resolve input path: " + err.Error())
+	}
+	info, err := os.Stat(absolute)
+	if err != nil || !info.Mode().IsRegular() {
+		if err == nil {
+			err = fmt.Errorf("not a regular file")
+		}
+		ahdLatexRaise("could not read LaTeX input " + input + ": " + err.Error())
+	}
+	ahdLatexCompile(absolute, filepath.Dir(absolute), output)
+}
+
+func ahdLatexCompile(input, workingDirectory, output string) {
+	engine, bundle, err := ahdLatexRuntime()
+	if err != nil {
+		ahdLatexRaise(err.Error())
+	}
+	temporary, err := os.MkdirTemp("", "ahdcode-latex-build-*")
+	if err != nil {
+		ahdLatexRaise("could not create a secure build directory: " + err.Error())
+	}
+	defer os.RemoveAll(temporary)
+	outputDirectory := filepath.Join(temporary, "output")
+	cacheDirectory := filepath.Join(temporary, "cache")
+	if err := os.Mkdir(outputDirectory, 0o700); err != nil {
+		ahdLatexRaise("could not prepare temporary PDF output: " + err.Error())
+	}
+	if err := os.Mkdir(cacheDirectory, 0o700); err != nil {
+		ahdLatexRaise("could not prepare isolated Tectonic cache: " + err.Error())
+	}
+
+	contextValue, cancel := context.WithTimeout(context.Background(), ahdLatexCompileTimeout)
+	defer cancel()
+	command := exec.CommandContext(contextValue, engine,
+		"--untrusted", "--color", "never", "--bundle", bundle, "--only-cached",
+		"--outdir", outputDirectory, input)
+	command.Dir = workingDirectory
+	command.Env = append(os.Environ(), "TECTONIC_CACHE_DIR="+cacheDirectory)
+	log := &ahdLatexLog{}
+	command.Stdout, command.Stderr = log, log
+	err = command.Run()
+	if contextValue.Err() == context.DeadlineExceeded {
+		ahdLatexRaise("compilation timed out after 30 seconds")
+	}
+	if err != nil {
+		message := ahdLatexDiagnostic(log.String())
+		if message == "" {
+			message = err.Error()
+		}
+		ahdLatexRaise("compilation failed: " + message)
+	}
+
+	base := strings.TrimSuffix(filepath.Base(input), filepath.Ext(input)) + ".pdf"
+	generated := filepath.Join(outputDirectory, base)
+	if err := ahdLatexVerifyPDF(generated); err != nil {
+		ahdLatexRaise("Tectonic did not produce a valid PDF: " + err.Error())
+	}
+	if err := ahdLatexPublish(generated, output); err != nil {
+		ahdLatexRaise("could not write output PDF: " + err.Error())
+	}
+}
+
+func ahdLatexRuntime() (string, string, error) {
+	roots := []string{os.Getenv("AHDCODE_LATEX_RUNTIME"), AhdLatexRuntimeHint}
+	if executable, err := os.Executable(); err == nil {
+		bin := filepath.Dir(executable)
+		roots = append(roots,
+			filepath.Join(bin, "latex"),
+			filepath.Join(bin, "..", "libexec", "ahdcode", "latex"),
+		)
+	}
+	seen := make(map[string]bool)
+	for _, root := range roots {
+		if root == "" {
+			continue
+		}
+		root = filepath.Clean(root)
+		if seen[root] {
+			continue
+		}
+		seen[root] = true
+		engineName := "tectonic"
+		if filepath.Ext(os.Args[0]) == ".exe" {
+			engineName = "tectonic.exe"
+		}
+		engine := filepath.Join(root, engineName)
+		bundle := filepath.Join(root, "ahdcode-latex.ttb")
+		engineInfo, engineError := os.Stat(engine)
+		bundleInfo, bundleError := os.Stat(bundle)
+		if engineError == nil && bundleError == nil && engineInfo.Mode().IsRegular() && bundleInfo.Mode().IsRegular() {
+			return engine, bundle, nil
+		}
+	}
+	return "", "", fmt.Errorf("bundled Tectonic engine or local resource bundle is missing")
+}
+
+type ahdLatexLog struct {
+	data      []byte
+	truncated bool
+}
+
+func (log *ahdLatexLog) Write(value []byte) (int, error) {
+	written := len(value)
+	remaining := ahdLatexLogLimit - len(log.data)
+	if remaining > 0 {
+		if len(value) > remaining {
+			value = value[:remaining]
+			log.truncated = true
+		}
+		log.data = append(log.data, value...)
+	} else {
+		log.truncated = true
+	}
+	return written, nil
+}
+
+func (log *ahdLatexLog) String() string {
+	result := string(log.data)
+	if log.truncated {
+		result += "\n[engine log truncated]"
+	}
+	return result
+}
+
+func ahdLatexDiagnostic(text string) string {
+	text = strings.TrimSpace(text)
+	if text == "" {
+		return ""
+	}
+	lines := strings.Split(text, "\n")
+	start := 0
+	for index, line := range lines {
+		lower := strings.ToLower(line)
+		if strings.Contains(lower, "error:") || strings.HasPrefix(strings.TrimSpace(line), "!") {
+			start = index
+			break
+		}
+	}
+	end := start + 20
+	if end > len(lines) {
+		end = len(lines)
+	}
+	result := strings.TrimSpace(strings.Join(lines[start:end], "\n"))
+	if len(result) > 8192 {
+		result = result[:8192] + "\n[diagnostic truncated]"
+	}
+	return result
+}
+
+func ahdLatexVerifyPDF(path string) error {
+	info, err := os.Stat(path)
+	if err != nil {
+		return err
+	}
+	if !info.Mode().IsRegular() || info.Size() < 5 {
+		return fmt.Errorf("output is missing, empty, or not a regular file")
+	}
+	file, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	signature := make([]byte, 5)
+	if _, err := io.ReadFull(file, signature); err != nil {
+		return err
+	}
+	if string(signature) != "%PDF-" {
+		return fmt.Errorf("output has no PDF signature")
+	}
+	return nil
+}
+
+func ahdLatexPublish(generated, output string) error {
+	absolute, err := filepath.Abs(output)
+	if err != nil {
+		return err
+	}
+	directory := filepath.Dir(absolute)
+	temporary, err := os.CreateTemp(directory, ".ahdcode-latex-output-*")
+	if err != nil {
+		return err
+	}
+	temporaryPath := temporary.Name()
+	cleanup := func() { _ = os.Remove(temporaryPath) }
+	defer cleanup()
+	source, err := os.Open(generated)
+	if err != nil {
+		_ = temporary.Close()
+		return err
+	}
+	_, copyError := io.Copy(temporary, source)
+	closeSourceError := source.Close()
+	syncError := temporary.Sync()
+	closeError := temporary.Close()
+	for _, candidate := range []error{copyError, closeSourceError, syncError, closeError} {
+		if candidate != nil {
+			return candidate
+		}
+	}
+	if err := os.Rename(temporaryPath, absolute); err != nil {
+		return err
+	}
+	return nil
+}
+
+func ahdLatexRaise(message string) {
+	AhdRaiseClass(AhdClassLatexError, message)
 }
 
 // ---------------------------------------------------------------------------

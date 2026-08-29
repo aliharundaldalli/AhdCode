@@ -1,0 +1,101 @@
+AhdCode — Third-party notices for the bundled Latex runtime
+===========================================================
+
+The AhdCode Latex standard module compiles documents with a bundled typesetting
+engine and a pinned, minimal offline resource bundle. Neither is part of
+AhdCode itself. This file records what is redistributed and under which terms.
+
+Full license texts accompany this file in the `licenses/` directory.
+
+
+1. Tectonic typesetting engine
+------------------------------
+
+  Component : Tectonic
+  Version   : 0.17.0
+  Project   : https://tectonic-typesetting.github.io/
+  Source    : https://github.com/tectonic-typesetting/tectonic
+  Release   : https://github.com/tectonic-typesetting/tectonic/releases/tag/tectonic%400.17.0
+  License   : MIT  (licenses/TECTONIC-MIT.txt)
+
+  AhdCode redistributes the unmodified official release executable for the
+  target platform. The exact archive filename, size, and SHA-256 for every
+  supported platform are pinned in `tooling/latex/assets.json`, and the
+  packaging tool refuses to stage an artifact whose checksum does not match.
+
+  Tectonic embeds XeTeX and related TeX engine code, which carries its own
+  upstream permissive TeX licensing. Those terms are reproduced in the
+  Tectonic distribution and its source repository.
+
+
+2. TeX macro packages and formats
+---------------------------------
+
+  Provenance : TeX Live, obtained through the pinned Tectonic web bundle
+               https://data1.fullyjustified.net/tlextras-2022.0r0.tar
+  License    : LaTeX Project Public License, version 1.3c
+               (licenses/LPPL-1.3c.txt)
+
+  The AhdCode bundle includes only the files needed by the supported document
+  baseline — the `article` class, `amsmath`/`amssymb`/`mathtools`, `graphicx`,
+  `booktabs`, `array`, `geometry`, `xcolor`, `hyperref`, `fontspec`, the LaTeX
+  kernel and expl3 support files, and their transitive dependencies. Every
+  included file is listed by name, byte range, and SHA-256 in
+  `tooling/latex/resources.json`.
+
+  The LPPL permits redistribution of unmodified files. AhdCode does not modify
+  any TeX macro file; the files are copied byte-for-byte from the pinned
+  upstream bundle and verified by checksum.
+
+
+3. Latin Modern fonts
+---------------------
+
+  Component : Latin Modern (lmroman10 regular/bold/italic/bolditalic, OpenType)
+  Author    : GUST e-foundry, derived from Computer Modern by Donald E. Knuth
+  License   : GUST Font License (a LPPL-1.3c–compatible font license)
+               (licenses/GUST-FONT-LICENSE.txt)
+
+  The GUST Font License permits redistribution and use, including within
+  larger works. AhdCode ships these fonts so a document compiles identically
+  on a machine with no fonts installed; the generated document preamble names
+  the bundled font files explicitly and never relies on a host system font.
+
+
+4. Computer Modern Type 1 fonts and metrics
+-------------------------------------------
+
+  Component : Computer Modern (cmr/cmmi/cmsy/cmex Type 1 outlines and TFM
+              metrics), AMS font metrics
+  Author    : Donald E. Knuth; American Mathematical Society
+  License   : Knuth's permissive Computer Modern terms and the AMS font terms
+              as distributed by TeX Live, both of which permit verbatim
+              redistribution.
+
+  These files are used by the mathematics baseline. They are redistributed
+  unmodified and are verified by SHA-256 against the pinned upstream bundle.
+
+
+5. Hyphenation patterns and Unicode data
+----------------------------------------
+
+  Component : hyph-*.tex hyphenation patterns, language.dat,
+              UnicodeData.txt, CaseFolding.txt, SpecialCasing.txt,
+              glyph lists, tex-text.tec
+  License   : The hyphenation patterns carry individual permissive licenses
+              from their respective authors as distributed by TeX Live. The
+              Unicode data files are distributed under the Unicode License.
+
+  All are redistributed unmodified.
+
+
+Reproducibility
+---------------
+
+The bundle is not downloaded at run time and is not assembled ad hoc. The
+packaging tool fetches exactly the pinned byte ranges listed in
+`resources.json`, verifies each file's SHA-256, builds the `.ttb` with
+Tectonic's own bundle builder, and then verifies the resulting bundle against
+the pinned `ttb_sha256`. Independent builds produce a byte-identical bundle.
+
+Ordinary AhdCode compilation and execution never download anything.

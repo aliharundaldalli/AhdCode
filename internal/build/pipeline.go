@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	backend "ahdcode/internal/backend/golang"
@@ -173,6 +174,7 @@ func BuildProgram(entryPath, outputPath string) (string, Result) {
 	if outputPath == "" {
 		outputPath = DefaultOutputPath(entryPath)
 	}
+	result.Program = configureLatexRuntime(result.Program)
 	workspace, failures := NewWorkspace(result.Program)
 	if len(failures) != 0 {
 		result.Diagnostics = append(result.Diagnostics, failures...)
@@ -256,6 +258,7 @@ func RunProgramIO(entryPath string, arguments []string, stdin io.Reader, stdout,
 	if result.HasErrors() || result.Program == nil {
 		return 1, result
 	}
+	result.Program = configureLatexRuntime(result.Program)
 	executable, cleanup, failures := runExecutable(result.Program)
 	defer cleanup()
 	result.Diagnostics = append(result.Diagnostics, failures...)
@@ -275,4 +278,56 @@ func RunProgramIO(entryPath string, arguments []string, stdin io.Reader, stdout,
 		return 1, result
 	}
 	return 0, result
+}
+
+// configureLatexRuntime records the shared installation resource directory in
+// programs that actually use Latex. Ordinary generated programs are unchanged.
+// The runtime still validates the files and raises LatexError if an installed
+// resource has been removed after build time.
+func configureLatexRuntime(program *backend.GeneratedProgram) *backend.GeneratedProgram {
+	if program == nil || !program.RequiresLatex {
+		return program
+	}
+	root := findLatexRuntimeRoot()
+	if root == "" {
+		return program
+	}
+	copyProgram := &backend.GeneratedProgram{RequiresLatex: true}
+	copyProgram.Files = append(copyProgram.Files, program.Files...)
+	copyProgram.Files = append(copyProgram.Files, backend.GeneratedFile{
+		Name:    "ahdcode_latex_runtime.go",
+		Content: "package main\n\nfunc init() { AhdLatexRuntimeHint = " + strconv.Quote(root) + " }\n",
+	})
+	return copyProgram
+}
+
+func findLatexRuntimeRoot() string {
+	candidates := []string{os.Getenv("AHDCODE_LATEX_RUNTIME")}
+	if executable, err := os.Executable(); err == nil {
+		bin := filepath.Dir(executable)
+		candidates = append(candidates,
+			filepath.Join(bin, "latex"),
+			filepath.Join(bin, "..", "libexec", "ahdcode", "latex"),
+		)
+	}
+	for _, candidate := range candidates {
+		if candidate == "" {
+			continue
+		}
+		candidate = filepath.Clean(candidate)
+		engine := filepath.Join(candidate, "tectonic")
+		if filepath.Ext(os.Args[0]) == ".exe" {
+			engine += ".exe"
+		}
+		bundle := filepath.Join(candidate, "ahdcode-latex.ttb")
+		engineInfo, engineError := os.Stat(engine)
+		bundleInfo, bundleError := os.Stat(bundle)
+		if engineError == nil && bundleError == nil && engineInfo.Mode().IsRegular() && bundleInfo.Mode().IsRegular() {
+			absolute, err := filepath.Abs(candidate)
+			if err == nil {
+				return absolute
+			}
+		}
+	}
+	return ""
 }

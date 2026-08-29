@@ -71,6 +71,81 @@ secret: Confidential Int := 7`
 	}
 }
 
+func TestModuleNamespaceAliasesUseTheGenericImportPath(t *testing.T) {
+	t.Run("user module", func(t *testing.T) {
+		_, result := compileMemory(t, map[string]string{
+			"/Main.ahd":   "bring Engine as E\nanswer: Int := E.tick()",
+			"/Engine.ahd": "tick: Function := () -> Int { return 1 }",
+		}, "/Main.ahd")
+		requireClean(t, result)
+		main := moduleNamed(t, result, "Main")
+		declaration := main.Parsed.Program.Statements[1].(*ast.VariableDecl)
+		member := declaration.Initializer.(*ast.CallExpr).Callee.(*ast.MemberExpr)
+		namespace := member.Object.(*ast.IdentifierExpr)
+		resolved := main.Semantic.ResolvedSymbols[namespace]
+		if resolved == nil || resolved.Kind != semantic.NamespaceSymbol || resolved.Name != "E" || resolved.Namespace.Name != "Engine" {
+			t.Fatalf("resolved user alias = %#v", resolved)
+		}
+	})
+
+	for _, test := range []struct {
+		name   string
+		source string
+	}{
+		{"Math", "bring Math as M\nanswer: Real := M.sqrt(25)"},
+		{"Time", "bring Time as T\nanswer: Bool := T.Calendar.isLeapYear(2028)"},
+		{"Latex", `bring Latex as L
+answer: String := L.escape("a&b")`},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			_, result := compileMemory(t, map[string]string{"/Main.ahd": test.source}, "/Main.ahd")
+			requireClean(t, result)
+		})
+	}
+}
+
+func TestAliasOnlyImportDoesNotBindOriginalModuleName(t *testing.T) {
+	_, result := compileMemory(t, map[string]string{
+		"/Main.ahd":   "bring Engine as E\nanswer: Int := Engine.tick()",
+		"/Engine.ahd": "tick: Function := () -> Int { return 1 }",
+	}, "/Main.ahd")
+	requireCode(t, result, "SEM001")
+
+	_, both := compileMemory(t, map[string]string{
+		"/Main.ahd":   "bring Engine as E\nbring Engine\na: Int := E.tick()\nb: Int := Engine.tick()",
+		"/Engine.ahd": "tick: Function := () -> Int { return 1 }",
+	}, "/Main.ahd")
+	requireClean(t, both)
+}
+
+func TestModuleAliasConflictsUseOrdinaryImportDiagnostics(t *testing.T) {
+	for name, sources := range map[string]map[string]string{
+		"two modules": {
+			"/Main.ahd": "bring Time as T\nbring Math as T",
+		},
+		"local declaration": {
+			"/Main.ahd":   "E: Int := 1\nbring Engine as E",
+			"/Engine.ahd": "tick: Function := () -> Int { return 1 }",
+		},
+		"duplicate alias": {
+			"/Main.ahd": "bring Time as T\nbring Time as T",
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			_, result := compileMemory(t, sources, "/Main.ahd")
+			requireCode(t, result, semantic.CodeImportCollision)
+		})
+	}
+}
+
+func TestUnknownModuleWithAliasKeepsModuleDiagnostic(t *testing.T) {
+	_, result := compileMemory(t, map[string]string{"/Main.ahd": "bring Missing as M"}, "/Main.ahd")
+	diagnostic := requireCode(t, result, semantic.CodeModuleNotFound)
+	if diagnostic.Diagnostic.Span.FileID == 0 {
+		t.Fatal("missing aliased module diagnostic has no source span")
+	}
+}
+
 func TestNamespaceAndMemberResolutionAreRecordedInSideTables(t *testing.T) {
 	_, result := compileMemory(t, map[string]string{
 		"/Main.ahd":        "bring Mathematics\nanswer: Real := Mathematics.sqrt(25)",

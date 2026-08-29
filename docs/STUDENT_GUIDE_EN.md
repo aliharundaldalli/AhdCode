@@ -25,14 +25,15 @@ This guide is designed for beginners. It will walk you through the AhdCode langu
 - [20. Fundamentals Module](#20-fundamentals-module)
 - [21. Math Module](#21-math-module)
 - [22. Time Module](#22-time-module)
-- [23. Formatter](#23-formatter)
-- [24. CLI](#24-cli)
-- [25. REPL](#25-repl)
-- [26. Common beginner mistakes](#26-common-beginner-mistakes)
-- [27. Mini Projects](#27-mini-projects)
-- [28. Exercises](#28-exercises)
-- [29. Solution Hints](#29-solution-hints)
-- [30. Next steps and technical documentation](#30-next-steps-and-technical-documentation)
+- [23. Latex Module](#23-latex-module)
+- [24. Formatter](#24-formatter)
+- [25. CLI](#25-cli)
+- [26. REPL](#26-repl)
+- [27. Common beginner mistakes](#27-common-beginner-mistakes)
+- [28. Mini Projects](#28-mini-projects)
+- [29. Exercises](#29-exercises)
+- [30. Solution Hints](#30-solution-hints)
+- [31. Next steps and technical documentation](#31-next-steps-and-technical-documentation)
 
 Türkçe sürüm: [Türkçe Öğrenci Rehberi](STUDENT_GUIDE_TR.md)
 
@@ -1192,6 +1193,30 @@ There are several ways to import things from a module:
 
 Import collisions and circular dependencies are errors.
 
+
+### Module aliases
+
+You can rename a module namespace when you import it using `as`. This is useful for keeping your code concise.
+
+```ahd
+bring Time as T
+
+write(T.Calendar.isLeapYear(2028))
+```
+
+The alias replaces the original namespace binding for that import. Writing `bring Time as T` gives you `T`, but it does not automatically give you `Time`. The normal `bring Time` still works if you prefer the full name. You can also alias your own local modules.
+
+This feature does not create qualified type syntax. For types, preserve the current style by importing the name directly:
+
+```ahd
+bring Time as T
+from Time bring DateTime
+
+current: DateTime := T.now()
+```
+
+Do not write `T.DateTime` as a type; that is invalid. Also, you cannot alias individual items like `from Time bring DateTime as DT`.
+
 ## 20. Fundamentals Module
 
 These names are predeclared in every module and require no `bring`. They cover standard input/output, text manipulation, and numeric reductions.
@@ -1446,7 +1471,40 @@ Watch the units, because they are different on purpose:
 `Time.sleep(0)` returns immediately. A negative wait is a `ValueError`, because waiting "minus one millisecond" is not a real request.
 
 
-## 23. Formatter
+## 23. Latex Module
+
+The `Latex` standard library allows you to create PDF documents directly from your AhdCode programs. It uses a bundled offline Tectonic engine, so you do not need to install TeX Live, MiKTeX, or any other external software. Shell escape is intentionally disabled for safety.
+
+The module provides a practical, beginner-friendly API to generate documents safely:
+
+```ahd
+bring Latex as L
+
+document: String := L.document(
+    L.section("My First Document") +
+    L.escape("Hello! This is an ordinary text section.") +
+    L.subsection("Math Example") +
+    L.equation("E = mc^2")
+)
+
+attempt {
+    L.pdfFile("output.pdf", document)
+    write("PDF created!")
+}
+except LatexError as error {
+    write("Failed to create PDF: {error.message}")
+}
+```
+
+- `Latex.escape(text)`: Safely escapes ordinary text so it won't be treated as LaTeX code.
+- `Latex.section(text)` and `Latex.subsection(text)`: Create headings.
+- `Latex.equation(math)`: Accepts raw LaTeX math source.
+- `Latex.document(content)`: Wraps your content in a complete, ready-to-compile document.
+- `Latex.pdf(document)`: Compiles the document and returns the PDF bytes.
+- `Latex.pdfFile(path, document)`: Compiles the document and saves it directly to a file.
+- `LatexError`: Raised if compilation fails (for example, if there is a syntax error in your math).
+
+## 24. Formatter
 
 Your program may work even when its spacing and line layout are untidy. The formatter rewrites the file into AhdCode's shared style while preserving your comments:
 
@@ -1457,7 +1515,7 @@ ahdcode format --check hello.ahd
 
 The first command updates the file directly (it is idempotent: running it again changes nothing). The second command checks the style without changing anything, which is useful in team environments to ensure code style is followed.
 
-## 24. CLI
+## 25. CLI
 
 AhdCode comes with a simple command-line interface.
 
@@ -1467,7 +1525,7 @@ AhdCode comes with a simple command-line interface.
 - `ahdcode --help`: Shows help for all commands.
 - `ahdcode --version`: Shows the current compiler version.
 
-## 25. REPL
+## 26. REPL
 
 Run `ahdcode` by itself to open the REPL (Read-Eval-Print Loop) for small experiments without a file. 
 
@@ -1484,7 +1542,7 @@ error: duplicate declaration
 
 > **Watch out:** Because the REPL replays successful work when you enter new lines, random behavior might replay unless you use `Math.seed(...)` for deterministic operations. Test interactive input with `take` in a `.ahd` file rather than in the REPL.
 
-## 26. Common beginner mistakes
+## 27. Common beginner mistakes
 
 Here are common errors you might see and how to fix them:
 
@@ -1588,7 +1646,7 @@ Here are common errors you might see and how to fix them:
 - Why: Unseeded random uses the OS entropy and is not reproducible.
 - Correct: Use `Math.seed(42)` before rolling.
 
-## 27. Mini Projects
+## 28. Mini Projects
 
 These mini projects combine the ideas taught in this guide. Try building them on your own!
 
@@ -1600,7 +1658,7 @@ These mini projects combine the ideas taught in this guide. Try building them on
 6. **Student Record with Class**: Create a `Student` Class and a `Course` Class. A Course contains a `List<Student>`. Write a method to add a student, and a method to calculate the class average.
 7. **Seeded Random Game**: Use `Math.seed(42)` to generate a "secret number" between 1 and 100. Ask the user to guess it. Tell them "higher" or "lower" until they guess it. Because it is seeded, the secret number will be the same every time you run it—great for testing!
 
-## 28. Exercises
+## 29. Exercises
 
 Build each program in small steps rather than looking for a complete solution immediately.
 
@@ -1630,7 +1688,7 @@ Build each program in small steps rather than looking for a complete solution im
 19. Demonstrate `break` and `continue` by finding the first 5 even numbers in a large range, skipping numbers divisible by 3.
 20. Create a module `MathUtils.ahd` with a function for calculating the area of a rectangle, and `bring` it into a `main.ahd` file to use it.
 
-## 29. Solution Hints
+## 30. Solution Hints
 
 1. `take` returns String; convert the age with `int(...)` and add `1`.
 2. Break the formula into small parts. Start with `real(take(...))` and use Real literals.
@@ -1653,7 +1711,7 @@ Build each program in small steps rather than looking for a complete solution im
 19. `if i % 3 == 0 { continue }`. `if count == 5 { break }`.
 20. Use `from MathUtils bring calculateArea`.
 
-## 30. Next steps and technical documentation
+## 31. Next steps and technical documentation
 
 After completing this guide, continue with the detailed project documents:
 

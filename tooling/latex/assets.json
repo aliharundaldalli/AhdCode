@@ -1,0 +1,62 @@
+{
+  "schema": 1,
+  "tectonic_version": "0.17.0",
+  "tectonic_release_url": "https://github.com/tectonic-typesetting/tectonic/releases/tag/tectonic%400.17.0",
+  "engines": [
+    {
+      "goos": "darwin",
+      "goarch": "arm64",
+      "archive": "tar.gz",
+      "filename": "tectonic-0.17.0-aarch64-apple-darwin.tar.gz",
+      "url": "https://github.com/tectonic-typesetting/tectonic/releases/download/tectonic%400.17.0/tectonic-0.17.0-aarch64-apple-darwin.tar.gz",
+      "size": 21704674,
+      "sha256": "a3f1cac7c5678f01661a92212f58480ae3b0634115d880dbc59e2953ded45667"
+    },
+    {
+      "goos": "darwin",
+      "goarch": "amd64",
+      "archive": "tar.gz",
+      "filename": "tectonic-0.17.0-x86_64-apple-darwin.tar.gz",
+      "url": "https://github.com/tectonic-typesetting/tectonic/releases/download/tectonic%400.17.0/tectonic-0.17.0-x86_64-apple-darwin.tar.gz",
+      "size": 21790177,
+      "sha256": "7c90ef5b6ddb1eb1937e4337add5237b79338e4b9676459fa91187d24d6cdf80"
+    },
+    {
+      "goos": "linux",
+      "goarch": "arm64",
+      "archive": "tar.gz",
+      "filename": "tectonic-0.17.0-aarch64-unknown-linux-musl.tar.gz",
+      "url": "https://github.com/tectonic-typesetting/tectonic/releases/download/tectonic%400.17.0/tectonic-0.17.0-aarch64-unknown-linux-musl.tar.gz",
+      "size": 9926834,
+      "sha256": "b10954a95404f3ab2328d2fa59a5ebab8e657f893fab096f98be8db7c0c979b8"
+    },
+    {
+      "goos": "linux",
+      "goarch": "amd64",
+      "archive": "tar.gz",
+      "filename": "tectonic-0.17.0-x86_64-unknown-linux-musl.tar.gz",
+      "url": "https://github.com/tectonic-typesetting/tectonic/releases/download/tectonic%400.17.0/tectonic-0.17.0-x86_64-unknown-linux-musl.tar.gz",
+      "size": 10151914,
+      "sha256": "8533d07f9ccbd7a65824b9e0459041bca34af1eb33daba48f59215593753a3b7"
+    },
+    {
+      "goos": "windows",
+      "goarch": "amd64",
+      "archive": "zip",
+      "filename": "tectonic-0.17.0-x86_64-pc-windows-msvc.zip",
+      "url": "https://github.com/tectonic-typesetting/tectonic/releases/download/tectonic%400.17.0/tectonic-0.17.0-x86_64-pc-windows-msvc.zip",
+      "size": 21060223,
+      "sha256": "f61ce51f0b0ade1015b7de7ef368541c5424e9756ecbd0d7af97d6d48030845f"
+    }
+  ],
+  "bundle": {
+    "profile": "ahdcode-latex-v1",
+    "source_url": "https://data1.fullyjustified.net/tlextras-2022.0r0.tar",
+    "source_size": 2881562112,
+    "source_content_identity": "6ffe055852f8faf66c0acbe1a7fb27f87b869a90bad1204f3bf4d9683f597c7c",
+    "content_sha256": "27d057f06cf1129db23d4077db9589a466560fd75b2018f8598e8613f3368169",
+    "ttb_sha256": "0221592cd6bc8f366e0f402ce72225e9b2edadc0dee797f0c55319f1123a6a5c",
+    "ttb_size": 3567148,
+    "resource_manifest": "resources.json"
+  }
+}

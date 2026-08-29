@@ -2259,6 +2259,47 @@ Name collisions introduced by bring are compile-time errors.
 
 Confidential module-level symbols are not externally bringable.
 
+### 33.2 Module aliases
+
+A namespace import may bind the module under a different name:
+
+```ahd
+bring Time as T
+bring Math as M
+bring Engine as E
+```
+
+The alias must be a valid identifier and is case-sensitive. `bring Time as T`
+binds `T` and does **not** bind `Time`; importing both names requires two
+`bring` statements. An alias participates in the ordinary binding rules, so a
+name already in use is the usual import collision diagnostic.
+
+Aliases apply uniformly to compiler-supplied standard modules and to source
+modules. The other forms are unchanged:
+
+```ahd
+bring Module
+from Module bring name
+from Module bring (
+    first
+    second
+)
+from Module bring all
+```
+
+v0.1 has no symbol alias (`from Time bring DateTime as DT`) and no
+namespace-qualified type syntax. A type is still imported before it is named:
+
+```ahd
+bring Time as T
+from Time bring DateTime
+
+current: DateTime := T.now()
+```
+
+The canonical formatting is `bring Time as T`.
+
+
 ---
 
 ## 34. Fundamentals
@@ -2957,9 +2998,92 @@ reader, no month or day names, and no natural-language dates.
 
 ---
 
-## 37. Core Terminal I/O
+## 37. Latex Standard Module
 
-### 37.1 take
+`Latex` is a compiler-registered standard module, imported like `Math` and
+`Time`, including with an alias:
+
+```ahd
+bring Latex as L
+from Latex bring LatexError
+```
+
+The canonical identity is `builtin:Latex`. Every argument must be `NonNull`.
+
+The exact public surface is:
+
+```text
+Latex.pdf(source: String, output: String)     -> Nothing
+Latex.pdfFile(input: String, output: String)  -> Nothing
+Latex.escape(text: String)                    -> String
+Latex.section(title: String)                  -> String
+Latex.subsection(title: String)               -> String
+Latex.equation(source: String)                -> String
+Latex.document(body: String, title: String = "", author: String = "") -> String
+Latex.table(headers: List<String>, rows: List<List<String>>) -> String
+
+LatexError
+```
+
+### 37.1 Text helpers
+
+`escape` is text-context escaping for the TeX-special characters
+`\ { } $ & # % _ ^ ~`. It does not claim to sanitize raw mathematics.
+
+`section` and `subsection` escape their titles. `equation` deliberately does
+not escape, because it accepts raw LaTeX math source. `table` produces
+`booktabs` source and escapes every cell; a row whose column count differs from
+the headers raises `ValueError`.
+
+`document` returns a complete document whose preamble names the bundled Latin
+Modern font files explicitly, so rendering never depends on a host system font.
+
+### 37.2 Compilation
+
+`pdf` compiles a source String and `pdfFile` compiles an existing `.tex` file,
+resolving document-relative assets such as `\includegraphics` against the input
+file's directory.
+
+Compilation uses a Tectonic engine and a local resource bundle that ship with an
+AhdCode installation. AhdCode never runs a `tectonic` found on `PATH`, never
+falls back to a system TeX installation, and never downloads a resource at run
+time. A supported document therefore compiles on a fresh machine with an empty
+cache and no network. A missing bundled engine or bundle is a `LatexError`.
+
+### 37.3 Security and limits
+
+The engine runs in untrusted mode, so shell escape is unavailable and no AhdCode
+construct can enable it. The engine is launched with an argument vector rather
+than a shell command string, so paths containing spaces, Unicode, quotes, `$`,
+`;`, `&`, or parentheses remain safe. Compilation is bounded by a 30-second
+timeout; on timeout the process is terminated, temporary files are removed, and
+`LatexError` is raised.
+
+### 37.4 Output safety
+
+Source compiles in a unique secure temporary directory that is removed on both
+success and failure. The PDF is produced to a temporary location and checked for
+existence, regular-file status, non-zero size, and the `%PDF-` signature before
+it replaces the requested destination, so a failed compile never destroys an
+already valid destination PDF.
+
+### 37.5 LatexError
+
+`LatexError` covers compilation failure, a missing bundled engine or bundle,
+timeout, engine process failure, and a PDF that was not produced. Engine
+diagnostics are bounded so a malformed document cannot flood the terminal, while
+the first useful TeX error is preserved.
+
+### 37.6 Not in this version
+
+No BibTeX management, package manager, TikZ or Beamer abstraction, PDF editor or
+parser, and no Markdown or HTML conversion.
+
+---
+
+## 38. Core Terminal I/O
+
+### 38.1 take
 
 `take` is the terminal input function. It has exactly two forms:
 
@@ -3010,7 +3134,7 @@ age: Int := take()
 `take` is the only terminal input function in v0.1. There is no `takeInt`,
 `takeReal`, `input`, or `readLine`.
 
-### 37.2 write
+### 38.2 write
 
 ```ahd
 write("Hello {name}")
@@ -3018,7 +3142,7 @@ write("Hello {name}")
 
 ---
 
-## 38. Runtime Numerical Safety
+## 39. Runtime Numerical Safety
 
 AhdCode prefers explicit errors over surprising low-level numeric behavior.
 
@@ -3031,7 +3155,7 @@ Complex mathematics belongs to a Complex facility later.
 
 ---
 
-## 39. Unsupported v0.1 Features
+## 40. Unsupported v0.1 Features
 
 Intentionally excluded:
 
@@ -3062,7 +3186,7 @@ Intentionally excluded:
 
 ---
 
-## 40. Planned Compiler Pipeline
+## 41. Planned Compiler Pipeline
 
 ```text
 AhdCode source (.ahd)
@@ -3092,7 +3216,7 @@ AhdCode must not be a thin Python/JavaScript eval wrapper or regex-only translat
 
 ---
 
-## 41. CLI and interactive toolchain
+## 42. CLI and interactive toolchain
 
 ```bash
 ahdcode
@@ -3124,7 +3248,7 @@ Canonical in-place formatter. `ahdcode format --check hello.ahd` performs the sa
 
 ---
 
-## 42. Example Program
+## 43. Example Program
 
 ```ahd
 PI: Constant Real := 3.14159
@@ -3149,7 +3273,7 @@ else {
 
 ---
 
-## 43. Example Class
+## 44. Example Class
 
 ```ahd
 Person: Class<> := {
@@ -3183,7 +3307,7 @@ Student: Class<Person> := {
 
 ---
 
-## 44. Implementation Rule: Do Not Invent Semantics Silently
+## 45. Implementation Rule: Do Not Invent Semantics Silently
 
 When the specification is ambiguous:
 
@@ -3197,7 +3321,7 @@ In particular, do not resolve uncertainty by introducing hidden `Any`, dynamic F
 
 ---
 
-## 45. v0.1 Definition of Done
+## 46. v0.1 Definition of Done
 
 Core v0.1 is meaningfully alive when:
 

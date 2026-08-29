@@ -3,9 +3,12 @@ package ahdruntime
 import (
 	"bufio"
 	"math"
+	"os"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
+	"time"
 	"unsafe"
 )
 
@@ -29,6 +32,7 @@ func init() {
 	for _, class := range []*AhdClass{
 		AhdClassError, AhdClassConstantError, AhdClassDivisionByZeroError, AhdClassDomainError,
 		AhdClassIndexError, AhdClassKeyError, AhdClassNullError, AhdClassOverflowError, AhdClassValueError,
+		AhdClassLatexError,
 	} {
 		target := class
 		AhdRegisterError(target, func(message string) AhdInstance {
@@ -887,5 +891,153 @@ func TestHasMemberWalksTheRuntimeClassChain(t *testing.T) {
 	}
 	if AhdHasMember(nil, "name") {
 		t.Fatal("a nil instance has no members")
+	}
+}
+
+func TestLatexSourceHelpersAreDeterministic(t *testing.T) {
+	plain := "Türkçe: ç ğ ı İ ö ş ü"
+	if AhdLatexEscape(plain) != plain {
+		t.Fatal("ordinary Unicode text must be preserved")
+	}
+	input := `\{}$&#%_^~`
+	want := `\textbackslash{}\{\}\$\&\#\%\_\textasciicircum{}\textasciitilde{}`
+	if result := AhdLatexEscape(input); result != want {
+		t.Fatalf("Latex.escape = %q, want %q", result, want)
+	}
+	if result := AhdLatexSection("A&B"); result != "\\section{A\\&B}\n" {
+		t.Fatalf("Latex.section = %q", result)
+	}
+	if result := AhdLatexSubsection("A_B"); result != "\\subsection{A\\_B}\n" {
+		t.Fatalf("Latex.subsection = %q", result)
+	}
+	if result := AhdLatexEquation(`\sum_{k=1}^n k`); result != "\\begin{equation}\n\\sum_{k=1}^n k\n\\end{equation}\n" {
+		t.Fatalf("Latex.equation = %q", result)
+	}
+	first := AhdLatexDocument("Body", "Türkçe & Math", "Ali")
+	second := AhdLatexDocument("Body", "Türkçe & Math", "Ali")
+	if first != second || !strings.Contains(first, "lmroman10-regular.otf") ||
+		!strings.Contains(first, "\\title{Türkçe \\& Math}") || strings.Contains(first, "today") {
+		t.Fatalf("Latex.document is not stable:\n%s", first)
+	}
+}
+
+func TestLatexTableEscapesAndValidatesCells(t *testing.T) {
+	headers := AhdNewList(AhdBox("Name"), AhdBox("A&B"))
+	rows := AhdNewList(AhdNewList(AhdBox("Ali"), AhdBox("1_2")))
+	result := AhdLatexTable(headers, rows)
+	for _, expected := range []string{"\\begin{tabular}{ll}", "A\\&B", "1\\_2", "\\toprule", "\\midrule", "\\bottomrule"} {
+		if !strings.Contains(result, expected) {
+			t.Fatalf("Latex.table omitted %q:\n%s", expected, result)
+		}
+	}
+	expectRaise(t, AhdClassValueError, func() {
+		AhdLatexTable(AhdNewList[*string](), AhdNewList[*AhdList[*string]]())
+	})
+	expectRaise(t, AhdClassValueError, func() {
+		AhdLatexTable(headers, AhdNewList(AhdNewList(AhdBox("only one"))))
+	})
+	expectRaise(t, AhdClassNullError, func() {
+		AhdLatexTable(headers, AhdNewList[*AhdList[*string]](nil))
+	})
+}
+
+func TestLatexInvocationUsesBundledArgvAndPublishesAtomically(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("the argv-capture fixture is a POSIX test executable")
+	}
+	root := t.TempDir()
+	capture := filepath.Join(root, "captured arguments")
+	engine := filepath.Join(root, "tectonic")
+	script := `#!/bin/sh
+out=""
+input=""
+for argument do
+    printf '%s\n' "$argument" >> "$AHD_LATEX_CAPTURE"
+    if [ "$previous" = "--outdir" ]; then out="$argument"; fi
+    previous="$argument"
+    case "$argument" in *.tex) input="$argument";; esac
+done
+base=${input##*/}
+base=${base%.*}
+printf '%%PDF-fake' > "$out/$base.pdf"
+`
+	if err := os.WriteFile(engine, []byte(script), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	bundle := filepath.Join(root, "ahdcode-latex.ttb")
+	if err := os.WriteFile(bundle, []byte("fixture"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("AHDCODE_LATEX_RUNTIME", root)
+	t.Setenv("AHD_LATEX_CAPTURE", capture)
+	outputDirectory := filepath.Join(t.TempDir(), "space ü $; &")
+	if err := os.Mkdir(outputDirectory, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	output := filepath.Join(outputDirectory, "result (safe).pdf")
+	AhdLatexPDF("\\documentclass{article}\\begin{document}ok\\end{document}", output)
+	content, err := os.ReadFile(output)
+	if err != nil || string(content) != "%PDF-fake" {
+		t.Fatalf("published output = %q, %v", content, err)
+	}
+	arguments, err := os.ReadFile(capture)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(arguments)
+	for _, required := range []string{"--untrusted\n", "--only-cached\n", "--bundle\n", bundle + "\n"} {
+		if !strings.Contains(text, required) {
+			t.Fatalf("engine argv omitted %q:\n%s", required, text)
+		}
+	}
+	if strings.Contains(text, "shell-escape") {
+		t.Fatalf("shell escape leaked into engine argv:\n%s", text)
+	}
+}
+
+func TestLatexFailuresRaiseLatexErrorAndPreserveDestination(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("the failing engine fixture is a POSIX test executable")
+	}
+	root := t.TempDir()
+	t.Setenv("AHDCODE_LATEX_RUNTIME", root)
+	expectRaise(t, AhdClassLatexError, func() { AhdLatexPDF("bad", filepath.Join(t.TempDir(), "x.pdf")) })
+
+	if err := os.WriteFile(filepath.Join(root, "ahdcode-latex.ttb"), []byte("fixture"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "tectonic"), []byte("#!/bin/sh\nprintf 'error: invalid control sequence' >&2\nexit 1\n"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	destination := filepath.Join(t.TempDir(), "existing.pdf")
+	if err := os.WriteFile(destination, []byte("%PDF-existing"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	expectRaise(t, AhdClassLatexError, func() { AhdLatexPDF("bad", destination) })
+	content, err := os.ReadFile(destination)
+	if err != nil || string(content) != "%PDF-existing" {
+		t.Fatalf("a failed compile changed the destination: %q, %v", content, err)
+	}
+}
+
+func TestLatexTimeoutIsBoundedAndRaisesLatexError(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("the sleeping engine fixture is a POSIX test executable")
+	}
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, "ahdcode-latex.ttb"), []byte("fixture"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "tectonic"), []byte("#!/bin/sh\nwhile :; do :; done\n"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("AHDCODE_LATEX_RUNTIME", root)
+	previous := ahdLatexCompileTimeout
+	ahdLatexCompileTimeout = 20 * time.Millisecond
+	t.Cleanup(func() { ahdLatexCompileTimeout = previous })
+	started := time.Now()
+	expectRaise(t, AhdClassLatexError, func() { AhdLatexPDF("loop", filepath.Join(t.TempDir(), "x.pdf")) })
+	if elapsed := time.Since(started); elapsed > time.Second {
+		t.Fatalf("timeout took %s", elapsed)
 	}
 }

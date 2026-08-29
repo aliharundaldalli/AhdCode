@@ -25,14 +25,15 @@ Bu rehber, programlamaya yeni başlayanlar için tasarlanmıştır. Sizi günlü
 - [20. Temel işlevler modülü (Fundamentals)](#20-temel-işlevler-modülü-fundamentals)
 - [21. Matematik modülü (Math)](#21-matematik-modülü-math)
 - [22. Zaman modülü (Time)](#22-zaman-modülü-time)
-- [23. Kod biçimlendirici (Formatter)](#23-kod-biçimlendirici-formatter)
-- [24. Komut satırı (CLI)](#24-komut-satırı-cli)
-- [25. Etkileşimli kabuk (REPL)](#25-etkileşimli-kabuk-repl)
-- [26. Başlangıçta sık yapılan hatalar](#26-başlangıçta-sık-yapılan-hatalar)
-- [27. Küçük Projeler](#27-küçük-projeler)
-- [28. Alıştırmalar](#28-alıştırmalar)
-- [29. Çözüm İpuçları](#29-çözüm-ipuçları)
-- [30. Sonraki adımlar ve teknik belgeler](#30-sonraki-adımlar-ve-teknik-belgeler)
+- [23. Latex modülü (Latex)](#23-latex-modülü-latex)
+- [24. Kod biçimlendirici (Formatter)](#24-kod-biçimlendirici-formatter)
+- [25. Komut satırı (CLI)](#25-komut-satırı-cli)
+- [26. Etkileşimli kabuk (REPL)](#26-etkileşimli-kabuk-repl)
+- [27. Başlangıçta sık yapılan hatalar](#27-başlangıçta-sık-yapılan-hatalar)
+- [28. Küçük Projeler](#28-küçük-projeler)
+- [29. Alıştırmalar](#29-alıştırmalar)
+- [30. Çözüm İpuçları](#30-çözüm-ipuçları)
+- [31. Sonraki adımlar ve teknik belgeler](#31-sonraki-adımlar-ve-teknik-belgeler)
 
 ## 1. AhdCode nedir?
 
@@ -1188,6 +1189,30 @@ Bir modülden öğeleri içe aktarmanın (import) birkaç yolu vardır:
 
 Aynı isimleri taşıyan çakışan içe aktarımlar (import collisions) ve döngüsel bağlılıklar (circular dependencies) derleme hatasıdır.
 
+
+### Modül takma adları (Alias)
+
+Bir modülü içe aktarırken `as` kullanarak o modülün ad alanına yeni bir takma ad verebilirsiniz. Bu, kodunuzu daha kısa tutmak için kullanışlıdır.
+
+```ahd
+bring Time as T
+
+write(T.Calendar.isLeapYear(2028))
+```
+
+Takma ad, o içe aktarma işlemi için orijinal adın yerini alır. `bring Time as T` yazdığınızda sadece `T` ismini kullanabilirsiniz, otomatik olarak `Time` ismine de sahip olmazsınız. Eğer uzun halini tercih ederseniz normal `bring Time` kullanımı hala geçerlidir. Kendi yerel modüllerinize de takma ad verebilirsiniz.
+
+Bu özellik tür (type) isimlendirmesinde kullanılamaz. Türleri kullanmak için eski tarzı koruyun ve türün adını doğrudan içe aktarın:
+
+```ahd
+bring Time as T
+from Time bring DateTime
+
+current: DateTime := T.now()
+```
+
+Tür olarak `T.DateTime` yazmayın; bu geçersizdir. Ayrıca, `from Time bring DateTime as DT` gibi tekil öğelere takma ad veremezsiniz.
+
 ## 20. Temel işlevler modülü (Fundamentals)
 
 Aşağıdaki isimler her modülde zaten hazır bulunur ve onları kullanmak için
@@ -1449,7 +1474,40 @@ Birimlere dikkat edin, bilerek farklıdır:
 `Time.sleep(0)` hemen geri döner. Negatif bir bekleme `ValueError` verir, çünkü "eksi bir milisaniye" beklemek gerçek bir istek değildir.
 
 
-## 23. Kod biçimlendirici (Formatter)
+## 23. Latex modülü (Latex)
+
+`Latex` standart kütüphanesi, doğrudan AhdCode programlarınızdan PDF belgeleri oluşturmanızı sağlar. Kendi içinde gömülü, çevrimdışı çalışan bir Tectonic motoru kullanır; bu nedenle TeX Live, MiKTeX veya başka bir dış yazılım kurmanıza gerek yoktur. Güvenlik amacıyla sistem kabuğuna erişim (shell escape) kasıtlı olarak devre dışı bırakılmıştır.
+
+Modül, belgeleri güvenli bir şekilde oluşturmak için pratik ve yeni başlayanlara uygun bir API sunar:
+
+```ahd
+bring Latex as L
+
+document: String := L.document(
+    L.section("İlk Belgem") +
+    L.escape("Merhaba! Bu sıradan bir metin bölümüdür.") +
+    L.subsection("Matematik Örneği") +
+    L.equation("E = mc^2")
+)
+
+attempt {
+    L.pdfFile("cikti.pdf", document)
+    write("PDF başarıyla oluşturuldu!")
+}
+except LatexError as error {
+    write("PDF oluşturulamadı: {error.message}")
+}
+```
+
+- `Latex.escape(text)`: Sıradan metinleri, LaTeX kodu olarak algılanmaması için güvenli bir şekilde kaçış (escape) dizisine dönüştürür.
+- `Latex.section(text)` ve `Latex.subsection(text)`: Başlıklar oluşturur.
+- `Latex.equation(math)`: Saf LaTeX matematik kodlarını kabul eder.
+- `Latex.document(content)`: İçeriğinizi tam, derlenmeye hazır bir belgenin içine sarar.
+- `Latex.pdf(document)`: Belgeyi derler ve PDF verisini (byte olarak) döndürür.
+- `Latex.pdfFile(path, document)`: Belgeyi derler ve doğrudan bir dosyaya kaydeder.
+- `LatexError`: Derleme başarısız olursa (örneğin matematiğinizde bir sözdizimi hatası varsa) ortaya çıkar.
+
+## 24. Kod biçimlendirici (Formatter)
 
 Programınızdaki boşluklar veya satır düzeni dağınık olsa bile kodunuz
 çalışabilir. Ancak kod biçimlendirici (formatter), yazdığınız yorum satırlarını koruyarak dosyanızı AhdCode'un ortak standart stiline göre yeniden düzenler:

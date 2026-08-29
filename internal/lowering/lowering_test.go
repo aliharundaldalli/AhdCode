@@ -249,6 +249,28 @@ rounded: Real := Math.round(3.14159, 2)`,
 	}
 }
 
+func TestLatexStandardModuleLowersStableBuiltinIdentities(t *testing.T) {
+	result := lowerSources(t, map[string]string{
+		"/Main.ahd": `bring Latex as L
+from Latex bring LatexError
+
+body: String := L.section("Title")
+source: String := L.document(body: body, title: "Example")
+`,
+	}, "/Main.ahd")
+	dump := ir.Dump(result.Compilation)
+	for _, expected := range []string{
+		"builtin:Latex::class::LatexError", "builtin:Latex::section", "builtin:Latex::document",
+	} {
+		if !strings.Contains(dump, expected) {
+			t.Fatalf("Latex did not lower to %s:\n%s", expected, dump)
+		}
+	}
+	if strings.Contains(dump, "Invalid") {
+		t.Fatalf("a Latex declaration left an Invalid type in the IR:\n%s", dump)
+	}
+}
+
 func TestNullInterpolationAndCollectionsAreConcrete(t *testing.T) {
 	result := lowerSources(t, map[string]string{"/Main.ahd": `Student: Class<> := {}
 student: Student := null

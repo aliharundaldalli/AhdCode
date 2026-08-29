@@ -14,7 +14,11 @@ const mathModuleID = "builtin:Math"
 // modules supplied by the compiler. They use the same ModuleInterface model as
 // source modules, but have canonical builtin identities and no source file.
 func StandardModuleInterfaces() map[string]*ModuleInterface {
-	return map[string]*ModuleInterface{"Math": mathModuleInterface(), "Time": timeModuleInterface()}
+	return map[string]*ModuleInterface{
+		"Latex": latexModuleInterface(),
+		"Math":  mathModuleInterface(),
+		"Time":  timeModuleInterface(),
+	}
 }
 
 func mathModuleInterface() *ModuleInterface {

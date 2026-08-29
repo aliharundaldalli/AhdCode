@@ -117,6 +117,22 @@ func TestGeneratedSourceIsGofmtStable(t *testing.T) {
 	}
 }
 
+func TestLatexGenerationMarksOnlyLatexPrograms(t *testing.T) {
+	ordinary := generate(t, `write("hello")`)
+	if ordinary.RequiresLatex {
+		t.Fatal("an ordinary program must not acquire a Latex runtime dependency")
+	}
+	latex := generate(t, `bring Latex as L
+write(L.escape("A&B"))
+`)
+	if !latex.RequiresLatex {
+		t.Fatal("a Latex call must record the shared runtime dependency")
+	}
+	if !strings.Contains(programSource(t, latex), "AhdLatexEscape") {
+		t.Fatal("Latex.escape did not lower to the runtime helper")
+	}
+}
+
 func TestGeneratedProgramCarriesRuntime(t *testing.T) {
 	program := generate(t, "write(\"hi\")\n")
 	names := make([]string, 0, len(program.Files))
