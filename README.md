@@ -12,7 +12,7 @@ AhdCode is an experimental statically checked general-purpose programming
 language focused on readable syntax, explicit intent, predictable semantics,
 and native compilation.
 
-The current release is **v0.1.11**. The core language works end to end, but
+The current release is **v0.1.12**. The core language works end to end, but
 the project is not production-ready and breaking changes may occur before 1.0.
 
 ```ahd
@@ -47,6 +47,9 @@ for name in names {
   millisecond representations without introducing a timezone database.
 - The strict [CSV module](docs/CSV.md) transports raw String rows or
   header-keyed String records with native and persistent-REPL parity.
+- The [Data module](docs/DATA.md) adds an immutable `Table` of String cells for
+  filtering, sorting, grouping, and deriving columns; it infers no types, so
+  numeric work stays an explicit `int(...)` / `real(...)` conversion.
 - The formatter defines one canonical presentation while preserving comments.
 
 ## Build from source
@@ -102,6 +105,7 @@ See the [CLI guide](docs/CLI.md), [formatter guide](docs/FORMATTER.md), and
 - [File and Path modules](docs/FILESYSTEM.md)
 - [Regex module](docs/REGEX.md)
 - [CSV module](docs/CSV.md)
+- [Data module](docs/DATA.md)
 - [Understanding diagnostics](docs/DIAGNOSTICS.md)
 - [AI-assisted local setup](FOR_AI.md)
 - [Curated v0.1 examples](examples/v0.1/README.md)

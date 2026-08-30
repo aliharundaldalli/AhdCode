@@ -1622,6 +1622,56 @@ write(records[0]["name"])
 CSV never infers numbers or dates. Malformed input and invalid record shapes
 raise `CSVError`. See [the CSV module reference](CSV.md).
 
+### A first look at Data tables
+
+Once text is in, `Data` gives you a `Table` to work with. Every cell is still a
+`String`, and every operation returns a **new** table instead of changing the
+one you had:
+
+```ahd
+bring Data
+from Data bring Table
+
+table: Table := Data.fromCSV("name,score\nAli,91\nAyse,78\n")
+
+write(table.rowCount())
+write(table.columns())
+
+passed: Table := table.filter(
+    lambda (row: Pair<String, String>) -> int(row["score"]) >= 80
+)
+
+write(passed.column("name"))
+write(table.rowCount())
+```
+
+=>
+
+```text
+2
+["name", "score"]
+["Ali"]
+2
+```
+
+The last line is the point: `table` still has both rows, because `filter`
+returned a new table.
+
+Notice `int(row["score"])`. Data never guesses that `"91"` is a number, so you
+convert when you need one — the same rule you already know from the rest of the
+language. A whole numeric column works the same way:
+
+```ahd
+scores: List<Real> := table.column("score").map(
+    lambda (value: String) -> real(value)
+)
+```
+
+There is also `sort`, `select`, `drop`, `rename`, `reverse`, `head`, `tail`,
+`transform`, `derive`, `unique`, `valueCounts`, and `groupBy`. Asking for a
+column that does not exist raises `DataError`. See
+[the Data module reference](DATA.md).
+
 ## 20. Fundamentals module
 
 To use some tools, you don't need to write any `bring`. These are directly available in an AhdCode program:

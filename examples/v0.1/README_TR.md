@@ -41,6 +41,7 @@ ahdcode run examples/v0.1/14_grade_app.ahd
 | `20_lambda.ahd` | yalnızca ifade içeren Function değerleri, çıkarım, callback'ler ve normal Function karşılaştırması |
 | `21_time_utc.ahd` | UTC, Unix milisaniyesi, sabit ofsetler ve anı koruyan dönüşüm |
 | `22_csv.ahd` | ham CSV taşıma, başlık kayıtları, tırnaklama, Unicode ve çok satırlı alanlar |
+| `23_data.ahd` | Data tabloları: CSV'den `Table`'a, filter, anahtarlı sort, derive, groupBy ve açık dönüşüm |
 
 `Greeting.ahd`, `11_modules.ahd` tarafından kullanılan kardeş (sibling)
 modüldür.

@@ -3953,4 +3953,179 @@ Runtime domain failures remain AhdCode Errors (`RegexError`, `ValueError`,
 
 ---
 
+## 53. Data Standard Module (v0.1.12)
+
+`Data` is explicit, like `Math`, `Time`, `Regex`, and `CSV` (§33, §51): it
+must be imported before use, and its canonical identity is `builtin:Data`, so
+a sibling `Data.ahd` cannot shadow it.
+
+```ahd
+bring Data
+from Data bring Table
+from Data bring DataError
+```
+
+`Data` is a table structure and transformation layer over the existing String,
+List, Pair, Function, and CSV facilities. It is deliberately not a
+heterogeneous DataFrame runtime: it adds no `Any`, no dynamic or union type, no
+variant cell, and no new language-level generic.
+
+### 53.1 The String cell model
+
+Every Table cell is a `String`. The canonical row is
+`Pair<String, String>` and a collection of rows is
+`List<Pair<String, String>>`.
+
+`Data` performs **no** type inference and **no** implicit conversion: `"95"`,
+`"3.14"`, and `"true"` remain `String`, and an empty cell is an empty `String`
+rather than `null`. v0.1.12 has no Data-specific missing-value model. A numeric
+value is obtained through the ordinary conversions (§5.5):
+
+```ahd
+total: Int := int(row["score"])
+```
+
+### 53.2 Creating a Table
+
+```text
+Data.fromRows(columns: List<String>, rows: List<List<String>>) -> Table
+Data.fromRecords(records: List<Pair<String, String>>)          -> Table
+Data.fromCSV(text: String, delimiter: String = ",")            -> Table
+Data.readCSV(path: String, delimiter: String = ",")            -> Table
+```
+
+`Table` is compiler-supplied and is never constructed directly, exactly like
+`DateTime` (§36) and `Pattern` (§49); a value comes only from these functions
+or from another Table operation.
+
+Column names must be non-empty and unique. `fromRows` requires every row to
+have exactly `len(columns)` cells and never pads, truncates, or invents a
+name. `fromRecords` takes the first record as the canonical column order and
+requires every later record to carry exactly the same key set, in any
+insertion order; values are copied into canonical order and the caller's Pairs
+are not mutated. Empty records yield an empty zero-column Table, because no
+schema can be inferred. Zero rows are valid and keep the schema.
+
+`fromCSV` and `readCSV` reuse the CSV module's reader, so Data defines no
+second CSV grammar. The first row is the header, and unlike
+`CSV.parseRecords` a header-only document keeps its schema: `name,score` with
+no data rows yields `columns = ["name", "score"]` and `rowCount() == 0`. Empty
+input yields zero columns and zero rows.
+
+### 53.3 Immutability
+
+Every Table operation is pure. `head`, `tail`, `select`, `drop`, `rename`,
+`reverse`, `filter`, `sort`, `transform`, and `derive` each return a new Table
+and leave the receiver unchanged. v0.1.12 publishes no mutating member: there
+is no `setCell`, `appendRow`, `deleteRow`, or in-place mode.
+
+The Table's storage is not a published attribute. It cannot be read and `has`
+(§29) does not report it, so a program cannot reach the backing collections to
+mutate them. Every value a Table returns is a fresh snapshot: mutating the
+result of `columns()`, `rows()`, `row()`, or `column()` never affects the
+Table.
+
+### 53.4 Table members
+
+```text
+rowCount()            -> Int
+columnCount()         -> Int
+columns()             -> List<String>
+rows()                -> List<Pair<String, String>>
+row(index: Int)       -> Pair<String, String>
+column(name: String)  -> List<String>
+
+head(count: Int = 5)  -> Table
+tail(count: Int = 5)  -> Table
+select(columns: List<String>) -> Table
+drop(columns: List<String>)   -> Table
+rename(oldName: String, newName: String) -> Table
+reverse()             -> Table
+
+filter(function: Function)                    -> Table
+sort(column: String)                          -> Table
+sort(function: Function)                      -> Table
+transform(column: String, function: Function) -> Table
+derive(name: String, function: Function)      -> Table
+
+unique(column: String)      -> List<String>
+valueCounts(column: String) -> Pair<String, Int>
+groupBy(column: String)     -> Pair<String, Table>
+
+toCSV(delimiter: String = ",")                  -> String
+writeCSV(path: String, delimiter: String = ",") -> Nothing
+```
+
+`row` follows the List index rules of §12.2, so a negative index counts from
+the end and an invalid index raises `IndexError`. `head`/`tail` clamp a count
+larger than `rowCount()`, return a Table with the same columns and no rows for
+zero, and reject a negative count. `select` uses the requested order as the
+output order; `drop` preserves the original order of the columns that remain;
+both reject an unknown column and a repeated request. `rename` preserves the
+column's position.
+
+`unique`, `valueCounts`, and `groupBy` key on the column's String cell and use
+first-occurrence order; rows inside a group keep source order and every grouped
+Table has the source schema. v0.1.12 adds no aggregation syntax.
+
+`toCSV` and `writeCSV` use the CSV module's writer, emitting the header
+followed by the data rows in column order. A zero-column, zero-row Table
+serializes to `""`.
+
+### 53.5 Callback contracts
+
+The callback-taking members reuse the ordinary Function/Lambda machinery of
+§15 and §50; Data adds no callable type and no dynamic dispatch. Each contract
+is fixed and checked statically:
+
+| member | contract |
+|---|---|
+| `filter` | `(Pair<String, String>) -> Bool` |
+| `sort` | `(Pair<String, String>) -> Int` \| `Real` \| `String` |
+| `transform` | `(String) -> String` |
+| `derive` | `(Pair<String, String>) -> String` |
+
+A callback receives a row snapshot, so mutating it cannot reach the Table, and
+runs exactly once per row in source order. `sort` is stable and ascending in
+both forms and evaluates its key exactly once per row, matching the List keyed
+sort of §12.5; there is no comparator callback and no descending form, so a
+descending order is written with a negated numeric key or `reverse()`. A
+callback failure propagates as an ordinary AhdCode Error and leaves the source
+Table unchanged. The lambda restrictions of §50, including the absence of
+lexical `Local` capture, remain in force.
+
+### 53.6 DataError
+
+`DataError` derives directly from `Error`. It covers Data-specific structural
+failures: a duplicate or empty column name, a row-width mismatch, a record
+key-set mismatch, an unknown column, a repeated `select`/`drop` request, a
+negative `head`/`tail` count, and a `derive` target that already exists.
+
+Other domains keep their own error identity, so a diagnostic names the layer
+that failed: CSV syntax and an invalid delimiter remain `CSVError`, filesystem
+access from `readCSV`/`writeCSV` remains `FileError`/`IOError`, and an invalid
+`row` index remains `IndexError`. No Go panic, Go type name, or stack trace is
+exposed.
+
+### 53.7 Table as a value
+
+`Table` is an ordinary Class reference. `type(table)` reports `"Table"`
+(§48.1), and `id()` and `same` behave as for any other reference. Table
+implements no Class Protocol Method (§47), so `==` and `same` keep reference
+identity; Data does not define value equality for tables.
+
+### 53.8 Not in this version
+
+`Data` deliberately has no join, merge, concat, pivot, melt, MultiIndex, index
+labels, query strings, SQL, window functions, rolling, resample, categorical
+dtypes, lazy execution, or expression trees. It has no schema inference, no
+automatic numeric or datetime parsing, and no null inference.
+
+It also has no statistics: `sum`, `mean`, `median`, `variance`, `stdev`,
+`quantile`, `correlation`, and `describe` belong to a later Statistics
+facility, which is intended to consume `List<Int>` and `List<Real>` produced by
+an explicit conversion, so Data is never forced to become dynamically typed.
+
+---
+
 # End of AhdCode v0.1 Core Specification

@@ -41,5 +41,6 @@ ahdcode run examples/v0.1/14_grade_app.ahd
 | `20_lambda.ahd` | expression-only Function values, inference, callbacks, and normal Function contrast |
 | `21_time_utc.ahd` | UTC, Unix milliseconds, fixed offsets, and instant-preserving conversion |
 | `22_csv.ahd` | raw CSV transport, header records, quoting, Unicode, and multiline fields |
+| `23_data.ahd` | Data tables: CSV to `Table`, filter, keyed sort, derive, groupBy, and explicit conversion |
 
 `Greeting.ahd` is the sibling module used by `11_modules.ahd`.

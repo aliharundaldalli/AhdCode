@@ -4376,4 +4376,181 @@ veya stack trace göstermemelidir.
 
 ---
 
+## 53. Data Standart Modülü (v0.1.12)
+
+`Data`, `Math`, `Time`, `Regex` ve `CSV` gibi açıktır (§33, §51): kullanılmadan
+önce içe aktarılmalıdır ve kanonik kimliği `builtin:Data`'dır, bu yüzden
+kardeş bir `Data.ahd` onu gölgeleyemez.
+
+```ahd
+bring Data
+from Data bring Table
+from Data bring DataError
+```
+
+`Data`, mevcut String, List, Pair, Function ve CSV olanakları üzerine kurulu
+bir tablo yapısı ve dönüşüm katmanıdır. Kasıtlı olarak heterojen bir DataFrame
+çalışma zamanı değildir: `Any`, dinamik veya birleşim (union) türü, varyant
+hücre veya yeni bir dil seviyesi generic eklemez.
+
+### 53.1 String hücre modeli
+
+Her Table hücresi bir `String`'tir. Kanonik satır `Pair<String, String>`,
+satır koleksiyonu ise `List<Pair<String, String>>`'tir.
+
+`Data`, **hiçbir** tür çıkarımı ve **hiçbir** örtük dönüşüm yapmaz: `"95"`,
+`"3.14"` ve `"true"` `String` kalır; boş bir hücre `null` değil, boş bir
+`String`'tir. v0.1.12'de Data'ya özgü eksik-değer modeli yoktur. Sayısal bir
+değer, sıradan dönüşümlerle (§5.5) elde edilir:
+
+```ahd
+total: Int := int(row["score"])
+```
+
+### 53.2 Bir Table oluşturmak
+
+```text
+Data.fromRows(columns: List<String>, rows: List<List<String>>) -> Table
+Data.fromRecords(records: List<Pair<String, String>>)          -> Table
+Data.fromCSV(text: String, delimiter: String = ",")            -> Table
+Data.readCSV(path: String, delimiter: String = ",")            -> Table
+```
+
+`Table` derleyici tarafından sağlanır ve tam olarak `DateTime` (§36) ve
+`Pattern` (§49) gibi asla doğrudan oluşturulmaz; bir değer yalnızca bu
+fonksiyonlardan veya başka bir Table işleminden gelir.
+
+Sütun isimleri boş olmamalı ve benzersiz olmalıdır. `fromRows`, her satırın tam
+olarak `len(columns)` hücreye sahip olmasını gerektirir ve asla doldurmaz,
+kırpmaz veya isim uydurmaz. `fromRecords`, ilk kaydı kanonik sütun sırası
+olarak alır ve sonraki her kaydın, herhangi bir ekleme sırasında, tam olarak
+aynı anahtar kümesini taşımasını gerektirir; değerler kanonik sıraya kopyalanır
+ve çağıranın Pair'leri değiştirilmez. Boş kayıtlar, hiçbir şema
+çıkarılamayacağı için boş, sıfır sütunlu bir Table verir. Sıfır satır
+geçerlidir ve şemayı korur.
+
+`fromCSV` ve `readCSV`, CSV modülünün okuyucusunu yeniden kullanır; bu yüzden
+Data ikinci bir CSV grameri tanımlamaz. İlk satır başlıktır ve
+`CSV.parseRecords`'un aksine yalnızca başlıktan oluşan bir belge şemasını
+korur: veri satırı olmayan `name,score`, `columns = ["name", "score"]` ve
+`rowCount() == 0` verir. Boş girdi sıfır sütun ve sıfır satır verir.
+
+### 53.3 Değiştirilemezlik
+
+Her Table işlemi saftır. `head`, `tail`, `select`, `drop`, `rename`, `reverse`,
+`filter`, `sort`, `transform` ve `derive`, her biri yeni bir Table döndürür ve
+alıcıyı (receiver) değiştirmez. v0.1.12 hiçbir değiştiren üye yayınlamaz:
+`setCell`, `appendRow`, `deleteRow` veya yerinde mod yoktur.
+
+Table'ın depolaması yayınlanan bir öznitelik değildir. Okunamaz ve `has` (§29)
+onu bildirmez; bu yüzden bir program, değiştirmek için arkadaki koleksiyonlara
+ulaşamaz. Bir Table'ın döndürdüğü her değer taze bir anlık görüntüdür:
+`columns()`, `rows()`, `row()` veya `column()` sonucunu değiştirmek Table'ı
+asla etkilemez.
+
+### 53.4 Table üyeleri
+
+```text
+rowCount()            -> Int
+columnCount()         -> Int
+columns()             -> List<String>
+rows()                -> List<Pair<String, String>>
+row(index: Int)       -> Pair<String, String>
+column(name: String)  -> List<String>
+
+head(count: Int = 5)  -> Table
+tail(count: Int = 5)  -> Table
+select(columns: List<String>) -> Table
+drop(columns: List<String>)   -> Table
+rename(oldName: String, newName: String) -> Table
+reverse()             -> Table
+
+filter(function: Function)                    -> Table
+sort(column: String)                          -> Table
+sort(function: Function)                      -> Table
+transform(column: String, function: Function) -> Table
+derive(name: String, function: Function)      -> Table
+
+unique(column: String)      -> List<String>
+valueCounts(column: String) -> Pair<String, Int>
+groupBy(column: String)     -> Pair<String, Table>
+
+toCSV(delimiter: String = ",")                  -> String
+writeCSV(path: String, delimiter: String = ",") -> Nothing
+```
+
+`row`, §12.2'nin List indeks kurallarını izler: negatif indeks sondan sayar ve
+geçersiz bir indeks `IndexError` fırlatır. `head`/`tail`, `rowCount()`'tan
+büyük bir sayıyı kırpar, sıfır için aynı sütunlara sahip ve satırsız bir Table
+döndürür ve negatif bir sayıyı reddeder. `select`, istenen sırayı çıktı sırası
+olarak kullanır; `drop`, kalan sütunların özgün sırasını korur; ikisi de
+bilinmeyen bir sütunu ve tekrarlanan bir isteği reddeder. `rename`, sütunun
+konumunu korur.
+
+`unique`, `valueCounts` ve `groupBy`, sütunun String hücresine göre anahtarlanır
+ve ilk-görülme sırasını kullanır; bir grup içindeki satırlar kaynak sırasını
+korur ve gruplanan her Table kaynak şemasına sahiptir. v0.1.12 hiçbir toplama
+(aggregation) sözdizimi eklemez.
+
+`toCSV` ve `writeCSV`, CSV modülünün yazıcısını kullanır ve sütun sırasında
+başlığı ve ardından veri satırlarını yayar. Sıfır sütunlu, sıfır satırlı bir
+Table `""` olarak serileşir.
+
+### 53.5 Geri çağırma (callback) sözleşmeleri
+
+Geri çağırma alan üyeler, §15 ve §50'nin sıradan Function/Lambda makinesini
+yeniden kullanır; Data hiçbir çağrılabilir tür ve dinamik dispatch eklemez. Her
+sözleşme sabittir ve statik olarak denetlenir:
+
+| üye | sözleşme |
+|---|---|
+| `filter` | `(Pair<String, String>) -> Bool` |
+| `sort` | `(Pair<String, String>) -> Int` \| `Real` \| `String` |
+| `transform` | `(String) -> String` |
+| `derive` | `(Pair<String, String>) -> String` |
+
+Bir geri çağırma bir satır anlık görüntüsü alır, bu yüzden onu değiştirmek
+Table'a ulaşamaz ve kaynak sırasında satır başına tam olarak bir kez çalışır.
+`sort`, her iki biçimde de kararlı ve artandır ve anahtarını satır başına tam
+olarak bir kez değerlendirir; bu, §12.5'in List anahtarlı sıralamasıyla
+eşleşir. Karşılaştırıcı geri çağırma ve azalan biçim yoktur; azalan sıra,
+negatiflenmiş sayısal bir anahtarla veya `reverse()` ile yazılır. Bir geri
+çağırma başarısızlığı sıradan bir AhdCode Error'u olarak yayılır ve kaynak
+Table'ı değiştirmeden bırakır. §50'nin lambda kısıtlamaları, lexical `Local`
+yakalamanın yokluğu dahil, yürürlükte kalır.
+
+### 53.6 DataError
+
+`DataError` doğrudan `Error`'dan türer. Data'ya özgü yapısal başarısızlıkları
+kapsar: tekrarlanan veya boş sütun ismi, satır genişliği uyuşmazlığı, kayıt
+anahtar kümesi uyuşmazlığı, bilinmeyen sütun, tekrarlanan `select`/`drop`
+isteği, negatif `head`/`tail` sayısı ve zaten var olan bir `derive` hedefi.
+
+Diğer alanlar kendi hata kimliğini korur; böylece bir tanılama başarısız olan
+katmanı isimlendirir: CSV sözdizimi ve geçersiz ayraç `CSVError` kalır,
+`readCSV`/`writeCSV` dosya sistemi erişimi `FileError`/`IOError` kalır ve
+geçersiz bir `row` indeksi `IndexError` kalır. Hiçbir Go paniği, Go tür ismi
+veya stack trace ifşa edilmez.
+
+### 53.7 Bir değer olarak Table
+
+`Table` sıradan bir Class referansıdır. `type(table)`, `"Table"` bildirir
+(§48.1); `id()` ve `same`, diğer herhangi bir referanstaki gibi davranır.
+Table hiçbir Class Protocol Method (§47) uygulamaz; bu yüzden `==` ve `same`
+referans kimliğini korur; Data, tablolar için değer eşitliği tanımlamaz.
+
+### 53.8 Bu sürümde olmayanlar
+
+`Data`, kasıtlı olarak join, merge, concat, pivot, melt, MultiIndex, indeks
+etiketleri, sorgu dizeleri, SQL, pencere fonksiyonları, rolling, resample,
+kategorik dtype, tembel yürütme veya ifade ağaçlarına sahip değildir. Şema
+çıkarımı, otomatik sayısal veya tarih ayrıştırma ve null çıkarımı yoktur.
+
+İstatistik de yoktur: `sum`, `mean`, `median`, `variance`, `stdev`, `quantile`,
+`correlation` ve `describe`, daha sonraki bir Statistics olanağına aittir; o
+olanağın, açık bir dönüşümle üretilen `List<Int>` ve `List<Real>` tüketmesi
+amaçlanmaktadır, böylece Data asla dinamik tipli olmaya zorlanmaz.
+
+---
+
 # AhdCode v0.1 Çekirdek Spesifikasyonu Sonu

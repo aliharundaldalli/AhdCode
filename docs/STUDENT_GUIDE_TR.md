@@ -1626,6 +1626,57 @@ write(records[0]["name"])
 CSV sayı veya tarih çıkarımı yapmaz. Bozuk girdi ve geçersiz kayıt şekilleri
 `CSVError` fırlatır. [CSV modülü referansına](CSV_TR.md) bakın.
 
+### Data tablolarına ilk bakış
+
+Metin içeri alındıktan sonra `Data`, üzerinde çalışabileceğiniz bir `Table`
+verir. Her hücre yine bir `String`'tir ve her işlem, elinizdekini değiştirmek
+yerine **yeni** bir tablo döndürür:
+
+```ahd
+bring Data
+from Data bring Table
+
+table: Table := Data.fromCSV("name,score\nAli,91\nAyse,78\n")
+
+write(table.rowCount())
+write(table.columns())
+
+passed: Table := table.filter(
+    lambda (row: Pair<String, String>) -> int(row["score"]) >= 80
+)
+
+write(passed.column("name"))
+write(table.rowCount())
+```
+
+=>
+
+```text
+2
+["name", "score"]
+["Ali"]
+2
+```
+
+Son satır asıl mesele: `filter` yeni bir tablo döndürdüğü için `table` hâlâ
+iki satıra sahiptir.
+
+`int(row["score"])` ifadesine dikkat edin. Data, `"91"`in bir sayı olduğunu
+asla tahmin etmez; ihtiyacınız olduğunda dönüştürürsünüz -- dilin geri
+kalanından zaten bildiğiniz kural. Sayısal bir sütunun tamamı da aynı şekilde
+çalışır:
+
+```ahd
+scores: List<Real> := table.column("score").map(
+    lambda (value: String) -> real(value)
+)
+```
+
+Ayrıca `sort`, `select`, `drop`, `rename`, `reverse`, `head`, `tail`,
+`transform`, `derive`, `unique`, `valueCounts` ve `groupBy` vardır. Var olmayan
+bir sütun istemek `DataError` fırlatır.
+[Data modülü referansına](DATA_TR.md) bakın.
+
 ## 20. Temel işlevler modülü (Fundamentals)
 
 Bazı araçları kullanmak için hiçbir `bring` yazmanız gerekmez. Bunlar AhdCode programında doğrudan hazırdır:

@@ -153,12 +153,13 @@ Vector2: Class<> := {
 Yakalanabilir hatalar için `attempt`, `except`, `ultimately` ve `toss`
 kullanın. Bir isim uzayı (namespace) için `bring ModülAdı`, doğrudan bir
 sembol için `from ModülAdı bring isim` kullanın. Yerel modüller kardeş
-(sibling) dosyalardır. `Math`, `Time`, `Latex`, `Path`, `Regex`, `CSV` ve
-`File` açık standart modüllerdir; alan ve dosya hataları yakalanabilir AhdCode
+(sibling) dosyalardır. `Math`, `Time`, `Latex`, `Path`, `Regex`, `CSV`, `Data`
+ve `File` açık standart modüllerdir; alan ve dosya hataları yakalanabilir AhdCode
 hatalarıdır.
 
 Devamı için [Fonksiyonlar](FUNCTIONS_TR.md), [Sınıflar](CLASSES_TR.md),
 [Class Protocol Methods](PROTOCOLS_TR.md), [Koleksiyonlar](COLLECTIONS_TR.md)
 ve [Modüller](MODULES_TR.md)'e bakın. Time yerel, UTC ve sabit-ofsetli anları;
-CSV String satırları ve kayıtlarını kapsar. Ayrıca [Time](TIME_TR.md),
-[CSV](CSV_TR.md) ve [tanılama rehberine](DIAGNOSTICS_TR.md) bakın.
+CSV String satırları ve kayıtlarını kapsar; Data ise bunları String
+hücrelerden oluşan değiştirilemez bir `Table`'a dönüştürür. Ayrıca [Time](TIME_TR.md),
+[CSV](CSV_TR.md), [Data](DATA_TR.md) ve [tanılama rehberine](DIAGNOSTICS_TR.md) bakın.

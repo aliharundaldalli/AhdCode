@@ -56,3 +56,12 @@ Boş, çok scalar içeren, geçersiz UTF-8 ya da desteklenmeyen ayraçlar
 `read`/`write` dosya erişim hataları `FileError`/`IOError` anlamını korur.
 Göreli yollar işlem çalışma dizisini; kalıcı REPL'de REPL'in başlatıldığı
 dizini kullanır.
+
+## CSV taşımadır, Data ise tablo katmanıdır
+
+CSV kasıtlı olarak metin taşımada durur: String satırlarını ve başlık
+anahtarlı String kayıtlarını ayrıştırır ve serileştirir, asla tür çıkarımı
+yapmaz. Bu veriler üzerinde filtreleme, sıralama, gruplama veya sütun türetme
+istediğinizde, onu [Data modülüne](DATA_TR.md) verin; `Table`'ı aynı String
+hücreler üzerine kuruludur ve bu modülün okuyucusunu ve yazıcısını yeniden
+kullanır.

@@ -81,4 +81,5 @@ kanonik (standart) biçimde olup olmadığını yalnızca kontrol eder.
 
 Sırada: [dil turunu](LANGUAGE_TOUR_TR.md) ve
 [tanılama rehberini](DIAGNOSTICS_TR.md) okuyun veya UTC Time ve CSV dahil
-[derlenmiş örnekleri](../examples/v0.1/README_TR.md) çalıştırın.
+[derlenmiş örnekleri](../examples/v0.1/README_TR.md) ve
+[Data tablolarını](DATA_TR.md) çalıştırın.

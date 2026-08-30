@@ -70,3 +70,11 @@ attempt {
     write(error.message)
 }
 ```
+
+## CSV is transport, Data is the table layer
+
+CSV deliberately stops at text transport: it parses and serializes String rows
+and header-keyed String records, and never infers a type. When you want to
+filter, sort, group, or derive columns over that data, hand it to the
+[Data module](DATA.md), whose `Table` is built on these same String cells and
+reuses this module's reader and writer.

@@ -82,4 +82,5 @@ the file is already canonical.
 
 Next: read the [language tour](LANGUAGE_TOUR.md), learn how to act on
 [diagnostics](DIAGNOSTICS.md), or run the
-[curated examples](../examples/v0.1/README.md), including UTC Time and CSV.
+[curated examples](../examples/v0.1/README.md), including UTC Time, CSV, and
+[Data tables](DATA.md).
