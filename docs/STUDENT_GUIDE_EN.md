@@ -1,62 +1,69 @@
 # AhdCode v0.1 English Student Guide
 
-This guide is designed for beginners. It will walk you through the AhdCode language step-by-step using everyday language, starting from your very first line of code.
+This guide is designed so that **even someone who has never programmed before** can follow along. You can read it in order from beginning to end; in each section, you will first see what we want to achieve, then write a working example, and finally learn the necessary rules.
+
+You will occasionally see English technical terms next to the code. You do not need to memorize these on your first read. If a box starts with **Technical note**, you don't necessarily have to know that detail immediately to run the program.
+
+The best way to learn is not just by reading the examples, but by running them. Copy an example, change a number or a text inside it, and observe how the result changes.
 
 ## Table of Contents
 - [1. What is AhdCode?](#1-what-is-ahdcode)
 - [2. Installation and your first program](#2-installation-and-your-first-program)
-- [3. Source basics](#3-source-basics)
+- [3. Code writing basics](#3-code-writing-basics)
 - [4. Core types](#4-core-types)
 - [5. Operators](#5-operators)
 - [6. Strings](#6-strings)
 - [7. Input, output, and conversions](#7-input-output-and-conversions)
 - [8. Conditions: if and state](#8-conditions-if-and-state)
 - [9. Loops: while, until, and for](#9-loops-while-until-and-for)
-- [10. Writing and calling Functions](#10-writing-and-calling-functions)
+- [10. Writing and calling functions](#10-writing-and-calling-functions)
 - [11. Local and Global](#11-local-and-global)
-- [12. Working with Lists](#12-working-with-lists)
+- [12. Working with Lists (List)](#12-working-with-lists-list)
 - [13. Reference Behavior](#13-reference-behavior)
 - [14. Working with Pair](#14-working-with-pair)
-- [15. Constant](#15-constant)
+- [15. Constants (Constant)](#15-constants-constant)
 - [16. Null safety](#16-null-safety)
-- [17. Class and attributes](#17-class-and-attributes)
-- [18. Errors with attempt, except, ultimately, and toss](#18-errors-with-attempt-except-ultimately-and-toss)
+- [17. Classes (Class) and Attributes](#17-classes-class-and-attributes)
+- [18. Error handling (`attempt`, `except`, `ultimately`, and `toss`)](#18-error-handling-attempt-except-ultimately-and-toss)
 - [19. Modules and bring](#19-modules-and-bring)
-- [20. Fundamentals Module](#20-fundamentals-module)
-- [21. Math Module](#21-math-module)
-- [22. Time Module](#22-time-module)
-- [23. Latex Module](#23-latex-module)
-- [24. Formatter](#24-formatter)
-- [25. CLI](#25-cli)
-- [26. REPL](#26-repl)
+- [20. Fundamentals module](#20-fundamentals-module)
+- [21. Math module](#21-math-module)
+- [22. Time module](#22-time-module)
+- [23. Latex module](#23-latex-module)
+- [24. Code Formatter](#24-code-formatter)
+- [25. Command line (CLI)](#25-command-line-cli)
+- [26. Interactive shell (REPL)](#26-interactive-shell-repl)
 - [27. Common beginner mistakes](#27-common-beginner-mistakes)
-- [28. Mini Projects](#28-mini-projects)
+- [28. Small Projects](#28-small-projects)
 - [29. Exercises](#29-exercises)
 - [30. Solution Hints](#30-solution-hints)
-- [31. Next steps and technical documentation](#31-next-steps-and-technical-documentation)
-
-Türkçe sürüm: [Türkçe Öğrenci Rehberi](STUDENT_GUIDE_TR.md)
-
-This guide helps you build small AhdCode command-line programs even if you
-have little or no previous programming experience. Work through the chapters
-in order, run each example, and try the small changes suggested along the way.
+- [31. Next steps and technical docs](#31-next-steps-and-technical-docs)
 
 ## 1. What is AhdCode?
 
-AhdCode is a general-purpose language designed for readable code and
-predictable behavior. The compiler checks your program before running it. This
-catches many mistakes early, such as using the wrong kind of value or trusting
-a value that might be `null`.
+A programming language is a way of telling the computer what we want it to do. With AhdCode, for example, you can have it perform calculations, get information from the user, read a file, or create your own small programs.
 
-> **Technical note:** Checking types before the program runs is called static
-> checking.
+Your first AhdCode program could be just a single line:
 
-Version 0.1 is an experimental learning release. It can run small CLI programs
-directly or compile them into native executables.
+```ahd
+write("Hello!")
+```
+
+This program prints the following to the screen:
+
+```text
+Hello!
+```
+
+AhdCode checks the code you wrote before running the program. For example, if you try to use text like a number, or if you use a value that could be `null` without checking it, it will tell you the error before the program even starts, whenever possible. But you don't need to think about these details at the beginning; we'll see examples in later sections.
+
+AhdCode v0.1 is still an evolving release. You can run small command-line programs directly or compile them into standalone local applications.
+
+> **Technical note:** Checking types before the program runs is called *static checking*.
 
 ## 2. Installation and your first program
 
-Building AhdCode from source currently requires Go 1.25 or newer:
+To build AhdCode from source, you must have Go 1.25 or newer installed on your computer. Run the following commands in the project folder:
 
 ```bash
 cd AhdCode
@@ -66,14 +73,16 @@ export PATH="$(go env GOPATH)/bin:$PATH"
 ahdcode --version
 ```
 
-Create a file named `hello.ahd`:
+If the last command shows the AhdCode version, you are ready.
+
+Now create a file named `hello.ahd` and write this inside:
 
 ```ahd
 name: String := "AhdCode"
 write("Hello {name}")
 ```
 
-Run it:
+Run the file:
 
 ```bash
 ahdcode run hello.ahd
@@ -85,79 +94,115 @@ Expected output:
 Hello AhdCode
 ```
 
-Try it: replace `AhdCode` with your own name and run the file again.
+Here we stored a small piece of information in a name, and then placed it inside the text. You don't need to memorize why the `:=` sign is used for now; we'll learn it in the next section.
 
-## 3. Source basics
+**Try it yourself:** Replace `AhdCode` with your own name and run the program again.
 
-Every AhdCode program is written in a `.ahd` file.
-Statements are usually written one per line. You do not need to end lines with
-semicolons. Blocks of code are wrapped in braces `{` and `}`.
+## 3. Code writing basics
 
-If you want to leave a note for yourself or other programmers, you can start a single-line comment with `//`. For longer notes, you can use multiline comments starting with `/*` and ending with `*/`. The compiler ignores comments. (Note: multiline comments do not nest).
+AhdCode programs are written in files with the `.ahd` extension. Each operation generally sits on its own line; you don't need to put a `;` at the end of a line.
+
+### Notes the computer won't read: comments
+
+You can leave notes for yourself inside the code. A section starting with `//` is a comment on that line:
 
 ```ahd
-// This is a comment. It is ignored by the compiler.
-write("This line runs")
+// This line just informs us.
+write("This line works")
 ```
 
-When you need to remember a value, you create a variable. An identifier (a variable's name) can start with a letter or `_`. Subsequent characters can contain letters, numbers, and `_`.
+Longer comments can start with `/*` and end with `*/`:
 
-### Declaring and changing variables: `:=` and `=`
+```ahd
+/*
+This explanation can span
+several lines.
+*/
+write("Continue")
+```
 
-Use `:=` to create a new variable. Use `=` to give a new value to a variable
-that already exists and can be changed.
+### Storing information: variables
+
+We can store a piece of information under a name for the program to use later:
+
+```ahd
+name: String := "Ayşe"
+age: Int := 19
+```
+
+Here `name` and `age` are **variables**. We can use the values on the right with these names later:
+
+```ahd
+name: String := "Ayşe"
+age: Int := 19
+
+write(name)
+write(age)
+```
+
+### `:=` creates a new variable, `=` modifies an existing one
+
+When creating it for the first time, use `:=`:
 
 ```ahd
 score: Int := 10
-name: String := "Ayşe"
+```
 
+Later, to change the value of the same variable, use `=`:
+
+```ahd
+score: Int := 10
 write(score)
 
 score = 20
 write(score)
 ```
 
-Expected output:
+Output:
 
 ```text
 10
 20
 ```
 
-Using only `=` on the first line is an error because `score` has not been
-created yet. For example, `score = 10` without a previous declaration produces a
-semantic error. Using `:=` a second time in the same block would try to create the
-same variable again, which is also an error.
+You cannot directly write `score = 10` for a variable that has not yet been created. Writing `score: Int := ...` a second time in the same place also means trying to create a new variable, which is an error.
 
-AhdCode can infer a clear initializer's static type, while an explicit type is
-still available when it improves readability:
+### You must specify the type explicitly
+
+In AhdCode, when creating a new variable, you must explicitly write its type. This rule makes your program run more safely and helps you find errors while checking the code:
 
 ```ahd
 age: Int := 19
-name := "Ayşe"  // inferred String
+name: String := "Ayşe"
+active: Bool := true
 ```
 
-Inference is not dynamic typing: `name = 5` is still an error. Inside a nested
-block write `name: Local := "Ayşe"`; scope intent is never inferred.
+Once you declare a type in AhdCode, you cannot change the variable to a value of a different type:
 
-> **Technical note:** The region where a name can be used is called its scope.
-> Letting the compiler determine the type automatically is called type inference.
+```ahd
+name: String := "Ayşe"
+// name = 5   // ERROR: name was created as a String
+```
+
+We will also learn about the `Local` rule for inner blocks in section 11; for now, focus on the examples at the top level of the file.
 
 ## 4. Core types
 
-These are the types you will meet most often at the beginning:
+We use **types** to specify what kind of information we hold in a variable. It's enough to know the following types in the first stage:
 
-| Type | Meaning | Example |
+| Type | What it holds | Example |
 |---|---|---|
-| `Int` | Signed 64-bit integer | `42` |
-| `Real` | Finite floating-point number | `3.5` |
-| `String` | Unicode text that is not changed in place | `"Ayşe"` |
-| `Bool` | Logical value | `true`, `false` |
-| `List<T>` | Ordered mutable collection of values | `[1, 2]` |
-| `Pair<K, V>` | Insertion-ordered key/value collection | `{"Ali": 90}` |
-| `Function` | A block of reusable code | |
-| `Class` | A custom data structure | |
-| `Nothing` | A type for a Function that returns no value | |
+| `Int` | Integer | `42`, `-3` |
+| `Real` | Decimal number | `3.5`, `-0.25` |
+| `String` | Text | `"Ayşe"` |
+| `Bool` | True/false value | `true`, `false` |
+| `List<T>` | Ordered values | `[1, 2, 3]` |
+| `Pair<K, V>` | Key-value pairs | `{"Ali": 90}` |
+| `Function` | An executable function | we'll see later |
+| `Class` | Defines your own data structure | we'll see later |
+| `Nothing` | States that a function returns no value | we'll see later |
+
+A simple example:
 
 ```ahd
 student: String := "Ayşe"
@@ -168,136 +213,103 @@ passed: Bool := average >= 50.0
 write("{student}, {age}, {average}, {passed}")
 ```
 
-Expected output:
+Output:
 
 ```text
 Ayşe, 19, 87.5, true
 ```
 
-An `Int` can safely be used as a `Real` where the language permits it. However,
-`List<Int>` and `List<Real>` are different types. You cannot directly pass a
-`List<Int>` where a `List<Real>` is required.
+Here we didn't write `true` directly into the `passed` variable. Since the result of the comparison `average >= 50.0` is already true or false, AhdCode understands it as a `Bool`.
 
-> **Technical note:** This strict rule for generic collections is called invariance.
+In some cases, an `Int` can be safely used where a `Real` is required. But collections have distinct types; for example, `List<Int>` and `List<Real>` are not the same type.
 
-In AhdCode, `T?` is a nullable type. The compiler also tracks whether a
-nullable value is currently known to be present. We will cover this in the
-Null Safety section.
+If a value might not exist at all, you can add `?` to the end of the type. For example, `String?` means "a String or `null`". We will cover this with examples in section 16.
+
+> **Technical note:** Generic types like `List<Int>` and `List<Real>` not automatically converting to each other is called *invariance*.
 
 ## 5. Operators
 
-AhdCode supports the standard mathematical and logical operators.
+Operators are symbols and words we use to do math, compare values, or combine conditions.
 
-### Arithmetic
-- `+` addition
-- `-` subtraction
-- `*` multiplication
-- `/` division (always returns a `Real`, so `5 / 2` is `2.5`)
-- `%` remainder (requires `Int` values)
-- `^` power (right-associative, so `2 ^ 3 ^ 2` means `2 ^ (3 ^ 2)`)
+### Arithmetic and other numeric operations
 
 ```ahd
-write(10 + 5)
-write(10 / 4)
-write(10 % 3)
-write(2 ^ 3)
+write(10 + 5)   // 15
+write(10 - 5)   // 5
+write(10 * 5)   // 50
+write(10 / 4)   // 2.5
+write(10 % 3)   // 1
+write(2 ^ 3)    // 8
 ```
 
-Expected output:
-```text
-15
-2.5
-1
-8
-```
+The `/` operation always results in a `Real`. So the result of `5 / 2` is `2.5`, not `2`.
 
-AhdCode checks integer math for overflow. If a result is too large or too small to fit in an `Int`, the program safely stops with an `OverflowError` instead of producing wrong numbers.
+`%` is only used with `Int` values and yields the remainder. `^` is exponentiation.
 
-> **Watch out:** Division `/` always returns a `Real`. If you need an integer division, use `int(a / b)`.
+AhdCode checks for overflow in integer calculations. If a result exceeds `Int` bounds, it raises an `OverflowError` instead of producing the wrong number.
 
-### Assignment and compound assignment
-You can change variables directly with math:
-- `+=`, `-=`, `*=`, `/=`, `%=`, `^=`
+### Shortcut for updating an existing value
 
 ```ahd
 score: Int := 10
 score += 5
-write(score)
+write(score) // 15
 ```
 
-> **Watch out:** Because `/` always returns a `Real`, you cannot use `/=` on an `Int` variable. `score /= 2` is invalid if `score` is an `Int`. It is only valid for `Real` variables.
+The forms `+=`, `-=`, `*=`, `/=`, `%=`, `^=` exist. Since the result of `/` is a `Real`, you cannot use `/=` on an `Int` variable.
 
-### Increment and decrement
-To add or subtract exactly `1` from an `Int`, use `++` or `--`. These must stand alone on their own line; they cannot be used inside another expression.
+To increment or decrement an `Int` value by exactly one:
 
 ```ahd
 count: Int := 0
 count++
-write(count)
+count++
+count--
+write(count) // 1
 ```
 
-### Comparison, Identity, and Membership
+`++` and `--` are used by themselves on their own line.
 
-- `==` equals (checks if the values/content are the same according to type)
-- `!=` not equals
-- `<` less than
-- `<=` less than or equal to
-- `>` greater than
-- `>=` greater than or equal to
+### Comparing values
 
-AhdCode also provides operators for checking identity, types, and membership:
+```ahd
+age: Int := 20
 
-- `same` checks if two variables point to the exact same object in memory.
-- `is` / `is not` check if an object is of a specific Class type.
-- `in` / `not in` check if a value exists inside a collection or a String.
-- `has` / `has not` check if a Class object has a specific member (attribute or method).
+write(age == 20) // true
+write(age != 18) // true
+write(age > 18)  // true
+write(age <= 30) // true
+```
 
-**Using `in` and `not in`:**
-You can check if a value is in a `List`, a substring is in a `String`, or a key is in a `Pair`. For `Pair`, `in` checks the keys, not the values.
+Basic comparisons: `==`, `!=`, `<`, `<=`, `>`, `>=`.
+
+### Asking if a value exists somewhere
+
+`in` and `not in` are very readable:
 
 ```ahd
 numbers: List<Int> := [10, 20, 30]
-write(20 in numbers)
-write(99 not in numbers)
+write(20 in numbers)      // true
+write(99 not in numbers)  // true
 
 text: String := "AhdCode"
-write("Code" in text)
+write("Code" in text)     // true
+```
 
+On a `Pair`, `in` searches keys, not values:
+
+```ahd
 scores: Pair<String, Int> := {
     "Ali": 90
     "Ayşe": 95
 }
-write("Ali" in scores)
+
+write("Ali" in scores) // true
 ```
 
-**Using `has` and `has not`:**
-These are used exclusively to check if a Class object has a specific member. The right side must be the actual name of the member, not a String.
+### `and`, `or`, `not`
 
-`has` checks the object's actual Class at runtime, so storing a Student in a Person variable does not hide Student-only members from `has`. Inherited members from parent Classes also count as existing.
-
-```ahd
-Person: Class<> := {
-    structure: Attributes := ( name: String )
-}
-Student: Class<Person> := {
-    structure: Attributes := (
-        SuperClass.attributes
-        number: Int
-    )
-}
-
-person: Person := Student(name: "Ali", number: 42)
-
-write(person has number) // true
-write(person has not nickname) // true
-```
-
-*Note: `person is Student` asks "Is this object a Student?", while `person has number` asks "Does this object have a member named number?".*
-
-### Logical operators
-- `and` (true if both are true)
-- `or` (true if at least one is true)
-- `not` (flips true to false, and false to true)
+You can combine multiple true/false conditions:
 
 ```ahd
 age: Int := 20
@@ -308,35 +320,57 @@ if age >= 18 and hasTicket {
 }
 ```
 
+- `and`: `true` if both sides are true
+- `or`: `true` if at least one side is true
+- `not`: reverses the result
+
+### When will we need `same`, `is`, and `has`?
+
+These are useful a bit further along:
+
+- `same`: asks if two variables point to the **same object**.
+- `is` / `is not`: asks if an object is of a specific Class.
+- `has` / `has not`: asks if a specific attribute or method exists in a Class object.
+
+You will see these concepts again with examples in the List references and Classes sections. You do not need to memorize them on your first read.
+
 ## 6. Strings
 
-A String holds text. AhdCode fully supports Unicode, meaning letters from any language and emojis work naturally. Strings are immutable: once created, a String cannot be changed in place. Operations on Strings return a new String.
-
-You can write strings in three ways:
-1. `"double quotes"`
-2. `'single quotes'`
-3. `"""triple quotes"""` for multiline text
+`String` is used to hold text:
 
 ```ahd
-greeting: String := "Hello"
-letter: String := 'A'
+name: String := "Ayşe"
+city: String := 'Hatay'
+```
+
+Single quotes and double quotes can both be used. For multi-line text, you can use triple quotes:
+
+```ahd
 poem: String := """
 Roses are red,
 Violets are blue.
 """
 ```
 
-### Escapes and Interpolation
-Use a backslash `\` to escape special characters, such as `\"` or `\n` (newline).
-You can insert variables directly into strings using braces `{ }`. This is called interpolation.
+### Placing a variable inside text
+
+Use curly braces:
 
 ```ahd
 name: String := "Ali"
-write("Hello, {name}!")
+age: Int := 20
+write("{name} is {age} years old")
 ```
 
-### String API (methods)
-AhdCode provides many useful methods for Strings:
+Output:
+
+```text
+Ali is 20 years old
+```
+
+This is called *interpolation*.
+
+### Common String operations
 
 ```ahd
 text: String := "  Ali,Veli,Ayşe  "
@@ -349,105 +383,90 @@ write(clean.split(","))
 write(clean.replace("Veli", "Can"))
 write(clean.contains("Ayşe"))
 write(clean.startsWith("Ali"))
-write(clean.endsWith("Can"))
+write(clean.endsWith("Ayşe"))
 write(clean.count("i"))
-write("a✓b✓".index("✓"))
 ```
 
-Expected output:
+`String` values are not modified in place. For example, `clean.upper()` produces a new String; it does not change the `clean` variable itself.
 
-```text
-ali,veli,ayşe
-ALI,VELI,AYŞE
-Ali,veli,ayşe
-["Ali", "Veli", "Ayşe"]
-Ali,Can,Ayşe
-true
-true
-false
-1
-1
-```
+### Accessing a character
 
-A missing search with `String.index` raises a `DomainError`.
-
-### Indexing and Length
-You can access a single character using `[ ]` brackets, or find the total number of characters using `len()`. Indexes count from `0`. You can also use negative indexes to count from the end of the string (`-1` is the last character).
+The index of the first character is `0`:
 
 ```ahd
 word: String := "AhdCode"
-write(len(word))
-write(word[0])
-write(word[-1])
+write(len(word)) // 7
+write(word[0])   // A
+write(word[-1])  // e
 ```
 
-Expected output:
-```text
-7
-A
-e
-```
+Negative indices count from the end; `-1` is the last character. An invalid index raises an `IndexError`. If `String.index(...)` cannot find what it is looking for, it raises a `DomainError`.
 
-Ordinary invalid String indexing raises `IndexError`.
+### Escape characters
+
+You can use `\` to write special characters inside text. For example, `\n` is a newline, and `\"` is the double quote character.
+
+> **Technical note:** AhdCode Strings work with Unicode characters and are immutable; they cannot be changed in place.
 
 ## 7. Input, output, and conversions
 
-`write(value)` prints a value followed by a newline. `take()` reads one line of
-text from the user, while `take(prompt)` first displays a short prompt. The result of `take`
-is always a `String`.
+Now let our program talk to the user.
+
+### Writing to the screen: `write`
+
+```ahd
+write("Hello")
+write(42)
+```
+
+`write(...)` prints the value to the screen and moves to a new line.
+
+### Getting information from the user: `take`
 
 ```ahd
 name: String := take("Name: ")
-age: Int := int(take("Age: "))
-
-write("{name} is {age}")
+write("Hello {name}")
 ```
 
-Example interaction:
+Example usage:
 
 ```text
 Name: Ali
-Age: 20
-Ali is 20
+Hello Ali
 ```
 
-### Conversions with `int`, `real`, and `str`
+`take()` always returns a **String**. Even if the user types `20`, initially we have the text `"20"`, not a number.
 
-These functions are available everywhere without needing to import them.
+If we want to do math with the age, we convert it to a number:
 
 ```ahd
-write(int(3.7))
-write(int(-3.7))
-write(int(" +42 "))
-write(real(2))
-write(real("1e3"))
-write(str(true))
+age: Int := int(take("Age: "))
+write("You will be {age + 1} years old next year.")
 ```
 
-Expected output:
+### Type conversions
 
-```text
-3
--3
-42
-2.0
-1000.0
-true
+```ahd
+write(int(3.7))       // 3
+write(int(" +42 "))  // 42
+write(real(2))        // 2.0
+write(real("1e3"))   // 1000.0
+write(str(true))      // true
 ```
 
-`int(Real)` cuts off the decimal part (truncates toward zero). 
+- `int(...)`: produces an `Int`.
+- `real(...)`: produces a `Real`.
+- `str(...)`: produces a String.
 
-`int(String)` ignores surrounding spaces and accepts an optional `+` or `-` sign followed only by digits. It does **not** accept a decimal point, exponent, underscore, or base prefix.
+AhdCode does not automatically convert text to numbers. If the user enters invalid text for a number, such as `int("hello")`, a `DomainError` occurs. For very large values, an `OverflowError` might occur. We will see how to catch errors in section 18.
 
-`real(String)` accepts decimal integers, fractions, and exponents, but not `NaN` or infinity. 
-
-Invalid text raises a `DomainError`; a number that is too large raises an `OverflowError`. AhdCode does not automatically convert text to numbers; you must be explicit.
+> **Detail:** `int(String)` only accepts integer texts consisting of signs and digits; it does not accept text like `"3.14"` directly. `real(String)` accepts decimal and exponential notations but does not accept `NaN` or infinity.
 
 ## 8. Conditions: `if` and `state`
 
+Programs don't always need to do the same thing. We can make them behave differently based on a condition.
+
 ### `if` and `else`
-Every AhdCode condition must be a `Bool`. There is no truthiness for zero,
-empty Strings, or empty Lists.
 
 ```ahd
 score: Int := 72
@@ -463,103 +482,105 @@ else {
 }
 ```
 
-Expected output:
+Output:
 
 ```text
 Passed
 ```
 
-`if score` is invalid because `score` is an `Int`, not a `Bool`. Write an explicit comparison such as `if score > 0`.
-
-### `state`, `condition`, and `default`
-When you need to compare one value against many specific matches, use `state`. This is cleaner than writing many `else if` chains.
+After `if`, there must always be an expression that produces `true` or `false`. Therefore, instead of:
 
 ```ahd
-status: String := "active"
+// if score { ... }  // invalid
+```
 
-state status {
-    condition "active" {
-        write("Account is active")
+we write:
+
+```ahd
+if score > 0 {
+    write("Positive")
+}
+```
+
+In AhdCode, `0`, empty text, or an empty list are not automatically considered true/false.
+
+### Comparing the same value with many options: `state`
+
+In cases like a menu selection, `state` can be readable:
+
+```ahd
+choice: Int := 2
+
+state choice {
+    condition 1 {
+        write("New game")
     }
-    condition "blocked" {
-        write("Account is blocked")
+    condition 2 {
+        write("Settings")
     }
     condition default {
-        write("Unknown status")
+        write("Unknown choice")
     }
 }
 ```
 
-Expected output:
-```text
-Account is active
-```
-
-The `state` block executes only the first matching `condition` block. It does not fall through to the next condition, so you do not need to write `break`. The `condition default` runs if no other condition matches. 
-> **Watch out:** Do not call `state`, `condition`, or `default` "variables". They are control flow keywords, similar to `if` and `else`.
+The first matching `condition` executes. If none matches, `condition default` executes. Because there is no automatic fall-through to the next option, `break` is not required.
 
 ## 9. Loops: `while`, `until`, and `for`
 
-Loops let you repeat code.
+A loop does the same job over and over again.
 
-### `while` and `until`
-`while` checks its condition before running the code inside it. `until` uses
-the opposite order: it runs its body first and checks the condition afterward.
-Its body therefore runs at least once, and the loop stops when the condition
-becomes `true`.
+### `while`: keep going as long as the condition is true
+
+```ahd
+count: Int := 1
+
+while count <= 3 {
+    write(count)
+    count++
+}
+```
+
+Output:
+
+```text
+1
+2
+3
+```
+
+`while` checks the condition first. If the condition is false initially, the body might not run at all.
+
+### `until`: run at least once, then check the stop condition
 
 ```ahd
 count: Int := 0
 
-while count < 2 {
-    write("while {count}")
+until count == 3 {
     count++
-}
-
-until count == 4 {
-    count++
-    write("until {count}")
+    write(count)
 }
 ```
 
-Expected output:
+Output:
 
 ```text
-while 0
-while 1
-until 3
-until 4
+1
+2
+3
 ```
 
-> **Technical note:** `while` is a pre-check loop, while `until` is a
-> post-check loop.
+`until` runs the body first, then checks the condition. Therefore, the body runs **at least once**. When the condition is `true`, the loop ends.
 
-### `break` and `continue`
-You can stop a loop early with `break`, or skip the rest of the current round and move to the next one with `continue`.
+### `for`: use values from a list or a range sequentially
 
 ```ahd
-count: Int := 0
-while count < 10 {
-    count++
-    if count == 2 {
-        continue
-    }
-    if count == 4 {
-        break
-    }
-    write("count is {count}")
+for value in [10, 20, 30] {
+    write(value)
 }
 ```
 
-Expected output:
-```text
-count is 1
-count is 3
-```
-
-### `for` and `between`
-Use `for` to loop over a collection of items, or over a range of numbers. 
-`between(start, stop)` creates a range that includes the start and **excludes** the stop. A third argument sets the step.
+and for a range of numbers:
 
 ```ahd
 for value in between(1, 6, 2) {
@@ -567,7 +588,7 @@ for value in between(1, 6, 2) {
 }
 ```
 
-Expected output:
+Output:
 
 ```text
 1
@@ -575,40 +596,86 @@ Expected output:
 5
 ```
 
-Negative steps are supported (e.g., `between(10, 0, -2)` counts down). A zero step raises a `DomainError`. `between` is highly efficient; it doesn't build a massive List in memory, it just counts lazily.
+`between(start, stop)` includes the start but not the stop. The third value is the step amount. You can go backward with a negative step; a step of `0` raises a `DomainError`.
 
-You usually do not need to write the type of a `for` variable; the compiler can
-learn it from the values being visited. You may also write the type explicitly:
+You generally don't need to write the type of the `for` variable:
 
 ```ahd
 for value in [10, 20, 30] {
     write(value)
 }
+```
 
+You can write it explicitly if you want:
+
+```ahd
 for value: Int in [10, 20, 30] {
     write(value)
 }
 ```
 
-In both forms, `value` is created only for the loop. It is already local. Do not add `Local` to it.
-This form is invalid:
+The `for` variable is already considered belonging to that loop; `Local` is not prepended to it.
+
+### Ending a loop early or skipping a turn
 
 ```ahd
-// INVALID:
-for value: Local Int in [10, 20] {
+for value in between(1, 10) {
+    if value == 2 {
+        continue
+    }
+    if value == 5 {
+        break
+    }
     write(value)
 }
 ```
 
-> **Technical note:** Letting the compiler determine the type is called type
-> inference. A `for` variable is already treated as Local. Snapshot iteration is used for lists, meaning you iterate over the values present at the start of the loop.
+- `continue`: skips the rest of that turn.
+- `break`: completely ends the loop.
 
+> **Technical note:** `while` is a pre-check loop, `until` is a post-check loop. `between` doesn't pre-fill all numbers into a List; it produces values as needed. When a `for` loop begins on a List, iteration progresses over a snapshot.
 
-## 10. Writing and calling Functions
+## 10. Writing and calling functions
 
-Every Function has a name in v0.1. You cannot declare a new Function inside
-another Function, and there are no lambdas. Each parameter and return value
-has an explicit type.
+Instead of writing the same code over and over again, we can give it a name and run it whenever we want. This is called a **function**.
+
+First, the smallest example:
+
+```ahd
+square: Function := (number: Int) -> Int {
+    return number * number
+}
+
+write(square(5))
+```
+
+Output:
+
+```text
+25
+```
+
+Let's break down this line:
+
+```text
+square: Function := (number: Int) -> Int
+^^^^^^^              ^^^^^^^^^^^     ^^^
+function name         received value  returned type
+```
+
+`number` is the name of the value we send into the function. `return` gives back the result of the function.
+
+### Multiple parameters
+
+```ahd
+add: Function := (a: Int, b: Int) -> Int {
+    return a + b
+}
+
+write(add(2, 3))
+```
+
+You can also write parameters on separate lines:
 
 ```ahd
 greet: Function := (
@@ -617,29 +684,40 @@ greet: Function := (
 ) -> String {
     return "Hello {title} {name}"
 }
+```
 
+Since we provided a default value for `title`, we don't have to provide it in the call:
+
+```ahd
 write(greet("Ali"))
 write(greet(name: "Ayşe", title: "Dr"))
 ```
 
-Expected output:
-
-```text
-Hello Student Ali
-Hello Dr Ayşe
-```
-
-A call must use either all positional arguments or all named arguments; it
-cannot mix the two forms. `title` has a default value (`"Student"`), so it is optional when calling the function. 
-
-A Function that does not return a value uses the return type `Nothing`. In a Function returning `Nothing`, a bare `return` ends the Function
-immediately without returning a value. When no early exit is needed, writing
-`return` is optional; reaching the end of the Function body is enough (natural fall-through).
+In a single call, either provide all values in order, or provide all of them by their names. Both of these are valid:
 
 ```ahd
-showStatus: Function := (
-    score: Int
-) -> Nothing {
+greet("Ali")
+greet(name: "Ayşe", title: "Dr")
+```
+
+But don't mix positional and named formats in the same call.
+
+### A function that doesn't return a result: `Nothing`
+
+A function that just does a job and doesn't return a value uses `Nothing`:
+
+```ahd
+sayHello: Function := (name: String) -> Nothing {
+    write("Hello {name}")
+}
+
+sayHello("Ali")
+```
+
+You do not have to write `return` at the end of such a function. But if you want to exit early, you can use a bare `return`:
+
+```ahd
+showScore: Function := (score: Int) -> Nothing {
     if score < 0 {
         write("Invalid score")
         return
@@ -647,40 +725,19 @@ showStatus: Function := (
 
     write("Score: {score}")
 }
-
-hello: Function := (
-    name: String
-) -> Nothing {
-    write("Hello {name}")
-}
-
-showStatus(-5)
-showStatus(80)
-hello("Ayşe")
 ```
 
-Expected output:
+### A function calling itself
 
-```text
-Invalid score
-Score: 80
-Hello Ayşe
-```
-
-The bare `return` in the first `showStatus` call prevents the later `write`
-from running. `hello` completes naturally by reaching the end of its body.
-
-### Recursion
-Functions can call themselves. This is called recursion. You must ensure there is a condition that stops the recursion so it doesn't run forever.
+A function can call itself again. For example:
 
 ```ahd
-countdown: Function := (
-    n: Int
-) -> Nothing {
+countdown: Function := (n: Int) -> Nothing {
     if n <= 0 {
-        write("Blastoff!")
+        write("Fire!")
         return
     }
+
     write(n)
     countdown(n - 1)
 }
@@ -688,69 +745,88 @@ countdown: Function := (
 countdown(3)
 ```
 
-Expected output:
-```text
-3
-2
-1
-Blastoff!
-```
+This is called **recursion**. There must be a condition where it stops.
 
-### More than one Function with the same name: overloads
+### Functions with the same name but different parameters
 
-You can define several versions of one Function name when their parameter
-types differ. Write the first as an ordinary `Function` and the later version
-as an `Overload Function`:
+For more advanced use, you can use the same name with different parameter types:
 
 ```ahd
-describe: Function := (
-    value: Int
-) -> String {
+describe: Function := (value: Int) -> String {
     return "Int {value}"
 }
 
-describe: Overload Function := (
-    value: Real
-) -> String {
+describe: Overload Function := (value: Real) -> String {
     return "Real {value}"
 }
-
-write(describe(2))
-write(describe(2.5))
 ```
 
-Expected output:
+AhdCode determines which version of the call it belongs to based on the parameters. Exact matches come first; safe `Int -> Real` widening can be used when needed. If it's ambiguous which version should be selected, the compiler will yield an error instead of guessing.
 
-```text
-Int 2
-Real 2.5
-```
-
-The compiler first chooses a version whose parameter type matches exactly. It
-may use the safe `Int`-to-`Real` conversion (widening) when needed. It also prefers versions with fewer default parameters if multiple versions match. If two versions are
-equally good, the call is ambiguous and compilation stops. A return type alone
-cannot select a version.
-
-> **Technical note:** This selection is called overload resolution. A
-> user-written `Function` is not dynamic; before the program runs, the compiler
-> must determine the one version each call will use.
+> **Technical note:** This selection is called *overload resolution*. In v0.1, functions must have a name; there are no nested functions or lambdas. Function parameters and return type are written explicitly. Function declarations maintain the `name: Function := (...) -> T { ... }` format.
 
 ## 11. `Local` and `Global`
 
-You can use Function parameters directly inside the Function; do not add
-`Local` to them. Write `Local` when you create a variable inside a Function or
-an inner block such as `if`, `for`, or `while`. To use a variable created at
-the top level of the file from inside a Function, declare that access with
-`Global`.
+This section might seem a bit different at first glance. The logic is actually simple: AhdCode wants you to explicitly see **where** a variable lives.
+
+### The function's parameter is already inside the function
+
+```ahd
+greet: Function := (name: String) -> Nothing {
+    write(name)
+}
+```
+
+Here `name` is the function's parameter. We don't separately define it as `Local`; it is already clear that it was sent into the function.
+
+### If you are creating a new variable inside the function, write `Local`
+
+```ahd
+greet: Function := (name: String) -> Nothing {
+    message: Local String := "Hello {name}"
+    write(message)
+}
+```
+
+`message` was created to be used solely inside this function. That's why we wrote `Local`.
+
+The same rule applies to new variables you create inside inner blocks like `if` or `while`:
+
+```ahd
+if true {
+    message: Local String := "This variable belongs to this block"
+    write(message)
+}
+```
+
+### Do not write `Local` for the `for` variable
+
+`for` already creates its own variable:
+
+```ahd
+for value in [10, 20, 30] {
+    write(value)
+}
+```
+
+Therefore, do not write `for value: Local Int ...`.
+
+### Using a variable from outside inside the function: `Global`
+
+Now let's create a counter at the very top of the file:
+
+```ahd
+counter: Int := 0
+```
+
+If we want a function to modify this **same** counter, we say this explicitly inside the function with `Global`:
 
 ```ahd
 counter: Int := 0
 
-increase: Function := (
-) -> Nothing {
+increase: Function := () -> Nothing {
     counter: Global Int
-    next: Local Int := counter + 1
-    counter = next
+    counter++
 }
 
 increase()
@@ -758,30 +834,83 @@ increase()
 write(counter)
 ```
 
-Expected output:
+Output:
 
 ```text
 2
 ```
 
-Here, `counter` is created at the top level of the file. The line
-`counter: Global Int` does not create another counter; it tells the Function to
-use the existing variable. `next` is created only inside the Function, so it
-uses `Local`.
+`counter: Global Int` does not create a new counter. It means "I will use the `counter` variable that is outside this function."
 
-> **Technical note:** These rules describe a variable's scope: the parts of
-> the program where it can be used. `Global` does not make a hidden copy, it refers to the module-root binding.
+In short:
 
-## 12. Working with Lists
+| Situation | What is written? |
+|---|---|
+| Function parameter | No extra `Local` required |
+| New variable inside function / `if` / `while` | `Local` |
+| `for` variable | `Local` is not written |
+| Inner access to variable at file root | `Global` |
 
-A List is an ordered collection of values. Its first index is `0`, and negative indexes count from the end (`-1` is the last item).
+> **Technical note:** The region of code where a name can be used is called *scope*. In AhdCode, `Local` and `Global` are scope intents, not types.
 
-### Adding, sorting, and reversing
+## 12. Working with Lists (List)
+
+You can use `List` to hold multiple values sequentially:
+
+```ahd
+numbers: List<Int> := [10, 20, 30]
+write(numbers)
+```
+
+The index of the first element is `0`:
+
+```ahd
+write(numbers[0])  // 10
+write(numbers[-1]) // 30
+```
+
+### Adding and removing elements
+
+```ahd
+numbers: List<Int> := [10, 20]
+numbers.add(30)
+write(numbers)
+
+numbers.eject(1)
+write(numbers)
+```
+
+Output:
+
+```text
+[10, 20, 30]
+[10, 30]
+```
+
+`clear(numbers)` empties the entire list.
+
+### Taking a portion of the list
+
+```ahd
+nums: List<Int> := [10, 20, 30, 40, 50]
+part: List<Int> := nums[1:4]
+write(part)
+```
+
+Output:
+
+```text
+[20, 30, 40]
+```
+
+This operation produces a new List.
+
+### Sorting, reversing, and shuffling
+
 ```ahd
 bring Math
 
-values: List<Int> := [4, 1, 3]
-values.add(2)
+values: List<Int> := [4, 1, 3, 2]
 values.sort()
 write(values)
 
@@ -792,222 +921,259 @@ Math.seed(42)
 values.shuffle()
 write(values)
 ```
-Because the seed is explicit, the output is reproducible:
-```text
-[1, 2, 3, 4]
-[4, 3, 2, 1]
-[2, 4, 1, 3]
-```
 
-These operations (`sort`, `reverse`, `shuffle`) do not create a new List. They change the order of the List you already have. `sort` uses natural ascending order.
+`sort`, `reverse`, and `shuffle` modify the existing List in place.
 
-### Clearing, Ejecting, and Slicing
-You can remove items from a List. `eject(index)` removes a single item in place. `clear(list)` empties the whole collection.
+### Searching
 
-```ahd
-letters: List<String> := ["A", "B", "C", "D"]
-letters.eject(1)
-write(letters)
-
-clear(letters)
-write(letters)
-```
-Expected output:
-```text
-["A", "C", "D"]
-[]
-```
-
-You can also take a slice of a List using `[start:stop]`. This returns a new List.
-```ahd
-nums: List<Int> := [10, 20, 30, 40, 50]
-slice: List<Int> := nums[1:4]
-write(slice)
-```
-Expected output:
-```text
-[20, 30, 40]
-```
-
-### Searching and Counting
-`count(value)` returns how many times a value appears in the List. `index(value)` finds the first position of the value.
 ```ahd
 data: List<Int> := [7, 8, 7, 9]
-write(data.count(7))
-write(data.index(8))
+write(data.count(7)) // 2
+write(data.index(8)) // 1
 ```
-Expected output:
-```text
-2
-1
-```
-> **Watch out:** If `index()` cannot find the value, it does not return `-1`. It raises a `DomainError`.
 
-### Map, Filter, and Keyed Sort
-Version 0.1 has no lambdas, so callbacks are named Function values. `map` and
-`filter` return new Lists and do not mutate their source. `sort(keyFunction)` sorts the List based on the results of your function (stable sort).
+If `index()` cannot find the value it is looking for, it raises a `DomainError`.
+
+### `map`, `filter`, and sorting by key
+
+You can use `map` to transform every value in a list, and `filter` to select some of them. Since there are no lambdas in v0.1, you first write the operation you will use as a named Function:
 
 ```ahd
-double: Function := (
-    value: Int
-) -> Int {
+double: Function := (value: Int) -> Int {
     return value * 2
 }
 
-isEven: Function := (
-    value: Int
-) -> Bool {
+isEven: Function := (value: Int) -> Bool {
     return value % 2 == 0
 }
 
-absSort: Function := (
-    value: Int
-) -> Int {
+values: List<Int> := [3, -1, 4, -2]
+write(values.map(double))
+write(values.filter(isEven))
+```
+
+`map` and `filter` do not alter the source List; they return a new List.
+
+You can also provide a sorting key:
+
+```ahd
+absSort: Function := (value: Int) -> Int {
     return abs(value)
 }
 
 values: List<Int> := [3, -1, 4, -2]
-doubled: List<Int> := values.map(double)
-evens: List<Int> := values.filter(isEven)
-
 values.sort(absSort)
-
-write(doubled)
-write(evens)
 write(values)
 ```
 
-Expected output:
-
-```text
-[6, -2, 8, -4]
-[4, -2]
-[-1, -2, 3, 4]
-```
+This sort is stable.
 
 ## 13. Reference Behavior
 
-If two variables are connected to the same List, they both see the same
-collection. A change made through one variable is visible through the other.
+Look at this example:
 
 ```ahd
 numbers: List<Int> := [10, 20, 30]
 alias: List<Int> := numbers
 
 alias[0] = 99
-numbers.add(40)
-
 write(numbers)
-write(alias)
-write(numbers same alias)
-write(numbers == alias)
 ```
 
-Expected output:
+Output:
 
 ```text
-[99, 20, 30, 40]
-[99, 20, 30, 40]
-true
-true
+[99, 20, 30]
 ```
 
-`same` checks if both variables point to the exact same object in memory. `==` checks if their contents are deeply equal. In this case, since they share the object, both are true.
+You might think, "I changed the `alias` variable, why did `numbers` change?" Because when we wrote `alias: List<Int> := numbers`, we did not create a second copy of the List. Both variables point to the **same List**.
 
-> **Technical note:** Sharing the same List this way is called reference
-> semantics. A second name for the same object is often called an alias.
+We can explicitly check this:
+
+```ahd
+write(numbers same alias) // true
+```
+
+`same` asks whether two variables point to the same object.
+
+`==` checks if their contents are equal:
+
+```ahd
+a: List<Int> := [1, 2]
+b: List<Int> := [1, 2]
+
+write(a == b)    // true: their contents are the same
+write(a same b)  // false: two separate Lists
+```
+
+This distinction is especially important when modifying List, Pair, and Class objects.
+
+> **Technical note:** Using multiple names for the same object is called *aliasing*, and this behavior is called *reference semantics*.
 
 ## 14. Working with Pair
 
-`Pair<K, V>` stores key/value associations and preserves insertion order. In
-v0.1 its key type can only be `String`, `Int`, or `Bool`.
+When you want to pair a student's name with their grade, a product code with its price, or a setting with its value, you can use `Pair`.
 
 ```ahd
 scores: Pair<String, Int> := {
     "Ali": 85
     "Ayşe": 92
 }
+```
+
+Here `"Ali"` is the key, and `85` is the value bound to that key.
+
+### Reading and modifying the value
+
+```ahd
+write(scores["Ali"])
 
 scores["Ali"] = 90
 scores["Veli"] = 78
 
+write(scores["Ali"])
+```
+
+If you try to read a non-existent key, a `KeyError` occurs.
+
+### Iterating over a Pair
+
+```ahd
 for name in scores {
     write("{name}: {scores[name]}")
 }
 ```
 
-Expected output:
+`for` yields the Pair's keys in insertion order.
 
-```text
-Ali: 90
-Ayşe: 92
-Veli: 78
-```
+To delete a key use `eject(key)`, to empty the entire Pair use `clear(pair)`.
 
-If two variables point to the same Pair, a change through one is visible
-through the other (Reference Behavior). A missing key raises `KeyError`. Updating a key keeps its
-position; removing and re-adding it moves it to the end. You can remove a key with `eject(key)` and empty the Pair with `clear(pair)`.
+`Pair` exhibits reference behavior just like a List: if two variables point to the same Pair, changes made from one are visible from the other.
 
-```ahd
-scores: Pair<String, Int> := {"Ali": 85}
-scores.eject("Ali")
-clear(scores)
-```
+In v0.1, Pair keys can be `String`, `Int`, or `Bool`.
 
-## 15. Constant
+## 15. Constants (Constant)
 
-A `Constant` collection cannot be changed. If you try to modify it directly, the compiler will reject it during checking.
+Sometimes you do not want a value to be changed after it is created. `Constant` explicitly states this:
 
 ```ahd
 locked: Constant List<Int> := [1, 2, 3]
-// locked[0] = 99 // This causes a compile-time error
 ```
 
-The entire reachable object graph is deep-frozen. If a `Constant` contains other collections or objects, those inner objects are also frozen. If you attempt to mutate an already frozen object through another variable (an alias) that isn't explicitly marked as Constant, it may produce a `ConstantError` at runtime.
+It is now an error to attempt to change this List:
 
-> **Technical note:** A `Constant` value cannot be initialized with `null`.
+```ahd
+// locked[0] = 99  // ERROR
+```
+
+`Constant` not only protects the outer List but also objects accessible from inside it. Meaning, if there are other List, Pair, or Class objects inside a constant structure, they are also frozen.
+
+Therefore, even if you access the same object through another variable, attempting to change it can raise a `ConstantError` at runtime.
+
+```ahd
+values: List<Int> := [1, 2, 3]
+locked: Constant List<Int> := values
+
+// values.add(4) might raise a ConstantError at runtime;
+// because the same List is now deep-frozen.
+```
+
+A `Constant` cannot initially be `null`.
+
+> **Technical note:** Freezing the entire reachable object graph is called *deep freeze*.
 
 ## 16. Null safety
 
-Plain `T` is non-nullable. Write `T?` when a known type may temporarily have no
-value. As the program moves through branches, the compiler tracks whether that
-nullable value is definitely present, definitely `null`, or possibly `null`.
+Sometimes it is normal for a value not to exist yet. For example, we search for a user but there is no record:
+
+```text
+"Ali" found    -> there is a User
+no record      -> no value
+```
+
+In AhdCode, `null` means "there is no value here right now."
+
+You can assign `null` to a regular variable, but AhdCode won't allow you to use it immediately:
 
 ```ahd
-message: String? := null
+name: String := null
+```
+
+This tells us that the `name` variable can hold a `String` or `null`.
+
+### Check before using
+
+```ahd
+message: String := null
 
 if message == null {
     message = "ready"
 }
 
-if message != null and message.contains("read") {
+if message != null {
     write(message.upper())
 }
 ```
 
-Expected output:
+The compiler knows that there is indeed a String inside this block after the `message != null` check.
 
-```text
-READY
+Writing the following without checking is invalid:
+
+```ahd
+message: String := null
+// write(message.upper()) // ERROR: message could be null
 ```
 
-Member access, calls, and indexing are compile-time errors when the value might
-be `null`. After a check such as `message != null`, the compiler knows the
-value is present inside that block. `List<User?>` has nullable elements,
-`List<User>?` is a nullable List, and `List<User?>?` combines both. A bare
-`value := null` is invalid; write `value: User? := null`. If `fetchUser()`
-returns `User?`, then `user := fetchUser()` infers the complete `User?` type.
+### `null` alone does not specify its type
 
-If you try to use a possibly null value without checking, you will get a compile-time error.
+The following usage is invalid:
 
-> **Technical note:** Documentation names the three possibilities `Null`,
-> `MaybeNull`, and `NonNull`. The compiler learning more after a check is
-> called null refinement.
+```ahd
+// value := null // ERROR: variables must have explicit types
+```
 
+Because AhdCode wouldn't know if this is a `String`, a `User`, or some other type. Specify the type:
 
-## 17. Class and attributes
+```ahd
+value: String := null
+```
 
-A Class defines a custom data structure and groups related functions (methods) together. It declares constructor inputs in `structure: Attributes`. Every non-`Local` structure input becomes an instance attribute.
+If a function returns `User` but the result could be `null`:
+
+```ahd
+user: User := fetchUser()
+```
+
+### Null usage in collections
+
+In collections, for example `List<User>`, the list itself could be `null`, or the list could be a valid object but the elements inside it could be `null`. This distinction is managed entirely by the same flow analysis (null refinement) logic in AhdCode.
+
+> **Technical note:** The compiler gaining more precise information about a nullable value after a check is called *null refinement*. In the documentation, flow states can be referred to as `Null`, `MaybeNull`, and `NonNull`.
+
+## 17. Classes (Class) and Attributes
+
+Imagine you want to hold a student not just by their name, but by their name and number together. Instead of constantly carrying these two pieces of information in separate variables, you can define your own data structure. In AhdCode, `Class` is used for this.
+
+### Our first Class
+
+```ahd
+Student: Class<> := {
+    structure: Attributes := (
+        name: String
+        number: Int
+    )
+}
+```
+
+This definition says that every `Student` object will have `name` and `number` information.
+
+Now let's create a student:
+
+```ahd
+student: Student := Student(name: "Ali", number: 42)
+```
+
+Inside the class, these properties are accessed via `attribute`. Let's add a method:
 
 ```ahd
 Student: Class<> := {
@@ -1016,8 +1182,7 @@ Student: Class<> := {
         number: Constant Int
     )
 
-    describe: Function := (
-    ) -> String {
+    describe: Function := () -> String {
         return "#{attribute.number} {attribute.name}"
     }
 }
@@ -1026,21 +1191,19 @@ student: Student := Student(name: "Ali", number: 42)
 write(student.describe())
 ```
 
-Expected output:
+Output:
 
 ```text
 #42 Ali
 ```
 
-A `Constant` attribute cannot be changed later. A `Local`
-structure input is used only while constructing the object and does not become
-an attribute. `Confidential` members are unavailable through ordinary access
-from outside the Class.
+Because `number: Constant Int`, the number cannot be changed after the student is created.
 
-### Parent and child Classes
+If `Local` is prepended to a `structure` entry, it can only be used while the object is being created; it doesn't become a permanent attribute of the object. `Confidential` blocks normal access to the member from outside the class.
 
-One Class can receive the features of another Class. Read the parent Class
-first, followed by the child that extends it:
+### Extending one Class from another
+
+First let's define a general `Person`:
 
 ```ahd
 Person: Class<> := {
@@ -1048,99 +1211,125 @@ Person: Class<> := {
         name: String
     )
 
-    describe: Function := (
-    ) -> String {
+    describe: Function := () -> String {
         return "Person {attribute.name}"
     }
 }
+```
 
+`Student` can inherit what `Person` has:
+
+```ahd
 Student: Class<Person> := {
     structure: Attributes := (
         SuperClass.attributes
         number: Int
     )
 
-    describe: Override Function := (
-    ) -> String {
+    describe: Override Function := () -> String {
         return "{SuperClass.describe()} #{attribute.number}"
     }
 }
+```
 
+- `Class<Person>`: `Student` is derived from `Person`.
+- `SuperClass.attributes`: brings in the creation inputs of the superclass.
+- `Override`: explicitly states that we knowingly modify a method from the superclass.
+- `SuperClass.describe()`: calls the superclass's own version.
+
+```ahd
 student: Student := Student(name: "Ayşe", number: 7)
 person: Person := student
 write(person.describe())
 ```
 
-Expected output:
+Since the object is actually a `Student`, `Student.describe()` runs.
 
-```text
-Person Ayşe #7
-```
+To query the actual type:
 
-`Student` is a child of `Person`. `SuperClass.attributes` carries the parent's
-constructor inputs forward. `Override` says that an inherited method is being
-replaced intentionally. `SuperClass.describe()` calls the parent's version.
-
-Although the variable `person` has type `Person`, the actual object is a
-`Student`, so `Student.describe` runs. 
-
-You can check the true type of an object using the `is` keyword:
 ```ahd
-Person: Class<> := { structure: Attributes := ( name: String ) }
-Student: Class<Person> := { structure: Attributes := ( SuperClass.attributes ) }
-
-person: Person := Student(name: "Ayşe")
 if person is Student {
     write("This person is a student!")
 }
 ```
 
-> **Technical note:** Keeping a child object in a parent-typed variable is
-> called upcasting. Choosing the method for the actual object is called dynamic
-> dispatch.
-
-## 18. Errors with `attempt`, `except`, `ultimately`, and `toss`
-
-If code inside `attempt` produces an error, a suitable `except` block can run.
-`ultimately` performs a final step whether or not there was an error. Use
-`toss` when your own code needs to raise an Error deliberately.
+To ask if it has a member, `has` can be used:
 
 ```ahd
-requirePositive: Function := (
-    value: Int
-) -> Int {
+write(person has name)
+```
+
+> **Technical note:** Holding a subclass object in a superclass type is called *upcasting*, and selecting the method to call based on the true object type is called *dynamic dispatch*. You do not have to memorize these terms on your first read.
+
+## 18. Error handling (`attempt`, `except`, `ultimately`, and `toss`)
+
+Some errors might not appear while writing the program, but while the program is running. For example, when waiting for a number from the user, they might type `abc`.
+
+```ahd
+age: Int := int(take("Age: "))
+```
+
+If the user types a number, there is no problem. If they type invalid text, a `DomainError` occurs. We can determine what the program will do in this situation.
+
+### Catching an error: `attempt` and `except`
+
+```ahd
+attempt {
+    age: Local Int := int(take("Age: "))
+    write("Your age: {age}")
+}
+except DomainError as error {
+    write("Please enter a valid integer.")
+}
+```
+
+The code inside `attempt` is tried. If the specified error occurs, the appropriate `except` block runs.
+
+You can write multiple `except` blocks for multiple error types:
+
+```ahd
+attempt {
+    // operations that might raise errors
+}
+except DomainError as error {
+    write("Number is invalid")
+}
+except IndexError as error {
+    write("Index is invalid")
+}
+```
+
+### The part that runs no matter what: `ultimately`
+
+```ahd
+attempt {
+    write("Trying operation")
+}
+except DomainError as error {
+    write("An error occurred")
+}
+ultimately {
+    write("This line runs in every case")
+}
+```
+
+### Raising an error on our own will: `toss`
+
+```ahd
+requirePositive: Function := (value: Int) -> Int {
     if value <= 0 {
         toss (DomainError("value must be positive"))
     }
+
     return value
 }
-
-attempt {
-    result: Local Int := requirePositive(-1)
-    write(result)
-}
-except DomainError as error {
-    write("Domain error: {error.message}")
-}
-except IndexError as error {
-    write("Index error: {error.message}")
-}
-ultimately {
-    write("Finished")
-}
 ```
 
-Expected output:
+Common error types in AhdCode include `DomainError`, `ValueError`, `IndexError`, `KeyError`, `OverflowError`, `DivisionByZeroError`, `NullError`, and `ConstantError`.
 
-```text
-Domain error: value must be positive
-Finished
-```
+### Creating your own error type
 
-Common built-in types include `DomainError`, `ValueError`, `IndexError`, `KeyError`,
-`OverflowError`, `DivisionByZeroError`, `NullError`, and `ConstantError`. You can have multiple `except` blocks to handle different errors differently.
-
-You can also create your own custom errors by inheriting from the built-in `Error` class:
+When needed, you can derive a new error type from the `Error` class:
 
 ```ahd
 InvalidAgeError: Class<Error> := {
@@ -1148,7 +1337,11 @@ InvalidAgeError: Class<Error> := {
         message: String
     )
 }
+```
 
+and then:
+
+```ahd
 attempt {
     age: Local Int := -5
     if age < 0 {
@@ -1156,24 +1349,30 @@ attempt {
     }
 }
 except InvalidAgeError as error {
-    write("Custom error caught: {error.message}")
+    write(error.message)
 }
 ```
 
-> **Technical note:** AhdCode runtime errors are catchable Class values.
+> **Technical note:** AhdCode runtime errors are modeled as normal catchable Class values.
 
 ## 19. Modules and `bring`
 
-A local module is a `.ahd` file in the same directory as its importer. For
-example, the module name `Greeting` resolves to `Greeting.ahd`.
+As a program grows, you won't want to write everything in a single file. You can put a task into a separate `.ahd` file and use it from another file. We can call this a **module**.
+
+### Creating your own module
+
+Imagine having two files in the same folder:
+
+```text
+main.ahd
+Greeting.ahd
+```
 
 `Greeting.ahd`:
 
 ```ahd
-greet: Function := (
-    name: String
-) -> String {
-    return "Hello from a module, {name}"
+greet: Function := (name: String) -> String {
+    return "Hello from module, {name}"
 }
 ```
 
@@ -1185,24 +1384,46 @@ from Greeting bring greet
 write(greet("Ayşe"))
 ```
 
-Running `main.ahd` produces:
+Output:
 
 ```text
-Hello from a module, Ayşe
+Hello from module, Ayşe
 ```
 
-There are several ways to import things from a module:
-- `bring Greeting` imports a namespace, making the call `Greeting.greet("Ayşe")`.
-- `from Greeting bring greet` imports the name directly.
-- `from Greeting bring ( greet, farewell )` allows you to selectively import multiple names on multiple lines.
-- `from Greeting bring all` imports all public, non-`Confidential` names.
+### In what formats can I import a module?
 
-Import collisions and circular dependencies are errors.
+As a namespace:
 
+```ahd
+bring Greeting
+write(Greeting.greet("Ayşe"))
+```
 
-### Module aliases
+Only bringing the name you want:
 
-You can rename a module namespace when you import it using `as`. This is useful for keeping your code concise.
+```ahd
+from Greeting bring greet
+write(greet("Ayşe"))
+```
+
+Multiple names:
+
+```ahd
+from Greeting bring (
+    greet
+    farewell
+)
+```
+
+All public names:
+
+```ahd
+from Greeting bring all
+```
+
+Imports that lead to the collision of identical names and circular module dependencies are compile-time errors.
+
+### Giving a short name to a module
 
 ```ahd
 bring Time as T
@@ -1210,9 +1431,9 @@ bring Time as T
 write(T.Calendar.isLeapYear(2028))
 ```
 
-The alias replaces the original namespace binding for that import. Writing `bring Time as T` gives you `T`, but it does not automatically give you `Time`. The normal `bring Time` still works if you prefer the full name. You can also alias your own local modules.
+When you use `as T`, you use `T` instead of `Time` for this import.
 
-This feature does not create qualified type syntax. For types, preserve the current style by importing the name directly:
+This abbreviation is not used in type declarations. For example:
 
 ```ahd
 bring Time as T
@@ -1221,65 +1442,80 @@ from Time bring DateTime
 current: DateTime := T.now()
 ```
 
-Do not write `T.DateTime` as a type; that is invalid. Also, you cannot alias individual items like `from Time bring DateTime as DT`.
+`T.DateTime` is not a valid type declaration syntax; import the type separately.
 
-### File and Path basics
+### A first look at File and Path
 
-`Path` joins and inspects paths without accessing the filesystem. `File` reads
-and writes UTF-8 text, creates directories, appends, deletes, checks existence,
-and lists immediate names in stable sorted order.
+AhdCode's built-in `Path` and `File` modules are also used via `bring`:
 
 ```ahd
 bring Path
 bring File
-from File bring FileError
 
-path := Path.join(["notes", "today.txt"])
+path: String := Path.join(["notes", "today.txt"])
 File.createDir("notes")
 File.writeText(path, "hello")
+write(File.readText(path))
+```
+
+`Path` works with path strings. `File` performs file and folder operations. If you want to catch errors in file operations, you can additionally import the `FileError` type:
+
+```ahd
+from File bring FileError
 
 attempt {
     write(File.readText("missing.txt"))
 }
 except FileError as error {
-    write("Could not read the file")
+    write("File could not be read")
 }
 ```
 
-`FileError` derives from `IOError`. Relative paths use the program or REPL
-working directory.
+`FileError` inherits from the `IOError` class. Relative paths use the working folder of the program or REPL session.
 
-## 20. Fundamentals Module
+## 20. Fundamentals module
 
-These names are predeclared in every module and require no `bring`. They cover standard input/output, text manipulation, and numeric reductions.
+To use some tools, you don't need to write any `bring`. These are directly available in an AhdCode program:
 
 ```text
 write take str int real len clear between abs sum min max
 ```
 
-| Function | Behavior |
+We have already used most of them. A brief summary:
+
+| Function | What it does |
 |---|---|
-| `write(value)` | writes one value followed by a newline |
-| `take()` / `take(prompt)` | reads one line as String |
-| `str(value)` | canonical deterministic text |
-| `int(Real)` | truncates toward zero |
-| `int(String)` | strict signed ASCII-decimal parse |
-| `real(Int)` | explicit safe widening |
-| `real(String)` | strict decimal/fraction/exponent parse |
-| `len(value)` | String characters, List elements, or Pair entries |
+| `write(value)` | prints value to the screen |
+| `take()` / `take(prompt)` | reads a line of String from the user |
+| `str(value)` | converts value to String |
+| `int(...)` | converts suitable value to `Int` |
+| `real(...)` | converts suitable value to `Real` |
+| `len(value)` | returns length of String/List/Pair |
 | `clear(collection)` | empties List or Pair in place |
-| `between(...)` | lazy stop-exclusive Int iteration |
-| `abs(number)` | numeric magnitude with exact result type |
-| `sum(list)` | numeric reduction; empty List gives `0` or `0.0` |
-| `min(list)` / `max(list)` | numeric extrema; empty List raises `DomainError` |
+| `between(...)` | produces a number range |
+| `abs(number)` | returns absolute value |
+| `sum(list)` | sums numbers in a list |
+| `min(list)` / `max(list)` | finds the smallest / largest value |
 
-`abs`, `sum`, `min`, and `max` work on both `Int` and `Real` types. `clear` mutates the existing collection, so any other variable sharing it will see it empty. The numeric reductions (`sum`, `min`, `max`) are pure reads, so they work safely on `Constant List` as well.
+Example:
 
-## 21. Math Module
+```ahd
+numbers: List<Int> := [3, -5, 10]
 
-The `Math` module provides advanced mathematical and random operations. It must be explicitly imported.
+write(len(numbers))
+write(sum(numbers))
+write(min(numbers))
+write(max(numbers))
+write(abs(-8))
+```
 
-### Functions and Constants
+`sum` gives `0` or `0.0` for an empty List. `min` and `max` produce a `DomainError` on an empty List.
+
+Because `clear` modifies the existing collection in place, other aliases pointing to the same collection will also see it emptied. `sum`, `min`, and `max` only read; they do not modify the List.
+
+## 21. Math module
+
+Use the `Math` module for tools like square root, trigonometric functions, or random numbers:
 
 ```ahd
 bring Math
@@ -1289,7 +1525,7 @@ write(Math.sqrt(81))
 write(Math.round(3.14159, 2))
 ```
 
-Expected output:
+Output:
 
 ```text
 3.141592653589793
@@ -1297,50 +1533,47 @@ Expected output:
 3.14
 ```
 
-Here is the complete Math surface available:
+Commonly used ones:
 
-| Item | Description |
+| Item | What it does |
 |---|---|
-| `PI`, `E` | Mathematical constants. |
-| `round`, `floor`, `ceil` | `round(value, digits)` rounds exact halves away from zero; digits is optional (0..15). `floor` and `ceil` return an `Int`. |
-| `sqrt`, `exp` | Square root and exponential function ($e^x$). |
-| `sin`, `cos`, `tan` | Trigonometric functions using radians. |
-| `log`, `log10` | Natural logarithm and base ten logarithm. |
-| `seed`, `random`, `randomInt` | Random number generation functions. |
+| `PI`, `E` | mathematical constants |
+| `round`, `floor`, `ceil` | rounding operations |
+| `sqrt`, `exp` | square root and $e^x$ |
+| `sin`, `cos`, `tan` | trigonometric functions (radians) |
+| `log`, `log10` | natural and base-10 logarithm |
+| `seed`, `random`, `randomInt` | random number generation |
 
-For exponentiation, use the `^` operator, there is no `Math.pow`. Functions like `abs`, `sum`, `min`, and `max` are in the Fundamentals module, not Math.
+For exponentiation, use the language's `^` operator instead of `Math.pow`. `abs`, `sum`, `min`, and `max` are not in `Math`; they are directly available Fundamentals functions.
 
-### Random State
+### Generating random numbers
 
 ```ahd
 bring Math
 
-Math.seed(42)
 write(Math.randomInt(1, 6))
 write(Math.random())
 ```
-`randomInt(min, max)` includes **both** bounds. `random()` returns a value with `0.0 <= value < 1.0`.
 
-Using the same seed again reproduces the same sequence of random values. Without a seed, each new program run gets its starting value from the operating system. This number generator must not be used for security or encryption.
+`randomInt(1, 6)` produces an integer in this range, including both `1` and `6`. `random()` is in the range `0.0 <= value < 1.0`.
 
-`Math.random`, `Math.randomInt`, and `List.shuffle` consume this same program-wide state. Equal `randomInt` bounds and empty/singleton shuffle consume no state.
-
-> **Technical note:** The sequence is pseudo-random. An unseeded run takes its starting value from operating-system entropy.
-
-
-## 22. Time Module
-
-The `Time` module lets your program read the clock, work with dates, and wait. Like `Math`, it must be imported.
-
-AhdCode has no `Time.DateTime` type syntax, so you import the types you want to name:
+If you want to obtain the exact same sequence of results again during testing, you can provide a seed:
 
 ```ahd
-bring Time
-from Time bring DateTime
-from Time bring Duration
+Math.seed(42)
 ```
 
-### The current date and time
+If the same seed is provided again, the same sequence of random numbers starts over. If no seed is provided, a new program run takes its initial state from the operating system.
+
+`Math.random`, `Math.randomInt`, and `List.shuffle` use the same shared randomness state; every call advances the sequence. `randomInt(5, 5)` or an empty/single-element `shuffle` do not consume the randomness state.
+
+> **Caution:** Do not use this random number generator for cryptography or security purposes.
+
+## 22. Time module
+
+The `Time` module is used for date, time, and wait operations.
+
+### Getting the current time
 
 ```ahd
 bring Time
@@ -1351,31 +1584,20 @@ current: DateTime := Time.now()
 write(current.year)
 write(current.month)
 write(current.day)
+write(current.hour)
 ```
 
-`Time.now()` gives you your computer's **local** time. Version 0.1 has no timezone features at all, so there is nothing to configure.
+`Time.now()` gives your computer's local time. In v0.1, there is no separate timezone management.
 
-A `DateTime` has eight pieces of information you can read:
+A `DateTime` contains the following information:
 
 ```text
 year  month  day  hour  minute  second  millisecond  weekday
 ```
 
-`weekday` counts from Monday:
+`weekday` uses the value `1` for Monday, and `7` for Sunday. These fields are read-only.
 
-| day | number |
-|---|---|
-| Monday | 1 |
-| Tuesday | 2 |
-| Wednesday | 3 |
-| Thursday | 4 |
-| Friday | 5 |
-| Saturday | 6 |
-| Sunday | 7 |
-
-These are read-only. Writing `current.year = 2030` is an error, exactly like changing any other `Constant`.
-
-### Building a date yourself
+### Creating a specific date
 
 ```ahd
 bring Time
@@ -1390,26 +1612,17 @@ birthday: DateTime := Time.dateTime(
 write(birthday.toString())
 ```
 
-Expected output:
+Output:
 
 ```text
 2028-02-29 00:00:00
 ```
 
-`hour`, `minute`, `second`, and `millisecond` are optional and start at `0`.
+If `hour`, `minute`, `second`, and `millisecond` are not provided, they default to `0`. An invalid date raises a `ValueError`; for example, AhdCode rejects `2026-02-29` instead of silently changing it to another day.
 
-If you ask for a date that does not exist, you get a `ValueError`. `2026-02-29` is not a real day, because 2026 is not a leap year, so AhdCode refuses it instead of quietly sliding to March 1.
-
-`toString()` always writes `YYYY-MM-DD HH:MM:SS`, in every language and on every computer.
-
-### Comparing two moments
-
-AhdCode does not use `<` and `>` on dates. You ask the question in words:
+### Comparing two times
 
 ```ahd
-bring Time
-from Time bring DateTime
-
 morning: DateTime := Time.dateTime(year: 2026, month: 1, day: 1, hour: 9)
 evening: DateTime := Time.dateTime(year: 2026, month: 1, day: 1, hour: 21)
 
@@ -1418,139 +1631,96 @@ write(morning.after(evening))
 write(morning.sameMoment(morning))
 ```
 
-Expected output:
+Instead of `<` and `>`, these readable methods are used for dates.
 
-```text
-true
-false
-true
-```
-
-Use `sameMoment` to ask whether two dates mean the same moment. `==` asks a different question — whether they are the same object — which is the normal rule for every Class.
-
-### How much time is between them
+### Duration between two times
 
 ```ahd
-bring Time
-from Time bring DateTime
 from Time bring Duration
 
 first: DateTime := Time.dateTime(year: 2026, month: 1, day: 1)
 second: DateTime := Time.dateTime(year: 2026, month: 1, day: 2)
 
 gap: Duration := Time.between(first, second)
-
 write(gap.milliseconds)
 write(gap.seconds)
 ```
 
-Expected output:
+`Time.between(first, second)` subtracts the first time from the second. You can directly create a duration with `Time.duration(milliseconds: 1500)`.
 
-```text
-86400000
-86400.0
-```
-
-`Time.between(first, second)` means "second minus first". Swapping the two gives a negative `Duration`, which is useful when you want to know that something is in the past.
-
-You can also make a `Duration` directly with `Time.duration(milliseconds: 1500)`.
-
-### Asking about the calendar
-
-Sometimes you only want to know something about the calendar, not about a particular date:
+### Calendar information
 
 ```ahd
-bring Time
-
 write(Time.Calendar.isLeapYear(2028))
-write(Time.Calendar.isLeapYear(2100))
 write(Time.Calendar.daysInMonth(2028, 2))
 write(Time.Calendar.weekday(2026, 8, 29))
 ```
 
-Expected output:
-
-```text
-true
-false
-29
-6
-```
-
-A leap year divides by 4, but a year ending in `00` must divide by 400. That is why 2000 is a leap year and 2100 is not.
-
-### Measuring and waiting
+### Delaying a task or measuring its duration
 
 ```ahd
-bring Time
-
 start: Real := Time.monotonic()
-
 Time.sleep(500)
-
 elapsed: Real := Time.monotonic() - start
-
 write(elapsed >= 0.5)
 ```
 
-Watch the units, because they are different on purpose:
+`Time.sleep(...)` uses **milliseconds**, whereas `Time.monotonic()` uses **seconds**. `Time.monotonic()` is not a date; it is used to calculate the duration between two measurements. A negative `sleep` value raises a `ValueError`.
 
-- `Time.sleep(...)` waits for a number of **milliseconds**.
-- `Time.monotonic()` reports **seconds**.
+## 23. Latex module
 
-`Time.monotonic()` on its own is not a date and means nothing by itself. It is only useful as a difference between two readings, which is exactly what you want for measuring how long something took.
+If you want to directly produce a PDF with AhdCode, you can use the `Latex` module. The module brings the necessary Tectonic engine with its own installation; you don't need to additionally install TeX Live or MiKTeX.
 
-`Time.sleep(0)` returns immediately. A negative wait is a `ValueError`, because waiting "minus one millisecond" is not a real request.
-
-
-## 23. Latex Module
-
-The `Latex` standard library allows you to create PDF documents directly from your AhdCode programs. It uses a bundled offline Tectonic engine, so you do not need to install TeX Live, MiKTeX, or any other external software. Shell escape is intentionally disabled for safety.
-
-The module provides a practical, beginner-friendly API to generate documents safely:
+A first example:
 
 ```ahd
 bring Latex as L
 from Latex bring LatexError
 
-document := L.document(
+document: String := L.document(
     L.section("My First Document") +
-    L.escape("Hello! This is an ordinary text section.") +
+    L.escape("Hello! This is a regular text section.") +
     L.subsection("Math Example") +
     L.equation("E = mc^2")
 )
 
 attempt {
     L.pdf(document, "output.pdf")
-    write("PDF created!")
+    write("PDF created successfully!")
 }
 except LatexError as error {
-    write("Failed to create PDF: {error.message}")
+    write("Could not create PDF: {error.message}")
 }
 ```
 
-- `Latex.escape(text)`: Safely escapes ordinary text so it won't be treated as LaTeX code.
-- `Latex.section(text)` and `Latex.subsection(text)`: Create headings.
-- `Latex.equation(math)`: Accepts raw LaTeX math source.
-- `Latex.document(content)`: Wraps your content in a complete, ready-to-compile document.
-- `Latex.pdf(source, output)`: Compiles a LaTeX source String and writes the PDF to the output path.
-- `Latex.pdfFile(input, output)`: Compiles an existing `.tex` input file and writes the PDF to the output path.
-- `LatexError`: Raised if compilation fails (for example, if there is a syntax error in your math). Import it with `from Latex bring LatexError` before naming it in an `except` clause.
+Here, respectively:
 
-## 24. Formatter
+- `Latex.escape(text)`: escapes regular text against LaTeX special characters.
+- `Latex.section(text)` / `subsection(text)`: produces a heading.
+- `Latex.equation(math)`: adds the math expression as LaTeX.
+- `Latex.document(content)`: turns the parts into a complete document.
+- `Latex.pdf(source, output)`: compiles the LaTeX source you provide as a String and writes to a PDF file.
+- `Latex.pdfFile(input, output)`: compiles an already existing `.tex` file and produces a PDF.
 
-Your program may work even when its spacing and line layout are untidy. The formatter rewrites the file into AhdCode's shared style while preserving your comments:
+If you are going to use the error type inside `except LatexError`, import it with `from Latex bring LatexError`.
+
+The module is designed to work offline, and shell escape is disabled. For more advanced tables and LaTeX details, you can look at the `docs/LATEX.md` document.
+
+## 24. Code Formatter
+
+Even if the code works, if everyone uses different spacing and line layouts, it becomes hard to read. The AhdCode formatter converts valid code to a common style:
 
 ```bash
 ahdcode format hello.ahd
+```
+
+This command edits the file. To check only:
+
+```bash
 ahdcode format --check hello.ahd
 ```
 
-The first command updates the file directly (it is idempotent: running it again changes nothing). The second command checks the style without changing anything, which is useful in team environments to ensure code style is followed.
-
-### Valid syntax vs. recommended style
-
-AhdCode's grammar is flexible about spelling: a comma between two items on the same line is required, but everywhere else -- between a Function's parameters, a call's arguments, and a List's or Pair's entries -- a comma is only needed when two items share a line, and a trailing comma is always optional. All three of these calls mean the same thing:
+When writing AhdCode, you don't have to manually adjust every comma or line break perfectly. For example, all three of these calls are valid:
 
 ```ahd
 add(2, 3)
@@ -1566,233 +1736,291 @@ add(
 )
 ```
 
-Only one placement is not free to choose: the value after `:=` or `=` has to start on the same line as the operator (see [Declarations and mutation](LANGUAGE_TOUR.md) in the language tour).
+The formatter keeps short structures on a single line and breaks long structures readably.
 
-You never have to pick a style by hand -- write whichever one is comfortable (or whatever an AI assistant hands you), then run `ahdcode format`. It always produces the same result: short constructs collapse onto one line, and anything too long to fit breaks into one item per line with no trailing comma. For example,
+There is one important layout rule: the value following a `:=` or `=` sign **must start on the same line**.
 
-```ahd
-calculate: Function := (first: Int, second: Int, description: String, flag: Bool) -> Real {
-    return first
-}
-```
-
-becomes
+Valid:
 
 ```ahd
-calculate: Function := (
-    first: Int
-    second: Int
-    description: String
-    flag: Bool
-) -> Real {
-    return first
-}
+values: List<Int> := [
+    1
+    2
+    3
+]
 ```
 
-while a short signature like `check: Function := (x: Int) -> Bool { ... }` stays exactly on one line.
-
-## 25. CLI
-
-AhdCode comes with a simple command-line interface.
-
-- `ahdcode run file.ahd`: Runs a program directly.
-- `ahdcode build file.ahd`: Compiles a program into a native executable that can be run on its own without needing the AhdCode compiler installed.
-- `ahdcode format file.ahd`: Formats the file.
-- `ahdcode --help`: Shows help for all commands.
-- `ahdcode --version`: Shows the current compiler version.
-
-## 26. REPL
-
-Run `ahdcode` by itself to open the REPL (Read-Eval-Print Loop) for small experiments without a file. 
-
-The REPL uses the exact same rules as the file compiler. Successful commands remain in the session. A failed command does not erase the last working state, so you can just try again. 
+Invalid:
 
 ```text
-> x := 5
-> x := 7
-error: duplicate declaration
-> x = 7
-> x
-7
+values: List<Int> :=
+    [1, 2, 3]
 ```
 
-The REPL keeps values, aliases, Functions, Classes, modules, and Math random
-state in one persistent session. Earlier commands are not run again. `take`
-reads a real answer line, and local modules plus relative File paths use the
-directory where you started `ahdcode`.
+The formatter is idempotent; running it again on the same file produces no new changes.
+
+## 25. Command line (CLI)
+
+You can use AhdCode from the terminal with a few basic commands:
+
+```text
+ahdcode run file.ahd
+```
+
+Runs the program.
+
+```text
+ahdcode build file.ahd
+```
+
+Compiles the program into a standalone local executable.
+
+```text
+ahdcode format file.ahd
+```
+
+Formats the file according to the common style.
+
+```text
+ahdcode --help
+ahdcode --version
+```
+
+Shows help and version information.
+
+If you are a beginner, the command you will use most of the time will be `ahdcode run ...`.
+
+## 26. Interactive shell (REPL)
+
+You don't have to create a file every time you want to try something small. In the terminal, just run:
+
+```bash
+ahdcode
+```
+
+The REPL opens, and you can try AhdCode commands one by one:
+
+```text
+> x: Int := 5
+> x = x + 1
+> x
+6
+```
+
+The REPL acts like a **session**. It remembers the values you created in previous successful commands:
+
+```text
+> name: String := "Ali"
+> write(name)
+Ali
+```
+
+Making a mistake in one command does not erase your previously working state:
+
+```text
+> x: Int := 5
+> x: Int := 7
+error: duplicate declaration
+> x
+5
+```
+
+The side effects of previous commands are not rerun. For example:
+
+```text
+> write("one")
+one
+> write("two")
+two
+```
+
+`one` is not printed again on the second command.
+
+`take()` waits for real user input even inside the REPL:
+
+```text
+> name: String := take("Name: ")
+Name: Ali
+> write(name)
+Ali
+```
+
+Function and Class definitions, modules, List/Pair objects, and the Math randomness state are preserved throughout the session. Local modules and relative File paths are resolved relative to the folder where you started the `ahdcode` command.
+
+The REPL is very useful when learning: you can quickly try an idea and see the result. For longer programs, using an `.ahd` file is more organized.
 
 ## 27. Common beginner mistakes
 
-Here are common errors you might see and how to fix them:
+Seeing an error message is a normal part of programming. Most errors simply tell you that the computer couldn't understand what you wanted. The following examples show common situations beginners encounter and how to fix them:
 
-**1. Using `=` before declaration**
+**1. Using `=` without declaring a variable**
 - Wrong: `score = 10`
-- Why: You must create a variable before assigning to it.
+- Why: You must create a variable before assigning a value to it.
 - Correct: `score: Int := 10`
 
-**2. Duplicate declaration**
+**2. Defining the same variable twice (Duplicate declaration)**
 - Wrong: `score: Int := 10 \n score: Int := 20`
-- Why: `score` already exists in this block.
+- Why: `score` already exists in that block.
 - Correct: `score: Int := 10 \n score = 20`
 
-**3. Missing `Local` in inner block**
+**3. Missing `Local` in inner blocks**
 - Wrong: `if true { result: Int := 1 }`
-- Why: New variables in inner blocks need `Local`.
+- Why: New variables created in inner blocks like `if` require `Local`.
 - Correct: `if true { result: Local Int := 1 }`
 
-**4. Wrong `Local` in `for` loop**
+**4. Wrong use of `Local` in `for` loops**
 - Wrong: `for item: Local Int in items`
 - Why: The `for` variable is already local by design.
 - Correct: `for item: Int in items`
 
-**5. Missing `Global` for module variables**
+**5. Missing `Global` for module-level variables**
 - Wrong: `count: Int := 0 \n f: Function := () -> Nothing { count = 1 }`
-- Why: To modify the module-root variable, you must explicitly declare access.
+- Why: To modify a variable at the module root, you must explicitly declare it with `Global`.
 - Correct: `f: Function := () -> Nothing { count: Global Int \n count = 1 }`
 
-**6. Truthiness**
+**6. Truthiness (Automatic true/false assumption)**
 - Wrong: `if 1 { write("Yes") }`
-- Why: Conditions must be strictly `Bool`.
+- Why: Conditions must be strictly of the `Bool` type.
 - Correct: `if 1 > 0 { write("Yes") }`
 
-**7. Unsafe null use**
+**7. Unsafe `null` usage**
 - Wrong: `name: String? := null \n write(name.upper())`
-- Why: `name` might be null, causing a crash. The compiler rejects this.
+- Why: `name` can be null and this could lead to a crash. The compiler does not allow this.
 - Correct: `if name != null { write(name.upper()) }`
 
-**8. Mixed positional and named arguments**
+**8. Mixing positional and named parameters**
 - Wrong: `greet("Ali", title: "Dr")`
-- Why: You must use all positional or all named arguments.
+- Why: You must use either all arguments by their order or all arguments by their names.
 - Correct: `greet(name: "Ali", title: "Dr")`
 
 **9. Overload ambiguity**
-- Wrong: Having `f(Int)` and `f(Real)` with defaults, then calling `f()`.
-- Why: The compiler cannot guess which one you meant.
-- Correct: Provide arguments to make the match exact.
+- Wrong: Calling `f()` when you have both `f(Int)` and `f(Real)` functions with default values.
+- Why: The compiler cannot guess which one you mean (ambiguous).
+- Correct: Provide arguments in the call so the match is exact.
 
-**10. Wrong List element type**
+**10. Putting wrong type elements into a List**
 - Wrong: `list: List<Int> := [1, 2.5]`
 - Why: `2.5` is a `Real`, not an `Int`.
-- Correct: Use `List<Real> := [1.0, 2.5]` or `int(2.5)`.
+- Correct: Use `List<Real> := [1.0, 2.5]` or convert with `int(2.5)`.
 
-**11. Modifying Constant**
+**11. Trying to change a Constant**
 - Wrong: `locked: Constant List<Int> := [1] \n locked[0] = 2`
-- Why: Constants cannot be changed in place.
-- Correct: Remove `Constant` if you intend to modify it.
+- Why: Constants cannot be modified in place.
+- Correct: If you intend to change it, remove the `Constant` keyword.
 
-**12. Zero step in between**
+**12. Zero step in `between`**
 - Wrong: `between(1, 10, 0)`
-- Why: A step of 0 creates an infinite loop, which `between` rejects.
+- Why: A loop with zero step would go on forever, so `between` rejects it.
 - Correct: `between(1, 10, 1)`
 
-**13. Invalid int string**
+**13. Invalid number conversion**
 - Wrong: `int("3.14")`
-- Why: `int()` parsing is strict and does not accept decimal points.
+- Why: The `int()` conversion is very strict and does not accept a decimal point.
 - Correct: `int(real("3.14"))`
 
-**14. Modulo on Real**
+**14. Using `%` on `Real`**
 - Wrong: `5.5 % 2.0`
-- Why: The `%` operator is for `Int` only.
-- Correct: Use `Int` values, e.g. `5 % 2`.
+- Why: The `%` (remainder) operator only works with `Int`.
+- Correct: Use `Int` values, for example `5 % 2`.
 
-**15. Int division assignment**
+**15. Division assignment to an `Int` variable**
 - Wrong: `count: Int := 4 \n count /= 2`
-- Why: `/` returns a `Real`, which cannot be assigned to an `Int`.
+- Why: The `/` operation returns a `Real`, and a `Real` cannot be directly assigned to an `Int` variable.
 - Correct: `count = int(count / 2)`
 
-**16. Missing module**
-- Wrong: `bring Math` without it existing locally (Math is built-in, but for your own `bring Greeting`, `Greeting.ahd` must exist).
-- Why: Modules must be sibling files.
-- Correct: Ensure `Greeting.ahd` is in the same folder.
+**16. Missing module file**
+- Wrong: Writing `bring Greeting` when there is no module file in the same folder. (`Math` is built-in, but your modules must have a file).
+- Why: Modules must be in the same folder (sibling file) as the importing code.
+- Correct: Make sure the `Greeting.ahd` file is in the same folder in your project.
 
-**17. Wrong Class Override usage**
+**17. Wrong use of the `Override` keyword**
 - Wrong: Writing `Override` on a method that does not exist in the parent Class.
-- Why: `Override` strictly means replacing an existing parent method.
-- Correct: Remove `Override` if it is a new method.
+- Why: `Override` strictly means "I am changing an existing method from the superclass."
+- Correct: If you are adding a brand new method, delete the `Override` keyword.
 
-**18. Invalid return**
-- Wrong: `return "Done"` inside a `-> Nothing` function.
-- Why: The function promised to return `Nothing`.
+**18. Invalid `return`**
+- Wrong: Using `return "Done"` inside a function marked `-> Nothing`.
+- Why: The function promised to return "nothing".
 - Correct: Use a bare `return`.
 
-**19. String mutation**
+**19. Trying to change a String in place**
 - Wrong: `name[0] = 'B'`
-- Why: Strings are immutable.
-- Correct: Use `replace` or build a new String.
+- Why: Texts (Strings) are immutable.
+- Correct: Use `replace` to swap a character, or create a new text.
 
-**20. Unseeded reproducible random**
-- Wrong: Expecting `Math.randomInt(1,6)` to be the same without `Math.seed(42)`.
-- Why: Unseeded random uses the OS entropy and is not reproducible.
-- Correct: Use `Math.seed(42)` before rolling.
+**20. Expecting unseeded random numbers to be repeatable**
+- Wrong: Expecting the code `Math.randomInt(1,6)` to remain the same on every run even though you didn't use `Math.seed(42)`.
+- Why: Unseeded randomness uses OS entropy and cannot be repeated.
+- Correct: Provide a seed value like `Math.seed(42)` before throwing the dice.
 
-## 28. Mini Projects
+## 28. Small Projects
 
-These mini projects combine the ideas taught in this guide. Try building them on your own!
+These small projects bring together what is taught in the guide. Try building them on your own!
 
-1. **Grade Average Calculator**: Ask the user for 5 grades. Put them in a `List<Int>`. Filter out invalid grades (less than 0 or greater than 100). Calculate the average, print the minimum, maximum, and whether the student passed (average >= 50).
-2. **Simple Calculator**: Use `take()` to get two numbers and an operator (`+`, `-`, `*`, `/`). Use `state` on the operator to perform the math and write the result. Handle division by zero using `attempt`/`except`.
-3. **Number Statistics**: Generate 100 random numbers using `Math.randomInt(1, 100)`. Count how many are even, how many are odd, and sort them. Use a function to check if a number is a prime number, and filter the list to show only primes.
-4. **Word Analysis**: Ask for a sentence. Use `split(" ")` to get the words. Count the number of words, find the longest word, and build a `Pair<String, Int>` that maps each word to its length.
-5. **Menu-Driven Program**: Create a banking simulation using an `until` loop. Show a menu: 1. Deposit, 2. Withdraw, 3. Balance, 0. Exit. Keep track of the balance in an `Int` and stop when the user chooses 0.
-6. **Student Record with Class**: Create a `Student` Class and a `Course` Class. A Course contains a `List<Student>`. Write a method to add a student, and a method to calculate the class average.
-7. **Seeded Random Game**: Use `Math.seed(42)` to generate a "secret number" between 1 and 100. Ask the user to guess it. Tell them "higher" or "lower" until they guess it. Because it is seeded, the secret number will be the same every time you run it—great for testing!
+1. **Grade Average Calculator**: Ask the user for 5 grades. Put them into a `List<Int>`. Filter out invalid grades (less than 0 or greater than 100). Print the average, minimum, and maximum value of the remaining grades, and finally whether the student passed (average >= 50).
+2. **Simple Calculator**: Use `take()` to get two numbers and an operator (`+`, `-`, `*`, `/`). Use `state` on the operator to select the operation, and print the result. Manage the possibility of division by zero with `attempt`/`except`.
+3. **Number Statistics**: Generate 100 random numbers with `Math.randomInt(1, 100)`. Count how many are odd and how many are even, and sort the list. Write a function that checks if a number is prime, and filter the list to show only primes.
+4. **Word Analysis**: Ask the user to enter a sentence. Use `split(" ")` to separate the words. Find the word count, find the longest word, and create a `Pair<String, Int>` where each word is matched with its own length.
+5. **Menu Program**: Make a small bank simulation using an `until` loop. Show a menu: 1. Deposit, 2. Withdraw, 3. Balance, 0. Exit. Store the balance in an `Int` and loop the program until the user enters 0.
+6. **Student Registry with Classes**: Create a `Student` class and a `Course` class. Let the Course have a `List<Student>` inside it. Write a method to add a new student to the course, and another method to calculate the overall average grade of the course.
+7. **Seeded Random Game**: Generate a "secret number" between 1 and 100 using `Math.seed(42)`. Ask the user to guess the number. Guide them with "higher" or "lower" until they guess correctly. Because a seed is used, the secret number will be the same every time you run the program—perfect for testing!
 
 ## 29. Exercises
 
-Build each program in small steps rather than looking for a complete solution immediately.
+Instead of immediately looking for full solutions, build each program in small steps.
 
-### Beginner
-1. Read a user's name and age, then print how old they will be next year.
+### Beginner Level
+1. Take the user's name and age; print how old they will be next year.
 2. Read a Celsius value as `Real` and calculate its Fahrenheit equivalent (`C * 9/5 + 32`).
-3. Read an `Int` and use `%` to print whether it is odd or even.
-4. Use `until` to show a menu at least once and stop when the user enters `0`.
-5. Write a Function that trims a name, converts it to lowercase, and capitalizes its first character.
-6. Create an empty `List<Int>`, add 3 numbers, and print the `sum` and `len`.
-7. Iterate over `between(10, 0, -1)` to print a countdown.
+3. Read an `Int` and print whether it is odd or even using `%`.
+4. Build a small menu that appears at least once using `until`, and stops when the user enters `0`.
+5. Write a Function that trims the surrounding whitespace, converts a name to lowercase, then capitalizes the first character.
+6. Create an empty `List<Int>`, add 3 numbers into it, and print `sum` and `len`.
+7. Print a countdown by looping over `between(10, 0, -1)`.
 
-### Intermediate
-8. Read a sentence and replace all spaces with underscores.
-9. Display `min` and `max` for a grade List while guarding against an empty List.
-10. Associate names with scores in a `Pair`, update one score, and print entries.
-11. Call `Math.seed(42)`, generate ten rolls with `randomInt(1, 6)`, and confirm that another run repeats them.
+### Intermediate Level
+8. Read a sentence and replace all spaces inside it with underscores.
+9. Show the `min` and `max` results in a List of grades; but check for the possibility of the List being empty first.
+10. Link names to grades using a `Pair`, update a grade, and print all records.
+11. Call the `Math.seed(42)` function, and throw a die ten times with `randomInt(1, 6)`. Verify that you get the exact same 10 results when you run the program again.
 12. Use `map` to square all numbers in a List.
-13. Create a `Student` Class with `name` and a `Constant number` attribute plus a method that returns a summary.
-14. Write a recursive Function to calculate the factorial of a number.
+13. Write a `Student` Class with `name` and `Constant number` attributes, and a method that returns a summary.
+14. Write a recursive function that calculates the factorial of a number.
 
-### Challenge
-15. Use `attempt` to safely handle `DomainError` when calling `int()` on invalid user input.
-16. Sort a `List<String>` by the length of the string using a `keyFunction`.
-17. Create a `Shape` parent Class and a `Circle` child Class with an `Override` method for area.
-18. Write a function that accepts a `String` and returns a `Pair` counting how many times each character appears.
-19. Demonstrate `break` and `continue` by finding the first 5 even numbers in a large range, skipping numbers divisible by 3.
-20. Create a module `MathUtils.ahd` with a function for calculating the area of a rectangle, and `bring` it into a `main.ahd` file to use it.
+### Advanced Level (Challenge)
+15. Use `attempt` to prevent getting a `DomainError` when converting invalid number characters that might arise when the user types input with `int()`.
+16. Sort texts in a `List<String>` by their lengths by calling `sort` with a `keyFunction`.
+17. Create a `Shape` parent Class, then create a `Circle` subclass with an `Override` method that performs area calculation.
+18. Write a function that takes a `String` as a parameter and returns a `Pair` counting how many times each character inside the text appears.
+19. Use `break` and `continue` to find the first 5 even numbers within a very large range, but skip multiples of 3 with `continue`.
+20. Create a module named `MathUtils.ahd` containing a function that calculates rectangle area, and use it from inside `main.ahd` by calling it with `bring`.
 
 ## 30. Solution Hints
 
-1. `take` returns String; convert the age with `int(...)` and add `1`.
-2. Break the formula into small parts. Start with `real(take(...))` and use Real literals.
+1. The result of `take` is a String; use `int(...)` for age, and `+ 1` for the new age.
+2. Break the formula into small parts; start with `real(take(...))` and use Real numbers.
 3. `value % 2 == 0` produces a `Bool`.
-4. `until` is post-check, so the menu can be printed at the start of its body.
-5. Try chaining `trim`, `lower`, and `capitalize` in one return expression.
-6. Give an empty `List<Int>` an explicit type and append each input with `add`.
-7. Negative step counts down; remember `between` excludes the stop value.
+4. Since `until` is post-check, you can place the menu text at the beginning of the body.
+5. Try chaining `trim`, `lower`, and `capitalize` operations on a single `return` line.
+6. Explicitly write the type for an empty `List<Int>`; add each entry with `add`.
+7. Negative steps count backwards; remember that `between` does not include the stop value.
 8. Use `String.replace(" ", "_")`.
-9. `min` and `max` raise `DomainError` for an empty List; first check `len(grades) > 0`.
-10. Use `Pair<String, Int>`; a Pair `for` loop yields keys in insertion order.
-11. Set the seed once before rolling. Inclusive bounds mean the arguments can be exactly `1, 6`.
-12. Your callback function should return `value * value`.
-13. Use the curated Class example as a model for `structure: Attributes`.
-14. The recursion base case is `n <= 1`, returning 1.
-15. Put the `int(take())` inside `attempt` and handle `DomainError` in `except`.
-16. The key function should take a `String` and return `len(value)`.
-17. Use `Math.PI * (radius ^ 2)`.
-18. Iterate through the string, check if the character is in the Pair, and add 1.
+9. `min` and `max` raise `DomainError` on an empty List; do a `len(grades) > 0` check first.
+10. Use `Pair<String, Int>`; `for` on a Pair yields keys in insertion order.
+11. Set the seed exactly once right before rolling the dice. Since bounds are inclusive, you can directly use `1, 6`.
+12. The callback function you write should return `value * value`.
+13. Take the class example from the beginning as a model for `structure: Attributes`.
+14. The base condition of the recursive function should be `n <= 1` and should return 1.
+15. Put the `int(take())` part inside `attempt` and catch `except DomainError`.
+16. Your key function must take a `String` parameter and return `len(value)`.
+17. For area, use `Math.PI * (radius ^ 2)`.
+18. Loop over every letter in the String, check if it exists in the Pair, and increment its count by 1.
 19. `if i % 3 == 0 { continue }`. `if count == 5 { break }`.
-20. Use `from MathUtils bring calculateArea`.
+20. You can use `from MathUtils bring calculateArea`.
 
-## 31. Next steps and technical documentation
+## 31. Next steps and technical docs
 
-After completing this guide, continue with the detailed project documents:
+After finishing this guide, you can deepen your knowledge of the language details from these documents:
 
 - [Getting Started](GETTING_STARTED.md)
 - [Language Tour](LANGUAGE_TOUR.md)
@@ -1812,4 +2040,4 @@ After completing this guide, continue with the detailed project documents:
 - [REPL](REPL.md)
 - [Full v0.1 specification](../AHDCODE_LANGUAGE_SPEC_v0.1.md)
 
-For more working programs, explore the [curated v0.1 examples](../examples/v0.1/README.md).
+Check the [curated v0.1 examples](../examples/v0.1/README.md) folder for more working examples.

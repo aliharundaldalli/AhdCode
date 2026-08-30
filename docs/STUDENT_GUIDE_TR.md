@@ -1,6 +1,10 @@
 # AhdCode v0.1 Türkçe Öğrenci Rehberi
 
-Bu rehber, programlamaya yeni başlayanlar için tasarlanmıştır. Sizi günlük bir dil kullanarak adım adım AhdCode diliyle tanıştıracak ve yazacağınız ilk kod satırından itibaren size yol gösterecektir.
+Bu rehber, **daha önce hiç programlama yapmamış birinin de takip edebilmesi** için hazırlanmıştır. Baştan sona sırayla okuyabilirsiniz; her bölümde önce ne yapmak istediğimizi görecek, sonra çalışan bir örnek yazacak, en son gerekli kuralları öğreneceksiniz.
+
+Kodların yanında zaman zaman İngilizce teknik terimler de göreceksiniz. Bunları ilk okumada ezberlemeniz gerekmez. Bir kutu **Teknik not** diye başlıyorsa, programı çalıştırabilmek için o ayrıntıyı hemen bilmek zorunda değilsiniz.
+
+En iyi öğrenme yolu, örnekleri yalnızca okumak değil çalıştırmaktır. Bir örneği kopyalayın, içindeki sayıyı veya metni değiştirin ve sonucun nasıl değiştiğine bakın.
 
 ## İçindekiler
 - [1. AhdCode nedir?](#1-ahdcode-nedir)
@@ -37,20 +41,29 @@ Bu rehber, programlamaya yeni başlayanlar için tasarlanmıştır. Sizi günlü
 
 ## 1. AhdCode nedir?
 
-AhdCode, okunabilir kod ve öngörülebilir davranış için tasarlanmış genel amaçlı
-bir dildir. Derleyici, programınızı çalıştırmadan önce kontrol eder. Bu sayede,
-yanlış türde bir değer kullanmak veya `null` olabilecek bir değere güvenmek gibi
-birçok hata erkenden yakalanır.
+Bir programlama dili, bilgisayara ne yapmasını istediğimizi anlatmanın bir yoludur. AhdCode ile örneğin bir hesaplama yaptırabilir, kullanıcıdan bilgi alabilir, dosya okuyabilir veya kendi küçük programlarınızı oluşturabilirsiniz.
 
-> **Teknik not:** Program çalışmadan önce türlerin kontrol edilmesine static
-> checking denir.
+İlk AhdCode programınız tek satır bile olabilir:
 
-0.1 sürümü deneysel bir öğrenim sürümüdür. Küçük CLI (komut satırı) programlarını
-doğrudan çalıştırabilir veya onları tek başına çalışan yerel bir uygulamaya çevirebilir.
+```ahd
+write("Merhaba!")
+```
+
+Bu program ekrana şunu yazar:
+
+```text
+Merhaba!
+```
+
+AhdCode, programı çalıştırmadan önce yazdığınız kodu kontrol eder. Örneğin bir metni sayı gibi kullanmaya çalışırsanız veya `null` olabilecek bir değeri kontrol etmeden kullanırsanız, mümkün olduğunda hatayı daha program başlamadan söyler. Ama başlangıçta bunun ayrıntılarını düşünmeniz gerekmiyor; ilerleyen bölümlerde örneklerle göreceğiz.
+
+AhdCode v0.1 hâlâ gelişen bir sürümdür. Küçük komut satırı programlarını doğrudan çalıştırabilir veya onları tek başına çalışan yerel uygulamalara dönüştürebilirsiniz.
+
+> **Teknik not:** Program çalışmadan önce türlerin kontrol edilmesine *static checking* denir.
 
 ## 2. Kurulum ve ilk programınız
 
-AhdCode'u kaynak kodundan derlemek için şu an Go 1.25 veya daha yeni bir sürüm gerekir:
+AhdCode'u kaynak kodundan kurmak için bilgisayarınızda Go 1.25 veya daha yeni bir sürüm bulunmalıdır. Proje klasöründe şu komutları çalıştırın:
 
 ```bash
 cd AhdCode
@@ -60,14 +73,16 @@ export PATH="$(go env GOPATH)/bin:$PATH"
 ahdcode --version
 ```
 
-`hello.ahd` adında bir dosya oluşturun:
+Son komut AhdCode sürümünü gösteriyorsa hazırsınız.
+
+Şimdi `hello.ahd` adında bir dosya oluşturun ve içine şunu yazın:
 
 ```ahd
 name: String := "AhdCode"
 write("Merhaba {name}")
 ```
 
-Çalıştırın:
+Dosyayı çalıştırın:
 
 ```bash
 ahdcode run hello.ahd
@@ -79,76 +94,117 @@ Beklenen çıktı:
 Merhaba AhdCode
 ```
 
-Deneme sırası sizde: `AhdCode` kelimesini kendi adınızla değiştirin ve dosyayı
-yeniden çalıştırın.
+Burada `name` adında küçük bir bilgi sakladık ve sonra onu yazının içine yerleştirdik. Şimdilik `:=` işaretinin neden kullanıldığını ezberlemenize gerek yok; bir sonraki bölümde öğreneceğiz.
+
+**Siz deneyin:** `AhdCode` yerine kendi adınızı yazıp programı tekrar çalıştırın.
 
 ## 3. Kod yazımının temelleri
 
-Her AhdCode programı bir `.ahd` dosyasına yazılır. Satırların sonuna noktalı virgül (`;`) koymanıza gerek yoktur, her komut genellikle kendi satırında yer alır. Kod blokları süslü parantez `{` ve `}` arasına yazılır.
+AhdCode programları `.ahd` uzantılı dosyalara yazılır. Her işlem genellikle kendi satırında durur; satır sonuna `;` koymanız gerekmez.
 
-Kendiniz veya diğer yazılımcılar için not bırakmak isterseniz, tek satırlık yorumlar için satıra `//` ile başlayabilirsiniz. Daha uzun notlar için `/*` ile başlayıp `*/` ile biten çok satırlı yorumlar (multiline comments) kullanabilirsiniz. Derleyici bu yorum satırlarını yok sayar. (Not: çok satırlı yorumlar iç içe geçemez).
+### Bilgisayarın okumayacağı notlar: yorumlar
+
+Kodun içine kendiniz için açıklama bırakabilirsiniz. `//` ile başlayan bölüm o satırda yorumdur:
 
 ```ahd
-// Bu bir yorum satırıdır. Derleyici bunu görmezden gelir.
+// Bu satır sadece bizi bilgilendirir.
 write("Bu satır çalışır")
 ```
 
-Bir değeri hatırlamanız gerektiğinde bir "değişken" (variable) oluşturursunuz. Değişken isimleri (identifiers) bir harf veya `_` ile başlayabilir. Sonraki karakterlerde harfler, sayılar ve `_` kullanılabilir.
+Daha uzun yorumlar `/*` ile başlayıp `*/` ile bitebilir:
 
-### Değişken tanımlama ve değiştirme: `:=` ve `=`
+```ahd
+/*
+Bu açıklama birkaç
+satır sürebilir.
+*/
+write("Devam")
+```
 
-Yeni bir değişken oluşturmak için `:=` kullanın. Daha önce oluşturulmuş ve
-değiştirilebilen bir değişkene yeni bir değer vermek için ise `=` kullanın.
+### Bir bilgiyi saklamak: değişken
+
+Programın daha sonra kullanacağı bir bilgiyi bir isim altında saklayabiliriz:
+
+```ahd
+name: String := "Ayşe"
+age: Int := 19
+```
+
+Burada `name` ve `age` birer **değişkendir**. Sağ taraftaki değerleri daha sonra bu isimlerle kullanabiliriz:
+
+```ahd
+name: String := "Ayşe"
+age: Int := 19
+
+write(name)
+write(age)
+```
+
+### `:=` yeni bir değişken oluşturur, `=` var olanı değiştirir
+
+İlk kez oluştururken `:=` kullanın:
 
 ```ahd
 score: Int := 10
-name: String := "Ayşe"
+```
 
+Daha sonra aynı değişkenin değerini değiştirmek için `=` kullanın:
+
+```ahd
+score: Int := 10
 write(score)
 
 score = 20
 write(score)
 ```
 
-Beklenen çıktı:
+Çıktı:
 
 ```text
 10
 20
 ```
 
-İlk satırda yalnızca `=` kullanmak bir hatadır çünkü `score` henüz
-oluşturulmamıştır. Örneğin, önceden tanımlanmamış bir değişkene `score = 10` yazmak derleyici tarafından reddedilir. Aynı blok içinde ikinci kez `:=` kullanmak, aynı
-değişkeni tekrar oluşturmaya çalışmak demektir; bu da bir hatadır.
+Henüz oluşturulmamış bir değişkene doğrudan `score = 10` yazamazsınız. Aynı yerde ikinci kez `score := ...` yazmak da yeni bir değişken oluşturmaya çalışmak anlamına gelir ve hatadır.
 
-AhdCode, başlangıç değerinden açıkça anlaşılabilen statik türü çıkarabilir;
-okunabilirlik için türü açıkça yazmaya da devam edebilirsiniz:
+### Türü açıkça belirtmek zorunludur
+
+AhdCode'da yeni bir değişken oluştururken türünü mutlaka açıkça yazmalısınız. Bu kural, programınızın daha güvenli çalışmasını sağlar ve hataları henüz kodu çalıştırırken bulmanıza yardımcı olur:
 
 ```ahd
 age: Int := 19
-name := "Ayşe"  // String çıkarılır
+name: String := "Ayşe"
+active: Bool := true
 ```
 
-Tür çıkarımı dinamik tür demek değildir: `name = 5` yine hatadır. İç blokta
-`name: Local := "Ayşe"` yazılır; kapsam niyeti otomatik çıkarılmaz.
+AhdCode türü bir kez belirledikten sonra değişkeni başka türde bir değere çeviremezsiniz:
 
-> **Teknik not:** Bir değişken adının kullanılabileceği bölgeye onun "scope"u (kapsamı) denir. Türün derleyici tarafından otomatik bulunmasına ise "type inference" denir.
+```ahd
+name: String := "Ayşe"
+// name = 5   // HATA: name bir String olarak oluşturuldu
+```
+
+İç bloklarda kullanacağımız `Local` kuralını 11. bölümde ayrıca öğreneceğiz; şimdilik dosyanın en üst seviyesindeki örneklere odaklanın.
+
+> **Teknik not:** Derleyicinin başlangıç değerine bakıp türü bulmasına *type inference* denir. Bu, değişkenin çalışma sırasında istediği türe dönüşebileceği anlamına gelmez; AhdCode statik türleri korur.
 
 ## 4. Temel türler
 
-Başlangıçta en sık karşılaşacağınız türler şunlardır:
+Bir değişkende ne tür bilgi tuttuğumuzu belirtmek için **türler** kullanılır. İlk aşamada şu türleri tanımanız yeterlidir:
 
-| Tür | Anlamı | Örnek |
+| Tür | Ne tutar? | Örnek |
 |---|---|---|
-| `Int` | İşaretli 64-bit tam sayı | `42` |
-| `Real` | Kesirli/ondalıklı sayı (floating-point) | `3.5` |
-| `String` | Değiştirilemeyen (immutable) metin | `"Ayşe"` |
-| `Bool` | Mantıksal değer | `true`, `false` |
-| `List<T>` | Sıralı ve değiştirilebilir değer koleksiyonu | `[1, 2]` |
-| `Pair<K, V>` | Ekleme sırasını koruyan anahtar/değer sözlüğü | `{"Ali": 90}` |
-| `Function` | Tekrar kullanılabilen kod bloğu | |
-| `Class` | Özel veri yapısı (custom data structure) | |
-| `Nothing` | Değer döndürmeyen bir fonksiyonun türü | |
+| `Int` | Tam sayı | `42`, `-3` |
+| `Real` | Ondalıklı sayı | `3.5`, `-0.25` |
+| `String` | Metin | `"Ayşe"` |
+| `Bool` | Doğru/yanlış değeri | `true`, `false` |
+| `List<T>` | Sıralı değerler | `[1, 2, 3]` |
+| `Pair<K, V>` | Anahtar-değer eşleşmeleri | `{"Ali": 90}` |
+| `Function` | Çalıştırılabilir bir fonksiyon | ileride göreceğiz |
+| `Class` | Kendi veri yapınızı tanımlar | ileride göreceğiz |
+| `Nothing` | Bir fonksiyonun değer döndürmediğini söyler | ileride göreceğiz |
+
+Basit bir örnek:
 
 ```ahd
 student: String := "Ayşe"
@@ -159,136 +215,103 @@ passed: Bool := average >= 50.0
 write("{student}, {age}, {average}, {passed}")
 ```
 
-Beklenen çıktı:
+Çıktı:
 
 ```text
 Ayşe, 19, 87.5, true
 ```
 
-Dilin izin verdiği yerlerde bir `Int`, güvenle bir `Real` olarak
-kullanılabilir. Fakat `List<Int>` ile `List<Real>` farklı türlerdir. Bir
-`List<Int>` değerini doğrudan `List<Real>` gereken yere veremezsiniz.
+Burada `passed` değişkenine doğrudan `true` yazmadık. `average >= 50.0` karşılaştırmasının sonucu zaten doğru veya yanlış olduğu için AhdCode onu `Bool` olarak anladı.
 
-> **Teknik not:** Generic türler (koleksiyonlar) için geçerli olan bu katı kurala invariance denir.
+Bazı durumlarda `Int` güvenli biçimde `Real` gereken yerde kullanılabilir. Fakat koleksiyonların türleri birbirinden ayrıdır; örneğin `List<Int>` ile `List<Real>` aynı tür değildir.
 
-AhdCode'da `T?` nullable (null olabilen) türdür. Derleyici ayrıca böyle bir
-değerin o anda kesinlikle var olup olmadığını takip eder. Bunu Null Güvenliği
-bölümünde işleyeceğiz.
+Bir değerin bazen hiç bulunmaması gerekiyorsa türün sonuna `?` eklenebilir. Örneğin `String?`, "bir String veya `null`" anlamına gelir. Bunu 16. bölümde örneklerle ele alacağız.
+
+> **Teknik not:** `List<Int>` ile `List<Real>` gibi generic türlerin birbirine otomatik dönüşmemesi *invariance* olarak adlandırılır.
 
 ## 5. Operatörler
 
-AhdCode standart matematiksel ve mantıksal operatörleri destekler.
+Operatörler sayılarla işlem yapmak, değerleri karşılaştırmak veya koşulları birleştirmek için kullandığımız işaret ve kelimelerdir.
 
-### Aritmetik
-- `+` toplama
-- `-` çıkarma
-- `*` çarpma
-- `/` bölme (her zaman `Real` döndürür, yani `5 / 2` sonucu `2.5`'tir)
-- `%` kalan (mod alma, yalnızca `Int` değerlerle çalışır)
-- `^` üs alma (sağdan birleşimlidir, yani `2 ^ 3 ^ 2`, `2 ^ (3 ^ 2)` anlamına gelir)
+### Dört işlem ve diğer sayısal işlemler
 
 ```ahd
-write(10 + 5)
-write(10 / 4)
-write(10 % 3)
-write(2 ^ 3)
+write(10 + 5)   // 15
+write(10 - 5)   // 5
+write(10 * 5)   // 50
+write(10 / 4)   // 2.5
+write(10 % 3)   // 1
+write(2 ^ 3)    // 8
 ```
 
-Beklenen çıktı:
-```text
-15
-2.5
-1
-8
-```
+`/` işlemi her zaman `Real` sonuç verir. Bu yüzden `5 / 2` sonucu `2` değil `2.5` olur.
 
-AhdCode tam sayı (integer) matematiğini taşmalara karşı kontrol eder (overflow). Eğer bir sonuç bir `Int`'e sığmayacak kadar büyük veya küçükse, program yanlış sayılar üretmek yerine `OverflowError` vererek güvenli bir şekilde durur.
+`%` yalnızca `Int` değerlerle kullanılır ve kalanını verir. `^` üs alma işlemidir.
 
-> **Dikkat:** Bölme işlemi `/` her zaman bir `Real` (kesirli sayı) döndürür. Tam sayı bölmesi istiyorsanız `int(a / b)` kullanmalısınız.
+AhdCode tam sayı hesaplarında taşmayı kontrol eder. Bir sonuç `Int` sınırlarını aşarsa yanlış bir sayı üretmek yerine `OverflowError` verir.
 
-### Atama ve bileşik atama (Compound assignment)
-Değişkenleri matematiksel işlemlerle doğrudan güncelleyebilirsiniz:
-- `+=`, `-=`, `*=`, `/=`, `%=`, `^=`
+### Var olan değeri kısa yoldan güncellemek
 
 ```ahd
 score: Int := 10
 score += 5
-write(score)
+write(score) // 15
 ```
 
-> **Dikkat:** `/` her zaman `Real` döndürdüğü için, `Int` bir değişken üzerinde `/=` kullanamazsınız. Eğer `score` bir `Int` ise `score /= 2` geçersizdir. Yalnızca `Real` değişkenler için geçerlidir.
+`+=`, `-=`, `*=`, `/=`, `%=`, `^=` biçimleri vardır. `/` sonucu `Real` olduğu için `Int` bir değişkende `/=` kullanamazsınız.
 
-### Birer artırma ve azaltma
-Bir `Int` değişkenini tam olarak `1` artırmak veya azaltmak için `++` veya `--` kullanın. Bunlar kendi satırlarında tek başına durmalıdır; başka bir işlemin veya atamanın içinde kullanılamazlar.
+Bir `Int` değeri yalnızca bir artırmak veya azaltmak için:
 
 ```ahd
 count: Int := 0
 count++
-write(count)
+count++
+count--
+write(count) // 1
 ```
 
-### Karşılaştırma, Kimlik ve Üyelik (Comparison, Identity, and Membership)
+`++` ve `--` kendi satırlarında tek başına kullanılır.
 
-- `==` eşittir (iki değerin içeriği kendi türüne göre aynı mı diye bakar)
-- `!=` eşit değildir
-- `<` küçüktür
-- `<=` küçük eşittir
-- `>` büyüktür
-- `>=` büyük eşittir
+### Değerleri karşılaştırmak
 
-AhdCode ayrıca kimlik, tür ve üyelik kontrolleri için şu operatörleri sunar:
+```ahd
+age: Int := 20
 
-- `same` iki değişkenin bellekte tam olarak aynı nesneye işaret edip etmediğine bakar (kimlik).
-- `is` / `is not` bir nesnenin belirli bir Sınıf (Class) türünden olup olmadığını kontrol eder.
-- `in` / `not in` bir değerin bir koleksiyon veya String içinde bulunup bulunmadığını kontrol eder.
-- `has` / `has not` bir Sınıf nesnesinin belirli bir üyeye (özellik veya metot) sahip olup olmadığını kontrol eder.
+write(age == 20) // true
+write(age != 18) // true
+write(age > 18)  // true
+write(age <= 30) // true
+```
 
-**`in` ve `not in` kullanımı:**
-Bir değerin bir `List`'te, bir metin parçasının bir `String`'de veya bir anahtarın (key) bir `Pair`'de olup olmadığını kontrol edebilirsiniz. `Pair` için `in` değerleri (values) değil, yalnızca anahtarları arar.
+Temel karşılaştırmalar: `==`, `!=`, `<`, `<=`, `>`, `>=`.
+
+### Bir değerin bir yerde bulunup bulunmadığını sormak
+
+`in` ve `not in` çok okunaklıdır:
 
 ```ahd
 numbers: List<Int> := [10, 20, 30]
-write(20 in numbers)
-write(99 not in numbers)
+write(20 in numbers)      // true
+write(99 not in numbers)  // true
 
 text: String := "AhdCode"
-write("Code" in text)
+write("Code" in text)     // true
+```
 
+`Pair` üzerinde `in`, değerleri değil anahtarları arar:
+
+```ahd
 scores: Pair<String, Int> := {
     "Ali": 90
     "Ayşe": 95
 }
-write("Ali" in scores)
+
+write("Ali" in scores) // true
 ```
 
-**`has` ve `has not` kullanımı:**
-Bunlar yalnızca bir Sınıf (Class) nesnesinin belirli bir üyeye sahip olup olmadığını kontrol etmek için kullanılır. Sağ taraf bir String değil, doğrudan üyenin adı olmalıdır.
+### `and`, `or`, `not`
 
-Bir değişkenin türü üst Sınıf olsa bile içinde tuttuğu gerçek nesne bir alt Sınıf olabilir. Teknik olarak `has`, değişkenin yazılı türüne değil, nesnenin çalışma anındaki gerçek Sınıfına bakar. Ayrıca üst Sınıftan miras alınan (inherited) üyeler de var kabul edilir.
-
-```ahd
-Person: Class<> := {
-    structure: Attributes := ( name: String )
-}
-Student: Class<Person> := {
-    structure: Attributes := (
-        SuperClass.attributes
-        number: Int
-    )
-}
-
-person: Person := Student(name: "Ali", number: 42)
-
-write(person has number) // true
-write(person has not nickname) // true
-```
-
-*Not: `person is Student` bu nesnenin bir `Student` olup olmadığını sorarken, `person has number` bu nesnenin `number` adında bir üyesi olup olmadığını sorar.*
-
-### Mantıksal operatörler
-- `and` (ikisi de doğruysa `true` üretir)
-- `or` (en az biri doğruysa `true` üretir)
-- `not` (doğruyu yanlışa, yanlışı doğruya çevirir)
+Birden fazla doğru/yanlış koşulunu birleştirebilirsiniz:
 
 ```ahd
 age: Int := 20
@@ -299,35 +322,57 @@ if age >= 18 and hasTicket {
 }
 ```
 
+- `and`: iki taraf da doğruysa `true`
+- `or`: en az bir taraf doğruysa `true`
+- `not`: sonucu tersine çevirir
+
+### `same`, `is` ve `has` ne zaman lazım olacak?
+
+Bunlar biraz daha ileride işimize yarar:
+
+- `same`: iki değişkenin **aynı nesneyi** gösterip göstermediğini sorar.
+- `is` / `is not`: bir nesnenin belirli bir Sınıftan olup olmadığını sorar.
+- `has` / `has not`: bir Sınıf nesnesinde belirli bir özellik veya metot bulunup bulunmadığını sorar.
+
+Bu kavramları List referansları ve Sınıflar bölümlerinde örneklerle tekrar göreceksiniz. İlk okumada ezberlemeniz gerekmez.
+
 ## 6. Metinler (Strings)
 
-Bir `String` metin tutar. AhdCode Unicode'u tam olarak destekler; bu da herhangi bir dildeki harflerin ve emojilerin sorunsuz çalıştığı anlamına gelir. String'ler değiştirilemezdir (immutable): Bir String oluşturulduktan sonra yerinde güncellenemez. String'ler üzerindeki işlemler yeni bir String döndürür.
-
-Metinleri üç şekilde yazabilirsiniz:
-1. `"Çift tırnak"`
-2. `'Tek tırnak'`
-3. `"""Üçlü tırnak"""` (çok satırlı metinler için)
+Metin tutmak için `String` kullanılır:
 
 ```ahd
-greeting: String := "Merhaba"
-letter: String := 'A'
+name: String := "Ayşe"
+city: String := 'Hatay'
+```
+
+Tek tırnak ve çift tırnak kullanılabilir. Birkaç satırlık metin için üçlü tırnak kullanabilirsiniz:
+
+```ahd
 poem: String := """
 Güller kırmızı,
 Menekşeler mavi.
 """
 ```
 
-### Kaçış karakterleri ve değer yerleştirme (Interpolation)
-Tırnak işaretleri veya yeni satır (`\n`) gibi özel karakterler için ters eğik çizgi `\` kullanın (`\"`).
-Süslü parantez `{ }` kullanarak değişkenleri doğrudan bir metnin içine yerleştirebilirsiniz. Buna interpolation denir.
+### Bir değişkeni metnin içine koymak
+
+Süslü parantez kullanın:
 
 ```ahd
 name: String := "Ali"
-write("Merhaba, {name}!")
+age: Int := 20
+write("{name} {age} yaşında")
 ```
 
-### String API (Metotlar)
-AhdCode, metinler için birçok faydalı metot sunar:
+Çıktı:
+
+```text
+Ali 20 yaşında
+```
+
+Buna *interpolation* denir.
+
+### Sık kullanılan String işlemleri
 
 ```ahd
 text: String := "  Ali,Veli,Ayşe  "
@@ -340,103 +385,90 @@ write(clean.split(","))
 write(clean.replace("Veli", "Can"))
 write(clean.contains("Ayşe"))
 write(clean.startsWith("Ali"))
-write(clean.endsWith("Can"))
+write(clean.endsWith("Ayşe"))
 write(clean.count("i"))
-write("a✓b✓".index("✓"))
 ```
 
-Beklenen çıktı:
+`String` değerleri yerinde değişmez. Örneğin `clean.upper()` yeni bir String üretir; `clean` değişkeninin kendisini değiştirmez.
 
-```text
-ali,veli,ayşe
-ALI,VELI,AYŞE
-Ali,veli,ayşe
-["Ali", "Veli", "Ayşe"]
-Ali,Can,Ayşe
-true
-true
-false
-1
-1
-```
+### Bir karaktere ulaşmak
 
-Aranan metni bulamayan bir `String.index` araması `DomainError` hatası üretir.
-
-### İndeksleme ve Uzunluk
-Köşeli parantez `[ ]` kullanarak tek bir karaktere erişebilir veya `len()` ile metnin kaç karakterden oluştuğunu bulabilirsiniz. İndeksler `0`'dan başlar. Metnin sonundan geriye doğru saymak için negatif indeksler kullanabilirsiniz (`-1` son karakterdir).
+İlk karakterin numarası `0`'dır:
 
 ```ahd
 word: String := "AhdCode"
-write(len(word))
-write(word[0])
-write(word[-1])
+write(len(word)) // 7
+write(word[0])   // A
+write(word[-1])  // e
 ```
 
-Beklenen çıktı:
-```text
-7
-A
-e
-```
+Negatif indeksler sondan sayar; `-1` son karakterdir. Geçersiz bir indeks `IndexError` üretir. `String.index(...)` aradığını bulamazsa `DomainError` üretir.
 
-Geçersiz bir sıradan indeksleme işlemi `IndexError` üretir.
+### Kaçış karakterleri
+
+Metnin içinde özel karakterler yazmak için `\` kullanılabilir. Örneğin `\n` yeni satır, `\"` ise çift tırnak karakteridir.
+
+> **Teknik not:** AhdCode String'leri Unicode karakterleriyle çalışır ve immutable'dır; yani yerinde değiştirilemez.
 
 ## 7. Girdi, çıktı ve dönüşümler
 
-`write(value)` bir değeri yazdırır ve ardından yeni bir satıra geçer. `take()`
-kullanıcıdan bir satırlık metin okur; `take(prompt)` ise metin okumadan önce ekrana kısa bir mesaj (istem) gösterir. `take` her zaman bir `String` döndürür.
+Şimdi programımız kullanıcıyla konuşsun.
+
+### Ekrana yazmak: `write`
+
+```ahd
+write("Merhaba")
+write(42)
+```
+
+`write(...)` değeri ekrana yazar ve yeni satıra geçer.
+
+### Kullanıcıdan bilgi almak: `take`
 
 ```ahd
 name: String := take("İsim: ")
-age: Int := int(take("Yaş: "))
-
-write("{name} {age} yaşında")
+write("Merhaba {name}")
 ```
 
-Örnek etkileşim:
+Örnek kullanım:
 
 ```text
 İsim: Ali
-Yaş: 20
-Ali 20 yaşında
+Merhaba Ali
 ```
 
-### `int`, `real` ve `str` ile dönüşümler
+`take()` her zaman **String** döndürür. Kullanıcı `20` yazsa bile ilk anda elimizde sayı değil, `"20"` metni vardır.
 
-Bu fonksiyonlar her modülde, hiçbir içeri aktarma (bring) yapmadan mevcuttur.
+Yaşla matematik yapmak istiyorsak onu sayıya dönüştürürüz:
 
 ```ahd
-write(int(3.7))
-write(int(-3.7))
-write(int(" +42 "))
-write(real(2))
-write(real("1e3"))
-write(str(true))
+age: Int := int(take("Yaş: "))
+write("Gelecek yıl {age + 1} yaşında olacaksınız.")
 ```
 
-Beklenen çıktı:
+### Tür dönüşümleri
 
-```text
-3
--3
-42
-2.0
-1000.0
-true
+```ahd
+write(int(3.7))       // 3
+write(int(" +42 "))  // 42
+write(real(2))        // 2.0
+write(real("1e3"))   // 1000.0
+write(str(true))      // true
 ```
 
-`int(Real)` ondalık kısmı keser (sıfıra doğru yuvarlar).
+- `int(...)`: `Int` üretir.
+- `real(...)`: `Real` üretir.
+- `str(...)`: String üretir.
 
-`int(String)` metnin başındaki ve sonundaki boşlukları yoksayar ve yalnızca isteğe bağlı bir `+` veya `-` işareti ve ardından rakamları kabul eder. Ondalık nokta, üs (exponent), alt çizgi veya taban (base) ön eklerini kabul **etmez**.
+AhdCode metni kendiliğinden sayıya çevirmez. Kullanıcı geçersiz bir sayı yazarsa örneğin `int("merhaba")`, `DomainError` oluşur. Çok büyük değerlerde `OverflowError` oluşabilir. Hataları nasıl yakalayacağımızı 18. bölümde göreceğiz.
 
-`real(String)` ondalık tam sayıları, kesirleri ve üsleri kabul eder; ancak `NaN` veya sonsuzluk (infinity) kabul etmez.
-
-Geçersiz bir metin `DomainError` üretir; çok büyük bir sayı ise `OverflowError` üretir. AhdCode metinleri sayılara otomatik dönüştürmez; bunu `int()` veya `real()` ile açıkça siz yapmalısınız.
+> **Ayrıntı:** `int(String)` yalnızca işaret ve rakamlardan oluşan tam sayı metinlerini kabul eder; `"3.14"` gibi bir metni doğrudan kabul etmez. `real(String)` ondalıklı ve üslü gösterimleri kabul eder fakat `NaN` ve sonsuzluğu kabul etmez.
 
 ## 8. Koşullar: `if` ve `state`
 
+Programların her zaman aynı şeyi yapması gerekmez. Bir koşula göre farklı davranmasını sağlayabiliriz.
+
 ### `if` ve `else`
-AhdCode'da her koşul mutlaka bir `Bool` olmalıdır. Sıfır, boş bir String veya boş bir List için otomatik doğru/yanlış kabulü (truthiness) yoktur.
 
 ```ahd
 score: Int := 72
@@ -452,102 +484,105 @@ else {
 }
 ```
 
-Beklenen çıktı:
+Çıktı:
 
 ```text
 Geçti
 ```
 
-`if score` geçersizdir çünkü `score` bir `Int`'tir, `Bool` değil. `if score > 0` gibi açık bir karşılaştırma yazmalısınız.
-
-### `state`, `condition` ve `default`
-Bir değeri birçok belirli eşleşmeyle karşılaştırmanız gerektiğinde `state` kullanın. Bu, peş peşe yazılmış birçok `else if` zincirinden daha temizdir.
+`if` sonrasında mutlaka `true` veya `false` üreten bir ifade olmalıdır. Bu yüzden:
 
 ```ahd
-status: String := "active"
+// if score { ... }  // geçersiz
+```
 
-state status {
-    condition "active" {
-        write("Hesap aktif")
+yerine:
+
+```ahd
+if score > 0 {
+    write("Pozitif")
+}
+```
+
+yazarız. AhdCode'da `0`, boş metin veya boş liste otomatik olarak doğru/yanlış kabul edilmez.
+
+### Aynı değeri birçok seçenekle karşılaştırmak: `state`
+
+Bir menü seçimi gibi durumlarda `state` okunaklı olabilir:
+
+```ahd
+choice: Int := 2
+
+state choice {
+    condition 1 {
+        write("Yeni oyun")
     }
-    condition "blocked" {
-        write("Hesap engelli")
+    condition 2 {
+        write("Ayarlar")
     }
     condition default {
-        write("Bilinmeyen durum")
+        write("Bilinmeyen seçim")
     }
 }
 ```
 
-Beklenen çıktı:
-```text
-Hesap aktif
-```
-
-`state` bloğu yalnızca eşleşen ilk `condition` bloğunu çalıştırır. Sonraki koşula "düşmez" (no fall-through), bu yüzden `break` yazmanıza gerek yoktur. Eğer hiçbir koşul eşleşmezse `condition default` çalışır.
-
-> **Dikkat:** `state`, `condition` veya `default` kelimelerini "değişken" sanmayın. Bunlar aynı `if` ve `else` gibi programın akışını kontrol eden anahtar kelimelerdir.
+İlk eşleşen `condition` çalışır. Hiçbiri eşleşmezse `condition default` çalışır. Bir sonraki seçeneğe otomatik geçiş olmadığı için `break` gerekmez.
 
 ## 9. Döngüler: `while`, `until` ve `for`
 
-Döngüler, kodu tekrar tekrar çalıştırmanızı sağlar.
+Döngü, aynı işi tekrar tekrar yaptırır.
 
-### `while` ve `until`
-`while`, içindeki kodu çalıştırmadan önce koşulunu kontrol eder. `until` ise
-tam tersini yapar: Önce gövdeyi çalıştırır, koşulu daha sonra kontrol eder.
-Bu yüzden gövdesi en az bir kez çalışır ve koşul `true` olduğunda döngü durur.
+### `while`: koşul doğru olduğu sürece devam et
+
+```ahd
+count: Int := 1
+
+while count <= 3 {
+    write(count)
+    count++
+}
+```
+
+Çıktı:
+
+```text
+1
+2
+3
+```
+
+`while` önce koşula bakar. Koşul başlangıçta yanlışsa gövde hiç çalışmayabilir.
+
+### `until`: en az bir kez çalıştır, sonra durma koşuluna bak
 
 ```ahd
 count: Int := 0
 
-while count < 2 {
-    write("while {count}")
+until count == 3 {
     count++
-}
-
-until count == 4 {
-    count++
-    write("until {count}")
+    write(count)
 }
 ```
 
-Beklenen çıktı:
+Çıktı:
 
 ```text
-while 0
-while 1
-until 3
-until 4
+1
+2
+3
 ```
 
-> **Teknik not:** `while` bir pre-check (önceden kontrol eden), `until` ise post-check (sonradan kontrol eden) loop'tur.
+`until` önce gövdeyi çalıştırır, sonra koşulu kontrol eder. Bu yüzden gövde **en az bir kez** çalışır. Koşul `true` olduğunda döngü biter.
 
-### `break` ve `continue`
-Bir döngüyü `break` ile erken durdurabilir veya `continue` ile mevcut turun geri kalanını atlayıp doğrudan bir sonraki tura geçebilirsiniz.
+### `for`: bir listedeki veya aralıktaki değerleri sırayla kullan
 
 ```ahd
-count: Int := 0
-while count < 10 {
-    count++
-    if count == 2 {
-        continue
-    }
-    if count == 4 {
-        break
-    }
-    write("sayaç {count}")
+for value in [10, 20, 30] {
+    write(value)
 }
 ```
 
-Beklenen çıktı:
-```text
-sayaç 1
-sayaç 3
-```
-
-### `for` ve `between`
-Bir koleksiyondaki öğelerin veya belirli bir sayı aralığının üzerinden geçmek (loop yapmak) için `for` kullanın.
-`between(start, stop)`, başlangıcı içeren ve bitişi **dışlayan** (exclude) bir aralık oluşturur. Üçüncü bir argüman adım (step) değerini ayarlar.
+ve sayı aralığı için:
 
 ```ahd
 for value in between(1, 6, 2) {
@@ -555,7 +590,7 @@ for value in between(1, 6, 2) {
 }
 ```
 
-Beklenen çıktı:
+Çıktı:
 
 ```text
 1
@@ -563,39 +598,86 @@ Beklenen çıktı:
 5
 ```
 
-Negatif adımlar desteklenir (ör. `between(10, 0, -2)` geriye doğru sayar). Sıfır adımı (zero step) sonsuz döngü yaratacağından `DomainError` üretir. `between` oldukça verimlidir; bellekte devasa bir List oluşturmaz, sadece sayıları anlık (lazy) olarak üretir.
+`between(start, stop)` başlangıcı içerir, bitişi içermez. Üçüncü değer adım miktarıdır. Negatif adımla geriye gidebilirsiniz; `0` adım `DomainError` üretir.
 
-Bir `for` değişkeninin türünü genellikle yazmanıza gerek yoktur; derleyici türü
-ziyaret edilen değerlerden kendi öğrenebilir. Ancak isterseniz türü açıkça yazabilirsiniz:
+`for` değişkeninin türünü genellikle yazmanız gerekmez:
 
 ```ahd
 for value in [10, 20, 30] {
     write(value)
 }
+```
 
+İsterseniz açıkça da yazabilirsiniz:
+
+```ahd
 for value: Int in [10, 20, 30] {
     write(value)
 }
 ```
 
-Her iki kullanımda da `value` yalnızca o döngü için oluşturulur. Zaten o döngüye özeldir (Local). Başlangıcına `Local` eklemeyin.
-Şu kullanım geçersizdir:
+`for` değişkeni zaten o döngüye ait kabul edilir; başına `Local` eklenmez.
+
+### Döngüyü erken bitirmek veya bir turu atlamak
 
 ```ahd
-// GEÇERSİZ:
-for value: Local Int in [10, 20] {
+for value in between(1, 10) {
+    if value == 2 {
+        continue
+    }
+    if value == 5 {
+        break
+    }
     write(value)
 }
 ```
 
-> **Teknik not:** Türün derleyici tarafından bulunmasına type inference denir. `for` değişkenleri varsayılan olarak zaten Local kabul edilir. Listeler için "snapshot iteration" (anlık görüntü iterasyonu) kullanılır; yani döngünün başında var olan değerler üzerinden ilerlenir.
+- `continue`: o turun geri kalanını atlar.
+- `break`: döngüyü tamamen bitirir.
 
+> **Teknik not:** `while` pre-check, `until` post-check bir döngüdür. `between` bütün sayıları önceden bir List'e doldurmaz; değerleri ihtiyaç oldukça üretir. List üzerinde `for` başladığında iterasyon bir snapshot üzerinden ilerler.
 
 ## 10. Fonksiyon yazmak ve çağırmak
 
-v0.1'de her fonksiyonun bir adı olmalıdır. Bir fonksiyonun içine başka bir yeni
-fonksiyon tanımlayamazsınız ve isimsiz fonksiyonlar (lambdas) yoktur. Her
-parametrenin ve döndürülen değerin (return value) türü açıkça belirtilir.
+Aynı kodu tekrar tekrar yazmak yerine ona bir isim verip istediğimiz zaman çalıştırabiliriz. Buna **fonksiyon** denir.
+
+Önce en küçük örnek:
+
+```ahd
+square: Function := (number: Int) -> Int {
+    return number * number
+}
+
+write(square(5))
+```
+
+Çıktı:
+
+```text
+25
+```
+
+Bu satırı parçalara ayıralım:
+
+```text
+square: Function := (number: Int) -> Int
+^^^^^^^              ^^^^^^^^^^^     ^^^
+fonksiyon adı         aldığı değer    döndürdüğü tür
+```
+
+`number` fonksiyonun içine gönderdiğimiz değerin adıdır. `return`, fonksiyonun sonucunu geri verir.
+
+### Birden fazla parametre
+
+```ahd
+add: Function := (a: Int, b: Int) -> Int {
+    return a + b
+}
+
+write(add(2, 3))
+```
+
+Parametreleri alt alta da yazabilirsiniz:
 
 ```ahd
 greet: Function := (
@@ -604,30 +686,40 @@ greet: Function := (
 ) -> String {
     return "Merhaba {title} {name}"
 }
+```
 
+`title` için başlangıç değeri verdiğimiz için çağrıda yazmak zorunda değiliz:
+
+```ahd
 write(greet("Ali"))
 write(greet(name: "Ayşe", title: "Dr"))
 ```
 
-Beklenen çıktı:
-
-```text
-Merhaba Öğrenci Ali
-Merhaba Dr Ayşe
-```
-
-Bir fonksiyon çağrılırken, değerleri ya tamamen sırayla (positional) ya da
-tamamen isim vererek (named) göndermelisiniz; iki şekli aynı çağrıda
-karıştıramazsınız. `title`'ın varsayılan bir değeri (`"Öğrenci"`) olduğu için fonksiyonu çağırırken onu girmek isteğe bağlıdır.
-
-Hiçbir değer döndürmeyen bir fonksiyon `Nothing` dönüş türünü kullanır. `Nothing` döndüren bir fonksiyonda, yalın bir `return` ifadesi herhangi bir
-değer üretmeden fonksiyonu anında bitirir. Fonksiyondan erken çıkmak
-gerekmiyorsa `return` yazmak isteğe bağlıdır; kodun doğal olarak sonuna ulaşması yeterlidir (natural fall-through).
+Bir çağrıda ya bütün değerleri sırayla verin ya da hepsini isimleriyle verin. Şu ikisi geçerlidir:
 
 ```ahd
-showStatus: Function := (
-    score: Int
-) -> Nothing {
+greet("Ali")
+greet(name: "Ayşe", title: "Dr")
+```
+
+ama positional ve named biçimleri aynı çağrıda karıştırmayın.
+
+### Sonuç döndürmeyen fonksiyon: `Nothing`
+
+Sadece bir iş yapıp değer döndürmeyen fonksiyon `Nothing` kullanır:
+
+```ahd
+sayHello: Function := (name: String) -> Nothing {
+    write("Merhaba {name}")
+}
+
+sayHello("Ali")
+```
+
+Böyle bir fonksiyonun sonuna `return` yazmak zorunda değilsiniz. Ama erken çıkmak isterseniz yalın `return` kullanabilirsiniz:
+
+```ahd
+showScore: Function := (score: Int) -> Nothing {
     if score < 0 {
         write("Geçersiz not")
         return
@@ -635,41 +727,19 @@ showStatus: Function := (
 
     write("Not: {score}")
 }
-
-hello: Function := (
-    name: String
-) -> Nothing {
-    write("Merhaba {name}")
-}
-
-showStatus(-5)
-showStatus(80)
-hello("Ayşe")
 ```
 
-Beklenen çıktı:
+### Fonksiyonun kendisini çağırması
 
-```text
-Geçersiz not
-Not: 80
-Merhaba Ayşe
-```
-
-İlk `showStatus` çağrısındaki yalın `return`, sonraki `write` satırının
-çalışmasını engeller. `hello` ise gövdesinin sonuna ulaşarak doğal şekilde
-tamamlanır.
-
-### Öz yineleme (Recursion)
-Fonksiyonlar kendi kendilerini çağırabilirler. Buna öz yineleme (recursion) denir. Fonksiyonun sonsuza kadar çalışmaması için kendisini çağırmayı durduracak bir koşul yazdığınızdan emin olmalısınız.
+Bir fonksiyon kendisini tekrar çağırabilir. Örneğin:
 
 ```ahd
-countdown: Function := (
-    n: Int
-) -> Nothing {
+countdown: Function := (n: Int) -> Nothing {
     if n <= 0 {
         write("Ateşle!")
         return
     }
+
     write(n)
     countdown(n - 1)
 }
@@ -677,70 +747,88 @@ countdown: Function := (
 countdown(3)
 ```
 
-Beklenen çıktı:
-```text
-3
-2
-1
-Ateşle!
-```
+Buna **recursion (öz yineleme)** denir. Mutlaka duracağı bir koşul bulunmalıdır.
 
-### Aynı isimde birden fazla fonksiyon: Overloads
+### Aynı isimde farklı parametrelerle fonksiyonlar
 
-Parametre türleri farklı olduğu sürece aynı fonksiyon adı için birkaç farklı
-versiyon tanımlayabilirsiniz. İlkini normal `Function`, sonrakileri ise
-`Overload Function` olarak yazın:
+Daha ileri bir kullanım olarak aynı adı farklı parametre türleriyle kullanabilirsiniz:
 
 ```ahd
-describe: Function := (
-    value: Int
-) -> String {
+describe: Function := (value: Int) -> String {
     return "Int {value}"
 }
 
-describe: Overload Function := (
-    value: Real
-) -> String {
+describe: Overload Function := (value: Real) -> String {
     return "Real {value}"
 }
-
-write(describe(2))
-write(describe(2.5))
 ```
 
-Beklenen çıktı:
+AhdCode çağrının hangi sürüme ait olduğunu parametrelerden belirler. Tam eşleşme önce gelir; güvenli `Int -> Real` genişletmesi gerektiğinde kullanılabilir. Hangi sürümün seçileceği belirsizse derleyici tahmin etmek yerine hata verir.
 
-```text
-Int 2
-Real 2.5
-```
-
-Derleyici her zaman öncelikle parametre türünün tam eşleştiği (exact match) versiyonu
-seçer. Gerektiğinde güvenli `Int`'ten `Real`'e çeviriyi (widening) kullanabilir. Ayrıca birden çok fonksiyon uyuyorsa, daha az varsayılan parametre kullanan versiyonu tercih eder. Eğer iki versiyon aynı derecede uygun görünüyorsa, çağrı belirsizdir
-(ambiguous) ve derleme işlemi hata verip durur. Sadece dönüş türünün farklı
-olması, hangi versiyonun seçileceğini belirlemeye yetmez.
-
-> **Teknik not:** Bu seçim işlemine "overload resolution" (aşırı yükleme
-> çözümlemesi) denir. Fonksiyonlar dinamik değildir; program çalışmadan önce
-> derleyicinin her çağrının hangi versiyonu kullanacağını kesin olarak
-> belirlemesi gerekir.
+> **Teknik not:** Bu seçime *overload resolution* denir. v0.1'de fonksiyonların adı olmalıdır; nested function ve lambda yoktur. Fonksiyon parametreleri ve dönüş türü açıkça yazılır. Fonksiyon bildirimi `name: Function := (...) -> T { ... }` biçimini korur.
 
 ## 11. `Local` ve `Global`
 
-Fonksiyonun parametrelerini fonksiyonun içinde doğrudan kullanabilirsiniz;
-başlarına `Local` eklemeyin. Fonksiyonun veya `if`, `for`, `while` gibi bir iç
-bloğun içinde yeni bir değişken oluştururken `Local` yazın. Dosyanın en üst
-seviyesinde oluşturulmuş bir değişkeni fonksiyonun içinden kullanmak için ise o
-erişimi `Global` ile beyan edin.
+Bu bölüm ilk bakışta biraz farklı gelebilir. Mantığı aslında basit: AhdCode bir değişkenin **nerede yaşadığını** açıkça görmenizi ister.
+
+### Fonksiyonun parametresi zaten fonksiyonun içindedir
+
+```ahd
+greet: Function := (name: String) -> Nothing {
+    write(name)
+}
+```
+
+Buradaki `name` fonksiyonun parametresidir. Onu ayrıca `Local` diye tanımlamayız; fonksiyonun içine gönderildiği zaten bellidir.
+
+### Fonksiyonun içinde yeni bir değişken oluşturuyorsanız `Local` yazın
+
+```ahd
+greet: Function := (name: String) -> Nothing {
+    message: Local String := "Merhaba {name}"
+    write(message)
+}
+```
+
+`message` yalnızca bu fonksiyonun içinde kullanılmak üzere oluşturuldu. Bu yüzden `Local` yazdık.
+
+Aynı kural `if`, `while` gibi iç bloklarda oluşturduğunuz yeni değişkenler için de geçerlidir:
+
+```ahd
+if true {
+    message: Local String := "Bu değişken bu bloğa ait"
+    write(message)
+}
+```
+
+### `for` değişkenine `Local` yazılmaz
+
+`for` zaten kendi değişkenini oluşturur:
+
+```ahd
+for value in [10, 20, 30] {
+    write(value)
+}
+```
+
+Bu nedenle `for value: Local Int ...` yazmayın.
+
+### Dışarıdaki bir değişkeni fonksiyonun içinde kullanmak: `Global`
+
+Şimdi dosyanın en üstünde bir sayaç oluşturalım:
+
+```ahd
+counter: Int := 0
+```
+
+Bir fonksiyonun bu **aynı** sayacı değiştirmesini istiyorsak fonksiyon içinde `Global` ile bunu açıkça söyleriz:
 
 ```ahd
 counter: Int := 0
 
-increase: Function := (
-) -> Nothing {
+increase: Function := () -> Nothing {
     counter: Global Int
-    next: Local Int := counter + 1
-    counter = next
+    counter++
 }
 
 increase()
@@ -748,31 +836,85 @@ increase()
 write(counter)
 ```
 
-Beklenen çıktı:
+Çıktı:
 
 ```text
 2
 ```
 
-Burada `counter` dosyanın en üst seviyesinde oluşturulmuştur. `counter: Global Int`
-satırı yeni bir sayaç oluşturmaz; sadece fonksiyona mevcut değişkeni
-kullanmasını söyler. `next` ise yalnızca fonksiyonun içinde oluşturulur, bu
-yüzden `Local` kullanır.
+`counter: Global Int` yeni bir sayaç oluşturmaz. "Bu fonksiyonun dışındaki `counter` değişkenini kullanacağım" demektir.
 
-> **Teknik not:** Bu kurallar bir değişkenin "scope"unu, yani programın hangi
-> kısımlarında kullanılabileceğini tanımlar. `Global` gizli bir kopya
-> oluşturmaz, doğrudan modül kökündeki asıl değişkene işaret eder.
+İsterseniz modül kökündeki değişkenin türü belliyse mevcut kurallara göre yalnız kapsam niyetini belirterek de çalışabilirsiniz; öğrenci rehberinde açık türü görmek ilk aşamada daha okunaklı olduğu için örneklerde `Global Int` biçimini kullandık.
+
+Kısacası:
+
+| Durum | Ne yazılır? |
+|---|---|
+| Fonksiyon parametresi | Ekstra `Local` gerekmez |
+| Fonksiyon / `if` / `while` içinde yeni değişken | `Local` |
+| `for` değişkeni | `Local` yazılmaz |
+| Dosya kökündeki değişkene içeriden erişim | `Global` |
+
+> **Teknik not:** Bir ismin kodun hangi bölgesinde kullanılabildiğine *scope* (kapsam) denir. AhdCode'da `Local` ve `Global` tür değil, kapsam niyetidir.
 
 ## 12. Listelerle çalışmak (List)
 
-`List`, sıralı bir değer koleksiyonudur. İlk indeks `0`'dır ve negatif indeksler sondan geriye sayar (`-1` son öğedir).
+Birden fazla değeri sırayla tutmak için `List` kullanabilirsiniz:
 
-### Ekleme, sıralama ve ters çevirme
+```ahd
+numbers: List<Int> := [10, 20, 30]
+write(numbers)
+```
+
+İlk elemanın indeksi `0`'dır:
+
+```ahd
+write(numbers[0])  // 10
+write(numbers[-1]) // 30
+```
+
+### Eleman eklemek ve çıkarmak
+
+```ahd
+numbers: List<Int> := [10, 20]
+numbers.add(30)
+write(numbers)
+
+numbers.eject(1)
+write(numbers)
+```
+
+Çıktı:
+
+```text
+[10, 20, 30]
+[10, 30]
+```
+
+`clear(numbers)` listenin tamamını boşaltır.
+
+### Listenin bir bölümünü almak
+
+```ahd
+nums: List<Int> := [10, 20, 30, 40, 50]
+part: List<Int> := nums[1:4]
+write(part)
+```
+
+Çıktı:
+
+```text
+[20, 30, 40]
+```
+
+Bu işlem yeni bir List üretir.
+
+### Sıralamak, ters çevirmek ve karıştırmak
+
 ```ahd
 bring Math
 
-values: List<Int> := [4, 1, 3]
-values.add(2)
+values: List<Int> := [4, 1, 3, 2]
 values.sort()
 write(values)
 
@@ -783,225 +925,259 @@ Math.seed(42)
 values.shuffle()
 write(values)
 ```
-Tohum (seed) açıkça belirtildiği için çıktı her seferinde aynıdır:
-```text
-[1, 2, 3, 4]
-[4, 3, 2, 1]
-[2, 4, 1, 3]
-```
 
-Bu işlemler (`sort`, `reverse`, `shuffle`) yeni bir List oluşturmaz. Sahip olduğunuz List'in sırasını doğrudan yerinde değiştirirler. `sort` doğal artan sıralamayı kullanır.
+`sort`, `reverse` ve `shuffle` mevcut List'i yerinde değiştirir.
 
-### Temizleme, Çıkarma ve Dilimleme (Slicing)
-Bir List'ten öğeleri silebilirsiniz. `eject(index)` belirtilen indeksteki öğeyi yerinde siler. `clear(list)` tüm koleksiyonu boşaltır.
+### Aramak
 
-```ahd
-letters: List<String> := ["A", "B", "C", "D"]
-letters.eject(1)
-write(letters)
-
-clear(letters)
-write(letters)
-```
-Beklenen çıktı:
-```text
-["A", "C", "D"]
-[]
-```
-
-Bir List'in bir kısmını `[başlangıç:bitiş]` (slice) kullanarak alabilirsiniz. Bu yeni bir List döndürür.
-```ahd
-nums: List<Int> := [10, 20, 30, 40, 50]
-slice: List<Int> := nums[1:4]
-write(slice)
-```
-Beklenen çıktı:
-```text
-[20, 30, 40]
-```
-
-### Arama ve Sayma
-`count(value)` bir değerin List'te kaç kez geçtiğini döndürür. `index(value)` değerin ilk bulunduğu konumu bulur.
 ```ahd
 data: List<Int> := [7, 8, 7, 9]
-write(data.count(7))
-write(data.index(8))
+write(data.count(7)) // 2
+write(data.index(8)) // 1
 ```
-Beklenen çıktı:
-```text
-2
-1
-```
-> **Dikkat:** Eğer `index()` değeri bulamazsa `-1` döndürmez. `DomainError` fırlatır.
 
-### Map, Filter ve Özel Sıralama (Keyed Sort)
-v0.1 sürümünde isimsiz fonksiyon (lambda) yoktur, bu yüzden "callback"ler isimlendirilmiş Function değerleridir. `map` ve `filter` yeni Listeler döndürür ve kaynaklarını değiştirmezler. `sort(keyFunction)`, Listeyi sizin fonksiyonunuzun ürettiği sonuçlara göre sıralar (bu kararlı -stable- bir sıralamadır).
+`index()` aradığı değeri bulamazsa `DomainError` üretir.
+
+### `map`, `filter` ve anahtara göre sıralama
+
+Bir listedeki her değeri dönüştürmek için `map`, bazılarını seçmek için `filter` kullanabilirsiniz. v0.1'de lambda olmadığı için kullanacağınız işlemi önce isimli bir Function olarak yazarsınız:
 
 ```ahd
-double: Function := (
-    value: Int
-) -> Int {
+double: Function := (value: Int) -> Int {
     return value * 2
 }
 
-isEven: Function := (
-    value: Int
-) -> Bool {
+isEven: Function := (value: Int) -> Bool {
     return value % 2 == 0
 }
 
-absSort: Function := (
-    value: Int
-) -> Int {
+values: List<Int> := [3, -1, 4, -2]
+write(values.map(double))
+write(values.filter(isEven))
+```
+
+`map` ve `filter` kaynak List'i değiştirmez; yeni List döndürür.
+
+Bir sıralama anahtarı da verebilirsiniz:
+
+```ahd
+absSort: Function := (value: Int) -> Int {
     return abs(value)
 }
 
 values: List<Int> := [3, -1, 4, -2]
-doubled: List<Int> := values.map(double)
-evens: List<Int> := values.filter(isEven)
-
 values.sort(absSort)
-
-write(doubled)
-write(evens)
 write(values)
 ```
 
-Beklenen çıktı:
-
-```text
-[6, -2, 8, -4]
-[4, -2]
-[-1, -2, 3, 4]
-```
+Bu sıralama kararlıdır (stable).
 
 ## 13. Referans davranışı (Reference Behavior)
 
-Eğer iki değişken aynı List'e bağlıysa, ikisi de aynı koleksiyonu görür. Bir
-değişken üzerinden yapılan değişiklik, diğerinden de görülür.
+Şu örneğe bakın:
 
 ```ahd
 numbers: List<Int> := [10, 20, 30]
 alias: List<Int> := numbers
 
 alias[0] = 99
-numbers.add(40)
-
 write(numbers)
-write(alias)
-write(numbers same alias)
-write(numbers == alias)
 ```
 
-Beklenen çıktı:
+Çıktı:
 
 ```text
-[99, 20, 30, 40]
-[99, 20, 30, 40]
-true
-true
+[99, 20, 30]
 ```
 
-`same` anahtar kelimesi, her iki değişkenin bellekte tam olarak aynı nesneyi gösterip göstermediğini kontrol eder. `==` ise içeriklerinin tamamen aynı olup olmadığına bakar. Bu durumda, aynı nesneyi paylaştıkları için ikisi de doğrudur.
+"Ben `alias` değişkenini değiştirdim, `numbers` neden değişti?" diye düşünebilirsiniz. Çünkü `alias := numbers` yazdığımızda ikinci bir List kopyası oluşturmadık. İki değişken de **aynı List'i** gösteriyor.
 
-> **Teknik not:** Aynı List'i bu şekilde paylaşmaya "reference semantics" (referans semantiği) denir. Aynı nesneyi gösteren ikinci bir değişken adına genellikle "alias" (takma ad) denir.
+Bunu açıkça kontrol edebiliriz:
+
+```ahd
+write(numbers same alias) // true
+```
+
+`same`, iki değişkenin aynı nesneyi gösterip göstermediğini sorar.
+
+`==` ise içeriklerinin eşit olup olmadığına bakar:
+
+```ahd
+a: List<Int> := [1, 2]
+b: List<Int> := [1, 2]
+
+write(a == b)    // true: içerikleri aynı
+write(a same b)  // false: iki ayrı List
+```
+
+Bu fark özellikle List, Pair ve Sınıf nesnelerini değiştirirken önemlidir.
+
+> **Teknik not:** Aynı nesneyi birden fazla isimle kullanmaya *aliasing*, bu davranışa *reference semantics* denir.
 
 ## 14. Pair ile çalışmak
 
-`Pair<K, V>` (çift), değerleri anahtarlarla (keys) eşleştirerek saklar ve
-ekleme sırasını korur. v0.1'de anahtar türü yalnızca `String`, `Int` veya
-`Bool` olabilir.
+Bir öğrenci adını notuyla, bir ürün kodunu fiyatıyla veya bir ayarı değeriyle eşleştirmek istediğinizde `Pair` kullanabilirsiniz.
 
 ```ahd
 scores: Pair<String, Int> := {
     "Ali": 85
     "Ayşe": 92
 }
+```
+
+Burada `"Ali"` anahtar, `85` ise o anahtara bağlı değerdir.
+
+### Değeri okumak ve değiştirmek
+
+```ahd
+write(scores["Ali"])
 
 scores["Ali"] = 90
 scores["Veli"] = 78
 
+write(scores["Ali"])
+```
+
+Olmayan bir anahtarı okumaya çalışırsanız `KeyError` oluşur.
+
+### Pair üzerinde dolaşmak
+
+```ahd
 for name in scores {
     write("{name}: {scores[name]}")
 }
 ```
 
-Beklenen çıktı:
+`for`, Pair'in anahtarlarını ekleme sırasıyla verir.
 
-```text
-Ali: 90
-Ayşe: 92
-Veli: 78
-```
+Bir anahtarı silmek için `eject(key)`, bütün Pair'i boşaltmak için `clear(pair)` kullanılır.
 
-Eğer iki değişken aynı Pair'e işaret ediyorsa, biri üzerinden yapılan
-değişiklik diğerinden de görülür (Referans Davranışı). Olmayan bir anahtarı aramak `KeyError` üretir. Var olan bir
-anahtarın değerini güncellemek, o anahtarın sıradaki yerini korur; onu silip
-yeniden eklemek ise listenin en sonuna taşır. Bir anahtarı `eject(key)` ile silebilir veya `clear(pair)` ile tüm Pair'i boşaltabilirsiniz.
+`Pair` de List gibi referans davranışı gösterir: iki değişken aynı Pair'i gösteriyorsa birinden yapılan değişiklik diğerinden de görülür.
 
-```ahd
-scores: Pair<String, Int> := {"Ali": 85}
-scores.eject("Ali")
-clear(scores)
-```
+v0.1'de Pair anahtarları `String`, `Int` veya `Bool` olabilir.
 
 ## 15. Sabitler (Constant)
 
-Bir `Constant` koleksiyon değiştirilemez. Eğer onu doğrudan değiştirmeye çalışırsanız derleme aşamasında reddedilir.
+Bazen bir değerin oluşturulduktan sonra değiştirilmesini istemezsiniz. `Constant` bunu açıkça belirtir:
 
 ```ahd
 locked: Constant List<Int> := [1, 2, 3]
-// locked[0] = 99 // Bu bir derleme zamanı hatasına neden olur
 ```
 
-Ulaşılabilir tüm nesne ağı derin dondurulur (deep-frozen). Eğer bir `Constant` içinde başka koleksiyonlar veya nesneler varsa, bu iç nesneler de dondurulur. Halihazırda dondurulmuş bir nesneyi, Constant olarak işaretlenmemiş başka bir değişken (alias/takma ad) üzerinden değiştirmeye çalışırsanız, program çalışırken (runtime) bir `ConstantError` üretebilir.
-
-> **Teknik not:** Bir `Constant` değer, başlangıç değeri olarak `null` alamaz.
-
-## 16. Null güvenliği (Null safety)
-
-Yalın `T` null olamaz. Bilinen bir türün geçici olarak değeri olmayabilmesi için
-`T?` yazılır. Program kodun farklı yollarından ilerledikçe derleyici, nullable
-bir değerin "kesinlikle var", "kesinlikle `null`" veya
-"belki `null`" (possibly null) olup olmadığını anbean takip eder.
+Artık bu List'i değiştirmeye çalışmak hatadır:
 
 ```ahd
-message: String? := null
+// locked[0] = 99  // HATA
+```
+
+`Constant` yalnızca dıştaki List'i değil, onun içinden ulaşılabilen nesneleri de korur. Yani sabit bir yapının içinde başka List, Pair veya Sınıf nesneleri varsa onlar da dondurulur.
+
+Bu yüzden aynı nesneye başka bir değişken üzerinden ulaşsanız bile onu değiştirmeye çalışmak çalışma sırasında `ConstantError` oluşturabilir.
+
+```ahd
+values: List<Int> := [1, 2, 3]
+locked: Constant List<Int> := values
+
+// values.add(4) çalışma sırasında ConstantError oluşturabilir;
+// çünkü aynı List artık deep-frozen durumdadır.
+```
+
+Bir `Constant` başlangıçta `null` olamaz.
+
+> **Teknik not:** Ulaşılabilir bütün nesne ağının dondurulmasına *deep freeze* denir.
+
+## 16. Null güvenliği
+
+Bazen bir değerin henüz bulunmaması normaldir. Örneğin bir kullanıcı arıyoruz ama kayıt yok:
+
+```text
+"Ali" bulundu  -> bir User var
+kayıt yok      -> değer yok
+```
+
+AhdCode'da `null`, "burada şu anda bir değer yok" demektir.
+
+Normal bir değişkene `null` atayabilirsiniz ancak AhdCode onu kullanmanıza hemen izin vermez:
+
+```ahd
+name: String := null
+```
+
+Bu, `name` değişkeninin bir `String` veya `null` tutabileceğini söyler.
+
+### Kullanmadan önce kontrol edin
+
+```ahd
+message: String := null
 
 if message == null {
     message = "hazır"
 }
 
-if message != null and message.contains("azı") {
+if message != null {
     write(message.upper())
 }
 ```
 
-Beklenen çıktı:
+Derleyici `message != null` kontrolünden sonra bu bloğun içinde gerçekten bir String bulunduğunu bilir.
 
-```text
-HAZIR
+Kontrol etmeden şunu yazmak geçersizdir:
+
+```ahd
+message: String := null
+// write(message.upper()) // HATA: message null olabilir
 ```
 
-Eğer değerin `null` olma ihtimali varsa, onun üyelerine erişmek (member
-access), fonksiyon gibi çağırmak veya indekslemek (indexing) derleme
-zamanında bir hatadır. `message != null` kontrolünden sonra derleyici blok
-içinde değerin var olduğunu bilir. `List<User?>` null elemanlı bir List,
-`List<User>?` null olabilen bir List, `List<User?>?` ise ikisinin birleşimidir.
-`value := null` geçersizdir; `value: User? := null` yazılır. `fetchUser()`
-`User?` döndürüyorsa `user := fetchUser()` tam `User?` türünü çıkarır.
+### `null` tek başına türünü söylemez
 
-Eğer `null` olabilecek bir değeri önceden kontrol etmeden kullanmaya çalışırsanız derleme zamanında bir hata alırsınız.
+Şu kullanım geçersizdir:
 
-> **Teknik not:** Dokümantasyon, bu üç ihtimale `Null`, `MaybeNull` ve
-> `NonNull` adını verir. Bir kontrol yaptıktan sonra derleyicinin değer hakkında
-> daha kesin bilgi sahibi olmasına "null refinement" denir.
+```ahd
+// value := null // HATA: tür belirtilmeli
+```
 
+Çünkü AhdCode bunun `String`, `User` veya başka hangi tür olduğunu bilemez. Türü belirtin:
+
+```ahd
+value: String := null
+```
+
+Eğer bir fonksiyon `User` döndürüyor ama sonuç `null` olabiliyorsa:
+
+```ahd
+user: User := fetchUser()
+```
+
+### Koleksiyonlarda null kullanımı
+
+Koleksiyonlarda, örneğin `List<User>`, listenin kendisi `null` olabileceği gibi, liste geçerli bir nesne olup içindeki elemanlar `null` olabilir. Bu ayrım AhdCode tarafından tamamen aynı akış analizi (null refinement) mantığı ile yönetilir.
+
+> **Teknik not:** Derleyicinin bir kontrol sonrasında değer hakkında daha kesin bilgi edinmesine *null refinement* denir. Belgelendirmelerde akış durumları `Null`, `MaybeNull` ve `NonNull` olarak adlandırılabilir.
 
 ## 17. Sınıflar (Class) ve Özellikler (Attributes)
 
-Bir Sınıf (Class), özel bir veri yapısı tanımlar ve birbiriyle ilgili
-fonksiyonları (metotları) bir araya getirir. Sınıfı oluşturmak için gereken girdiler `structure: Attributes` kısmında tanımlanır. Başına `Local` yazılmayan her yapı girdisi otomatik olarak bir örnek özelliğine (instance attribute) dönüşür.
+Bir öğrenciyi yalnızca adıyla değil, adı ve numarasıyla birlikte tutmak istediğinizi düşünün. Bu iki bilgiyi sürekli ayrı değişkenlerde taşımak yerine kendi veri yapınızı tanımlayabilirsiniz. AhdCode'da bunun için `Class` kullanılır.
+
+### İlk Sınıfımız
+
+```ahd
+Student: Class<> := {
+    structure: Attributes := (
+        name: String
+        number: Int
+    )
+}
+```
+
+Bu tanım, her `Student` nesnesinin `name` ve `number` bilgileri olacağını söyler.
+
+Şimdi bir öğrenci oluşturalım:
+
+```ahd
+student: Student := Student(name: "Ali", number: 42)
+```
+
+Sınıfın içinden bu özelliklere `attribute` ile ulaşılır. Bir metot ekleyelim:
 
 ```ahd
 Student: Class<> := {
@@ -1010,8 +1186,7 @@ Student: Class<> := {
         number: Constant Int
     )
 
-    describe: Function := (
-    ) -> String {
+    describe: Function := () -> String {
         return "#{attribute.number} {attribute.name}"
     }
 }
@@ -1020,21 +1195,19 @@ student: Student := Student(name: "Ali", number: 42)
 write(student.describe())
 ```
 
-Beklenen çıktı:
+Çıktı:
 
 ```text
 #42 Ali
 ```
 
-`Constant` olarak tanımlanan bir özellik daha sonra değiştirilemez. Başına `Local` eklenen
-bir yapı girdisi yalnızca nesne oluşturulurken kullanılır ve bir özelliğe
-dönüşmez. Başına `Confidential` (gizli) eklenen üyelere ise sınıfın dışından
-normal yollarla erişilemez.
+`number: Constant Int` olduğu için öğrenci oluşturulduktan sonra numara değiştirilemez.
 
-### Üst ve alt Sınıflar (Parent / Child)
+Bir `structure` girdisinin başına `Local` yazılırsa yalnız nesne oluşturulurken kullanılabilir; nesnenin kalıcı özelliği olmaz. `Confidential` ise üyeye sınıfın dışından normal erişimi engeller.
 
-Bir Sınıf, başka bir Sınıfın özelliklerini devralabilir. Önce üst Sınıfı
-(parent), ardından onu genişleten alt Sınıfı (child) okuyun:
+### Bir Sınıfı başka bir Sınıftan genişletmek
+
+Önce genel bir `Person` tanımlayalım:
 
 ```ahd
 Person: Class<> := {
@@ -1042,102 +1215,125 @@ Person: Class<> := {
         name: String
     )
 
-    describe: Function := (
-    ) -> String {
+    describe: Function := () -> String {
         return "Kişi {attribute.name}"
     }
 }
+```
 
+`Student`, `Person`'ın sahip olduklarını devralabilir:
+
+```ahd
 Student: Class<Person> := {
     structure: Attributes := (
         SuperClass.attributes
         number: Int
     )
 
-    describe: Override Function := (
-    ) -> String {
+    describe: Override Function := () -> String {
         return "{SuperClass.describe()} #{attribute.number}"
     }
 }
+```
 
+- `Class<Person>`: `Student`, `Person`'dan türetilmiştir.
+- `SuperClass.attributes`: üst sınıfın oluşturma girdilerini getirir.
+- `Override`: üst sınıftaki bir metodu bilerek değiştirdiğimizi söyler.
+- `SuperClass.describe()`: üst sınıfın kendi sürümünü çağırır.
+
+```ahd
 student: Student := Student(name: "Ayşe", number: 7)
 person: Person := student
 write(person.describe())
 ```
 
-Beklenen çıktı:
+Nesne gerçekte `Student` olduğu için `Student.describe()` çalışır.
 
-```text
-Kişi Ayşe #7
-```
+Gerçek türü sormak için:
 
-`Student`, `Person`'ın bir alt Sınıfıdır. `SuperClass.attributes`, üst Sınıfın oluşturulması için gereken
-girdileri aynen alt sınıfa da aktarır. `Override` kelimesi, üst sınıftan
-miras alınan bir metodun kasten değiştirildiğini (üzerine yazıldığını)
-belirtir. `SuperClass.describe()` ise üst Sınıfın kendi versiyonunu çağırır.
-
-Her ne kadar `person` değişkeninin türü `Person` olsa da, o değişkenin
-tuttuğu gerçek nesne bir `Student` olduğu için `Student.describe` çalışır.
-
-Bir nesnenin asıl (gerçek) türünü kontrol etmek için `is` anahtar kelimesini kullanabilirsiniz:
 ```ahd
-Person: Class<> := { structure: Attributes := ( name: String ) }
-Student: Class<Person> := { structure: Attributes := ( SuperClass.attributes ) }
-
-person: Person := Student(name: "Ayşe")
 if person is Student {
     write("Bu kişi bir öğrenci!")
 }
 ```
 
-> **Teknik not:** Bir alt Sınıf nesnesini üst Sınıf türündeki bir değişkende
-> tutmaya "upcasting" denir. Hangi metodun çalışacağının, nesnenin asıl türüne
-> bakılarak çalışma anında seçilmesine ise "dynamic dispatch" denir.
+Bir üyeye sahip olup olmadığını sormak için `has` kullanılabilir:
+
+```ahd
+write(person has name)
+```
+
+> **Teknik not:** Alt sınıf nesnesini üst sınıf türünde tutmaya *upcasting*, çağrılacak metodun gerçek nesne türüne göre seçilmesine *dynamic dispatch* denir. İlk okumada bu terimleri ezberlemek zorunda değilsiniz.
 
 ## 18. Hata yönetimi (`attempt`, `except`, `ultimately` ve `toss`)
 
-Eğer `attempt` (dene) içindeki kod bir hata üretirse, o hataya uygun bir
-`except` (hariç) bloğu devreye girebilir. `ultimately` (en nihayetinde) bloğu
-ise, bir hata oluşsun veya oluşmasın her zaman en son adım olarak çalışır. Kendi
-kodunuz kasten bir Hata (Error) üretmek istediğinde `toss` (fırlat) kullanın.
+Bazı hatalar programı yazarken değil, program çalışırken ortaya çıkabilir. Örneğin kullanıcıdan sayı beklerken `abc` yazabilir.
 
 ```ahd
-requirePositive: Function := (
-    value: Int
-) -> Int {
+age: Int := int(take("Yaş: "))
+```
+
+Kullanıcı sayı yazarsa sorun yoktur. Geçersiz bir metin yazarsa `DomainError` oluşur. Programın bu durumda ne yapacağını biz belirleyebiliriz.
+
+### Bir hatayı yakalamak: `attempt` ve `except`
+
+```ahd
+attempt {
+    age: Local Int := int(take("Yaş: "))
+    write("Yaşınız: {age}")
+}
+except DomainError as error {
+    write("Lütfen geçerli bir tam sayı yazın.")
+}
+```
+
+`attempt` içindeki kod denenir. Belirtilen hata oluşursa uygun `except` bloğu çalışır.
+
+Birden fazla hata türü için birden fazla `except` yazabilirsiniz:
+
+```ahd
+attempt {
+    // hata oluşturabilecek işlemler
+}
+except DomainError as error {
+    write("Sayı geçersiz")
+}
+except IndexError as error {
+    write("İndeks geçersiz")
+}
+```
+
+### Ne olursa olsun çalışacak bölüm: `ultimately`
+
+```ahd
+attempt {
+    write("İşlem deneniyor")
+}
+except DomainError as error {
+    write("Hata oluştu")
+}
+ultimately {
+    write("Bu satır her durumda çalışır")
+}
+```
+
+### Kendi isteğimizle hata üretmek: `toss`
+
+```ahd
+requirePositive: Function := (value: Int) -> Int {
     if value <= 0 {
         toss (DomainError("değer pozitif olmalı"))
     }
+
     return value
 }
-
-attempt {
-    result: Local Int := requirePositive(-1)
-    write(result)
-}
-except DomainError as error {
-    write("Domain hatası: {error.message}")
-}
-except IndexError as error {
-    write("İndeks hatası: {error.message}")
-}
-ultimately {
-    write("Bitti")
-}
 ```
 
-Beklenen çıktı:
+AhdCode'un sık karşılaşılan hata türleri arasında `DomainError`, `ValueError`, `IndexError`, `KeyError`, `OverflowError`, `DivisionByZeroError`, `NullError` ve `ConstantError` bulunur.
 
-```text
-Domain hatası: değer pozitif olmalı
-Bitti
-```
+### Kendi hata türünüzü oluşturmak
 
-Dilin sunduğu yaygın hata türleri arasında `DomainError`, `ValueError`, `IndexError`, `KeyError`,
-`OverflowError`, `DivisionByZeroError`, `NullError` ve `ConstantError`
-bulunur. Farklı hatalara farklı şekilde tepki verebilmek için birden fazla `except` bloğu kullanabilirsiniz.
-
-Ayrıca yerleşik `Error` sınıfından miras alarak kendi özel hatalarınızı oluşturabilirsiniz:
+İhtiyaç olduğunda `Error` sınıfından yeni hata türü türetebilirsiniz:
 
 ```ahd
 InvalidAgeError: Class<Error> := {
@@ -1145,7 +1341,11 @@ InvalidAgeError: Class<Error> := {
         message: String
     )
 }
+```
 
+ve sonra:
+
+```ahd
 attempt {
     age: Local Int := -5
     if age < 0 {
@@ -1153,25 +1353,29 @@ attempt {
     }
 }
 except InvalidAgeError as error {
-    write("Özel hata yakalandı: {error.message}")
+    write(error.message)
 }
 ```
 
-> **Teknik not:** AhdCode çalışma zamanı (runtime) hataları, yakalanabilen
-> (catchable) normal Sınıf (Class) değerleridir.
+> **Teknik not:** AhdCode runtime hataları yakalanabilir normal Class değerleri olarak modellenir.
 
 ## 19. Modüller ve `bring`
 
-Yerel bir modül, onu içe aktaran (import) dosyayla aynı klasörde bulunan bir
-`.ahd` dosyasıdır. Örneğin, `Greeting` (Selamlama) modül adı `Greeting.ahd`
-dosyasını temsil eder.
+Program büyüdükçe her şeyi tek bir dosyaya yazmak istemezsiniz. Bir işi ayrı `.ahd` dosyasına koyup başka dosyadan kullanabilirsiniz. Buna **modül** diyebiliriz.
+
+### Kendi modülünüzü oluşturmak
+
+Aynı klasörde iki dosya olduğunu düşünün:
+
+```text
+main.ahd
+Greeting.ahd
+```
 
 `Greeting.ahd`:
 
 ```ahd
-greet: Function := (
-    name: String
-) -> String {
+greet: Function := (name: String) -> String {
     return "Modülden merhaba, {name}"
 }
 ```
@@ -1184,24 +1388,46 @@ from Greeting bring greet
 write(greet("Ayşe"))
 ```
 
-`main.ahd` çalıştırıldığında beklenen çıktı:
+Çıktı:
 
 ```text
 Modülden merhaba, Ayşe
 ```
 
-Bir modülden öğeleri içe aktarmanın (import) birkaç yolu vardır:
-- `bring Greeting` bir "isim uzayını" (namespace) içe aktarır, çağrı `Greeting.greet("Ayşe")` şekline dönüşür.
-- `from Greeting bring greet` öğenin ismini doğrudan kullanılabilir hale getirir.
-- `from Greeting bring ( greet, farewell )` aynı anda birden fazla ismi farklı satırlarda okunaklı şekilde içe aktarmanızı sağlar.
-- `from Greeting bring all` modüldeki gizli (`Confidential`) olmayan (public) tüm isimleri içe aktarır.
+### Modülü hangi biçimde içe aktarabilirim?
 
-Aynı isimleri taşıyan çakışan içe aktarımlar (import collisions) ve döngüsel bağlılıklar (circular dependencies) derleme hatasıdır.
+Bir namespace olarak:
 
+```ahd
+bring Greeting
+write(Greeting.greet("Ayşe"))
+```
 
-### Modül takma adları (Alias)
+Yalnız istediğiniz ismi alarak:
 
-Bir modülü içe aktarırken `as` kullanarak o modülün ad alanına yeni bir takma ad verebilirsiniz. Bu, kodunuzu daha kısa tutmak için kullanışlıdır.
+```ahd
+from Greeting bring greet
+write(greet("Ayşe"))
+```
+
+Birden fazla isim:
+
+```ahd
+from Greeting bring (
+    greet
+    farewell
+)
+```
+
+Tüm public isimler:
+
+```ahd
+from Greeting bring all
+```
+
+Aynı isimlerin çakışmasına yol açan importlar ve döngüsel modül bağımlılıkları derleme hatasıdır.
+
+### Modüle kısa bir ad vermek
 
 ```ahd
 bring Time as T
@@ -1209,9 +1435,9 @@ bring Time as T
 write(T.Calendar.isLeapYear(2028))
 ```
 
-Takma ad, o içe aktarma işlemi için orijinal adın yerini alır. `bring Time as T` yazdığınızda sadece `T` ismini kullanabilirsiniz, otomatik olarak `Time` ismine de sahip olmazsınız. Eğer uzun halini tercih ederseniz normal `bring Time` kullanımı hala geçerlidir. Kendi yerel modüllerinize de takma ad verebilirsiniz.
+`as T` kullandığınızda bu import için `Time` yerine `T` kullanırsınız.
 
-Bu özellik tür (type) isimlendirmesinde kullanılamaz. Türleri kullanmak için eski tarzı koruyun ve türün adını doğrudan içe aktarın:
+Bu kısaltma tür adlarında kullanılmaz. Örneğin:
 
 ```ahd
 bring Time as T
@@ -1220,22 +1446,26 @@ from Time bring DateTime
 current: DateTime := T.now()
 ```
 
-Tür olarak `T.DateTime` yazmayın; bu geçersizdir. Ayrıca, `from Time bring DateTime as DT` gibi tekil öğelere takma ad veremezsiniz.
+`T.DateTime` bir tür yazımı değildir; türü ayrıca içe aktarın.
 
-### File ve Path temelleri
+### File ve Path'e ilk bakış
 
-`Path`, dosya sistemine erişmeden yolları birleştirir ve inceler. `File`; UTF-8
-metin okur/yazar, klasör oluşturur, metin ekler, siler, varlığı kontrol eder ve
-bir klasördeki doğrudan isimleri kararlı sıralı biçimde listeler.
+AhdCode'un hazır `Path` ve `File` modülleri de `bring` ile kullanılır:
 
 ```ahd
 bring Path
 bring File
-from File bring FileError
 
-path := Path.join(["notlar", "bugun.txt"])
+path: String := Path.join(["notlar", "bugun.txt"])
 File.createDir("notlar")
 File.writeText(path, "merhaba")
+write(File.readText(path))
+```
+
+`Path` yol metinleriyle çalışır. `File` dosya ve klasör işlemleri yapar. Dosya işlemlerinde hata yakalamak istiyorsanız `FileError` türünü ayrıca içe aktarabilirsiniz:
+
+```ahd
+from File bring FileError
 
 attempt {
     write(File.readText("olmayan.txt"))
@@ -1245,42 +1475,51 @@ except FileError as error {
 }
 ```
 
-`FileError`, `IOError` sınıfından türemiştir. Göreli yollar programın veya REPL
-oturumunun çalışma klasörünü kullanır.
+`FileError`, `IOError` sınıfından türemiştir. Göreli yollar programın veya REPL oturumunun çalışma klasörünü kullanır.
 
 ## 20. Temel işlevler modülü (Fundamentals)
 
-Aşağıdaki isimler her modülde zaten hazır bulunur ve onları kullanmak için
-`bring` ile içe aktarmanıza gerek yoktur. Bunlar standart girdi/çıktı, metin
-dönüşümleri ve sayısal işlemleri kapsar.
+Bazı araçları kullanmak için hiçbir `bring` yazmanız gerekmez. Bunlar AhdCode programında doğrudan hazırdır:
 
 ```text
 write take str int real len clear between abs sum min max
 ```
 
-| Fonksiyon | Davranış |
-|---|---|
-| `write(value)` | bir değeri yazdırır ve ardından yeni bir satıra geçer |
-| `take()` / `take(prompt)` | kullanıcıdan bir satır metin (String) okur |
-| `str(value)` | nesnenin metin karşılığını üretir |
-| `int(Real)` | ondalık kısmı kesip atar (sıfıra doğru yuvarlar) |
-| `int(String)` | karakterleri sadece işareti ve sayıları olan bir tam sayıya çevirir |
-| `real(Int)` | tam sayıyı ondalıklı sayıya çevirir (widening) |
-| `real(String)` | ondalıklı sayı içeren metni dönüştürür |
-| `len(value)` | String'deki karakter, List'teki eleman, Pair'deki çift sayısını verir |
-| `clear(collection)` | List'i veya Pair'i yerinde tamamen boşaltır |
-| `between(...)` | bitiş noktasını dışlayan anlık (lazy) bir sayı aralığı üretir |
-| `abs(number)` | sayının mutlak değerini (magnitude) hesaplar |
-| `sum(list)` | listedeki sayıları toplar; boş bir List `0` veya `0.0` verir |
-| `min(list)` / `max(list)` | listedeki en küçük/büyük sayıyı bulur; List boşsa `DomainError` fırlatır |
+Çoğunu zaten kullandık. Kısa bir özet:
 
-`abs`, `sum`, `min` ve `max` hem `Int` hem de `Real` türleri üzerinde çalışır. `clear` mevcut koleksiyonu yerinde (in place) boşaltır, bu yüzden aynı koleksiyona işaret eden diğer tüm değişkenler (alias'lar) onu boş olarak görür. Sayısal hesaplama işlemleri (`sum`, `min`, `max`) List'i değiştirmez (pure reads), bu nedenle `Constant List` üzerinde de güvenle çalışırlar.
+| Fonksiyon | Ne yapar? |
+|---|---|
+| `write(value)` | değeri ekrana yazar |
+| `take()` / `take(prompt)` | kullanıcıdan bir satır String okur |
+| `str(value)` | değeri String'e çevirir |
+| `int(...)` | uygun değeri `Int` yapar |
+| `real(...)` | uygun değeri `Real` yapar |
+| `len(value)` | String/List/Pair uzunluğunu verir |
+| `clear(collection)` | List veya Pair'i yerinde boşaltır |
+| `between(...)` | sayı aralığı üretir |
+| `abs(number)` | mutlak değer verir |
+| `sum(list)` | listedeki sayıları toplar |
+| `min(list)` / `max(list)` | en küçük / en büyük değeri bulur |
+
+Örnek:
+
+```ahd
+numbers: List<Int> := [3, -5, 10]
+
+write(len(numbers))
+write(sum(numbers))
+write(min(numbers))
+write(max(numbers))
+write(abs(-8))
+```
+
+`sum` boş List için `0` veya `0.0` verir. `min` ve `max` ise boş List'te `DomainError` üretir.
+
+`clear` mevcut koleksiyonu yerinde değiştirdiği için aynı koleksiyonu gösteren diğer alias'lar da boş hali görür. `sum`, `min` ve `max` yalnızca okur; List'i değiştirmez.
 
 ## 21. Matematik modülü (Math)
 
-`Math` modülü gelişmiş matematiksel işlemler ve rastgele (random) sayı üretim fonksiyonları sunar. Kullanmadan önce açıkça içe aktarılmalıdır.
-
-### Fonksiyonlar ve Sabitler
+Karekök, trigonometrik fonksiyonlar veya rastgele sayı gibi araçlar için `Math` modülünü kullanın:
 
 ```ahd
 bring Math
@@ -1290,7 +1529,7 @@ write(Math.sqrt(81))
 write(Math.round(3.14159, 2))
 ```
 
-Beklenen çıktı:
+Çıktı:
 
 ```text
 3.141592653589793
@@ -1298,55 +1537,47 @@ Beklenen çıktı:
 3.14
 ```
 
-Kullanabileceğiniz tüm Math özellikleri şunlardır:
+Sık kullanılanlar:
 
-| Öğe | Açıklama |
+| Öğe | Ne yapar? |
 |---|---|
-| `PI`, `E` | Matematiksel sabitler. |
-| `round`, `floor`, `ceil` | `round(değer, basamak)` tam buçuklu sayıları sıfırdan uzaklaşacak şekilde yuvarlar; basamak isteğe bağlıdır (0..15). `floor` ve `ceil` ise `Int` döndürür. |
-| `sqrt`, `exp` | Karekök ve üstel fonksiyon ($e^x$). |
-| `sin`, `cos`, `tan` | Radyan kullanan trigonometrik fonksiyonlar. |
-| `log`, `log10` | Doğal logaritma ve 10 tabanında logaritma. |
-| `seed`, `random`, `randomInt` | Rastgele sayı üretim fonksiyonları. |
+| `PI`, `E` | matematik sabitleri |
+| `round`, `floor`, `ceil` | yuvarlama işlemleri |
+| `sqrt`, `exp` | karekök ve $e^x$ |
+| `sin`, `cos`, `tan` | trigonometrik fonksiyonlar (radyan) |
+| `log`, `log10` | doğal ve 10 tabanında logaritma |
+| `seed`, `random`, `randomInt` | rastgele sayı üretimi |
 
-Üs alma işlemi için `^` operatörünü kullanın, dilde `Math.pow` yoktur. Ayrıca `abs`, `sum`, `min` ve `max` gibi fonksiyonlar Math değil, Temel İşlevler (Fundamentals) modülündedir.
+Üs alma için `Math.pow` yerine dilin `^` operatörünü kullanın. `abs`, `sum`, `min`, `max` ise `Math` içinde değil, doğrudan hazır Fundamentals işlevleridir.
 
-### Rastgele sayı durumu (Random state)
+### Rastgele sayı üretmek
 
 ```ahd
 bring Math
 
-Math.seed(42)
 write(Math.randomInt(1, 6))
 write(Math.random())
 ```
-`randomInt(min, max)` verilen **iki sınırı da içerir**. `random()` ise `0.0 <= value < 1.0` aralığında bir değer üretir.
 
-Aynı tohum (seed) değerini yeniden verirseniz, aynı rastgele sayı dizisini tekrar elde edersiniz. Eğer bir tohum (`Math.seed`) vermezseniz, her yeni program çalışması başlangıç değerini işletim sisteminden (OS) alır. Bu rastgele sayı üreticisi, güvenlik veya şifreleme amacıyla kesinlikle **kullanılmamalıdır**.
+`randomInt(1, 6)` hem `1` hem `6` dahil olmak üzere bu aralıkta bir tam sayı üretir. `random()` ise `0.0 <= value < 1.0` aralığındadır.
 
-`Math.random`, `Math.randomInt` ve `List.shuffle` işlemleri, programın
-genelindeki bu tek, paylaşılan durumu tüketir. Sınırları aynı olan (örneğin
-`randomInt(5, 5)`) çağrılar ile boş/tek öğeli bir List üzerinde yapılan `shuffle`
-(karıştırma) işlemi rastgelelik durumunu tüketmez.
+Test sırasında aynı sonuç dizisini tekrar elde etmek istiyorsanız bir seed verebilirsiniz:
 
-> **Teknik not:** Üretilen dizi sözde rastgeledir (pseudo-random). Tohum
-> (seed) verilmemiş bir çalışmada başlangıç değeri işletim sisteminin
-> entropisinden alınır.
+```ahd
+Math.seed(42)
+```
 
+Aynı seed tekrar verilirse aynı rastgele sayı dizisi baştan başlar. Seed verilmezse yeni program çalışması başlangıç durumunu işletim sisteminden alır.
+
+`Math.random`, `Math.randomInt` ve `List.shuffle` aynı paylaşılan rastgelelik durumunu kullanır; her çağrı diziyi ilerletir. `randomInt(5, 5)` ile boş/tek elemanlı `shuffle` rastgelelik durumunu tüketmez.
+
+> **Dikkat:** Bu rastgele sayı üreticisini kriptografi veya güvenlik amacıyla kullanmayın.
 
 ## 22. Zaman modülü (Time)
 
-`Time` modülü programınızın saati okumasını, tarihlerle çalışmasını ve beklemesini sağlar. `Math` gibi bu modül de açıkça içe aktarılmalıdır.
+Tarih, saat ve bekleme işlemleri için `Time` modülü kullanılır.
 
-AhdCode'da `Time.DateTime` biçiminde tip yazımı yoktur; bu yüzden adını kullanacağınız tipleri içe aktarırsınız:
-
-```ahd
-bring Time
-from Time bring DateTime
-from Time bring Duration
-```
-
-### Şu anki tarih ve saat
+### Şu anki zamanı almak
 
 ```ahd
 bring Time
@@ -1357,31 +1588,20 @@ current: DateTime := Time.now()
 write(current.year)
 write(current.month)
 write(current.day)
+write(current.hour)
 ```
 
-`Time.now()` bilgisayarınızın **yerel** saatini verir. Sürüm 0.1'de saat dilimi özelliği hiç yoktur, bu yüzden ayarlanacak bir şey de yoktur.
+`Time.now()` bilgisayarınızın yerel saatini verir. v0.1'de ayrıca saat dilimi yönetimi yoktur.
 
-Bir `DateTime` içinde okuyabileceğiniz sekiz bilgi vardır:
+Bir `DateTime` içinde şu bilgiler bulunur:
 
 ```text
 year  month  day  hour  minute  second  millisecond  weekday
 ```
 
-`weekday` Pazartesi'den başlar:
+`weekday` Pazartesi için `1`, Pazar için `7` değerini kullanır. Bu alanlar yalnızca okunur.
 
-| gün | sayı |
-|---|---|
-| Pazartesi | 1 |
-| Salı | 2 |
-| Çarşamba | 3 |
-| Perşembe | 4 |
-| Cuma | 5 |
-| Cumartesi | 6 |
-| Pazar | 7 |
-
-Bu değerler yalnızca okunur. `current.year = 2030` yazmak, herhangi bir `Constant` değeri değiştirmek gibi hatadır.
-
-### Kendi tarihinizi oluşturmak
+### Belirli bir tarih oluşturmak
 
 ```ahd
 bring Time
@@ -1396,26 +1616,17 @@ birthday: DateTime := Time.dateTime(
 write(birthday.toString())
 ```
 
-Beklenen çıktı:
+Çıktı:
 
 ```text
 2028-02-29 00:00:00
 ```
 
-`hour`, `minute`, `second` ve `millisecond` isteğe bağlıdır ve `0` ile başlar.
+`hour`, `minute`, `second` ve `millisecond` verilmezse `0` olur. Geçersiz bir tarih `ValueError` üretir; örneğin AhdCode `2026-02-29` değerini sessizce başka güne çevirmek yerine reddeder.
 
-Var olmayan bir tarih isterseniz `ValueError` alırsınız. 2026 artık yıl olmadığı için `2026-02-29` gerçek bir gün değildir; AhdCode bunu sessizce 1 Mart'a kaydırmak yerine reddeder.
-
-`toString()` her dilde ve her bilgisayarda hep `YYYY-MM-DD HH:MM:SS` biçiminde yazar.
-
-### İki anı karşılaştırmak
-
-AhdCode tarihlerde `<` ve `>` kullanmaz. Soruyu kelimelerle sorarsınız:
+### İki zamanı karşılaştırmak
 
 ```ahd
-bring Time
-from Time bring DateTime
-
 morning: DateTime := Time.dateTime(year: 2026, month: 1, day: 1, hour: 9)
 evening: DateTime := Time.dateTime(year: 2026, month: 1, day: 1, hour: 21)
 
@@ -1424,102 +1635,53 @@ write(morning.after(evening))
 write(morning.sameMoment(morning))
 ```
 
-Beklenen çıktı:
+Tarihler için `<` ve `>` yerine bu okunaklı metotlar kullanılır.
 
-```text
-true
-false
-true
-```
-
-İki tarihin aynı anı gösterip göstermediğini sormak için `sameMoment` kullanın. `==` farklı bir şey sorar: aynı nesne olup olmadıklarını. Bu, her Sınıf (Class) için geçerli olan normal kuraldır.
-
-### Aralarında ne kadar zaman var
+### İki zaman arasındaki süre
 
 ```ahd
-bring Time
-from Time bring DateTime
 from Time bring Duration
 
 first: DateTime := Time.dateTime(year: 2026, month: 1, day: 1)
 second: DateTime := Time.dateTime(year: 2026, month: 1, day: 2)
 
 gap: Duration := Time.between(first, second)
-
 write(gap.milliseconds)
 write(gap.seconds)
 ```
 
-Beklenen çıktı:
+`Time.between(first, second)` ikinci zamandan birincisini çıkarır. `Time.duration(milliseconds: 1500)` ile doğrudan süre oluşturabilirsiniz.
 
-```text
-86400000
-86400.0
-```
-
-`Time.between(first, second)` "second eksi first" demektir. İkisinin yerini değiştirirseniz negatif bir `Duration` elde edersiniz; bir şeyin geçmişte kaldığını anlamak için bu kullanışlıdır.
-
-`Time.duration(milliseconds: 1500)` ile doğrudan bir `Duration` da oluşturabilirsiniz.
-
-### Takvime soru sormak
-
-Bazen belirli bir tarihi değil, doğrudan takvimi merak edersiniz:
+### Takvim bilgileri
 
 ```ahd
-bring Time
-
 write(Time.Calendar.isLeapYear(2028))
-write(Time.Calendar.isLeapYear(2100))
 write(Time.Calendar.daysInMonth(2028, 2))
 write(Time.Calendar.weekday(2026, 8, 29))
 ```
 
-Beklenen çıktı:
-
-```text
-true
-false
-29
-6
-```
-
-Artık yıl 4'e bölünür, ancak `00` ile biten bir yılın 400'e de bölünmesi gerekir. 2000 artık yıldır, 2100 değildir.
-
-### Ölçmek ve beklemek
+### Bir işi bekletmek veya süresini ölçmek
 
 ```ahd
-bring Time
-
 start: Real := Time.monotonic()
-
 Time.sleep(500)
-
 elapsed: Real := Time.monotonic() - start
-
 write(elapsed >= 0.5)
 ```
 
-Birimlere dikkat edin, bilerek farklıdır:
-
-- `Time.sleep(...)` **milisaniye** cinsinden bekler.
-- `Time.monotonic()` **saniye** cinsinden değer verir.
-
-`Time.monotonic()` tek başına bir tarih değildir ve kendi başına bir anlam taşımaz. Yalnızca iki okuma arasındaki fark olarak işe yarar; bir işin ne kadar sürdüğünü ölçmek için istediğiniz tam olarak budur.
-
-`Time.sleep(0)` hemen geri döner. Negatif bir bekleme `ValueError` verir, çünkü "eksi bir milisaniye" beklemek gerçek bir istek değildir.
-
+`Time.sleep(...)` **milisaniye**, `Time.monotonic()` ise **saniye** kullanır. `Time.monotonic()` tarih değildir; iki ölçüm arasındaki süreyi hesaplamak için kullanılır. Negatif `sleep` değeri `ValueError` üretir.
 
 ## 23. Latex modülü (Latex)
 
-`Latex` standart kütüphanesi, doğrudan AhdCode programlarınızdan PDF belgeleri oluşturmanızı sağlar. Kendi içinde gömülü, çevrimdışı çalışan bir Tectonic motoru kullanır; bu nedenle TeX Live, MiKTeX veya başka bir dış yazılım kurmanıza gerek yoktur. Güvenlik amacıyla sistem kabuğuna erişim (shell escape) kasıtlı olarak devre dışı bırakılmıştır.
+AhdCode ile doğrudan PDF üretmek istiyorsanız `Latex` modülünü kullanabilirsiniz. Modül gerekli Tectonic motorunu kendi kurulumuyla birlikte getirir; ayrıca TeX Live veya MiKTeX kurmanız gerekmez.
 
-Modül, belgeleri güvenli bir şekilde oluşturmak için pratik ve yeni başlayanlara uygun bir API sunar:
+İlk örnek:
 
 ```ahd
 bring Latex as L
 from Latex bring LatexError
 
-document := L.document(
+document: String := L.document(
     L.section("İlk Belgem") +
     L.escape("Merhaba! Bu sıradan bir metin bölümüdür.") +
     L.subsection("Matematik Örneği") +
@@ -1535,29 +1697,34 @@ except LatexError as error {
 }
 ```
 
-- `Latex.escape(text)`: Sıradan metinleri, LaTeX kodu olarak algılanmaması için güvenli bir şekilde kaçış (escape) dizisine dönüştürür.
-- `Latex.section(text)` ve `Latex.subsection(text)`: Başlıklar oluşturur.
-- `Latex.equation(math)`: Saf LaTeX matematik kodlarını kabul eder.
-- `Latex.document(content)`: İçeriğinizi tam, derlenmeye hazır bir belgenin içine sarar.
-- `Latex.pdf(source, output)`: Verilen LaTeX kaynak metnini (String) derler ve PDF'i belirtilen çıktı yoluna yazar.
-- `Latex.pdfFile(input, output)`: Var olan bir `.tex` girdi dosyasını derler ve PDF'i belirtilen çıktı yoluna yazar.
-- `LatexError`: Derleme başarısız olursa (örneğin matematiğinizde bir sözdizimi hatası varsa) ortaya çıkar. Bir `except` bloğunda kullanmadan önce `from Latex bring LatexError` ile içe aktarmanız gerekir.
+Burada sırasıyla:
+
+- `Latex.escape(text)`: normal metni LaTeX özel karakterlerine karşı kaçışlı hale getirir.
+- `Latex.section(text)` / `subsection(text)`: başlık üretir.
+- `Latex.equation(math)`: matematik ifadesini LaTeX olarak ekler.
+- `Latex.document(content)`: parçaları tam bir belgeye dönüştürür.
+- `Latex.pdf(source, output)`: String olarak verdiğiniz LaTeX kaynağını derleyip PDF dosyasına yazar.
+- `Latex.pdfFile(input, output)`: zaten var olan `.tex` dosyasını derleyip PDF üretir.
+
+Hata türünü `except LatexError` içinde kullanacaksanız `from Latex bring LatexError` ile içe aktarın.
+
+Modül çevrimdışı çalışacak biçimde tasarlanmıştır ve shell escape kapalıdır. Daha gelişmiş tablo ve LaTeX ayrıntıları için `docs/LATEX.md` belgesine bakabilirsiniz.
 
 ## 24. Kod biçimlendirici (Formatter)
 
-Programınızdaki boşluklar veya satır düzeni dağınık olsa bile kodunuz
-çalışabilir. Ancak kod biçimlendirici (formatter), yazdığınız yorum satırlarını koruyarak dosyanızı AhdCode'un ortak standart stiline göre yeniden düzenler:
+Kod çalışsa bile herkes farklı boşluk ve satır düzeni kullanırsa okumak zorlaşır. AhdCode formatter, geçerli kodu ortak bir stile dönüştürür:
 
 ```bash
 ahdcode format hello.ahd
+```
+
+Bu komut dosyayı düzenler. Yalnız kontrol etmek için:
+
+```bash
 ahdcode format --check hello.ahd
 ```
 
-İlk komut dosyayı doğrudan düzenleyerek günceller (bu işlem "idempotent"tir: tekrar tekrar çalıştırsanız da aynı sonucu verir ve fazladan değişiklik yapmaz). İkinci komut ise sadece dosyanın stilini kontrol eder, hiçbir şeyi değiştirmez. Bu komut, ekip projelerinde kod stilinin düzgün olduğundan emin olmak için kullanışlıdır.
-
-### Geçerli sözdizimi ile önerilen stil
-
-AhdCode'un grameri yazım konusunda esnektir: aynı satırdaki iki öğe arasında virgül zorunludur, ama başka her yerde -- bir Fonksiyonun parametreleri, bir çağrının argümanları, bir List veya Pair'in öğeleri arasında -- virgül yalnızca iki öğe aynı satırı paylaşıyorsa gereklidir, ve sondaki virgül her zaman isteğe bağlıdır. Aşağıdaki üç çağrı aynı anlama gelir:
+AhdCode yazarken her virgülü veya satır kırılımını elle mükemmel ayarlamak zorunda değilsiniz. Örneğin şu çağrıların üçü de geçerlidir:
 
 ```ahd
 add(2, 3)
@@ -1573,66 +1740,122 @@ add(
 )
 ```
 
-Serbest olmayan tek yerleşim kuralı şudur: `:=` veya `=` işaretinden sonraki değer, işaretle aynı satırda başlamalıdır (bkz. [Language tour](LANGUAGE_TOUR.md) belgesindeki "Declarations and mutation" bölümü).
+Formatter kısa yapıları tek satırda tutar, uzun yapıları okunaklı şekilde böler.
 
-Stili elle seçmenize gerek yok -- hangisi rahatınıza geliyorsa onu yazın (ya da bir yapay zeka asistanının size verdiği hâliyle bırakın), ardından `ahdcode format` çalıştırın. Sonuç her zaman aynıdır: kısa yapılar tek satıra toplanır, sığmayanlar ise sonunda virgül olmadan her öğe kendi satırında olacak şekilde bölünür. Örneğin:
+Önemli bir yerleşim kuralı vardır: `:=` veya `=` işaretinden sonraki değer **aynı satırda başlamalıdır**.
 
-```ahd
-calculate: Function := (first: Int, second: Int, description: String, flag: Bool) -> Real {
-    return first
-}
-```
-
-şu hâle gelir:
+Geçerli:
 
 ```ahd
-calculate: Function := (
-    first: Int
-    second: Int
-    description: String
-    flag: Bool
-) -> Real {
-    return first
-}
+values: List<Int> := [
+    1
+    2
+    3
+]
 ```
 
-kısa bir imza olan `check: Function := (x: Int) -> Bool { ... }` ise tek satırda kalır.
+Geçersiz:
+
+```text
+values :=
+    [1, 2, 3]
+```
+
+Formatter idempotent'tir; aynı dosyada tekrar çalıştırmak yeni değişiklik üretmez.
 
 ## 25. Komut satırı (CLI)
 
-AhdCode basit bir komut satırı arayüzüyle gelir.
+AhdCode'u terminalden birkaç temel komutla kullanabilirsiniz:
 
-- `ahdcode run file.ahd`: Bir programı doğrudan çalıştırır.
-- `ahdcode build file.ahd`: Programı, AhdCode derleyicisine ihtiyaç duymadan kendi başına çalışabilen yerel bir uygulamaya (native executable) dönüştürür.
-- `ahdcode format file.ahd`: Dosyayı standart stile göre biçimlendirir.
-- `ahdcode --help`: Tüm komutlar için yardım ekranını gösterir.
-- `ahdcode --version`: Mevcut derleyici sürümünü gösterir.
+```text
+ahdcode run file.ahd
+```
+
+Programı çalıştırır.
+
+```text
+ahdcode build file.ahd
+```
+
+Programı kendi başına çalışan yerel bir executable'a dönüştürür.
+
+```text
+ahdcode format file.ahd
+```
+
+Dosyayı ortak stile göre biçimlendirir.
+
+```text
+ahdcode --help
+ahdcode --version
+```
+
+Yardım ve sürüm bilgisini gösterir.
+
+Yeni başlıyorsanız çoğu zaman kullanacağınız komut `ahdcode run ...` olacaktır.
 
 ## 26. Etkileşimli kabuk (REPL)
 
-Küçük denemeler yapmak için `ahdcode` komutunu tek başına çalıştırarak
-REPL'i (Oku-Değerlendir-Yazdır Döngüsü) açabilirsiniz. Bunun için bir `.ahd`
-dosyasına ihtiyacınız yoktur.
+Küçük bir şeyi denemek için her seferinde dosya oluşturmak zorunda değilsiniz. Terminalde yalnızca:
 
-REPL, dosya derleyicisi ile birebir aynı kuralları kullanır. Başarılı komutlar oturum (session) boyunca hafızada kalır. Başarısız bir komut son çalışan durumu silmez, bu yüzden rahatça tekrar deneyebilirsiniz.
-
-```text
-> x := 5
-> x := 7
-error: duplicate declaration
-> x = 7
-> x
-7
+```bash
+ahdcode
 ```
 
-REPL; değerleri, takma adları, Function ve Class tanımlarını, modülleri ve Math
-rastgele sayı durumunu tek kalıcı oturumda tutar. Önceki komutlar yeniden
-çalıştırılmaz. `take` gerçek bir cevap satırı okur; yerel modüller ile göreli
-File yolları `ahdcode` komutunu başlattığınız klasörü kullanır.
+çalıştırın. REPL açılır ve AhdCode komutlarını tek tek deneyebilirsiniz:
+
+```text
+> x: Int := 5
+> x = x + 1
+> x
+6
+```
+
+REPL bir **oturum** gibi davranır. Önceki başarılı komutlarda oluşturduğunuz değerleri hatırlar:
+
+```text
+> name: String := "Ali"
+> write(name)
+Ali
+```
+
+Bir komutta hata yapmanız önceki çalışan durumu silmez:
+
+```text
+> x: Int := 5
+> x: Int := 7
+error: duplicate declaration
+> x
+5
+```
+
+Önceki komutların yan etkileri yeniden çalıştırılmaz. Örneğin:
+
+```text
+> write("bir")
+bir
+> write("iki")
+iki
+```
+
+ikinci komutta `bir` tekrar yazılmaz.
+
+`take()` REPL içinde de gerçek kullanıcı girdisini bekler:
+
+```text
+> name: String := take("İsim: ")
+İsim: Ali
+> write(name)
+Ali
+```
+
+Function ve Class tanımları, modüller, List/Pair nesneleri ve Math rastgelelik durumu oturum boyunca korunur. Yerel modüller ve göreli File yolları, `ahdcode` komutunu başlattığınız klasöre göre çözülür.
+
+REPL öğrenirken çok kullanışlıdır: bir fikri hızlıca deneyip sonucu görebilirsiniz. Daha uzun programlarda `.ahd` dosyası kullanmak daha düzenlidir.
 
 ## 27. Başlangıçta sık yapılan hatalar
 
-İşte karşılaşabileceğiniz yaygın hatalar ve onları düzeltme yolları:
+Hata mesajı görmek programlamanın normal bir parçasıdır. Çoğu hata, bilgisayarın ne istediğinizi anlayamadığını söyler. Aşağıdaki örnekler yeni başlayanların sık karşılaştığı durumları ve nasıl düzelteceğinizi gösterir:
 
 **1. Değişken tanımlamadan `=` kullanmak**
 - Yanlış: `score = 10`
