@@ -334,3 +334,69 @@ for label in labels {
 		t.Fatalf("diagnostics = %+v, want exactly one PAR013", result.Diagnostics)
 	}
 }
+
+// TestTablePivotCountRunsNatively covers the strict count cross-tabulation.
+// It is deliberately not a general pivot: no aggregation callback, no value
+// column, no missing-data model, and every cell stays a String.
+func TestTablePivotCountRunsNatively(t *testing.T) {
+	preamble := "bring Data\nfrom Data bring Table\nfrom Data bring DataError\n\n"
+	sample := `"name,department,grade\nAli,Math,A\nAyse,Physics,B\nMehmet,Math,A\nZeynep,Physics,A\n"`
+	runProgramCases(t, []program{
+		{
+			name: "counts cross-tabulate in first-occurrence order on both axes",
+			sources: map[string]string{"main.ahd": preamble + `students: Table := Data.fromCSV(` + sample + `)
+pivoted: Table := students.pivotCount("department", "grade")
+write(pivoted.columns())
+write(pivoted.toCSV())
+`},
+			expected: "[\"department\", \"A\", \"B\"]\ndepartment,A,B\nMath,2,0\nPhysics,1,1\n\n",
+		},
+		{
+			name: "an absent combination counts zero and stays a String",
+			sources: map[string]string{"main.ahd": preamble + `students: Table := Data.fromCSV(` + sample + `)
+pivoted: Table := students.pivotCount("department", "grade")
+write(pivoted.row(0)["B"])
+write(type(pivoted.row(0)["B"]))
+write(int(pivoted.row(0)["A"]) + 1)
+`},
+			expected: "0\nString\n3\n",
+		},
+		{
+			name: "the source Table is unchanged",
+			sources: map[string]string{"main.ahd": preamble + `students: Table := Data.fromCSV(` + sample + `)
+students.pivotCount("department", "grade")
+write(students.columns())
+write(students.rowCount())
+`},
+			expected: "[\"name\", \"department\", \"grade\"]\n4\n",
+		},
+		{
+			name: "empty and header-only tables keep well-defined shapes",
+			sources: map[string]string{"main.ahd": preamble + `header: Table := Data.fromCSV("a,b\n")
+write(header.pivotCount("a", "b").columns())
+write(header.pivotCount("a", "b").rowCount())
+write("[{header.pivotCount("a", "b").toCSV()}]")
+`},
+			expected: "[\"a\"]\n0\n[a\n]\n",
+		},
+		{
+			name: "Unicode category values survive a CSV round trip",
+			sources: map[string]string{"main.ahd": preamble + `source: Table := Data.fromCSV("k,v\nşehir,İstanbul\nşehir,Ankara\nköy,Ankara\n")
+text: String := source.pivotCount("k", "v").toCSV()
+write(text)
+write(Data.fromCSV(text).columns())
+`},
+			expected: "k,İstanbul,Ankara\nşehir,1,1\nköy,0,1\n\n[\"k\", \"İstanbul\", \"Ankara\"]\n",
+		},
+		{
+			name: "unknown or repeated columns raise DataError naming the column",
+			sources: map[string]string{"main.ahd": preamble + `students: Table := Data.fromCSV(` + sample + `)
+attempt { students.pivotCount("nope", "grade") } except DataError as error { write(error.message) }
+attempt { students.pivotCount("department", "nope") } except DataError as error { write(error.message) }
+attempt { students.pivotCount("grade", "grade") } except DataError as error { write(error.message) }
+`},
+			expected: "Table has no column \"nope\"\nTable has no column \"nope\"\n" +
+				"pivotCount needs two different columns; received \"grade\" twice\n",
+		},
+	})
+}

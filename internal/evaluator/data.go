@@ -277,6 +277,8 @@ func (session *Session) dataOperation(name string, receiver any, arguments []any
 		return session.dataValueCounts(table, text(0, ""))
 	case "Table.groupBy":
 		return session.dataGroupBy(table, text(0, ""))
+	case "Table.pivotCount":
+		return session.dataPivotCount(table, text(0, ""), text(1, ""))
 	case "Table.toCSV":
 		return session.csvStringify(session.dataGrid(table), text(0, ","))
 	case "Table.writeCSV":
@@ -539,4 +541,44 @@ func (session *Session) dataGrid(table dataTable) *List {
 		grid.Items = append(grid.Items, cells)
 	}
 	return grid
+}
+
+// dataPivotCount is a strict count cross-tabulation. It matches the native
+// helper exactly: first-occurrence order on both axes, zero for an absent
+// combination, and String cells throughout.
+func (session *Session) dataPivotCount(table dataTable, rowName, columnName string) any {
+	rowPosition := session.dataColumnPosition(table.columns, rowName)
+	columnPosition := session.dataColumnPosition(table.columns, columnName)
+	if rowName == columnName {
+		session.raise("DataError", "pivotCount needs two different columns; received "+
+			strconv.Quote(rowName)+" twice")
+	}
+	var rowOrder, columnOrder []string
+	seenRow := make(map[string]bool)
+	seenColumn := make(map[string]bool)
+	counts := make(map[string]map[string]int64)
+	for _, row := range table.cells {
+		rowKey, columnKey := row[rowPosition], row[columnPosition]
+		if !seenRow[rowKey] {
+			seenRow[rowKey] = true
+			rowOrder = append(rowOrder, rowKey)
+			counts[rowKey] = make(map[string]int64)
+		}
+		if !seenColumn[columnKey] {
+			seenColumn[columnKey] = true
+			columnOrder = append(columnOrder, columnKey)
+		}
+		counts[rowKey][columnKey]++
+	}
+	schema := append([]string{rowName}, columnOrder...)
+	result := make([][]string, 0, len(rowOrder))
+	for _, rowKey := range rowOrder {
+		line := make([]string, 0, len(schema))
+		line = append(line, rowKey)
+		for _, columnKey := range columnOrder {
+			line = append(line, strconv.FormatInt(counts[rowKey][columnKey], 10))
+		}
+		result = append(result, line)
+	}
+	return session.tableValue(dataTable{columns: schema, cells: result})
 }

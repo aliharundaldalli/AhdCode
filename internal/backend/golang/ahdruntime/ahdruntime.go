@@ -3700,3 +3700,49 @@ func ahdStatisticsFinite(class *AhdClass, value float64, statistic string) float
 	return value
 }
 
+// AhdDataPivotCount is a strict count cross-tabulation: one row per distinct
+// value of the row column, one generated column per distinct value of the
+// column column, and each cell the number of source rows in that combination.
+//
+// It is deliberately not a general pivot. There is no aggregation callback, no
+// value column, and no missing-data model: an absent combination counts zero,
+// and every cell stays a String like every other Table cell.
+func AhdDataPivotCount(class *AhdClass, value AhdTable, rowName, columnName string) AhdTable {
+	columns, cells := ahdTableOf(value)
+	rowPosition := ahdDataColumnPosition(class, columns, rowName)
+	columnPosition := ahdDataColumnPosition(class, columns, columnName)
+	if rowName == columnName {
+		AhdRaiseClass(class, "pivotCount needs two different columns; received "+
+			strconv.Quote(rowName)+" twice")
+	}
+	// First-occurrence order for both axes, matching groupBy and valueCounts,
+	// so the result never depends on map iteration order.
+	var rowOrder, columnOrder []string
+	seenRow := make(map[string]bool)
+	seenColumn := make(map[string]bool)
+	counts := make(map[string]map[string]int64)
+	for _, row := range cells {
+		rowKey, columnKey := row[rowPosition], row[columnPosition]
+		if !seenRow[rowKey] {
+			seenRow[rowKey] = true
+			rowOrder = append(rowOrder, rowKey)
+			counts[rowKey] = make(map[string]int64)
+		}
+		if !seenColumn[columnKey] {
+			seenColumn[columnKey] = true
+			columnOrder = append(columnOrder, columnKey)
+		}
+		counts[rowKey][columnKey]++
+	}
+	schema := append([]string{rowName}, columnOrder...)
+	result := make([][]string, 0, len(rowOrder))
+	for _, rowKey := range rowOrder {
+		line := make([]string, 0, len(schema))
+		line = append(line, rowKey)
+		for _, columnKey := range columnOrder {
+			line = append(line, strconv.FormatInt(counts[rowKey][columnKey], 10))
+		}
+		result = append(result, line)
+	}
+	return ahdTableValue(schema, result)
+}

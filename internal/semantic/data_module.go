@@ -30,7 +30,7 @@ var DataTableOperations = []string{
 	"rowCount", "columnCount", "columns", "rows", "row", "column",
 	"head", "tail", "select", "drop", "rename", "reverse",
 	"filter", "sort", "transform", "derive",
-	"unique", "valueCounts", "groupBy", "toCSV", "writeCSV",
+	"unique", "valueCounts", "groupBy", "pivotCount", "toCSV", "writeCSV",
 }
 
 // dataRow is the canonical row shape AhdCode source sees. Every cell is a
@@ -127,6 +127,7 @@ func dataOperationShapes() map[TypeOperation]dataOperationShape {
 		DataUnique:      {name, 1, strings, "pass one existing column name"},
 		DataValueCounts: {name, 1, types.Pair{Key: types.String, Value: types.Int}, "pass one existing column name"},
 		DataGroupBy:     {name, 1, types.Pair{Key: types.String, Value: dataTableType()}, "pass one existing column name"},
+		DataPivotCount:  {[]types.Type{types.String, types.String}, 2, dataTableType(), "pass the row column name and the column column name"},
 		DataToCSV:       {name, 0, types.String, "pass a single-character String delimiter, or no argument for \",\""},
 		DataWriteCSV:    {[]types.Type{types.String, types.String}, 1, types.Nothing, "pass the destination path, and optionally a single-character String delimiter"},
 	}
@@ -138,7 +139,7 @@ var dataOperationNames = map[string]TypeOperation{
 	"head": DataHead, "tail": DataTail, "select": DataSelect, "drop": DataDrop,
 	"rename": DataRename, "reverse": DataReverse, "filter": DataFilter, "sort": DataSort,
 	"transform": DataTransform, "derive": DataDerive, "unique": DataUnique,
-	"valueCounts": DataValueCounts, "groupBy": DataGroupBy,
+	"valueCounts": DataValueCounts, "groupBy": DataGroupBy, "pivotCount": DataPivotCount,
 	"toCSV": DataToCSV, "writeCSV": DataWriteCSV,
 }
 

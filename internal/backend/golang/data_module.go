@@ -186,6 +186,9 @@ func (generator *generator) dataOperation(name string, value *ir.CallExpr) strin
 		return "AhdDataValueCounts(" + dataError + ", " + receiver + ", " + text(0, `""`) + ")"
 	case "Table.groupBy":
 		return generator.dataGroupBy(receiver, dataError, text(0, `""`), meta)
+	case "Table.pivotCount":
+		return generator.tableFrom("AhdDataPivotCount("+dataError+", "+receiver+", "+
+			text(0, `""`)+", "+text(1, `""`)+")", meta)
 	case "Table.toCSV":
 		return "AhdDataToCSV(" + csvError + ", " + receiver + ", " + text(0, `","`) + ")"
 	case "Table.writeCSV":
