@@ -31,6 +31,12 @@ func (generator *generator) timeCall(value *ir.CallExpr) string {
 	switch name {
 	case "now":
 		return generator.dateTimeFrom("AhdTimeNow()", meta)
+	case "utc":
+		return generator.dateTimeFrom("AhdTimeUTC()", meta)
+	case "timestamp":
+		return "AhdTimeTimestamp()"
+	case "fromTimestamp":
+		return generator.dateTimeFrom("AhdTimeFromTimestamp("+argument(0)+")", meta)
 	case "monotonic":
 		return "AhdTimeMonotonic()"
 	case "sleep":
@@ -41,6 +47,18 @@ func (generator *generator) timeCall(value *ir.CallExpr) string {
 			fields[index] = argument(index)
 		}
 		return generator.dateTimeFrom("AhdTimeCivil("+strings.Join(fields, ", ")+")", meta)
+	case "dateTimeUTC":
+		fields := make([]string, 7)
+		for index := range fields {
+			fields[index] = argument(index)
+		}
+		return generator.dateTimeFrom("AhdTimeCivilUTC("+strings.Join(fields, ", ")+")", meta)
+	case "dateTimeOffset":
+		fields := make([]string, 8)
+		for index := range fields {
+			fields[index] = argument(index)
+		}
+		return generator.dateTimeFrom("AhdTimeCivilOffset("+strings.Join(fields, ", ")+")", meta)
 	case "duration":
 		return generator.durationFrom(argument(0), meta)
 	case "between":
@@ -75,22 +93,25 @@ func (generator *generator) durationFrom(milliseconds string, meta ir.ExprBase) 
 	return helper + "(" + milliseconds + ")"
 }
 
-// instantOf rebuilds the local instant a DateTime expression denotes from its
+// instantOf rebuilds the instant a DateTime expression denotes from its
 // published attributes, so comparison and difference need no hidden state.
 func (generator *generator) instantOf(expression ir.Expr) string {
-	return "AhdTimeInstant(" + strings.Join(generator.dateTimeParts(expression), ", ") + ")"
+	return "AhdTimeInstantCivil(" + generator.civilOf(expression) + ")"
 }
 
-// dateTimeParts reads the seven civil components of a DateTime expression. The
-// receiver is evaluated once into a temporary by the caller's helper.
-func (generator *generator) dateTimeParts(expression ir.Expr) []string {
+// civilOf evaluates one DateTime expression exactly once and snapshots all of
+// its public civil fields into the runtime interchange shape.
+func (generator *generator) civilOf(expression ir.Expr) string {
 	rendered := generator.expr(expression)
-	names := []string{"year", "month", "day", "hour", "minute", "second", "millisecond"}
+	names := []string{"year", "month", "day", "hour", "minute", "second", "millisecond", "offsetMinutes"}
 	parts := make([]string, 0, len(names))
 	for _, name := range names {
-		parts = append(parts, rendered+"."+generator.fieldName(ir.FieldID(string(timeDateTimeClass)+"::field::"+name))+"_get()")
+		parts = append(parts, "value."+generator.fieldName(ir.FieldID(string(timeDateTimeClass)+"::field::"+name))+"_get()")
 	}
-	return parts
+	return "func(value " + generator.interfaceName(timeDateTimeClass) + ") AhdCivilTime { " +
+		"return AhdCivilTime{Year: " + parts[0] + ", Month: " + parts[1] + ", Day: " + parts[2] +
+		", Hour: " + parts[3] + ", Minute: " + parts[4] + ", Second: " + parts[5] +
+		", Millisecond: " + parts[6] + ", OffsetMinutes: " + parts[7] + "} }(" + rendered + ")"
 }
 
 // timeHelper registers the generated constructor wrapper of one Time Class.
@@ -124,7 +145,7 @@ func (generator *generator) emitTimeHelpers(writer *emitter) {
 			writer.line("// DateTime value built from one civil-time reading.")
 			writer.open("func " + name + "(civil AhdCivilTime) " + result + " {")
 			writer.line("return " + generator.callableName(constructor) +
-				"(civil.Year, civil.Month, civil.Day, civil.Hour, civil.Minute, civil.Second, civil.Millisecond, civil.Weekday)")
+				"(civil.Year, civil.Month, civil.Day, civil.Hour, civil.Minute, civil.Second, civil.Millisecond, civil.Weekday, civil.OffsetMinutes)")
 			writer.close("}")
 			writer.blank()
 			continue
@@ -145,7 +166,7 @@ func (generator *generator) timeOperation(name string, value *ir.CallExpr) strin
 	other := func() string {
 		if len(value.Arguments) != 1 || value.Arguments[0].Value == nil {
 			generator.fail(CodeGenerationFailure, name+" has a missing argument", meta.Span, "the IR call is malformed")
-			return "AhdTimeInstant(0, 1, 1, 0, 0, 0, 0)"
+			return "AhdTimeInstant(1, 1, 1, 0, 0, 0, 0, 0)"
 		}
 		return generator.instantOf(value.Arguments[0].Value)
 	}
@@ -163,9 +184,16 @@ func (generator *generator) timeOperation(name string, value *ir.CallExpr) strin
 		return "(AhdTimeCompare(" + generator.instantOf(value.Callee) + ", " + other() + ") > 0)"
 	case "DateTime.sameMoment":
 		return "(AhdTimeCompare(" + generator.instantOf(value.Callee) + ", " + other() + ") == 0)"
+	case "DateTime.timestamp":
+		return "AhdTimeInstantTimestamp(" + generator.instantOf(value.Callee) + ")"
+	case "DateTime.toUTC":
+		return generator.dateTimeFrom("AhdTimeToUTC("+generator.instantOf(value.Callee)+")", meta)
+	case "DateTime.toLocal":
+		return generator.dateTimeFrom("AhdTimeToLocal("+generator.instantOf(value.Callee)+")", meta)
+	case "DateTime.toOffset":
+		return generator.dateTimeFrom("AhdTimeToOffset("+generator.instantOf(value.Callee)+", "+integer(0)+")", meta)
 	case "DateTime.toString":
-		parts := generator.dateTimeParts(value.Callee)
-		return "AhdTimeText(" + strings.Join(parts[:6], ", ") + ")"
+		return "AhdTimeCivilText(" + generator.civilOf(value.Callee) + ")"
 	case "Calendar.isLeapYear":
 		return "AhdCalendarIsLeapYear(" + integer(0) + ")"
 	case "Calendar.daysInMonth":

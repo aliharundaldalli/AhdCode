@@ -25,7 +25,7 @@ func timeFieldID(class, field string) ir.FieldID {
 // Time Class publishes through built-in type operations. They exist so member
 // existence reports what the value really offers.
 var (
-	timeDateTimeOperations = []string{"before", "after", "sameMoment", "toString"}
+	timeDateTimeOperations = []string{"before", "after", "sameMoment", "timestamp", "toUTC", "toLocal", "toOffset", "toString"}
 	timeCalendarOperations = []string{"isLeapYear", "daysInMonth", "weekday"}
 )
 

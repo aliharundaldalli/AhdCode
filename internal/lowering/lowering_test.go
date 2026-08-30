@@ -839,7 +839,7 @@ func TestTimeClassesPublishTheirBuiltInMembers(t *testing.T) {
 		for _, class := range module.Classes {
 			found[class.Name] = class.Operations
 		}
-		if len(found["DateTime"]) != 4 || len(found["Calendar"]) != 3 {
+		if len(found["DateTime"]) != 8 || len(found["Calendar"]) != 3 {
 			t.Fatalf("published operations = %v", found)
 		}
 		if len(found["Duration"]) != 0 {

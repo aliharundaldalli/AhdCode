@@ -218,7 +218,7 @@ func (a *analyzer) analyzeLambda(lambda *ast.LambdaExpr, current *scope, flow fl
 		a.result.Symbols = append(a.result.Symbols, parameterSymbol)
 		a.trackInference(parameterSymbol, lambdaScope)
 		if parameter.Default != nil {
-			a.error(codeInvalidLambda, fmt.Sprintf("lambda parameter %q cannot have a default value in v0.1.10", parameter.Name), parameter.Default.Span(), "use a required lambda parameter or a named Function declaration")
+			a.error(codeInvalidLambda, fmt.Sprintf("lambda parameter %q cannot have a default value in v0.1.11", parameter.Name), parameter.Default.Span(), "use a required lambda parameter or a named Function declaration")
 		}
 	}
 	body := a.analyzeExpression(lambda.Body, lambdaScope, lambdaFlow)
@@ -278,7 +278,7 @@ func (a *analyzer) analyzeIdentifier(identifier *ast.IdentifierExpr, current *sc
 		return expressionInfo{typeValue: types.Invalid, nullState: MaybeNull}
 	}
 	if current.callable != nil && current.callable.kind == lambdaCallable && owner != a.module && owner.callable != current.callable && symbol.Alias == nil && isLexicalCapture(symbol.Kind) {
-		a.error(codePendingFeature, fmt.Sprintf("lambda cannot capture enclosing Local binding %q in v0.1.10", identifier.Name), identifier.Span(), "pass the value as an explicit lambda parameter; lexical closures are not part of v0.1.10")
+		a.error(codePendingFeature, fmt.Sprintf("lambda cannot capture enclosing Local binding %q in v0.1.11", identifier.Name), identifier.Span(), "pass the value as an explicit lambda parameter; lexical closures are not part of v0.1.11")
 	}
 	// Global governs module state. A module-root Function, Class, or namespace
 	// declaration is a callable or type declaration rather than a binding, so
@@ -707,7 +707,7 @@ func timeConstructionHint(identity *types.ClassSymbol) (string, bool) {
 	}
 	switch identity.Name {
 	case "DateTime":
-		return "create a DateTime with Time.now() or Time.dateTime(...)", true
+		return "create a DateTime with Time.now(), Time.utc(), or a Time.dateTime... function", true
 	case "Duration":
 		return "create a Duration with Time.duration(...) or Time.between(...)", true
 	case "Calendar":
@@ -737,7 +737,9 @@ func timeOperationFor(receiver types.Type, name string) (TypeOperation, bool) {
 
 var dateTimeOperationNames = map[string]TypeOperation{
 	"before": DateTimeBefore, "after": DateTimeAfter,
-	"sameMoment": DateTimeSameMoment, "toString": DateTimeToString,
+	"sameMoment": DateTimeSameMoment, "timestamp": DateTimeTimestamp,
+	"toUTC": DateTimeToUTC, "toLocal": DateTimeToLocal,
+	"toOffset": DateTimeToOffset, "toString": DateTimeToString,
 }
 
 var calendarOperationNames = map[string]TypeOperation{
@@ -758,6 +760,10 @@ func timeOperationShapes() map[TypeOperation]timeOperationShape {
 		DateTimeBefore:      {[]types.Type{instant}, types.Bool, "pass one DateTime to compare against"},
 		DateTimeAfter:       {[]types.Type{instant}, types.Bool, "pass one DateTime to compare against"},
 		DateTimeSameMoment:  {[]types.Type{instant}, types.Bool, "pass one DateTime to compare against"},
+		DateTimeTimestamp:   {nil, types.Int, "call timestamp with no argument"},
+		DateTimeToUTC:       {nil, instant, "call toUTC with no argument"},
+		DateTimeToLocal:     {nil, instant, "call toLocal with no argument"},
+		DateTimeToOffset:    {[]types.Type{types.Int}, instant, "pass one Int offset in minutes"},
 		DateTimeToString:    {nil, types.String, "call toString with no argument"},
 		CalendarIsLeapYear:  {[]types.Type{types.Int}, types.Bool, "pass one Int year"},
 		CalendarDaysInMonth: {[]types.Type{types.Int, types.Int}, types.Int, "pass an Int year and an Int month"},

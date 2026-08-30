@@ -1744,7 +1744,7 @@ func AhdRegexSplit(class *AhdClass, pattern, text string) *AhdList[string] {
 // time. It is the only shape that crosses between the runtime clock and the
 // generated DateTime value, so no Go time type ever reaches AhdCode.
 type AhdCivilTime struct {
-	Year, Month, Day, Hour, Minute, Second, Millisecond, Weekday int64
+	Year, Month, Day, Hour, Minute, Second, Millisecond, Weekday, OffsetMinutes int64
 }
 
 // ahdMonotonicOrigin anchors the monotonic clock. Go's time.Since uses the
@@ -1755,19 +1755,39 @@ var ahdMonotonicOrigin = time.Now()
 // ahdCivilFrom converts a local instant into the calendar fields AhdCode
 // publishes, using the Monday=1..Sunday=7 convention.
 func ahdCivilFrom(value time.Time) AhdCivilTime {
+	if value.Year() < 1 || value.Year() > 9999 {
+		AhdRaiseClass(AhdClassValueError, "instant is outside the supported DateTime range")
+	}
 	weekday := int64(value.Weekday())
 	if weekday == 0 {
 		weekday = 7
 	}
+	_, offsetSeconds := value.Zone()
 	return AhdCivilTime{
 		Year: int64(value.Year()), Month: int64(value.Month()), Day: int64(value.Day()),
 		Hour: int64(value.Hour()), Minute: int64(value.Minute()), Second: int64(value.Second()),
 		Millisecond: int64(value.Nanosecond() / 1e6), Weekday: weekday,
+		OffsetMinutes: int64(offsetSeconds / 60),
 	}
 }
 
 // AhdTimeNow reads the current local date and time.
 func AhdTimeNow() AhdCivilTime { return ahdCivilFrom(time.Now()) }
+
+// AhdTimeUTC reads the current civil date and time in UTC.
+func AhdTimeUTC() AhdCivilTime { return ahdCivilFrom(time.Now().UTC()) }
+
+// AhdTimeTimestamp is the current Unix timestamp in milliseconds.
+func AhdTimeTimestamp() int64 { return time.Now().UnixMilli() }
+
+// AhdTimeFromTimestamp converts a representable Unix millisecond timestamp to UTC.
+func AhdTimeFromTimestamp(milliseconds int64) AhdCivilTime {
+	value := time.UnixMilli(milliseconds).UTC()
+	if value.Year() < 1 || value.Year() > 9999 {
+		AhdRaiseClass(AhdClassValueError, "timestamp is outside the supported DateTime range")
+	}
+	return ahdCivilFrom(value)
+}
 
 // AhdTimeMonotonic is elapsed seconds on a clock that never moves backwards.
 // Its absolute value has no calendar meaning; only differences do.
@@ -1789,6 +1809,22 @@ func AhdTimeSleep(milliseconds int64) {
 // component is checked against the Gregorian calendar, so an impossible date
 // is an error rather than a silently rolled-over one.
 func AhdTimeCivil(year, month, day, hour, minute, second, millisecond int64) AhdCivilTime {
+	return ahdTimeCivilIn(year, month, day, hour, minute, second, millisecond, time.Local)
+}
+
+// AhdTimeCivilUTC constructs a validated UTC civil time.
+func AhdTimeCivilUTC(year, month, day, hour, minute, second, millisecond int64) AhdCivilTime {
+	return ahdTimeCivilIn(year, month, day, hour, minute, second, millisecond, time.UTC)
+}
+
+// AhdTimeCivilOffset constructs a validated civil time at a fixed minute offset.
+func AhdTimeCivilOffset(year, month, day, offsetMinutes, hour, minute, second, millisecond int64) AhdCivilTime {
+	ahdRequireOffset(offsetMinutes)
+	return ahdTimeCivilIn(year, month, day, hour, minute, second, millisecond,
+		time.FixedZone("", int(offsetMinutes*60)))
+}
+
+func ahdTimeCivilIn(year, month, day, hour, minute, second, millisecond int64, location *time.Location) AhdCivilTime {
 	ahdRequireRange(year, 1, 9999, "year")
 	ahdRequireRange(month, 1, 12, "month")
 	ahdRequireRange(day, 1, AhdCalendarDaysInMonth(year, month), "day")
@@ -1797,8 +1833,12 @@ func AhdTimeCivil(year, month, day, hour, minute, second, millisecond int64) Ahd
 	ahdRequireRange(second, 0, 59, "second")
 	ahdRequireRange(millisecond, 0, 999, "millisecond")
 	value := time.Date(int(year), time.Month(month), int(day), int(hour), int(minute), int(second),
-		int(millisecond)*1e6, time.Local)
+		int(millisecond)*1e6, location)
 	return ahdCivilFrom(value)
+}
+
+func ahdRequireOffset(offsetMinutes int64) {
+	ahdRequireRange(offsetMinutes, -840, 840, "offsetMinutes")
 }
 
 func ahdRequireRange(value, low, high int64, name string) {
@@ -1810,9 +1850,10 @@ func ahdRequireRange(value, low, high int64, name string) {
 
 // ahdInstant rebuilds the local instant a DateTime denotes from its published
 // fields, so comparison and difference need no hidden state.
-func ahdInstant(year, month, day, hour, minute, second, millisecond int64) time.Time {
+func ahdInstant(year, month, day, hour, minute, second, millisecond, offsetMinutes int64) time.Time {
+	ahdRequireOffset(offsetMinutes)
 	return time.Date(int(year), time.Month(month), int(day), int(hour), int(minute), int(second),
-		int(millisecond)*1e6, time.Local)
+		int(millisecond)*1e6, time.FixedZone("", int(offsetMinutes*60)))
 }
 
 // AhdTimeCompare orders two DateTime values: negative, zero, or positive.
@@ -1828,19 +1869,44 @@ func AhdTimeCompare(left, right time.Time) int64 {
 }
 
 // AhdTimeInstant is the generated code's entry point for rebuilding an instant.
-func AhdTimeInstant(year, month, day, hour, minute, second, millisecond int64) time.Time {
-	return ahdInstant(year, month, day, hour, minute, second, millisecond)
+func AhdTimeInstant(year, month, day, hour, minute, second, millisecond, offsetMinutes int64) time.Time {
+	return ahdInstant(year, month, day, hour, minute, second, millisecond, offsetMinutes)
+}
+
+// AhdTimeInstantCivil rebuilds an instant from the runtime interchange shape.
+func AhdTimeInstantCivil(value AhdCivilTime) time.Time {
+	return AhdTimeInstant(value.Year, value.Month, value.Day, value.Hour, value.Minute,
+		value.Second, value.Millisecond, value.OffsetMinutes)
+}
+
+// AhdTimeInstantTimestamp returns one DateTime instant as Unix milliseconds.
+func AhdTimeInstantTimestamp(value time.Time) int64 { return value.UnixMilli() }
+
+// AhdTimeToUTC, AhdTimeToLocal, and AhdTimeToOffset preserve the instant while
+// selecting the requested civil representation.
+func AhdTimeToUTC(value time.Time) AhdCivilTime { return ahdCivilFrom(value.UTC()) }
+
+func AhdTimeToLocal(value time.Time) AhdCivilTime { return ahdCivilFrom(value.In(time.Local)) }
+
+func AhdTimeToOffset(value time.Time, offsetMinutes int64) AhdCivilTime {
+	ahdRequireOffset(offsetMinutes)
+	return ahdCivilFrom(value.In(time.FixedZone("", int(offsetMinutes*60))))
 }
 
 // AhdTimeDifference is the signed millisecond difference second minus first.
 func AhdTimeDifference(first, second time.Time) int64 {
-	return int64(second.Sub(first) / time.Millisecond)
+	return second.UnixMilli() - first.UnixMilli()
 }
 
 // AhdTimeText is the stable, locale-independent DateTime text.
 func AhdTimeText(year, month, day, hour, minute, second int64) string {
 	return ahdPad(year, 4) + "-" + ahdPad(month, 2) + "-" + ahdPad(day, 2) + " " +
 		ahdPad(hour, 2) + ":" + ahdPad(minute, 2) + ":" + ahdPad(second, 2)
+}
+
+// AhdTimeCivilText formats the visible civil fields without appending an offset.
+func AhdTimeCivilText(value AhdCivilTime) string {
+	return AhdTimeText(value.Year, value.Month, value.Day, value.Hour, value.Minute, value.Second)
 }
 
 func ahdPad(value int64, width int) string {

@@ -12,7 +12,7 @@ const timeModuleID = "builtin:Time"
 // in constructor order. The runtime derives every one of them, including
 // weekday, when a DateTime is created.
 var TimeDateTimeFields = []string{
-	"year", "month", "day", "hour", "minute", "second", "millisecond", "weekday",
+	"year", "month", "day", "hour", "minute", "second", "millisecond", "weekday", "offsetMinutes",
 }
 
 // Canonical identities of the Classes the Time standard module publishes.
@@ -75,15 +75,31 @@ func timeModuleInterface() *ModuleInterface {
 	instant := types.Class{Symbol: timeDateTimeClass}
 	elapsed := types.Class{Symbol: timeDurationClass}
 	add(timeFunction("now", timeSignature(instant)))
+	add(timeFunction("utc", timeSignature(instant)))
+	add(timeFunction("timestamp", timeSignature(types.Int)))
+	add(timeFunction("fromTimestamp", timeSignature(instant, timeParameter("milliseconds", types.Int))))
 	add(timeFunction("monotonic", timeSignature(types.Real)))
 	add(timeFunction("sleep", timeSignature(types.Nothing, timeParameter("milliseconds", types.Int))))
 	add(timeFunction("duration", timeSignature(elapsed, timeParameter("milliseconds", types.Int))))
 	add(timeFunction("between", timeSignature(elapsed,
 		timeParameter("first", instant), timeParameter("second", instant))))
 	add(timeFunction("dateTime", timeDateTimeSignature(instant)))
+	add(timeFunction("dateTimeUTC", timeDateTimeSignature(instant)))
+	add(timeFunction("dateTimeOffset", timeDateTimeOffsetSignature(instant)))
 
 	sort.Strings(module.ExportNames)
 	return module
+}
+
+func timeDateTimeOffsetSignature(result types.Type) *types.Signature {
+	parameters := []types.Parameter{
+		timeParameter("year", types.Int), timeParameter("month", types.Int),
+		timeParameter("day", types.Int), timeParameter("offsetMinutes", types.Int),
+	}
+	for _, name := range []string{"hour", "minute", "second", "millisecond"} {
+		parameters = append(parameters, types.Parameter{Name: name, Type: types.Int, HasDefault: true})
+	}
+	return &types.Signature{Parameters: parameters, Return: result}
 }
 
 // timeDateTimeSignature is the civil-construction contract. hour, minute,

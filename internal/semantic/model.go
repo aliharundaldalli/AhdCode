@@ -186,6 +186,10 @@ const (
 	DateTimeBefore     TypeOperation = "DateTime.before"
 	DateTimeAfter      TypeOperation = "DateTime.after"
 	DateTimeSameMoment TypeOperation = "DateTime.sameMoment"
+	DateTimeTimestamp  TypeOperation = "DateTime.timestamp"
+	DateTimeToUTC      TypeOperation = "DateTime.toUTC"
+	DateTimeToLocal    TypeOperation = "DateTime.toLocal"
+	DateTimeToOffset   TypeOperation = "DateTime.toOffset"
 	// DateTimeToString is the stable, locale-independent moment text.
 	DateTimeToString TypeOperation = "DateTime.toString"
 	// CalendarIsLeapYear, CalendarDaysInMonth, and CalendarWeekday are the
