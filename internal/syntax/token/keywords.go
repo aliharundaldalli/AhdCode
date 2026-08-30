@@ -11,7 +11,7 @@ var keywords = map[string]Kind{
 	"as": KeywordAs, "true": KeywordTrue, "false": KeywordFalse, "null": KeywordNull,
 	"Int": KeywordInt, "Real": KeywordReal, "String": KeywordString, "Bool": KeywordBool,
 	"Nothing": KeywordNothing, "List": KeywordList, "Pair": KeywordPair,
-	"Function": KeywordFunction, "Overload": KeywordOverload, "Override": KeywordOverride,
+	"Function": KeywordFunction, "lambda": KeywordLambda, "Overload": KeywordOverload, "Override": KeywordOverride,
 	"Class": KeywordClass, "Attributes": KeywordAttributes, "Constant": KeywordConstant,
 	"Local": KeywordLocal, "Global": KeywordGlobal, "Confidential": KeywordConfidential,
 	"Object": KeywordObject, "Error": KeywordError,

@@ -15,6 +15,7 @@ type callableKind uint8
 const (
 	functionCallable callableKind = iota
 	structureCallable
+	lambdaCallable
 )
 
 type callableContext struct {

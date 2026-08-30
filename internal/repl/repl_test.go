@@ -43,6 +43,27 @@ func TestPersistentSessionMutationErrorsAndDeclarations(t *testing.T) {
 	}
 }
 
+func TestLambdaPersistsAndWorksAsListCallback(t *testing.T) {
+	input := `square := lambda (x: Int) -> x ^ 2
+write(square(5))
+values := [1, 2, 3]
+write(values.map(lambda (x: Int) -> x ^ 2))
+write(values.filter(lambda (x: Int) -> x > 1))
+values.sort(lambda (x: Int) -> -x)
+write(values)
+`
+	var output, errors bytes.Buffer
+	Run(strings.NewReader(input), &output, &errors, "AhdCode v0.1.10")
+	for _, want := range []string{"25\n", "[1, 4, 9]\n", "[2, 3]\n", "[3, 2, 1]\n"} {
+		if !strings.Contains(output.String(), want) {
+			t.Fatalf("REPL output missing %q:\n%s", want, output.String())
+		}
+	}
+	if errors.Len() != 0 {
+		t.Fatalf("REPL errors: %s", errors.String())
+	}
+}
+
 func TestMultilineFunctionAndClassPersist(t *testing.T) {
 	input := `add: Function := (
     x: Int

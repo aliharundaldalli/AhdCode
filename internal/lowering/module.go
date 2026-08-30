@@ -15,6 +15,11 @@ func (lowerer *moduleLowerer) lowerModule() *ir.Module {
 		result.Dependencies = append(result.Dependencies, ir.ModuleID(dependency))
 	}
 	result.Init.Span = lowerer.module.Parsed.Program.Span()
+	for _, lambda := range lowerer.semantic.LambdaExpressions {
+		if function := lowerer.lowerLambda(lambda); function != nil {
+			result.Functions = append(result.Functions, function)
+		}
+	}
 	for _, statement := range lowerer.module.Parsed.Program.Statements {
 		switch value := statement.(type) {
 		case *ast.VariableDecl:
@@ -47,6 +52,49 @@ func (lowerer *moduleLowerer) lowerModule() *ir.Module {
 	sort.Slice(result.Functions, func(i, j int) bool { return result.Functions[i].ID < result.Functions[j].ID })
 	sort.Slice(result.Classes, func(i, j int) bool { return result.Classes[i].ID < result.Classes[j].ID })
 	return result
+}
+
+func (lowerer *moduleLowerer) lowerLambda(lambda *ast.LambdaExpr) *ir.Function {
+	symbol := lowerer.semantic.ResolvedSymbols[lambda]
+	if symbol == nil || symbol.Callable == nil || symbol.Callable.Signature == nil {
+		lowerer.compilation.error(CodeMissingSemantic, "lambda has no concrete Function signature", lambda.Span())
+		return nil
+	}
+	callable := symbol.Callable
+	callableID := lowerer.compilation.registry.callableID(lowerer.module, symbol, callable, false)
+	function := &ir.Function{
+		Span: lambda.Span(), ID: callableID,
+		Symbol: lowerer.compilation.registry.symbolID(lowerer.module, symbol),
+		Name:   "lambda", Kind: ir.OrdinaryFunction,
+		Signature: *lowerSignature(callable.Signature), ReturnNull: lowerNull(callable.ReturnNull),
+	}
+	previousReturn, previousReceiver, previousOwner := lowerer.currentReturn, lowerer.currentReceiver, lowerer.currentOwner
+	lowerer.currentReturn, lowerer.currentReceiver, lowerer.currentOwner = function.Signature.Return, "", ""
+	for index := range lambda.Parameters {
+		if index >= len(callable.Signature.Parameters) {
+			break
+		}
+		parameter := &lambda.Parameters[index]
+		semanticParameter := findSymbol(lowerer.semantic, semantic.ParameterSymbol, parameter.Name, parameter.Span())
+		parameterType := lowerType(callable.Signature.Parameters[index].Type)
+		id := lowerer.compilation.registry.symbolID(lowerer.module, semanticParameter)
+		if id == "" {
+			id = ir.SymbolID(string(callableID) + "::parameter::" + parameter.Name)
+		}
+		item := ir.Parameter{Span: parameter.Span(), ID: id, Name: parameter.Name, Type: parameterType, NullState: lowerNull(callable.ParameterNull[index])}
+		function.Parameters = append(function.Parameters, item)
+	}
+	body := lowerer.lowerExprExpected(lambda.Body, function.Signature.Return)
+	function.Body = ir.Block{Span: lambda.Body.Span()}
+	if function.Signature.Return.Kind == ir.NothingType {
+		function.Body.Statements = []ir.Statement{&ir.ExprStmt{StmtBase: ir.StmtBase{Span: lambda.Body.Span()}, Value: body}}
+	} else {
+		function.Body.Statements = []ir.Statement{&ir.ReturnStmt{
+			StmtBase: ir.StmtBase{Span: lambda.Body.Span()}, Value: body, ReturnType: function.Signature.Return,
+		}}
+	}
+	lowerer.currentReturn, lowerer.currentReceiver, lowerer.currentOwner = previousReturn, previousReceiver, previousOwner
+	return function
 }
 
 func (lowerer *moduleLowerer) lowerGlobal(declaration *ast.VariableDecl, symbol *semantic.Symbol) *ir.Global {

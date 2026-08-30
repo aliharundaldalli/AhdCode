@@ -105,11 +105,12 @@ func TestXIDStartAndContinueBoundaries(t *testing.T) {
 }
 
 func TestReservedKeywordsAndCaseSensitivity(t *testing.T) {
-	result := lexText("and or not true false null Int int Class class")
+	result := lexText("and or not true false null lambda Lambda Int int Class class")
 	assertNoDiagnostics(t, result)
 	assertKinds(t, result,
 		token.KeywordAnd, token.KeywordOr, token.KeywordNot,
 		token.KeywordTrue, token.KeywordFalse, token.KeywordNull,
+		token.KeywordLambda, token.Identifier,
 		token.KeywordInt, token.Identifier, token.KeywordClass, token.Identifier, token.EOF,
 	)
 }

@@ -77,6 +77,8 @@ func (p *parser) parsePrefix() ast.Expr {
 	case token.KeywordNull:
 		p.advance()
 		return &ast.LiteralExpr{Base: ast.Base{Range: item.Span}, Kind: ast.NullLiteral, Raw: item.Lexeme, Value: "null"}
+	case token.KeywordLambda:
+		return p.parseLambda()
 	case token.Identifier:
 		p.advance()
 		return &ast.IdentifierExpr{Base: ast.Base{Range: item.Span}, Name: item.Value, Raw: item.Lexeme}
@@ -115,6 +117,21 @@ func (p *parser) parsePrefix() ast.Expr {
 		}
 		return &ast.BadExpr{Base: ast.Base{Range: item.Span}}
 	}
+}
+
+func (p *parser) parseLambda() ast.Expr {
+	start := p.advance().Span.Start
+	parameters := p.parseParameterList(false)
+	p.skipNewlines()
+	p.expect(token.Arrow, "expected -> after lambda parameters")
+	p.skipNewlines()
+	if p.check(token.LeftBrace) {
+		p.errorCurrent(codeInvalidLambdaSyntax, "lambda body must be one expression, not a block", "use lambda (...) -> expression, or write a normal Function for statements")
+		block := p.parseBlock()
+		return &ast.BadExpr{Base: p.base(start, block.Span().End)}
+	}
+	body := p.parseExpression(0)
+	return &ast.LambdaExpr{Base: p.base(start, spanEnd(body)), Parameters: parameters, Body: body}
 }
 
 func (p *parser) infixOperator() (operator string, leftBP, rightBP, width int) {

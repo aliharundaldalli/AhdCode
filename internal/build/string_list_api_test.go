@@ -6,8 +6,8 @@ import (
 	"testing"
 )
 
-// listCallbacks is the shared preamble of the callback-typed List operations.
-// v0.1 has no lambda syntax, so every callback is a declared Function.
+// listCallbacks keeps named Function callbacks as regression fixtures for the
+// callback-typed List operations; lambda coverage lives in lambda_test.go.
 const listCallbacks = `double: Function := (
     x: Int
 ) -> Int {

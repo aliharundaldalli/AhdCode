@@ -66,6 +66,80 @@ func TestAssignmentCompatibility(t *testing.T) {
 	}
 }
 
+func TestLambdaTypingCallsCallbacksAndNullability(t *testing.T) {
+	parsed, result := analyzeText(t, `Student: Class<> := {
+    structure: Attributes := (score: Int)
+}
+square := lambda (x: Int) -> x ^ 2
+positive: Function := lambda (x: Int) -> x > 0
+zero := lambda () -> 42
+combine := lambda (x: Int, y: Int, z: Real, text: String) -> real(x + y) > z and text != ""
+studentScore := lambda (student: Student) -> student.score
+present := lambda (student: Student?) -> student != null
+first := lambda (items: List<Int>) -> items[0]
+usesPredicate := lambda (operation: Function) -> [1].filter(operation)[0] > 0
+values := [1, 2, 3]
+mapped := values.map(lambda (x: Int) -> x ^ 2)
+filtered := values.filter(lambda (x: Int) -> x > 1)
+values.sort(lambda (x: Int) -> -x)
+answer := square(5)`)
+	requireSemanticClean(t, result)
+	for _, index := range []int{1, 2, 3, 4, 5, 6, 7, 8} {
+		declaration := parsed.Program.Statements[index].(*ast.VariableDecl)
+		function, ok := result.ResolvedSymbols[declaration].Type.(types.Function)
+		if !ok || function.Signature == nil || types.IsInvalid(function.Signature.Return) {
+			t.Fatalf("%s type = %#v", declaration.Name, result.ResolvedSymbols[declaration].Type)
+		}
+	}
+}
+
+func TestLambdaDiagnosticsAndNoImplicitCoercion(t *testing.T) {
+	_, wrongArgument := analyzeText(t, `f := lambda (x: Int) -> x ^ 2
+answer := f("5")`)
+	requireSemanticCode(t, wrongArgument, codeTypeMismatch)
+
+	_, nullableUse := analyzeText(t, `Student: Class<> := {
+    structure: Attributes := (score: Int)
+}
+score := lambda (student: Student?) -> student.score`)
+	requireSemanticCode(t, nullableUse, codeNullableUse)
+
+	_, capture := analyzeText(t, `outer: Function := (offset: Int) -> Function {
+    return lambda (x: Int) -> x + offset
+}`)
+	requireSemanticCode(t, capture, codePendingFeature)
+
+	_, blockCapture := analyzeText(t, `if true {
+    offset: Local Int := 1
+    f: Local := lambda (x: Int) -> x + offset
+}`)
+	requireSemanticCode(t, blockCapture, codePendingFeature)
+
+	_, defaultValue := analyzeText(t, `f := lambda (x: Int := 1) -> x + 1`)
+	requireSemanticCode(t, defaultValue, codeInvalidLambda)
+
+	_, globalAlias := analyzeText(t, `offset: Int := 1
+useGlobal: Function := () -> Int {
+    offset: Global Int
+    addOffset: Local := lambda (x: Int) -> x + offset
+    return addOffset(2)
+}
+answer := useGlobal()`)
+	requireSemanticClean(t, globalAlias)
+}
+
+func TestNormalFunctionSyntaxStillWorksBesideLambda(t *testing.T) {
+	_, result := analyzeText(t, `full: Function := (x: Int) -> Bool {
+    if x <= 0 {
+        return false
+    }
+    return true
+}
+short := lambda (x: Int) -> x > 0
+write(full(1) == short(1))`)
+	requireSemanticClean(t, result)
+}
+
 func TestUndefinedMutationTargetsReportUnknownName(t *testing.T) {
 	for _, text := range []string{
 		"missing = 1",

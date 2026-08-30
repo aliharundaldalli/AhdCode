@@ -53,6 +53,7 @@ const (
 	KeywordList
 	KeywordPair
 	KeywordFunction
+	KeywordLambda
 	KeywordOverload
 	KeywordOverride
 	KeywordClass
@@ -114,7 +115,7 @@ var names = [...]string{
 	KeywordAs: "as", KeywordTrue: "true", KeywordFalse: "false", KeywordNull: "null",
 	KeywordInt: "Int", KeywordReal: "Real", KeywordString: "String", KeywordBool: "Bool",
 	KeywordNothing: "Nothing", KeywordList: "List", KeywordPair: "Pair",
-	KeywordFunction: "Function", KeywordOverload: "Overload", KeywordOverride: "Override",
+	KeywordFunction: "Function", KeywordLambda: "lambda", KeywordOverload: "Overload", KeywordOverride: "Override",
 	KeywordClass: "Class", KeywordAttributes: "Attributes", KeywordConstant: "Constant",
 	KeywordLocal: "Local", KeywordGlobal: "Global", KeywordConfidential: "Confidential",
 	KeywordObject: "Object", KeywordError: "Error", Colon: ":", Declare: ":=", Assign: "=",

@@ -5,7 +5,7 @@ import "testing"
 func TestReservedKeywordTable(t *testing.T) {
 	tests := map[string]Kind{
 		"and": KeywordAnd, "null": KeywordNull, "Int": KeywordInt,
-		"Function": KeywordFunction, "Confidential": KeywordConfidential,
+		"Function": KeywordFunction, "lambda": KeywordLambda, "Confidential": KeywordConfidential,
 		"Object": KeywordObject, "Error": KeywordError,
 	}
 	for text, want := range tests {
@@ -22,7 +22,7 @@ func TestReservedKeywordTable(t *testing.T) {
 }
 
 func TestEveryKindHasName(t *testing.T) {
-	for kind := Invalid; kind <= RightBrace; kind++ {
+	for kind := Invalid; kind <= Question; kind++ {
 		if got := kind.String(); got == "" || got == "Kind(?)" {
 			t.Fatalf("kind %d has no stable name", kind)
 		}

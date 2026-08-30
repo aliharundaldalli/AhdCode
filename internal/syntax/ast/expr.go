@@ -39,6 +39,16 @@ type GroupExpr struct {
 
 func (*GroupExpr) expressionNode() {}
 
+// LambdaExpr is the expression-only shorthand for an anonymous value of the
+// existing Function type. Its return type is inferred from Body.
+type LambdaExpr struct {
+	Base
+	Parameters []Parameter
+	Body       Expr
+}
+
+func (*LambdaExpr) expressionNode() {}
+
 type UnaryExpr struct {
 	Base
 	Operator string

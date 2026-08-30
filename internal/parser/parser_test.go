@@ -61,6 +61,36 @@ func TestPowerIsRightAssociative(t *testing.T) {
 	}
 }
 
+func TestLambdaExpressionGrammar(t *testing.T) {
+	result := parseText(t, `f := lambda (x: Int, y: Real) -> real(x) > y
+zero := lambda () -> 42`)
+	requireClean(t, result)
+	first := result.Program.Statements[0].(*ast.VariableDecl).Initializer
+	lambda, ok := first.(*ast.LambdaExpr)
+	if !ok || len(lambda.Parameters) != 2 {
+		t.Fatalf("initializer = %#v, want two-parameter LambdaExpr", first)
+	}
+	if _, ok := lambda.Body.(*ast.BinaryExpr); !ok {
+		t.Fatalf("lambda body = %T, want BinaryExpr", lambda.Body)
+	}
+	second := result.Program.Statements[1].(*ast.VariableDecl).Initializer.(*ast.LambdaExpr)
+	if len(second.Parameters) != 0 {
+		t.Fatalf("zero-parameter lambda has %d parameters", len(second.Parameters))
+	}
+}
+
+func TestBlockLambdaIsRejected(t *testing.T) {
+	result := parseText(t, "f := lambda (x: Int) -> {\nreturn x\n}\n")
+	requireCode(t, result, codeInvalidLambdaSyntax)
+}
+
+func TestLambdaParameterTypeAndArrowAreRequired(t *testing.T) {
+	requireCode(t, parseText(t, "f := lambda (x) -> x\n"), codeExpectedToken)
+	requireCode(t, parseText(t, "f := lambda (x: Int) x\n"), codeExpectedToken)
+	requireCode(t, parseText(t, "f := lambda (x: Int) ->\n"), codeUnexpectedToken)
+	requireCode(t, parseText(t, "f := lambda (x: Int) -> return x\n"), codeUnexpectedToken)
+}
+
 func TestNotBindsOutsideEquality(t *testing.T) {
 	result := parseText(t, "not x == 5")
 	requireClean(t, result)

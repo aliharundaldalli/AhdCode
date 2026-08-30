@@ -42,4 +42,5 @@ const (
 	codeCannotInferType     = "SEM039"
 	codeProtocolSlot        = "SEM040"
 	codeProtocolSignature   = "SEM041"
+	codeInvalidLambda       = "SEM042"
 )

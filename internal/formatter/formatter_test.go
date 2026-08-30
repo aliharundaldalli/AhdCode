@@ -48,6 +48,24 @@ active:true
 	}
 }
 
+func TestLambdaFormattingAndIdempotence(t *testing.T) {
+	input := "short:=lambda(x:Int)->x>0\nlong:=lambda(first:Int,second:Int,description:String,flag:Bool)->first+second>0 and description!=\"\" and flag\n"
+	formatted := formatText(t, input)
+	for _, wanted := range []string{
+		"short := lambda (x: Int) -> x > 0",
+		"long := lambda (",
+		"    first: Int",
+		") -> first + second > 0 and description != \"\" and flag",
+	} {
+		if !strings.Contains(formatted, wanted) {
+			t.Fatalf("formatted lambda lacks %q:\n%s", wanted, formatted)
+		}
+	}
+	if twice := formatText(t, formatted); twice != formatted {
+		t.Fatalf("lambda formatter is not idempotent:\nfirst:\n%s\nsecond:\n%s", formatted, twice)
+	}
+}
+
 func TestFormatterPreservesUpToOneBlankLineBetweenStatements(t *testing.T) {
 	input := "a: Int := 1\n\n\n\nb: Int := 2\nc: Int := 3\n"
 	want := "a: Int := 1\n\nb: Int := 2\nc: Int := 3\n"

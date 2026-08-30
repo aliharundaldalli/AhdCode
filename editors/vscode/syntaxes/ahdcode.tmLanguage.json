@@ -79,7 +79,7 @@
       "patterns": [
         {
           "name": "keyword.control.ahdcode",
-          "match": "\\b(?:if|else|while|until|for|break|continue|state|condition|default|attempt|except|ultimately|toss|return|bring|from|all|as)\\b"
+          "match": "\\b(?:if|else|while|until|for|break|continue|state|condition|default|attempt|except|ultimately|toss|return|bring|from|all|as|lambda)\\b"
         },
         {
           "name": "keyword.operator.word.ahdcode",

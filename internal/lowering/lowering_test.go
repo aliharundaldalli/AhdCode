@@ -142,6 +142,32 @@ runtimePower: Function := (exponent: Int) -> Int {
 	}
 }
 
+func TestLambdaLowersToExistingFunctionValueAndCallableIR(t *testing.T) {
+	result := lowerSources(t, map[string]string{"/Main.ahd": `square := lambda (x: Int) -> x ^ 2
+answer := square(5)
+values := [1, 2, 3]
+mapped := values.map(lambda (x: Int) -> x + 1)`}, "/Main.ahd")
+	main := moduleIR(t, result.Compilation, "Main")
+	if len(main.Functions) != 2 {
+		t.Fatalf("lambda Function count = %d, want 2", len(main.Functions))
+	}
+	for _, function := range main.Functions {
+		if function.Name != "lambda" || function.Kind != ir.OrdinaryFunction || len(function.Body.Statements) != 1 {
+			t.Fatalf("lowered lambda = %#v", function)
+		}
+		if _, ok := function.Body.Statements[0].(*ir.ReturnStmt); !ok {
+			t.Fatalf("lambda body statement = %T", function.Body.Statements[0])
+		}
+	}
+	if _, ok := globalInitializer(t, main, "square").(*ir.FunctionValueExpr); !ok {
+		t.Fatalf("square initializer = %T, want FunctionValueExpr", globalInitializer(t, main, "square"))
+	}
+	mapCall := globalInitializer(t, main, "mapped").(*ir.CallExpr)
+	if _, ok := mapCall.Arguments[0].Value.(*ir.FunctionValueExpr); !ok {
+		t.Fatalf("map callback = %T, want FunctionValueExpr", mapCall.Arguments[0].Value)
+	}
+}
+
 func TestCallsNormalizeNamesDefaultsOverloadsAndCallbacks(t *testing.T) {
 	result := lowerSources(t, map[string]string{"/Main.ahd": `create: Function := (name: String, age: Int := 25) -> Int {
     return age

@@ -695,6 +695,12 @@ func (b *builder) expr(e ast.Expr) doc {
 		inner := b.expr(v.Expression)
 		trail := b.gap()
 		return concat(open, lead, inner, trail, b.leaf())
+	case *ast.LambdaExpr:
+		keyword := b.leaf()
+		parameters := b.parameterGroup(v.Parameters)
+		arrow := b.leaf()
+		gapDoc := b.gap()
+		return concat(keyword, text(" "), parameters, text(" "), arrow, text(" "), gapDoc, b.expr(v.Body))
 	case *ast.UnaryExpr:
 		operator := b.leaf()
 		gapDoc := b.gap()

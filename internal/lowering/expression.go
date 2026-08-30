@@ -68,6 +68,16 @@ func (lowerer *moduleLowerer) lowerExprWithExpected(expression ast.Expr, expecte
 		return lowerer.lowerIdentifier(value, base)
 	case *ast.GroupExpr:
 		return lowerer.lowerExprExpected(value.Expression, chooseExpected(expected, typeValue))
+	case *ast.LambdaExpr:
+		symbol := lowerer.semantic.ResolvedSymbols[value]
+		if symbol == nil || symbol.Callable == nil {
+			lowerer.compilation.error(CodeMissingSemantic, "lambda has no resolved callable", value.Span())
+			return nil
+		}
+		return &ir.FunctionValueExpr{
+			ExprBase: base, Symbol: lowerer.compilation.registry.symbolID(lowerer.module, symbol),
+			Callable: lowerer.compilation.registry.callableID(lowerer.module, symbol, symbol.Callable, false),
+		}
 	case *ast.UnaryExpr:
 		if resolved := lowerer.semantic.ResolvedSymbols[value]; resolved != nil {
 			if callable := lowerer.semantic.SelectedFunctionValues[value]; callable != nil {

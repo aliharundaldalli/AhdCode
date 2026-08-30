@@ -48,6 +48,7 @@ type Callable struct {
 	ParameterNull []NullState
 	ReturnNull    NullState
 	Declaration   *ast.FunctionDecl
+	Lambda        *ast.LambdaExpr
 	Structure     *ast.StructureDecl
 }
 
@@ -251,6 +252,9 @@ type Result struct {
 	// TypeOperations records the built-in String, List, and Pair operations,
 	// so lowering never has to rediscover them from member names.
 	TypeOperations map[*ast.CallExpr]TypeOperation
+	// LambdaExpressions preserves source order for deterministic lowering into
+	// the existing Function IR/runtime representation.
+	LambdaExpressions []*ast.LambdaExpr
 }
 
 func (result Result) HasErrors() bool {

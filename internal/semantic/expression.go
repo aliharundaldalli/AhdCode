@@ -43,6 +43,8 @@ func (a *analyzer) analyzeExpressionExpected(expression ast.Expr, current *scope
 		a.result.ExpressionTypes[expression] = info.typeValue
 		a.result.NullStates[expression] = info.nullState
 		return info
+	case *ast.LambdaExpr:
+		return a.recordExpression(expression, a.analyzeLambda(value, current, flow))
 	case *ast.CallExpr:
 		info := a.analyzeCallExpected(value, current, flow, expected)
 		a.result.ExpressionTypes[expression] = info.typeValue
@@ -127,6 +129,8 @@ func (a *analyzer) analyzeExpressionWithMagnitude(expression ast.Expr, current *
 		info = a.analyzeIdentifier(value, current, flow)
 	case *ast.GroupExpr:
 		info = a.analyzeExpressionWithMagnitude(value.Expression, current, flow, allowMinMagnitude)
+	case *ast.LambdaExpr:
+		info = a.analyzeLambda(value, current, flow)
 	case *ast.UnaryExpr:
 		info = a.analyzeUnary(value, current, flow)
 	case *ast.BinaryExpr:
@@ -152,6 +156,88 @@ func (a *analyzer) analyzeExpressionWithMagnitude(expression ast.Expr, current *
 		a.result.ResolvedSymbols[expression] = info.symbol
 	}
 	return info
+}
+
+func (a *analyzer) recordExpression(expression ast.Expr, info expressionInfo) expressionInfo {
+	a.result.ExpressionTypes[expression] = info.typeValue
+	a.result.NullStates[expression] = info.nullState
+	if info.symbol != nil {
+		a.result.ResolvedSymbols[expression] = info.symbol
+	}
+	return info
+}
+
+// analyzeLambda builds one concrete callable signature from explicit
+// parameter types and the statically inferred type of the single body
+// expression. The scope is linked for name lookup, but crossing an enclosing
+// callable boundary is diagnosed as unsupported capture by analyzeIdentifier.
+func (a *analyzer) analyzeLambda(lambda *ast.LambdaExpr, current *scope, flow flowState) expressionInfo {
+	parameters := make([]types.Parameter, len(lambda.Parameters))
+	parameterNull := make([]NullState, len(lambda.Parameters))
+	for index := range lambda.Parameters {
+		parameter := &lambda.Parameters[index]
+		parameters[index] = types.Parameter{Name: parameter.Name, Type: a.resolveType(parameter.Type)}
+		parameterNull[index] = nullStateFor(parameter.Type != nil && parameter.Type.Nullable)
+	}
+	callable := &Callable{
+		Signature:     &types.Signature{Parameters: parameters, Return: types.Invalid},
+		ParameterNull: parameterNull, ReturnNull: NonNull, Lambda: lambda,
+	}
+	symbol := &Symbol{
+		Name: "lambda", Kind: FunctionSymbol, Type: types.Function{Signature: callable.Signature},
+		Span: lambda.Span(), Declaration: lambda, Callable: callable, InitialNull: NonNull,
+		OriginModuleID: a.environment.ModuleID,
+	}
+	a.result.ResolvedSymbols[lambda] = symbol
+	a.result.Symbols = append(a.result.Symbols, symbol)
+	a.result.LambdaExpressions = append(a.result.LambdaExpressions, lambda)
+
+	lambdaScope := newScope(current, callableScope)
+	context := &callableContext{kind: lambdaCallable, symbol: symbol, callable: callable, returnType: types.Invalid}
+	lambdaScope.callable = context
+	lambdaFlow := flow.clone()
+	for index := range lambda.Parameters {
+		parameter := &lambda.Parameters[index]
+		if len(parameter.Modifiers) != 0 {
+			a.error(codeScopeModifier, fmt.Sprintf("lambda parameter %q is implicitly Local", parameter.Name), parameter.Span(), "remove declaration modifiers from the lambda parameter")
+		}
+		if _, exists := lambdaScope.local(parameter.Name); exists {
+			a.error(codeRedeclaration, fmt.Sprintf("duplicate lambda parameter %q", parameter.Name), parameter.Span(), "use a unique parameter name")
+			continue
+		}
+		parameterSymbol := &Symbol{
+			Name: parameter.Name, Kind: ParameterSymbol, Type: parameters[index].Type,
+			Span: parameter.Span(), InitialNull: parameterNull[index],
+			DeclaredNullable: parameter.Type != nil && parameter.Type.Nullable,
+		}
+		if function, ok := parameters[index].Type.(types.Function); ok && function.Signature == nil {
+			parameterSymbol.inference = newFunctionInference(callable.Signature, index)
+		}
+		lambdaScope.symbols[parameter.Name] = parameterSymbol
+		lambdaFlow[parameterSymbol] = parameterSymbol.InitialNull
+		a.result.Symbols = append(a.result.Symbols, parameterSymbol)
+		a.trackInference(parameterSymbol, lambdaScope)
+		if parameter.Default != nil {
+			a.error(codeInvalidLambda, fmt.Sprintf("lambda parameter %q cannot have a default value in v0.1.10", parameter.Name), parameter.Default.Span(), "use a required lambda parameter or a named Function declaration")
+		}
+	}
+	body := a.analyzeExpression(lambda.Body, lambdaScope, lambdaFlow)
+	a.finalizeInferences(context.inferences)
+	if resolved := a.result.ExpressionTypes[lambda.Body]; resolved != nil {
+		body.typeValue = resolved
+		body.nullState = a.result.NullStates[lambda.Body]
+	}
+	if types.IsInvalid(body.typeValue) {
+		if body.nullState == Null {
+			a.error(codeCannotInferType, "cannot infer a lambda return type from null", lambda.Body.Span(), "return an expression with a concrete static type")
+		}
+		callable.Signature.Return = types.Invalid
+	} else {
+		callable.Signature.Return = body.typeValue
+		callable.ReturnNull = body.nullState
+	}
+	symbol.Type = types.Function{Signature: callable.Signature}
+	return expressionInfo{typeValue: symbol.Type, nullState: NonNull, symbol: symbol}
 }
 
 func (a *analyzer) analyzeLiteral(literal *ast.LiteralExpr, allowMinMagnitude bool) expressionInfo {
@@ -191,6 +277,9 @@ func (a *analyzer) analyzeIdentifier(identifier *ast.IdentifierExpr, current *sc
 		a.error(codeUnknownName, fmt.Sprintf("unknown name %q", identifier.Name), identifier.Span(), "declare the binding in a visible lexical scope")
 		return expressionInfo{typeValue: types.Invalid, nullState: MaybeNull}
 	}
+	if current.callable != nil && current.callable.kind == lambdaCallable && owner != a.module && owner.callable != current.callable && symbol.Alias == nil && isLexicalCapture(symbol.Kind) {
+		a.error(codePendingFeature, fmt.Sprintf("lambda cannot capture enclosing Local binding %q in v0.1.10", identifier.Name), identifier.Span(), "pass the value as an explicit lambda parameter; lexical closures are not part of v0.1.10")
+	}
 	// Global governs module state. A module-root Function, Class, or namespace
 	// declaration is a callable or type declaration rather than a binding, so
 	// it needs no Global declaration to be used inside a callable.
@@ -205,6 +294,15 @@ func (a *analyzer) analyzeIdentifier(identifier *ast.IdentifierExpr, current *sc
 	}
 	constant := symbol.ConstValue
 	return expressionInfo{typeValue: typeValue, nullState: flow.state(symbol), symbol: symbol, constant: constant}
+}
+
+func isLexicalCapture(kind SymbolKind) bool {
+	switch kind {
+	case BindingSymbol, ParameterSymbol, ForSymbol, ExceptSymbol:
+		return true
+	default:
+		return false
+	}
 }
 
 func (a *analyzer) analyzeUnary(expression *ast.UnaryExpr, current *scope, flow flowState) expressionInfo {

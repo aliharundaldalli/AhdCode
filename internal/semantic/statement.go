@@ -255,6 +255,18 @@ func (a *analyzer) analyzeInferredDeclaration(declaration *ast.VariableDecl, cur
 	}
 	a.result.ResolvedSymbols[declaration] = symbol
 	a.result.ResolvedSymbols[identifier] = symbol
+	if function, ok := typeValue.(types.Function); ok && function.Signature != nil && symbol.Callable == nil {
+		// An inferred Function binding keeps a separate copy of the concrete
+		// callable contract. In particular, nullable lambda parameters and return
+		// state must not be replaced by the conservative external-Function
+		// fallback used when no callable metadata exists.
+		concrete := concreteCallable(initializer)
+		if concrete != nil {
+			symbol.Callable = &Callable{
+				Signature: function.Signature, ParameterNull: append([]NullState(nil), concrete.ParameterNull...), ReturnNull: concrete.ReturnNull,
+			}
+		}
+	}
 	flow[symbol] = resultNull
 	return flow
 }
