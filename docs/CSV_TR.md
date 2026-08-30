@@ -29,6 +29,11 @@ desteklenir: ayraçlar ve yeni satırlar tırnaklı alanlarda bulunabilir; bir
 tırnak `""` ile kaçırılır. LF/CRLF girdi, Unicode ve boş alanlar kabul edilir.
 Go CSV yazıcısı deterministik çıktıyı tanımlar; `stringify([])` sonucu `""`dır.
 
+```ahd
+rows: List<List<String>> := CSV.parse("name,note\nAli,\"hello, world\"\n")
+write(rows[1][1])
+```
+
 ## Kayıtlar
 
 ```text
@@ -56,6 +61,14 @@ Boş, çok scalar içeren, geçersiz UTF-8 ya da desteklenmeyen ayraçlar
 `read`/`write` dosya erişim hataları `FileError`/`IOError` anlamını korur.
 Göreli yollar işlem çalışma dizisini; kalıcı REPL'de REPL'in başlatıldığı
 dizini kullanır.
+
+```ahd
+attempt {
+    CSV.parse("a,\"unfinished")
+} except CSVError as error {
+    write(error.message)
+}
+```
 
 ## CSV taşımadır, Data ise tablo katmanıdır
 

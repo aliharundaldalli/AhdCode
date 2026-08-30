@@ -79,14 +79,24 @@ Yalın bir isim (`lambda [minimum] (...)`) reddedilir -- türünü belirtin,
 8. Protokol tanılamaları sözleşmeyi adlandırır. Örneğin `CCompare` dönüşünü
 `Int`, `CStr` dönüşünü `String` yapın; yeni protokol adı eklemeyin.
 
-9. Geçersiz regex, çalışma zamanında yakalanabilir `RegexError` fırlatır.
+9. Geçersiz regex, çalışma zamanında yakalanabilir `RegexError` fırlatır:
+
+```ahd
+attempt { Regex.compile("(unfinished") }
+except RegexError as error { write(error.message) }
+```
 
 10. Geçersiz tarihler, -840..840 dışı sabit ofsetler ve DateTime yıl 1..9999
 dışına çıkan timestamp'ler `ValueError` fırlatır; Go panic/stack trace dil
 davranışı değildir.
 
 11. Bozuk tırnaklama, geçersiz ayraç, yinelenen/boş başlık ve kayıt şekli
-uyuşmazlıkları `CSVError` fırlatır.
+uyuşmazlıkları `CSVError` fırlatır:
+
+```ahd
+attempt { CSV.parse("a,\"unfinished") }
+except CSVError as error { write(error.message) }
+```
 
 Eksik initializer, atanan ifade, ikili sağ operand, index, çağrı, List, Pair ve
 lambda gövdeleri; parser eksik parçayı bildiğinde yapıya özgü mesaj kullanır.

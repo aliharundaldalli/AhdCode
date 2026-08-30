@@ -59,9 +59,18 @@ write(turkey.hour)
 write(epoch.sameMoment(turkey))
 ```
 
-Dönüşümler aynı anı korur: `timestamp()`, `toUTC()`, `toLocal()` ve
-`toOffset(offsetMinutes)`. `before`, `after`, `sameMoment` ve `Time.between`,
-görünen saat alanlarını değil anları karşılaştırır.
+Dönüşümler aynı anı korur:
+
+```text
+value.timestamp() -> Int
+value.toUTC() -> DateTime
+value.toLocal() -> DateTime
+value.toOffset(offsetMinutes: Int) -> DateTime
+```
+
+`before`, `after`, `sameMoment` ve `Time.between`, görünen saat alanlarını
+değil anları karşılaştırır; bu yüzden farklı ofsetli değerler doğru
+karşılaştırılır.
 
 ## DateTime
 
@@ -82,13 +91,19 @@ kullanın; sıradan `==` ve `same`, Class kimliği anlamını korur.
 
 Sivil kurucular; yıl 1..9999, Gregoryen tarih, saat 0..23, dakika/saniye
 0..59 ve milisaniye 0..999 aralıklarını doğrular. `DateTime` ve `Duration`
-doğrudan oluşturulamaz. `Duration`, salt okunur `milliseconds: Int` ve
-`seconds: Real` sunar. `between(first, second)`, `second - first` anlamına gelir.
+doğrudan oluşturulamaz.
 
-`Calendar.isLeapYear`, `Calendar.daysInMonth` ve `Calendar.weekday` Gregoryen
-takvim sorularını yanıtlar. `monotonic()` gerilemeyen bir saatten geçen
-saniyeleri döndürür. `sleep` milisaniye alır; negatif değer `ValueError`
-fırlatır.
+`Duration`, salt okunur `milliseconds: Int` ve `seconds: Real` sunar.
+`between(first, second)`, `second - first` anlamına gelir.
+
+```text
+Calendar.isLeapYear(year: Int) -> Bool
+Calendar.daysInMonth(year: Int, month: Int) -> Int
+Calendar.weekday(year: Int, month: Int, day: Int) -> Int
+```
+
+`monotonic()` gerilemeyen bir saatten geçen saniyeleri döndürür. `sleep`
+milisaniye alır; negatif değer `ValueError` fırlatır.
 
 ## Kasıtlı sınır
 
