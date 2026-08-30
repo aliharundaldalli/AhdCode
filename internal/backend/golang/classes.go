@@ -147,6 +147,9 @@ func (current *layout) memberNames() []string {
 		names = append(names, name)
 	}
 	for _, field := range current.ownFields {
+		if field.Hidden {
+			continue
+		}
 		add(field.Name)
 	}
 	for _, entry := range current.ownSlots {

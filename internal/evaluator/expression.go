@@ -442,7 +442,7 @@ func (session *Session) hasMember(value any, name string) bool {
 			break
 		}
 		for _, field := range class.Fields {
-			if field.Name == name {
+			if !field.Hidden && field.Name == name {
 				return true
 			}
 		}

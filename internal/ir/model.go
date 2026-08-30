@@ -80,6 +80,13 @@ type Field struct {
 	NullState    NullState
 	Constant     bool
 	Confidential bool
+	// Hidden marks storage that a compiler-supplied Class needs at runtime but
+	// never publishes. The frontend does not declare such a field as an
+	// attribute, so reading it is already an unknown-member error; Hidden keeps
+	// member existence agreeing with that by excluding it from has / has not.
+	// It is not an access-control flag: Confidential covers restricted but
+	// genuinely published members.
+	Hidden bool
 }
 
 type Class struct {

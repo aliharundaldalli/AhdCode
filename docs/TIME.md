@@ -35,10 +35,14 @@ fixed offset in whole minutes. The supported offset range is -840..840
 inclusive. Invalid civil components, offsets, and unrepresentable timestamps
 raise `ValueError`.
 
-The public offset model has minute precision. A historical host-local offset
-that contains a seconds component cannot be represented without changing the
-instant, so local construction/conversion raises `ValueError` for that rare
-case rather than silently truncating it.
+The public offset model has minute precision: `offsetMinutes` is always whole
+minutes, and every offset AhdCode source can name is a whole minute. A few
+historical host-local zones sit at an offset that includes seconds — for
+example `Europe/Istanbul` is `+01:55:52` before 1880. Such a moment is still
+represented exactly: `offsetMinutes` reports the whole-minute part, and the
+leftover seconds are kept as runtime representation rather than being
+truncated, so the instant never shifts. The seconds remainder is not a
+published attribute, so it is not readable and `has` does not report it.
 
 ## Unix milliseconds and conversions
 

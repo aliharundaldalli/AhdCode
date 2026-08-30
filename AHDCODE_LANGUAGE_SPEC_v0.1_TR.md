@@ -3250,9 +3250,15 @@ tam dakikalık sabit ofset kullanır. Unix timestamp,
 `Time.timestamp()` güncel değeri okur, `Time.fromTimestamp` UTC görünümünü
 döndürür. DateTime yılı 1..9999 içinde temsil edilebildiğinde negatif
 timestamp geçerlidir. v0.1.11'de adlandırılmış/IANA saat dilimi veritabanı yoktur.
-Ofset gösterimi dakika hassasiyetindedir. Host'un tarihsel yerel bölgesi saniye
-bileşeni bildirirse yerel oluşturma/dönüşüm, ofseti kırpıp anı değiştirmek yerine
-`ValueError` fırlatır.
+Yayınlanan ofset gösterimi dakika hassasiyetindedir: `offsetMinutes` her zaman
+tam dakikadır ve AhdCode kaynağının adlandırabildiği her ofset tam dakikadır.
+Birkaç tarihsel host-yerel bölge, saniye içeren bir ofsette bulunur
+(`Europe/Istanbul` 1880 öncesinde `+01:55:52`'dir). Böyle bir an yine de tam
+olarak temsil edilir: `offsetMinutes` tam dakika kısmını bildirir, artan
+saniyeler ise çalışma zamanı gösterimi olarak korunur, bu yüzden an ne kırpılır
+ne de kayar. Bu artık yayınlanan bir öznitelik değildir -- okunamaz ve `has`
+onu bildirmez -- bu yüzden DateTime öznitelik yüzeyi tam olarak §36.2'deki
+dokuz isimden ibaret kalır.
 
 ### 36.2 DateTime
 

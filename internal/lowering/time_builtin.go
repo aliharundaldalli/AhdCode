@@ -29,13 +29,36 @@ var (
 	timeCalendarOperations = []string{"isLeapYear", "daysInMonth", "weekday"}
 )
 
+// timeDateTimeHiddenFields are runtime representation, not published
+// attributes. A historical host zone can sit at a UTC offset that is not a
+// whole number of minutes (Europe/Istanbul is +01:55:52 before 1880) while the
+// published offsetMinutes attribute is deliberately minute-based. Storing the
+// leftover seconds keeps such an instant exact. The frontend never learns these
+// names, because semantic.TimeDateTimeFields stays the public attribute list,
+// so AhdCode source can neither read them nor see them through has.
+var timeDateTimeHiddenFields = []string{"offsetSeconds"}
+
+// timeDateTimeIntFields is the field layout the IR class and its constructor
+// use: every published attribute first, in declaration order, then the hidden
+// representation, which is marked so member existence keeps matching what the
+// frontend actually publishes.
+func timeDateTimeIntFields() []ir.Field {
+	fields := timeIntFields("DateTime", semantic.TimeDateTimeFields)
+	for _, name := range timeDateTimeHiddenFields {
+		hidden := timeIntFields("DateTime", []string{name})[0]
+		hidden.Hidden = true
+		fields = append(fields, hidden)
+	}
+	return fields
+}
+
 // timeModule emits DateTime, Duration, and Calendar as ordinary IR classes.
 // Their attributes are real fields, so reading them needs no special path and
 // the frontend's Constant rule already makes them read-only.
 func timeModule(id ir.ModuleID, name, path string) *ir.Module {
 	module := &ir.Module{ID: id, Name: name, SourcePath: path}
 
-	dateTime := timeClassDeclaration("DateTime", timeIntFields("DateTime", semantic.TimeDateTimeFields)...)
+	dateTime := timeClassDeclaration("DateTime", timeDateTimeIntFields()...)
 	dateTime.Operations = timeDateTimeOperations
 	duration := timeClassDeclaration("Duration",
 		append(timeIntFields("Duration", []string{"milliseconds"}),

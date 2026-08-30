@@ -2884,9 +2884,15 @@ A Unix timestamp is signed milliseconds since `1970-01-01 00:00:00 UTC`;
 `Time.timestamp()` reads the current value and `Time.fromTimestamp` returns
 its UTC representation. Negative timestamps are valid when representable as a
 DateTime year 1..9999. v0.1.11 has no named/IANA timezone database.
-The offset representation has minute precision. If a host's historical local
-zone reports a seconds component, local construction/conversion raises
-`ValueError` rather than truncating the offset and changing the instant.
+The published offset representation has minute precision: `offsetMinutes` is
+always whole minutes, and every offset AhdCode source can name is a whole
+minute. A few historical host-local zones sit at an offset that includes
+seconds (`Europe/Istanbul` is `+01:55:52` before 1880). Such a moment is still
+represented exactly: `offsetMinutes` reports the whole-minute part and the
+leftover seconds are retained as runtime representation, so the instant is
+neither truncated nor shifted. That remainder is not a published attribute --
+it cannot be read, and `has` does not report it -- so the DateTime attribute
+surface stays exactly the nine names of §36.2.
 
 ### 36.2 DateTime
 

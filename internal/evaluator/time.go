@@ -89,12 +89,15 @@ func (session *Session) dateTime(value time.Time) *Instance {
 	class := ir.ClassID("builtin:Time::class::DateTime")
 	instance := &Instance{Class: class, Fields: make(map[ir.FieldID]any)}
 	weekday := int64((int(value.Weekday())+6)%7 + 1)
+	// A historical host zone can sit at a UTC offset that is not a whole
+	// number of minutes (Europe/Istanbul is +01:55:52 before 1880), while the
+	// published offsetMinutes attribute is minute-based. The leftover seconds
+	// are stored as hidden representation so the instant stays exact; Go
+	// truncates toward zero and % keeps the dividend's sign, so
+	// minutes*60+seconds reproduces the original offset for both signs.
 	_, offsetSeconds := value.Zone()
-	if offsetSeconds%60 != 0 {
-		session.raise("ValueError", "local offset is not representable at minute precision")
-	}
-	values := []int64{int64(value.Year()), int64(value.Month()), int64(value.Day()), int64(value.Hour()), int64(value.Minute()), int64(value.Second()), int64(value.Nanosecond() / 1e6), weekday, int64(offsetSeconds / 60)}
-	names := []string{"year", "month", "day", "hour", "minute", "second", "millisecond", "weekday", "offsetMinutes"}
+	values := []int64{int64(value.Year()), int64(value.Month()), int64(value.Day()), int64(value.Hour()), int64(value.Minute()), int64(value.Second()), int64(value.Nanosecond() / 1e6), weekday, int64(offsetSeconds / 60), int64(offsetSeconds % 60)}
+	names := []string{"year", "month", "day", "hour", "minute", "second", "millisecond", "weekday", "offsetMinutes", "offsetSeconds"}
 	for index, name := range names {
 		instance.Fields[ir.FieldID(string(class)+"::field::"+name)] = values[index]
 	}
@@ -114,8 +117,11 @@ func (session *Session) instant(value any) time.Time {
 	get := func(name string) int64 {
 		return instance.Fields[ir.FieldID("builtin:Time::class::DateTime::field::"+name)].(int64)
 	}
-	offset := get("offsetMinutes")
-	return time.Date(int(get("year")), time.Month(get("month")), int(get("day")), int(get("hour")), int(get("minute")), int(get("second")), int(get("millisecond"))*1e6, time.FixedZone("", int(offset*60)))
+	// offsetSeconds is the hidden sub-minute remainder of a historical local
+	// offset and is zero for every offset AhdCode source can name, so this
+	// mirrors the native backend's ahdInstant exactly.
+	offset := get("offsetMinutes")*60 + get("offsetSeconds")
+	return time.Date(int(get("year")), time.Month(get("month")), int(get("day")), int(get("hour")), int(get("minute")), int(get("second")), int(get("millisecond"))*1e6, time.FixedZone("", int(offset)))
 }
 
 func (session *Session) timeOperation(name string, receiver any, arguments []any) any {

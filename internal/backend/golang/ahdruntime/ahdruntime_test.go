@@ -1106,3 +1106,41 @@ func TestLatexTableTwoArgumentOutputIsUnchanged(t *testing.T) {
 		t.Fatalf("two-argument table output changed:\n%q\nwant\n%q", text, expected)
 	}
 }
+
+// TestSubMinuteLocalOffsetKeepsTheInstantExact pins the historical-offset rule.
+// A few host zones sit at a UTC offset that is not a whole number of minutes
+// (Europe/Istanbul is +01:55:52 before 1880). AhdCode publishes offsetMinutes
+// as whole minutes, so the leftover seconds are carried as runtime
+// representation: truncating them would silently move the instant, and
+// rejecting them would refuse ordinary historical dates. This test is
+// host-timezone independent because it builds the zone explicitly.
+func TestSubMinuteLocalOffsetKeepsTheInstantExact(t *testing.T) {
+	for _, testCase := range []struct {
+		name                     string
+		offsetSeconds            int
+		wantMinutes, wantSeconds int64
+	}{
+		{"istanbul LMT", 6952, 115, 52},
+		{"west of UTC", -6952, -115, -52},
+		{"whole minute", 10800, 180, 0},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			zone := time.FixedZone("", testCase.offsetSeconds)
+			original := time.Date(999, 12, 31, 23, 59, 59, 250*1e6, zone)
+			civil := ahdCivilFrom(original)
+			if civil.OffsetMinutes != testCase.wantMinutes || civil.OffsetSeconds != testCase.wantSeconds {
+				t.Fatalf("offset = %dm %ds; want %dm %ds",
+					civil.OffsetMinutes, civil.OffsetSeconds, testCase.wantMinutes, testCase.wantSeconds)
+			}
+			// The published civil fields are never shifted to absorb the remainder.
+			if civil.Hour != 23 || civil.Minute != 59 || civil.Second != 59 || civil.Millisecond != 250 {
+				t.Fatalf("civil clock fields changed: %+v", civil)
+			}
+			// minutes*60+seconds must reproduce the original offset exactly, so
+			// the rebuilt instant equals the one we started from.
+			if rebuilt := AhdTimeInstantCivil(civil); !rebuilt.Equal(original) {
+				t.Fatalf("instant shifted by %v", rebuilt.Sub(original))
+			}
+		})
+	}
+}

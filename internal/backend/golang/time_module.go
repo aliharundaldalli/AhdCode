@@ -99,11 +99,13 @@ func (generator *generator) instantOf(expression ir.Expr) string {
 	return "AhdTimeInstantCivil(" + generator.civilOf(expression) + ")"
 }
 
-// civilOf evaluates one DateTime expression exactly once and snapshots all of
-// its public civil fields into the runtime interchange shape.
+// civilOf evaluates one DateTime expression exactly once and snapshots its
+// civil fields into the runtime interchange shape. offsetSeconds is runtime
+// representation rather than a published attribute, so it travels with the
+// reading and keeps a historical sub-minute offset exact.
 func (generator *generator) civilOf(expression ir.Expr) string {
 	rendered := generator.expr(expression)
-	names := []string{"year", "month", "day", "hour", "minute", "second", "millisecond", "offsetMinutes"}
+	names := []string{"year", "month", "day", "hour", "minute", "second", "millisecond", "offsetMinutes", "offsetSeconds"}
 	parts := make([]string, 0, len(names))
 	for _, name := range names {
 		parts = append(parts, "value."+generator.fieldName(ir.FieldID(string(timeDateTimeClass)+"::field::"+name))+"_get()")
@@ -111,7 +113,8 @@ func (generator *generator) civilOf(expression ir.Expr) string {
 	return "func(value " + generator.interfaceName(timeDateTimeClass) + ") AhdCivilTime { " +
 		"return AhdCivilTime{Year: " + parts[0] + ", Month: " + parts[1] + ", Day: " + parts[2] +
 		", Hour: " + parts[3] + ", Minute: " + parts[4] + ", Second: " + parts[5] +
-		", Millisecond: " + parts[6] + ", OffsetMinutes: " + parts[7] + "} }(" + rendered + ")"
+		", Millisecond: " + parts[6] + ", OffsetMinutes: " + parts[7] +
+		", OffsetSeconds: " + parts[8] + "} }(" + rendered + ")"
 }
 
 // timeHelper registers the generated constructor wrapper of one Time Class.
@@ -145,7 +148,7 @@ func (generator *generator) emitTimeHelpers(writer *emitter) {
 			writer.line("// DateTime value built from one civil-time reading.")
 			writer.open("func " + name + "(civil AhdCivilTime) " + result + " {")
 			writer.line("return " + generator.callableName(constructor) +
-				"(civil.Year, civil.Month, civil.Day, civil.Hour, civil.Minute, civil.Second, civil.Millisecond, civil.Weekday, civil.OffsetMinutes)")
+				"(civil.Year, civil.Month, civil.Day, civil.Hour, civil.Minute, civil.Second, civil.Millisecond, civil.Weekday, civil.OffsetMinutes, civil.OffsetSeconds)")
 			writer.close("}")
 			writer.blank()
 			continue
@@ -166,7 +169,7 @@ func (generator *generator) timeOperation(name string, value *ir.CallExpr) strin
 	other := func() string {
 		if len(value.Arguments) != 1 || value.Arguments[0].Value == nil {
 			generator.fail(CodeGenerationFailure, name+" has a missing argument", meta.Span, "the IR call is malformed")
-			return "AhdTimeInstant(1, 1, 1, 0, 0, 0, 0, 0)"
+			return "AhdTimeInstant(1, 1, 1, 0, 0, 0, 0, 0, 0)"
 		}
 		return generator.instantOf(value.Arguments[0].Value)
 	}

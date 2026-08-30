@@ -35,9 +35,14 @@ ofsetli bir değer oluşturur. Desteklenen ofset aralığı -840..840'tır. Geç
 sivil bileşenler, ofsetler ve temsil edilemeyen timestamp'ler `ValueError`
 fırlatır.
 
-Herkese açık ofset modeli dakika hassasiyetindedir. Saniye bileşeni içeren
-tarihsel bir host-yerel ofset, an değiştirilmeden temsil edilemez; bu nadir
-durumda yerel oluşturma/dönüşüm sessizce kırpmak yerine `ValueError` fırlatır.
+Herkese açık ofset modeli dakika hassasiyetindedir: `offsetMinutes` her zaman
+tam dakikadır ve AhdCode kaynağının adlandırabildiği her ofset tam dakikadır.
+Birkaç tarihsel host-yerel bölge, saniye içeren bir ofsette bulunur -- örneğin
+`Europe/Istanbul` 1880 öncesinde `+01:55:52`'dir. Böyle bir an yine de tam
+olarak temsil edilir: `offsetMinutes` tam dakika kısmını bildirir, artan
+saniyeler ise kırpılmak yerine çalışma zamanı gösterimi olarak saklanır, bu
+yüzden an asla kaymaz. Saniye artığı yayınlanan bir öznitelik değildir; bu
+nedenle okunamaz ve `has` onu bildirmez.
 
 ## Unix milisaniyeleri ve dönüşümler
 
