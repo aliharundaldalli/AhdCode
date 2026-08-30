@@ -45,3 +45,13 @@ func targetNullable(target expressionInfo) bool {
 	}
 	return target.nullState != NonNull
 }
+
+// declaredNullState is the null state a declaration's own type asserts,
+// independent of any initializer. It is the fallback when an initializer is
+// already invalid and therefore says nothing about nullability.
+func declaredNullState(nullable bool) NullState {
+	if nullable {
+		return MaybeNull
+	}
+	return NonNull
+}

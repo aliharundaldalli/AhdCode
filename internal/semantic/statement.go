@@ -148,6 +148,13 @@ func (a *analyzer) analyzeVariableDeclaration(declaration *ast.VariableDecl, cur
 	if !nullOK {
 		resultNull = NonNull
 	}
+	if initializer.invalid() {
+		// An already-rejected initializer carries no null information: its
+		// MaybeNull means "unknown", not "may be null". Adopting it would
+		// invent a nullability the program never wrote and cascade into every
+		// later use of the binding, so the declared type decides instead.
+		resultNull = declaredNullState(declaration.Type.Nullable)
+	}
 	symbol.InitialNull = resultNull
 	flow[symbol] = resultNull
 

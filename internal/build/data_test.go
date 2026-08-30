@@ -305,3 +305,32 @@ func TestDataReadsAndWritesCSVFilesRelativeToTheProcess(t *testing.T) {
 		expected: "[\"name\", \"score\"]\n2\n1\nAli\n",
 	}})
 }
+
+// TestRejectedLeadingDotChainProducesOneDiagnostic is the end-to-end guard for
+// PAR013 recovery. A leading-dot continuation is still invalid; the point is
+// that one malformed chain explains itself once, without a bracket cascade and
+// without a derived complaint about the receiver the parser had to truncate.
+func TestRejectedLeadingDotChainProducesOneDiagnostic(t *testing.T) {
+	source := `entries: List<Int> := [1, 2]
+
+labels: List<String> := entries
+    .filter(
+        lambda (value: Int) -> value > 1
+    )
+    .map(
+        lambda (value: Int) -> str(value)
+    )
+
+for label in labels {
+    write(label)
+}
+`
+	directory := writeSources(t, map[string]string{"main.ahd": source})
+	path, result := BuildProgram(filepath.Join(directory, "main.ahd"), filepath.Join(t.TempDir(), "program"))
+	if path != "" || !result.HasErrors() {
+		t.Fatal("a leading-dot continuation must still fail the build")
+	}
+	if len(result.Diagnostics) != 1 || result.Diagnostics[0].Code != "PAR013" {
+		t.Fatalf("diagnostics = %+v, want exactly one PAR013", result.Diagnostics)
+	}
+}
