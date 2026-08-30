@@ -77,6 +77,11 @@ func LowerCompilation(compilation module.CompilationResult) Result {
 					regexModule(ir.ModuleID(current.ID), current.Source.Name, current.Source.Path))
 				continue
 			}
+			if string(current.ID) == StatisticsModuleID {
+				result.Modules = append(result.Modules,
+					statisticsModule(ir.ModuleID(current.ID), current.Source.Name, current.Source.Path))
+				continue
+			}
 			if string(current.ID) == DataModuleID {
 				result.Modules = append(result.Modules,
 					dataModule(ir.ModuleID(current.ID), current.Source.Name, current.Source.Path))

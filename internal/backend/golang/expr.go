@@ -722,6 +722,9 @@ func (generator *generator) call(value *ir.CallExpr) string {
 	if strings.HasPrefix(string(value.Callable), dataModulePrefix) {
 		return generator.dataCall(value)
 	}
+	if strings.HasPrefix(string(value.Callable), statisticsModulePrefix) {
+		return generator.statisticsCall(value)
+	}
 	if method, ok := value.Callee.(*ir.MemberExpr); ok && method.Kind == ir.MethodMember {
 		function := generator.functions[method.Callable]
 		if function == nil {

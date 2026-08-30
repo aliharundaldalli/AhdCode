@@ -168,6 +168,8 @@ func (session *Session) builtin(identity ir.CallableID, receiver any, arguments 
 		return session.pathBuiltin(strings.TrimPrefix(name, "builtin:Path::"), values(arguments))
 	case strings.HasPrefix(name, "builtin:Regex::"):
 		return session.regexBuiltin(strings.TrimPrefix(name, "builtin:Regex::"), values(arguments))
+	case strings.HasPrefix(name, "builtin:Statistics::"):
+		return session.statisticsBuiltin(strings.TrimPrefix(name, "builtin:Statistics::"), values(arguments))
 	case strings.HasPrefix(name, "builtin:Data::"):
 		return session.dataBuiltin(strings.TrimPrefix(name, "builtin:Data::"), values(arguments))
 	}

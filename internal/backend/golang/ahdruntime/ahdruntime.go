@@ -64,6 +64,7 @@ var (
 	AhdClassRegexError          = &AhdClass{Name: "RegexError", Parent: AhdClassError}
 	AhdClassCSVError            = &AhdClass{Name: "CSVError", Parent: AhdClassError}
 	AhdClassDataError           = &AhdClass{Name: "DataError", Parent: AhdClassError}
+	AhdClassStatisticsError     = &AhdClass{Name: "StatisticsError", Parent: AhdClassError}
 )
 
 // AhdInstance is every AhdCode Class instance. The generated interface of each
@@ -3418,3 +3419,284 @@ func AhdDataWriteCSV(csvClass, fileClass *AhdClass, value AhdTable, path, delimi
 		ahdFileFailure(fileClass, "write", path, err)
 	}
 }
+
+// ---------------------------------------------------------------------------
+// Statistics standard module
+//
+// Descriptive statistics over typed numeric Lists. Every function reads a
+// snapshot, so ordering a List to find a median or quantile never reorders the
+// caller's List. A statistic that is mathematically undefined for its input --
+// most often because the List is empty -- raises StatisticsError rather than
+// returning a placeholder.
+// ---------------------------------------------------------------------------
+
+// ahdStatisticsValues snapshots a numeric List, rejecting a null List or a null
+// element before any arithmetic runs.
+func ahdStatisticsValues[T int64 | float64](list *AhdList[T]) []T {
+	if list == nil {
+		AhdRaiseClass(AhdClassNullError, "List value is null")
+	}
+	return append([]T(nil), list.Snapshot()...)
+}
+
+func ahdStatisticsRequire(class *AhdClass, count int, statistic string) {
+	if count == 0 {
+		AhdRaiseClass(class, statistic+" is undefined for an empty List")
+	}
+}
+
+// ahdStatisticsReal widens one numeric value for an averaging statistic.
+func ahdStatisticsReal[T int64 | float64](value T) float64 { return float64(value) }
+
+// AhdStatisticsSum adds every value. The empty sum is the additive identity,
+// which is the one total that keeps sum(a) + sum(b) == sum(a ++ b).
+func AhdStatisticsSumInt(values *AhdList[int64]) int64 {
+	total := int64(0)
+	for _, value := range ahdStatisticsValues(values) {
+		total = AhdIntAdd(total, value)
+	}
+	return total
+}
+
+func AhdStatisticsSumReal(values *AhdList[float64]) float64 {
+	total := float64(0)
+	for _, value := range ahdStatisticsValues(values) {
+		total = AhdRealAdd(total, value)
+	}
+	return total
+}
+
+func ahdStatisticsMin[T int64 | float64](class *AhdClass, list *AhdList[T]) T {
+	values := ahdStatisticsValues(list)
+	ahdStatisticsRequire(class, len(values), "min")
+	smallest := values[0]
+	for _, value := range values[1:] {
+		if value < smallest {
+			smallest = value
+		}
+	}
+	return smallest
+}
+
+func ahdStatisticsMax[T int64 | float64](class *AhdClass, list *AhdList[T]) T {
+	values := ahdStatisticsValues(list)
+	ahdStatisticsRequire(class, len(values), "max")
+	largest := values[0]
+	for _, value := range values[1:] {
+		if value > largest {
+			largest = value
+		}
+	}
+	return largest
+}
+
+func AhdStatisticsMinInt(class *AhdClass, values *AhdList[int64]) int64 {
+	return ahdStatisticsMin(class, values)
+}
+
+func AhdStatisticsMinReal(class *AhdClass, values *AhdList[float64]) float64 {
+	return ahdStatisticsMin(class, values)
+}
+
+func AhdStatisticsMaxInt(class *AhdClass, values *AhdList[int64]) int64 {
+	return ahdStatisticsMax(class, values)
+}
+
+func AhdStatisticsMaxReal(class *AhdClass, values *AhdList[float64]) float64 {
+	return ahdStatisticsMax(class, values)
+}
+
+// AhdStatisticsRange is max - min, using the language's checked arithmetic so an
+// Int range that overflows is an error rather than a wrapped value.
+func AhdStatisticsRangeInt(class *AhdClass, values *AhdList[int64]) int64 {
+	// Checked before delegating, so an empty List reports "range" rather than
+	// the name of whichever extreme happened to be computed first.
+	ahdStatisticsRequire(class, len(ahdStatisticsValues(values)), "range")
+	return AhdIntSubtract(ahdStatisticsMax(class, values), ahdStatisticsMin(class, values))
+}
+
+func AhdStatisticsRangeReal(class *AhdClass, values *AhdList[float64]) float64 {
+	ahdStatisticsRequire(class, len(ahdStatisticsValues(values)), "range")
+	return AhdRealSubtract(ahdStatisticsMax(class, values), ahdStatisticsMin(class, values))
+}
+
+// ahdStatisticsMean is the arithmetic mean, always Real: the average of whole
+// numbers is generally not whole.
+func ahdStatisticsMean[T int64 | float64](class *AhdClass, list *AhdList[T]) float64 {
+	values := ahdStatisticsValues(list)
+	ahdStatisticsRequire(class, len(values), "mean")
+	total := float64(0)
+	for _, value := range values {
+		total += ahdStatisticsReal(value)
+	}
+	return ahdStatisticsFinite(class, total/float64(len(values)), "mean")
+}
+
+func AhdStatisticsMeanInt(class *AhdClass, values *AhdList[int64]) float64 {
+	return ahdStatisticsMean(class, values)
+}
+
+func AhdStatisticsMeanReal(class *AhdClass, values *AhdList[float64]) float64 {
+	return ahdStatisticsMean(class, values)
+}
+
+// ahdStatisticsSorted orders a snapshot, so the caller's List keeps its order.
+func ahdStatisticsSorted[T int64 | float64](list *AhdList[T]) []T {
+	values := ahdStatisticsValues(list)
+	sort.Slice(values, func(left, right int) bool { return values[left] < values[right] })
+	return values
+}
+
+// ahdStatisticsMedian is the middle value of the ordered data, averaging the two
+// middle values when the count is even. It is always Real so the even case needs
+// no separate rule.
+func ahdStatisticsMedian[T int64 | float64](class *AhdClass, list *AhdList[T]) float64 {
+	values := ahdStatisticsSorted(list)
+	ahdStatisticsRequire(class, len(values), "median")
+	middle := len(values) / 2
+	if len(values)%2 == 1 {
+		return ahdStatisticsReal(values[middle])
+	}
+	low, high := ahdStatisticsReal(values[middle-1]), ahdStatisticsReal(values[middle])
+	return ahdStatisticsFinite(class, low+(high-low)/2, "median")
+}
+
+func AhdStatisticsMedianInt(class *AhdClass, values *AhdList[int64]) float64 {
+	return ahdStatisticsMedian(class, values)
+}
+
+func AhdStatisticsMedianReal(class *AhdClass, values *AhdList[float64]) float64 {
+	return ahdStatisticsMedian(class, values)
+}
+
+// ahdStatisticsVariance is the mean squared deviation. sample divides by n-1
+// (Bessel's correction) and needs at least two values; the population form
+// divides by n and needs at least one.
+func ahdStatisticsVariance[T int64 | float64](class *AhdClass, list *AhdList[T], sample bool) float64 {
+	values := ahdStatisticsValues(list)
+	statistic := "variance"
+	if sample {
+		statistic = "sampleVariance"
+		if len(values) < 2 {
+			AhdRaiseClass(class, "sampleVariance requires at least two values")
+		}
+	}
+	ahdStatisticsRequire(class, len(values), statistic)
+	mean := float64(0)
+	for _, value := range values {
+		mean += ahdStatisticsReal(value)
+	}
+	mean /= float64(len(values))
+	total := float64(0)
+	for _, value := range values {
+		deviation := ahdStatisticsReal(value) - mean
+		total += deviation * deviation
+	}
+	divisor := float64(len(values))
+	if sample {
+		divisor = float64(len(values) - 1)
+	}
+	return ahdStatisticsFinite(class, total/divisor, statistic)
+}
+
+func AhdStatisticsVarianceInt(class *AhdClass, values *AhdList[int64]) float64 {
+	return ahdStatisticsVariance(class, values, false)
+}
+
+func AhdStatisticsVarianceReal(class *AhdClass, values *AhdList[float64]) float64 {
+	return ahdStatisticsVariance(class, values, false)
+}
+
+func AhdStatisticsSampleVarianceInt(class *AhdClass, values *AhdList[int64]) float64 {
+	return ahdStatisticsVariance(class, values, true)
+}
+
+func AhdStatisticsSampleVarianceReal(class *AhdClass, values *AhdList[float64]) float64 {
+	return ahdStatisticsVariance(class, values, true)
+}
+
+func AhdStatisticsStdDevInt(class *AhdClass, values *AhdList[int64]) float64 {
+	return ahdStatisticsFinite(class, math.Sqrt(ahdStatisticsVariance(class, values, false)), "stdDev")
+}
+
+func AhdStatisticsStdDevReal(class *AhdClass, values *AhdList[float64]) float64 {
+	return ahdStatisticsFinite(class, math.Sqrt(ahdStatisticsVariance(class, values, false)), "stdDev")
+}
+
+func AhdStatisticsSampleStdDevInt(class *AhdClass, values *AhdList[int64]) float64 {
+	return ahdStatisticsFinite(class, math.Sqrt(ahdStatisticsVariance(class, values, true)), "sampleStdDev")
+}
+
+func AhdStatisticsSampleStdDevReal(class *AhdClass, values *AhdList[float64]) float64 {
+	return ahdStatisticsFinite(class, math.Sqrt(ahdStatisticsVariance(class, values, true)), "sampleStdDev")
+}
+
+// ahdStatisticsMode is the most frequent value. A tie is broken by first
+// occurrence in the input, so the answer never depends on map iteration order.
+func ahdStatisticsMode[T int64 | float64](class *AhdClass, list *AhdList[T]) T {
+	values := ahdStatisticsValues(list)
+	ahdStatisticsRequire(class, len(values), "mode")
+	counts := make(map[T]int, len(values))
+	for _, value := range values {
+		counts[value]++
+	}
+	best := values[0]
+	for _, value := range values {
+		if counts[value] > counts[best] {
+			best = value
+		}
+	}
+	return best
+}
+
+func AhdStatisticsModeInt(class *AhdClass, values *AhdList[int64]) int64 {
+	return ahdStatisticsMode(class, values)
+}
+
+func AhdStatisticsModeReal(class *AhdClass, values *AhdList[float64]) float64 {
+	return ahdStatisticsMode(class, values)
+}
+
+// ahdStatisticsQuantile is the linear-interpolation quantile of the ordered
+// data: position = probability * (count - 1), then interpolate between the two
+// neighbouring order statistics. probability 0 is the minimum and 1 is the
+// maximum, a single value is its own quantile, and a probability outside
+// 0.0..1.0 is an error rather than a clamp.
+func ahdStatisticsQuantile[T int64 | float64](class *AhdClass, list *AhdList[T], probability float64) float64 {
+	values := ahdStatisticsSorted(list)
+	ahdStatisticsRequire(class, len(values), "quantile")
+	if !(probability >= 0 && probability <= 1) {
+		AhdRaiseClass(class, "quantile probability must be between 0.0 and 1.0")
+	}
+	if len(values) == 1 {
+		return ahdStatisticsReal(values[0])
+	}
+	position := probability * float64(len(values)-1)
+	lower := int(math.Floor(position))
+	upper := int(math.Ceil(position))
+	if lower == upper {
+		return ahdStatisticsReal(values[lower])
+	}
+	weight := position - float64(lower)
+	low, high := ahdStatisticsReal(values[lower]), ahdStatisticsReal(values[upper])
+	return ahdStatisticsFinite(class, low+(high-low)*weight, "quantile")
+}
+
+func AhdStatisticsQuantileInt(class *AhdClass, values *AhdList[int64], probability float64) float64 {
+	return ahdStatisticsQuantile(class, values, probability)
+}
+
+func AhdStatisticsQuantileReal(class *AhdClass, values *AhdList[float64], probability float64) float64 {
+	return ahdStatisticsQuantile(class, values, probability)
+}
+
+// ahdStatisticsFinite keeps the language's finite-Real contract: a statistic
+// never hands back NaN or an infinity, matching how ordinary Real arithmetic
+// reports an undefined or out-of-range result.
+func ahdStatisticsFinite(class *AhdClass, value float64, statistic string) float64 {
+	if math.IsNaN(value) || math.IsInf(value, 0) {
+		AhdRaiseClass(class, statistic+" has no finite Real value for this input")
+	}
+	return value
+}
+
