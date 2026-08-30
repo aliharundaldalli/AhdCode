@@ -1,0 +1,55 @@
+# Modüller
+
+[English](MODULES.md) · [Türkçe]
+
+[README'ye dön](../README_TR.md) · [Math](MATH_TR.md) · [File ve Path](FILESYSTEM_TR.md)
+
+Yerel bir modül, kardeş (sibling) bir `.ahd` dosyasıdır. Referans, büyük/küçük
+harfe duyarlı tek bir tanımlayıcıdır (identifier): `Utilities`,
+içe aktaran dosyanın yanındaki `Utilities.ahd` dosyasına karşılık gelir. v0.1,
+noktalı yollara (dotted paths), paket-kökü aramasına (package-root search)
+veya yapılandırılabilir bir modül yoluna sahip değildir.
+
+İsim uzayı (namespace) içe aktarımı:
+
+```ahd
+bring Utilities
+write(Utilities.greet("Ali"))
+```
+
+Doğrudan içe aktarım:
+
+```ahd
+from Utilities bring greet
+write(greet("Ali"))
+```
+
+Seçici, çok satırlı içe aktarım:
+
+```ahd
+from Utilities bring (
+    greet
+    farewell
+)
+```
+
+Herkese açık-hepsi (public-all) içe aktarım:
+
+```ahd
+from Utilities bring all
+```
+
+`all`, yalnızca herkese açık, `Confidential` olmayan sembolleri getirir. İçe
+aktarım çakışmaları (import collisions) ve döngüsel bağımlılıklar (circular
+dependencies) derleme zamanı hatalarıdır.
+
+`Math`, `Time`, `Latex`, `Path`, `File` ve `Regex` derleyici tarafından
+kayıtlıdır (compiler-registered) ve aynı içe aktarım biçimlerini kullanır.
+Yerel bir dosya, aynı isimdeki standart bir modülün yerini alamaz (shadow
+edemez). Ayrıca sıradan isim uzayı takma adı (namespace alias) biçimini de
+kullanabilirler:
+
+```ahd
+bring File as F
+F.writeText("note.txt", "hello")
+```

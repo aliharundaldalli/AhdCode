@@ -1,5 +1,7 @@
 # Fundamentals
 
+[English] · [Türkçe](FUNDAMENTALS_TR.md)
+
 [Back to README](../README.md) · [String API](STRING_API.md) · [List API](LIST_API.md)
 
 These names are predeclared in every module and require no `bring`:

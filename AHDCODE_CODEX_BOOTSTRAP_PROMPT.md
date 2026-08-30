@@ -1,5 +1,17 @@
 # Codex Bootstrap Prompt — Implement AhdCode v0.1
 
+> **Historical note:** This document is the bootstrap implementation prompt
+> used during early AhdCode v0.1 development. Some language decisions
+> described here were intentionally revised in later v0.1.x releases (for
+> example, declaration type inference in v0.1.7, and the Class Protocol
+> Methods introduced in v0.1.8 -- neither of which existed when this prompt
+> was written). The current language specification and current docs are
+> authoritative for present behavior; this document is kept as a record of
+> the initial design and how the language has evolved since. See
+> [`AHDCODE_LANGUAGE_SPEC_v0.1.md`](AHDCODE_LANGUAGE_SPEC_v0.1.md),
+> [`docs/PROTOCOLS.md`](docs/PROTOCOLS.md), and
+> [`docs/TYPES_AND_NULL.md`](docs/TYPES_AND_NULL.md) for the current rules.
+
 You are the primary implementation agent for a new programming language named **AhdCode**.
 
 The authoritative language contract is:

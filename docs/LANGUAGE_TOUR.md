@@ -1,5 +1,7 @@
 # Language tour
 
+[English] · [Türkçe](LANGUAGE_TOUR_TR.md)
+
 [Back to README](../README.md) · [Types and null](TYPES_AND_NULL.md)
 
 ## Declarations and mutation
@@ -134,8 +136,8 @@ Vector2: Class<> := {
 
 Use `attempt`, `except`, `ultimately`, and `toss` for catchable errors. Use
 `bring ModuleName` for a namespace or `from ModuleName bring name` for a direct
-symbol. Local modules are sibling files. `Math`, `Time`, `Latex`, `Path`, and
-`File` are explicit standard modules; `File` failures are catchable.
+symbol. Local modules are sibling files. `Math`, `Time`, `Latex`, `Path`, `Regex`, and
+`File` are explicit standard modules; `File` and `Regex` failures are catchable.
 
 Continue with [Functions](FUNCTIONS.md), [Classes](CLASSES.md),
 [Class Protocol Methods](PROTOCOLS.md), [Collections](COLLECTIONS.md), and

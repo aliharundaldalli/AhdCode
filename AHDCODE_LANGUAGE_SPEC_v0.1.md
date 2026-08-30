@@ -2053,7 +2053,13 @@ Other built-in meanings include:
 
 No implicit String-number coercion.
 
-No user-defined operator overloading in v0.1.
+v0.1.8 adds a small, closed set of ten Class Protocol Methods (`CAdd`,
+`CSubtract`, `CMultiply`, `CDivide`, `CRemainder`, `CPower`, and their
+counterparts for `CEqual`/`CCompare`/`CNegate`/`CStr`) that let a Class define
+these operators for its own instances. This is not general/unrestricted
+operator overloading: only these ten exact reserved names carry protocol
+meaning, and only when they occupy a Class method slot. See §47 for the full
+specification.
 
 ---
 
@@ -2064,11 +2070,15 @@ No user-defined operator overloading in v0.1.
 - scalar: value equality;
 - `5 == 5.0` is true through numeric compatibility;
 - List/Pair: deep value equality;
-- Class: object/reference identity.
+- Class: object/reference identity, **unless** the Class provides the
+  `CEqual` Class Protocol Method (§47), in which case `a == b` calls
+  `a.CEqual(b)` and `a != b` is always its logical negation. A Class with no
+  `CEqual` keeps the plain reference-identity rule above.
 
 ### same
 
-Strict type + value/state.
+Strict type + value/state. `same` is never affected by `CEqual`: it is always
+the raw identity test, independent of any Class Protocol Method.
 
 ```ahd
 5 same 5       // true
@@ -2907,11 +2917,12 @@ Milliseconds are read through the `millisecond` attribute rather than through
 the text. `str(value)` renders a `DateTime` as `<DateTime>`, because §34.1
 deliberately does not print Class attributes.
 
-AhdCode has no operator overloading, so `<` and `>` do not apply to a
-`DateTime`. Ordering is written with `before` and `after`. `==` and `same`
-follow the ordinary Class rule of §29 — object identity — so two separately
-built equal moments are **not** `==`. Value comparison is `sameMoment`, and two
-`Duration` values are compared through `milliseconds`.
+`DateTime` does not implement `CCompare` (§47), so `<` and `>` do not apply to
+it. Ordering is written with `before` and `after`. `DateTime` also does not
+implement `CEqual`, so `==` and `same` follow the ordinary Class rule of §29 —
+object identity — and two separately built equal moments are **not** `==`.
+Value comparison is `sameMoment`, and two `Duration` values are compared
+through `milliseconds`.
 
 ### 36.3 Creating a DateTime
 
@@ -3240,7 +3251,9 @@ Intentionally excluded:
 - static class members
 - Getter/Setter syntax
 - lambdas
-- user-defined operator overloads
+- general/unrestricted user-defined operator overloading (only the ten fixed
+  Class Protocol Methods of §47 exist; there is no arbitrary operator
+  definition, no reverse operators, and no in-place protocols)
 - multiple return values
 - tuple/multiple assignment
 - chained assignment
@@ -3421,6 +3434,334 @@ Core v0.1 is meaningfully alive when:
 8. Formatter is deterministic/idempotent.
 9. Tests cover malformed syntax and adversarial semantic cases.
 10. No web functionality is required for core completion.
+
+---
+
+## 47. Class Protocol Methods (v0.1.8)
+
+A Class may define operator behavior for its own instances through a small,
+closed set of exactly ten reserved method names, called **Class Protocol
+Methods**:
+
+```text
+CEqual CCompare
+CAdd CSubtract CMultiply CDivide CRemainder CPower
+CNegate CStr
+```
+
+No others exist. This is a deliberately narrow compiler extension, not
+general/unrestricted operator overloading and not Python's magic-method
+system: there is no `__eq__`/`__lt__`/`__repr__`/`__radd__`-style
+double-underscore convention, and no attempt to give every language mechanism
+(construction, iteration, indexing, attribute access, calling) its own
+protocol name.
+
+### 47.1 Where the names are reserved
+
+The ten names are compiler-special **only** when they occupy a Class method
+slot. At module scope, `CAdd: Function := ...` remains an ordinary Function.
+Inside a Class, a name that is not one of the ten (`Calculate`, `Create`,
+`CWhatever`, `CustomMethod`, and so on) remains an ordinary member; the
+letter `C` itself carries no meaning. A Class body member that reuses one of
+the ten names but is not a Function — for example `CAdd: Int := 5` — is a
+compile-time error (reserved Class Protocol Method slot), not a silently
+accepted field.
+
+### 47.2 Declaration syntax is unchanged
+
+A Class Protocol Method is written with the ordinary method syntax; there is
+no new declaration form, and Function/Class declaration syntax do not change:
+
+```ahd
+Vector2: Class<> := {
+    structure: Attributes := (
+        x: Real
+        y: Real
+    )
+
+    CEqual: Function := (
+        other: Vector2
+    ) -> Bool {
+        return attribute.x == other.x and attribute.y == other.y
+    }
+
+    CAdd: Function := (
+        other: Vector2
+    ) -> Vector2 {
+        return Vector2(x: attribute.x + other.x, y: attribute.y + other.y)
+    }
+
+    CNegate: Function := (
+    ) -> Vector2 {
+        return Vector2(x: -attribute.x, y: -attribute.y)
+    }
+
+    CStr: Function := (
+    ) -> String {
+        return "Vector2({attribute.x}, {attribute.y})"
+    }
+}
+```
+
+### 47.3 Required signatures
+
+| Protocol | Explicit parameters | Return type |
+|---|---|---|
+| `CEqual` | exactly 1 | `Bool` |
+| `CCompare` | exactly 1 | `Int` |
+| `CAdd`, `CSubtract`, `CMultiply`, `CDivide`, `CRemainder`, `CPower` | exactly 1 | the operator's result type; not required to equal the containing Class |
+| `CNegate` | 0 | the operator's result type |
+| `CStr` | 0 | `String` |
+
+A malformed declaration (wrong arity, wrong return type, or a reserved name
+occupying a non-Function slot) is a normal semantic diagnostic, never a
+runtime panic. The arithmetic protocols and `CNegate` may legitimately return
+a different type than the containing Class — for example a future
+`Matrix * Vector -> Vector` — and the operator expression's static type is
+simply the selected method's declared return type.
+
+### 47.4 Operator mapping
+
+| Operator | Protocol |
+|---|---|
+| `==` | `CEqual` |
+| `!=` | logical negation of the same `CEqual` call; there is no `CNotEqual` |
+| `<`, `<=`, `>`, `>=` | all four derive from one `CCompare` call, evaluated exactly once per expression |
+| `+` | `CAdd` |
+| `-` (binary) | `CSubtract` |
+| `*` | `CMultiply` |
+| `/` | `CDivide` |
+| `%` | `CRemainder` |
+| `^` | `CPower` |
+| `-` (unary) | `CNegate` |
+
+`CCompare`'s result uses the conventional sign interpretation and is **not**
+restricted to `-1`/`0`/`1`:
+
+```text
+a <  b   =>  a.CCompare(b) <  0
+a <= b   =>  a.CCompare(b) <= 0
+a >  b   =>  a.CCompare(b) >  0
+a >= b   =>  a.CCompare(b) >= 0
+```
+
+`CEqual` is never derived from `CCompare`, and `CCompare` is never derived
+from `CEqual`: a type may be meaningfully equality-comparable without a
+natural ordering, and vice versa. If a Class provides no `CEqual`, `==`/`!=`
+keep the pre-v0.1.8 reference-equality rule of §29 unchanged; if it provides
+no `CCompare`, `<`/`<=`/`>`/`>=` remain the ordinary static type error.
+
+### 47.5 Dispatch is left-operand based
+
+There is no reverse-operator protocol (`CReverseAdd`/`CRAdd`, etc.):
+
+```ahd
+value + 3   // works if value's Class declares CAdd(Int)
+3 + value   // does NOT try value's CAdd; ordinary primitive-operator rules
+            // apply, and this is a static type error unless independently valid
+```
+
+### 47.6 Overloading, inheritance, and dynamic dispatch
+
+Class Protocol Methods reuse the ordinary method overload-resolution,
+inheritance, and dynamic-dispatch machinery; there is no second system. A
+Class may declare more than one `CAdd` overload under the existing
+`Overload Function` rules (§26), operator resolution uses the same static
+overload-resolution rules as an explicit call, and ambiguity is the ordinary
+compile-time error. A protocol method is inherited and overridden exactly
+like any other method (`Override` is required to replace one), and operator
+dispatch uses the same dynamic dispatch as an ordinary method call: if a
+statically valid protocol method is overridden by a subclass, the override
+runs when the runtime object is that subclass, exactly as in §26.
+
+### 47.7 Compound assignment
+
+`+=`, `-=`, `*=`, `/=`, `%=`, and `^=` on a Class target reuse the matching
+arithmetic protocol: `a += b` behaves like `a = a + b`, subject to the normal
+assignment-compatibility rules, with the receiver evaluated exactly once
+(including a member or indexed target). There is no separate in-place
+protocol (no `CIAdd`-style method). `++` and `--` are unrelated and are not
+extended to Class values.
+
+### 47.8 Nullability
+
+Protocol dispatch never weakens the null-safety rules of §§17-24. If the left
+operand is nullable, it must be narrowed to `NonNull` by ordinary flow
+analysis before a protocol method can be invoked on it — the same requirement
+as any other method call:
+
+```ahd
+user: User?
+
+user + other   // invalid unless user is narrowed to non-null
+```
+
+The right-hand argument uses its own declared parameter type and nullability
+normally; a protocol may explicitly accept a nullable argument
+(`CEqual(other: User?) -> Bool`), but nothing about that acceptance is
+inferred automatically.
+
+### 47.9 CStr and str()
+
+For a Class instance whose statically declared type resolves `CStr`, the
+Fundamental `str(value)` (§34) dispatches to it, and `write` benefits through
+the same shared conversion path. There is no `repr()`/`CRepr`, and no second
+developer/debug string protocol. A Class with no `CStr` keeps the existing
+`<ClassName>` rendering of §34.1.
+
+---
+
+## 48. Runtime Introspection Fundamentals: `type()` and `id()` (v0.1.8)
+
+### 48.1 `type(value) -> String`
+
+Returns the canonical AhdCode type name of `value` as a `String`. It is a
+small runtime/introspection aid, not a reflection framework: it never returns
+a first-class type object, and there is no metaclass or reflection API.
+
+```text
+type(5)      -> "Int"
+type(5.0)    -> "Real"
+type("Ali")  -> "String"
+type(true)   -> "Bool"
+type(null)   -> "Null"
+```
+
+Collections use canonical AhdCode generic notation wherever the language has
+sufficient static type information: `List<Int>`, `List<Int?>`,
+`Pair<String, Int>`. `type` never exposes a backend/Go implementation type.
+
+For a Class instance, `type` reports the **most-derived runtime Class**, not
+the static/declared type of the expression:
+
+```ahd
+animal: Animal := Dog(name: "Rex")
+write(type(animal))   // "Dog", not "Animal"
+```
+
+For a nullable value that currently holds a non-null value, `type` reports
+the contained value's own type, never the declared type's trailing `?`. For
+`null` itself, `type` reports the literal String `"Null"`; this is an
+intrinsic Fundamental special case and does **not** introduce `Null` as an
+ordinary source-level declaration type, and does not weaken the `x := null`
+inference rejection of §17.
+
+A Function value's `type()` text reuses the same canonical signature
+formatting already used elsewhere in diagnostics (`Function(ParamType, ...)
+-> ReturnType`), never a Go-level representation.
+
+### 48.2 `id(reference) -> Int`
+
+Returns an opaque, runtime-managed identity number for a **List, Pair, or
+Class instance**. `Int`, `Real`, `String`, and `Bool` are not accepted --
+`id(5)` and `id("x")` are compile-time errors, and no primitive is boxed
+merely to manufacture an identity.
+
+The returned number:
+
+- is opaque and only meaningful within the current process or REPL session;
+- is **not** a memory address, and never derived from one;
+- is not guaranteed to be stable across separate program executions;
+- is not serialization data or a persistent/database identifier;
+- may happen to be produced by an incrementing allocator internally, but a
+  program must never depend on allocation order, only on equality/inequality
+  between two identities.
+
+Within one process or REPL session, an alias shares its identity with the
+original (`id(a) == id(b)` when `b := a`), and two distinct, simultaneously
+existing objects have distinct identities. The identity is stable for an
+object's entire lifetime and is unaffected by mutation (mutating a List,
+Pair, or Class instance never changes its `id()`). `id()` requires a
+non-null identity-bearing reference under the ordinary nullable-use rules of
+§§17-24.
+
+`id()` does not replace `same` (§29): `same` is the ordinary programmatic
+identity test; `id()` exists for debugging, logging, and introspection. For
+supported live reference values, `(a same b) == (id(a) == id(b))`.
+
+---
+
+## 49. Regex Standard Module (v0.1.9)
+
+`Regex` is explicit, like `Math` and `Time` (§33, §35, §36): it must be
+imported with `bring Regex` before use, and its canonical identity is
+`builtin:Regex`, so a sibling `Regex.ahd` file cannot shadow it.
+
+```ahd
+bring Regex
+from Regex bring Pattern
+from Regex bring RegexError
+```
+
+### 49.1 Compiling a pattern
+
+```text
+Regex.compile(pattern: String) -> Pattern
+```
+
+`Regex.compile` compiles a pattern using Go `regexp` (RE2) syntax and returns
+a `Pattern` instance. An invalid pattern raises the catchable `RegexError`,
+which derives directly from `Error` (not from `IOError`). `Pattern` is a
+compiler-supplied Class: it is never constructed directly, only produced by
+`Regex.compile`, exactly like `Time.dateTime` and `DateTime` in §36.
+
+The Class is named `Pattern`, not `Regex`, specifically so it can be named
+independently of the module's own namespace (`bring Regex` already binds the
+name `Regex`; `from Regex bring Pattern` is required to name the type).
+
+### 49.2 Pattern members
+
+```text
+matches(text: String)                    -> Bool
+find(text: String)                       -> String?
+findAll(text: String)                    -> List<String>
+groups(text: String)                     -> List<String>?
+replace(text: String, replacement: String) -> String
+split(text: String)                      -> List<String>
+```
+
+- `matches` reports whether the pattern is found anywhere in `text` (not an
+  implicit full-string anchor; write `^...$` in the pattern for that).
+- `find` returns the first match, or `null` if the pattern does not occur in
+  `text`. The result is `String?`; ordinary null-safety narrowing (§§17-24)
+  applies before use.
+- `findAll` returns every non-overlapping match, in order; an empty
+  `List<String>` if there is no match.
+- `groups` returns the first match's full match text followed by its capture
+  groups (index `0` is the whole match), or `null` if the pattern does not
+  occur. An unmatched optional group reports as an empty `String`, matching
+  the underlying RE2 submatch convention.
+- `replace` rewrites every match with `replacement`, which may reference
+  capture groups as `$1`, `$2`, and so on.
+- `split` divides `text` on every match of the pattern.
+
+Every argument is `String` and `NonNull`. `has`/`has not` (§29) report these
+six names as existing members of a `Pattern` instance.
+
+### 49.3 Caching and determinism
+
+A `Pattern`'s only observable state is its source pattern text (readable
+through ordinary Class semantics); the compiled matcher itself is an
+implementation detail cached internally by pattern text, so repeated use of
+the same `Pattern` value -- or repeated `Regex.compile` calls with an
+identical pattern string -- does not repeatedly pay compilation cost.
+Matching, replacement, and splitting are deterministic for a given pattern
+and input.
+
+### 49.4 RegexError
+
+```ahd
+attempt {
+    Regex.compile("(unterminated")
+}
+except RegexError as error {
+    write(error.message)
+}
+```
+
+`RegexError` is raised only by `Regex.compile` on invalid pattern syntax. No
+other `Pattern` operation raises it: match, find, replace, and split never
+fail once a `Pattern` exists.
 
 ---
 

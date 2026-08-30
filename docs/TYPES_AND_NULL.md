@@ -1,5 +1,7 @@
 # Types, inference, and null safety
 
+[English] · [Türkçe](TYPES_AND_NULL_TR.md)
+
 [Back to README](../README.md) · [Collections](COLLECTIONS.md)
 
 ## Static types and inference

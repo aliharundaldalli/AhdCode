@@ -1,5 +1,7 @@
 # AhdCode v0.1 examples
 
+[English] · [Türkçe](README_TR.md)
+
 [Back to project README](../../README.md)
 
 These programs are small, working introductions to the v0.1 language.
@@ -35,5 +37,6 @@ ahdcode run examples/v0.1/14_grade_app.ahd
 | `16_latex.ahd` | Latex module: module alias, helpers, PDF, LatexError |
 | `17_filesystem.ahd` | inferred declarations, Path, UTF-8 File I/O, FileError |
 | `18_protocols.ahd` | Class Protocol Methods, `type()`, `id()` |
+| `19_regex.ahd` | Regex module: `Pattern`, match/find/replace/split/groups, `RegexError` |
 
 `Greeting.ahd` is the sibling module used by `11_modules.ahd`.

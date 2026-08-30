@@ -1,5 +1,7 @@
 # Control flow
 
+[English] · [Türkçe](CONTROL_FLOW_TR.md)
+
 [Back to README](../README.md)
 
 ## Conditions

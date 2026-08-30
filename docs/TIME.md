@@ -1,5 +1,7 @@
 # Time standard module
 
+[English] · [Türkçe](TIME_TR.md)
+
 [Back to README](../README.md) · [Modules](MODULES.md) · [Math module](MATH.md)
 
 Time is explicit, like Math. AhdCode has no namespace-qualified type syntax, so
@@ -48,10 +50,10 @@ deterministic and locale-independent, formatted `YYYY-MM-DD HH:MM:SS`;
 milliseconds are read through the `millisecond` attribute. `str(value)` renders
 `<DateTime>`, because Class attributes are never printed automatically.
 
-There is no operator overloading, so ordering is `before`/`after` rather than
-`<`/`>`. `==` and `same` keep the ordinary Class identity rule, so two
-separately built equal moments are not `==`; `sameMoment` is the value
-comparison.
+`DateTime` does not implement the `CCompare`/`CEqual` [Class Protocol
+Methods](PROTOCOLS.md), so ordering is `before`/`after` rather than `<`/`>`.
+`==` and `same` keep the ordinary Class identity rule, so two separately
+built equal moments are not `==`; `sameMoment` is the value comparison.
 
 ## Validation
 

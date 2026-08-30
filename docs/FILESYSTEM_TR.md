@@ -1,10 +1,10 @@
-# File and Path modules
+# File ve Path modülleri
 
-[English] · [Türkçe](FILESYSTEM_TR.md)
+[English](FILESYSTEM.md) · [Türkçe]
 
-[Back to README](../README.md) · [Modules](MODULES.md) · [Errors](ERRORS.md)
+[README'ye dön](../README_TR.md) · [Modüller](MODULES_TR.md) · [Hatalar](ERRORS_TR.md)
 
-Import the modules explicitly:
+Modülleri açıkça içe aktarın:
 
 ```ahd
 bring Path
@@ -14,7 +14,8 @@ from File bring FileError
 
 ## Path
 
-`Path` performs pure, host-operating-system-aware path operations:
+`Path`, ana bilgisayar işletim sistemine duyarlı (host-operating-system-
+aware), saf yol işlemleri gerçekleştirir:
 
 ```text
 Path.join(parts: List<String>) -> String
@@ -42,9 +43,10 @@ File.createDir(path: String)                  -> Nothing
 File.list(path: String)                       -> List<String>
 ```
 
-Text is UTF-8. `File.list` returns immediate entry names in stable ascending
-lexical order; it is not recursive. Relative paths use the process working
-directory. In a REPL that is the directory from which `ahdcode` was launched.
+Metin UTF-8'dir. `File.list`, doğrudan girdi adlarını kararlı, artan
+sözlüksel (ascending lexical) sırada döndürür; özyinelemeli (recursive)
+değildir. Göreli yollar, süreç çalışma dizinini (process working directory)
+kullanır. Bir REPL'de bu, `ahdcode`'un başlatıldığı dizindir.
 
 ```ahd
 File.createDir("notes")
@@ -54,8 +56,8 @@ write(File.readText("notes/today.txt"))
 write(File.list("notes"))
 ```
 
-`File.exists` returns `false` for a missing path. Failures of the other File
-operations raise `FileError`, which derives from `IOError` and `Error`:
+`File.exists`, eksik bir yol için `false` döndürür. Diğer File işlemlerinin
+hataları, `IOError` ve `Error`'dan türeyen `FileError`'ı fırlatır:
 
 ```ahd
 attempt {
@@ -66,6 +68,7 @@ except FileError as error {
 }
 ```
 
-File operations never expose host error objects. v0.1.7 deliberately has no
-recursive listing, binary I/O, permissions API, directory walking, or broad OS
-module.
+File işlemleri, hiçbir zaman ana bilgisayar (host) hata nesnesini
+göstermez. v0.1.7, kasıtlı olarak özyinelemeli listeleme, ikili (binary)
+G/Ç, izinler API'si, dizin gezinme (directory walking) veya geniş bir OS
+modülüne sahip değildir.

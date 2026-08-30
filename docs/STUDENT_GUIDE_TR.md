@@ -22,7 +22,7 @@ En iyi öğrenme yolu, örnekleri yalnızca okumak değil çalıştırmaktır. B
 - [13. Referans davranışı (Reference Behavior)](#13-referans-davranışı-reference-behavior)
 - [14. Pair ile çalışmak](#14-pair-ile-çalışmak)
 - [15. Sabitler (Constant)](#15-sabitler-constant)
-- [16. Null güvenliği (Null safety)](#16-null-güvenliği-null-safety)
+- [16. Null güvenliği](#16-null-güvenliği)
 - [17. Sınıflar (Class) ve Özellikler (Attributes)](#17-sınıflar-class-ve-özellikler-attributes)
 - [18. Hata yönetimi (`attempt`, `except`, `ultimately` ve `toss`)](#18-hata-yönetimi-attempt-except-ultimately-ve-toss)
 - [19. Modüller ve bring](#19-modüller-ve-bring)
@@ -1339,7 +1339,7 @@ Kısa özet:
 - Tekli `-` -> `CNegate`
 - `str(nesne)` -> `CStr`
 
-Dağıtım (dispatch) her zaman **sol taraftaki** işlenene bakar: `vektor + 3` çalışıyorsa bu `3 + vektor` ifadesinin de çalışacağı anlamına gelmez — tersine bir operatör kuralı yoktur. Kalıtım ve `Override` sıradan metotlarla aynı şekilde çalışır. Daha fazla ayrıntı için [Class Protocol Methods](PROTOCOLS.md) belgesine bakın.
+Dağıtım (dispatch) her zaman **sol taraftaki** işlenene bakar: `vektor + 3` çalışıyorsa bu `3 + vektor` ifadesinin de çalışacağı anlamına gelmez — tersine bir operatör kuralı yoktur. Kalıtım ve `Override` sıradan metotlarla aynı şekilde çalışır. Daha fazla ayrıntı için [Class Protocol Methods](PROTOCOLS_TR.md) belgesine bakın.
 
 ## 18. Hata yönetimi (`attempt`, `except`, `ultimately` ve `toss`)
 
@@ -1552,6 +1552,47 @@ except FileError as error {
 ```
 
 `FileError`, `IOError` sınıfından türemiştir. Göreli yollar programın veya REPL oturumunun çalışma klasörünü kullanır.
+
+### Regex'e ilk bakış
+
+AhdCode'un hazır `Regex` modülü, bir deseni (pattern) bir `Pattern` değerine derler; ardından bu değeri kullanarak bir String hakkında sorular sormanızı sağlar:
+
+```ahd
+bring Regex
+from Regex bring Pattern
+
+digits: Pattern := Regex.compile("[0-9]+")
+
+write(digits.matches("order #482"))       // true
+write(digits.find("order #482, item #7")) // "482"
+write(digits.findAll("order #482, item #7")) // ["482", "7"]
+```
+
+`Regex.compile`'ın ürettiği Class'ın adı `Regex` değil `Pattern`'dır -- `bring Regex` zaten modülün kendisini isimlendirir, bu yüzden derlenmiş-desen türünün bir tür olarak yazılabilmesi için kendi adına (`from Regex bring Pattern`) ihtiyacı vardır.
+
+`find`, hiç eşleşme olmayabileceği için `String?` döndürür, bu yüzden onu kullanmadan önce, diğer null olabilen herhangi bir değer gibi kontrol edin:
+
+```ahd
+found: String? := digits.find("no numbers here")
+if found == null {
+    write("nothing found")
+}
+```
+
+Geçersiz bir desen `RegexError` fırlatır:
+
+```ahd
+from Regex bring RegexError
+
+attempt {
+    Regex.compile("(unterminated")
+}
+except RegexError as error {
+    write("could not compile: {error.message}")
+}
+```
+
+`replace`, `split` ve `groups` için [Regex modülü referansına](REGEX_TR.md) bakın.
 
 ## 20. Temel işlevler modülü (Fundamentals)
 
@@ -2167,23 +2208,28 @@ Tam çözümleri hemen aramak yerine her programı küçük adımlarla kurun.
 Bu rehberi tamamladıktan sonra dilin ayrıntılarını şu belgelerden
 derinleştirebilirsiniz:
 
-- [Başlangıç / Getting Started](GETTING_STARTED.md)
-- [Dil turu / Language Tour](LANGUAGE_TOUR.md)
-- [Türler ve null / Types and Null](TYPES_AND_NULL.md)
-- [Control Flow](CONTROL_FLOW.md)
-- [Functions](FUNCTIONS.md)
-- [Classes](CLASSES.md)
-- [Collections](COLLECTIONS.md)
-- [Modules](MODULES.md)
-- [Errors](ERRORS.md)
-- [Fundamentals](FUNDAMENTALS.md)
-- [String API](STRING_API.md)
-- [List API](LIST_API.md)
-- [Math](MATH.md)
-- [CLI](CLI.md)
-- [Formatter](FORMATTER.md)
-- [REPL](REPL.md)
-- [Tam v0.1 spesifikasyonu](../AHDCODE_LANGUAGE_SPEC_v0.1.md)
+- [Başlangıç](GETTING_STARTED_TR.md)
+- [Dil turu](LANGUAGE_TOUR_TR.md)
+- [Türler ve null](TYPES_AND_NULL_TR.md)
+- [Kontrol Akışı](CONTROL_FLOW_TR.md)
+- [Fonksiyonlar](FUNCTIONS_TR.md)
+- [Sınıflar](CLASSES_TR.md)
+- [Class Protocol Methods](PROTOCOLS_TR.md)
+- [Koleksiyonlar](COLLECTIONS_TR.md)
+- [Modüller](MODULES_TR.md)
+- [Hatalar](ERRORS_TR.md)
+- [Temel İşlevler](FUNDAMENTALS_TR.md)
+- [String API](STRING_API_TR.md)
+- [List API](LIST_API_TR.md)
+- [Math](MATH_TR.md)
+- [Time](TIME_TR.md)
+- [Latex](LATEX_TR.md)
+- [File ve Path](FILESYSTEM_TR.md)
+- [Regex](REGEX_TR.md)
+- [CLI](CLI_TR.md)
+- [Formatter](FORMATTER_TR.md)
+- [REPL](REPL_TR.md)
+- [Tam v0.1 spesifikasyonu](../AHDCODE_LANGUAGE_SPEC_v0.1_TR.md)
 
-Çalışan daha fazla örnek için [curated v0.1 examples](../examples/v0.1/README.md)
+Çalışan daha fazla örnek için [derlenmiş v0.1 örnekleri](../examples/v0.1/README_TR.md)
 klasörünü inceleyin.

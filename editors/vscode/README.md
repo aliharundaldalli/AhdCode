@@ -1,5 +1,7 @@
 # AhdCode editor extension
 
+[English] · [Türkçe](README_TR.md)
+
 This minimal extension adds AhdCode file recognition, lightweight syntax highlighting, and a **Run AhdCode File** play button to VS Code-compatible editors.
 
 The extension supplies AhdCode package branding and light/dark language icons.

@@ -1,5 +1,7 @@
 # Classes
 
+[English] · [Türkçe](CLASSES_TR.md)
+
 [Back to README](../README.md) · [Functions](FUNCTIONS.md) · [Class Protocol Methods](PROTOCOLS.md)
 
 ## Structure and construction

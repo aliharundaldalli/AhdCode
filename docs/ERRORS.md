@@ -1,5 +1,7 @@
 # Errors
 
+[English] · [Türkçe](ERRORS_TR.md)
+
 [Back to README](../README.md)
 
 AhdCode errors are catchable Class values derived from `Error`.
@@ -31,6 +33,7 @@ Common built-in errors include:
 | `IndexError` | invalid List/String index |
 | `IOError` | base class for input/output failures |
 | `FileError` | `File` module operation failure; derives from `IOError` |
+| `RegexError` | invalid pattern passed to `Regex.compile`; derives from `Error` |
 | `KeyError` | missing Pair key |
 | `NullError` | runtime null safety boundary |
 | `ConstantError` | mutation through a deep-frozen reference |

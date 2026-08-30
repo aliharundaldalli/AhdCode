@@ -1,5 +1,7 @@
 # Math standard module
 
+[English] · [Türkçe](MATH_TR.md)
+
 [Back to README](../README.md) · [Modules](MODULES.md) · [List API](LIST_API.md)
 
 Math is explicit:

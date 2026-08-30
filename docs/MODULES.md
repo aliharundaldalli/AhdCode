@@ -1,5 +1,7 @@
 # Modules
 
+[English] · [Türkçe](MODULES_TR.md)
+
 [Back to README](../README.md) · [Math](MATH.md) · [File and Path](FILESYSTEM.md)
 
 A local module is a sibling `.ahd` file. The reference is one case-sensitive
@@ -38,7 +40,7 @@ from Utilities bring all
 `all` brings only public, non-`Confidential` symbols. Import collisions and
 circular dependencies are compile-time errors.
 
-`Math`, `Time`, `Latex`, `Path`, and `File` are compiler-registered and use
+`Math`, `Time`, `Latex`, `Path`, `File`, and `Regex` are compiler-registered and use
 these same import forms. A local file cannot shadow a standard module of the
 same name. They can also use the ordinary namespace alias form:
 

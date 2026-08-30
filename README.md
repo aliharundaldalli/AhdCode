@@ -6,6 +6,8 @@
 
 [![CI](https://github.com/aliharundaldalli/AhdCode/actions/workflows/ci.yml/badge.svg)](https://github.com/aliharundaldalli/AhdCode/actions/workflows/ci.yml)
 
+[English](README.md) · [Türkçe](README_TR.md)
+
 AhdCode is an experimental statically checked general-purpose programming
 language focused on readable syntax, explicit intent, predictable semantics,
 and native compilation.
@@ -37,6 +39,8 @@ for name in names {
   part of the v0.1 core.
 - A small, closed set of [Class Protocol Methods](docs/PROTOCOLS.md) lets a
   Class define `==`, ordering, arithmetic, unary `-`, and `str()` behavior.
+- A [Regex module](docs/REGEX.md) compiles patterns to a `Pattern` value with
+  `matches`, `find`, `findAll`, `groups`, `replace`, and `split`.
 - The formatter defines one canonical presentation while preserving comments.
 
 ## Build from source
@@ -90,6 +94,7 @@ See the [CLI guide](docs/CLI.md), [formatter guide](docs/FORMATTER.md), and
 - [Time module](docs/TIME.md)
 - [Latex module](docs/LATEX.md)
 - [File and Path modules](docs/FILESYSTEM.md)
+- [Regex module](docs/REGEX.md)
 - [Curated v0.1 examples](examples/v0.1/README.md)
 - [Full v0.1 language specification](AHDCODE_LANGUAGE_SPEC_v0.1.md)
 
@@ -108,7 +113,7 @@ Operator behavior is user-definable only through the ten fixed
 [Class Protocol Methods](docs/PROTOCOLS.md), not a general overloading
 mechanism. Modules are sibling `.ahd` files, and the editor extension is a
 lightweight run-and-highlight integration. See the
-[specification's unsupported-feature list](AHDCODE_LANGUAGE_SPEC_v0.1.md#38-unsupported-v01-features).
+[specification's unsupported-feature list](AHDCODE_LANGUAGE_SPEC_v0.1.md#40-unsupported-v01-features).
 
 ## Repository map
 

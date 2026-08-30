@@ -1,5 +1,7 @@
 # REPL
 
+[English] · [Türkçe](REPL_TR.md)
+
 [Back to README](../README.md) · [CLI](CLI.md) · [File and Path](FILESYSTEM.md)
 
 Start a persistent interactive session:
@@ -9,7 +11,7 @@ ahdcode
 ```
 
 ```text
-AhdCode v0.1.8
+AhdCode v0.1.9
 ahd> x := 5
 ahd> x = x + 1
 ahd> x

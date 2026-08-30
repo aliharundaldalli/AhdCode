@@ -1,5 +1,7 @@
 # Formatter
 
+[English] · [Türkçe](FORMATTER_TR.md)
+
 [Back to README](../README.md) · [CLI](CLI.md)
 
 Format a source file in place:

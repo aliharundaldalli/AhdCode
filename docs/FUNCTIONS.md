@@ -1,5 +1,7 @@
 # Functions
 
+[English] · [Türkçe](FUNCTIONS_TR.md)
+
 [Back to README](../README.md) · [Classes](CLASSES.md)
 
 Functions are named declarations at module root; methods are named declarations

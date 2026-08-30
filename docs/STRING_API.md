@@ -1,5 +1,7 @@
 # String API
 
+[English] · [Türkçe](STRING_API_TR.md)
+
 [Back to README](../README.md) · [Fundamentals](FUNDAMENTALS.md)
 
 String is immutable and indexed by Unicode character, not UTF-8 byte. Every

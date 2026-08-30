@@ -1551,6 +1551,47 @@ except FileError as error {
 
 `FileError` inherits from the `IOError` class. Relative paths use the working folder of the program or REPL session.
 
+### A first look at Regex
+
+AhdCode's built-in `Regex` module compiles a pattern into a `Pattern` value, then lets you ask questions about a String using it:
+
+```ahd
+bring Regex
+from Regex bring Pattern
+
+digits: Pattern := Regex.compile("[0-9]+")
+
+write(digits.matches("order #482"))       // true
+write(digits.find("order #482, item #7")) // "482"
+write(digits.findAll("order #482, item #7")) // ["482", "7"]
+```
+
+The Class produced by `Regex.compile` is called `Pattern`, not `Regex` -- `bring Regex` already names the module itself, so the compiled-pattern type needs its own name (`from Regex bring Pattern`) to be written as a type.
+
+`find` returns `String?` because there might be no match at all, so check it before use, exactly like any other nullable value:
+
+```ahd
+found: String? := digits.find("no numbers here")
+if found == null {
+    write("nothing found")
+}
+```
+
+An invalid pattern raises `RegexError`:
+
+```ahd
+from Regex bring RegexError
+
+attempt {
+    Regex.compile("(unterminated")
+}
+except RegexError as error {
+    write("could not compile: {error.message}")
+}
+```
+
+See [the Regex module reference](REGEX.md) for `replace`, `split`, and `groups`.
+
 ## 20. Fundamentals module
 
 To use some tools, you don't need to write any `bring`. These are directly available in an AhdCode program:
@@ -2174,9 +2215,14 @@ After finishing this guide, you can deepen your knowledge of the language detail
 - [Modules](MODULES.md)
 - [Errors](ERRORS.md)
 - [Fundamentals](FUNDAMENTALS.md)
+- [Class Protocol Methods](PROTOCOLS.md)
 - [String API](STRING_API.md)
 - [List API](LIST_API.md)
 - [Math](MATH.md)
+- [Time](TIME.md)
+- [Latex](LATEX.md)
+- [File and Path](FILESYSTEM.md)
+- [Regex](REGEX.md)
 - [CLI](CLI.md)
 - [Formatter](FORMATTER.md)
 - [REPL](REPL.md)

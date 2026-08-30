@@ -1,5 +1,7 @@
 # Class Protocol Methods
 
+[English] · [Türkçe](PROTOCOLS_TR.md)
+
 [Back to README](../README.md) · [Classes](CLASSES.md) · [Fundamentals](FUNDAMENTALS.md)
 
 AhdCode lets a Class define operator behavior through a small, closed set of

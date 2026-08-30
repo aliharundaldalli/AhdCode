@@ -1,5 +1,7 @@
 # Getting started
 
+[English] · [Türkçe](GETTING_STARTED_TR.md)
+
 [Back to README](../README.md) · [Language tour](LANGUAGE_TOUR.md) · [CLI](CLI.md)
 
 ## Install the compiler

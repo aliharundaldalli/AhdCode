@@ -1,5 +1,7 @@
 # Latex standard module
 
+[English] · [Türkçe](LATEX_TR.md)
+
 [Back to README](../README.md) · [Modules](MODULES.md) · [Time module](TIME.md)
 
 Latex turns AhdCode Strings into PDF documents. It is explicit, like Math and

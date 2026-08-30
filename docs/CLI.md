@@ -1,5 +1,7 @@
 # CLI
 
+[English] · [Türkçe](CLI_TR.md)
+
 [Back to README](../README.md) · [Formatter](FORMATTER.md) · [REPL](REPL.md)
 
 The current command surface is:
