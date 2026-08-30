@@ -1,8 +1,10 @@
-// A lambda is one expression. It may read a binding from the surrounding
-// scope only by listing that binding in an explicit capture list, so what a
-// lambda depends on is visible where the lambda is written.
+// A lambda is one expression. It may read a binding from outside its own
+// parameters only by listing that binding in an explicit dependency list, so
+// what a lambda depends on -- and how -- is visible where the lambda is
+// written. `#name`/`Local name` is a lexical capture; `@name`/`Global name`
+// is an explicit module/global dependency.
 keepAbove: Function := (minimum: Int, scores: List<Int>) -> List<Int> {
-    return scores.filter(lambda [minimum] (score: Int) -> score >= minimum)
+    return scores.filter(lambda [#minimum] (score: Int) -> score >= minimum)
 }
 
 write(keepAbove(70, [50, 70, 90, 65]))
@@ -13,8 +15,8 @@ label: Function := (
     values: List<Int>
 ) -> List<String> {
     return values.filter(
-        lambda [width] (value: Int) -> value <= width
-    ).map(lambda [prefix] (value: Int) -> "{prefix}{value}")
+        lambda [#width] (value: Int) -> value <= width
+    ).map(lambda [#prefix] (value: Int) -> "{prefix}{value}")
 }
 
 write(label("n", 20, [5, 25, 18]))
@@ -22,15 +24,31 @@ write(label("n", 20, [5, 25, 18]))
 // a later change to that binding is not visible inside the lambda.
 snapshot: Function := () -> Int {
     step: Local Int := 1
-    first: Local Function := lambda [step] (x: Int) -> x + step
+    first: Local Function := lambda [#step] (x: Int) -> x + step
     step = step + 100
-    second: Local Function := lambda [step] (x: Int) -> x + step
+    second: Local Function := lambda [#step] (x: Int) -> x + step
     return first(0) + second(0)
 }
 
 write(snapshot())
-// A lambda with no capture list reads nothing from the surrounding scope.
+// A lambda with no dependency list reads nothing outside its own parameters.
 write([1, 2, 3].map(lambda (x: Int) -> x * 2))
+// An @ dependency is not a capture: it reads the real module binding, so a
+// legal mutation after the lambda was created is visible the next time it
+// runs.
+Maximum: Int := 100
+underCap: Function := lambda [@Maximum] (score: Int) -> score <= Maximum
+
+write(underCap(50))
+Maximum = 40
+write(underCap(50))
+// # and @ dependencies mix freely, and may be spelled compactly or in full.
+inRange: Function := (minimum: Int) -> Bool {
+    check: Local Function := lambda [Local minimum, @Maximum] (score: Int) -> score >= minimum and score <= Maximum
+    return check(35)
+}
+
+write(inRange(10))
 // Statements still belong to a full Function, not a lambda.
 describe: Function := (value: Int) -> String {
     doubled: Local Int := value * 2

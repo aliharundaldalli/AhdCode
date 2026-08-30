@@ -354,13 +354,13 @@ func TestExplicitLambdaCaptureInThePersistentREPL(t *testing.T) {
     minimum: Int
     scores: List<Int>
 ) -> List<Int> {
-    return scores.filter(lambda [minimum] (score: Int) -> score >= minimum)
+    return scores.filter(lambda [#minimum] (score: Int) -> score >= minimum)
 }
 write(keep(70, [50, 70, 90, 65]))
 run: Function := (
 ) -> Bool {
     minimum: Local Int := 70
-    check: Local Function := lambda [minimum] (score: Int) -> score >= minimum
+    check: Local Function := lambda [#minimum] (score: Int) -> score >= minimum
     return check(80)
 }
 write(run())
@@ -368,14 +368,19 @@ bump: Function := (
     start: Int
 ) -> Int {
     step: Local Int := start
-    first: Local Function := lambda [step] (x: Int) -> x + step
+    first: Local Function := lambda [#step] (x: Int) -> x + step
     step = step + 100
-    second: Local Function := lambda [step] (x: Int) -> x + step
+    second: Local Function := lambda [#step] (x: Int) -> x + step
     return first(0) + second(0)
 }
 write(bump(1))
 write([1, 2, 3].map(lambda (x: Int) -> x * 2))
 write([1, 2, 3].map(lambda [] (x: Int) -> x * 3))
+Maximum: Int := 100
+check: Function := lambda [@Maximum] (score: Int) -> score <= Maximum
+write(check(50))
+Maximum = 40
+write(check(50))
 `
 	var output, errors bytes.Buffer
 	Run(strings.NewReader(input), &output, &errors, "AhdCode v0.1.13")
@@ -387,6 +392,10 @@ write([1, 2, 3].map(lambda [] (x: Int) -> x * 3))
 		"102\n",
 		"[2, 4, 6]\n",
 		"[3, 6, 9]\n",
+		// A Global dependency observes the live binding: true before the
+		// mutation, false after -- not a snapshot from lambda creation.
+		"true\n",
+		"false\n",
 	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("REPL output missing %q:\n%s", want, text)

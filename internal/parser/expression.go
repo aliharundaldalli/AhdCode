@@ -135,7 +135,7 @@ func (p *parser) parsePrefix() ast.Expr {
 
 func (p *parser) parseLambda() ast.Expr {
 	start := p.advance().Span.Start
-	captures := p.parseCaptureList()
+	captures, malformed := p.parseCaptureList()
 	parameters := p.parseParameterList(false)
 	p.skipNewlines()
 	p.expect(token.Arrow, "expected -> after lambda parameters")
@@ -146,39 +146,90 @@ func (p *parser) parseLambda() ast.Expr {
 		return &ast.BadExpr{Base: p.base(start, block.Span().End)}
 	}
 	body := p.parseRequiredExpression(0, "missing lambda body expression after '->'", "write one expression after '->', or use a normal Function for statements")
+	// A malformed dependency entry already reported its own diagnostic; a body
+	// that reads the very name that entry failed to declare would otherwise
+	// also report a "missing dependency" diagnostic. Reporting the whole
+	// lambda as invalid (matching the block-body-rejected recovery just above)
+	// keeps semantic analysis from re-deriving that same fact a second time.
+	if malformed {
+		return &ast.BadExpr{Base: p.base(start, spanEnd(body))}
+	}
 	return &ast.LambdaExpr{Base: p.base(start, spanEnd(body)), Captures: captures, Parameters: parameters, Body: body}
 }
 
-// parseCaptureList reads the optional `[name, name]` capture list that may
-// follow `lambda`. The list is names only: a capture reads an existing
-// binding, so there is no type, no modifier, and no initializer to write.
-func (p *parser) parseCaptureList() []ast.CaptureRef {
+// parseCaptureList reads the optional `[...]` dependency list that may follow
+// `lambda`. Each entry states its own kind: `#name`/`Local name` for a
+// lexical value capture, `@name`/`Global name` for an explicit module/global
+// dependency. There is no type, no modifier beyond the kind, and no
+// initializer to write. The second result reports whether a malformed entry
+// was found, so the caller can suppress the lambda entirely rather than let a
+// body reference to the undeclared name cascade into a second diagnostic.
+func (p *parser) parseCaptureList() ([]ast.CaptureRef, bool) {
 	if !p.check(token.LeftBracket) {
-		return nil
+		return nil, false
 	}
 	p.advance()
-	var captures []ast.CaptureRef
 	p.skipNewlines()
+	var captures []ast.CaptureRef
+	malformed := false
 	for !p.check(token.RightBracket) && !p.atEnd() {
-		name := p.current()
-		if name.Kind != token.Identifier {
-			p.errorCurrent(codeInvalidLambdaSyntax, "lambda capture list expects a binding name",
-				"list the names the lambda reads, as in lambda [minimum] (value: Int) -> value >= minimum")
+		capture, ok := p.parseLambdaDependency()
+		if !ok {
+			malformed = true
 			break
 		}
-		p.advance()
-		captures = append(captures, ast.CaptureRef{Base: p.base(name.Span.Start, name.Span.End), Name: name.Value})
-		p.skipNewlines()
-		if p.check(token.Comma) {
-			p.advance()
-			p.skipNewlines()
+		captures = append(captures, capture)
+		if p.consumeItemSeparator(token.RightBracket) {
 			continue
 		}
-		break
+		if !p.check(token.RightBracket) {
+			p.errorCurrent(codeExpectedSeparator, "expected comma or newline between lambda dependencies", "separate same-line dependencies with commas")
+		}
 	}
 	p.skipNewlines()
-	p.expect(token.RightBracket, "expected ] to close the lambda capture list")
-	return captures
+	p.expect(token.RightBracket, "expected ] to close the lambda dependency list")
+	return captures, malformed
+}
+
+// parseLambdaDependency reads one dependency-list entry. A bare name (the
+// unpublished pre-v0.1.13 spelling) is rejected outright: every entry must
+// state whether it is a Local capture or a Global dependency, either with the
+// compact `#`/`@` sigil or the full `Local`/`Global` keyword. On a malformed
+// entry it consumes the remaining tokens up to the closing `]` so the caller
+// does not also report a mismatched-bracket diagnostic.
+func (p *parser) parseLambdaDependency() (ast.CaptureRef, bool) {
+	start := p.current().Span.Start
+	var kind ast.CaptureKind
+	var nameMessage string
+	switch p.current().Kind {
+	case token.Hash:
+		p.advance()
+		kind, nameMessage = ast.LocalCapture, "expected a binding name after '#'"
+	case token.At:
+		p.advance()
+		kind, nameMessage = ast.GlobalCapture, "expected a binding name after '@'"
+	case token.KeywordLocal:
+		p.advance()
+		kind, nameMessage = ast.LocalCapture, "expected a binding name after 'Local'"
+	case token.KeywordGlobal:
+		p.advance()
+		kind, nameMessage = ast.GlobalCapture, "expected a binding name after 'Global'"
+	default:
+		p.errorCurrent(codeInvalidLambdaSyntax, "lambda dependency must state whether it is Local or Global",
+			"prefix the name with # for a Local capture or @ for a Global dependency, or write Local/Global out in full, as in lambda [#minimum, @Maximum] (...)")
+		for !p.check(token.RightBracket) && !p.atEnd() {
+			p.advance()
+		}
+		return ast.CaptureRef{}, false
+	}
+	name := p.expect(token.Identifier, nameMessage)
+	if name.Synthetic {
+		for !p.check(token.RightBracket) && !p.atEnd() {
+			p.advance()
+		}
+		return ast.CaptureRef{}, false
+	}
+	return ast.CaptureRef{Base: p.base(start, name.Span.End), Kind: kind, Name: name.Value}, true
 }
 
 func (p *parser) infixOperator() (operator string, leftBP, rightBP, width int) {

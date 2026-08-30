@@ -4299,12 +4299,17 @@ Lambda bir ifadedir, bildirim değildir. Atanması, sıradan modül-kökü ve a�
 olarak yereldir.
 
 v0.1.10 hiçbir closure ortamı tanıtmadı: bir lambda, çevreleyen bir
-çağrılabilirin lexical kapsamındaki bir bağlamayı hiç okuyamıyordu. v0.1.13 bu
-kısıtlamayı açık yakalamayla (§54) değiştirir: çevreleyen bir Function
-parametresi veya `Local`, lambda onu listelediğinde okunabilir; listelemediği
-birini okumak semantik hata olarak kalır. Modül bağlamaları, Function'lar, Class'lar ve içe aktarımlar mevcut
-görünürlük kurallarını korur. Özellikle, mevcut açık `Global` kuralı yalnızca
-ifade lambda olduğu için zayıflatılmaz.
+çağrılabilirin lexical kapsamındaki bir bağlamayı veya bir modül bağlamasını
+hiç okuyamıyordu. v0.1.13 bu kısıtlamayı açık bir bağımlılık listesiyle (§54)
+değiştirir: çevreleyen bir Function parametresi veya `Local`, lambda onu
+`#name`/`Local name` olarak listelediğinde okunabilir; bir modül bağlaması ise
+lambda onu `@name`/`Global name` olarak listelediğinde okunabilir -- bu,
+sıradan bir Function'ın zaten ihtiyaç duyduğu açık `Global` bildirimini
+yansıtır. Her iki türden bir bağlamayı listelemeden okumak semantik hata olarak
+kalır. Function'lar, Class'lar, ad alanları ve içe aktarımlar mevcut görünürlük
+kurallarını korur ve hiçbir bağımlılık-listesi girdisine ihtiyaç duymaz;
+modül bağlamaları için mevcut açık `Global` kuralı yalnızca ifade lambda
+olduğu için zayıflatılmaz -- bu aynı kural, sadece kısaca yazılmıştır.
 
 ### 50.5 Uygulama ve araçlar
 
@@ -4553,38 +4558,58 @@ amaçlanmaktadır, böylece Data asla dinamik tipli olmaya zorlanmaz.
 
 ---
 
-## 54. Açık Lambda Yakalama (v0.1.13)
+## 54. Açık Lambda Bağımlılıkları (v0.1.13)
 
 Bir lambda hâlâ tek bir ifadedir (§50). v0.1.13; lambda içine blok gövde,
 deyim, `return` veya yerel bildirim eklemez; deyimli gövde isimli Function'ın
-işi olarak kalır. Eklediği şey, o tek ifadenin çevreleyen çağrılabilirin seçili
-bağlamalarını okuyabilmesidir.
+işi olarak kalır. Eklediği şey, o tek ifadenin kendi parametrelerinin dışından
+seçili bağlamaları okuyabilmesidir: çevreleyen bir lexical bağlama, veya bir
+modül/global bağlaması.
 
 ### 54.1 Sözdizimi
 
-`lambda` ile parametre listesi arasına isteğe bağlı bir yakalama listesi
-yazılır:
+`lambda` ile parametre listesi arasına isteğe bağlı bir bağımlılık listesi
+yazılır. Her girdi kendi türünü, ister kısaca ister tam olarak, belirtir:
 
 ```text
-lambda [ isim, isim, ... ] ( <tipli parametreler> ) -> <ifade>
+lambda [ bağımlılık, bağımlılık, ... ] ( <tipli parametreler> ) -> <ifade>
+
+bağımlılık := "#" isim | "Local" isim
+            | "@" isim | "Global" isim
 ```
 
 ```ahd
-lambda [minimum] (score: Int) -> score >= minimum
-lambda [low, high] (value: Int) -> value >= low and value <= high
+lambda [#minimum] (score: Int) -> score >= minimum
+lambda [#low, #high] (value: Int) -> value >= low and value <= high
+lambda [@Maximum] (score: Int) -> score <= Maximum
+lambda [#minimum, @Maximum] (score: Int) -> score >= minimum and score <= Maximum
+lambda [Local minimum, Global Maximum] (score: Int) -> score >= minimum and score <= Maximum
 ```
 
-Liste yalın bağlama isimleri tutar: bir yakalama var olan bir bağlamayı okur,
-bu yüzden tür, değiştirici veya başlatıcı taşımaz. Listeyi tamamen atlamak
-değişmemiş v0.1.10 sözdizimidir ve lexical yakalama yok demektir; bu yüzden
-v0.1.13'ten önce yazılmış her lambda anlamını korur. `lambda [] (...)` kabul
-edilir ve listeyi atlamakla aynı anlama gelir.
+`#name` ve `Local name` aynı bağımlılığın iki yazımıdır; `@name` ve
+`Global name` de öyledir. Bir bağımlılık listesi kısa ve uzun yazımları
+serbestçe karıştırabilir; formatter, kaynağın hangi yazımı kullandığını
+korur, birini diğerine dönüştürmez. Yinelenen bağımlılık denetimi `#x` ve
+`Local x`'i tek bir girdi sayar; bu yüzden ikisini birden listelemek iki
+bağımlılık değil, bir yinelenen-bağımlılık hatasıdır.
 
-### 54.2 Yakalama açıktır
+Başka bir yazım yoktur: yalın bir isim (`lambda [minimum] (...)`) reddedilir.
+Her girdi, çevreleyen bir lexical bağlamaya mı yoksa bir modül/global
+bağlamasına mı bağımlı olduğunu -- ve nasıl -- belirtmelidir; böylece bir
+lambda'nın neye bağımlı olduğu lambda'nın yazıldığı yerde görünür olur.
 
-Yakalama asla çıkarılmaz. Listenin atladığı, çevreleyen bir çağrılabilire ait
-bir bağlamayı okumak, bağlamayı isimlendiren bir derleme zamanı hatasıdır;
-böylece bir lambda'nın bağımlılıkları lambda'nın yazıldığı yerde görünür olur:
+Listeyi tamamen atlamak veya `lambda [] (...)` yazmak, lambda'nın kendi
+parametrelerinin dışında hiçbir şey okumadığı anlamına gelir; her iki biçim de
+v0.1.10'dan değişmemiştir, bu yüzden v0.1.13'ten önce yazılmış her lambda
+anlamını korur.
+
+### 54.2 Yerel yakalama (`#name` / `Local name`)
+
+`#name` (veya `Local name`) çevreleyen bir lexical bağlamayı okur: bir Function
+parametresi, bir `Local` veya bir `for`/`except` bağlaması. Yakalama asla
+çıkarılmaz. Böyle bir bağlamayı listelemeden okumak, bağlamayı isimlendiren bir
+derleme zamanı hatasıdır; böylece bir lambda'nın lexical bağımlılıkları
+lambda'nın yazıldığı yerde görünür olur:
 
 ```ahd
 run: Function := (
@@ -4595,22 +4620,8 @@ run: Function := (
 }
 ```
 
-reddedilir; aynı lambda `lambda [minimum] (...)` olarak yazıldığında kabul
-edilir.
-
-### 54.3 Neler yakalanabilir
-
-Yalnızca çevreleyen bir çağrılabilirin değer bağlaması uygundur: bir Function
-parametresi, bir `Local` veya bir `for`/`except` bağlaması. Modül kökündeki bir
-isim, Class, isim uzayı veya Function bildirimi sıradan aramayla erişilir ve
-listelenmemelidir; birini listelemek hatadır. Bir çağrılabilir içindeki modül
-bağlamaları için mevcut açık `Global` kuralı değişmez ve yakalamayla
-değiştirilmez.
-
-Bir yakalama tekrarlanmamalı ve bir lambda parametresi ismiyle çakışmamalıdır;
-her biri ayrı bir tanılamadır.
-
-### 54.4 Yakalama anlambilimi
+reddedilir; aynı lambda `lambda [#minimum] (...)` (veya
+`lambda [Local minimum] (...)`) olarak yazıldığında kabul edilir.
 
 Yakalama **değere göredir** ve lambda değerinin oluşturulduğu yerde bir kez
 değerlendirilir. Çevreleyen bağlamadaki sonraki bir değişiklik lambda içinde
@@ -4618,9 +4629,9 @@ görünmez:
 
 ```ahd
 step: Local Int := 1
-first: Local Function := lambda [step] (x: Int) -> x + step
+first: Local Function := lambda [#step] (x: Int) -> x + step
 step = step + 100
-second: Local Function := lambda [step] (x: Int) -> x + step
+second: Local Function := lambda [#step] (x: Int) -> x + step
 // first(0) 1'dir; second(0) 101'dir
 ```
 
@@ -4629,27 +4640,88 @@ Yakalanan değer dilin sıradan değer ve referans kurallarına uyar (§11): bir
 referans verilen nesne, tam olarak onu parametre olarak geçirmekteki gibi
 paylaşılır. `Constant` derin dondurma anlambilimi etkilenmez.
 
-Yakalanan bir isim lambda içinde salt okunurdur: açık yakalama çevreleyen
-değeri verir, çevreleyen değişkenin sahipliğini değil. v0.1.13 değiştirilebilir
-bir closure hücresi, referans kutusu, `Ref` veya `Cell` tanıtmaz.
+Yakalanan bir isim lambda içinde salt okunurdur: `#`/`Local` çevreleyen değeri
+verir, çevreleyen değişkenin sahipliğini değil. v0.1.13 değiştirilebilir bir
+closure hücresi, referans kutusu, `Ref` veya `Cell` tanıtmaz.
 
 Yakalanan bir değer, çevreleyen çağrı döndükten sonra da geçerli kalır; bu
 yüzden bir lambda değeri onu oluşturan çerçeveden daha uzun yaşayabilir.
 
+### 54.3 Global bağımlılığı (`@name` / `Global name`)
+
+`@name` (veya `Global name`) bir yakalama değildir: lambda'nın bir
+modül/global bağlamasını kasıtlı olarak okuduğuna dair açık bir bildirimdir;
+bu, sıradan bir Function'ın modül durumuna dokunmak için zaten ihtiyaç duyduğu
+`Global` bildirimini yansıtır (§30). Bir lambda'nın bu bildirimi yazabileceği
+bir deyim gövdesi yoktur, bu yüzden aynı niyeti belirttiği yer bağımlılık
+listesidir:
+
+```ahd
+Maximum: Int := 100
+
+check: Function := lambda [@Maximum] (score: Int) -> score <= Maximum
+```
+
+`@name`, `Maximum`'u closure depolamasına kopyalamaz, modül bağlamasını
+anlık görüntülemez ve onu bir `Local`'e dönüştürmez. Gerçek modül bağlamasını,
+dilin mevcut global-mutasyon kuralları altında, tam olarak sıradan bir
+Function'ın `x: Global Type` bildirimi gibi okur:
+
+```ahd
+Maximum: Int := 100
+
+check: Function := lambda [@Maximum] (score: Int) -> score <= Maximum
+
+check(50)  // true, Maximum 100'dür
+Maximum = 40
+check(50)  // false, @Maximum canlı bağlamayı gözlemler, anlık görüntü değil
+```
+
+Bir lambda içinde bir modül bağlamasını, bağımlılığı bildirmeden okumak,
+listelenmemiş bir `#`/`Local` yakalaması gibi bir derleme zamanı hatasıdır.
+`Confidential` görünürlüğü ve dilin diğer modül-erişim kuralları etkilenmez:
+`@` bunları ne atlar ne de ikinci bir global-durum modeli tanıtır.
+
+### 54.4 Neler listelenebilir
+
+`#`/`Local` yalnızca çevreleyen bir lexical bağlamayı isimlendirir;
+`@`/`Global` yalnızca modül kökündeki bir değer bağlamasını isimlendirir.
+Bir isim için yanlış türü kullanmak -- çevreleyen bir Local için `@`, ya da
+bir modül bağlaması için `#` -- sessizce yeniden yorumlanmak yerine ayrı bir
+tanılamadır.
+
+Modül kökündeki bir Class, isim uzayı veya Function bildirimi sıradan aramayla
+erişilir ve her iki türde de listelenmemelidir; birini listelemek hatadır. Bu,
+sıradan bir Function için geçerli olan kuralı yansıtır -- o da bir modül
+Function'ını çağırmak veya bir Class'a başvurmak için `Global` bildirimine
+ihtiyaç duymaz -- bir lambda'nın bağımlılık listesi bir Function'ınkinden daha
+geniş bir kural değildir, yalnızca aynı kuralın daha kısa bir yazımıdır.
+
+Bir bağımlılık her iki yazım altında da tekrarlanmamalı ve bir lambda
+parametresi ismiyle çakışmamalıdır; her biri ayrı bir tanılamadır.
+
 ### 54.5 Tipleme ve uygulama
 
-Her yakalama statik olarak çözülür ve çevreleyen bağlamanın tam türünü korur;
-bu yüzden closure'lar dinamik bir ortam ve `Any` tanıtmaz. Yakalanan bağlamalar
-yükseltilmiş (lifted) çağrılabilirin baştaki parametreleri olur; bu, closure
-depolamasını ikinci bir mekanizma yerine sıradan tipli parametre geçişi yapar.
-Çağrılabilirin yayınlanan imzası hâlâ yalnızca bildirilen parametrelerini
-tanımlar, bu yüzden çağıranlar ve callback adaptörleri etkilenmez.
+Her `#`/`Local` yakalaması statik olarak çözülür ve çevreleyen bağlamanın tam
+türünü korur; bu yüzden closure'lar dinamik bir ortam ve `Any` tanıtmaz.
+Yakalanan bağlamalar yükseltilmiş (lifted) çağrılabilirin baştaki
+parametreleri olur; bu, closure depolamasını ikinci bir mekanizma yerine
+sıradan tipli parametre geçişi yapar. Çağrılabilirin yayınlanan imzası hâlâ
+yalnızca bildirilen parametrelerini tanımlar, bu yüzden çağıranlar ve callback
+adaptörleri etkilenmez.
+
+Her `@`/`Global` bağımlılığı, sıradan bir Function'ın `Global` bildiriminin
+kullandığı aynı takma ad (alias) mekanizmasını kullanarak gerçek modül
+bağlamasına bir takma ad kurar; bu yüzden ayrı bir IR veya çalışma zamanı
+temsiline ihtiyaç duymaz: lambda, modül bağlamasını tam olarak bir Function'ın
+okuyacağı gibi okur.
 
 Yerel arka uç ve kalıcı REPL değerlendiricisi aynı modeli uygular ve aynı
-sonuçları üretir. Yakalamalar mevcut her callback ile birlikte çalışır; buna
+sonuçları üretir. Bağımlılıklar mevcut her callback ile birlikte çalışır; buna
 `List.map`/`filter`/`sort` ve §53.5'teki Data callback'leri dahildir.
 
-Formatter yakalama listesini render eder ve idempotenttir.
+Formatter bağımlılık listesini, her girdinin seçtiği yazımı koruyarak render
+eder ve idempotenttir.
 
 ---
 

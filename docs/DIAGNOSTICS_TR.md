@@ -65,9 +65,12 @@ double := lambda (x: Int) -> { return x * 2 }
 double := lambda (x: Int) -> x * 2
 ```
 
-6. v0.1.11 lambda'ları çevreleyen `Local` değerleri veya Function
-parametrelerini yakalamaz. Değeri açık lambda parametresi yapın ya da normal
-Function kullanın.
+6. Bir lambda, kendi parametrelerinin dışındaki bir bağlamayı yalnızca açık
+bağımlılık listesiyle okur: çevreleyen bir `Local` veya Function parametresi
+için `#name`/`Local name`, bir modül bağlaması için `@name`/`Global name`.
+Yalın bir isim (`lambda [minimum] (...)`) reddedilir -- türünü belirtin,
+`lambda [#minimum] (...)` gibi. Bkz.
+[Functions](FUNCTIONS_TR.md#açık-lambda-bağımlılıkları).
 
 7. Function tanılamaları yanlış argüman sayısını, türünü veya adını belirtir.
 Çağrıyı bildirilen parametre adları ve türleriyle eşleştirin; ilgisiz değerler

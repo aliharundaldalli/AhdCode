@@ -18,13 +18,13 @@ scores: List<Real> := students.column(
 write(Statistics.mean(scores))
 write(Statistics.median(scores))
 write(Statistics.stdDev(scores))
-// An explicit capture lets a threshold reach a Data callback.
+// An explicit dependency lets a threshold reach a Data callback.
 minimum: Int := 85
 
 report: Function := (threshold: Int, table: Table) -> Nothing {
     strong: Local Table := table.filter(
         lambda [
-            threshold
+            #threshold
         ] (row: Pair<String, String>) -> int(row["score"]) >= threshold
     )
     write(strong.column("name"))

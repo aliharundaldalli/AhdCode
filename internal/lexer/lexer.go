@@ -338,7 +338,7 @@ func (l *lexer) operator() (token.Kind, int) {
 		'<': token.Less, '>': token.Greater, '.': token.Dot, ',': token.Comma,
 		'(': token.LeftParen, ')': token.RightParen, '[': token.LeftBracket,
 		']': token.RightBracket, '{': token.LeftBrace, '}': token.RightBrace,
-		'?': token.Question,
+		'?': token.Question, '#': token.Hash, '@': token.At,
 	}
 	if kind, ok := singles[l.byteAt(0)]; ok {
 		return kind, 1

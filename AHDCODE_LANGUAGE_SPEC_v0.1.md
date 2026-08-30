@@ -3875,13 +3875,17 @@ module-root and explicit `Local` declaration rules. Lambda parameters are
 implicitly local to the lambda.
 
 v0.1.10 introduced no closure environment: a lambda could not read a binding
-from an enclosing callable's lexical scope at all. v0.1.13 replaces that
-restriction with explicit capture (§54): an enclosing Function parameter or
-`Local` may be read when the lambda lists it, and reading one it does not list
-remains a semantic error. Module bindings,
-Functions, Classes, and imports retain the existing visibility rules. In
-particular, the existing explicit `Global` rule is not weakened merely because
-the expression is a lambda.
+from an enclosing callable's lexical scope, or a module binding, at all.
+v0.1.13 replaces that restriction with an explicit dependency list (§54): an
+enclosing Function parameter or `Local` may be read when the lambda lists it
+as `#name`/`Local name`, and a module binding may be read when the lambda
+lists it as `@name`/`Global name`, mirroring the explicit `Global` declaration
+an ordinary Function already needs. Reading either kind of binding without
+listing it remains a semantic error. Functions, Classes, namespaces, and
+imports retain the existing visibility rules and need no dependency-list entry
+at all; the existing explicit `Global` rule for module bindings is not
+weakened merely because the expression is a lambda -- it is the same rule,
+spelled compactly.
 
 ### 50.5 Implementation and tools
 
@@ -4129,37 +4133,57 @@ an explicit conversion, so Data is never forced to become dynamically typed.
 
 ---
 
-## 54. Explicit Lambda Capture (v0.1.13)
+## 54. Explicit Lambda Dependencies (v0.1.13)
 
 A lambda is still one expression (§50). v0.1.13 adds no block body, no
 statement, no `return`, and no local declaration inside a lambda; a statement
 body remains the named Function's job. What it adds is a way for that one
-expression to read selected bindings of the enclosing callable.
+expression to read selected bindings from outside its own parameters: an
+enclosing lexical binding, or a module/global binding.
 
 ### 54.1 Syntax
 
-An optional capture list is written between `lambda` and the parameter list:
+An optional dependency list is written between `lambda` and the parameter
+list. Each entry states its own kind, either compactly or in full:
 
 ```text
-lambda [ name, name, ... ] ( <typed parameters> ) -> <expression>
+lambda [ dependency, dependency, ... ] ( <typed parameters> ) -> <expression>
+
+dependency := "#" name | "Local" name
+            | "@" name | "Global" name
 ```
 
 ```ahd
-lambda [minimum] (score: Int) -> score >= minimum
-lambda [low, high] (value: Int) -> value >= low and value <= high
+lambda [#minimum] (score: Int) -> score >= minimum
+lambda [#low, #high] (value: Int) -> value >= low and value <= high
+lambda [@Maximum] (score: Int) -> score <= Maximum
+lambda [#minimum, @Maximum] (score: Int) -> score >= minimum and score <= Maximum
+lambda [Local minimum, Global Maximum] (score: Int) -> score >= minimum and score <= Maximum
 ```
 
-The list holds bare binding names: a capture reads an existing binding, so it
-carries no type, modifier, or initializer. Omitting the list entirely is
-unchanged v0.1.10 syntax and means no lexical capture, so every lambda written
-before v0.1.13 keeps its meaning. `lambda [] (...)` is accepted and means the
-same as omitting the list.
+`#name` and `Local name` are the same dependency under two spellings, and so
+are `@name` and `Global name`. A dependency list may freely mix short and long
+spellings; the formatter preserves whichever spelling the source used rather
+than rewriting one into the other. Duplicate detection treats `#x`/`Local x`
+as one entry, so listing both is a duplicate-dependency error, not two
+dependencies.
 
-### 54.2 Capture is explicit
+There is no other spelling: a bare name (`lambda [minimum] (...)`) is
+rejected. Every entry must state whether it depends on an enclosing lexical
+binding or a module/global binding, so what a lambda depends on -- and how --
+is visible where the lambda is written.
 
-Capture is never inferred. Reading a binding of an enclosing callable that the
-list omits is a compile-time error naming the binding, so a lambda's
-dependencies are visible where the lambda is written:
+Omitting the list entirely, or writing `lambda [] (...)`, means the lambda
+reads nothing outside its own parameters; both forms are unchanged from
+v0.1.10, so every lambda written before v0.1.13 keeps its meaning.
+
+### 54.2 Local capture (`#name` / `Local name`)
+
+`#name` (or `Local name`) reads an enclosing lexical binding: a Function
+parameter, a `Local`, or a `for`/`except` binding. Capture is never inferred.
+Reading such a binding without listing it is a compile-time error naming the
+binding, so a lambda's lexical dependencies are visible where the lambda is
+written:
 
 ```ahd
 run: Function := (
@@ -4170,30 +4194,17 @@ run: Function := (
 }
 ```
 
-is rejected, while the same lambda written `lambda [minimum] (...)` is
-accepted.
-
-### 54.3 What may be captured
-
-Only a value binding of an enclosing callable qualifies: a Function parameter,
-a `Local`, or a `for`/`except` binding. A module-root name, Class, namespace,
-or Function declaration is reached by ordinary lookup and must not be listed;
-listing one is an error. The existing explicit `Global` rule for module
-bindings inside a callable is unchanged and is not replaced by capture.
-
-A capture must not repeat, and must not collide with a lambda parameter name;
-each is a distinct diagnostic.
-
-### 54.4 Capture semantics
+is rejected, while the same lambda written `lambda [#minimum] (...)` (or
+`lambda [Local minimum] (...)`) is accepted.
 
 Capture is **by value**, evaluated once where the lambda value is created. A
 later change to the enclosing binding is not visible inside the lambda:
 
 ```ahd
 step: Local Int := 1
-first: Local Function := lambda [step] (x: Int) -> x + step
+first: Local Function := lambda [#step] (x: Int) -> x + step
 step = step + 100
-second: Local Function := lambda [step] (x: Int) -> x + step
+second: Local Function := lambda [#step] (x: Int) -> x + step
 // first(0) is 1; second(0) is 101
 ```
 
@@ -4202,27 +4213,85 @@ The captured value obeys the language's ordinary value and reference rules
 the referenced object stays shared, exactly as passing it as a parameter does.
 `Constant` deep-freeze semantics are unaffected.
 
-A captured name is read-only inside the lambda: explicit capture grants the
+A captured name is read-only inside the lambda: `#`/`Local` grants the
 enclosing value, not ownership of the enclosing variable. v0.1.13 introduces no
 mutable closure cell, reference box, `Ref`, or `Cell`.
 
 A captured value stays valid after the enclosing call returns, so a lambda
 value may outlive the frame that created it.
 
+### 54.3 Global dependency (`@name` / `Global name`)
+
+`@name` (or `Global name`) is not a capture: it is an explicit declaration
+that the lambda intentionally reads a module/global binding, mirroring the
+`Global` declaration an ordinary Function already needs to touch module state
+(§30). A lambda has no statement body in which to write that declaration, so
+the dependency list is where it states the same intent:
+
+```ahd
+Maximum: Int := 100
+
+check: Function := lambda [@Maximum] (score: Int) -> score <= Maximum
+```
+
+`@name` does not copy `Maximum` into closure storage, does not snapshot the
+module binding, and does not turn it into a `Local`. It reads the real module
+binding under the language's existing global-mutation rules, exactly like an
+ordinary Function's `x: Global Type` declaration:
+
+```ahd
+Maximum: Int := 100
+
+check: Function := lambda [@Maximum] (score: Int) -> score <= Maximum
+
+check(50)  // true, Maximum is 100
+Maximum = 40
+check(50)  // false, @Maximum observes the live binding, not a snapshot
+```
+
+Reading a module binding inside a lambda without declaring the dependency is a
+compile-time error, exactly like an unlisted `#`/`Local` capture. `Confidential`
+visibility and the language's other module-access rules are unaffected: `@`
+neither bypasses them nor introduces a second global-state model.
+
+### 54.4 What may be listed
+
+`#`/`Local` names only an enclosing lexical binding; `@`/`Global` names only a
+module-root value binding. Using the wrong kind for a name -- `@` on an
+enclosing Local, or `#` on a module binding -- is a distinct diagnostic, not a
+silent reinterpretation.
+
+A module-root Class, namespace, or Function declaration is reached by ordinary
+lookup and must not be listed under either kind; listing one is an error. This
+mirrors the existing rule for an ordinary Function, which likewise needs no
+`Global` declaration to call a module Function or reference a Class -- a
+lambda's dependency list is not a broader rule than a Function's, only a more
+compact spelling of the same one.
+
+A dependency must not repeat under either spelling, and must not collide with
+a lambda parameter name; each is a distinct diagnostic.
+
 ### 54.5 Typing and implementation
 
-Every capture is resolved statically and keeps the enclosing binding's exact
-type, so closures introduce no dynamic environment and no `Any`. The captured
-bindings become leading parameters of the lifted callable, which makes closure
-storage ordinary typed parameter passing rather than a second mechanism; the
-callable's published signature still describes only its declared parameters, so
-callers and callback adapters are unaffected.
+Every `#`/`Local` capture is resolved statically and keeps the enclosing
+binding's exact type, so closures introduce no dynamic environment and no
+`Any`. The captured bindings become leading parameters of the lifted callable,
+which makes closure storage ordinary typed parameter passing rather than a
+second mechanism; the callable's published signature still describes only its
+declared parameters, so callers and callback adapters are unaffected.
+
+Every `@`/`Global` dependency installs an alias to the real module binding,
+using the same alias mechanism an ordinary Function's `Global` declaration
+uses, so it needs no separate IR or runtime representation: the lambda reads
+the module binding exactly as a Function would.
 
 The native backend and the persistent REPL evaluator implement the same model
-and produce the same results. Captures compose with every existing callback,
-including `List.map`/`filter`/`sort` and the Data callbacks of §53.5.
+and produce the same results. Dependencies compose with every existing
+callback, including `List.map`/`filter`/`sort` and the Data callbacks of
+§53.5.
 
-The formatter renders the capture list and is idempotent.
+The formatter renders the dependency list, preserving each entry's chosen
+spelling, and is idempotent.
 
 ---
 

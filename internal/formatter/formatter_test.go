@@ -66,6 +66,36 @@ func TestLambdaFormattingAndIdempotence(t *testing.T) {
 	}
 }
 
+// TestLambdaDependencyListFormatting checks that the formatter normalizes
+// spacing around a dependency entry (no space after # or @, one space after
+// Local/Global) while preserving whichever spelling -- compact sigil or full
+// keyword -- the source actually used, since both are canonical.
+func TestLambdaDependencyListFormatting(t *testing.T) {
+	compact := formatText(t, "f:=lambda[#minimum,@Maximum](x:Int)->x")
+	if want := "f := lambda [#minimum, @Maximum] (x: Int) -> x"; !strings.Contains(compact, want) {
+		t.Fatalf("formatted = %q, want %q", compact, want)
+	}
+	if twice := formatText(t, compact); twice != compact {
+		t.Fatalf("compact dependency list is not idempotent:\nfirst:\n%s\nsecond:\n%s", compact, twice)
+	}
+
+	full := formatText(t, "f:=lambda[Local minimum,Global Maximum](x:Int)->x")
+	if want := "f := lambda [Local minimum, Global Maximum] (x: Int) -> x"; !strings.Contains(full, want) {
+		t.Fatalf("formatted = %q, want %q", full, want)
+	}
+	if twice := formatText(t, full); twice != full {
+		t.Fatalf("full dependency list is not idempotent:\nfirst:\n%s\nsecond:\n%s", full, twice)
+	}
+
+	mixed := formatText(t, "f:=lambda[#minimum,Global Maximum](x:Int)->x")
+	if want := "f := lambda [#minimum, Global Maximum] (x: Int) -> x"; !strings.Contains(mixed, want) {
+		t.Fatalf("formatted = %q, want %q", mixed, want)
+	}
+	if twice := formatText(t, mixed); twice != mixed {
+		t.Fatalf("mixed dependency list is not idempotent:\nfirst:\n%s\nsecond:\n%s", mixed, twice)
+	}
+}
+
 func TestFormatterPreservesUpToOneBlankLineBetweenStatements(t *testing.T) {
 	input := "a: Int := 1\n\n\n\nb: Int := 2\nc: Int := 3\n"
 	want := "a: Int := 1\n\nb: Int := 2\nc: Int := 3\n"

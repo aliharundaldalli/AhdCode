@@ -14,7 +14,7 @@ func TestLambdaExpressionsRunAsNativeFunctionValues(t *testing.T) {
 offset: Int := 10
 useGlobal: Function := () -> Int {
     offset: Global Int
-    addOffset: Local := lambda (value: Int) -> value + offset
+    addOffset: Local := lambda [@offset] (value: Int) -> value + offset
     return addOffset(5)
 }
 

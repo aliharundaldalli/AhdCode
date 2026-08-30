@@ -7,6 +7,7 @@
     { "include": "#tripleStrings" },
     { "include": "#strings" },
     { "include": "#numbers" },
+    { "include": "#lambdaDependencies" },
     { "include": "#keywords" },
     { "include": "#typesAndModifiers" },
     { "include": "#constants" }
@@ -72,6 +73,32 @@
         {
           "name": "constant.numeric.integer.ahdcode",
           "match": "(?<![\\p{L}\\p{N}_])[0-9]+(?![\\p{L}\\p{N}_])"
+        }
+      ]
+    },
+    "lambdaDependencies": {
+      "comment": "The `#`/`@` sigils are contextual to a lambda's dependency list only -- never a general comment prefix or expression sigil elsewhere.",
+      "begin": "\\blambda\\b\\s*(?=\\[)",
+      "end": "(?=\\()",
+      "beginCaptures": {
+        "0": { "name": "keyword.control.ahdcode" }
+      },
+      "patterns": [
+        {
+          "name": "keyword.operator.capture.ahdcode",
+          "match": "#(?=[\\p{L}_])"
+        },
+        {
+          "name": "keyword.operator.global.ahdcode",
+          "match": "@(?=[\\p{L}_])"
+        },
+        {
+          "name": "storage.modifier.ahdcode",
+          "match": "\\b(?:Local|Global)\\b"
+        },
+        {
+          "name": "variable.other.ahdcode",
+          "match": "[\\p{L}_][\\p{L}\\p{N}_]*"
         }
       ]
     },

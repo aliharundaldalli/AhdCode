@@ -141,6 +141,66 @@ func TestLambdaParameterTypeAndArrowAreRequired(t *testing.T) {
 	requireCode(t, parseText(t, "f := lambda (x: Int) -> return x\n"), codeUnexpectedToken)
 }
 
+// TestLambdaDependencyListGrammar covers the `#name`/`@name`/`Local name`/
+// `Global name` dependency-list grammar: every entry states its own kind, in
+// either the compact sigil spelling or the full keyword spelling.
+func TestLambdaDependencyListGrammar(t *testing.T) {
+	result := parseText(t, "f := lambda [#minimum, @Maximum] (x: Int) -> x")
+	requireClean(t, result)
+	lambda := result.Program.Statements[0].(*ast.VariableDecl).Initializer.(*ast.LambdaExpr)
+	if len(lambda.Captures) != 2 {
+		t.Fatalf("captures = %#v, want 2 entries", lambda.Captures)
+	}
+	if lambda.Captures[0].Kind != ast.LocalCapture || lambda.Captures[0].Name != "minimum" {
+		t.Fatalf("capture 0 = %#v, want LocalCapture minimum", lambda.Captures[0])
+	}
+	if lambda.Captures[1].Kind != ast.GlobalCapture || lambda.Captures[1].Name != "Maximum" {
+		t.Fatalf("capture 1 = %#v, want GlobalCapture Maximum", lambda.Captures[1])
+	}
+
+	full := parseText(t, "f := lambda [Local minimum, Global Maximum] (x: Int) -> x")
+	requireClean(t, full)
+	fullLambda := full.Program.Statements[0].(*ast.VariableDecl).Initializer.(*ast.LambdaExpr)
+	if fullLambda.Captures[0].Kind != ast.LocalCapture || fullLambda.Captures[0].Name != "minimum" {
+		t.Fatalf("capture 0 = %#v, want LocalCapture minimum", fullLambda.Captures[0])
+	}
+	if fullLambda.Captures[1].Kind != ast.GlobalCapture || fullLambda.Captures[1].Name != "Maximum" {
+		t.Fatalf("capture 1 = %#v, want GlobalCapture Maximum", fullLambda.Captures[1])
+	}
+
+	mixed := parseText(t, "f := lambda [#minimum, Global Maximum] (x: Int) -> x")
+	requireClean(t, mixed)
+
+	empty := parseText(t, "f := lambda [] (x: Int) -> x")
+	requireClean(t, empty)
+	if len(empty.Program.Statements[0].(*ast.VariableDecl).Initializer.(*ast.LambdaExpr).Captures) != 0 {
+		t.Fatalf("empty dependency list produced entries")
+	}
+
+	multiline := parseText(t, "f := lambda [\n    #minimum\n    @Maximum\n] (x: Int) -> x")
+	requireClean(t, multiline)
+	if len(multiline.Program.Statements[0].(*ast.VariableDecl).Initializer.(*ast.LambdaExpr).Captures) != 2 {
+		t.Fatalf("newline-separated dependency list did not parse both entries")
+	}
+}
+
+// TestLambdaBareDependencyNameIsRejected checks that the unpublished,
+// pre-v0.1.13 bare-name capture spelling is rejected outright, with a
+// diagnostic naming # and @ rather than being silently reinterpreted as a
+// Local capture, and that the rejection does not cascade into a second
+// diagnostic when the body reads the same name.
+func TestLambdaBareDependencyNameIsRejected(t *testing.T) {
+	result := parseText(t, `run: Function := () -> Bool {
+    minimum: Local Int := 70
+    check: Local Function := lambda [minimum] (score: Int) -> score >= minimum
+    return check(80)
+}`)
+	requireCode(t, result, codeInvalidLambdaSyntax)
+	if len(result.Diagnostics) != 1 {
+		t.Fatalf("diagnostics = %+v, want exactly one PAR012", result.Diagnostics)
+	}
+}
+
 func TestNotBindsOutsideEquality(t *testing.T) {
 	result := parseText(t, "not x == 5")
 	requireClean(t, result)

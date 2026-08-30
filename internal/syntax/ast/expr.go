@@ -41,10 +41,28 @@ func (*GroupExpr) expressionNode() {}
 
 // LambdaExpr is the expression-only shorthand for an anonymous value of the
 // existing Function type. Its return type is inferred from Body.
-// CaptureRef is one name in a lambda's explicit capture list. Capture is
-// always written out: a lambda never takes an enclosing local implicitly.
+
+// CaptureKind distinguishes the two kinds of external dependency a lambda's
+// dependency list may name.
+type CaptureKind uint8
+
+const (
+	// LocalCapture reads an enclosing lexical binding by value, spelled either
+	// `#name` or `Local name`.
+	LocalCapture CaptureKind = iota
+	// GlobalCapture is an explicit declaration that the lambda intentionally
+	// accesses a module/global binding, spelled either `@name` or `Global
+	// name`. It is not a capture: the lambda reads the real binding, exactly
+	// like an ordinary Function's Global declaration.
+	GlobalCapture
+)
+
+// CaptureRef is one entry in a lambda's explicit dependency list. Dependency
+// is always written out: a lambda never reads an enclosing local or a module
+// binding implicitly.
 type CaptureRef struct {
 	Base
+	Kind CaptureKind
 	Name string
 }
 

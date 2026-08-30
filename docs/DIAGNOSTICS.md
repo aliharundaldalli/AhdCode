@@ -71,9 +71,11 @@ double := lambda (x: Int) -> { return x * 2 }
 double := lambda (x: Int) -> x * 2
 ```
 
-6. v0.1.11 lambdas do not capture surrounding `Local` values or Function
-parameters. Pass the value as another lambda parameter or use a normal
-Function.
+6. A lambda reads a binding outside its own parameters only through its
+explicit dependency list: `#name`/`Local name` for an enclosing `Local` or
+Function parameter, `@name`/`Global name` for a module binding. A bare name
+(`lambda [minimum] (...)`) is rejected — state the kind, as in
+`lambda [#minimum] (...)`. See [Functions](FUNCTIONS.md#explicit-lambda-dependencies).
 
 7. Function diagnostics name wrong arity, argument type, or named argument.
 Correct the call to match the declared parameter names and types; AhdCode does

@@ -280,11 +280,15 @@ func (a *analyzer) analyzeIdentifier(identifier *ast.IdentifierExpr, current *sc
 	}
 	// A lambda reads an enclosing binding only when it lists that name. The
 	// listed names already resolve inside the lambda's own scope, so reaching
-	// this with a lexical binding from an outer callable means the capture list
-	// is missing it.
-	if current.callable != nil && current.callable.kind == lambdaCallable && owner != a.module && owner.callable != current.callable && symbol.Alias == nil && isLexicalCapture(symbol.Kind) {
-		a.error(codeMissingCapture, fmt.Sprintf("local %q is not captured by this lambda", identifier.Name), identifier.Span(),
-			fmt.Sprintf("add %q to the lambda capture list, as in lambda [%s] (...) -> ..., or pass the %s as a parameter",
+	// this with a lexical binding from an outer callable means the dependency
+	// list is missing it -- including a binding that is itself an enclosing
+	// Function's explicit Global alias: from the lambda's own point of view
+	// that is still an ordinary enclosing lexical binding, and a lambda gains
+	// no privilege a Function lacks just because a Global declaration sits
+	// somewhere between it and the module.
+	if current.callable != nil && current.callable.kind == lambdaCallable && owner != a.module && owner.callable != current.callable && isLexicalCapture(symbol.Kind) {
+		a.error(codeMissingCapture, fmt.Sprintf("local %q is not a lambda dependency", identifier.Name), identifier.Span(),
+			fmt.Sprintf("add #%s (or Local %s) to the lambda dependency list, or pass the %s as a parameter",
 				identifier.Name, identifier.Name, captureTypeText(symbol)))
 	}
 	// Global governs module state. A module-root Function, Class, or namespace
@@ -293,7 +297,12 @@ func (a *analyzer) analyzeIdentifier(identifier *ast.IdentifierExpr, current *sc
 	if owner == a.module && current.callable != nil && !symbol.Builtin &&
 		symbol.Kind != ClassSymbol && symbol.Kind != NamespaceSymbol && symbol.Kind != FunctionSymbol &&
 		current.callable.symbol != symbol {
-		a.error(codeHiddenGlobal, fmt.Sprintf("module binding %q requires an explicit Global declaration", identifier.Name), identifier.Span(), fmt.Sprintf("add %s: Global %s in this callable", identifier.Name, types.Display(symbol.Type)))
+		if current.callable.kind == lambdaCallable {
+			a.error(codeHiddenGlobal, fmt.Sprintf("module binding %q requires an explicit Global dependency", identifier.Name), identifier.Span(),
+				fmt.Sprintf("add @%s (or Global %s) to the lambda dependency list", identifier.Name, identifier.Name))
+		} else {
+			a.error(codeHiddenGlobal, fmt.Sprintf("module binding %q requires an explicit Global declaration", identifier.Name), identifier.Span(), fmt.Sprintf("add %s: Global %s in this callable", identifier.Name, types.Display(symbol.Type)))
+		}
 	}
 	typeValue := symbol.Type
 	if symbol.Kind == ClassSymbol {

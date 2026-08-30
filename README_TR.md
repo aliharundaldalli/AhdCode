@@ -53,9 +53,11 @@ for name in names {
   dakika ofseti ve Unix milisaniye gösterimlerini destekler.
 - Sıkı [CSV modülü](docs/CSV_TR.md), ham String satırlarını veya başlık
   anahtarlı String kayıtlarını native ve kalıcı REPL uyumuyla taşır.
-- Bir ifade lambda'sı, çevreleyen değerleri açık bir yakalama listesiyle
-  okuyabilir: `lambda [minimum] (score: Int) -> score >= minimum`; yakalama
-  asla çıkarılmaz ve asla örtük değildir.
+- Bir ifade lambda'sı, dışarıdaki değerleri açık bir bağımlılık listesiyle
+  okuyabilir: lexical yakalama için `#name`/`Local name`, modül bağlaması için
+  `@name`/`Global name`, örneğin
+  `lambda [#minimum, @Maximum] (score: Int) -> score >= minimum and score <= Maximum`;
+  her iki tür de asla çıkarılmaz ve asla örtük değildir.
 - [Statistics modülü](docs/STATISTICS_TR.md), `List<Int>` ve `List<Real>`
   üzerinde tipli betimleyici istatistik sağlar; String zorlaması yoktur.
 - Formatter, yorumları korurken tek bir kanonik (standart) sunum tanımlar.

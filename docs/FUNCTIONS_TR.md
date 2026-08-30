@@ -62,50 +62,66 @@ döngüler, hata işleme veya birden çok adım gerektiğinde değişmeyen isiml
 Function sözdizimini kullanın. Sıradan `Local`/`Global` görünürlük kuralları
 değişmez.
 
-## Açık lambda yakalama (capture)
+## Açık lambda bağımlılıkları
 
-Bir lambda, çevreleyen çağrılabilirdeki bir bağlamayı yalnızca o bağlamayı
-`lambda` ile parametreler arasına yazılan açık bir yakalama listesinde
-listeleyerek okur:
+Bir lambda, kendi parametrelerinin dışındaki bir bağlamayı yalnızca o bağlamayı
+`lambda` ile parametreler arasına yazılan açık bir bağımlılık listesinde
+listeleyerek okur. Her girdi kendi türünü belirtir:
+
+- `#name` veya `Local name` -- çevreleyen bir bağlamanın değere göre yakalanması.
+- `@name` veya `Global name` -- bir modül/global bağlamasına açık bir
+  bağımlılık; sıradan bir Function'ın modül durumuna dokunmak için zaten
+  ihtiyaç duyduğu `Global` bildirimini yansıtır.
 
 ```ahd
 keepAbove: Function := (
     minimum: Int
     scores: List<Int>
 ) -> List<Int> {
-    return scores.filter(lambda [minimum] (score: Int) -> score >= minimum)
+    return scores.filter(lambda [#minimum] (score: Int) -> score >= minimum)
 }
+
+Maximum: Int := 100
+inRange: Function := lambda [#minimum, @Maximum] (score: Int) -> score >= minimum and score <= Maximum
 ```
 
-Birden çok isim virgülle ayrılır: `lambda [low, high] (v: Int) -> ...`.
+Birden çok girdi virgülle ayrılır: `lambda [#low, #high] (v: Int) -> ...`.
+`#name`/`Local name` ve `@name`/`Global name` aynı bağımlılığın alternatif
+yazımlarıdır; bir liste kısa ve tam yazımları serbestçe karıştırabilir.
+Formatter, kaynağın hangi yazımı kullandığını korur.
 
-Yakalama asla çıkarılmaz (infer edilmez). Listenin atladığı çevreleyen bir
-`Local`'i veya Function parametresini okumak, bağlamayı isimlendiren bir
-derleme zamanı hatasıdır; böylece bir lambda'nın neye bağlı olduğu, lambda'nın
-yazıldığı yerde görünür olur:
+Bir bağımlılık asla çıkarılmaz (infer edilmez) ve yalın bir isim
+(`lambda [minimum] (...)`, yayınlanmamış v0.1.13-öncesi yazım) reddedilir: her
+girdi Local mi yoksa Global mi olduğunu belirtmelidir. Listenin atladığı
+çevreleyen bir `Local`'i veya Function parametresini okumak, bağlamayı
+isimlendiren bir derleme zamanı hatasıdır; böylece bir lambda'nın neye bağlı
+olduğu -- ve nasıl -- lambda'nın yazıldığı yerde görünür olur:
 
 ```text
-SEM043  local "minimum" is not captured by this lambda
+SEM043  local "minimum" is not a lambda dependency
+SEM007  module binding "Maximum" requires an explicit Global dependency
 ```
 
-Yakalama listesi olmadan yazılan bir lambda hiçbir şey yakalamaz; bu yüzden
-v0.1.13'ten önce derlenen her lambda değişmeden derlenmeye devam eder.
-`lambda [] (...)` kabul edilir ve aynı anlama gelir.
+Bağımlılık listesi olmadan yazılan bir lambda, kendi parametrelerinin
+dışında hiçbir şey okumaz; bu yüzden v0.1.13'ten önce derlenen her lambda
+değişmeden derlenmeye devam eder. `lambda [] (...)` kabul edilir ve aynı
+anlama gelir.
 
-Yalnızca çevreleyen bir çağrılabilirin bağlaması yakalanır: bir Function
-parametresi, bir `Local` veya bir `for`/`except` bağlaması. Modül kökündeki bir
-isim, Class veya isim uzayı sıradan aramayla erişilir ve listelenmemelidir --
-modül bağlamaları mevcut `Global` kuralını izlemeye devam eder.
+`#`/`Local` yalnızca çevreleyen bir çağrılabilirin bağlamasını isimlendirir:
+bir Function parametresi, bir `Local` veya bir `for`/`except` bağlaması.
+`@`/`Global` yalnızca modül kökündeki bir değer bağlamasını isimlendirir.
+Modül kökündeki bir Class, Function veya isim uzayı sıradan aramayla erişilir
+ve her iki türde de listelenmemelidir.
 
-**Yakalama değere göredir.** Bir yakalama, lambda değeri oluşturulduğunda
-bağlamanın tuttuğu şeyi okur; bu yüzden o bağlamadaki sonraki bir değişiklik
-lambda'nın içinde görünmez:
+**Bir `#`/`Local` yakalaması değere göredir.** Lambda değeri
+oluşturulduğunda bağlamanın tuttuğu şeyi okur; bu yüzden o bağlamadaki
+sonraki bir değişiklik lambda'nın içinde görünmez:
 
 ```ahd
 step: Local Int := 1
-first: Local Function := lambda [step] (x: Int) -> x + step
+first: Local Function := lambda [#step] (x: Int) -> x + step
 step = step + 100
-second: Local Function := lambda [step] (x: Int) -> x + step
+second: Local Function := lambda [#step] (x: Int) -> x + step
 // first(0) 1'dir, second(0) ise 101
 ```
 
@@ -113,16 +129,31 @@ Referans değerler dilin sıradan kurallarını izler: bir `List`, `Pair` veya
 Class örneğini yakalamak, tam olarak onu bir parametre olarak geçirmek gibi
 referansı kopyalar; bu yüzden referans verilen nesne paylaşılmaya devam eder.
 
-Yakalanan bir isim lambda içinde salt okunurdur. Açık yakalama, lambda'ya
+Yakalanan bir isim lambda içinde salt okunurdur. `#`/`Local`, lambda'ya
 çevreleyen değeri verir, çevreleyen değişkenin sahipliğini değil; v0.1.13
 değiştirilebilir bir closure hücresi veya referans kutusu eklemez.
 
-Yakalamalar mevcut her callback ile çalışır; buna [Data](DATA_TR.md)'nın
+**Bir `@`/`Global` bağımlılığı bir yakalama değildir.** Modül bağlamasını
+anlık görüntülemez veya closure depolamasına kopyalamaz; gerçek bağlamayı
+AhdCode'un sıradan global-mutasyon kuralları altında okur; bu yüzden lambda
+oluşturulduktan sonraki yasal bir mutasyon, lambda bir sonraki çalıştığında
+görünür olur:
+
+```ahd
+Maximum: Int := 100
+check: Function := lambda [@Maximum] (score: Int) -> score <= Maximum
+
+check(50)  // true, Maximum 100'dür
+Maximum = 40
+check(50)  // false, @Maximum canlı bağlamayı gözlemler
+```
+
+Bağımlılıklar mevcut her callback ile çalışır; buna [Data](DATA_TR.md)'nın
 `filter`, `sort`, `transform` ve `derive` üyeleri dahildir:
 
 ```ahd
 strong: Local Table := table.filter(
-    lambda [minimum] (row: Pair<String, String>) -> int(row["score"]) >= minimum
+    lambda [#minimum] (row: Pair<String, String>) -> int(row["score"]) >= minimum
 )
 ```
 

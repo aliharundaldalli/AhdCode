@@ -120,14 +120,28 @@ score := lambda (student: Student?) -> student.score`)
 	_, defaultValue := analyzeText(t, `f := lambda (x: Int := 1) -> x + 1`)
 	requireSemanticCode(t, defaultValue, codeInvalidLambda)
 
-	_, globalAlias := analyzeText(t, `offset: Int := 1
+	// A lambda gains no privilege a Function lacks: an enclosing Function's own
+	// explicit Global alias still has to be listed by the nested lambda, same
+	// as any other enclosing lexical binding.
+	_, hiddenThroughAlias := analyzeText(t, `offset: Int := 1
 useGlobal: Function := () -> Int {
     offset: Global Int
     addOffset: Local := lambda (x: Int) -> x + offset
     return addOffset(2)
 }
 answer := useGlobal()`)
-	requireSemanticClean(t, globalAlias)
+	requireSemanticCode(t, hiddenThroughAlias, codeMissingCapture)
+
+	// A lambda may instead reach the module binding directly with its own
+	// explicit Global dependency, bypassing the enclosing Function's alias.
+	_, directGlobal := analyzeText(t, `offset: Int := 1
+useGlobal: Function := () -> Int {
+    offset: Global Int
+    addOffset: Local := lambda [@offset] (x: Int) -> x + offset
+    return addOffset(2)
+}
+answer := useGlobal()`)
+	requireSemanticClean(t, directGlobal)
 }
 
 func TestNormalFunctionSyntaxStillWorksBesideLambda(t *testing.T) {
@@ -734,27 +748,56 @@ func TestNullableBoolAndCallableUse(t *testing.T) {
 	requireSemanticCode(t, callResult, codeNullableUse)
 }
 
-// TestExplicitLambdaCapture covers the capture list's static rules. Capture is
-// always written out, so each way of getting the list wrong has its own
-// diagnostic and none of them cascades.
+// TestExplicitLambdaCapture covers the dependency list's static rules. A
+// dependency is always written out, and states its own kind -- `#name`/
+// `Local name` for a lexical capture, `@name`/`Global name` for an explicit
+// module/global dependency -- so each way of getting the list wrong has its
+// own diagnostic and none of them cascades.
 func TestExplicitLambdaCapture(t *testing.T) {
 	accepted := []struct{ name, text string }{
 		{"enclosing parameter", `keep: Function := (minimum: Int, scores: List<Int>) -> List<Int> {
-    return scores.filter(lambda [minimum] (score: Int) -> score >= minimum)
+    return scores.filter(lambda [#minimum] (score: Int) -> score >= minimum)
 }`},
 		{"enclosing Local", `run: Function := () -> Bool {
     minimum: Local Int := 70
-    check: Local Function := lambda [minimum] (score: Int) -> score >= minimum
+    check: Local Function := lambda [#minimum] (score: Int) -> score >= minimum
     return check(80)
 }`},
 		{"several captures", `band: Function := (low: Int, high: Int, values: List<Int>) -> List<Int> {
-    return values.filter(lambda [low, high] (v: Int) -> v >= low and v <= high)
+    return values.filter(lambda [#low, #high] (v: Int) -> v >= low and v <= high)
 }`},
 		{"no capture list is still valid", `double := lambda (x: Int) -> x * 2`},
 		{"an empty capture list is allowed", `double := lambda [] (x: Int) -> x * 2`},
 		{"a captured String keeps its type", `tag: Function := (suffix: String, names: List<String>) -> List<String> {
-    return names.map(lambda [suffix] (name: String) -> name + suffix)
+    return names.map(lambda [#suffix] (name: String) -> name + suffix)
 }`},
+		{"a single Global dependency", `Maximum: Int := 100
+check := lambda [@Maximum] (score: Int) -> score <= Maximum`},
+		{"several Global dependencies", `Minimum: Int := 0
+Maximum: Int := 100
+inRange := lambda [@Minimum, @Maximum] (score: Int) -> score >= Minimum and score <= Maximum`},
+		{"a mixed Local capture and Global dependency", `Maximum: Int := 100
+check: Function := (minimum: Int) -> Bool {
+    inRange: Local Function := lambda [#minimum, @Maximum] (score: Int) -> score >= minimum and score <= Maximum
+    return inRange(50)
+}`},
+		{"the full Local spelling is equivalent to #", `run: Function := () -> Bool {
+    minimum: Local Int := 70
+    check: Local Function := lambda [Local minimum] (score: Int) -> score >= minimum
+    return check(80)
+}`},
+		{"the full Global spelling is equivalent to @", `Maximum: Int := 100
+check := lambda [Global Maximum] (score: Int) -> score <= Maximum`},
+		{"mixed short and long spelling in one list", `Maximum: Int := 100
+check: Function := (minimum: Int) -> Bool {
+    a: Local Function := lambda [#minimum, Global Maximum] (score: Int) -> score >= minimum and score <= Maximum
+    b: Local Function := lambda [Local minimum, @Maximum] (score: Int) -> score >= minimum and score <= Maximum
+    return a(50) and b(50)
+}`},
+		{"a module-root Function needs no dependency entry", `helper: Function := (x: Int) -> Int {
+    return x + 1
+}
+apply := lambda (x: Int) -> helper(x)`},
 	}
 	for _, testCase := range accepted {
 		t.Run(testCase.name, func(t *testing.T) {
@@ -772,19 +815,40 @@ func TestExplicitLambdaCapture(t *testing.T) {
 		{"an unlisted enclosing parameter", `keep: Function := (minimum: Int, scores: List<Int>) -> List<Int> {
     return scores.filter(lambda (score: Int) -> score >= minimum)
 }`, codeMissingCapture},
-		{"an unknown capture", `f := lambda [missing] (x: Int) -> x`, codeUnknownCapture},
+		{"a missing Global dependency", `Maximum: Int := 100
+check := lambda (score: Int) -> score <= Maximum`, codeHiddenGlobal},
+		{"an unknown Local capture", `f := lambda [#missing] (x: Int) -> x`, codeUnknownCapture},
+		{"an unknown Global dependency", `f := lambda [@missing] (x: Int) -> x`, codeUnknownCapture},
 		{"a duplicate capture", `run: Function := (m: Int) -> Int {
-    f: Local Function := lambda [m, m] (x: Int) -> x + m
+    f: Local Function := lambda [#m, #m] (x: Int) -> x + m
     return f(1)
 }`, codeInvalidCapture},
+		{"a duplicate Global dependency", `Maximum: Int := 100
+f := lambda [@Maximum, @Maximum] (x: Int) -> x <= Maximum`, codeInvalidCapture},
+		{"the same dependency under both spellings is still a duplicate", `run: Function := (x: Int) -> Int {
+    f: Local Function := lambda [Local x, #x] (v: Int) -> v + x
+    return f(1)
+}`, codeInvalidCapture},
+		{"the same Global dependency under both spellings is still a duplicate", `X: Int := 1
+f := lambda [Global X, @X] (v: Int) -> v <= X`, codeInvalidCapture},
 		{"a capture colliding with a parameter", `run: Function := (minimum: Int) -> Int {
-    f: Local Function := lambda [minimum] (minimum: Int) -> minimum + 1
+    f: Local Function := lambda [#minimum] (minimum: Int) -> minimum + 1
     return f(1)
 }`, codeInvalidCapture},
 		{"capturing a Class declaration", `Student: Class<> := {
     structure: Attributes := (score: Int)
 }
-f := lambda [Student] (x: Int) -> x`, codeInvalidCapture},
+f := lambda [#Student] (x: Int) -> x`, codeInvalidCapture},
+		{"# used for an actual module binding", `Maximum: Int := 100
+f := lambda [#Maximum] (x: Int) -> x <= Maximum`, codeInvalidCapture},
+		{"@ used for an actual enclosing Local", `run: Function := (minimum: Int) -> Bool {
+    f: Local Function := lambda [@minimum] (score: Int) -> score >= minimum
+    return f(1)
+}`, codeInvalidCapture},
+		{"Global used for an actual module Function", `helper: Function := (x: Int) -> Int {
+    return x + 1
+}
+f := lambda [Global helper] (x: Int) -> x`, codeInvalidCapture},
 	}
 	for _, testCase := range rejected {
 		t.Run(testCase.name, func(t *testing.T) {
@@ -798,12 +862,27 @@ f := lambda [Student] (x: Int) -> x`, codeInvalidCapture},
 // binding's exact type, so closures cannot smuggle in dynamic typing.
 func TestCapturedBindingsStayTyped(t *testing.T) {
 	_, mismatch := analyzeText(t, `run: Function := (minimum: Int, names: List<String>) -> List<String> {
-    return names.filter(lambda [minimum] (name: String) -> name >= minimum)
+    return names.filter(lambda [#minimum] (name: String) -> name >= minimum)
 }`)
 	requireSemanticFailure(t, mismatch)
 
 	_, wrongUse := analyzeText(t, `run: Function := (label: String, values: List<Int>) -> List<Int> {
-    return values.filter(lambda [label] (v: Int) -> v >= label)
+    return values.filter(lambda [#label] (v: Int) -> v >= label)
 }`)
 	requireSemanticFailure(t, wrongUse)
+}
+
+// TestGlobalDependencyUsesLiveBindingNotSnapshot checks that a `@name`
+// dependency observes AhdCode's ordinary Global-mutation semantics: reading
+// it after a legal mutation sees the new value, unlike a `#name` capture,
+// which keeps the value the binding held when the lambda was created.
+func TestGlobalDependencyUsesLiveBindingNotSnapshot(t *testing.T) {
+	_, result := analyzeText(t, `Maximum: Int := 100
+check: Function := () -> Bool {
+    Maximum: Global Int
+    first: Local Function := lambda [@Maximum] (score: Int) -> score <= Maximum
+    Maximum = 40
+    return first(50)
+}`)
+	requireSemanticClean(t, result)
 }

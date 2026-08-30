@@ -50,9 +50,11 @@ for name in names {
 - The [Data module](docs/DATA.md) adds an immutable `Table` of String cells for
   filtering, sorting, grouping, and deriving columns; it infers no types, so
   numeric work stays an explicit `int(...)` / `real(...)` conversion.
-- An expression lambda may read enclosing values through an explicit capture
-  list, as in `lambda [minimum] (score: Int) -> score >= minimum`; capture is
-  never inferred and never implicit.
+- An expression lambda may read outside values through an explicit dependency
+  list: `#name`/`Local name` for a lexical capture, `@name`/`Global name` for a
+  module binding, as in
+  `lambda [#minimum, @Maximum] (score: Int) -> score >= minimum and score <= Maximum`;
+  neither kind is ever inferred or implicit.
 - The [Statistics module](docs/STATISTICS.md) provides typed descriptive
   statistics over `List<Int>` and `List<Real>`, with no String coercion.
 - The formatter defines one canonical presentation while preserving comments.

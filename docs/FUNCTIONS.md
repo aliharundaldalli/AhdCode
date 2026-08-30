@@ -60,49 +60,64 @@ Function syntax when control flow, declarations, loops, error handling, or
 multiple steps are needed. Ordinary `Local`/`Global` visibility rules stay
 unchanged.
 
-## Explicit lambda capture
+## Explicit lambda dependencies
 
-A lambda reads a binding from the surrounding callable only by listing that
-binding in an explicit capture list, written between `lambda` and the
-parameters:
+A lambda reads a binding from outside its own parameters only by listing that
+binding in an explicit dependency list, written between `lambda` and the
+parameters. Each entry states its own kind:
+
+- `#name` or `Local name` — a lexical capture of an enclosing binding, by
+  value.
+- `@name` or `Global name` — an explicit dependency on a module/global
+  binding, mirroring the `Global` declaration an ordinary Function already
+  needs to touch module state.
 
 ```ahd
 keepAbove: Function := (
     minimum: Int
     scores: List<Int>
 ) -> List<Int> {
-    return scores.filter(lambda [minimum] (score: Int) -> score >= minimum)
+    return scores.filter(lambda [#minimum] (score: Int) -> score >= minimum)
 }
+
+Maximum: Int := 100
+inRange: Function := lambda [#minimum, @Maximum] (score: Int) -> score >= minimum and score <= Maximum
 ```
 
-Several names are separated by commas: `lambda [low, high] (v: Int) -> ...`.
+Several entries are separated by commas: `lambda [#low, #high] (v: Int) -> ...`.
+`#name`/`Local name` and `@name`/`Global name` are alternate spellings of the
+same dependency, and a list may mix compact and full spellings freely; the
+formatter preserves whichever spelling the source used.
 
-Capture is never inferred. Reading an enclosing `Local` or Function parameter
-that the list omits is a compile-time error naming the binding, so what a
-lambda depends on is visible where the lambda is written:
+A dependency is never inferred, and a bare name (`lambda [minimum] (...)`, the
+unpublished pre-v0.1.13 spelling) is rejected: every entry must state whether
+it is Local or Global. Reading an enclosing `Local` or Function parameter that
+the list omits is a compile-time error naming the binding, so what a lambda
+depends on — and how — is visible where the lambda is written:
 
 ```text
-SEM043  local "minimum" is not captured by this lambda
+SEM043  local "minimum" is not a lambda dependency
+SEM007  module binding "Maximum" requires an explicit Global dependency
 ```
 
-A lambda written without a capture list captures nothing, so every lambda that
-compiled before v0.1.13 still compiles unchanged. `lambda [] (...)` is accepted
-and means the same thing.
+A lambda written without a dependency list reads nothing outside its own
+parameters, so every lambda that compiled before v0.1.13 still compiles
+unchanged. `lambda [] (...)` is accepted and means the same thing.
 
-Only a binding of an enclosing callable is captured: a Function parameter, a
-`Local`, or a `for`/`except` binding. A module-root name, Class, or namespace
-is reached by ordinary lookup and must not be listed — module bindings still
-follow the existing `Global` rule.
+`#`/`Local` names only a binding of an enclosing callable: a Function
+parameter, a `Local`, or a `for`/`except` binding. `@`/`Global` names only a
+module-root value binding. A module-root Class, Function, or namespace is
+reached by ordinary lookup and must not be listed under either kind.
 
-**Capture is by value.** A capture reads what the binding held when the lambda
-value was created, so a later change to that binding is not visible inside the
-lambda:
+**A `#`/`Local` capture is by value.** It reads what the binding held when the
+lambda value was created, so a later change to that binding is not visible
+inside the lambda:
 
 ```ahd
 step: Local Int := 1
-first: Local Function := lambda [step] (x: Int) -> x + step
+first: Local Function := lambda [#step] (x: Int) -> x + step
 step = step + 100
-second: Local Function := lambda [step] (x: Int) -> x + step
+second: Local Function := lambda [#step] (x: Int) -> x + step
 // first(0) is 1 and second(0) is 101
 ```
 
@@ -110,16 +125,30 @@ Reference values follow the language's ordinary rules: capturing a `List`,
 `Pair`, or Class instance copies the reference, exactly as passing it as a
 parameter does, so the referenced object stays shared.
 
-A captured name is read-only inside the lambda. Explicit capture gives the
-lambda the enclosing value, not ownership of the enclosing variable, and
-v0.1.13 adds no mutable closure cell or reference box.
+A captured name is read-only inside the lambda. `#`/`Local` gives the lambda
+the enclosing value, not ownership of the enclosing variable, and v0.1.13 adds
+no mutable closure cell or reference box.
 
-Captures work with every existing callback, including
+**An `@`/`Global` dependency is not a capture.** It does not snapshot the
+module binding or copy it into closure storage; it reads the real binding
+under AhdCode's ordinary global-mutation rules, so a legal mutation after the
+lambda was created is visible the next time the lambda runs:
+
+```ahd
+Maximum: Int := 100
+check: Function := lambda [@Maximum] (score: Int) -> score <= Maximum
+
+check(50)  // true, Maximum is 100
+Maximum = 40
+check(50)  // false, @Maximum observes the live binding
+```
+
+Dependencies work with every existing callback, including
 [Data](DATA.md)'s `filter`, `sort`, `transform`, and `derive`:
 
 ```ahd
 strong: Local Table := table.filter(
-    lambda [minimum] (row: Pair<String, String>) -> int(row["score"]) >= minimum
+    lambda [#minimum] (row: Pair<String, String>) -> int(row["score"]) >= minimum
 )
 ```
 

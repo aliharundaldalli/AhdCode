@@ -13,7 +13,7 @@ func TestExplicitLambdaCaptureRunsNatively(t *testing.T) {
     minimum: Int
     scores: List<Int>
 ) -> List<Int> {
-    return scores.filter(lambda [minimum] (score: Int) -> score >= minimum)
+    return scores.filter(lambda [#minimum] (score: Int) -> score >= minimum)
 }
 
 write(keep(70, [50, 70, 90, 65]))
@@ -26,7 +26,7 @@ write(keep(90, [50, 70, 90, 65]))
 			sources: map[string]string{"main.ahd": `run: Function := (
 ) -> Bool {
     minimum: Local Int := 70
-    check: Local Function := lambda [minimum] (score: Int) -> score >= minimum
+    check: Local Function := lambda [#minimum] (score: Int) -> score >= minimum
     return check(80)
 }
 
@@ -43,8 +43,8 @@ write(run())
     values: List<Int>
 ) -> List<String> {
     return values.filter(
-        lambda [low, high] (v: Int) -> v >= low and v <= high
-    ).map(lambda [label] (v: Int) -> "{label}{v}")
+        lambda [#low, #high] (v: Int) -> v >= low and v <= high
+    ).map(lambda [#label] (v: Int) -> "{label}{v}")
 }
 
 write(band(10, 20, "n", [5, 12, 25, 18]))
@@ -57,7 +57,7 @@ write(band(10, 20, "n", [5, 12, 25, 18]))
     base: Int
     values: List<Int>
 ) -> List<Int> {
-    return values.map(lambda [base] (x: Int) -> x + base)
+    return values.map(lambda [#base] (x: Int) -> x + base)
 }
 
 write(adders(100, [1, 2, 3]))
@@ -74,9 +74,9 @@ write(adders(1000, [1, 2, 3]))
     start: Int
 ) -> Int {
     step: Local Int := start
-    first: Local Function := lambda [step] (x: Int) -> x + step
+    first: Local Function := lambda [#step] (x: Int) -> x + step
     step = step + 100
-    second: Local Function := lambda [step] (x: Int) -> x + step
+    second: Local Function := lambda [#step] (x: Int) -> x + step
     return first(0) + second(0)
 }
 
@@ -90,7 +90,7 @@ write(bump(1))
     sink: List<Int>
     values: List<Int>
 ) -> Int {
-    return len(values.map(lambda [sink] (v: Int) -> len(sink) + v))
+    return len(values.map(lambda [#sink] (v: Int) -> len(sink) + v))
 }
 
 target: List<Int> := [7]
@@ -112,7 +112,7 @@ write([1, 2, 3].map(lambda [] (x: Int) -> x * 3))
     pivot: Int
     values: List<Int>
 ) -> List<Int> {
-    values.sort(lambda [pivot] (v: Int) -> pivot - v)
+    values.sort(lambda [#pivot] (v: Int) -> pivot - v)
     return values
 }
 
@@ -131,17 +131,113 @@ report: Function := (
 ) -> Nothing {
     students: Local Table := Data.fromCSV("name,score\nAli,91\nAyse,78\nMehmet,84\n")
     passed: Local Table := students.filter(
-        lambda [minimum] (row: Pair<String, String>) -> int(row["score"]) >= minimum
+        lambda [#minimum] (row: Pair<String, String>) -> int(row["score"]) >= minimum
     )
     write(passed.column("name"))
-    write(passed.sort(lambda [minimum] (row: Pair<String, String>) -> minimum - int(row["score"])).column("name"))
-    write(passed.transform("name", lambda [suffix] (value: String) -> value + suffix).column("name"))
-    write(passed.derive("band", lambda [minimum] (row: Pair<String, String>) -> str(int(row["score"]) - minimum)).column("band"))
+    write(passed.sort(lambda [#minimum] (row: Pair<String, String>) -> minimum - int(row["score"])).column("name"))
+    write(passed.transform("name", lambda [#suffix] (value: String) -> value + suffix).column("name"))
+    write(passed.derive("band", lambda [#minimum] (row: Pair<String, String>) -> str(int(row["score"]) - minimum)).column("band"))
 }
 
 report(80, "!")
 `},
 			expected: "[\"Ali\", \"Mehmet\"]\n[\"Ali\", \"Mehmet\"]\n[\"Ali!\", \"Mehmet!\"]\n[\"11\", \"4\"]\n",
+		},
+		{
+			name: "an explicit Global dependency reads the module binding directly",
+			sources: map[string]string{"main.ahd": `Maximum: Int := 100
+
+check: Function := lambda [@Maximum] (score: Int) -> score <= Maximum
+
+write(check(50))
+write(check(150))
+`},
+			expected: "true\nfalse\n",
+		},
+		{
+			name: "an explicit Global dependency observes a later legal mutation, not a snapshot",
+			sources: map[string]string{"main.ahd": `Maximum: Int := 100
+
+check: Function := lambda [@Maximum] (score: Int) -> score <= Maximum
+
+write(check(50))
+Maximum = 40
+write(check(50))
+`},
+			expected: "true\nfalse\n",
+		},
+		{
+			name: "several Global dependencies",
+			sources: map[string]string{"main.ahd": `Minimum: Int := 10
+Maximum: Int := 100
+
+inRange: Function := lambda [@Minimum, @Maximum] (score: Int) -> score >= Minimum and score <= Maximum
+
+write(inRange(5))
+write(inRange(50))
+write(inRange(500))
+`},
+			expected: "false\ntrue\nfalse\n",
+		},
+		{
+			name: "a mixed Local capture and Global dependency",
+			sources: map[string]string{"main.ahd": `Maximum: Int := 100
+
+check: Function := (minimum: Int) -> Bool {
+    inRange: Local Function := lambda [#minimum, @Maximum] (score: Int) -> score >= minimum and score <= Maximum
+    return inRange(50)
+}
+
+write(check(10))
+write(check(60))
+`},
+			expected: "true\nfalse\n",
+		},
+		{
+			name: "the full Local/Global spelling is equivalent to the compact sigil",
+			sources: map[string]string{"main.ahd": `Maximum: Int := 100
+
+check: Function := (minimum: Int) -> Bool {
+    compact: Local Function := lambda [#minimum, @Maximum] (score: Int) -> score >= minimum and score <= Maximum
+    full: Local Function := lambda [Local minimum, Global Maximum] (score: Int) -> score >= minimum and score <= Maximum
+    mixedSpelling: Local Function := lambda [#minimum, Global Maximum] (score: Int) -> score >= minimum and score <= Maximum
+    return compact(50) same full(50) and full(50) same mixedSpelling(50)
+}
+
+write(check(10))
+`},
+			expected: "true\n",
+		},
+		{
+			name: "captures a for-binding fresh on every iteration",
+			sources: map[string]string{"main.ahd": `demo: Function := () -> List<Int> {
+    values: Local List<Int> := []
+    for x in between(1, 4) {
+        double: Local Function := lambda [#x] () -> x * 2
+        values.add(double())
+    }
+    return values
+}
+
+write(demo())
+`},
+			expected: "[2, 4, 6]\n",
+		},
+		{
+			name: "captures an except-binding",
+			sources: map[string]string{"main.ahd": `describe: Function := () -> String {
+    values: Local List<Int> := [1, 2, 3]
+    attempt {
+        return str(values[10])
+    } except IndexError as error {
+        describeError: Local Function := lambda [#error] () -> error.message
+        return describeError()
+    }
+}
+
+write(describe())
+`},
+			expected: "index 10 is out of range for length 3\n",
 		},
 	})
 }

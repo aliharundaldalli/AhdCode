@@ -416,10 +416,18 @@ func (b *builder) pairGroup(entries []ast.PairEntry) doc {
 	})
 }
 
-// captureGroup renders a lambda's explicit capture list. Each entry is a bare
-// binding name, so the group carries no type, modifier, or initializer.
+// captureGroup renders a lambda's explicit dependency list. Each entry names
+// its kind either compactly (`#name`/`@name`) or in full (`Local name`/
+// `Global name`); the formatter preserves whichever spelling the source used
+// rather than rewriting one into the other, since both are canonical.
 func (b *builder) captureGroup(captures []ast.CaptureRef) doc {
-	return b.delimitedGroup(len(captures), func(int) doc { return b.leaf() })
+	return b.delimitedGroup(len(captures), func(int) doc {
+		if b.current().Kind == token.KeywordLocal || b.current().Kind == token.KeywordGlobal {
+			keyword := b.leaf()
+			return concat(keyword, text(" "), b.leaf())
+		}
+		return concat(b.leaf(), b.leaf())
+	})
 }
 
 func (b *builder) parameterGroup(parameters []ast.Parameter) doc {
