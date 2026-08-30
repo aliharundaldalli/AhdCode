@@ -593,7 +593,10 @@ func typeOperationFor(receiver types.Type, name string) (TypeOperation, bool) {
 			return PairEject, true
 		}
 	case types.ClassKind:
-		return timeOperationFor(receiver, name)
+		if operation, ok := timeOperationFor(receiver, name); ok {
+			return operation, true
+		}
+		return regexOperationFor(receiver, name)
 	}
 	return "", false
 }
@@ -757,6 +760,9 @@ func (a *analyzer) analyzeTypeOperation(call *ast.CallExpr, member *ast.MemberEx
 	if shape, isTime := timeOperationShapes()[operation]; isTime {
 		return a.analyzeTimeOperation(call, operation, shape, current, flow), true
 	}
+	if shape, isRegex := regexOperationShapes()[operation]; isRegex {
+		return a.analyzeRegexOperation(call, operation, shape, current, flow), true
+	}
 	switch operation {
 	case ListAdd, ListEject, PairEject:
 		return a.analyzeCollectionMutation(call, operation, receiver, current, flow), true
@@ -782,6 +788,13 @@ func typeOperationFailure(operation TypeOperation, receiver types.Type) expressi
 	if shape, known := timeOperationShapes()[operation]; known {
 		return expressionInfo{typeValue: shape.result, nullState: NonNull}
 	}
+	if shape, known := regexOperationShapes()[operation]; known {
+		nullState := NonNull
+		if shape.resultNullable {
+			nullState = MaybeNull
+		}
+		return expressionInfo{typeValue: shape.result, nullState: nullState}
+	}
 	switch operation {
 	case ListAdd, ListEject, PairEject, ListSort, ListReverse, ListShuffle:
 		return expressionInfo{typeValue: types.Nothing, nullState: NonNull}
@@ -799,6 +812,9 @@ func typeOperationHint(operation TypeOperation, receiver types.Type) string {
 		return shape.hint
 	}
 	if shape, known := timeOperationShapes()[operation]; known {
+		return shape.hint
+	}
+	if shape, known := regexOperationShapes()[operation]; known {
 		return shape.hint
 	}
 	element := types.Invalid

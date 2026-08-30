@@ -499,6 +499,9 @@ func typeOperationArgument(operation semantic.TypeOperation, receiver ir.Type) (
 		return ir.Type{Kind: ir.StringType}, true
 	case semantic.CalendarIsLeapYear, semantic.CalendarDaysInMonth, semantic.CalendarWeekday:
 		return ir.Type{Kind: ir.IntType}, true
+	case semantic.RegexMatches, semantic.RegexFind, semantic.RegexFindAll,
+		semantic.RegexGroups, semantic.RegexReplace, semantic.RegexSplit:
+		return ir.Type{Kind: ir.StringType}, true
 	}
 	return ir.Type{Kind: ir.InvalidType}, false
 }

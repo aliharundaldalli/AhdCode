@@ -1,0 +1,32 @@
+bring Regex
+from Regex bring Pattern
+from Regex bring RegexError
+
+digits: Pattern := Regex.compile("[0-9]+")
+
+write(digits.matches("order #482"))
+write(digits.matches("no numbers here"))
+
+firstNumber: String? := digits.find("order #482, item #7")
+if firstNumber != null {
+    write(firstNumber)
+}
+
+write(digits.findAll("order #482, item #7"))
+write(digits.replace("order #482, item #7", "N"))
+
+whitespace: Pattern := Regex.compile("\\s+")
+write(whitespace.split("one   two\tthree"))
+
+entry: Pattern := Regex.compile("([a-zA-Z]+)-([0-9]+)")
+parts: List<String>? := entry.groups("item-42")
+if parts != null {
+    write("whole: {parts[0]}, name: {parts[1]}, number: {parts[2]}")
+}
+
+attempt {
+    Regex.compile("[unterminated")
+}
+except RegexError as error {
+    write("could not compile: {error.message}")
+}

@@ -193,6 +193,21 @@ const (
 	CalendarIsLeapYear  TypeOperation = "Calendar.isLeapYear"
 	CalendarDaysInMonth TypeOperation = "Calendar.daysInMonth"
 	CalendarWeekday     TypeOperation = "Calendar.weekday"
+
+	// RegexMatches reports whether a pattern is found anywhere in a String.
+	RegexMatches TypeOperation = "Regex.matches"
+	// RegexFind is the first match, or null if the pattern is not found.
+	RegexFind TypeOperation = "Regex.find"
+	// RegexFindAll is every non-overlapping match, in order.
+	RegexFindAll TypeOperation = "Regex.findAll"
+	// RegexGroups is the first match's full match followed by its capture
+	// groups, or null if the pattern is not found.
+	RegexGroups TypeOperation = "Regex.groups"
+	// RegexReplace rewrites every match with a replacement, which may
+	// reference capture groups as $1, $2, and so on.
+	RegexReplace TypeOperation = "Regex.replace"
+	// RegexSplit divides a String on every match of the pattern.
+	RegexSplit TypeOperation = "Regex.split"
 )
 
 // listOperationMutates reports whether one List operation rewrites its

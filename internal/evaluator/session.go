@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"regexp"
 	"sort"
 	"strings"
 
@@ -30,6 +31,7 @@ type Session struct {
 	rngState     uint64
 	identities   map[any]int64
 	nextIdentity int64
+	regexCache   map[string]*regexp.Regexp
 }
 
 type ExecutionResult struct {

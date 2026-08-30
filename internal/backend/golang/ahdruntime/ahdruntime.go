@@ -17,6 +17,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -59,6 +60,7 @@ var (
 	AhdClassValueError          = &AhdClass{Name: "ValueError", Parent: AhdClassError}
 	AhdClassLatexError          = &AhdClass{Name: "LatexError", Parent: AhdClassError}
 	AhdClassFileError           = &AhdClass{Name: "FileError", Parent: AhdClassIOError}
+	AhdClassRegexError          = &AhdClass{Name: "RegexError", Parent: AhdClassError}
 )
 
 // AhdInstance is every AhdCode Class instance. The generated interface of each
@@ -1649,6 +1651,89 @@ func AhdFileList(class *AhdClass, path string) *AhdList[string] {
 	}
 	sort.Strings(names)
 	return AhdNewList(names...)
+}
+
+// ---------------------------------------------------------------------------
+// Regex standard module
+// ---------------------------------------------------------------------------
+
+var (
+	ahdRegexMu    sync.Mutex
+	ahdRegexCache = map[string]*regexp.Regexp{}
+)
+
+// ahdRegexCompiled compiles a pattern once and caches it by its exact source
+// text, so a Regex value that is used many times pays the compilation cost
+// only the first time. The cache is process-lifetime; AhdCode has no way to
+// evict from it, and pattern texts in real programs are bounded in practice.
+func ahdRegexCompiled(class *AhdClass, pattern string) *regexp.Regexp {
+	ahdRegexMu.Lock()
+	if cached, ok := ahdRegexCache[pattern]; ok {
+		ahdRegexMu.Unlock()
+		return cached
+	}
+	ahdRegexMu.Unlock()
+	compiled, err := regexp.Compile(pattern)
+	if err != nil {
+		AhdRaiseClass(class, fmt.Sprintf("invalid Regex pattern %q: %v", pattern, err))
+	}
+	ahdRegexMu.Lock()
+	ahdRegexCache[pattern] = compiled
+	ahdRegexMu.Unlock()
+	return compiled
+}
+
+// AhdRegexValidate compiles (and caches) a pattern, raising the given Regex
+// error class on invalid syntax, then returns the pattern unchanged so it
+// composes directly as the generated Regex constructor's sole argument.
+func AhdRegexValidate(class *AhdClass, pattern string) string {
+	ahdRegexCompiled(class, pattern)
+	return pattern
+}
+
+// AhdRegexMatches reports whether the pattern is found anywhere in text.
+func AhdRegexMatches(class *AhdClass, pattern, text string) bool {
+	return ahdRegexCompiled(class, pattern).MatchString(text)
+}
+
+// AhdRegexFind returns the first match, or nil (AhdCode null) if the pattern
+// is not found. It uses the match's index rather than its text so an empty
+// match is distinguished from no match at all.
+func AhdRegexFind(class *AhdClass, pattern, text string) *string {
+	location := ahdRegexCompiled(class, pattern).FindStringIndex(text)
+	if location == nil {
+		return nil
+	}
+	result := text[location[0]:location[1]]
+	return &result
+}
+
+// AhdRegexFindAll returns every non-overlapping match, in order.
+func AhdRegexFindAll(class *AhdClass, pattern, text string) *AhdList[string] {
+	return AhdNewList(ahdRegexCompiled(class, pattern).FindAllString(text, -1)...)
+}
+
+// AhdRegexGroups returns the first match's full match followed by its
+// capture groups, or nil (AhdCode null) if the pattern is not found. An
+// unmatched optional group reports as an empty String, matching Go's own
+// regexp/submatch convention.
+func AhdRegexGroups(class *AhdClass, pattern, text string) *AhdList[string] {
+	match := ahdRegexCompiled(class, pattern).FindStringSubmatch(text)
+	if match == nil {
+		return nil
+	}
+	return AhdNewList(match...)
+}
+
+// AhdRegexReplace rewrites every match with a replacement, which may
+// reference capture groups as $1, $2, and so on.
+func AhdRegexReplace(class *AhdClass, pattern, text, replacement string) string {
+	return ahdRegexCompiled(class, pattern).ReplaceAllString(text, replacement)
+}
+
+// AhdRegexSplit divides text on every match of the pattern.
+func AhdRegexSplit(class *AhdClass, pattern, text string) *AhdList[string] {
+	return AhdNewList(ahdRegexCompiled(class, pattern).Split(text, -1)...)
 }
 
 // ---------------------------------------------------------------------------
