@@ -42,6 +42,9 @@ ahdcode run examples/v0.1/14_grade_app.ahd
 | `21_time_utc.ahd` | UTC, Unix milisaniyesi, sabit ofsetler ve anı koruyan dönüşüm |
 | `22_csv.ahd` | ham CSV taşıma, başlık kayıtları, tırnaklama, Unicode ve çok satırlı alanlar |
 | `23_data.ahd` | Data tabloları: CSV'den `Table`'a, filter, anahtarlı sort, derive, groupBy ve açık dönüşüm |
+| `24_capture.ahd` | açık lambda yakalama listeleri, değere göre yakalama ve lambda/Function ayrımı |
+| `25_statistics.ahd` | Statistics: sum, mean, median, mode, dağılım, quantile ve tanımsız girdi hataları |
+| `26_data_statistics.ahd` | Data ve Statistics birlikte: pivotCount, açık dönüşüm ve yakalanmış bir eşik |
 
 `Greeting.ahd`, `11_modules.ahd` tarafından kullanılan kardeş (sibling)
 modüldür.

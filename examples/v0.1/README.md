@@ -42,5 +42,8 @@ ahdcode run examples/v0.1/14_grade_app.ahd
 | `21_time_utc.ahd` | UTC, Unix milliseconds, fixed offsets, and instant-preserving conversion |
 | `22_csv.ahd` | raw CSV transport, header records, quoting, Unicode, and multiline fields |
 | `23_data.ahd` | Data tables: CSV to `Table`, filter, keyed sort, derive, groupBy, and explicit conversion |
+| `24_capture.ahd` | explicit lambda capture lists, capture by value, and the lambda/Function split |
+| `25_statistics.ahd` | Statistics: sum, mean, median, mode, dispersion, quantile, and undefined-input errors |
+| `26_data_statistics.ahd` | Data and Statistics together: pivotCount, explicit conversion, and a captured threshold |
 
 `Greeting.ahd` is the sibling module used by `11_modules.ahd`.

@@ -345,3 +345,98 @@ attempt { table.column("missing") } except DataError as error { write(error.mess
 		t.Fatalf("REPL errors: %s", errors.String())
 	}
 }
+
+// TestExplicitLambdaCaptureInThePersistentREPL pins closure behavior in the
+// persistent evaluator against the results the native backend produces for the
+// same programs, so the two closure implementations cannot drift.
+func TestExplicitLambdaCaptureInThePersistentREPL(t *testing.T) {
+	input := `keep: Function := (
+    minimum: Int
+    scores: List<Int>
+) -> List<Int> {
+    return scores.filter(lambda [minimum] (score: Int) -> score >= minimum)
+}
+write(keep(70, [50, 70, 90, 65]))
+run: Function := (
+) -> Bool {
+    minimum: Local Int := 70
+    check: Local Function := lambda [minimum] (score: Int) -> score >= minimum
+    return check(80)
+}
+write(run())
+bump: Function := (
+    start: Int
+) -> Int {
+    step: Local Int := start
+    first: Local Function := lambda [step] (x: Int) -> x + step
+    step = step + 100
+    second: Local Function := lambda [step] (x: Int) -> x + step
+    return first(0) + second(0)
+}
+write(bump(1))
+write([1, 2, 3].map(lambda (x: Int) -> x * 2))
+write([1, 2, 3].map(lambda [] (x: Int) -> x * 3))
+`
+	var output, errors bytes.Buffer
+	Run(strings.NewReader(input), &output, &errors, "AhdCode v0.1.13")
+	text := output.String()
+	for _, want := range []string{
+		"[70, 90]\n",
+		"true\n",
+		// Capture by value: 1 + 101, not 101 + 101.
+		"102\n",
+		"[2, 4, 6]\n",
+		"[3, 6, 9]\n",
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("REPL output missing %q:\n%s", want, text)
+		}
+	}
+	if errors.Len() != 0 {
+		t.Fatalf("REPL errors: %s", errors.String())
+	}
+}
+
+// TestStatisticsAndPivotCountInThePersistentREPL pins both new surfaces in the
+// persistent evaluator against the native backend's results for the same input.
+func TestStatisticsAndPivotCountInThePersistentREPL(t *testing.T) {
+	input := `bring Statistics
+from Statistics bring StatisticsError
+bring Data
+from Data bring Table
+values: List<Int> := [3, 1, 4, 1, 5]
+write(Statistics.sum(values))
+write(Statistics.mean(values))
+write(Statistics.median(values))
+write(Statistics.mode(values))
+write(Statistics.variance(values))
+write(Statistics.sampleVariance(values))
+write(Statistics.quantile(values, 0.5))
+write(values)
+empty: List<Int> := []
+attempt { Statistics.mean(empty) } except StatisticsError as error { write(error.message) }
+students: Table := Data.fromCSV("name,department,grade\nAli,Math,A\nAyse,Physics,B\nMehmet,Math,A\nZeynep,Physics,A\n")
+write(students.pivotCount("department", "grade").toCSV())
+write(students.rowCount())
+scores: List<Real> := students.column("grade").map(lambda (value: String) -> real(len(value)))
+write(Statistics.mean(scores))
+`
+	var output, errors bytes.Buffer
+	Run(strings.NewReader(input), &output, &errors, "AhdCode v0.1.13")
+	text := output.String()
+	for _, want := range []string{
+		"14\n", "2.8\n", "3.0\n", "1\n", "2.56\n", "3.2\n",
+		// The input List is never reordered by a median or quantile.
+		"[3, 1, 4, 1, 5]\n",
+		"mean is undefined for an empty List\n",
+		"department,A,B\nMath,2,0\nPhysics,1,1\n",
+		"4\n", "1.0\n",
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("REPL output missing %q:\n%s", want, text)
+		}
+	}
+	if errors.Len() != 0 {
+		t.Fatalf("REPL errors: %s", errors.String())
+	}
+}

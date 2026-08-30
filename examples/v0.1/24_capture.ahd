@@ -1,0 +1,40 @@
+// A lambda is one expression. It may read a binding from the surrounding
+// scope only by listing that binding in an explicit capture list, so what a
+// lambda depends on is visible where the lambda is written.
+keepAbove: Function := (minimum: Int, scores: List<Int>) -> List<Int> {
+    return scores.filter(lambda [minimum] (score: Int) -> score >= minimum)
+}
+
+write(keepAbove(70, [50, 70, 90, 65]))
+// Several captures, of different types.
+label: Function := (
+    prefix: String
+    width: Int
+    values: List<Int>
+) -> List<String> {
+    return values.filter(
+        lambda [width] (value: Int) -> value <= width
+    ).map(lambda [prefix] (value: Int) -> "{prefix}{value}")
+}
+
+write(label("n", 20, [5, 25, 18]))
+// A capture takes the value the binding held when the lambda was created, so
+// a later change to that binding is not visible inside the lambda.
+snapshot: Function := () -> Int {
+    step: Local Int := 1
+    first: Local Function := lambda [step] (x: Int) -> x + step
+    step = step + 100
+    second: Local Function := lambda [step] (x: Int) -> x + step
+    return first(0) + second(0)
+}
+
+write(snapshot())
+// A lambda with no capture list reads nothing from the surrounding scope.
+write([1, 2, 3].map(lambda (x: Int) -> x * 2))
+// Statements still belong to a full Function, not a lambda.
+describe: Function := (value: Int) -> String {
+    doubled: Local Int := value * 2
+    return "{value} -> {doubled}"
+}
+
+write(describe(21))

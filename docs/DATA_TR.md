@@ -260,6 +260,7 @@ labelled: Table := table.derive(
 unique(column: String)      -> List<String>
 valueCounts(column: String) -> Pair<String, Int>
 groupBy(column: String)     -> Pair<String, Table>
+pivotCount(rows: String, columns: String) -> Table
 ```
 
 Üçü de sütunun String hücresine göre anahtarlanır ve ilk-görülme sırasını
@@ -278,6 +279,47 @@ for department in groups {
 
 Toplama (aggregation) sözdizimi kasıtlı olarak yoktur; bir grup sıradan bir
 Table'dır.
+
+## pivotCount
+
+```text
+pivotCount(rows: String, columns: String) -> Table
+```
+
+Katı bir sayım çapraz tablosu (cross-tabulation): `rows` sütununun her farklı
+değeri için bir satır, `columns` sütununun her farklı değeri için üretilmiş bir
+sütun ve her hücrede o kombinasyondaki kaynak satır sayısı.
+
+```ahd
+students: Table := Data.fromCSV(
+    "name,department,grade\nAli,Math,A\nAyse,Physics,B\nMehmet,Math,A\nZeynep,Physics,A\n"
+)
+
+write(students.pivotCount("department", "grade").toCSV())
+```
+
+=>
+
+```text
+department,A,B
+Math,2,0
+Physics,1,1
+```
+
+Her iki eksen de `groupBy` ve `valueCounts` ile eşleşerek ilk-görülme sırasını
+kullanır; bu yüzden sonuç asla map yineleme sırasına bağlı değildir. Bulunmayan
+bir kombinasyon `"0"` sayılır -- bu, eksik veri değil, sayım anlambilimidir.
+Sayımlar diğer her hücre gibi `String` hücrelerdir; bu yüzden bir program
+üzerlerinde aritmetik yapmak için açıkça dönüştürür. Argümanlar konumsaldır
+(positional), çünkü yerleşik bir tür işlemi adlandırılmış argüman almaz; bu
+metot için yeni bir sözdizimi eklenmemiştir.
+
+Bilinmeyen bir sütun, onu isimlendiren bir `DataError` fırlatır ve her iki
+eksen için aynı sütunu vermek, sessizce bir köşegen üretmek yerine reddedilir.
+
+`pivotCount` kasıtlı olarak tek çapraz tablodur. Genel bir pivot değildir:
+toplama (aggregation) callback'i, değer sütunu, multi-index veya eksik-değer
+modeli yoktur.
 
 ## toCSV ve writeCSV
 

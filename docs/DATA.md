@@ -255,6 +255,7 @@ labelled: Table := table.derive(
 unique(column: String)      -> List<String>
 valueCounts(column: String) -> Pair<String, Int>
 groupBy(column: String)     -> Pair<String, Table>
+pivotCount(rows: String, columns: String) -> Table
 ```
 
 All three key on the column's String cell and use first-occurrence order. Rows
@@ -272,6 +273,46 @@ for department in groups {
 ```
 
 Aggregation syntax is deliberately absent; a group is an ordinary Table.
+
+## pivotCount
+
+```text
+pivotCount(rows: String, columns: String) -> Table
+```
+
+A strict count cross-tabulation: one row per distinct value of the `rows`
+column, one generated column per distinct value of the `columns` column, and
+each cell the number of source rows in that combination.
+
+```ahd
+students: Table := Data.fromCSV(
+    "name,department,grade\nAli,Math,A\nAyse,Physics,B\nMehmet,Math,A\nZeynep,Physics,A\n"
+)
+
+write(students.pivotCount("department", "grade").toCSV())
+```
+
+=>
+
+```text
+department,A,B
+Math,2,0
+Physics,1,1
+```
+
+Both axes use first-occurrence order, matching `groupBy` and `valueCounts`, so
+the result never depends on map iteration order. An absent combination counts
+`"0"` — this is count semantics, not missing data. Counts are `String` cells
+like every other cell, so a program converts explicitly to do arithmetic on
+them. The arguments are positional because a built-in type operation takes no
+named arguments; no new syntax was added for this method.
+
+An unknown column raises `DataError` naming it, and naming the same column for
+both axes is rejected rather than silently producing a diagonal.
+
+`pivotCount` is deliberately the only cross-tabulation. It is not a general
+pivot: there is no aggregation callback, no value column, no multi-index, and no
+missing-value model.
 
 ## toCSV and writeCSV
 

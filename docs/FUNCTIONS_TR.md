@@ -59,10 +59,72 @@ ifade lambda'larında değil, isimli Function bildirimlerinde kullanılabilir.
 
 Bir lambda blok veya deyim (statement) içeremez. Kontrol akışı, bildirimler,
 döngüler, hata işleme veya birden çok adım gerektiğinde değişmeyen isimli
-Function sözdizimini kullanın. v0.1.11 lexical closure da uygulamaz: lambda,
-çevreleyen bir `Local` bağlamayı yakalayamaz; bu değeri açık bir parametre
-olarak geçirin. Sıradan `Local`/`Global` görünürlük kuralları bunun dışında
+Function sözdizimini kullanın. Sıradan `Local`/`Global` görünürlük kuralları
 değişmez.
+
+## Açık lambda yakalama (capture)
+
+Bir lambda, çevreleyen çağrılabilirdeki bir bağlamayı yalnızca o bağlamayı
+`lambda` ile parametreler arasına yazılan açık bir yakalama listesinde
+listeleyerek okur:
+
+```ahd
+keepAbove: Function := (
+    minimum: Int
+    scores: List<Int>
+) -> List<Int> {
+    return scores.filter(lambda [minimum] (score: Int) -> score >= minimum)
+}
+```
+
+Birden çok isim virgülle ayrılır: `lambda [low, high] (v: Int) -> ...`.
+
+Yakalama asla çıkarılmaz (infer edilmez). Listenin atladığı çevreleyen bir
+`Local`'i veya Function parametresini okumak, bağlamayı isimlendiren bir
+derleme zamanı hatasıdır; böylece bir lambda'nın neye bağlı olduğu, lambda'nın
+yazıldığı yerde görünür olur:
+
+```text
+SEM043  local "minimum" is not captured by this lambda
+```
+
+Yakalama listesi olmadan yazılan bir lambda hiçbir şey yakalamaz; bu yüzden
+v0.1.13'ten önce derlenen her lambda değişmeden derlenmeye devam eder.
+`lambda [] (...)` kabul edilir ve aynı anlama gelir.
+
+Yalnızca çevreleyen bir çağrılabilirin bağlaması yakalanır: bir Function
+parametresi, bir `Local` veya bir `for`/`except` bağlaması. Modül kökündeki bir
+isim, Class veya isim uzayı sıradan aramayla erişilir ve listelenmemelidir --
+modül bağlamaları mevcut `Global` kuralını izlemeye devam eder.
+
+**Yakalama değere göredir.** Bir yakalama, lambda değeri oluşturulduğunda
+bağlamanın tuttuğu şeyi okur; bu yüzden o bağlamadaki sonraki bir değişiklik
+lambda'nın içinde görünmez:
+
+```ahd
+step: Local Int := 1
+first: Local Function := lambda [step] (x: Int) -> x + step
+step = step + 100
+second: Local Function := lambda [step] (x: Int) -> x + step
+// first(0) 1'dir, second(0) ise 101
+```
+
+Referans değerler dilin sıradan kurallarını izler: bir `List`, `Pair` veya
+Class örneğini yakalamak, tam olarak onu bir parametre olarak geçirmek gibi
+referansı kopyalar; bu yüzden referans verilen nesne paylaşılmaya devam eder.
+
+Yakalanan bir isim lambda içinde salt okunurdur. Açık yakalama, lambda'ya
+çevreleyen değeri verir, çevreleyen değişkenin sahipliğini değil; v0.1.13
+değiştirilebilir bir closure hücresi veya referans kutusu eklemez.
+
+Yakalamalar mevcut her callback ile çalışır; buna [Data](DATA_TR.md)'nın
+`filter`, `sort`, `transform` ve `derive` üyeleri dahildir:
+
+```ahd
+strong: Local Table := table.filter(
+    lambda [minimum] (row: Pair<String, String>) -> int(row["score"]) >= minimum
+)
+```
 
 ## Dönüş davranışı
 

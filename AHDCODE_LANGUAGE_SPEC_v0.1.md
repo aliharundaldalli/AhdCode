@@ -3874,10 +3874,11 @@ Lambda is an expression, not a declaration. Assigning it follows the ordinary
 module-root and explicit `Local` declaration rules. Lambda parameters are
 implicitly local to the lambda.
 
-v0.1.10 does not introduce a closure environment. A lambda may not capture a
-binding from an enclosing callable's lexical scope, including an enclosing
-Function parameter or `Local`; such use is a semantic error. Pass the value as
-an explicit lambda parameter or use a named Function. Module bindings,
+v0.1.10 introduced no closure environment: a lambda could not read a binding
+from an enclosing callable's lexical scope at all. v0.1.13 replaces that
+restriction with explicit capture (§54): an enclosing Function parameter or
+`Local` may be read when the lambda lists it, and reading one it does not list
+remains a semantic error. Module bindings,
 Functions, Classes, and imports retain the existing visibility rules. In
 particular, the existing explicit `Global` rule is not weakened merely because
 the expression is a lambda.
@@ -4125,6 +4126,197 @@ It also has no statistics: `sum`, `mean`, `median`, `variance`, `stdev`,
 `quantile`, `correlation`, and `describe` belong to a later Statistics
 facility, which is intended to consume `List<Int>` and `List<Real>` produced by
 an explicit conversion, so Data is never forced to become dynamically typed.
+
+---
+
+## 54. Explicit Lambda Capture (v0.1.13)
+
+A lambda is still one expression (§50). v0.1.13 adds no block body, no
+statement, no `return`, and no local declaration inside a lambda; a statement
+body remains the named Function's job. What it adds is a way for that one
+expression to read selected bindings of the enclosing callable.
+
+### 54.1 Syntax
+
+An optional capture list is written between `lambda` and the parameter list:
+
+```text
+lambda [ name, name, ... ] ( <typed parameters> ) -> <expression>
+```
+
+```ahd
+lambda [minimum] (score: Int) -> score >= minimum
+lambda [low, high] (value: Int) -> value >= low and value <= high
+```
+
+The list holds bare binding names: a capture reads an existing binding, so it
+carries no type, modifier, or initializer. Omitting the list entirely is
+unchanged v0.1.10 syntax and means no lexical capture, so every lambda written
+before v0.1.13 keeps its meaning. `lambda [] (...)` is accepted and means the
+same as omitting the list.
+
+### 54.2 Capture is explicit
+
+Capture is never inferred. Reading a binding of an enclosing callable that the
+list omits is a compile-time error naming the binding, so a lambda's
+dependencies are visible where the lambda is written:
+
+```ahd
+run: Function := (
+) -> Bool {
+    minimum: Local Int := 70
+    check: Local Function := lambda (score: Int) -> score >= minimum
+    return check(80)
+}
+```
+
+is rejected, while the same lambda written `lambda [minimum] (...)` is
+accepted.
+
+### 54.3 What may be captured
+
+Only a value binding of an enclosing callable qualifies: a Function parameter,
+a `Local`, or a `for`/`except` binding. A module-root name, Class, namespace,
+or Function declaration is reached by ordinary lookup and must not be listed;
+listing one is an error. The existing explicit `Global` rule for module
+bindings inside a callable is unchanged and is not replaced by capture.
+
+A capture must not repeat, and must not collide with a lambda parameter name;
+each is a distinct diagnostic.
+
+### 54.4 Capture semantics
+
+Capture is **by value**, evaluated once where the lambda value is created. A
+later change to the enclosing binding is not visible inside the lambda:
+
+```ahd
+step: Local Int := 1
+first: Local Function := lambda [step] (x: Int) -> x + step
+step = step + 100
+second: Local Function := lambda [step] (x: Int) -> x + step
+// first(0) is 1; second(0) is 101
+```
+
+The captured value obeys the language's ordinary value and reference rules
+(§11): capturing a `List`, `Pair`, or Class instance copies the reference, so
+the referenced object stays shared, exactly as passing it as a parameter does.
+`Constant` deep-freeze semantics are unaffected.
+
+A captured name is read-only inside the lambda: explicit capture grants the
+enclosing value, not ownership of the enclosing variable. v0.1.13 introduces no
+mutable closure cell, reference box, `Ref`, or `Cell`.
+
+A captured value stays valid after the enclosing call returns, so a lambda
+value may outlive the frame that created it.
+
+### 54.5 Typing and implementation
+
+Every capture is resolved statically and keeps the enclosing binding's exact
+type, so closures introduce no dynamic environment and no `Any`. The captured
+bindings become leading parameters of the lifted callable, which makes closure
+storage ordinary typed parameter passing rather than a second mechanism; the
+callable's published signature still describes only its declared parameters, so
+callers and callback adapters are unaffected.
+
+The native backend and the persistent REPL evaluator implement the same model
+and produce the same results. Captures compose with every existing callback,
+including `List.map`/`filter`/`sort` and the Data callbacks of §53.5.
+
+The formatter renders the capture list and is idempotent.
+
+---
+
+## 55. Statistics Standard Module (v0.1.13)
+
+`Statistics` is explicit, like `Math`, `Time`, `Regex`, `CSV`, and `Data`
+(§33): it must be imported before use, and its canonical identity is
+`builtin:Statistics`, so a sibling `Statistics.ahd` cannot shadow it.
+
+```ahd
+bring Statistics
+from Statistics bring StatisticsError
+```
+
+It is descriptive statistics over typed numeric Lists and deliberately does not
+depend on `Data`: a Table cell is a `String` (§53.1), so a program converts
+explicitly before asking for a statistic. That keeps both modules strict rather
+than introducing a dynamic numeric value.
+
+### 55.1 Surface and typing
+
+Every function is published as an explicit `Int`/`Real` overload pair, resolved
+by the ordinary overload machinery (§16), so a result's static type is always
+known and no weakly typed entry point exists.
+
+```text
+sum(values: List<Int>)   -> Int      sum(values: List<Real>)   -> Real
+min(values: List<Int>)   -> Int      min(values: List<Real>)   -> Real
+max(values: List<Int>)   -> Int      max(values: List<Real>)   -> Real
+range(values: List<Int>) -> Int      range(values: List<Real>) -> Real
+mode(values: List<Int>)  -> Int      mode(values: List<Real>)  -> Real
+
+mean(values)           -> Real
+median(values)         -> Real
+variance(values)       -> Real
+sampleVariance(values) -> Real
+stdDev(values)         -> Real
+sampleStdDev(values)   -> Real
+quantile(values, probability: Real) -> Real
+```
+
+A statistic whose answer is one of the input's own values keeps the element
+type; a statistic that averages or measures spread is always `Real`. `Int`
+results use the language's checked arithmetic, so an out-of-range `Int` sum or
+range raises `OverflowError` rather than wrapping.
+
+There is no implicit String conversion: `Statistics.mean(["10", "20"])` does
+not compile.
+
+### 55.2 Definitions
+
+`median` is the middle value of the ordered data, averaging the two middle
+values for an even count; it is always `Real`.
+
+`variance` and `stdDev` are the **population** forms (divide by `n`);
+`sampleVariance` and `sampleStdDev` are the **sample** forms (divide by
+`n - 1`). Both names exist so the definition is never implicit.
+
+`mode` is the most frequent value; a tie is resolved by first occurrence in the
+input, so the result never depends on map iteration order.
+
+`quantile` interpolates linearly between order statistics: with the data
+ordered ascending, the position is `probability * (n - 1)` and a fractional
+position interpolates between its neighbours. `probability` must lie in
+`0.0..1.0`; anything else is an error rather than a clamp. `0.0` is the
+minimum, `1.0` is the maximum, and a single-value List is its own quantile.
+
+### 55.3 Empty and undefined input
+
+`sum` of an empty List is the additive identity (`0`/`0.0`), the one total that
+keeps sums composable. Every other statistic is undefined for an empty List and
+raises `StatisticsError`. `sampleVariance` and `sampleStdDev` additionally
+require at least two values.
+
+`StatisticsError` derives directly from `Error` and is used only for a
+statistic that is undefined for its input; it is never reused for Data, CSV, or
+filesystem failures.
+
+A statistic never yields `NaN` or an infinity: the finite-`Real` contract of
+§39 is preserved, and `StatisticsError` is reported instead.
+
+### 55.4 Immutability
+
+A statistic never modifies its input. Ordering for `median` or `quantile` works
+on a snapshot, so the caller's List keeps its order. The native backend and the
+persistent REPL evaluator agree on every result and every error.
+
+### 55.5 Not in this version
+
+v0.1.13 is descriptive statistics only: no inferential tests, regression,
+distributions, random sampling, or plotting. There is no `frequency` function,
+because a frequency table would be `Pair<K, Int>` and a Pair key must be
+`String`, `Int`, or `Bool` (§13.3), so `List<Real>` input has no expressible
+result; `mode` and `Table.valueCounts` (§53.4) cover the common needs.
 
 ---
 

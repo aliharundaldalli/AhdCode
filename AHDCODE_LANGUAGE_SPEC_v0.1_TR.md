@@ -4298,11 +4298,11 @@ Lambda bir ifadedir, bildirim değildir. Atanması, sıradan modül-kökü ve a�
 `Local` bildirim kurallarını izler. Lambda parametreleri lambda içinde örtük
 olarak yereldir.
 
-v0.1.10 bir closure ortamı tanıtmaz. Lambda, çevreleyen bir Function
-parametresi veya `Local` dahil, çevreleyen bir çağrılabilirin lexical
-kapsamındaki bağlamayı yakalayamaz; böyle bir kullanım semantik hatadır.
-Değeri açık bir lambda parametresi olarak geçirin veya isimli bir Function
-kullanın. Modül bağlamaları, Function'lar, Class'lar ve içe aktarımlar mevcut
+v0.1.10 hiçbir closure ortamı tanıtmadı: bir lambda, çevreleyen bir
+çağrılabilirin lexical kapsamındaki bir bağlamayı hiç okuyamıyordu. v0.1.13 bu
+kısıtlamayı açık yakalamayla (§54) değiştirir: çevreleyen bir Function
+parametresi veya `Local`, lambda onu listelediğinde okunabilir; listelemediği
+birini okumak semantik hata olarak kalır. Modül bağlamaları, Function'lar, Class'lar ve içe aktarımlar mevcut
 görünürlük kurallarını korur. Özellikle, mevcut açık `Global` kuralı yalnızca
 ifade lambda olduğu için zayıflatılmaz.
 
@@ -4550,6 +4550,202 @@ kategorik dtype, tembel yürütme veya ifade ağaçlarına sahip değildir. Şem
 `correlation` ve `describe`, daha sonraki bir Statistics olanağına aittir; o
 olanağın, açık bir dönüşümle üretilen `List<Int>` ve `List<Real>` tüketmesi
 amaçlanmaktadır, böylece Data asla dinamik tipli olmaya zorlanmaz.
+
+---
+
+## 54. Açık Lambda Yakalama (v0.1.13)
+
+Bir lambda hâlâ tek bir ifadedir (§50). v0.1.13; lambda içine blok gövde,
+deyim, `return` veya yerel bildirim eklemez; deyimli gövde isimli Function'ın
+işi olarak kalır. Eklediği şey, o tek ifadenin çevreleyen çağrılabilirin seçili
+bağlamalarını okuyabilmesidir.
+
+### 54.1 Sözdizimi
+
+`lambda` ile parametre listesi arasına isteğe bağlı bir yakalama listesi
+yazılır:
+
+```text
+lambda [ isim, isim, ... ] ( <tipli parametreler> ) -> <ifade>
+```
+
+```ahd
+lambda [minimum] (score: Int) -> score >= minimum
+lambda [low, high] (value: Int) -> value >= low and value <= high
+```
+
+Liste yalın bağlama isimleri tutar: bir yakalama var olan bir bağlamayı okur,
+bu yüzden tür, değiştirici veya başlatıcı taşımaz. Listeyi tamamen atlamak
+değişmemiş v0.1.10 sözdizimidir ve lexical yakalama yok demektir; bu yüzden
+v0.1.13'ten önce yazılmış her lambda anlamını korur. `lambda [] (...)` kabul
+edilir ve listeyi atlamakla aynı anlama gelir.
+
+### 54.2 Yakalama açıktır
+
+Yakalama asla çıkarılmaz. Listenin atladığı, çevreleyen bir çağrılabilire ait
+bir bağlamayı okumak, bağlamayı isimlendiren bir derleme zamanı hatasıdır;
+böylece bir lambda'nın bağımlılıkları lambda'nın yazıldığı yerde görünür olur:
+
+```ahd
+run: Function := (
+) -> Bool {
+    minimum: Local Int := 70
+    check: Local Function := lambda (score: Int) -> score >= minimum
+    return check(80)
+}
+```
+
+reddedilir; aynı lambda `lambda [minimum] (...)` olarak yazıldığında kabul
+edilir.
+
+### 54.3 Neler yakalanabilir
+
+Yalnızca çevreleyen bir çağrılabilirin değer bağlaması uygundur: bir Function
+parametresi, bir `Local` veya bir `for`/`except` bağlaması. Modül kökündeki bir
+isim, Class, isim uzayı veya Function bildirimi sıradan aramayla erişilir ve
+listelenmemelidir; birini listelemek hatadır. Bir çağrılabilir içindeki modül
+bağlamaları için mevcut açık `Global` kuralı değişmez ve yakalamayla
+değiştirilmez.
+
+Bir yakalama tekrarlanmamalı ve bir lambda parametresi ismiyle çakışmamalıdır;
+her biri ayrı bir tanılamadır.
+
+### 54.4 Yakalama anlambilimi
+
+Yakalama **değere göredir** ve lambda değerinin oluşturulduğu yerde bir kez
+değerlendirilir. Çevreleyen bağlamadaki sonraki bir değişiklik lambda içinde
+görünmez:
+
+```ahd
+step: Local Int := 1
+first: Local Function := lambda [step] (x: Int) -> x + step
+step = step + 100
+second: Local Function := lambda [step] (x: Int) -> x + step
+// first(0) 1'dir; second(0) 101'dir
+```
+
+Yakalanan değer dilin sıradan değer ve referans kurallarına uyar (§11): bir
+`List`, `Pair` veya Class örneğini yakalamak referansı kopyalar; bu yüzden
+referans verilen nesne, tam olarak onu parametre olarak geçirmekteki gibi
+paylaşılır. `Constant` derin dondurma anlambilimi etkilenmez.
+
+Yakalanan bir isim lambda içinde salt okunurdur: açık yakalama çevreleyen
+değeri verir, çevreleyen değişkenin sahipliğini değil. v0.1.13 değiştirilebilir
+bir closure hücresi, referans kutusu, `Ref` veya `Cell` tanıtmaz.
+
+Yakalanan bir değer, çevreleyen çağrı döndükten sonra da geçerli kalır; bu
+yüzden bir lambda değeri onu oluşturan çerçeveden daha uzun yaşayabilir.
+
+### 54.5 Tipleme ve uygulama
+
+Her yakalama statik olarak çözülür ve çevreleyen bağlamanın tam türünü korur;
+bu yüzden closure'lar dinamik bir ortam ve `Any` tanıtmaz. Yakalanan bağlamalar
+yükseltilmiş (lifted) çağrılabilirin baştaki parametreleri olur; bu, closure
+depolamasını ikinci bir mekanizma yerine sıradan tipli parametre geçişi yapar.
+Çağrılabilirin yayınlanan imzası hâlâ yalnızca bildirilen parametrelerini
+tanımlar, bu yüzden çağıranlar ve callback adaptörleri etkilenmez.
+
+Yerel arka uç ve kalıcı REPL değerlendiricisi aynı modeli uygular ve aynı
+sonuçları üretir. Yakalamalar mevcut her callback ile birlikte çalışır; buna
+`List.map`/`filter`/`sort` ve §53.5'teki Data callback'leri dahildir.
+
+Formatter yakalama listesini render eder ve idempotenttir.
+
+---
+
+## 55. Statistics Standart Modülü (v0.1.13)
+
+`Statistics`, `Math`, `Time`, `Regex`, `CSV` ve `Data` gibi açıktır (§33):
+kullanılmadan önce içe aktarılmalıdır ve kanonik kimliği
+`builtin:Statistics`'tir, bu yüzden kardeş bir `Statistics.ahd` onu
+gölgeleyemez.
+
+```ahd
+bring Statistics
+from Statistics bring StatisticsError
+```
+
+Tipli sayısal List'ler üzerinde betimleyici istatistiktir ve kasıtlı olarak
+`Data`'ya bağımlı değildir: bir Table hücresi `String`'tir (§53.1), bu yüzden
+bir program bir istatistik istemeden önce açıkça dönüştürür. Bu, her iki modülü
+de dinamik bir sayısal değer tanıtmak yerine katı tutar.
+
+### 55.1 Yüzey ve tipleme
+
+Her fonksiyon açık bir `Int`/`Real` aşırı yükleme çifti olarak yayınlanır ve
+sıradan aşırı yükleme makinesiyle (§16) çözülür; bu yüzden bir sonucun statik
+türü her zaman bilinir ve zayıf tipli bir giriş noktası yoktur.
+
+```text
+sum(values: List<Int>)   -> Int      sum(values: List<Real>)   -> Real
+min(values: List<Int>)   -> Int      min(values: List<Real>)   -> Real
+max(values: List<Int>)   -> Int      max(values: List<Real>)   -> Real
+range(values: List<Int>) -> Int      range(values: List<Real>) -> Real
+mode(values: List<Int>)  -> Int      mode(values: List<Real>)  -> Real
+
+mean(values)           -> Real
+median(values)         -> Real
+variance(values)       -> Real
+sampleVariance(values) -> Real
+stdDev(values)         -> Real
+sampleStdDev(values)   -> Real
+quantile(values, probability: Real) -> Real
+```
+
+Cevabı girdinin kendi değerlerinden biri olan bir istatistik eleman türünü
+korur; ortalama alan veya dağılım ölçen bir istatistik her zaman `Real`'dir.
+`Int` sonuçlar dilin denetimli aritmetiğini kullanır; bu yüzden aralık dışı bir
+`Int` toplamı veya aralığı sarmalamak yerine `OverflowError` fırlatır.
+
+Örtük String dönüşümü yoktur: `Statistics.mean(["10", "20"])` derlenmez.
+
+### 55.2 Tanımlar
+
+`median`, sıralanmış verinin ortadaki değeridir; çift sayıda değer için
+ortadaki ikisinin ortalamasını alır ve her zaman `Real`'dir.
+
+`variance` ve `stdDev` **popülasyon** biçimleridir (`n`'e böler);
+`sampleVariance` ve `sampleStdDev` **örneklem** biçimleridir (`n - 1`'e böler).
+Tanımın asla örtük kalmaması için iki isim de vardır.
+
+`mode`, en sık görülen değerdir; eşitlik girdideki ilk geçişe göre çözülür, bu
+yüzden sonuç asla map yineleme sırasına bağlı değildir.
+
+`quantile`, sıra istatistikleri arasında doğrusal interpolasyon yapar: veri
+artan sırada iken konum `probability * (n - 1)`'dir ve kesirli bir konum
+komşuları arasında interpolasyon yapar. `probability`, `0.0..1.0` aralığında
+olmalıdır; başka bir şey kırpma değil hatadır. `0.0` minimum, `1.0`
+maksimumdur ve tek değerli bir List kendi quantile'ıdır.
+
+### 55.3 Boş ve tanımsız girdi
+
+Boş bir List'in `sum`'ı toplamsal birim öğedir (`0`/`0.0`); toplamları
+birleştirilebilir tutan tek toplam budur. Diğer her istatistik boş bir List
+için tanımsızdır ve `StatisticsError` fırlatır. `sampleVariance` ve
+`sampleStdDev` ek olarak en az iki değer gerektirir.
+
+`StatisticsError` doğrudan `Error`'dan türer ve yalnızca girdisi için tanımsız
+olan bir istatistik için kullanılır; Data, CSV veya dosya sistemi
+başarısızlıkları için asla yeniden kullanılmaz.
+
+Bir istatistik asla `NaN` veya sonsuzluk vermez: §39'un sonlu-`Real`
+sözleşmesi korunur ve bunun yerine `StatisticsError` bildirilir.
+
+### 55.4 Değiştirilemezlik
+
+Bir istatistik girdisini asla değiştirmez. `median` veya `quantile` için
+sıralama bir anlık görüntü üzerinde çalışır, bu yüzden çağıranın List'i sırasını
+korur. Yerel arka uç ve kalıcı REPL değerlendiricisi her sonuçta ve her hatada
+uyuşur.
+
+### 55.5 Bu sürümde olmayanlar
+
+v0.1.13 yalnızca betimleyici istatistiktir: çıkarımsal test, regresyon,
+dağılım, rastgele örnekleme veya grafik çizimi yoktur. `frequency` fonksiyonu
+yoktur, çünkü bir frekans tablosu `Pair<K, Int>` olurdu ve bir Pair anahtarı
+`String`, `Int` veya `Bool` olmak zorundadır (§13.3); bu yüzden `List<Real>`
+girdisinin ifade edilebilir bir sonucu yoktur. `mode` ve `Table.valueCounts`
+(§53.4) yaygın ihtiyaçları karşılar.
 
 ---
 

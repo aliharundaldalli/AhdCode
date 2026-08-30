@@ -12,7 +12,7 @@ AhdCode is an experimental statically checked general-purpose programming
 language focused on readable syntax, explicit intent, predictable semantics,
 and native compilation.
 
-The current release is **v0.1.12**. The core language works end to end, but
+The current release is **v0.1.13**. The core language works end to end, but
 the project is not production-ready and breaking changes may occur before 1.0.
 
 ```ahd
@@ -50,6 +50,11 @@ for name in names {
 - The [Data module](docs/DATA.md) adds an immutable `Table` of String cells for
   filtering, sorting, grouping, and deriving columns; it infers no types, so
   numeric work stays an explicit `int(...)` / `real(...)` conversion.
+- An expression lambda may read enclosing values through an explicit capture
+  list, as in `lambda [minimum] (score: Int) -> score >= minimum`; capture is
+  never inferred and never implicit.
+- The [Statistics module](docs/STATISTICS.md) provides typed descriptive
+  statistics over `List<Int>` and `List<Real>`, with no String coercion.
 - The formatter defines one canonical presentation while preserving comments.
 
 ## Build from source
@@ -106,6 +111,7 @@ See the [CLI guide](docs/CLI.md), [formatter guide](docs/FORMATTER.md), and
 - [Regex module](docs/REGEX.md)
 - [CSV module](docs/CSV.md)
 - [Data module](docs/DATA.md)
+- [Statistics module](docs/STATISTICS.md)
 - [Understanding diagnostics](docs/DIAGNOSTICS.md)
 - [AI-assisted local setup](FOR_AI.md)
 - [Curated v0.1 examples](examples/v0.1/README.md)

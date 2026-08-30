@@ -12,7 +12,7 @@ AhdCode; okunabilir sözdizimi, açık niyet (explicit intent), öngörülebilir
 anlambilim (semantics) ve yerel (native) derlemeye odaklanan, deneysel,
 statik olarak denetlenen genel amaçlı bir programlama dilidir.
 
-Mevcut sürüm **v0.1.12**'dir. Çekirdek dil uçtan uca çalışır, ancak proje
+Mevcut sürüm **v0.1.13**'tür. Çekirdek dil uçtan uca çalışır, ancak proje
 üretime hazır değildir ve 1.0'dan önce kırıcı (breaking) değişiklikler
 olabilir.
 
@@ -53,6 +53,11 @@ for name in names {
   dakika ofseti ve Unix milisaniye gösterimlerini destekler.
 - Sıkı [CSV modülü](docs/CSV_TR.md), ham String satırlarını veya başlık
   anahtarlı String kayıtlarını native ve kalıcı REPL uyumuyla taşır.
+- Bir ifade lambda'sı, çevreleyen değerleri açık bir yakalama listesiyle
+  okuyabilir: `lambda [minimum] (score: Int) -> score >= minimum`; yakalama
+  asla çıkarılmaz ve asla örtük değildir.
+- [Statistics modülü](docs/STATISTICS_TR.md), `List<Int>` ve `List<Real>`
+  üzerinde tipli betimleyici istatistik sağlar; String zorlaması yoktur.
 - Formatter, yorumları korurken tek bir kanonik (standart) sunum tanımlar.
 
 ## Kaynak koddan derleme
@@ -109,6 +114,7 @@ ve [REPL rehberine](docs/REPL_TR.md) bakın.
 - [Regex modülü](docs/REGEX_TR.md)
 - [CSV modülü](docs/CSV_TR.md)
 - [Data modülü](docs/DATA_TR.md)
+- [Statistics modülü](docs/STATISTICS_TR.md)
 - [Tanılamaları anlama](docs/DIAGNOSTICS_TR.md)
 - [Yapay zekâ destekli yerel kurulum](FOR_AI.md)
 - [Derlenmiş v0.1 örnekleri](examples/v0.1/README_TR.md)

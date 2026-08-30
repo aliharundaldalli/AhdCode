@@ -1,0 +1,35 @@
+bring Statistics
+from Statistics bring StatisticsError
+
+scores: List<Int> := [72, 91, 68, 91, 84]
+
+write(Statistics.sum(scores))
+write(Statistics.mean(scores))
+write(Statistics.median(scores))
+write(Statistics.min(scores))
+write(Statistics.max(scores))
+write(Statistics.range(scores))
+// mode returns the most frequent value; a tie keeps the first occurrence.
+write(Statistics.mode(scores))
+// Dispersion is explicit about which definition it uses.
+write(Statistics.variance(scores))
+write(Statistics.sampleVariance(scores))
+write(Statistics.stdDev(scores))
+write(Statistics.sampleStdDev(scores))
+// quantile interpolates between the neighbouring ordered values.
+write(Statistics.quantile(scores, 0.0))
+write(Statistics.quantile(scores, 0.5))
+write(Statistics.quantile(scores, 1.0))
+// Ordering a List for a median never reorders the caller's List.
+write(scores)
+// A statistic that is mathematically undefined raises StatisticsError.
+empty: List<Int> := []
+
+write(Statistics.sum(empty))
+
+attempt {
+    write(Statistics.mean(empty))
+}
+except StatisticsError as error {
+    write(error.message)
+}

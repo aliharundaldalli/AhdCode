@@ -1,0 +1,40 @@
+bring Data
+bring Statistics
+from Data bring Table
+// Data transports and shapes the table; every cell stays a String.
+students: Table := Data.fromCSV(
+    "name,department,grade,score\nAli,Math,A,91\nAyse,Physics,B,78\nMehmet,Math,A,84\nZeynep,Physics,A,95\n"
+)
+
+write(students.rowCount())
+write(students.columns())
+// A strict count cross-tabulation is still an ordinary Table of String cells.
+write(students.pivotCount("department", "grade").toCSV())
+// Statistics works on typed numbers, so the conversion is explicit.
+scores: List<Real> := students.column(
+    "score"
+).map(lambda (value: String) -> real(value))
+
+write(Statistics.mean(scores))
+write(Statistics.median(scores))
+write(Statistics.stdDev(scores))
+// An explicit capture lets a threshold reach a Data callback.
+minimum: Int := 85
+
+report: Function := (threshold: Int, table: Table) -> Nothing {
+    strong: Local Table := table.filter(
+        lambda [
+            threshold
+        ] (row: Pair<String, String>) -> int(row["score"]) >= threshold
+    )
+    write(strong.column("name"))
+
+    values: Local List<Real> := strong.column(
+        "score"
+    ).map(lambda (value: String) -> real(value))
+    write(Statistics.mean(values))
+}
+
+report(minimum, students)
+// The source table is unchanged by every step above.
+write(students.rowCount())
