@@ -1511,8 +1511,9 @@ The module provides a practical, beginner-friendly API to generate documents saf
 
 ```ahd
 bring Latex as L
+from Latex bring LatexError
 
-document: String := L.document(
+document := L.document(
     L.section("My First Document") +
     L.escape("Hello! This is an ordinary text section.") +
     L.subsection("Math Example") +
@@ -1520,7 +1521,7 @@ document: String := L.document(
 )
 
 attempt {
-    L.pdfFile("output.pdf", document)
+    L.pdf(document, "output.pdf")
     write("PDF created!")
 }
 except LatexError as error {
@@ -1532,9 +1533,9 @@ except LatexError as error {
 - `Latex.section(text)` and `Latex.subsection(text)`: Create headings.
 - `Latex.equation(math)`: Accepts raw LaTeX math source.
 - `Latex.document(content)`: Wraps your content in a complete, ready-to-compile document.
-- `Latex.pdf(document)`: Compiles the document and returns the PDF bytes.
-- `Latex.pdfFile(path, document)`: Compiles the document and saves it directly to a file.
-- `LatexError`: Raised if compilation fails (for example, if there is a syntax error in your math).
+- `Latex.pdf(source, output)`: Compiles a LaTeX source String and writes the PDF to the output path.
+- `Latex.pdfFile(input, output)`: Compiles an existing `.tex` input file and writes the PDF to the output path.
+- `LatexError`: Raised if compilation fails (for example, if there is a syntax error in your math). Import it with `from Latex bring LatexError` before naming it in an `except` clause.
 
 ## 24. Formatter
 

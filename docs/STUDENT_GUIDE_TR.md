@@ -1517,8 +1517,9 @@ Modül, belgeleri güvenli bir şekilde oluşturmak için pratik ve yeni başlay
 
 ```ahd
 bring Latex as L
+from Latex bring LatexError
 
-document: String := L.document(
+document := L.document(
     L.section("İlk Belgem") +
     L.escape("Merhaba! Bu sıradan bir metin bölümüdür.") +
     L.subsection("Matematik Örneği") +
@@ -1526,7 +1527,7 @@ document: String := L.document(
 )
 
 attempt {
-    L.pdfFile("cikti.pdf", document)
+    L.pdf(document, "cikti.pdf")
     write("PDF başarıyla oluşturuldu!")
 }
 except LatexError as error {
@@ -1538,9 +1539,9 @@ except LatexError as error {
 - `Latex.section(text)` ve `Latex.subsection(text)`: Başlıklar oluşturur.
 - `Latex.equation(math)`: Saf LaTeX matematik kodlarını kabul eder.
 - `Latex.document(content)`: İçeriğinizi tam, derlenmeye hazır bir belgenin içine sarar.
-- `Latex.pdf(document)`: Belgeyi derler ve PDF verisini (byte olarak) döndürür.
-- `Latex.pdfFile(path, document)`: Belgeyi derler ve doğrudan bir dosyaya kaydeder.
-- `LatexError`: Derleme başarısız olursa (örneğin matematiğinizde bir sözdizimi hatası varsa) ortaya çıkar.
+- `Latex.pdf(source, output)`: Verilen LaTeX kaynak metnini (String) derler ve PDF'i belirtilen çıktı yoluna yazar.
+- `Latex.pdfFile(input, output)`: Var olan bir `.tex` girdi dosyasını derler ve PDF'i belirtilen çıktı yoluna yazar.
+- `LatexError`: Derleme başarısız olursa (örneğin matematiğinizde bir sözdizimi hatası varsa) ortaya çıkar. Bir `except` bloğunda kullanmadan önce `from Latex bring LatexError` ile içe aktarmanız gerekir.
 
 ## 24. Kod biçimlendirici (Formatter)
 
@@ -1597,7 +1598,7 @@ calculate: Function := (
 
 kısa bir imza olan `check: Function := (x: Int) -> Bool { ... }` ise tek satırda kalır.
 
-## 24. Komut satırı (CLI)
+## 25. Komut satırı (CLI)
 
 AhdCode basit bir komut satırı arayüzüyle gelir.
 
@@ -1607,7 +1608,7 @@ AhdCode basit bir komut satırı arayüzüyle gelir.
 - `ahdcode --help`: Tüm komutlar için yardım ekranını gösterir.
 - `ahdcode --version`: Mevcut derleyici sürümünü gösterir.
 
-## 25. Etkileşimli kabuk (REPL)
+## 26. Etkileşimli kabuk (REPL)
 
 Küçük denemeler yapmak için `ahdcode` komutunu tek başına çalıştırarak
 REPL'i (Oku-Değerlendir-Yazdır Döngüsü) açabilirsiniz. Bunun için bir `.ahd`
@@ -1629,7 +1630,7 @@ rastgele sayı durumunu tek kalıcı oturumda tutar. Önceki komutlar yeniden
 çalıştırılmaz. `take` gerçek bir cevap satırı okur; yerel modüller ile göreli
 File yolları `ahdcode` komutunu başlattığınız klasörü kullanır.
 
-## 26. Başlangıçta sık yapılan hatalar
+## 27. Başlangıçta sık yapılan hatalar
 
 İşte karşılaşabileceğiniz yaygın hatalar ve onları düzeltme yolları:
 
@@ -1733,7 +1734,7 @@ File yolları `ahdcode` komutunu başlattığınız klasörü kullanır.
 - Neden: Tohum (seed) verilmemiş rastgelelik, OS entropisini kullanır ve tekrarlanamaz.
 - Doğru: Zar atmadan önce `Math.seed(42)` gibi bir tohum değeri verin.
 
-## 27. Küçük Projeler
+## 28. Küçük Projeler
 
 Bu küçük projeler rehberde öğretilenleri bir araya getirir. Onları tek başınıza kurmayı deneyin!
 
@@ -1745,7 +1746,7 @@ Bu küçük projeler rehberde öğretilenleri bir araya getirir. Onları tek ba�
 6. **Sınıflarla (Class) Öğrenci Kaydı**: Bir `Student` sınıfı ve bir `Course` (Kurs) sınıfı oluşturun. Course içinde bir `List<Student>` bulunsun. Kursa yeni bir öğrenci eklemek için bir metot, kursun genel not ortalamasını hesaplamak için başka bir metot yazın.
 7. **Tohumlu (Seeded) Rastgele Oyun**: `Math.seed(42)` kullanarak 1 ile 100 arasında "gizli bir sayı" üretin. Kullanıcıdan sayıyı tahmin etmesini isteyin. Doğru tahmin edene kadar "daha yüksek" veya "daha düşük" diye yönlendirin. Tohum kullanıldığı için, gizli sayı programı her çalıştırdığınızda aynı olacaktır—test yapmak için mükemmel!
 
-## 28. Alıştırmalar
+## 29. Alıştırmalar
 
 Tam çözümleri hemen aramak yerine her programı küçük adımlarla kurun.
 
@@ -1775,7 +1776,7 @@ Tam çözümleri hemen aramak yerine her programı küçük adımlarla kurun.
 19. `break` ve `continue` kullanarak çok geniş bir aralık içindeki ilk 5 çift sayıyı bulun, ancak 3'e bölünenleri `continue` ile atlayın.
 20. Dikdörtgen alanı hesaplayan bir fonksiyona sahip `MathUtils.ahd` adında bir modül oluşturun ve bir `main.ahd` içinden `bring` ile çağırarak kullanın.
 
-## 29. Çözüm İpuçları
+## 30. Çözüm İpuçları
 
 1. `take` sonucu String'dir; yaş için `int(...)` ve yeni yaş için `+ 1` kullanın.
 2. Formülü küçük parçalara ayırın; `real(take(...))` ile başlayın ve Real sayılarını kullanın.
@@ -1798,7 +1799,7 @@ Tam çözümleri hemen aramak yerine her programı küçük adımlarla kurun.
 19. `if i % 3 == 0 { continue }`. `if count == 5 { break }`.
 20. `from MathUtils bring alanHesapla` kullanabilirsiniz.
 
-## 30. Sonraki adımlar ve teknik belgeler
+## 31. Sonraki adımlar ve teknik belgeler
 
 Bu rehberi tamamladıktan sonra dilin ayrıntılarını şu belgelerden
 derinleştirebilirsiniz:
