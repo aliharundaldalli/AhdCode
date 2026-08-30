@@ -23,6 +23,7 @@ import (
 	"sync"
 	"time"
 	"unicode"
+	"unicode/utf8"
 )
 
 // ---------------------------------------------------------------------------
@@ -51,11 +52,13 @@ var (
 	AhdClassDivisionByZeroError = &AhdClass{Name: "DivisionByZeroError", Parent: AhdClassError}
 	AhdClassDomainError         = &AhdClass{Name: "DomainError", Parent: AhdClassError}
 	AhdClassIndexError          = &AhdClass{Name: "IndexError", Parent: AhdClassError}
+	AhdClassIOError             = &AhdClass{Name: "IOError", Parent: AhdClassError}
 	AhdClassKeyError            = &AhdClass{Name: "KeyError", Parent: AhdClassError}
 	AhdClassNullError           = &AhdClass{Name: "NullError", Parent: AhdClassError}
 	AhdClassOverflowError       = &AhdClass{Name: "OverflowError", Parent: AhdClassError}
 	AhdClassValueError          = &AhdClass{Name: "ValueError", Parent: AhdClassError}
 	AhdClassLatexError          = &AhdClass{Name: "LatexError", Parent: AhdClassError}
+	AhdClassFileError           = &AhdClass{Name: "FileError", Parent: AhdClassIOError}
 )
 
 // AhdInstance is every AhdCode Class instance. The generated interface of each
@@ -1502,6 +1505,100 @@ func AhdListSortKeyReal[T any](list *AhdList[T], key func(T) *float64) { ahdSort
 
 // AhdListSortKeyString orders a List by a String key.
 func AhdListSortKeyString[T any](list *AhdList[T], key func(T) *string) { ahdSortByKey(list, key) }
+
+// ---------------------------------------------------------------------------
+// Path and File standard modules
+// ---------------------------------------------------------------------------
+
+func AhdPathJoin(parts *AhdList[string]) string {
+	return filepath.Join(parts.Snapshot()...)
+}
+
+func AhdPathExt(path string) string  { return filepath.Ext(path) }
+func AhdPathBase(path string) string { return filepath.Base(path) }
+func AhdPathDir(path string) string  { return filepath.Dir(path) }
+
+func ahdFileFailure(class *AhdClass, operation, path string, err error) {
+	message := operation + " " + strconv.Quote(path) + " failed"
+	if err != nil {
+		message += ": " + err.Error()
+	}
+	AhdRaiseClass(class, message)
+}
+
+func AhdFileExists(class *AhdClass, path string) bool {
+	_, err := os.Stat(path)
+	if err == nil {
+		return true
+	}
+	if os.IsNotExist(err) {
+		return false
+	}
+	ahdFileFailure(class, "stat", path, err)
+	return false
+}
+
+func AhdFileReadText(class *AhdClass, path string) string {
+	content, err := os.ReadFile(path)
+	if err != nil {
+		ahdFileFailure(class, "read", path, err)
+	}
+	if !utf8.Valid(content) {
+		ahdFileFailure(class, "read", path, fmt.Errorf("content is not valid UTF-8"))
+	}
+	return string(content)
+}
+
+func AhdFileWriteText(class *AhdClass, path, content string) {
+	if !utf8.ValidString(content) {
+		ahdFileFailure(class, "write", path, fmt.Errorf("content is not valid UTF-8"))
+	}
+	if err := os.WriteFile(path, []byte(content), 0o666); err != nil {
+		ahdFileFailure(class, "write", path, err)
+	}
+}
+
+func AhdFileAppend(class *AhdClass, path, content string) {
+	if !utf8.ValidString(content) {
+		ahdFileFailure(class, "append", path, fmt.Errorf("content is not valid UTF-8"))
+	}
+	file, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o666)
+	if err != nil {
+		ahdFileFailure(class, "append", path, err)
+	}
+	if _, err = io.WriteString(file, content); err != nil {
+		_ = file.Close()
+		ahdFileFailure(class, "append", path, err)
+	}
+	if err = file.Close(); err != nil {
+		ahdFileFailure(class, "close", path, err)
+	}
+}
+
+func AhdFileDelete(class *AhdClass, path string) {
+	if err := os.Remove(path); err != nil {
+		ahdFileFailure(class, "delete", path, err)
+	}
+}
+
+func AhdFileCreateDir(class *AhdClass, path string) {
+	if err := os.MkdirAll(path, 0o777); err != nil {
+		ahdFileFailure(class, "create directory", path, err)
+	}
+}
+
+func AhdFileList(class *AhdClass, path string) *AhdList[string] {
+	entries, err := os.ReadDir(path)
+	if err != nil {
+		ahdFileFailure(class, "list", path, err)
+	}
+	names := make([]string, len(entries))
+	for index, entry := range entries {
+		names[index] = entry.Name()
+	}
+	sort.Strings(names)
+	return AhdNewList(names...)
+}
 
 // ---------------------------------------------------------------------------
 // Time standard module

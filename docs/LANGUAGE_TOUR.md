@@ -7,10 +7,14 @@
 `:=` creates a binding. `=` changes an existing binding.
 
 ```ahd
-name: String := "Ali"
-count: Int := 3
+name := "Ali"       // inferred String, still statically typed
+count: Int := 3     // explicit annotations remain available
 count = 4
 ```
+
+Inference preserves the complete static type. `count = "four"` is still an
+error. Bare `value := null` is invalid because no underlying type can be
+inferred; write `value: User? := null`.
 
 Line breaks otherwise carry no meaning -- indentation is purely for
 readability, and `ahdcode format` (see [Formatter](FORMATTER.md)) chooses it
@@ -32,7 +36,7 @@ Inside an executable nested scope, a new declaration uses `Local`:
 
 ```ahd
 if count > 0 {
-    message: Local String := "Ready"
+    message: Local := "Ready"
     write(message)
 }
 ```
@@ -113,8 +117,8 @@ Student: Class<> := {
 
 Use `attempt`, `except`, `ultimately`, and `toss` for catchable errors. Use
 `bring ModuleName` for a namespace or `from ModuleName bring name` for a direct
-symbol. Local modules are sibling files; `Math` is the explicit built-in
-standard module.
+symbol. Local modules are sibling files. `Math`, `Time`, `Latex`, `Path`, and
+`File` are explicit standard modules; `File` failures are catchable.
 
 Continue with [Functions](FUNCTIONS.md), [Classes](CLASSES.md),
 [Collections](COLLECTIONS.md), and [Modules](MODULES.md).

@@ -33,9 +33,9 @@ Required parameters precede default parameters.
 
 ## Return behavior
 
-A value-returning Function must return a compatible value or typed null on
-every reachable path. A `Nothing` Function may use bare `return` or reach its
-end.
+A value-returning Function must return a compatible value on every reachable
+path. It may return `null` only when its declared return type is nullable, such
+as `User?`. A `Nothing` Function may use bare `return` or reach its end.
 
 ## Overloads
 

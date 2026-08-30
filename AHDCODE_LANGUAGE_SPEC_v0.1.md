@@ -141,6 +141,9 @@ For function arguments and collection elements:
 - a newline may separate items;
 - plain whitespace alone may **not** separate multiple arguments on the same line.
 
+Absence is written explicitly in source types with `?`. Plain `T` is strictly
+non-nullable; `T?` is the nullable form of the same underlying type.
+
 Valid:
 
 ```ahd
@@ -660,9 +663,9 @@ return Nothing
 Valid:
 
 ```ahd
-name: String := null
-age: Int := null
-student: Student := null
+name: String? := null
+age: Int? := null
+student: Student? := null
 ```
 
 The declared type remains unchanged.
@@ -690,14 +693,15 @@ MaybeNull
 NonNull
 ```
 
-These states are compiler analysis states, not public AhdCode types and not user-written syntax.
+These states are compiler analysis states. They refine the public nullable type
+syntax; they do not replace it.
 
 If the compiler can prove that a value is null or may be null, unsafe operations must be rejected at compile time whenever possible.
 
 Example:
 
 ```ahd
-age: Int := null
+age: Int? := null
 write(age + 5)
 ```
 
@@ -715,7 +719,7 @@ the value is considered `NonNull` and the operation is valid.
 Branch conditions refine null state:
 
 ```ahd
-student: Student := findStudent()
+student: Student? := findStudent()
 
 if student != null {
     write(student.name)
@@ -754,17 +758,28 @@ id: Constant Int := null
 
 ### 7.4 null in typed collections
 
-`null` may appear where the surrounding type is known.
+Nullability composes structurally:
+
+```text
+List<User?>   non-null List whose elements may be null
+List<User>?   nullable List whose elements are non-null
+List<User?>?  nullable List whose elements may be null
+Pair<String, User?>
+```
+
+`null` may appear only where the corresponding `?` makes the surrounding type
+explicit.
 
 ```ahd
-names: List<String> := [
+names: List<String?> := [
     "Ali"
     null
     "Ayşe"
 ]
 ```
 
-A `null` key in a Pair is not allowed.
+A `null` key in a Pair is not allowed. `T` is assignable to `T?`; `T?` is not
+assignable to `T` unless flow analysis has proven the expression non-null.
 
 ---
 
@@ -785,6 +800,20 @@ age: Int := 28
 ```
 
 `:=` always indicates first declaration/binding.
+
+When an initializer has one unambiguous complete static type, the annotation
+may be omitted:
+
+```ahd
+age := 28              // Int
+user := findStudent()  // Student? when that is the Function return type
+```
+
+This is static inference, not a dynamic variable. Later assignment must still
+match the inferred type. Bare `value := null` is invalid because it supplies
+no underlying type; write `value: User? := null`. Scope intent remains
+explicit: a nested inferred declaration is `name: Local := "Ali"`, while a
+bare nested `name := "Ali"` remains invalid under §9.
 
 ### 8.2 Reassignment
 
@@ -1321,7 +1350,7 @@ evens: List<Int> := values.filter(isEven)
 [2, 4]
 ```
 
-A List element is nullable, so a `null` element is passed to the callback as written rather than silently skipped. When the callback parameter is `NonNull`, that element raises the ordinary `NullError` at the call boundary.
+A nullable List element (`List<T?>`) is passed to the callback as written rather than silently skipped. When the callback parameter is non-nullable, that element is rejected by the ordinary null-safety rules.
 
 ---
 
@@ -3081,6 +3110,50 @@ parser, and no Markdown or HTML conversion.
 
 ---
 
+### 37.7 Path and File Standard Modules
+
+`Path` and `File` are compiler-registered standard modules imported through
+the ordinary module system. They are not predeclared Fundamentals.
+
+```ahd
+bring Path
+bring File
+from File bring FileError
+```
+
+Their exact v0.1 public surfaces are:
+
+```text
+Path.join(parts: List<String>) -> String
+Path.ext(path: String)         -> String
+Path.base(path: String)        -> String
+Path.dir(path: String)         -> String
+
+File.exists(path: String)                  -> Bool
+File.readText(path: String)                -> String
+File.writeText(path: String, content: String) -> Nothing
+File.append(path: String, content: String) -> Nothing
+File.delete(path: String)                  -> Nothing
+File.createDir(path: String)               -> Nothing
+File.list(path: String)                    -> List<String>
+
+FileError
+```
+
+Path operations use the host operating system's path rules and perform no
+filesystem access. File text is UTF-8; reading invalid UTF-8 raises
+`FileError`. `File.list` returns only the immediate entry names in stable
+ascending lexical order and never recurses. Relative paths use the executing
+process's current working directory, including the directory from which a REPL
+session was launched.
+
+Ordinary operating-system failures are catchable AhdCode errors. `FileError`
+inherits `IOError`, which inherits `Error`; a missing path passed to
+`File.exists` yields `false`, while failures of the other operations raise
+`FileError`. No raw host error value or Go panic is exposed.
+
+---
+
 ## 38. Core Terminal I/O
 
 ### 38.1 take
@@ -3224,7 +3297,20 @@ ahdcode
 
 REPL.
 
-The REPL uses the same lexer, parser, semantic checker, lowering, backend, and runtime behavior as file compilation. It is not a separate mini-language. Session declarations persist, and ordinary same-scope declaration rules remain in force: entering `x: Int := 5` and later `x: Int := 7` is a duplicate declaration error. Reassignment is written `x = 7`. A failed semantic check or catchable runtime Error does not discard the last successfully committed session state or terminate the REPL.
+The REPL uses the same lexer, parser, semantic checker, and typed/lowered IR as
+file compilation. Validated new IR executes in one persistent evaluator; prior
+statements are not executed again. Values, aliases, Functions, Classes,
+imports, module initialization, Math RNG state, working directory, and terminal
+streams persist. It is not a separate mini-language. Session declarations
+persist, and ordinary same-scope declaration rules remain in force: entering
+`x := 5` and later `x := 7` is a duplicate declaration error. Reassignment is
+written `x = 7`. A failed semantic check or catchable runtime Error does not
+discard the last successfully committed session state or terminate the REPL.
+
+`take()` reads the same real terminal input stream as the REPL. Its prompt is
+flushed before blocking, and the one answer line it consumes is not parsed as a
+subsequent REPL command. A top-level expression whose type is not `Nothing` is
+printed in canonical form.
 
 ```bash
 ahdcode run hello.ahd

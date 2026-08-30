@@ -121,12 +121,16 @@ Beklenen çıktı:
 oluşturulmamıştır. Örneğin, önceden tanımlanmamış bir değişkene `score = 10` yazmak derleyici tarafından reddedilir. Aynı blok içinde ikinci kez `:=` kullanmak, aynı
 değişkeni tekrar oluşturmaya çalışmak demektir; bu da bir hatadır.
 
-AhdCode türü açıkça yazmanızı bekler (yukarıdaki `Int` ve `String` gibi):
+AhdCode, başlangıç değerinden açıkça anlaşılabilen statik türü çıkarabilir;
+okunabilirlik için türü açıkça yazmaya da devam edebilirsiniz:
 
 ```ahd
 age: Int := 19
-// Derleyici age'in her zaman bir Int olarak kalmasını sağlar.
+name := "Ayşe"  // String çıkarılır
 ```
+
+Tür çıkarımı dinamik tür demek değildir: `name = 5` yine hatadır. İç blokta
+`name: Local := "Ayşe"` yazılır; kapsam niyeti otomatik çıkarılmaz.
 
 > **Teknik not:** Bir değişken adının kullanılabileceği bölgeye onun "scope"u (kapsamı) denir. Türün derleyici tarafından otomatik bulunmasına ise "type inference" denir.
 
@@ -167,7 +171,9 @@ kullanılabilir. Fakat `List<Int>` ile `List<Real>` farklı türlerdir. Bir
 
 > **Teknik not:** Generic türler (koleksiyonlar) için geçerli olan bu katı kurala invariance denir.
 
-AhdCode'da `null` tek başına bir tür değildir, bir değişkenin bulunabileceği bir "durum"dur (state). Bunu Null Güvenliği (Null Safety) bölümünde işleyeceğiz.
+AhdCode'da `T?` nullable (null olabilen) türdür. Derleyici ayrıca böyle bir
+değerin o anda kesinlikle var olup olmadığını takip eder. Bunu Null Güvenliği
+bölümünde işleyeceğiz.
 
 ## 5. Operatörler
 
@@ -954,14 +960,13 @@ Ulaşılabilir tüm nesne ağı derin dondurulur (deep-frozen). Eğer bir `Const
 
 ## 16. Null güvenliği (Null safety)
 
-`null`, "bu değişkenin belirli bir türü var ama şu an herhangi bir değere sahip
-değil" anlamına gelir. `String` veya `Student` gibi türlerin yanına yazılan
-ayrı bir `null` türü yoktur. Program kodun farklı yollarından ilerledikçe
-derleyici, bir değerin "kesinlikle var", "kesinlikle `null`" veya
+Yalın `T` null olamaz. Bilinen bir türün geçici olarak değeri olmayabilmesi için
+`T?` yazılır. Program kodun farklı yollarından ilerledikçe derleyici, nullable
+bir değerin "kesinlikle var", "kesinlikle `null`" veya
 "belki `null`" (possibly null) olup olmadığını anbean takip eder.
 
 ```ahd
-message: String := null
+message: String? := null
 
 if message == null {
     message = "hazır"
@@ -980,7 +985,11 @@ HAZIR
 
 Eğer değerin `null` olma ihtimali varsa, onun üyelerine erişmek (member
 access), fonksiyon gibi çağırmak veya indekslemek (indexing) derleme
-zamanında bir hatadır. `message != null` gibi bir kontrol yapıldıktan sonra, derleyici artık o bloğun içinde değerin kesin olarak var olduğunu bilir. Listeler ve Pair değerleri de `null` olabilir, bu yüzden onlardan okunan değerlerin de aynı şekilde kontrol edilmesi gerekebilir.
+zamanında bir hatadır. `message != null` kontrolünden sonra derleyici blok
+içinde değerin var olduğunu bilir. `List<User?>` null elemanlı bir List,
+`List<User>?` null olabilen bir List, `List<User?>?` ise ikisinin birleşimidir.
+`value := null` geçersizdir; `value: User? := null` yazılır. `fetchUser()`
+`User?` döndürüyorsa `user := fetchUser()` tam `User?` türünü çıkarır.
 
 Eğer `null` olabilecek bir değeri önceden kontrol etmeden kullanmaya çalışırsanız derleme zamanında bir hata alırsınız.
 
@@ -1212,6 +1221,32 @@ current: DateTime := T.now()
 ```
 
 Tür olarak `T.DateTime` yazmayın; bu geçersizdir. Ayrıca, `from Time bring DateTime as DT` gibi tekil öğelere takma ad veremezsiniz.
+
+### File ve Path temelleri
+
+`Path`, dosya sistemine erişmeden yolları birleştirir ve inceler. `File`; UTF-8
+metin okur/yazar, klasör oluşturur, metin ekler, siler, varlığı kontrol eder ve
+bir klasördeki doğrudan isimleri kararlı sıralı biçimde listeler.
+
+```ahd
+bring Path
+bring File
+from File bring FileError
+
+path := Path.join(["notlar", "bugun.txt"])
+File.createDir("notlar")
+File.writeText(path, "merhaba")
+
+attempt {
+    write(File.readText("olmayan.txt"))
+}
+except FileError as error {
+    write("Dosya okunamadı")
+}
+```
+
+`FileError`, `IOError` sınıfından türemiştir. Göreli yollar programın veya REPL
+oturumunun çalışma klasörünü kullanır.
 
 ## 20. Temel işlevler modülü (Fundamentals)
 
@@ -1581,15 +1616,18 @@ dosyasına ihtiyacınız yoktur.
 REPL, dosya derleyicisi ile birebir aynı kuralları kullanır. Başarılı komutlar oturum (session) boyunca hafızada kalır. Başarısız bir komut son çalışan durumu silmez, bu yüzden rahatça tekrar deneyebilirsiniz.
 
 ```text
-> x: Int := 5
-> x: Int := 7
+> x := 5
+> x := 7
 error: duplicate declaration
 > x = 7
-> write(x)
+> x
 7
 ```
 
-> **Dikkat:** REPL'de yeni satırlar girdiğinizde arka planda başarılı kodlar baştan itibaren tekrar çalıştırılabilir (replayed). Eğer `Math.seed(...)` kullanmıyorsanız, bu durum rastgele sayıların değişmesine yol açabilir. Bu yüzden kullanıcı girişi (`take`) gibi etkileşimli denemeleri REPL yerine bir `.ahd` dosyası oluşturup orada test edin.
+REPL; değerleri, takma adları, Function ve Class tanımlarını, modülleri ve Math
+rastgele sayı durumunu tek kalıcı oturumda tutar. Önceki komutlar yeniden
+çalıştırılmaz. `take` gerçek bir cevap satırı okur; yerel modüller ile göreli
+File yolları `ahdcode` komutunu başlattığınız klasörü kullanır.
 
 ## 26. Başlangıçta sık yapılan hatalar
 
@@ -1626,7 +1664,7 @@ error: duplicate declaration
 - Doğru: `if 1 > 0 { write("Evet") }`
 
 **7. Güvensiz `null` kullanımı**
-- Yanlış: `name: String := null \n write(name.upper())`
+- Yanlış: `name: String? := null \n write(name.upper())`
 - Neden: `name` null olabilir ve bu bir çökmeye yol açabilir. Derleyici buna izin vermez.
 - Doğru: `if name != null { write(name.upper()) }`
 
@@ -1785,5 +1823,3 @@ derinleştirebilirsiniz:
 
 Çalışan daha fazla örnek için [curated v0.1 examples](../examples/v0.1/README.md)
 klasörünü inceleyin.
-
-

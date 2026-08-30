@@ -1,11 +1,9 @@
-// Package repl implements an interactive AhdCode session by replaying the
-// successfully committed session source through the ordinary compiler and
-// native runtime. It deliberately contains no evaluator or semantic rules.
+// Package repl implements a persistent interactive AhdCode session over the
+// same validated and lowered IR consumed by the native backend.
 package repl
 
 import (
 	"bufio"
-	"bytes"
 	"fmt"
 	"io"
 	"os"
@@ -14,7 +12,10 @@ import (
 
 	"ahdcode/internal/build"
 	"ahdcode/internal/diagnostics"
+	"ahdcode/internal/evaluator"
 	"ahdcode/internal/lexer"
+	"ahdcode/internal/lowering"
+	"ahdcode/internal/module"
 	"ahdcode/internal/parser"
 	"ahdcode/internal/source"
 	"ahdcode/internal/syntax/ast"
@@ -26,20 +27,18 @@ const (
 	ContinuationPrompt = "...> "
 )
 
-// Run starts a session and returns when input reaches EOF. Every successful
-// submission is appended to one module source; failed submissions are never
-// committed, so semantic/runtime failures leave the prior state available.
+// Run starts a session and returns when input reaches EOF. Frontend validation
+// sees aggregate source for static context, while only new IR spans execute.
 func Run(input io.Reader, output, errorOutput io.Writer, version string) int {
-	directory, err := os.MkdirTemp("", "ahdcode-repl-")
+	directory, err := os.Getwd()
 	if err != nil {
-		fmt.Fprintf(errorOutput, "error [REPL001]\ncould not create REPL workspace: %v\n", err)
+		fmt.Fprintf(errorOutput, "error [REPL001]\ncould not determine REPL working directory: %v\n", err)
 		return 1
 	}
-	defer os.RemoveAll(directory)
-	entry := filepath.Join(directory, "Session.ahd")
+	entry := filepath.Join(directory, ".ahdcode-repl-session.ahd")
 	reader := bufio.NewReader(input)
+	session := evaluator.New(reader, output, directory)
 	committedSource := ""
-	committedOutput := ""
 	pending := ""
 	fmt.Fprintln(output, version)
 
@@ -77,38 +76,78 @@ func Run(input io.Reader, output, errorOutput io.Writer, version string) int {
 			continue
 		}
 
-		candidate := appendSubmission(committedSource, pending)
-		pending = ""
-		if err := os.WriteFile(entry, []byte(candidate), 0o600); err != nil {
-			fmt.Fprintf(errorOutput, "error [REPL001]\ncould not write REPL source: %v\n", err)
-			return 1
+		prefix := committedSource
+		if prefix != "" && !strings.HasSuffix(prefix, "\n") {
+			prefix += "\n"
 		}
-		var stdout, stderr bytes.Buffer
-		// REPL command input belongs to the session reader; handing that reader to
-		// an external executable would let os/exec prefetch future commands. The
-		// v0.1 REPL therefore gives each replay an isolated EOF runtime input.
-		code, result := build.RunProgramIO(entry, nil, strings.NewReader(""), &stdout, &stderr)
+		entryOffset := len(prefix)
+		candidate := prefix + pending
+		pending = ""
+		result := compileSession(entry, candidate)
 		if result.HasErrors() {
 			reportDiagnostics(errorOutput, result)
 		} else {
-			current := stdout.String()
-			if !strings.HasPrefix(current, committedOutput) {
-				fmt.Fprintln(errorOutput, "error [REPL002]\nreplayed session output was not deterministic")
+			execution := session.Execute(result.IR, entryOffset)
+			if execution.Failure != nil {
+				fmt.Fprintf(errorOutput, "error [RUN001]\n%s\n", execution.Failure)
 			} else {
-				fmt.Fprint(output, current[len(committedOutput):])
-				if code == 0 {
-					committedSource = candidate
-					committedOutput = current
+				committedSource = candidate
+				if execution.HasValue {
+					fmt.Fprintln(output, session.Render(execution.Value))
 				}
-			}
-			if stderr.Len() != 0 {
-				fmt.Fprint(errorOutput, stderr.String())
 			}
 		}
 		if readError == io.EOF {
 			return 0
 		}
 	}
+}
+
+// overlayWorkspace keeps the synthetic entry in memory while ordinary local
+// modules resolve relative to the real directory where the REPL was launched.
+type overlayWorkspace struct {
+	entryPath string
+	text      string
+	resolver  module.FileResolver
+	loader    module.FileLoader
+}
+
+func (workspace overlayWorkspace) CanonicalEntry(entryPath string) (module.SourceIdentity, error) {
+	return workspace.resolver.CanonicalEntry(entryPath)
+}
+
+func (workspace overlayWorkspace) Resolve(importer module.SourceIdentity, moduleName string) (module.SourceIdentity, error) {
+	return workspace.resolver.Resolve(importer, moduleName)
+}
+
+func (workspace overlayWorkspace) Load(identity module.SourceIdentity) (string, error) {
+	if filepath.Clean(identity.Path) == filepath.Clean(workspace.entryPath) {
+		return workspace.text, nil
+	}
+	return workspace.loader.Load(identity)
+}
+
+func compileSession(entry, text string) build.Result {
+	workspace := overlayWorkspace{entryPath: entry, text: text}
+	frontend := module.NewCompiler(workspace, workspace).Compile(entry)
+	result := build.Result{Compilation: &frontend, Files: make(map[source.FileID]source.File)}
+	for _, current := range frontend.Modules {
+		if current != nil && current.File.ID != 0 {
+			result.Files[current.File.ID] = current.File
+		}
+	}
+	for _, item := range frontend.Diagnostics {
+		result.Diagnostics = append(result.Diagnostics, item.Diagnostic)
+	}
+	if result.HasErrors() {
+		return result
+	}
+	lowered := lowering.LowerCompilation(frontend)
+	result.Diagnostics = append(result.Diagnostics, lowered.Diagnostics...)
+	if !result.HasErrors() {
+		result.IR = lowered.Compilation
+	}
+	return result
 }
 
 func appendSubmission(committed, next string) string {
@@ -121,7 +160,7 @@ func appendSubmission(committed, next string) string {
 func reportDiagnostics(writer io.Writer, result build.Result) {
 	files := result.Files
 	for id, file := range files {
-		if filepath.Base(file.Path) == "Session.ahd" {
+		if filepath.Base(file.Path) == ".ahdcode-repl-session.ahd" {
 			file.Path = "<repl>"
 			files[id] = file
 		}

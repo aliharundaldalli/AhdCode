@@ -15,6 +15,9 @@ Lists are homogeneous, ordered reference objects. Negative indices are
 supported; invalid indices raise `IndexError`. A bare empty List needs an
 explicit element type.
 
+Element and receiver nullability are separate: `List<User?>` may contain null,
+`List<User>?` is itself nullable, and `List<User?>?` combines both.
+
 Commas between elements are optional wherever a newline already separates
 them, and a trailing comma is always allowed:
 
@@ -53,6 +56,8 @@ write(scores["Ali"])
 Pairs preserve insertion order. Updating a key keeps its position; ejecting
 and re-adding it appends it. Missing keys raise `KeyError`. Valid key types are
 `String`, `Int`, and `Bool`; Real, Class, and null keys are not supported.
+Pair values may be nullable when written explicitly, for example
+`Pair<String, User?>`.
 
 Pair entries follow the same flexible-comma rule as Lists: `{"Ali": 85,
 "Ayşe": 92}` and the multiline form above are the same value.

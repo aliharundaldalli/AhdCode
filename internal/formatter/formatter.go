@@ -447,11 +447,26 @@ func (b *builder) declHead(targetDoc doc, typeRef *ast.TypeRef) doc {
 }
 
 func (b *builder) variableDecl(v *ast.VariableDecl) doc {
-	head := b.declHead(b.expr(v.Target), v.Type)
+	target := b.expr(v.Target)
+	head := target
+	inferredAfterModifier := false
+	if b.current().Kind == token.Colon {
+		colon := b.leaf()
+		modifiers := b.declarationModifiers()
+		head = concat(target, colon, text(" "), modifiers)
+		if v.Type != nil {
+			head = concat(head, b.typeRef(v.Type))
+		} else {
+			inferredAfterModifier = true
+		}
+	}
 	if v.GlobalOnly {
 		return head
 	}
 	declare := b.leaf()
+	if inferredAfterModifier {
+		return concat(head, declare, text(" "), b.expr(v.Initializer))
+	}
 	return concat(head, text(" "), declare, text(" "), b.expr(v.Initializer))
 }
 

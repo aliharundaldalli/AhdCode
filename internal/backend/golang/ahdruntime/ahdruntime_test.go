@@ -31,8 +31,8 @@ func (value *stubError) AhdFreezeGraph(visited map[AhdFreezable]bool) {
 func init() {
 	for _, class := range []*AhdClass{
 		AhdClassError, AhdClassConstantError, AhdClassDivisionByZeroError, AhdClassDomainError,
-		AhdClassIndexError, AhdClassKeyError, AhdClassNullError, AhdClassOverflowError, AhdClassValueError,
-		AhdClassLatexError,
+		AhdClassIndexError, AhdClassIOError, AhdClassKeyError, AhdClassNullError, AhdClassOverflowError, AhdClassValueError,
+		AhdClassLatexError, AhdClassFileError,
 	} {
 		target := class
 		AhdRegisterError(target, func(message string) AhdInstance {

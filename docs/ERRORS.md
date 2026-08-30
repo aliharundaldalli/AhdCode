@@ -29,6 +29,8 @@ Common built-in errors include:
 | `OverflowError` | checked Int or finite Real overflow |
 | `DomainError` | valid type but invalid mathematical/search domain |
 | `IndexError` | invalid List/String index |
+| `IOError` | base class for input/output failures |
+| `FileError` | `File` module operation failure; derives from `IOError` |
 | `KeyError` | missing Pair key |
 | `NullError` | runtime null safety boundary |
 | `ConstantError` | mutation through a deep-frozen reference |

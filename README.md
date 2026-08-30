@@ -31,8 +31,8 @@ for name in names {
 
 - Declaration and mutation look different: `:=` declares, `=` mutates.
 - Static checking rejects unrelated implicit conversions and truthiness.
-- Flow-sensitive null checks make absence explicit without new nullable type
-  syntax.
+- Explicit nullable types (`T?`) compose with collections, while flow-sensitive
+  checks narrow proven non-null values.
 - Lists, Pairs, Classes, Functions, modules, errors, and native executables are
   part of the v0.1 core.
 - The formatter defines one canonical presentation while preserving comments.
@@ -86,6 +86,7 @@ See the [CLI guide](docs/CLI.md), [formatter guide](docs/FORMATTER.md), and
 - [Math module](docs/MATH.md)
 - [Time module](docs/TIME.md)
 - [Latex module](docs/LATEX.md)
+- [File and Path modules](docs/FILESYSTEM.md)
 - [Curated v0.1 examples](examples/v0.1/README.md)
 - [Full v0.1 language specification](AHDCODE_LANGUAGE_SPEC_v0.1.md)
 

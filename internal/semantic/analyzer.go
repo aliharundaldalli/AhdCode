@@ -149,6 +149,7 @@ var BuiltinRuntimeErrorNames = []string{
 	"DivisionByZeroError",
 	"DomainError",
 	"IndexError",
+	"IOError",
 	"KeyError",
 	"NullError",
 	"OverflowError",

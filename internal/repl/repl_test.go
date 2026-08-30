@@ -2,6 +2,8 @@ package repl
 
 import (
 	"bytes"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -99,33 +101,92 @@ func TestNumericConversionsAndPowerUseTheSharedPipeline(t *testing.T) {
 	}
 }
 
-// TestTakeInsideTheSessionSeesEndOfInput pins the v0.1 REPL decision: each
-// replay runs with an isolated, already-exhausted runtime input, so take never
-// consumes the session's own command stream.
-func TestTakeInsideTheSessionSeesEndOfInput(t *testing.T) {
+func TestTakeUsesTheSharedInteractiveInput(t *testing.T) {
 	input := strings.Join([]string{
-		`name: String := take("Name: ")`,
+		`name := take("Name: ")`,
+		"Ali",
 		`write("[{name}]")`,
 		`write(len(name))`,
-		"this line must stay a REPL command",
 		"",
 	}, "\n")
 	var output, errors bytes.Buffer
 	Run(strings.NewReader(input), &output, &errors, "AhdCode v0.1.5")
 	text := output.String()
-	// The prompt is written, and the read reaches end of input immediately, so
-	// the session yields an empty String rather than the next command.
 	if !strings.Contains(text, "Name: ") {
 		t.Fatalf("the take prompt was not written: %q", text)
 	}
-	if !strings.Contains(text, "[]") {
-		t.Fatalf("take inside the REPL did not read an empty String: %q", text)
+	if !strings.Contains(text, "[Ali]") {
+		t.Fatalf("take did not consume the intended answer: %q", text)
 	}
-	if !strings.Contains(text, "\n0\n") && !strings.Contains(text, "> 0\n") {
-		t.Fatalf("the String read inside the REPL was not empty: %q", text)
+	if !strings.Contains(text, "3\n") {
+		t.Fatalf("the captured answer did not persist: %q", text)
 	}
-	// The following line is still treated as a command, not as program input.
-	if !strings.Contains(errors.String(), "error") {
-		t.Fatalf("a later REPL line was consumed as program input: %q", errors.String())
+	if errors.Len() != 0 {
+		t.Fatalf("REPL errors: %s", errors.String())
+	}
+}
+
+func TestPersistentEvaluatorDoesNotReplayEffectsAndPreservesAliasesAndRNG(t *testing.T) {
+	input := `write("once")
+a := [1, 2]
+b := a
+a.add(3)
+write(b)
+bring Math
+Math.seed(42)
+write(Math.random())
+write(Math.random())
+`
+	var output, errors bytes.Buffer
+	Run(strings.NewReader(input), &output, &errors, "AhdCode v0.1.7")
+	text := output.String()
+	if strings.Count(text, "once\n") != 1 {
+		t.Fatalf("a prior side effect replayed:\n%s", text)
+	}
+	if !strings.Contains(text, `[1, 2, 3]`) {
+		t.Fatalf("List alias identity was lost:\n%s", text)
+	}
+	if !strings.Contains(text, "0.7415648787718233") || strings.Count(text, "0.7415648787718233") != 1 {
+		t.Fatalf("Math RNG state did not progress:\n%s", text)
+	}
+	if errors.Len() != 0 {
+		t.Fatalf("REPL errors: %s", errors.String())
+	}
+}
+
+func TestREPLUsesLaunchDirectoryForModulesAndFiles(t *testing.T) {
+	directory := t.TempDir()
+	engine := `write("engine init")
+tick: Function := () -> Int {
+    return 7
+}
+`
+	if err := os.WriteFile(filepath.Join(directory, "Engine.ahd"), []byte(engine), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	previous, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(directory); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = os.Chdir(previous) }()
+	input := `bring Engine
+write(Engine.tick())
+bring File
+File.writeText("note.txt", "hello")
+write(File.readText("note.txt"))
+`
+	var output, errors bytes.Buffer
+	Run(strings.NewReader(input), &output, &errors, "AhdCode v0.1.7")
+	if strings.Count(output.String(), "engine init\n") != 1 || !strings.Contains(output.String(), "7\n") || !strings.Contains(output.String(), "hello\n") {
+		t.Fatalf("REPL launch-directory behavior:\n%s", output.String())
+	}
+	if content, err := os.ReadFile(filepath.Join(directory, "note.txt")); err != nil || string(content) != "hello" {
+		t.Fatalf("relative File write = %q, %v", content, err)
+	}
+	if errors.Len() != 0 {
+		t.Fatalf("REPL errors: %s", errors.String())
 	}
 }

@@ -24,9 +24,13 @@ ahdcode --version
 Create `hello.ahd`:
 
 ```ahd
-name: String := "AhdCode"
+name := "AhdCode"
 write("Hello {name}")
 ```
+
+The compiler infers `String`; the binding is still statically typed. Write an
+explicit annotation (`name: String := ...`) whenever it communicates intent or
+inference is insufficient.
 
 Run it:
 
@@ -47,8 +51,8 @@ ahdcode build hello.ahd -o hello
 conversion:
 
 ```ahd
-name: String := take("Name: ")
-age: Int := int(take("Age: "))
+name := take("Name: ")
+age := int(take("Age: "))
 
 write("{name} is {age}")
 ```

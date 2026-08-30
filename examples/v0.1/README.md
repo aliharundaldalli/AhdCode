@@ -33,5 +33,6 @@ ahdcode run examples/v0.1/14_grade_app.ahd
 | `14_grade_app.ahd` | compact interactive CLI application |
 | `15_time.ahd` | Time module: DateTime, Duration, Calendar, monotonic |
 | `16_latex.ahd` | Latex module: module alias, helpers, PDF, LatexError |
+| `17_filesystem.ahd` | inferred declarations, Path, UTF-8 File I/O, FileError |
 
 `Greeting.ahd` is the sibling module used by `11_modules.ahd`.

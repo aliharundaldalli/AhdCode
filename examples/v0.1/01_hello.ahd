@@ -1,2 +1,2 @@
-name: String := "AhdCode"
+name := "AhdCode"
 write("Hello {name}")

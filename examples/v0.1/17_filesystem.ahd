@@ -1,0 +1,26 @@
+bring File
+bring Path
+from File bring FileError
+
+directory := "ahdcode-v017-files"
+note := Path.join([directory, "note.txt"])
+
+File.createDir(directory)
+File.writeText(note, "first")
+File.append(note, " second")
+
+write(File.readText(note))
+write(File.list(directory))
+write(Path.ext(note))
+write(Path.base(note))
+write(Path.dir(note))
+
+attempt {
+    File.readText(Path.join([directory, "missing.txt"]))
+}
+except FileError as error {
+    write("missing file caught")
+}
+
+File.delete(note)
+File.delete(directory)

@@ -661,6 +661,12 @@ func (generator *generator) call(value *ir.CallExpr) string {
 	if strings.HasPrefix(string(value.Callable), latexModulePrefix) {
 		return generator.latexCall(value)
 	}
+	if strings.HasPrefix(string(value.Callable), fileModulePrefix) {
+		return generator.fileCall(value)
+	}
+	if strings.HasPrefix(string(value.Callable), pathModulePrefix) {
+		return generator.pathCall(value)
+	}
 	if method, ok := value.Callee.(*ir.MemberExpr); ok && method.Kind == ir.MethodMember {
 		function := generator.functions[method.Callable]
 		if function == nil {

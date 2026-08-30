@@ -129,12 +129,16 @@ created yet. For example, `score = 10` without a previous declaration produces a
 semantic error. Using `:=` a second time in the same block would try to create the
 same variable again, which is also an error.
 
-AhdCode requires you to write the type explicitly (like `Int` and `String` above):
+AhdCode can infer a clear initializer's static type, while an explicit type is
+still available when it improves readability:
 
 ```ahd
 age: Int := 19
-// The compiler ensures age remains an Int.
+name := "Ayşe"  // inferred String
 ```
+
+Inference is not dynamic typing: `name = 5` is still an error. Inside a nested
+block write `name: Local := "Ayşe"`; scope intent is never inferred.
 
 > **Technical note:** The region where a name can be used is called its scope.
 > Letting the compiler determine the type automatically is called type inference.
@@ -176,7 +180,9 @@ An `Int` can safely be used as a `Real` where the language permits it. However,
 
 > **Technical note:** This strict rule for generic collections is called invariance.
 
-In AhdCode, `null` is a state a variable can be in, rather than a normal type of its own. We will cover this in the Null Safety section.
+In AhdCode, `T?` is a nullable type. The compiler also tracks whether a
+nullable value is currently known to be present. We will cover this in the
+Null Safety section.
 
 ## 5. Operators
 
@@ -963,14 +969,12 @@ The entire reachable object graph is deep-frozen. If a `Constant` contains other
 
 ## 16. Null safety
 
-`null` means “this variable has a known type, but it has no value right now.”
-There is no separate `null` type written beside types such as `String` or
-`Student`. As the program moves through different branches, the compiler
-tracks whether a value is definitely present, definitely `null`, or possibly
-`null`.
+Plain `T` is non-nullable. Write `T?` when a known type may temporarily have no
+value. As the program moves through branches, the compiler tracks whether that
+nullable value is definitely present, definitely `null`, or possibly `null`.
 
 ```ahd
-message: String := null
+message: String? := null
 
 if message == null {
     message = "ready"
@@ -989,8 +993,10 @@ READY
 
 Member access, calls, and indexing are compile-time errors when the value might
 be `null`. After a check such as `message != null`, the compiler knows the
-value is present inside that block. List elements and Pair values can also be
-null, so values read from them may need the same kind of check. 
+value is present inside that block. `List<User?>` has nullable elements,
+`List<User>?` is a nullable List, and `List<User?>?` combines both. A bare
+`value := null` is invalid; write `value: User? := null`. If `fetchUser()`
+returns `User?`, then `user := fetchUser()` infers the complete `User?` type.
 
 If you try to use a possibly null value without checking, you will get a compile-time error.
 
@@ -1216,6 +1222,32 @@ current: DateTime := T.now()
 ```
 
 Do not write `T.DateTime` as a type; that is invalid. Also, you cannot alias individual items like `from Time bring DateTime as DT`.
+
+### File and Path basics
+
+`Path` joins and inspects paths without accessing the filesystem. `File` reads
+and writes UTF-8 text, creates directories, appends, deletes, checks existence,
+and lists immediate names in stable sorted order.
+
+```ahd
+bring Path
+bring File
+from File bring FileError
+
+path := Path.join(["notes", "today.txt"])
+File.createDir("notes")
+File.writeText(path, "hello")
+
+attempt {
+    write(File.readText("missing.txt"))
+}
+except FileError as error {
+    write("Could not read the file")
+}
+```
+
+`FileError` derives from `IOError`. Relative paths use the program or REPL
+working directory.
 
 ## 20. Fundamentals Module
 
@@ -1575,15 +1607,18 @@ Run `ahdcode` by itself to open the REPL (Read-Eval-Print Loop) for small experi
 The REPL uses the exact same rules as the file compiler. Successful commands remain in the session. A failed command does not erase the last working state, so you can just try again. 
 
 ```text
-> x: Int := 5
-> x: Int := 7
+> x := 5
+> x := 7
 error: duplicate declaration
 > x = 7
-> write(x)
+> x
 7
 ```
 
-> **Watch out:** Because the REPL replays successful work when you enter new lines, random behavior might replay unless you use `Math.seed(...)` for deterministic operations. Test interactive input with `take` in a `.ahd` file rather than in the REPL.
+The REPL keeps values, aliases, Functions, Classes, modules, and Math random
+state in one persistent session. Earlier commands are not run again. `take`
+reads a real answer line, and local modules plus relative File paths use the
+directory where you started `ahdcode`.
 
 ## 27. Common beginner mistakes
 
@@ -1620,7 +1655,7 @@ Here are common errors you might see and how to fix them:
 - Correct: `if 1 > 0 { write("Yes") }`
 
 **7. Unsafe null use**
-- Wrong: `name: String := null \n write(name.upper())`
+- Wrong: `name: String? := null \n write(name.upper())`
 - Why: `name` might be null, causing a crash. The compiler rejects this.
 - Correct: `if name != null { write(name.upper()) }`
 
@@ -1777,5 +1812,3 @@ After completing this guide, continue with the detailed project documents:
 - [Full v0.1 specification](../AHDCODE_LANGUAGE_SPEC_v0.1.md)
 
 For more working programs, explore the [curated v0.1 examples](../examples/v0.1/README.md).
-
-

@@ -692,7 +692,7 @@ Use this exact definition for signed Int range checking and other compile-time l
 Example:
 
 ```ahd
-student: Student := null
+student: Student? := null
 ```
 
 The variable type remains Student.
@@ -1370,10 +1370,10 @@ forms. Ordinary whitespace is preserved and end of input yields an empty
 String. The two forms stay distinct in generated code: `take()` writes no
 prompt at all rather than writing an empty one.
 
-The v0.1 REPL gives each replay an isolated, already-exhausted runtime input,
-so `take` inside a session reads end of input instead of consuming the next
-REPL command. That is a deliberate decision of the replay architecture, not a
-limitation of `take`.
+The REPL owns one shared buffered terminal reader. Its persistent IR evaluator
+calls the same logical `take` operation on that reader, flushes the prompt, and
+consumes exactly one answer line. The answer is therefore never mistaken for
+the next REPL command. Do not restore subprocess EOF or source-replay behavior.
 
 ## between
 
@@ -1733,7 +1733,14 @@ Use the same lexer/parser/semantic engine as files.
 
 Do not create a second incompatible mini-language.
 
-Persist successful session declarations and statements through the shared compilation pipeline. Ordinary declaration semantics do not change in the REPL: duplicate same-scope `:=` is an error and mutation uses `=`. Failed semantic input or a catchable runtime Error must leave the last successful session state available.
+Persist successful session declarations, values, aliases, Functions, Classes,
+imports, module initialization markers, Math RNG state, launch working
+directory, and streams in a long-lived evaluator over typed/lowered IR.
+Frontend checking may use aggregate session source for static context, but only
+newly lowered statement spans execute. Never execute complete source history
+again. Ordinary declaration semantics do not change in the REPL: duplicate
+same-scope `:=` is an error and mutation uses `=`. Failed semantic input or a
+catchable runtime Error must leave the last successful session state available.
 
 Target:
 
@@ -1746,7 +1753,21 @@ ahd> write(x^2)
 25
 ```
 
-The v0.1 REPL must support ordinary core declarations, Functions, Classes, multiline constructs, mutation, and recoverable semantic/runtime failures through the shared compilation path. Do not weaken declaration rules for interactive convenience.
+The v0.1 REPL must support ordinary core declarations, Functions, Classes,
+multiline constructs, mutation, control flow, errors, Fundamentals, standard
+and local modules, and recoverable semantic/runtime failures through the shared
+IR path. Local module resolution and File operations use the real launch
+working directory. Do not weaken declaration rules for interactive convenience.
+
+### Filesystem modules
+
+Implement `Path` and `File` as ordinary compiler-registered standard-module
+interfaces, not as syntax or REPL special cases. Backend and evaluator dispatch
+their stable `builtin:Path::*` and `builtin:File::*` callable identities. File
+operations map host failures to the generated `FileError` Class; `FileError`
+inherits the core `IOError`. Runtime file handles are closed on every path,
+text reads validate UTF-8, and directory names are sorted before becoming an
+AhdCode List.
 
 ---
 

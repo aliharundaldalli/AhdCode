@@ -183,6 +183,18 @@ func TestValidExampleCorpusRemainsSemanticAndIdempotent(t *testing.T) {
 	}
 }
 
+func TestFormatterPreservesInferredDeclarations(t *testing.T) {
+	sourceText := "age:=25\nname:Local:=\"Ali\"\nuser:Local User?:=null\n"
+	want := "age := 25\nname: Local := \"Ali\"\nuser: Local User? := null\n"
+	result := Format(source.NewFile(1, "inferred.ahd", sourceText))
+	if result.HasErrors() {
+		t.Fatalf("format diagnostics: %#v", result.Diagnostics)
+	}
+	if result.Text != want {
+		t.Fatalf("formatted = %q, want %q", result.Text, want)
+	}
+}
+
 func TestFormatterRendersIterationBindingTypes(t *testing.T) {
 	cases := map[string]string{
 		"typed for":   "for j: Int in between(1,100) {\nwrite(j)\n}\n",

@@ -62,6 +62,11 @@ func LowerCompilation(compilation module.CompilationResult) Result {
 					latexModule(ir.ModuleID(current.ID), current.Source.Name, current.Source.Path))
 				continue
 			}
+			if string(current.ID) == FileModuleID {
+				result.Modules = append(result.Modules,
+					fileModule(ir.ModuleID(current.ID), current.Source.Name, current.Source.Path))
+				continue
+			}
 			result.Modules = append(result.Modules, &ir.Module{
 				ID: ir.ModuleID(current.ID), Name: current.Source.Name, SourcePath: current.Source.Path,
 			})
