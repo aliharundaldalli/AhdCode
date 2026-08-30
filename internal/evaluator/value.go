@@ -51,6 +51,11 @@ type FunctionValue struct {
 	Callable ir.CallableID
 	Receiver *Instance
 	Direct   bool
+	// Captured holds a capturing lambda's explicitly captured values, in the
+	// callable's leading-parameter order. They are bound ahead of the declared
+	// arguments at every invocation, which is the same shape the native backend
+	// compiles a closure into.
+	Captured []any
 }
 
 type ClassValue struct{ Class ir.ClassID }

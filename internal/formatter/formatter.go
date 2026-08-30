@@ -416,6 +416,12 @@ func (b *builder) pairGroup(entries []ast.PairEntry) doc {
 	})
 }
 
+// captureGroup renders a lambda's explicit capture list. Each entry is a bare
+// binding name, so the group carries no type, modifier, or initializer.
+func (b *builder) captureGroup(captures []ast.CaptureRef) doc {
+	return b.delimitedGroup(len(captures), func(int) doc { return b.leaf() })
+}
+
 func (b *builder) parameterGroup(parameters []ast.Parameter) doc {
 	return b.delimitedGroup(len(parameters), func(index int) doc {
 		parameter := parameters[index]
@@ -697,10 +703,16 @@ func (b *builder) expr(e ast.Expr) doc {
 		return concat(open, lead, inner, trail, b.leaf())
 	case *ast.LambdaExpr:
 		keyword := b.leaf()
+		// An explicit capture list is part of the lambda's own syntax, so its
+		// tokens are consumed here rather than left for the parameter list.
+		captures := text("")
+		if b.current().Kind == token.LeftBracket {
+			captures = concat(b.captureGroup(v.Captures), text(" "))
+		}
 		parameters := b.parameterGroup(v.Parameters)
 		arrow := b.leaf()
 		gapDoc := b.gap()
-		return concat(keyword, text(" "), parameters, text(" "), arrow, text(" "), gapDoc, b.expr(v.Body))
+		return concat(keyword, text(" "), captures, parameters, text(" "), arrow, text(" "), gapDoc, b.expr(v.Body))
 	case *ast.UnaryExpr:
 		operator := b.leaf()
 		gapDoc := b.gap()

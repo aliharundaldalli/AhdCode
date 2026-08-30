@@ -104,16 +104,18 @@ answer := f("5")`)
 score := lambda (student: Student?) -> student.score`)
 	requireSemanticCode(t, nullableUse, codeNullableUse)
 
+	// An enclosing binding is read only when the lambda lists it, so an
+	// unlisted one names the missing capture rather than failing generically.
 	_, capture := analyzeText(t, `outer: Function := (offset: Int) -> Function {
     return lambda (x: Int) -> x + offset
 }`)
-	requireSemanticCode(t, capture, codePendingFeature)
+	requireSemanticCode(t, capture, codeMissingCapture)
 
 	_, blockCapture := analyzeText(t, `if true {
     offset: Local Int := 1
     f: Local := lambda (x: Int) -> x + offset
 }`)
-	requireSemanticCode(t, blockCapture, codePendingFeature)
+	requireSemanticCode(t, blockCapture, codeMissingCapture)
 
 	_, defaultValue := analyzeText(t, `f := lambda (x: Int := 1) -> x + 1`)
 	requireSemanticCode(t, defaultValue, codeInvalidLambda)
@@ -730,4 +732,78 @@ func TestNullableBoolAndCallableUse(t *testing.T) {
 
 	_, callResult := analyzeText(t, "operation: Function? := null\noperation()")
 	requireSemanticCode(t, callResult, codeNullableUse)
+}
+
+// TestExplicitLambdaCapture covers the capture list's static rules. Capture is
+// always written out, so each way of getting the list wrong has its own
+// diagnostic and none of them cascades.
+func TestExplicitLambdaCapture(t *testing.T) {
+	accepted := []struct{ name, text string }{
+		{"enclosing parameter", `keep: Function := (minimum: Int, scores: List<Int>) -> List<Int> {
+    return scores.filter(lambda [minimum] (score: Int) -> score >= minimum)
+}`},
+		{"enclosing Local", `run: Function := () -> Bool {
+    minimum: Local Int := 70
+    check: Local Function := lambda [minimum] (score: Int) -> score >= minimum
+    return check(80)
+}`},
+		{"several captures", `band: Function := (low: Int, high: Int, values: List<Int>) -> List<Int> {
+    return values.filter(lambda [low, high] (v: Int) -> v >= low and v <= high)
+}`},
+		{"no capture list is still valid", `double := lambda (x: Int) -> x * 2`},
+		{"an empty capture list is allowed", `double := lambda [] (x: Int) -> x * 2`},
+		{"a captured String keeps its type", `tag: Function := (suffix: String, names: List<String>) -> List<String> {
+    return names.map(lambda [suffix] (name: String) -> name + suffix)
+}`},
+	}
+	for _, testCase := range accepted {
+		t.Run(testCase.name, func(t *testing.T) {
+			_, result := analyzeText(t, testCase.text)
+			requireSemanticClean(t, result)
+		})
+	}
+
+	rejected := []struct{ name, text, code string }{
+		{"an unlisted enclosing Local", `run: Function := () -> Bool {
+    minimum: Local Int := 70
+    check: Local Function := lambda (score: Int) -> score >= minimum
+    return check(80)
+}`, codeMissingCapture},
+		{"an unlisted enclosing parameter", `keep: Function := (minimum: Int, scores: List<Int>) -> List<Int> {
+    return scores.filter(lambda (score: Int) -> score >= minimum)
+}`, codeMissingCapture},
+		{"an unknown capture", `f := lambda [missing] (x: Int) -> x`, codeUnknownCapture},
+		{"a duplicate capture", `run: Function := (m: Int) -> Int {
+    f: Local Function := lambda [m, m] (x: Int) -> x + m
+    return f(1)
+}`, codeInvalidCapture},
+		{"a capture colliding with a parameter", `run: Function := (minimum: Int) -> Int {
+    f: Local Function := lambda [minimum] (minimum: Int) -> minimum + 1
+    return f(1)
+}`, codeInvalidCapture},
+		{"capturing a Class declaration", `Student: Class<> := {
+    structure: Attributes := (score: Int)
+}
+f := lambda [Student] (x: Int) -> x`, codeInvalidCapture},
+	}
+	for _, testCase := range rejected {
+		t.Run(testCase.name, func(t *testing.T) {
+			_, result := analyzeText(t, testCase.text)
+			requireSemanticCode(t, result, testCase.code)
+		})
+	}
+}
+
+// TestCapturedBindingsStayTyped checks that a capture keeps the enclosing
+// binding's exact type, so closures cannot smuggle in dynamic typing.
+func TestCapturedBindingsStayTyped(t *testing.T) {
+	_, mismatch := analyzeText(t, `run: Function := (minimum: Int, names: List<String>) -> List<String> {
+    return names.filter(lambda [minimum] (name: String) -> name >= minimum)
+}`)
+	requireSemanticFailure(t, mismatch)
+
+	_, wrongUse := analyzeText(t, `run: Function := (label: String, values: List<Int>) -> List<Int> {
+    return values.filter(lambda [label] (v: Int) -> v >= label)
+}`)
+	requireSemanticFailure(t, wrongUse)
 }

@@ -135,6 +135,7 @@ func (p *parser) parsePrefix() ast.Expr {
 
 func (p *parser) parseLambda() ast.Expr {
 	start := p.advance().Span.Start
+	captures := p.parseCaptureList()
 	parameters := p.parseParameterList(false)
 	p.skipNewlines()
 	p.expect(token.Arrow, "expected -> after lambda parameters")
@@ -145,7 +146,39 @@ func (p *parser) parseLambda() ast.Expr {
 		return &ast.BadExpr{Base: p.base(start, block.Span().End)}
 	}
 	body := p.parseRequiredExpression(0, "missing lambda body expression after '->'", "write one expression after '->', or use a normal Function for statements")
-	return &ast.LambdaExpr{Base: p.base(start, spanEnd(body)), Parameters: parameters, Body: body}
+	return &ast.LambdaExpr{Base: p.base(start, spanEnd(body)), Captures: captures, Parameters: parameters, Body: body}
+}
+
+// parseCaptureList reads the optional `[name, name]` capture list that may
+// follow `lambda`. The list is names only: a capture reads an existing
+// binding, so there is no type, no modifier, and no initializer to write.
+func (p *parser) parseCaptureList() []ast.CaptureRef {
+	if !p.check(token.LeftBracket) {
+		return nil
+	}
+	p.advance()
+	var captures []ast.CaptureRef
+	p.skipNewlines()
+	for !p.check(token.RightBracket) && !p.atEnd() {
+		name := p.current()
+		if name.Kind != token.Identifier {
+			p.errorCurrent(codeInvalidLambdaSyntax, "lambda capture list expects a binding name",
+				"list the names the lambda reads, as in lambda [minimum] (value: Int) -> value >= minimum")
+			break
+		}
+		p.advance()
+		captures = append(captures, ast.CaptureRef{Base: p.base(name.Span.Start, name.Span.End), Name: name.Value})
+		p.skipNewlines()
+		if p.check(token.Comma) {
+			p.advance()
+			p.skipNewlines()
+			continue
+		}
+		break
+	}
+	p.skipNewlines()
+	p.expect(token.RightBracket, "expected ] to close the lambda capture list")
+	return captures
 }
 
 func (p *parser) infixOperator() (operator string, leftBP, rightBP, width int) {

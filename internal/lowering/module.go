@@ -70,6 +70,22 @@ func (lowerer *moduleLowerer) lowerLambda(lambda *ast.LambdaExpr) *ir.Function {
 	}
 	previousReturn, previousReceiver, previousOwner := lowerer.currentReturn, lowerer.currentReceiver, lowerer.currentOwner
 	lowerer.currentReturn, lowerer.currentReceiver, lowerer.currentOwner = function.Signature.Return, "", ""
+	// Captures become leading parameters of the lifted function, so closure
+	// storage is ordinary typed parameter passing rather than a second
+	// environment mechanism. They stay out of Signature, which remains the
+	// callable's public arity, so every caller and callback adapter is
+	// unaffected; the lambda's value site supplies them.
+	function.Captures = len(callable.Captures)
+	for _, capture := range callable.Captures {
+		id := lowerer.compilation.registry.symbolID(lowerer.module, capture.Inner)
+		if id == "" {
+			id = ir.SymbolID(string(callableID) + "::capture::" + capture.Name)
+		}
+		function.Parameters = append(function.Parameters, ir.Parameter{
+			Span: capture.Inner.Span, ID: id, Name: capture.Name,
+			Type: lowerType(capture.Inner.Type), NullState: lowerNull(capture.Inner.InitialNull),
+		})
+	}
 	for index := range lambda.Parameters {
 		if index >= len(callable.Signature.Parameters) {
 			break

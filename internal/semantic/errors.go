@@ -43,4 +43,10 @@ const (
 	codeProtocolSlot        = "SEM040"
 	codeProtocolSignature   = "SEM041"
 	codeInvalidLambda       = "SEM042"
+	// The explicit lambda capture rules. A lambda reads an enclosing local
+	// only when it lists that name, so each way of getting the list wrong has
+	// its own diagnostic rather than a shared generic one.
+	codeMissingCapture = "SEM043"
+	codeUnknownCapture = "SEM044"
+	codeInvalidCapture = "SEM045"
 )

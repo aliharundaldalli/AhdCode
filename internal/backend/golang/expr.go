@@ -78,6 +78,9 @@ func (generator *generator) expr(expression ir.Expr) string {
 		if function == nil {
 			return generator.unsupported("a Function value with no generated callable", meta.Span)
 		}
+		if len(value.Captures) != 0 {
+			return generator.closureValue(function, value, meta)
+		}
 		return generator.adapterName(function)
 	case *ir.ConvertExpr:
 		if value.From.Kind == ir.IntType && meta.Type.Kind == ir.RealType {
@@ -1236,4 +1239,61 @@ func (generator *generator) length(expression ir.Expr, span source.Span) string 
 	default:
 		return generator.unsupported("len of "+expression.ExprMeta().Type.String(), span)
 	}
+}
+
+// closureValue renders a capturing lambda's Function value. A non-capturing
+// lambda keeps using the shared package-level adapter; a capturing one needs a
+// value per evaluation, because two evaluations of the same lambda expression
+// may capture different values.
+//
+// Each capture is read once, here, into its own variable before the returned
+// closure is built. That makes capture by value: the closure holds what the
+// enclosing binding held when the lambda value was created, so a later
+// reassignment of that binding is not visible inside the lambda, and Go's own
+// closure capture keeps the value alive after the enclosing function returns.
+// Reference values (List, Pair, Class instances) are captured the same way any
+// assignment copies them -- the reference is copied, so the referenced object
+// stays shared, exactly as when the value is passed as a parameter.
+func (generator *generator) closureValue(function *ir.Function, value *ir.FunctionValueExpr, meta ir.ExprBase) string {
+	if len(value.Captures) != function.Captures || function.Captures > len(function.Parameters) {
+		generator.fail(CodeGenerationFailure, "a capturing Function value does not match its callable", meta.Span,
+			"the IR call is malformed")
+		return "nil"
+	}
+	bound := make([]string, 0, function.Captures)
+	binders := make([]string, 0, function.Captures)
+	for index, capture := range value.Captures {
+		parameter := function.Parameters[index]
+		name := generator.temporaryName()
+		binders = append(binders, name+" := "+
+			generator.value(capture, parameter.Type, parameter.NullState != ir.NonNull))
+		bound = append(bound, name)
+	}
+	declared := function.Parameters[function.Captures:]
+	parameters := make([]string, 0, len(declared))
+	arguments := append([]string(nil), bound...)
+	for index, parameter := range declared {
+		name := "argument" + itoa(index)
+		parameters = append(parameters, name+" "+generator.goType(parameter.Type, true))
+		arguments = append(arguments, generator.coerce(name,
+			ir.ExprBase{Type: parameter.Type, NullState: ir.MaybeNull}, parameter.Type, parameter.NullState != ir.NonNull))
+	}
+	result := ""
+	body := generator.callableName(function) + "(" + strings.Join(arguments, ", ") + ")"
+	if function.Signature.Return.Kind != ir.NothingType {
+		result = " " + generator.goType(function.Signature.Return, true)
+		body = "return " + generator.coerce(body,
+			ir.ExprBase{Type: function.Signature.Return, NullState: function.ReturnNull}, function.Signature.Return, true)
+	}
+	closure := "func(" + strings.Join(parameters, ", ") + ")" + result + " { " + body + " }"
+	return "func() func(" + strings.Join(generator.closureParameterTypes(declared), ", ") + ")" + result + " { " +
+		strings.Join(binders, "; ") + "; return " + closure + " }()"
+}
+
+func (generator *generator) closureParameterTypes(parameters []ir.Parameter) []string {
+	types := make([]string, 0, len(parameters))
+	for _, parameter := range parameters {
+		types = append(types, generator.goType(parameter.Type, true))
+	}
+	return types
 }

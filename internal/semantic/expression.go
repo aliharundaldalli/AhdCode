@@ -196,6 +196,7 @@ func (a *analyzer) analyzeLambda(lambda *ast.LambdaExpr, current *scope, flow fl
 	context := &callableContext{kind: lambdaCallable, symbol: symbol, callable: callable, returnType: types.Invalid}
 	lambdaScope.callable = context
 	lambdaFlow := flow.clone()
+	a.analyzeLambdaCaptures(lambda, current, lambdaScope, flow, lambdaFlow, callable)
 	for index := range lambda.Parameters {
 		parameter := &lambda.Parameters[index]
 		if len(parameter.Modifiers) != 0 {
@@ -277,8 +278,14 @@ func (a *analyzer) analyzeIdentifier(identifier *ast.IdentifierExpr, current *sc
 		a.error(codeUnknownName, fmt.Sprintf("unknown name %q", identifier.Name), identifier.Span(), "declare the binding in a visible lexical scope")
 		return expressionInfo{typeValue: types.Invalid, nullState: MaybeNull}
 	}
+	// A lambda reads an enclosing binding only when it lists that name. The
+	// listed names already resolve inside the lambda's own scope, so reaching
+	// this with a lexical binding from an outer callable means the capture list
+	// is missing it.
 	if current.callable != nil && current.callable.kind == lambdaCallable && owner != a.module && owner.callable != current.callable && symbol.Alias == nil && isLexicalCapture(symbol.Kind) {
-		a.error(codePendingFeature, fmt.Sprintf("lambda cannot capture enclosing Local binding %q in v0.1.11", identifier.Name), identifier.Span(), "pass the value as an explicit lambda parameter; lexical closures are not part of v0.1.11")
+		a.error(codeMissingCapture, fmt.Sprintf("local %q is not captured by this lambda", identifier.Name), identifier.Span(),
+			fmt.Sprintf("add %q to the lambda capture list, as in lambda [%s] (...) -> ..., or pass the %s as a parameter",
+				identifier.Name, identifier.Name, captureTypeText(symbol)))
 	}
 	// Global governs module state. A module-root Function, Class, or namespace
 	// declaration is a callable or type declaration rather than a binding, so

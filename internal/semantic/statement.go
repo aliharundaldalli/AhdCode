@@ -382,6 +382,8 @@ func (a *analyzer) analyzeAssignment(statement *ast.AssignmentStmt, current *sco
 				a.error(codeInvalidTarget, "assignment target does not resolve to a mutable binding or member", statement.Target.Span(), "assign an identifier, member, or index")
 			}
 		}
+	} else if target.symbol.Captured {
+		a.error(codeInvalidCapture, fmt.Sprintf("captured %q cannot be reassigned inside a lambda", target.symbol.Name), statement.Target.Span(), "a capture reads the enclosing value; assign in the enclosing scope instead")
 	} else if target.symbol.Constant {
 		a.error(codeConstantAssignment, fmt.Sprintf("Constant %q cannot be reassigned", target.symbol.Name), statement.Target.Span(), "remove the assignment or declare a mutable binding")
 	}
@@ -449,7 +451,9 @@ func (a *analyzer) analyzeIncDec(statement *ast.IncDecStmt, current *scope, flow
 	if target.invalid() {
 		return flow
 	}
-	if target.symbol != nil && target.symbol.Constant {
+	if target.symbol != nil && target.symbol.Captured {
+		a.error(codeInvalidCapture, fmt.Sprintf("captured %q cannot be updated inside a lambda", target.symbol.Name), statement.Target.Span(), "a capture reads the enclosing value; update it in the enclosing scope instead")
+	} else if target.symbol != nil && target.symbol.Constant {
 		a.error(codeConstantAssignment, fmt.Sprintf("Constant %q cannot be updated", target.symbol.Name), statement.Target.Span(), "declare a mutable Int binding")
 	}
 	if target.nullState != NonNull {

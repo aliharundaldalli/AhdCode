@@ -74,9 +74,22 @@ func (lowerer *moduleLowerer) lowerExprWithExpected(expression ast.Expr, expecte
 			lowerer.compilation.error(CodeMissingSemantic, "lambda has no resolved callable", value.Span())
 			return nil
 		}
+		// A capturing lambda's value binds its captures where the lambda is
+		// written, reading each enclosing binding exactly once.
+		var captures []ir.Expr
+		for _, capture := range symbol.Callable.Captures {
+			captures = append(captures, &ir.LoadExpr{
+				ExprBase: ir.ExprBase{
+					Span: value.Span(), Type: lowerType(capture.Outer.Type),
+					NullState: lowerNull(capture.Inner.InitialNull),
+				},
+				Symbol: lowerer.compilation.registry.symbolID(lowerer.module, capture.Outer),
+			})
+		}
 		return &ir.FunctionValueExpr{
 			ExprBase: base, Symbol: lowerer.compilation.registry.symbolID(lowerer.module, symbol),
 			Callable: lowerer.compilation.registry.callableID(lowerer.module, symbol, symbol.Callable, false),
+			Captures: captures,
 		}
 	case *ast.UnaryExpr:
 		if resolved := lowerer.semantic.ResolvedSymbols[value]; resolved != nil {

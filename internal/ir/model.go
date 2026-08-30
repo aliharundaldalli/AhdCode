@@ -70,7 +70,13 @@ type Function struct {
 	ParentConstructor CallableID
 	ParentArguments   []int
 	Parameters        []Parameter
-	Body              Block
+	// Captures is how many leading Parameters are closure captures rather than
+	// declared parameters. A lambda's explicit capture list is passed as
+	// ordinary typed parameters, so no second environment mechanism exists;
+	// Signature still describes only the declared parameters, which is what a
+	// caller supplies. It is zero for every non-capturing callable.
+	Captures int
+	Body     Block
 }
 
 type Field struct {

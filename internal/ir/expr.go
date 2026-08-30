@@ -54,6 +54,12 @@ type FunctionValueExpr struct {
 	ExprBase
 	Symbol   SymbolID
 	Callable CallableID
+	// Captures are the values bound into a capturing lambda's closure, in the
+	// callable's leading-parameter order. They are evaluated once where the
+	// lambda value is created, so the closure holds the captured values rather
+	// than a live view of the enclosing bindings. Empty for every ordinary
+	// Function value.
+	Captures []Expr
 }
 
 func (*FunctionValueExpr) IRExpr() {}

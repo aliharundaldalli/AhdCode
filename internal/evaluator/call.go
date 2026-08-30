@@ -77,6 +77,16 @@ func (session *Session) invoke(value *FunctionValue, arguments []argumentValue) 
 	if function == nil {
 		session.raise("Error", "missing callable "+string(identity))
 	}
+	if len(value.Captured) != 0 {
+		// A capturing lambda's captures are the callable's leading parameters,
+		// so they are bound ahead of the declared arguments. This mirrors the
+		// native backend, where the closure passes them in the same positions.
+		bound := make([]argumentValue, 0, len(value.Captured)+len(arguments))
+		for _, captured := range value.Captured {
+			bound = append(bound, argumentValue{value: captured})
+		}
+		arguments = append(bound, arguments...)
+	}
 	return session.invokeFunction(function, value.Receiver, arguments)
 }
 

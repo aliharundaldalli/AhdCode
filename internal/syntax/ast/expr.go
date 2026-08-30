@@ -41,8 +41,19 @@ func (*GroupExpr) expressionNode() {}
 
 // LambdaExpr is the expression-only shorthand for an anonymous value of the
 // existing Function type. Its return type is inferred from Body.
+// CaptureRef is one name in a lambda's explicit capture list. Capture is
+// always written out: a lambda never takes an enclosing local implicitly.
+type CaptureRef struct {
+	Base
+	Name string
+}
+
 type LambdaExpr struct {
 	Base
+	// Captures is the explicit capture list. It is empty both for a lambda
+	// written without brackets and for one written `lambda [] (...)`, because
+	// the two mean the same thing: no enclosing local is captured.
+	Captures   []CaptureRef
 	Parameters []Parameter
 	Body       Expr
 }

@@ -50,6 +50,20 @@ type Callable struct {
 	Declaration   *ast.FunctionDecl
 	Lambda        *ast.LambdaExpr
 	Structure     *ast.StructureDecl
+	// Captures are the enclosing bindings a lambda explicitly listed, in
+	// source order. They are not part of Signature: a capture is closure
+	// storage the caller never supplies, so the callable's public arity and
+	// type are exactly what was written between the parentheses.
+	Captures []*Capture
+}
+
+// Capture is one resolved entry of a lambda's explicit capture list. Outer is
+// the enclosing binding being read; Inner is the read-only binding the lambda
+// body sees under the same name.
+type Capture struct {
+	Name  string
+	Outer *Symbol
+	Inner *Symbol
 }
 
 // OverloadSet is distinct from a single Function type. Candidates remain
@@ -98,15 +112,20 @@ type Symbol struct {
 	// It answers "may null legally be written here", independent of whatever
 	// the current flow analysis currently believes about the value.
 	DeclaredNullable bool
-	Alias            *Symbol
-	Callable         *Callable
-	OverloadSet      *OverloadSet
-	Namespace        *ModuleInterface
-	Class            *types.ClassSymbol
-	OwnerClass       *types.ClassSymbol
-	OriginModuleID   string
-	Members          map[string]*Symbol
-	Constructor      *Callable
+	// Captured marks a binding a lambda reads through its explicit capture
+	// list. The lambda sees the enclosing binding's value; it does not gain
+	// ownership of the outer variable, so the name cannot be reassigned from
+	// inside the lambda.
+	Captured       bool
+	Alias          *Symbol
+	Callable       *Callable
+	OverloadSet    *OverloadSet
+	Namespace      *ModuleInterface
+	Class          *types.ClassSymbol
+	OwnerClass     *types.ClassSymbol
+	OriginModuleID string
+	Members        map[string]*Symbol
+	Constructor    *Callable
 	// ConstructorAttributes records, per constructor parameter, the instance
 	// attribute that parameter initializes. A Local structure parameter has a
 	// nil entry. Inherited entries come from the parent construction contract.
@@ -256,6 +275,8 @@ const (
 	DataValueCounts TypeOperation = "Table.valueCounts"
 	// DataGroupBy partitions rows into Tables keyed by one column's cells.
 	DataGroupBy TypeOperation = "Table.groupBy"
+	// DataPivotCount is a strict count cross-tabulation of two columns.
+	DataPivotCount TypeOperation = "Table.pivotCount"
 	// DataToCSV and DataWriteCSV serialize through the CSV module's writer.
 	DataToCSV    TypeOperation = "Table.toCSV"
 	DataWriteCSV TypeOperation = "Table.writeCSV"

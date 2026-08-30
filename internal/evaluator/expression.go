@@ -40,7 +40,14 @@ func (session *Session) eval(expression ir.Expr, current *frame) any {
 		if cell := session.optionalCell(current, value.Symbol); cell != nil && cell.Value != nil {
 			return cell.Value
 		}
-		return &FunctionValue{Callable: value.Callable}
+		// A capturing lambda reads each captured binding once, here, so the
+		// closure holds the captured values rather than a live view of the
+		// enclosing frame and stays valid after that frame is gone.
+		var captured []any
+		for _, capture := range value.Captures {
+			captured = append(captured, session.eval(capture, current))
+		}
+		return &FunctionValue{Callable: value.Callable, Captured: captured}
 	case *ir.UnaryExpr:
 		operand := session.eval(value.Operand, current)
 		switch value.Op {

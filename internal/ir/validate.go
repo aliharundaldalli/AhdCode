@@ -21,7 +21,8 @@ const (
 func Validate(compilation *Compilation) []diagnostics.Diagnostic {
 	validator := &validator{
 		symbols: make(map[SymbolID]Type), callables: make(map[CallableID]Signature),
-		classes: make(map[ClassID]bool), parents: make(map[ClassID]ClassID), fields: make(map[FieldID]bool),
+		captures: make(map[CallableID]int),
+		classes:  make(map[ClassID]bool), parents: make(map[ClassID]ClassID), fields: make(map[FieldID]bool),
 	}
 	if compilation == nil {
 		validator.error(CodeMalformedNode, "nil CompilationIR", source.Span{})
@@ -42,6 +43,7 @@ func Validate(compilation *Compilation) []diagnostics.Diagnostic {
 				continue
 			}
 			validator.callables[function.ID] = function.Signature
+			validator.captures[function.ID] = function.Captures
 			validator.symbols[function.Symbol] = Type{Kind: FunctionType, Signature: &function.Signature}
 			for _, parameter := range function.Parameters {
 				validator.symbols[parameter.ID] = parameter.Type
@@ -72,9 +74,12 @@ type validator struct {
 	diagnostics []diagnostics.Diagnostic
 	symbols     map[SymbolID]Type
 	callables   map[CallableID]Signature
-	classes     map[ClassID]bool
-	parents     map[ClassID]ClassID
-	fields      map[FieldID]bool
+	// captures records how many leading parameters of each callable are
+	// closure captures, so a Function value can be checked against it.
+	captures map[CallableID]int
+	classes  map[ClassID]bool
+	parents  map[ClassID]ClassID
+	fields   map[FieldID]bool
 }
 
 func (v *validator) validateModule(module *Module) {
@@ -292,6 +297,16 @@ func (v *validator) validateExpr(expression Expr) {
 	case *FunctionValueExpr:
 		v.requireSymbol(value.Symbol, meta.Span)
 		v.requireCallable(value.Callable, meta.Span)
+		// A capturing lambda's value must bind exactly the leading capture
+		// parameters its lifted callable declares, or the closure would call
+		// that callable with the wrong arity.
+		if declared, known := v.captures[value.Callable]; known && len(value.Captures) != declared {
+			v.error(CodeMalformedNode, fmt.Sprintf("Function value binds %d capture(s) for a callable declaring %d",
+				len(value.Captures), declared), meta.Span)
+		}
+		for _, capture := range value.Captures {
+			v.validateExpr(capture)
+		}
 	case *UnaryExpr:
 		if value.Op == "" {
 			v.error(CodeMalformedNode, "unary expression has no typed operation", meta.Span)
