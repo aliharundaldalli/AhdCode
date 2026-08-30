@@ -117,6 +117,10 @@ func (generator *generator) expr(expression ir.Expr) string {
 		return generator.construct(value)
 	case *ir.ClassRefExpr:
 		return generator.unsupported("a Class reference used as a value", meta.Span)
+	case *ir.IdentityExpr:
+		return generator.identity(value)
+	case *ir.TypeNameExpr:
+		return generator.typeName(value)
 	default:
 		return generator.unsupported(fmt.Sprintf("IR expression %T", expression), meta.Span)
 	}
@@ -492,8 +496,47 @@ func (generator *generator) text(expression ir.Expr) string {
 		}
 		return "AhdStrFunction(" + strconv.Quote(declared.Name) + ")"
 	}
+	if meta.Type.Kind == ir.ClassType {
+		if method := generator.findProtocolMethod(meta.Type.Class, "CStr"); method != nil {
+			receiver := generator.expr(expression)
+			slot := generator.slotName(method.ID)
+			if naturalNullable(expression) {
+				return "func() string { if v := " + receiver + "; v != nil { return v." + slot + "() }; return \"null\" }()"
+			}
+			return receiver + "." + slot + "()"
+		}
+	}
 	nullable := naturalNullable(expression)
 	return generator.renderFunc(meta.Type, nullable, false, meta.Span) + "(" + generator.expr(expression) + ")"
+}
+
+// identity renders the id() Fundamental. Semantic analysis has already
+// required a NonNull List, Pair, or Class instance, so no runtime null check
+// is needed here.
+func (generator *generator) identity(value *ir.IdentityExpr) string {
+	return "AhdId(" + generator.expr(value.Value) + ")"
+}
+
+// typeName renders the type() Fundamental. A Class value defers to the
+// runtime AhdClassOf().Name so a more-derived override is reported instead of
+// the statically declared Class. Every other case uses the compile-time
+// canonical name computed during lowering. Either branch adds a runtime null
+// check only when the argument expression's own (possibly already-narrowed)
+// null state says it may actually be null.
+func (generator *generator) typeName(value *ir.TypeNameExpr) string {
+	nullable := naturalNullable(value.Value)
+	if value.IsClass {
+		receiver := generator.expr(value.Value)
+		if !nullable {
+			return receiver + ".AhdClassOf().Name"
+		}
+		return "func() string { if v := " + receiver + "; v != nil { return v.AhdClassOf().Name }; return \"Null\" }()"
+	}
+	name := strconv.Quote(value.StaticName)
+	if !nullable {
+		return name
+	}
+	return "func() string { if v := " + generator.expr(value.Value) + "; v != nil { return " + name + " }; return \"Null\" }()"
 }
 
 func (generator *generator) toString(value *ir.ToStringExpr) string {

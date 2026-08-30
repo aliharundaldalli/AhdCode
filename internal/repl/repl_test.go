@@ -154,6 +154,66 @@ write(Math.random())
 	}
 }
 
+// TestPersistentIdentitySurvivesAcrossCommandsAndMutation matches the
+// v0.1.8 spec example verbatim: id() must return the same number for the
+// same List across separate REPL submissions, before and after mutation, and
+// for a later alias of the same object.
+func TestPersistentIdentitySurvivesAcrossCommandsAndMutation(t *testing.T) {
+	input := `x := [1, 2]
+firstId := id(x)
+write(firstId)
+x.add(3)
+write(id(x) == firstId)
+y := x
+write(id(y) == firstId)
+`
+	var output, errors bytes.Buffer
+	Run(strings.NewReader(input), &output, &errors, "AhdCode v0.1.8")
+	text := output.String()
+	if strings.Count(text, "true\n") != 2 {
+		t.Fatalf("id() did not remain stable across commands/mutation/alias:\n%s", text)
+	}
+	if errors.Len() != 0 {
+		t.Fatalf("REPL errors: %s", errors.String())
+	}
+}
+
+// TestClassProtocolAndIntrospectionInREPL exercises Class Protocol Methods,
+// type(), and id() together in the persistent REPL and confirms the results
+// match the native backend's behavior for the same program.
+func TestClassProtocolAndIntrospectionInREPL(t *testing.T) {
+	input := `Vector2: Class<> := {
+    structure: Attributes := (x: Real, y: Real)
+    CAdd: Function := (other: Vector2) -> Vector2 {
+        return Vector2(x: attribute.x + other.x, y: attribute.y + other.y)
+    }
+    CEqual: Function := (other: Vector2) -> Bool {
+        return attribute.x == other.x and attribute.y == other.y
+    }
+    CStr: Function := () -> String {
+        return "Vector2({attribute.x}, {attribute.y})"
+    }
+}
+a := Vector2(x: 1.0, y: 2.0)
+b := Vector2(x: 3.0, y: 4.0)
+write(a + b)
+write(str(a))
+write(type(a))
+write(a == Vector2(x: 1.0, y: 2.0))
+`
+	var output, errors bytes.Buffer
+	Run(strings.NewReader(input), &output, &errors, "AhdCode v0.1.8")
+	text := output.String()
+	for _, want := range []string{"Vector2(4.0, 6.0)", "Vector2(1.0, 2.0)", "Vector2\n", "true\n"} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("REPL output missing %q:\n%s", want, text)
+		}
+	}
+	if errors.Len() != 0 {
+		t.Fatalf("REPL errors: %s", errors.String())
+	}
+}
+
 func TestREPLUsesLaunchDirectoryForModulesAndFiles(t *testing.T) {
 	directory := t.TempDir()
 	engine := `write("engine init")

@@ -195,7 +195,7 @@ func TestConstantValidation(t *testing.T) {
 	_, reassigned := analyzeText(t, "PI: Constant Real := 3.14\nPI = 5")
 	requireSemanticCode(t, reassigned, codeConstantAssignment)
 
-	_, nullConstant := analyzeText(t, "id: Constant Int := null")
+	_, nullConstant := analyzeText(t, "code: Constant Int := null")
 	requireSemanticCode(t, nullConstant, codeConstantInitializer)
 
 	// A Constant reference binding deep-freezes its object graph; only a

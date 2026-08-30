@@ -219,6 +219,13 @@ func (a *analyzer) analyzeUnary(expression *ast.UnaryExpr, current *scope, flow 
 	switch expression.Operator {
 	case "+", "-":
 		if !types.IsNumeric(operand.typeValue) {
+			if expression.Operator == "-" {
+				if classSymbol := a.classInstanceSymbol(operand.typeValue); classSymbol != nil {
+					if info, handled := a.analyzeClassNegate(expression, classSymbol); handled {
+						return info
+					}
+				}
+			}
 			a.operatorError(expression.Operator, operand.typeValue, nil, expression.Span())
 			return expressionInfo{typeValue: types.Invalid, nullState: NonNull}
 		}
@@ -295,6 +302,10 @@ func (a *analyzer) analyzeBinary(expression *ast.BinaryExpr, current *scope, flo
 	}
 	if left.nullState != NonNull {
 		a.nullableError(operator, expression.Left, left.nullState)
+	} else if classSymbol := a.classInstanceSymbol(left.typeValue); classSymbol != nil {
+		if info, handled := a.analyzeClassOperator(expression, classSymbol, operator, right); handled {
+			return info
+		}
 	}
 	if right.nullState != NonNull {
 		a.nullableError(operator, expression.Right, right.nullState)
@@ -325,6 +336,15 @@ func (a *analyzer) analyzeEqualityLike(expression *ast.BinaryExpr, left, right e
 	if operator == "same" {
 		constant, _ := a.evaluateConstant(expression)
 		return expressionInfo{typeValue: types.Bool, nullState: NonNull, constant: constant}
+	}
+	if operator == "==" || operator == "!=" {
+		if left.nullState == NonNull {
+			if classSymbol := a.classInstanceSymbol(left.typeValue); classSymbol != nil {
+				if info, handled := a.analyzeClassEquality(expression, classSymbol, right); handled {
+					return info
+				}
+			}
+		}
 	}
 	compatible := types.Equal(left.typeValue, right.typeValue) ||
 		(types.IsNumeric(left.typeValue) && types.IsNumeric(right.typeValue)) ||
@@ -1113,8 +1133,55 @@ func (a *analyzer) analyzeBuiltinCall(call *ast.CallExpr, symbol *Symbol, argume
 		return a.analyzeAbsCall(call, arguments)
 	case "sum", "min", "max":
 		return a.analyzeNumericListCall(call, symbol.Name, arguments)
+	case "type":
+		return a.analyzeTypeCall(call, arguments)
+	case "id":
+		return a.analyzeIdCall(call, arguments)
 	}
 	return expressionInfo{typeValue: types.Invalid, nullState: MaybeNull}
+}
+
+// analyzeTypeCall checks the runtime/introspection built-in type(value). It
+// accepts any value, including one that is currently null or only possibly
+// null: reporting the exact runtime type, including "Null" itself, is the
+// entire point, so no narrowing is required.
+func (a *analyzer) analyzeTypeCall(call *ast.CallExpr, arguments []expressionInfo) expressionInfo {
+	if !a.checkBuiltinArity(call, "type", arguments, 1, "call type with exactly one value") {
+		return expressionInfo{typeValue: types.String, nullState: NonNull}
+	}
+	if arguments[0].invalid() && arguments[0].nullState != Null {
+		return expressionInfo{typeValue: types.Invalid, nullState: MaybeNull}
+	}
+	return expressionInfo{typeValue: types.String, nullState: NonNull}
+}
+
+// analyzeIdCall checks the runtime identity built-in id(reference). Only
+// Class instances, List, and Pair carry a meaningful AhdCode reference
+// identity in v0.1.8; every other type, and every not-yet-narrowed nullable
+// reference, is a compile-time error.
+func (a *analyzer) analyzeIdCall(call *ast.CallExpr, arguments []expressionInfo) expressionInfo {
+	result := expressionInfo{typeValue: types.Int, nullState: NonNull}
+	if !a.checkBuiltinArity(call, "id", arguments, 1, "call id with exactly one Class instance, List, or Pair value") {
+		return result
+	}
+	argument := arguments[0]
+	if argument.invalid() {
+		return expressionInfo{typeValue: types.Invalid, nullState: MaybeNull}
+	}
+	if argument.nullState != NonNull {
+		a.nullableError("id", call.Arguments[0].Value, argument.nullState)
+		return result
+	}
+	switch value := argument.typeValue.(type) {
+	case types.List, types.Pair:
+	case types.Class:
+		if value.Reference {
+			a.error(codeCallArguments, "id does not accept a Class reference", call.Arguments[0].Span(), "pass a constructed Class instance")
+		}
+	default:
+		a.error(codeCallArguments, fmt.Sprintf("id does not accept %s", types.Display(argument.typeValue)), call.Arguments[0].Span(), "pass a Class instance, List, or Pair value")
+	}
+	return result
 }
 
 // analyzeNumericConversion implements only the two explicit numeric

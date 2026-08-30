@@ -35,6 +35,8 @@ for name in names {
   checks narrow proven non-null values.
 - Lists, Pairs, Classes, Functions, modules, errors, and native executables are
   part of the v0.1 core.
+- A small, closed set of [Class Protocol Methods](docs/PROTOCOLS.md) lets a
+  Class define `==`, ordering, arithmetic, unary `-`, and `str()` behavior.
 - The formatter defines one canonical presentation while preserving comments.
 
 ## Build from source
@@ -77,6 +79,7 @@ See the [CLI guide](docs/CLI.md), [formatter guide](docs/FORMATTER.md), and
 - [Control flow](docs/CONTROL_FLOW.md)
 - [Functions](docs/FUNCTIONS.md)
 - [Classes](docs/CLASSES.md)
+- [Class Protocol Methods](docs/PROTOCOLS.md)
 - [Collections](docs/COLLECTIONS.md)
 - [Modules](docs/MODULES.md)
 - [Errors](docs/ERRORS.md)
@@ -99,10 +102,12 @@ VS Code and Antigravity. See its [installation guide](editors/vscode/README.md).
 
 ## Current limitations
 
-v0.1 intentionally has no lambdas, tuple returns, user-defined operator
-overloading, interfaces, multiple inheritance, debugger, LSP, package search
-paths, or web runtime. Modules are sibling `.ahd` files, and the editor
-extension is a lightweight run-and-highlight integration. See the
+v0.1 intentionally has no lambdas, tuple returns, reflection, interfaces,
+multiple inheritance, debugger, LSP, package search paths, or web runtime.
+Operator behavior is user-definable only through the ten fixed
+[Class Protocol Methods](docs/PROTOCOLS.md), not a general overloading
+mechanism. Modules are sibling `.ahd` files, and the editor extension is a
+lightweight run-and-highlight integration. See the
 [specification's unsupported-feature list](AHDCODE_LANGUAGE_SPEC_v0.1.md#38-unsupported-v01-features).
 
 ## Repository map

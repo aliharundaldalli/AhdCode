@@ -224,7 +224,12 @@ type Result struct {
 	NullStates             map[ast.Expr]NullState
 	SelectedCallables      map[*ast.CallExpr]*Callable
 	SelectedFunctionValues map[ast.Expr]*Callable
-	OverloadResolutions    map[*ast.CallExpr]ResolutionTrace
+	// SelectedAssignmentCallables records the resolved Class Protocol Method
+	// for one compound assignment (+=, -=, and so on) whose target is a Class
+	// instance, keyed by the AssignmentStmt itself since it is a statement
+	// rather than an expression.
+	SelectedAssignmentCallables map[*ast.AssignmentStmt]*Callable
+	OverloadResolutions         map[*ast.CallExpr]ResolutionTrace
 	// SuperCalls marks member expressions written as SuperClass.member, which
 	// bind the current instance but call the parent implementation directly.
 	SuperCalls map[ast.Expr]bool

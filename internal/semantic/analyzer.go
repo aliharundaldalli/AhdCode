@@ -88,6 +88,7 @@ func analyzeWithEnvironment(parsed parser.Result, environment Environment) Resul
 	a.result.NullStates = make(map[ast.Expr]NullState)
 	a.result.SelectedCallables = make(map[*ast.CallExpr]*Callable)
 	a.result.SelectedFunctionValues = make(map[ast.Expr]*Callable)
+	a.result.SelectedAssignmentCallables = make(map[*ast.AssignmentStmt]*Callable)
 	a.result.OverloadResolutions = make(map[*ast.CallExpr]ResolutionTrace)
 	a.result.SuperCalls = make(map[ast.Expr]bool)
 	a.result.TypeOperations = make(map[*ast.CallExpr]TypeOperation)
@@ -183,7 +184,7 @@ func (a *analyzer) installBuiltins() {
 		a.classes[name] = symbol
 		a.classByType[identity] = symbol
 	}
-	for _, name := range []string{"write", "take", "str", "int", "real", "len", "clear", "between", "abs", "sum", "min", "max"} {
+	for _, name := range []string{"write", "take", "str", "int", "real", "len", "clear", "between", "abs", "sum", "min", "max", "type", "id"} {
 		a.addBuiltin(&Symbol{Name: name, Kind: BuiltinSymbol, Type: types.Function{}, ModuleRoot: true, Builtin: true, InitialNull: NonNull})
 	}
 }
@@ -298,6 +299,8 @@ func (a *analyzer) predeclareClassMembers(program *ast.Program) {
 				a.buildConstructor(value, class)
 			case *ast.FunctionDecl:
 				a.registerFunction(value, nil, class)
+			case *ast.VariableDecl:
+				a.validateProtocolSlot(value.Name, value.Span())
 			}
 		}
 		if class.Constructor == nil {
@@ -308,6 +311,9 @@ func (a *analyzer) predeclareClassMembers(program *ast.Program) {
 
 func (a *analyzer) registerFunction(declaration *ast.FunctionDecl, targetScope *scope, owner *Symbol) {
 	callable := a.callableFromFunction(declaration)
+	if owner != nil {
+		a.validateProtocolSignature(declaration, callable)
+	}
 	var existing *Symbol
 	if owner != nil {
 		existing = owner.Members[declaration.Name]

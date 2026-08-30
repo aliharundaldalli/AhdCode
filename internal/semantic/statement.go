@@ -382,17 +382,33 @@ func (a *analyzer) analyzeAssignment(statement *ast.AssignmentStmt, current *sco
 	resultType := value.typeValue
 	resultNull := value.nullState
 	if statement.Operator != "=" {
+		operator := statement.Operator[:len(statement.Operator)-1]
+		protocolHandled := false
 		if target.nullState != NonNull {
 			a.nullableError(statement.Operator, statement.Target, target.nullState)
+		} else if name, isArithmetic := arithmeticProtocolNames[operator]; isArithmetic {
+			if classSymbol := a.classInstanceSymbol(target.typeValue); classSymbol != nil {
+				if resolved := a.resolveClassProtocol(classSymbol, name); resolved != nil {
+					protocolHandled = true
+					if callable := a.resolveProtocolOneArg(name, resolved, value, statement.Span()); callable != nil {
+						a.result.ResolvedSymbols[statement] = resolved
+						a.result.SelectedAssignmentCallables[statement] = callable
+						resultType, resultNull = callable.Signature.Return, callable.ReturnNull
+					} else {
+						resultType, resultNull = types.Invalid, MaybeNull
+					}
+				}
+			}
 		}
-		if value.nullState != NonNull {
-			a.nullableError(statement.Operator, statement.Value, value.nullState)
-		}
-		operator := statement.Operator[:len(statement.Operator)-1]
-		resultType = a.binaryOperatorType(operator, target.typeValue, value.typeValue)
-		resultNull = NonNull
-		if types.IsInvalid(resultType) {
-			a.operatorError(statement.Operator, target.typeValue, value.typeValue, statement.Span())
+		if !protocolHandled {
+			if value.nullState != NonNull {
+				a.nullableError(statement.Operator, statement.Value, value.nullState)
+			}
+			resultType = a.binaryOperatorType(operator, target.typeValue, value.typeValue)
+			resultNull = NonNull
+			if types.IsInvalid(resultType) {
+				a.operatorError(statement.Operator, target.typeValue, value.typeValue, statement.Span())
+			}
 		}
 	} else if !a.requireCompatibleNull(targetNullable(target), value, statement.Value.Span(), "assignment target") {
 		resultNull = NonNull

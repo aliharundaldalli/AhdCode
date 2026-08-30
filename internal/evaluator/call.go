@@ -26,6 +26,10 @@ func (session *Session) evalArguments(arguments []ir.Argument, current *frame) [
 }
 
 func (session *Session) evalCall(call *ir.CallExpr, current *frame) any {
+	if string(call.Callable) == "builtin:core::write" && len(call.Arguments) == 1 && call.Arguments[0].Value != nil {
+		session.writeText(session.textOf(call.Arguments[0].Value, current) + "\n")
+		return Nothing
+	}
 	arguments := session.evalArguments(call.Arguments, current)
 	identity := string(call.Callable)
 	if strings.HasPrefix(identity, "builtin:") {

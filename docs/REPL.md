@@ -9,7 +9,7 @@ ahdcode
 ```
 
 ```text
-AhdCode v0.1.7
+AhdCode v0.1.8
 ahd> x := 5
 ahd> x = x + 1
 ahd> x

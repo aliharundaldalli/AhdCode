@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"math"
 	"sort"
 	"strings"
 
@@ -20,13 +21,15 @@ type Session struct {
 	Output io.Writer
 	CWD    string
 
-	globals     map[ir.SymbolID]*Cell
-	functions   map[ir.CallableID]*ir.Function
-	classes     map[ir.ClassID]*ir.Class
-	modules     map[ir.ModuleID]*ir.Module
-	initialized map[ir.ModuleID]bool
-	dispatch    map[ir.ClassID]map[ir.CallableID]ir.CallableID
-	rngState    uint64
+	globals      map[ir.SymbolID]*Cell
+	functions    map[ir.CallableID]*ir.Function
+	classes      map[ir.ClassID]*ir.Class
+	modules      map[ir.ModuleID]*ir.Module
+	initialized  map[ir.ModuleID]bool
+	dispatch     map[ir.ClassID]map[ir.CallableID]ir.CallableID
+	rngState     uint64
+	identities   map[any]int64
+	nextIdentity int64
 }
 
 type ExecutionResult struct {
@@ -53,8 +56,46 @@ func New(input *bufio.Reader, output io.Writer, cwd string) *Session {
 		globals: make(map[ir.SymbolID]*Cell), functions: make(map[ir.CallableID]*ir.Function),
 		classes: make(map[ir.ClassID]*ir.Class), modules: make(map[ir.ModuleID]*ir.Module),
 		initialized: make(map[ir.ModuleID]bool), dispatch: make(map[ir.ClassID]map[ir.CallableID]ir.CallableID),
-		rngState: binary.LittleEndian.Uint64(seed[:]),
+		rngState: binary.LittleEndian.Uint64(seed[:]), identities: make(map[any]int64),
 	}
+}
+
+// identityOf lazily assigns and then returns a runtime identity number for a
+// reference value (a *List, *Pair, or *Instance pointer). The Go map key is
+// the pointer itself, which stays stable for the object's lifetime even
+// though its contents mutate, so the number never changes once assigned.
+func (session *Session) identityOf(value any) int64 {
+	if id, exists := session.identities[value]; exists {
+		return id
+	}
+	if session.nextIdentity == math.MaxInt64 {
+		session.raise("OverflowError", "runtime identity allocator overflowed signed 64-bit range")
+	}
+	session.nextIdentity++
+	session.identities[value] = session.nextIdentity
+	return session.nextIdentity
+}
+
+// findProtocolMethod walks a Class and its ancestors, own declarations only,
+// for a method with the given name, returning a CallableID usable with
+// invoke. Any callable found this way -- root declaration or a later
+// override -- resolves through the dispatch table to the same most-derived
+// implementation, because buildDispatch links every override's own identity
+// to it as well as the root's.
+func (session *Session) findProtocolMethod(class ir.ClassID, name string) (ir.CallableID, bool) {
+	for current := class; current != ""; {
+		definition := session.classes[current]
+		if definition == nil {
+			return "", false
+		}
+		for _, id := range definition.Methods {
+			if function := session.functions[id]; function != nil && function.Name == name {
+				return id, true
+			}
+		}
+		current = definition.Parent
+	}
+	return "", false
 }
 
 // Execute installs one validated compilation and executes only module work

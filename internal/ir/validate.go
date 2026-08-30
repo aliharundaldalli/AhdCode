@@ -155,8 +155,11 @@ func (v *validator) validateBlock(block Block, returnType *Type) {
 			v.validateExpr(value.Value)
 		case *CompoundAssignStmt:
 			v.validateTarget(value.Target, value.Span)
-			if value.Op == "" {
+			if value.Op == "" && value.Protocol == "" {
 				v.error(CodeMalformedNode, "compound assignment has no typed operation", value.Span)
+			}
+			if value.Protocol != "" {
+				v.requireCallable(value.Protocol, value.Span)
 			}
 			v.validateExpr(value.Value)
 		case *UpdateStmt:
@@ -347,6 +350,10 @@ func (v *validator) validateExpr(expression Expr) {
 			v.validateExpr(part.ToString)
 		}
 	case *ToStringExpr:
+		v.validateExpr(value.Value)
+	case *IdentityExpr:
+		v.validateExpr(value.Value)
+	case *TypeNameExpr:
 		v.validateExpr(value.Value)
 	default:
 		v.error(CodeMalformedNode, fmt.Sprintf("unknown expression %T", expression), meta.Span)

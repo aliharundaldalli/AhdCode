@@ -167,9 +167,9 @@ Output:
 
 You cannot directly write `score = 10` for a variable that has not yet been created. Writing `score: Int := ...` a second time in the same place also means trying to create a new variable, which is an error.
 
-### You must specify the type explicitly
+### Writing the type explicitly: a recommended habit, not a requirement
 
-In AhdCode, when creating a new variable, you must explicitly write its type. This rule makes your program run more safely and helps you find errors while checking the code:
+When you're starting out, it's recommended to write the type explicitly. This lets you see at a glance what kind of value a variable holds, and helps you catch mistakes early:
 
 ```ahd
 age: Int := 19
@@ -177,7 +177,16 @@ name: String := "Ayşe"
 active: Bool := true
 ```
 
-Once you declare a type in AhdCode, you cannot change the variable to a value of a different type:
+This is not a requirement, though. When the initializer's type is already unambiguous, you can leave the type out entirely and just use `:=`; the compiler infers it for you:
+
+```ahd
+age := 19       // inferred as Int
+name := "Ayşe"  // inferred as String
+```
+
+Both forms are completely equivalent. This guide will usually write the type explicitly for readability, but which one you use is up to you.
+
+Whether the type is written explicitly or inferred, once AhdCode has settled on a type for a variable, you cannot change it to a value of a different type:
 
 ```ahd
 name: String := "Ayşe"
@@ -185,6 +194,8 @@ name: String := "Ayşe"
 ```
 
 We will also learn about the `Local` rule for inner blocks in section 11; for now, focus on the examples at the top level of the file.
+
+> **Technical note:** Letting the compiler work out the type from the initializer is called *type inference*. This does not mean the variable can later hold a different kind of value at runtime -- AhdCode keeps static types. `name = 5` is still an error, because `name` was inferred as `String` once and for all.
 
 ## 4. Core types
 
@@ -1261,6 +1272,73 @@ write(person has name)
 
 > **Technical note:** Holding a subclass object in a superclass type is called *upcasting*, and selecting the method to call based on the true object type is called *dynamic dispatch*. You do not have to memorize these terms on your first read.
 
+### Class Protocol Methods: making `+`, `==`, `<`, and friends work for your own Class
+
+You can make your own Class work with operators like `+`, `==`, and `<`. AhdCode does this with exactly ten reserved names, called **Class Protocol Methods**:
+
+```text
+CEqual CCompare CAdd CSubtract CMultiply CDivide CRemainder CPower CNegate CStr
+```
+
+These names carry special meaning only when they occupy a method slot inside a Class. Everywhere else they are ordinary identifiers -- the letter `C` itself is not reserved, so `Calculate`, `Create`, and `CWhatever` all remain perfectly normal names.
+
+```ahd
+Vector2: Class<> := {
+    structure: Attributes := (
+        x: Real
+        y: Real
+    )
+
+    CEqual: Function := (
+        other: Vector2
+    ) -> Bool {
+        return attribute.x == other.x and attribute.y == other.y
+    }
+
+    CAdd: Function := (
+        other: Vector2
+    ) -> Vector2 {
+        return Vector2(x: attribute.x + other.x, y: attribute.y + other.y)
+    }
+
+    CNegate: Function := (
+    ) -> Vector2 {
+        return Vector2(x: -attribute.x, y: -attribute.y)
+    }
+
+    CStr: Function := (
+    ) -> String {
+        return "Vector2({attribute.x}, {attribute.y})"
+    }
+}
+
+a: Vector2 := Vector2(x: 1.0, y: 2.0)
+b: Vector2 := Vector2(x: 3.0, y: 4.0)
+
+write(a + b)
+write(-a)
+write(a == b)
+write(str(a))
+```
+
+Expected output:
+
+```text
+Vector2(4.0, 6.0)
+Vector2(-1.0, -2.0)
+false
+Vector2(1.0, 2.0)
+```
+
+Quick summary:
+- `==` and `!=` map to `CEqual` (`!=` is always the negation of `CEqual`'s result; there is no separate `CNotEqual`)
+- `<`, `<=`, `>`, and `>=` all derive from one `CCompare` call (there are no separate `CLess` and similar names)
+- `+ - * / % ^` map to `CAdd CSubtract CMultiply CDivide CRemainder CPower`
+- Unary `-` maps to `CNegate`
+- `str(object)` maps to `CStr`
+
+Dispatch always looks at the **left-hand** operand: if `vector + 3` works, that does not mean `3 + vector` also works -- there is no reverse-operator rule. Inheritance and `Override` behave exactly like ordinary methods. See [Class Protocol Methods](PROTOCOLS.md) for the full reference.
+
 ## 18. Error handling (`attempt`, `except`, `ultimately`, and `toss`)
 
 Some errors might not appear while writing the program, but while the program is running. For example, when waiting for a number from the user, they might type `abc`.
@@ -1478,7 +1556,7 @@ except FileError as error {
 To use some tools, you don't need to write any `bring`. These are directly available in an AhdCode program:
 
 ```text
-write take str int real len clear between abs sum min max
+write take str int real len clear between abs sum min max type id
 ```
 
 We have already used most of them. A brief summary:
@@ -1512,6 +1590,70 @@ write(abs(-8))
 `sum` gives `0` or `0.0` for an empty List. `min` and `max` produce a `DomainError` on an empty List.
 
 Because `clear` modifies the existing collection in place, other aliases pointing to the same collection will also see it emptied. `sum`, `min`, and `max` only read; they do not modify the List.
+
+### `type(value)`: finding out a value's type
+
+`type(value)` returns a value's AhdCode type as a `String`. It's especially handy while experimenting in the REPL:
+
+```ahd
+write(type(5))
+write(type(5.0))
+write(type("Ali"))
+write(type(true))
+write(type(null))
+write(type([1, 2, 3]))
+```
+
+Expected output:
+
+```text
+Int
+Real
+String
+Bool
+Null
+List<Int>
+```
+
+For a Class instance, `type` always reports the object's **actual runtime Class**, not the variable's declared type:
+
+```ahd
+Animal: Class<> := { structure: Attributes := (name: String) }
+Dog: Class<Animal> := { structure: Attributes := (SuperClass.attributes) }
+
+pet: Animal := Dog(name: "Rex")
+write(type(pet)) // prints "Dog", not "Animal"
+```
+
+`type` does not return a reflection object of any kind -- only a plain String.
+
+### `id(reference)`: runtime identity
+
+`id(reference)` returns an opaque identity number (`Int`) for a List, Pair, or Class instance. It cannot be used on primitive values such as `Int`, `Real`, `String`, or `Bool`.
+
+```ahd
+a: List<Int> := [1, 2]
+b: List<Int> := a
+c: List<Int> := [1, 2]
+
+write(id(a) == id(b))
+write(id(a) == id(c))
+
+a.add(3)
+write(id(a) == id(b))
+```
+
+Expected output:
+
+```text
+true
+false
+true
+```
+
+`a` and `b` refer to the same List, so their identities match; `c` is a DIFFERENT List even though its contents look the same, so its identity differs. Mutating `a` (with `add`) never changes its identity.
+
+This number is not a memory address, is not preserved between program runs, and is only meaningful during the current run/session. Use `same` for ordinary identity comparisons; `id` is mainly meant for debugging and logging.
 
 ## 21. Math module
 

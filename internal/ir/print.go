@@ -222,6 +222,10 @@ func printExpr(expression Expr) string {
 		return "stringparts[" + strings.Join(parts, ",") + "]"
 	case *ToStringExpr:
 		return "tostring(" + printExpr(value.Value) + ")"
+	case *IdentityExpr:
+		return "id(" + printExpr(value.Value) + ")"
+	case *TypeNameExpr:
+		return "type(" + printExpr(value.Value) + ")"
 	default:
 		return fmt.Sprintf("<%T>", expression)
 	}

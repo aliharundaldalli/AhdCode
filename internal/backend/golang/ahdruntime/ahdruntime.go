@@ -66,12 +66,14 @@ var (
 type AhdInstance interface {
 	AhdClassOf() *AhdClass
 	AhdFreezeGraph(visited map[AhdFreezable]bool)
+	AhdIdentity() int64
 }
 
 // AhdBase is embedded in the root of every generated Class struct.
 type AhdBase struct {
 	ahdClass  *AhdClass
 	ahdFrozen bool
+	ahdID     int64
 }
 
 // AhdClassOf returns the exact runtime Class of an instance.
@@ -131,6 +133,44 @@ func AhdHasMember(value AhdInstance, name string) bool {
 	}
 	return false
 }
+
+// ---------------------------------------------------------------------------
+// Runtime identity (id())
+// ---------------------------------------------------------------------------
+
+var (
+	ahdIdentityMu      sync.Mutex
+	ahdIdentityCounter int64
+)
+
+// ahdNextIdentity allocates the next opaque, process-local identity number.
+// It is a plain incrementing counter; AhdCode programs must not depend on
+// allocation order, only on equality/inequality between two identities.
+func ahdNextIdentity() int64 {
+	ahdIdentityMu.Lock()
+	defer ahdIdentityMu.Unlock()
+	if ahdIdentityCounter == math.MaxInt64 {
+		AhdRaiseClass(AhdClassOverflowError, "runtime identity allocator overflowed signed 64-bit range")
+	}
+	ahdIdentityCounter++
+	return ahdIdentityCounter
+}
+
+// AhdIdentity lazily assigns and then returns this instance's stable identity
+// number. It never changes once assigned, regardless of later mutation.
+func (base *AhdBase) AhdIdentity() int64 {
+	if base.ahdID == 0 {
+		base.ahdID = ahdNextIdentity()
+	}
+	return base.ahdID
+}
+
+// AhdIdentifiable is any AhdCode reference value with a meaningful runtime
+// identity: a Class instance, a List, or a Pair.
+type AhdIdentifiable interface{ AhdIdentity() int64 }
+
+// AhdId implements the id() Fundamental.
+func AhdId(value AhdIdentifiable) int64 { return value.AhdIdentity() }
 
 // AhdEqInstance is Class reference identity.
 func AhdEqInstance(left, right AhdInstance) bool { return left == right }
@@ -1214,6 +1254,17 @@ func (iteration *AhdRange) Next() (int64, bool) {
 type AhdList[T any] struct {
 	items  []T
 	frozen bool
+	id     int64
+}
+
+// AhdIdentity lazily assigns and then returns this List's stable identity
+// number. It belongs to the List object itself, not its backing array, so
+// growth and reallocation never change it.
+func (list *AhdList[T]) AhdIdentity() int64 {
+	if list.id == 0 {
+		list.id = ahdNextIdentity()
+	}
+	return list.id
 }
 
 // AhdFreezeGraph deep-freezes this List and every reachable element.
@@ -2126,6 +2177,16 @@ type AhdPair[K comparable, V any] struct {
 	keys   []K
 	values map[K]V
 	frozen bool
+	id     int64
+}
+
+// AhdIdentity lazily assigns and then returns this Pair's stable identity
+// number.
+func (pair *AhdPair[K, V]) AhdIdentity() int64 {
+	if pair.id == 0 {
+		pair.id = ahdNextIdentity()
+	}
+	return pair.id
 }
 
 // AhdFreezeGraph deep-freezes this Pair and every reachable key and value.

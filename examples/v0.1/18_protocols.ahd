@@ -1,0 +1,44 @@
+Vector2: Class<> := {
+    structure: Attributes := (x: Real, y: Real)
+
+    CEqual: Function := (other: Vector2) -> Bool {
+        return attribute.x == other.x and attribute.y == other.y
+    }
+
+    CAdd: Function := (other: Vector2) -> Vector2 {
+        return Vector2(x: attribute.x + other.x, y: attribute.y + other.y)
+    }
+
+    CNegate: Function := () -> Vector2 {
+        return Vector2(x: -attribute.x, y: -attribute.y)
+    }
+
+    CStr: Function := () -> String {
+        return "Vector2({attribute.x}, {attribute.y})"
+    }
+}
+
+Score: Class<> := {
+    structure: Attributes := (value: Int)
+
+    CCompare: Function := (other: Score) -> Int {
+        return attribute.value - other.value
+    }
+}
+
+a: Vector2 := Vector2(x: 1.0, y: 2.0)
+b: Vector2 := Vector2(x: 3.0, y: 4.0)
+
+write(a + b)
+write(-a)
+write(a == Vector2(x: 1.0, y: 2.0))
+write(str(a))
+write(type(a))
+write(id(a) == id(a))
+write(id(a) == id(b))
+
+low: Score := Score(value: 10)
+high: Score := Score(value: 90)
+
+write(low < high)
+write(low >= high)

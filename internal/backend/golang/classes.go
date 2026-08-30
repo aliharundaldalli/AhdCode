@@ -293,6 +293,22 @@ func (generator *generator) emitErrorMessage(writer *emitter, current *layout) {
 	}
 }
 
+// findProtocolMethod walks a Class and its ancestors, own declarations only,
+// for a method with the given name. It is used to resolve a Class Protocol
+// Method (such as CStr) from a statically known Class type: the returned
+// Function's dispatch slot already carries dynamic dispatch, so a more
+// derived override still runs when the runtime object is a subclass.
+func (generator *generator) findProtocolMethod(id ir.ClassID, name string) *ir.Function {
+	for current := generator.classes[id]; current != nil; current = generator.classes[current.Parent] {
+		for _, methodID := range current.Methods {
+			if function := generator.functions[methodID]; function != nil && function.Name == name {
+				return function
+			}
+		}
+	}
+	return nil
+}
+
 func (generator *generator) fieldType(current *layout, field ir.Field) string {
 	return generator.goType(field.Type, generator.nullFields[field.ID])
 }

@@ -40,4 +40,6 @@ const (
 	codeCollectionInference = "SEM037"
 	codeNullNotAllowed      = "SEM038"
 	codeCannotInferType     = "SEM039"
+	codeProtocolSlot        = "SEM040"
+	codeProtocolSignature   = "SEM041"
 )

@@ -182,3 +182,25 @@ type ToStringExpr struct {
 }
 
 func (*ToStringExpr) IRExpr() {}
+
+// IdentityExpr is the runtime-managed identity number of a List, Pair, or
+// Class instance, produced by the id() Fundamental.
+type IdentityExpr struct {
+	ExprBase
+	Value Expr
+}
+
+func (*IdentityExpr) IRExpr() {}
+
+// TypeNameExpr is the canonical AhdCode type name produced by the type()
+// Fundamental. StaticName is the compile-time canonical name for every
+// non-Class, non-null case; IsClass requests the most-derived runtime Class
+// name instead, and a null Value always renders "Null" regardless of either.
+type TypeNameExpr struct {
+	ExprBase
+	Value      Expr
+	StaticName string
+	IsClass    bool
+}
+
+func (*TypeNameExpr) IRExpr() {}

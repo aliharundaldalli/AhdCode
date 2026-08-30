@@ -167,9 +167,9 @@ write(score)
 
 Henüz oluşturulmamış bir değişkene doğrudan `score = 10` yazamazsınız. Aynı yerde ikinci kez `score := ...` yazmak da yeni bir değişken oluşturmaya çalışmak anlamına gelir ve hatadır.
 
-### Türü açıkça belirtmek zorunludur
+### Türü açıkça yazmak: önerilen ama zorunlu olmayan bir alışkanlık
 
-AhdCode'da yeni bir değişken oluştururken türünü mutlaka açıkça yazmalısınız. Bu kural, programınızın daha güvenli çalışmasını sağlar ve hataları henüz kodu çalıştırırken bulmanıza yardımcı olur:
+Yeni başlarken türü açıkça yazmanız önerilir; bu, kodunuzu okurken hangi değeri tuttuğunuzu hemen görmenizi sağlar ve hataları erkenden fark etmenize yardımcı olur:
 
 ```ahd
 age: Int := 19
@@ -177,7 +177,16 @@ name: String := "Ayşe"
 active: Bool := true
 ```
 
-AhdCode türü bir kez belirledikten sonra değişkeni başka türde bir değere çeviremezsiniz:
+Ancak bu bir zorunluluk değildir. Başlangıç değeri türü açıkça belirtiyorsa, türü hiç yazmadan sadece `:=` kullanabilirsiniz; derleyici türü kendisi çıkarır:
+
+```ahd
+age := 19       // Int olarak çıkarılır
+name := "Ayşe"  // String olarak çıkarılır
+```
+
+Bu iki yazım şekli tamamen eşdeğerdir. Bu rehberde okunabilirlik için genellikle türü açıkça yazacağız, ama ikisinden hangisini kullanacağınız size kalmış.
+
+Tür ister açıkça yazılsın ister çıkarılsın, AhdCode türü bir kez belirledikten sonra değişkeni başka türde bir değere çeviremezsiniz:
 
 ```ahd
 name: String := "Ayşe"
@@ -186,7 +195,7 @@ name: String := "Ayşe"
 
 İç bloklarda kullanacağımız `Local` kuralını 11. bölümde ayrıca öğreneceğiz; şimdilik dosyanın en üst seviyesindeki örneklere odaklanın.
 
-> **Teknik not:** Derleyicinin başlangıç değerine bakıp türü bulmasına *type inference* denir. Bu, değişkenin çalışma sırasında istediği türe dönüşebileceği anlamına gelmez; AhdCode statik türleri korur.
+> **Teknik not:** Derleyicinin başlangıç değerine bakıp türü bulmasına *type inference* denir. Bu, değişkenin çalışma sırasında istediği türe dönüşebileceği anlamına gelmez; AhdCode statik türleri korur. `name = 5` yine hatadır, çünkü `name` bir kez `String` olarak çıkarılmıştır.
 
 ## 4. Temel türler
 
@@ -1265,6 +1274,73 @@ write(person has name)
 
 > **Teknik not:** Alt sınıf nesnesini üst sınıf türünde tutmaya *upcasting*, çağrılacak metodun gerçek nesne türüne göre seçilmesine *dynamic dispatch* denir. İlk okumada bu terimleri ezberlemek zorunda değilsiniz.
 
+### Sınıf Protokol Metotları: `+`, `==`, `<` gibi operatörleri kendi sınıfınız için tanımlamak
+
+Kendi sınıfınızın `+`, `==`, `<` gibi operatörlerle çalışmasını isteyebilirsiniz. Bunun için AhdCode'da tam olarak on tane özel isimden biri kullanılır; bunlara **Sınıf Protokol Metotları** (Class Protocol Methods) denir:
+
+```text
+CEqual CCompare CAdd CSubtract CMultiply CDivide CRemainder CPower CNegate CStr
+```
+
+Bu isimler yalnızca bir sınıfın metot konumunda özel anlam taşır; başka her yerde sıradan bir isimdirler. `C` harfi kendisi ayrılmış değildir — `Calculate`, `Create` veya `CWhatever` gibi isimler her zaman sıradan kalır.
+
+```ahd
+Vector2: Class<> := {
+    structure: Attributes := (
+        x: Real
+        y: Real
+    )
+
+    CEqual: Function := (
+        other: Vector2
+    ) -> Bool {
+        return attribute.x == other.x and attribute.y == other.y
+    }
+
+    CAdd: Function := (
+        other: Vector2
+    ) -> Vector2 {
+        return Vector2(x: attribute.x + other.x, y: attribute.y + other.y)
+    }
+
+    CNegate: Function := (
+    ) -> Vector2 {
+        return Vector2(x: -attribute.x, y: -attribute.y)
+    }
+
+    CStr: Function := (
+    ) -> String {
+        return "Vector2({attribute.x}, {attribute.y})"
+    }
+}
+
+a: Vector2 := Vector2(x: 1.0, y: 2.0)
+b: Vector2 := Vector2(x: 3.0, y: 4.0)
+
+write(a + b)
+write(-a)
+write(a == b)
+write(str(a))
+```
+
+Beklenen çıktı:
+
+```text
+Vector2(4.0, 6.0)
+Vector2(-1.0, -2.0)
+false
+Vector2(1.0, 2.0)
+```
+
+Kısa özet:
+- `==` ve `!=` -> `CEqual` (`!=` her zaman `CEqual` sonucunun tersidir; ayrı bir `CNotEqual` yoktur)
+- `<`, `<=`, `>`, `>=` -> hepsi tek bir `CCompare` çağrısına dayanır (ayrı `CLess` vb. yoktur)
+- `+ - * / % ^` -> `CAdd CSubtract CMultiply CDivide CRemainder CPower`
+- Tekli `-` -> `CNegate`
+- `str(nesne)` -> `CStr`
+
+Dağıtım (dispatch) her zaman **sol taraftaki** işlenene bakar: `vektor + 3` çalışıyorsa bu `3 + vektor` ifadesinin de çalışacağı anlamına gelmez — tersine bir operatör kuralı yoktur. Kalıtım ve `Override` sıradan metotlarla aynı şekilde çalışır. Daha fazla ayrıntı için [Class Protocol Methods](PROTOCOLS.md) belgesine bakın.
+
 ## 18. Hata yönetimi (`attempt`, `except`, `ultimately` ve `toss`)
 
 Bazı hatalar programı yazarken değil, program çalışırken ortaya çıkabilir. Örneğin kullanıcıdan sayı beklerken `abc` yazabilir.
@@ -1482,7 +1558,7 @@ except FileError as error {
 Bazı araçları kullanmak için hiçbir `bring` yazmanız gerekmez. Bunlar AhdCode programında doğrudan hazırdır:
 
 ```text
-write take str int real len clear between abs sum min max
+write take str int real len clear between abs sum min max type id
 ```
 
 Çoğunu zaten kullandık. Kısa bir özet:
@@ -1516,6 +1592,70 @@ write(abs(-8))
 `sum` boş List için `0` veya `0.0` verir. `min` ve `max` ise boş List'te `DomainError` üretir.
 
 `clear` mevcut koleksiyonu yerinde değiştirdiği için aynı koleksiyonu gösteren diğer alias'lar da boş hali görür. `sum`, `min` ve `max` yalnızca okur; List'i değiştirmez.
+
+### `type(value)`: bir değerin türünü öğrenmek
+
+`type(value)` bir değerin AhdCode türünü, `String` olarak döndürür. Özellikle REPL'de deneme yaparken kullanışlıdır:
+
+```ahd
+write(type(5))
+write(type(5.0))
+write(type("Ali"))
+write(type(true))
+write(type(null))
+write(type([1, 2, 3]))
+```
+
+Beklenen çıktı:
+
+```text
+Int
+Real
+String
+Bool
+Null
+List<Int>
+```
+
+`type`, bir Sınıf (Class) nesnesi için her zaman nesnenin **gerçek çalışma zamanı sınıfını** verir, değişkenin yazılı türünü değil:
+
+```ahd
+Animal: Class<> := { structure: Attributes := (name: String) }
+Dog: Class<Animal> := { structure: Attributes := (SuperClass.attributes) }
+
+pet: Animal := Dog(name: "Rex")
+write(type(pet)) // "Dog" yazar, "Animal" değil
+```
+
+`type`, bir tür nesnesi (reflection) döndürmez; yalnızca bir metin (String) döndürür.
+
+### `id(reference)`: çalışma zamanı kimliği
+
+`id(reference)` bir List, Pair veya Sınıf nesnesi için opak bir kimlik numarası (`Int`) döndürür. `Int`, `Real`, `String` ve `Bool` gibi ilkel değerler için kullanılamaz.
+
+```ahd
+a: List<Int> := [1, 2]
+b: List<Int> := a
+c: List<Int> := [1, 2]
+
+write(id(a) == id(b))
+write(id(a) == id(c))
+
+a.add(3)
+write(id(a) == id(b))
+```
+
+Beklenen çıktı:
+
+```text
+true
+false
+true
+```
+
+`a` ve `b` aynı List'i gösterdiği için kimlikleri aynıdır; `c` içerik olarak aynı olsa da FARKLI bir List olduğu için kimliği farklıdır. `a`'yı değiştirmek (`add`) kimliğini değiştirmez.
+
+Bu sayı bir bellek adresi değildir, programlar arasında saklı değildir ve yalnızca geçerli çalışma anında/oturumda anlamlıdır. Sıradan kimlik karşılaştırmaları için genellikle `same` operatörünü kullanın; `id` daha çok hata ayıklama (debugging) ve günlükleme (logging) için düşünülmüştür.
 
 ## 21. Matematik modülü (Math)
 

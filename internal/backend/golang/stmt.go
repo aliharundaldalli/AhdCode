@@ -154,8 +154,23 @@ func (generator *generator) emitIndexAssign(writer *emitter, value *ir.AssignStm
 }
 
 // emitCompoundAssign evaluates the receiver and index exactly once, so a
-// compound assignment never re-evaluates its target expression.
+// compound assignment never re-evaluates its target expression. A Protocol
+// compound assignment reuses the same single-evaluation combine callback,
+// calling the resolved Class Protocol Method on the read value instead of a
+// built-in binary operation.
 func (generator *generator) emitCompoundAssign(writer *emitter, value *ir.CompoundAssignStmt) {
+	if value.Protocol != "" {
+		function := generator.functions[value.Protocol]
+		if function == nil {
+			generator.unsupported("a compound-assignment Class Protocol Method with no generated callable", value.Span)
+			return
+		}
+		arguments := generator.arguments(function, []ir.Argument{{ParameterIndex: 0, ParameterName: function.Parameters[0].Name, Value: value.Value}}, value.Span)
+		generator.emitTargetUpdate(writer, value.Target, value.Span, func(read string) string {
+			return generator.methodCall(read, false, function, arguments)
+		})
+		return
+	}
 	generator.emitTargetUpdate(writer, value.Target, value.Span, func(read string) string {
 		return generator.applyOperation(value.Op, read, generator.value(value.Value, value.Target.Type, false), value)
 	})

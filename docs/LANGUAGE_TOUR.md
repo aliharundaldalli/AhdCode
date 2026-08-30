@@ -113,6 +113,23 @@ Student: Class<> := {
 }
 ```
 
+A Class may define `==`, ordering, arithmetic, unary `-`, and `str()`
+behavior through ten exact
+[Class Protocol Methods](PROTOCOLS.md) (`CEqual`, `CCompare`, `CAdd`,
+`CSubtract`, `CMultiply`, `CDivide`, `CRemainder`, `CPower`, `CNegate`,
+`CStr`) -- an ordinary method using regular Function syntax:
+
+```ahd
+Vector2: Class<> := {
+    structure: Attributes := (x: Real, y: Real)
+    CAdd: Function := (
+        other: Vector2
+    ) -> Vector2 {
+        return Vector2(x: attribute.x + other.x, y: attribute.y + other.y)
+    }
+}
+```
+
 ## Errors and modules
 
 Use `attempt`, `except`, `ultimately`, and `toss` for catchable errors. Use
@@ -121,4 +138,5 @@ symbol. Local modules are sibling files. `Math`, `Time`, `Latex`, `Path`, and
 `File` are explicit standard modules; `File` failures are catchable.
 
 Continue with [Functions](FUNCTIONS.md), [Classes](CLASSES.md),
-[Collections](COLLECTIONS.md), and [Modules](MODULES.md).
+[Class Protocol Methods](PROTOCOLS.md), [Collections](COLLECTIONS.md), and
+[Modules](MODULES.md).

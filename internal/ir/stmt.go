@@ -75,11 +75,18 @@ type AssignStmt struct {
 
 func (*AssignStmt) IRStatement() {}
 
+// CompoundAssignStmt evaluates its Target's receiver/index exactly once, then
+// combines the read value with Value and writes the result back. Exactly one
+// of Op or Protocol is set: Op selects a built-in binary operation, while
+// Protocol selects a Class Protocol Method call on the read value (with Value
+// as its sole argument) for a compound assignment resolved to a Class
+// instance target -- there is no separate in-place protocol name.
 type CompoundAssignStmt struct {
 	StmtBase
-	Target Target
-	Op     BinaryOp
-	Value  Expr
+	Target   Target
+	Op       BinaryOp
+	Protocol CallableID
+	Value    Expr
 }
 
 func (*CompoundAssignStmt) IRStatement() {}

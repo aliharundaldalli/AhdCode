@@ -1,6 +1,6 @@
 # Classes
 
-[Back to README](../README.md) · [Functions](FUNCTIONS.md)
+[Back to README](../README.md) · [Functions](FUNCTIONS.md) · [Class Protocol Methods](PROTOCOLS.md)
 
 ## Structure and construction
 
@@ -64,3 +64,13 @@ v0.1 has one direct superclass. Replacing an inherited method requires
 `Confidential` members are accessible in the defining class and subclasses,
 but not through ordinary external access. Module-root Confidential declarations
 are not public module exports.
+
+## Operator behavior
+
+A Class defines `==`, ordering (`<`/`<=`/`>`/`>=`), arithmetic, unary `-`,
+and `str()` behavior through ten exact, compiler-recognized method names --
+`CEqual`, `CCompare`, `CAdd`, `CSubtract`, `CMultiply`, `CDivide`,
+`CRemainder`, `CPower`, `CNegate`, `CStr`. See
+[Class Protocol Methods](PROTOCOLS.md) for the required signatures and
+operator semantics. No other name, including one that merely starts with
+`C`, carries special meaning.

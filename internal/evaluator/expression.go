@@ -114,10 +114,79 @@ func (session *Session) eval(expression ir.Expr, current *frame) any {
 		}
 		return builder.String()
 	case *ir.ToStringExpr:
-		return session.render(session.eval(value.Value, current), false, make(map[visit]bool))
+		return session.textOf(value.Value, current)
+	case *ir.IdentityExpr:
+		return session.identityOf(session.identityValue(session.eval(value.Value, current)))
+	case *ir.TypeNameExpr:
+		return session.typeNameOf(value, current)
 	}
 	session.raise("Error", fmt.Sprintf("unsupported IR expression %T", expression))
 	return nil
+}
+
+// textOf renders one expression as the text write/str/interpolation use. A
+// Class value whose statically declared type resolves CStr dispatches to it
+// through the ordinary dynamic-dispatch path (so a more-derived override
+// still runs); every other value uses the shared canonical renderer, matching
+// the native backend's equivalent choke point in generator.text.
+func (session *Session) textOf(expression ir.Expr, current *frame) string {
+	if expression.ExprMeta().Type.Kind == ir.ClassType {
+		if methodID, found := session.findProtocolMethod(expression.ExprMeta().Type.Class, "CStr"); found {
+			instance, ok := session.eval(expression, current).(*Instance)
+			if !ok || instance == nil {
+				return "null"
+			}
+			if text, ok := session.invoke(&FunctionValue{Callable: methodID, Receiver: instance}, nil).(string); ok {
+				return text
+			}
+		}
+	}
+	return session.render(session.eval(expression, current), false, make(map[visit]bool))
+}
+
+// identityValue requires the value id() accepts: a non-null List, Pair, or
+// Class instance. Semantic analysis already rejects every other case at
+// compile time; this is defense in depth for the runtime value actually
+// reached.
+func (session *Session) identityValue(value any) any {
+	switch item := value.(type) {
+	case *List:
+		if item == nil {
+			session.raise("NullError", "id requires a non-null List")
+		}
+		return item
+	case *Pair:
+		if item == nil {
+			session.raise("NullError", "id requires a non-null Pair")
+		}
+		return item
+	case *Instance:
+		if item == nil {
+			session.raise("NullError", "id requires a non-null Class instance")
+		}
+		return item
+	}
+	session.raise("Error", "id requires a List, Pair, or Class instance")
+	return nil
+}
+
+// typeNameOf implements the type() Fundamental. A Class value reports its
+// most-derived runtime Class name; every other value reports the canonical
+// static name computed once during lowering, unless it is actually null right
+// now, which always reports "Null" regardless of the declared type.
+func (session *Session) typeNameOf(node *ir.TypeNameExpr, current *frame) string {
+	result := session.eval(node.Value, current)
+	if node.IsClass {
+		instance, ok := result.(*Instance)
+		if !ok || instance == nil {
+			return "Null"
+		}
+		return className(instance.Class)
+	}
+	if result == nil {
+		return "Null"
+	}
+	return node.StaticName
 }
 
 func (session *Session) optionalCell(current *frame, symbol ir.SymbolID) *Cell {

@@ -38,6 +38,13 @@ func (lowerer *moduleLowerer) lowerStatement(statement ast.Stmt) ir.Statement {
 		if value.Operator == "=" {
 			return &ir.AssignStmt{StmtBase: ir.StmtBase{Span: value.Span()}, Target: target, Value: lowerer.lowerExprExpected(value.Value, target.Type)}
 		}
+		if resolved := lowerer.semantic.ResolvedSymbols[value]; resolved != nil {
+			if callable := lowerer.semantic.SelectedAssignmentCallables[value]; callable != nil {
+				callableID := lowerer.compilation.registry.callableID(lowerer.module, resolved, callable, false)
+				right := lowerer.lowerExprExpected(value.Value, lowerType(callable.Signature.Parameters[0].Type))
+				return &ir.CompoundAssignStmt{StmtBase: ir.StmtBase{Span: value.Span()}, Target: target, Protocol: callableID, Value: right}
+			}
+		}
 		right := lowerer.lowerExprExpected(value.Value, target.Type)
 		op := typedBinaryOp(value.Operator[:len(value.Operator)-1], target.Type, right.ExprMeta().Type, target.Type)
 		return &ir.CompoundAssignStmt{StmtBase: ir.StmtBase{Span: value.Span()}, Target: target, Op: op, Value: right}

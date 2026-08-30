@@ -84,7 +84,12 @@ func (session *Session) execStatement(statement ir.Statement, current *frame) (a
 	case *ir.CompoundAssignStmt:
 		target := session.resolveTarget(value.Target, current)
 		right := session.eval(value.Value, current)
-		target.set(session.binary(value.Op, target.get(), right))
+		if value.Protocol != "" {
+			receiver := session.requireInstance(target.get())
+			target.set(session.invoke(&FunctionValue{Callable: value.Protocol, Receiver: receiver}, []argumentValue{{value: right}}))
+		} else {
+			target.set(session.binary(value.Op, target.get(), right))
+		}
 	case *ir.UpdateStmt:
 		target := session.resolveTarget(value.Target, current)
 		target.set(session.binary("CheckedIntAdd", target.get(), int64(value.Delta)))

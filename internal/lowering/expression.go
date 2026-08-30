@@ -5,7 +5,9 @@ import (
 
 	"ahdcode/internal/ir"
 	"ahdcode/internal/semantic"
+	"ahdcode/internal/source"
 	"ahdcode/internal/syntax/ast"
+	"ahdcode/internal/types"
 )
 
 func (lowerer *moduleLowerer) lowerExprExpected(expression ast.Expr, expected ir.Type) ir.Expr {
@@ -67,6 +69,18 @@ func (lowerer *moduleLowerer) lowerExprWithExpected(expression ast.Expr, expecte
 	case *ast.GroupExpr:
 		return lowerer.lowerExprExpected(value.Expression, chooseExpected(expected, typeValue))
 	case *ast.UnaryExpr:
+		if resolved := lowerer.semantic.ResolvedSymbols[value]; resolved != nil {
+			if callable := lowerer.semantic.SelectedFunctionValues[value]; callable != nil {
+				receiver := lowerer.lowerExpr(value.Operand)
+				if receiver == nil {
+					lowerer.compilation.error(CodeUnsupportedNode, "Class Protocol Method receiver did not lower", value.Span())
+					return nil
+				}
+				call := lowerer.lowerProtocolCall(resolved, callable, receiver, nil, value.Span())
+				call.ExprBase = base
+				return call
+			}
+		}
 		operand := lowerer.lowerExpr(value.Operand)
 		return &ir.UnaryExpr{ExprBase: base, Op: typedUnaryOp(value.Operator, operand), Operand: operand}
 	case *ast.BinaryExpr:
@@ -152,6 +166,11 @@ func (lowerer *moduleLowerer) lowerBinary(expression *ast.BinaryExpr, base ir.Ex
 	if expression.Operator == "has" || expression.Operator == "has not" {
 		return lowerer.lowerMemberDesignator(expression, base)
 	}
+	if resolved := lowerer.semantic.ResolvedSymbols[expression]; resolved != nil {
+		if callable := lowerer.semantic.SelectedFunctionValues[expression]; callable != nil {
+			return lowerer.lowerProtocolBinary(expression, resolved, callable, base)
+		}
+	}
 	if isNullAST(expression.Left) {
 		right = lowerer.lowerExpr(expression.Right)
 		left = lowerer.lowerExprExpected(expression.Left, right.ExprMeta().Type)
@@ -173,6 +192,54 @@ func (lowerer *moduleLowerer) lowerBinary(expression *ast.BinaryExpr, base ir.Ex
 		right = explicitWiden(right)
 	}
 	return &ir.BinaryExpr{ExprBase: base, Op: op, Left: left, Right: right}
+}
+
+// lowerProtocolCall builds the CallExpr+MemberExpr shape of one resolved
+// Class Protocol Method dispatch, exactly as if the receiver's method had
+// been called directly from source. Reusing the ordinary method-call IR shape
+// means dynamic dispatch, inheritance, and overrides behave identically to
+// any other method call in both the native backend and the persistent REPL
+// evaluator -- neither has to know that the call originated from an operator.
+func (lowerer *moduleLowerer) lowerProtocolCall(resolved *semantic.Symbol, callable *semantic.Callable, receiver ir.Expr, rightOperand ast.Expr, span source.Span) *ir.CallExpr {
+	callableID := lowerer.compilation.registry.callableID(lowerer.module, resolved, callable, false)
+	member := &ir.MemberExpr{
+		ExprBase: ir.ExprBase{Span: span, Type: ir.Type{Kind: ir.FunctionType, Signature: lowerSignature(callable.Signature)}, NullState: ir.NonNull},
+		Kind:     ir.MethodMember, Object: receiver, Callable: callableID,
+	}
+	result := &ir.CallExpr{
+		ExprBase: ir.ExprBase{Span: span, Type: lowerType(callable.Signature.Return), NullState: lowerNull(callable.ReturnNull)},
+		Callable: callableID, Callee: member, ReturnNull: lowerNull(callable.ReturnNull),
+	}
+	if rightOperand != nil && len(callable.Signature.Parameters) == 1 {
+		parameter := callable.Signature.Parameters[0]
+		result.Arguments = []ir.Argument{{ParameterIndex: 0, ParameterName: parameter.Name, Value: lowerer.lowerExprExpected(rightOperand, lowerType(parameter.Type))}}
+	}
+	return result
+}
+
+// lowerProtocolBinary lowers one binary operator that semantic analysis
+// resolved to a Class Protocol Method. != is the logical negation of the same
+// CEqual call; <, <=, >, and >= each evaluate the same CCompare call exactly
+// once and compare its Int result to zero. Every other operator (==, and the
+// six arithmetic operators) is the call itself.
+func (lowerer *moduleLowerer) lowerProtocolBinary(expression *ast.BinaryExpr, resolved *semantic.Symbol, callable *semantic.Callable, base ir.ExprBase) ir.Expr {
+	receiver := lowerer.lowerExpr(expression.Left)
+	if receiver == nil {
+		lowerer.compilation.error(CodeUnsupportedNode, "Class Protocol Method receiver did not lower", expression.Span())
+		return nil
+	}
+	call := lowerer.lowerProtocolCall(resolved, callable, receiver, expression.Right, expression.Span())
+	switch expression.Operator {
+	case "!=":
+		return &ir.UnaryExpr{ExprBase: base, Op: "BoolNot", Operand: call}
+	case "<", "<=", ">", ">=":
+		compareOps := map[string]ir.BinaryOp{"<": "IntLess", "<=": "IntLessEqual", ">": "IntGreater", ">=": "IntGreaterEqual"}
+		zero := &ir.LiteralExpr{ExprBase: ir.ExprBase{Span: expression.Span(), Type: ir.Type{Kind: ir.IntType}, NullState: ir.NonNull}, Kind: ir.IntLiteral, Value: "0"}
+		return &ir.BinaryExpr{ExprBase: base, Op: compareOps[expression.Operator], Left: call, Right: zero}
+	default:
+		call.ExprBase = base
+		return call
+	}
 }
 
 // lowerMemberDesignator keeps the has/has not right operand as the resolved
@@ -459,6 +526,21 @@ func (lowerer *moduleLowerer) lowerCall(call *ast.CallExpr, base ir.ExprBase) ir
 			return nil
 		}
 		return &ir.ConvertExpr{ExprBase: base, From: argument.ExprMeta().Type, Value: argument}
+	}
+	if symbol != nil && symbol.Builtin && symbol.Name == "type" && len(call.Arguments) == 1 {
+		// type(null) has no underlying declared type to inspect, exactly like
+		// str(null); it is folded to its normative result the same way.
+		if isNullAST(call.Arguments[0].Value) {
+			return &ir.LiteralExpr{ExprBase: base, Kind: ir.StringLiteral, Value: "Null"}
+		}
+		argumentType := lowerer.semantic.ExpressionTypes[call.Arguments[0].Value]
+		return &ir.TypeNameExpr{
+			ExprBase: base, Value: lowerer.lowerExpr(call.Arguments[0].Value),
+			StaticName: types.Display(argumentType), IsClass: argumentType != nil && argumentType.Kind() == types.ClassKind,
+		}
+	}
+	if symbol != nil && symbol.Builtin && symbol.Name == "id" && len(call.Arguments) == 1 {
+		return &ir.IdentityExpr{ExprBase: base, Value: lowerer.lowerExpr(call.Arguments[0].Value)}
 	}
 	selected := lowerer.semantic.SelectedCallables[call]
 	if symbol != nil && symbol.Kind == semantic.ClassSymbol && symbol.Class != nil {
