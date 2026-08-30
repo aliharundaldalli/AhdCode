@@ -11,7 +11,7 @@ ahdcode
 ```
 
 ```text
-AhdCode v0.1.9
+AhdCode v0.1.10
 ahd> x := 5
 ahd> x = x + 1
 ahd> x
@@ -20,6 +20,9 @@ ahd> age := int(take("Age: "))
 Age: 26
 ahd> age + 1
 27
+ahd> square := lambda (x: Int) -> x^2
+ahd> square(5)
+25
 ```
 
 Normal sözcüksel çözümleyici (lexer), ayrıştırıcı (parser), semantik
@@ -47,6 +50,11 @@ ahd> Math.random()
 ahd> Math.random()
 ...
 ```
+
+Lambda Function değerleri de komutlar arasında kalır ve örneğin
+`values.map(lambda (x: Int) -> x^2)` biçiminde doğrudan callback olarak
+çalışır. Diğer yerlerde olduğu gibi yalnızca ifade içerir ve çevreleyen bir
+`Local` bağlamayı yakalayamaz.
 
 `take`, isteğini (prompt) yazdırır ve temizler (flush), ardından gerçek
 terminalden tam olarak bir cevap satırı tüketir. O cevap, başka bir REPL

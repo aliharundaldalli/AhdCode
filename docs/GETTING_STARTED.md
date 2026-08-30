@@ -34,6 +34,17 @@ The compiler infers `String`; the binding is still statically typed. Write an
 explicit annotation (`name: String := ...`) whenever it communicates intent or
 inference is insufficient.
 
+For a short reusable operation, an expression-only lambda creates a value of
+the existing `Function` type:
+
+```ahd
+square := lambda (value: Int) -> value^2
+write(square(5))
+```
+
+Lambda parameters require explicit types; the return type is inferred from
+the single expression. Use a normal Function for a block or multiple steps.
+
 Run it:
 
 ```bash

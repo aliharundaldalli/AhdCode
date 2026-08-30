@@ -20,8 +20,8 @@ For `List<T>`:
 | `filter(function)` | new List of kept snapshot elements |
 
 Mutating operations preserve object identity, so aliases observe them.
-`map` and `filter` never mutate the receiver. v0.1 has no lambda syntax; pass a
-named Function.
+`map` and `filter` never mutate the receiver. Pass either a compatible named
+Function or an expression lambda; `sort(keyFunction)` accepts the same form.
 
 ```ahd
 double: Function := (
@@ -32,6 +32,7 @@ double: Function := (
 
 values: List<Int> := [3, 1, 2]
 mapped: List<Int> := values.map(double)
+positive: List<Int> := values.filter(lambda (value: Int) -> value > 0)
 values.sort()
 
 write(values)

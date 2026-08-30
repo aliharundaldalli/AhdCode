@@ -38,6 +38,7 @@ ahdcode run examples/v0.1/14_grade_app.ahd
 | `17_filesystem.ahd` | çıkarımlı (inferred) bildirimler, Path, UTF-8 File G/Ç, FileError |
 | `18_protocols.ahd` | Class Protocol Methods, `type()`, `id()` |
 | `19_regex.ahd` | Regex modülü: `Pattern`, match/find/replace/split/groups, `RegexError` |
+| `20_lambda.ahd` | yalnızca ifade içeren Function değerleri, çıkarım, callback'ler ve normal Function karşılaştırması |
 
 `Greeting.ahd`, `11_modules.ahd` tarafından kullanılan kardeş (sibling)
 modüldür.

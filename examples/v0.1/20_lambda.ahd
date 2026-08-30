@@ -1,0 +1,27 @@
+square := lambda (value: Int) -> value ^ 2
+positive: Function := lambda (value: Int) -> value > 0
+greaterTotal := lambda (
+    left: Int
+    right: Int
+    threshold: Real
+    text: String
+) -> real(left + right) > threshold and text != ""
+
+classify: Function := (value: Int) -> String {
+    if value > 0 {
+        return "positive"
+    }
+
+    return "not positive"
+}
+
+values := [1, -2, 3]
+
+write(square(5))
+write(positive(-2))
+write(greaterTotal(2, 3, 4.5, "ready"))
+write(values.map(lambda (value: Int) -> value ^ 2))
+write(values.filter(lambda (value: Int) -> value > 0))
+values.sort(lambda (value: Int) -> -value)
+write(values)
+write(classify(-1))

@@ -5,7 +5,9 @@
 [Back to README](../README.md) · [Classes](CLASSES.md)
 
 Functions are named declarations at module root; methods are named declarations
-inside a Class. v0.1 has no nested Function declarations or lambdas.
+inside a Class. Nested Function declarations remain unsupported. A lambda is
+an expression-only shorthand that creates an anonymous value of the existing
+`Function` type; it is not a new type or a second callable system.
 
 ```ahd
 greet: Function := (
@@ -32,6 +34,33 @@ write(greet(name: "Ali", title: "Dr"))
 
 `greet("Ali", title: "Dr")` is invalid because it mixes the two forms.
 Required parameters precede default parameters.
+
+## Expression lambdas
+
+```ahd
+square := lambda (x: Int) -> x^2
+positive: Function := lambda (x: Int) -> x > 0
+
+values := [1, 2, 3]
+squares := values.map(lambda (x: Int) -> x^2)
+```
+
+The exact syntax is `lambda (<typed parameters>) -> <expression>`. Every
+parameter has an explicit static type; the return type and return nullability
+come from the one body expression. Zero parameters and every parameter type
+already valid for a Function are supported. A compatible lambda works anywhere
+a `Function` value is accepted, including `map`, `filter`, and the existing
+`sort` key callback. No implicit coercion is added.
+
+Lambda parameters are required; default-valued parameters remain available on
+named Function declarations, not expression lambdas, in v0.1.10.
+
+A lambda cannot contain a block or statements. Use the unchanged named
+Function syntax when control flow, declarations, loops, error handling, or
+multiple steps are needed. v0.1.10 also does not implement lexical closures:
+a lambda cannot capture an enclosing `Local` binding; pass that value as an
+explicit parameter. Ordinary `Local`/`Global` visibility rules otherwise stay
+unchanged.
 
 ## Return behavior
 

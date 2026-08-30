@@ -12,7 +12,7 @@ AhdCode is an experimental statically checked general-purpose programming
 language focused on readable syntax, explicit intent, predictable semantics,
 and native compilation.
 
-The current release target is **v0.1**. The core language works end to end, but
+The current release is **v0.1.10**. The core language works end to end, but
 the project is not production-ready and breaking changes may occur before 1.0.
 
 ```ahd
@@ -37,6 +37,8 @@ for name in names {
   checks narrow proven non-null values.
 - Lists, Pairs, Classes, Functions, modules, errors, and native executables are
   part of the v0.1 core.
+- Expression-only `lambda (<typed parameters>) -> <expression>` creates a
+  value of the existing `Function` type; it is not a separate callable type.
 - A small, closed set of [Class Protocol Methods](docs/PROTOCOLS.md) lets a
   Class define `==`, ordering, arithmetic, unary `-`, and `str()` behavior.
 - A [Regex module](docs/REGEX.md) compiles patterns to a `Pattern` value with
@@ -95,6 +97,7 @@ See the [CLI guide](docs/CLI.md), [formatter guide](docs/FORMATTER.md), and
 - [Latex module](docs/LATEX.md)
 - [File and Path modules](docs/FILESYSTEM.md)
 - [Regex module](docs/REGEX.md)
+- [AI-assisted local setup](FOR_AI.md)
 - [Curated v0.1 examples](examples/v0.1/README.md)
 - [Full v0.1 language specification](AHDCODE_LANGUAGE_SPEC_v0.1.md)
 
@@ -107,8 +110,9 @@ VS Code and Antigravity. See its [installation guide](editors/vscode/README.md).
 
 ## Current limitations
 
-v0.1 intentionally has no lambdas, tuple returns, reflection, interfaces,
-multiple inheritance, debugger, LSP, package search paths, or web runtime.
+v0.1 intentionally has no block/statement lambdas, lexical closures, tuple
+returns, reflection, interfaces, multiple inheritance, debugger, LSP, package
+search paths, or web runtime.
 Operator behavior is user-definable only through the ten fixed
 [Class Protocol Methods](docs/PROTOCOLS.md), not a general overloading
 mechanism. Modules are sibling `.ahd` files, and the editor extension is a
@@ -126,6 +130,14 @@ examples/v0.1/     curated working programs
 AHDCODE_LANGUAGE_SPEC_v0.1.md
                    authoritative language contract
 ```
+
+## Development and credits
+
+AhdCode is designed and specified by Ali Harun Daldallı. Implementation,
+documentation, and testing have been developed with extensive AI assistance,
+including OpenAI Codex, Anthropic Claude, and Google Gemini. Their roles vary
+by task; language design and final technical decisions remain with the project
+author.
 
 ## License
 

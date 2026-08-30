@@ -5,8 +5,10 @@
 [README'ye dön](../README_TR.md) · [Sınıflar](CLASSES_TR.md)
 
 Function'lar modül kökündeki (module root) isimlendirilmiş bildirimlerdir;
-metotlar bir Class içindeki isimlendirilmiş bildirimlerdir. v0.1'de iç içe
-Function bildirimleri veya lambda'lar yoktur.
+metotlar bir Class içindeki isimlendirilmiş bildirimlerdir. İç içe Function
+bildirimleri desteklenmez. Lambda, mevcut `Function` türünde isimsiz bir değer
+oluşturan, yalnızca ifade içeren kısa yazımdır; yeni bir tür veya ikinci bir
+çağrılabilir sistem değildir.
 
 ```ahd
 greet: Function := (
@@ -34,6 +36,33 @@ write(greet(name: "Ali", title: "Dr"))
 
 `greet("Ali", title: "Dr")` geçersizdir çünkü iki biçimi karıştırır. Zorunlu
 parametreler varsayılan (default) parametrelerden önce gelir.
+
+## İfade lambda'ları
+
+```ahd
+square := lambda (x: Int) -> x^2
+positive: Function := lambda (x: Int) -> x > 0
+
+values := [1, 2, 3]
+squares := values.map(lambda (x: Int) -> x^2)
+```
+
+Kesin sözdizimi `lambda (<tipli parametreler>) -> <ifade>` biçimindedir. Her
+parametrenin açık bir statik türü vardır; dönüş türü ve dönüş null olabilirliği
+tek gövde ifadesinden çıkarılır. Sıfır parametre ve Function için zaten geçerli
+olan her parametre türü desteklenir. Uyumlu bir lambda; `map`, `filter` ve
+mevcut `sort` anahtar callback'i dahil, `Function` değeri kabul edilen her
+yerde çalışır. Örtük zorlama (implicit coercion) eklenmez.
+
+Lambda parametreleri zorunludur; varsayılan değerli parametreler v0.1.10'da
+ifade lambda'larında değil, isimli Function bildirimlerinde kullanılabilir.
+
+Bir lambda blok veya deyim (statement) içeremez. Kontrol akışı, bildirimler,
+döngüler, hata işleme veya birden çok adım gerektiğinde değişmeyen isimli
+Function sözdizimini kullanın. v0.1.10 lexical closure da uygulamaz: lambda,
+çevreleyen bir `Local` bağlamayı yakalayamaz; bu değeri açık bir parametre
+olarak geçirin. Sıradan `Local`/`Global` görünürlük kuralları bunun dışında
+değişmez.
 
 ## Dönüş davranışı
 

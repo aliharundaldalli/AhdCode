@@ -100,7 +100,7 @@ attempt except ultimately toss return
 bring from all as
 true false null
 Int Real String Bool Nothing
-List Pair Function Overload Override
+List Pair Function lambda Overload Override
 Class Attributes Constant Local Global Confidential
 Object Error
 ```
@@ -1508,9 +1508,9 @@ yineler -- `for`'un izlediği aynı kural -- ve callback'i anlık görüntü
 elemanı başına soldan sağa tam olarak bir kez çağırır. Bir callback
 hatası normal şekilde yayılır.
 
-v0.1'de lambda sözdizimi yoktur; bir callback sıradan, bildirilmiş bir
-Function'dır ve parametre türü, `List` değişmez (invariant) olduğu için
-tam olarak eleman türü olmalıdır.
+Bir callback uyumlu bir Function değeridir: sıradan, bildirilmiş bir Function
+veya ifade lambda'sı olabilir. Parametre türü, `List` değişmez (invariant)
+olduğu için tam olarak eleman türü olmalıdır.
 
 ```ahd
 double: Function := (
@@ -1521,6 +1521,7 @@ double: Function := (
 
 numbers: List<Int> := [1, 2, 3]
 doubled: List<Int> := numbers.map(double)
+squared: List<Int> := numbers.map(lambda (x: Int) -> x^2)
 ```
 
 =>
@@ -1785,8 +1786,8 @@ bağlamasında saklanabilir:
 operation: Local Function := add
 ```
 
-v0.1'de iç içe geçmiş bir Function bildirimi ve lambda/isimsiz Function
-sözdizimi yoktur.
+v0.1'de iç içe geçmiş bir Function bildirimi yoktur. İfade lambda'ları §50'de
+belirtilir ve bu bildirim sözdizimini değiştirmez.
 
 ### 15.1 Dönüş davranışı
 
@@ -1850,8 +1851,6 @@ createUser("Ali", age: 25)
 İsimlendirilmiş fonksiyonlar değişkenlerde saklanabilir ve başka
 fonksiyonlara geçirilebilir.
 
-v0.1'de lambda/isimsiz fonksiyon sözdizimi yoktur.
-
 Bir parametre veya bağlama basitçe `Function` olarak tiplenebilir;
 programcı `Function<Int -> Int>` gibi herkese açık bir fonksiyon-imza türü
 yazmaz.
@@ -1892,6 +1891,14 @@ fonksiyon-çıkarımı hatasıyla başarısız olur.
 
 Derleyici, `Function`'ı asla sessizce dinamik olarak çağrılabilir olarak
 ele almamalı veya imza doğruluğunu çalışma zamanına ertelememelidir.
+
+### 15.5 İfade lambda'ları
+
+`lambda (<tipli parametreler>) -> <ifade>`, mevcut `Function` türünde isimsiz
+bir değer oluşturur. Statik türü ve null durumu, çağrılabilir dönüş
+sözleşmesini oluşturan tek bir ifade gövdesi vardır. Yeni bir tür değildir ve
+normal isimli Function sözdizimi değişmez. Lexical yakalama sınırlaması dahil
+tam v0.1.10 kuralları §50'dedir.
 
 ---
 
@@ -3637,7 +3644,7 @@ Kasıtlı olarak hariç tutulanlar:
 - HTML düzenleri
 - statik Class üyeleri
 - Getter/Setter sözdizimi
-- lambda'lar
+- blok/deyim lambda'ları ve lexical closure'lar
 - genel/sınırsız kullanıcı-tanımlı operatör aşırı yüklemesi (yalnızca
   §47'nin on sabit Class Protocol Methods'ı vardır; keyfi operatör
   tanımı, ters operatörler veya yerinde (in-place) protokoller yoktur)
@@ -4191,6 +4198,106 @@ except RegexError as error {
 sözdiziminde fırlatılır. Başka hiçbir `Pattern` işlemi onu fırlatmaz:
 eşleştirme, bulma, yer değiştirme ve bölme, bir `Pattern` var
 olduktan sonra asla başarısız olmaz.
+
+---
+
+## 50. İfade Lambda'ları (v0.1.10)
+
+Lambda, AhdCode'un mevcut `Function` türünde bir değer oluşturmak için kısa
+bir ifade sözdizimidir. Bir `Lambda` türü, ikinci bir çağrılabilir aile veya
+isimli Function bildirimlerinin yerine geçen bir sistem değildir.
+
+### 50.1 Gramer
+
+```text
+lambda-expression  ::= "lambda" "(" [ lambda-parameter-list ] ")"
+                       "->" expression
+lambda-parameter   ::= identifier ":" type-reference
+```
+
+Parametre listesi sıradan virgül/satır sonu ayırıcı kurallarını kullanır. Her
+parametrenin açık bir türü vardır; sıfır parametre geçerlidir. Mevcut Function
+parametre türleri uygulanır. Parametre bildirim değiştiricileri ve varsayılan
+değerler v0.1.10'da kabul edilmez; varsayılan parametre gerektiğinde isimli bir
+Function bildirimi kullanılır.
+
+```ahd
+positive := lambda (x: Int) -> x > 0
+difference := lambda (x: Int, y: Int) -> x^2 - y^2
+now := lambda () -> Time.now()
+```
+
+Yazılan bir lambda dönüş belirtimi yoktur. Statik dönüş türü ve dönüş null
+durumu, tek gövde ifadesinden çıkarılır. Geçersiz veya çözümlenemeyen gövde
+türü semantik hatadır; asla dinamik tiplemeye geri dönülmez. Gizli
+String/sayısal/truthiness zorlamalarının bulunmaması dahil mevcut atanabilirlik,
+null olabilirlik, argüman sayısı ve dönüşüm kuralları değişmeden uygulanır.
+
+### 50.2 Yalnızca ifade sınırı
+
+Bir lambda gövdesi tam olarak bir ifadedir. `{ ... }` bloğu, `return`, `if`,
+döngü, bildirim, `attempt` veya başka bir deyim gövdesi geçersizdir. Deyim
+gerektiren mantık, değişmeyen isimli Function biçimini kullanır:
+
+```ahd
+positive: Function := (x: Int) -> Bool {
+    if x <= 0 {
+        return false
+    }
+    return true
+}
+```
+
+### 50.3 Function uyumluluğu ve callback'ler
+
+Herkese açık kaynak türü `Function` olarak kalırken derleyici somut
+çağrılabilir imzayı dahili olarak korur:
+
+```ahd
+positive: Function := lambda (x: Int) -> x > 0
+inferred := lambda (x: Int) -> x > 0
+values.filter(lambda (x: Int) -> x > 0)
+values.map(lambda (x: Int) -> x^2)
+values.sort(lambda (x: Int) -> -x)
+```
+
+Lambda, bu kesin Function imzasının kabul edildiği her yerde çalışır. `map`,
+`filter` ve anahtarlı `sort` mevcut sözleşmelerini korur; koleksiyon API'si
+eklenmez veya yeniden tasarlanmaz.
+
+### 50.4 Kapsam ve lexical yakalama
+
+Lambda bir ifadedir, bildirim değildir. Atanması, sıradan modül-kökü ve açık
+`Local` bildirim kurallarını izler. Lambda parametreleri lambda içinde örtük
+olarak yereldir.
+
+v0.1.10 bir closure ortamı tanıtmaz. Lambda, çevreleyen bir Function
+parametresi veya `Local` dahil, çevreleyen bir çağrılabilirin lexical
+kapsamındaki bağlamayı yakalayamaz; böyle bir kullanım semantik hatadır.
+Değeri açık bir lambda parametresi olarak geçirin veya isimli bir Function
+kullanın. Modül bağlamaları, Function'lar, Class'lar ve içe aktarımlar mevcut
+görünürlük kurallarını korur. Özellikle, mevcut açık `Global` kuralı yalnızca
+ifade lambda olduğu için zayıflatılmaz.
+
+### 50.5 Uygulama ve araçlar
+
+`lambda` ayrılmış bir anahtar kelimedir ve gerçek bir `LambdaExpr` AST düğümüne
+ayrıştırılır. Semantik denetleyici, her Function değeri için kullanılan aynı
+somut çağrılabilir imzayı üretir. Lowering, sıradan tiplenmiş bir Function IR
+çağrılabiliri ve `FunctionValueExpr` üretir; böylece yerel Go backend'i ve
+kalıcı değerlendirici mevcut Function adaptörlerini ve çağrı yollarını yeniden
+kullanır. Kaynak yeniden yazımı veya çalışma zamanı Lambda kimliği yoktur ve
+`id()` Function'lara genişletilmez.
+
+Kalıcı REPL, lambda Function değerlerini komutlar arasında korur. Formatter,
+sıradan Function parametre-listesi düzenini kullanır ve idempotenttir:
+
+```ahd
+lambda (x: Int) -> x > 0
+```
+
+Uzun parametre listeleri mevcut 80-sütun politikasına göre bölünür; tek ifade
+`->` sonrasında kalır.
 
 ---
 

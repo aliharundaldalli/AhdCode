@@ -774,7 +774,7 @@ describe: Overload Function := (value: Real) -> String {
 
 AhdCode determines which version of the call it belongs to based on the parameters. Exact matches come first; safe `Int -> Real` widening can be used when needed. If it's ambiguous which version should be selected, the compiler will yield an error instead of guessing.
 
-> **Technical note:** This selection is called *overload resolution*. In v0.1, functions must have a name; there are no nested functions or lambdas. Function parameters and return type are written explicitly. Function declarations maintain the `name: Function := (...) -> T { ... }` format.
+> **Technical note:** This selection is called *overload resolution*. Named Function declarations keep the `name: Function := (...) -> T { ... }` form and cannot be nested. For one expression, `lambda (x: Int) -> x > 0` creates an anonymous value of the same `Function` type. Lambda parameters are explicit, its return type is inferred, and it has no block or statements.
 
 ## 11. `Local` and `Global`
 
@@ -947,7 +947,8 @@ If `index()` cannot find the value it is looking for, it raises a `DomainError`.
 
 ### `map`, `filter`, and sorting by key
 
-You can use `map` to transform every value in a list, and `filter` to select some of them. Since there are no lambdas in v0.1, you first write the operation you will use as a named Function:
+You can use `map` to transform every value in a list, and `filter` to select
+some of them. A named Function remains useful for multi-step logic:
 
 ```ahd
 double: Function := (value: Int) -> Int {
@@ -962,6 +963,20 @@ values: List<Int> := [3, -1, 4, -2]
 write(values.map(double))
 write(values.filter(isEven))
 ```
+
+For a short single expression, pass a lambda directly:
+
+```ahd
+squares := values.map(lambda (value: Int) -> value^2)
+positive := values.filter(lambda (value: Int) -> value > 0)
+values.sort(lambda (value: Int) -> -value)
+```
+
+Lambda is not a separate type: it creates a value of the existing `Function`
+type. Each parameter needs an explicit static type, the return type comes from
+the expression, and ordinary strict typing/null-safety rules still apply. A
+lambda has no block or statements and cannot capture an enclosing `Local`
+binding in v0.1.10; use a normal Function or pass the value explicitly.
 
 `map` and `filter` do not alter the source List; they return a new List.
 

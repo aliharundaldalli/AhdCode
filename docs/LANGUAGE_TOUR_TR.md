@@ -102,6 +102,20 @@ square: Function := (
 }
 ```
 
+Tek bir ifade için `lambda`, aynı `Function` türünde bir değer oluşturur.
+Parametreler açıkça tiplenir ve dönüş türü çıkarılır:
+
+```ahd
+squareShort := lambda (value: Int) -> value^2
+values := [1, 2, 3]
+squares := values.map(lambda (value: Int) -> value^2)
+```
+
+Lambda yalnızca bir ifade içerir: blok/deyim lambda'sı, ayrı bir Lambda türü
+ve örtük zorlama yoktur. v0.1.10'da çevreleyen bir `Local` bağlamayı
+yakalayamaz; normal bir Function kullanın veya değeri açıkça geçirin. Normal
+Function bildirim sözdizimi değişmemiştir.
+
 ```ahd
 Student: Class<> := {
     structure: Attributes := (

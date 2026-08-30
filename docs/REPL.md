@@ -11,7 +11,7 @@ ahdcode
 ```
 
 ```text
-AhdCode v0.1.9
+AhdCode v0.1.10
 ahd> x := 5
 ahd> x = x + 1
 ahd> x
@@ -20,6 +20,9 @@ ahd> age := int(take("Age: "))
 Age: 26
 ahd> age + 1
 27
+ahd> square := lambda (x: Int) -> x^2
+ahd> square(5)
+25
 ```
 
 The normal lexer, parser, semantic checker, and typed/lowered IR are shared
@@ -45,6 +48,10 @@ ahd> Math.random()
 ahd> Math.random()
 ...
 ```
+
+Lambda Function values also persist between commands and work directly as
+callbacks, for example `values.map(lambda (x: Int) -> x^2)`. As elsewhere,
+they are expression-only and cannot capture an enclosing `Local` binding.
 
 `take` prints and flushes its prompt, then consumes exactly one answer line
 from the real terminal. That answer is not treated as another REPL command.

@@ -38,5 +38,6 @@ ahdcode run examples/v0.1/14_grade_app.ahd
 | `17_filesystem.ahd` | inferred declarations, Path, UTF-8 File I/O, FileError |
 | `18_protocols.ahd` | Class Protocol Methods, `type()`, `id()` |
 | `19_regex.ahd` | Regex module: `Pattern`, match/find/replace/split/groups, `RegexError` |
+| `20_lambda.ahd` | expression-only Function values, inference, callbacks, and normal Function contrast |
 
 `Greeting.ahd` is the sibling module used by `11_modules.ahd`.

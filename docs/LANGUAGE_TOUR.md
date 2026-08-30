@@ -101,6 +101,20 @@ square: Function := (
 }
 ```
 
+For a single expression, `lambda` creates a value of that same `Function`
+type. Parameters are explicitly typed and the return type is inferred:
+
+```ahd
+squareShort := lambda (value: Int) -> value^2
+values := [1, 2, 3]
+squares := values.map(lambda (value: Int) -> value^2)
+```
+
+Lambda has one expression only: there is no block/statement lambda, no
+separate Lambda type, and no implicit coercion. It cannot capture an enclosing
+`Local` binding in v0.1.10; use a normal Function or pass the value explicitly.
+Normal Function declaration syntax is unchanged.
+
 ```ahd
 Student: Class<> := {
     structure: Attributes := (

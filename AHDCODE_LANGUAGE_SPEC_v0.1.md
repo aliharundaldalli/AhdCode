@@ -77,7 +77,7 @@ attempt except ultimately toss return
 bring from all as
 true false null
 Int Real String Bool Nothing
-List Pair Function Overload Override
+List Pair Function lambda Overload Override
 Class Attributes Constant Local Global Confidential
 Object Error
 ```
@@ -1298,7 +1298,9 @@ filter(keep: Function(T) -> Bool)  -> List<T>
 
 Both build a new mutable List and never modify the receiver, so a `Constant` List is a valid receiver. Both iterate a shallow snapshot taken when the operation starts, which is the same rule `for` follows, and invoke the callback left to right exactly once per snapshot element. A callback error propagates normally.
 
-v0.1 has no lambda syntax; a callback is an ordinary declared Function, and its parameter type must be exactly the element type because `List` is invariant.
+A callback is a compatible Function value: either an ordinary declared
+Function or an expression lambda. Its parameter type must be exactly the
+element type because `List` is invariant.
 
 ```ahd
 double: Function := (
@@ -1309,6 +1311,7 @@ double: Function := (
 
 numbers: List<Int> := [1, 2, 3]
 doubled: List<Int> := numbers.map(double)
+squared: List<Int> := numbers.map(lambda (x: Int) -> x^2)
 ```
 
 =>
@@ -1559,7 +1562,8 @@ An existing named Function value may still be stored in a Local Function binding
 operation: Local Function := add
 ```
 
-v0.1 has no nested Function declaration and no lambda/anonymous Function syntax.
+v0.1 has no nested Function declaration. Expression lambdas are specified in
+§50 and do not change this declaration syntax.
 
 ### 15.1 Return behavior
 
@@ -1619,8 +1623,6 @@ createUser("Ali", age: 25)
 
 Named functions may be stored in variables and passed to other functions.
 
-No lambda/anonymous function syntax exists in v0.1.
-
 A parameter or binding may be typed simply as `Function`; the programmer does not write a public function-signature type such as `Function<Int -> Int>`.
 
 However, `Function` is **not** a dynamic callable escape hatch.
@@ -1652,6 +1654,14 @@ If multiple callable signatures remain equally valid, compilation fails with an 
 If there is not enough information to infer one safe signature, compilation fails with a function-inference error.
 
 The compiler must never silently treat `Function` as dynamically callable or defer signature correctness to runtime.
+
+### 15.5 Expression lambdas
+
+`lambda (<typed parameters>) -> <expression>` creates an anonymous value of
+the existing `Function` type. It has one expression body, whose static type
+and null-state form the callable return contract. It is not a new type, and
+normal named Function syntax remains unchanged. The complete v0.1.10 rules,
+including the lexical-capture limitation, are in §50.
 
 ---
 
@@ -3250,7 +3260,7 @@ Intentionally excluded:
 - HTML layouts
 - static class members
 - Getter/Setter syntax
-- lambdas
+- block/statement lambdas and lexical closures
 - general/unrestricted user-defined operator overloading (only the ten fixed
   Class Protocol Methods of §47 exist; there is no arbitrary operator
   definition, no reverse operators, and no in-place protocols)
@@ -3762,6 +3772,105 @@ except RegexError as error {
 `RegexError` is raised only by `Regex.compile` on invalid pattern syntax. No
 other `Pattern` operation raises it: match, find, replace, and split never
 fail once a `Pattern` exists.
+
+---
+
+## 50. Expression Lambdas (v0.1.10)
+
+Lambda is a concise expression syntax for creating a value of AhdCode's
+existing `Function` type. It is not a `Lambda` type, a second callable family,
+or a replacement for named Function declarations.
+
+### 50.1 Grammar
+
+```text
+lambda-expression  ::= "lambda" "(" [ lambda-parameter-list ] ")"
+                       "->" expression
+lambda-parameter   ::= identifier ":" type-reference
+```
+
+The parameter list uses the ordinary comma/newline separator rules. Every
+parameter has an explicit type; zero parameters are valid. The existing
+Function parameter types apply. Parameter declaration modifiers and default
+values are not accepted in v0.1.10; use a named Function declaration when a
+default parameter is needed.
+
+```ahd
+positive := lambda (x: Int) -> x > 0
+difference := lambda (x: Int, y: Int) -> x^2 - y^2
+now := lambda () -> Time.now()
+```
+
+There is no written lambda return annotation. The static return type and
+return null-state are inferred from the single body expression. An invalid or
+unresolved body type is a semantic error; it never falls back to dynamic
+typing. Existing assignability, nullability, arity, and conversion rules apply
+unchanged, including the lack of hidden String/numeric/truthiness coercions.
+
+### 50.2 Expression-only boundary
+
+A lambda body is exactly one expression. A `{ ... }` block, `return`, `if`,
+loop, declaration, `attempt`, or any other statement body is invalid. Logic
+that requires statements uses the unchanged named Function form:
+
+```ahd
+positive: Function := (x: Int) -> Bool {
+    if x <= 0 {
+        return false
+    }
+    return true
+}
+```
+
+### 50.3 Function compatibility and callbacks
+
+The compiler preserves the concrete callable signature internally while the
+public source type remains `Function`:
+
+```ahd
+positive: Function := lambda (x: Int) -> x > 0
+inferred := lambda (x: Int) -> x > 0
+values.filter(lambda (x: Int) -> x > 0)
+values.map(lambda (x: Int) -> x^2)
+values.sort(lambda (x: Int) -> -x)
+```
+
+A lambda works anywhere that exact Function signature is accepted. `map`,
+`filter`, and keyed `sort` keep their existing contracts; no collection API is
+added or redesigned.
+
+### 50.4 Scope and lexical capture
+
+Lambda is an expression, not a declaration. Assigning it follows the ordinary
+module-root and explicit `Local` declaration rules. Lambda parameters are
+implicitly local to the lambda.
+
+v0.1.10 does not introduce a closure environment. A lambda may not capture a
+binding from an enclosing callable's lexical scope, including an enclosing
+Function parameter or `Local`; such use is a semantic error. Pass the value as
+an explicit lambda parameter or use a named Function. Module bindings,
+Functions, Classes, and imports retain the existing visibility rules. In
+particular, the existing explicit `Global` rule is not weakened merely because
+the expression is a lambda.
+
+### 50.5 Implementation and tools
+
+`lambda` is a reserved keyword and parses to a real `LambdaExpr` AST node. The
+semantic checker produces the same concrete callable signature used for every
+Function value. Lowering emits an ordinary typed Function IR callable and a
+`FunctionValueExpr`; the native Go backend and persistent evaluator therefore
+reuse their existing Function adapters and invocation paths. No source rewrite
+or runtime Lambda identity exists, and `id()` is not extended to Functions.
+
+The persistent REPL retains lambda Function values between commands. The
+formatter uses the ordinary Function parameter-list layout and is idempotent:
+
+```ahd
+lambda (x: Int) -> x > 0
+```
+
+Long parameter lists break according to the existing 80-column policy; the
+single expression remains after `->`.
 
 ---
 

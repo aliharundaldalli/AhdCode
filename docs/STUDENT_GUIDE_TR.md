@@ -774,7 +774,7 @@ describe: Overload Function := (value: Real) -> String {
 
 AhdCode çağrının hangi sürüme ait olduğunu parametrelerden belirler. Tam eşleşme önce gelir; güvenli `Int -> Real` genişletmesi gerektiğinde kullanılabilir. Hangi sürümün seçileceği belirsizse derleyici tahmin etmek yerine hata verir.
 
-> **Teknik not:** Bu seçime *overload resolution* denir. v0.1'de fonksiyonların adı olmalıdır; nested function ve lambda yoktur. Fonksiyon parametreleri ve dönüş türü açıkça yazılır. Fonksiyon bildirimi `name: Function := (...) -> T { ... }` biçimini korur.
+> **Teknik not:** Bu seçime *overload resolution* denir. İsimli Function bildirimleri `name: Function := (...) -> T { ... }` biçimini korur ve iç içe yazılamaz. Tek bir ifade için `lambda (x: Int) -> x > 0`, aynı `Function` türünde isimsiz bir değer oluşturur. Lambda parametreleri açıktır, dönüş türü çıkarılır ve blok veya deyim içermez.
 
 ## 11. `Local` ve `Global`
 
@@ -949,7 +949,9 @@ write(data.index(8)) // 1
 
 ### `map`, `filter` ve anahtara göre sıralama
 
-Bir listedeki her değeri dönüştürmek için `map`, bazılarını seçmek için `filter` kullanabilirsiniz. v0.1'de lambda olmadığı için kullanacağınız işlemi önce isimli bir Function olarak yazarsınız:
+Bir listedeki her değeri dönüştürmek için `map`, bazılarını seçmek için
+`filter` kullanabilirsiniz. Çok adımlı mantık için isimli bir Function
+kullanışlı olmaya devam eder:
 
 ```ahd
 double: Function := (value: Int) -> Int {
@@ -964,6 +966,20 @@ values: List<Int> := [3, -1, 4, -2]
 write(values.map(double))
 write(values.filter(isEven))
 ```
+
+Kısa, tek bir ifade için doğrudan lambda geçebilirsiniz:
+
+```ahd
+squares := values.map(lambda (value: Int) -> value^2)
+positive := values.filter(lambda (value: Int) -> value > 0)
+values.sort(lambda (value: Int) -> -value)
+```
+
+Lambda ayrı bir tür değildir: mevcut `Function` türünde bir değer oluşturur.
+Her parametre açık bir statik tür ister, dönüş türü ifadeden gelir ve sıradan
+katı tip/null güvenliği kuralları uygulanmaya devam eder. Lambda blok veya
+deyim içermez ve v0.1.10'da çevreleyen bir `Local` bağlamayı yakalayamaz;
+normal bir Function kullanın veya değeri açıkça geçirin.
 
 `map` ve `filter` kaynak List'i değiştirmez; yeni List döndürür.
 

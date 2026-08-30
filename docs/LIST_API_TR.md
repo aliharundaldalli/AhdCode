@@ -21,8 +21,8 @@
 
 Değiştiren (mutating) işlemler nesne kimliğini (object identity) korur, bu
 yüzden alias'lar bu değişiklikleri görür. `map` ve `filter` alıcıyı
-(receiver) hiçbir zaman değiştirmez. v0.1'de lambda sözdizimi yoktur;
-isimlendirilmiş bir Function geçirin.
+(receiver) hiçbir zaman değiştirmez. Uyumlu isimli bir Function veya ifade
+lambda'sı geçirin; `sort(keyFunction)` da aynı biçimi kabul eder.
 
 ```ahd
 double: Function := (
@@ -33,6 +33,7 @@ double: Function := (
 
 values: List<Int> := [3, 1, 2]
 mapped: List<Int> := values.map(double)
+positive: List<Int> := values.filter(lambda (value: Int) -> value > 0)
 values.sort()
 
 write(values)

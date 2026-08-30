@@ -27,6 +27,8 @@ canonical layout for everything else:
   all** -- not even a trailing one.
 - The `(parameters) -> ReturnType` shape of a Function signature is always
   kept together on the line that opens its body.
+- Lambda uses the same parameter-list layout and canonical spacing:
+  `lambda (x: Int) -> x > 0`; only its parameter list breaks when needed.
 - Indentation is always 4 spaces per level, independent of how the source
   was indented.
 

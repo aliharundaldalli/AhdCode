@@ -12,7 +12,7 @@ AhdCode; okunabilir sözdizimi, açık niyet (explicit intent), öngörülebilir
 anlambilim (semantics) ve yerel (native) derlemeye odaklanan, deneysel,
 statik olarak denetlenen genel amaçlı bir programlama dilidir.
 
-Mevcut sürüm hedefi **v0.1**'dir. Çekirdek dil uçtan uca çalışır, ancak proje
+Mevcut sürüm **v0.1.10**'dur. Çekirdek dil uçtan uca çalışır, ancak proje
 üretime hazır değildir ve 1.0'dan önce kırıcı (breaking) değişiklikler
 olabilir.
 
@@ -41,6 +41,8 @@ for name in names {
   değerleri daraltır (narrow eder).
 - List'ler, Pair'ler, Class'lar, Function'lar, modüller, hatalar ve yerel
   çalıştırılabilir dosyalar v0.1 çekirdeğinin bir parçasıdır.
+- Yalnızca ifade içeren `lambda (<tipli parametreler>) -> <ifade>`, mevcut
+  `Function` türünde bir değer oluşturur; ayrı bir çağrılabilir tür değildir.
 - Küçük, kapalı bir [Class Protocol Methods](docs/PROTOCOLS_TR.md) kümesi,
   bir Class'ın `==`, sıralama, aritmetik, tekli `-` ve `str()` davranışını
   tanımlamasına izin verir.
@@ -101,6 +103,7 @@ ve [REPL rehberine](docs/REPL_TR.md) bakın.
 - [Latex modülü](docs/LATEX_TR.md)
 - [File ve Path modülleri](docs/FILESYSTEM_TR.md)
 - [Regex modülü](docs/REGEX_TR.md)
+- [Yapay zekâ destekli yerel kurulum](FOR_AI.md)
 - [Derlenmiş v0.1 örnekleri](examples/v0.1/README_TR.md)
 - [Tam v0.1 dil spesifikasyonu](AHDCODE_LANGUAGE_SPEC_v0.1_TR.md)
 
@@ -114,10 +117,11 @@ ve [REPL rehberine](docs/REPL_TR.md) bakın.
 
 ## Mevcut sınırlamalar
 
-v0.1, kasıtlı olarak lambda, tuple dönüş değerleri, reflection, interface,
-çoklu kalıtım (multiple inheritance), hata ayıklayıcı (debugger), LSP, paket
-arama yolları (package search paths) veya web çalışma zamanına sahip
-değildir. Operatör davranışı yalnızca on sabit
+v0.1, kasıtlı olarak blok/deyim (statement) lambda'ları, lexical closure'lar,
+tuple dönüş değerleri, reflection, interface, çoklu kalıtım (multiple
+inheritance), hata ayıklayıcı (debugger), LSP, paket arama yolları (package
+search paths) veya web çalışma zamanına sahip değildir. Operatör davranışı
+yalnızca on sabit
 [Class Protocol Methods](docs/PROTOCOLS_TR.md) aracılığıyla
 kullanıcı-tanımlıdır (user-definable), genel bir aşırı yükleme (overloading)
 mekanizması değildir. Modüller kardeş (sibling) `.ahd` dosyalarıdır ve
@@ -135,6 +139,14 @@ examples/v0.1/     derlenmiş çalışan programlar
 AHDCODE_LANGUAGE_SPEC_v0.1.md
                    yetkili (authoritative) dil sözleşmesi
 ```
+
+## Geliştirme ve katkılar
+
+AhdCode, Ali Harun Daldallı tarafından tasarlanmış ve spesifikasyonu
+oluşturulmuştur. Uygulama, dokümantasyon ve test süreçlerinde OpenAI Codex,
+Anthropic Claude ve Google Gemini dahil olmak üzere yoğun yapay zekâ
+desteğinden yararlanılmıştır. Araçların katkı biçimi göreve göre değişmekte;
+dil tasarımı ve nihai teknik kararlar proje yazarına aittir.
 
 ## Lisans
 

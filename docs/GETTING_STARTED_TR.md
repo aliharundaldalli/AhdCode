@@ -33,6 +33,17 @@ tiplenmiştir. Niyetinizi açıkça ifade etmek istediğinizde veya çıkarım
 (inference) yetersiz kaldığında açık bir tür belirtimi (`name: String := ...`)
 yazın.
 
+Kısa, yeniden kullanılabilir bir işlem için yalnızca ifade içeren lambda,
+mevcut `Function` türünde bir değer oluşturur:
+
+```ahd
+square := lambda (value: Int) -> value^2
+write(square(5))
+```
+
+Lambda parametreleri açık tür gerektirir; dönüş türü tek ifadeden çıkarılır.
+Blok veya birden çok adım için normal bir Function kullanın.
+
 Çalıştırın:
 
 ```bash

@@ -27,6 +27,8 @@ korur; geri kalan her şey için tek bir kanonik (standart) düzeni işler:
   **hiç virgül kullanılmaz** — sonda bile.
 - Bir Function imzasının `(parametreler) -> DönüşTürü` şekli, her zaman
   gövdesini açan satırda bir arada tutulur.
+- Lambda aynı parametre-listesi düzenini ve kanonik boşluğu kullanır:
+  `lambda (x: Int) -> x > 0`; gerektiğinde yalnızca parametre listesi bölünür.
 - Girinti (indentation), kaynağın nasıl girintilenmiş olduğundan bağımsız
   olarak, her zaman seviye başına 4 boşluktur.
 
