@@ -146,6 +146,8 @@ func (session *Session) builtin(identity ir.CallableID, receiver any, arguments 
 		return session.core(strings.TrimPrefix(name, "builtin:core::"), receiver, values(arguments))
 	case strings.HasPrefix(name, "builtin:Math::"):
 		return session.math(strings.TrimPrefix(name, "builtin:Math::"), values(arguments))
+	case strings.HasPrefix(name, "builtin:CSV::"):
+		return session.csvBuiltin(strings.TrimPrefix(name, "builtin:CSV::"), values(arguments))
 	case strings.HasPrefix(name, "builtin:Time::"):
 		return session.timeBuiltin(strings.TrimPrefix(name, "builtin:Time::"), values(arguments))
 	case strings.HasPrefix(name, "builtin:Latex::"):

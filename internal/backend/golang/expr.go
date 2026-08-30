@@ -698,6 +698,9 @@ func (generator *generator) call(value *ir.CallExpr) string {
 	if strings.HasPrefix(string(value.Callable), "builtin:Math::") {
 		return generator.mathCall(value)
 	}
+	if strings.HasPrefix(string(value.Callable), csvModulePrefix) {
+		return generator.csvCall(value)
+	}
 	if strings.HasPrefix(string(value.Callable), timeModulePrefix) {
 		return generator.timeCall(value)
 	}

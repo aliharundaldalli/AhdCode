@@ -369,6 +369,17 @@ func (generator *generator) emitInstaller(writer *emitter) {
 		writer.line("AhdRegisterError(" + generator.descriptorName(class.ID) + ", func(message string) AhdInstance { return " +
 			generator.callableName(constructor) + "(message) })")
 	}
+	// CSV file operations preserve FileError even when the program did not
+	// separately import File. Its IOError representation is sufficient for
+	// ordinary IOError catches; importing File still registers the exact
+	// generated FileError constructor above.
+	ioError := generator.classes[ir.ClassID("builtin:core::class::IOError")]
+	if ioError != nil {
+		if constructor := generator.functions[ioError.Constructor]; constructor != nil {
+			writer.line("AhdRegisterErrorFallback(AhdClassFileError, func(message string) AhdInstance { return " +
+				generator.callableName(constructor) + "(message) })")
+		}
+	}
 	writer.close("}")
 	writer.blank()
 }

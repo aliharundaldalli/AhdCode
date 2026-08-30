@@ -11,6 +11,7 @@ import (
 	"context"
 	cryptorand "crypto/rand"
 	"encoding/binary"
+	"encoding/csv"
 	"fmt"
 	"io"
 	"math"
@@ -61,6 +62,7 @@ var (
 	AhdClassLatexError          = &AhdClass{Name: "LatexError", Parent: AhdClassError}
 	AhdClassFileError           = &AhdClass{Name: "FileError", Parent: AhdClassIOError}
 	AhdClassRegexError          = &AhdClass{Name: "RegexError", Parent: AhdClassError}
+	AhdClassCSVError            = &AhdClass{Name: "CSVError", Parent: AhdClassError}
 )
 
 // AhdInstance is every AhdCode Class instance. The generated interface of each
@@ -237,6 +239,24 @@ var ahdErrorConstructors = map[*AhdClass]func(string) AhdInstance{}
 // AhdRegisterError installs the generated constructor of one built-in Error.
 func AhdRegisterError(class *AhdClass, construct func(string) AhdInstance) {
 	ahdErrorConstructors[class] = construct
+}
+
+// AhdRegisterErrorFallback installs a derived built-in Error using an
+// available parent representation when its owning standard module is not
+// otherwise present in the compilation. A later exact registration wins.
+func AhdRegisterErrorFallback(class *AhdClass, construct func(string) AhdInstance) {
+	if ahdErrorConstructors[class] != nil {
+		return
+	}
+	ahdErrorConstructors[class] = func(message string) AhdInstance {
+		instance := construct(message)
+		setter, ok := instance.(interface{ AhdSetClass(*AhdClass) })
+		if !ok {
+			panic("ahdcode: fallback Error instance cannot be assigned a Class")
+		}
+		setter.AhdSetClass(class)
+		return instance
+	}
 }
 
 // AhdRaiseClass raises a built-in AhdCode runtime Error.
@@ -1651,6 +1671,171 @@ func AhdFileList(class *AhdClass, path string) *AhdList[string] {
 	}
 	sort.Strings(names)
 	return AhdNewList(names...)
+}
+
+// ---------------------------------------------------------------------------
+// CSV standard module
+// ---------------------------------------------------------------------------
+
+func ahdCSVDelimiter(class *AhdClass, delimiter string) rune {
+	if !utf8.ValidString(delimiter) {
+		AhdRaiseClass(class, "delimiter is not valid UTF-8")
+	}
+	runes := []rune(delimiter)
+	if len(runes) != 1 || runes[0] == '\r' || runes[0] == '\n' || runes[0] == '"' || runes[0] == utf8.RuneError || runes[0] == 0 {
+		AhdRaiseClass(class, "delimiter must be exactly one valid Unicode scalar other than quote, CR, or LF")
+	}
+	return runes[0]
+}
+
+func ahdCSVRows(class *AhdClass, text, delimiter string) [][]string {
+	if !utf8.ValidString(text) {
+		AhdRaiseClass(class, "CSV text is not valid UTF-8")
+	}
+	reader := csv.NewReader(strings.NewReader(text))
+	reader.Comma = ahdCSVDelimiter(class, delimiter)
+	reader.FieldsPerRecord = -1
+	rows, err := reader.ReadAll()
+	if err != nil {
+		AhdRaiseClass(class, "invalid CSV: "+err.Error())
+	}
+	return rows
+}
+
+func ahdCSVList(rows [][]string) *AhdList[*AhdList[string]] {
+	result := make([]*AhdList[string], len(rows))
+	for index, row := range rows {
+		result[index] = AhdNewList(row...)
+	}
+	return AhdNewList(result...)
+}
+
+func AhdCSVParse(class *AhdClass, text, delimiter string) *AhdList[*AhdList[string]] {
+	return ahdCSVList(ahdCSVRows(class, text, delimiter))
+}
+
+func AhdCSVStringify(class *AhdClass, rows *AhdList[*AhdList[string]], delimiter string) string {
+	comma := ahdCSVDelimiter(class, delimiter)
+	if rows == nil {
+		AhdRaiseClass(AhdClassNullError, "List value is null")
+	}
+	var output strings.Builder
+	writer := csv.NewWriter(&output)
+	writer.Comma = comma
+	for _, row := range rows.Snapshot() {
+		if row == nil {
+			AhdRaiseClass(AhdClassNullError, "CSV row is null")
+		}
+		if err := writer.Write(row.Snapshot()); err != nil {
+			AhdRaiseClass(class, "could not encode CSV: "+err.Error())
+		}
+	}
+	writer.Flush()
+	if err := writer.Error(); err != nil {
+		AhdRaiseClass(class, "could not encode CSV: "+err.Error())
+	}
+	return output.String()
+}
+
+func AhdCSVRead(csvClass, fileClass *AhdClass, path, delimiter string) *AhdList[*AhdList[string]] {
+	content, err := os.ReadFile(path)
+	if err != nil {
+		ahdFileFailure(fileClass, "read", path, err)
+	}
+	return AhdCSVParse(csvClass, string(content), delimiter)
+}
+
+func AhdCSVWrite(csvClass, fileClass *AhdClass, path string, rows *AhdList[*AhdList[string]], delimiter string) {
+	content := AhdCSVStringify(csvClass, rows, delimiter)
+	if err := os.WriteFile(path, []byte(content), 0o666); err != nil {
+		ahdFileFailure(fileClass, "write", path, err)
+	}
+}
+
+func ahdCSVRecords(class *AhdClass, rows [][]string) *AhdList[*AhdPair[string, string]] {
+	if len(rows) == 0 {
+		return AhdNewList[*AhdPair[string, string]]()
+	}
+	headers := rows[0]
+	seen := make(map[string]bool, len(headers))
+	for _, header := range headers {
+		if header == "" {
+			AhdRaiseClass(class, "record headers must not be empty")
+		}
+		if seen[header] {
+			AhdRaiseClass(class, "record headers must be unique; duplicate "+strconv.Quote(header))
+		}
+		seen[header] = true
+	}
+	result := make([]*AhdPair[string, string], 0, len(rows)-1)
+	for rowIndex, row := range rows[1:] {
+		if len(row) != len(headers) {
+			AhdRaiseClass(class, "record row "+strconv.Itoa(rowIndex+2)+" has "+strconv.Itoa(len(row))+" fields; expected "+strconv.Itoa(len(headers)))
+		}
+		record := AhdNewPair[string, string]()
+		for index, header := range headers {
+			record.Set(header, row[index])
+		}
+		result = append(result, record)
+	}
+	return AhdNewList(result...)
+}
+
+func AhdCSVParseRecords(class *AhdClass, text, delimiter string) *AhdList[*AhdPair[string, string]] {
+	return ahdCSVRecords(class, ahdCSVRows(class, text, delimiter))
+}
+
+func AhdCSVReadRecords(csvClass, fileClass *AhdClass, path, delimiter string) *AhdList[*AhdPair[string, string]] {
+	content, err := os.ReadFile(path)
+	if err != nil {
+		ahdFileFailure(fileClass, "read", path, err)
+	}
+	return AhdCSVParseRecords(csvClass, string(content), delimiter)
+}
+
+func AhdCSVStringifyRecords(class *AhdClass, records *AhdList[*AhdPair[string, string]], delimiter string) string {
+	ahdCSVDelimiter(class, delimiter)
+	if records == nil {
+		AhdRaiseClass(AhdClassNullError, "List value is null")
+	}
+	items := records.Snapshot()
+	if len(items) == 0 {
+		return ""
+	}
+	if items[0] == nil {
+		AhdRaiseClass(AhdClassNullError, "CSV record is null")
+	}
+	headers := items[0].Keys()
+	if len(headers) == 0 {
+		AhdRaiseClass(class, "records must contain at least one column")
+	}
+	rows := make([]*AhdList[string], 0, len(items)+1)
+	rows = append(rows, AhdNewList(headers...))
+	for recordIndex, record := range items {
+		if record == nil {
+			AhdRaiseClass(AhdClassNullError, "CSV record is null")
+		}
+		keys := record.Keys()
+		if len(keys) != len(headers) {
+			AhdRaiseClass(class, "record "+strconv.Itoa(recordIndex+1)+" does not have the same key set as the first record")
+		}
+		row := make([]string, len(headers))
+		for index, header := range headers {
+			if !record.Has(header) {
+				AhdRaiseClass(class, "record "+strconv.Itoa(recordIndex+1)+" is missing key "+strconv.Quote(header))
+			}
+			row[index] = record.Get(header)
+		}
+		rows = append(rows, AhdNewList(row...))
+	}
+	return AhdCSVStringify(class, AhdNewList(rows...), delimiter)
+}
+
+func AhdCSVWriteRecords(csvClass, fileClass *AhdClass, path string, records *AhdList[*AhdPair[string, string]], delimiter string) {
+	content := AhdCSVStringifyRecords(csvClass, records, delimiter)
+	if err := os.WriteFile(path, []byte(content), 0o666); err != nil {
+		ahdFileFailure(fileClass, "write", path, err)
+	}
 }
 
 // ---------------------------------------------------------------------------

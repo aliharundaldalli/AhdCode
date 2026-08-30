@@ -52,6 +52,11 @@ func LowerCompilation(compilation module.CompilationResult) Result {
 		if current.Source.Builtin {
 			// A standard module that publishes Classes carries their
 			// declarations; the others contribute no IR of their own.
+			if string(current.ID) == CSVModuleID {
+				result.Modules = append(result.Modules,
+					csvModule(ir.ModuleID(current.ID), current.Source.Name, current.Source.Path))
+				continue
+			}
 			if string(current.ID) == TimeModuleID {
 				result.Modules = append(result.Modules,
 					timeModule(ir.ModuleID(current.ID), current.Source.Name, current.Source.Path))

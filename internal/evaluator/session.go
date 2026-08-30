@@ -230,14 +230,36 @@ func (session *Session) errorClass(name string) ir.ClassID {
 			return id
 		}
 	}
+	switch name {
+	case "FileError":
+		return "builtin:File::class::FileError"
+	case "LatexError":
+		return "builtin:Latex::class::LatexError"
+	case "RegexError":
+		return "builtin:Regex::class::RegexError"
+	case "CSVError":
+		return "builtin:CSV::class::CSVError"
+	}
 	return preferred
+}
+
+func knownBuiltinErrorParent(class ir.ClassID) ir.ClassID {
+	switch class {
+	case "builtin:File::class::FileError":
+		return "builtin:core::class::IOError"
+	case "builtin:Latex::class::LatexError", "builtin:Regex::class::RegexError", "builtin:CSV::class::CSVError":
+		return "builtin:core::class::Error"
+	default:
+		return ""
+	}
 }
 
 func (session *Session) fieldNamed(classID ir.ClassID, name string) ir.FieldID {
 	for current := classID; current != ""; {
 		class := session.classes[current]
 		if class == nil {
-			break
+			current = knownBuiltinErrorParent(current)
+			continue
 		}
 		for _, field := range class.Fields {
 			if field.Name == name {
@@ -256,7 +278,8 @@ func (session *Session) isClass(value, target ir.ClassID) bool {
 		}
 		class := session.classes[current]
 		if class == nil {
-			return false
+			current = knownBuiltinErrorParent(current)
+			continue
 		}
 		current = class.Parent
 	}
