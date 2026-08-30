@@ -22,6 +22,10 @@ type parser struct {
 	tokens []token.Token
 	index  int
 	bag    diagnostics.Bag
+	// recoveredDotContinuation records that the statement just parsed was a
+	// rejected leading-dot continuation, so the statement list can mark the
+	// receiver it continued as malformed.
+	recoveredDotContinuation bool
 }
 
 // Parse builds a syntax-only typed AST. It performs no name or type resolution.
@@ -48,8 +52,18 @@ func (p *parser) parseStatementList(scope scopeKind, terminator token.Kind) []as
 	p.skipNewlines()
 	for !p.check(terminator) && !p.atEnd() {
 		before := p.index
+		p.recoveredDotContinuation = false
 		statement := p.parseStatement(scope)
 		if statement != nil {
+			if p.recoveredDotContinuation {
+				// The receiver that this rejected chain continues was already
+				// parsed as a complete statement. Its initializer is only
+				// "complete" because the parser stopped at the newline, so
+				// leaving it intact would invite a second, misleading
+				// diagnostic about the truncated value's type. Marking it
+				// malformed keeps PAR013 the single explanation.
+				invalidateTruncatedReceiver(statements)
+			}
 			statements = append(statements, statement)
 		}
 		if p.index == before {
@@ -67,6 +81,27 @@ func (p *parser) parseStatementList(scope scopeKind, terminator token.Kind) []as
 		p.skipNewlines()
 	}
 	return statements
+}
+
+// invalidateTruncatedReceiver replaces the value of the statement a rejected
+// leading-dot chain was continuing with a BadExpr, so semantic analysis does
+// not type-check a receiver the parser cut short. Only the value is replaced:
+// the declared name, type, and modifiers stay, so unrelated later uses of the
+// binding still resolve normally instead of cascading unknown-name errors.
+func invalidateTruncatedReceiver(statements []ast.Stmt) {
+	if len(statements) == 0 {
+		return
+	}
+	switch previous := statements[len(statements)-1].(type) {
+	case *ast.VariableDecl:
+		if previous.Initializer != nil {
+			previous.Initializer = &ast.BadExpr{Base: ast.Base{Range: previous.Initializer.Span()}}
+		}
+	case *ast.AssignmentStmt:
+		if previous.Value != nil {
+			previous.Value = &ast.BadExpr{Base: ast.Base{Range: previous.Value.Span()}}
+		}
+	}
 }
 
 func (p *parser) parseStatement(scope scopeKind) ast.Stmt {
@@ -104,16 +139,72 @@ func (p *parser) parseStatement(scope scopeKind) ast.Stmt {
 	}
 }
 
+// parseLeadingDotContinuation rejects a member chain continued from a new
+// line. AhdCode does not have leading-dot continuation, and this does not make
+// it valid; it reports the first precise PAR013 and then consumes the whole
+// malformed chain as one region.
+//
+// The chain is consumed with bracket awareness, because a rejected
+// `.filter(` normally opens arguments that run over several physical lines. A
+// newline inside those brackets does not end the chain, so the argument list
+// is never reinterpreted as independent statements and its closing bracket
+// never becomes a spurious "expected expression". Once the brackets balance, a
+// further leading-dot member on the next line belongs to the same rejected
+// chain and is absorbed silently rather than reported again.
 func (p *parser) parseLeadingDotContinuation() ast.Stmt {
 	leading := p.advance()
 	p.errorSpan(codeLeadingDotContinuation, "method chain cannot continue from a new line", leading.Span,
 		"keep the member call on the same expression as its receiver, or store the intermediate result in a variable")
-	end := leading.Span.End
-	for !p.atEnd() && !p.check(token.Newline) && !p.check(token.RightBrace) {
-		end = p.advance().Span.End
-	}
+	end := p.consumeDotContinuation(leading.Span.End)
+	p.recoveredDotContinuation = true
 	bad := &ast.BadExpr{Base: p.base(leading.Span.Start, end)}
 	return &ast.ExprStmt{Base: p.base(leading.Span.Start, end), Expression: bad}
+}
+
+// consumeDotContinuation skips the remainder of one rejected chain, including
+// every bracketed argument list and every further leading-dot member that
+// continues it.
+func (p *parser) consumeDotContinuation(end source.Position) source.Position {
+	for {
+		depth := 0
+		for !p.atEnd() {
+			if depth == 0 && (p.check(token.Newline) || p.check(token.RightBrace)) {
+				break
+			}
+			switch p.current().Kind {
+			case token.LeftParen, token.LeftBracket:
+				depth++
+			case token.RightParen, token.RightBracket:
+				// A closing bracket with nothing open belongs to an enclosing
+				// construct, so recovery stops before consuming it.
+				if depth == 0 {
+					return end
+				}
+				depth--
+			case token.LeftBrace:
+				// A block brace is not part of an expression chain; leaving it
+				// alone keeps the enclosing statement list recoverable.
+				if depth == 0 {
+					return end
+				}
+				depth++
+			case token.RightBrace:
+				depth--
+			}
+			end = p.advance().Span.End
+		}
+		// Look past the newline for another member of the same chain.
+		next := 0
+		for p.peek(next).Kind == token.Newline {
+			next++
+		}
+		if p.peek(next).Kind != token.Dot {
+			return end
+		}
+		for range next + 1 {
+			end = p.advance().Span.End
+		}
+	}
 }
 
 func (p *parser) current() token.Token {

@@ -944,3 +944,94 @@ func TestRHSSameLineIsValidForEveryDeclarationShape(t *testing.T) {
 	}, "\n"))
 	requireClean(t, result)
 }
+
+// TestLeadingDotContinuationRecoversAcrossMultipleLines pins the recovery rule
+// for a rejected chain whose arguments span several physical lines. AhdCode
+// still has no leading-dot continuation; the point is that one malformed chain
+// produces one explanation instead of a cascade.
+func TestLeadingDotContinuationRecoversAcrossMultipleLines(t *testing.T) {
+	tests := []struct {
+		name string
+		text string
+	}{
+		{
+			name: "one multiline member",
+			text: "values := [1]\n" +
+				"    .filter(\n" +
+				"        lambda (x: Int) -> true\n" +
+				"    )\n",
+		},
+		{
+			name: "two multiline members in the same chain",
+			text: "values := [1]\n" +
+				"    .filter(\n" +
+				"        lambda (x: Int) -> true\n" +
+				"    )\n" +
+				"    .map(\n" +
+				"        lambda (x: Int) -> str(x)\n" +
+				"    )\n",
+		},
+	}
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			result := parseText(t, testCase.text)
+			if len(result.Diagnostics) != 1 {
+				t.Fatalf("diagnostics = %+v, want exactly one leading-dot error", result.Diagnostics)
+			}
+			item := result.Diagnostics[0]
+			if item.Code != codeLeadingDotContinuation ||
+				item.Span.Start.Line != 2 || item.Span.Start.Column != 5 {
+				t.Fatalf("leading-dot diagnostic = %+v", item)
+			}
+		})
+	}
+}
+
+// TestLeadingDotContinuationMarksTheTruncatedReceiver checks that the receiver
+// the rejected chain continued is left malformed, so a later stage cannot
+// report a type mismatch that only exists because the parser stopped early.
+func TestLeadingDotContinuationMarksTheTruncatedReceiver(t *testing.T) {
+	result := parseText(t, "values: List<String> := entries\n    .map(\n        lambda (x: Int) -> str(x)\n    )\n")
+	if len(result.Diagnostics) != 1 || result.Diagnostics[0].Code != codeLeadingDotContinuation {
+		t.Fatalf("diagnostics = %+v", result.Diagnostics)
+	}
+	if len(result.Program.Statements) == 0 {
+		t.Fatal("no statements were produced")
+	}
+	declaration, ok := result.Program.Statements[0].(*ast.VariableDecl)
+	if !ok {
+		t.Fatalf("first statement = %T, want a declaration", result.Program.Statements[0])
+	}
+	if _, bad := declaration.Initializer.(*ast.BadExpr); !bad {
+		t.Fatalf("initializer = %T, want it marked malformed so no derived type error is reported", declaration.Initializer)
+	}
+}
+
+// TestLeadingDotContinuationStillReportsIndependentErrors keeps recovery from
+// swallowing a genuinely separate mistake later in the file.
+func TestLeadingDotContinuationStillReportsIndependentErrors(t *testing.T) {
+	result := parseText(t, "values := [1]\n"+
+		"    .filter(\n"+
+		"        lambda (x: Int) -> true\n"+
+		"    )\n"+
+		"\n"+
+		"other :=\n")
+	if len(result.Diagnostics) != 2 {
+		t.Fatalf("diagnostics = %+v, want the leading-dot error and the independent later error", result.Diagnostics)
+	}
+	if result.Diagnostics[0].Code != codeLeadingDotContinuation {
+		t.Fatalf("first diagnostic = %+v", result.Diagnostics[0])
+	}
+	if result.Diagnostics[1].Code != codeExpectedSameLineRHS {
+		t.Fatalf("second diagnostic = %+v", result.Diagnostics[1])
+	}
+}
+
+// TestSameExpressionMemberChainRemainsValid guards the syntax this recovery
+// must not affect: a chain written as one expression is still accepted.
+func TestSameExpressionMemberChainRemainsValid(t *testing.T) {
+	result := parseText(t, "values := entries.filter(\n    lambda (x: Int) -> true\n).map(\n    lambda (x: Int) -> str(x)\n)\n")
+	if len(result.Diagnostics) != 0 {
+		t.Fatalf("valid same-expression chain reported %+v", result.Diagnostics)
+	}
+}
