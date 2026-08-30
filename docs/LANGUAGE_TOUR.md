@@ -112,7 +112,7 @@ squares := values.map(lambda (value: Int) -> value^2)
 
 Lambda has one expression only: there is no block/statement lambda, no
 separate Lambda type, and no implicit coercion. It cannot capture an enclosing
-`Local` binding in v0.1.10; use a normal Function or pass the value explicitly.
+`Local` binding in v0.1.11; use a normal Function or pass the value explicitly.
 Normal Function declaration syntax is unchanged.
 
 ```ahd
@@ -150,9 +150,12 @@ Vector2: Class<> := {
 
 Use `attempt`, `except`, `ultimately`, and `toss` for catchable errors. Use
 `bring ModuleName` for a namespace or `from ModuleName bring name` for a direct
-symbol. Local modules are sibling files. `Math`, `Time`, `Latex`, `Path`, `Regex`, and
-`File` are explicit standard modules; `File` and `Regex` failures are catchable.
+symbol. Local modules are sibling files. `Math`, `Time`, `Latex`, `Path`,
+`Regex`, `CSV`, and `File` are explicit standard modules; their domain and
+file failures are catchable AhdCode errors.
 
 Continue with [Functions](FUNCTIONS.md), [Classes](CLASSES.md),
 [Class Protocol Methods](PROTOCOLS.md), [Collections](COLLECTIONS.md), and
-[Modules](MODULES.md).
+[Modules](MODULES.md). Time covers local, UTC, and fixed-offset instants; CSV
+transports String rows and records. See [Time](TIME.md), [CSV](CSV.md), and the
+[diagnostics guide](DIAGNOSTICS.md).

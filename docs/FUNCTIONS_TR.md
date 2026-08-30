@@ -54,12 +54,12 @@ olan her parametre türü desteklenir. Uyumlu bir lambda; `map`, `filter` ve
 mevcut `sort` anahtar callback'i dahil, `Function` değeri kabul edilen her
 yerde çalışır. Örtük zorlama (implicit coercion) eklenmez.
 
-Lambda parametreleri zorunludur; varsayılan değerli parametreler v0.1.10'da
+Lambda parametreleri zorunludur; varsayılan değerli parametreler v0.1.11'de
 ifade lambda'larında değil, isimli Function bildirimlerinde kullanılabilir.
 
 Bir lambda blok veya deyim (statement) içeremez. Kontrol akışı, bildirimler,
 döngüler, hata işleme veya birden çok adım gerektiğinde değişmeyen isimli
-Function sözdizimini kullanın. v0.1.10 lexical closure da uygulamaz: lambda,
+Function sözdizimini kullanın. v0.1.11 lexical closure da uygulamaz: lambda,
 çevreleyen bir `Local` bağlamayı yakalayamaz; bu değeri açık bir parametre
 olarak geçirin. Sıradan `Local`/`Global` görünürlük kuralları bunun dışında
 değişmez.

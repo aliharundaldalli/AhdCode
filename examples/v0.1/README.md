@@ -39,5 +39,7 @@ ahdcode run examples/v0.1/14_grade_app.ahd
 | `18_protocols.ahd` | Class Protocol Methods, `type()`, `id()` |
 | `19_regex.ahd` | Regex module: `Pattern`, match/find/replace/split/groups, `RegexError` |
 | `20_lambda.ahd` | expression-only Function values, inference, callbacks, and normal Function contrast |
+| `21_time_utc.ahd` | UTC, Unix milliseconds, fixed offsets, and instant-preserving conversion |
+| `22_csv.ahd` | raw CSV transport, header records, quoting, Unicode, and multiline fields |
 
 `Greeting.ahd` is the sibling module used by `11_modules.ahd`.

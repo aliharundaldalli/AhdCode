@@ -39,6 +39,8 @@ ahdcode run examples/v0.1/14_grade_app.ahd
 | `18_protocols.ahd` | Class Protocol Methods, `type()`, `id()` |
 | `19_regex.ahd` | Regex modülü: `Pattern`, match/find/replace/split/groups, `RegexError` |
 | `20_lambda.ahd` | yalnızca ifade içeren Function değerleri, çıkarım, callback'ler ve normal Function karşılaştırması |
+| `21_time_utc.ahd` | UTC, Unix milisaniyesi, sabit ofsetler ve anı koruyan dönüşüm |
+| `22_csv.ahd` | ham CSV taşıma, başlık kayıtları, tırnaklama, Unicode ve çok satırlı alanlar |
 
 `Greeting.ahd`, `11_modules.ahd` tarafından kullanılan kardeş (sibling)
 modüldür.

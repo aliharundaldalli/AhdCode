@@ -53,13 +53,22 @@ func (p *parser) parseExpression(minBindingPower int) ast.Expr {
 			p.advance()
 		}
 		p.skipNewlines()
-		right := p.parseExpression(rightBP)
+		right := p.parseRequiredExpression(rightBP, "missing right operand after '"+operator+"'", "write an expression after the operator")
 		left = &ast.BinaryExpr{
 			Base: p.base(spanStart(left), spanEnd(right)), Left: left,
 			Operator: operator, Right: right,
 		}
 	}
 	return left
+}
+
+func (p *parser) parseRequiredExpression(minBindingPower int, message, hint string) ast.Expr {
+	if p.atEnd() || p.check(token.RightParen) || p.check(token.RightBracket) || p.check(token.RightBrace) || p.check(token.InterpolationEnd) {
+		item := p.current()
+		p.errorCurrent(codeUnexpectedToken, message, hint)
+		return &ast.BadExpr{Base: ast.Base{Range: item.Span}}
+	}
+	return p.parseExpression(minBindingPower)
 }
 
 func (p *parser) parsePrefix() ast.Expr {
@@ -92,9 +101,14 @@ func (p *parser) parsePrefix() ast.Expr {
 	case token.LeftParen:
 		start := p.advance().Span.Start
 		p.skipNewlines()
+		if p.atEnd() {
+			p.errorCurrent(codeExpectedToken, "expected an expression and ) to close the grouped expression", "write an expression followed by )")
+			bad := &ast.BadExpr{Base: ast.Base{Range: p.current().Span}}
+			return &ast.GroupExpr{Base: p.base(start, p.current().Span.End), Expression: bad}
+		}
 		expression := p.parseExpression(0)
 		p.skipNewlines()
-		closing := p.expect(token.RightParen, "expected ) after grouped expression")
+		closing := p.expect(token.RightParen, "expected ) to close the grouped expression")
 		return &ast.GroupExpr{Base: p.base(start, closing.Span.End), Expression: expression}
 	case token.LeftBracket:
 		return p.parseList()
@@ -130,7 +144,7 @@ func (p *parser) parseLambda() ast.Expr {
 		block := p.parseBlock()
 		return &ast.BadExpr{Base: p.base(start, block.Span().End)}
 	}
-	body := p.parseExpression(0)
+	body := p.parseRequiredExpression(0, "missing lambda body expression after '->'", "write one expression after '->', or use a normal Function for statements")
 	return &ast.LambdaExpr{Base: p.base(start, spanEnd(body)), Parameters: parameters, Body: body}
 }
 
@@ -201,7 +215,7 @@ func (p *parser) parseCall(callee ast.Expr) ast.Expr {
 			p.errorCurrent(codeExpectedSeparator, "expected comma or newline between call arguments", "add a comma on the same line or place the next argument on a new line")
 		}
 	}
-	closing := p.expect(token.RightParen, "expected ) after call arguments")
+	closing := p.expect(token.RightParen, "expected ) to close the call argument list")
 	return &ast.CallExpr{Base: p.base(start, closing.Span.End), Callee: callee, Arguments: arguments}
 }
 
@@ -215,6 +229,11 @@ func (p *parser) parseIndexOrSlice(object ast.Expr) ast.Expr {
 	p.advance()
 	p.skipNewlines()
 	var first ast.Expr
+	if p.atEnd() {
+		p.errorCurrent(codeExpectedToken, "expected an index expression and ] to close the index", "write an index followed by ]")
+		first = &ast.BadExpr{Base: ast.Base{Range: p.current().Span}}
+		return &ast.IndexExpr{Base: p.base(spanStart(object), p.current().Span.End), Object: object, Index: first}
+	}
 	if !p.check(token.Colon) && !p.check(token.RightBracket) {
 		first = p.parseExpression(0)
 		p.skipNewlines()
@@ -229,7 +248,7 @@ func (p *parser) parseIndexOrSlice(object ast.Expr) ast.Expr {
 		closing := p.expect(token.RightBracket, "expected ] after slice")
 		return &ast.SliceExpr{Base: p.base(spanStart(object), closing.Span.End), Object: object, Start: first, End: end}
 	}
-	closing := p.expect(token.RightBracket, "expected ] after index")
+	closing := p.expect(token.RightBracket, "expected ] to close the index")
 	if first == nil {
 		p.errorSpan(codeUnexpectedToken, "empty index is not allowed", closing.Span, "provide an index or use : for a slice")
 		first = &ast.BadExpr{Base: ast.Base{Range: closing.Span}}
@@ -250,7 +269,7 @@ func (p *parser) parseList() ast.Expr {
 			p.errorCurrent(codeExpectedSeparator, "expected comma or newline between List elements", "separate same-line elements with commas")
 		}
 	}
-	closing := p.expect(token.RightBracket, "expected ] after List literal")
+	closing := p.expect(token.RightBracket, "expected ] to close the List literal")
 	return &ast.ListExpr{Base: p.base(start, closing.Span.End), Elements: elements}
 }
 
@@ -272,7 +291,7 @@ func (p *parser) parsePair() ast.Expr {
 			p.errorCurrent(codeExpectedSeparator, "expected comma or newline between Pair entries", "separate same-line entries with commas")
 		}
 	}
-	closing := p.expect(token.RightBrace, "expected } after Pair literal")
+	closing := p.expect(token.RightBrace, "expected } to close the Pair literal")
 	return &ast.PairExpr{Base: p.base(start, closing.Span.End), Entries: entries}
 }
 

@@ -80,5 +80,6 @@ ahdcode format --check hello.ahd
 The first command updates the file atomically. The second only checks whether
 the file is already canonical.
 
-Next: read the [language tour](LANGUAGE_TOUR.md) or run the
-[curated examples](../examples/v0.1/README.md).
+Next: read the [language tour](LANGUAGE_TOUR.md), learn how to act on
+[diagnostics](DIAGNOSTICS.md), or run the
+[curated examples](../examples/v0.1/README.md), including UTC Time and CSV.

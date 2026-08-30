@@ -1948,6 +1948,9 @@ func ahdCivilFrom(value time.Time) AhdCivilTime {
 		weekday = 7
 	}
 	_, offsetSeconds := value.Zone()
+	if offsetSeconds%60 != 0 {
+		AhdRaiseClass(AhdClassValueError, "local offset is not representable at minute precision")
+	}
 	return AhdCivilTime{
 		Year: int64(value.Year()), Month: int64(value.Month()), Day: int64(value.Day()),
 		Hour: int64(value.Hour()), Minute: int64(value.Minute()), Second: int64(value.Second()),

@@ -976,7 +976,7 @@ Lambda is not a separate type: it creates a value of the existing `Function`
 type. Each parameter needs an explicit static type, the return type comes from
 the expression, and ordinary strict typing/null-safety rules still apply. A
 lambda has no block or statements and cannot capture an enclosing `Local`
-binding in v0.1.10; use a normal Function or pass the value explicitly.
+binding in v0.1.11; use a normal Function or pass the value explicitly.
 
 `map` and `filter` do not alter the source List; they return a new List.
 
@@ -1607,6 +1607,21 @@ except RegexError as error {
 
 See [the Regex module reference](REGEX.md) for `replace`, `split`, and `groups`.
 
+### A first look at CSV
+
+`CSV` transports text as raw String rows or header-keyed String records:
+
+```ahd
+bring CSV
+
+rows: List<List<String>> := CSV.parse("name,age\nAli,42\n")
+records: List<Pair<String, String>> := CSV.parseRecords("name,age\nAli,42\n")
+write(records[0]["name"])
+```
+
+CSV never infers numbers or dates. Malformed input and invalid record shapes
+raise `CSVError`. See [the CSV module reference](CSV.md).
+
 ## 20. Fundamentals module
 
 To use some tools, you don't need to write any `bring`. These are directly available in an AhdCode program:
@@ -1785,15 +1800,22 @@ write(current.day)
 write(current.hour)
 ```
 
-`Time.now()` gives your computer's local time. In v0.1, there is no separate timezone management.
+`Time.now()` gives your computer's local time. `Time.utc()` gives UTC.
+`Time.timestamp()` is signed Unix milliseconds. AhdCode supports fixed minute
+offsets but deliberately has no named/IANA timezone database.
 
 A `DateTime` contains the following information:
 
 ```text
-year  month  day  hour  minute  second  millisecond  weekday
+year  month  day  hour  minute  second  millisecond  weekday  offsetMinutes
 ```
 
 `weekday` uses the value `1` for Monday, and `7` for Sunday. These fields are read-only.
+
+`Time.fromTimestamp(milliseconds)` returns UTC. `dateTimeUTC(...)` constructs
+UTC, while `dateTimeOffset(..., offsetMinutes: 180)` constructs a fixed-offset
+value. `toUTC()`, `toLocal()`, and `toOffset(...)` preserve the instant;
+`timestamp()` recovers its Unix milliseconds. Offsets must be -840..840.
 
 ### Creating a specific date
 
@@ -2238,6 +2260,8 @@ After finishing this guide, you can deepen your knowledge of the language detail
 - [Latex](LATEX.md)
 - [File and Path](FILESYSTEM.md)
 - [Regex](REGEX.md)
+- [CSV](CSV.md)
+- [Diagnostics](DIAGNOSTICS.md)
 - [CLI](CLI.md)
 - [Formatter](FORMATTER.md)
 - [REPL](REPL.md)

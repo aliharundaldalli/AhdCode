@@ -43,7 +43,7 @@ from Utilities bring all
 aktarım çakışmaları (import collisions) ve döngüsel bağımlılıklar (circular
 dependencies) derleme zamanı hatalarıdır.
 
-`Math`, `Time`, `Latex`, `Path`, `File` ve `Regex` derleyici tarafından
+`Math`, `Time`, `Latex`, `Path`, `File`, `Regex` ve `CSV` derleyici tarafından
 kayıtlıdır (compiler-registered) ve aynı içe aktarım biçimlerini kullanır.
 Yerel bir dosya, aynı isimdeki standart bir modülün yerini alamaz (shadow
 edemez). Ayrıca sıradan isim uzayı takma adı (namespace alias) biçimini de
@@ -53,3 +53,6 @@ kullanabilirler:
 bring File as F
 F.writeText("note.txt", "hello")
 ```
+
+Tipli yüzeyleri ve yakalanabilir alan hataları için [Time](TIME_TR.md),
+[CSV](CSV_TR.md) ve diğer modül referanslarına bakın.

@@ -34,6 +34,7 @@ Common built-in errors include:
 | `IOError` | base class for input/output failures |
 | `FileError` | `File` module operation failure; derives from `IOError` |
 | `RegexError` | invalid pattern passed to `Regex.compile`; derives from `Error` |
+| `CSVError` | malformed CSV, invalid delimiter, or invalid record/header shape; derives from `Error` |
 | `KeyError` | missing Pair key |
 | `NullError` | runtime null safety boundary |
 | `ConstantError` | mutation through a deep-frozen reference |

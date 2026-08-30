@@ -97,9 +97,23 @@ func (p *parser) parseStatement(scope scopeKind) ast.Stmt {
 		return p.parseBring()
 	case token.Increment, token.Decrement:
 		return p.parsePrefixUpdate()
+	case token.Dot:
+		return p.parseLeadingDotContinuation()
 	default:
 		return p.parseSimpleStatement(scope)
 	}
+}
+
+func (p *parser) parseLeadingDotContinuation() ast.Stmt {
+	leading := p.advance()
+	p.errorSpan(codeLeadingDotContinuation, "method chain cannot continue from a new line", leading.Span,
+		"keep the member call on the same expression as its receiver, or store the intermediate result in a variable")
+	end := leading.Span.End
+	for !p.atEnd() && !p.check(token.Newline) && !p.check(token.RightBrace) {
+		end = p.advance().Span.End
+	}
+	bad := &ast.BadExpr{Base: p.base(leading.Span.Start, end)}
+	return &ast.ExprStmt{Base: p.base(leading.Span.Start, end), Expression: bad}
 }
 
 func (p *parser) current() token.Token {
@@ -194,14 +208,15 @@ func (p *parser) base(start, end source.Position) ast.Base {
 // declarations and assignments visually anchored to their operator. On
 // violation it reports the exact diagnostic and skips the offending newlines
 // so parsing can recover and keep finding further errors.
-func (p *parser) requireSameLineRHS(operator token.Token) {
+func (p *parser) requireSameLineRHS(operator token.Token) bool {
 	if !p.check(token.Newline) {
-		return
+		return false
 	}
 	symbol := operator.Kind.String()
 	message := fmt.Sprintf("expected the assigned expression to begin after '%s' on the same line", symbol)
-	p.errorSpan(codeExpectedSameLineRHS, message, operator.Span, fmt.Sprintf("move the expression after '%s' onto the same line", symbol))
+	p.errorSpan(codeExpectedSameLineRHS, message, operator.Span, fmt.Sprintf("write the assigned expression on the same line as '%s'", symbol))
 	p.skipNewlines()
+	return true
 }
 
 func (p *parser) synchronize(terminator token.Kind) {

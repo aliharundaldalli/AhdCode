@@ -90,6 +90,9 @@ func (session *Session) dateTime(value time.Time) *Instance {
 	instance := &Instance{Class: class, Fields: make(map[ir.FieldID]any)}
 	weekday := int64((int(value.Weekday())+6)%7 + 1)
 	_, offsetSeconds := value.Zone()
+	if offsetSeconds%60 != 0 {
+		session.raise("ValueError", "local offset is not representable at minute precision")
+	}
 	values := []int64{int64(value.Year()), int64(value.Month()), int64(value.Day()), int64(value.Hour()), int64(value.Minute()), int64(value.Second()), int64(value.Nanosecond() / 1e6), weekday, int64(offsetSeconds / 60)}
 	names := []string{"year", "month", "day", "hour", "minute", "second", "millisecond", "weekday", "offsetMinutes"}
 	for index, name := range names {

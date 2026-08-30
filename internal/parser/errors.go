@@ -13,4 +13,5 @@ const (
 	codeExpectedSameLineRHS     = "PAR010"
 	codeInvalidInferredTarget   = "PAR011"
 	codeInvalidLambdaSyntax     = "PAR012"
+	codeLeadingDotContinuation  = "PAR013"
 )

@@ -12,7 +12,7 @@ AhdCode; okunabilir sözdizimi, açık niyet (explicit intent), öngörülebilir
 anlambilim (semantics) ve yerel (native) derlemeye odaklanan, deneysel,
 statik olarak denetlenen genel amaçlı bir programlama dilidir.
 
-Mevcut sürüm **v0.1.10**'dur. Çekirdek dil uçtan uca çalışır, ancak proje
+Mevcut sürüm **v0.1.11**'dir. Çekirdek dil uçtan uca çalışır, ancak proje
 üretime hazır değildir ve 1.0'dan önce kırıcı (breaking) değişiklikler
 olabilir.
 
@@ -49,6 +49,10 @@ for name in names {
 - Bir [Regex modülü](docs/REGEX_TR.md), desenleri (patterns) `matches`,
   `find`, `findAll`, `groups`, `replace` ve `split` içeren bir `Pattern`
   değerine derler.
+- [Time](docs/TIME_TR.md), saat dilimi veritabanı eklemeden yerel, UTC, sabit
+  dakika ofseti ve Unix milisaniye gösterimlerini destekler.
+- Sıkı [CSV modülü](docs/CSV_TR.md), ham String satırlarını veya başlık
+  anahtarlı String kayıtlarını native ve kalıcı REPL uyumuyla taşır.
 - Formatter, yorumları korurken tek bir kanonik (standart) sunum tanımlar.
 
 ## Kaynak koddan derleme
@@ -103,6 +107,8 @@ ve [REPL rehberine](docs/REPL_TR.md) bakın.
 - [Latex modülü](docs/LATEX_TR.md)
 - [File ve Path modülleri](docs/FILESYSTEM_TR.md)
 - [Regex modülü](docs/REGEX_TR.md)
+- [CSV modülü](docs/CSV_TR.md)
+- [Tanılamaları anlama](docs/DIAGNOSTICS_TR.md)
 - [Yapay zekâ destekli yerel kurulum](FOR_AI.md)
 - [Derlenmiş v0.1 örnekleri](examples/v0.1/README_TR.md)
 - [Tam v0.1 dil spesifikasyonu](AHDCODE_LANGUAGE_SPEC_v0.1_TR.md)

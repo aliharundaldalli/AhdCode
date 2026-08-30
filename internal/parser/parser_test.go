@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"ahdcode/internal/diagnostics"
 	"ahdcode/internal/lexer"
 	"ahdcode/internal/source"
 	"ahdcode/internal/syntax/ast"
@@ -18,6 +19,55 @@ func parseText(t *testing.T, text string) Result {
 		t.Fatalf("unexpected lexer diagnostics: %+v", lexed.Diagnostics)
 	}
 	return Parse(file, lexed.Tokens)
+}
+
+func TestLeadingDotContinuationHasOnePreciseDiagnosticAndRecovers(t *testing.T) {
+	result := parseText(t, "values := [1]\n    .filter(lambda (x: Int) -> true)\nother :=\n")
+	if len(result.Diagnostics) != 2 {
+		t.Fatalf("diagnostics = %+v, want the leading-dot error and one independent later error", result.Diagnostics)
+	}
+	first := result.Diagnostics[0]
+	if first.Code != codeLeadingDotContinuation || first.Severity != diagnostics.SeverityError ||
+		first.Message != "method chain cannot continue from a new line" ||
+		first.Hint != "keep the member call on the same expression as its receiver, or store the intermediate result in a variable" ||
+		first.Span.Start.Line != 2 || first.Span.Start.Column != 5 || first.Span.End.Column != 6 {
+		t.Fatalf("leading-dot diagnostic = %+v", first)
+	}
+	if result.Diagnostics[1].Code != codeExpectedSameLineRHS {
+		t.Fatalf("independent diagnostic = %+v", result.Diagnostics[1])
+	}
+	for _, item := range result.Diagnostics {
+		if item.Code == codeExpectedSeparator {
+			t.Fatalf("misleading separator cascade survived: %+v", result.Diagnostics)
+		}
+	}
+}
+
+func TestIncompleteExpressionsUseContextualMessages(t *testing.T) {
+	tests := []struct {
+		text, message string
+	}{
+		{"x :=", "missing initializer after ':='"},
+		{"x: Int := 1\nx =", "missing assigned expression after '='"},
+		{"x: Int := 1\nx +=", "missing assigned expression after '+='"},
+		{"value +", "missing right operand after '+'"},
+		{"lambda (x: Int) ->", "missing lambda body expression after '->'"},
+		{"values[", "expected an index expression and ] to close the index"},
+	}
+	for _, test := range tests {
+		t.Run(test.message, func(t *testing.T) {
+			result := parseText(t, test.text)
+			found := false
+			for _, item := range result.Diagnostics {
+				if item.Message == test.message {
+					found = true
+				}
+			}
+			if !found {
+				t.Fatalf("diagnostics = %+v, want %q", result.Diagnostics, test.message)
+			}
+		})
+	}
 }
 
 func requireClean(t *testing.T, result Result) {
@@ -828,6 +878,11 @@ func TestRHSMustStartOnSameLineAsOperator(t *testing.T) {
 			text:    "x: Int := 1\nx +=\n2",
 			message: "expected the assigned expression to begin after '+=' on the same line",
 		},
+		{name: "minus compound RHS on next line", text: "x: Int := 1\nx -=\n2", message: "expected the assigned expression to begin after '-=' on the same line"},
+		{name: "multiply compound RHS on next line", text: "x: Int := 1\nx *=\n2", message: "expected the assigned expression to begin after '*=' on the same line"},
+		{name: "divide compound RHS on next line", text: "x: Int := 1\nx /=\n2", message: "expected the assigned expression to begin after '/=' on the same line"},
+		{name: "remainder compound RHS on next line", text: "x: Int := 1\nx %=\n2", message: "expected the assigned expression to begin after '%=' on the same line"},
+		{name: "power compound RHS on next line", text: "x: Int := 1\nx ^=\n2", message: "expected the assigned expression to begin after '^=' on the same line"},
 		{
 			name:    "parameter default RHS on next line",
 			text:    "f: Function := (x: Int :=\n1) -> Int {\nreturn x\n}",

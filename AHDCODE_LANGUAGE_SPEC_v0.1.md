@@ -2855,6 +2855,9 @@ The exact public surface is:
 
 ```text
 Time.now()                        -> DateTime
+Time.utc()                        -> DateTime
+Time.timestamp()                  -> Int
+Time.fromTimestamp(milliseconds: Int) -> DateTime
 Time.monotonic()                  -> Real
 Time.sleep(milliseconds: Int)     -> Nothing
 Time.duration(milliseconds: Int)  -> Duration
@@ -2868,21 +2871,29 @@ Time.dateTime(
     second: Int = 0,
     millisecond: Int = 0
 ) -> DateTime
+Time.dateTimeUTC(year, month, day, hour = 0, minute = 0, second = 0, millisecond = 0) -> DateTime
+Time.dateTimeOffset(year, month, day, offsetMinutes, hour = 0, minute = 0, second = 0, millisecond = 0) -> DateTime
 ```
 
-### 36.1 Local time only
+### 36.1 Local, UTC, fixed offset, and timestamps
 
 `Time.now()` reports the host's **local** date and time, and `Time.dateTime`
-builds a local civil moment. v0.1 has no timezone API at all: no UTC
-conversion, no timezone objects or names, no fixed offsets, no DST
-configuration, and no timezone parsing or formatting.
+builds a local civil moment. `Time.utc()` and `Time.dateTimeUTC` use UTC.
+`Time.dateTimeOffset` uses a fixed whole-minute offset from -840 through 840.
+A Unix timestamp is signed milliseconds since `1970-01-01 00:00:00 UTC`;
+`Time.timestamp()` reads the current value and `Time.fromTimestamp` returns
+its UTC representation. Negative timestamps are valid when representable as a
+DateTime year 1..9999. v0.1.11 has no named/IANA timezone database.
+The offset representation has minute precision. If a host's historical local
+zone reports a seconds component, local construction/conversion raises
+`ValueError` rather than truncating the offset and changing the instant.
 
 ### 36.2 DateTime
 
-`DateTime` exposes eight read-only `Int` attributes:
+`DateTime` exposes nine read-only `Int` attributes:
 
 ```text
-year  month  day  hour  minute  second  millisecond  weekday
+year  month  day  hour  minute  second  millisecond  weekday  offsetMinutes
 ```
 
 `weekday` numbers the days from Monday:
@@ -2908,12 +2919,17 @@ current.year = 2030
 
 is invalid.
 
-`DateTime` publishes four members:
+`offsetMinutes` is the value's fixed offset east of UTC. `DateTime` publishes
+eight members:
 
 ```text
 before(other: DateTime)     -> Bool
 after(other: DateTime)      -> Bool
 sameMoment(other: DateTime) -> Bool
+timestamp()                 -> Int
+toUTC()                     -> DateTime
+toLocal()                   -> DateTime
+toOffset(offsetMinutes: Int) -> DateTime
 toString()                  -> String
 ```
 
@@ -2934,9 +2950,13 @@ object identity — and two separately built equal moments are **not** `==`.
 Value comparison is `sameMoment`, and two `Duration` values are compared
 through `milliseconds`.
 
+`timestamp`, `toUTC`, `toLocal`, and `toOffset` preserve the represented
+instant. `before`, `after`, `sameMoment`, and `Time.between` compare instants,
+not displayed civil fields, even when the offsets differ.
+
 ### 36.3 Creating a DateTime
 
-`Time.dateTime` validates every component against the Gregorian calendar and
+`Time.dateTime`, `Time.dateTimeUTC`, and `Time.dateTimeOffset` validate every component against the Gregorian calendar and
 raises `ValueError` for an impossible moment rather than rolling it over:
 
 ```text
@@ -2947,6 +2967,7 @@ hour         0..23
 minute       0..59
 second       0..59
 millisecond  0..999
+offsetMinutes -840..840 (fixed-offset constructor and conversion)
 ```
 
 ```ahd
@@ -3043,8 +3064,10 @@ request raises `ValueError` rather than being clamped to zero.
 
 ### 36.8 Not in this version
 
-`Time` deliberately has no format strings, no `parse`, no ISO-8601 or RFC 3339
-reader, no month or day names, and no natural-language dates.
+`Time` deliberately has no named/IANA zones, DST configuration objects,
+format strings, `parse`, ISO-8601 or RFC 3339 reader, month or day names, or
+natural-language dates. Existing `toString()` remains `YYYY-MM-DD HH:MM:SS`
+and does not append an offset.
 
 ---
 
@@ -3871,6 +3894,56 @@ lambda (x: Int) -> x > 0
 
 Long parameter lists break according to the existing 80-column policy; the
 single expression remains after `->`.
+
+---
+
+## 51. CSV Standard Module (v0.1.11)
+
+`CSV` is the explicit compiler-registered `builtin:CSV` module; a sibling
+`CSV.ahd` cannot shadow it. It transports Strings only and performs no type
+inference or DataFrame/table modeling.
+
+```text
+parse(text: String, delimiter: String = ",") -> List<List<String>>
+stringify(rows: List<List<String>>, delimiter: String = ",") -> String
+read(path: String, delimiter: String = ",") -> List<List<String>>
+write(path: String, rows: List<List<String>>, delimiter: String = ",") -> Nothing
+parseRecords(text: String, delimiter: String = ",") -> List<Pair<String, String>>
+readRecords(path: String, delimiter: String = ",") -> List<Pair<String, String>>
+stringifyRecords(records: List<Pair<String, String>>, delimiter: String = ",") -> String
+writeRecords(path: String, records: List<Pair<String, String>>, delimiter: String = ",") -> Nothing
+```
+
+Raw parsing supports standard quoting, escaped quotes, embedded delimiters and
+newlines, LF/CRLF, Unicode, empty fields, and variable-width rows. Empty raw
+rows stringify to `""`; encoding uses deterministic Go `encoding/csv` output.
+
+Record parsing uses the first row as non-empty unique headers. Empty input and
+header-only input return an empty List. Every data row must have exactly the
+header width. Record writing takes column order from the first Pair; every
+later Pair must have exactly the same key set, although insertion order may
+differ. Empty records stringify to `""`.
+
+The delimiter is exactly one valid Unicode scalar and cannot be quote, CR, or
+LF. Invalid delimiters, malformed CSV, invalid UTF-8 CSV content, and invalid
+header/record shape raise `CSVError`, which derives directly from `Error`.
+File access failures preserve `FileError`/`IOError` semantics. Relative paths
+use process working directory, including the REPL launch directory.
+
+## 52. Diagnostic quality and recovery (v0.1.11)
+
+Diagnostics carry code, severity, message, hint, and precise source span.
+Established codes retain their rules: `PAR010` identifies an assigned/default
+expression that begins after its operator's physical line; `SEM022` retains the
+no-lexical-capture rule. `PAR013` identifies unsupported leading-dot newline
+continuation and recovers at the statement boundary to suppress derivative
+parse/semantic cascades without hiding independent later errors.
+
+When a construct is known, incomplete initializer, assignment, binary operand,
+index, lambda body, call/list/pair/group, and delimiter messages name the
+missing part. Lambda blocks remain rejected as expression-lambda syntax.
+Runtime domain failures remain AhdCode Errors (`RegexError`, `ValueError`,
+`CSVError`, or `FileError`) and must not expose Go panics or stack traces.
 
 ---
 

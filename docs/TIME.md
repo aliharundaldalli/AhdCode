@@ -2,10 +2,10 @@
 
 [English] · [Türkçe](TIME_TR.md)
 
-[Back to README](../README.md) · [Modules](MODULES.md) · [Math module](MATH.md)
+[Back to README](../README.md) · [Modules](MODULES.md) · [Diagnostics](DIAGNOSTICS.md)
 
-Time is explicit, like Math. AhdCode has no namespace-qualified type syntax, so
-a type is imported before it is named:
+`Time` is the explicit, compiler-registered `builtin:Time` module. A sibling
+`Time.ahd` cannot shadow it. Import its Classes before naming them:
 
 ```ahd
 bring Time
@@ -13,90 +13,96 @@ from Time bring DateTime
 from Time bring Duration
 ```
 
-The canonical identity is `builtin:Time`; a sibling `Time.ahd` cannot shadow
-it. Every argument must be `NonNull`.
-
 ## Surface
 
 ```text
 now() -> DateTime
+utc() -> DateTime
+timestamp() -> Int
+fromTimestamp(milliseconds: Int) -> DateTime
+dateTime(year, month, day, hour = 0, minute = 0, second = 0, millisecond = 0) -> DateTime
+dateTimeUTC(year, month, day, hour = 0, minute = 0, second = 0, millisecond = 0) -> DateTime
+dateTimeOffset(year, month, day, offsetMinutes, hour = 0, minute = 0, second = 0, millisecond = 0) -> DateTime
 monotonic() -> Real
 sleep(milliseconds: Int) -> Nothing
 duration(milliseconds: Int) -> Duration
 between(first: DateTime, second: DateTime) -> Duration
-dateTime(year, month, day, hour = 0, minute = 0, second = 0, millisecond = 0) -> DateTime
+```
 
+`now` uses the host's local civil time. `utc` uses UTC. `dateTime` constructs a
+local civil value, `dateTimeUTC` constructs UTC, and `dateTimeOffset` uses a
+fixed offset in whole minutes. The supported offset range is -840..840
+inclusive. Invalid civil components, offsets, and unrepresentable timestamps
+raise `ValueError`.
+
+The public offset model has minute precision. A historical host-local offset
+that contains a seconds component cannot be represented without changing the
+instant, so local construction/conversion raises `ValueError` for that rare
+case rather than silently truncating it.
+
+## Unix milliseconds and conversions
+
+A timestamp is signed milliseconds since `1970-01-01 00:00:00 UTC`.
+`Time.timestamp()` reads the current timestamp. `Time.fromTimestamp(value)`
+returns its UTC representation; negative timestamps are supported when the
+resulting year is in 1..9999.
+
+```ahd
+epoch: DateTime := Time.fromTimestamp(0)
+turkey: DateTime := epoch.toOffset(180)
+
+write(epoch.timestamp())
+write(turkey.hour)
+write(epoch.sameMoment(turkey))
+```
+
+Conversions preserve the instant:
+
+```text
+value.timestamp() -> Int
+value.toUTC() -> DateTime
+value.toLocal() -> DateTime
+value.toOffset(offsetMinutes: Int) -> DateTime
+```
+
+`before`, `after`, `sameMoment`, and `Time.between` compare instants, not the
+displayed clock fields, so differently offset values compare correctly.
+
+## DateTime
+
+Nine read-only `Int` attributes are available: `year`, `month`, `day`, `hour`,
+`minute`, `second`, `millisecond`, `weekday`, and `offsetMinutes`. Weekdays run
+Monday=1 through Sunday=7. `offsetMinutes` is the value's offset east of UTC.
+
+Members are `before`, `after`, `sameMoment`, `timestamp`, `toUTC`, `toLocal`,
+`toOffset`, and `toString`. The existing `toString()` output remains
+`YYYY-MM-DD HH:MM:SS`; it deliberately does not append milliseconds or an
+offset. `str(value)` remains the ordinary Class rendering `<DateTime>`.
+
+`DateTime` does not implement `CCompare` or `CEqual`. Use the named instant
+operations; ordinary `==` and `same` retain Class identity semantics.
+
+## Validation, Duration, and Calendar
+
+Civil constructors validate year 1..9999, Gregorian dates, hour 0..23, minute
+and second 0..59, and millisecond 0..999. `DateTime` and `Duration` cannot be
+constructed directly.
+
+`Duration` exposes read-only `milliseconds: Int` and `seconds: Real`.
+`between(first, second)` means `second - first` and may be negative.
+
+```text
 Calendar.isLeapYear(year: Int) -> Bool
 Calendar.daysInMonth(year: Int, month: Int) -> Int
 Calendar.weekday(year: Int, month: Int, day: Int) -> Int
 ```
 
-## Local time only
+`monotonic()` returns elapsed seconds on a non-decreasing clock. `sleep` takes
+milliseconds; zero returns immediately and a negative value raises
+`ValueError`.
 
-`now` reports host local time and `dateTime` builds a local civil moment. v0.1
-has no UTC conversion, timezone objects or names, fixed offsets, DST
-configuration, or timezone parsing and formatting.
+## Deliberate boundary
 
-## DateTime
-
-Eight read-only `Int` attributes: `year`, `month`, `day`, `hour`, `minute`,
-`second`, `millisecond`, `weekday`. Weekdays run Monday=1 to Sunday=7.
-
-Every attribute is `Constant`, so `value.year = 2030` is the ordinary Constant
-diagnostic rather than a Time-specific rule.
-
-Members: `before`, `after`, `sameMoment`, and `toString`. `toString` is
-deterministic and locale-independent, formatted `YYYY-MM-DD HH:MM:SS`;
-milliseconds are read through the `millisecond` attribute. `str(value)` renders
-`<DateTime>`, because Class attributes are never printed automatically.
-
-`DateTime` does not implement the `CCompare`/`CEqual` [Class Protocol
-Methods](PROTOCOLS.md), so ordering is `before`/`after` rather than `<`/`>`.
-`==` and `same` keep the ordinary Class identity rule, so two separately
-built equal moments are not `==`; `sameMoment` is the value comparison.
-
-## Validation
-
-`dateTime` checks `year` 1..9999, `month` 1..12, `day` against that month of
-that year, `hour` 0..23, `minute` 0..59, `second` 0..59, and `millisecond`
-0..999. An impossible moment raises the catchable `ValueError` rather than
-rolling over, so `2026-02-29` and `2026-02-30` are both rejected while
-`2028-02-29` is valid.
-
-`DateTime` and `Duration` are never constructed directly; they come only from
-the Time functions, which validate first.
-
-## Duration
-
-Read-only `milliseconds: Int` and `seconds: Real`. A Duration may be negative,
-and the sign is preserved rather than reduced to a magnitude.
-
-`between(first, second)` is `second - first`, so reversing the arguments gives
-a negative Duration and the same moment twice gives zero.
-
-## Calendar
-
-`Calendar` answers questions about the Gregorian calendar without a DateTime. A
-leap year divides by 4, except a century year, which must divide by 400: 2028
-and 2000 are leap years, 2100 and 1900 are not. An invalid year, month, or
-date raises `ValueError`. v0.1 has no month or day names, localization, or
-calendar rendering.
-
-## Elapsed time and waiting
-
-`monotonic` reports **seconds** on a clock that never moves backwards. Only
-differences are meaningful; the absolute value has no calendar meaning.
-
-`sleep` takes **milliseconds**. Zero returns immediately, and a negative
-request raises `ValueError` rather than being clamped.
-
-```ahd
-start: Real := Time.monotonic()
-Time.sleep(100)
-elapsed: Real := Time.monotonic() - start
-```
-
-## Not in this version
-
-No format strings, no `parse`, no ISO-8601 or RFC 3339 reader, no month or day
-names, and no natural-language dates.
+v0.1.11 adds UTC and fixed minute offsets, not a timezone database. There are
+no named/IANA zones, DST configuration objects, date parsers, ISO-8601/RFC
+3339 readers, format strings, localized names, or natural-language dates.

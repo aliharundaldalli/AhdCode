@@ -978,7 +978,7 @@ values.sort(lambda (value: Int) -> -value)
 Lambda ayrı bir tür değildir: mevcut `Function` türünde bir değer oluşturur.
 Her parametre açık bir statik tür ister, dönüş türü ifadeden gelir ve sıradan
 katı tip/null güvenliği kuralları uygulanmaya devam eder. Lambda blok veya
-deyim içermez ve v0.1.10'da çevreleyen bir `Local` bağlamayı yakalayamaz;
+deyim içermez ve v0.1.11'de çevreleyen bir `Local` bağlamayı yakalayamaz;
 normal bir Function kullanın veya değeri açıkça geçirin.
 
 `map` ve `filter` kaynak List'i değiştirmez; yeni List döndürür.
@@ -1610,6 +1610,22 @@ except RegexError as error {
 
 `replace`, `split` ve `groups` için [Regex modülü referansına](REGEX_TR.md) bakın.
 
+### CSV'ye ilk bakış
+
+`CSV`, metni ham String satırları veya başlık anahtarlı String kayıtları olarak
+taşır:
+
+```ahd
+bring CSV
+
+rows: List<List<String>> := CSV.parse("name,age\nAli,42\n")
+records: List<Pair<String, String>> := CSV.parseRecords("name,age\nAli,42\n")
+write(records[0]["name"])
+```
+
+CSV sayı veya tarih çıkarımı yapmaz. Bozuk girdi ve geçersiz kayıt şekilleri
+`CSVError` fırlatır. [CSV modülü referansına](CSV_TR.md) bakın.
+
 ## 20. Temel işlevler modülü (Fundamentals)
 
 Bazı araçları kullanmak için hiçbir `bring` yazmanız gerekmez. Bunlar AhdCode programında doğrudan hazırdır:
@@ -1788,15 +1804,22 @@ write(current.day)
 write(current.hour)
 ```
 
-`Time.now()` bilgisayarınızın yerel saatini verir. v0.1'de ayrıca saat dilimi yönetimi yoktur.
+`Time.now()` bilgisayarınızın yerel saatini, `Time.utc()` UTC'yi verir.
+`Time.timestamp()` işaretli Unix milisaniyesidir. AhdCode sabit dakika
+ofsetlerini destekler, ancak adlandırılmış/IANA saat dilimi veritabanı yoktur.
 
 Bir `DateTime` içinde şu bilgiler bulunur:
 
 ```text
-year  month  day  hour  minute  second  millisecond  weekday
+year  month  day  hour  minute  second  millisecond  weekday  offsetMinutes
 ```
 
 `weekday` Pazartesi için `1`, Pazar için `7` değerini kullanır. Bu alanlar yalnızca okunur.
+
+`Time.fromTimestamp(milliseconds)` UTC döndürür. `dateTimeUTC(...)` UTC,
+`dateTimeOffset(..., offsetMinutes: 180)` sabit ofsetli değer oluşturur.
+`toUTC()`, `toLocal()` ve `toOffset(...)` aynı anı korur; `timestamp()` Unix
+milisaniyesini verir. Ofset -840..840 arasında olmalıdır.
 
 ### Belirli bir tarih oluşturmak
 
@@ -2242,6 +2265,8 @@ derinleştirebilirsiniz:
 - [Latex](LATEX_TR.md)
 - [File ve Path](FILESYSTEM_TR.md)
 - [Regex](REGEX_TR.md)
+- [CSV](CSV_TR.md)
+- [Tanılamalar](DIAGNOSTICS_TR.md)
 - [CLI](CLI_TR.md)
 - [Formatter](FORMATTER_TR.md)
 - [REPL](REPL_TR.md)

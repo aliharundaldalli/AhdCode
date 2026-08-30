@@ -53,7 +53,7 @@ values.sort(lambda (x: Int) -> -x)
 write(values)
 `
 	var output, errors bytes.Buffer
-	Run(strings.NewReader(input), &output, &errors, "AhdCode v0.1.10")
+	Run(strings.NewReader(input), &output, &errors, "AhdCode v0.1.11")
 	for _, want := range []string{"25\n", "[1, 4, 9]\n", "[2, 3]\n", "[3, 2, 1]\n"} {
 		if !strings.Contains(output.String(), want) {
 			t.Fatalf("REPL output missing %q:\n%s", want, output.String())
@@ -258,14 +258,30 @@ write(Engine.tick())
 bring File
 File.writeText("note.txt", "hello")
 write(File.readText("note.txt"))
+bring CSV
+CSV.write("data.csv", [["name"], ["Ali"]])
+write(CSV.read("data.csv")[1][0])
+attempt {
+    CSV.read("missing.csv")
+}
+except IOError as error {
+    write("csv file caught")
+}
+bring Time
+from Time bring DateTime
+epoch: DateTime := Time.fromTimestamp(0)
+write(epoch.toOffset(180).timestamp())
 `
 	var output, errors bytes.Buffer
 	Run(strings.NewReader(input), &output, &errors, "AhdCode v0.1.7")
-	if strings.Count(output.String(), "engine init\n") != 1 || !strings.Contains(output.String(), "7\n") || !strings.Contains(output.String(), "hello\n") {
+	if strings.Count(output.String(), "engine init\n") != 1 || !strings.Contains(output.String(), "7\n") || !strings.Contains(output.String(), "hello\n") || !strings.Contains(output.String(), "Ali\n") || !strings.Contains(output.String(), "csv file caught\n") || !strings.Contains(output.String(), "0\n") {
 		t.Fatalf("REPL launch-directory behavior:\n%s", output.String())
 	}
 	if content, err := os.ReadFile(filepath.Join(directory, "note.txt")); err != nil || string(content) != "hello" {
 		t.Fatalf("relative File write = %q, %v", content, err)
+	}
+	if content, err := os.ReadFile(filepath.Join(directory, "data.csv")); err != nil || string(content) != "name\nAli\n" {
+		t.Fatalf("relative CSV write = %q, %v", content, err)
 	}
 	if errors.Len() != 0 {
 		t.Fatalf("REPL errors: %s", errors.String())

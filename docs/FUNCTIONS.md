@@ -53,11 +53,11 @@ a `Function` value is accepted, including `map`, `filter`, and the existing
 `sort` key callback. No implicit coercion is added.
 
 Lambda parameters are required; default-valued parameters remain available on
-named Function declarations, not expression lambdas, in v0.1.10.
+named Function declarations, not expression lambdas, in v0.1.11.
 
 A lambda cannot contain a block or statements. Use the unchanged named
 Function syntax when control flow, declarations, loops, error handling, or
-multiple steps are needed. v0.1.10 also does not implement lexical closures:
+multiple steps are needed. v0.1.11 also does not implement lexical closures:
 a lambda cannot capture an enclosing `Local` binding; pass that value as an
 explicit parameter. Ordinary `Local`/`Global` visibility rules otherwise stay
 unchanged.

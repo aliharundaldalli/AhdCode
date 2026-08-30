@@ -112,7 +112,7 @@ squares := values.map(lambda (value: Int) -> value^2)
 ```
 
 Lambda yalnızca bir ifade içerir: blok/deyim lambda'sı, ayrı bir Lambda türü
-ve örtük zorlama yoktur. v0.1.10'da çevreleyen bir `Local` bağlamayı
+ve örtük zorlama yoktur. v0.1.11'de çevreleyen bir `Local` bağlamayı
 yakalayamaz; normal bir Function kullanın veya değeri açıkça geçirin. Normal
 Function bildirim sözdizimi değişmemiştir.
 
@@ -153,9 +153,12 @@ Vector2: Class<> := {
 Yakalanabilir hatalar için `attempt`, `except`, `ultimately` ve `toss`
 kullanın. Bir isim uzayı (namespace) için `bring ModülAdı`, doğrudan bir
 sembol için `from ModülAdı bring isim` kullanın. Yerel modüller kardeş
-(sibling) dosyalardır. `Math`, `Time`, `Latex`, `Path`, `Regex` ve `File`
-açık standart modüllerdir; `File` ve `Regex` hataları yakalanabilir.
+(sibling) dosyalardır. `Math`, `Time`, `Latex`, `Path`, `Regex`, `CSV` ve
+`File` açık standart modüllerdir; alan ve dosya hataları yakalanabilir AhdCode
+hatalarıdır.
 
 Devamı için [Fonksiyonlar](FUNCTIONS_TR.md), [Sınıflar](CLASSES_TR.md),
 [Class Protocol Methods](PROTOCOLS_TR.md), [Koleksiyonlar](COLLECTIONS_TR.md)
-ve [Modüller](MODULES_TR.md)'e bakın.
+ve [Modüller](MODULES_TR.md)'e bakın. Time yerel, UTC ve sabit-ofsetli anları;
+CSV String satırları ve kayıtlarını kapsar. Ayrıca [Time](TIME_TR.md),
+[CSV](CSV_TR.md) ve [tanılama rehberine](DIAGNOSTICS_TR.md) bakın.

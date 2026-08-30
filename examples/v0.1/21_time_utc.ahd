@@ -1,0 +1,14 @@
+bring Time
+from Time bring DateTime
+
+epoch: DateTime := Time.fromTimestamp(0)
+istanbul: DateTime := epoch.toOffset(180)
+newYork: DateTime := epoch.toOffset(-300)
+
+write(epoch.toString())
+write(istanbul.toString())
+write(newYork.toString())
+write(epoch.sameMoment(istanbul))
+write(Time.between(newYork, istanbul).milliseconds)
+write(istanbul.offsetMinutes)
+write(istanbul.toUTC().timestamp())

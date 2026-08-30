@@ -1,0 +1,17 @@
+bring CSV
+
+records: List<Pair<String, String>> := CSV.parseRecords(
+    "name,city\nAli,İstanbul\nAda,London\n"
+)
+
+write(records[0]["name"])
+write(records[1]["city"])
+
+encoded: String := CSV.stringifyRecords(
+    [
+        {"name": "Ali", "note": "hello, world"}
+        {"note": "line1\nline2", "name": "Ada"}
+    ]
+)
+
+write(CSV.parseRecords(encoded)[1]["note"] == "line1\nline2")

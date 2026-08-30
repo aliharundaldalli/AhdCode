@@ -20,8 +20,14 @@ func (p *parser) parseSimpleStatement(scope scopeKind) ast.Stmt {
 		if !expressionCanAssign(expression) {
 			p.errorSpan(codeInvalidAssignmentTarget, "expression is not assignable", expression.Span(), "assign only to an identifier, member, or index")
 		}
-		p.requireSameLineRHS(operator)
-		value := p.parseExpression(0)
+		lineBroken := p.requireSameLineRHS(operator)
+		var value ast.Expr
+		if lineBroken && p.atEnd() {
+			value = &ast.BadExpr{Base: ast.Base{Range: p.current().Span}}
+		} else {
+			value = p.parseRequiredExpression(0, "missing assigned expression after '"+operator.Kind.String()+"'",
+				"write the assigned expression after the operator on the same line")
+		}
 		return &ast.AssignmentStmt{
 			Base: p.base(start, spanEnd(value)), Target: expression,
 			Operator: operator.Kind.String(), Value: value,
@@ -52,8 +58,13 @@ func (p *parser) parseInferredDeclaration(start source.Position, target ast.Expr
 		p.errorSpan(codeInvalidInferredTarget, "an inferred declaration target must be a plain identifier", target.Span(), "write name := value, or use an explicit name: Type := value declaration")
 	}
 	declareToken := p.expect(token.Declare, "expected := in declaration")
-	p.requireSameLineRHS(declareToken)
-	initializer := p.parseExpression(0)
+	lineBroken := p.requireSameLineRHS(declareToken)
+	var initializer ast.Expr
+	if lineBroken && p.atEnd() {
+		initializer = &ast.BadExpr{Base: ast.Base{Range: p.current().Span}}
+	} else {
+		initializer = p.parseRequiredExpression(0, "missing initializer after ':='", "write the initializer after ':=' on the same line")
+	}
 	name := ""
 	if ok {
 		name = identifier.Name
@@ -125,7 +136,7 @@ func (p *parser) parseDeclaration(start source.Position, target ast.Expr, scope 
 	}
 
 	declareToken := p.expect(token.Declare, "expected := in declaration")
-	p.requireSameLineRHS(declareToken)
+	lineBroken := p.requireSameLineRHS(declareToken)
 
 	if name == "structure" && typeRef.Name == "Attributes" && p.check(token.LeftParen) {
 		return p.parseStructureDecl(start, scope)
@@ -137,7 +148,12 @@ func (p *parser) parseDeclaration(start source.Position, target ast.Expr, scope 
 		return p.parseClassDecl(start, name, modifiers, typeRef, scope)
 	}
 
-	initializer := p.parseExpression(0)
+	var initializer ast.Expr
+	if lineBroken && p.atEnd() {
+		initializer = &ast.BadExpr{Base: ast.Base{Range: p.current().Span}}
+	} else {
+		initializer = p.parseRequiredExpression(0, "missing initializer after ':='", "write the initializer after ':=' on the same line")
+	}
 	return &ast.VariableDecl{
 		Base: p.base(start, spanEnd(initializer)), Target: target, Name: name,
 		Modifiers: modifiers, Type: typeRef, Initializer: initializer,
@@ -360,8 +376,12 @@ func (p *parser) parseParameterList(allowInherited bool) []ast.Parameter {
 			var defaultValue ast.Expr
 			if p.check(token.Declare) {
 				declareToken := p.advance()
-				p.requireSameLineRHS(declareToken)
-				defaultValue = p.parseExpression(0)
+				lineBroken := p.requireSameLineRHS(declareToken)
+				if lineBroken && p.atEnd() {
+					defaultValue = &ast.BadExpr{Base: ast.Base{Range: p.current().Span}}
+				} else {
+					defaultValue = p.parseRequiredExpression(0, "missing default expression after ':='", "write the default expression after ':=' on the same line")
+				}
 				seenDefault = true
 			} else if seenDefault {
 				p.errorSpan(codeInvalidTypeSyntax, "required parameter cannot follow a default parameter", name.Span, "move required parameters before default parameters")
@@ -382,6 +402,6 @@ func (p *parser) parseParameterList(allowInherited bool) []ast.Parameter {
 			p.errorCurrent(codeExpectedSeparator, "expected comma or newline between parameters", "separate same-line parameters with commas")
 		}
 	}
-	p.expect(token.RightParen, "expected ) after parameters")
+	p.expect(token.RightParen, "expected ) to close the parameter list")
 	return parameters
 }

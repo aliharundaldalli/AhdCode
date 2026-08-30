@@ -79,5 +79,6 @@ ahdcode format --check hello.ahd
 İlk komut dosyayı atomik olarak günceller. İkincisi ise dosyanın zaten
 kanonik (standart) biçimde olup olmadığını yalnızca kontrol eder.
 
-Sırada: [dil turunu](LANGUAGE_TOUR_TR.md) okuyun veya
+Sırada: [dil turunu](LANGUAGE_TOUR_TR.md) ve
+[tanılama rehberini](DIAGNOSTICS_TR.md) okuyun veya UTC Time ve CSV dahil
 [derlenmiş örnekleri](../examples/v0.1/README_TR.md) çalıştırın.

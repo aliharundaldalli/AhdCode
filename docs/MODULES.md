@@ -40,7 +40,7 @@ from Utilities bring all
 `all` brings only public, non-`Confidential` symbols. Import collisions and
 circular dependencies are compile-time errors.
 
-`Math`, `Time`, `Latex`, `Path`, `File`, and `Regex` are compiler-registered and use
+`Math`, `Time`, `Latex`, `Path`, `File`, `Regex`, and `CSV` are compiler-registered and use
 these same import forms. A local file cannot shadow a standard module of the
 same name. They can also use the ordinary namespace alias form:
 
@@ -48,3 +48,6 @@ same name. They can also use the ordinary namespace alias form:
 bring File as F
 F.writeText("note.txt", "hello")
 ```
+
+See [Time](TIME.md), [CSV](CSV.md), and the other module-specific references
+for their typed surfaces and catchable domain errors.

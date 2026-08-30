@@ -3220,6 +3220,9 @@ Tam herkese açık yüzey şudur:
 
 ```text
 Time.now()                        -> DateTime
+Time.utc()                        -> DateTime
+Time.timestamp()                  -> Int
+Time.fromTimestamp(milliseconds: Int) -> DateTime
 Time.monotonic()                  -> Real
 Time.sleep(milliseconds: Int)     -> Nothing
 Time.duration(milliseconds: Int)  -> Duration
@@ -3233,22 +3236,30 @@ Time.dateTime(
     second: Int = 0,
     millisecond: Int = 0
 ) -> DateTime
+Time.dateTimeUTC(year, month, day, hour = 0, minute = 0, second = 0, millisecond = 0) -> DateTime
+Time.dateTimeOffset(year, month, day, offsetMinutes, hour = 0, minute = 0, second = 0, millisecond = 0) -> DateTime
 ```
 
-### 36.1 Yalnızca yerel saat
+### 36.1 Yerel, UTC, sabit ofset ve timestamp
 
 `Time.now()`, ana bilgisayarın (host) **yerel** tarih ve saatini bildirir
-ve `Time.dateTime`, yerel bir sivil an oluşturur. v0.1'de hiçbir saat
-dilimi API'si yoktur: UTC dönüşümü, saat dilimi nesneleri veya isimleri,
-sabit ofsetler, DST yapılandırması veya saat dilimi ayrıştırma/
-biçimlendirme yoktur.
+ve `Time.dateTime`, yerel bir sivil an oluşturur. `Time.utc()` ve
+`Time.dateTimeUTC` UTC kullanır. `Time.dateTimeOffset`, -840 ile 840 arasında
+tam dakikalık sabit ofset kullanır. Unix timestamp,
+`1970-01-01 00:00:00 UTC`'den itibaren işaretli milisaniyedir;
+`Time.timestamp()` güncel değeri okur, `Time.fromTimestamp` UTC görünümünü
+döndürür. DateTime yılı 1..9999 içinde temsil edilebildiğinde negatif
+timestamp geçerlidir. v0.1.11'de adlandırılmış/IANA saat dilimi veritabanı yoktur.
+Ofset gösterimi dakika hassasiyetindedir. Host'un tarihsel yerel bölgesi saniye
+bileşeni bildirirse yerel oluşturma/dönüşüm, ofseti kırpıp anı değiştirmek yerine
+`ValueError` fırlatır.
 
 ### 36.2 DateTime
 
-`DateTime`, sekiz salt okunur `Int` özniteliği gösterir:
+`DateTime`, dokuz salt okunur `Int` özniteliği gösterir:
 
 ```text
-year  month  day  hour  minute  second  millisecond  weekday
+year  month  day  hour  minute  second  millisecond  weekday  offsetMinutes
 ```
 
 `weekday`, günleri Pazartesi'den başlayarak numaralandırır:
@@ -3274,12 +3285,16 @@ current.year = 2030
 
 geçersizdir.
 
-`DateTime`, dört üye yayınlar:
+`offsetMinutes`, UTC'nin doğusundaki sabit ofsettir. `DateTime`, sekiz üye yayınlar:
 
 ```text
 before(other: DateTime)     -> Bool
 after(other: DateTime)      -> Bool
 sameMoment(other: DateTime) -> Bool
+timestamp()                 -> Int
+toUTC()                     -> DateTime
+toLocal()                   -> DateTime
+toOffset(offsetMinutes: Int) -> DateTime
 toString()                  -> String
 ```
 
@@ -3301,9 +3316,13 @@ nesne kimliğini -- izler ve ayrı ayrı oluşturulmuş eşit anlar `==`
 **değildir**. Değer karşılaştırması `sameMoment`'tır ve iki `Duration`
 değeri `milliseconds` üzerinden karşılaştırılır.
 
+`timestamp`, `toUTC`, `toLocal` ve `toOffset` temsil edilen anı korur.
+`before`, `after`, `sameMoment` ve `Time.between`, ofsetler farklı olsa bile
+görüntülenen sivil alanları değil anları karşılaştırır.
+
 ### 36.3 Bir DateTime oluşturmak
 
-`Time.dateTime`, her bileşeni Gregoryen takvime göre doğrular ve
+`Time.dateTime`, `Time.dateTimeUTC` ve `Time.dateTimeOffset`, her bileşeni Gregoryen takvime göre doğrular ve
 imkânsız bir anı sarmalamak yerine `ValueError` fırlatır:
 
 ```text
@@ -3314,6 +3333,7 @@ hour         0..23
 minute       0..59
 second       0..59
 millisecond  0..999
+offsetMinutes -840..840 (sabit-ofset kurucusu ve dönüşümü)
 ```
 
 ```ahd
@@ -3411,9 +3431,10 @@ istek, sıfıra kırpılmak yerine `ValueError` fırlatır.
 
 ### 36.8 Bu sürümde olmayanlar
 
-`Time`, kasıtlı olarak biçim dizelerine (format strings), `parse`'a,
-ISO-8601 veya RFC 3339 okuyucusuna, ay veya gün isimlerine ve doğal dil
-tarihlerine sahip değildir.
+`Time`; kasıtlı olarak adlandırılmış/IANA bölgelere, DST yapılandırma
+nesnelerine, biçim dizelerine (format strings), `parse`'a, ISO-8601 veya RFC
+3339 okuyucusuna, ay/gün isimlerine ve doğal dil tarihlerine sahip değildir.
+Mevcut `toString()` çıktısı `YYYY-MM-DD HH:MM:SS` olarak kalır ve ofset eklemez.
 
 ---
 
@@ -4298,6 +4319,54 @@ lambda (x: Int) -> x > 0
 
 Uzun parametre listeleri mevcut 80-sütun politikasına göre bölünür; tek ifade
 `->` sonrasında kalır.
+
+---
+
+## 51. CSV Standart Modülü (v0.1.11)
+
+`CSV`, açık ve derleyiciye kayıtlı `builtin:CSV` modülüdür; kardeş `CSV.ahd`
+onun yerini alamaz. Yalnız String taşır; tür çıkarımı veya DataFrame/tablo
+modellemesi yapmaz.
+
+```text
+parse(text: String, delimiter: String = ",") -> List<List<String>>
+stringify(rows: List<List<String>>, delimiter: String = ",") -> String
+read(path: String, delimiter: String = ",") -> List<List<String>>
+write(path: String, rows: List<List<String>>, delimiter: String = ",") -> Nothing
+parseRecords(text: String, delimiter: String = ",") -> List<Pair<String, String>>
+readRecords(path: String, delimiter: String = ",") -> List<Pair<String, String>>
+stringifyRecords(records: List<Pair<String, String>>, delimiter: String = ",") -> String
+writeRecords(path: String, records: List<Pair<String, String>>, delimiter: String = ",") -> Nothing
+```
+
+Ham ayrıştırma standart tırnaklama, kaçırılmış tırnak, gömülü ayraç/yeni satır,
+LF/CRLF, Unicode, boş alan ve değişken genişlikli satırları destekler. Boş ham
+satırlar `""`a çevrilir; kodlama deterministik Go `encoding/csv` çıktısıdır.
+
+Kayıt ayrıştırma ilk satırı boş olmayan benzersiz başlıklar olarak kullanır.
+Boş ve yalnız başlıklı girdi boş List döndürür. Her veri satırı tam başlık
+genişliğinde olmalıdır. Yazmada ilk Pair sütun sırasını belirler; sonraki her
+Pair, ekleme sırası farklı olsa da tam aynı anahtar kümesine sahip olmalıdır.
+
+Ayraç tam bir geçerli Unicode scalar olmalı; tırnak, CR veya LF olmamalıdır.
+Geçersiz ayraç, bozuk CSV/UTF-8 ve başlık/kayıt şekli doğrudan `Error`'dan
+türeyen `CSVError` fırlatır. Dosya erişim hataları `FileError`/`IOError`
+anlamını korur. Göreli yollar REPL başlatma dizini dahil işlem çalışma dizinidir.
+
+## 52. Tanılama kalitesi ve recovery (v0.1.11)
+
+Tanılamalar kod, önem, mesaj, ipucu ve kesin kaynak aralığı taşır. `PAR010`,
+atanan/varsayılan ifadenin operatörün fiziksel satırından sonra başlamasını;
+`SEM022`, lexical yakalama yasağını belirtmeye devam eder. `PAR013`,
+desteklenmeyen yeni-satır başı nokta devamını belirtir ve türev tanılama
+zincirlerini bastırırken ilerideki bağımsız hataları gizlemeden deyim sınırında
+toparlanır.
+
+Yapı bilindiğinde eksik initializer, atama, ikili operand, index, lambda
+gövdesi, çağrı/List/Pair/grup ve kapatıcı mesajları eksik parçayı adlandırır.
+Lambda blokları reddedilmeye devam eder. Çalışma zamanı alan hataları AhdCode
+Error'larıdır (`RegexError`, `ValueError`, `CSVError`, `FileError`); Go panic
+veya stack trace göstermemelidir.
 
 ---
 
