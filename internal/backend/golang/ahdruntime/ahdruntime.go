@@ -63,6 +63,7 @@ var (
 	AhdClassFileError           = &AhdClass{Name: "FileError", Parent: AhdClassIOError}
 	AhdClassRegexError          = &AhdClass{Name: "RegexError", Parent: AhdClassError}
 	AhdClassCSVError            = &AhdClass{Name: "CSVError", Parent: AhdClassError}
+	AhdClassDataError           = &AhdClass{Name: "DataError", Parent: AhdClassError}
 )
 
 // AhdInstance is every AhdCode Class instance. The generated interface of each
@@ -2865,4 +2866,555 @@ func AhdBuildPair[K comparable, V any](keys []K, values []V) *AhdPair[K, V] {
 // rather than a user program error.
 func AhdUnreachable[T any]() T {
 	panic("ahdcode: Function ended without returning a value")
+}
+
+// ---------------------------------------------------------------------------
+// Data standard module
+//
+// A Table is an ordered list of column names plus one List of String cells per
+// row. Every cell is a String: Data is a table structure layer, not a typed
+// value system, so a program converts explicitly with int(...) / real(...).
+//
+// Every operation here is pure. Values arriving from AhdCode are copied on the
+// way in and every result is freshly built, so a Table never shares mutable
+// storage with the program that made it or with a snapshot it handed out.
+// ---------------------------------------------------------------------------
+
+// AhdTable is the runtime interchange shape of one Table's storage. The
+// generated constructor spreads it into the Class's two hidden fields.
+type AhdTable struct {
+	Columns *AhdList[string]
+	Cells   *AhdList[*AhdList[string]]
+}
+
+// ahdTableOf rebuilds the working representation from the stored Lists.
+func ahdTableOf(value AhdTable) ([]string, [][]string) {
+	var columns []string
+	if value.Columns != nil {
+		columns = value.Columns.Snapshot()
+	}
+	var cells [][]string
+	if value.Cells != nil {
+		for _, row := range value.Cells.Snapshot() {
+			if row == nil {
+				AhdRaiseClass(AhdClassNullError, "table row is null")
+			}
+			cells = append(cells, row.Snapshot())
+		}
+	}
+	return columns, cells
+}
+
+// ahdTableValue packages a validated schema and grid as stored Lists.
+func ahdTableValue(columns []string, cells [][]string) AhdTable {
+	rows := make([]*AhdList[string], len(cells))
+	for index, row := range cells {
+		rows[index] = AhdNewList(row...)
+	}
+	return AhdTable{Columns: AhdNewList(columns...), Cells: AhdNewList(rows...)}
+}
+
+// ahdDataRequireSchema enforces the column rules every Table shares: a column
+// name is non-empty, and no name repeats.
+func ahdDataRequireSchema(class *AhdClass, columns []string) {
+	seen := make(map[string]bool, len(columns))
+	for _, name := range columns {
+		if name == "" {
+			AhdRaiseClass(class, "column name is empty")
+		}
+		if seen[name] {
+			AhdRaiseClass(class, "duplicate column "+strconv.Quote(name))
+		}
+		seen[name] = true
+	}
+}
+
+// ahdDataIndex is the column-name lookup every per-row operation shares, so a
+// name is resolved once instead of scanning the schema for every row.
+func ahdDataIndex(columns []string) map[string]int {
+	index := make(map[string]int, len(columns))
+	for position, name := range columns {
+		index[name] = position
+	}
+	return index
+}
+
+func ahdDataColumnPosition(class *AhdClass, columns []string, name string) int {
+	for position, column := range columns {
+		if column == name {
+			return position
+		}
+	}
+	AhdRaiseClass(class, "Table has no column "+strconv.Quote(name))
+	return -1
+}
+
+func ahdDataRequireWidth(class *AhdClass, columns []string, cells [][]string) {
+	for number, row := range cells {
+		if len(row) != len(columns) {
+			AhdRaiseClass(class, "row "+strconv.FormatInt(int64(number), 10)+" has "+
+				strconv.FormatInt(int64(len(row)), 10)+" cell(s); the table has "+
+				strconv.FormatInt(int64(len(columns)), 10)+" column(s)")
+		}
+	}
+}
+
+// AhdDataFromRows builds a Table from an explicit schema and grid.
+func AhdDataFromRows(class *AhdClass, columns *AhdList[string], rows *AhdList[*AhdList[string]]) AhdTable {
+	if columns == nil || rows == nil {
+		AhdRaiseClass(AhdClassNullError, "List value is null")
+	}
+	names := columns.Snapshot()
+	ahdDataRequireSchema(class, names)
+	var cells [][]string
+	for _, row := range rows.Snapshot() {
+		if row == nil {
+			AhdRaiseClass(AhdClassNullError, "table row is null")
+		}
+		cells = append(cells, row.Snapshot())
+	}
+	ahdDataRequireWidth(class, names, cells)
+	return ahdTableValue(names, cells)
+}
+
+// AhdDataFromRecords builds a Table from records. The first record fixes the
+// column order; every later record must carry exactly the same key set, in any
+// insertion order, and its values are copied into canonical order.
+func AhdDataFromRecords(class *AhdClass, records *AhdList[*AhdPair[string, string]]) AhdTable {
+	if records == nil {
+		AhdRaiseClass(AhdClassNullError, "List value is null")
+	}
+	items := records.Snapshot()
+	if len(items) == 0 {
+		// No record means no schema to infer; an empty Table is the only
+		// honest answer, rather than inventing column names.
+		return ahdTableValue(nil, nil)
+	}
+	if items[0] == nil {
+		AhdRaiseClass(AhdClassNullError, "record is null")
+	}
+	columns := items[0].Keys()
+	ahdDataRequireSchema(class, columns)
+	cells := make([][]string, 0, len(items))
+	for number, record := range items {
+		if record == nil {
+			AhdRaiseClass(AhdClassNullError, "record is null")
+		}
+		if record.Len() != int64(len(columns)) {
+			AhdRaiseClass(class, "record "+strconv.FormatInt(int64(number), 10)+" has "+
+				strconv.FormatInt(record.Len(), 10)+" key(s); the first record has "+
+				strconv.FormatInt(int64(len(columns)), 10))
+		}
+		row := make([]string, len(columns))
+		for position, name := range columns {
+			if !record.Has(name) {
+				AhdRaiseClass(class, "record "+strconv.FormatInt(int64(number), 10)+
+					" has no key "+strconv.Quote(name))
+			}
+			row[position] = record.Get(name)
+		}
+		cells = append(cells, row)
+	}
+	return ahdTableValue(columns, cells)
+}
+
+// ahdDataFromGrid turns parsed CSV rows into a Table. The first row is the
+// header, so unlike CSV.parseRecords a header-only document keeps its schema.
+func ahdDataFromGrid(class *AhdClass, grid [][]string) AhdTable {
+	if len(grid) == 0 {
+		return ahdTableValue(nil, nil)
+	}
+	columns := grid[0]
+	ahdDataRequireSchema(class, columns)
+	cells := grid[1:]
+	ahdDataRequireWidth(class, columns, cells)
+	return ahdTableValue(columns, cells)
+}
+
+// AhdDataFromCSV and AhdDataReadCSV reuse the CSV module's reader, so Data
+// never defines a second CSV grammar. CSV syntax failures stay CSVError and
+// filesystem failures stay FileError.
+func AhdDataFromCSV(dataClass, csvClass *AhdClass, text, delimiter string) AhdTable {
+	return ahdDataFromGrid(dataClass, ahdCSVRows(csvClass, text, delimiter))
+}
+
+func AhdDataReadCSV(dataClass, csvClass, fileClass *AhdClass, path, delimiter string) AhdTable {
+	content, err := os.ReadFile(path)
+	if err != nil {
+		ahdFileFailure(fileClass, "read", path, err)
+	}
+	return ahdDataFromGrid(dataClass, ahdCSVRows(csvClass, string(content), delimiter))
+}
+
+// AhdDataRowCount and AhdDataColumnCount report the table's shape.
+func AhdDataRowCount(value AhdTable) int64 {
+	_, cells := ahdTableOf(value)
+	return int64(len(cells))
+}
+
+func AhdDataColumnCount(value AhdTable) int64 {
+	columns, _ := ahdTableOf(value)
+	return int64(len(columns))
+}
+
+// AhdDataColumns returns a new List, so mutating it cannot reach the Table.
+func AhdDataColumns(value AhdTable) *AhdList[string] {
+	columns, _ := ahdTableOf(value)
+	return AhdNewList(columns...)
+}
+
+func ahdDataRecord(columns, row []string) *AhdPair[string, string] {
+	record := AhdNewPair[string, string]()
+	for position, name := range columns {
+		record.Set(name, row[position])
+	}
+	return record
+}
+
+// AhdDataRows returns a new List of new Pair snapshots.
+func AhdDataRows(value AhdTable) *AhdList[*AhdPair[string, string]] {
+	columns, cells := ahdTableOf(value)
+	records := make([]*AhdPair[string, string], len(cells))
+	for index, row := range cells {
+		records[index] = ahdDataRecord(columns, row)
+	}
+	return AhdNewList(records...)
+}
+
+// AhdDataRow returns one row snapshot, using the ordinary List index rules so
+// a negative index counts from the end and an invalid one is an IndexError.
+func AhdDataRow(value AhdTable, index int64) *AhdPair[string, string] {
+	columns, cells := ahdTableOf(value)
+	position := index
+	if position < 0 {
+		position += int64(len(cells))
+	}
+	if position < 0 || position >= int64(len(cells)) {
+		AhdRaiseClass(AhdClassIndexError, "row index "+strconv.FormatInt(index, 10)+" is out of range")
+	}
+	return ahdDataRecord(columns, cells[position])
+}
+
+// AhdDataColumn returns one column's cells, in row order.
+func AhdDataColumn(class *AhdClass, value AhdTable, name string) *AhdList[string] {
+	columns, cells := ahdTableOf(value)
+	position := ahdDataColumnPosition(class, columns, name)
+	result := make([]string, len(cells))
+	for index, row := range cells {
+		result[index] = row[position]
+	}
+	return AhdNewList(result...)
+}
+
+// AhdDataHead and AhdDataTail keep the first or last rows, preserving order
+// and the full schema even when no row survives.
+func AhdDataHead(class *AhdClass, value AhdTable, count int64) AhdTable {
+	columns, cells := ahdTableOf(value)
+	if count < 0 {
+		AhdRaiseClass(class, "head requires a non-negative row count")
+	}
+	if count > int64(len(cells)) {
+		count = int64(len(cells))
+	}
+	return ahdTableValue(columns, cells[:count])
+}
+
+func AhdDataTail(class *AhdClass, value AhdTable, count int64) AhdTable {
+	columns, cells := ahdTableOf(value)
+	if count < 0 {
+		AhdRaiseClass(class, "tail requires a non-negative row count")
+	}
+	if count > int64(len(cells)) {
+		count = int64(len(cells))
+	}
+	return ahdTableValue(columns, cells[int64(len(cells))-count:])
+}
+
+// AhdDataSelect keeps the requested columns, in the requested order.
+func AhdDataSelect(class *AhdClass, value AhdTable, requested *AhdList[string]) AhdTable {
+	if requested == nil {
+		AhdRaiseClass(AhdClassNullError, "List value is null")
+	}
+	columns, cells := ahdTableOf(value)
+	names := requested.Snapshot()
+	seen := make(map[string]bool, len(names))
+	positions := make([]int, len(names))
+	for index, name := range names {
+		if seen[name] {
+			AhdRaiseClass(class, "duplicate column "+strconv.Quote(name)+" in select")
+		}
+		seen[name] = true
+		positions[index] = ahdDataColumnPosition(class, columns, name)
+	}
+	result := make([][]string, len(cells))
+	for index, row := range cells {
+		selected := make([]string, len(positions))
+		for target, position := range positions {
+			selected[target] = row[position]
+		}
+		result[index] = selected
+	}
+	return ahdTableValue(names, result)
+}
+
+// AhdDataDrop removes the requested columns, keeping the original order of the
+// columns that remain.
+func AhdDataDrop(class *AhdClass, value AhdTable, requested *AhdList[string]) AhdTable {
+	if requested == nil {
+		AhdRaiseClass(AhdClassNullError, "List value is null")
+	}
+	columns, cells := ahdTableOf(value)
+	removed := make(map[string]bool, requested.Len())
+	for _, name := range requested.Snapshot() {
+		if removed[name] {
+			AhdRaiseClass(class, "duplicate column "+strconv.Quote(name)+" in drop")
+		}
+		ahdDataColumnPosition(class, columns, name)
+		removed[name] = true
+	}
+	var kept []string
+	var positions []int
+	for position, name := range columns {
+		if !removed[name] {
+			kept = append(kept, name)
+			positions = append(positions, position)
+		}
+	}
+	result := make([][]string, len(cells))
+	for index, row := range cells {
+		remaining := make([]string, len(positions))
+		for target, position := range positions {
+			remaining[target] = row[position]
+		}
+		result[index] = remaining
+	}
+	return ahdTableValue(kept, result)
+}
+
+// AhdDataRename renames one column in place, preserving its position.
+func AhdDataRename(class *AhdClass, value AhdTable, oldName, newName string) AhdTable {
+	columns, cells := ahdTableOf(value)
+	position := ahdDataColumnPosition(class, columns, oldName)
+	if newName == "" {
+		AhdRaiseClass(class, "column name is empty")
+	}
+	if newName != oldName {
+		for _, name := range columns {
+			if name == newName {
+				AhdRaiseClass(class, "duplicate column "+strconv.Quote(newName))
+			}
+		}
+	}
+	renamed := append([]string(nil), columns...)
+	renamed[position] = newName
+	return ahdTableValue(renamed, cells)
+}
+
+// AhdDataReverse reverses row order and leaves the schema untouched.
+func AhdDataReverse(value AhdTable) AhdTable {
+	columns, cells := ahdTableOf(value)
+	result := make([][]string, len(cells))
+	for index, row := range cells {
+		result[len(cells)-1-index] = row
+	}
+	return ahdTableValue(columns, result)
+}
+
+// AhdDataFilter keeps the rows the predicate accepts, in source order. The
+// predicate sees a fresh row snapshot, so mutating it cannot reach the Table.
+func AhdDataFilter(value AhdTable, keep func(*AhdPair[string, string]) *bool) AhdTable {
+	columns, cells := ahdTableOf(value)
+	var result [][]string
+	for _, row := range cells {
+		if ahdPredicate(keep(ahdDataRecord(columns, row))) {
+			result = append(result, row)
+		}
+	}
+	return ahdTableValue(columns, result)
+}
+
+// AhdDataSortColumn orders rows by one column's text, stably and ascending.
+func AhdDataSortColumn(class *AhdClass, value AhdTable, name string) AhdTable {
+	columns, cells := ahdTableOf(value)
+	position := ahdDataColumnPosition(class, columns, name)
+	order := make([]int, len(cells))
+	for index := range order {
+		order[index] = index
+	}
+	sort.SliceStable(order, func(left, right int) bool {
+		return cells[order[left]][position] < cells[order[right]][position]
+	})
+	result := make([][]string, len(cells))
+	for index, original := range order {
+		result[index] = cells[original]
+	}
+	return ahdTableValue(columns, result)
+}
+
+// ahdDataSortByKey is the shared keyed ordering. The key Function runs exactly
+// once per row, before any comparison, matching List's keyed sort.
+func ahdDataSortByKey[K int64 | float64 | string](value AhdTable, key func(*AhdPair[string, string]) *K) AhdTable {
+	columns, cells := ahdTableOf(value)
+	keys := make([]K, len(cells))
+	for index, row := range cells {
+		computed := key(ahdDataRecord(columns, row))
+		if computed == nil {
+			AhdRaiseClass(AhdClassNullError, "sort key Function returned null")
+		}
+		keys[index] = *computed
+	}
+	order := make([]int, len(cells))
+	for index := range order {
+		order[index] = index
+	}
+	sort.SliceStable(order, func(left, right int) bool { return keys[order[left]] < keys[order[right]] })
+	result := make([][]string, len(cells))
+	for index, original := range order {
+		result[index] = cells[original]
+	}
+	return ahdTableValue(columns, result)
+}
+
+// AhdDataSortKeyInt, AhdDataSortKeyReal, and AhdDataSortKeyString order rows by
+// an Int, Real, or String key.
+func AhdDataSortKeyInt(value AhdTable, key func(*AhdPair[string, string]) *int64) AhdTable {
+	return ahdDataSortByKey(value, key)
+}
+
+func AhdDataSortKeyReal(value AhdTable, key func(*AhdPair[string, string]) *float64) AhdTable {
+	return ahdDataSortByKey(value, key)
+}
+
+func AhdDataSortKeyString(value AhdTable, key func(*AhdPair[string, string]) *string) AhdTable {
+	return ahdDataSortByKey(value, key)
+}
+
+// AhdDataTransform rewrites one column, leaving its position and every other
+// column untouched.
+func AhdDataTransform(class *AhdClass, value AhdTable, name string, convert func(string) *string) AhdTable {
+	columns, cells := ahdTableOf(value)
+	position := ahdDataColumnPosition(class, columns, name)
+	result := make([][]string, len(cells))
+	for index, row := range cells {
+		replaced := append([]string(nil), row...)
+		computed := convert(row[position])
+		if computed == nil {
+			AhdRaiseClass(AhdClassNullError, "transform Function returned null")
+		}
+		replaced[position] = *computed
+		result[index] = replaced
+	}
+	return ahdTableValue(columns, result)
+}
+
+// AhdDataDerive appends a new column built from each complete row.
+func AhdDataDerive(class *AhdClass, value AhdTable, name string, build func(*AhdPair[string, string]) *string) AhdTable {
+	columns, cells := ahdTableOf(value)
+	if name == "" {
+		AhdRaiseClass(class, "column name is empty")
+	}
+	for _, column := range columns {
+		if column == name {
+			AhdRaiseClass(class, "column "+strconv.Quote(name)+
+				" already exists; use transform to rewrite an existing column")
+		}
+	}
+	result := make([][]string, len(cells))
+	for index, row := range cells {
+		computed := build(ahdDataRecord(columns, row))
+		if computed == nil {
+			AhdRaiseClass(AhdClassNullError, "derive Function returned null")
+		}
+		result[index] = append(append([]string(nil), row...), *computed)
+	}
+	return ahdTableValue(append(append([]string(nil), columns...), name), result)
+}
+
+// AhdDataUnique lists one column's distinct cells in first-occurrence order.
+func AhdDataUnique(class *AhdClass, value AhdTable, name string) *AhdList[string] {
+	columns, cells := ahdTableOf(value)
+	position := ahdDataColumnPosition(class, columns, name)
+	seen := make(map[string]bool, len(cells))
+	var result []string
+	for _, row := range cells {
+		if !seen[row[position]] {
+			seen[row[position]] = true
+			result = append(result, row[position])
+		}
+	}
+	return AhdNewList(result...)
+}
+
+// AhdDataValueCounts counts one column's cells, keyed in first-occurrence
+// order.
+func AhdDataValueCounts(class *AhdClass, value AhdTable, name string) *AhdPair[string, int64] {
+	columns, cells := ahdTableOf(value)
+	position := ahdDataColumnPosition(class, columns, name)
+	counts := AhdNewPair[string, int64]()
+	for _, row := range cells {
+		if counts.Has(row[position]) {
+			counts.Set(row[position], counts.Get(row[position])+1)
+			continue
+		}
+		counts.Set(row[position], 1)
+	}
+	return counts
+}
+
+// ahdDataGroups partitions rows by one column, keeping first-occurrence key
+// order and source row order inside each group.
+func ahdDataGroups(class *AhdClass, value AhdTable, name string) ([]string, map[string][][]string, []string) {
+	columns, cells := ahdTableOf(value)
+	position := ahdDataColumnPosition(class, columns, name)
+	var order []string
+	groups := make(map[string][][]string)
+	for _, row := range cells {
+		key := row[position]
+		if _, known := groups[key]; !known {
+			order = append(order, key)
+		}
+		groups[key] = append(groups[key], row)
+	}
+	return columns, groups, order
+}
+
+// AhdDataGroupCount, AhdDataGroupKey, and AhdDataGroupTable let the generated
+// code build the Pair<String, Table> without the runtime needing to know the
+// generated Table Class type.
+func AhdDataGroupKeys(class *AhdClass, value AhdTable, name string) *AhdList[string] {
+	_, _, order := ahdDataGroups(class, value, name)
+	return AhdNewList(order...)
+}
+
+func AhdDataGroupTable(class *AhdClass, value AhdTable, name, key string) AhdTable {
+	columns, groups, _ := ahdDataGroups(class, value, name)
+	return ahdTableValue(columns, groups[key])
+}
+
+// ahdDataGrid renders the header followed by the data rows, which is the shape
+// the CSV writer serializes.
+func ahdDataGrid(value AhdTable) *AhdList[*AhdList[string]] {
+	columns, cells := ahdTableOf(value)
+	if len(columns) == 0 && len(cells) == 0 {
+		return AhdNewList[*AhdList[string]]()
+	}
+	rows := make([]*AhdList[string], 0, len(cells)+1)
+	rows = append(rows, AhdNewList(columns...))
+	for _, row := range cells {
+		rows = append(rows, AhdNewList(row...))
+	}
+	return AhdNewList(rows...)
+}
+
+// AhdDataToCSV and AhdDataWriteCSV reuse the CSV module's writer, so quoting,
+// delimiters, and line endings match CSV.stringify exactly.
+func AhdDataToCSV(csvClass *AhdClass, value AhdTable, delimiter string) string {
+	return AhdCSVStringify(csvClass, ahdDataGrid(value), delimiter)
+}
+
+func AhdDataWriteCSV(csvClass, fileClass *AhdClass, value AhdTable, path, delimiter string) {
+	content := AhdCSVStringify(csvClass, ahdDataGrid(value), delimiter)
+	if err := os.WriteFile(path, []byte(content), 0o666); err != nil {
+		ahdFileFailure(fileClass, "write", path, err)
+	}
 }

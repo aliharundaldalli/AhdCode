@@ -622,9 +622,14 @@ func (a *analyzer) analyzeCallWithCallee(call *ast.CallExpr, callee expressionIn
 		if symbol == nil {
 			return expressionInfo{typeValue: types.Invalid, nullState: MaybeNull}
 		}
-		if hint, supplied := timeConstructionHint(class.Symbol); supplied {
-			// A compiler-supplied Time value is produced by a Time function
-			// that validates its arguments, never by direct construction.
+		hint, supplied := timeConstructionHint(class.Symbol)
+		if !supplied {
+			hint, supplied = dataConstructionHint(class.Symbol)
+		}
+		if supplied {
+			// A compiler-supplied value is produced by a standard-module
+			// function that validates its arguments, never by direct
+			// construction.
 			a.error(codeCallArguments, fmt.Sprintf("%s values are not constructed directly", class.Symbol.Name), call.Span(), hint)
 			a.analyzeCallArguments(call, current, flow, nil)
 			return expressionInfo{typeValue: types.Class{Symbol: class.Symbol}, nullState: NonNull}
@@ -694,7 +699,10 @@ func typeOperationFor(receiver types.Type, name string) (TypeOperation, bool) {
 		if operation, ok := timeOperationFor(receiver, name); ok {
 			return operation, true
 		}
-		return regexOperationFor(receiver, name)
+		if operation, ok := regexOperationFor(receiver, name); ok {
+			return operation, true
+		}
+		return dataOperationFor(receiver, name)
 	}
 	return "", false
 }
@@ -867,6 +875,12 @@ func (a *analyzer) analyzeTypeOperation(call *ast.CallExpr, member *ast.MemberEx
 	if shape, isRegex := regexOperationShapes()[operation]; isRegex {
 		return a.analyzeRegexOperation(call, operation, shape, current, flow), true
 	}
+	if shape, isData := dataOperationShapes()[operation]; isData {
+		return a.analyzeDataOperation(call, operation, shape, current, flow), true
+	}
+	if dataCallbackOperation(operation) {
+		return a.analyzeDataCallbackOperation(call, operation, current, flow), true
+	}
 	switch operation {
 	case ListAdd, ListEject, PairEject:
 		return a.analyzeCollectionMutation(call, operation, receiver, current, flow), true
@@ -899,6 +913,9 @@ func typeOperationFailure(operation TypeOperation, receiver types.Type) expressi
 		}
 		return expressionInfo{typeValue: shape.result, nullState: nullState}
 	}
+	if result, known := dataOperationResult(operation); known {
+		return expressionInfo{typeValue: result, nullState: NonNull}
+	}
 	switch operation {
 	case ListAdd, ListEject, PairEject, ListSort, ListReverse, ListShuffle:
 		return expressionInfo{typeValue: types.Nothing, nullState: NonNull}
@@ -920,6 +937,12 @@ func typeOperationHint(operation TypeOperation, receiver types.Type) string {
 	}
 	if shape, known := regexOperationShapes()[operation]; known {
 		return shape.hint
+	}
+	if shape, known := dataOperationShapes()[operation]; known {
+		return shape.hint
+	}
+	if dataCallbackOperation(operation) {
+		return dataCallbackHint(operation)
 	}
 	element := types.Invalid
 	if list, ok := receiver.(types.List); ok {

@@ -158,6 +158,8 @@ func (session *Session) builtin(identity ir.CallableID, receiver any, arguments 
 		return session.pathBuiltin(strings.TrimPrefix(name, "builtin:Path::"), values(arguments))
 	case strings.HasPrefix(name, "builtin:Regex::"):
 		return session.regexBuiltin(strings.TrimPrefix(name, "builtin:Regex::"), values(arguments))
+	case strings.HasPrefix(name, "builtin:Data::"):
+		return session.dataBuiltin(strings.TrimPrefix(name, "builtin:Data::"), values(arguments))
 	}
 	session.raise("Error", "unsupported builtin "+name)
 	return nil
@@ -257,6 +259,9 @@ func (session *Session) core(name string, receiver any, arguments []any) any {
 	}
 	if strings.HasPrefix(name, "Regex.") {
 		return session.regexOperation(name, receiver, arguments)
+	}
+	if strings.HasPrefix(name, "Table.") {
+		return session.dataOperation(name, receiver, arguments)
 	}
 	session.raise("Error", "unsupported Fundamentals operation "+name)
 	return nil

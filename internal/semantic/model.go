@@ -213,6 +213,52 @@ const (
 	RegexReplace TypeOperation = "Regex.replace"
 	// RegexSplit divides a String on every match of the pattern.
 	RegexSplit TypeOperation = "Regex.split"
+
+	// The Data standard module's Table members. Every Table operation is pure:
+	// it reads a snapshot and, where it produces a Table, returns a new one.
+	// DataRowCount is the number of rows.
+	DataRowCount TypeOperation = "Table.rowCount"
+	// DataColumnCount is the number of columns.
+	DataColumnCount TypeOperation = "Table.columnCount"
+	// DataColumns is a new List snapshot of the column names, in order.
+	DataColumns TypeOperation = "Table.columns"
+	// DataRows is a new List of new Pair row snapshots.
+	DataRows TypeOperation = "Table.rows"
+	// DataRow is a new Pair snapshot of one row, by List index rules.
+	DataRow TypeOperation = "Table.row"
+	// DataColumn is a new List of one column's cells, in row order.
+	DataColumn TypeOperation = "Table.column"
+	// DataHead keeps the first rows; DataTail keeps the last rows.
+	DataHead TypeOperation = "Table.head"
+	DataTail TypeOperation = "Table.tail"
+	// DataSelect keeps the requested columns in the requested order.
+	DataSelect TypeOperation = "Table.select"
+	// DataDrop removes the requested columns, keeping the original order.
+	DataDrop TypeOperation = "Table.drop"
+	// DataRename renames one column in place, preserving its position.
+	DataRename TypeOperation = "Table.rename"
+	// DataReverse reverses row order.
+	DataReverse TypeOperation = "Table.reverse"
+	// DataFilter keeps the rows a (Pair<String, String>) -> Bool predicate
+	// accepts, in source order.
+	DataFilter TypeOperation = "Table.filter"
+	// DataSort orders rows by a column name or by an Int/Real/String key
+	// Function, stably and ascending.
+	DataSort TypeOperation = "Table.sort"
+	// DataTransform rewrites one column through a (String) -> String Function.
+	DataTransform TypeOperation = "Table.transform"
+	// DataDerive appends a column built by a
+	// (Pair<String, String>) -> String Function.
+	DataDerive TypeOperation = "Table.derive"
+	// DataUnique lists one column's distinct cells in first-occurrence order.
+	DataUnique TypeOperation = "Table.unique"
+	// DataValueCounts counts one column's cells in first-occurrence order.
+	DataValueCounts TypeOperation = "Table.valueCounts"
+	// DataGroupBy partitions rows into Tables keyed by one column's cells.
+	DataGroupBy TypeOperation = "Table.groupBy"
+	// DataToCSV and DataWriteCSV serialize through the CSV module's writer.
+	DataToCSV    TypeOperation = "Table.toCSV"
+	DataWriteCSV TypeOperation = "Table.writeCSV"
 )
 
 // listOperationMutates reports whether one List operation rewrites its

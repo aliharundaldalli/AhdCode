@@ -16,6 +16,7 @@ const mathModuleID = "builtin:Math"
 func StandardModuleInterfaces() map[string]*ModuleInterface {
 	return map[string]*ModuleInterface{
 		"CSV":   csvModuleInterface(),
+		"Data":  dataModuleInterface(),
 		"File":  fileModuleInterface(),
 		"Latex": latexModuleInterface(),
 		"Math":  mathModuleInterface(),

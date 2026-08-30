@@ -287,3 +287,61 @@ write(epoch.toOffset(180).timestamp())
 		t.Fatalf("REPL errors: %s", errors.String())
 	}
 }
+
+// TestDataTablesInThePersistentREPL exercises the Data table layer in the
+// persistent evaluator and pins the results the native backend produces for the
+// same program, so the two implementations cannot drift apart.
+func TestDataTablesInThePersistentREPL(t *testing.T) {
+	input := `bring Data
+from Data bring Table
+from Data bring DataError
+table: Table := Data.fromCSV("name,department,score\nAli,Math,91\nAyse,Physics,78\nMehmet,Math,84\n")
+write(table.rowCount())
+write(table.columns())
+write(table.row(-1)["name"])
+write(table.filter(lambda (row: Pair<String, String>) -> int(row["score"]) >= 84).column("name"))
+write(table.sort(lambda (row: Pair<String, String>) -> -int(row["score"])).column("name"))
+write(table.derive("flag", lambda (row: Pair<String, String>) -> str(int(row["score"]) >= 85)).column("flag"))
+write(table.transform("name", lambda (value: String) -> value.upper()).column("name"))
+write(table.unique("department"))
+write(table.valueCounts("department"))
+groups: Pair<String, Table> := table.groupBy("department")
+write(groups["Math"].column("name"))
+snapshot: List<String> := table.columns()
+snapshot.add("injected")
+write(table.columns())
+write(type(table))
+write(type(table.row(0)["score"]))
+attempt { table.column("missing") } except DataError as error { write(error.message) }
+`
+	var output, errors bytes.Buffer
+	Run(strings.NewReader(input), &output, &errors, "AhdCode v0.1.12")
+	expected := []string{
+		"3\n",
+		"[\"name\", \"department\", \"score\"]\n",
+		"Mehmet\n",
+		"[\"Ali\", \"Mehmet\"]\n",
+		"[\"Ali\", \"Mehmet\", \"Ayse\"]\n",
+		"[\"true\", \"false\", \"false\"]\n",
+		"[\"ALI\", \"AYSE\", \"MEHMET\"]\n",
+		"[\"Math\", \"Physics\"]\n",
+		"{\"Math\": 2, \"Physics\": 1}\n",
+		"[\"Ali\", \"Mehmet\"]\n",
+		"Table\n",
+		"String\n",
+		"Table has no column \"missing\"\n",
+	}
+	text := output.String()
+	for _, want := range expected {
+		if !strings.Contains(text, want) {
+			t.Fatalf("REPL output missing %q:\n%s", want, text)
+		}
+	}
+	// The snapshot mutation must not have reached the Table's own schema.
+	if strings.Contains(text, "injected") {
+		t.Fatalf("a columns() snapshot mutated the Table:\n%s", text)
+	}
+	if errors.Len() != 0 {
+		t.Fatalf("REPL errors: %s", errors.String())
+	}
+}

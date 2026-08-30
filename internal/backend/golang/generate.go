@@ -338,6 +338,7 @@ func (generator *generator) emitProgram() string {
 	// Bodies register the Time helpers they need, so those are written after
 	// generation and before the bodies themselves.
 	generator.emitTimeHelpers(writer)
+	generator.emitDataHelpers(writer)
 	writer.raw(bodies.String())
 	generator.emitInstaller(writer)
 	writer.open("func main() {")

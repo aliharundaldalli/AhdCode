@@ -1,0 +1,45 @@
+bring Data
+from Data bring Table
+
+report: String := "name,department,score\nAli,Math,91\nAyse,Physics,78\nMehmet,Math,84\nZeynep,Physics,95\n"
+
+table: Table := Data.fromCSV(report)
+
+write(table.rowCount())
+write(table.columns())
+// Every cell is a String, so a numeric comparison converts explicitly.
+passed: Table := table.filter(
+    lambda (row: Pair<String, String>) -> int(row["score"]) >= 80
+)
+// A negative Int key sorts highest score first without a second sort API.
+ranked: Table := passed.sort(
+    lambda (row: Pair<String, String>) -> -int(row["score"])
+)
+
+labelled: Table := ranked.derive(
+    "grade"
+    lambda (row: Pair<String, String>) -> str(int(row["score"]) >= 90)
+)
+
+summary: Table := labelled.select(["name", "score", "grade"])
+
+write(summary.toCSV())
+
+write(table.valueCounts("department"))
+
+groups: Pair<String, Table> := table.groupBy("department")
+
+for department in groups {
+    group: Local Table := groups[department]
+    write("{department}: {group.rowCount()}")
+}
+// Explicit conversion is how a numeric List is produced; Data stays a table
+// structure layer and leaves statistics to the program.
+scores: List<Real> := table.column(
+    "score"
+).map(lambda (value: String) -> real(value))
+
+write(scores)
+// Every transformation above was pure: the original table is unchanged.
+write(table.rowCount())
+write(table.columns())
