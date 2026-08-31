@@ -574,6 +574,8 @@ func typeOperationArgument(operation semantic.TypeOperation, receiver ir.Type) (
 	case semantic.RegexMatches, semantic.RegexFind, semantic.RegexFindAll,
 		semantic.RegexGroups, semantic.RegexReplace, semantic.RegexSplit:
 		return ir.Type{Kind: ir.StringType}, true
+	case semantic.NumericVectorScale, semantic.NumericMatrixScale:
+		return ir.Type{Kind: ir.RealType}, true
 	}
 	return ir.Type{Kind: ir.InvalidType}, false
 }

@@ -174,12 +174,17 @@ func (session *Session) builtin(identity ir.CallableID, receiver any, arguments 
 		return session.dataBuiltin(strings.TrimPrefix(name, "builtin:Data::"), values(arguments))
 	case strings.HasPrefix(name, "builtin:Plot::"):
 		return session.plotBuiltin(strings.TrimPrefix(name, "builtin:Plot::"), values(arguments))
+	case strings.HasPrefix(name, "builtin:Numeric::"):
+		return session.numericBuiltin(strings.TrimPrefix(name, "builtin:Numeric::"), values(arguments))
 	}
 	session.raise("Error", "unsupported builtin "+name)
 	return nil
 }
 
 func (session *Session) core(name string, receiver any, arguments []any) any {
+	if strings.HasPrefix(name, "Vector.") || strings.HasPrefix(name, "Matrix.") {
+		return session.numericOperation(name, session.requireInstance(receiver), arguments)
+	}
 	arg := func(index int) any {
 		if index < len(arguments) {
 			return arguments[index]

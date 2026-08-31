@@ -107,7 +107,10 @@ func (generator *generator) plotNumericListValue(expression ir.Expr, meta ir.Exp
 	case ir.IntType:
 		return "AhdPlotWidenList(" + rendered + ")"
 	default:
-		return generator.unsupported("Plot numeric List argument over "+element.String(), meta.Span)
+		if expression.ExprMeta().Type.Kind == ir.ClassType && expression.ExprMeta().Type.Class == numericVectorClass {
+			return generator.numericVectorOf(expression) + ".Values"
+		}
+		return generator.unsupported("Plot numeric argument over "+expression.ExprMeta().Type.String(), meta.Span)
 	}
 }
 

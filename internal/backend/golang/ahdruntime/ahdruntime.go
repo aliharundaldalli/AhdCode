@@ -68,6 +68,7 @@ var (
 	AhdClassDataError           = &AhdClass{Name: "DataError", Parent: AhdClassError}
 	AhdClassStatisticsError     = &AhdClass{Name: "StatisticsError", Parent: AhdClassError}
 	AhdClassPlotError           = &AhdClass{Name: "PlotError", Parent: AhdClassError}
+	AhdClassNumericError        = &AhdClass{Name: "NumericError", Parent: AhdClassError}
 )
 
 // AhdInstance is every AhdCode Class instance. The generated interface of each
@@ -4317,4 +4318,708 @@ func AhdPlotFigureShow(class *AhdClass, rows, columns int64, charts []AhdChart) 
 	width, height := AhdPlotFigureDefaultSize(rows, columns)
 	ahdPlotRender(class, ahdPlotFigureRequest(rows, columns, charts, path, int(width), int(height)))
 	ahdPlotOpenViewer(class, path)
+}
+
+// ---------------------------------------------------------------------------
+// Numeric standard module
+// ---------------------------------------------------------------------------
+
+type AhdVector struct{ Values *AhdList[float64] }
+type AhdMatrix struct{ Rows *AhdList[*AhdList[float64]] }
+type AhdMatrixPair struct {
+	Keys   []string
+	Values []AhdMatrix
+}
+
+var AhdNumericRuntimeHint string
+
+// The wire types intentionally mirror internal/numericproto. This runtime is
+// copied into dependency-free generated workspaces, so it cannot import that
+// package directly.
+type ahdNumericRequest struct {
+	Operation string      `json:"operation"`
+	Matrix    [][]float64 `json:"matrix"`
+	Vector    []float64   `json:"vector,omitempty"`
+}
+
+type ahdNumericComplex struct {
+	Real float64 `json:"real"`
+	Imag float64 `json:"imag"`
+}
+
+type ahdNumericResponse struct {
+	Error    string                 `json:"error,omitempty"`
+	Scalar   *float64               `json:"scalar,omitempty"`
+	Integer  *int                   `json:"integer,omitempty"`
+	Vector   []float64              `json:"vector,omitempty"`
+	Matrix   [][]float64            `json:"matrix,omitempty"`
+	Matrices map[string][][]float64 `json:"matrices,omitempty"`
+	Complex  []ahdNumericComplex    `json:"complex,omitempty"`
+}
+
+func ahdNumericDiscoverRuntime() (string, error) {
+	name := "ahdnumeric"
+	if runtime.GOOS == "windows" {
+		name += ".exe"
+	}
+	var candidates []string
+	if custom := os.Getenv("AHDCODE_NUMERIC_RUNTIME"); custom != "" {
+		candidates = append(candidates, custom, filepath.Join(custom, name))
+	}
+	if AhdNumericRuntimeHint != "" {
+		candidates = append(candidates, filepath.Join(AhdNumericRuntimeHint, name))
+	}
+	if executable, err := os.Executable(); err == nil {
+		bin := filepath.Dir(executable)
+		candidates = append(candidates,
+			filepath.Join(bin, name),
+			filepath.Join(bin, "..", "libexec", "ahdcode", name),
+		)
+	}
+	seen := make(map[string]bool)
+	for _, candidate := range candidates {
+		if candidate == "" {
+			continue
+		}
+		candidate = filepath.Clean(candidate)
+		if seen[candidate] {
+			continue
+		}
+		seen[candidate] = true
+		if info, err := os.Stat(candidate); err == nil && info.Mode().IsRegular() {
+			return candidate, nil
+		}
+	}
+	return "", fmt.Errorf("the Numeric helper (ahdnumeric) was not found; set AHDCODE_NUMERIC_RUNTIME or reinstall AhdCode with the bundled Numeric helper")
+}
+
+func ahdNumericCall(class *AhdClass, operation string, matrix [][]float64, vector []float64) ahdNumericResponse {
+	helper, err := ahdNumericDiscoverRuntime()
+	if err != nil {
+		ahdNumericRaise(class, err.Error())
+	}
+	dir := filepath.Join(os.TempDir(), "ahdcode", "numeric")
+	if err = os.MkdirAll(dir, 0o700); err != nil {
+		ahdNumericRaise(class, "creating temporary directory: "+err.Error())
+	}
+	file, err := os.CreateTemp(dir, "request-*.json")
+	if err != nil {
+		ahdNumericRaise(class, "writing Numeric request: "+err.Error())
+	}
+	defer os.Remove(file.Name())
+	encoded, err := json.Marshal(ahdNumericRequest{Operation: operation, Matrix: matrix, Vector: vector})
+	if err == nil {
+		_, err = file.Write(encoded)
+	}
+	if closeErr := file.Close(); err == nil {
+		err = closeErr
+	}
+	if err != nil {
+		ahdNumericRaise(class, "writing Numeric request: "+err.Error())
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	output, runErr := exec.CommandContext(ctx, helper, file.Name()).Output()
+	var response ahdNumericResponse
+	decodeErr := json.Unmarshal(output, &response)
+	if response.Error != "" {
+		ahdNumericRaise(class, response.Error)
+	}
+	if ctx.Err() != nil {
+		ahdNumericRaise(class, "Numeric helper timed out")
+	}
+	if decodeErr != nil {
+		ahdNumericRaise(class, "Numeric helper returned an invalid response")
+	}
+	if runErr != nil {
+		ahdNumericRaise(class, "Numeric helper failed: "+runErr.Error())
+	}
+	return response
+}
+
+func ahdNumericResponseMatrix(class *AhdClass, response ahdNumericResponse) AhdMatrix {
+	if len(response.Matrix) == 0 {
+		ahdNumericRaise(class, "Numeric helper omitted its Matrix result")
+	}
+	result := ahdNumericMatrix(response.Matrix)
+	ahdNumericShape(class, result)
+	return result
+}
+
+func ahdNumericResponseMatrices(class *AhdClass, response ahdNumericResponse, keys ...string) AhdMatrixPair {
+	result := AhdMatrixPair{Keys: append([]string(nil), keys...), Values: make([]AhdMatrix, len(keys))}
+	for index, key := range keys {
+		rows, ok := response.Matrices[key]
+		if !ok || len(rows) == 0 {
+			ahdNumericRaise(class, "Numeric helper omitted its "+key+" Matrix result")
+		}
+		result.Values[index] = ahdNumericMatrix(rows)
+		ahdNumericShape(class, result.Values[index])
+	}
+	return result
+}
+
+func ahdNumericRaise(class *AhdClass, message string) { AhdRaiseClass(class, message) }
+func ahdNumericValues(vector AhdVector) []float64 {
+	if vector.Values == nil {
+		return nil
+	}
+	return vector.Values.Snapshot()
+}
+func ahdNumericRows(matrix AhdMatrix) [][]float64 {
+	if matrix.Rows == nil {
+		return nil
+	}
+	source := matrix.Rows.Snapshot()
+	rows := make([][]float64, len(source))
+	for i, row := range source {
+		if row != nil {
+			rows[i] = row.Snapshot()
+		}
+	}
+	return rows
+}
+func ahdNumericVector(values []float64) AhdVector { return AhdVector{Values: AhdNewList(values...)} }
+func ahdNumericMatrix(rows [][]float64) AhdMatrix {
+	result := make([]*AhdList[float64], len(rows))
+	for i, row := range rows {
+		result[i] = AhdNewList(append([]float64(nil), row...)...)
+	}
+	return AhdMatrix{Rows: AhdNewList(result...)}
+}
+func ahdNumericShape(class *AhdClass, matrix AhdMatrix) ([][]float64, int, int) {
+	rows := ahdNumericRows(matrix)
+	if len(rows) == 0 {
+		ahdNumericRaise(class, "matrix requires at least one row")
+	}
+	columns := len(rows[0])
+	if columns == 0 {
+		ahdNumericRaise(class, "matrix requires at least one column")
+	}
+	for _, row := range rows {
+		if len(row) != columns {
+			ahdNumericRaise(class, "matrix rows must have equal lengths")
+		}
+	}
+	return rows, len(rows), columns
+}
+func ahdNumericSquare(class *AhdClass, m AhdMatrix) ([][]float64, int) {
+	rows, r, c := ahdNumericShape(class, m)
+	if r != c {
+		ahdNumericRaise(class, "operation requires a square matrix")
+	}
+	return rows, r
+}
+
+func AhdNumericWidenList(values *AhdList[int64]) *AhdList[float64] {
+	if values == nil {
+		return nil
+	}
+	source := values.Snapshot()
+	out := make([]float64, len(source))
+	for i, v := range source {
+		out[i] = float64(v)
+	}
+	return AhdNewList(out...)
+}
+func AhdNumericWidenGrid(values *AhdList[*AhdList[int64]]) *AhdList[*AhdList[float64]] {
+	if values == nil {
+		return nil
+	}
+	source := values.Snapshot()
+	out := make([]*AhdList[float64], len(source))
+	for i, row := range source {
+		out[i] = AhdNumericWidenList(row)
+	}
+	return AhdNewList(out...)
+}
+func AhdNumericVector(class *AhdClass, values *AhdList[float64]) AhdVector {
+	if values == nil {
+		ahdNumericRaise(class, "vector values must not be null")
+	}
+	return ahdNumericVector(values.Snapshot())
+}
+func AhdNumericMatrix(class *AhdClass, rows *AhdList[*AhdList[float64]]) AhdMatrix {
+	m := AhdMatrix{Rows: rows}
+	grid, _, _ := ahdNumericShape(class, m)
+	return ahdNumericMatrix(grid)
+}
+func ahdNumericSize(class *AhdClass, size int64) int {
+	if size < 0 || size > int64(^uint(0)>>1) {
+		ahdNumericRaise(class, "size must be a non-negative Int")
+	}
+	return int(size)
+}
+func AhdNumericZerosVector(class *AhdClass, size int64) AhdVector {
+	return ahdNumericVector(make([]float64, ahdNumericSize(class, size)))
+}
+func AhdNumericOnesVector(class *AhdClass, size int64) AhdVector {
+	v := make([]float64, ahdNumericSize(class, size))
+	for i := range v {
+		v[i] = 1
+	}
+	return ahdNumericVector(v)
+}
+func ahdNumericFilledMatrix(class *AhdClass, r, c int64, value float64) AhdMatrix {
+	rows, cols := ahdNumericSize(class, r), ahdNumericSize(class, c)
+	if rows == 0 || cols == 0 {
+		ahdNumericRaise(class, "matrix dimensions must be positive")
+	}
+	grid := make([][]float64, rows)
+	for i := range grid {
+		grid[i] = make([]float64, cols)
+		if value != 0 {
+			for j := range grid[i] {
+				grid[i][j] = value
+			}
+		}
+	}
+	return ahdNumericMatrix(grid)
+}
+func AhdNumericZerosMatrix(class *AhdClass, r, c int64) AhdMatrix {
+	return ahdNumericFilledMatrix(class, r, c, 0)
+}
+func AhdNumericOnesMatrix(class *AhdClass, r, c int64) AhdMatrix {
+	return ahdNumericFilledMatrix(class, r, c, 1)
+}
+func AhdNumericIdentity(class *AhdClass, size int64) AhdMatrix {
+	n := ahdNumericSize(class, size)
+	if n == 0 {
+		ahdNumericRaise(class, "identity size must be positive")
+	}
+	m := make([][]float64, n)
+	for i := range m {
+		m[i] = make([]float64, n)
+		m[i][i] = 1
+	}
+	return ahdNumericMatrix(m)
+}
+func AhdNumericLinspace(class *AhdClass, start, stop float64, count int64) AhdVector {
+	if count <= 0 {
+		ahdNumericRaise(class, "linspace count must be positive")
+	}
+	v := make([]float64, count)
+	if count == 1 {
+		v[0] = start
+	} else {
+		step := (stop - start) / float64(count-1)
+		for i := range v {
+			v[i] = start + float64(i)*step
+		}
+		v[len(v)-1] = stop
+	}
+	return ahdNumericVector(v)
+}
+
+func AhdNumericVectorLength(v AhdVector) int64             { return int64(len(ahdNumericValues(v))) }
+func AhdNumericVectorValues(v AhdVector) *AhdList[float64] { return AhdNewList(ahdNumericValues(v)...) }
+func ahdNumericVectorBinary(class *AhdClass, a, b AhdVector, subtract bool) AhdVector {
+	x, y := ahdNumericValues(a), ahdNumericValues(b)
+	if len(x) != len(y) {
+		ahdNumericRaise(class, "vector lengths do not match")
+	}
+	out := make([]float64, len(x))
+	for i := range x {
+		if subtract {
+			out[i] = x[i] - y[i]
+		} else {
+			out[i] = x[i] + y[i]
+		}
+	}
+	return ahdNumericVector(out)
+}
+func AhdNumericVectorAdd(class *AhdClass, a, b AhdVector) AhdVector {
+	return ahdNumericVectorBinary(class, a, b, false)
+}
+func AhdNumericVectorSubtract(class *AhdClass, a, b AhdVector) AhdVector {
+	return ahdNumericVectorBinary(class, a, b, true)
+}
+func AhdNumericVectorScale(v AhdVector, f float64) AhdVector {
+	x := ahdNumericValues(v)
+	for i := range x {
+		x[i] *= f
+	}
+	return ahdNumericVector(x)
+}
+func AhdNumericVectorDot(class *AhdClass, a, b AhdVector) float64 {
+	x, y := ahdNumericValues(a), ahdNumericValues(b)
+	if len(x) != len(y) {
+		ahdNumericRaise(class, "vector lengths do not match")
+	}
+	sum := 0.0
+	for i := range x {
+		sum += x[i] * y[i]
+	}
+	return sum
+}
+func ahdNumericElement(class *AhdClass, value float64, operation string) float64 {
+	switch operation {
+	case "abs":
+		return math.Abs(value)
+	case "sqrt":
+		if value < 0 {
+			ahdNumericRaise(class, "sqrt requires non-negative values")
+		}
+		return math.Sqrt(value)
+	case "exp":
+		value = math.Exp(value)
+	case "log":
+		if value <= 0 {
+			ahdNumericRaise(class, "log requires positive values")
+		}
+		value = math.Log(value)
+	}
+	if math.IsInf(value, 0) || math.IsNaN(value) {
+		ahdNumericRaise(class, "elementwise operation produced a non-finite value")
+	}
+	return value
+}
+func AhdNumericVectorElementwise(class *AhdClass, v AhdVector, op string) AhdVector {
+	x := ahdNumericValues(v)
+	for i := range x {
+		x[i] = ahdNumericElement(class, x[i], op)
+	}
+	return ahdNumericVector(x)
+}
+func AhdNumericVectorReduction(class *AhdClass, v AhdVector, op string) float64 {
+	x := ahdNumericValues(v)
+	if len(x) == 0 && (op == "min" || op == "max") {
+		ahdNumericRaise(class, op+" requires a non-empty Vector")
+	}
+	result := 0.0
+	if len(x) > 0 && (op == "min" || op == "max") {
+		result = x[0]
+	}
+	for i, value := range x {
+		if op == "sum" {
+			result += value
+		} else if op == "min" && value < result {
+			result = value
+		} else if op == "max" && value > result {
+			result = value
+		}
+		_ = i
+	}
+	return result
+}
+
+func AhdNumericMatrixRowCount(m AhdMatrix) int64 { return int64(len(ahdNumericRows(m))) }
+func AhdNumericMatrixColumnCount(m AhdMatrix) int64 {
+	rows := ahdNumericRows(m)
+	if len(rows) == 0 {
+		return 0
+	}
+	return int64(len(rows[0]))
+}
+func AhdNumericMatrixRows(m AhdMatrix) *AhdList[*AhdList[float64]] {
+	return ahdNumericMatrix(ahdNumericRows(m)).Rows
+}
+func AhdNumericMatrixTranspose(m AhdMatrix) AhdMatrix {
+	a := ahdNumericRows(m)
+	if len(a) == 0 {
+		return ahdNumericMatrix(nil)
+	}
+	out := make([][]float64, len(a[0]))
+	for j := range out {
+		out[j] = make([]float64, len(a))
+		for i := range a {
+			out[j][i] = a[i][j]
+		}
+	}
+	return ahdNumericMatrix(out)
+}
+func ahdNumericMatrixBinary(class *AhdClass, a, b AhdMatrix, subtract bool) AhdMatrix {
+	x, r, c := ahdNumericShape(class, a)
+	y, rr, cc := ahdNumericShape(class, b)
+	if r != rr || c != cc {
+		ahdNumericRaise(class, "matrix shapes do not match")
+	}
+	for i := range x {
+		for j := range x[i] {
+			if subtract {
+				x[i][j] -= y[i][j]
+			} else {
+				x[i][j] += y[i][j]
+			}
+		}
+	}
+	return ahdNumericMatrix(x)
+}
+func AhdNumericMatrixAdd(class *AhdClass, a, b AhdMatrix) AhdMatrix {
+	return ahdNumericMatrixBinary(class, a, b, false)
+}
+func AhdNumericMatrixSubtract(class *AhdClass, a, b AhdMatrix) AhdMatrix {
+	return ahdNumericMatrixBinary(class, a, b, true)
+}
+func AhdNumericMatrixScale(m AhdMatrix, f float64) AhdMatrix {
+	a := ahdNumericRows(m)
+	for i := range a {
+		for j := range a[i] {
+			a[i][j] *= f
+		}
+	}
+	return ahdNumericMatrix(a)
+}
+func AhdNumericMatrixMatmul(class *AhdClass, a, b AhdMatrix) AhdMatrix {
+	x, r, k := ahdNumericShape(class, a)
+	y, kk, c := ahdNumericShape(class, b)
+	if k != kk {
+		ahdNumericRaise(class, "matrix multiplication shapes do not match")
+	}
+	out := make([][]float64, r)
+	for i := range out {
+		out[i] = make([]float64, c)
+		for j := 0; j < c; j++ {
+			for q := 0; q < k; q++ {
+				out[i][j] += x[i][q] * y[q][j]
+			}
+		}
+	}
+	return ahdNumericMatrix(out)
+}
+func AhdNumericMatrixTrace(class *AhdClass, m AhdMatrix) float64 {
+	a, n := ahdNumericSquare(class, m)
+	sum := 0.0
+	for i := 0; i < n; i++ {
+		sum += a[i][i]
+	}
+	return sum
+}
+func ahdNumericEliminate(a [][]float64) (rank int, det float64, swaps int) {
+	rows, cols := len(a), len(a[0])
+	det = 1
+	pivotRow := 0
+	for col := 0; col < cols && pivotRow < rows; col++ {
+		pivot := pivotRow
+		for i := pivotRow + 1; i < rows; i++ {
+			if math.Abs(a[i][col]) > math.Abs(a[pivot][col]) {
+				pivot = i
+			}
+		}
+		if math.Abs(a[pivot][col]) <= 1e-12 {
+			if rows == cols {
+				det = 0
+			}
+			continue
+		}
+		if pivot != pivotRow {
+			a[pivot], a[pivotRow] = a[pivotRow], a[pivot]
+			swaps++
+		}
+		p := a[pivotRow][col]
+		if rows == cols {
+			det *= p
+		}
+		for i := pivotRow + 1; i < rows; i++ {
+			factor := a[i][col] / p
+			for j := col; j < cols; j++ {
+				a[i][j] -= factor * a[pivotRow][j]
+			}
+		}
+		pivotRow++
+		rank++
+	}
+	if swaps%2 != 0 {
+		det = -det
+	}
+	return
+}
+func AhdNumericMatrixDeterminant(class *AhdClass, m AhdMatrix) float64 {
+	a, _ := ahdNumericSquare(class, m)
+	response := ahdNumericCall(class, "determinant", a, nil)
+	if response.Scalar == nil {
+		ahdNumericRaise(class, "Numeric helper omitted its scalar result")
+	}
+	return *response.Scalar
+}
+func AhdNumericMatrixRank(class *AhdClass, m AhdMatrix) int64 {
+	a, _, _ := ahdNumericShape(class, m)
+	response := ahdNumericCall(class, "rank", a, nil)
+	if response.Integer == nil {
+		ahdNumericRaise(class, "Numeric helper omitted its Int result")
+	}
+	return int64(*response.Integer)
+}
+func ahdNumericSolve(class *AhdClass, a [][]float64, b []float64) []float64 {
+	n := len(a)
+	if len(b) != n {
+		ahdNumericRaise(class, "system dimensions do not match")
+	}
+	for i := 0; i < n; i++ {
+		a[i] = append(a[i], b[i])
+	}
+	for col := 0; col < n; col++ {
+		pivot := col
+		for i := col + 1; i < n; i++ {
+			if math.Abs(a[i][col]) > math.Abs(a[pivot][col]) {
+				pivot = i
+			}
+		}
+		if math.Abs(a[pivot][col]) <= 1e-12 {
+			ahdNumericRaise(class, "matrix is singular")
+		}
+		a[pivot], a[col] = a[col], a[pivot]
+		p := a[col][col]
+		for j := col; j <= n; j++ {
+			a[col][j] /= p
+		}
+		for i := 0; i < n; i++ {
+			if i == col {
+				continue
+			}
+			f := a[i][col]
+			for j := col; j <= n; j++ {
+				a[i][j] -= f * a[col][j]
+			}
+		}
+	}
+	x := make([]float64, n)
+	for i := range x {
+		x[i] = a[i][n]
+	}
+	return x
+}
+func AhdNumericMatrixSolve(class *AhdClass, m AhdMatrix, v AhdVector) AhdVector {
+	a, _ := ahdNumericSquare(class, m)
+	response := ahdNumericCall(class, "solve", a, ahdNumericValues(v))
+	if response.Vector == nil {
+		ahdNumericRaise(class, "Numeric helper omitted its Vector result")
+	}
+	return ahdNumericVector(response.Vector)
+}
+func AhdNumericMatrixInverse(class *AhdClass, m AhdMatrix) AhdMatrix {
+	a, _ := ahdNumericSquare(class, m)
+	return ahdNumericResponseMatrix(class, ahdNumericCall(class, "inverse", a, nil))
+}
+func AhdNumericMatrixElementwise(class *AhdClass, m AhdMatrix, op string) AhdMatrix {
+	a := ahdNumericRows(m)
+	for i := range a {
+		for j := range a[i] {
+			a[i][j] = ahdNumericElement(class, a[i][j], op)
+		}
+	}
+	return ahdNumericMatrix(a)
+}
+func AhdNumericMatrixReduction(class *AhdClass, m AhdMatrix, op string) float64 {
+	a, _, _ := ahdNumericShape(class, m)
+	flat := []float64{}
+	for _, row := range a {
+		flat = append(flat, row...)
+	}
+	return AhdNumericVectorReduction(class, ahdNumericVector(flat), op)
+}
+
+func AhdNumericMatrixCholesky(class *AhdClass, m AhdMatrix) AhdMatrix {
+	a, _ := ahdNumericSquare(class, m)
+	return ahdNumericResponseMatrix(class, ahdNumericCall(class, "cholesky", a, nil))
+}
+func ahdNumericQR(class *AhdClass, a [][]float64) ([][]float64, [][]float64) {
+	m, n := len(a), len(a[0])
+	q := make([][]float64, m)
+	for i := range q {
+		q[i] = make([]float64, n)
+	}
+	r := make([][]float64, n)
+	for i := range r {
+		r[i] = make([]float64, n)
+	}
+	for j := 0; j < n; j++ {
+		v := make([]float64, m)
+		for i := range v {
+			v[i] = a[i][j]
+		}
+		for k := 0; k < j; k++ {
+			for i := 0; i < m; i++ {
+				r[k][j] += q[i][k] * v[i]
+			}
+			for i := 0; i < m; i++ {
+				v[i] -= r[k][j] * q[i][k]
+			}
+		}
+		for _, x := range v {
+			r[j][j] += x * x
+		}
+		r[j][j] = math.Sqrt(r[j][j])
+		if r[j][j] <= 1e-12 {
+			ahdNumericRaise(class, "QR decomposition failed for rank-deficient matrix")
+		}
+		for i := 0; i < m; i++ {
+			q[i][j] = v[i] / r[j][j]
+		}
+	}
+	return q, r
+}
+func AhdNumericMatrixQR(class *AhdClass, m AhdMatrix) AhdMatrixPair {
+	a, _, _ := ahdNumericShape(class, m)
+	return ahdNumericResponseMatrices(class, ahdNumericCall(class, "qr", a, nil), "Q", "R")
+}
+func AhdNumericMatrixLU(class *AhdClass, m AhdMatrix) AhdMatrixPair {
+	a, _ := ahdNumericSquare(class, m)
+	return ahdNumericResponseMatrices(class, ahdNumericCall(class, "lu", a, nil), "P", "L", "U")
+}
+func AhdNumericMatrixSVD(class *AhdClass, m AhdMatrix) AhdMatrixPair {
+	a, _, _ := ahdNumericShape(class, m)
+	return ahdNumericResponseMatrices(class, ahdNumericCall(class, "svd", a, nil), "U", "S", "V")
+}
+func ahdNumericJacobi(a [][]float64) ([]float64, [][]float64) {
+	n := len(a)
+	v := make([][]float64, n)
+	for i := range v {
+		v[i] = make([]float64, n)
+		v[i][i] = 1
+	}
+	for iteration := 0; iteration < 100*n*n; iteration++ {
+		p, q := 0, 0
+		largest := 0.0
+		for i := 0; i < n; i++ {
+			for j := i + 1; j < n; j++ {
+				if math.Abs(a[i][j]) > largest {
+					largest = math.Abs(a[i][j])
+					p, q = i, j
+				}
+			}
+		}
+		if largest < 1e-12 {
+			break
+		}
+		angle := .5 * math.Atan2(2*a[p][q], a[q][q]-a[p][p])
+		c, s := math.Cos(angle), math.Sin(angle)
+		for i := 0; i < n; i++ {
+			ap, aq := a[i][p], a[i][q]
+			a[i][p], a[i][q] = c*ap-s*aq, s*ap+c*aq
+		}
+		for j := 0; j < n; j++ {
+			ap, aq := a[p][j], a[q][j]
+			a[p][j], a[q][j] = c*ap-s*aq, s*ap+c*aq
+		}
+		for i := 0; i < n; i++ {
+			vp, vq := v[i][p], v[i][q]
+			v[i][p], v[i][q] = c*vp-s*vq, s*vp+c*vq
+		}
+	}
+	values := make([]float64, n)
+	for i := range values {
+		values[i] = a[i][i]
+	}
+	return values, v
+}
+func AhdNumericMatrixEigenvalues(class *AhdClass, m AhdMatrix) *AhdList[complex128] {
+	a, _ := ahdNumericSquare(class, m)
+	response := ahdNumericCall(class, "eigenvalues", a, nil)
+	out := make([]complex128, len(response.Complex))
+	if len(out) == 0 {
+		ahdNumericRaise(class, "Numeric helper omitted its Complex result")
+	}
+	for i, value := range response.Complex {
+		out[i] = complex(value.Real, value.Imag)
+	}
+	return AhdNewList(out...)
+}
+func AhdNumericWrapMatrixPair[T any](pair AhdMatrixPair, wrap func(AhdMatrix) T) *AhdPair[string, T] {
+	values := make([]T, len(pair.Values))
+	for i, v := range pair.Values {
+		values[i] = wrap(v)
+	}
+	return AhdBuildPair(pair.Keys, values)
 }

@@ -660,6 +660,9 @@ func (a *analyzer) analyzeCallWithCallee(call *ast.CallExpr, callee expressionIn
 		if !supplied {
 			hint, supplied = plotConstructionHint(class.Symbol)
 		}
+		if !supplied {
+			hint, supplied = numericConstructionHint(class.Symbol)
+		}
 		if supplied {
 			// A compiler-supplied value is produced by a standard-module
 			// function that validates its arguments, never by direct
@@ -733,6 +736,9 @@ func typeOperationFor(receiver types.Type, name string) (TypeOperation, bool) {
 			return PairEject, true
 		}
 	case types.ClassKind:
+		if operation, ok := numericOperationFor(receiver, name); ok {
+			return operation, true
+		}
 		if operation, ok := timeOperationFor(receiver, name); ok {
 			return operation, true
 		}

@@ -43,7 +43,7 @@ from Utilities bring all
 aktarım çakışmaları (import collisions) ve döngüsel bağımlılıklar (circular
 dependencies) derleme zamanı hatalarıdır.
 
-`Math`, `Time`, `Latex`, `Path`, `File`, `Regex`, `CSV`, `Data`, `Statistics` ve `Plot` derleyici tarafından
+`Math`, `Time`, `Latex`, `Path`, `File`, `Regex`, `CSV`, `Data`, `Statistics`, `Plot` ve `Numeric` derleyici tarafından
 kayıtlıdır (compiler-registered) ve aynı içe aktarım biçimlerini kullanır.
 Yerel bir dosya, aynı isimdeki standart bir modülün yerini alamaz (shadow
 edemez). Ayrıca sıradan isim uzayı takma adı (namespace alias) biçimini de
@@ -55,4 +55,4 @@ F.writeText("note.txt", "hello")
 ```
 
 Tipli yüzeyleri ve yakalanabilir alan hataları için [Time](TIME_TR.md),
-[CSV](CSV_TR.md), [Data](DATA_TR.md), [Statistics](STATISTICS_TR.md), [Plot](PLOT_TR.md) ve diğer modül referanslarına bakın.
+[CSV](CSV_TR.md), [Data](DATA_TR.md), [Statistics](STATISTICS_TR.md), [Plot](PLOT_TR.md), [Numeric](NUMERIC_TR.md) ve diğer modül referanslarına bakın.

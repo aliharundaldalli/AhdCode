@@ -205,6 +205,9 @@ func plotRealGridToField(grid [][]float64) *List {
 // widening any Int elements, matching Statistics' internal Int -> Real
 // convention.
 func (session *Session) plotNumbers(value any) []float64 {
+	if instance, ok := value.(*Instance); ok && instance != nil && instance.Class == evalVectorClass {
+		return session.vectorValues(instance)
+	}
 	list := session.requireList(value)
 	numbers := make([]float64, len(list.Items))
 	for index, item := range list.Items {

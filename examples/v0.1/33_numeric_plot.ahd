@@ -1,0 +1,13 @@
+bring Numeric
+bring Plot
+from Plot bring Chart
+
+x := Numeric.linspace(0.0, 10.0, 101)
+y := x.scale(2.0).add(Numeric.ones(101))
+
+chart: Chart := Plot.line(x, y)
+chart = chart.title("y = 2x + 1").xLabel("x").yLabel("y")
+chart = chart.scatter(x, y, "samples")
+chart.save("numeric-plot.png")
+
+write("numeric-plot.png saved")

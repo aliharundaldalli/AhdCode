@@ -4,6 +4,7 @@ go 1.25.0
 
 require (
 	golang.org/x/text v0.41.0
+	gonum.org/v1/gonum v0.16.0
 	gonum.org/v1/plot v0.17.0
 )
 

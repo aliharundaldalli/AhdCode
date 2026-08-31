@@ -20,6 +20,7 @@ func StandardModuleInterfaces() map[string]*ModuleInterface {
 		"File":       fileModuleInterface(),
 		"Latex":      latexModuleInterface(),
 		"Math":       mathModuleInterface(),
+		"Numeric":    numericModuleInterface(),
 		"Path":       pathModuleInterface(),
 		"Plot":       plotModuleInterface(),
 		"Regex":      regexModuleInterface(),

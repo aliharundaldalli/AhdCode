@@ -140,6 +140,11 @@ func plotModuleInterface() *ModuleInterface {
 	addStandardExport(module, plotFunction("new", &types.Signature{Return: chart}))
 	addStandardExport(module, plotFunction("line", plotNumericSignatures(chart, []string{"x", "y"})...))
 	addStandardExport(module, plotFunction("scatter", plotNumericSignatures(chart, []string{"x", "y"})...))
+	for _, name := range []string{"line", "scatter"} {
+		symbol := module.Exports[name]
+		callable := &Callable{Signature: &types.Signature{Parameters: []types.Parameter{{Name: "x", Type: numericVectorType()}, {Name: "y", Type: numericVectorType()}}, Return: chart}, ParameterNull: []NullState{NonNull, NonNull}, ReturnNull: NonNull}
+		symbol.OverloadSet.Candidates = append(symbol.OverloadSet.Candidates, callable)
+	}
 	addStandardExport(module, plotBarFunction())
 	addStandardExport(module, plotFunction("histogram", plotNumericSignatures(chart, []string{"values"},
 		types.Parameter{Name: "bins", Type: types.Int})...))
@@ -319,7 +324,8 @@ func (a *analyzer) requirePlotNumericList(call *ast.CallExpr, index int, operati
 		return
 	}
 	list, isList := info.typeValue.(types.List)
-	numeric := isList && list.Element != nil && (list.Element.Kind() == types.IntKind || list.Element.Kind() == types.RealKind)
+	vector := types.Equal(info.typeValue, numericVectorType())
+	numeric := vector || (isList && list.Element != nil && (list.Element.Kind() == types.IntKind || list.Element.Kind() == types.RealKind))
 	if !numeric {
 		a.typeMismatch(call.Arguments[index].Span(), types.List{Element: types.Real}, info.typeValue, string(operation)+" argument")
 	}

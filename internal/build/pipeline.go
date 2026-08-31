@@ -176,6 +176,7 @@ func BuildProgram(entryPath, outputPath string) (string, Result) {
 	}
 	result.Program = configureLatexRuntime(result.Program)
 	result.Program = configurePlotRuntime(result.Program)
+	result.Program = configureNumericRuntime(result.Program)
 	workspace, failures := NewWorkspace(result.Program)
 	if len(failures) != 0 {
 		result.Diagnostics = append(result.Diagnostics, failures...)
@@ -261,6 +262,7 @@ func RunProgramIO(entryPath string, arguments []string, stdin io.Reader, stdout,
 	}
 	result.Program = configureLatexRuntime(result.Program)
 	result.Program = configurePlotRuntime(result.Program)
+	result.Program = configureNumericRuntime(result.Program)
 	executable, cleanup, failures := runExecutable(result.Program)
 	defer cleanup()
 	result.Diagnostics = append(result.Diagnostics, failures...)
@@ -297,13 +299,14 @@ func configureLatexRuntime(program *backend.GeneratedProgram) *backend.Generated
 	// RequiresPlot is preserved from the original program (not just
 	// RequiresLatex: true) so a program using both Latex and Plot keeps its
 	// Plot hint regardless of which configure*Runtime call ran first.
-	copyProgram := &backend.GeneratedProgram{RequiresLatex: true, RequiresPlot: program.RequiresPlot}
-	copyProgram.Files = append(copyProgram.Files, program.Files...)
+	copyProgram := *program
+	copyProgram.RequiresLatex = true
+	copyProgram.Files = append([]backend.GeneratedFile(nil), program.Files...)
 	copyProgram.Files = append(copyProgram.Files, backend.GeneratedFile{
 		Name:    "ahdcode_latex_runtime.go",
 		Content: "package main\n\nfunc init() { AhdLatexRuntimeHint = " + strconv.Quote(root) + " }\n",
 	})
-	return copyProgram
+	return &copyProgram
 }
 
 // configurePlotRuntime records the shared installation resource directory in
@@ -318,13 +321,59 @@ func configurePlotRuntime(program *backend.GeneratedProgram) *backend.GeneratedP
 	if root == "" {
 		return program
 	}
-	copyProgram := &backend.GeneratedProgram{RequiresPlot: true, RequiresLatex: program.RequiresLatex}
-	copyProgram.Files = append(copyProgram.Files, program.Files...)
+	copyProgram := *program
+	copyProgram.RequiresPlot = true
+	copyProgram.Files = append([]backend.GeneratedFile(nil), program.Files...)
 	copyProgram.Files = append(copyProgram.Files, backend.GeneratedFile{
 		Name:    "ahdcode_plot_runtime.go",
 		Content: "package main\n\nfunc init() { AhdPlotRuntimeHint = " + strconv.Quote(root) + " }\n",
 	})
-	return copyProgram
+	return &copyProgram
+}
+
+// configureNumericRuntime preserves every unrelated runtime requirement while
+// adding the installed ahdnumeric discovery hint.
+func configureNumericRuntime(program *backend.GeneratedProgram) *backend.GeneratedProgram {
+	if program == nil || !program.RequiresNumeric {
+		return program
+	}
+	root := findNumericRuntimeRoot()
+	if root == "" {
+		return program
+	}
+	copyProgram := *program
+	copyProgram.RequiresNumeric = true
+	copyProgram.Files = append([]backend.GeneratedFile(nil), program.Files...)
+	copyProgram.Files = append(copyProgram.Files, backend.GeneratedFile{Name: "ahdcode_numeric_runtime.go", Content: "package main\n\nfunc init() { AhdNumericRuntimeHint = " + strconv.Quote(root) + " }\n"})
+	return &copyProgram
+}
+
+func findNumericRuntimeRoot() string {
+	name := "ahdnumeric"
+	if filepath.Ext(os.Args[0]) == ".exe" {
+		name += ".exe"
+	}
+	var candidates []string
+	if custom := os.Getenv("AHDCODE_NUMERIC_RUNTIME"); custom != "" {
+		if info, err := os.Stat(custom); err == nil && info.Mode().IsRegular() {
+			candidates = append(candidates, filepath.Dir(custom))
+		} else {
+			candidates = append(candidates, custom)
+		}
+	}
+	if executable, err := os.Executable(); err == nil {
+		bin := filepath.Dir(executable)
+		candidates = append(candidates, bin, filepath.Join(bin, "..", "libexec", "ahdcode"))
+	}
+	for _, candidate := range candidates {
+		helper := filepath.Join(filepath.Clean(candidate), name)
+		if info, err := os.Stat(helper); err == nil && info.Mode().IsRegular() {
+			if absolute, err := filepath.Abs(candidate); err == nil {
+				return absolute
+			}
+		}
+	}
+	return ""
 }
 
 // findPlotRuntimeRoot locates the directory holding the bundled ahdplot

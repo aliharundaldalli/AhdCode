@@ -21,9 +21,10 @@ type GeneratedFile struct {
 
 // GeneratedProgram is the complete Go source of one AhdCode compilation.
 type GeneratedProgram struct {
-	Files         []GeneratedFile
-	RequiresLatex bool
-	RequiresPlot  bool
+	Files           []GeneratedFile
+	RequiresLatex   bool
+	RequiresPlot    bool
+	RequiresNumeric bool
 }
 
 const (
@@ -54,6 +55,7 @@ type generator struct {
 	temporary   int
 	usesLatex   bool
 	usesPlot    bool
+	usesNumeric bool
 	// frames tracks the enclosing loop and attempt structure so break,
 	// continue, and return transfer through error handling correctly.
 	frames []frame
@@ -99,7 +101,7 @@ func Generate(compilation *ir.Compilation) (*GeneratedProgram, []diagnostics.Dia
 	return &GeneratedProgram{Files: []GeneratedFile{
 		{Name: programFileName, Content: string(formatted)},
 		{Name: runtimeFileName, Content: string(runtime)},
-	}, RequiresLatex: generator.usesLatex, RequiresPlot: generator.usesPlot}, generator.diagnostics
+	}, RequiresLatex: generator.usesLatex, RequiresPlot: generator.usesPlot, RequiresNumeric: generator.usesNumeric}, generator.diagnostics
 }
 
 // runtimeSource re-points the shared runtime package at the generated program.
@@ -342,6 +344,7 @@ func (generator *generator) emitProgram() string {
 	generator.emitTimeHelpers(writer)
 	generator.emitDataHelpers(writer)
 	generator.emitPlotHelpers(writer)
+	generator.emitNumericHelpers(writer)
 	writer.raw(bodies.String())
 	generator.emitInstaller(writer)
 	writer.open("func main() {")

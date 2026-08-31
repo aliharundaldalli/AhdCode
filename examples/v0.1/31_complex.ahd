@@ -1,0 +1,13 @@
+z := 2 + 3I
+w: Complex := 5I
+realValue: Complex := 2
+
+write(type(z))
+write(z)
+write(z + w)
+write(z * z.conjugate())
+write(z.real())
+write(z.imag())
+write(z.magnitude())
+write(z.phase())
+write(realValue)

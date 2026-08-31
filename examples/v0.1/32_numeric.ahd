@@ -1,0 +1,25 @@
+bring Numeric
+from Numeric bring Matrix
+from Numeric bring Vector
+
+values: List<Int> := [1, 2, 3]
+v: Vector := Numeric.vector(values)
+w := Numeric.linspace(2.0, 6.0, 3)
+
+write(v.values())
+write(v.add(w).values())
+write(v.dot(w))
+
+m: Matrix := Numeric.matrix([
+    [4.0, 1.0]
+    [1.0, 3.0]
+])
+
+write(m.transpose().rows())
+write(m.determinant())
+write(m.solve(Numeric.vector([1.0, 2.0])).values())
+write(m.cholesky().rows())
+write(m.eigenvalues())
+
+// Numeric copied the constructor input; this List is unchanged.
+write(values)
