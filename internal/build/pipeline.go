@@ -175,6 +175,7 @@ func BuildProgram(entryPath, outputPath string) (string, Result) {
 		outputPath = DefaultOutputPath(entryPath)
 	}
 	result.Program = configureLatexRuntime(result.Program)
+	result.Program = configurePlotRuntime(result.Program)
 	workspace, failures := NewWorkspace(result.Program)
 	if len(failures) != 0 {
 		result.Diagnostics = append(result.Diagnostics, failures...)
@@ -259,6 +260,7 @@ func RunProgramIO(entryPath string, arguments []string, stdin io.Reader, stdout,
 		return 1, result
 	}
 	result.Program = configureLatexRuntime(result.Program)
+	result.Program = configurePlotRuntime(result.Program)
 	executable, cleanup, failures := runExecutable(result.Program)
 	defer cleanup()
 	result.Diagnostics = append(result.Diagnostics, failures...)
@@ -292,13 +294,70 @@ func configureLatexRuntime(program *backend.GeneratedProgram) *backend.Generated
 	if root == "" {
 		return program
 	}
-	copyProgram := &backend.GeneratedProgram{RequiresLatex: true}
+	// RequiresPlot is preserved from the original program (not just
+	// RequiresLatex: true) so a program using both Latex and Plot keeps its
+	// Plot hint regardless of which configure*Runtime call ran first.
+	copyProgram := &backend.GeneratedProgram{RequiresLatex: true, RequiresPlot: program.RequiresPlot}
 	copyProgram.Files = append(copyProgram.Files, program.Files...)
 	copyProgram.Files = append(copyProgram.Files, backend.GeneratedFile{
 		Name:    "ahdcode_latex_runtime.go",
 		Content: "package main\n\nfunc init() { AhdLatexRuntimeHint = " + strconv.Quote(root) + " }\n",
 	})
 	return copyProgram
+}
+
+// configurePlotRuntime records the shared installation resource directory in
+// programs that actually use Plot, mirroring configureLatexRuntime. The
+// runtime still validates the helper exists and raises PlotError if it is
+// missing at run time.
+func configurePlotRuntime(program *backend.GeneratedProgram) *backend.GeneratedProgram {
+	if program == nil || !program.RequiresPlot {
+		return program
+	}
+	root := findPlotRuntimeRoot()
+	if root == "" {
+		return program
+	}
+	copyProgram := &backend.GeneratedProgram{RequiresPlot: true, RequiresLatex: program.RequiresLatex}
+	copyProgram.Files = append(copyProgram.Files, program.Files...)
+	copyProgram.Files = append(copyProgram.Files, backend.GeneratedFile{
+		Name:    "ahdcode_plot_runtime.go",
+		Content: "package main\n\nfunc init() { AhdPlotRuntimeHint = " + strconv.Quote(root) + " }\n",
+	})
+	return copyProgram
+}
+
+// findPlotRuntimeRoot locates the directory holding the bundled ahdplot
+// renderer helper, the same way findLatexRuntimeRoot locates the Tectonic
+// bundle: an explicit override, then a path relative to the compiler's own
+// executable (bin/ or a sibling libexec/ahdcode/ directory).
+func findPlotRuntimeRoot() string {
+	name := "ahdplot"
+	if filepath.Ext(os.Args[0]) == ".exe" {
+		name = "ahdplot.exe"
+	}
+	var candidates []string
+	if custom := os.Getenv("AHDCODE_PLOT_RUNTIME"); custom != "" {
+		candidates = append(candidates, filepath.Dir(custom))
+	}
+	if executable, err := os.Executable(); err == nil {
+		bin := filepath.Dir(executable)
+		candidates = append(candidates, bin, filepath.Join(bin, "..", "libexec", "ahdcode"))
+	}
+	for _, candidate := range candidates {
+		if candidate == "" {
+			continue
+		}
+		candidate = filepath.Clean(candidate)
+		helper := filepath.Join(candidate, name)
+		if info, err := os.Stat(helper); err == nil && info.Mode().IsRegular() {
+			absolute, err := filepath.Abs(candidate)
+			if err == nil {
+				return absolute
+			}
+		}
+	}
+	return ""
 }
 
 func findLatexRuntimeRoot() string {

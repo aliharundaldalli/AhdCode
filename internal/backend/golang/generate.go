@@ -23,6 +23,7 @@ type GeneratedFile struct {
 type GeneratedProgram struct {
 	Files         []GeneratedFile
 	RequiresLatex bool
+	RequiresPlot  bool
 }
 
 const (
@@ -52,6 +53,7 @@ type generator struct {
 	diagnostics []diagnostics.Diagnostic
 	temporary   int
 	usesLatex   bool
+	usesPlot    bool
 	// frames tracks the enclosing loop and attempt structure so break,
 	// continue, and return transfer through error handling correctly.
 	frames []frame
@@ -97,7 +99,7 @@ func Generate(compilation *ir.Compilation) (*GeneratedProgram, []diagnostics.Dia
 	return &GeneratedProgram{Files: []GeneratedFile{
 		{Name: programFileName, Content: string(formatted)},
 		{Name: runtimeFileName, Content: string(runtime)},
-	}, RequiresLatex: generator.usesLatex}, generator.diagnostics
+	}, RequiresLatex: generator.usesLatex, RequiresPlot: generator.usesPlot}, generator.diagnostics
 }
 
 // runtimeSource re-points the shared runtime package at the generated program.

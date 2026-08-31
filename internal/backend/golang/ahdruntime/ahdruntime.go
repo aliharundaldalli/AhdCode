@@ -3764,6 +3764,16 @@ func AhdDataPivotCount(class *AhdClass, value AhdTable, rowName, columnName stri
 // internal/plotproto for the canonical protocol shape (duplicated here,
 // field-for-field, since this file cannot import that package).
 
+// AhdPlotRuntimeHint is filled by the compiler when it builds a program that
+// uses Plot, mirroring AhdLatexRuntimeHint: os.Executable() inside a
+// natively-compiled program can be a short-lived temporary binary (ahdcode
+// run) or a copy moved away from the toolchain's own install directory
+// (ahdcode build -o ... then relocated), so the compiler resolves the
+// bundled helper's location once, at build time, from its own executable
+// path, and bakes the result in. The environment override is reserved for
+// packaging and tests; neither mechanism is AhdCode language syntax.
+var AhdPlotRuntimeHint string
+
 // AhdChart is the runtime interchange shape for one Chart: every field a
 // Chart operation might read or write, laid out exactly like the AhdCode
 // Class's hidden storage fields. Kind discriminates which family-specific
@@ -3918,22 +3928,33 @@ func ahdPlotTempDir(class *AhdClass) string {
 // explicit override, then a path relative to the running executable,
 // mirroring this file's Latex-runtime discovery.
 func ahdPlotDiscoverRuntime() (string, error) {
-	if custom := os.Getenv("AHDCODE_PLOT_RUNTIME"); custom != "" {
-		return custom, nil
+	name := "ahdplot"
+	if runtime.GOOS == "windows" {
+		name = "ahdplot.exe"
+	}
+	candidates := []string{os.Getenv("AHDCODE_PLOT_RUNTIME")}
+	if AhdPlotRuntimeHint != "" {
+		candidates = append(candidates, filepath.Join(AhdPlotRuntimeHint, name))
 	}
 	if executable, err := os.Executable(); err == nil {
 		bin := filepath.Dir(executable)
-		candidates := []string{
-			filepath.Join(bin, "ahdplot"),
-			filepath.Join(bin, "..", "libexec", "ahdcode", "ahdplot"),
+		candidates = append(candidates,
+			filepath.Join(bin, name),
+			filepath.Join(bin, "..", "libexec", "ahdcode", name),
+		)
+	}
+	seen := make(map[string]bool)
+	for _, candidate := range candidates {
+		if candidate == "" {
+			continue
 		}
-		if runtime.GOOS == "windows" {
-			candidates = append([]string{filepath.Join(bin, "ahdplot.exe")}, candidates...)
+		candidate = filepath.Clean(candidate)
+		if seen[candidate] {
+			continue
 		}
-		for _, candidate := range candidates {
-			if info, err := os.Stat(candidate); err == nil && !info.IsDir() {
-				return candidate, nil
-			}
+		seen[candidate] = true
+		if info, err := os.Stat(candidate); err == nil && !info.IsDir() {
+			return candidate, nil
 		}
 	}
 	return "", fmt.Errorf("the Plot renderer helper (ahdplot) was not found; set AHDCODE_PLOT_RUNTIME " +

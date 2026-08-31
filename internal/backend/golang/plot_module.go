@@ -46,6 +46,7 @@ func plotFigureFieldID(name string) ir.FieldID {
 // argument, so this layer only widens an Int list to Real (plotNumericValue)
 // and dispatches to the matching runtime helper.
 func (generator *generator) plotCall(value *ir.CallExpr) string {
+	generator.usesPlot = true
 	meta := value.ExprMeta()
 	name := strings.TrimPrefix(string(value.Callable), plotModulePrefix)
 	numeric := func(index int) string {
@@ -261,6 +262,7 @@ func plotChartInterchangeField(name string) string {
 
 // plotOperation lowers the built-in members of Chart and Figure.
 func (generator *generator) plotOperation(name string, value *ir.CallExpr) string {
+	generator.usesPlot = true
 	meta := value.ExprMeta()
 	if value.Callee == nil {
 		generator.fail(CodeGenerationFailure, name+" has no receiver", meta.Span, "the IR call is malformed")
