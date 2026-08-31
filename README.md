@@ -12,8 +12,13 @@ AhdCode is an experimental statically checked general-purpose programming
 language focused on readable syntax, explicit intent, predictable semantics,
 and native compilation.
 
-The current release is **v0.1.16**. The core language works end to end, but
+The current release is **v0.1.17**. The core language works end to end, but
 the project is not production-ready and breaking changes may occur before 1.0.
+
+v0.1.17 — Structured Data & Configuration — adds typed [JSON](docs/JSON.md)
+and [XML](docs/XML.md) modules and a compact [Env](docs/ENV.md) module for
+process/`.env` configuration, and fixes a confirmed Word merged-table
+silent data-loss bug on read/save round-trips.
 
 ```ahd
 greet: Function := (
@@ -131,6 +136,9 @@ See the [CLI guide](docs/CLI.md), [formatter guide](docs/FORMATTER.md), and
 - [Statistics module](docs/STATISTICS.md)
 - [Plot module](docs/PLOT.md)
 - [Numeric module and Complex scalars](docs/NUMERIC.md)
+- [JSON module](docs/JSON.md)
+- [XML module](docs/XML.md)
+- [Env module](docs/ENV.md)
 - [Understanding diagnostics](docs/DIAGNOSTICS.md)
 - [AI-assisted local setup](FOR_AI.md)
 - [Curated v0.1 examples](examples/v0.1/README.md)

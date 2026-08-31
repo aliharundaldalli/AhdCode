@@ -34,6 +34,9 @@ The best way to learn is not just by reading the examples, but by running them. 
 - [25. Numeric module and Complex](#25-numeric-module-and-complex)
 - [26. Latex module](#26-latex-module)
 - [Word module](#word-module)
+- [JSON module](#json-module)
+- [XML module](#xml-module)
+- [Env module](#env-module)
 - [27. Code Formatter](#27-code-formatter)
 - [28. Command line (CLI)](#28-command-line-cli)
 - [29. Interactive shell (REPL)](#29-interactive-shell-repl)
@@ -2088,6 +2091,64 @@ its result. Document methods are positional-only and return a new Document.
 Word can also embed Plot-generated PNG files and read text, headings, and
 tables from a bounded semantic DOCX subset. See the [Word module
 reference](WORD.md).
+
+## JSON module
+
+JSON reads and builds typed `JSONValue`s — no `Any`, no dynamic typing:
+
+```ahd
+bring JSON
+from JSON bring JSONValue
+
+student: JSONValue := JSON.object({
+    "name": JSON.fromString("Ali")
+    "score": JSON.fromInt(91)
+})
+text: String := JSON.stringify(student, true)
+parsed: JSONValue := JSON.parse(text)
+name: JSONValue? := parsed.get("name")
+if name != null {
+    write(name.string())
+}
+```
+
+Every accessor (`int()`, `string()`, `array()`, ...) raises `JSONError` if
+the value's `kind()` doesn't match; `get(key)` returns `JSONValue?` because a
+key can genuinely be absent. Write literal JSON braces with a raw String
+(`r'{"a":1}'`) so AhdCode doesn't read them as string interpolation. See the
+[JSON module reference](JSON.md).
+
+## XML module
+
+XML builds and reads a small `Element`/`Text` node model:
+
+```ahd
+bring XML
+from XML bring XMLNode
+
+root: XMLNode := XML.element("student", {"id": "42"}, [XML.text("Ali")])
+document := XML.document(root)
+write(XML.stringify(document, true))
+```
+
+`XML.document(root)` requires an `Element` root. Every `XMLNode` accessor
+except `kind()` and `text()` raises `XMLError` on a `Text` node. See the
+[XML module reference](XML.md).
+
+## Env module
+
+Env reads process environment variables and `.env` files, always as
+`String`:
+
+```ahd
+bring Env
+
+Env.load(".env")
+port: Int := int(Env.getOr("PORT", "8080"))
+```
+
+`Env.get(name)` returns `String?` so absence and an explicit empty value stay
+distinguishable. See the [Env module reference](ENV.md).
 
 ## 24. Code Formatter
 

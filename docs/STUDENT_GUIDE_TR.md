@@ -34,6 +34,9 @@ En iyi öğrenme yolu, örnekleri yalnızca okumak değil çalıştırmaktır. B
 - [25. Numeric modülü ve Complex](#25-numeric-modulu-ve-complex)
 - [26. Latex modülü](#26-latex-modulu)
 - [Word modülü](#word-modulu)
+- [JSON modülü](#json-modulu)
+- [XML modülü](#xml-modulu)
+- [Env modülü](#env-modulu)
 - [27. Kod Biçimlendirici (Formatter)](#27-kod-bicimlendirici-formatter)
 - [28. Komut satırı (CLI)](#28-komut-satiri-cli)
 - [29. Etkileşimli kabuk (REPL)](#29-etkilesimli-kabuk-repl)
@@ -1568,6 +1571,66 @@ Document metotları yalnızca konumsaldır ve yeni bir Document döndürür. Wor
 Plot ile üretilen PNG dosyalarını gömebilir ve sınırlandırılmış anlamsal DOCX
 alt kümesinden metin, heading ve table okuyabilir. Ayrıntılar için [Word modül
 referansına](WORD_TR.md) bakın.
+
+## JSON modülü
+
+JSON, tipli `JSONValue`'lar okur ve oluşturur — `Any` yok, dinamik tipleme
+yok:
+
+```ahd
+bring JSON
+from JSON bring JSONValue
+
+student: JSONValue := JSON.object({
+    "name": JSON.fromString("Ali")
+    "score": JSON.fromInt(91)
+})
+text: String := JSON.stringify(student, true)
+parsed: JSONValue := JSON.parse(text)
+name: JSONValue? := parsed.get("name")
+if name != null {
+    write(name.string())
+}
+```
+
+Her erişimci (`int()`, `string()`, `array()`, ...), değerin `kind()`'ı
+uyuşmazsa `JSONError` fırlatır; `get(key)`, `JSONValue?` döndürür çünkü bir
+anahtar gerçekten yok olabilir. AhdCode'un onları string interpolation olarak
+okumaması için literal JSON süslü parantezlerini bir raw String ile yazın
+(`r'{"a":1}'`). Ayrıntılar için [JSON modül referansına](JSON_TR.md) bakın.
+
+## XML modülü
+
+XML, küçük bir `Element`/`Text` node modeli oluşturur ve okur:
+
+```ahd
+bring XML
+from XML bring XMLNode
+
+root: XMLNode := XML.element("student", {"id": "42"}, [XML.text("Ali")])
+document := XML.document(root)
+write(XML.stringify(document, true))
+```
+
+`XML.document(root)`, bir `Element` kökü gerektirir. `kind()` ve `text()`
+dışındaki her `XMLNode` erişimcisi bir `Text` node'unda `XMLError` fırlatır.
+Ayrıntılar için [XML modül referansına](XML_TR.md) bakın.
+
+## Env modülü
+
+Env, işlem ortam değişkenlerini ve `.env` dosyalarını, her zaman `String`
+olarak okur:
+
+```ahd
+bring Env
+
+Env.load(".env")
+port: Int := int(Env.getOr("PORT", "8080"))
+```
+
+`Env.get(name)`, `String?` döndürür; böylece yokluk ile açıkça boş bir değer
+ayırt edilebilir kalır. Ayrıntılar için [Env modül referansına](ENV_TR.md)
+bakın.
 
 ## 24. Kod biçimlendirici (Formatter)
 
