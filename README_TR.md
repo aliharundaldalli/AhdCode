@@ -12,7 +12,7 @@ AhdCode; okunabilir sözdizimi, açık niyet (explicit intent), öngörülebilir
 anlambilim (semantics) ve yerel (native) derlemeye odaklanan, deneysel,
 statik olarak denetlenen genel amaçlı bir programlama dilidir.
 
-Mevcut sürüm **v0.1.13**'tür. Çekirdek dil uçtan uca çalışır, ancak proje
+Mevcut sürüm **v0.1.14**'tür. Çekirdek dil uçtan uca çalışır, ancak proje
 üretime hazır değildir ve 1.0'dan önce kırıcı (breaking) değişiklikler
 olabilir.
 
