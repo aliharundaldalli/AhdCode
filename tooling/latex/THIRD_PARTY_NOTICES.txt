@@ -37,11 +37,12 @@ Full license texts accompany this file in the `licenses/` directory.
                (licenses/LPPL-1.3c.txt)
 
   The AhdCode bundle includes only the files needed by the supported document
-  baseline — the `article` class, `amsmath`/`amssymb`/`mathtools`, `graphicx`,
-  `booktabs`, `array`, `geometry`, `xcolor`, `hyperref`, `fontspec`, the LaTeX
-  kernel and expl3 support files, and their transitive dependencies. Every
-  included file is listed by name, byte range, and SHA-256 in
-  `tooling/latex/resources.json`.
+  baseline — the `article`/`report`/`beamer` classes, `amsmath`/`amssymb`/
+  `mathtools`, `graphicx`, `booktabs`, `array`, `geometry`, `xcolor`,
+  `hyperref`, `fontspec`, the PGF/TikZ core and `translator` packages Beamer
+  builds on, the LaTeX kernel and expl3 support files, and their transitive
+  dependencies. Every included file is listed by name, byte range, and
+  SHA-256 in `tooling/latex/resources.json`.
 
   The LPPL permits redistribution of unmodified files. AhdCode does not modify
   any TeX macro file; the files are copied byte-for-byte from the pinned

@@ -161,7 +161,7 @@ func (session *Session) builtin(identity ir.CallableID, receiver any, arguments 
 	case strings.HasPrefix(name, "builtin:Time::"):
 		return session.timeBuiltin(strings.TrimPrefix(name, "builtin:Time::"), values(arguments))
 	case strings.HasPrefix(name, "builtin:Latex::"):
-		session.raise("LatexError", "Latex runtime operations are not available in the interactive evaluator")
+		return session.latexBuiltin(strings.TrimPrefix(name, "builtin:Latex::"), values(arguments))
 	case strings.HasPrefix(name, "builtin:File::"):
 		return session.fileBuiltin(strings.TrimPrefix(name, "builtin:File::"), values(arguments))
 	case strings.HasPrefix(name, "builtin:Path::"):

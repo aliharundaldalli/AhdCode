@@ -46,19 +46,33 @@ func latexModuleInterface() *ModuleInterface {
 		stringParameter("source"), stringParameter("output"))))
 	add(latexFunction("pdfFile", latexSignature(types.Nothing,
 		stringParameter("input"), stringParameter("output"))))
-	for _, name := range []string{"escape", "section", "subsection", "equation"} {
+	for _, name := range []string{"escape", "chapter", "section", "subsection", "center", "ref", "cite"} {
 		parameter := "text"
-		if name == "section" || name == "subsection" {
+		if name == "chapter" || name == "section" || name == "subsection" {
 			parameter = "title"
-		} else if name == "equation" {
-			parameter = "source"
 		}
 		add(latexFunction(name, latexSignature(types.String, stringParameter(parameter))))
 	}
+	add(latexFunction("pageBreak", latexSignature(types.String)))
+	add(latexFunction("contents", latexSignature(types.String)))
+	add(latexFunction("frame", latexSignature(types.String, stringParameter("title"), stringParameter("body"))))
+	add(latexFunction("equation", latexSignature(types.String, stringParameter("source"), types.Parameter{Name: "label", Type: types.String, HasDefault: true})))
+	add(latexFunction("theorem", latexSignature(types.String, stringParameter("type"), stringParameter("body"), types.Parameter{Name: "label", Type: types.String, HasDefault: true})))
+	sizePair := types.Pair{Key: types.String, Value: types.Real}
+	add(latexFunction("image", latexSignature(types.String, stringParameter("path"), types.Parameter{Name: "size", Type: sizePair, HasDefault: true})))
+	add(latexFunction("figure", latexSignature(types.String, stringParameter("path"), stringParameter("caption"), types.Parameter{Name: "label", Type: types.String, HasDefault: true}, types.Parameter{Name: "size", Type: sizePair, HasDefault: true})))
+	add(latexFunction("minipage", latexSignature(types.String, stringParameter("body"), types.Parameter{Name: "width", Type: types.Real}, types.Parameter{Name: "alignment", Type: types.String, HasDefault: true})))
+	add(latexFunction("bibliography", latexSignature(types.String, types.Parameter{Name: "references", Type: types.Pair{Key: types.String, Value: types.String}})))
 	add(latexFunction("document", latexSignature(types.String,
 		stringParameter("body"),
 		types.Parameter{Name: "title", Type: types.String, HasDefault: true},
 		types.Parameter{Name: "author", Type: types.String, HasDefault: true},
+		types.Parameter{Name: "date", Type: types.String, HasDefault: true},
+		types.Parameter{Name: "type", Type: types.String, HasDefault: true},
+		types.Parameter{Name: "margin", Type: types.Real, HasDefault: true},
+		types.Parameter{Name: "color", Type: types.String, HasDefault: true},
+		types.Parameter{Name: "cover", Type: types.String, HasDefault: true},
+		types.Parameter{Name: "theorems", Type: types.Pair{Key: types.String, Value: types.String}, HasDefault: true},
 	)))
 	add(latexFunction("table", latexSignature(types.String,
 		types.Parameter{Name: "headers", Type: types.List{Element: types.String}},

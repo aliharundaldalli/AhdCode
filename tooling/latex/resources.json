@@ -60,6 +60,12 @@
     "sha256": "49426425d82407dc702c77236fdeb4b82568ebb9566b8dd849bcfbf9eb9644de"
   },
   {
+    "name": "amsthm.sty",
+    "offset": 55274496,
+    "length": 12594,
+    "sha256": "8d5e2bdb117297385971927b14fe4804314133dc0027b3171249a08280894626"
+  },
+  {
     "name": "array.sty",
     "offset": 263789056,
     "length": 12694,
@@ -100,6 +106,234 @@
     "offset": 58918400,
     "length": 3935,
     "sha256": "1d9f36f4e9674bef594a47cac7d5781e9f7e0c7c8edf9f72769f4dc6f10d1b5f"
+  },
+  {
+    "name": "beamer.cls",
+    "offset": 60482048,
+    "length": 12335,
+    "sha256": "fb176c3746d439c7f07ecaffde8d14868a6bc64bfdcfd7f1cea0366a209ee6c7"
+  },
+  {
+    "name": "beamerbaseauxtemplates.sty",
+    "offset": 60502016,
+    "length": 24160,
+    "sha256": "6b305fd20eb78e100cf9adb641a526b7c1d5343317dcde06aac80f90cf2248c5"
+  },
+  {
+    "name": "beamerbaseboxes.sty",
+    "offset": 60527104,
+    "length": 7344,
+    "sha256": "9b7c1c2f4dbd87a57dbf0ca72143d9bb73149ff08f62676a903b585439a5349a"
+  },
+  {
+    "name": "beamerbasecolor.sty",
+    "offset": 60535296,
+    "length": 12589,
+    "sha256": "4a2366830bed3b89b9997be82bfa4ae1da4ba27c394a48d022cb3aff0efc2ae4"
+  },
+  {
+    "name": "beamerbasecompatibility.sty",
+    "offset": 60548608,
+    "length": 26232,
+    "sha256": "8abed080444b198f3f4ab8a5eab2c3bd99269b0d13af62d0fff9ead022f62274"
+  },
+  {
+    "name": "beamerbasedecode.sty",
+    "offset": 60575744,
+    "length": 9407,
+    "sha256": "705e532e68a5220cc3748306b3cb98587ae790ed624c5f0e0089c22bf103482d"
+  },
+  {
+    "name": "beamerbasefont.sty",
+    "offset": 60585984,
+    "length": 13642,
+    "sha256": "de8068fc9ab681d5c43f7f1235946215c9bac3cd6f61b6628e3107f76d59fa1b"
+  },
+  {
+    "name": "beamerbaseframe.sty",
+    "offset": 60600320,
+    "length": 25572,
+    "sha256": "28733a5cd0ca7484ba25ff4bc5294d9e1ffc57abb29e8facc721fe2e4bc5e49e"
+  },
+  {
+    "name": "beamerbaseframecomponents.sty",
+    "offset": 60626432,
+    "length": 12171,
+    "sha256": "7b72f9bf67d4f41b01345924dc28ce87ebe1bcae4d54c23bf7d4cc11508d9ea5"
+  },
+  {
+    "name": "beamerbaseframesize.sty",
+    "offset": 60639232,
+    "length": 9209,
+    "sha256": "dc3c572598247593390bd0bce9dc732b4c07cb6f54cf74d01ebb6e655f108ff0"
+  },
+  {
+    "name": "beamerbaselocalstructure.sty",
+    "offset": 60648960,
+    "length": 17622,
+    "sha256": "01a08bf3737e9416958b60418077a7249eacc337cc141e6ff70e3fd1dc6ee64a"
+  },
+  {
+    "name": "beamerbasemisc.sty",
+    "offset": 60667392,
+    "length": 8313,
+    "sha256": "ba92764f5e17655d0bc0db350d680c7b407223fb9f0d658d69fffb672b827002"
+  },
+  {
+    "name": "beamerbasemodes.sty",
+    "offset": 60676608,
+    "length": 7574,
+    "sha256": "34818fc4e3036aee258a068cbb31080df88a7b8c443ad7f1e72195847d3dbba6"
+  },
+  {
+    "name": "beamerbasenavigation.sty",
+    "offset": 60684800,
+    "length": 29020,
+    "sha256": "5238da16e589a46745c95ab469fe602a410d12b91b98b23d136dad762814cd84"
+  },
+  {
+    "name": "beamerbasenotes.sty",
+    "offset": 60714496,
+    "length": 5712,
+    "sha256": "9406547fa8d6b9ab7805199934435f9a7ccacaedbfd66ec094c50013b05d0598"
+  },
+  {
+    "name": "beamerbaseoptions.sty",
+    "offset": 60721152,
+    "length": 1753,
+    "sha256": "d0741d5fc1d68be23c8fd1238af7a1bef1edbac3d7cbd785c1b926b295d432dd"
+  },
+  {
+    "name": "beamerbaseoverlay.sty",
+    "offset": 60723712,
+    "length": 27425,
+    "sha256": "e8a76e10102ffe8b2476cccb80904b1b26b8e9061059a26519e1dde2c621b539"
+  },
+  {
+    "name": "beamerbaserequires.sty",
+    "offset": 60751872,
+    "length": 1593,
+    "sha256": "e0b15be25695a2427912da7142c16220c13fad07f2484dbba792d6cb0dcbb6d7"
+  },
+  {
+    "name": "beamerbasesection.sty",
+    "offset": 60754432,
+    "length": 13527,
+    "sha256": "c49981d3958c3ed9b85d033ab65b697b2924feb53fe74773c7f6227089c789dc"
+  },
+  {
+    "name": "beamerbasetemplates.sty",
+    "offset": 60768768,
+    "length": 5753,
+    "sha256": "99acf90036d223d711bb6637067d04ee80ac6355cd198f558bb8dfa1619b92c5"
+  },
+  {
+    "name": "beamerbasethemes.sty",
+    "offset": 60775424,
+    "length": 1140,
+    "sha256": "75edeeeb6a32236ac0c4e4e890cd4f410d15de8f21f23ad1312b756d621265ca"
+  },
+  {
+    "name": "beamerbasetheorems.sty",
+    "offset": 60777472,
+    "length": 4548,
+    "sha256": "c86fba110d953166601543b0ab70a93ed1148b409cd55eeeb79359fb71b447c9"
+  },
+  {
+    "name": "beamerbasetitle.sty",
+    "offset": 60782592,
+    "length": 5356,
+    "sha256": "6b2c0b8baaaf05a848f03571d84fb7f98ca563ca23b4d1857d1752ab9714f164"
+  },
+  {
+    "name": "beamerbasetoc.sty",
+    "offset": 60788736,
+    "length": 7755,
+    "sha256": "1ad43ee0de013d7eb0f9e1c5906b7979e148465567cc2017c5ca67175100259c"
+  },
+  {
+    "name": "beamerbasetranslator.sty",
+    "offset": 60797440,
+    "length": 637,
+    "sha256": "08a0cc25d01c6b59c0bb50cb68e4516db22ae66fac184110b14a847108984c8c"
+  },
+  {
+    "name": "beamerbasetwoscreens.sty",
+    "offset": 60798976,
+    "length": 1808,
+    "sha256": "eb8d18cd947de3a57f781ae75b15757756bfff23e2191adbab617049f1b09659"
+  },
+  {
+    "name": "beamerbaseverbatim.sty",
+    "offset": 60801536,
+    "length": 4026,
+    "sha256": "26352db056d92bd9726c979a46d75aa8efaae7b5762d2fdfcb19cad8bb44b379"
+  },
+  {
+    "name": "beamercolorthemedefault.sty",
+    "offset": 60816384,
+    "length": 7089,
+    "sha256": "8e7889e33fd2984fd2361775e38454fa2b43ff5d0c30b6405813652548558914"
+  },
+  {
+    "name": "beamerfontthemedefault.sty",
+    "offset": 60854272,
+    "length": 4236,
+    "sha256": "891c349ef57a26d5f1511c9ff46666f43117c23f8ea5652fe8f9e809957c5fd5"
+  },
+  {
+    "name": "beamericonarticle.20.pdf",
+    "offset": 60884480,
+    "length": 2958,
+    "sha256": "6382a61b014ac95385b2a329e7486aada95df3dee61691c838a11d4fe135713e"
+  },
+  {
+    "name": "beamericonarticle.pdf",
+    "offset": 60915200,
+    "length": 2936,
+    "sha256": "559a97289e2141b27c642e5738a3e92a15b30d17e0d7b8dc9600b9fe5d245145"
+  },
+  {
+    "name": "beamericonbook.20.pdf",
+    "offset": 60948480,
+    "length": 2734,
+    "sha256": "374d9720b7a9a01e89f741e69e6c9da75d7a6b0ce92bdb4a679c030ad1422f49"
+  },
+  {
+    "name": "beamericonbook.pdf",
+    "offset": 60974080,
+    "length": 2667,
+    "sha256": "f433b8072d03da8a91d653b03a0fcebbebf81d76435bd56be836a2c74a793c4a"
+  },
+  {
+    "name": "beamericononline.20.pdf",
+    "offset": 61015040,
+    "length": 24451,
+    "sha256": "2df190881c7c603c277c735306f2de5226bbc64f2239f04fafa012c6fb6d0e7b"
+  },
+  {
+    "name": "beamericononline.pdf",
+    "offset": 61092864,
+    "length": 24611,
+    "sha256": "9a2187f1ee0b53f4308781db6d240b2c625b4598b8c459c96b5d6be9398c1628"
+  },
+  {
+    "name": "beamerinnerthemedefault.sty",
+    "offset": 61119488,
+    "length": 13080,
+    "sha256": "788a484d2e4600a94c77589a8b990f987a4018adb4db420ef1cc6114911c872b"
+  },
+  {
+    "name": "beamerouterthemedefault.sty",
+    "offset": 61140992,
+    "length": 6946,
+    "sha256": "a3490453bc8545edece77928f0baace2adc01ca1113acdd098a38bae9de3db85"
+  },
+  {
+    "name": "beamerthemedefault.sty",
+    "offset": 61242880,
+    "length": 355,
+    "sha256": "fba379a26dec38c8c363715bed0195707c55fe569f5cf49c624bb53b8206a363"
   },
   {
     "name": "bigintcalc.sty",
@@ -408,10 +642,22 @@
     "sha256": "99d210320228a242478c36c0dfde48c7513e4495d4feea7fe3997aab27582dfc"
   },
   {
+    "name": "enumerate.sty",
+    "offset": 263835648,
+    "length": 3468,
+    "sha256": "72f9086f7e0eb8b0df3c2aaff8a837b3f5f7b002212ceb307ef250d62e89f066"
+  },
+  {
     "name": "etexcmds.sty",
     "offset": 24020992,
     "length": 7734,
     "sha256": "a7db2834e02bd11be0e62a3be15e3dc293ba1be9196f19b29b9d98bfdbeb7514"
+  },
+  {
+    "name": "etoolbox.sty",
+    "offset": 106872320,
+    "length": 46845,
+    "sha256": "b10381f0017ae75bd03dc9175b35ad56b93fdd24f2a47dd4aa9c6987ef35ccdb"
   },
   {
     "name": "expl3-code.tex",
@@ -2016,6 +2262,318 @@
     "sha256": "2df7e0bd148c99d8097352b8ac9948dccf91d61ba360dcf43f82206933b6045b"
   },
   {
+    "name": "pgf.cfg",
+    "offset": 29611008,
+    "length": 926,
+    "sha256": "eb308ac3d665db8dd3c03b18328c551609346c659c2ce0e5029223fbcc339cb3"
+  },
+  {
+    "name": "pgf.revision.tex",
+    "offset": 26453504,
+    "length": 465,
+    "sha256": "5cc371cd73a94c45ecbd228bf13061519bdb2d7d832b023f17b42446798deb64"
+  },
+  {
+    "name": "pgfcore.code.tex",
+    "offset": 26454528,
+    "length": 992,
+    "sha256": "8fc49d574a99abb77941c2487363af43bca0010f3d239fddfe79d692a5476579"
+  },
+  {
+    "name": "pgfcore.sty",
+    "offset": 190956032,
+    "length": 410,
+    "sha256": "aedcbd99a6d92c35c94021afc85f9eef63ec2cdfccb9b761ef3b039e425efd8c"
+  },
+  {
+    "name": "pgfcorearrows.code.tex",
+    "offset": 26456064,
+    "length": 43820,
+    "sha256": "1668608078204a627d6e67a853f8a904e6149b901607ae177741c650b143a94e"
+  },
+  {
+    "name": "pgfcoreexternal.code.tex",
+    "offset": 26500608,
+    "length": 19324,
+    "sha256": "545c4616f93c5f5d25bc04090a0b7ef869bab84b3952fadfd539d71187c83fe0"
+  },
+  {
+    "name": "pgfcoregraphicstate.code.tex",
+    "offset": 26520576,
+    "length": 6038,
+    "sha256": "81862c3425e8aa2a82e605eb8fde07b1b7b47862b981922393d4f54ca9fa6250"
+  },
+  {
+    "name": "pgfcoreimage.code.tex",
+    "offset": 26527232,
+    "length": 6944,
+    "sha256": "921b5d811b3e0e27b7af84d48ef23730466d2b9f2a2905e9b3a17d98a158b5e2"
+  },
+  {
+    "name": "pgfcorelayers.code.tex",
+    "offset": 26534912,
+    "length": 4883,
+    "sha256": "743e89ac1e529af45751fa85fde4b3438284a63dfd53ff52c94c2f229b20beff"
+  },
+  {
+    "name": "pgfcoreobjects.code.tex",
+    "offset": 26540544,
+    "length": 2544,
+    "sha256": "541e41626d66e0e8bc8b5249805c9efbb134dfe0dc85c63102eea3c2d21da6f0"
+  },
+  {
+    "name": "pgfcorepathconstruct.code.tex",
+    "offset": 26543616,
+    "length": 44195,
+    "sha256": "64b0b4193616b937a2b4520c678f8863ae06ab38385bb58db437b39a8f27719b"
+  },
+  {
+    "name": "pgfcorepathprocessing.code.tex",
+    "offset": 26588672,
+    "length": 17311,
+    "sha256": "ebcf9d5dec1714b575ffef09be6cdf03eaf1501f511204d7efae5d73b07b2221"
+  },
+  {
+    "name": "pgfcorepathusage.code.tex",
+    "offset": 26606592,
+    "length": 21302,
+    "sha256": "165569c2ffb6a80272d2853c3d3c4373c386391e8cbb81ed9683ae2a810dd28c"
+  },
+  {
+    "name": "pgfcorepatterns.code.tex",
+    "offset": 26628608,
+    "length": 9690,
+    "sha256": "786f07d8be461aa13ed5c150a62b85d9f15bf9efc0addba029c5119ac440d705"
+  },
+  {
+    "name": "pgfcorepoints.code.tex",
+    "offset": 26638848,
+    "length": 33335,
+    "sha256": "7533dd80c95a5124726b0a617a5f458226d4a7490bcd209e3fd7e717e24dc127"
+  },
+  {
+    "name": "pgfcorequick.code.tex",
+    "offset": 26673152,
+    "length": 2965,
+    "sha256": "6143371709342ea83dcdb1744a229d18f4c1ee670e1e31b496046a708bfa3e66"
+  },
+  {
+    "name": "pgfcorerdf.code.tex",
+    "offset": 26676736,
+    "length": 5196,
+    "sha256": "0bc32a855862a83b7ece27d2ebf6bfeace759d6b64fb776394eee13d62401350"
+  },
+  {
+    "name": "pgfcorescopes.code.tex",
+    "offset": 26682880,
+    "length": 20726,
+    "sha256": "cc91bb4b62f7ecb72d216b13f5f9c92252164ed73196faf8783e1d4e5770aec6"
+  },
+  {
+    "name": "pgfcoreshade.code.tex",
+    "offset": 26704384,
+    "length": 35249,
+    "sha256": "b111efaa8b7c0905870b1ce9bcf400cd59c8db3cfa8d7ae91e7d63c1bac747cc"
+  },
+  {
+    "name": "pgfcoretransformations.code.tex",
+    "offset": 26740224,
+    "length": 21989,
+    "sha256": "1efc14583bc87ba3e08f0e4d7d82191ca1ddeb6e982573d9520d26f13d8ad4eb"
+  },
+  {
+    "name": "pgfcoretransparency.code.tex",
+    "offset": 26762752,
+    "length": 8893,
+    "sha256": "ea5e14f7fade556cee79636a6824710e97db928542fc1b23dfa618ff6448688e"
+  },
+  {
+    "name": "pgfint.code.tex",
+    "offset": 28874240,
+    "length": 3063,
+    "sha256": "95f8053efeeb2267d543d8d1afb10195d6114765eea7b90755b4e0c359324d64"
+  },
+  {
+    "name": "pgfkeys.code.tex",
+    "offset": 30024192,
+    "length": 37060,
+    "sha256": "34363e741734268afff76b31b486413257297c86d4b39811a99dc35640b8b66c"
+  },
+  {
+    "name": "pgfkeys.sty",
+    "offset": 191147520,
+    "length": 274,
+    "sha256": "b90072b20d0590f23fd0ad273d059e3b7737319b3fb61e3bea6102fd77f24b3d"
+  },
+  {
+    "name": "pgfkeysfiltered.code.tex",
+    "offset": 30062080,
+    "length": 37431,
+    "sha256": "1d9d95de8b45811859942e439f2e1fcc64471a865f83709ae1666cf24df7f326"
+  },
+  {
+    "name": "pgfmath.code.tex",
+    "offset": 28877824,
+    "length": 521,
+    "sha256": "3b7d8bc80eb5e56235d9bab97a6b6ee4c8880e026617642f016154bc61ade968"
+  },
+  {
+    "name": "pgfmath.sty",
+    "offset": 191143424,
+    "length": 306,
+    "sha256": "4abed7d8c88642201dd1a932a435ae05a1f2659f1f7e95c72d6b5347c83d232a"
+  },
+  {
+    "name": "pgfmathcalc.code.tex",
+    "offset": 28879360,
+    "length": 13391,
+    "sha256": "316c8d9bba11debc9cceeebad99eb8a30953fda79b9657824b86bc935cde6b56"
+  },
+  {
+    "name": "pgfmathfloat.code.tex",
+    "offset": 28893696,
+    "length": 104935,
+    "sha256": "93709f80d66aa216e51fd5183d8016c39e0a408ad650e4a88c6dbb552bb7d7db"
+  },
+  {
+    "name": "pgfmathfunctions.base.code.tex",
+    "offset": 28999168,
+    "length": 10165,
+    "sha256": "f83601dd74e8c166162cb3daf926744c44ccf15a0122e17613658f82fa64c6a9"
+  },
+  {
+    "name": "pgfmathfunctions.basic.code.tex",
+    "offset": 29009920,
+    "length": 28178,
+    "sha256": "c94abbd89ad0556546d9e5053af16b58ce7f38d19c379b27309e5fefd23908f8"
+  },
+  {
+    "name": "pgfmathfunctions.code.tex",
+    "offset": 29039104,
+    "length": 9989,
+    "sha256": "06988bee6690c3eab67ea9d80070cf4462696dec186a1d8d8b1345ea6e427b8e"
+  },
+  {
+    "name": "pgfmathfunctions.comparison.code.tex",
+    "offset": 29049856,
+    "length": 3865,
+    "sha256": "ea5ff35778088d94d8d2f1a20075ec57cc4ecd22844f9c288625a6db59ba7818"
+  },
+  {
+    "name": "pgfmathfunctions.integerarithmetics.code.tex",
+    "offset": 29054464,
+    "length": 3177,
+    "sha256": "6e9383c1e63a6dbcfd2d95369905df566bdb6e7374c06e28c15a25eb782dc46b"
+  },
+  {
+    "name": "pgfmathfunctions.misc.code.tex",
+    "offset": 29058560,
+    "length": 11024,
+    "sha256": "51038be668b2083ac5e8ae38a1da6f75091ee9471d71f33749d01a8bff1a9aa6"
+  },
+  {
+    "name": "pgfmathfunctions.random.code.tex",
+    "offset": 29070336,
+    "length": 7854,
+    "sha256": "9308151b47cfe8144a60110976fa68acdede9c49fb5567a204271c7ac5d535b4"
+  },
+  {
+    "name": "pgfmathfunctions.round.code.tex",
+    "offset": 29079040,
+    "length": 3379,
+    "sha256": "9b980e1373f9451da75cc6030a5b4c1671b88a1b14b45ed172cfb7cf2607fe1f"
+  },
+  {
+    "name": "pgfmathfunctions.trigonometric.code.tex",
+    "offset": 29083136,
+    "length": 92405,
+    "sha256": "1c8834abe00807467a52d31ef96032d5084b2560eea45995018084d13a3cde3c"
+  },
+  {
+    "name": "pgfmathparser.code.tex",
+    "offset": 29184000,
+    "length": 37376,
+    "sha256": "70468cf91fe751c5d7468a9a74ab4f256ec085da35da5950a6590f2ad2b3cd63"
+  },
+  {
+    "name": "pgfmathutil.code.tex",
+    "offset": 29221888,
+    "length": 8471,
+    "sha256": "cda208d98bdc556a06f5915571c6ce4d98c18aa639c4782a56c6d32a6ba68055"
+  },
+  {
+    "name": "pgfrcs.code.tex",
+    "offset": 30100480,
+    "length": 4494,
+    "sha256": "123c47446b645169403ca67d70501dbdb02698a9ea1091bd4db08a9bc9ca2b5a"
+  },
+  {
+    "name": "pgfrcs.sty",
+    "offset": 191186432,
+    "length": 325,
+    "sha256": "9653b8fae6bba95bec40ffbedd7d6c2b8f3be4a85b8b39580ab3ee6c3590041a"
+  },
+  {
+    "name": "pgfsys-common-pdf.def",
+    "offset": 29620224,
+    "length": 5546,
+    "sha256": "5643eed1101dbfbeb7e81ed4d4c4d03048b27eaf6b0c7b4b9c7cb63349149a7a"
+  },
+  {
+    "name": "pgfsys-dvipdfmx.def",
+    "offset": 29728256,
+    "length": 18491,
+    "sha256": "bba6dd22807721d71d9ab54ffd061676556a3df9e2dbaaac25f96a0b2389def6"
+  },
+  {
+    "name": "pgfsys-xetex.def",
+    "offset": 29834240,
+    "length": 2926,
+    "sha256": "3738251bd32ac408cd0223b560fa6adefbcd0755c7b7d14f8e3215e1636a0c24"
+  },
+  {
+    "name": "pgfsys.code.tex",
+    "offset": 29837824,
+    "length": 61163,
+    "sha256": "493a92ee584b170e9893b856d83d951c633cc124c897116e9d62bb57d72d303d"
+  },
+  {
+    "name": "pgfsys.sty",
+    "offset": 191144448,
+    "length": 443,
+    "sha256": "cc7121c5706c5c52807aea879ca0a9083a8dc81b04d96303d0d398804d9d3d52"
+  },
+  {
+    "name": "pgfsysprotocol.code.tex",
+    "offset": 29960192,
+    "length": 1896,
+    "sha256": "818b8e3cd0606bdb8ac7fbaccc5f80033672fa817537536f76bc67bc3942928c"
+  },
+  {
+    "name": "pgfsyssoftpath.code.tex",
+    "offset": 29962752,
+    "length": 7778,
+    "sha256": "6ea4caeea5bcb6cd60b80ef4607e8a79824ec0cdcebb47424c1bdbe0c2ea6671"
+  },
+  {
+    "name": "pgfutil-common-lists.tex",
+    "offset": 30105600,
+    "length": 7251,
+    "sha256": "4137a4adb5e8b7f2800f8dc28b80aea2c19db57e4ac02d3b2fee37c6eff74b7f"
+  },
+  {
+    "name": "pgfutil-common.tex",
+    "offset": 30113792,
+    "length": 29274,
+    "sha256": "4dcfd1ab88afdb5d0a1343aff7942b3e92f243fd2d0ac924c09d4fbb3cd83363"
+  },
+  {
+    "name": "pgfutil-latex.def",
+    "offset": 30156288,
+    "length": 6825,
+    "sha256": "5fcde4bb08efbdfbcbfcf95fdde4cb467b799d541699aac05ae2f46dec08a2fc"
+  },
+  {
     "name": "preload.cfg",
     "offset": 145019392,
     "length": 1982,
@@ -2046,16 +2604,52 @@
     "sha256": "1bd5d42025520bef74f8808af99cf3f3be7d2e3774b9931bf85c11ba81bb6cab"
   },
   {
+    "name": "report.cls",
+    "offset": 145033728,
+    "length": 23203,
+    "sha256": "bcd5b55d3a7df7691938ffb329bd1e96eb3321c7cf8f73e035f9b815ffc0bc3a"
+  },
+  {
     "name": "rerunfilecheck.sty",
     "offset": 235487232,
     "length": 9715,
     "sha256": "c206a966a49fe47d1c59723d116dac95994468272cda392a56cf7379519c460f"
   },
   {
+    "name": "sansmathaccent.sty",
+    "offset": 242308608,
+    "length": 4282,
+    "sha256": "a39fa4bd2ab9a88b806bab8eeec23d1e617d0b82bfd0d7d9b8494a24287817a2"
+  },
+  {
+    "name": "scrlfile-hook.sty",
+    "offset": 139665920,
+    "length": 11081,
+    "sha256": "a613d921e27e89a688c9252ce75765f1447de2af628e9d06b550adc5ba98909f"
+  },
+  {
+    "name": "scrlfile.sty",
+    "offset": 139696640,
+    "length": 3225,
+    "sha256": "657caebef9a5cb17fb6fc6077ac681f847132be2505b6ab0941b5c86a328a797"
+  },
+  {
+    "name": "scrlogo.sty",
+    "offset": 139700736,
+    "length": 1954,
+    "sha256": "96dd5f857c84de326529c40db2566627ac5a330d3ad876bf39ca26d439243b3c"
+  },
+  {
     "name": "size10.clo",
     "offset": 145079808,
     "length": 8448,
     "sha256": "dee88bc30609ea53e4004f8baf91a2951050a635751fecf1c9b1eb7cf471302e"
+  },
+  {
+    "name": "size11.clo",
+    "offset": 145089024,
+    "length": 8464,
+    "sha256": "efc946da03cfa55c75be27d73012ab866fcc935fd47ac4a674026bbdbdcfa9f1"
   },
   {
     "name": "stringenc.sty",
@@ -2098,6 +2692,48 @@
     "offset": 145267200,
     "length": 8067,
     "sha256": "a0986d94c81fd7ce2251695a1affc58060055ccc9430483e64a73f4aa5e53306"
+  },
+  {
+    "name": "translator-basic-dictionary-English.dict",
+    "offset": 264571904,
+    "length": 3535,
+    "sha256": "38a86974ee420dee1478e9cfb75b4f93272ce71963a75bb3c0e2bc41ef59dbc1"
+  },
+  {
+    "name": "translator-bibliography-dictionary-English.dict",
+    "offset": 264643584,
+    "length": 903,
+    "sha256": "6939ab71152d05c2ff0ce486704f67b382ef31f18878590c88e3902270b605c5"
+  },
+  {
+    "name": "translator-environment-dictionary-English.dict",
+    "offset": 264669696,
+    "length": 433,
+    "sha256": "069fc53391540f61febc71de0745a405fc6a2d93a647199d816f58ea76e7282d"
+  },
+  {
+    "name": "translator-months-dictionary-English.dict",
+    "offset": 264695296,
+    "length": 1337,
+    "sha256": "ef7da9059e11c54e8595924f9b941d58917d4cf3eee0df3c77e04275646389db"
+  },
+  {
+    "name": "translator-numbers-dictionary-English.dict",
+    "offset": 264740352,
+    "length": 1638,
+    "sha256": "04c11e5c724675980c0e3560de71d60b0f15475b341782d6b81af7b3385cbd05"
+  },
+  {
+    "name": "translator-theorem-dictionary-English.dict",
+    "offset": 264804352,
+    "length": 3523,
+    "sha256": "b62e6b132e55b1c6dc9abf42deb24d97fdd20f5595ba2e26bcc1e5418ae51535"
+  },
+  {
+    "name": "translator.sty",
+    "offset": 264863744,
+    "length": 8765,
+    "sha256": "f4d21a31f5f49b55d977269d799d9a66a29f057bb7be1fe27ceb767029819f00"
   },
   {
     "name": "trig.sty",
@@ -2206,6 +2842,12 @@
     "offset": 143503872,
     "length": 6758,
     "sha256": "c10bc5df2c6dc10c1e796988a4095d3a8a2728e33e0d0e7230e4a5d999d3a5ec"
+  },
+  {
+    "name": "xxcolor.sty",
+    "offset": 191193600,
+    "length": 2232,
+    "sha256": "d1606ff59e4ea65f1ea98935bf1b1f1acba8b0e8e9b29e193f6030db4722c735"
   },
   {
     "name": "zerohyph.tex",

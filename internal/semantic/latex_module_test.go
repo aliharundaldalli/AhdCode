@@ -26,7 +26,7 @@ func TestLatexStandardModuleHasExactSignatures(t *testing.T) {
 		{"pdf wrong arity", `Latex.pdf("document")`, false},
 		{"escape rejects Int", `value: String := Latex.escape(42)`, false},
 		{"equation rejects Bool", `value: String := Latex.equation(true)`, false},
-		{"document rejects extra argument", `value: String := Latex.document("b", "t", "a", "extra")`, false},
+		{"document rejects extra argument", `value: String := Latex.document("b", "t", "a", "d", "Article", 2.54, "", "", {}, "extra")`, false},
 		{"table requires nested strings", `value: String := Latex.table(["Name"], [[1]])`, false},
 	}
 	for _, test := range tests {

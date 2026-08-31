@@ -10,6 +10,8 @@ import (
 	"bufio"
 	"context"
 	cryptorand "crypto/rand"
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/binary"
 	"encoding/csv"
 	"encoding/json"
@@ -414,29 +416,229 @@ func AhdLatexSubsection(title string) string {
 	return `\subsection{` + AhdLatexEscape(title) + "}\n"
 }
 
-func AhdLatexEquation(source string) string {
-	return "\\begin{equation}\n" + source + "\n\\end{equation}\n"
+func AhdLatexChapter(title string) string { return `\chapter{` + AhdLatexEscape(title) + "}\n" }
+func AhdLatexFrame(title, body string) string {
+	return "\\begin{frame}{" + AhdLatexEscape(title) + "}\n" + body + func() string {
+		if body != "" && !strings.HasSuffix(body, "\n") {
+			return "\n"
+		}
+		return ""
+	}() + "\\end{frame}\n"
+}
+func ahdLatexLabel(label string) string {
+	if label == "" {
+		return ""
+	}
+	return "\\label{" + AhdLatexEscape(label) + "}\n"
+}
+func AhdLatexEquation(source string, labels ...string) string {
+	label := ""
+	if len(labels) > 0 {
+		label = labels[0]
+	}
+	return "\\begin{equation}\n" + source + "\n" + ahdLatexLabel(label) + "\\end{equation}\n"
+}
+func AhdLatexRef(label string) string { return "\\ref{" + AhdLatexEscape(label) + "}" }
+func AhdLatexCite(key string) string  { return "\\cite{" + AhdLatexEscape(key) + "}" }
+func AhdLatexCenter(body string) string {
+	return "\\begin{center}\n" + body + func() string {
+		if body != "" && !strings.HasSuffix(body, "\n") {
+			return "\n"
+		}
+		return ""
+	}() + "\\end{center}\n"
+}
+func AhdLatexPageBreak() string { return "\\clearpage\n" }
+func AhdLatexContents() string  { return "\\tableofcontents\n" }
+func AhdLatexMinipage(body string, width float64, alignment string) string {
+	if width <= 0 {
+		AhdRaiseClass(AhdClassValueError, "Latex.minipage width must be positive")
+	}
+	command := map[string]string{"left": "\\raggedright", "center": "\\centering", "right": "\\raggedleft"}[alignment]
+	if command == "" {
+		AhdRaiseClass(AhdClassValueError, "Latex.minipage alignment must be left, center, or right")
+	}
+	return "\\begin{minipage}{" + ahdFormatReal(width) + "cm}\n" + command + "\n" + body + func() string {
+		if body != "" && !strings.HasSuffix(body, "\n") {
+			return "\n"
+		}
+		return ""
+	}() + "\\end{minipage}\n"
+}
+
+func ahdLatexTheoremID(name string) string {
+	sum := sha256.Sum256([]byte(name))
+	return fmt.Sprintf("ahdthm%x", sum[:6])
+}
+func AhdLatexTheorem(kind, body, label string) string {
+	if kind == "" {
+		AhdRaiseClass(AhdClassValueError, "Latex.theorem type must not be empty")
+	}
+	id := ahdLatexTheoremID(kind)
+	return "\\begin{" + id + "}\n" + body + func() string {
+		if body != "" && !strings.HasSuffix(body, "\n") {
+			return "\n"
+		}
+		return ""
+	}() + ahdLatexLabel(label) + "\\end{" + id + "}\n"
+}
+
+func ahdLatexSizes(size *AhdPair[string, float64]) string {
+	if size == nil {
+		return ""
+	}
+	size.require()
+	options := []string{}
+	known := map[string]bool{}
+	for _, key := range size.keys {
+		if key != "width" && key != "height" {
+			AhdRaiseClass(AhdClassValueError, "Latex image size supports only width and height")
+		}
+		if known[key] {
+			AhdRaiseClass(AhdClassValueError, "duplicate Latex image size option")
+		}
+		known[key] = true
+		value := size.values[key]
+		if value <= 0 {
+			AhdRaiseClass(AhdClassValueError, "Latex image dimensions must be positive")
+		}
+		options = append(options, key+"="+ahdFormatReal(value)+"cm")
+	}
+	if len(options) == 0 {
+		return ""
+	}
+	return "[" + strings.Join(options, ",") + "]"
+}
+func ahdLatexAsset(path string) (string, string) {
+	if path == "" {
+		AhdRaiseClass(AhdClassValueError, "Latex image path must not be empty")
+	}
+	extension := strings.ToLower(filepath.Ext(path))
+	if extension != ".png" && extension != ".pdf" && extension != ".jpg" && extension != ".jpeg" {
+		AhdRaiseClass(AhdClassValueError, "Latex image supports PNG, PDF, and JPEG assets")
+	}
+	sum := sha256.Sum256([]byte(path))
+	staged := fmt.Sprintf("ahdasset-%x%s", sum[:8], extension)
+	marker := "% AHDCODE_ASSET " + base64.RawStdEncoding.EncodeToString([]byte(path)) + " " + staged + "\n"
+	return marker, staged
+}
+func AhdLatexImage(path string, size *AhdPair[string, float64]) string {
+	marker, staged := ahdLatexAsset(path)
+	return marker + "\\includegraphics" + ahdLatexSizes(size) + "{" + staged + "}\n"
+}
+func AhdLatexFigure(path, caption, label string, size *AhdPair[string, float64]) string {
+	marker, staged := ahdLatexAsset(path)
+	return marker + "\\begin{figure}[!ht]\n\\centering\n\\includegraphics" + ahdLatexSizes(size) + "{" + staged + "}\n\\caption{" + AhdLatexEscape(caption) + "}\n" + ahdLatexLabel(label) + "\\end{figure}\n"
+}
+func AhdLatexBibliography(references *AhdPair[string, string]) string {
+	if references == nil {
+		return ""
+	}
+	references.require()
+	var out strings.Builder
+	out.WriteString("\\begin{thebibliography}{99}\n")
+	for _, key := range references.keys {
+		out.WriteString("\\bibitem{" + AhdLatexEscape(key) + "} " + AhdLatexEscape(references.values[key]) + "\n")
+	}
+	out.WriteString("\\end{thebibliography}\n")
+	return out.String()
 }
 
 // AhdLatexDocument returns one stable complete document. Font files are named
 // explicitly so the supported baseline never depends on a system font.
 func AhdLatexDocument(body, title, author string) string {
+	return AhdLatexDocumentFull(body, title, author, "", "Article", 2.54, "", "", AhdBuildPair([]string{}, []string{}))
+}
+
+func AhdLatexDocumentFull(body, title, author, date, documentType string, margin float64, color, cover string, theorems *AhdPair[string, string]) string {
+	classes := map[string]string{"Article": "article", "Report": "report", "Beamer": "beamer"}
+	documentClass := classes[documentType]
+	if documentClass == "" {
+		AhdRaiseClass(AhdClassValueError, "Latex.document type must be Article, Report, or Beamer")
+	}
+	if margin <= 0 {
+		AhdRaiseClass(AhdClassValueError, "Latex.document margin must be positive")
+	}
+	if color != "" {
+		matched, _ := regexp.MatchString(`^#[0-9A-Fa-f]{6}$`, color)
+		if !matched {
+			AhdRaiseClass(AhdClassValueError, "Latex.document color must use #RRGGBB")
+		}
+	}
 	var result strings.Builder
-	result.WriteString("\\documentclass{article}\n")
+	result.WriteString("\\documentclass{" + documentClass + "}\n")
 	result.WriteString("\\usepackage{fontspec}\n")
 	result.WriteString("\\setmainfont{lmroman10-regular.otf}[BoldFont=lmroman10-bold.otf,ItalicFont=lmroman10-italic.otf,BoldItalicFont=lmroman10-bolditalic.otf]\n")
 	result.WriteString("\\usepackage{amsmath,amssymb,mathtools}\n")
 	result.WriteString("\\usepackage{geometry,graphicx,booktabs,array,xcolor,hyperref}\n")
+	result.WriteString("\\geometry{margin=" + ahdFormatReal(margin) + "cm}\n")
 	result.WriteString("\\hypersetup{hidelinks}\n")
+	if color != "" {
+		hex := strings.TrimPrefix(color, "#")
+		result.WriteString("\\definecolor{ahdaccent}{HTML}{" + strings.ToUpper(hex) + "}\n")
+		if documentType == "Beamer" {
+			result.WriteString("\\setbeamercolor{structure}{fg=ahdaccent}\n")
+		}
+	}
+	declared := map[string]string{}
+	if theorems != nil {
+		theorems.require()
+		for _, display := range theorems.keys {
+			if display == "" {
+				AhdRaiseClass(AhdClassValueError, "theorem type name must not be empty")
+			}
+			id := ahdLatexTheoremID(display)
+			rule := theorems.values[display]
+			switch rule {
+			case "":
+				result.WriteString("\\newtheorem{" + id + "}{" + AhdLatexEscape(display) + "}\n")
+			case "section", "subsection":
+				result.WriteString("\\newtheorem{" + id + "}{" + AhdLatexEscape(display) + "}[" + rule + "]\n")
+			case "chapter":
+				if documentType != "Report" {
+					AhdRaiseClass(AhdClassValueError, "chapter theorem counters require a Report document")
+				}
+				result.WriteString("\\newtheorem{" + id + "}{" + AhdLatexEscape(display) + "}[chapter]\n")
+			default:
+				shared := declared[rule]
+				if shared == "" {
+					AhdRaiseClass(AhdClassValueError, "theorem counter references an unknown or later type: "+rule)
+				}
+				result.WriteString("\\newtheorem{" + id + "}[" + shared + "]{" + AhdLatexEscape(display) + "}\n")
+			}
+			declared[display] = id
+		}
+	}
+	knownTheorems := map[string]bool{}
+	for _, id := range declared {
+		knownTheorems[id] = true
+	}
+	theoremPattern := regexp.MustCompile(`\\begin\{(ahdthm[0-9a-f]+)\}`)
+	for _, match := range theoremPattern.FindAllStringSubmatch(body, -1) {
+		if !knownTheorems[match[1]] {
+			AhdRaiseClass(AhdClassValueError, "document body uses an undeclared theorem type")
+		}
+	}
 	if title != "" {
 		result.WriteString("\\title{" + AhdLatexEscape(title) + "}\n")
 	}
 	if author != "" {
 		result.WriteString("\\author{" + AhdLatexEscape(author) + "}\n")
 	}
-	result.WriteString("\\date{}\n\\begin{document}\n")
+	result.WriteString("\\date{" + AhdLatexEscape(date) + "}\n\\begin{document}\n")
+	if cover != "" {
+		result.WriteString(cover)
+		if !strings.HasSuffix(cover, "\n") {
+			result.WriteByte('\n')
+		}
+		result.WriteString("\\clearpage\n")
+	}
 	if title != "" {
-		result.WriteString("\\maketitle\n")
+		if documentType == "Beamer" {
+			result.WriteString("\\begin{frame}\n\\titlepage\n\\end{frame}\n")
+		} else {
+			result.WriteString("\\maketitle\n")
+		}
 	}
 	result.WriteString(body)
 	if body != "" && !strings.HasSuffix(body, "\n") {
@@ -448,7 +650,7 @@ func AhdLatexDocument(body, title, author string) string {
 
 // AhdLatexTable creates deterministic booktabs source. List elements retain
 // the ordinary nullable-element rule; a null row or cell raises NullError.
-func AhdLatexTable(headers *AhdList[*string], rows *AhdList[*AhdList[*string]], mathColumns *AhdList[*int64]) string {
+func AhdLatexTable(headers *AhdList[string], rows *AhdList[*AhdList[string]], mathColumns *AhdList[int64]) string {
 	headerValues := headers.Snapshot()
 	if len(headerValues) == 0 {
 		AhdRaiseClass(AhdClassValueError, "Latex.table requires at least one header")
@@ -456,8 +658,7 @@ func AhdLatexTable(headers *AhdList[*string], rows *AhdList[*AhdList[*string]], 
 	// A listed column is the caller's explicit opt-in to raw LaTeX math for
 	// that column. Membership is a set, so a repeated index wraps a cell once.
 	math := make(map[int64]bool)
-	for _, column := range mathColumns.Snapshot() {
-		index := AhdNonNull(column)
+	for _, index := range mathColumns.Snapshot() {
 		if index < 0 || index >= int64(len(headerValues)) {
 			AhdRaiseClass(AhdClassValueError, "Latex.table math column "+strconv.FormatInt(index, 10)+
 				" is outside 0.."+strconv.FormatInt(int64(len(headerValues)-1), 10))
@@ -473,7 +674,7 @@ func AhdLatexTable(headers *AhdList[*string], rows *AhdList[*AhdList[*string]], 
 		if index != 0 {
 			result.WriteString(" & ")
 		}
-		result.WriteString(AhdLatexEscape(AhdNonNull(value)))
+		result.WriteString(AhdLatexEscape(value))
 	}
 	result.WriteString(" \\\\\n\\midrule\n")
 	for _, row := range rowValues {
@@ -486,7 +687,7 @@ func AhdLatexTable(headers *AhdList[*string], rows *AhdList[*AhdList[*string]], 
 			if index != 0 {
 				result.WriteString(" & ")
 			}
-			cell := AhdNonNull(value)
+			cell := value
 			// A math column carries LaTeX source, so escaping it would destroy
 			// the very commands it exists to typeset.
 			if math[int64(index)] {
@@ -510,15 +711,67 @@ func AhdLatexPDF(source, output string) {
 		ahdLatexRaise("could not create a secure temporary directory: " + err.Error())
 	}
 	defer os.RemoveAll(directory)
+	working, err := os.Getwd()
+	if err != nil {
+		ahdLatexRaise("could not resolve the asset base directory: " + err.Error())
+	}
+	if err := ahdLatexStageAssets(source, working, directory); err != nil {
+		ahdLatexRaise(err.Error())
+	}
 	input := filepath.Join(directory, "document.tex")
 	if err := os.WriteFile(input, []byte(source), 0o600); err != nil {
 		ahdLatexRaise("could not write temporary LaTeX source: " + err.Error())
 	}
-	working, err := os.Getwd()
-	if err != nil {
-		working = directory
+	ahdLatexCompile(input, directory, output)
+}
+
+func ahdLatexStageAssets(source, base, destination string) error {
+	pattern := regexp.MustCompile(`(?m)^% AHDCODE_ASSET ([A-Za-z0-9_-]+) (ahdasset-[0-9a-f]+\.(?:png|pdf|jpg|jpeg))$`)
+	seen := map[string]bool{}
+	for _, match := range pattern.FindAllStringSubmatch(source, -1) {
+		if seen[match[2]] {
+			continue
+		}
+		seen[match[2]] = true
+		decoded, err := base64.RawStdEncoding.DecodeString(match[1])
+		if err != nil {
+			return fmt.Errorf("invalid generated Latex asset marker")
+		}
+		path := string(decoded)
+		if !filepath.IsAbs(path) {
+			path = filepath.Join(base, path)
+		}
+		absolute, err := filepath.Abs(path)
+		if err != nil {
+			return fmt.Errorf("could not resolve Latex asset %s: %w", path, err)
+		}
+		info, err := os.Stat(absolute)
+		if err != nil || !info.Mode().IsRegular() {
+			return fmt.Errorf("Latex asset is missing or not a regular file: %s", path)
+		}
+		input, err := os.Open(absolute)
+		if err != nil {
+			return fmt.Errorf("could not open Latex asset %s: %w", path, err)
+		}
+		output, err := os.OpenFile(filepath.Join(destination, match[2]), os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
+		if err != nil {
+			input.Close()
+			return fmt.Errorf("could not stage Latex asset: %w", err)
+		}
+		_, copyError := io.Copy(output, input)
+		closeInput := input.Close()
+		closeOutput := output.Close()
+		if copyError != nil {
+			return fmt.Errorf("could not stage Latex asset: %w", copyError)
+		}
+		if closeInput != nil {
+			return closeInput
+		}
+		if closeOutput != nil {
+			return closeOutput
+		}
 	}
-	ahdLatexCompile(input, working, output)
+	return nil
 }
 
 func AhdLatexPDFFile(input, output string) {

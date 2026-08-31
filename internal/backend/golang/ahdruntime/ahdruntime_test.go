@@ -922,22 +922,22 @@ func TestLatexSourceHelpersAreDeterministic(t *testing.T) {
 }
 
 func TestLatexTableEscapesAndValidatesCells(t *testing.T) {
-	headers := AhdNewList(AhdBox("Name"), AhdBox("A&B"))
-	rows := AhdNewList(AhdNewList(AhdBox("Ali"), AhdBox("1_2")))
-	result := AhdLatexTable(headers, rows, AhdNewList[*int64]())
+	headers := AhdNewList("Name", "A&B")
+	rows := AhdNewList(AhdNewList("Ali", "1_2"))
+	result := AhdLatexTable(headers, rows, AhdNewList[int64]())
 	for _, expected := range []string{"\\begin{tabular}{ll}", "A\\&B", "1\\_2", "\\toprule", "\\midrule", "\\bottomrule"} {
 		if !strings.Contains(result, expected) {
 			t.Fatalf("Latex.table omitted %q:\n%s", expected, result)
 		}
 	}
 	expectRaise(t, AhdClassValueError, func() {
-		AhdLatexTable(AhdNewList[*string](), AhdNewList[*AhdList[*string]](), AhdNewList[*int64]())
+		AhdLatexTable(AhdNewList[string](), AhdNewList[*AhdList[string]](), AhdNewList[int64]())
 	})
 	expectRaise(t, AhdClassValueError, func() {
-		AhdLatexTable(headers, AhdNewList(AhdNewList(AhdBox("only one"))), AhdNewList[*int64]())
+		AhdLatexTable(headers, AhdNewList(AhdNewList("only one")), AhdNewList[int64]())
 	})
 	expectRaise(t, AhdClassNullError, func() {
-		AhdLatexTable(headers, AhdNewList[*AhdList[*string]](nil), AhdNewList[*int64]())
+		AhdLatexTable(headers, AhdNewList[*AhdList[string]](nil), AhdNewList[int64]())
 	})
 }
 
@@ -1043,12 +1043,12 @@ func TestLatexTimeoutIsBoundedAndRaisesLatexError(t *testing.T) {
 }
 
 func TestLatexTableMathColumns(t *testing.T) {
-	headers := AhdNewList(AhdBox("Fonksiyon"), AhdBox("Türev"), AhdBox("Yorum"))
+	headers := AhdNewList("Fonksiyon", "Türev", "Yorum")
 	rows := AhdNewList(AhdNewList(
-		AhdBox(`g(x)=e^{a(\ln x)^m}`), AhdBox(`\frac{1}{2}\star e^a`), AhdBox("İlk & son")))
+		`g(x)=e^{a(\ln x)^m}`, `\frac{1}{2}\star e^a`, "İlk & son"))
 
 	// Without math columns every cell is escaped, exactly as before.
-	text := AhdLatexTable(headers, rows, AhdNewList[*int64]())
+	text := AhdLatexTable(headers, rows, AhdNewList[int64]())
 	for _, escaped := range []string{`\textbackslash{}ln`, `\textasciicircum{}`, `İlk \& son`} {
 		if !strings.Contains(text, escaped) {
 			t.Fatalf("text columns are no longer escaped, expected %q in:\n%s", escaped, text)
@@ -1059,7 +1059,7 @@ func TestLatexTableMathColumns(t *testing.T) {
 	}
 
 	// A listed column is raw math: commands, braces, and scripts survive.
-	text = AhdLatexTable(headers, rows, AhdNewList(AhdBox(int64(0)), AhdBox(int64(1))))
+	text = AhdLatexTable(headers, rows, AhdNewList(int64(0), int64(1)))
 	for _, expected := range []string{
 		`\(g(x)=e^{a(\ln x)^m}\)`,
 		`\(\frac{1}{2}\star e^a\)`,
@@ -1075,34 +1075,34 @@ func TestLatexTableMathColumns(t *testing.T) {
 
 	// A repeated index selects the column once rather than nesting delimiters.
 	repeated := AhdLatexTable(headers, rows,
-		AhdNewList(AhdBox(int64(0)), AhdBox(int64(0)), AhdBox(int64(0))))
-	once := AhdLatexTable(headers, rows, AhdNewList(AhdBox(int64(0))))
+		AhdNewList(int64(0), int64(0), int64(0)))
+	once := AhdLatexTable(headers, rows, AhdNewList(int64(0)))
 	if repeated != once {
 		t.Fatalf("duplicate math columns are not idempotent:\n%s\n%s", repeated, once)
 	}
 
 	expectRaise(t, AhdClassValueError, func() {
-		AhdLatexTable(headers, rows, AhdNewList(AhdBox(int64(-1))))
+		AhdLatexTable(headers, rows, AhdNewList(int64(-1)))
 	})
 	expectRaise(t, AhdClassValueError, func() {
-		AhdLatexTable(headers, rows, AhdNewList(AhdBox(int64(3))))
+		AhdLatexTable(headers, rows, AhdNewList(int64(3)))
 	})
 	expectRaise(t, AhdClassValueError, func() {
-		AhdLatexTable(headers, rows, AhdNewList(AhdBox(int64(0)), AhdBox(int64(9))))
+		AhdLatexTable(headers, rows, AhdNewList(int64(0), int64(9)))
 	})
 	// Row width validation is unchanged.
 	expectRaise(t, AhdClassValueError, func() {
-		short := AhdNewList(AhdNewList(AhdBox("only")))
-		AhdLatexTable(headers, short, AhdNewList[*int64]())
+		short := AhdNewList(AhdNewList("only"))
+		AhdLatexTable(headers, short, AhdNewList[int64]())
 	})
 }
 
 func TestLatexTableTwoArgumentOutputIsUnchanged(t *testing.T) {
-	headers := AhdNewList(AhdBox("A"), AhdBox("B"))
-	rows := AhdNewList(AhdNewList(AhdBox("x_1"), AhdBox("ç & ğ")))
+	headers := AhdNewList("A", "B")
+	rows := AhdNewList(AhdNewList("x_1", "ç & ğ"))
 	expected := "\\begin{tabular}{ll}\n\\toprule\nA & B \\\\\n\\midrule\n" +
 		"x\\_1 & ç \\& ğ \\\\\n\\bottomrule\n\\end{tabular}\n"
-	if text := AhdLatexTable(headers, rows, AhdNewList[*int64]()); text != expected {
+	if text := AhdLatexTable(headers, rows, AhdNewList[int64]()); text != expected {
 		t.Fatalf("two-argument table output changed:\n%q\nwant\n%q", text, expected)
 	}
 }
