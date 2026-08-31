@@ -173,6 +173,36 @@ last"""`, `"Merhaba { ad }"`} {
 	}
 }
 
+func TestRawStringsAreReproducedVerbatimAndIdempotent(t *testing.T) {
+	input := `name:String:="Ali"
+write(r"{name}")
+write(r"\n")
+pattern:String:=r"^MATH-[0-9]{3}$"
+formula:String:=r'''
+\frac{x+1}{x-1}
+'''
+`
+	formatted := formatText(t, input)
+	for _, exact := range []string{
+		`r"{name}"`,
+		`r"\n"`,
+		`r"^MATH-[0-9]{3}$"`,
+		`r'''
+\frac{x+1}{x-1}
+'''`,
+	} {
+		if !strings.Contains(formatted, exact) {
+			t.Fatalf("formatted text lost %q:\n%s", exact, formatted)
+		}
+	}
+	if strings.Contains(formatted, `"{name}"`) && !strings.Contains(formatted, `r"{name}"`) {
+		t.Fatal("formatter stripped the raw string prefix, changing semantics")
+	}
+	if twice := formatText(t, formatted); twice != formatted {
+		t.Fatalf("raw string formatting is not idempotent:\nfirst:\n%s\nsecond:\n%s", formatted, twice)
+	}
+}
+
 func TestFunctionClassAndSemanticValidityArePreserved(t *testing.T) {
 	input := `Person:Class<>:={
 structure:Attributes:=(

@@ -87,6 +87,55 @@ func (l *lexer) scanString() {
 	l.emitSynthetic(token.StringEnd, l.position())
 }
 
+// scanRawString scans r"...", r'...', r"""...""", and r”'...”' literals.
+// A raw String has no escape processing and no interpolation: backslashes
+// and braces are ordinary characters, and the resulting value is copied
+// verbatim from source. The StringStart token's span is widened to start at
+// the r prefix, so the parser and formatter need no raw-specific handling --
+// StringExpr.Span() already covers the prefix, and the formatter reproduces
+// source text verbatim.
+func (l *lexer) scanRawString() {
+	prefixStart := l.position()
+	l.advanceASCII(1)
+	delimiter := l.readStringDelimiter()
+	l.advanceASCII(delimiter.width)
+	l.emit(token.StringStart, prefixStart, string(delimiter.quote), false)
+
+	textStart := l.position()
+	flush := func() {
+		if l.position().Offset == textStart.Offset {
+			return
+		}
+		l.emit(token.StringText, textStart, l.span(textStart).Text(l.file), false)
+		textStart = l.position()
+	}
+
+	for !l.atEnd() {
+		if l.matchesDelimiter(delimiter) {
+			flush()
+			endStart := l.position()
+			l.advanceASCII(delimiter.width)
+			l.emit(token.StringEnd, endStart, string(delimiter.quote), false)
+			return
+		}
+		if !delimiter.triple && l.isNewline() {
+			flush()
+			l.bag.Error(codeNewlineInString, "physical newline in ordinary string", source.NewSpan(l.file.ID, l.position(), l.position()), "close the string before the newline or use a triple string")
+			l.emitSynthetic(token.StringEnd, l.position())
+			return
+		}
+		if l.isNewline() {
+			l.consumeNewline()
+			continue
+		}
+		l.advanceRune()
+	}
+
+	flush()
+	l.bag.Error(codeUnterminatedString, "unterminated string", l.span(prefixStart), "add the matching string delimiter")
+	l.emitSynthetic(token.StringEnd, l.position())
+}
+
 func (l *lexer) readStringDelimiter() stringDelimiter {
 	quote := l.byteAt(0)
 	tripleText := string([]byte{quote, quote, quote})

@@ -45,5 +45,6 @@ ahdcode run examples/v0.1/14_grade_app.ahd
 | `24_capture.ahd` | explicit lambda capture lists, capture by value, and the lambda/Function split |
 | `25_statistics.ahd` | Statistics: sum, mean, median, mode, dispersion, quantile, and undefined-input errors |
 | `26_data_statistics.ahd` | Data and Statistics together: pivotCount, explicit conversion, and a captured threshold |
+| `27_raw_strings.ahd` | Raw String literals: no escapes, no interpolation, Regex quantifiers, and LaTeX source |
 
 `Greeting.ahd` is the sibling module used by `11_modules.ahd`.

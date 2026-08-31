@@ -45,6 +45,7 @@ ahdcode run examples/v0.1/14_grade_app.ahd
 | `24_capture.ahd` | açık lambda yakalama listeleri, değere göre yakalama ve lambda/Function ayrımı |
 | `25_statistics.ahd` | Statistics: sum, mean, median, mode, dağılım, quantile ve tanımsız girdi hataları |
 | `26_data_statistics.ahd` | Data ve Statistics birlikte: pivotCount, açık dönüşüm ve yakalanmış bir eşik |
+| `27_raw_strings.ahd` | Ham (raw) String literalleri: kaçış yok, interpolasyon yok, Regex niceleyicileri ve LaTeX kaynağı |
 
 `Greeting.ahd`, `11_modules.ahd` tarafından kullanılan kardeş (sibling)
 modüldür.

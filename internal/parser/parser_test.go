@@ -343,6 +343,24 @@ func TestDeclarationsAssignmentsAndUpdates(t *testing.T) {
 	}
 }
 
+func TestRawStringParsesAsOrdinaryStringExprWithNoInterpolationParts(t *testing.T) {
+	result := parseText(t, `r"^MATH-[0-9]{3}$"`)
+	requireClean(t, result)
+	expr, ok := expressionAt(t, result, 0).(*ast.StringExpr)
+	if !ok {
+		t.Fatalf("expression is %T, want *ast.StringExpr", expressionAt(t, result, 0))
+	}
+	if len(expr.Parts) != 1 || expr.Parts[0].Expression != nil {
+		t.Fatalf("raw string parts = %+v, want a single text-only part", expr.Parts)
+	}
+	if got, want := expr.Parts[0].Text, "^MATH-[0-9]{3}$"; got != want {
+		t.Fatalf("raw string text = %q; want %q", got, want)
+	}
+	if got, want := expr.Span().Start.Column, 1; got != want {
+		t.Fatalf("StringExpr span start column = %d; want %d (must cover the r prefix)", got, want)
+	}
+}
+
 func TestPostfixAndCollectionExpressions(t *testing.T) {
 	result := parseText(t, strings.Join([]string{
 		"object.member[1]",

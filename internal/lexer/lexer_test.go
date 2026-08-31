@@ -330,3 +330,129 @@ func TestValidLexingReconstructsExactSource(t *testing.T) {
 		t.Fatalf("reconstructed source = %q; want %q", got, text)
 	}
 }
+
+func TestRawStringDoesNotDecodeEscapes(t *testing.T) {
+	// A raw String cannot contain its own delimiter (nothing escapes it, so a
+	// quote always closes the literal) -- this exercises every other escape
+	// form staying literal: \n, \t, and a doubled backslash.
+	result := lexText(`r"\n\t\\{x}"`)
+	assertNoDiagnostics(t, result)
+	assertKinds(t, result, token.StringStart, token.StringText, token.StringEnd, token.EOF)
+	want := `\n\t\\{x}`
+	if got := result.Tokens[1].Value; got != want {
+		t.Fatalf("raw StringText = %q; want %q", got, want)
+	}
+}
+
+func TestRawStringHasNoInterpolation(t *testing.T) {
+	result := lexText(`r"{name}"`)
+	assertNoDiagnostics(t, result)
+	assertKinds(t, result, token.StringStart, token.StringText, token.StringEnd, token.EOF)
+	if got := result.Tokens[1].Value; got != "{name}" {
+		t.Fatalf("raw StringText = %q; want %q", got, "{name}")
+	}
+}
+
+func TestRawStringUnsupportedEscapeIsNotAnError(t *testing.T) {
+	result := lexText(`r"\q"`)
+	assertNoDiagnostics(t, result)
+	if got := result.Tokens[1].Value; got != `\q` {
+		t.Fatalf("raw StringText = %q; want %q", got, `\q`)
+	}
+}
+
+func TestRawStringRegexQuantifierIsExact(t *testing.T) {
+	result := lexText(`r"^MATH-[0-9]{3}$"`)
+	assertNoDiagnostics(t, result)
+	if got := result.Tokens[1].Value; got != "^MATH-[0-9]{3}$" {
+		t.Fatalf("raw StringText = %q", got)
+	}
+}
+
+func TestRawStringSingleQuoteForm(t *testing.T) {
+	result := lexText(`r'abc\n{x}'`)
+	assertNoDiagnostics(t, result)
+	if got := result.Tokens[1].Value; got != `abc\n{x}` {
+		t.Fatalf("raw StringText = %q", got)
+	}
+}
+
+func TestRawTripleStringPreservesContentAndUnicode(t *testing.T) {
+	result := lexText("r\"\"\"\n\\frac{x}{y} öğrenci\n\"\"\"")
+	assertNoDiagnostics(t, result)
+	want := "\n\\frac{x}{y} öğrenci\n"
+	if got := result.Tokens[1].Value; got != want {
+		t.Fatalf("raw triple content = %q; want %q", got, want)
+	}
+}
+
+func TestRawTripleSingleQuoteForm(t *testing.T) {
+	result := lexText("r'''\\frac{x}{y}'''")
+	assertNoDiagnostics(t, result)
+	if got := result.Tokens[1].Value; got != `\frac{x}{y}` {
+		t.Fatalf("raw triple content = %q", got)
+	}
+}
+
+func TestRawStringSpanIncludesPrefix(t *testing.T) {
+	result := lexText(`r"abc"`)
+	assertNoDiagnostics(t, result)
+	if got := result.Tokens[0].Lexeme; got != `r"` {
+		t.Fatalf("StringStart lexeme = %q; want %q", got, `r"`)
+	}
+}
+
+func TestEmptyRawString(t *testing.T) {
+	result := lexText(`r""`)
+	assertNoDiagnostics(t, result)
+	assertKinds(t, result, token.StringStart, token.StringEnd, token.EOF)
+}
+
+func TestUnterminatedRawStringDiagnostics(t *testing.T) {
+	singleQuote := lexText(`r'unterminated`)
+	if got := diagnosticCodes(singleQuote); len(got) != 1 || got[0] != codeUnterminatedString {
+		t.Fatalf("raw single-quote diagnostics = %v", got)
+	}
+
+	doubleQuote := lexText(`r"unterminated`)
+	if got := diagnosticCodes(doubleQuote); len(got) != 1 || got[0] != codeUnterminatedString {
+		t.Fatalf("raw double-quote diagnostics = %v", got)
+	}
+
+	triple := lexText(`r"""unterminated`)
+	if got := diagnosticCodes(triple); len(got) != 1 || got[0] != codeUnterminatedString {
+		t.Fatalf("raw triple-quote diagnostics = %v", got)
+	}
+
+	newline := lexText("r\"hello\nnext")
+	if got := diagnosticCodes(newline); len(got) == 0 || got[0] != codeNewlineInString {
+		t.Fatalf("raw newline diagnostics = %v", got)
+	}
+}
+
+func TestUppercaseRIsNotARawStringPrefix(t *testing.T) {
+	result := lexText(`R"not raw"`)
+	assertNoDiagnostics(t, result)
+	assertKinds(t, result, token.Identifier, token.StringStart, token.StringText, token.StringEnd, token.EOF)
+	if got := result.Tokens[0].Value; got != "R" {
+		t.Fatalf("identifier value = %q; want %q", got, "R")
+	}
+}
+
+func TestBareIdentifierNamedRIsUnaffected(t *testing.T) {
+	result := lexText("r := 5\nr + 1")
+	assertNoDiagnostics(t, result)
+	assertKinds(t, result,
+		token.Identifier, token.Declare, token.IntLiteral, token.Newline,
+		token.Identifier, token.Plus, token.IntLiteral, token.EOF,
+	)
+}
+
+func TestRawStringRoundTripsExactSource(t *testing.T) {
+	text := "value: String := r\"x\\y{z}\" + r'''raw'''"
+	result := lexText(text)
+	assertNoDiagnostics(t, result)
+	if got := reconstruct(result); got != text {
+		t.Fatalf("reconstructed source = %q; want %q", got, text)
+	}
+}

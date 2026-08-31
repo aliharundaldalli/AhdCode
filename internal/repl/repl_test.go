@@ -406,6 +406,42 @@ write(check(50))
 	}
 }
 
+// TestRawStringsInThePersistentREPL pins raw String literal semantics --
+// no escape processing, no interpolation -- in the persistent evaluator
+// against the native backend's results for the same input.
+func TestRawStringsInThePersistentREPL(t *testing.T) {
+	input := `name: String := "Ali"
+write(r"{name}")
+write(r"\n")
+write("{name}")
+pattern: String := r"^MATH-[0-9]{3}$"
+write(pattern)
+write(r'abc\n{x}')
+multi: String := r"""
+\frac{x+1}{x-1}
+"""
+write(multi)
+`
+	var output, errors bytes.Buffer
+	Run(strings.NewReader(input), &output, &errors, "AhdCode v0.1.13")
+	text := output.String()
+	for _, want := range []string{
+		"{name}\n",
+		`\n` + "\n",
+		"Ali\n",
+		"^MATH-[0-9]{3}$\n",
+		`abc\n{x}` + "\n",
+		"\n\\frac{x+1}{x-1}\n\n",
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("REPL output missing %q:\n%s", want, text)
+		}
+	}
+	if errors.Len() != 0 {
+		t.Fatalf("REPL errors: %s", errors.String())
+	}
+}
+
 // TestStatisticsAndPivotCountInThePersistentREPL pins both new surfaces in the
 // persistent evaluator against the native backend's results for the same input.
 func TestStatisticsAndPivotCountInThePersistentREPL(t *testing.T) {

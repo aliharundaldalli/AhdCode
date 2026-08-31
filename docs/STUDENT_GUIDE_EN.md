@@ -419,6 +419,29 @@ You can use `\` to write special characters inside text. For example, `\n` is a 
 
 > **Technical note:** AhdCode Strings work with Unicode characters and are immutable; they cannot be changed in place.
 
+### Raw Strings
+
+A normal String decodes `\` escapes and `{...}` interpolation. Sometimes you want the exact text instead -- for example, a regular-expression pattern full of `{3}`-style quantifiers, or LaTeX source full of backslashes. Prefix the opening quote with `r` for a raw String, and neither escapes nor interpolation are processed:
+
+```ahd
+name: String := "Ali"
+
+write(r"{name}")   // {name}, not Ali -- no interpolation
+write(r"\n")       // \n as two characters, not a newline
+
+pattern: String := r"^MATH-[0-9]{3}$"
+formula: String := r"\frac{x+1}{x-1}"
+```
+
+Raw multiline strings work the same way, with `r"""..."""` or `r'''...'''`. In short:
+
+```text
+normal String = escapes + interpolation
+raw String    = neither escapes nor interpolation
+```
+
+A raw String is still an ordinary `String`; there is no separate raw type.
+
 ## 7. Input, output, and conversions
 
 Now let our program talk to the user.

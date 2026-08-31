@@ -419,6 +419,34 @@ Metnin içinde özel karakterler yazmak için `\` kullanılabilir. Örneğin `\n
 
 > **Teknik not:** AhdCode String'leri Unicode karakterleriyle çalışır ve immutable'dır; yani yerinde değiştirilemez.
 
+### Ham (raw) String'ler
+
+Normal bir String, `\` kaçışlarını ve `{...}` interpolasyonunu çözümler.
+Bazen tam olarak yazdığınız metni istersiniz -- örneğin `{3}` gibi
+niceleyicilerle dolu bir düzenli ifade (regex) deseni ya da ters eğik
+çizgilerle dolu bir LaTeX kaynağı. Açılış tırnağının önüne `r` koyarak ham
+bir String yazabilirsiniz; ne kaçışlar ne de interpolasyon işlenir:
+
+```ahd
+name: String := "Ali"
+
+write(r"{name}")   // {name}, Ali değil -- interpolasyon yok
+write(r"\n")       // bir satır sonu değil, iki karakter olarak \n
+
+pattern: String := r"^MATH-[0-9]{3}$"
+formula: String := r"\frac{x+1}{x-1}"
+```
+
+Ham çok satırlı string'ler de aynı şekilde çalışır: `r"""..."""` veya
+`r'''...'''`. Kısaca:
+
+```text
+normal String = kaçışlar + interpolasyon
+ham String    = ne kaçış ne de interpolasyon
+```
+
+Ham bir String hâlâ sıradan bir `String`'dir; ayrı bir ham tür yoktur.
+
 ## 7. Girdi, çıktı ve dönüşümler
 
 Şimdi programımız kullanıcıyla konuşsun.

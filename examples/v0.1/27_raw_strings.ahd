@@ -1,0 +1,39 @@
+bring Regex
+from Regex bring Pattern
+
+// A raw String has no escape processing and no interpolation: backslashes
+// and braces are ordinary characters, and the value is still a plain String.
+name: String := "Ali"
+
+write(r"{name}")
+write("{name}")
+
+// \n stays as two literal characters -- a backslash and an n -- not a
+// newline.
+write(r"\n")
+
+// This is the primary motivation for raw Strings: a regex quantifier like
+// {3} needs no brace-escaping at all.
+pattern: Pattern := Regex.compile(
+    r"^MATH-[0-9]{3}$"
+)
+
+write(pattern.matches("MATH-101"))
+write(pattern.matches("MATH-X12"))
+
+// LaTeX source is full of backslashes; raw Strings keep it readable.
+formula: String := r"\frac{x^2 + 1}{\sqrt{x}}"
+write(formula)
+
+// Raw triple strings preserve content exactly, like normal triple strings.
+proof: String := r"""
+\begin{align}
+f(x) &= x^2 + 1 \\
+g(x) &= \frac{x+1}{x-1}
+\end{align}
+"""
+write(proof)
+
+// Single-quote raw Strings work the same way.
+single: String := r'no \n escapes, no {x} interpolation here'
+write(single)

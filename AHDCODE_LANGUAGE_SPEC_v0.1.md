@@ -624,6 +624,87 @@ write("a✓b✓".index("✓"))
 
 `index` has no sentinel result. A search text the receiver does not contain raises the catchable `DomainError`, and so does an empty search text.
 
+### 6.4 Raw String literals (v0.1.14)
+
+A raw String literal is written with the exact lowercase prefix `r` immediately followed by a String delimiter, with no space or trivia between them:
+
+```ahd
+r"raw text"
+r'raw text'
+
+r"""
+multiline raw text
+"""
+
+r'''
+multiline raw text
+'''
+```
+
+A raw String is still an ordinary `String` value. There is no separate `RawString` type, and a raw String is indistinguishable from a normal String once constructed -- only the source spelling that produced it differs.
+
+Inside a raw String:
+
+- there is no escape processing: `\n`, `\t`, `\\`, and every other backslash sequence are copied verbatim as literal characters, not decoded;
+- there is no `{...}` interpolation: braces are ordinary characters;
+- the literal's value is the exact source text between the opening and closing delimiters.
+
+```ahd
+name: String := "Ali"
+
+write(r"{name}")
+```
+
+=>
+
+```text
+{name}
+```
+
+```ahd
+write(r"\n")
+```
+
+=>
+
+```text
+\n
+```
+
+(two characters, a backslash followed by `n`, not a newline.)
+
+Because a raw String has no escape mechanism, it cannot contain its own delimiter: nothing protects a `"` inside `r"..."` or a `'` inside `r'...'`, so the first occurrence of the delimiter always closes the literal. A raw String needing that exact quote character must use the other quote family (`r'...'` for text containing `"`, or `r"..."` for text containing `'`), or the normal quoted/triple form when escapes are required.
+
+Raw triple strings follow the same physical-newline, delimiter, and content-preservation rules as normal triple strings (§6.1): only three consecutive matching quote characters close the literal, and content between the delimiters is preserved exactly, with no dedent or trim.
+
+The prefix detection is purely a lexical adjacency check: an identifier named `r` used anywhere else -- `r := 5`, `r + 1`, `read("x")` -- is unaffected, because only the single character `r` immediately followed by `"` or `'` activates raw mode. `r` is not a reserved word. Only the exact lowercase `r` activates raw mode; `R"..."` is an ordinary identifier `R` followed by a separate String literal token, not a raw String.
+
+Raw String literals exist to write text that would otherwise require heavy escaping. Two representative uses:
+
+Regular-expression patterns, where `{n}` quantifiers would otherwise require escaping every brace:
+
+```ahd
+bring Regex
+from Regex bring Pattern
+
+pattern: Pattern := Regex.compile(
+    r"^MATH-[0-9]{3}$"
+)
+```
+
+LaTeX source, where backslashes are pervasive:
+
+```ahd
+formula: String := r"\frac{x^2 + 1}{\sqrt{x}}"
+```
+
+In summary:
+
+```text
+normal String = escapes + interpolation
+raw String    = neither escapes nor interpolation
+```
+
 ---
 
 ## 7. Nothing and null

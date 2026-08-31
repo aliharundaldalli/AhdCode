@@ -202,6 +202,13 @@ func (l *lexer) scanCodeToken(context *interpolationContext) {
 		l.advanceRune()
 		return
 	}
+	if isRawStringPrefix(l.byteAt(0), l.byteAt(1)) {
+		if context != nil {
+			context.sawExpressionToken = true
+		}
+		l.scanRawString()
+		return
+	}
 	if isXIDStart(r) {
 		l.scanIdentifier(context)
 		return
@@ -352,6 +359,15 @@ func isASCIIDigit(b byte) bool {
 
 func isHorizontalWhitespace(b byte) bool {
 	return b == ' ' || b == '\t' || b == '\f' || b == '\v'
+}
+
+// isRawStringPrefix reports whether prefix/quote form the start of a raw
+// String literal. Only the exact lowercase prefix r immediately followed by
+// a String delimiter activates raw String mode; this is a byte-adjacency
+// check (no trivia between r and the quote), so an identifier named r used
+// anywhere else in an expression is unaffected.
+func isRawStringPrefix(prefix, quote byte) bool {
+	return prefix == 'r' && (quote == '"' || quote == '\'')
 }
 
 func startsIdentifierAt(text string, offset int) bool {

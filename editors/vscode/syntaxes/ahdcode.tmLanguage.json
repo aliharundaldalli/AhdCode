@@ -4,6 +4,8 @@
   "scopeName": "source.ahdcode",
   "patterns": [
     { "include": "#comments" },
+    { "include": "#rawTripleStrings" },
+    { "include": "#rawStrings" },
     { "include": "#tripleStrings" },
     { "include": "#strings" },
     { "include": "#numbers" },
@@ -23,6 +25,36 @@
           "name": "comment.block.ahdcode",
           "begin": "/\\*",
           "end": "\\*/"
+        }
+      ]
+    },
+    "rawTripleStrings": {
+      "comment": "r\"\"\"...\"\"\" and r'''...''' have no escape processing and no interpolation -- content between the delimiters is plain text, never highlighted as an escape or an interpolation expression.",
+      "patterns": [
+        {
+          "name": "string.quoted.raw.triple.double.ahdcode",
+          "begin": "r\\\"\\\"\\\"",
+          "end": "\\\"\\\"\\\""
+        },
+        {
+          "name": "string.quoted.raw.triple.single.ahdcode",
+          "begin": "r'''",
+          "end": "'''"
+        }
+      ]
+    },
+    "rawStrings": {
+      "comment": "r\"...\" and r'...' have no escape processing and no interpolation -- a raw String cannot contain its own delimiter, so the closing quote always ends the literal.",
+      "patterns": [
+        {
+          "name": "string.quoted.raw.double.ahdcode",
+          "begin": "r\\\"",
+          "end": "\\\""
+        },
+        {
+          "name": "string.quoted.raw.single.ahdcode",
+          "begin": "r'",
+          "end": "'"
         }
       ]
     },

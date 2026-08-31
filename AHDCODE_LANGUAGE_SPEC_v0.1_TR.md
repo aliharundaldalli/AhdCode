@@ -745,6 +745,111 @@ write("a✓b✓".index("✓"))
 arama metni yakalanabilir `DomainError` fırlatır, boş bir arama metni de
 öyle.
 
+### 6.4 Ham (raw) String literalleri (v0.1.14)
+
+Bir ham (raw) String literali, aralarında boşluk veya trivia olmadan
+doğrudan bir String sınırlayıcısının önüne gelen, tam olarak küçük harfli
+`r` öneki ile yazılır:
+
+```ahd
+r"raw text"
+r'raw text'
+
+r"""
+multiline raw text
+"""
+
+r'''
+multiline raw text
+'''
+```
+
+Ham bir String hâlâ sıradan bir `String` değeridir. Ayrı bir `RawString`
+türü yoktur ve bir ham String, bir kez oluşturulduktan sonra normal bir
+String'den ayırt edilemez -- yalnızca onu üreten kaynak yazımı farklıdır.
+
+Ham bir String'in içinde:
+
+- kaçış işleme yoktur: `\n`, `\t`, `\\` ve diğer her ters eğik çizgi dizisi,
+  çözümlenmeden olduğu gibi kopyalanır;
+- `{...}` interpolasyonu yoktur: süslü parantezler sıradan karakterlerdir;
+- literalin değeri, açılış ve kapanış sınırlayıcıları arasındaki tam kaynak
+  metindir.
+
+```ahd
+name: String := "Ali"
+
+write(r"{name}")
+```
+
+=>
+
+```text
+{name}
+```
+
+```ahd
+write(r"\n")
+```
+
+=>
+
+```text
+\n
+```
+
+(bir satır sonu değil, ters eğik çizgi ve ardından `n` olmak üzere iki
+karakter.)
+
+Ham bir String'in kaçış mekanizması olmadığından, kendi sınırlayıcısını
+içeremez: `r"..."` içindeki bir `"` veya `r'...'` içindeki bir `'` hiçbir
+şeyle korunmaz, bu yüzden sınırlayıcının ilk geçişi her zaman literali
+kapatır. Tam olarak o tırnak karakterine ihtiyaç duyan bir ham String, diğer
+tırnak ailesini kullanmalıdır (`"` içeren metin için `r'...'`, `'` içeren
+metin için `r"..."`), ya da kaçış gerektiğinde normal tırnaklı/üçlü biçimi
+kullanmalıdır.
+
+Ham üçlü string'ler, normal üçlü string'lerle aynı fiziksel satır sonu,
+sınırlayıcı ve içerik koruma kurallarını izler (§6.1): literali yalnızca üç
+ardışık eşleşen tırnak karakteri kapatır ve sınırlayıcılar arasındaki içerik,
+girinti kaldırma veya kırpma olmadan tam olarak korunur.
+
+Önek algılama, salt sözcüksel bir bitişiklik kontrolüdür: başka bir yerde
+kullanılan `r` adlı bir tanımlayıcı -- `r := 5`, `r + 1`, `read("x")` --
+etkilenmez, çünkü yalnızca hemen ardından `"` veya `'` gelen tek bir `r`
+karakteri ham kipi etkinleştirir. `r` ayrılmış bir sözcük değildir. Yalnızca
+tam olarak küçük harfli `r` ham kipi etkinleştirir; `R"..."`, ham bir String
+değil, ayrı bir String literal belirteci tarafından izlenen sıradan bir `R`
+tanımlayıcısıdır.
+
+Ham String literalleri, aksi takdirde ağır kaçışlama gerektirecek metinleri
+yazmak için vardır. İki temel kullanım:
+
+Her `{n}` niceleyicisinin aksi takdirde kaçışlanması gereken düzenli ifade
+(regular-expression) desenleri:
+
+```ahd
+bring Regex
+from Regex bring Pattern
+
+pattern: Pattern := Regex.compile(
+    r"^MATH-[0-9]{3}$"
+)
+```
+
+Ters eğik çizgilerin yaygın olduğu LaTeX kaynağı:
+
+```ahd
+formula: String := r"\frac{x^2 + 1}{\sqrt{x}}"
+```
+
+Özetle:
+
+```text
+normal String = kaçışlar + interpolasyon
+ham String    = ne kaçış ne de interpolasyon
+```
+
 ---
 
 ## 7. Nothing ve null
