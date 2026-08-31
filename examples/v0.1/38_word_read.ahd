@@ -1,0 +1,14 @@
+bring Word
+from Word bring Document
+
+source: Document := Word.new()
+source = source.heading("Results", 1)
+source = source.paragraph("A semantic DOCX round trip.")
+source = source.table(["Name", "Score"], [["Ali", "91"], ["Ayşe", "95"]])
+source.save("word-read-source.docx")
+
+loaded: Document := Word.read("word-read-source.docx")
+write(loaded.text())
+write(loaded.headings())
+write(loaded.paragraphs())
+write(loaded.tables())

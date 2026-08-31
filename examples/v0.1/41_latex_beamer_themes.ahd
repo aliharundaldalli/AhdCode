@@ -1,0 +1,40 @@
+bring Latex as L
+from Latex bring LatexError
+
+slides: String := ""
+slides += L.frame("Contents", L.contents())
+slides += L.section("Themes")
+slides += L.frame("Equation", L.equation(r"E = mc^2"))
+slides += L.frame(
+    "Table"
+    L.table(["Theme", "Offline"], [["Madrid", "yes"], ["Warsaw", "yes"]])
+)
+
+defaultSource: String := L.document(
+    body: slides
+    title: "Default Beamer"
+    type: "Beamer"
+)
+madridSource: String := L.document(
+    body: slides
+    title: "Madrid Beamer"
+    type: "Beamer"
+    theme: "Madrid"
+    color: "#8A1538"
+)
+warsawSource: String := L.document(
+    body: slides
+    title: "Warsaw Beamer"
+    type: "Beamer"
+    theme: "Warsaw"
+)
+
+attempt {
+    L.pdf(defaultSource, "beamer-default.pdf")
+    L.pdf(madridSource, "beamer-madrid.pdf")
+    L.pdf(warsawSource, "beamer-warsaw.pdf")
+    write("Default, Madrid, and Warsaw PDFs compiled")
+}
+except LatexError as error {
+    write(error.message)
+}

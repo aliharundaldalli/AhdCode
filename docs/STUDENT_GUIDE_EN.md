@@ -33,6 +33,7 @@ The best way to learn is not just by reading the examples, but by running them. 
 - [24. Plot module](#24-plot-module)
 - [25. Numeric module and Complex](#25-numeric-module-and-complex)
 - [26. Latex module](#26-latex-module)
+- [Word module](#word-module)
 - [27. Code Formatter](#27-code-formatter)
 - [28. Command line (CLI)](#28-command-line-cli)
 - [29. Interactive shell (REPL)](#29-interactive-shell-repl)
@@ -2065,7 +2066,28 @@ except LatexError as e {
 }
 ```
 
-Beyond basic articles, you can use `document(type: "Report")` or `document(type: "Beamer")`. The module also supports `date`, `margin`, `color`, `figure`, `image`, `theorem`, `ref`, `cite`, and `bibliography`. For more advanced capabilities, see the [Latex module reference](LATEX.md).
+Beyond basic articles, you can use `document(type: "Report")` or `document(type: "Beamer")`. Beamer supports the bounded `"Default"`, `"Madrid"`, and `"Warsaw"` themes. The module also supports `date`, `margin`, `color`, `figure`, `image`, `theorem`, `ref`, `cite`, and `bibliography`. For more advanced capabilities, see the [Latex module reference](LATEX.md).
+
+## Word module
+
+Word builds immutable DOCX documents without requiring Microsoft Office:
+
+```ahd
+bring Word
+from Word bring Document
+
+document: Document := Word.new()
+document = document.heading("Class report", 1)
+document = document.paragraph("Prepared with AhdCode.", "center", true)
+document = document.table(["Name", "Score"], [["Ali", "91"]])
+document.save("class-report.docx")
+```
+
+`save()` returns `Nothing`, so call it as a statement rather than assigning
+its result. Document methods are positional-only and return a new Document.
+Word can also embed Plot-generated PNG files and read text, headings, and
+tables from a bounded semantic DOCX subset. See the [Word module
+reference](WORD.md).
 
 ## 24. Code Formatter
 

@@ -11,7 +11,7 @@ ahdcode
 ```
 
 ```text
-AhdCode v0.1.15
+AhdCode v0.1.16
 ahd> x := 5
 ahd> x = x + 1
 ahd> x

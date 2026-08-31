@@ -59,6 +59,9 @@ for name in names {
   statistics over `List<Int>` and `List<Real>`, with no String coercion.
 - The [Numeric module](docs/NUMERIC.md) adds immutable Real-oriented vectors,
   matrices, linear algebra, and additive `Vector` overloads in Plot.
+- The [Word module](docs/WORD.md) builds immutable formatted documents, merged
+  tables, embedded Plot images, and bounded semantic DOCX read-back without
+  requiring Office or an external runtime.
 - The formatter defines one canonical presentation while preserving comments.
 
 ## Build from source
@@ -120,6 +123,7 @@ See the [CLI guide](docs/CLI.md), [formatter guide](docs/FORMATTER.md), and
 - [Math module](docs/MATH.md)
 - [Time module](docs/TIME.md)
 - [Latex module](docs/LATEX.md)
+- [Word module](docs/WORD.md)
 - [File and Path modules](docs/FILESYSTEM.md)
 - [Regex module](docs/REGEX.md)
 - [CSV module](docs/CSV.md)

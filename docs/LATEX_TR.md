@@ -27,7 +27,8 @@ escape(text: String)                     -> String
 document(
     body: String, title: String = "", author: String = "", date: String = "",
     type: String = "Article", margin: Real = 2.54, color: String = "",
-    cover: String = "", theorems: Pair<String, String> = {}
+    cover: String = "", theorems: Pair<String, String> = {},
+    theme: String = "Default"
 )                                         -> String
 
 chapter(title: String)                   -> String
@@ -107,8 +108,7 @@ yeni parametre varsayılan değerindeyken hâlâ bir `Article` üretir.
   boş, v0.1.14 çıktısını tam olarak korur). Ayarlandığında, AhdCode
   tarafından üretilen vurgular için kullanılan bir `ahdaccent` rengi
   tanımlar — başlık/kapak alanı ve Beamer için, sunumun yapısal rengi.
-  Geçersiz bir değer `LatexError` fırlatır. Bu tek bir vurgu rengidir, bir
-  tema sistemi değildir.
+  Geçersiz bir değer `ValueError` fırlatır.
 - **`cover`**, sıradan üretilmiş LaTeX içeriğidir (varsayılan olarak boş),
   başlık sayfasından önce eklenir ve bir sayfa sonu izler; `cover` `""`
   olduğunda, başlık/yazar/tarih davranışı v0.1.14 ile bayt-bayt aynıdır.
@@ -123,6 +123,13 @@ yeni parametre varsayılan değerindeyken hâlâ bir `Article` üretir.
   etkinleştirir; **`type: "Beamer"`**, `beamer` belge sınıfını kullanır,
   başlığı `\maketitle` yerine bir başlık-sayfası çerçevesi olarak render
   eder ve aşağıda açıklanan dar slayt yüzeyini destekler.
+- **`theme`**, tam olarak büyük/küçük harfe duyarlı `"Default"`, `"Madrid"`
+  ve `"Warsaw"` değerlerini kabul eder, varsayılanı `"Default"`'tır ve son
+  konumsal parametredir. Madrid ve Warsaw `type: "Beamer"` gerektirir;
+  Article veya Report ile seçilmeleri `ValueError` fırlatır. Bilinmeyen tema
+  adları da `ValueError` fırlatır ve LaTeX kaynağına hiçbir zaman doğrudan
+  geçirilmez. Özel `color` theme'den sonra uygulanır; theme yerleşimini
+  korurken yapısal vurgu rengini override eder.
 
 ## Article, Report, Beamer
 
@@ -140,16 +147,23 @@ body += L.section("Background")
 **Beamer**, paketlenmiş kaynak paketiyle gerçekten çevrimdışı derlenir —
 sistem TeX yok, ağ yok, çalışma zamanı indirmesi yok. Kapsamı kasıtlı
 olarak dardır: `document`, `frame`, `section`, `equation`, `table`,
-`image` ve `contents`. Tema, overlay, `\pause`, geçiş, konuşmacı notu,
-özel navigasyon sembolleri veya bir columns soyutlaması yoktur. `frame`
-bir slayt oluşturur:
+`image` ve `contents`. Theme desteği bilinçli olarak Default, Madrid ve
+Warsaw ile sınırlıdır; keyfi theme passthrough yoktur. Overlay, `\pause`,
+geçiş, konuşmacı notu, özel navigasyon sembolleri veya bir columns
+soyutlaması yoktur. `frame` bir slayt oluşturur:
 
 ```ahd
 slides: String := ""
 slides += L.frame("Contents", L.contents())
 slides += L.frame("First Slide", L.equation(r"E = mc^2"))
 
-presentation := L.document(body: slides, title: "Talk", type: "Beamer")
+presentation := L.document(
+    body: slides
+    title: "Talk"
+    type: "Beamer"
+    theme: "Madrid"
+    color: "#1F4E79"
+)
 ```
 
 ## Denklem etiketleri ve `ref`
@@ -374,15 +388,19 @@ dizinde derlenir. PDF, geçici bir konuma üretilir, varlığı, sıradan-dosya
 ve ancak o zaman istenen hedefe taşınır. Başarısız bir derleme bu yüzden
 hiçbir zaman zaten geçerli bir hedef PDF'i yok etmez.
 
-## LatexError
+## ValueError ve LatexError
 
-Tek bir hata, Latex'e özgü her başarısızlığı kapsar: derleme başarısızlığı,
-eksik bir çevrimdışı motor veya paket, zaman aşımı, motor süreç
-başarısızlığı, üretilmemiş bir PDF, geçersiz bir `document()` parametresi
-(margin, color, bilinmeyen bir `type`), geçersiz teorem kaydı veya
-referansı ve eksik ya da desteklenmeyen bir image/figure varlığı. Motor
-tanılamaları, hatalı biçimlendirilmiş bir belgenin terminali doldurmasını
-önlemek için sınırlıdır; bu sırada ilk faydalı TeX hatası korunur.
+Girdi-alanı doğrulaması mevcut Latex API sözleşmesini izler ve `ValueError`
+fırlatır: geçersiz `document()` type, margin, color veya theme; Beamer dışında
+Default olmayan theme; geçersiz teorem kaydı/referansı; geçersiz table,
+minipage veya image-size seçeneği ve desteklenmeyen image uzantısı. Theme
+doğrulaması bilinçli olarak farklı bir hata sınıfı eklemez.
+
+`LatexError` yürütme hatalarını kapsar: derleme başarısızlığı, eksik
+çevrimdışı motor veya paket, zaman aşımı, motor süreç başarısızlığı,
+üretilmemiş PDF ve stage edilemeyen varlık dosyası. Motor tanılamaları,
+hatalı biçimlendirilmiş bir belgenin terminali doldurmasını önlemek için
+sınırlıdır; bu sırada ilk faydalı TeX hatası korunur.
 
 ```ahd
 bring Latex as L
@@ -400,10 +418,10 @@ attempt {
 `article`, `report`, `beamer`, `amsmath`/`amssymb`/`mathtools`,
 `graphicx`, `booktabs`, `array`, `geometry`, `xcolor`, `hyperref`,
 `fontspec`, Beamer'ın üzerine inşa edildiği PGF/TikZ çekirdeği ve
-`translator` paketleri, Latin Modern yazı tipleri, Computer Modern
+`translator` paketleri, Default/Madrid/Warsaw Beamer theme kapanışı, Latin Modern yazı tipleri, Computer Modern
 matematik ve heceleme (hyphenation) verisi. Türkçe dahil Unicode metin,
 kutudan çıktığı gibi çalışır.
 
 Bu sürümde olmayanlar: BibTeX, bir paket yöneticisi, genel bir TikZ çizim
-API'si, Beamer temaları/overlay'leri/konuşmacı notları, bir PDF düzenleyici
+API'si, keyfi Beamer theme'leri/overlay'leri/konuşmacı notları, bir PDF düzenleyici
 veya ayrıştırıcı ve Markdown veya HTML dönüşümü.

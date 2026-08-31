@@ -58,5 +58,13 @@ go run ./tooling/latex/cmd/package-latex --output "$(go env GOPATH)"
 | `31_complex.ahd` | Complex literals, widening, operations, and canonical output |
 | `32_numeric.ahd` | Numeric vectors, matrices, decompositions, solve, and eigenvalues |
 | `33_numeric_plot.ahd` | Numeric `Vector` inputs passed directly to Plot |
+| `34_latex_report.ahd` | Article/Report document options, cover, figures, theorems, references, and bibliography |
+| `35_latex_beamer.ahd` | offline Beamer frames, contents, equations, tables, and accent color |
+| `36_full_workflow.ahd` | Data → Numeric/Statistics → Plot → Latex Report workflow |
+| `37_word_document.ahd` | Word headings, formatted paragraphs, alignment, page breaks, and DOCX save |
+| `38_word_read.ahd` | Word DOCX semantic read-back: text, headings, paragraphs, and tables |
+| `39_word_plot.ahd` | Plot PNG embedded into an immutable Word Document |
+| `40_word_table_merge.ahd` | horizontal/vertical Word table merges and alignment |
+| `41_latex_beamer_themes.ahd` | bounded Default/Madrid/Warsaw Beamer themes and custom color |
 
 `Greeting.ahd` is the sibling module used by `11_modules.ahd`.

@@ -62,6 +62,9 @@ for name in names {
   üzerinde tipli betimleyici istatistik sağlar; String zorlaması yoktur.
 - [Numeric modülü](docs/NUMERIC_TR.md), immutable ve Real yönelimli Vector/
   Matrix değerleri, doğrusal cebir ve Plot için ek `Vector` overload'ları sağlar.
+- [Word modülü](docs/WORD_TR.md), Office veya harici çalışma zamanı
+  gerektirmeden immutable biçimlendirilmiş belgeler, merge edilmiş tablolar,
+  gömülü Plot görselleri ve sınırlandırılmış anlamsal DOCX okuma sağlar.
 - Formatter, yorumları korurken tek bir kanonik (standart) sunum tanımlar.
 
 ## Kaynak koddan derleme
@@ -123,6 +126,7 @@ ve [REPL rehberine](docs/REPL_TR.md) bakın.
 - [Math modülü](docs/MATH_TR.md)
 - [Time modülü](docs/TIME_TR.md)
 - [Latex modülü](docs/LATEX_TR.md)
+- [Word modülü](docs/WORD_TR.md)
 - [File ve Path modülleri](docs/FILESYSTEM_TR.md)
 - [Regex modülü](docs/REGEX_TR.md)
 - [CSV modülü](docs/CSV_TR.md)

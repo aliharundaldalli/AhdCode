@@ -58,6 +58,14 @@ go run ./tooling/latex/cmd/package-latex --output "$(go env GOPATH)"
 | `31_complex.ahd` | Complex literalleri, genişletme, işlemler ve kanonik çıktı |
 | `32_numeric.ahd` | Numeric Vector/Matrix, ayrıştırmalar, solve ve özdeğerler |
 | `33_numeric_plot.ahd` | Doğrudan Plot'a geçirilen Numeric `Vector` girdileri |
+| `34_latex_report.ahd` | Article/Report seçenekleri, kapak, figure, theorem, reference ve bibliography |
+| `35_latex_beamer.ahd` | çevrimdışı Beamer frame, contents, equation, table ve vurgu rengi |
+| `36_full_workflow.ahd` | Data → Numeric/Statistics → Plot → Latex Report akışı |
+| `37_word_document.ahd` | Word heading, biçimlendirilmiş paragraf, hizalama, sayfa sonu ve DOCX save |
+| `38_word_read.ahd` | Word DOCX anlamsal okuma: text, heading, paragraph ve table |
+| `39_word_plot.ahd` | Immutable Word Document içine gömülen Plot PNG'si |
+| `40_word_table_merge.ahd` | yatay/dikey Word tablo merge'leri ve hizalama |
+| `41_latex_beamer_themes.ahd` | sınırlı Default/Madrid/Warsaw Beamer theme'leri ve özel renk |
 
 `Greeting.ahd`, `11_modules.ahd` tarafından kullanılan kardeş (sibling)
 modüldür.

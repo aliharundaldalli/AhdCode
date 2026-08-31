@@ -33,6 +33,7 @@ En iyi öğrenme yolu, örnekleri yalnızca okumak değil çalıştırmaktır. B
 - [24. Plot modülü](#24-plot-modulu)
 - [25. Numeric modülü ve Complex](#25-numeric-modulu-ve-complex)
 - [26. Latex modülü](#26-latex-modulu)
+- [Word modülü](#word-modulu)
 - [27. Kod Biçimlendirici (Formatter)](#27-kod-bicimlendirici-formatter)
 - [28. Komut satırı (CLI)](#28-komut-satiri-cli)
 - [29. Etkileşimli kabuk (REPL)](#29-etkilesimli-kabuk-repl)
@@ -1542,6 +1543,31 @@ Burada sırasıyla:
 Hata türünü `except LatexError` içinde kullanacaksanız `from Latex bring LatexError` ile içe aktarın.
 
 Modül çevrimdışı çalışacak biçimde tasarlanmıştır ve shell escape kapalıdır. Daha gelişmiş tablo ve LaTeX ayrıntıları için `docs/LATEX.md` belgesine bakabilirsiniz.
+
+Beamer belgeleri sınırlı `"Default"`, `"Madrid"` ve `"Warsaw"` theme'lerini
+destekler. Geçersiz theme veya Beamer dışında Default olmayan theme
+`ValueError` fırlatır.
+
+## Word modülü
+
+Word, Microsoft Office gerektirmeden immutable DOCX belgeleri oluşturur:
+
+```ahd
+bring Word
+from Word bring Document
+
+document: Document := Word.new()
+document = document.heading("Sınıf raporu", 1)
+document = document.paragraph("AhdCode ile hazırlandı.", "center", true)
+document = document.table(["Ad", "Puan"], [["Ali", "91"]])
+document.save("sinif-raporu.docx")
+```
+
+`save()` `Nothing` döndürür; sonucunu atamak yerine statement olarak çağırın.
+Document metotları yalnızca konumsaldır ve yeni bir Document döndürür. Word,
+Plot ile üretilen PNG dosyalarını gömebilir ve sınırlandırılmış anlamsal DOCX
+alt kümesinden metin, heading ve table okuyabilir. Ayrıntılar için [Word modül
+referansına](WORD_TR.md) bakın.
 
 ## 24. Kod biçimlendirici (Formatter)
 

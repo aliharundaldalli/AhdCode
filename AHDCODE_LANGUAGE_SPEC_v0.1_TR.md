@@ -3574,7 +3574,8 @@ Latex.escape(text: String)                    -> String
 Latex.document(
     body: String, title: String = "", author: String = "", date: String = "",
     type: String = "Article", margin: Real = 2.54, color: String = "",
-    cover: String = "", theorems: Pair<String, String> = {}
+    cover: String = "", theorems: Pair<String, String> = {},
+    theme: String = "Default"
 )                                              -> String
 
 Latex.chapter(title: String)                  -> String
@@ -3631,18 +3632,25 @@ cinsinden tek bir belge-geneli değerdir (varsayılan `2.54`, `\geometry`
 geçersiz kılması olmayan etkin v0.1.14 yerleşimi) ve pozitif olmalıdır.
 `color`, boş olmadığında `#RRGGBB` ile eşleşmelidir ve AhdCode tarafından
 üretilen vurgu yapısı (başlık/kapak alanı ve Beamer'ın yapısal rengi) için
-kullanılan tek bir `ahdaccent` rengi adlandırır — bir tema sistemi değildir
-ve geçersiz bir değer `LatexError` fırlatır. `cover`, sıradan üretilmiş
+kullanılan tek bir `ahdaccent` rengi adlandırır; geçersiz değer `ValueError`
+fırlatır. `cover`, sıradan üretilmiş
 içeriktir (varsayılan `""`, boş olduğunda v0.1.14 başlık davranışını tam
 olarak korur), başlıktan önce, bir sayfa sonu izleyerek yerleştirilir;
-gövde sıralaması her zaman kapak, sonra başlık, sonra gövdedir.
+gövde sıralaması her zaman kapak, sonra başlık, sonra gövdedir. `theme`,
+büyük/küçük harfe duyarlı tam olarak `"Default"`, `"Madrid"` ve `"Warsaw"`
+değerlerini kabul eder, varsayılanı `"Default"`'tır ve son konumsal
+parametredir. Madrid ve Warsaw yalnız Beamer için geçerlidir; bilinmeyen theme
+veya Article/Report ile Default olmayan theme `ValueError` fırlatır. Theme adı
+sabit kümeden seçilir ve ham olarak geçirilmez. Özel `color`, theme'den sonra
+yazılır; yerleşimi değiştirmeden yapısal vurgu rengini override eder.
 
 `type: "Report"`, `report` belge sınıfını seçer ve `chapter`'ı kabul eder.
 `type: "Beamer"`, `beamer` belge sınıfını seçer, başlığı `\maketitle`
 yerine bir başlık-sayfası çerçevesi olarak render eder ve yüzeyin geri
 kalanından tam olarak `frame`, `section`, `equation`, `table`, `image` ve
-`contents`'i kabul eder — tema, overlay, `\pause`, geçiş, konuşmacı notu,
-özel navigasyon veya bir columns soyutlaması yoktur. Beamer, Article ve
+`contents`'i kabul eder. Theme desteği Default, Madrid ve Warsaw ile
+sınırlıdır; keyfi passthrough, overlay, `\pause`, geçiş, konuşmacı notu,
+özel navigasyon veya columns soyutlaması yoktur. Beamer, Article ve
 Report ile aynı paketlenmiş kaynak paketinden çevrimdışı derlenir (§37.6).
 
 ### 37.3 Teorem kaydı
@@ -3661,7 +3669,7 @@ bir dahili ad alır. `document`, boş bir tür adı, bildirilmemiş bir türü
 adlandıran bir `theorem()` çağrısı, bilinmeyen veya henüz bildirilmemiş
 bir türü adlandıran bir paylaşılan-sayaç kuralı (bu aynı zamanda kendine
 veya döngüsel bir referansı da reddeder) ve bir Report belgesi dışındaki
-bir `"chapter"` kuralı için `LatexError` fırlatır.
+bir `"chapter"` kuralı için `ValueError` fırlatır.
 
 ### 37.4 Denklem etiketleri, `ref`, `cite` ve `bibliography`
 
@@ -3739,21 +3747,24 @@ hedefin yerini almadan önce varlık, normal-dosya durumu, sıfır olmayan
 boyut ve `%PDF-` imzası kontrol edilir, bu yüzden başarısız bir derleme
 asla zaten geçerli olan bir hedef PDF'yi yok etmez.
 
-### 37.10 LatexError
+### 37.10 ValueError ve LatexError
 
-`LatexError`, derleme başarısızlığını, eksik bir paketlenmiş motoru veya
-paketi, zaman aşımını, motor süreç başarısızlığını, üretilmemiş bir
-PDF'yi, geçersiz bir `document()` parametresini (margin, color veya
-tanınmayan bir `type`), geçersiz teorem kaydını veya referansını (§37.3)
-ve eksik ya da desteklenmeyen biçimdeki bir image/figure varlığını
-(§37.5) kapsar. Motor tanılamaları sınırlıdır, bu yüzden bozuk bir belge
+`ValueError`, `document()` type, margin, color, theme, Beamer dışında Default
+olmayan theme, teorem kaydı/referansı (§37.3), table/minipage/image-size
+seçenekleri ve desteklenmeyen image uzantısı dahil geçersiz Latex girdi
+alanlarını kapsar. Yeni theme parametresi mevcut Latex doğrulama sözleşmesini
+korur.
+
+`LatexError`, derleme başarısızlığını, eksik paketlenmiş motor veya paketi,
+zaman aşımını, motor süreç başarısızlığını, üretilmemiş PDF'yi ve stage
+edilemeyen varlık dosyasını kapsar. Motor tanılamaları sınırlıdır, bu yüzden bozuk bir belge
 terminali dolduramaz, ancak ilk yararlı TeX hatası korunur. Statik bir tip
 uyuşmazlığı, sıradan bir derleme-zamanı tanılaması olarak kalır.
 
 ### 37.11 Bu sürümde olmayanlar
 
-BibTeX yönetimi, paket yöneticisi, genel bir TikZ çizim API'si, Beamer
-temaları/overlay'leri/konuşmacı notları, PDF düzenleyici veya ayrıştırıcı
+BibTeX yönetimi, paket yöneticisi, genel bir TikZ çizim API'si, keyfi Beamer
+theme'leri, overlay'ler, konuşmacı notları, PDF düzenleyici veya ayrıştırıcı
 ve Markdown veya HTML dönüşümü yoktur.
 
 ---
@@ -5252,6 +5263,68 @@ tekillik, helper ve ayrıştırma hataları `NumericError` fırlatır.
 
 `Plot.line(Vector, Vector)`, `Plot.scatter(Vector, Vector)` ve karşılık gelen
 Chart metotları ek overload'lardır; mevcut List overload'ları korunur.
+
+## 58. Word Standart Modülü (v0.1.16)
+
+`bring Word`, kanonik derleyici-kayıtlı `builtin:Word` modülünü içe aktarır.
+Modül derleyicinin sağladığı `Document` ve `WordError` Class'larıyla şu yüzeyi
+dışa açar:
+
+```text
+Word.new()              -> Document
+Word.read(path: String) -> Document
+
+Document.heading(String, Int) -> Document
+Document.paragraph(String, String = "left", Bool = false,
+                   Bool = false, Bool = false) -> Document
+Document.table(List<String>, List<List<String>>,
+               List<List<Int>> = [], String = "left") -> Document
+Document.image(String, Pair<String, Real> = {}) -> Document
+Document.pageBreak() -> Document
+Document.save(String) -> Nothing
+Document.text() -> String
+Document.paragraphs() -> List<String>
+Document.headings() -> List<String>
+Document.tables() -> List<List<List<String>>>
+```
+
+`Document` doğrudan oluşturulamaz. `Word.new()` boş Document, `Word.read()`
+DOCX anlamsal alt kümesinden Document üretir. Her içerik işlemi saf (pure)
+çalışır, çağıranın List'lerini ve görsel baytlarını kopyalar; yayımlanan hiçbir
+üye tek gizli block-storage alanını açmaz.
+
+Document işlemleri yalnızca konumsaldır. Bu, String, List, Table, Chart,
+Vector ve Matrix'in kullandığı ortak derleyici-sağlı tip-işlemi kuralıdır;
+Word tek Class için isimli argüman ekleyerek ortak dispatch'i yeniden
+tasarlamaz. Modül Function'ları normal Function çağrı sözdizimini korur.
+
+Heading seviyeleri 1–6'dır. Paragraf hizası tam olarak `left`, `center`,
+`right` veya `justify`; tablo hizası `left`, `center` veya `right` olur.
+Tabloda en az bir header bulunmalı ve satır genişlikleri eşit olmalıdır. Merge
+tanımı `[row, column, rowSpan, columnSpan]` biçimindedir; sıfır tabanlıdır ve
+header 0. satırdır. Span'ler pozitif olmalı, birden fazla hücreyi kapsamalı,
+sınırda kalmalı ve çakışmamalıdır. Yatay/dikey merge'ler WordprocessingML
+`gridSpan` ve `vMerge` olarak kodlanır.
+
+Görseller çözülebilen PNG/JPEG verisi kabul eder. Santimetre cinsinden yalnız
+`width` ve `height` size anahtarları vardır; tek boyut oranı korur, iki boyut
+açıktır, boş Pair 96 DPI doğal piksel boyutunu kullanır. Baytlar `image()`
+anında gömülür.
+
+`save()` `.docx` hedefi kabul eder, `Nothing` döndürür, deterministik paket
+parçaları/relationship/media adları oluşturur, ZIP ve XML'i doğrular ve atomik
+yayımlar. Eşit Document değerleri eşit baytlar üretir.
+
+`read()` paragraf/Heading 1–6 metnini ve fiziksel tablo hücre metnini kurtarır;
+desteklenmeyen biçimlendirme, görsel, header/footer, yorum, relationship veya
+sayfa yerleşimini korumaz. Tab ve satır sonları `\t`/`\n` olur. Okuma; arşiv,
+üye sayısı, tekil/toplam açılmış boyut ve sıkıştırma oranıyla sınırlıdır;
+güvensiz/yinelenen ZIP yolları, bozuk paket/XML ve limit ihlalleri `WordError`
+fırlatır. Relationship izlenmez ve ağa erişilmez.
+
+Word, sınırlandırılmış anlamsal bir DOCX alt kümesi oluşturur ve okur. Bir
+Office klonu değildir ve piksel düzeyinde kusursuz round-trip koruması vaat
+etmez.
 
 ---
 

@@ -27,7 +27,8 @@ escape(text: String)                     -> String
 document(
     body: String, title: String = "", author: String = "", date: String = "",
     type: String = "Article", margin: Real = 2.54, color: String = "",
-    cover: String = "", theorems: Pair<String, String> = {}
+    cover: String = "", theorems: Pair<String, String> = {},
+    theme: String = "Default"
 )                                         -> String
 
 chapter(title: String)                   -> String
@@ -88,6 +89,7 @@ source: String := L.document(
     color: "#1F4E79"
     cover: cover
     theorems: theoremTypes
+    theme: "Default"
 )
 ```
 
@@ -105,7 +107,7 @@ every new parameter at its default.
   preserving v0.1.14 output exactly). When set, it defines an `ahdaccent`
   color used for AhdCode-generated accents — the title/cover area and, for
   Beamer, the presentation's structural color. An invalid value raises
-  `LatexError`. This is one accent color, not a theme system.
+  `ValueError`.
 - **`cover`** is ordinary generated LaTeX content (empty by default),
   inserted before the title page and followed by a page break; when `cover`
   is `""`, title/author/date behavior is byte-identical to v0.1.14.
@@ -120,6 +122,13 @@ every new parameter at its default.
   `chapter`; **`type: "Beamer"`** uses the `beamer` document class, renders
   the title as a title-page frame instead of `\maketitle`, and supports the
   narrow slide surface described below.
+- **`theme`** accepts exactly `"Default"`, `"Madrid"`, and `"Warsaw"`
+  (case-sensitive), defaults to `"Default"`, and is the final positional
+  parameter. Madrid and Warsaw require `type: "Beamer"`; selecting either
+  for Article or Report raises `ValueError`. Unknown theme names also raise
+  `ValueError` and are never interpolated into LaTeX source. A custom
+  `color` is applied after the theme, so it overrides the theme's structural
+  accent while retaining the theme layout.
 
 ## Article, Report, Beamer
 
@@ -137,16 +146,23 @@ body += L.section("Background")
 **Beamer** genuinely compiles offline with the bundled resource bundle — no
 system TeX, no network, no runtime download. Its scope is intentionally
 narrow: `document`, `frame`, `section`, `equation`, `table`, `image`, and
-`contents`. There are no themes, overlays, `\pause`, transitions, speaker
-notes, custom navigation symbols, or a columns abstraction. `frame` builds
-one slide:
+`contents`. Theme support is deliberately bounded to Default, Madrid, and
+Warsaw; there is no arbitrary theme passthrough. There are no overlays,
+`\pause`, transitions, speaker notes, custom navigation symbols, or a columns
+abstraction. `frame` builds one slide:
 
 ```ahd
 slides: String := ""
 slides += L.frame("Contents", L.contents())
 slides += L.frame("First Slide", L.equation(r"E = mc^2"))
 
-presentation := L.document(body: slides, title: "Talk", type: "Beamer")
+presentation := L.document(
+    body: slides
+    title: "Talk"
+    type: "Beamer"
+    theme: "Madrid"
+    color: "#1F4E79"
+)
 ```
 
 ## Equation labels and `ref`
@@ -359,15 +375,19 @@ existence, regular-file status, non-zero size, and the `%PDF-` signature, and
 only then moved into the requested destination. A failed compile therefore
 never destroys an already valid destination PDF.
 
-## LatexError
+## ValueError and LatexError
 
-One error covers every Latex-specific failure: compilation failure, a missing
-staged engine or bundle, timeout, engine process failure, a PDF that was not
-produced, an invalid `document()` parameter (margin, color, an unknown
-`type`), invalid theorem registration or reference, and a missing or
-unsupported image/figure asset. Engine diagnostics are bounded so a malformed
-document cannot flood the terminal, while the first useful TeX error is
-preserved.
+Input-domain validation follows the existing Latex API contract and raises
+`ValueError`: invalid `document()` type, margin, color, or theme; a non-Default
+theme outside Beamer; invalid theorem registration/reference; invalid table,
+minipage, or image-size options; and an unsupported image extension. Theme
+validation deliberately does not introduce a different error class.
+
+`LatexError` covers execution failures: compilation failure, a missing staged
+engine or bundle, timeout, engine process failure, a PDF that was not produced,
+and an asset file that cannot be staged. Engine diagnostics are bounded so a
+malformed document cannot flood the terminal, while the first useful TeX
+error is preserved.
 
 ```ahd
 bring Latex as L
@@ -385,9 +405,9 @@ attempt {
 `article`, `report`, `beamer`, `amsmath`/`amssymb`/`mathtools`, `graphicx`,
 `booktabs`, `array`, `geometry`, `xcolor`, `hyperref`, `fontspec`, the PGF/
 TikZ core and `translator` packages Beamer builds on, Latin Modern fonts,
-Computer Modern maths, and hyphenation data. Unicode text — including
-Turkish — works out of the box.
+Computer Modern maths, the Default/Madrid/Warsaw Beamer theme closure, and
+hyphenation data. Unicode text — including Turkish — works out of the box.
 
 Not in this version: BibTeX, a package manager, a general TikZ drawing API,
-Beamer themes/overlays/speaker notes, a PDF editor or parser, and Markdown or
-HTML conversion.
+arbitrary Beamer themes, overlays, speaker notes, a PDF editor or parser, and
+Markdown or HTML conversion.

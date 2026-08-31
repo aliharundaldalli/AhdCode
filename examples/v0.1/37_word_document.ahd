@@ -1,0 +1,29 @@
+bring Word
+from Word bring Document
+from Word bring WordError
+
+document: Document := Word.new()
+document = document.heading("AhdCode Word report", 1)
+document = document.paragraph("Word documents are immutable values.")
+document = document.paragraph("Centered and bold", "center", true, false, false)
+document = document.paragraph(
+    "Right, italic, and underlined"
+    "right"
+    false
+    true
+    true
+)
+document = document.pageBreak()
+document = document.heading("Second page", 2)
+document = document.paragraph(
+    "The DOCX package is produced without Office."
+    "justify"
+)
+
+attempt {
+    document.save("word-document.docx")
+    write("word-document.docx saved")
+}
+except WordError as error {
+    write(error.message)
+}

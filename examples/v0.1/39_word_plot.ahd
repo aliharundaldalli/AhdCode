@@ -1,0 +1,15 @@
+bring Plot
+from Plot bring Chart
+bring Word
+from Word bring Document
+
+chart: Chart := Plot.line([0.0, 1.0, 2.0, 3.0], [0.0, 1.0, 4.0, 9.0])
+chart = chart.title("Quadratic growth").xLabel("x").yLabel("x squared")
+chart.save("word-plot.png")
+
+document: Document := Word.new()
+document = document.heading("Plot report", 1)
+document = document.paragraph("Plot writes a PNG; Word embeds its bytes.")
+document = document.image("word-plot.png", {"width": 14.0})
+document.save("word-plot.docx")
+write("word-plot.docx saved")

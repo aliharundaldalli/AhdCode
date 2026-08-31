@@ -3181,7 +3181,8 @@ Latex.escape(text: String)                    -> String
 Latex.document(
     body: String, title: String = "", author: String = "", date: String = "",
     type: String = "Article", margin: Real = 2.54, color: String = "",
-    cover: String = "", theorems: Pair<String, String> = {}
+    cover: String = "", theorems: Pair<String, String> = {},
+    theme: String = "Default"
 )                                              -> String
 
 Latex.chapter(title: String)                  -> String
@@ -3234,18 +3235,25 @@ output stays deterministic. `margin` is one document-wide value in
 centimeters (default `2.54`, the effective v0.1.14 layout with no
 `\geometry` override) and must be positive. `color`, when non-empty, must
 match `#RRGGBB` and names one `ahdaccent` color used for AhdCode-generated
-accent structure (the title/cover area, and Beamer's structural color) — it
-is not a theme system, and an invalid value raises `LatexError`. `cover` is
+accent structure (the title/cover area, and Beamer's structural color); an
+invalid value raises `ValueError`. `cover` is
 ordinary generated content (default `""`, preserving v0.1.14 title behavior
 exactly when empty) placed before the title, followed by a page break; body
-ordering is always cover, then title, then body.
+ordering is always cover, then title, then body. `theme` accepts exactly the
+case-sensitive values `"Default"`, `"Madrid"`, and `"Warsaw"`, defaults to
+`"Default"`, and is the last positional parameter. Madrid and Warsaw are
+valid only for Beamer; an unknown theme or a non-Default theme with Article/
+Report raises `ValueError`. Theme names are selected from this fixed set and
+are never interpolated raw. A custom `color` is emitted after the theme so it
+overrides the theme's structural accent without replacing its layout.
 
 `type: "Report"` selects the `report` document class and admits `chapter`.
 `type: "Beamer"` selects the `beamer` document class, renders the title as a
 title-page frame instead of `\maketitle`, and admits exactly `frame`,
 `section`, `equation`, `table`, `image`, and `contents` from the rest of the
-surface — there are no themes, overlays, `\pause`, transitions, speaker
-notes, custom navigation, or a columns abstraction. Beamer compiles offline
+surface. Theme support is limited to Default, Madrid, and Warsaw; there is no
+arbitrary theme passthrough, overlays, `\pause`, transitions, speaker notes,
+custom navigation, or a columns abstraction. Beamer compiles offline
 from the same bundled resource bundle as Article and Report (§37.6).
 
 ### 37.3 Theorem registration
@@ -3260,7 +3268,7 @@ public type name and the value is its counter rule --
 for `type: "Report"`), or the name of an already-declared type whose counter
 it shares. A display name is never used as a raw TeX identifier; each type
 receives a generated, collision-safe internal name. `document` raises
-`LatexError` for an empty type name, a `theorem()` call naming an
+`ValueError` for an empty type name, a `theorem()` call naming an
 undeclared type, a shared-counter rule naming an unknown or not-yet-declared
 type (which also rejects a self- or circular reference), and a `"chapter"`
 rule outside a Report document.
@@ -3335,21 +3343,25 @@ existence, regular-file status, non-zero size, and the `%PDF-` signature before
 it replaces the requested destination, so a failed compile never destroys an
 already valid destination PDF.
 
-### 37.10 LatexError
+### 37.10 ValueError and LatexError
+
+`ValueError` covers invalid Latex input domains, including `document()` type,
+margin, color, theme, a non-Default theme outside Beamer, theorem registration
+or reference (§37.3), table/minipage/image-size options, and unsupported image
+extensions. This preserves the existing Latex validation contract for the new
+theme parameter.
 
 `LatexError` covers compilation failure, a missing bundled engine or bundle,
-timeout, engine process failure, a PDF that was not produced, an invalid
-`document()` parameter (margin, color, or an unrecognized `type`), invalid
-theorem registration or reference (§37.3), and a missing or
-unsupported-format image/figure asset (§37.5). Engine
+timeout, engine process failure, a PDF that was not produced, and an asset
+file that cannot be staged. Engine
 diagnostics are bounded so a malformed document cannot flood the terminal, while
 the first useful TeX error is preserved. A static type mismatch remains an
 ordinary compile-time diagnostic.
 
 ### 37.11 Not in this version
 
-No BibTeX management, package manager, a general TikZ drawing API, Beamer
-themes/overlays/speaker notes, PDF editor or parser, and no Markdown or HTML
+No BibTeX management, package manager, a general TikZ drawing API, arbitrary
+Beamer themes, overlays, speaker notes, PDF editor or parser, and no Markdown or HTML
 conversion.
 
 ---
@@ -4783,6 +4795,67 @@ helper, and decomposition failures raise `NumericError`.
 
 `Plot.line(Vector, Vector)`, `Plot.scatter(Vector, Vector)`, and the matching
 Chart methods are additive overloads; all existing List overloads remain.
+
+## 58. Word Standard Module (v0.1.16)
+
+`bring Word` imports canonical compiler-registered module `builtin:Word`.
+It exports compiler-supplied `Document` and `WordError` Classes plus:
+
+```text
+Word.new()              -> Document
+Word.read(path: String) -> Document
+
+Document.heading(String, Int) -> Document
+Document.paragraph(String, String = "left", Bool = false,
+                   Bool = false, Bool = false) -> Document
+Document.table(List<String>, List<List<String>>,
+               List<List<Int>> = [], String = "left") -> Document
+Document.image(String, Pair<String, Real> = {}) -> Document
+Document.pageBreak() -> Document
+Document.save(String) -> Nothing
+Document.text() -> String
+Document.paragraphs() -> List<String>
+Document.headings() -> List<String>
+Document.tables() -> List<List<List<String>>>
+```
+
+`Document` cannot be constructed directly. `Word.new()` creates an empty
+Document and `Word.read()` creates one from a DOCX semantic subset. Every
+Document content operation is pure and copies caller Lists and image bytes;
+no published member exposes its one hidden block-storage field.
+
+Document operations are positional-only. This is the common compiler-supplied
+type-operation rule already used by String, List, Table, Chart, Vector, and
+Matrix; Word does not redesign that dispatch mechanism to add named arguments
+for one Class. Module Functions retain ordinary Function call syntax.
+
+Heading levels are 1–6. Paragraph alignment is exactly `left`, `center`,
+`right`, or `justify`; table alignment is `left`, `center`, or `right`.
+Tables require at least one header and equal row widths. A merge descriptor is
+`[row, column, rowSpan, columnSpan]`, zero-based with the header at row 0.
+Spans must be positive, cover more than one cell, remain in bounds, and not
+overlap. Horizontal and vertical merges are encoded as WordprocessingML
+`gridSpan` and `vMerge`.
+
+Images accept decoded PNG/JPEG data. Size keys are only `width` and `height`
+in centimeters; one dimension preserves aspect ratio, both are explicit, and
+an empty Pair uses the natural pixel size at 96 DPI. Bytes are embedded at
+`image()` time.
+
+`save()` accepts a `.docx` destination, returns `Nothing`, builds deterministic
+package parts/relationships/media names, validates the ZIP and XML, and
+publishes atomically. Identical Document values save to identical bytes.
+
+`read()` recovers paragraph/Heading 1–6 text and physical table cell text. It
+does not preserve unsupported formatting, images, headers/footers, comments,
+relationships, or page layout. Tabs and line breaks are recovered as `\t` and
+`\n`. Reads are bounded by archive, entry-count, individual/total decompressed
+size, and compression-ratio limits; unsafe or duplicate ZIP paths, malformed
+packages/XML, and limit violations raise `WordError`. Relationships are never
+followed and the network is never accessed.
+
+Word creates and reads a bounded semantic DOCX subset. It is not an Office
+clone and does not promise pixel-perfect round-trip preservation.
 
 ---
 
