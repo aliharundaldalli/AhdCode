@@ -1,0 +1,38 @@
+bring JSON
+from JSON bring JSONValue
+from JSON bring JSONError
+
+student: JSONValue := JSON.object({
+    "name": JSON.fromString("Ali")
+    "score": JSON.fromInt(91)
+    "active": JSON.fromBool(true)
+})
+
+text: String := JSON.stringify(student, true)
+write(text)
+
+parsed: JSONValue := JSON.parse(text)
+
+name: JSONValue? := parsed.get("name")
+if name != null {
+    write(name.string())
+}
+
+score: JSONValue? := parsed.get("score")
+if score != null {
+    write(score.int())
+}
+
+missing: JSONValue? := parsed.get("nickname")
+write(missing == null)
+
+scores: JSONValue := JSON.array([JSON.fromInt(91), JSON.fromInt(88), JSON.fromInt(95)])
+write(scores.at(0).int())
+write(scores.at(-1).int())
+
+attempt {
+    JSON.parse(r'{"a": 1,}')
+}
+except JSONError as error {
+    write(error.message)
+}

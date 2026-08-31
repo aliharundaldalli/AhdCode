@@ -66,6 +66,7 @@ go run ./tooling/latex/cmd/package-latex --output "$(go env GOPATH)"
 | `39_word_plot.ahd` | Immutable Word Document içine gömülen Plot PNG'si |
 | `40_word_table_merge.ahd` | yatay/dikey Word tablo merge'leri ve hizalama |
 | `41_latex_beamer_themes.ahd` | sınırlı Default/Madrid/Warsaw Beamer theme'leri ve özel renk |
+| `42_json.ahd` | JSON modülü: object/array oluşturma, parse, stringify, tipli erişimciler, get/at, JSONError |
 
 `Greeting.ahd`, `11_modules.ahd` tarafından kullanılan kardeş (sibling)
 modüldür.

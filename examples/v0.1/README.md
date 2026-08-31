@@ -66,5 +66,6 @@ go run ./tooling/latex/cmd/package-latex --output "$(go env GOPATH)"
 | `39_word_plot.ahd` | Plot PNG embedded into an immutable Word Document |
 | `40_word_table_merge.ahd` | horizontal/vertical Word table merges and alignment |
 | `41_latex_beamer_themes.ahd` | bounded Default/Madrid/Warsaw Beamer themes and custom color |
+| `42_json.ahd` | JSON module: object/array construction, parse, stringify, typed accessors, get/at, JSONError |
 
 `Greeting.ahd` is the sibling module used by `11_modules.ahd`.

@@ -667,6 +667,9 @@ func (a *analyzer) analyzeCallWithCallee(call *ast.CallExpr, callee expressionIn
 		if !supplied {
 			hint, supplied = wordConstructionHint(class.Symbol)
 		}
+		if !supplied {
+			hint, supplied = jsonConstructionHint(class.Symbol)
+		}
 		if supplied {
 			// A compiler-supplied value is produced by a standard-module
 			// function that validates its arguments, never by direct
@@ -753,6 +756,9 @@ func typeOperationFor(receiver types.Type, name string) (TypeOperation, bool) {
 			return operation, true
 		}
 		if operation, ok := wordOperationFor(receiver, name); ok {
+			return operation, true
+		}
+		if operation, ok := jsonOperationFor(receiver, name); ok {
 			return operation, true
 		}
 		return dataOperationFor(receiver, name)
@@ -960,6 +966,9 @@ func (a *analyzer) analyzeTypeOperation(call *ast.CallExpr, member *ast.MemberEx
 	if shape, isWord := wordOperationShapes()[operation]; isWord {
 		return a.analyzeWordOperation(call, operation, shape, current, flow), true
 	}
+	if shape, isJSON := jsonOperationShapes()[operation]; isJSON {
+		return a.analyzeJSONOperation(call, operation, shape, current, flow), true
+	}
 	switch operation {
 	case ListAdd, ListEject, PairEject:
 		return a.analyzeCollectionMutation(call, operation, receiver, current, flow), true
@@ -1009,6 +1018,13 @@ func typeOperationFailure(operation TypeOperation, receiver types.Type) expressi
 	}
 	if shape, known := wordOperationShapes()[operation]; known {
 		return expressionInfo{typeValue: shape.result, nullState: NonNull}
+	}
+	if shape, known := jsonOperationShapes()[operation]; known {
+		nullState := NonNull
+		if shape.resultNullable {
+			nullState = MaybeNull
+		}
+		return expressionInfo{typeValue: shape.result, nullState: nullState}
 	}
 	switch operation {
 	case ListAdd, ListEject, PairEject, ListSort, ListReverse, ListShuffle:

@@ -5339,4 +5339,74 @@ etmez.
 
 ---
 
+## 59. JSON Standart Modülü (v0.1.17)
+
+`bring JSON`, kanonik derleyici-kayıtlı `builtin:JSON` modülünü içe aktarır.
+Modül derleyicinin sağladığı `JSONValue` ve `JSONError` Class'larıyla şu
+yüzeyi dışa açar:
+
+```text
+JSON.parse(String)                    -> JSONValue
+JSON.read(String)                     -> JSONValue
+JSON.nullValue()                      -> JSONValue
+JSON.fromBool(Bool)                   -> JSONValue
+JSON.fromInt(Int)                     -> JSONValue
+JSON.fromReal(Real)                   -> JSONValue
+JSON.fromString(String)               -> JSONValue
+JSON.array(List<JSONValue>)           -> JSONValue
+JSON.object(Pair<String, JSONValue>)  -> JSONValue
+JSON.stringify(JSONValue, Bool = false) -> String
+JSON.write(JSONValue, String, Bool = false) -> Nothing
+
+JSONValue.kind()   -> String
+JSONValue.isNull() -> Bool
+JSONValue.bool()   -> Bool
+JSONValue.int()    -> Int
+JSONValue.real()   -> Real
+JSONValue.string() -> String
+JSONValue.array()  -> List<JSONValue>
+JSONValue.object() -> Pair<String, JSONValue>
+JSONValue.get(String) -> JSONValue?
+JSONValue.at(Int)      -> JSONValue
+```
+
+`JSONValue`, kapalı, özyinelemeli bir değer modelidir; tam olarak `Null`,
+`Bool`, `Int`, `Real`, `String`, `Array` (bir `List<JSONValue>`) ve `Object`
+(ekleme sıralı bir `Pair<String, JSONValue>`) türlerini temsil eder. `Any`,
+dinamik tipleme veya reflection getirmez: her işlemin sabit, bildirilmiş bir
+tipi vardır ve JSON bir değeri asla sessizce ilgisiz bir türe zorlamaz.
+
+`JSON.nullValue()`, `null` değil `nullValue` olarak adlandırılmıştır, çünkü
+`null` her sözdizimsel bağlamda (§2.1) saklı bir anahtar kelimedir ve `.`
+sonrası bir üye adı olarak görünemez.
+
+`JSON.parse`/`JSON.read`, tam olarak bir üst düzey JSON değeri kabul eder;
+sondaki içerik, yinelenen Object anahtarları ve bozuk girdi `JSONError`
+fırlatır. Object ekleme sırası ve Array sırası her zaman korunur. Kesirli
+veya üslü bir sayı lekseme'si `Real`dir; aksi halde `Int`tir. `Int`'e
+sığmayan bir tam sayı lekseme'si `Real`e dönüşmek yerine `JSONError`
+fırlatır. Ayrıştırma, 8 MiB üzerindeki girdiyi ve 256 seviyeden derin
+Array/Object iç içeliğini reddeder.
+
+`get` dışındaki `JSONValue` erişimcileri, alıcının türü uyuşmadığında
+`JSONError` fırlatır; istisna `real()`'dir, ayrıca bir `Int` alıcısını kabul
+eder ve onu `Real`e genişletir (AhdCode'un başka yerlerde zaten uyguladığı
+aynı güvenli `Int -> Real` genişlemesi); `int()` asla ters daraltmayı
+yapmaz. `get(key)` yalnızca `Object` içindir ve `JSONValue?` döndürür:
+`null`, anahtarın yok olduğu anlamına gelir, değerinin JSON'un kendi
+`Null`'u olduğu anlamına gelmez. `at(index)` yalnızca `Array` içindir ve
+sıradan List indeks kurallarını izler.
+
+`JSON.stringify`/`JSON.write`, her zaman sırayı koruyarak, her zaman doğru
+kaçışlayarak ve aynı `JSONValue` için her zaman deterministik olarak ya
+kompakt ya da iki-boşluklu girintili pretty JSON üretir. `JSON.write`,
+`Word.save`'in kullandığı aynı kuralla çıktısını aşamalı olarak hazırlar ve
+atomik olarak yayımlar.
+
+`JSONError` doğrudan `Error`'dan türer ve dosya okuma/yazma hataları dahil
+her JSON'a özgü hatayı uçtan uca kapsar — `JSON.read` ve `JSON.write`
+`FileError` fırlatmaz.
+
+---
+
 # AhdCode v0.1 Çekirdek Spesifikasyonu Sonu

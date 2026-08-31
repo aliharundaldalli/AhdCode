@@ -35,6 +35,7 @@ import (
 	"sync"
 	"time"
 	"unicode"
+	"unicode/utf16"
 	"unicode/utf8"
 )
 
@@ -78,6 +79,7 @@ var (
 	AhdClassPlotError           = &AhdClass{Name: "PlotError", Parent: AhdClassError}
 	AhdClassNumericError        = &AhdClass{Name: "NumericError", Parent: AhdClassError}
 	AhdClassWordError           = &AhdClass{Name: "WordError", Parent: AhdClassError}
+	AhdClassJSONError           = &AhdClass{Name: "JSONError", Parent: AhdClassError}
 )
 
 // AhdInstance is every AhdCode Class instance. The generated interface of each
@@ -6367,4 +6369,695 @@ func ahdWordRaggedTableMessage(blocks []ahdWordBlock) string {
 		}
 	}
 	return ""
+}
+
+// --- JSON standard module ---
+//
+// A JSONValue is represented at rest as its own canonical, compact JSON
+// text (never as a Go interface{} tree): every JSON module function that
+// returns a JSONValue hands back that canonical text, which the generated
+// program then wraps in one JSONValue instance through the class helper
+// emitted by internal/backend/golang/json_module.go. Composing values
+// (array/object construction) is therefore plain string concatenation of
+// already-canonical child text, and every accessor works by re-parsing that
+// text on demand. This mirrors the Word module's own "hidden String field,
+// reparsed by helpers" pattern for Document.
+//
+// Parsing is hand-written rather than delegated to encoding/json because the
+// public contract needs three things encoding/json's interface{} decoding
+// does not give: Int/Real are distinct kinds (not "every number is
+// float64"), Object key order is preserved, and duplicate Object keys are a
+// hard parse error rather than last-write-wins.
+
+const (
+	// ahdJSONMaxInputBytes bounds JSON.parse/JSON.read input size.
+	ahdJSONMaxInputBytes = 8 * 1024 * 1024
+	// ahdJSONMaxDepth bounds Array/Object nesting to defend against
+	// pathological recursion on adversarial input.
+	ahdJSONMaxDepth = 256
+)
+
+// AhdJSONEntry is one ordered Object member, used to build a JSONValue from
+// a Pair<String, JSONValue> in AhdJSONObject.
+type AhdJSONEntry struct {
+	Key  string
+	Text string
+}
+
+// ahdJSONNode is the parsed interchange form of one JSON value, used only
+// transiently while parsing or pretty-printing; a JSONValue's resting
+// representation is always its canonical text, never this tree.
+type ahdJSONNode struct {
+	kind   string
+	flag   bool
+	number int64
+	real   float64
+	text   string
+	items  []ahdJSONNode
+	keys   []string
+	values map[string]ahdJSONNode
+}
+
+// ---------------------------------------------------------------------------
+// Parsing
+// ---------------------------------------------------------------------------
+
+type ahdJSONParser struct {
+	class  *AhdClass
+	source string
+	pos    int
+}
+
+func ahdJSONParseDocument(class *AhdClass, source string) ahdJSONNode {
+	if len(source) > ahdJSONMaxInputBytes {
+		AhdRaiseClass(class, "JSON input is larger than the supported limit")
+	}
+	if !utf8.ValidString(source) {
+		AhdRaiseClass(class, "JSON input is not valid UTF-8")
+	}
+	parser := &ahdJSONParser{class: class, source: source}
+	parser.skipWhitespace()
+	if parser.pos >= len(parser.source) {
+		AhdRaiseClass(class, "JSON input is empty")
+	}
+	node := parser.parseValue(0)
+	parser.skipWhitespace()
+	if parser.pos != len(parser.source) {
+		AhdRaiseClass(class, "JSON input has trailing content after its value")
+	}
+	return node
+}
+
+func (parser *ahdJSONParser) fail(message string) {
+	AhdRaiseClass(parser.class, message)
+}
+
+func (parser *ahdJSONParser) skipWhitespace() {
+	for parser.pos < len(parser.source) {
+		switch parser.source[parser.pos] {
+		case ' ', '\t', '\n', '\r':
+			parser.pos++
+		default:
+			return
+		}
+	}
+}
+
+func (parser *ahdJSONParser) parseValue(depth int) ahdJSONNode {
+	if depth > ahdJSONMaxDepth {
+		parser.fail("JSON input exceeds the maximum supported nesting depth")
+	}
+	parser.skipWhitespace()
+	if parser.pos >= len(parser.source) {
+		parser.fail("JSON input ends where a value was expected")
+	}
+	switch character := parser.source[parser.pos]; {
+	case character == '{':
+		return parser.parseObject(depth)
+	case character == '[':
+		return parser.parseArray(depth)
+	case character == '"':
+		return ahdJSONNode{kind: "String", text: parser.parseString()}
+	case character == 't':
+		parser.expectLiteral("true")
+		return ahdJSONNode{kind: "Bool", flag: true}
+	case character == 'f':
+		parser.expectLiteral("false")
+		return ahdJSONNode{kind: "Bool", flag: false}
+	case character == 'n':
+		parser.expectLiteral("null")
+		return ahdJSONNode{kind: "Null"}
+	case character == '-' || (character >= '0' && character <= '9'):
+		return parser.parseNumber()
+	default:
+		parser.fail("JSON input has an unexpected character")
+		return ahdJSONNode{}
+	}
+}
+
+func (parser *ahdJSONParser) expectLiteral(literal string) {
+	if !strings.HasPrefix(parser.source[parser.pos:], literal) {
+		parser.fail("JSON input has an invalid literal")
+	}
+	parser.pos += len(literal)
+}
+
+func (parser *ahdJSONParser) parseObject(depth int) ahdJSONNode {
+	parser.pos++ // consume '{'
+	node := ahdJSONNode{kind: "Object", values: make(map[string]ahdJSONNode)}
+	parser.skipWhitespace()
+	if parser.pos < len(parser.source) && parser.source[parser.pos] == '}' {
+		parser.pos++
+		return node
+	}
+	for {
+		parser.skipWhitespace()
+		if parser.pos >= len(parser.source) || parser.source[parser.pos] != '"' {
+			parser.fail("JSON object key must be a String")
+		}
+		key := parser.parseString()
+		parser.skipWhitespace()
+		if parser.pos >= len(parser.source) || parser.source[parser.pos] != ':' {
+			parser.fail("JSON object is missing ':' after a key")
+		}
+		parser.pos++
+		value := parser.parseValue(depth + 1)
+		if _, duplicate := node.values[key]; duplicate {
+			parser.fail("JSON object has a duplicate key")
+		}
+		node.keys = append(node.keys, key)
+		node.values[key] = value
+		parser.skipWhitespace()
+		if parser.pos >= len(parser.source) {
+			parser.fail("JSON object is not closed")
+		}
+		switch parser.source[parser.pos] {
+		case ',':
+			parser.pos++
+			continue
+		case '}':
+			parser.pos++
+			return node
+		default:
+			parser.fail("JSON object is missing ',' or '}'")
+		}
+	}
+}
+
+func (parser *ahdJSONParser) parseArray(depth int) ahdJSONNode {
+	parser.pos++ // consume '['
+	node := ahdJSONNode{kind: "Array"}
+	parser.skipWhitespace()
+	if parser.pos < len(parser.source) && parser.source[parser.pos] == ']' {
+		parser.pos++
+		return node
+	}
+	for {
+		node.items = append(node.items, parser.parseValue(depth+1))
+		parser.skipWhitespace()
+		if parser.pos >= len(parser.source) {
+			parser.fail("JSON array is not closed")
+		}
+		switch parser.source[parser.pos] {
+		case ',':
+			parser.pos++
+			continue
+		case ']':
+			parser.pos++
+			return node
+		default:
+			parser.fail("JSON array is missing ',' or ']'")
+		}
+	}
+}
+
+func (parser *ahdJSONParser) parseString() string {
+	parser.pos++ // consume opening quote
+	var builder strings.Builder
+	for {
+		if parser.pos >= len(parser.source) {
+			parser.fail("JSON String is not closed")
+		}
+		character := parser.source[parser.pos]
+		switch {
+		case character == '"':
+			parser.pos++
+			return builder.String()
+		case character == '\\':
+			parser.pos++
+			if parser.pos >= len(parser.source) {
+				parser.fail("JSON String has an incomplete escape sequence")
+			}
+			switch parser.source[parser.pos] {
+			case '"':
+				builder.WriteByte('"')
+				parser.pos++
+			case '\\':
+				builder.WriteByte('\\')
+				parser.pos++
+			case '/':
+				builder.WriteByte('/')
+				parser.pos++
+			case 'b':
+				builder.WriteByte('\b')
+				parser.pos++
+			case 'f':
+				builder.WriteByte('\f')
+				parser.pos++
+			case 'n':
+				builder.WriteByte('\n')
+				parser.pos++
+			case 'r':
+				builder.WriteByte('\r')
+				parser.pos++
+			case 't':
+				builder.WriteByte('\t')
+				parser.pos++
+			case 'u':
+				builder.WriteRune(parser.parseUnicodeEscape())
+			default:
+				parser.fail("JSON String has an invalid escape sequence")
+			}
+		case character < 0x20:
+			parser.fail("JSON String contains an unescaped control character")
+		default:
+			_, width := utf8.DecodeRuneInString(parser.source[parser.pos:])
+			builder.WriteString(parser.source[parser.pos : parser.pos+width])
+			parser.pos += width
+		}
+	}
+}
+
+func (parser *ahdJSONParser) parseUnicodeEscape() rune {
+	high := parser.parseHex4()
+	if utf16.IsSurrogate(rune(high)) {
+		if strings.HasPrefix(parser.source[parser.pos:], `\u`) {
+			mark := parser.pos
+			parser.pos += 2
+			low := parser.parseHex4()
+			combined := utf16.DecodeRune(rune(high), rune(low))
+			if combined != utf8.RuneError {
+				return combined
+			}
+			parser.pos = mark
+		}
+		return utf8.RuneError
+	}
+	return rune(high)
+}
+
+func (parser *ahdJSONParser) parseHex4() uint16 {
+	parser.pos++ // consume 'u'
+	if parser.pos+4 > len(parser.source) {
+		parser.fail("JSON String has an incomplete \\u escape")
+	}
+	digits := parser.source[parser.pos : parser.pos+4]
+	value, err := strconv.ParseUint(digits, 16, 32)
+	if err != nil {
+		parser.fail("JSON String has an invalid \\u escape")
+	}
+	parser.pos += 4
+	return uint16(value)
+}
+
+func (parser *ahdJSONParser) parseNumber() ahdJSONNode {
+	start := parser.pos
+	if parser.pos < len(parser.source) && parser.source[parser.pos] == '-' {
+		parser.pos++
+	}
+	if parser.pos >= len(parser.source) || parser.source[parser.pos] < '0' || parser.source[parser.pos] > '9' {
+		parser.fail("JSON input has a malformed number")
+	}
+	if parser.source[parser.pos] == '0' {
+		parser.pos++
+	} else {
+		for parser.pos < len(parser.source) && parser.source[parser.pos] >= '0' && parser.source[parser.pos] <= '9' {
+			parser.pos++
+		}
+	}
+	isReal := false
+	if parser.pos < len(parser.source) && parser.source[parser.pos] == '.' {
+		isReal = true
+		parser.pos++
+		digitStart := parser.pos
+		for parser.pos < len(parser.source) && parser.source[parser.pos] >= '0' && parser.source[parser.pos] <= '9' {
+			parser.pos++
+		}
+		if parser.pos == digitStart {
+			parser.fail("JSON number has a malformed fraction")
+		}
+	}
+	if parser.pos < len(parser.source) && (parser.source[parser.pos] == 'e' || parser.source[parser.pos] == 'E') {
+		isReal = true
+		parser.pos++
+		if parser.pos < len(parser.source) && (parser.source[parser.pos] == '+' || parser.source[parser.pos] == '-') {
+			parser.pos++
+		}
+		digitStart := parser.pos
+		for parser.pos < len(parser.source) && parser.source[parser.pos] >= '0' && parser.source[parser.pos] <= '9' {
+			parser.pos++
+		}
+		if parser.pos == digitStart {
+			parser.fail("JSON number has a malformed exponent")
+		}
+	}
+	lexeme := parser.source[start:parser.pos]
+	if !isReal {
+		value, err := strconv.ParseInt(lexeme, 10, 64)
+		if err != nil {
+			parser.fail("JSON integer literal " + lexeme + " does not fit AhdCode's Int range")
+		}
+		return ahdJSONNode{kind: "Int", number: value}
+	}
+	value, err := strconv.ParseFloat(lexeme, 64)
+	if err != nil || math.IsInf(value, 0) {
+		parser.fail("JSON real literal " + lexeme + " is out of range")
+	}
+	return ahdJSONNode{kind: "Real", real: value}
+}
+
+// ---------------------------------------------------------------------------
+// Serialization
+// ---------------------------------------------------------------------------
+
+func ahdJSONFormatReal(value float64) string {
+	text := strconv.FormatFloat(value, 'g', -1, 64)
+	if !strings.ContainsAny(text, ".eE") {
+		text += ".0"
+	}
+	return text
+}
+
+func ahdJSONEncodeString(value string) string {
+	var builder strings.Builder
+	builder.WriteByte('"')
+	for _, character := range value {
+		switch {
+		case character == '"':
+			builder.WriteString(`\"`)
+		case character == '\\':
+			builder.WriteString(`\\`)
+		case character == '\n':
+			builder.WriteString(`\n`)
+		case character == '\r':
+			builder.WriteString(`\r`)
+		case character == '\t':
+			builder.WriteString(`\t`)
+		case character == '\b':
+			builder.WriteString(`\b`)
+		case character == '\f':
+			builder.WriteString(`\f`)
+		case character < 0x20:
+			builder.WriteString(`\u`)
+			builder.WriteString(strconv.FormatInt(int64(character), 16))
+		default:
+			builder.WriteRune(character)
+		}
+	}
+	builder.WriteByte('"')
+	return builder.String()
+}
+
+func ahdJSONStringifyNode(node ahdJSONNode, pretty bool, depth int) string {
+	indent := func(level int) string {
+		if !pretty {
+			return ""
+		}
+		return "\n" + strings.Repeat("  ", level)
+	}
+	switch node.kind {
+	case "Null":
+		return "null"
+	case "Bool":
+		if node.flag {
+			return "true"
+		}
+		return "false"
+	case "Int":
+		return strconv.FormatInt(node.number, 10)
+	case "Real":
+		return ahdJSONFormatReal(node.real)
+	case "String":
+		return ahdJSONEncodeString(node.text)
+	case "Array":
+		if len(node.items) == 0 {
+			return "[]"
+		}
+		var builder strings.Builder
+		builder.WriteByte('[')
+		for index, item := range node.items {
+			if index > 0 {
+				builder.WriteByte(',')
+			}
+			builder.WriteString(indent(depth + 1))
+			builder.WriteString(ahdJSONStringifyNode(item, pretty, depth+1))
+		}
+		builder.WriteString(indent(depth))
+		builder.WriteByte(']')
+		return builder.String()
+	case "Object":
+		if len(node.keys) == 0 {
+			return "{}"
+		}
+		var builder strings.Builder
+		builder.WriteByte('{')
+		for index, key := range node.keys {
+			if index > 0 {
+				builder.WriteByte(',')
+			}
+			builder.WriteString(indent(depth + 1))
+			builder.WriteString(ahdJSONEncodeString(key))
+			builder.WriteByte(':')
+			if pretty {
+				builder.WriteByte(' ')
+			}
+			builder.WriteString(ahdJSONStringifyNode(node.values[key], pretty, depth+1))
+		}
+		builder.WriteString(indent(depth))
+		builder.WriteByte('}')
+		return builder.String()
+	}
+	return "null"
+}
+
+func ahdJSONCanonicalText(node ahdJSONNode) string {
+	return ahdJSONStringifyNode(node, false, 0)
+}
+
+// ---------------------------------------------------------------------------
+// Public JSON module functions
+// ---------------------------------------------------------------------------
+
+// AhdJSONParse parses source and returns the resulting JSONValue's
+// canonical compact text.
+func AhdJSONParse(class *AhdClass, source string) string {
+	return ahdJSONCanonicalText(ahdJSONParseDocument(class, source))
+}
+
+// AhdJSONRead reads path and parses its content the same way AhdJSONParse
+// does. Unlike CSV/File, JSON owns its own error identity end to end: a
+// missing or unreadable file raises JSONError, not FileError.
+func AhdJSONRead(class *AhdClass, path string) string {
+	content, err := os.ReadFile(path)
+	if err != nil {
+		AhdRaiseClass(class, "could not read the JSON file: "+err.Error())
+	}
+	return AhdJSONParse(class, string(content))
+}
+
+func AhdJSONNull() string { return "null" }
+
+func AhdJSONFromBool(value bool) string {
+	if value {
+		return "true"
+	}
+	return "false"
+}
+
+func AhdJSONFromInt(value int64) string { return strconv.FormatInt(value, 10) }
+
+func AhdJSONFromReal(class *AhdClass, value float64) string {
+	if math.IsNaN(value) || math.IsInf(value, 0) {
+		AhdRaiseClass(class, "JSON Real value must be finite")
+	}
+	return ahdJSONFormatReal(value)
+}
+
+func AhdJSONFromString(value string) string { return ahdJSONEncodeString(value) }
+
+// AhdJSONArray builds a compact Array from each element's own already
+// canonical text.
+func AhdJSONArray(texts []string) string {
+	return "[" + strings.Join(texts, ",") + "]"
+}
+
+// AhdJSONObject builds a compact Object from ordered, already-canonical
+// entries. A Pair<String, JSONValue> cannot itself carry a duplicate key, so
+// no duplicate check is needed here.
+func AhdJSONObject(class *AhdClass, entries []AhdJSONEntry) string {
+	var builder strings.Builder
+	builder.WriteByte('{')
+	for index, entry := range entries {
+		if index > 0 {
+			builder.WriteByte(',')
+		}
+		builder.WriteString(ahdJSONEncodeString(entry.Key))
+		builder.WriteByte(':')
+		builder.WriteString(entry.Text)
+	}
+	builder.WriteByte('}')
+	return builder.String()
+}
+
+// AhdJSONStringify renders a JSONValue's own canonical text back as compact
+// text (a no-op) or reparses it to render with two-space pretty indentation.
+func AhdJSONStringify(text string, pretty bool) string {
+	if !pretty {
+		return text
+	}
+	node := ahdJSONParseDocument(AhdClassJSONError, text)
+	return ahdJSONStringifyNode(node, true, 0)
+}
+
+// AhdJSONWrite stringifies and writes the result to path, staging the
+// content in the destination directory and renaming into place so a failed
+// write never disturbs an existing destination.
+func AhdJSONWrite(class *AhdClass, text, path string, pretty bool) {
+	content := AhdJSONStringify(text, pretty)
+	if err := ahdJSONPublish([]byte(content), path); err != nil {
+		AhdRaiseClass(class, "could not write the JSON file: "+err.Error())
+	}
+}
+
+func ahdJSONPublish(data []byte, output string) error {
+	absolute, err := filepath.Abs(output)
+	if err != nil {
+		return err
+	}
+	directory := filepath.Dir(absolute)
+	if err := os.MkdirAll(directory, 0o755); err != nil {
+		return err
+	}
+	temporary, err := os.CreateTemp(directory, ".ahdcode-json-output-*")
+	if err != nil {
+		return err
+	}
+	temporaryPath := temporary.Name()
+	defer func() { _ = os.Remove(temporaryPath) }()
+	_, writeError := temporary.Write(data)
+	syncError := temporary.Sync()
+	closeError := temporary.Close()
+	for _, candidate := range []error{writeError, syncError, closeError} {
+		if candidate != nil {
+			return candidate
+		}
+	}
+	return os.Rename(temporaryPath, absolute)
+}
+
+// ---------------------------------------------------------------------------
+// JSONValue accessors
+// ---------------------------------------------------------------------------
+
+func ahdJSONDecode(class *AhdClass, text string) ahdJSONNode {
+	return ahdJSONParseDocument(class, text)
+}
+
+func ahdJSONWrongKind(class *AhdClass, operation, kind string) {
+	AhdRaiseClass(class, operation+" cannot be called on a "+kind+" JSONValue")
+}
+
+func AhdJSONKind(class *AhdClass, text string) string {
+	return ahdJSONDecode(class, text).kind
+}
+
+func AhdJSONIsNull(class *AhdClass, text string) bool {
+	return ahdJSONDecode(class, text).kind == "Null"
+}
+
+func AhdJSONBool(class *AhdClass, text string) bool {
+	node := ahdJSONDecode(class, text)
+	if node.kind != "Bool" {
+		ahdJSONWrongKind(class, "bool()", node.kind)
+	}
+	return node.flag
+}
+
+func AhdJSONInt(class *AhdClass, text string) int64 {
+	node := ahdJSONDecode(class, text)
+	if node.kind != "Int" {
+		ahdJSONWrongKind(class, "int()", node.kind)
+	}
+	return node.number
+}
+
+// AhdJSONReal accepts both Int and Real JSONValues, widening an Int the same
+// way AhdCode's Int -> Real assignment already does.
+func AhdJSONReal(class *AhdClass, text string) float64 {
+	node := ahdJSONDecode(class, text)
+	switch node.kind {
+	case "Real":
+		return node.real
+	case "Int":
+		return float64(node.number)
+	default:
+		ahdJSONWrongKind(class, "real()", node.kind)
+		return 0
+	}
+}
+
+func AhdJSONString(class *AhdClass, text string) string {
+	node := ahdJSONDecode(class, text)
+	if node.kind != "String" {
+		ahdJSONWrongKind(class, "string()", node.kind)
+	}
+	return node.text
+}
+
+func AhdJSONArrayElements(class *AhdClass, text string) []string {
+	node := ahdJSONDecode(class, text)
+	if node.kind != "Array" {
+		ahdJSONWrongKind(class, "array()", node.kind)
+	}
+	result := make([]string, len(node.items))
+	for index, item := range node.items {
+		result[index] = ahdJSONCanonicalText(item)
+	}
+	return result
+}
+
+func AhdJSONObjectKeys(class *AhdClass, text string) []string {
+	node := ahdJSONDecode(class, text)
+	if node.kind != "Object" {
+		ahdJSONWrongKind(class, "object()", node.kind)
+	}
+	keys := make([]string, len(node.keys))
+	copy(keys, node.keys)
+	return keys
+}
+
+func AhdJSONObjectValueTexts(class *AhdClass, text string) []string {
+	node := ahdJSONDecode(class, text)
+	if node.kind != "Object" {
+		ahdJSONWrongKind(class, "object()", node.kind)
+	}
+	values := make([]string, len(node.keys))
+	for index, key := range node.keys {
+		values[index] = ahdJSONCanonicalText(node.values[key])
+	}
+	return values
+}
+
+// AhdJSONGet returns the canonical text of key's value, or nil if the
+// receiver has no such key. The receiver must itself be an Object.
+func AhdJSONGet(class *AhdClass, text, key string) *string {
+	node := ahdJSONDecode(class, text)
+	if node.kind != "Object" {
+		ahdJSONWrongKind(class, "get()", node.kind)
+	}
+	value, found := node.values[key]
+	if !found {
+		return nil
+	}
+	result := ahdJSONCanonicalText(value)
+	return &result
+}
+
+// AhdJSONAt returns the canonical text of the element at index, following
+// List index rules (a negative index counts back from the end). The
+// receiver must itself be an Array, and index must be in range.
+func AhdJSONAt(class *AhdClass, text string, index int64) string {
+	node := ahdJSONDecode(class, text)
+	if node.kind != "Array" {
+		ahdJSONWrongKind(class, "at()", node.kind)
+	}
+	length := int64(len(node.items))
+	resolved := index
+	if resolved < 0 {
+		resolved += length
+	}
+	if resolved < 0 || resolved >= length {
+		AhdRaiseClass(class, "JSONValue array index is out of range")
+	}
+	return ahdJSONCanonicalText(node.items[resolved])
 }

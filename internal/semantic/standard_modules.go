@@ -18,6 +18,7 @@ func StandardModuleInterfaces() map[string]*ModuleInterface {
 		"CSV":        csvModuleInterface(),
 		"Data":       dataModuleInterface(),
 		"File":       fileModuleInterface(),
+		"JSON":       jsonModuleInterface(),
 		"Latex":      latexModuleInterface(),
 		"Math":       mathModuleInterface(),
 		"Numeric":    numericModuleInterface(),

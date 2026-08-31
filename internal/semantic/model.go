@@ -353,6 +353,47 @@ const (
 	PlotChartShow    TypeOperation = "Chart.show"
 	PlotFigureSave   TypeOperation = "Figure.save"
 	PlotFigureShow   TypeOperation = "Figure.show"
+
+	// The JSON standard module's JSONValue members. JSONValue is a closed,
+	// immutable recursive value; every accessor below raises JSONError if the
+	// receiver's kind does not match, except JSONValueGet, whose absence of a
+	// key is a genuine, statically expected possibility rather than an error.
+	JSONValueKind   TypeOperation = "JSONValue.kind"
+	JSONValueIsNull TypeOperation = "JSONValue.isNull"
+	JSONValueBool   TypeOperation = "JSONValue.bool"
+	JSONValueInt    TypeOperation = "JSONValue.int"
+	JSONValueReal   TypeOperation = "JSONValue.real"
+	JSONValueString TypeOperation = "JSONValue.string"
+	JSONValueArray  TypeOperation = "JSONValue.array"
+	JSONValueObject TypeOperation = "JSONValue.object"
+	// JSONValueGet looks up one Object key, or null if the key is absent.
+	JSONValueGet TypeOperation = "JSONValue.get"
+	// JSONValueAt indexes one Array element by List index rules.
+	JSONValueAt TypeOperation = "JSONValue.at"
+
+	// The XML standard module's XMLNode members. XMLNode is a closed,
+	// immutable Element/Text value.
+	XMLNodeKind TypeOperation = "XMLNode.kind"
+	// XMLNodeName is the Element's local name; Text raises XMLError.
+	XMLNodeName TypeOperation = "XMLNode.name"
+	// XMLNodeNamespace is the Element's namespace URI, or "" when unqualified;
+	// Text raises XMLError.
+	XMLNodeNamespace TypeOperation = "XMLNode.namespace"
+	// XMLNodeText is a Text node's own content, or an Element's direct Text
+	// children concatenated in document order.
+	XMLNodeText TypeOperation = "XMLNode.text"
+	// XMLNodeAttribute looks up one Element attribute, or null if absent;
+	// Text raises XMLError.
+	XMLNodeAttribute TypeOperation = "XMLNode.attribute"
+	// XMLNodeAttributes is every Element attribute in document order; Text
+	// raises XMLError.
+	XMLNodeAttributes TypeOperation = "XMLNode.attributes"
+	// XMLNodeChildren is every Element/Text child in document order; Text
+	// raises XMLError.
+	XMLNodeChildren TypeOperation = "XMLNode.children"
+	// XMLNodeElements is only the child Element nodes, in document order;
+	// Text raises XMLError.
+	XMLNodeElements TypeOperation = "XMLNode.elements"
 )
 
 // listOperationMutates reports whether one List operation rewrites its

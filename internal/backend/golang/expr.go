@@ -760,6 +760,9 @@ func (generator *generator) call(value *ir.CallExpr) string {
 	if strings.HasPrefix(string(value.Callable), wordModulePrefix) {
 		return generator.wordCall(value)
 	}
+	if strings.HasPrefix(string(value.Callable), jsonModulePrefix) {
+		return generator.jsonCall(value)
+	}
 	if method, ok := value.Callee.(*ir.MemberExpr); ok && method.Kind == ir.MethodMember {
 		function := generator.functions[method.Callable]
 		if function == nil {
@@ -1001,6 +1004,9 @@ func (generator *generator) builtinCall(value *ir.CallExpr) string {
 		}
 		if strings.HasPrefix(name, "Document.") {
 			return generator.wordOperation(name, value)
+		}
+		if strings.HasPrefix(name, "JSONValue.") {
+			return generator.jsonOperation(name, value)
 		}
 		return generator.unsupported("Fundamentals function "+name, meta.Span)
 	}

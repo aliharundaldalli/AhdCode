@@ -4869,4 +4869,71 @@ clone and does not promise pixel-perfect round-trip preservation.
 
 ---
 
+## 59. JSON Standard Module (v0.1.17)
+
+`bring JSON` imports canonical compiler-registered module `builtin:JSON`. It
+exports compiler-supplied `JSONValue` and `JSONError` Classes plus:
+
+```text
+JSON.parse(String)                    -> JSONValue
+JSON.read(String)                     -> JSONValue
+JSON.nullValue()                      -> JSONValue
+JSON.fromBool(Bool)                   -> JSONValue
+JSON.fromInt(Int)                     -> JSONValue
+JSON.fromReal(Real)                   -> JSONValue
+JSON.fromString(String)               -> JSONValue
+JSON.array(List<JSONValue>)           -> JSONValue
+JSON.object(Pair<String, JSONValue>)  -> JSONValue
+JSON.stringify(JSONValue, Bool = false) -> String
+JSON.write(JSONValue, String, Bool = false) -> Nothing
+
+JSONValue.kind()   -> String
+JSONValue.isNull() -> Bool
+JSONValue.bool()   -> Bool
+JSONValue.int()    -> Int
+JSONValue.real()   -> Real
+JSONValue.string() -> String
+JSONValue.array()  -> List<JSONValue>
+JSONValue.object() -> Pair<String, JSONValue>
+JSONValue.get(String) -> JSONValue?
+JSONValue.at(Int)      -> JSONValue
+```
+
+`JSONValue` is a closed recursive value model representing exactly `Null`,
+`Bool`, `Int`, `Real`, `String`, `Array` (a `List<JSONValue>`), and `Object`
+(an insertion-ordered `Pair<String, JSONValue>`). It introduces no `Any`, no
+dynamic typing, and no reflection: every operation has a fixed, declared
+type, and JSON never silently coerces a value into an unrelated kind.
+
+`JSON.nullValue()` is named `nullValue`, not `null`, because `null` is a
+reserved keyword (§2.1) in every syntactic context and cannot appear as a
+member name after `.`.
+
+`JSON.parse`/`JSON.read` accept exactly one top-level JSON value; trailing
+content, duplicate Object keys, and malformed input all raise `JSONError`.
+Object insertion order and Array order are always preserved. A number
+lexeme with a fraction or exponent is `Real`; otherwise it is `Int`. An
+integer lexeme that does not fit `Int` raises `JSONError` rather than
+becoming a `Real`. Parsing rejects input over 8 MiB and Array/Object nesting
+past 256 levels.
+
+`JSONValue` accessors other than `get` raise `JSONError` when the receiver's
+kind does not match, except `real()`, which additionally accepts an `Int`
+receiver and widens it to `Real` (the same safe `Int -> Real` widening
+AhdCode already performs elsewhere); `int()` never performs the reverse
+narrowing. `get(key)` is `Object`-only and returns `JSONValue?`: `null` means
+the key is absent, not that its value is JSON's own `Null`. `at(index)` is
+`Array`-only and follows ordinary List index rules.
+
+`JSON.stringify`/`JSON.write` produce either compact or two-space-indented
+pretty JSON, always preserving order, always escaping correctly, and always
+deterministic for the same `JSONValue`. `JSON.write` stages and atomically
+publishes its output, the same convention `Word.save` uses.
+
+`JSONError` derives directly from `Error` and covers every JSON-specific
+failure end to end, including file read/write failures — `JSON.read` and
+`JSON.write` do not raise `FileError`.
+
+---
+
 # End of AhdCode v0.1 Core Specification
