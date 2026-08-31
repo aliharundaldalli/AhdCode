@@ -10,9 +10,11 @@
 **Açıklama revizyonu:** 2026-08-28; açıklanan kurallar v0.1 için normatiftir
 **Birincil uygulama hedefi:** Go
 **Dosya uzantısı:** `.ahd`
-**Başlangıç kapsamı:** yalnızca terminal/CLI dili. Web, HTTP, MySQL, SMTP,
-HTML düzenleri (layouts), JSON'a özgü web kolaylıkları ve AhdWeb, çekirdek
-dil güvenilir bir şekilde çalışana kadar açıkça ertelenmiştir.
+**Başlangıç kapsamı:** CLI öncelikli dil. Açık standart-kütüphane işlemleri,
+ilan edilmiş amaçları bu olduğunda paketlenmiş çalışma zamanı yardımcılarını
+veya platform görüntüleyicilerini çağırabilir; bu, AhdCode'u bir GUI dili
+yapmaz. Web, HTTP, MySQL, SMTP, HTML düzenleri, JSON'a özgü web kolaylıkları
+ve AhdWeb ertelenmiş olarak kalır.
 
 ---
 
@@ -3566,12 +3568,35 @@ Tam herkese açık yüzey şudur:
 ```text
 Latex.pdf(source: String, output: String)     -> Nothing
 Latex.pdfFile(input: String, output: String)  -> Nothing
+
 Latex.escape(text: String)                    -> String
+
+Latex.document(
+    body: String, title: String = "", author: String = "", date: String = "",
+    type: String = "Article", margin: Real = 2.54, color: String = "",
+    cover: String = "", theorems: Pair<String, String> = {}
+)                                              -> String
+
+Latex.chapter(title: String)                  -> String
 Latex.section(title: String)                  -> String
 Latex.subsection(title: String)               -> String
-Latex.equation(source: String)                -> String
-Latex.document(body: String, title: String = "", author: String = "") -> String
-Latex.table(headers: List<String>, rows: List<List<String>>) -> String
+Latex.frame(title: String, body: String)      -> String
+
+Latex.equation(source: String, label: String = "") -> String
+Latex.theorem(type: String, body: String, label: String = "") -> String
+
+Latex.table(headers: List<String>, rows: List<List<String>>, mathColumns: List<Int> = []) -> String
+Latex.image(path: String, size: Pair<String, Real> = {}) -> String
+Latex.figure(path: String, caption: String, label: String = "", size: Pair<String, Real> = {}) -> String
+
+Latex.minipage(body: String, width: Real, alignment: String = "left") -> String
+Latex.center(body: String)                    -> String
+Latex.pageBreak()                             -> String
+Latex.contents()                              -> String
+
+Latex.ref(label: String)                      -> String
+Latex.cite(key: String)                       -> String
+Latex.bibliography(references: Pair<String, String>) -> String
 
 LatexError
 ```
@@ -3582,17 +3607,104 @@ LatexError
 kaçış işlemidir (escaping). Ham matematiği temizlediğini (sanitize) iddia
 etmez.
 
-`section` ve `subsection`, başlıklarını kaçış işlemine tabi tutar.
-`equation`, kasıtlı olarak kaçış işlemi yapmaz, çünkü ham LaTeX matematik
-kaynağı kabul eder. `table`, `booktabs` kaynağı üretir ve her hücreyi
+`chapter`, `section` ve `subsection`, başlıklarını kaçış işlemine tabi
+tutar. `equation`, kasıtlı olarak kaçış işlemi yapmaz, çünkü ham LaTeX
+matematik kaynağı kabul eder (v0.1.14 ham String literalleri, §6.4, bunu
+yazmanın doğal yoludur). `table`, `booktabs` kaynağı üretir ve her hücreyi
 kaçış işlemine tabi tutar; sütun sayısı başlıklardan farklı olan bir
 satır `ValueError` fırlatır.
 
-`document`, önsözü (preamble) paketlenmiş Latin Modern yazı tipi
-dosyalarını açıkça isimlendiren tam bir belge döndürür, bu yüzden
-render işlemi asla bir ana bilgisayar sistem yazı tipine bağlı değildir.
+### 37.2 Her belge türü için TEK bir `document()`
 
-### 37.2 Derleme
+`document`, `type` ile seçilen, her desteklenen belge türü için TEK giriş
+noktasıdır; `type` tam olarak `"Article"`, `"Report"` ve `"Beamer"` kabul
+eder ve varsayılanı `"Article"`'dır; `Latex.report()` veya
+`Latex.beamer()` yoktur. `document`'ın önsözü (preamble), paketlenmiş
+Latin Modern yazı tipi dosyalarını açıkça isimlendirir, bu yüzden render
+işlemi asla bir ana bilgisayar sistem yazı tipine bağlı değildir. Var olan
+üç argümanlı bir çağrı, `document(body, title, author)`, geçerli kalır ve
+eklenen her parametre varsayılan değerindeyken bir `Article` üretir.
+
+`date`, varsayılan olarak `""`'dir ve sistem saatinden asla doldurulmaz,
+bu yüzden çıktı belirlenimci (deterministic) kalır. `margin`, santimetre
+cinsinden tek bir belge-geneli değerdir (varsayılan `2.54`, `\geometry`
+geçersiz kılması olmayan etkin v0.1.14 yerleşimi) ve pozitif olmalıdır.
+`color`, boş olmadığında `#RRGGBB` ile eşleşmelidir ve AhdCode tarafından
+üretilen vurgu yapısı (başlık/kapak alanı ve Beamer'ın yapısal rengi) için
+kullanılan tek bir `ahdaccent` rengi adlandırır — bir tema sistemi değildir
+ve geçersiz bir değer `LatexError` fırlatır. `cover`, sıradan üretilmiş
+içeriktir (varsayılan `""`, boş olduğunda v0.1.14 başlık davranışını tam
+olarak korur), başlıktan önce, bir sayfa sonu izleyerek yerleştirilir;
+gövde sıralaması her zaman kapak, sonra başlık, sonra gövdedir.
+
+`type: "Report"`, `report` belge sınıfını seçer ve `chapter`'ı kabul eder.
+`type: "Beamer"`, `beamer` belge sınıfını seçer, başlığı `\maketitle`
+yerine bir başlık-sayfası çerçevesi olarak render eder ve yüzeyin geri
+kalanından tam olarak `frame`, `section`, `equation`, `table`, `image` ve
+`contents`'i kabul eder — tema, overlay, `\pause`, geçiş, konuşmacı notu,
+özel navigasyon veya bir columns soyutlaması yoktur. Beamer, Article ve
+Report ile aynı paketlenmiş kaynak paketinden çevrimdışı derlenir (§37.6).
+
+### 37.3 Teorem kaydı
+
+`theorem(type, body, label)`, tek genel teorem yardımcısıdır; ayrı
+`lemma`/`definition`/`corollary`/`proposition`/`remark` fonksiyonları
+yoktur. Mevcut teorem türleri kümesi ve her birinin sayacı,
+`document(theorems: Pair<String, String>)` aracılığıyla bildirilir: Pair
+anahtarı herkese açık tür adıdır ve değer onun sayaç kuralıdır --
+`""` (bağımsız, belge-geneli bir sayaç), `"section"`/`"subsection"` (o
+bölümleme birimiyle sıfırlanır), `"chapter"` (chapter ile sıfırlanır,
+yalnızca `type: "Report"` için geçerlidir) veya sayacını paylaştığı
+zaten-bildirilmiş bir türün adı. Bir görünen ad asla ham bir TeX
+tanımlayıcısı olarak kullanılmaz; her tür üretilmiş, çakışmadan güvenli
+bir dahili ad alır. `document`, boş bir tür adı, bildirilmemiş bir türü
+adlandıran bir `theorem()` çağrısı, bilinmeyen veya henüz bildirilmemiş
+bir türü adlandıran bir paylaşılan-sayaç kuralı (bu aynı zamanda kendine
+veya döngüsel bir referansı da reddeder) ve bir Report belgesi dışındaki
+bir `"chapter"` kuralı için `LatexError` fırlatır.
+
+### 37.4 Denklem etiketleri, `ref`, `cite` ve `bibliography`
+
+`equation(source, label)`, isteğe bağlı bir etiket kabul eder. `ref(label)`,
+`equation`, `theorem` veya `figure` tarafından üretilen bir etiketi çözer --
+üçü için tek bir fonksiyon, `eqRef`/`theoremRef`/`figureRef` değil.
+`cite(key)`, ayrı, bir kaynakça alıntısıdır.
+`bibliography(references: Pair<String, String>)`, alıntı anahtarından tam
+kaynakça metnine, Pair ekleme sırasında bir referans listesi render eder;
+asla sıralamaz, yapılandırılmış alanlar çıkarmaz, bir alıntı biçimi
+biçimlendirmez, BibTeX kullanmaz veya sağlanan metni yeniden yazmaz.
+
+### 37.5 Image, figure ve varlık (asset) hazırlama
+
+`image(path, size)`, numaralandırılmamış bir figür parçasıdır;
+`figure(path, caption, label, size)`, numaralandırılmış, altyazılı ve
+`ref` üzerinden referans verilebilirdir. `size`, santimetre cinsinden
+`"width"`/`"height"` anahtarlarıyla sınırlı `Pair<String, Real>`'dır:
+yalnızca genişlik veya yalnızca yükseklik en-boy oranını korur, her iki
+boyut da açıkça sığdırılır ve boş bir Pair, varlığın doğal boyutunu
+kullanır. Desteklenen biçimler PNG, PDF ve JPEG'dir; kırpma, kesme,
+döndürme, subfigure'lar veya açığa çıkarılmış `graphicx`/float yerleştirme
+seçeneği yoktur.
+
+`pdf`/`pdfFile` izole bir geçici çalışma alanında derlendiğinden (§37.7),
+`image`/`figure` yollarını derlenen programın çalışma dizinine göre çözer
+(`File`'ın ve Plot'un `save`'inin kullandığı aynı kural) ve o dosyanın bir
+kopyasını derleme zamanında otomatik olarak derleme çalışma alanına
+yerleştirir. Eksik, okunamayan veya desteklenmeyen biçimdeki bir varlık,
+derleme başlamadan önce `LatexError` fırlatır; `pdfFile`'ın var olan
+belgeye-göreli varlık çözümlemesi değişmeden kalır.
+
+### 37.6 Yerleşim (layout) yardımcıları
+
+`minipage(body, width, alignment)`, santimetre cinsinden bir genişlik ve
+minipage'in içeriğine uygulanan, tam olarak `"left"`, `"center"` veya
+`"right"` olan bir hizalama belirler; `center(body)`, ayrı, daha basit bir
+sarmalayıcıdır; `pageBreak()`, koşulsuz bir sayfa sonu üretir.
+`contents()`, Article/Report için bir içindekiler parçası üretir; Beamer
+için örtük olarak bir frame'e dönüşmez, bu yüzden bir içindekiler slaydı
+`frame("Contents", contents())` olarak açıkça yazılır.
+
+### 37.7 Derleme
 
 `pdf`, bir kaynak String'i derler ve `pdfFile`, mevcut bir `.tex`
 dosyasını derler; `\includegraphics` gibi belgeye-göreli varlıkları girdi
@@ -3606,17 +3718,18 @@ desteklenen bir belge, boş önbelleğe ve ağ bağlantısı olmayan taze bir
 makinede derlenir. Eksik bir paketlenmiş motor veya paket, bir
 `LatexError`'dır.
 
-### 37.3 Güvenlik ve sınırlar
+### 37.8 Güvenlik ve sınırlar
 
 Motor güvenilmeyen (untrusted) modda çalışır, bu yüzden kabuk kaçışı
 (shell escape) kullanılamaz ve hiçbir AhdCode yapısı onu etkinleştiremez.
 Motor, bir kabuk komut dizesi yerine bir argüman vektörüyle başlatılır,
 bu yüzden boşluk, Unicode, tırnak, `$`, `;`, `&` veya parantez içeren
-yollar güvenli kalır. Derleme, 30 saniyelik bir zaman aşımıyla
-sınırlıdır; zaman aşımında süreç sonlandırılır, geçici dosyalar
+yollar güvenli kalır. Varlık hazırlama (§37.5), dosyaları asla bir kabuk
+üzerinden değil, yol üzerinden kopyalar. Derleme, 30 saniyelik bir zaman
+aşımıyla sınırlıdır; zaman aşımında süreç sonlandırılır, geçici dosyalar
 kaldırılır ve `LatexError` fırlatılır.
 
-### 37.4 Çıktı güvenliği
+### 37.9 Çıktı güvenliği
 
 Kaynak, hem başarıda hem başarısızlıkta kaldırılan benzersiz, güvenli
 bir geçici dizinde derlenir. PDF, geçici bir konumda üretilir ve istenen
@@ -3624,21 +3737,26 @@ hedefin yerini almadan önce varlık, normal-dosya durumu, sıfır olmayan
 boyut ve `%PDF-` imzası kontrol edilir, bu yüzden başarısız bir derleme
 asla zaten geçerli olan bir hedef PDF'yi yok etmez.
 
-### 37.5 LatexError
+### 37.10 LatexError
 
 `LatexError`, derleme başarısızlığını, eksik bir paketlenmiş motoru veya
-paketi, zaman aşımını, motor süreç başarısızlığını ve üretilmemiş bir
-PDF'yi kapsar. Motor tanılamaları sınırlıdır, bu yüzden bozuk bir belge
-terminali dolduramaz, ancak ilk yararlı TeX hatası korunur.
+paketi, zaman aşımını, motor süreç başarısızlığını, üretilmemiş bir
+PDF'yi, geçersiz bir `document()` parametresini (margin, color veya
+tanınmayan bir `type`), geçersiz teorem kaydını veya referansını (§37.3)
+ve eksik ya da desteklenmeyen biçimdeki bir image/figure varlığını
+(§37.5) kapsar. Motor tanılamaları sınırlıdır, bu yüzden bozuk bir belge
+terminali dolduramaz, ancak ilk yararlı TeX hatası korunur. Statik bir tip
+uyuşmazlığı, sıradan bir derleme-zamanı tanılaması olarak kalır.
 
-### 37.6 Bu sürümde olmayanlar
+### 37.11 Bu sürümde olmayanlar
 
-BibTeX yönetimi, paket yöneticisi, TikZ veya Beamer soyutlaması, PDF
-düzenleyici veya ayrıştırıcı ve Markdown veya HTML dönüşümü yoktur.
+BibTeX yönetimi, paket yöneticisi, genel bir TikZ çizim API'si, Beamer
+temaları/overlay'leri/konuşmacı notları, PDF düzenleyici veya ayrıştırıcı
+ve Markdown veya HTML dönüşümü yoktur.
 
 ---
 
-### 37.7 Path ve File Standart Modülleri
+### 37.12 Path ve File Standart Modülleri
 
 `Path` ve `File`, sıradan modül sistemi aracılığıyla içe aktarılan,
 derleyici tarafından kayıtlı standart modüllerdir. Önceden bildirilmiş
@@ -5091,12 +5209,47 @@ tip denetleyicisinin önceden eleyemediği şeyleri kapsar.
 
 ### 56.9 Bu sürümde olmayanlar
 
-v0.1.14 tam olarak altı grafik ailesini destekler: line, scatter, bar,
+v0.1.15 tam olarak altı grafik ailesini destekler: line, scatter, bar,
 histogram, box ve error bar. Pie, heatmap, contour, violin, stem, polar,
 3D, candlestick, area veya surface grafiği yoktur ve keyfi özel plotter
-enjeksiyonu yoktur. Bir `Numeric` tipi yoktur -- sayısal esneklik yalnızca
-`Int`/`Real` genişletmesidir, Statistics ile eşleşir -- genel bir GUI
-çerçevesi yoktur ve ikincil eksenler yoktur.
+enjeksiyonu yoktur. Plot, mevcut `List<Int>`/`List<Real>` girdilerine ek olarak
+§57'deki `Vector` overload'larını kabul eder. Genel bir GUI çerçevesi ve
+ikincil eksenler yoktur.
+
+## 57. Complex Skalerleri ve Numeric Standart Modülü (v0.1.15)
+
+`Complex` sayısal bir skaler türdür. Hemen ardından büyük `I` gelen sayısal
+literal sanaldır (`3I`, `3.5I`, `1e2I`); küçük `i`, tek başına `I` ve aralıklı
+`3 I` sanal literal değildir. Güvenli genişletmeler `Int -> Real`, `Int ->
+Complex` ve `Real -> Complex` şeklindedir. Complex; `+`, `-`, `*`, `/`,
+eşitlik, eşitsizlik, `Complex ^ Int` ve argümansız `real`, `imag`, `conjugate`,
+`magnitude`, `phase` işlemlerini destekler. Sıralaması ve `Complex -> Real`
+örtük dönüşümü yoktur. Metin biçimi kanonik Real bileşenlerini kullanır:
+`2.0+3.0I`, `2.0-3.0I`, `0.0+5.0I`.
+
+`bring Numeric`, kanonik kimliği `builtin:Numeric` olan modülü; `Vector`,
+`Matrix` ve `NumericError` ile içe aktarır. Kurucular `vector`, `matrix`, bir/
+iki argümanlı `zeros` ve `ones`, `identity`, `linspace`'tır. Vector ve Matrix
+immutable, Real yönelimli değerlerdir; kurucular Int/Real List'leri için açık
+overload kullanır ve String dönüştürmez.
+
+Vector işlemleri `length`, `values`, `add`, `subtract`, `scale`, `dot`, `abs`,
+`sqrt`, `exp`, `log`, `sum`, `min`, `max`'tır. Matrix işlemleri `rowCount`,
+`columnCount`, `rows`, `transpose`, `add`, `subtract`, `scale`, `matmul`,
+`determinant`, `trace`, `inverse`, `solve(Vector)`, `rank`, `lu`, `qr`,
+`cholesky`, `svd`, `eigenvalues`, eleman işlemleri ve indirgemelerdir.
+Broadcasting ve şekil tahmini yoktur.
+
+`lu()` ekleme sıralı `P`, `L`, `U`; `qr()` `Q`, `R`; `svd()` `U`, diyagonal
+`S`, `V` anahtarlarını `Pair<String, Matrix>` olarak döndürür. `cholesky()`
+alt Matrix'i verir. `eigenvalues()` Gonum backend sırasıyla `List<Complex>`
+döndürür; bu sıra dilde Complex sıralaması tanımlamaz. İleri doğrusal cebir,
+dar bir JSON protokolü kullanan paketli `ahdnumeric` yardımcısında çalışır;
+üretilen çalışma alanları yalnızca standart kütüphanedir. Şekil, domain,
+tekillik, helper ve ayrıştırma hataları `NumericError` fırlatır.
+
+`Plot.line(Vector, Vector)`, `Plot.scatter(Vector, Vector)` ve karşılık gelen
+Chart metotları ek overload'lardır; mevcut List overload'ları korunur.
 
 ---
 

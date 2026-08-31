@@ -9,7 +9,7 @@ AhdCode şu anda Go 1.25 veya daha yeni bir sürümle derlenir.
 ```bash
 cd AhdCode
 go test ./...
-go install ./cmd/ahdcode
+go install ./cmd/ahdcode ./cmd/ahdnumeric ./cmd/ahdplot
 export PATH="$(go env GOPATH)/bin:$PATH"
 ```
 

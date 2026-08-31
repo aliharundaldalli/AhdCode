@@ -1,0 +1,62 @@
+// The full v0.1.15 pipeline: Data -> explicit String-to-number conversion
+// -> Numeric -> Statistics -> Plot -> image output -> Latex.figure ->
+// Latex.document(type: "Report") -> final PDF. No module silently converts
+// another module's values; every boundary crossing is explicit.
+bring Data
+from Data bring Table
+bring Numeric
+bring Statistics
+bring Plot
+from Plot bring Chart
+bring Latex as L
+from Latex bring LatexError
+
+report: String := """student,score
+Ali,91
+Ayse,78
+Mehmet,84
+Zeynep,95
+Can,67
+"""
+
+students: Table := Data.fromCSV(report)
+
+// Data never guesses a numeric type: the conversion is explicit.
+scores: List<Real> := students.column("score").map(
+    lambda (value: String) -> real(value)
+)
+
+// Numeric works alongside Statistics rather than replacing it.
+scoreVector := Numeric.vector(scores)
+write(scoreVector.sum())
+write(Statistics.mean(scores))
+write(Statistics.stdDev(scores))
+
+chart: Chart := Plot.histogram(scores, 5)
+chart = chart.title("Score distribution").xLabel("score").yLabel("count")
+chart.save("scores.png")
+
+body: String := ""
+body += L.section("Results")
+body += L.figure(
+    "scores.png"
+    "Distribution of student scores"
+    "fig:scores"
+    {"width": 12.0}
+)
+body += "The mean score was computed with Statistics.mean and the total "
+body += "with a Numeric Vector's sum(), agreeing by construction.\n"
+
+source: String := L.document(
+    body: body
+    title: "Score Report"
+    type: "Report"
+)
+
+attempt {
+    L.pdf(source, "scores_report.pdf")
+    write("scores_report.pdf compiled")
+}
+except LatexError as error {
+    write(error.message)
+}

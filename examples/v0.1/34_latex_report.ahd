@@ -1,0 +1,77 @@
+bring Latex as L
+from Latex bring LatexError
+
+// Latex.document has one entry point for every document type. Omitting
+// type/date/margin/color/cover/theorems produces the same Article baseline
+// as v0.1.14.
+article: String := L.document(
+    "Just an ordinary Article body.\n"
+    "Untitled Note"
+)
+write(len(article) > 0)
+
+// Report adds chapter on top of section/subsection, and every new
+// document() parameter: a deterministic date, a margin in centimeters, an
+// accent color, a cover page, and user-defined theorem types with their
+// own counters.
+theoremTypes: Pair<String, String> := {
+    "Theorem": "section"
+    "Lemma": "Theorem"
+    "Corollary": "Theorem"
+}
+
+cover: String := L.center(
+    L.equation(r"\int_0^1 x^2\,dx = \tfrac{1}{3}")
+)
+
+body: String := ""
+body += L.chapter("Introduction")
+body += L.section("Motivation")
+body += L.equation(
+    r"\|x+y\| \leq \|x\|+\|y\|"
+    "eq:triangle"
+)
+body += "Inequality " + L.ref("eq:triangle") + " is the triangle inequality.\n"
+
+body += L.theorem(
+    type: "Theorem"
+    body: "Every finite-dimensional normed space is complete."
+    label: "thm:finite"
+)
+body += L.theorem(
+    type: "Lemma"
+    body: "Every Cauchy sequence in a complete space converges."
+)
+body += "See " + L.ref("thm:finite") + " above.\n"
+
+body += L.section("References")
+body += "As shown in " + L.cite("Hardy1934") + ".\n"
+
+references: Pair<String, String> := {
+    "Hardy1934": "G. H. Hardy, J. E. Littlewood and G. Pólya, Inequalities, 1934."
+}
+body += L.bibliography(references)
+
+left: String := L.minipage("Left column text.", 7.0, "left")
+right: String := L.minipage("Right column text.", 7.0, "right")
+body += left + right
+
+report: String := L.document(
+    body: body
+    title: "Numerical Analysis Notes"
+    author: "Ali Harun"
+    date: "31 August 2026"
+    type: "Report"
+    margin: 2.5
+    color: "#1F4E79"
+    cover: cover
+    theorems: theoremTypes
+)
+
+attempt {
+    L.pdf(report, "report.pdf")
+    write("report.pdf compiled")
+}
+except LatexError as error {
+    write(error.message)
+}

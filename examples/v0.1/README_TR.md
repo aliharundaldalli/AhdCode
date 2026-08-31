@@ -49,6 +49,9 @@ ahdcode run examples/v0.1/14_grade_app.ahd
 | `28_plot.ahd` | Plot modülü: line, scatter, bar, histogram, box, errorBar, birden çok seri, save ve subplot'lar |
 | `29_data_plot.ahd` | Data, Regex (ham bir String deseniyle), açık dönüşüm, Statistics ve Plot birlikte |
 | `30_plot_show.ahd` | `chart.show()`/`figure.show()` için elle yapılan duman testi -- otomatik CI'nin parçası değildir |
+| `31_complex.ahd` | Complex literalleri, genişletme, işlemler ve kanonik çıktı |
+| `32_numeric.ahd` | Numeric Vector/Matrix, ayrıştırmalar, solve ve özdeğerler |
+| `33_numeric_plot.ahd` | Doğrudan Plot'a geçirilen Numeric `Vector` girdileri |
 
 `Greeting.ahd`, `11_modules.ahd` tarafından kullanılan kardeş (sibling)
 modüldür.

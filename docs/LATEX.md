@@ -21,12 +21,35 @@ it. Every argument must be `NonNull`.
 ```text
 pdf(source: String, output: String)      -> Nothing
 pdfFile(input: String, output: String)   -> Nothing
+
 escape(text: String)                     -> String
+
+document(
+    body: String, title: String = "", author: String = "", date: String = "",
+    type: String = "Article", margin: Real = 2.54, color: String = "",
+    cover: String = "", theorems: Pair<String, String> = {}
+)                                         -> String
+
+chapter(title: String)                   -> String
 section(title: String)                   -> String
 subsection(title: String)                -> String
-equation(source: String)                 -> String
-document(body: String, title: String = "", author: String = "") -> String
+frame(title: String, body: String)       -> String
+
+equation(source: String, label: String = "") -> String
+theorem(type: String, body: String, label: String = "") -> String
+
 table(headers: List<String>, rows: List<List<String>>, mathColumns: List<Int> = []) -> String
+image(path: String, size: Pair<String, Real> = {})    -> String
+figure(path: String, caption: String, label: String = "", size: Pair<String, Real> = {}) -> String
+
+minipage(body: String, width: Real, alignment: String = "left") -> String
+center(body: String)                     -> String
+pageBreak()                              -> String
+contents()                               -> String
+
+ref(label: String)                       -> String
+cite(key: String)                        -> String
+bibliography(references: Pair<String, String>) -> String
 
 LatexError
 ```
@@ -37,43 +60,252 @@ LatexError
 `\ { } $ & # % _ ^ ~` and nothing more — it does not claim to sanitize raw
 mathematics.
 
-`section` and `subsection` escape their titles. `equation` deliberately does
-**not** escape: it takes raw LaTeX math source, which is the point.
-
-`document` returns a complete document. Its preamble names the bundled Latin
-Modern font files explicitly, so a document renders identically on a machine
-with no fonts installed.
-
-`table` produces deterministic `booktabs` source and escapes every cell. A row
-whose column count differs from the headers is a `ValueError`.
-
-`mathColumns` opts specific columns into inline mathematics. A cell in a listed
-column is trusted raw LaTeX and is wrapped in `\( ... \)` rather than escaped,
-so `^`, `_`, braces, and commands such as `\ln` survive. Headers are always
-ordinary escaped text, and every unlisted column keeps the existing escaping —
-there is no general raw-LaTeX bypass.
+`chapter`, `section`, and `subsection` escape their titles. `equation`
+deliberately does **not** escape: it takes raw LaTeX math source, which is the
+point. Raw String literals (v0.1.14) make this pleasant to write, since a
+backslash needs no escaping of its own:
 
 ```ahd
-body += L.table(
-    ["Fonksiyon", "Bigeometrik türev", "Yorum"],
-    [
-        ["g(x)=x^a", "e^a", "İlk türev sabittir"],
-        ["g(x)=e^\{a(\\ln x)^m\}", "e^\{am(\\ln x)^\{m-1\}\}", "Logaritmik aile"]
-    ],
-    [0, 1]
+body += L.equation(
+    r"\|x+y\| \leq \|x\|+\|y\|"
 )
 ```
 
-AhdCode does not allow positional and named arguments in one call, so pass the
-list positionally as above, or name every argument:
+## One `document()` for Article, Report, and Beamer
+
+There is a single `document(...)` function for every supported document
+type, selected by the `type` parameter — never separate `Latex.report()` or
+`Latex.beamer()` functions:
 
 ```ahd
-body += L.table(headers: titles, rows: values, mathColumns: [0, 1])
+source: String := L.document(
+    body: body
+    title: "Numerical Analysis"
+    author: "Ali Harun"
+    date: "31 August 2026"
+    type: "Report"
+    margin: 2.5
+    color: "#1F4E79"
+    cover: cover
+    theorems: theoremTypes
+)
 ```
 
-Column indexes are zero-based. A negative or out-of-range index is a
-`ValueError`, and a repeated index selects that column once rather than nesting
-delimiters. Omitting `mathColumns` leaves every cell escaped exactly as before.
+`type` accepts exactly `"Article"`, `"Report"`, and `"Beamer"`; the default is
+`"Article"`. An existing three-argument call, `L.document(body, title,
+author)`, continues to work unchanged and still produces an `Article` with
+every new parameter at its default.
+
+- **`date`** defaults to `""` and is never filled in automatically with the
+  system date — output stays deterministic across runs and machines.
+- **`margin`** is one document-wide value in **centimeters**, defaulting to
+  `2.54` (the effective v0.1.14 layout); there is no per-side margin, paper
+  size, or orientation control. It must be positive.
+- **`color`** is an optional `#RRGGBB` accent color (empty by default,
+  preserving v0.1.14 output exactly). When set, it defines an `ahdaccent`
+  color used for AhdCode-generated accents — the title/cover area and, for
+  Beamer, the presentation's structural color. An invalid value raises
+  `LatexError`. This is one accent color, not a theme system.
+- **`cover`** is ordinary generated LaTeX content (empty by default),
+  inserted before the title page and followed by a page break; when `cover`
+  is `""`, title/author/date behavior is byte-identical to v0.1.14.
+  Ordering is always cover, then title, then body:
+  ```ahd
+  cover: String := L.center(
+      L.image("logo.png", {"width": 5.0})
+  )
+  source := L.document(body: body, title: "Numerical Analysis", cover: cover)
+  ```
+- **`type: "Report"`** uses the `report` document class and enables
+  `chapter`; **`type: "Beamer"`** uses the `beamer` document class, renders
+  the title as a title-page frame instead of `\maketitle`, and supports the
+  narrow slide surface described below.
+
+## Article, Report, Beamer
+
+**Article** is the existing v0.1.14 baseline, unchanged when `type` is
+omitted or `"Article"`.
+
+**Report** genuinely uses the `report` document class and adds `chapter` on
+top of the existing `section`/`subsection`:
+
+```ahd
+body += L.chapter("Introduction")
+body += L.section("Background")
+```
+
+**Beamer** genuinely compiles offline with the bundled resource bundle — no
+system TeX, no network, no runtime download. Its scope is intentionally
+narrow: `document`, `frame`, `section`, `equation`, `table`, `image`, and
+`contents`. There are no themes, overlays, `\pause`, transitions, speaker
+notes, custom navigation symbols, or a columns abstraction. `frame` builds
+one slide:
+
+```ahd
+slides: String := ""
+slides += L.frame("Contents", L.contents())
+slides += L.frame("First Slide", L.equation(r"E = mc^2"))
+
+presentation := L.document(body: slides, title: "Talk", type: "Beamer")
+```
+
+## Equation labels and `ref`
+
+`equation(source, label)` takes an optional label. One `ref(label)` resolves
+a label produced by `equation`, `theorem`, or `figure` — there are no
+separate `eqRef`/`theoremRef`/`figureRef` functions:
+
+```ahd
+body += L.equation(
+    r"\|x+y\| \leq \|x\|+\|y\|"
+    "eq:triangle"
+)
+body += "See " + L.ref("eq:triangle") + "."
+```
+
+## User-defined theorem types
+
+There is one generic `theorem(type, body, label)` helper — never separate
+`lemma`/`definition`/`corollary`/`proposition`/`remark` functions. The
+available theorem types, and how each one's counter behaves, are configured
+through `document(theorems: ...)`:
+
+```ahd
+theoremTypes: Pair<String, String> := {
+    "Theorem": "section"
+    "Lemma": "Theorem"
+    "Definition": "section"
+    "Corollary": "Theorem"
+}
+
+source := L.document(body: body, type: "Article", theorems: theoremTypes)
+
+body += L.theorem(type: "Theorem", body: "Every finite-dimensional normed space is complete.", label: "thm:finite")
+```
+
+The Pair's **key** is the public theorem type name; the **value** is its
+counter rule:
+
+```text
+""            -> an independent, document-wide counter
+"section"     -> reset by section
+"subsection"  -> reset by subsection
+"chapter"     -> reset by chapter (Report documents only)
+"<type name>" -> share that (already-declared) type's counter
+```
+
+`"Theorem": "section"` with `"Lemma": "Theorem"` and `"Corollary": "Theorem"`
+numbers conceptually like `Theorem 1.1`, `Lemma 1.2`, `Corollary 1.3` — the
+three types share one counter that resets per section.
+
+A display name never becomes a raw TeX identifier: each theorem type gets a
+generated, collision-safe internal name. `document()` rejects, as
+`LatexError`, an empty type name, a `theorem()` call for a type that was
+never registered, a shared-counter rule naming an unknown or not-yet-declared
+type (which also catches a self- or circular reference), and a `"chapter"`
+rule outside a Report document.
+
+## Image and figure
+
+`image(path, size)` is an unnumbered figure fragment; `figure(path, caption,
+label, size)` is numbered, captioned, and (with a label) referenceable via
+`ref`. `size` is `Pair<String, Real>` with only `"width"`/`"height"` keys, in
+centimeters: width only or height only preserves aspect ratio, both fit
+explicitly, and an empty Pair uses the image's natural size.
+
+```ahd
+body += L.image("logo.png", {"width": 6.0})
+body += L.figure("result.pdf", "Numerical solution", "fig:solution", {"width": 12.0})
+```
+
+Supported formats are PNG, PDF, and JPEG. There is no crop, trim, rotation,
+subfigures, or exposed `graphicx`/float-placement options.
+
+### Asset staging
+
+`pdf`/`pdfFile` compile in an isolated temporary workspace, so an image path
+cannot simply be assumed to exist there. `image`/`figure` resolve their path
+against the compiling program's working directory (the same rule `chart.save`
+and `File` use) and stage a copy of that file into the compilation workspace
+automatically — no dev-repository path, accidental working-directory
+behavior, system TeX, or network access is involved:
+
+```ahd
+chart.save("chart.png")
+
+body += L.figure("chart.png", "Results", "fig:results", {"width": 12.0})
+
+source := L.document(body: body, type: "Report")
+L.pdf(source: source, output: "report.pdf")
+```
+
+A missing or unreadable asset is a `LatexError` raised at compile time, not a
+silently broken PDF. `pdfFile`'s existing document-relative asset resolution
+is unchanged.
+
+## Layout helpers
+
+```ahd
+left := L.minipage(leftBody, 7.0, "left")
+right := L.minipage(rightBody, 7.0, "right")
+body += left + right
+
+body += L.center(
+    L.minipage(content, 10.0, "center")
+)
+
+body += L.pageBreak()
+```
+
+`minipage`'s `width` is centimeters; `alignment` is exactly `"left"`,
+`"center"`, or `"right"`, applied to the content inside the minipage. `center`
+is a separate, simpler wrapper. There is no CSS-like layout system and no
+grid/flex abstraction.
+
+`contents()` emits a table of contents fragment for Article/Report:
+
+```ahd
+body += L.contents()
+```
+
+For Beamer, `contents()` does not silently become a frame — write the frame
+explicitly:
+
+```ahd
+slides += L.frame("Contents", L.contents())
+```
+
+## Citations and bibliography
+
+`cite(key)` is a bibliography citation, kept distinct from `ref` (an internal
+document reference to an equation/theorem/figure label):
+
+```ahd
+body += "As shown in " + L.cite("Hardy1934") + "."
+```
+
+`bibliography(references)` renders a reference list from a `Pair<String,
+String>` of citation key to exact bibliography text, in insertion order:
+
+```ahd
+references: Pair<String, String> := {
+    "Yildiz2016": "B. Yıldız, Article title, Journal Name, 2016."
+    "Hardy1934": "G. H. Hardy, J. E. Littlewood and G. Pólya, Inequalities, 1934."
+}
+
+body += L.bibliography(references)
+```
+
+Latex never sorts references, infers author/year/journal, formats APA or
+IEEE, uses BibTeX, requires a `.bib` file, or rewrites the provided text —
+the value is used exactly as given.
+
+## Table
+
+`table` is unchanged from v0.1.14: deterministic `booktabs` source, every
+cell escaped, and `mathColumns: List<Int>` opting specific zero-based columns
+into raw inline math (`\( ... \)`) instead of escaping. See the v0.1.14
+behavior above; nothing about it changed for v0.1.15.
 
 ## Compiling
 
@@ -99,14 +331,19 @@ engine or bundle is missing, that is a `LatexError`.
 The engine is invoked with an isolated per-invocation cache and a local-bundle
 only policy, so a supported document compiles on a fresh machine with an empty
 cache and no network. There is no separately installed TeX distribution and no
-runtime resource download.
+runtime resource download. This includes Beamer: the bundled resource bundle
+carries `beamer.cls`, its `beamerbase*` components, the PGF/TikZ core it
+builds on, and `translator`, so a Beamer presentation compiles exactly like
+Article/Report — offline, with no system TeX.
 
 ## Security
 
 The engine runs in untrusted mode, so `\write18` shell escape is unavailable,
 and no AhdCode source construct can enable it. The engine is launched with an
 argument vector — never a shell command string — so paths containing spaces,
-Unicode, quotes, `$`, `;`, `&`, or parentheses stay safe.
+Unicode, quotes, `$`, `;`, `&`, or parentheses stay safe. Asset staging copies
+files by path, never through a shell, and rejects a missing, unreadable, or
+unsupported-format asset before compilation starts.
 
 Compilation is bounded by a 30-second timeout. On timeout the engine process is
 terminated, temporary files are removed, and a `LatexError` is raised.
@@ -121,10 +358,13 @@ never destroys an already valid destination PDF.
 
 ## LatexError
 
-One error covers the Latex-specific failures: compilation failure, a missing
-bundled engine or bundle, timeout, engine process failure, and a PDF that was
-not produced. Engine diagnostics are bounded so a malformed document cannot
-flood the terminal, while the first useful TeX error is preserved.
+One error covers every Latex-specific failure: compilation failure, a missing
+bundled engine or bundle, timeout, engine process failure, a PDF that was not
+produced, an invalid `document()` parameter (margin, color, an unknown
+`type`), invalid theorem registration or reference, and a missing or
+unsupported image/figure asset. Engine diagnostics are bounded so a malformed
+document cannot flood the terminal, while the first useful TeX error is
+preserved.
 
 ```ahd
 bring Latex as L
@@ -139,10 +379,12 @@ attempt {
 
 ## Supported baseline
 
-`article`, `amsmath`/`amssymb`/`mathtools`, `graphicx`, `booktabs`, `array`,
-`geometry`, `xcolor`, `hyperref`, `fontspec`, Latin Modern fonts, Computer
-Modern maths, and hyphenation data. Unicode text — including Turkish — works
-out of the box.
+`article`, `report`, `beamer`, `amsmath`/`amssymb`/`mathtools`, `graphicx`,
+`booktabs`, `array`, `geometry`, `xcolor`, `hyperref`, `fontspec`, the PGF/
+TikZ core and `translator` packages Beamer builds on, Latin Modern fonts,
+Computer Modern maths, and hyphenation data. Unicode text — including
+Turkish — works out of the box.
 
-Not in this version: BibTeX, a package manager, TikZ or Beamer abstractions, a
-PDF editor or parser, and Markdown or HTML conversion.
+Not in this version: BibTeX, a package manager, a general TikZ drawing API,
+Beamer themes/overlays/speaker notes, a PDF editor or parser, and Markdown or
+HTML conversion.

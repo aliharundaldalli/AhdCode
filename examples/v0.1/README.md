@@ -49,5 +49,8 @@ ahdcode run examples/v0.1/14_grade_app.ahd
 | `28_plot.ahd` | Plot module: line, scatter, bar, histogram, box, errorBar, multiple series, save, and subplots |
 | `29_data_plot.ahd` | Data, Regex (with a raw String pattern), explicit conversion, Statistics, and Plot together |
 | `30_plot_show.ahd` | Manual smoke test for `chart.show()`/`figure.show()` -- not part of automated CI |
+| `31_complex.ahd` | Complex literals, widening, operations, and canonical output |
+| `32_numeric.ahd` | Numeric vectors, matrices, decompositions, solve, and eigenvalues |
+| `33_numeric_plot.ahd` | Numeric `Vector` inputs passed directly to Plot |
 
 `Greeting.ahd` is the sibling module used by `11_modules.ahd`.

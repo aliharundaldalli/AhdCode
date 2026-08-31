@@ -4,7 +4,7 @@
 **Clarification revision:** 2026-08-28; clarified rules are normative for v0.1  
 **Primary implementation target:** Go  
 **File extension:** `.ahd`  
-**Initial scope:** terminal/CLI language only. Web, HTTP, MySQL, SMTP, HTML layouts, JSON-specific web conveniences, and AhdWeb are explicitly deferred until the core language works reliably.
+**Initial scope:** CLI-first language. Explicit standard-library operations may invoke bundled runtime helpers or platform viewers when that is their declared purpose; this does not make AhdCode a GUI language. Web, HTTP, MySQL, SMTP, HTML layouts, JSON-specific web conveniences, and AhdWeb remain deferred.
 
 ---
 
@@ -3175,12 +3175,35 @@ The exact public surface is:
 ```text
 Latex.pdf(source: String, output: String)     -> Nothing
 Latex.pdfFile(input: String, output: String)  -> Nothing
+
 Latex.escape(text: String)                    -> String
+
+Latex.document(
+    body: String, title: String = "", author: String = "", date: String = "",
+    type: String = "Article", margin: Real = 2.54, color: String = "",
+    cover: String = "", theorems: Pair<String, String> = {}
+)                                              -> String
+
+Latex.chapter(title: String)                  -> String
 Latex.section(title: String)                  -> String
 Latex.subsection(title: String)               -> String
-Latex.equation(source: String)                -> String
-Latex.document(body: String, title: String = "", author: String = "") -> String
-Latex.table(headers: List<String>, rows: List<List<String>>) -> String
+Latex.frame(title: String, body: String)      -> String
+
+Latex.equation(source: String, label: String = "") -> String
+Latex.theorem(type: String, body: String, label: String = "") -> String
+
+Latex.table(headers: List<String>, rows: List<List<String>>, mathColumns: List<Int> = []) -> String
+Latex.image(path: String, size: Pair<String, Real> = {}) -> String
+Latex.figure(path: String, caption: String, label: String = "", size: Pair<String, Real> = {}) -> String
+
+Latex.minipage(body: String, width: Real, alignment: String = "left") -> String
+Latex.center(body: String)                    -> String
+Latex.pageBreak()                             -> String
+Latex.contents()                              -> String
+
+Latex.ref(label: String)                      -> String
+Latex.cite(key: String)                       -> String
+Latex.bibliography(references: Pair<String, String>) -> String
 
 LatexError
 ```
@@ -3190,15 +3213,97 @@ LatexError
 `escape` is text-context escaping for the TeX-special characters
 `\ { } $ & # % _ ^ ~`. It does not claim to sanitize raw mathematics.
 
-`section` and `subsection` escape their titles. `equation` deliberately does
-not escape, because it accepts raw LaTeX math source. `table` produces
+`chapter`, `section`, and `subsection` escape their titles. `equation`
+deliberately does not escape, because it accepts raw LaTeX math source (v0.1.14
+raw String literals, §6.4, are the natural way to write it). `table` produces
 `booktabs` source and escapes every cell; a row whose column count differs from
 the headers raises `ValueError`.
 
-`document` returns a complete document whose preamble names the bundled Latin
-Modern font files explicitly, so rendering never depends on a host system font.
+### 37.2 One `document()` for every document type
 
-### 37.2 Compilation
+`document` is the single entry point for every supported document type,
+selected by `type`, which accepts exactly `"Article"`, `"Report"`, and
+`"Beamer"` and defaults to `"Article"`; there is no `Latex.report()` or
+`Latex.beamer()`. `document`'s preamble names the bundled Latin Modern font
+files explicitly, so rendering never depends on a host system font. An
+existing three-argument call, `document(body, title, author)`, remains valid
+and produces an `Article` with every added parameter at its default.
+
+`date` defaults to `""` and is never populated from the system clock, so
+output stays deterministic. `margin` is one document-wide value in
+centimeters (default `2.54`, the effective v0.1.14 layout with no
+`\geometry` override) and must be positive. `color`, when non-empty, must
+match `#RRGGBB` and names one `ahdaccent` color used for AhdCode-generated
+accent structure (the title/cover area, and Beamer's structural color) — it
+is not a theme system, and an invalid value raises `LatexError`. `cover` is
+ordinary generated content (default `""`, preserving v0.1.14 title behavior
+exactly when empty) placed before the title, followed by a page break; body
+ordering is always cover, then title, then body.
+
+`type: "Report"` selects the `report` document class and admits `chapter`.
+`type: "Beamer"` selects the `beamer` document class, renders the title as a
+title-page frame instead of `\maketitle`, and admits exactly `frame`,
+`section`, `equation`, `table`, `image`, and `contents` from the rest of the
+surface — there are no themes, overlays, `\pause`, transitions, speaker
+notes, custom navigation, or a columns abstraction. Beamer compiles offline
+from the same bundled resource bundle as Article and Report (§37.6).
+
+### 37.3 Theorem registration
+
+`theorem(type, body, label)` is the one generic theorem helper; there are no
+separate `lemma`/`definition`/`corollary`/`proposition`/`remark` functions.
+The set of available theorem types, and each one's counter, is declared
+through `document(theorems: Pair<String, String>)`: the Pair key is the
+public type name and the value is its counter rule --
+`""` (an independent document-wide counter), `"section"`/`"subsection"`
+(reset by that sectioning unit), `"chapter"` (reset by chapter, valid only
+for `type: "Report"`), or the name of an already-declared type whose counter
+it shares. A display name is never used as a raw TeX identifier; each type
+receives a generated, collision-safe internal name. `document` raises
+`LatexError` for an empty type name, a `theorem()` call naming an
+undeclared type, a shared-counter rule naming an unknown or not-yet-declared
+type (which also rejects a self- or circular reference), and a `"chapter"`
+rule outside a Report document.
+
+### 37.4 Equation labels, `ref`, `cite`, and `bibliography`
+
+`equation(source, label)` accepts an optional label. `ref(label)` resolves a
+label produced by `equation`, `theorem`, or `figure` -- one function for all
+three, not `eqRef`/`theoremRef`/`figureRef`. `cite(key)` is a distinct,
+bibliography citation. `bibliography(references: Pair<String, String>)`
+renders a reference list from citation key to exact bibliography text, in
+Pair insertion order; it never sorts, infers structured fields, formats a
+citation style, uses BibTeX, or rewrites the provided text.
+
+### 37.5 Image, figure, and asset staging
+
+`image(path, size)` is an unnumbered figure fragment; `figure(path, caption,
+label, size)` is numbered, captioned, and referenceable via `ref`. `size` is
+`Pair<String, Real>` restricted to `"width"`/`"height"` keys in centimeters:
+width only or height only preserves aspect ratio, both dimensions fit
+explicitly, and an empty Pair uses the asset's natural size. Supported
+formats are PNG, PDF, and JPEG; there is no crop, trim, rotation,
+subfigures, or exposed `graphicx`/float-placement option.
+
+Because `pdf`/`pdfFile` compile in an isolated temporary workspace (§37.7),
+`image`/`figure` resolve their path against the compiling program's working
+directory (the same rule `File` and Plot's `save` use) and stage a copy of
+that file into the compilation workspace automatically at compile time. A
+missing, unreadable, or unsupported-format asset raises `LatexError` before
+compilation starts; `pdfFile`'s existing document-relative asset resolution
+is unchanged.
+
+### 37.6 Layout helpers
+
+`minipage(body, width, alignment)` sets a width in centimeters and an
+alignment of exactly `"left"`, `"center"`, or `"right"`, applied to the
+minipage's content; `center(body)` is a separate, simpler wrapper;
+`pageBreak()` emits an unconditional page break. `contents()` emits a table
+of contents fragment for Article/Report; for Beamer it does not implicitly
+become a frame, so a contents slide is written explicitly as
+`frame("Contents", contents())`.
+
+### 37.7 Compilation
 
 `pdf` compiles a source String and `pdfFile` compiles an existing `.tex` file,
 resolving document-relative assets such as `\includegraphics` against the input
@@ -3210,16 +3315,17 @@ falls back to a system TeX installation, and never downloads a resource at run
 time. A supported document therefore compiles on a fresh machine with an empty
 cache and no network. A missing bundled engine or bundle is a `LatexError`.
 
-### 37.3 Security and limits
+### 37.8 Security and limits
 
 The engine runs in untrusted mode, so shell escape is unavailable and no AhdCode
 construct can enable it. The engine is launched with an argument vector rather
 than a shell command string, so paths containing spaces, Unicode, quotes, `$`,
-`;`, `&`, or parentheses remain safe. Compilation is bounded by a 30-second
+`;`, `&`, or parentheses remain safe. Asset staging (§37.5) copies files by
+path, never through a shell. Compilation is bounded by a 30-second
 timeout; on timeout the process is terminated, temporary files are removed, and
 `LatexError` is raised.
 
-### 37.4 Output safety
+### 37.9 Output safety
 
 Source compiles in a unique secure temporary directory that is removed on both
 success and failure. The PDF is produced to a temporary location and checked for
@@ -3227,21 +3333,26 @@ existence, regular-file status, non-zero size, and the `%PDF-` signature before
 it replaces the requested destination, so a failed compile never destroys an
 already valid destination PDF.
 
-### 37.5 LatexError
+### 37.10 LatexError
 
 `LatexError` covers compilation failure, a missing bundled engine or bundle,
-timeout, engine process failure, and a PDF that was not produced. Engine
+timeout, engine process failure, a PDF that was not produced, an invalid
+`document()` parameter (margin, color, or an unrecognized `type`), invalid
+theorem registration or reference (§37.3), and a missing or
+unsupported-format image/figure asset (§37.5). Engine
 diagnostics are bounded so a malformed document cannot flood the terminal, while
-the first useful TeX error is preserved.
+the first useful TeX error is preserved. A static type mismatch remains an
+ordinary compile-time diagnostic.
 
-### 37.6 Not in this version
+### 37.11 Not in this version
 
-No BibTeX management, package manager, TikZ or Beamer abstraction, PDF editor or
-parser, and no Markdown or HTML conversion.
+No BibTeX management, package manager, a general TikZ drawing API, Beamer
+themes/overlays/speaker notes, PDF editor or parser, and no Markdown or HTML
+conversion.
 
 ---
 
-### 37.7 Path and File Standard Modules
+### 37.12 Path and File Standard Modules
 
 `Path` and `File` are compiler-registered standard modules imported through
 the ordinary module system. They are not predeclared Fundamentals.
@@ -4628,12 +4739,48 @@ static type mismatch remains an ordinary compile-time diagnostic;
 
 ### 56.9 Not in this version
 
-v0.1.14 supports exactly six chart families: line, scatter, bar, histogram,
+v0.1.15 supports exactly six chart families: line, scatter, bar, histogram,
 box, and error bar. There is no pie, heatmap, contour, violin, stem, polar,
 3D, candlestick, area, or surface chart, and no arbitrary custom plotter
-injection. There is no `Numeric` type -- numeric flexibility is `Int`/`Real`
-widening only, matching Statistics -- no general GUI framework, and no
-secondary axes.
+injection. Plot accepts both its existing `List<Int>`/`List<Real>` inputs and
+the additive `Vector` overloads described in §57. There is no general GUI
+framework and there are no secondary axes.
+
+## 57. Complex Scalars and Numeric Standard Module (v0.1.15)
+
+`Complex` is a numeric scalar. A numeric literal immediately followed by
+uppercase `I` is imaginary (`3I`, `3.5I`, `1e2I`); lowercase `i`, bare `I`,
+and separated `3 I` are not imaginary literals. Safe widening is `Int ->
+Real`, `Int -> Complex`, and `Real -> Complex`. Complex supports `+`, `-`,
+`*`, `/`, equality, inequality, `Complex ^ Int`, and the zero-argument
+operations `real`, `imag`, `conjugate`, `magnitude`, and `phase`. It has no
+ordering and no implicit conversion to `Real`. Text is canonical Real-component
+text, for example `2.0+3.0I`, `2.0-3.0I`, and `0.0+5.0I`.
+
+`bring Numeric` imports canonical module `builtin:Numeric`, exporting
+`Vector`, `Matrix`, and `NumericError`. Constructors are `vector`, `matrix`,
+one/two-argument `zeros` and `ones`, `identity`, and `linspace`. Vector and
+Matrix are immutable Real-oriented values; constructors overload explicitly
+for Int/Real Lists and never convert Strings.
+
+Vector operations are `length`, `values`, `add`, `subtract`, `scale`, `dot`,
+`abs`, `sqrt`, `exp`, `log`, `sum`, `min`, and `max`. Matrix operations are
+`rowCount`, `columnCount`, `rows`, `transpose`, `add`, `subtract`, `scale`,
+`matmul`, `determinant`, `trace`, `inverse`, `solve(Vector)`, `rank`, `lu`,
+`qr`, `cholesky`, `svd`, `eigenvalues`, the four elementwise operations, and
+the three reductions. There is no broadcasting or shape guessing.
+
+`lu()` returns insertion-ordered keys `P`, `L`, `U`; `qr()` returns `Q`, `R`;
+and `svd()` returns `U`, diagonal `S`, and `V`, all as
+`Pair<String, Matrix>`. `cholesky()` returns the lower Matrix.
+`eigenvalues()` returns `List<Complex>` in Gonum backend order; this ordering
+does not define Complex ordering in the language. Advanced linear algebra is
+performed by the bundled `ahdnumeric` helper over a narrow JSON protocol;
+generated workspaces remain standard-library-only. Shape, domain, singularity,
+helper, and decomposition failures raise `NumericError`.
+
+`Plot.line(Vector, Vector)`, `Plot.scatter(Vector, Vector)`, and the matching
+Chart methods are additive overloads; all existing List overloads remain.
 
 ---
 

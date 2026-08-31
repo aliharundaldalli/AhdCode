@@ -1,0 +1,43 @@
+bring Latex as L
+from Latex bring LatexError
+
+// Beamer's scope is intentionally narrow: document, frame, section,
+// equation, table, image, and contents. It compiles fully offline from the
+// same bundled resource bundle as Article and Report -- no system TeX, no
+// network.
+slides: String := ""
+
+slides += L.frame("Contents", L.contents())
+
+slides += L.section("Motivation")
+slides += L.frame(
+    "A Familiar Equation"
+    L.equation(r"E = mc^2")
+)
+
+slides += L.frame(
+    "A Small Table"
+    L.table(
+        ["City", "Population"]
+        [
+            ["Antakya", "216,960"]
+            ["Hatay", "1,660,000"]
+        ]
+    )
+)
+
+presentation: String := L.document(
+    body: slides
+    title: "AhdCode v0.1.15"
+    author: "AhdCode"
+    type: "Beamer"
+    color: "#1F4E79"
+)
+
+attempt {
+    L.pdf(presentation, "presentation.pdf")
+    write("presentation.pdf compiled")
+}
+except LatexError as error {
+    write(error.message)
+}

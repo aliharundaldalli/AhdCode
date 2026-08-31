@@ -12,7 +12,7 @@ AhdCode is an experimental statically checked general-purpose programming
 language focused on readable syntax, explicit intent, predictable semantics,
 and native compilation.
 
-The current release is **v0.1.14**. The core language works end to end, but
+The current release is **v0.1.15**. The core language works end to end, but
 the project is not production-ready and breaking changes may occur before 1.0.
 
 ```ahd
@@ -57,6 +57,8 @@ for name in names {
   neither kind is ever inferred or implicit.
 - The [Statistics module](docs/STATISTICS.md) provides typed descriptive
   statistics over `List<Int>` and `List<Real>`, with no String coercion.
+- The [Numeric module](docs/NUMERIC.md) adds immutable Real-oriented vectors,
+  matrices, linear algebra, and additive `Vector` overloads in Plot.
 - The formatter defines one canonical presentation while preserving comments.
 
 ## Build from source
@@ -66,7 +68,7 @@ AhdCode currently requires Go 1.25 or newer.
 ```bash
 cd AhdCode
 go test ./...
-go install ./cmd/ahdcode
+go install ./cmd/ahdcode ./cmd/ahdnumeric ./cmd/ahdplot
 ```
 
 Ensure Go's binary directory is on `PATH`:
@@ -114,6 +116,7 @@ See the [CLI guide](docs/CLI.md), [formatter guide](docs/FORMATTER.md), and
 - [CSV module](docs/CSV.md)
 - [Data module](docs/DATA.md)
 - [Statistics module](docs/STATISTICS.md)
+- [Numeric module and Complex scalars](docs/NUMERIC.md)
 - [Understanding diagnostics](docs/DIAGNOSTICS.md)
 - [AI-assisted local setup](FOR_AI.md)
 - [Curated v0.1 examples](examples/v0.1/README.md)
@@ -141,6 +144,8 @@ lightweight run-and-highlight integration. See the
 
 ```text
 cmd/ahdcode/       CLI entry point
+cmd/ahdnumeric/    bundled advanced linear-algebra helper
+cmd/ahdplot/       bundled chart-rendering helper
 internal/          compiler, runtime, formatter, and REPL
 editors/vscode/    VS Code / Antigravity extension
 docs/              end-user guides

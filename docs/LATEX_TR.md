@@ -21,12 +21,35 @@ alamaz. Her argüman `NonNull` olmalıdır.
 ```text
 pdf(source: String, output: String)      -> Nothing
 pdfFile(input: String, output: String)   -> Nothing
+
 escape(text: String)                     -> String
+
+document(
+    body: String, title: String = "", author: String = "", date: String = "",
+    type: String = "Article", margin: Real = 2.54, color: String = "",
+    cover: String = "", theorems: Pair<String, String> = {}
+)                                         -> String
+
+chapter(title: String)                   -> String
 section(title: String)                   -> String
 subsection(title: String)                -> String
-equation(source: String)                 -> String
-document(body: String, title: String = "", author: String = "") -> String
+frame(title: String, body: String)       -> String
+
+equation(source: String, label: String = "") -> String
+theorem(type: String, body: String, label: String = "") -> String
+
 table(headers: List<String>, rows: List<List<String>>, mathColumns: List<Int> = []) -> String
+image(path: String, size: Pair<String, Real> = {})    -> String
+figure(path: String, caption: String, label: String = "", size: Pair<String, Real> = {}) -> String
+
+minipage(body: String, width: Real, alignment: String = "left") -> String
+center(body: String)                     -> String
+pageBreak()                              -> String
+contents()                               -> String
+
+ref(label: String)                       -> String
+cite(key: String)                        -> String
+bibliography(references: Pair<String, String>) -> String
 
 LatexError
 ```
@@ -37,48 +60,264 @@ LatexError
 TeX'e özel `\ { } $ & # % _ ^ ~` karakterlerini işler ve başka hiçbir şeyi
 işlemez — ham matematiği (raw mathematics) sterilize ettiğini iddia etmez.
 
-`section` ve `subsection`, başlıklarını (title) kaçış işlemine tabi tutar.
-`equation` kasıtlı olarak kaçış işlemi **yapmaz**: amaç bu olduğu için ham
-LaTeX matematik kaynağını olduğu gibi alır.
-
-`document`, tam bir belge döndürür. Önsözü (preamble), paketlenmiş
-(bundled) Latin Modern yazı tipi (font) dosyalarını açıkça adlandırır, bu
-yüzden bir belge, hiç yazı tipi kurulu olmayan bir makinede bile aynı
-şekilde işlenir.
-
-`table`, deterministik `booktabs` kaynağı üretir ve her hücreye kaçış
-işlemi uygular. Sütun sayısı başlıklardan farklı bir satır `ValueError`'dır.
-
-`mathColumns`, belirli sütunları satır içi (inline) matematiğe dahil eder.
-Listelenmiş bir sütundaki bir hücreye ham LaTeX olarak güvenilir ve kaçış
-işlemi yerine `\( ... \)` içine sarılır, bu yüzden `^`, `_`, süslü
-parantezler ve `\ln` gibi komutlar hayatta kalır. Başlıklar her zaman
-sıradan kaçışlı metindir ve listelenmeyen her sütun mevcut kaçış işlemini
-korur — genel bir ham-LaTeX baypası (bypass) yoktur.
+`chapter`, `section` ve `subsection`, başlıklarını (title) kaçış işlemine
+tabi tutar. `equation` kasıtlı olarak kaçış işlemi **yapmaz**: amaç bu
+olduğu için ham LaTeX matematik kaynağını olduğu gibi alır. Ham (raw)
+String literalleri (v0.1.14) bunu yazmayı keyifli hale getirir, çünkü bir
+ters eğik çizginin kendi kaçışına ihtiyacı yoktur:
 
 ```ahd
-body += L.table(
-    ["Fonksiyon", "Bigeometrik türev", "Yorum"],
-    [
-        ["g(x)=x^a", "e^a", "İlk türev sabittir"],
-        ["g(x)=e^\{a(\\ln x)^m\}", "e^\{am(\\ln x)^\{m-1\}\}", "Logaritmik aile"]
-    ],
-    [0, 1]
+body += L.equation(
+    r"\|x+y\| \leq \|x\|+\|y\|"
 )
 ```
 
-AhdCode, tek bir çağrıda sıralı (positional) ve isimlendirilmiş (named)
-argümanlara izin vermez, bu yüzden listeyi yukarıdaki gibi sıralı geçirin
-veya her argümanı isimlendirin:
+## Article, Report ve Beamer için TEK bir `document()`
+
+Her desteklenen belge türü için, `type` parametresiyle seçilen TEK bir
+`document(...)` fonksiyonu vardır — asla ayrı `Latex.report()` veya
+`Latex.beamer()` fonksiyonları değil:
 
 ```ahd
-body += L.table(headers: titles, rows: values, mathColumns: [0, 1])
+source: String := L.document(
+    body: body
+    title: "Numerical Analysis"
+    author: "Ali Harun"
+    date: "31 August 2026"
+    type: "Report"
+    margin: 2.5
+    color: "#1F4E79"
+    cover: cover
+    theorems: theoremTypes
+)
 ```
 
-Sütun indeksleri sıfır tabanlıdır (zero-based). Negatif veya aralık dışı
-bir indeks `ValueError`'dır ve tekrarlanan bir indeks, sınırlayıcıları
-(delimiters) iç içe geçirmek yerine o sütunu bir kez seçer. `mathColumns`'u
-atlamak, her hücreyi tam olarak öncekiyle aynı şekilde kaçışlı bırakır.
+`type`, tam olarak `"Article"`, `"Report"` ve `"Beamer"` kabul eder;
+varsayılan `"Article"`'dır. Var olan üç argümanlı bir çağrı,
+`L.document(body, title, author)`, değişmeden çalışmaya devam eder ve her
+yeni parametre varsayılan değerindeyken hâlâ bir `Article` üretir.
+
+- **`date`** varsayılan olarak `""`'dir ve sistem tarihiyle otomatik olarak
+  hiçbir zaman doldurulmaz — çıktı, çalıştırmalar ve makineler arasında
+  belirlenimci (deterministic) kalır.
+- **`margin`**, **santimetre** cinsinden tek bir belge-geneli değerdir,
+  varsayılanı `2.54`'tür (etkin v0.1.14 yerleşimi); sayfa-başı kenar boşluğu,
+  kağıt boyutu veya yönelim kontrolü yoktur. Pozitif olmalıdır.
+- **`color`**, isteğe bağlı bir `#RRGGBB` vurgu rengidir (varsayılan olarak
+  boş, v0.1.14 çıktısını tam olarak korur). Ayarlandığında, AhdCode
+  tarafından üretilen vurgular için kullanılan bir `ahdaccent` rengi
+  tanımlar — başlık/kapak alanı ve Beamer için, sunumun yapısal rengi.
+  Geçersiz bir değer `LatexError` fırlatır. Bu tek bir vurgu rengidir, bir
+  tema sistemi değildir.
+- **`cover`**, sıradan üretilmiş LaTeX içeriğidir (varsayılan olarak boş),
+  başlık sayfasından önce eklenir ve bir sayfa sonu izler; `cover` `""`
+  olduğunda, başlık/yazar/tarih davranışı v0.1.14 ile bayt-bayt aynıdır.
+  Sıralama her zaman kapak, sonra başlık, sonra gövdedir:
+  ```ahd
+  cover: String := L.center(
+      L.image("logo.png", {"width": 5.0})
+  )
+  source := L.document(body: body, title: "Numerical Analysis", cover: cover)
+  ```
+- **`type: "Report"`**, `report` belge sınıfını kullanır ve `chapter`'ı
+  etkinleştirir; **`type: "Beamer"`**, `beamer` belge sınıfını kullanır,
+  başlığı `\maketitle` yerine bir başlık-sayfası çerçevesi olarak render
+  eder ve aşağıda açıklanan dar slayt yüzeyini destekler.
+
+## Article, Report, Beamer
+
+**Article**, `type` atlandığında veya `"Article"` olduğunda değişmeyen,
+var olan v0.1.14 temel çizgisidir.
+
+**Report**, gerçekten `report` belge sınıfını kullanır ve var olan
+`section`/`subsection`'ın üzerine `chapter`'ı ekler:
+
+```ahd
+body += L.chapter("Introduction")
+body += L.section("Background")
+```
+
+**Beamer**, paketlenmiş kaynak paketiyle gerçekten çevrimdışı derlenir —
+sistem TeX yok, ağ yok, çalışma zamanı indirmesi yok. Kapsamı kasıtlı
+olarak dardır: `document`, `frame`, `section`, `equation`, `table`,
+`image` ve `contents`. Tema, overlay, `\pause`, geçiş, konuşmacı notu,
+özel navigasyon sembolleri veya bir columns soyutlaması yoktur. `frame`
+bir slayt oluşturur:
+
+```ahd
+slides: String := ""
+slides += L.frame("Contents", L.contents())
+slides += L.frame("First Slide", L.equation(r"E = mc^2"))
+
+presentation := L.document(body: slides, title: "Talk", type: "Beamer")
+```
+
+## Denklem etiketleri ve `ref`
+
+`equation(source, label)`, isteğe bağlı bir etiket (label) alır. Tek bir
+`ref(label)`, `equation`, `theorem` veya `figure` tarafından üretilen bir
+etiketi çözer — ayrı `eqRef`/`theoremRef`/`figureRef` fonksiyonları yoktur:
+
+```ahd
+body += L.equation(
+    r"\|x+y\| \leq \|x\|+\|y\|"
+    "eq:triangle"
+)
+body += "See " + L.ref("eq:triangle") + "."
+```
+
+## Kullanıcı tanımlı teorem türleri
+
+Tek bir genel `theorem(type, body, label)` yardımcısı vardır — asla ayrı
+`lemma`/`definition`/`corollary`/`proposition`/`remark` fonksiyonları
+değil. Mevcut teorem türleri ve her birinin sayacının (counter) nasıl
+davrandığı, `document(theorems: ...)` aracılığıyla yapılandırılır:
+
+```ahd
+theoremTypes: Pair<String, String> := {
+    "Theorem": "section"
+    "Lemma": "Theorem"
+    "Definition": "section"
+    "Corollary": "Theorem"
+}
+
+source := L.document(body: body, type: "Article", theorems: theoremTypes)
+
+body += L.theorem(type: "Theorem", body: "Every finite-dimensional normed space is complete.", label: "thm:finite")
+```
+
+Pair'in **anahtarı**, herkese açık teorem türü adıdır; **değeri**, sayaç
+kuralıdır:
+
+```text
+""            -> bağımsız, belge-geneli bir sayaç
+"section"     -> section ile sıfırlanır
+"subsection"  -> subsection ile sıfırlanır
+"chapter"     -> chapter ile sıfırlanır (yalnızca Report belgeleri)
+"<tür adı>"   -> o (zaten bildirilmiş) türün sayacını paylaşır
+```
+
+`"Lemma": "Theorem"` ve `"Corollary": "Theorem"` ile birlikte
+`"Theorem": "section"`, kavramsal olarak `Theorem 1.1`, `Lemma 1.2`,
+`Corollary 1.3` gibi numaralandırır — üç tür, her bölümde sıfırlanan tek
+bir sayacı paylaşır.
+
+Bir görünen ad (display name) asla ham bir TeX tanımlayıcısı olmaz: her
+teorem türü, üretilmiş, çakışmadan güvenli (collision-safe) bir dahili ad
+alır. `document()`, boş bir tür adını, hiç kaydedilmemiş bir tür için
+yapılan bir `theorem()` çağrısını, bilinmeyen veya henüz bildirilmemiş bir
+türü adlandıran bir paylaşılan-sayaç kuralını (bu aynı zamanda kendine
+referansı veya döngüsel bir referansı da yakalar) ve bir Report belgesi
+dışındaki bir `"chapter"` kuralını `LatexError` olarak reddeder.
+
+## Image ve figure
+
+`image(path, size)` numaralandırılmamış bir figür parçasıdır;
+`figure(path, caption, label, size)` numaralandırılmış, altyazılı ve (bir
+etiketle) `ref` üzerinden referans verilebilir. `size`, yalnızca
+`"width"`/`"height"` anahtarlarıyla `Pair<String, Real>`'dır, santimetre
+cinsindendir: yalnızca genişlik veya yalnızca yükseklik en-boy oranını
+korur, ikisi birden açıkça sığdırılır ve boş bir Pair görüntünün doğal
+boyutunu kullanır.
+
+```ahd
+body += L.image("logo.png", {"width": 6.0})
+body += L.figure("result.pdf", "Numerical solution", "fig:solution", {"width": 12.0})
+```
+
+Desteklenen biçimler PNG, PDF ve JPEG'dir. Kırpma (crop), kesme (trim),
+döndürme (rotation), subfigure'lar veya açığa çıkarılmış `graphicx`/float
+yerleştirme seçenekleri yoktur.
+
+### Varlık (asset) hazırlama
+
+`pdf`/`pdfFile`, izole bir geçici çalışma alanında derlenir, bu yüzden bir
+görüntü yolunun orada var olduğu varsayılamaz. `image`/`figure`, yollarını
+derlenen programın çalışma dizinine göre çözer (`chart.save` ve `File`'ın
+kullandığı aynı kural) ve o dosyanın bir kopyasını otomatik olarak derleme
+çalışma alanına yerleştirir (stage) — hiçbir geliştirme-deposu (dev-repo)
+yolu, kazara çalışma-dizini davranışı, sistem TeX veya ağ erişimi söz
+konusu değildir:
+
+```ahd
+chart.save("chart.png")
+
+body += L.figure("chart.png", "Results", "fig:results", {"width": 12.0})
+
+source := L.document(body: body, type: "Report")
+L.pdf(source: source, output: "report.pdf")
+```
+
+Eksik veya okunamayan bir varlık, sessizce bozuk bir PDF değil, derleme
+zamanında fırlatılan bir `LatexError`'dır. `pdfFile`'ın var olan belgeye
+göreli varlık çözümlemesi değişmeden kalır.
+
+## Yerleşim (layout) yardımcıları
+
+```ahd
+left := L.minipage(leftBody, 7.0, "left")
+right := L.minipage(rightBody, 7.0, "right")
+body += left + right
+
+body += L.center(
+    L.minipage(content, 10.0, "center")
+)
+
+body += L.pageBreak()
+```
+
+`minipage`'in `width`'i santimetredir; `alignment` tam olarak `"left"`,
+`"center"` veya `"right"`'tır, minipage içindeki içeriğe uygulanır.
+`center`, ayrı, daha basit bir sarmalayıcıdır (wrapper). CSS benzeri bir
+yerleşim sistemi ve grid/flex soyutlaması yoktur.
+
+`contents()`, Article/Report için bir içindekiler (table of contents)
+parçası üretir:
+
+```ahd
+body += L.contents()
+```
+
+Beamer için, `contents()` sessizce bir frame'e dönüşmez — frame'i açıkça
+yazın:
+
+```ahd
+slides += L.frame("Contents", L.contents())
+```
+
+## Alıntılar (citations) ve kaynakça (bibliography)
+
+`cite(key)`, `ref`'ten (bir denklem/teorem/figür etiketine dahili belge
+referansı) ayrı tutulan bir kaynakça alıntısıdır:
+
+```ahd
+body += "As shown in " + L.cite("Hardy1934") + "."
+```
+
+`bibliography(references)`, ekleme sırasına (insertion order) göre bir
+`Pair<String, String>` alıntı-anahtarı-metin çiftinden bir referans
+listesi render eder:
+
+```ahd
+references: Pair<String, String> := {
+    "Yildiz2016": "B. Yıldız, Article title, Journal Name, 2016."
+    "Hardy1934": "G. H. Hardy, J. E. Littlewood and G. Pólya, Inequalities, 1934."
+}
+
+body += L.bibliography(references)
+```
+
+Latex asla referansları sıralamaz, yazar/yıl/dergi çıkarımı yapmaz, APA
+veya IEEE biçimlendirmez, BibTeX kullanmaz, bir `.bib` dosyası
+gerektirmez veya sağlanan metni yeniden yazmaz — değer tam olarak verildiği
+gibi kullanılır.
+
+## Table
+
+`table`, v0.1.14'ten değişmemiştir: deterministik `booktabs` kaynağı, her
+hücre kaçışlı ve `mathColumns: List<Int>`, belirli sıfır tabanlı sütunları
+kaçış yerine ham satır içi matematiğe (`\( ... \)`) dahil eder. Yukarıdaki
+v0.1.14 davranışına bakın; v0.1.15 için bu konuda hiçbir şey değişmedi.
 
 ## Derleme
 
@@ -107,7 +346,10 @@ Motor, izole bir çağrı-başına (per-invocation) önbellek (cache) ve yalnız
 yerel-paket (local-bundle-only) politikasıyla çağrılır, bu yüzden
 desteklenen bir belge, boş bir önbelleğe ve ağa sahip olmayan taze bir
 makinede derlenir. Ayrıca kurulu bir TeX dağıtımı ve çalışma zamanı kaynak
-indirmesi yoktur.
+indirmesi yoktur. Bu, Beamer'ı da kapsar: paketlenmiş kaynak paketi
+`beamer.cls`'i, `beamerbase*` bileşenlerini, üzerine inşa edildiği PGF/
+TikZ çekirdeğini ve `translator`'ı taşır, bu yüzden bir Beamer sunumu tam
+olarak Article/Report gibi derlenir — çevrimdışı, sistem TeX olmadan.
 
 ## Güvenlik
 
@@ -115,7 +357,9 @@ Motor güvenilmeyen (untrusted) modda çalışır, bu yüzden `\write18` kabuk
 kaçışı (shell escape) kullanılamaz ve hiçbir AhdCode kaynak yapısı bunu
 etkinleştiremez. Motor, bir kabuk komut dizesi değil bir argüman vektörüyle
 başlatılır — bu yüzden boşluk, Unicode, tırnak, `$`, `;`, `&` veya parantez
-içeren yollar güvende kalır.
+içeren yollar güvende kalır. Varlık hazırlama, dosyaları asla bir kabuk
+üzerinden değil, yol (path) üzerinden kopyalar ve derleme başlamadan önce
+eksik, okunamayan veya desteklenmeyen biçimdeki bir varlığı reddeder.
 
 Derleme, 30 saniyelik bir zaman aşımıyla (timeout) sınırlıdır. Zaman
 aşımında motor süreci sonlandırılır, geçici dosyalar kaldırılır ve bir
@@ -131,11 +375,13 @@ hiçbir zaman zaten geçerli bir hedef PDF'i yok etmez.
 
 ## LatexError
 
-Tek bir hata, Latex'e özgü başarısızlıkları kapsar: derleme başarısızlığı,
+Tek bir hata, Latex'e özgü her başarısızlığı kapsar: derleme başarısızlığı,
 eksik bir paketlenmiş motor veya paket, zaman aşımı, motor süreç
-başarısızlığı ve üretilmemiş bir PDF. Motor tanılamaları, hatalı
-biçimlendirilmiş bir belgenin terminali doldurmasını önlemek için
-sınırlıdır; bu sırada ilk faydalı TeX hatası korunur.
+başarısızlığı, üretilmemiş bir PDF, geçersiz bir `document()` parametresi
+(margin, color, bilinmeyen bir `type`), geçersiz teorem kaydı veya
+referansı ve eksik ya da desteklenmeyen bir image/figure varlığı. Motor
+tanılamaları, hatalı biçimlendirilmiş bir belgenin terminali doldurmasını
+önlemek için sınırlıdır; bu sırada ilk faydalı TeX hatası korunur.
 
 ```ahd
 bring Latex as L
@@ -150,11 +396,13 @@ attempt {
 
 ## Desteklenen temel çizgi (baseline)
 
-`article`, `amsmath`/`amssymb`/`mathtools`, `graphicx`, `booktabs`,
-`array`, `geometry`, `xcolor`, `hyperref`, `fontspec`, Latin Modern yazı
-tipleri, Computer Modern matematik ve heceleme (hyphenation) verisi.
-Türkçe dahil Unicode metin, kutudan çıktığı gibi çalışır.
+`article`, `report`, `beamer`, `amsmath`/`amssymb`/`mathtools`,
+`graphicx`, `booktabs`, `array`, `geometry`, `xcolor`, `hyperref`,
+`fontspec`, Beamer'ın üzerine inşa edildiği PGF/TikZ çekirdeği ve
+`translator` paketleri, Latin Modern yazı tipleri, Computer Modern
+matematik ve heceleme (hyphenation) verisi. Türkçe dahil Unicode metin,
+kutudan çıktığı gibi çalışır.
 
-Bu sürümde olmayanlar: BibTeX, bir paket yöneticisi, TikZ veya Beamer
-soyutlamaları, bir PDF düzenleyici veya ayrıştırıcı ve Markdown veya HTML
-dönüşümü.
+Bu sürümde olmayanlar: BibTeX, bir paket yöneticisi, genel bir TikZ çizim
+API'si, Beamer temaları/overlay'leri/konuşmacı notları, bir PDF düzenleyici
+veya ayrıştırıcı ve Markdown veya HTML dönüşümü.

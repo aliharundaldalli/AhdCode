@@ -12,7 +12,7 @@ AhdCode; okunabilir sözdizimi, açık niyet (explicit intent), öngörülebilir
 anlambilim (semantics) ve yerel (native) derlemeye odaklanan, deneysel,
 statik olarak denetlenen genel amaçlı bir programlama dilidir.
 
-Mevcut sürüm **v0.1.14**'tür. Çekirdek dil uçtan uca çalışır, ancak proje
+Mevcut sürüm **v0.1.15**'tir. Çekirdek dil uçtan uca çalışır, ancak proje
 üretime hazır değildir ve 1.0'dan önce kırıcı (breaking) değişiklikler
 olabilir.
 
@@ -60,6 +60,8 @@ for name in names {
   her iki tür de asla çıkarılmaz ve asla örtük değildir.
 - [Statistics modülü](docs/STATISTICS_TR.md), `List<Int>` ve `List<Real>`
   üzerinde tipli betimleyici istatistik sağlar; String zorlaması yoktur.
+- [Numeric modülü](docs/NUMERIC_TR.md), immutable ve Real yönelimli Vector/
+  Matrix değerleri, doğrusal cebir ve Plot için ek `Vector` overload'ları sağlar.
 - Formatter, yorumları korurken tek bir kanonik (standart) sunum tanımlar.
 
 ## Kaynak koddan derleme
@@ -69,7 +71,7 @@ AhdCode şu anda Go 1.25 veya daha yeni bir sürüm gerektirir.
 ```bash
 cd AhdCode
 go test ./...
-go install ./cmd/ahdcode
+go install ./cmd/ahdcode ./cmd/ahdnumeric ./cmd/ahdplot
 ```
 
 Go'nun ikili dosya (binary) dizininin `PATH`'te olduğundan emin olun:
@@ -117,6 +119,7 @@ ve [REPL rehberine](docs/REPL_TR.md) bakın.
 - [CSV modülü](docs/CSV_TR.md)
 - [Data modülü](docs/DATA_TR.md)
 - [Statistics modülü](docs/STATISTICS_TR.md)
+- [Numeric modülü ve Complex skalerleri](docs/NUMERIC_TR.md)
 - [Tanılamaları anlama](docs/DIAGNOSTICS_TR.md)
 - [Yapay zekâ destekli yerel kurulum](FOR_AI.md)
 - [Derlenmiş v0.1 örnekleri](examples/v0.1/README_TR.md)
@@ -147,6 +150,8 @@ editör eklentisi hafif bir çalıştır-ve-vurgula entegrasyonudur. Bkz.
 
 ```text
 cmd/ahdcode/       CLI giriş noktası
+cmd/ahdnumeric/    paketli ileri doğrusal-cebir yardımcısı
+cmd/ahdplot/       paketli grafik render yardımcısı
 internal/          derleyici, çalışma zamanı, formatter ve REPL
 editors/vscode/    VS Code / Antigravity eklentisi
 docs/              son kullanıcı rehberleri
