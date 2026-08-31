@@ -411,7 +411,10 @@ attempt { document.heading("bad", 7) } except WordError as error { write(error.m
 	text := output.String()
 	for _, want := range []string{
 		"Left\n", "Right\n", "Report\nSummary\n", `["Report"]`, `["Summary"]`,
-		`[[["A"], ["1", "2"]]]`, "heading level must be between 1 and 6\n",
+		// The header's gridSpan=2 merge means Word.read() recovers this table
+		// as ["A", ""] / ["1", "2"]: the merged header expands to its full
+		// logical width instead of the pre-fix ragged ["A"] / ["1", "2"].
+		`[[["A", ""], ["1", "2"]]]`, "heading level must be between 1 and 6\n",
 	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("REPL output omitted %q:\n%s", want, text)
