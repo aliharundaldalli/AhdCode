@@ -7,7 +7,9 @@
 package ahdruntime
 
 import (
+	"archive/zip"
 	"bufio"
+	"bytes"
 	"context"
 	cryptorand "crypto/rand"
 	"crypto/sha256"
@@ -15,7 +17,11 @@ import (
 	"encoding/binary"
 	"encoding/csv"
 	"encoding/json"
+	"encoding/xml"
 	"fmt"
+	"image"
+	_ "image/jpeg"
+	_ "image/png"
 	"io"
 	"math"
 	"os"
@@ -71,6 +77,7 @@ var (
 	AhdClassStatisticsError     = &AhdClass{Name: "StatisticsError", Parent: AhdClassError}
 	AhdClassPlotError           = &AhdClass{Name: "PlotError", Parent: AhdClassError}
 	AhdClassNumericError        = &AhdClass{Name: "NumericError", Parent: AhdClassError}
+	AhdClassWordError           = &AhdClass{Name: "WordError", Parent: AhdClassError}
 )
 
 // AhdInstance is every AhdCode Class instance. The generated interface of each
@@ -547,10 +554,12 @@ func AhdLatexBibliography(references *AhdPair[string, string]) string {
 // AhdLatexDocument returns one stable complete document. Font files are named
 // explicitly so the supported baseline never depends on a system font.
 func AhdLatexDocument(body, title, author string) string {
-	return AhdLatexDocumentFull(body, title, author, "", "Article", 2.54, "", "", AhdBuildPair([]string{}, []string{}))
+	return AhdLatexDocumentFull(body, title, author, "", "Article", 2.54, "", "", AhdBuildPair([]string{}, []string{}), "Default")
 }
 
-func AhdLatexDocumentFull(body, title, author, date, documentType string, margin float64, color, cover string, theorems *AhdPair[string, string]) string {
+var ahdLatexBeamerThemes = map[string]bool{"Default": true, "Madrid": true, "Warsaw": true}
+
+func AhdLatexDocumentFull(body, title, author, date, documentType string, margin float64, color, cover string, theorems *AhdPair[string, string], theme string) string {
 	classes := map[string]string{"Article": "article", "Report": "report", "Beamer": "beamer"}
 	documentClass := classes[documentType]
 	if documentClass == "" {
@@ -565,8 +574,18 @@ func AhdLatexDocumentFull(body, title, author, date, documentType string, margin
 			AhdRaiseClass(AhdClassValueError, "Latex.document color must use #RRGGBB")
 		}
 	}
+	if !ahdLatexBeamerThemes[theme] {
+		AhdRaiseClass(AhdClassValueError, "Latex.document theme must be Default, Madrid, or Warsaw")
+	}
+	if theme != "Default" && documentType != "Beamer" {
+		AhdRaiseClass(AhdClassValueError, "Latex.document theme requires a Beamer document")
+	}
 	var result strings.Builder
 	result.WriteString("\\documentclass{" + documentClass + "}\n")
+	if theme != "Default" {
+		// theme != "Default" already implies documentType == "Beamer", checked above.
+		result.WriteString("\\usetheme{" + theme + "}\n")
+	}
 	result.WriteString("\\usepackage{fontspec}\n")
 	result.WriteString("\\setmainfont{lmroman10-regular.otf}[BoldFont=lmroman10-bold.otf,ItalicFont=lmroman10-italic.otf,BoldItalicFont=lmroman10-bolditalic.otf]\n")
 	result.WriteString("\\usepackage{amsmath,amssymb,mathtools}\n")
@@ -5275,4 +5294,1021 @@ func AhdNumericWrapMatrixPair[T any](pair AhdMatrixPair, wrap func(AhdMatrix) T)
 		values[i] = wrap(v)
 	}
 	return AhdBuildPair(pair.Keys, values)
+}
+
+// ---------------------------------------------------------------------------
+// Word standard module (WordprocessingML / DOCX)
+// ---------------------------------------------------------------------------
+//
+// A Document's entire visible AhdCode surface is one immutable value plus
+// WordError. Internally a Document carries exactly one hidden field, a
+// List<String>, where every element is one JSON-encoded ahdWordBlock. That
+// encoding is a private implementation detail: it is never read by AhdCode
+// source (the field is hidden) and never round-tripped through any public
+// operation, so it can change freely across releases without being a
+// compatibility surface. Every operation appends to (or reads) that block
+// list; nothing here shells out, links a third-party package, or depends on
+// system Office software.
+
+func ahdWordRaise(message string) { AhdRaiseClass(AhdClassWordError, message) }
+
+// ahdWordBlock is the private content-block shape. Kind selects which of the
+// remaining fields are meaningful; the zero value of every other field is
+// simply omitted from the JSON encoding.
+type ahdWordBlock struct {
+	Kind      string     `json:"kind"`
+	Text      string     `json:"text,omitempty"`
+	Level     int        `json:"level,omitempty"`
+	Align     string     `json:"align,omitempty"`
+	Bold      bool       `json:"bold,omitempty"`
+	Italic    bool       `json:"italic,omitempty"`
+	Underline bool       `json:"underline,omitempty"`
+	Headers   []string   `json:"headers,omitempty"`
+	Rows      [][]string `json:"rows,omitempty"`
+	Merges    [][4]int   `json:"merges,omitempty"`
+	Media     []byte     `json:"media,omitempty"`
+	MediaExt  string     `json:"mediaExt,omitempty"`
+	WidthEMU  int64      `json:"widthEMU,omitempty"`
+	HeightEMU int64      `json:"heightEMU,omitempty"`
+}
+
+// AhdWordDocument is the runtime interchange shape the generated backend
+// reads and writes through the Document Class's one hidden field.
+type AhdWordDocument struct {
+	Blocks []string
+}
+
+// ahdWordAppend returns a new document with one more block. It always copies
+// the existing block slice before appending, so two documents derived from
+// the same base never share a backing array: appending to one can never
+// retroactively change what the other one already produced.
+func ahdWordAppend(doc AhdWordDocument, block ahdWordBlock) AhdWordDocument {
+	// This concrete struct has no channel, function, or cyclic field, so
+	// encoding it as JSON cannot fail.
+	encoded, _ := json.Marshal(block)
+	blocks := append(append([]string(nil), doc.Blocks...), string(encoded))
+	return AhdWordDocument{Blocks: blocks}
+}
+
+func ahdWordDecodeBlocks(doc AhdWordDocument) []ahdWordBlock {
+	blocks := make([]ahdWordBlock, len(doc.Blocks))
+	for index, raw := range doc.Blocks {
+		var block ahdWordBlock
+		if err := json.Unmarshal([]byte(raw), &block); err != nil {
+			ahdWordRaise("document storage is corrupted")
+		}
+		blocks[index] = block
+	}
+	return blocks
+}
+
+// AhdWordNew starts an empty Document. It is the only zero-content entry
+// point: nothing else in the module constructs a Document from nothing.
+func AhdWordNew() AhdWordDocument { return AhdWordDocument{} }
+
+var ahdWordParagraphAlignments = map[string]bool{"left": true, "center": true, "right": true, "justify": true}
+var ahdWordTableAlignments = map[string]bool{"left": true, "center": true, "right": true}
+
+func AhdWordHeading(doc AhdWordDocument, text string, level int64) AhdWordDocument {
+	if level < 1 || level > 6 {
+		ahdWordRaise("heading level must be between 1 and 6")
+	}
+	return ahdWordAppend(doc, ahdWordBlock{Kind: "heading", Text: text, Level: int(level)})
+}
+
+func AhdWordParagraph(doc AhdWordDocument, text, align string, bold, italic, underline bool) AhdWordDocument {
+	if !ahdWordParagraphAlignments[align] {
+		ahdWordRaise("paragraph align must be left, center, right, or justify")
+	}
+	return ahdWordAppend(doc, ahdWordBlock{
+		Kind: "paragraph", Text: text, Align: align, Bold: bold, Italic: italic, Underline: underline,
+	})
+}
+
+// AhdWordTable validates shape and merge geometry before ever building XML,
+// so a malformed table is always a clean WordError, never a corrupt package.
+func AhdWordTable(doc AhdWordDocument, headers *AhdList[string], rows *AhdList[*AhdList[string]], merges *AhdList[*AhdList[int64]], align string) AhdWordDocument {
+	if !ahdWordTableAlignments[align] {
+		ahdWordRaise("table align must be left, center, or right")
+	}
+	headerValues := headers.Snapshot()
+	if len(headerValues) == 0 {
+		ahdWordRaise("table requires at least one column")
+	}
+	rowValues := rows.Snapshot()
+	grid := make([][]string, len(rowValues))
+	for index, row := range rowValues {
+		nonNullRow := AhdNonNull(row)
+		cells := nonNullRow.Snapshot()
+		if len(cells) != len(headerValues) {
+			ahdWordRaise("table row column count does not match headers")
+		}
+		grid[index] = cells
+	}
+	mergeValues := ahdWordValidateMerges(merges, 1+len(grid), len(headerValues))
+	return ahdWordAppend(doc, ahdWordBlock{
+		Kind: "table", Headers: headerValues, Rows: grid, Merges: mergeValues, Align: align,
+	})
+}
+
+// ahdWordValidateMerges rejects every malformed or geometrically impossible
+// descriptor explicitly: nothing is silently clipped, normalized, or
+// dropped. rowCount includes the rendered header row (row 0).
+func ahdWordValidateMerges(merges *AhdList[*AhdList[int64]], rowCount, columnCount int) [][4]int {
+	entries := merges.Snapshot()
+	result := make([][4]int, 0, len(entries))
+	covered := make(map[[2]int]bool)
+	for _, entry := range entries {
+		nonNullEntry := AhdNonNull(entry)
+		values := nonNullEntry.Snapshot()
+		if len(values) != 4 {
+			ahdWordRaise("a table merge descriptor must have exactly four Int values: row, column, rowSpan, columnSpan")
+		}
+		row, column, rowSpan, columnSpan := values[0], values[1], values[2], values[3]
+		if row < 0 || column < 0 {
+			ahdWordRaise("a table merge row and column must not be negative")
+		}
+		if rowSpan < 1 || columnSpan < 1 {
+			ahdWordRaise("a table merge rowSpan and columnSpan must be at least 1")
+		}
+		if rowSpan == 1 && columnSpan == 1 {
+			ahdWordRaise("a 1x1 table merge is meaningless")
+		}
+		if row+rowSpan > int64(rowCount) || column+columnSpan > int64(columnCount) {
+			ahdWordRaise("a table merge extends outside the table")
+		}
+		for r := row; r < row+rowSpan; r++ {
+			for c := column; c < column+columnSpan; c++ {
+				key := [2]int{int(r), int(c)}
+				if covered[key] {
+					ahdWordRaise("table merge regions overlap")
+				}
+				covered[key] = true
+			}
+		}
+		result = append(result, [4]int{int(row), int(column), int(rowSpan), int(columnSpan)})
+	}
+	return result
+}
+
+const (
+	ahdWordEMUPerCentimeter = 360000
+	ahdWordEMUPerPixel96DPI = 9525
+)
+
+// AhdWordImage reads and embeds the image bytes immediately, so the produced
+// Document (and the DOCX it eventually saves to) never depends on the source
+// file surviving: moving or deleting it afterward changes nothing.
+func AhdWordImage(doc AhdWordDocument, path string, size *AhdPair[string, float64]) AhdWordDocument {
+	if path == "" {
+		ahdWordRaise("image path must not be empty")
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		ahdWordRaise("could not read image: " + err.Error())
+	}
+	format, naturalWidth, naturalHeight := ahdWordDecodeImage(data)
+	widthEMU, heightEMU := ahdWordImageExtent(size, naturalWidth, naturalHeight)
+	return ahdWordAppend(doc, ahdWordBlock{
+		Kind: "image", Media: data, MediaExt: format, WidthEMU: widthEMU, HeightEMU: heightEMU,
+	})
+}
+
+func ahdWordDecodeImage(data []byte) (format string, width, height int) {
+	config, formatName, err := image.DecodeConfig(bytes.NewReader(data))
+	if err != nil {
+		ahdWordRaise("unsupported image format: Word supports PNG and JPEG")
+	}
+	switch formatName {
+	case "png":
+		return "png", config.Width, config.Height
+	case "jpeg":
+		return "jpeg", config.Width, config.Height
+	default:
+		ahdWordRaise("unsupported image format: Word supports PNG and JPEG")
+		return "", 0, 0
+	}
+}
+
+// ahdWordImageExtent resolves the four size.md-documented cases: an empty
+// Pair keeps the image's natural pixel size (at 96 DPI, the OOXML default
+// anchor), one dimension alone preserves the source aspect ratio, and both
+// dimensions are used exactly as given.
+func ahdWordImageExtent(size *AhdPair[string, float64], naturalWidth, naturalHeight int) (int64, int64) {
+	size.require()
+	var width, height float64
+	var hasWidth, hasHeight bool
+	for _, key := range size.keys {
+		switch key {
+		case "width":
+			hasWidth = true
+			width = size.values[key]
+		case "height":
+			hasHeight = true
+			height = size.values[key]
+		default:
+			ahdWordRaise("image size supports only width and height")
+		}
+	}
+	if hasWidth && width <= 0 {
+		ahdWordRaise("image width must be positive")
+	}
+	if hasHeight && height <= 0 {
+		ahdWordRaise("image height must be positive")
+	}
+	if naturalWidth <= 0 || naturalHeight <= 0 {
+		naturalWidth, naturalHeight = 1, 1
+	}
+	aspect := float64(naturalHeight) / float64(naturalWidth)
+	switch {
+	case hasWidth && hasHeight:
+		return int64(width * ahdWordEMUPerCentimeter), int64(height * ahdWordEMUPerCentimeter)
+	case hasWidth:
+		return int64(width * ahdWordEMUPerCentimeter), int64(width * aspect * ahdWordEMUPerCentimeter)
+	case hasHeight:
+		return int64(height / aspect * ahdWordEMUPerCentimeter), int64(height * ahdWordEMUPerCentimeter)
+	default:
+		return int64(naturalWidth) * ahdWordEMUPerPixel96DPI, int64(naturalHeight) * ahdWordEMUPerPixel96DPI
+	}
+}
+
+func AhdWordPageBreak(doc AhdWordDocument) AhdWordDocument {
+	return ahdWordAppend(doc, ahdWordBlock{Kind: "pageBreak"})
+}
+
+// ---------------------------------------------------------------------------
+// Word: reading accessors
+// ---------------------------------------------------------------------------
+
+func AhdWordText(doc AhdWordDocument) string {
+	var lines []string
+	for _, block := range ahdWordDecodeBlocks(doc) {
+		switch block.Kind {
+		case "heading", "paragraph":
+			lines = append(lines, block.Text)
+		}
+	}
+	return strings.Join(lines, "\n")
+}
+
+func AhdWordParagraphs(doc AhdWordDocument) *AhdList[string] {
+	var texts []string
+	for _, block := range ahdWordDecodeBlocks(doc) {
+		if block.Kind == "paragraph" {
+			texts = append(texts, block.Text)
+		}
+	}
+	return AhdNewList(texts...)
+}
+
+func AhdWordHeadings(doc AhdWordDocument) *AhdList[string] {
+	var texts []string
+	for _, block := range ahdWordDecodeBlocks(doc) {
+		if block.Kind == "heading" {
+			texts = append(texts, block.Text)
+		}
+	}
+	return AhdNewList(texts...)
+}
+
+func AhdWordTables(doc AhdWordDocument) *AhdList[*AhdList[*AhdList[string]]] {
+	var tables []*AhdList[*AhdList[string]]
+	for _, block := range ahdWordDecodeBlocks(doc) {
+		if block.Kind != "table" {
+			continue
+		}
+		rows := make([]*AhdList[string], 0, 1+len(block.Rows))
+		rows = append(rows, AhdNewList(block.Headers...))
+		for _, row := range block.Rows {
+			rows = append(rows, AhdNewList(row...))
+		}
+		tables = append(tables, AhdNewList(rows...))
+	}
+	return AhdNewList(tables...)
+}
+
+// ---------------------------------------------------------------------------
+// Word: DOCX package generation
+// ---------------------------------------------------------------------------
+
+const ahdWordNamespaces = `xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" ` +
+	`xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" ` +
+	`xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" ` +
+	`xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" ` +
+	`xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"`
+
+// ahdWordEscapeXML escapes the five predefined XML entities and drops any
+// control character XML 1.0 forbids outright, so arbitrary AhdCode String
+// content (including raw "<", "&", or stray control bytes) always produces
+// well-formed XML.
+func ahdWordEscapeXML(text string) string {
+	var b strings.Builder
+	for _, r := range text {
+		switch {
+		case r == '&':
+			b.WriteString("&amp;")
+		case r == '<':
+			b.WriteString("&lt;")
+		case r == '>':
+			b.WriteString("&gt;")
+		case r == '"':
+			b.WriteString("&quot;")
+		case r == '\'':
+			b.WriteString("&apos;")
+		case r == '\t' || r == '\n' || r == '\r':
+			b.WriteRune(r)
+		case r < 0x20:
+			// Not legal in XML 1.0 even escaped; drop it rather than emit an
+			// invalid package.
+		default:
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
+}
+
+func ahdWordAlignValue(align string) string {
+	if align == "justify" {
+		return "both"
+	}
+	return align
+}
+
+func ahdWordHeadingXML(block ahdWordBlock) string {
+	style := "Heading" + strconv.Itoa(block.Level)
+	return `<w:p><w:pPr><w:pStyle w:val="` + style + `"/></w:pPr><w:r><w:t xml:space="preserve">` +
+		ahdWordEscapeXML(block.Text) + `</w:t></w:r></w:p>`
+}
+
+func ahdWordParagraphXML(block ahdWordBlock) string {
+	var run strings.Builder
+	run.WriteString(`<w:r>`)
+	var properties strings.Builder
+	if block.Bold {
+		properties.WriteString(`<w:b/>`)
+	}
+	if block.Italic {
+		properties.WriteString(`<w:i/>`)
+	}
+	if block.Underline {
+		properties.WriteString(`<w:u w:val="single"/>`)
+	}
+	if properties.Len() > 0 {
+		run.WriteString(`<w:rPr>` + properties.String() + `</w:rPr>`)
+	}
+	run.WriteString(`<w:t xml:space="preserve">` + ahdWordEscapeXML(block.Text) + `</w:t></w:r>`)
+	return `<w:p><w:pPr><w:jc w:val="` + ahdWordAlignValue(block.Align) + `"/></w:pPr>` + run.String() + `</w:p>`
+}
+
+func ahdWordPageBreakXML() string {
+	return `<w:p><w:r><w:br w:type="page"/></w:r></w:p>`
+}
+
+func ahdWordSectionPropertiesXML() string {
+	return `<w:sectPr><w:pgSz w:w="12240" w:h="15840"/>` +
+		`<w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440" w:header="720" w:footer="720" w:gutter="0"/>` +
+		`</w:sectPr>`
+}
+
+// ahdWordColumnWidth splits a fixed default content width (roughly a Letter
+// page with one-inch margins, in twentieths of a point) evenly across a
+// table's columns, so every generated table has an explicit, valid width.
+func ahdWordColumnWidth(columnCount int) int {
+	const contentWidth = 9350
+	if columnCount <= 0 {
+		return contentWidth
+	}
+	return contentWidth / columnCount
+}
+
+// ahdWordTableXML renders one table block, including gridSpan/vMerge for
+// every merge. A merge's anchor cell (its top-left corner) is the only cell
+// that ever carries the merged region's text; every other covered position
+// contributes no separate <w:tc> (horizontal continuation) or one empty,
+// vMerge-continuation <w:tc> (vertical continuation), matching how Word
+// itself represents a merged region.
+func ahdWordTableXML(block ahdWordBlock) string {
+	columnCount := len(block.Headers)
+	rowCount := 1 + len(block.Rows)
+	anchorMerge := make([][]int, rowCount)
+	consumed := make([][]bool, rowCount)
+	for r := 0; r < rowCount; r++ {
+		anchorMerge[r] = make([]int, columnCount)
+		consumed[r] = make([]bool, columnCount)
+		for c := range anchorMerge[r] {
+			anchorMerge[r][c] = -1
+		}
+	}
+	for mergeIndex, merge := range block.Merges {
+		row, column, rowSpan, columnSpan := merge[0], merge[1], merge[2], merge[3]
+		for r := row; r < row+rowSpan; r++ {
+			anchorMerge[r][column] = mergeIndex
+			for c := column + 1; c < column+columnSpan; c++ {
+				consumed[r][c] = true
+			}
+		}
+	}
+	var b strings.Builder
+	b.WriteString(`<w:tbl><w:tblPr><w:tblW w:w="0" w:type="auto"/><w:jc w:val="` + block.Align + `"/><w:tblBorders>`)
+	for _, edge := range []string{"top", "left", "bottom", "right", "insideH", "insideV"} {
+		b.WriteString(`<w:` + edge + ` w:val="single" w:sz="4" w:space="0" w:color="auto"/>`)
+	}
+	b.WriteString(`</w:tblBorders></w:tblPr><w:tblGrid>`)
+	columnWidth := ahdWordColumnWidth(columnCount)
+	for i := 0; i < columnCount; i++ {
+		b.WriteString(`<w:gridCol w:w="` + strconv.Itoa(columnWidth) + `"/>`)
+	}
+	b.WriteString(`</w:tblGrid>`)
+	for r := 0; r < rowCount; r++ {
+		var rowText []string
+		if r == 0 {
+			rowText = block.Headers
+		} else {
+			rowText = block.Rows[r-1]
+		}
+		b.WriteString(`<w:tr>`)
+		for c := 0; c < columnCount; c++ {
+			if consumed[r][c] {
+				continue
+			}
+			mergeIndex := anchorMerge[r][c]
+			columnSpan, rowSpan, mergeRow := 1, 1, r
+			if mergeIndex >= 0 {
+				merge := block.Merges[mergeIndex]
+				mergeRow, rowSpan, columnSpan = merge[0], merge[2], merge[3]
+			}
+			var properties strings.Builder
+			properties.WriteString(`<w:tcW w:w="0" w:type="auto"/>`)
+			if columnSpan > 1 {
+				properties.WriteString(`<w:gridSpan w:val="` + strconv.Itoa(columnSpan) + `"/>`)
+			}
+			if rowSpan > 1 {
+				if r == mergeRow {
+					properties.WriteString(`<w:vMerge w:val="restart"/>`)
+				} else {
+					properties.WriteString(`<w:vMerge/>`)
+				}
+			}
+			paragraph := `<w:p>`
+			// A vertical-merge continuation cell renders no text: the anchor
+			// row already carries the merged region's content.
+			if mergeIndex < 0 || r == mergeRow {
+				cellText := ""
+				if c < len(rowText) {
+					cellText = rowText[c]
+				}
+				paragraph += `<w:r><w:t xml:space="preserve">` + ahdWordEscapeXML(cellText) + `</w:t></w:r>`
+			}
+			paragraph += `</w:p>`
+			b.WriteString(`<w:tc><w:tcPr>` + properties.String() + `</w:tcPr>` + paragraph + `</w:tc>`)
+		}
+		b.WriteString(`</w:tr>`)
+	}
+	b.WriteString(`</w:tbl>`)
+	return b.String()
+}
+
+func ahdWordImageXML(block ahdWordBlock, id int, relID string) string {
+	name := ahdWordEscapeXML("Picture " + strconv.Itoa(id))
+	cx, cy := strconv.FormatInt(block.WidthEMU, 10), strconv.FormatInt(block.HeightEMU, 10)
+	idText := strconv.Itoa(id)
+	return `<w:p><w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0">` +
+		`<wp:extent cx="` + cx + `" cy="` + cy + `"/>` +
+		`<wp:effectExtent l="0" t="0" r="0" b="0"/>` +
+		`<wp:docPr id="` + idText + `" name="` + name + `"/>` +
+		`<wp:cNvGraphicFramePr><a:graphicFrameLocks noChangeAspect="1"/></wp:cNvGraphicFramePr>` +
+		`<a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">` +
+		`<pic:pic><pic:nvPicPr><pic:cNvPr id="` + idText + `" name="` + name + `"/><pic:cNvPicPr/></pic:nvPicPr>` +
+		`<pic:blipFill><a:blip r:embed="` + relID + `"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill>` +
+		`<pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="` + cx + `" cy="` + cy + `"/></a:xfrm>` +
+		`<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic>` +
+		`</a:graphicData></a:graphic></wp:inline></w:drawing></w:r></w:p>`
+}
+
+func ahdWordDocumentXML(blocks []ahdWordBlock, imageRelIDs []string) string {
+	var b strings.Builder
+	b.WriteString(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>`)
+	b.WriteString(`<w:document ` + ahdWordNamespaces + `><w:body>`)
+	imageIndex := 0
+	for _, block := range blocks {
+		switch block.Kind {
+		case "heading":
+			b.WriteString(ahdWordHeadingXML(block))
+		case "paragraph":
+			b.WriteString(ahdWordParagraphXML(block))
+		case "table":
+			b.WriteString(ahdWordTableXML(block))
+		case "image":
+			b.WriteString(ahdWordImageXML(block, imageIndex+1, imageRelIDs[imageIndex]))
+			imageIndex++
+		case "pageBreak":
+			b.WriteString(ahdWordPageBreakXML())
+		}
+	}
+	b.WriteString(ahdWordSectionPropertiesXML())
+	b.WriteString(`</w:body></w:document>`)
+	return b.String()
+}
+
+// ahdWordStylesXML defines Normal and Heading1..Heading6 with a deterministic
+// decreasing size scale, so document.xml can reference real WordprocessingML
+// heading styles rather than hand-built bold paragraphs.
+func ahdWordStylesXML() string {
+	sizes := [6]int{32, 28, 26, 24, 22, 22}
+	var b strings.Builder
+	b.WriteString(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>`)
+	b.WriteString(`<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">`)
+	b.WriteString(`<w:docDefaults><w:rPrDefault><w:rPr><w:sz w:val="22"/><w:szCs w:val="22"/></w:rPr></w:rPrDefault></w:docDefaults>`)
+	b.WriteString(`<w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/><w:qFormat/></w:style>`)
+	for level := 1; level <= 6; level++ {
+		id := "Heading" + strconv.Itoa(level)
+		b.WriteString(`<w:style w:type="paragraph" w:styleId="` + id + `"><w:name w:val="heading ` + strconv.Itoa(level) + `"/>` +
+			`<w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:qFormat/>` +
+			`<w:pPr><w:spacing w:before="240" w:after="120"/><w:outlineLvl w:val="` + strconv.Itoa(level-1) + `"/></w:pPr>` +
+			`<w:rPr><w:b/><w:sz w:val="` + strconv.Itoa(sizes[level-1]) + `"/></w:rPr></w:style>`)
+	}
+	b.WriteString(`</w:styles>`)
+	return b.String()
+}
+
+func ahdWordContentTypesXML(hasPNG, hasJPEG bool) string {
+	var b strings.Builder
+	b.WriteString(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>`)
+	b.WriteString(`<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">`)
+	b.WriteString(`<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>`)
+	b.WriteString(`<Default Extension="xml" ContentType="application/xml"/>`)
+	if hasPNG {
+		b.WriteString(`<Default Extension="png" ContentType="image/png"/>`)
+	}
+	if hasJPEG {
+		b.WriteString(`<Default Extension="jpeg" ContentType="image/jpeg"/>`)
+	}
+	b.WriteString(`<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>`)
+	b.WriteString(`<Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>`)
+	b.WriteString(`</Types>`)
+	return b.String()
+}
+
+const ahdWordPackageRelsXML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
+	`<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">` +
+	`<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>` +
+	`</Relationships>`
+
+// ahdWordDocumentRelsXML assigns relationship IDs in a fixed, deterministic
+// order: rId1 is always the styles part, then one rIdN per image in document
+// order.
+func ahdWordDocumentRelsXML(extensions []string) (string, []string) {
+	var b strings.Builder
+	b.WriteString(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>`)
+	b.WriteString(`<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">`)
+	b.WriteString(`<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>`)
+	relIDs := make([]string, len(extensions))
+	for index, extension := range extensions {
+		relID := "rId" + strconv.Itoa(2+index)
+		relIDs[index] = relID
+		b.WriteString(`<Relationship Id="` + relID + `" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" ` +
+			`Target="media/image` + strconv.Itoa(index+1) + `.` + extension + `"/>`)
+	}
+	b.WriteString(`</Relationships>`)
+	return b.String(), relIDs
+}
+
+// ahdWordBuildPackage assembles the complete DOCX ZIP in a fixed member
+// order, so identical Document content always produces byte-identical
+// package bytes.
+func ahdWordBuildPackage(blocks []ahdWordBlock) []byte {
+	var images []ahdWordBlock
+	for _, block := range blocks {
+		if block.Kind == "image" {
+			images = append(images, block)
+		}
+	}
+	extensions := make([]string, len(images))
+	hasPNG, hasJPEG := false, false
+	for index, block := range images {
+		extensions[index] = block.MediaExt
+		hasPNG = hasPNG || block.MediaExt == "png"
+		hasJPEG = hasJPEG || block.MediaExt == "jpeg"
+	}
+	documentRelsXML, relIDs := ahdWordDocumentRelsXML(extensions)
+	documentXML := ahdWordDocumentXML(blocks, relIDs)
+
+	var buffer bytes.Buffer
+	writer := zip.NewWriter(&buffer)
+	ahdWordWriteEntry(writer, "[Content_Types].xml", []byte(ahdWordContentTypesXML(hasPNG, hasJPEG)))
+	ahdWordWriteEntry(writer, "_rels/.rels", []byte(ahdWordPackageRelsXML))
+	ahdWordWriteEntry(writer, "word/document.xml", []byte(documentXML))
+	ahdWordWriteEntry(writer, "word/_rels/document.xml.rels", []byte(documentRelsXML))
+	ahdWordWriteEntry(writer, "word/styles.xml", []byte(ahdWordStylesXML()))
+	for index, block := range images {
+		name := "word/media/image" + strconv.Itoa(index+1) + "." + block.MediaExt
+		ahdWordWriteEntry(writer, name, block.Media)
+	}
+	if err := writer.Close(); err != nil {
+		ahdWordRaise("could not assemble the DOCX package: " + err.Error())
+	}
+	return buffer.Bytes()
+}
+
+func ahdWordWriteEntry(writer *zip.Writer, name string, content []byte) {
+	part, err := writer.Create(name)
+	if err != nil {
+		ahdWordRaise("could not assemble the DOCX package: " + err.Error())
+	}
+	if _, err := part.Write(content); err != nil {
+		ahdWordRaise("could not assemble the DOCX package: " + err.Error())
+	}
+}
+
+// ahdWordValidatePackage is the last check before a generated package is
+// allowed to replace a save destination: it must open as a ZIP, carry every
+// required part, and word/document.xml must be non-empty, well-formed XML.
+func ahdWordValidatePackage(data []byte) error {
+	if len(data) == 0 {
+		return fmt.Errorf("package is empty")
+	}
+	reader, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
+	if err != nil {
+		return fmt.Errorf("not a valid ZIP package: %w", err)
+	}
+	required := map[string]bool{"[Content_Types].xml": false, "_rels/.rels": false, "word/document.xml": false}
+	var documentXML []byte
+	for _, file := range reader.File {
+		if _, known := required[file.Name]; known {
+			required[file.Name] = true
+		}
+		if file.Name != "word/document.xml" {
+			continue
+		}
+		opened, err := file.Open()
+		if err != nil {
+			return fmt.Errorf("could not read word/document.xml: %w", err)
+		}
+		documentXML, err = io.ReadAll(opened)
+		closeErr := opened.Close()
+		if err != nil {
+			return fmt.Errorf("could not read word/document.xml: %w", err)
+		}
+		if closeErr != nil {
+			return closeErr
+		}
+	}
+	for name, present := range required {
+		if !present {
+			return fmt.Errorf("package is missing %s", name)
+		}
+	}
+	if len(documentXML) == 0 {
+		return fmt.Errorf("word/document.xml is empty")
+	}
+	decoder := xml.NewDecoder(bytes.NewReader(documentXML))
+	for {
+		if _, err := decoder.Token(); err != nil {
+			if err == io.EOF {
+				break
+			}
+			return fmt.Errorf("word/document.xml does not parse: %w", err)
+		}
+	}
+	return nil
+}
+
+// AhdWordSave renders the Document to a real DOCX package and publishes it
+// atomically: the destination is written only after the generated package
+// has already passed AhdWordValidatePackage, and a failed save never
+// disturbs a file that was already there.
+func AhdWordSave(doc AhdWordDocument, path string) {
+	if path == "" {
+		ahdWordRaise("save path must not be empty")
+	}
+	if !strings.EqualFold(filepath.Ext(path), ".docx") {
+		ahdWordRaise("Word.save only supports a .docx destination")
+	}
+	blocks := ahdWordDecodeBlocks(doc)
+	packageBytes := ahdWordBuildPackage(blocks)
+	if err := ahdWordValidatePackage(packageBytes); err != nil {
+		ahdWordRaise("failed to produce a valid DOCX: " + err.Error())
+	}
+	if err := ahdWordPublish(packageBytes, path); err != nil {
+		ahdWordRaise("could not write the destination file: " + err.Error())
+	}
+}
+
+// ahdWordPublish stages the package in the destination's own directory (so
+// the final rename is on one filesystem, hence atomic) and only then renames
+// it over the real destination.
+func ahdWordPublish(data []byte, output string) error {
+	absolute, err := filepath.Abs(output)
+	if err != nil {
+		return err
+	}
+	directory := filepath.Dir(absolute)
+	if err := os.MkdirAll(directory, 0o755); err != nil {
+		return err
+	}
+	temporary, err := os.CreateTemp(directory, ".ahdcode-word-output-*")
+	if err != nil {
+		return err
+	}
+	temporaryPath := temporary.Name()
+	defer func() { _ = os.Remove(temporaryPath) }()
+	_, writeError := temporary.Write(data)
+	syncError := temporary.Sync()
+	closeError := temporary.Close()
+	for _, candidate := range []error{writeError, syncError, closeError} {
+		if candidate != nil {
+			return candidate
+		}
+	}
+	return os.Rename(temporaryPath, absolute)
+}
+
+// ---------------------------------------------------------------------------
+// Word: DOCX reading
+// ---------------------------------------------------------------------------
+//
+// Reading recovers ordinary paragraph text, heading text, and basic table
+// cell text from a real DOCX package. It is not a fidelity-preserving
+// editor: formatting it does not understand (custom fonts, unknown run
+// properties, page layout, headers/footers, comments, unrecognized styles)
+// is safely ignored rather than treated as a failure. Only a structurally
+// broken package or a missing/unparseable word/document.xml raises
+// WordError. Reading never touches the network: every relationship target,
+// including an external one, is simply never followed.
+
+const (
+	ahdWordMaxArchiveSize       = 64 * 1024 * 1024  // total input file size
+	ahdWordMaxEntryUncompressed = 32 * 1024 * 1024  // any single ZIP member, decompressed
+	ahdWordMaxTotalUncompressed = 128 * 1024 * 1024 // every member's declared size, summed
+	ahdWordMaxCompressionRatio  = 200               // reject a member that inflates more than 200x
+	ahdWordMaxEntries           = 2000              // reject a package with an unreasonable member count
+)
+
+func AhdWordRead(path string) AhdWordDocument {
+	if path == "" {
+		ahdWordRaise("read path must not be empty")
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		ahdWordRaise("could not open the DOCX file: " + err.Error())
+	}
+	if !info.Mode().IsRegular() {
+		ahdWordRaise("the DOCX path is not a regular file")
+	}
+	if info.Size() > ahdWordMaxArchiveSize {
+		ahdWordRaise("the DOCX file is larger than the supported limit")
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		ahdWordRaise("could not read the DOCX file: " + err.Error())
+	}
+	documentXML := ahdWordExtractDocumentXML(data)
+	blocks := ahdWordParseDocumentXML(documentXML)
+	doc := AhdWordDocument{}
+	for _, block := range blocks {
+		doc = ahdWordAppend(doc, block)
+	}
+	return doc
+}
+
+// ahdWordExtractDocumentXML opens the ZIP package entirely in memory,
+// rejects every unsafe or oversized member up front (path traversal,
+// duplicates, declared sizes and compression ratios past the bounded
+// limits), and returns only the bytes of word/document.xml, itself capped by
+// a hard read limit that ignores whatever the ZIP header claims.
+func ahdWordExtractDocumentXML(data []byte) []byte {
+	if len(data) == 0 {
+		ahdWordRaise("the DOCX file is empty")
+	}
+	reader, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
+	if err != nil {
+		ahdWordRaise("not a valid DOCX package: " + err.Error())
+	}
+	if len(reader.File) == 0 {
+		ahdWordRaise("the DOCX package has no members")
+	}
+	if len(reader.File) > ahdWordMaxEntries {
+		ahdWordRaise("the DOCX package has too many members")
+	}
+	seen := make(map[string]bool, len(reader.File))
+	var documentEntry *zip.File
+	var totalUncompressed uint64
+	for _, file := range reader.File {
+		name := file.Name
+		if name == "" || strings.HasPrefix(name, "/") || filepath.IsAbs(name) || strings.Contains(name, "..") {
+			ahdWordRaise("the DOCX package contains an unsafe member path")
+		}
+		if seen[name] {
+			ahdWordRaise("the DOCX package has a duplicate member")
+		}
+		seen[name] = true
+		if file.UncompressedSize64 > ahdWordMaxEntryUncompressed {
+			ahdWordRaise("the DOCX package has a member that is too large")
+		}
+		if file.CompressedSize64 > 0 && file.UncompressedSize64/file.CompressedSize64 > ahdWordMaxCompressionRatio {
+			ahdWordRaise("the DOCX package has a member with an unreasonable compression ratio")
+		}
+		totalUncompressed += file.UncompressedSize64
+		if totalUncompressed > ahdWordMaxTotalUncompressed {
+			ahdWordRaise("the DOCX package is larger than the supported limit once decompressed")
+		}
+		if name == "word/document.xml" {
+			documentEntry = file
+		}
+	}
+	if documentEntry == nil {
+		ahdWordRaise("the DOCX package has no word/document.xml")
+	}
+	opened, err := documentEntry.Open()
+	if err != nil {
+		ahdWordRaise("could not read word/document.xml: " + err.Error())
+	}
+	defer opened.Close()
+	content, err := io.ReadAll(io.LimitReader(opened, ahdWordMaxEntryUncompressed+1))
+	if err != nil {
+		ahdWordRaise("could not read word/document.xml: " + err.Error())
+	}
+	if int64(len(content)) > ahdWordMaxEntryUncompressed {
+		ahdWordRaise("word/document.xml is larger than the supported limit")
+	}
+	if len(content) == 0 {
+		ahdWordRaise("word/document.xml is empty")
+	}
+	return content
+}
+
+var ahdWordHeadingStylePattern = regexp.MustCompile(`(?i)^heading\s*([1-6])$`)
+
+func ahdWordHeadingLevel(styleID string) int {
+	match := ahdWordHeadingStylePattern.FindStringSubmatch(strings.TrimSpace(styleID))
+	if match == nil {
+		return 0
+	}
+	level, _ := strconv.Atoi(match[1])
+	return level
+}
+
+func ahdWordAttr(element xml.StartElement, local string) string {
+	for _, attr := range element.Attr {
+		if attr.Name.Local == local {
+			return attr.Value
+		}
+	}
+	return ""
+}
+
+// ahdWordParseDocumentXML walks the flat token stream once, dispatching each
+// top-level <w:p> or <w:tbl> inside <w:body> to a dedicated subtree parser.
+// Every other element - page layout, bookmarks, headers/footers references,
+// comments ranges, unknown run properties - is simply never matched, which
+// is what lets an unrelated, unsupported feature pass through instead of
+// failing the read.
+func ahdWordParseDocumentXML(data []byte) []ahdWordBlock {
+	decoder := xml.NewDecoder(bytes.NewReader(data))
+	var blocks []ahdWordBlock
+	inBody := false
+	for {
+		token, err := decoder.Token()
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			ahdWordRaise("word/document.xml does not parse: " + err.Error())
+		}
+		start, ok := token.(xml.StartElement)
+		if !ok {
+			continue
+		}
+		switch start.Name.Local {
+		case "body":
+			inBody = true
+		case "p":
+			if inBody {
+				block := ahdWordParseParagraphElement(decoder)
+				if block.Kind != "" {
+					blocks = append(blocks, block)
+				}
+			}
+		case "tbl":
+			if inBody {
+				blocks = append(blocks, ahdWordParseTableElement(decoder))
+			}
+		}
+	}
+	return blocks
+}
+
+// ahdWordParseParagraphElement consumes tokens up to and including the
+// matching </w:p>, tracking a small local element stack so that only
+// character data whose immediate parent is <w:t> is treated as text -
+// whitespace between sibling elements in a pretty-printed foreign document
+// is never mistaken for content.
+func ahdWordParseParagraphElement(decoder *xml.Decoder) ahdWordBlock {
+	styleID := ""
+	var text strings.Builder
+	var stack []string
+	hasContent := false
+	for {
+		token, err := decoder.Token()
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			ahdWordRaise("word/document.xml does not parse: " + err.Error())
+		}
+		switch element := token.(type) {
+		case xml.StartElement:
+			stack = append(stack, element.Name.Local)
+			if element.Name.Local == "pStyle" {
+				styleID = ahdWordAttr(element, "val")
+			}
+			if element.Name.Local == "t" {
+				hasContent = true
+			}
+			if element.Name.Local == "tab" {
+				hasContent = true
+				text.WriteByte('\t')
+			}
+			if element.Name.Local == "br" && ahdWordAttr(element, "type") != "page" {
+				hasContent = true
+				text.WriteByte('\n')
+			}
+		case xml.EndElement:
+			if len(stack) == 0 {
+				return ahdWordFinishParagraph(styleID, text.String(), hasContent)
+			}
+			stack = stack[:len(stack)-1]
+		case xml.CharData:
+			if len(stack) > 0 && stack[len(stack)-1] == "t" {
+				text.Write(element)
+			}
+		}
+	}
+	return ahdWordFinishParagraph(styleID, text.String(), hasContent)
+}
+
+func ahdWordFinishParagraph(styleID, text string, hasContent bool) ahdWordBlock {
+	if !hasContent {
+		return ahdWordBlock{}
+	}
+	if level := ahdWordHeadingLevel(styleID); level > 0 {
+		return ahdWordBlock{Kind: "heading", Text: text, Level: level}
+	}
+	return ahdWordBlock{Kind: "paragraph", Text: text, Align: "left"}
+}
+
+// ahdWordParseTableElement consumes tokens up to and including the matching
+// </w:tbl>, collecting one String per <w:tc> encountered, grouped by <w:tr>.
+// It does not attempt to reconstruct a rectangular, unmerged grid: a merged
+// or continuation cell contributes exactly the cell(s) actually present in
+// the XML, which is table cell text recovery, not structural round-trip.
+func ahdWordParseTableElement(decoder *xml.Decoder) ahdWordBlock {
+	var rows [][]string
+	var currentRow []string
+	var cellText *strings.Builder
+	var stack []string
+	for {
+		token, err := decoder.Token()
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			ahdWordRaise("word/document.xml does not parse: " + err.Error())
+		}
+		switch element := token.(type) {
+		case xml.StartElement:
+			stack = append(stack, element.Name.Local)
+			switch element.Name.Local {
+			case "tr":
+				currentRow = nil
+			case "tc":
+				cellText = &strings.Builder{}
+			}
+		case xml.EndElement:
+			if len(stack) == 0 {
+				return ahdWordFinishTable(rows)
+			}
+			closed := stack[len(stack)-1]
+			stack = stack[:len(stack)-1]
+			if closed == "tc" && cellText != nil {
+				currentRow = append(currentRow, cellText.String())
+				cellText = nil
+			}
+			if closed == "tr" {
+				rows = append(rows, currentRow)
+			}
+		case xml.CharData:
+			if cellText != nil && len(stack) > 0 && stack[len(stack)-1] == "t" {
+				cellText.Write(element)
+			}
+		}
+	}
+	return ahdWordFinishTable(rows)
+}
+
+func ahdWordFinishTable(rows [][]string) ahdWordBlock {
+	if len(rows) == 0 {
+		return ahdWordBlock{Kind: "table", Headers: []string{}, Align: "left"}
+	}
+	return ahdWordBlock{Kind: "table", Headers: rows[0], Rows: rows[1:], Align: "left"}
 }

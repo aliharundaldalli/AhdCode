@@ -297,6 +297,34 @@ source: String := L.document(body: body, title: "Example")
 	}
 }
 
+func TestWordStandardModuleLowersStableBuiltinIdentities(t *testing.T) {
+	result := lowerSources(t, map[string]string{
+		"/Main.ahd": `bring Word
+from Word bring Document
+from Word bring WordError
+
+document: Document := Word.new()
+document = document.heading("Report", 1)
+document = document.paragraph("Summary")
+document.save("report.docx")
+loaded: Document := Word.read("report.docx")
+`,
+	}, "/Main.ahd")
+	dump := ir.Dump(result.Compilation)
+	for _, expected := range []string{
+		"builtin:Word::class::WordError", "builtin:Word::class::Document",
+		"builtin:Word::new", "Document.heading", "Document.paragraph",
+		"Document.save", "builtin:Word::read",
+	} {
+		if !strings.Contains(dump, expected) {
+			t.Fatalf("Word did not lower to %s:\n%s", expected, dump)
+		}
+	}
+	if strings.Contains(dump, "Invalid") {
+		t.Fatalf("a Word declaration left an Invalid type in the IR:\n%s", dump)
+	}
+}
+
 func TestNullInterpolationAndCollectionsAreConcrete(t *testing.T) {
 	result := lowerSources(t, map[string]string{"/Main.ahd": `Student: Class<> := {}
 student: Student? := null

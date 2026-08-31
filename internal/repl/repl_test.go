@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -376,6 +377,48 @@ attempt { table.column("missing") } except DataError as error { write(error.mess
 	// The snapshot mutation must not have reached the Table's own schema.
 	if strings.Contains(text, "injected") {
 		t.Fatalf("a columns() snapshot mutated the Table:\n%s", text)
+	}
+	if errors.Len() != 0 {
+		t.Fatalf("REPL errors: %s", errors.String())
+	}
+}
+
+func TestWordDocumentsInThePersistentREPL(t *testing.T) {
+	outputPath := filepath.Join(t.TempDir(), "repl.docx")
+	input := `bring Word
+from Word bring Document
+from Word bring WordError
+document: Document := Word.new()
+document = document.heading("Report", 1)
+document = document.paragraph("Summary", "center", true, false, false)
+document = document.table(["A", "B"], [["1", "2"]], [[0, 0, 1, 2]], "center")
+base: Document := Word.new()
+left: Document := base.paragraph("Left")
+right: Document := base.paragraph("Right")
+write(base.text())
+write(left.text())
+write(right.text())
+document.save(` + strconv.Quote(outputPath) + `)
+loaded: Document := Word.read(` + strconv.Quote(outputPath) + `)
+write(loaded.text())
+write(loaded.headings())
+write(loaded.paragraphs())
+write(loaded.tables())
+attempt { document.heading("bad", 7) } except WordError as error { write(error.message) }
+`
+	var output, errors bytes.Buffer
+	Run(strings.NewReader(input), &output, &errors, "AhdCode v0.1.16")
+	text := output.String()
+	for _, want := range []string{
+		"Left\n", "Right\n", "Report\nSummary\n", `["Report"]`, `["Summary"]`,
+		`[[["A"], ["1", "2"]]]`, "heading level must be between 1 and 6\n",
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("REPL output omitted %q:\n%s", want, text)
+		}
+	}
+	if content, err := os.ReadFile(outputPath); err != nil || len(content) < 100 || !bytes.HasPrefix(content, []byte("PK")) {
+		t.Fatalf("REPL did not produce a DOCX: size=%d err=%v", len(content), err)
 	}
 	if errors.Len() != 0 {
 		t.Fatalf("REPL errors: %s", errors.String())

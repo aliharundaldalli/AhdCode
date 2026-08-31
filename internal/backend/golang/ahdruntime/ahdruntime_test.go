@@ -1,7 +1,11 @@
 package ahdruntime
 
 import (
+	"archive/zip"
 	"bufio"
+	"bytes"
+	"image"
+	"image/png"
 	"math"
 	"os"
 	"path/filepath"
@@ -32,7 +36,7 @@ func init() {
 	for _, class := range []*AhdClass{
 		AhdClassError, AhdClassConstantError, AhdClassDivisionByZeroError, AhdClassDomainError,
 		AhdClassIndexError, AhdClassIOError, AhdClassKeyError, AhdClassNullError, AhdClassOverflowError, AhdClassValueError,
-		AhdClassLatexError, AhdClassFileError,
+		AhdClassLatexError, AhdClassFileError, AhdClassWordError,
 	} {
 		target := class
 		AhdRegisterError(target, func(message string) AhdInstance {
@@ -1104,6 +1108,313 @@ func TestLatexTableTwoArgumentOutputIsUnchanged(t *testing.T) {
 		"x\\_1 & ç \\& ğ \\\\\n\\bottomrule\n\\end{tabular}\n"
 	if text := AhdLatexTable(headers, rows, AhdNewList[int64]()); text != expected {
 		t.Fatalf("two-argument table output changed:\n%q\nwant\n%q", text, expected)
+	}
+}
+
+func TestLatexBeamerThemesAreBoundedAndComposeWithColor(t *testing.T) {
+	theorems := AhdNewPair[string, string]()
+	for _, theme := range []string{"Madrid", "Warsaw"} {
+		source := AhdLatexDocumentFull("Body", "Title", "Author", "", "Beamer", 2.5, "#8A1538", "", theorems, theme)
+		themeLine := `\usetheme{` + theme + `}`
+		colorLine := `\definecolor{ahdaccent}{HTML}{8A1538}`
+		if !strings.Contains(source, themeLine) || !strings.Contains(source, colorLine) {
+			t.Fatalf("%s source omitted theme or color:\n%s", theme, source)
+		}
+		if strings.Index(source, themeLine) > strings.Index(source, colorLine) {
+			t.Fatalf("custom color must follow and override %s:\n%s", theme, source)
+		}
+	}
+	defaultSource := AhdLatexDocumentFull("Body", "", "", "", "Beamer", 2.5, "", "", theorems, "Default")
+	if strings.Contains(defaultSource, `\usetheme{`) {
+		t.Fatalf("Default unexpectedly emitted a named Beamer theme:\n%s", defaultSource)
+	}
+	expectRaise(t, AhdClassValueError, func() {
+		AhdLatexDocumentFull("Body", "", "", "", "Beamer", 2.5, "", "", theorems, "Metropolis")
+	})
+	expectRaise(t, AhdClassValueError, func() {
+		AhdLatexDocumentFull("Body", "", "", "", "Article", 2.5, "", "", theorems, "Madrid")
+	})
+}
+
+func wordTestZIPEntry(t *testing.T, path, name string) []byte {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	reader, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, file := range reader.File {
+		if file.Name != name {
+			continue
+		}
+		opened, err := file.Open()
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer opened.Close()
+		var content bytes.Buffer
+		if _, err := content.ReadFrom(opened); err != nil {
+			t.Fatal(err)
+		}
+		return content.Bytes()
+	}
+	t.Fatalf("DOCX entry %s is missing", name)
+	return nil
+}
+
+func wordTestWriteZIP(t *testing.T, path string, entries [][2][]byte) {
+	t.Helper()
+	var content bytes.Buffer
+	writer := zip.NewWriter(&content)
+	for _, entry := range entries {
+		part, err := writer.Create(string(entry[0]))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := part.Write(entry[1]); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, content.Bytes(), 0o600); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestWordDocumentCreationFormattingPageBreakAndDeterminism(t *testing.T) {
+	base := AhdWordNew()
+	left := AhdWordParagraph(base, "One", "left", false, false, false)
+	right := AhdWordParagraph(base, "Two", "right", false, false, false)
+	if AhdWordText(base) != "" || AhdWordText(left) != "One" || AhdWordText(right) != "Two" {
+		t.Fatalf("Document derivation mutated a sibling: base=%q left=%q right=%q",
+			AhdWordText(base), AhdWordText(left), AhdWordText(right))
+	}
+
+	document := AhdWordHeading(base, "A&B <Report>", 2)
+	document = AhdWordParagraph(document, " formatted text ", "justify", true, true, true)
+	document = AhdWordPageBreak(document)
+	first := filepath.Join(t.TempDir(), "first.docx")
+	second := filepath.Join(t.TempDir(), "second.docx")
+	AhdWordSave(document, first)
+	AhdWordSave(document, second)
+	firstBytes, _ := os.ReadFile(first)
+	secondBytes, _ := os.ReadFile(second)
+	if !bytes.Equal(firstBytes, secondBytes) {
+		t.Fatal("saving the same Document twice produced different package bytes")
+	}
+	if err := ahdWordValidatePackage(firstBytes); err != nil {
+		t.Fatalf("generated package is invalid: %v", err)
+	}
+	xmlText := string(wordTestZIPEntry(t, first, "word/document.xml"))
+	for _, want := range []string{
+		`<w:pStyle w:val="Heading2"/>`, `A&amp;B &lt;Report&gt;`,
+		`<w:jc w:val="both"/>`, `<w:b/>`, `<w:i/>`, `<w:u w:val="single"/>`,
+		`<w:br w:type="page"/>`,
+	} {
+		if !strings.Contains(xmlText, want) {
+			t.Fatalf("document.xml omitted %q:\n%s", want, xmlText)
+		}
+	}
+	if got := AhdWordHeadings(document).Snapshot(); len(got) != 1 || got[0] != "A&B <Report>" {
+		t.Fatalf("headings = %v", got)
+	}
+	if got := AhdWordParagraphs(document).Snapshot(); len(got) != 1 || got[0] != " formatted text " {
+		t.Fatalf("paragraphs = %v", got)
+	}
+	expectRaise(t, AhdClassWordError, func() { AhdWordHeading(base, "bad", 0) })
+	expectRaise(t, AhdClassWordError, func() { AhdWordHeading(base, "bad", 7) })
+	expectRaise(t, AhdClassWordError, func() { AhdWordParagraph(base, "bad", "middle", false, false, false) })
+	expectRaise(t, AhdClassWordError, func() { AhdWordSave(base, "report.txt") })
+}
+
+func TestWordTablesValidateMergesAndCopyCallerLists(t *testing.T) {
+	headers := AhdNewList("A", "B", "C")
+	firstRow := AhdNewList("1", "2", "3")
+	secondRow := AhdNewList("4", "5", "6")
+	rows := AhdNewList(firstRow, secondRow)
+	horizontal := AhdNewList(int64(0), int64(0), int64(1), int64(2))
+	vertical := AhdNewList(int64(1), int64(2), int64(2), int64(1))
+	merges := AhdNewList(horizontal, vertical)
+	document := AhdWordTable(AhdWordNew(), headers, rows, merges, "center")
+
+	if got := headers.Snapshot(); strings.Join(got, ",") != "A,B,C" {
+		t.Fatalf("table mutated headers: %v", got)
+	}
+	if got := firstRow.Snapshot(); strings.Join(got, ",") != "1,2,3" {
+		t.Fatalf("table mutated a row: %v", got)
+	}
+	if got := horizontal.Snapshot(); len(got) != 4 || got[3] != 2 {
+		t.Fatalf("table mutated a merge descriptor: %v", got)
+	}
+	headers.Set(0, "changed")
+	firstRow.Set(0, "changed")
+	horizontal.Set(3, 3)
+	tables := AhdWordTables(document).Snapshot()
+	grid := tables[0].Snapshot()
+	if grid[0].Snapshot()[0] != "A" || grid[1].Snapshot()[0] != "1" {
+		t.Fatalf("Document retained caller List aliases: %v", tables)
+	}
+
+	path := filepath.Join(t.TempDir(), "merges.docx")
+	AhdWordSave(document, path)
+	xmlText := string(wordTestZIPEntry(t, path, "word/document.xml"))
+	for _, want := range []string{
+		`<w:jc w:val="center"/>`, `<w:gridSpan w:val="2"/>`,
+		`<w:vMerge w:val="restart"/>`, `<w:vMerge/>`,
+	} {
+		if !strings.Contains(xmlText, want) {
+			t.Fatalf("merged table omitted %q:\n%s", want, xmlText)
+		}
+	}
+	dataMerge := AhdWordTable(AhdWordNew(), AhdNewList("A", "B", "C"),
+		AhdNewList(AhdNewList("1", "2", "3")),
+		AhdNewList(AhdNewList(int64(1), int64(0), int64(1), int64(2))), "left")
+	dataMergePath := filepath.Join(t.TempDir(), "data-merge.docx")
+	AhdWordSave(dataMerge, dataMergePath)
+	// A horizontal merge in a data row reads back as fewer physical cells than
+	// the header. Re-saving that bounded semantic reading must stay safe.
+	AhdWordSave(AhdWordRead(dataMergePath), filepath.Join(t.TempDir(), "resaved.docx"))
+
+	validHeaders := AhdNewList("A", "B")
+	validRows := AhdNewList(AhdNewList("1", "2"))
+	invalid := []*AhdList[*AhdList[int64]]{
+		AhdNewList(AhdNewList(int64(0), 0, 1)),
+		AhdNewList(AhdNewList(int64(-1), 0, 1, 2)),
+		AhdNewList(AhdNewList(int64(0), 0, 0, 2)),
+		AhdNewList(AhdNewList(int64(0), 0, 1, 1)),
+		AhdNewList(AhdNewList(int64(0), 1, 1, 2)),
+		AhdNewList(AhdNewList(int64(0), 0, 1, 2), AhdNewList(int64(0), 1, 2, 1)),
+	}
+	for _, descriptors := range invalid {
+		descriptors := descriptors
+		expectRaise(t, AhdClassWordError, func() {
+			AhdWordTable(AhdWordNew(), validHeaders, validRows, descriptors, "left")
+		})
+	}
+	expectRaise(t, AhdClassWordError, func() {
+		AhdWordTable(AhdWordNew(), AhdNewList[string](), AhdNewList[*AhdList[string]](), AhdNewList[*AhdList[int64]](), "left")
+	})
+	expectRaise(t, AhdClassWordError, func() {
+		AhdWordTable(AhdWordNew(), validHeaders, AhdNewList(AhdNewList("short")), AhdNewList[*AhdList[int64]](), "left")
+	})
+	expectRaise(t, AhdClassWordError, func() {
+		AhdWordTable(AhdWordNew(), validHeaders, validRows, AhdNewList[*AhdList[int64]](), "justify")
+	})
+}
+
+func TestWordImagesEmbedBytesAndResolveSizing(t *testing.T) {
+	directory := t.TempDir()
+	imagePath := filepath.Join(directory, "source.png")
+	var encoded bytes.Buffer
+	if err := png.Encode(&encoded, image.NewRGBA(image.Rect(0, 0, 200, 100))); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(imagePath, encoded.Bytes(), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	size := AhdNewPair[string, float64]()
+	size.Set("width", 10)
+	document := AhdWordImage(AhdWordNew(), imagePath, size)
+	if err := os.Remove(imagePath); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(directory, "image.docx")
+	AhdWordSave(document, path)
+	secondPath := filepath.Join(directory, "image-second.docx")
+	AhdWordSave(document, secondPath)
+	firstPackage, _ := os.ReadFile(path)
+	secondPackage, _ := os.ReadFile(secondPath)
+	if !bytes.Equal(firstPackage, secondPackage) {
+		t.Fatal("image relationship IDs or media names are nondeterministic")
+	}
+	if got := wordTestZIPEntry(t, path, "word/media/image1.png"); !bytes.Equal(got, encoded.Bytes()) {
+		t.Fatal("embedded image bytes differ from the source snapshot")
+	}
+	relationships := string(wordTestZIPEntry(t, path, "word/_rels/document.xml.rels"))
+	if !strings.Contains(relationships, `Id="rId2"`) || !strings.Contains(relationships, `Target="media/image1.png"`) {
+		t.Fatalf("image relationship is not deterministic:\n%s", relationships)
+	}
+	xmlText := string(wordTestZIPEntry(t, path, "word/document.xml"))
+	if !strings.Contains(xmlText, `cx="3600000" cy="1800000"`) {
+		t.Fatalf("width-only sizing did not preserve the 2:1 aspect ratio:\n%s", xmlText)
+	}
+
+	both := AhdNewPair[string, float64]()
+	both.Set("width", 4)
+	both.Set("height", 3)
+	if width, height := ahdWordImageExtent(both, 200, 100); width != 1440000 || height != 1080000 {
+		t.Fatalf("explicit image extent = %d x %d", width, height)
+	}
+	heightOnly := AhdNewPair[string, float64]()
+	heightOnly.Set("height", 2)
+	if width, height := ahdWordImageExtent(heightOnly, 200, 100); width != 1440000 || height != 720000 {
+		t.Fatalf("height-only image extent = %d x %d", width, height)
+	}
+	natural := AhdNewPair[string, float64]()
+	if width, height := ahdWordImageExtent(natural, 200, 100); width != 1905000 || height != 952500 {
+		t.Fatalf("natural image extent = %d x %d", width, height)
+	}
+	badKey := AhdNewPair[string, float64]()
+	badKey.Set("depth", 1)
+	expectRaise(t, AhdClassWordError, func() { ahdWordImageExtent(badKey, 1, 1) })
+	badWidth := AhdNewPair[string, float64]()
+	badWidth.Set("width", 0)
+	expectRaise(t, AhdClassWordError, func() { ahdWordImageExtent(badWidth, 1, 1) })
+}
+
+func TestWordReadRoundTripForeignDocumentAndSecurityBounds(t *testing.T) {
+	directory := t.TempDir()
+	generated := filepath.Join(directory, "roundtrip.docx")
+	document := AhdWordHeading(AhdWordNew(), "Başlık", 1)
+	document = AhdWordParagraph(document, "Türkçe içerik", "left", false, false, false)
+	document = AhdWordTable(document, AhdNewList("Ad", "Puan"), AhdNewList(AhdNewList("Ali", "91")), AhdNewList[*AhdList[int64]](), "left")
+	AhdWordSave(document, generated)
+	loaded := AhdWordRead(generated)
+	if got := AhdWordText(loaded); got != "Başlık\nTürkçe içerik" {
+		t.Fatalf("round-trip text = %q", got)
+	}
+	if tables := AhdWordTables(loaded).Snapshot(); len(tables) != 1 || tables[0].Snapshot()[1].Snapshot()[1] != "91" {
+		t.Fatalf("round-trip tables = %v", tables)
+	}
+
+	foreign := filepath.Join(directory, "foreign.docx")
+	foreignXML := []byte(`<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:pPr><w:pStyle w:val="Heading 3"/></w:pPr><w:r><w:t>Independent</w:t></w:r></w:p><w:p><w:r><w:t>one</w:t></w:r><w:r><w:tab/><w:t>two</w:t><w:br/><w:t>three</w:t></w:r></w:p><w:tbl><w:tr><w:tc><w:p><w:r><w:t>A</w:t></w:r></w:p></w:tc></w:tr><w:tr><w:tc><w:p><w:r><w:t>B</w:t></w:r></w:p></w:tc></w:tr></w:tbl></w:body></w:document>`)
+	wordTestWriteZIP(t, foreign, [][2][]byte{{[]byte("word/document.xml"), foreignXML}})
+	foreignDocument := AhdWordRead(foreign)
+	if got := AhdWordHeadings(foreignDocument).Snapshot(); len(got) != 1 || got[0] != "Independent" {
+		t.Fatalf("foreign headings = %v", got)
+	}
+	if got := AhdWordText(foreignDocument); got != "Independent\none\ttwo\nthree" {
+		t.Fatalf("foreign text = %q", got)
+	}
+
+	notZIP := filepath.Join(directory, "not.docx")
+	if err := os.WriteFile(notZIP, []byte("not a zip"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	missing := filepath.Join(directory, "missing.docx")
+	wordTestWriteZIP(t, missing, [][2][]byte{{[]byte("other.xml"), []byte("<x/>")}})
+	unsafe := filepath.Join(directory, "unsafe.docx")
+	wordTestWriteZIP(t, unsafe, [][2][]byte{
+		{[]byte("../../../etc/evil.xml"), []byte("bad")},
+		{[]byte("word/document.xml"), foreignXML},
+	})
+	duplicate := filepath.Join(directory, "duplicate.docx")
+	wordTestWriteZIP(t, duplicate, [][2][]byte{
+		{[]byte("word/document.xml"), foreignXML},
+		{[]byte("word/document.xml"), foreignXML},
+	})
+	bomb := filepath.Join(directory, "bomb.docx")
+	wordTestWriteZIP(t, bomb, [][2][]byte{{[]byte("word/document.xml"), bytes.Repeat([]byte("0"), 1024*1024)}})
+	for _, path := range []string{"", filepath.Join(directory, "absent.docx"), notZIP, missing, unsafe, duplicate, bomb} {
+		path := path
+		expectRaise(t, AhdClassWordError, func() { AhdWordRead(path) })
 	}
 }
 

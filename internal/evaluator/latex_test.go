@@ -67,3 +67,27 @@ func TestLatexDocumentRejectsChapterCounterOutsideReport(t *testing.T) {
 		s.latexBuiltin("document", []any{"", "", "", "", "Article", nil, "", "", theorems})
 	})
 }
+
+func TestLatexBeamerThemesMatchNativeValidationAndColorOrder(t *testing.T) {
+	session := newLatexTestSession()
+	for _, theme := range []string{"Madrid", "Warsaw"} {
+		got := session.latexBuiltin("document", []any{"Body", "Title", "Author", "", "Beamer", 2.5, "#8A1538", "", &Pair{}, theme}).(string)
+		themeLine := `\usetheme{` + theme + `}`
+		colorLine := `\definecolor{ahdaccent}{HTML}{8A1538}`
+		structureLine := `\setbeamercolor{structure}{fg=ahdaccent}`
+		for _, want := range []string{themeLine, colorLine, structureLine} {
+			if !strings.Contains(got, want) {
+				t.Fatalf("%s source omitted %q:\n%s", theme, want, got)
+			}
+		}
+		if strings.Index(got, themeLine) > strings.Index(got, colorLine) {
+			t.Fatalf("custom color did not follow %s:\n%s", theme, got)
+		}
+	}
+	expectEvaluatorRaise(t, "ValueError", func() {
+		session.latexBuiltin("document", []any{"Body", "", "", "", "Beamer", 2.5, "", "", &Pair{}, "Metropolis"})
+	})
+	expectEvaluatorRaise(t, "ValueError", func() {
+		session.latexBuiltin("document", []any{"Body", "", "", "", "Article", 2.5, "", "", &Pair{}, "Madrid"})
+	})
+}

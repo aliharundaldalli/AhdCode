@@ -133,6 +133,26 @@ write(L.escape("A&B"))
 	}
 }
 
+func TestWordGenerationUsesRuntimeHelpersWithoutExternalRequirement(t *testing.T) {
+	program := generate(t, `bring Word
+from Word bring Document
+
+document: Document := Word.new()
+document = document.heading("Report", 1)
+document = document.paragraph("Summary", "center", true, false, false)
+document.save("report.docx")
+`)
+	generated := programSource(t, program)
+	for _, helper := range []string{"AhdWordNew", "AhdWordHeading", "AhdWordParagraph", "AhdWordSave"} {
+		if !strings.Contains(generated, helper) {
+			t.Fatalf("Word generation omitted %s:\n%s", helper, generated)
+		}
+	}
+	if program.RequiresLatex || program.RequiresPlot || program.RequiresNumeric {
+		t.Fatalf("Word acquired an unrelated external runtime requirement: %+v", program)
+	}
+}
+
 func TestGeneratedProgramCarriesRuntime(t *testing.T) {
 	program := generate(t, "write(\"hi\")\n")
 	names := make([]string, 0, len(program.Files))

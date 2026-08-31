@@ -52,6 +52,8 @@ func latexTheoremID(name string) string {
 
 var latexTheoremPattern = regexp.MustCompile(`\\begin\{(ahdthm[0-9a-f]+)\}`)
 
+var latexBeamerThemes = map[string]bool{"Default": true, "Madrid": true, "Warsaw": true}
+
 func (s *Session) latexBuiltin(name string, args []any) any {
 	str := func(i int, fallback string) string {
 		if i >= len(args) || args[i] == nil {
@@ -191,9 +193,27 @@ func (s *Session) latexDocument(args []any) string {
 	if color != "" && !regexp.MustCompile(`^#[0-9A-Fa-f]{6}$`).MatchString(color) {
 		s.raise("ValueError", "Latex.document color must use #RRGGBB")
 	}
+	theme := get(9, "Default")
+	if !latexBeamerThemes[theme] {
+		s.raise("ValueError", "Latex.document theme must be Default, Madrid, or Warsaw")
+	}
+	if theme != "Default" && kind != "Beamer" {
+		s.raise("ValueError", "Latex.document theme requires a Beamer document")
+	}
 	theorems := pairArg(args, 8)
 	var b strings.Builder
-	b.WriteString("\\documentclass{" + class + "}\n\\usepackage{fontspec}\n\\setmainfont{lmroman10-regular.otf}[BoldFont=lmroman10-bold.otf,ItalicFont=lmroman10-italic.otf,BoldItalicFont=lmroman10-bolditalic.otf]\n\\usepackage{amsmath,amssymb,mathtools}\n\\usepackage{geometry,graphicx,booktabs,array,xcolor,hyperref}\n\\geometry{margin=" + formatReal(margin) + "cm}\n\\hypersetup{hidelinks}\n")
+	b.WriteString("\\documentclass{" + class + "}\n")
+	if theme != "Default" {
+		// theme != "Default" already implies kind == "Beamer", checked above.
+		b.WriteString("\\usetheme{" + theme + "}\n")
+	}
+	b.WriteString("\\usepackage{fontspec}\n\\setmainfont{lmroman10-regular.otf}[BoldFont=lmroman10-bold.otf,ItalicFont=lmroman10-italic.otf,BoldItalicFont=lmroman10-bolditalic.otf]\n\\usepackage{amsmath,amssymb,mathtools}\n\\usepackage{geometry,graphicx,booktabs,array,xcolor,hyperref}\n\\geometry{margin=" + formatReal(margin) + "cm}\n\\hypersetup{hidelinks}\n")
+	if color != "" {
+		b.WriteString("\\definecolor{ahdaccent}{HTML}{" + strings.ToUpper(strings.TrimPrefix(color, "#")) + "}\n")
+		if kind == "Beamer" {
+			b.WriteString("\\setbeamercolor{structure}{fg=ahdaccent}\n")
+		}
+	}
 	declared := map[string]string{}
 	for _, key := range theorems.Keys {
 		display, rule := key.(string), theorems.Values[key].(string)
@@ -228,9 +248,6 @@ func (s *Session) latexDocument(args []any) string {
 		if !knownTheorems[match[1]] {
 			s.raise("ValueError", "document body uses an undeclared theorem type")
 		}
-	}
-	if color != "" {
-		b.WriteString("\\definecolor{ahdaccent}{HTML}{" + strings.ToUpper(strings.TrimPrefix(color, "#")) + "}\n")
 	}
 	if title != "" {
 		b.WriteString("\\title{" + latexEscape(title) + "}\n")

@@ -245,6 +245,17 @@ const (
 	NumericMatrixMin         TypeOperation = "Matrix.min"
 	NumericMatrixMax         TypeOperation = "Matrix.max"
 
+	WordDocumentHeading    TypeOperation = "Document.heading"
+	WordDocumentParagraph  TypeOperation = "Document.paragraph"
+	WordDocumentTable      TypeOperation = "Document.table"
+	WordDocumentImage      TypeOperation = "Document.image"
+	WordDocumentPageBreak  TypeOperation = "Document.pageBreak"
+	WordDocumentSave       TypeOperation = "Document.save"
+	WordDocumentText       TypeOperation = "Document.text"
+	WordDocumentParagraphs TypeOperation = "Document.paragraphs"
+	WordDocumentHeadings   TypeOperation = "Document.headings"
+	WordDocumentTables     TypeOperation = "Document.tables"
+
 	// DateTimeBefore, DateTimeAfter, and DateTimeSameMoment order two moments
 	// without giving AhdCode operator overloading.
 	DateTimeBefore     TypeOperation = "DateTime.before"

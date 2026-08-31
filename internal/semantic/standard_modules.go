@@ -26,6 +26,7 @@ func StandardModuleInterfaces() map[string]*ModuleInterface {
 		"Regex":      regexModuleInterface(),
 		"Statistics": statisticsModuleInterface(),
 		"Time":       timeModuleInterface(),
+		"Word":       wordModuleInterface(),
 	}
 }
 

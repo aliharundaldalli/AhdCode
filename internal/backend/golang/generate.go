@@ -345,6 +345,7 @@ func (generator *generator) emitProgram() string {
 	generator.emitDataHelpers(writer)
 	generator.emitPlotHelpers(writer)
 	generator.emitNumericHelpers(writer)
+	generator.emitWordHelpers(writer)
 	writer.raw(bodies.String())
 	generator.emitInstaller(writer)
 	writer.open("func main() {")

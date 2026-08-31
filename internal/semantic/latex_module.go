@@ -73,6 +73,7 @@ func latexModuleInterface() *ModuleInterface {
 		types.Parameter{Name: "color", Type: types.String, HasDefault: true},
 		types.Parameter{Name: "cover", Type: types.String, HasDefault: true},
 		types.Parameter{Name: "theorems", Type: types.Pair{Key: types.String, Value: types.String}, HasDefault: true},
+		types.Parameter{Name: "theme", Type: types.String, HasDefault: true},
 	)))
 	add(latexFunction("table", latexSignature(types.String,
 		types.Parameter{Name: "headers", Type: types.List{Element: types.String}},

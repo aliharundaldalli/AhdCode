@@ -54,9 +54,9 @@
     "source_url": "https://data1.fullyjustified.net/tlextras-2022.0r0.tar",
     "source_size": 2881562112,
     "source_content_identity": "6ffe055852f8faf66c0acbe1a7fb27f87b869a90bad1204f3bf4d9683f597c7c",
-    "content_sha256": "e417a8a624b998817ed35633cb00e7fd71861d3fa5e75284b7381d26ecf2d94b",
-    "ttb_sha256": "f22b34458301f79c8214a17ff9b9f9087e261de8df5cc870820b39a185ef73f6",
-    "ttb_size": 5541062,
+    "content_sha256": "5c54299ae22804eb8d38ddff8345a7d31544630f70da6948ec66b0fb770f80c3",
+    "ttb_sha256": "320d29bb51485ad686115ba58f4004d717771bb560db4f01e87a130789212b21",
+    "ttb_size": 5546077,
     "resource_manifest": "resources.json"
   }
 }

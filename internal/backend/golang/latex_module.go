@@ -75,7 +75,11 @@ func (generator *generator) latexCall(value *ir.CallExpr) string {
 		if len(value.Arguments) > 8 && !value.Arguments[8].UsesDefault && value.Arguments[8].Value != nil {
 			theorems = generator.expr(value.Arguments[8].Value)
 		}
-		return "AhdLatexDocumentFull(" + argument(0) + ", " + argument(1) + ", " + argument(2) + ", " + argument(3) + ", " + typeArg + ", " + realArgument(5, "2.54") + ", " + argument(6) + ", " + argument(7) + ", " + theorems + ")"
+		theme := `"Default"`
+		if len(value.Arguments) > 9 && !value.Arguments[9].UsesDefault {
+			theme = argument(9)
+		}
+		return "AhdLatexDocumentFull(" + argument(0) + ", " + argument(1) + ", " + argument(2) + ", " + argument(3) + ", " + typeArg + ", " + realArgument(5, "2.54") + ", " + argument(6) + ", " + argument(7) + ", " + theorems + ", " + theme + ")"
 	case "table":
 		if len(value.Arguments) < 2 || value.Arguments[0].Value == nil || value.Arguments[1].Value == nil {
 			generator.fail(CodeGenerationFailure, "Latex.table has a missing argument", meta.Span, "the IR call is malformed")

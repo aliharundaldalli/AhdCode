@@ -18,7 +18,7 @@ func TestLatexStandardModuleHasExactSignatures(t *testing.T) {
 		{"subsection", `value: String := Latex.subsection("Title")`, true},
 		{"equation", `value: String := Latex.equation("x^2")`, true},
 		{"document required only", `value: String := Latex.document("body")`, true},
-		{"document all", `value: String := Latex.document(body: "body", title: "Title", author: "AhdCode")`, true},
+		{"document all", `value: String := Latex.document(body: "body", title: "Title", author: "AhdCode", type: "Beamer", theme: "Madrid")`, true},
 		{"table", `value: String := Latex.table(["Name"], [["Ali"]])`, true},
 
 		{"pdf rejects numeric source", `Latex.pdf(source: 123, output: "out.pdf")`, false},
@@ -26,7 +26,7 @@ func TestLatexStandardModuleHasExactSignatures(t *testing.T) {
 		{"pdf wrong arity", `Latex.pdf("document")`, false},
 		{"escape rejects Int", `value: String := Latex.escape(42)`, false},
 		{"equation rejects Bool", `value: String := Latex.equation(true)`, false},
-		{"document rejects extra argument", `value: String := Latex.document("b", "t", "a", "d", "Article", 2.54, "", "", {}, "extra")`, false},
+		{"document rejects extra argument", `value: String := Latex.document("b", "t", "a", "d", "Article", 2.54, "", "", {}, "Default", "extra")`, false},
 		{"table requires nested strings", `value: String := Latex.table(["Name"], [[1]])`, false},
 	}
 	for _, test := range tests {

@@ -1,6 +1,7 @@
 package build
 
 import (
+	"bytes"
 	"encoding/json"
 	"os"
 	"os/exec"
@@ -27,6 +28,54 @@ write(source)
 		if !strings.Contains(stdout, expected) {
 			t.Fatalf("Latex helper output omitted %q:\n%s", expected, stdout)
 		}
+	}
+}
+
+func TestLatexBeamerThemesCompileWithStagedOfflineBundle(t *testing.T) {
+	root := os.Getenv("AHDCODE_LATEX_TEST_RUNTIME")
+	if root == "" {
+		t.Skip("set AHDCODE_LATEX_TEST_RUNTIME to a staged Tectonic + ahdcode-latex.ttb directory")
+	}
+	t.Setenv("AHDCODE_LATEX_RUNTIME", root)
+	for _, testCase := range []struct {
+		theme string
+		color string
+	}{
+		{theme: "Default"},
+		{theme: "Madrid", color: "#8A1538"},
+		{theme: "Warsaw", color: "#006A4E"},
+	} {
+		t.Run(testCase.theme, func(t *testing.T) {
+			directory := t.TempDir()
+			output := filepath.Join(directory, strings.ToLower(testCase.theme)+".pdf")
+			source := `bring Latex as L
+slides: String := L.frame("Contents", L.contents())
+slides += L.section("Evidence")
+slides += L.frame("Equation", L.equation(r"E = mc^2"))
+slides += L.frame("Table", L.table(["Theme", "Offline"], [["` + testCase.theme + `", "yes"]]))
+document: String := L.document(
+    body: slides
+    title: "` + testCase.theme + `"
+    type: "Beamer"
+    color: "` + testCase.color + `"
+    theme: "` + testCase.theme + `"
+)
+L.pdf(document, ` + strconv.Quote(output) + `)
+write("ok")
+`
+			entry := filepath.Join(directory, "main.ahd")
+			if err := os.WriteFile(entry, []byte(source), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			stdout, stderr, code := buildAndRun(t, entry, "")
+			if code != 0 || stdout != "ok\n" || stderr != "" {
+				t.Fatalf("%s compile failed: code=%d stdout=%q stderr=%q", testCase.theme, code, stdout, stderr)
+			}
+			content, err := os.ReadFile(output)
+			if err != nil || len(content) < 1024 || !bytes.HasPrefix(content, []byte("%PDF-")) {
+				t.Fatalf("%s produced invalid PDF: size=%d err=%v", testCase.theme, len(content), err)
+			}
+		})
 	}
 }
 

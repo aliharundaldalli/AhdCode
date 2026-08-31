@@ -276,6 +276,18 @@
     "sha256": "8e7889e33fd2984fd2361775e38454fa2b43ff5d0c30b6405813652548558914"
   },
   {
+    "name": "beamercolorthemeorchid.sty",
+    "offset": 60835328,
+    "length": 835,
+    "sha256": "74fb34ec3869fa1f7313dcb654b8fefa3693e9aa4cf9bf4b8d18b06d1235e4c1"
+  },
+  {
+    "name": "beamercolorthemewhale.sty",
+    "offset": 60848128,
+    "length": 1013,
+    "sha256": "7ed7028d2a15e75bc7c729fbff5223a275f9893f212dcbaa1de6eba8ed4d16be"
+  },
+  {
     "name": "beamerfontthemedefault.sty",
     "offset": 60854272,
     "length": 4236,
@@ -324,10 +336,46 @@
     "sha256": "788a484d2e4600a94c77589a8b990f987a4018adb4db420ef1cc6114911c872b"
   },
   {
+    "name": "beamerinnerthemerounded.sty",
+    "offset": 61139456,
+    "length": 1012,
+    "sha256": "cade07c0eb281d753ba4ef5d6ec098a0f3800d2b0112de63c7d856812760a7b1"
+  },
+  {
     "name": "beamerouterthemedefault.sty",
     "offset": 61140992,
     "length": 6946,
     "sha256": "a3490453bc8545edece77928f0baace2adc01ca1113acdd098a38bae9de3db85"
+  },
+  {
+    "name": "beamerouterthemeinfolines.sty",
+    "offset": 61148672,
+    "length": 2190,
+    "sha256": "43c50255c6dc8dd829116d4d0775529f539f7f5724a8266eafaac3491905bdde"
+  },
+  {
+    "name": "beamerouterthemeshadow.sty",
+    "offset": 61157376,
+    "length": 2754,
+    "sha256": "c0f7d628d5cb78b79d48b845a5165499d59dcbaafc15d67a0848664bf74a50e9"
+  },
+  {
+    "name": "beamerouterthemesplit.sty",
+    "offset": 61176832,
+    "length": 2529,
+    "sha256": "81a6cd87303d7f48ffe9d61baa424593c538eed289a54d1da96a17113b921032"
+  },
+  {
+    "name": "beamerthemeMadrid.sty",
+    "offset": 61221376,
+    "length": 557,
+    "sha256": "485beb8e248abee7f9f3a3648aa442b41dcc575709ce51f3c160f906bab02a7d"
+  },
+  {
+    "name": "beamerthemeWarsaw.sty",
+    "offset": 61233664,
+    "length": 403,
+    "sha256": "a3e0b4626e65a2c59b655abcdccb4a67beb857bccc1b1b21ef4952b2cce5d06d"
   },
   {
     "name": "beamerthemedefault.sty",
