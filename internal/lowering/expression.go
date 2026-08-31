@@ -22,6 +22,9 @@ func (lowerer *moduleLowerer) lowerExprExpected(expression ast.Expr, expected ir
 	if expected.Kind == ir.RealType && actual.Kind == ir.IntType {
 		return &ir.ConvertExpr{ExprBase: ir.ExprBase{Span: expression.Span(), Type: expected, NullState: result.ExprMeta().NullState}, From: actual, Value: result}
 	}
+	if expected.Kind == ir.ComplexType && (actual.Kind == ir.IntType || actual.Kind == ir.RealType) {
+		return &ir.ConvertExpr{ExprBase: ir.ExprBase{Span: expression.Span(), Type: expected, NullState: result.ExprMeta().NullState}, From: actual, Value: result}
+	}
 	return result
 }
 
@@ -50,6 +53,8 @@ func (lowerer *moduleLowerer) lowerExprWithExpected(expression ast.Expr, expecte
 			return &ir.LiteralExpr{ExprBase: base, Kind: ir.IntLiteral, Value: value.Value}
 		case ast.RealLiteral:
 			return &ir.LiteralExpr{ExprBase: base, Kind: ir.RealLiteral, Value: value.Value}
+		case ast.ImaginaryLiteral:
+			return &ir.LiteralExpr{ExprBase: base, Kind: ir.ComplexLiteral, Value: value.Value}
 		case ast.BoolLiteral:
 			return &ir.LiteralExpr{ExprBase: base, Kind: ir.BoolLiteral, Value: value.Value}
 		}
@@ -210,11 +215,32 @@ func (lowerer *moduleLowerer) lowerBinary(expression *ast.BinaryExpr, base ir.Ex
 	}
 	leftType, rightType := left.ExprMeta().Type, right.ExprMeta().Type
 	op := typedBinaryOp(expression.Operator, leftType, rightType, base.Type)
-	if needsRealOperands(expression.Operator, leftType, rightType, base.Type) {
+	if needsComplexOperands(expression.Operator, leftType, rightType, base.Type) {
+		left = explicitComplexWiden(left)
+		right = explicitComplexWiden(right)
+	} else if needsRealOperands(expression.Operator, leftType, rightType, base.Type) {
 		left = explicitWiden(left)
 		right = explicitWiden(right)
 	}
 	return &ir.BinaryExpr{ExprBase: base, Op: op, Left: left, Right: right}
+}
+
+func explicitComplexWiden(expression ir.Expr) ir.Expr {
+	if expression == nil || expression.ExprMeta().Type.Kind == ir.ComplexType {
+		return expression
+	}
+	base := expression.ExprMeta()
+	if base.Type.Kind != ir.IntType && base.Type.Kind != ir.RealType {
+		return expression
+	}
+	return &ir.ConvertExpr{ExprBase: ir.ExprBase{Span: base.Span, Type: ir.Type{Kind: ir.ComplexType}, NullState: base.NullState}, From: base.Type, Value: expression}
+}
+
+func needsComplexOperands(operator string, left, right, result ir.Type) bool {
+	if result.Kind == ir.ComplexType && operator != "^" {
+		return true
+	}
+	return (operator == "==" || operator == "!=") && (left.Kind == ir.ComplexType || right.Kind == ir.ComplexType)
 }
 
 // lowerProtocolCall builds the CallExpr+MemberExpr shape of one resolved
@@ -366,10 +392,16 @@ func typedUnaryOp(operator string, operand ir.Expr) ir.UnaryOp {
 		if kind == ir.IntType {
 			return "IntPositive"
 		}
+		if kind == ir.ComplexType {
+			return "ComplexPositive"
+		}
 		return "RealPositive"
 	case "-":
 		if kind == ir.IntType {
 			return "CheckedIntNegate"
+		}
+		if kind == ir.ComplexType {
+			return "ComplexNegate"
 		}
 		return "RealNegate"
 	case "not":
@@ -379,6 +411,20 @@ func typedUnaryOp(operator string, operand ir.Expr) ir.UnaryOp {
 }
 
 func typedBinaryOp(operator string, left, right, result ir.Type) ir.BinaryOp {
+	if result.Kind == ir.ComplexType {
+		switch operator {
+		case "+":
+			return "ComplexAdd"
+		case "-":
+			return "ComplexSubtract"
+		case "*":
+			return "ComplexMultiply"
+		case "/":
+			return "ComplexDivide"
+		case "^":
+			return "ComplexIntPower"
+		}
+	}
 	numeric := "Int"
 	if left.Kind == ir.RealType || right.Kind == ir.RealType || result.Kind == ir.RealType {
 		numeric = "Real"
@@ -452,6 +498,9 @@ func typedBinaryOp(operator string, left, right, result ir.Type) ir.BinaryOp {
 }
 
 func comparisonPrefix(left, right ir.Type) string {
+	if left.Kind == ir.ComplexType || right.Kind == ir.ComplexType {
+		return "Complex"
+	}
 	if left.Kind == ir.RealType || right.Kind == ir.RealType {
 		return "Real"
 	}

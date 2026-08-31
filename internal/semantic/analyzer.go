@@ -547,6 +547,8 @@ func (a *analyzer) resolveType(reference *ast.TypeRef) types.Type {
 		return noArguments(types.Int)
 	case "Real":
 		return noArguments(types.Real)
+	case "Complex":
+		return noArguments(types.Complex)
 	case "String":
 		return noArguments(types.String)
 	case "Bool":

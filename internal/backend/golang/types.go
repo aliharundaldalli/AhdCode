@@ -26,7 +26,7 @@ func (generator *generator) goType(value ir.Type, nullable bool) string {
 
 func isScalar(value ir.Type) bool {
 	switch value.Kind {
-	case ir.IntType, ir.RealType, ir.StringType, ir.BoolType:
+	case ir.IntType, ir.RealType, ir.ComplexType, ir.StringType, ir.BoolType:
 		return true
 	default:
 		return false
@@ -39,6 +39,8 @@ func (generator *generator) plainType(value ir.Type) string {
 		return "int64"
 	case ir.RealType:
 		return "float64"
+	case ir.ComplexType:
+		return "complex128"
 	case ir.StringType:
 		return "string"
 	case ir.BoolType:

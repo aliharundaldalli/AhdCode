@@ -10,6 +10,7 @@ const (
 	Identifier
 	IntLiteral
 	RealLiteral
+	ImaginaryLiteral
 	StringStart
 	StringText
 	InterpolationStart
@@ -47,6 +48,7 @@ const (
 	KeywordNull
 	KeywordInt
 	KeywordReal
+	KeywordComplex
 	KeywordString
 	KeywordBool
 	KeywordNothing
@@ -104,7 +106,7 @@ const (
 
 var names = [...]string{
 	Invalid: "Invalid", EOF: "EOF", Newline: "Newline", Identifier: "Identifier",
-	IntLiteral: "IntLiteral", RealLiteral: "RealLiteral", StringStart: "StringStart",
+	IntLiteral: "IntLiteral", RealLiteral: "RealLiteral", ImaginaryLiteral: "ImaginaryLiteral", StringStart: "StringStart",
 	StringText: "StringText", InterpolationStart: "InterpolationStart",
 	InterpolationEnd: "InterpolationEnd", StringEnd: "StringEnd",
 	KeywordAnd: "and", KeywordOr: "or", KeywordNot: "not", KeywordSame: "same",
@@ -115,7 +117,7 @@ var names = [...]string{
 	KeywordExcept: "except", KeywordUltimately: "ultimately", KeywordToss: "toss",
 	KeywordReturn: "return", KeywordBring: "bring", KeywordFrom: "from", KeywordAll: "all",
 	KeywordAs: "as", KeywordTrue: "true", KeywordFalse: "false", KeywordNull: "null",
-	KeywordInt: "Int", KeywordReal: "Real", KeywordString: "String", KeywordBool: "Bool",
+	KeywordInt: "Int", KeywordReal: "Real", KeywordComplex: "Complex", KeywordString: "String", KeywordBool: "Bool",
 	KeywordNothing: "Nothing", KeywordList: "List", KeywordPair: "Pair",
 	KeywordFunction: "Function", KeywordLambda: "lambda", KeywordOverload: "Overload", KeywordOverride: "Override",
 	KeywordClass: "Class", KeywordAttributes: "Attributes", KeywordConstant: "Constant",

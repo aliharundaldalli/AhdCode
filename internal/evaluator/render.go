@@ -33,6 +33,20 @@ func (session *Session) render(value any, nested bool, seen map[visit]bool) stri
 			session.raise("OverflowError", "Real value is not finite")
 		}
 		return formatReal(item)
+	case complex128:
+		if math.IsNaN(real(item)) || math.IsNaN(imag(item)) {
+			session.raise("DomainError", "Complex component is not a number")
+		}
+		if math.IsInf(real(item), 0) || math.IsInf(imag(item), 0) {
+			session.raise("OverflowError", "Complex component is not finite")
+		}
+		sign := "+"
+		imaginary := imag(item)
+		if math.Signbit(imaginary) {
+			sign = "-"
+			imaginary = -imaginary
+		}
+		return formatReal(real(item)) + sign + formatReal(imaginary) + "I"
 	case bool:
 		return strconv.FormatBool(item)
 	case string:
@@ -164,6 +178,9 @@ func (session *Session) equalSeen(left, right any, seen map[equalityVisit]bool) 
 		return ok && first == second
 	case float64:
 		second, ok := right.(float64)
+		return ok && first == second
+	case complex128:
+		second, ok := right.(complex128)
 		return ok && first == second
 	case string:
 		second, ok := right.(string)

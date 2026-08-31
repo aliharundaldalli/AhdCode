@@ -14,6 +14,8 @@ func lowerType(value types.Type) ir.Type {
 			return ir.Type{Kind: ir.IntType}
 		case types.RealKind:
 			return ir.Type{Kind: ir.RealType}
+		case types.ComplexKind:
+			return ir.Type{Kind: ir.ComplexType}
 		case types.StringKind:
 			return ir.Type{Kind: ir.StringType}
 		case types.BoolKind:

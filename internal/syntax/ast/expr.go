@@ -11,6 +11,7 @@ type LiteralKind uint8
 const (
 	IntLiteral LiteralKind = iota
 	RealLiteral
+	ImaginaryLiteral
 	BoolLiteral
 	NullLiteral
 )

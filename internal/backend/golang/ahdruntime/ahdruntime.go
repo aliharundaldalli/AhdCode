@@ -949,6 +949,53 @@ func AhdRealPower(base, exponent float64) float64 {
 // AhdRealNegate negates a Real value.
 func AhdRealNegate(value float64) float64 { return -value }
 
+func AhdIntToComplex(value int64) complex128               { return complex(float64(value), 0) }
+func AhdRealToComplex(value float64) complex128            { return complex(value, 0) }
+func AhdComplexNegate(value complex128) complex128         { return -value }
+func AhdComplexAdd(left, right complex128) complex128      { return left + right }
+func AhdComplexSubtract(left, right complex128) complex128 { return left - right }
+func AhdComplexMultiply(left, right complex128) complex128 { return left * right }
+func AhdComplexDivide(left, right complex128) complex128 {
+	if right == 0 {
+		AhdRaiseClass(AhdClassDivisionByZeroError, "Complex division by zero")
+	}
+	return left / right
+}
+func AhdComplexIntPower(base complex128, exponent int64) complex128 {
+	if exponent == 0 {
+		return complex(1, 0)
+	}
+	negative := exponent < 0
+	var magnitude uint64
+	if negative {
+		magnitude = uint64(-(exponent + 1)) + 1
+	} else {
+		magnitude = uint64(exponent)
+	}
+	result := complex(1, 0)
+	for magnitude != 0 {
+		if magnitude&1 != 0 {
+			result *= base
+		}
+		magnitude >>= 1
+		if magnitude != 0 {
+			base *= base
+		}
+	}
+	if negative {
+		if result == 0 {
+			AhdRaiseClass(AhdClassDivisionByZeroError, "Complex negative power divides by zero")
+		}
+		return 1 / result
+	}
+	return result
+}
+func AhdComplexReal(value complex128) float64         { return real(value) }
+func AhdComplexImag(value complex128) float64         { return imag(value) }
+func AhdComplexConjugate(value complex128) complex128 { return complex(real(value), -imag(value)) }
+func AhdComplexMagnitude(value complex128) float64    { return math.Hypot(real(value), imag(value)) }
+func AhdComplexPhase(value complex128) float64        { return math.Atan2(imag(value), real(value)) }
+
 // AhdIntToReal is the explicit Int -> Real widening conversion.
 func AhdIntToReal(value int64) float64 { return float64(value) }
 
@@ -2710,6 +2757,22 @@ func AhdStrReal(value float64) string {
 	return ahdFormatReal(value)
 }
 
+func AhdStrComplex(value complex128) string {
+	realPart, imaginary := real(value), imag(value)
+	if math.IsNaN(realPart) || math.IsNaN(imaginary) {
+		AhdRaiseClass(AhdClassDomainError, "Complex component is not a number")
+	}
+	if math.IsInf(realPart, 0) || math.IsInf(imaginary, 0) {
+		AhdRaiseClass(AhdClassOverflowError, "Complex component is not finite")
+	}
+	sign := "+"
+	if math.Signbit(imaginary) {
+		sign = "-"
+		imaginary = -imaginary
+	}
+	return ahdFormatReal(realPart) + sign + ahdFormatReal(imaginary) + "I"
+}
+
 // ahdFormatReal renders the shortest round-trip decimal text for a finite
 // Real. Fixed notation is used for ordinary magnitudes; scientific notation
 // with a lowercase e is used only when a fixed rendering would be unwieldy.
@@ -2814,6 +2877,8 @@ func AhdEqInt(left, right int64) bool { return left == right }
 
 // AhdEqReal compares two Real values.
 func AhdEqReal(left, right float64) bool { return left == right }
+
+func AhdEqComplex(left, right complex128) bool { return left == right }
 
 // AhdEqString compares two String values.
 func AhdEqString(left, right string) bool { return left == right }

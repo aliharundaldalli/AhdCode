@@ -18,6 +18,7 @@ const (
 	InvalidType  TypeKind = "Invalid"
 	IntType      TypeKind = "Int"
 	RealType     TypeKind = "Real"
+	ComplexType  TypeKind = "Complex"
 	StringType   TypeKind = "String"
 	BoolType     TypeKind = "Bool"
 	NothingType  TypeKind = "Nothing"

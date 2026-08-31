@@ -25,6 +25,9 @@ func (session *Session) eval(expression ir.Expr, current *frame) any {
 		case ir.RealLiteral:
 			parsed, _ := strconv.ParseFloat(value.Value, 64)
 			return parsed
+		case ir.ComplexLiteral:
+			parsed, _ := strconv.ParseFloat(value.Value, 64)
+			return complex(0, parsed)
 		case ir.BoolLiteral:
 			return value.Value == "true"
 		case ir.StringLiteral:
@@ -51,7 +54,7 @@ func (session *Session) eval(expression ir.Expr, current *frame) any {
 	case *ir.UnaryExpr:
 		operand := session.eval(value.Operand, current)
 		switch value.Op {
-		case "IntPositive", "RealPositive":
+		case "IntPositive", "RealPositive", "ComplexPositive":
 			return operand
 		case "CheckedIntNegate":
 			item := operand.(int64)
@@ -61,6 +64,8 @@ func (session *Session) eval(expression ir.Expr, current *frame) any {
 			return -item
 		case "RealNegate":
 			return -operand.(float64)
+		case "ComplexNegate":
+			return -operand.(complex128)
 		case "BoolNot":
 			return !session.boolean(operand)
 		}
@@ -220,6 +225,10 @@ func (session *Session) convert(from, to ir.Type, value any) any {
 	switch {
 	case from.Kind == ir.IntType && to.Kind == ir.RealType:
 		return float64(value.(int64))
+	case from.Kind == ir.IntType && to.Kind == ir.ComplexType:
+		return complex(float64(value.(int64)), 0)
+	case from.Kind == ir.RealType && to.Kind == ir.ComplexType:
+		return complex(value.(float64), 0)
 	case from.Kind == ir.RealType && to.Kind == ir.IntType:
 		number := value.(float64)
 		if math.IsNaN(number) {
@@ -266,6 +275,19 @@ func (session *Session) binary(operation ir.BinaryOp, left, right any) any {
 		return session.realCheck(left.(float64)/right.(float64), "division")
 	case "RealPower":
 		return session.realCheck(math.Pow(left.(float64), right.(float64)), "power")
+	case "ComplexAdd":
+		return left.(complex128) + right.(complex128)
+	case "ComplexSubtract":
+		return left.(complex128) - right.(complex128)
+	case "ComplexMultiply":
+		return left.(complex128) * right.(complex128)
+	case "ComplexDivide":
+		if right.(complex128) == 0 {
+			session.raise("DivisionByZeroError", "Complex division by zero")
+		}
+		return left.(complex128) / right.(complex128)
+	case "ComplexIntPower":
+		return complexIntPower(left.(complex128), right.(int64))
 	case "StringConcat":
 		return left.(string) + right.(string)
 	case "StringRepeat":
@@ -328,6 +350,33 @@ func (session *Session) binary(operation ir.BinaryOp, left, right any) any {
 	}
 	session.raise("Error", "unsupported binary operation "+string(operation))
 	return nil
+}
+
+func complexIntPower(base complex128, exponent int64) complex128 {
+	if exponent == 0 {
+		return complex(1, 0)
+	}
+	negative := exponent < 0
+	var magnitude uint64
+	if negative {
+		magnitude = uint64(-(exponent + 1)) + 1
+	} else {
+		magnitude = uint64(exponent)
+	}
+	result := complex(1, 0)
+	for magnitude != 0 {
+		if magnitude&1 != 0 {
+			result *= base
+		}
+		magnitude >>= 1
+		if magnitude != 0 {
+			base *= base
+		}
+	}
+	if negative {
+		return 1 / result
+	}
+	return result
 }
 
 func (session *Session) intAdd(left, right int64) int64 {

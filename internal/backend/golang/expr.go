@@ -89,6 +89,12 @@ func (generator *generator) expr(expression ir.Expr) string {
 		if value.From.Kind == ir.RealType && meta.Type.Kind == ir.IntType {
 			return "AhdRealToInt(" + generator.value(value.Value, ir.Type{Kind: ir.RealType}, false) + ")"
 		}
+		if value.From.Kind == ir.IntType && meta.Type.Kind == ir.ComplexType {
+			return "AhdIntToComplex(" + generator.value(value.Value, ir.Type{Kind: ir.IntType}, false) + ")"
+		}
+		if value.From.Kind == ir.RealType && meta.Type.Kind == ir.ComplexType {
+			return "AhdRealToComplex(" + generator.value(value.Value, ir.Type{Kind: ir.RealType}, false) + ")"
+		}
 		if value.From.Kind == ir.StringType && meta.Type.Kind == ir.IntType {
 			return "AhdStringToInt(" + generator.value(value.Value, ir.Type{Kind: ir.StringType}, false) + ")"
 		}
@@ -157,6 +163,13 @@ func (generator *generator) literal(value *ir.LiteralExpr) string {
 			return "float64(0)"
 		}
 		return "float64(" + goRealConstant(parsed) + ")"
+	case ir.ComplexLiteral:
+		parsed, err := strconv.ParseFloat(value.Value, 64)
+		if err != nil || math.IsInf(parsed, 0) || math.IsNaN(parsed) {
+			generator.fail(CodeGenerationFailure, "imaginary literal "+value.Value+"I has no finite float64 value", meta.Span, "the frontend should reject non-finite imaginary constants")
+			return "complex128(0)"
+		}
+		return "complex(0.0, float64(" + goRealConstant(parsed) + "))"
 	case ir.BoolLiteral:
 		if value.Value == "true" {
 			return "true"
@@ -201,10 +214,14 @@ func (generator *generator) unary(value *ir.UnaryExpr) string {
 		return operand(ir.IntType)
 	case "RealPositive":
 		return operand(ir.RealType)
+	case "ComplexPositive":
+		return operand(ir.ComplexType)
 	case "CheckedIntNegate":
 		return "AhdIntNegate(" + operand(ir.IntType) + ")"
 	case "RealNegate":
 		return "AhdRealNegate(" + operand(ir.RealType) + ")"
+	case "ComplexNegate":
+		return "AhdComplexNegate(" + operand(ir.ComplexType) + ")"
 	case "BoolNot":
 		return "(!" + operand(ir.BoolType) + ")"
 	default:
@@ -224,6 +241,11 @@ func (generator *generator) binary(value *ir.BinaryExpr) string {
 	case "RealAdd", "RealSubtract", "RealMultiply", "RealDivide", "RealPower":
 		left, right := scalar(ir.RealType)
 		return "Ahd" + string(value.Op) + "(" + left + ", " + right + ")"
+	case "ComplexAdd", "ComplexSubtract", "ComplexMultiply", "ComplexDivide":
+		left, right := scalar(ir.ComplexType)
+		return "Ahd" + string(value.Op) + "(" + left + ", " + right + ")"
+	case "ComplexIntPower":
+		return "AhdComplexIntPower(" + generator.value(value.Left, ir.Type{Kind: ir.ComplexType}, false) + ", " + generator.value(value.Right, ir.Type{Kind: ir.IntType}, false) + ")"
 	case "StringConcat":
 		left, right := scalar(ir.StringType)
 		return "(" + left + " + " + right + ")"
@@ -420,6 +442,8 @@ func (generator *generator) renderFunc(value ir.Type, nullable, nested bool, spa
 		base = "AhdStrInt"
 	case ir.RealType:
 		base = "AhdStrReal"
+	case ir.ComplexType:
+		base = "AhdStrComplex"
 	case ir.BoolType:
 		base = "AhdStrBool"
 	case ir.StringType:
@@ -457,6 +481,8 @@ func (generator *generator) equalFunc(value ir.Type, nullable bool, span source.
 		base = "AhdEqInt"
 	case ir.RealType:
 		base = "AhdEqReal"
+	case ir.ComplexType:
+		base = "AhdEqComplex"
 	case ir.BoolType:
 		base = "AhdEqBool"
 	case ir.StringType:
@@ -946,6 +972,9 @@ func (generator *generator) builtinCall(value *ir.CallExpr) string {
 		if strings.HasPrefix(name, "String.") {
 			return generator.stringOperation(strings.TrimPrefix(name, "String."), value)
 		}
+		if strings.HasPrefix(name, "Complex.") {
+			return generator.complexOperation(strings.TrimPrefix(name, "Complex."), value)
+		}
 		if strings.HasPrefix(name, "List.") {
 			return generator.listOperation(strings.TrimPrefix(name, "List."), value)
 		}
@@ -963,6 +992,18 @@ func (generator *generator) builtinCall(value *ir.CallExpr) string {
 		}
 		return generator.unsupported("Fundamentals function "+name, meta.Span)
 	}
+}
+
+func (generator *generator) complexOperation(name string, value *ir.CallExpr) string {
+	if value.Callee == nil || len(value.Arguments) != 0 {
+		return generator.unsupported("Complex operation "+name+" with malformed arguments", value.ExprMeta().Span)
+	}
+	helpers := map[string]string{"real": "AhdComplexReal", "imag": "AhdComplexImag", "conjugate": "AhdComplexConjugate", "magnitude": "AhdComplexMagnitude", "phase": "AhdComplexPhase"}
+	helper, ok := helpers[name]
+	if !ok {
+		return generator.unsupported("Complex operation "+name, value.ExprMeta().Span)
+	}
+	return helper + "(" + generator.value(value.Callee, ir.Type{Kind: ir.ComplexType}, false) + ")"
 }
 
 // stringOperation lowers one built-in String operation. String is immutable,

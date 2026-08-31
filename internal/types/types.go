@@ -14,6 +14,7 @@ const (
 	InvalidKind Kind = iota
 	IntKind
 	RealKind
+	ComplexKind
 	StringKind
 	BoolKind
 	NothingKind
@@ -32,6 +33,8 @@ func (kind Kind) String() string {
 		return "Int"
 	case RealKind:
 		return "Real"
+	case ComplexKind:
+		return "Complex"
 	case StringKind:
 		return "String"
 	case BoolKind:
@@ -68,6 +71,7 @@ var (
 	Invalid Type = Basic{InvalidKind}
 	Int     Type = Basic{IntKind}
 	Real    Type = Basic{RealKind}
+	Complex Type = Basic{ComplexKind}
 	String  Type = Basic{StringKind}
 	Bool    Type = Basic{BoolKind}
 	Nothing Type = Basic{NothingKind}
@@ -217,7 +221,7 @@ func IsPairKey(value Type) bool {
 	}
 }
 func IsNumeric(value Type) bool {
-	return value != nil && (value.Kind() == IntKind || value.Kind() == RealKind)
+	return value != nil && (value.Kind() == IntKind || value.Kind() == RealKind || value.Kind() == ComplexKind)
 }
 
 // Equal compares semantic type identity, including invariant generic
@@ -277,6 +281,9 @@ func Assignable(target, value Type) bool {
 		return true
 	}
 	if target.Kind() == RealKind && value.Kind() == IntKind {
+		return true
+	}
+	if target.Kind() == ComplexKind && (value.Kind() == IntKind || value.Kind() == RealKind) {
 		return true
 	}
 	targetFunction, targetFunctionOK := target.(Function)

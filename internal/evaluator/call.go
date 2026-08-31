@@ -190,6 +190,17 @@ func (session *Session) core(name string, receiver any, arguments []any) any {
 	case "write":
 		session.writeText(session.render(arg(0), false, make(map[visit]bool)) + "\n")
 		return Nothing
+	case "Complex.real":
+		return real(receiver.(complex128))
+	case "Complex.imag":
+		return imag(receiver.(complex128))
+	case "Complex.conjugate":
+		v := receiver.(complex128)
+		return complex(real(v), -imag(v))
+	case "Complex.magnitude":
+		return math.Hypot(real(receiver.(complex128)), imag(receiver.(complex128)))
+	case "Complex.phase":
+		return math.Atan2(imag(receiver.(complex128)), real(receiver.(complex128)))
 	case "take":
 		if len(arguments) != 0 {
 			session.writeText(arg(0).(string))

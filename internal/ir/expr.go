@@ -18,10 +18,11 @@ func (base ExprBase) ExprMeta() ExprBase { return base }
 type LiteralKind string
 
 const (
-	IntLiteral    LiteralKind = "Int"
-	RealLiteral   LiteralKind = "Real"
-	BoolLiteral   LiteralKind = "Bool"
-	StringLiteral LiteralKind = "String"
+	IntLiteral     LiteralKind = "Int"
+	RealLiteral    LiteralKind = "Real"
+	ComplexLiteral LiteralKind = "Complex"
+	BoolLiteral    LiteralKind = "Bool"
+	StringLiteral  LiteralKind = "String"
 )
 
 type LiteralExpr struct {

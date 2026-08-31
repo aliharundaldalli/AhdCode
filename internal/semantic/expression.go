@@ -262,6 +262,12 @@ func (a *analyzer) analyzeLiteral(literal *ast.LiteralExpr, allowMinMagnitude bo
 			a.error(codeConstantRange, fmt.Sprintf("Real literal %s is not representable", literal.Raw), literal.Span(), "use a finite Real literal")
 		}
 		return expressionInfo{typeValue: types.Real, nullState: NonNull, constant: value}
+	case ast.ImaginaryLiteral:
+		value, err := strconv.ParseFloat(literal.Value, 64)
+		if err != nil || value != value || value > 1.7976931348623157e308 || value < -1.7976931348623157e308 {
+			a.error(codeConstantRange, fmt.Sprintf("imaginary literal %s is not representable", literal.Raw), literal.Span(), "use a finite imaginary literal")
+		}
+		return expressionInfo{typeValue: types.Complex, nullState: NonNull}
 	case ast.BoolLiteral:
 		value, _ := a.evaluateConstant(literal)
 		return expressionInfo{typeValue: types.Bool, nullState: NonNull, constant: value}
@@ -513,6 +519,9 @@ func (a *analyzer) binaryOperatorType(operator string, left, right types.Type) t
 		return types.Invalid
 	}
 	if operator == "^" {
+		if left.Kind() == types.ComplexKind && right.Kind() == types.IntKind {
+			return types.Complex
+		}
 		if left.Kind() == types.IntKind && right.Kind() == types.IntKind {
 			return types.Int
 		}
@@ -523,12 +532,18 @@ func (a *analyzer) binaryOperatorType(operator string, left, right types.Type) t
 	}
 	if operator == "/" {
 		if types.IsNumeric(left) && types.IsNumeric(right) {
+			if left.Kind() == types.ComplexKind || right.Kind() == types.ComplexKind {
+				return types.Complex
+			}
 			return types.Real
 		}
 		return types.Invalid
 	}
 	if operator == "+" || operator == "-" || operator == "*" {
 		if types.IsNumeric(left) && types.IsNumeric(right) {
+			if left.Kind() == types.ComplexKind || right.Kind() == types.ComplexKind {
+				return types.Complex
+			}
 			if left.Kind() == types.RealKind || right.Kind() == types.RealKind {
 				return types.Real
 			}
@@ -537,7 +552,7 @@ func (a *analyzer) binaryOperatorType(operator string, left, right types.Type) t
 		return types.Invalid
 	}
 	if operator == "<" || operator == "<=" || operator == ">" || operator == ">=" {
-		if types.IsNumeric(left) && types.IsNumeric(right) {
+		if (left.Kind() == types.IntKind || left.Kind() == types.RealKind) && (right.Kind() == types.IntKind || right.Kind() == types.RealKind) {
 			return types.Bool
 		}
 	}
@@ -704,6 +719,9 @@ func (a *analyzer) analyzeCallWithCallee(call *ast.CallExpr, callee expressionIn
 // own add, map, or index method.
 func typeOperationFor(receiver types.Type, name string) (TypeOperation, bool) {
 	switch receiver.Kind() {
+	case types.ComplexKind:
+		operation, known := complexOperationNames[name]
+		return operation, known
 	case types.StringKind:
 		operation, known := stringOperationNames[name]
 		return operation, known
@@ -833,6 +851,16 @@ var stringOperationNames = map[string]TypeOperation{
 	"count": StringCount, "index": StringIndex,
 }
 
+var complexOperationNames = map[string]TypeOperation{
+	"real": ComplexReal, "imag": ComplexImag, "conjugate": ComplexConjugate,
+	"magnitude": ComplexMagnitude, "phase": ComplexPhase,
+}
+
+var complexOperationResults = map[TypeOperation]types.Type{
+	ComplexReal: types.Real, ComplexImag: types.Real, ComplexConjugate: types.Complex,
+	ComplexMagnitude: types.Real, ComplexPhase: types.Real,
+}
+
 var listOperationNames = map[string]TypeOperation{
 	"add": ListAdd, "eject": ListEject, "sort": ListSort, "reverse": ListReverse, "shuffle": ListShuffle,
 	"count": ListCount, "index": ListIndex, "map": ListMap, "filter": ListFilter,
@@ -891,6 +919,13 @@ func (a *analyzer) analyzeTypeOperation(call *ast.CallExpr, member *ast.MemberEx
 	if shape, isString := stringOperationShapes[operation]; isString {
 		return a.analyzeStringOperation(call, operation, shape, current, flow), true
 	}
+	if shape, isNumeric := numericShapes()[operation]; isNumeric {
+		return a.analyzeNumericOperation(call, operation, shape, current, flow), true
+	}
+	if result, isComplex := complexOperationResults[operation]; isComplex {
+		a.requireTypeOperationArity(call, operation, types.Complex, 0, current, flow)
+		return expressionInfo{typeValue: result, nullState: NonNull}, true
+	}
 	if shape, isTime := timeOperationShapes()[operation]; isTime {
 		return a.analyzeTimeOperation(call, operation, shape, current, flow), true
 	}
@@ -931,6 +966,12 @@ func typeOperationFailure(operation TypeOperation, receiver types.Type) expressi
 	if shape, known := stringOperationShapes[operation]; known {
 		return expressionInfo{typeValue: shape.result, nullState: NonNull}
 	}
+	if shape, known := numericShapes()[operation]; known {
+		return expressionInfo{typeValue: shape.result, nullState: NonNull}
+	}
+	if result, known := complexOperationResults[operation]; known {
+		return expressionInfo{typeValue: result, nullState: NonNull}
+	}
 	if shape, known := timeOperationShapes()[operation]; known {
 		return expressionInfo{typeValue: shape.result, nullState: NonNull}
 	}
@@ -965,6 +1006,12 @@ func typeOperationFailure(operation TypeOperation, receiver types.Type) expressi
 func typeOperationHint(operation TypeOperation, receiver types.Type) string {
 	if shape, known := stringOperationShapes[operation]; known {
 		return shape.hint
+	}
+	if shape, known := numericShapes()[operation]; known {
+		return shape.hint
+	}
+	if _, known := complexOperationResults[operation]; known {
+		return "call " + string(operation) + " with no argument"
 	}
 	if shape, known := timeOperationShapes()[operation]; known {
 		return shape.hint
@@ -1904,7 +1951,9 @@ func (a *analyzer) analyzeListExpected(list *ast.ListExpr, current *scope, flow 
 			continue
 		}
 		if types.IsNumeric(elementType) && types.IsNumeric(info.typeValue) {
-			if elementType.Kind() == types.RealKind || info.typeValue.Kind() == types.RealKind {
+			if elementType.Kind() == types.ComplexKind || info.typeValue.Kind() == types.ComplexKind {
+				elementType = types.Complex
+			} else if elementType.Kind() == types.RealKind || info.typeValue.Kind() == types.RealKind {
 				elementType = types.Real
 			}
 			continue
@@ -2103,6 +2152,9 @@ func (a *analyzer) mergeLiteralType(current, next types.Type, expression ast.Exp
 		return next
 	}
 	if types.IsNumeric(current) && types.IsNumeric(next) {
+		if current.Kind() == types.ComplexKind || next.Kind() == types.ComplexKind {
+			return types.Complex
+		}
 		if current.Kind() == types.RealKind || next.Kind() == types.RealKind {
 			return types.Real
 		}

@@ -266,7 +266,7 @@ func syntacticTypeName(item token.Token) (string, bool) {
 		return item.Value, true
 	}
 	switch item.Kind {
-	case token.KeywordInt, token.KeywordReal, token.KeywordString, token.KeywordBool,
+	case token.KeywordInt, token.KeywordReal, token.KeywordComplex, token.KeywordString, token.KeywordBool,
 		token.KeywordNothing, token.KeywordList, token.KeywordPair, token.KeywordFunction,
 		token.KeywordClass, token.KeywordAttributes, token.KeywordObject, token.KeywordError:
 		return item.Kind.String(), true

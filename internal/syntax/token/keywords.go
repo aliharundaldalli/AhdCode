@@ -9,7 +9,7 @@ var keywords = map[string]Kind{
 	"except": KeywordExcept, "ultimately": KeywordUltimately, "toss": KeywordToss,
 	"return": KeywordReturn, "bring": KeywordBring, "from": KeywordFrom, "all": KeywordAll,
 	"as": KeywordAs, "true": KeywordTrue, "false": KeywordFalse, "null": KeywordNull,
-	"Int": KeywordInt, "Real": KeywordReal, "String": KeywordString, "Bool": KeywordBool,
+	"Int": KeywordInt, "Real": KeywordReal, "Complex": KeywordComplex, "String": KeywordString, "Bool": KeywordBool,
 	"Nothing": KeywordNothing, "List": KeywordList, "Pair": KeywordPair,
 	"Function": KeywordFunction, "lambda": KeywordLambda, "Overload": KeywordOverload, "Override": KeywordOverride,
 	"Class": KeywordClass, "Attributes": KeywordAttributes, "Constant": KeywordConstant,

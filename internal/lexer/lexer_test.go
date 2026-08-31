@@ -127,6 +127,21 @@ func TestNumericLiteralGrammarAndNoLexerRangeCheck(t *testing.T) {
 	}
 }
 
+func TestImaginaryLiteralRequiresImmediateUppercaseI(t *testing.T) {
+	valid := lexText("3I 3.5I 1e2I")
+	assertNoDiagnostics(t, valid)
+	assertKinds(t, valid, token.ImaginaryLiteral, token.ImaginaryLiteral, token.ImaginaryLiteral, token.EOF)
+
+	lowercase := lexText("3i")
+	if got := diagnosticCodes(lowercase); len(got) != 1 || got[0] != codeInvalidNumericLiteral {
+		t.Fatalf("lowercase suffix diagnostics = %v", got)
+	}
+
+	separated := lexText("3 I")
+	assertNoDiagnostics(t, separated)
+	assertKinds(t, separated, token.IntLiteral, token.Identifier, token.EOF)
+}
+
 func TestMalformedNumericLiterals(t *testing.T) {
 	result := lexText("1e 1_000 123abc .5 5.")
 	if got := diagnosticCodes(result); strings.Join(got, ",") != "LEX004,LEX004,LEX004,LEX004,LEX004" {

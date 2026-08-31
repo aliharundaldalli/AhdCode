@@ -80,6 +80,9 @@ func (p *parser) parsePrefix() ast.Expr {
 	case token.RealLiteral:
 		p.advance()
 		return &ast.LiteralExpr{Base: ast.Base{Range: item.Span}, Kind: ast.RealLiteral, Raw: item.Lexeme, Value: item.Value}
+	case token.ImaginaryLiteral:
+		p.advance()
+		return &ast.LiteralExpr{Base: ast.Base{Range: item.Span}, Kind: ast.ImaginaryLiteral, Raw: item.Lexeme, Value: item.Value[:len(item.Value)-1]}
 	case token.KeywordTrue, token.KeywordFalse:
 		p.advance()
 		return &ast.LiteralExpr{Base: ast.Base{Range: item.Span}, Kind: ast.BoolLiteral, Raw: item.Lexeme, Value: item.Value}

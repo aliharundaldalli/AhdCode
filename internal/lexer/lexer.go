@@ -300,6 +300,10 @@ func (l *lexer) scanNumber(context *interpolationContext) {
 			}
 		}
 	}
+	if l.byteAt(0) == 'I' {
+		kind = token.ImaginaryLiteral
+		l.advanceASCII(1)
+	}
 	if l.byteAt(0) == '_' || startsIdentifierAt(l.file.Text, l.offset) {
 		for !l.atEnd() {
 			r, _ := l.peekRune()
@@ -308,7 +312,7 @@ func (l *lexer) scanNumber(context *interpolationContext) {
 			}
 			l.advanceRune()
 		}
-		l.bag.Error(codeInvalidNumericLiteral, "numeric suffixes and separators are not supported", l.span(start), "write plain decimal digits without a suffix or underscore")
+		l.bag.Error(codeInvalidNumericLiteral, "only the uppercase I numeric suffix is supported", l.span(start), "write plain decimal digits or append uppercase I immediately for an imaginary literal")
 	}
 	if context != nil {
 		context.sawExpressionToken = true
