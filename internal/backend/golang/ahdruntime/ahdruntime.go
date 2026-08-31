@@ -5985,6 +5985,9 @@ func AhdWordSave(doc AhdWordDocument, path string) {
 		ahdWordRaise("Word.save only supports a .docx destination")
 	}
 	blocks := ahdWordDecodeBlocks(doc)
+	if message := ahdWordRaggedTableMessage(blocks); message != "" {
+		ahdWordRaise(message)
+	}
 	packageBytes := ahdWordBuildPackage(blocks)
 	if err := ahdWordValidatePackage(packageBytes); err != nil {
 		ahdWordRaise("failed to produce a valid DOCX: " + err.Error())
@@ -6258,14 +6261,19 @@ func ahdWordFinishParagraph(styleID, text string, hasContent bool) ahdWordBlock 
 }
 
 // ahdWordParseTableElement consumes tokens up to and including the matching
-// </w:tbl>, collecting one String per <w:tc> encountered, grouped by <w:tr>.
-// It does not attempt to reconstruct a rectangular, unmerged grid: a merged
-// or continuation cell contributes exactly the cell(s) actually present in
-// the XML, which is table cell text recovery, not structural round-trip.
+// </w:tbl>, collecting one logical column per <w:tc> encountered, grouped by
+// <w:tr>. A <w:tc> carrying <w:gridSpan w:val="N"/> expands to N logical
+// columns at the position where the span occurred - the cell's own text
+// followed by N-1 empty columns - so a merged header still lines up with the
+// unmerged data columns beneath it. ahdWordFinishTable then widens any row
+// that is still short (a defensive fallback for markup whose spans do not
+// fully account for the table's true width) so every row stays rectangular
+// and no cell text is ever dropped.
 func ahdWordParseTableElement(decoder *xml.Decoder) ahdWordBlock {
 	var rows [][]string
 	var currentRow []string
 	var cellText *strings.Builder
+	cellSpan := 1
 	var stack []string
 	for {
 		token, err := decoder.Token()
@@ -6283,6 +6291,13 @@ func ahdWordParseTableElement(decoder *xml.Decoder) ahdWordBlock {
 				currentRow = nil
 			case "tc":
 				cellText = &strings.Builder{}
+				cellSpan = 1
+			case "gridSpan":
+				if cellText != nil {
+					if value, err := strconv.Atoi(ahdWordAttr(element, "val")); err == nil && value > 1 {
+						cellSpan = value
+					}
+				}
 			}
 		case xml.EndElement:
 			if len(stack) == 0 {
@@ -6292,7 +6307,11 @@ func ahdWordParseTableElement(decoder *xml.Decoder) ahdWordBlock {
 			stack = stack[:len(stack)-1]
 			if closed == "tc" && cellText != nil {
 				currentRow = append(currentRow, cellText.String())
+				for extra := 1; extra < cellSpan; extra++ {
+					currentRow = append(currentRow, "")
+				}
 				cellText = nil
+				cellSpan = 1
 			}
 			if closed == "tr" {
 				rows = append(rows, currentRow)
@@ -6310,5 +6329,42 @@ func ahdWordFinishTable(rows [][]string) ahdWordBlock {
 	if len(rows) == 0 {
 		return ahdWordBlock{Kind: "table", Headers: []string{}, Align: "left"}
 	}
-	return ahdWordBlock{Kind: "table", Headers: rows[0], Rows: rows[1:], Align: "left"}
+	width := 0
+	for _, row := range rows {
+		if len(row) > width {
+			width = len(row)
+		}
+	}
+	widened := make([][]string, len(rows))
+	for index, row := range rows {
+		if len(row) == width {
+			widened[index] = row
+			continue
+		}
+		padded := make([]string, width)
+		copy(padded, row)
+		widened[index] = padded
+	}
+	return ahdWordBlock{Kind: "table", Headers: widened[0], Rows: widened[1:], Align: "left"}
+}
+
+// ahdWordRaggedTableMessage reports the first table block whose rows are not
+// all the same logical width, or "" if every table block is rectangular.
+// ahdWordFinishTable always produces rectangular blocks and AhdWordTable
+// rejects mismatched row widths at construction time, so this exists purely
+// as a save-time defensive invariant: it must never be possible to silently
+// truncate a ragged table into a shorter DOCX row.
+func ahdWordRaggedTableMessage(blocks []ahdWordBlock) string {
+	for _, block := range blocks {
+		if block.Kind != "table" {
+			continue
+		}
+		width := len(block.Headers)
+		for _, row := range block.Rows {
+			if len(row) != width {
+				return "a table has rows with different widths and cannot be saved"
+			}
+		}
+	}
+	return ""
 }

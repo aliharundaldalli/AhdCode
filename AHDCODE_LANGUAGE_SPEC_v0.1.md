@@ -4846,13 +4846,23 @@ an empty Pair uses the natural pixel size at 96 DPI. Bytes are embedded at
 package parts/relationships/media names, validates the ZIP and XML, and
 publishes atomically. Identical Document values save to identical bytes.
 
-`read()` recovers paragraph/Heading 1–6 text and physical table cell text. It
-does not preserve unsupported formatting, images, headers/footers, comments,
+`read()` recovers paragraph/Heading 1–6 text and table cell text. It does not
+preserve unsupported formatting, images, headers/footers, comments,
 relationships, or page layout. Tabs and line breaks are recovered as `\t` and
 `\n`. Reads are bounded by archive, entry-count, individual/total decompressed
 size, and compression-ratio limits; unsafe or duplicate ZIP paths, malformed
 packages/XML, and limit violations raise `WordError`. Relationships are never
 followed and the network is never accessed.
+
+`read()` is semantic, not formatting-preserving. A `gridSpan` cell expands
+back to one empty logical column per spanned position, at the position the
+span occurred, so every recovered table row stays rectangular and no cell
+text is ever dropped; a `vMerge` cell is not reconstructed as a merge, and its
+continuation cells simply read back as empty text. `save()` never silently
+truncates a ragged table to fit a shorter row width: an internal table that is
+not rectangular raises `WordError` instead. Merged-cell visual topology may
+therefore be flattened after a read/save cycle, but logical column position
+and cell text are always preserved.
 
 Word creates and reads a bounded semantic DOCX subset. It is not an Office
 clone and does not promise pixel-perfect round-trip preservation.

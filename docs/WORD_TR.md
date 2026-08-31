@@ -129,7 +129,10 @@ document = document.table(
 
 Bozuk tanımlar, negatif koordinatlar, sıfır span, 1x1 merge, sınır dışı
 bölgeler, çakışmalar ve satır genişliği uyuşmazlıkları paket yazılmadan önce
-`WordError` fırlatır.
+`WordError` fırlatır. Bu satır genişliği garantisi, `Word.read` ile
+üretilenler dahil her Document için geçerlidir: kaydetme hiçbir zaman düzensiz
+bir tabloyu sessizce kırpmaz; bir iç tablo herhangi bir şekilde dikdörtgen
+değilse tek olası sonuç savunmacı bir `WordError`dur.
 
 ## Görseller
 
@@ -175,6 +178,18 @@ metnini ve tablo hücre metnini kurtarır. Paragraf içindeki tab ve satır sonl
 yorumlar, sayfa geometrisi, görseller ve bilinmeyen relationship'ler yeniden
 üretilmez; güvenle yok sayılır.
 
+`Word.read` biçimlendirmeyi değil, anlamı korur. Yatay birleştirilmiş bir
+hücre (`gridSpan`), span'in oluştuğu konumda, span kapsadığı her ek konum için
+boş bir mantıksal sütuna genişletilir; böylece birleştirilmiş bir header
+altındaki birleştirilmemiş sütunlarla hizalı kalır ve her tablo satırı
+dikdörtgen kalır. Dikey birleştirilmiş bir hücre (`vMerge`) okuma sırasında
+bir merge olarak yeniden kurulmaz; devam hücreleri kendi satırında yalnızca
+boş metin olarak okunur. Bu nedenle bir okuma/kaydetme döngüsünden sonra
+birleştirilmiş hücrelerin görsel topolojisi düzleşebilir, ancak mantıksal
+sütun konumu ve hücre metni her zaman korunur — sessiz veri kaybı asla kabul
+edilemez ve okuma, satırların genişliğini eşitlemek için hiçbir hücrenin
+metnini asla düşürmez.
+
 ```ahd
 loaded: Document := Word.read("rapor.docx")
 write(loaded.text())
@@ -183,8 +198,10 @@ write(loaded.paragraphs())
 write(loaded.tables())
 ```
 
-`text()` heading ve paragrafları newline ile birleştirir. `tables()` her tabloyu
-fiziksel satırlarıyla döndürür; ilk satır `0`. indekstedir. Erişim List'leri
+`text()` heading ve paragrafları newline ile birleştirir. `tables()` her
+tabloyu mantıksal satırlarıyla döndürür; ilk satır `0`. indekstedir. Bir
+merge'den kurtarılan satır, merge'in oluştuğu yerde boş String sütunlar
+içerebilir, ama bir tablodaki her satır aynı genişliktedir. Erişim List'leri
 yeni snapshot'lardır.
 
 Okuma sınırlandırılmıştır: arşiv baytı, üye sayısı, tekil/toplam açılmış boyut

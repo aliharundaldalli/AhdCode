@@ -139,7 +139,10 @@ document = document.table(
 
 Malformed descriptors, negative coordinates, zero spans, 1x1 merges,
 out-of-bounds regions, overlaps, and row-width mismatches raise `WordError`
-before a package is written.
+before a package is written. This row-width guarantee holds for every
+Document, including one produced by `Word.read`: saving never silently
+truncates a ragged table, so a defensive `WordError` is the only possible
+outcome if an internal table is ever not rectangular.
 
 ## Images
 
@@ -188,6 +191,17 @@ text from `word/document.xml`. Tabs and line breaks inside a paragraph become
 comments, page geometry, images, and unknown relationships are ignored rather
 than reproduced.
 
+`Word.read` is semantic, not formatting-preserving. A horizontally merged
+cell (`gridSpan`) is expanded back to one empty logical column per spanned
+position, at the position the span occurred, so a merged header still lines
+up with the unmerged columns beneath it and every table row stays
+rectangular. A vertically merged cell (`vMerge`) is *not* reconstructed as a
+merge on read; its continuation cells simply read back as empty text in their
+own row. Merged-cell visual topology may therefore be flattened after a
+read/save cycle, but logical column position and cell text are always
+preserved — silent data loss is never acceptable, and reading never drops a
+cell's text to make a table's rows agree in width.
+
 ```ahd
 loaded: Document := Word.read("report.docx")
 write(loaded.text())
@@ -197,8 +211,10 @@ write(loaded.tables())
 ```
 
 `text()` joins headings and paragraphs with newline characters. `tables()`
-returns each table as its physical rows, with the first row at index `0`.
-Accessor Lists are fresh snapshots.
+returns each table as its logical rows, with the first row at index `0`; a
+row recovered from a merged cell may contain empty-String columns where the
+merge occurred, but every row in a table has the same width. Accessor Lists
+are fresh snapshots.
 
 Reading is bounded: the implementation limits archive bytes, entry count,
 individual and total uncompressed sizes, and compression ratio. It rejects

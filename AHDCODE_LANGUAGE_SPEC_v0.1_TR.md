@@ -5315,12 +5315,23 @@ anında gömülür.
 parçaları/relationship/media adları oluşturur, ZIP ve XML'i doğrular ve atomik
 yayımlar. Eşit Document değerleri eşit baytlar üretir.
 
-`read()` paragraf/Heading 1–6 metnini ve fiziksel tablo hücre metnini kurtarır;
+`read()` paragraf/Heading 1–6 metnini ve tablo hücre metnini kurtarır;
 desteklenmeyen biçimlendirme, görsel, header/footer, yorum, relationship veya
 sayfa yerleşimini korumaz. Tab ve satır sonları `\t`/`\n` olur. Okuma; arşiv,
 üye sayısı, tekil/toplam açılmış boyut ve sıkıştırma oranıyla sınırlıdır;
 güvensiz/yinelenen ZIP yolları, bozuk paket/XML ve limit ihlalleri `WordError`
 fırlatır. Relationship izlenmez ve ağa erişilmez.
+
+`read()` biçimlendirmeyi değil, anlamı korur. Bir `gridSpan` hücresi, span'in
+oluştuğu konumda, kapsadığı her ek konum için boş bir mantıksal sütuna
+genişler; böylece kurtarılan her tablo satırı dikdörtgen kalır ve hiçbir hücre
+metni kaybolmaz. Bir `vMerge` hücresi merge olarak yeniden kurulmaz; devam
+hücreleri yalnızca boş metin olarak okunur. `save()` düzensiz bir tabloyu daha
+kısa bir satır genişliğine uydurmak için asla sessizce kırpmaz: dikdörtgen
+olmayan bir iç tablo bunun yerine `WordError` fırlatır. Bu nedenle
+birleştirilmiş hücrelerin görsel topolojisi bir okuma/kaydetme döngüsünden
+sonra düzleşebilir, ama mantıksal sütun konumu ve hücre metni her zaman
+korunur.
 
 Word, sınırlandırılmış anlamsal bir DOCX alt kümesi oluşturur ve okur. Bir
 Office klonu değildir ve piksel düzeyinde kusursuz round-trip koruması vaat

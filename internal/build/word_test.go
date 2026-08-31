@@ -37,6 +37,10 @@ document.save(` + strconv.Quote(output) + `)
 loaded: Document := Word.read(` + strconv.Quote(output) + `)
 write(loaded.text())
 write(loaded.tables())
+resaved: String := ` + strconv.Quote(filepath.Join(directory, "resaved.docx")) + `
+loaded.save(resaved)
+reloaded: Document := Word.read(resaved)
+write(reloaded.tables())
 attempt {
     base.table(["A"], [["1"]], [[0, 0, 1, 1]])
 }
@@ -55,6 +59,12 @@ except WordError as error {
 	for _, want := range []string{
 		"true\n", "Report\nSummary\n", `["Report"]`, `["Summary"]`,
 		`[[["A", "B"], ["1", "2"], ["3", "4"]]]`,
+		// The header's horizontal merge (gridSpan) and the first column's
+		// vertical merge (vMerge) mean Word.read() recovers this table as
+		// ["A", ""] / ["1", "2"] / ["", "4"]: every logical column survives,
+		// including the "2" and "4" cells a pre-fix reader would have
+		// silently dropped by capping every row at the 1-cell merged header.
+		`[[["A", ""], ["1", "2"], ["", "4"]]]`,
 		"a 1x1 table merge is meaningless\n",
 	} {
 		if !strings.Contains(stdout, want) {

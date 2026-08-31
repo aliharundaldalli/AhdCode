@@ -417,6 +417,9 @@ func (s *Session) wordSave(receiver any, path string) {
 		s.raise("WordError", "Word.save only supports a .docx destination")
 	}
 	blocks := s.documentBlocks(receiver)
+	if message := wordRaggedTableMessage(blocks); message != "" {
+		s.raise("WordError", message)
+	}
 	packageBytes, err := wordBuildPackage(blocks)
 	if err != nil {
 		s.raise("WordError", "could not assemble the DOCX package: "+err.Error())
@@ -633,10 +636,20 @@ func wordFinishParagraph(styleID, text string, hasContent bool) wordBlock {
 	return wordBlock{Kind: "paragraph", Text: text, Align: "left"}
 }
 
+// wordParseTableElement consumes tokens up to and including the matching
+// </w:tbl>, collecting one logical column per <w:tc> encountered, grouped by
+// <w:tr>. A <w:tc> carrying <w:gridSpan w:val="N"/> expands to N logical
+// columns at the position where the span occurred - the cell's own text
+// followed by N-1 empty columns - so a merged header still lines up with the
+// unmerged data columns beneath it. wordFinishTable then widens any row that
+// is still short (a defensive fallback for markup whose spans do not fully
+// account for the table's true width) so every row stays rectangular and no
+// cell text is ever dropped.
 func (s *Session) wordParseTableElement(decoder *xml.Decoder) wordBlock {
 	var rows [][]string
 	var currentRow []string
 	var cellText *strings.Builder
+	cellSpan := 1
 	var stack []string
 	for {
 		token, err := decoder.Token()
@@ -654,6 +667,13 @@ func (s *Session) wordParseTableElement(decoder *xml.Decoder) wordBlock {
 				currentRow = nil
 			case "tc":
 				cellText = &strings.Builder{}
+				cellSpan = 1
+			case "gridSpan":
+				if cellText != nil {
+					if value, err := strconv.Atoi(wordAttr(element, "val")); err == nil && value > 1 {
+						cellSpan = value
+					}
+				}
 			}
 		case xml.EndElement:
 			if len(stack) == 0 {
@@ -663,7 +683,11 @@ func (s *Session) wordParseTableElement(decoder *xml.Decoder) wordBlock {
 			stack = stack[:len(stack)-1]
 			if closed == "tc" && cellText != nil {
 				currentRow = append(currentRow, cellText.String())
+				for extra := 1; extra < cellSpan; extra++ {
+					currentRow = append(currentRow, "")
+				}
 				cellText = nil
+				cellSpan = 1
 			}
 			if closed == "tr" {
 				rows = append(rows, currentRow)
@@ -681,5 +705,42 @@ func wordFinishTable(rows [][]string) wordBlock {
 	if len(rows) == 0 {
 		return wordBlock{Kind: "table", Headers: []string{}, Align: "left"}
 	}
-	return wordBlock{Kind: "table", Headers: rows[0], Rows: rows[1:], Align: "left"}
+	width := 0
+	for _, row := range rows {
+		if len(row) > width {
+			width = len(row)
+		}
+	}
+	widened := make([][]string, len(rows))
+	for index, row := range rows {
+		if len(row) == width {
+			widened[index] = row
+			continue
+		}
+		padded := make([]string, width)
+		copy(padded, row)
+		widened[index] = padded
+	}
+	return wordBlock{Kind: "table", Headers: widened[0], Rows: widened[1:], Align: "left"}
+}
+
+// wordRaggedTableMessage reports the first table block whose rows are not
+// all the same logical width, or "" if every table block is rectangular.
+// wordFinishTable always produces rectangular blocks and Document.table
+// rejects mismatched row widths at construction time, so this exists purely
+// as a save-time defensive invariant: it must never be possible to silently
+// truncate a ragged table into a shorter DOCX row.
+func wordRaggedTableMessage(blocks []wordBlock) string {
+	for _, block := range blocks {
+		if block.Kind != "table" {
+			continue
+		}
+		width := len(block.Headers)
+		for _, row := range block.Rows {
+			if len(row) != width {
+				return "a table has rows with different widths and cannot be saved"
+			}
+		}
+	}
+	return ""
 }
