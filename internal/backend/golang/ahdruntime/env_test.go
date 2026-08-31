@@ -2,10 +2,59 @@ package ahdruntime
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 )
+
+// envChildHelperFlag switches this same test binary into "child helper"
+// mode: it prints the target variable's value (or envChildAbsentSentinel if
+// unset) to stdout and returns, instead of running the parent test body.
+// This is the standard os/exec-based technique for testing real child-
+// process environment inheritance without any shell.
+const (
+	envChildHelperFlag     = "AHDCODE_ENV_CHILD_HELPER"
+	envChildTargetVar      = "AHDCODE_TEST_ENV_CHILD_VAR"
+	envChildAbsentSentinel = "<absent>"
+)
+
+func TestEnvSetUnsetVisibleToChildProcess(t *testing.T) {
+	if os.Getenv(envChildHelperFlag) == "1" {
+		// os.Exit, not return: returning would let the testing framework
+		// print its own "PASS" line, polluting the output this test reads.
+		value, present := os.LookupEnv(envChildTargetVar)
+		if !present {
+			value = envChildAbsentSentinel
+		}
+		os.Stdout.WriteString(value)
+		os.Exit(0)
+	}
+
+	os.Unsetenv(envChildTargetVar)
+	t.Cleanup(func() { os.Unsetenv(envChildTargetVar) })
+
+	runChild := func() string {
+		t.Helper()
+		command := exec.Command(os.Args[0], "-test.run=^TestEnvSetUnsetVisibleToChildProcess$")
+		command.Env = append(os.Environ(), envChildHelperFlag+"=1")
+		output, err := command.CombinedOutput()
+		if err != nil {
+			t.Fatalf("child process failed: %v (output=%q)", err, output)
+		}
+		return strings.TrimRight(string(output), "\r\n")
+	}
+
+	AhdEnvSet(AhdClassEnvError, envChildTargetVar, "child-value")
+	if got := runChild(); got != "child-value" {
+		t.Fatalf("child process did not inherit Env.set: got %q, want %q", got, "child-value")
+	}
+
+	AhdEnvUnset(AhdClassEnvError, envChildTargetVar)
+	if got := runChild(); got != envChildAbsentSentinel {
+		t.Fatalf("child process still saw the unset variable: got %q, want %q", got, envChildAbsentSentinel)
+	}
+}
 
 func TestEnvGetHasGetOrDistinguishMissingFromEmpty(t *testing.T) {
 	name := "AHDCODE_TEST_ENV_VAR_MISSING"
