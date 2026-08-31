@@ -5484,4 +5484,58 @@ her XML'e özgü hatayı uçtan uca kapsar.
 
 ---
 
+## 61. Env Standart Modülü (v0.1.17)
+
+`bring Env`, kanonik derleyici-kayıtlı `builtin:Env` modülünü içe aktarır.
+Modül derleyicinin sağladığı `EnvError` artı şunları dışa açar:
+
+```text
+Env.get(String)                    -> String?
+Env.getOr(String, String)          -> String
+Env.exists(String)                 -> Bool
+Env.set(String, String)            -> Nothing
+Env.unset(String)                  -> Nothing
+Env.read(String)                   -> Pair<String, String>
+Env.load(String, Bool = false)     -> Nothing
+```
+
+`Env.has` değil `Env.exists`: `has` saklı bir anahtar kelimedir (§2.1, `x
+has y` protokol operatörü) ve `.` sonrası bir üye adı olarak görünemez;
+`exists`, mevcut `File.exists` adlandırmasıyla eşleşir.
+
+Env'in veri taşıyan bir Class'ı yoktur — Word/JSON/XML'in aksine, her işlem
+`String`/`Bool`/`Pair<String, String>` değerleri üzerinde düz bir
+Function'dır. İçinde hiçbir yerde sayısal/boolean çıkarım, shell
+interpolation veya komut çalıştırma yoktur.
+
+`get(name)`, `String?` döndürür: `null`, değişkenin yok olduğu anlamına
+gelir. `exists(name)`, yokluğu açıkça mevcut ama boş bir değerden ayırt
+eder. `getOr(name, fallback)`, yalnızca değişken yokken `fallback`
+döndürür — mevcut boş bir değer `""` olarak döndürülür. `set`/`unset`,
+adın boş olmadığını ve bir NUL baytı veya `=` içermediğini doğruladıktan
+sonra mevcut sürecin kendi ortamını değiştirir; hata mesajları asla
+değerleri içermez.
+
+`.env` grameri sınırlandırılmıştır: `KEY=value`, `KEY="value"` (tam olarak
+`\\`, `\"`, `\n`, `\r`, `\t` kaçışlarıyla), `KEY='value'` (literal, kaçışsız),
+tam satır `#` comment'leri ve boş satırlar. Anahtarlar
+`[A-Za-z_][A-Za-z0-9_]*` ile eşleşir. Bilinçli olarak `$(...)`, `` `...` ``,
+`${...}`, `$NAME` veya herhangi bir shell-tarzı genişletme yoktur — bir
+`.env` değeri literal metin olarak okunur, asla değerlendirilmez. Bir dosya
+içindeki yinelenen anahtarlar, sonuncunun kazanmasına izin vermek yerine
+`EnvError` ile reddedilir.
+
+`read(path)`, bir dosyayı işlem ortamına dokunmadan ekleme sıralı bir
+`Pair<String, String>`e ayrıştırır. `load(path, override = false)`, bir
+şey uygulamadan önce dosyanın tamamını ayrıştırır ve doğrular, bu yüzden
+sonraki bozuk bir satır ortamı asla yarı güncellenmiş bırakamaz;
+`override = false` ile zaten mevcut bir değişken (`exists` ile aynı
+yokluk-karşı-boş-farkında şekilde kontrol edilir) dokunulmadan bırakılır,
+ve `override = true` ile `.env` değeri her zaman kazanır.
+
+`EnvError` doğrudan `Error`'dan türer ve her Env'e özgü hatayı uçtan uca
+kapsar.
+
+---
+
 # AhdCode v0.1 Çekirdek Spesifikasyonu Sonu

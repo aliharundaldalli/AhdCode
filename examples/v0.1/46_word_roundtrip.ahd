@@ -1,0 +1,26 @@
+bring Word
+from Word bring Document
+
+// A horizontal merge inside a data row (columns 0-1 of the one data row
+// share a single merged cell) reads back from DOCX as fewer physical cells
+// than the header. Before v0.1.17, Word.read() recovered that row as
+// ["1", "3"] - two cells against a three-column header - and Document.save
+// silently dropped "3" when re-emitting the table. v0.1.17 expands the
+// merged cell to its full logical width on read, so every value survives.
+
+document: Document := Word.new()
+document = document.heading("Merged data row round-trip", 1)
+document = document.table(
+    ["A", "B", "C"]
+    [["1", "2", "3"]]
+    [[1, 0, 1, 2]]
+    "left"
+)
+document.save("word-roundtrip.docx")
+
+loaded: Document := Word.read("word-roundtrip.docx")
+write(loaded.tables())
+
+loaded.save("word-roundtrip-resaved.docx")
+reread: Document := Word.read("word-roundtrip-resaved.docx")
+write(reread.tables())

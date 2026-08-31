@@ -111,6 +111,11 @@ func LowerCompilation(compilation module.CompilationResult) Result {
 					xmlModule(ir.ModuleID(current.ID), current.Source.Name, current.Source.Path))
 				continue
 			}
+			if string(current.ID) == EnvModuleID {
+				result.Modules = append(result.Modules,
+					envModule(ir.ModuleID(current.ID), current.Source.Name, current.Source.Path))
+				continue
+			}
 			result.Modules = append(result.Modules, &ir.Module{
 				ID: ir.ModuleID(current.ID), Name: current.Source.Name, SourcePath: current.Source.Path,
 			})

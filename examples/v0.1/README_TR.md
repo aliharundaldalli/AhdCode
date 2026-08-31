@@ -68,6 +68,9 @@ go run ./tooling/latex/cmd/package-latex --output "$(go env GOPATH)"
 | `41_latex_beamer_themes.ahd` | sınırlı Default/Madrid/Warsaw Beamer theme'leri ve özel renk |
 | `42_json.ahd` | JSON modülü: object/array oluşturma, parse, stringify, tipli erişimciler, get/at, JSONError |
 | `43_xml.ahd` | XML modülü: element/text oluşturma, öznitelikler, parse, karışık içerik, stringify, XMLError |
+| `44_env.ahd` | Env modülü: kendi kurduğu bir `.env` fixture'ı, load/get/getOr/exists/set/unset, override önceliği, EnvError |
+| `45_structured_data_report.ahd` | JSON'dan Data'ya, Statistics/Plot'a ve Word'e: küçük bir yapılandırılmış-veri raporlama iş akışı |
+| `46_word_roundtrip.ahd` | düzeltilmiş Word merge'li tablo anlamsal okuma/kaydetme davranışı (v0.1.17) |
 
 `Greeting.ahd`, `11_modules.ahd` tarafından kullanılan kardeş (sibling)
 modüldür.

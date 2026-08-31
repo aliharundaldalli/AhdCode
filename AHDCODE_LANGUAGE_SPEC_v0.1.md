@@ -5007,4 +5007,56 @@ failure end to end, including file read/write failures.
 
 ---
 
+## 61. Env Standard Module (v0.1.17)
+
+`bring Env` imports canonical compiler-registered module `builtin:Env`. It
+exports compiler-supplied `EnvError` plus:
+
+```text
+Env.get(String)                    -> String?
+Env.getOr(String, String)          -> String
+Env.exists(String)                 -> Bool
+Env.set(String, String)            -> Nothing
+Env.unset(String)                  -> Nothing
+Env.read(String)                   -> Pair<String, String>
+Env.load(String, Bool = false)     -> Nothing
+```
+
+`Env.exists`, not `Env.has`: `has` is a reserved keyword (§2.1, the `x has
+y` protocol operator) and cannot appear as a member name after `.`; `exists`
+matches the existing `File.exists` naming.
+
+Env has no data-carrying Class - unlike Word/JSON/XML, every operation is a
+plain function over `String`/`Bool`/`Pair<String, String>` values. There is
+no numeric/boolean inference, no shell interpolation, and no command
+execution anywhere in it.
+
+`get(name)` returns `String?`: `null` means the variable is absent.
+`exists(name)` distinguishes absence from an explicitly present but empty
+value. `getOr(name, fallback)` returns `fallback` only when the variable is
+absent - a present empty value is returned as `""`. `set`/`unset` change the
+current process's own environment after validating the name is non-empty
+and contains no NUL byte or `=`; error messages never include values.
+
+The `.env` grammar is bounded: `KEY=value`, `KEY="value"` (with exactly the
+`\\`, `\"`, `\n`, `\r`, `\t` escapes), `KEY='value'` (literal, no escapes),
+full-line `#` comments, and blank lines. Keys match
+`[A-Za-z_][A-Za-z0-9_]*`. There is deliberately no `$(...)`, `` `...` ``,
+`${...}`, `$NAME`, or any shell-style expansion - a `.env` value is read as
+literal text, never evaluated. Duplicate keys within one file are rejected
+with `EnvError` rather than letting the last one win.
+
+`read(path)` parses a file into an insertion-ordered `Pair<String, String>`
+without touching the process environment. `load(path, override = false)`
+parses and validates the entire file before applying anything, so a later
+malformed line can never leave the environment half-updated; with
+`override = false` an already-present variable (checked the same
+absent-vs-empty-aware way as `exists`) is left untouched, and with
+`override = true` the `.env` value always wins.
+
+`EnvError` derives directly from `Error` and covers every Env-specific
+failure end to end.
+
+---
+
 # End of AhdCode v0.1 Core Specification

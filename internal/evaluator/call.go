@@ -182,6 +182,8 @@ func (session *Session) builtin(identity ir.CallableID, receiver any, arguments 
 		return session.jsonBuiltin(strings.TrimPrefix(name, "builtin:JSON::"), values(arguments))
 	case strings.HasPrefix(name, "builtin:XML::"):
 		return session.xmlBuiltin(strings.TrimPrefix(name, "builtin:XML::"), values(arguments))
+	case strings.HasPrefix(name, "builtin:Env::"):
+		return session.envBuiltin(strings.TrimPrefix(name, "builtin:Env::"), values(arguments))
 	}
 	session.raise("Error", "unsupported builtin "+name)
 	return nil

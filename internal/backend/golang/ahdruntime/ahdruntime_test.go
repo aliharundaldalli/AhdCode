@@ -36,7 +36,7 @@ func init() {
 	for _, class := range []*AhdClass{
 		AhdClassError, AhdClassConstantError, AhdClassDivisionByZeroError, AhdClassDomainError,
 		AhdClassIndexError, AhdClassIOError, AhdClassKeyError, AhdClassNullError, AhdClassOverflowError, AhdClassValueError,
-		AhdClassLatexError, AhdClassFileError, AhdClassWordError, AhdClassJSONError, AhdClassXMLError,
+		AhdClassLatexError, AhdClassFileError, AhdClassWordError, AhdClassJSONError, AhdClassXMLError, AhdClassEnvError,
 	} {
 		target := class
 		AhdRegisterError(target, func(message string) AhdInstance {

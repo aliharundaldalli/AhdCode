@@ -1,0 +1,42 @@
+bring Env
+bring File
+bring Path
+from Env bring EnvError
+
+directory := "ahdcode-v017-env"
+envPath := Path.join([directory, "sample.env"])
+
+File.createDir(directory)
+File.writeText(
+    envPath
+    "PORT=8080\nGREETING=\"Hello, world\"\n# a comment line\nEMPTY=\n"
+)
+
+Env.load(envPath)
+
+port: String := Env.getOr("PORT", "3000")
+write(port)
+
+greeting: String? := Env.get("GREETING")
+if greeting != null {
+    write(greeting)
+}
+
+write(Env.exists("EMPTY"))
+write(Env.exists("NOT_IN_FILE"))
+write(Env.getOr("NOT_IN_FILE", "fallback"))
+
+Env.set("AHDCODE_EXAMPLE_VAR", "temporary")
+write(Env.get("AHDCODE_EXAMPLE_VAR"))
+Env.unset("AHDCODE_EXAMPLE_VAR")
+write(Env.exists("AHDCODE_EXAMPLE_VAR"))
+
+record: Pair<String, String> := Env.read(envPath)
+write(record)
+
+attempt {
+    Env.set("BAD=NAME", "x")
+}
+except EnvError as error {
+    write(error.message)
+}

@@ -68,5 +68,8 @@ go run ./tooling/latex/cmd/package-latex --output "$(go env GOPATH)"
 | `41_latex_beamer_themes.ahd` | bounded Default/Madrid/Warsaw Beamer themes and custom color |
 | `42_json.ahd` | JSON module: object/array construction, parse, stringify, typed accessors, get/at, JSONError |
 | `43_xml.ahd` | XML module: element/text construction, attributes, parse, mixed content, stringify, XMLError |
+| `44_env.ahd` | Env module: a self-created `.env` fixture, load/get/getOr/exists/set/unset, override precedence, EnvError |
+| `45_structured_data_report.ahd` | JSON to Data to Statistics/Plot to Word: a small structured-data reporting workflow |
+| `46_word_roundtrip.ahd` | the fixed Word merged-table semantic read/save behavior (v0.1.17) |
 
 `Greeting.ahd` is the sibling module used by `11_modules.ahd`.

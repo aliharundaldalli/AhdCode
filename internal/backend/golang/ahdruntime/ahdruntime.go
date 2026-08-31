@@ -81,6 +81,7 @@ var (
 	AhdClassWordError           = &AhdClass{Name: "WordError", Parent: AhdClassError}
 	AhdClassJSONError           = &AhdClass{Name: "JSONError", Parent: AhdClassError}
 	AhdClassXMLError            = &AhdClass{Name: "XMLError", Parent: AhdClassError}
+	AhdClassEnvError            = &AhdClass{Name: "EnvError", Parent: AhdClassError}
 )
 
 // AhdInstance is every AhdCode Class instance. The generated interface of each
@@ -7469,4 +7470,203 @@ func AhdXMLElementsData(class *AhdClass, data string) []string {
 		}
 	}
 	return result
+}
+
+// --- Env standard module ---
+//
+// Env is deliberately small: it has no data-carrying Class (unlike Word/
+// JSON/XML), just plain String/Bool/Nothing/Pair<String,String> functions
+// over the process environment and a bounded .env file grammar. There is
+// no shell interpolation, no command substitution, and no variable
+// expansion - a .env value is read as literal text (with a small, explicit
+// escape set inside double quotes), never evaluated.
+
+var ahdEnvKeyPattern = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
+
+// AhdEnvEntry is one ordered .env file assignment.
+type AhdEnvEntry struct {
+	Key   string
+	Value string
+}
+
+func ahdEnvValidateName(class *AhdClass, name string) {
+	if name == "" {
+		AhdRaiseClass(class, "environment variable name must not be empty")
+	}
+	if strings.IndexByte(name, 0) >= 0 {
+		AhdRaiseClass(class, "environment variable name must not contain a NUL byte")
+	}
+	if strings.IndexByte(name, '=') >= 0 {
+		AhdRaiseClass(class, "environment variable name must not contain '='")
+	}
+}
+
+func AhdEnvGet(name string) *string {
+	value, present := os.LookupEnv(name)
+	if !present {
+		return nil
+	}
+	return &value
+}
+
+func AhdEnvGetOr(name, fallback string) string {
+	if value, present := os.LookupEnv(name); present {
+		return value
+	}
+	return fallback
+}
+
+func AhdEnvHas(name string) bool {
+	_, present := os.LookupEnv(name)
+	return present
+}
+
+func AhdEnvSet(class *AhdClass, name, value string) {
+	ahdEnvValidateName(class, name)
+	if err := os.Setenv(name, value); err != nil {
+		AhdRaiseClass(class, "could not set the environment variable")
+	}
+}
+
+func AhdEnvUnset(class *AhdClass, name string) {
+	ahdEnvValidateName(class, name)
+	if err := os.Unsetenv(name); err != nil {
+		AhdRaiseClass(class, "could not unset the environment variable")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// .env parsing
+// ---------------------------------------------------------------------------
+
+func ahdEnvParseFile(class *AhdClass, content string) []AhdEnvEntry {
+	var entries []AhdEnvEntry
+	seen := make(map[string]bool)
+	for index, rawLine := range strings.Split(content, "\n") {
+		lineNumber := index + 1
+		line := strings.TrimRight(rawLine, "\r")
+		trimmed := strings.TrimLeft(line, " \t")
+		if trimmed == "" || trimmed[0] == '#' {
+			continue
+		}
+		key, value := ahdEnvParseAssignment(class, trimmed, lineNumber)
+		if seen[key] {
+			AhdRaiseClass(class, fmt.Sprintf("line %d: duplicate key %q in .env file", lineNumber, key))
+		}
+		seen[key] = true
+		entries = append(entries, AhdEnvEntry{Key: key, Value: value})
+	}
+	return entries
+}
+
+func ahdEnvParseAssignment(class *AhdClass, line string, lineNumber int) (string, string) {
+	equals := strings.IndexByte(line, '=')
+	if equals < 0 {
+		AhdRaiseClass(class, fmt.Sprintf("line %d is not a valid KEY=value assignment", lineNumber))
+	}
+	key := line[:equals]
+	if !ahdEnvKeyPattern.MatchString(key) {
+		AhdRaiseClass(class, fmt.Sprintf("line %d has an invalid key %q", lineNumber, key))
+	}
+	return key, ahdEnvParseValue(class, line[equals+1:], lineNumber)
+}
+
+func ahdEnvParseValue(class *AhdClass, rest string, lineNumber int) string {
+	if len(rest) == 0 {
+		return ""
+	}
+	switch rest[0] {
+	case '"':
+		return ahdEnvParseDoubleQuoted(class, rest, lineNumber)
+	case '\'':
+		return ahdEnvParseSingleQuoted(class, rest, lineNumber)
+	default:
+		return strings.TrimSpace(rest)
+	}
+}
+
+func ahdEnvParseDoubleQuoted(class *AhdClass, rest string, lineNumber int) string {
+	var builder strings.Builder
+	index := 1
+	for index < len(rest) {
+		character := rest[index]
+		switch character {
+		case '"':
+			if strings.TrimSpace(rest[index+1:]) != "" {
+				AhdRaiseClass(class, fmt.Sprintf("line %d has content after a closing quote", lineNumber))
+			}
+			return builder.String()
+		case '\\':
+			index++
+			if index >= len(rest) {
+				AhdRaiseClass(class, fmt.Sprintf("line %d has an incomplete escape sequence", lineNumber))
+			}
+			switch rest[index] {
+			case '\\':
+				builder.WriteByte('\\')
+			case '"':
+				builder.WriteByte('"')
+			case 'n':
+				builder.WriteByte('\n')
+			case 'r':
+				builder.WriteByte('\r')
+			case 't':
+				builder.WriteByte('\t')
+			default:
+				AhdRaiseClass(class, fmt.Sprintf("line %d has an invalid escape sequence", lineNumber))
+			}
+			index++
+			continue
+		default:
+			builder.WriteByte(character)
+		}
+		index++
+	}
+	AhdRaiseClass(class, fmt.Sprintf("line %d has an unterminated double-quoted value", lineNumber))
+	return ""
+}
+
+func ahdEnvParseSingleQuoted(class *AhdClass, rest string, lineNumber int) string {
+	closing := strings.IndexByte(rest[1:], '\'')
+	if closing < 0 {
+		AhdRaiseClass(class, fmt.Sprintf("line %d has an unterminated single-quoted value", lineNumber))
+	}
+	value := rest[1 : 1+closing]
+	if strings.TrimSpace(rest[1+closing+1:]) != "" {
+		AhdRaiseClass(class, fmt.Sprintf("line %d has content after a closing quote", lineNumber))
+	}
+	return value
+}
+
+func ahdEnvReadFile(class *AhdClass, path string) []AhdEnvEntry {
+	content, err := os.ReadFile(path)
+	if err != nil {
+		AhdRaiseClass(class, "could not read the .env file: "+err.Error())
+	}
+	return ahdEnvParseFile(class, string(content))
+}
+
+// AhdEnvReadEntries parses path without touching the process environment.
+func AhdEnvReadEntries(class *AhdClass, path string) []AhdEnvEntry {
+	return ahdEnvReadFile(class, path)
+}
+
+// AhdEnvLoad parses the entire file first (so a later malformed line can
+// never leave the process environment half-applied), then applies every
+// entry: with override=false an already-present variable (checked with
+// LookupEnv, so an explicitly empty existing value still counts as
+// present) is left untouched; with override=true the .env value always
+// wins.
+func AhdEnvLoad(class *AhdClass, path string, override bool) {
+	entries := ahdEnvReadFile(class, path)
+	for _, entry := range entries {
+		if !override {
+			if _, present := os.LookupEnv(entry.Key); present {
+				continue
+			}
+		}
+		if err := os.Setenv(entry.Key, entry.Value); err != nil {
+			AhdRaiseClass(class, "could not set the environment variable")
+		}
+	}
 }

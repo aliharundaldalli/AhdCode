@@ -1,0 +1,46 @@
+bring JSON
+bring Data
+bring Statistics
+bring Word
+from JSON bring JSONValue
+from Data bring Table
+from Word bring Document
+
+source: String := r'''[
+    {"name": "Ali", "score": 91},
+    {"name": "Ayşe", "score": 88},
+    {"name": "Mehmet", "score": 95}
+]'''
+
+parsed: JSONValue := JSON.parse(source)
+records: List<JSONValue> := parsed.array()
+
+columns: List<String> := ["name", "score"]
+rows: List<List<String>> := []
+scores: List<Real> := []
+
+for record in records {
+    name: Local JSONValue? := record.get("name")
+    score: Local JSONValue? := record.get("score")
+    if name != null {
+        if score != null {
+            rows.add([name.string(), str(score.int())])
+            scores.add(real(score.int()))
+        }
+    }
+}
+
+table: Table := Data.fromRows(columns, rows)
+average: Real := Statistics.mean(scores)
+
+document: Document := Word.new()
+document = document.heading("Score report", 1)
+document = document.paragraph("Class average: " + str(average))
+document = document.table(table.columns(), table.rows().map(
+    lambda (row: Pair<String, String>) -> [row["name"], row["score"]]
+))
+document.save("score-report.docx")
+
+write(table.rowCount())
+write(average)
+write("score-report.docx saved")
