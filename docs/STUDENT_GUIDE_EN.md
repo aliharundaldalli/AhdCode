@@ -29,15 +29,18 @@ The best way to learn is not just by reading the examples, but by running them. 
 - [20. Fundamentals module](#20-fundamentals-module)
 - [21. Math module](#21-math-module)
 - [22. Time module](#22-time-module)
-- [23. Latex module](#23-latex-module)
-- [24. Code Formatter](#24-code-formatter)
-- [25. Command line (CLI)](#25-command-line-cli)
-- [26. Interactive shell (REPL)](#26-interactive-shell-repl)
-- [27. Common beginner mistakes](#27-common-beginner-mistakes)
-- [28. Small Projects](#28-small-projects)
-- [29. Exercises](#29-exercises)
-- [30. Solution Hints](#30-solution-hints)
-- [31. Next steps and technical docs](#31-next-steps-and-technical-docs)
+- [23. Statistics module](#23-statistics-module)
+- [24. Plot module](#24-plot-module)
+- [25. Numeric module and Complex](#25-numeric-module-and-complex)
+- [26. Latex module](#26-latex-module)
+- [27. Code Formatter](#27-code-formatter)
+- [28. Command line (CLI)](#28-command-line-cli)
+- [29. Interactive shell (REPL)](#29-interactive-shell-repl)
+- [30. Common beginner mistakes](#30-common-beginner-mistakes)
+- [31. Small Projects](#31-small-projects)
+- [32. Exercises](#32-exercises)
+- [33. Solution Hints](#33-solution-hints)
+- [34. Next steps and technical docs](#34-next-steps-and-technical-docs)
 
 ## 1. What is AhdCode?
 
@@ -68,9 +71,15 @@ To build AhdCode from source, you must have Go 1.25 or newer installed on your c
 ```bash
 cd AhdCode
 go test ./...
-go install ./cmd/ahdcode
+go install ./cmd/ahdcode ./cmd/ahdnumeric ./cmd/ahdplot
 export PATH="$(go env GOPATH)/bin:$PATH"
 ahdcode --version
+```
+
+If you want to use the `Latex` module, you must also stage the offline Latex runtime bundle. This step performs a one-time network fetch to download pinned resources:
+
+```bash
+go run ./tooling/latex/cmd/package-latex --output "$(go env GOPATH)"
 ```
 
 If the last command shows the AhdCode version, you are ready.
@@ -207,6 +216,7 @@ We use **types** to specify what kind of information we hold in a variable. It's
 | `Real` | Decimal number | `3.5`, `-0.25` |
 | `String` | Text | `"Ayşe"` |
 | `Bool` | True/false value | `true`, `false` |
+| `Complex` | Complex number | `2 + 3I` |
 | `List<T>` | Ordered values | `[1, 2, 3]` |
 | `Pair<K, V>` | Key-value pairs | `{"Ali": 90}` |
 | `Function` | An executable function | we'll see later |
@@ -998,8 +1008,19 @@ values.sort(lambda (value: Int) -> -value)
 Lambda is not a separate type: it creates a value of the existing `Function`
 type. Each parameter needs an explicit static type, the return type comes from
 the expression, and ordinary strict typing/null-safety rules still apply. A
-lambda has no block or statements and cannot capture an enclosing `Local`
-binding in v0.1.11; use a normal Function or pass the value explicitly.
+lambda has no block or statements.
+
+If a lambda needs to use a variable from outside its own parameters, you must list it explicitly in square brackets before the parameters:
+
+```ahd
+minimum: Int := 50
+passed := values.filter(lambda [#minimum] (score: Int) -> score >= minimum)
+```
+
+- `#` is for `Local` captures: it copies the value at the moment the lambda is created.
+- `@` is for `Global` captures: it links to a live module variable.
+
+No dependencies are inferred automatically; you must declare them.
 
 `map` and `filter` do not alter the source List; they return a new List.
 
@@ -1960,44 +1981,91 @@ write(elapsed >= 0.5)
 
 `Time.sleep(...)` uses **milliseconds**, whereas `Time.monotonic()` uses **seconds**. `Time.monotonic()` is not a date; it is used to calculate the duration between two measurements. A negative `sleep` value raises a `ValueError`.
 
-## 23. Latex module
+## 23. Statistics module
 
-If you want to directly produce a PDF with AhdCode, you can use the `Latex` module. The module brings the necessary Tectonic engine with its own installation; you don't need to additionally install TeX Live or MiKTeX.
+The `Statistics` module provides descriptive statistics for `List<Int>` or `List<Real>`. It does not draw charts (for visualization, see `Plot`).
 
-A first example:
+```ahd
+bring Statistics
+
+scores: List<Int> := [70, 80, 90]
+write(Statistics.mean(scores))
+write(Statistics.median(scores))
+```
+
+## 24. Plot module
+
+The `Plot` module creates charts from numeric data and saves them as images (`.png`, `.svg`, `.pdf`).
+
+```ahd
+bring Plot
+
+chart := Plot.line([1, 2, 3], [2, 4, 3])
+chart.save("chart.png")
+```
+
+You can customize the chart before saving:
+
+```ahd
+chart = chart.title("Growth").xLabel("Days")
+```
+
+Plot only accepts numeric types (`List<Int>`, `List<Real>`, or `Numeric` Vectors). It does not automatically parse text.
+
+## 25. Numeric module and Complex
+
+The `Numeric` module provides linear algebra operations (Vectors and Matrices).
+
+```ahd
+bring Numeric
+
+v := Numeric.vector([1, 2, 3])
+m := Numeric.matrix([[1, 2], [3, 4]])
+write(m.determinant())
+```
+
+A `Numeric` Vector can also be passed directly to `Plot.line` or `Plot.scatter` instead of a plain List.
+
+### Complex Numbers
+
+AhdCode also supports `Complex` numbers (composed of `Real` components) as a core type. To create one, attach an uppercase `I` directly to a number:
+
+```ahd
+z := 2 + 3I
+write(z)       // 2.0+3.0I
+```
+
+- `3I` is valid.
+- `3i` is invalid.
+- `3 I` (with a space) is invalid.
+
+An `Int` or `Real` can be safely used where a `Complex` is required. `Complex` values can be added, multiplied, and divided, but they are unordered (you cannot use `<` or `>`).
+
+## 26. Latex module
+
+If you want to directly produce a PDF with AhdCode, you can use the `Latex` module. The module brings the necessary engine with its own installation.
+
+A basic example:
 
 ```ahd
 bring Latex as L
 from Latex bring LatexError
 
-document: String := L.document(
-    L.section("My First Document") +
-    L.escape("Hello! This is a regular text section.") +
-    L.subsection("Math Example") +
-    L.equation("E = mc^2")
+doc: String := L.document(
+    type: "Article",
+    contents: L.section("My First Document") +
+              L.escape("Hello! This is a regular text section.")
 )
 
 attempt {
-    L.pdf(document, "output.pdf")
-    write("PDF created successfully!")
+    L.pdf(doc, "output.pdf")
 }
-except LatexError as error {
-    write("Could not create PDF: {error.message}")
+except LatexError as e {
+    write("Could not create PDF: {e.message}")
 }
 ```
 
-Here, respectively:
-
-- `Latex.escape(text)`: escapes regular text against LaTeX special characters.
-- `Latex.section(text)` / `subsection(text)`: produces a heading.
-- `Latex.equation(math)`: adds the math expression as LaTeX.
-- `Latex.document(content)`: turns the parts into a complete document.
-- `Latex.pdf(source, output)`: compiles the LaTeX source you provide as a String and writes to a PDF file.
-- `Latex.pdfFile(input, output)`: compiles an already existing `.tex` file and produces a PDF.
-
-If you are going to use the error type inside `except LatexError`, import it with `from Latex bring LatexError`.
-
-The module is designed to work offline, and shell escape is disabled. For more advanced tables and LaTeX details, you can look at the `docs/LATEX.md` document.
+Beyond basic articles, you can use `document(type: "Report")` or `document(type: "Beamer")`. The module also supports `date`, `margin`, `color`, `figure`, `image`, `theorem`, `ref`, `cite`, and `bibliography`. For more advanced capabilities, see the [Latex module reference](LATEX.md).
 
 ## 24. Code Formatter
 
@@ -2142,7 +2210,7 @@ Function and Class definitions, modules, List/Pair objects, and the Math randomn
 
 The REPL is very useful when learning: you can quickly try an idea and see the result. For longer programs, using an `.ahd` file is more organized.
 
-## 27. Common beginner mistakes
+## 30. Common beginner mistakes
 
 Seeing an error message is a normal part of programming. Most errors simply tell you that the computer couldn't understand what you wanted. The following examples show common situations beginners encounter and how to fix them:
 
@@ -2246,7 +2314,7 @@ Seeing an error message is a normal part of programming. Most errors simply tell
 - Why: Unseeded randomness uses OS entropy and cannot be repeated.
 - Correct: Provide a seed value like `Math.seed(42)` before throwing the dice.
 
-## 28. Small Projects
+## 31. Small Projects
 
 These small projects bring together what is taught in the guide. Try building them on your own!
 
@@ -2258,7 +2326,7 @@ These small projects bring together what is taught in the guide. Try building th
 6. **Student Registry with Classes**: Create a `Student` class and a `Course` class. Let the Course have a `List<Student>` inside it. Write a method to add a new student to the course, and another method to calculate the overall average grade of the course.
 7. **Seeded Random Game**: Generate a "secret number" between 1 and 100 using `Math.seed(42)`. Ask the user to guess the number. Guide them with "higher" or "lower" until they guess correctly. Because a seed is used, the secret number will be the same every time you run the program—perfect for testing!
 
-## 29. Exercises
+## 32. Exercises
 
 Instead of immediately looking for full solutions, build each program in small steps.
 
@@ -2288,7 +2356,7 @@ Instead of immediately looking for full solutions, build each program in small s
 19. Use `break` and `continue` to find the first 5 even numbers within a very large range, but skip multiples of 3 with `continue`.
 20. Create a module named `MathUtils.ahd` containing a function that calculates rectangle area, and use it from inside `main.ahd` by calling it with `bring`.
 
-## 30. Solution Hints
+## 33. Solution Hints
 
 1. The result of `take` is a String; use `int(...)` for age, and `+ 1` for the new age.
 2. Break the formula into small parts; start with `real(take(...))` and use Real numbers.
@@ -2311,7 +2379,7 @@ Instead of immediately looking for full solutions, build each program in small s
 19. `if i % 3 == 0 { continue }`. `if count == 5 { break }`.
 20. You can use `from MathUtils bring calculateArea`.
 
-## 31. Next steps and technical docs
+## 34. Next steps and technical docs
 
 After finishing this guide, you can deepen your knowledge of the language details from these documents:
 
@@ -2330,10 +2398,14 @@ After finishing this guide, you can deepen your knowledge of the language detail
 - [List API](LIST_API.md)
 - [Math](MATH.md)
 - [Time](TIME.md)
+- [Statistics](STATISTICS.md)
+- [Plot](PLOT.md)
+- [Numeric](NUMERIC.md)
 - [Latex](LATEX.md)
 - [File and Path](FILESYSTEM.md)
 - [Regex](REGEX.md)
 - [CSV](CSV.md)
+- [Data](DATA.md)
 - [Diagnostics](DIAGNOSTICS.md)
 - [CLI](CLI.md)
 - [Formatter](FORMATTER.md)

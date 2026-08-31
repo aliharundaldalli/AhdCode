@@ -95,6 +95,10 @@
     "numbers": {
       "patterns": [
         {
+          "name": "constant.numeric.complex.ahdcode",
+          "match": "(?<![\\p{L}\\p{N}_])[0-9]+(?:\\.[0-9]+)?(?:[eE][+-]?[0-9]+)?I(?![\\p{L}\\p{N}_])"
+        },
+        {
           "name": "constant.numeric.real.ahdcode",
           "match": "(?<![\\p{L}\\p{N}_])[0-9]+\\.[0-9]+(?:[eE][+-]?[0-9]+)?(?![\\p{L}\\p{N}_])"
         },
@@ -154,7 +158,7 @@
       "patterns": [
         {
           "name": "storage.type.ahdcode",
-          "match": "\\b(?:Int|Real|String|Bool|Nothing|List|Pair|Object|Error)\\b"
+          "match": "\\b(?:Int|Real|Complex|String|Bool|Nothing|List|Pair|Object|Error)\\b"
         },
         {
           "name": "storage.modifier.ahdcode",

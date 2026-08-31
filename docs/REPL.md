@@ -11,7 +11,7 @@ ahdcode
 ```
 
 ```text
-AhdCode v0.1.14
+AhdCode v0.1.15
 ahd> x := 5
 ahd> x = x + 1
 ahd> x
@@ -51,7 +51,7 @@ ahd> Math.random()
 
 Lambda Function values also persist between commands and work directly as
 callbacks, for example `values.map(lambda (x: Int) -> x^2)`. As elsewhere,
-they are expression-only and cannot capture an enclosing `Local` binding.
+they are expression-only and require explicit `#` or `@` annotations to capture outer variables.
 
 `take` prints and flushes its prompt, then consumes exactly one answer line
 from the real terminal. That answer is not treated as another REPL command.

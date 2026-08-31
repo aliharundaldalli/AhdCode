@@ -325,9 +325,13 @@ v0.1.14 davranışına bakın; v0.1.15 için bu konuda hiçbir şey değişmedi.
 derler ve `\includegraphics` gibi belgeye göreli varlıkları (assets) girdi
 dosyasının dizinine göre çözer.
 
-Derleme, bir AhdCode kurulumuyla birlikte gelen **paketlenmiş** bir
-Tectonic motoru ve **paketlenmiş** bir yerel kaynak paketi tarafından
-yapılır:
+Derleme, çevrimdışı Tectonic motoru ve yerel bir kaynak paketi tarafından yapılır. Kaynak koddan yapılan standart `go install` adımı LaTeX runtime dosyalarını kurmaz. LaTeX kullanmak isteyen kullanıcı, bunları `package-latex` aracıyla bir kez ayrıca hazırlar (stage):
+
+```bash
+go run ./tooling/latex/cmd/package-latex --output "$(go env GOPATH)"
+```
+
+Bu komut, sabitlenmiş (pinned) kaynakları getirmek ve doğrulamak için bir defaya mahsus bir ağ işlemi gerçekleştirir ve bunları Go binary dizininizde `ahdcode` ile yan yana yerleştirir:
 
 ```text
 libexec/ahdcode/latex/tectonic
@@ -335,10 +339,7 @@ libexec/ahdcode/latex/ahdcode-latex.ttb
 libexec/ahdcode/latex/THIRD_PARTY_NOTICES.txt
 ```
 
-AhdCode, `PATH`'te bulunan bir `tectonic`'i asla çalıştırmaz, hiçbir zaman
-bir sistem TeX kurulumuna geri dönmez (fall back) ve çalışma zamanında
-hiçbir şey indirmez. Paketlenmiş motor veya paket eksikse, bu bir
-`LatexError`'dır.
+Hazırlandıktan (staged) sonra AhdCode, `PATH`'te bulunan bir `tectonic`'i asla çalıştırmaz, hiçbir zaman bir sistem TeX kurulumuna geri dönmez (fall back) ve çalışma zamanında hiçbir şey indirmez. Çevrimdışı motor veya paket eksikse, bu bir `LatexError`'dır.
 
 ## Yapısı gereği çevrimdışı
 
@@ -346,7 +347,7 @@ Motor, izole bir çağrı-başına (per-invocation) önbellek (cache) ve yalnız
 yerel-paket (local-bundle-only) politikasıyla çağrılır, bu yüzden
 desteklenen bir belge, boş bir önbelleğe ve ağa sahip olmayan taze bir
 makinede derlenir. Ayrıca kurulu bir TeX dağıtımı ve çalışma zamanı kaynak
-indirmesi yoktur. Bu, Beamer'ı da kapsar: paketlenmiş kaynak paketi
+indirmesi yoktur. Bu, Beamer'ı da kapsar: hazırlanan (staged) kaynak paketi
 `beamer.cls`'i, `beamerbase*` bileşenlerini, üzerine inşa edildiği PGF/
 TikZ çekirdeğini ve `translator`'ı taşır, bu yüzden bir Beamer sunumu tam
 olarak Article/Report gibi derlenir — çevrimdışı, sistem TeX olmadan.
@@ -376,7 +377,7 @@ hiçbir zaman zaten geçerli bir hedef PDF'i yok etmez.
 ## LatexError
 
 Tek bir hata, Latex'e özgü her başarısızlığı kapsar: derleme başarısızlığı,
-eksik bir paketlenmiş motor veya paket, zaman aşımı, motor süreç
+eksik bir çevrimdışı motor veya paket, zaman aşımı, motor süreç
 başarısızlığı, üretilmemiş bir PDF, geçersiz bir `document()` parametresi
 (margin, color, bilinmeyen bir `type`), geçersiz teorem kaydı veya
 referansı ve eksik ya da desteklenmeyen bir image/figure varlığı. Motor

@@ -77,12 +77,12 @@ From the repository root:
 
 ```bash
 go test ./...
-go install ./cmd/ahdcode
+go install ./cmd/ahdcode ./cmd/ahdnumeric ./cmd/ahdplot
 ahdcode_exe="$(go env GOPATH)/bin/ahdcode"
 "$ahdcode_exe" --version
 ```
 
-The expected current result is `AhdCode v0.1.11`. Using the explicit
+The expected current result is `AhdCode v0.1.15`. Using the explicit
 `$ahdcode_exe` path proves which binary was tested. If the user wants the
 short `ahdcode` command and that directory is not already on `PATH`, explain
 the temporary or persistent options and obtain permission before editing a
@@ -90,6 +90,12 @@ shell profile. For a temporary current-shell setting only:
 
 ```bash
 export PATH="$(go env GOPATH)/bin:$PATH"
+```
+
+If the user wants Latex support, explicitly ask for permission to stage the Latex runtime, as this performs an installation-time network operation to fetch pinned/checksummed resources. Do not use a system TeX fallback.
+
+```bash
+go run ./tooling/latex/cmd/package-latex --output "$(go env GOPATH)"
 ```
 
 ### 4. Run a real smoke program
@@ -114,8 +120,8 @@ From the repository root:
 cd editors/vscode
 npm test
 npm run package
-code --install-extension ahdcode-0.1.3.vsix
-code --list-extensions --show-versions | grep '^ahdcode-local.ahdcode@0.1.3$'
+code --install-extension ahdcode-0.1.4.vsix
+code --list-extensions --show-versions | grep '^ahdcode-local.ahdcode@0.1.4$'
 cd ../..
 ```
 
@@ -180,12 +186,12 @@ From the repository root:
 
 ```powershell
 go test ./...
-go install ./cmd/ahdcode
+go install ./cmd/ahdcode ./cmd/ahdnumeric ./cmd/ahdplot
 $AhdCodeExe = Join-Path (go env GOPATH) "bin\ahdcode.exe"
 & $AhdCodeExe --version
 ```
 
-The expected current result is `AhdCode v0.1.11`. The explicit executable path
+The expected current result is `AhdCode v0.1.15`. The explicit executable path
 avoids accidentally testing an older global installation. If the Go binary
 directory is not on `PATH`, explain the choice before changing anything. A
 temporary current-PowerShell-process change is:
@@ -195,6 +201,12 @@ $env:Path = "$(go env GOPATH)\bin;$env:Path"
 ```
 
 Do not persist it to the user or system environment without permission.
+
+If the user wants Latex support, explicitly ask for permission to stage the Latex runtime, as this performs an installation-time network operation to fetch pinned/checksummed resources. Do not use a system TeX fallback.
+
+```powershell
+go run ./tooling/latex/cmd/package-latex --output "$(go env GOPATH)"
+```
 
 ### 4. Run a real smoke program
 
@@ -217,8 +229,8 @@ temporary paths are outside the repository.
 Set-Location editors\vscode
 npm test
 npm run package
-code --install-extension .\ahdcode-0.1.3.vsix
-code --list-extensions --show-versions | Select-String '^ahdcode-local\.ahdcode@0\.1\.3$'
+code --install-extension .\ahdcode-0.1.4.vsix
+code --list-extensions --show-versions | Select-String '^ahdcode-local\.ahdcode@0\.1\.4$'
 Set-Location ..\..
 ```
 

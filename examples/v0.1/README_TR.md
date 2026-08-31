@@ -17,6 +17,12 @@ ahdcode run examples/v0.1/02_input.ahd
 ahdcode run examples/v0.1/14_grade_app.ahd
 ```
 
+`16_latex.ahd` örneğini çalıştırmadan önce, `Latex` modülünün çevrimdışı derleyiciyi bir kez hazırlamanızı (stage) gerektirdiğini unutmayın:
+
+```bash
+go run ./tooling/latex/cmd/package-latex --output "$(go env GOPATH)"
+```
+
 | Örnek | Konu |
 |---|---|
 | `01_hello.ahd` | bildirimler, interpolasyon, çıktı |

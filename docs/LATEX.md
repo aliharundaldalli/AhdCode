@@ -313,8 +313,13 @@ behavior above; nothing about it changed for v0.1.15.
 resolves document-relative assets such as `\includegraphics` against the input
 file's directory.
 
-Compilation is done by a **bundled** Tectonic engine and a **bundled** local
-resource bundle that ship with an AhdCode installation:
+Compilation is done by the offline Tectonic engine and a local resource bundle. The standard source installation (`go install`) does not install the LaTeX runtime files. A user who wants to use LaTeX must explicitly stage them once using the `package-latex` tool:
+
+```bash
+go run ./tooling/latex/cmd/package-latex --output "$(go env GOPATH)"
+```
+
+This command performs a one-time network operation to fetch and verify the pinned resources, placing them in your Go binary directory alongside `ahdcode`:
 
 ```text
 libexec/ahdcode/latex/tectonic
@@ -322,16 +327,14 @@ libexec/ahdcode/latex/ahdcode-latex.ttb
 libexec/ahdcode/latex/THIRD_PARTY_NOTICES.txt
 ```
 
-AhdCode never runs a `tectonic` found on `PATH`, never falls back to a system
-TeX installation, and never downloads anything at run time. If the bundled
-engine or bundle is missing, that is a `LatexError`.
+Once staged, AhdCode never runs a `tectonic` found on `PATH`, never falls back to a system TeX installation, and never downloads anything at run time. If the offline engine or bundle is missing, that is a `LatexError`.
 
 ## Offline by construction
 
 The engine is invoked with an isolated per-invocation cache and a local-bundle
 only policy, so a supported document compiles on a fresh machine with an empty
 cache and no network. There is no separately installed TeX distribution and no
-runtime resource download. This includes Beamer: the bundled resource bundle
+runtime resource download. This includes Beamer: the staged resource bundle
 carries `beamer.cls`, its `beamerbase*` components, the PGF/TikZ core it
 builds on, and `translator`, so a Beamer presentation compiles exactly like
 Article/Report — offline, with no system TeX.
@@ -359,7 +362,7 @@ never destroys an already valid destination PDF.
 ## LatexError
 
 One error covers every Latex-specific failure: compilation failure, a missing
-bundled engine or bundle, timeout, engine process failure, a PDF that was not
+staged engine or bundle, timeout, engine process failure, a PDF that was not
 produced, an invalid `document()` parameter (margin, color, an unknown
 `type`), invalid theorem registration or reference, and a missing or
 unsupported image/figure asset. Engine diagnostics are bounded so a malformed

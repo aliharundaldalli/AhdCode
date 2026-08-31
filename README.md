@@ -71,6 +71,15 @@ go test ./...
 go install ./cmd/ahdcode ./cmd/ahdnumeric ./cmd/ahdplot
 ```
 
+The command above installs the compiler and the local numeric/plot rendering helpers.
+If you plan to use the `Latex` module, you must also stage the offline Latex runtime bundle. This requires a one-time network fetch to download pinned, checksummed resources:
+
+```bash
+go run ./tooling/latex/cmd/package-latex --output "$(go env GOPATH)"
+```
+
+After staging, ordinary AhdCode Latex execution remains strictly offline.
+
 Ensure Go's binary directory is on `PATH`:
 
 ```bash
@@ -116,6 +125,7 @@ See the [CLI guide](docs/CLI.md), [formatter guide](docs/FORMATTER.md), and
 - [CSV module](docs/CSV.md)
 - [Data module](docs/DATA.md)
 - [Statistics module](docs/STATISTICS.md)
+- [Plot module](docs/PLOT.md)
 - [Numeric module and Complex scalars](docs/NUMERIC.md)
 - [Understanding diagnostics](docs/DIAGNOSTICS.md)
 - [AI-assisted local setup](FOR_AI.md)
@@ -131,7 +141,7 @@ VS Code and Antigravity. See its [installation guide](editors/vscode/README.md).
 
 ## Current limitations
 
-v0.1 intentionally has no block/statement lambdas, lexical closures, tuple
+v0.1 intentionally has no block/statement lambdas, implicit/general mutable closure cells, tuple
 returns, reflection, interfaces, multiple inheritance, debugger, LSP, package
 search paths, or web runtime.
 Operator behavior is user-definable only through the ten fixed

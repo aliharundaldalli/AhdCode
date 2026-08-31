@@ -2,7 +2,7 @@
   "name": "ahdcode",
   "displayName": "AhdCode",
   "description": "Run AhdCode files and provide minimal syntax highlighting.",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "publisher": "ahdcode-local",
   "license": "MIT",
   "private": true,

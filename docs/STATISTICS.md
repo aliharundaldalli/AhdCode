@@ -170,7 +170,7 @@ write(values)                     // [3, 1, 2]
 
 ## What Statistics is not
 
-v0.1.13 is descriptive statistics only. There is no inferential testing, no
+The `Statistics` module is descriptive statistics only. There is no inferential testing, no
 regression, no distribution, no random sampling, and no plotting. There is no
 `frequency` function either: a frequency table would be `Pair<K, Int>`, and a
 Pair key must be `String`, `Int`, or `Bool`, so `List<Real>` input has no

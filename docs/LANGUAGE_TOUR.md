@@ -111,9 +111,16 @@ squares := values.map(lambda (value: Int) -> value^2)
 ```
 
 Lambda has one expression only: there is no block/statement lambda, no
-separate Lambda type, and no implicit coercion. It cannot capture an enclosing
-`Local` binding in v0.1.11; use a normal Function or pass the value explicitly.
-Normal Function declaration syntax is unchanged.
+separate Lambda type, and no implicit coercion.
+
+If a lambda needs a variable from outside its parameters, you must declare the dependency explicitly in square brackets:
+
+```ahd
+minimum: Int := 50
+passed := values.filter(lambda [#minimum] (score: Int) -> score >= minimum)
+```
+
+Use `#` for `Local` by-value capture and `@` for live `Global` dependency. No dependency is inferred automatically.
 
 ```ahd
 Student: Class<> := {
@@ -151,12 +158,12 @@ Vector2: Class<> := {
 Use `attempt`, `except`, `ultimately`, and `toss` for catchable errors. Use
 `bring ModuleName` for a namespace or `from ModuleName bring name` for a direct
 symbol. Local modules are sibling files. `Math`, `Time`, `Latex`, `Path`,
-`Regex`, `CSV`, `Data`, and `File` are explicit standard modules; their domain and
+`Regex`, `CSV`, `Data`, `File`, `Statistics`, `Plot`, and `Numeric` are explicit standard modules; their domain and
 file failures are catchable AhdCode errors.
 
 Continue with [Functions](FUNCTIONS.md), [Classes](CLASSES.md),
 [Class Protocol Methods](PROTOCOLS.md), [Collections](COLLECTIONS.md), and
 [Modules](MODULES.md). Time covers local, UTC, and fixed-offset instants; CSV
 transports String rows and records, and Data turns them into an immutable
-`Table` of String cells. See [Time](TIME.md), [CSV](CSV.md), [Data](DATA.md), and the
+`Table` of String cells. See [Time](TIME.md), [CSV](CSV.md), [Data](DATA.md), [Statistics](STATISTICS.md), [Plot](PLOT.md), [Numeric](NUMERIC.md), and the
 [diagnostics guide](DIAGNOSTICS.md).

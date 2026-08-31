@@ -54,6 +54,7 @@ implementation name.
 ```ahd
 write(type(5))          // "Int"
 write(type(5.0))        // "Real"
+write(type(2 + 3I))     // "Complex"
 write(type("Ali"))      // "String"
 write(type(true))       // "Bool"
 write(type(null))       // "Null"

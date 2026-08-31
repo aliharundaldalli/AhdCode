@@ -170,7 +170,7 @@ write(values)                     // [3, 1, 2]
 
 ## Statistics ne değildir
 
-v0.1.13 yalnızca betimleyici istatistiktir. Çıkarımsal test, regresyon,
+`Statistics` modülü yalnızca betimleyici istatistiktir. Çıkarımsal test, regresyon,
 dağılım, rastgele örnekleme ve grafik çizimi yoktur. Bir `frequency` fonksiyonu
 da yoktur: bir frekans tablosu `Pair<K, Int>` olurdu ve bir Pair anahtarı
 `String`, `Int` veya `Bool` olmak zorundadır; bu yüzden `List<Real>` girdisinin

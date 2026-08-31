@@ -10,6 +10,19 @@ AhdCode şu anda Go 1.25 veya daha yeni bir sürümle derlenir.
 cd AhdCode
 go test ./...
 go install ./cmd/ahdcode ./cmd/ahdnumeric ./cmd/ahdplot
+```
+
+Eğer `Latex` modülünü kullanmayı planlıyorsanız, çevrimdışı (offline) Latex çalışma zamanını da hazırlamanız (stage) gerekir. Bu adım, sabitlenmiş kaynakları indirmek için bir defaya mahsus ağ bağlantısı kullanır:
+
+```bash
+go run ./tooling/latex/cmd/package-latex --output "$(go env GOPATH)"
+```
+
+Hazırlık (staging) aşamasından sonra, AhdCode'un normal Latex işlemleri tamamen çevrimdışı çalışmaya devam eder.
+
+Go'nun ikili dosya (binary) dizininin `PATH`'te olduğundan emin olun:
+
+```bash
 export PATH="$(go env GOPATH)/bin:$PATH"
 ```
 

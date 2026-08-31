@@ -68,21 +68,21 @@ VS Code'da Komut Paleti'nden **Extensions: Install from VSIX...** ile veya
 şununla kurun:
 
 ```bash
-code --install-extension ahdcode-0.1.3.vsix
+code --install-extension ahdcode-0.1.4.vsix
 ```
 
 Google Antigravity IDE 1.107, aynı yerel VSIX CLI işlemini sunar:
 
 ```bash
-antigravity-ide --install-extension ahdcode-0.1.3.vsix
+antigravity-ide --install-extension ahdcode-0.1.4.vsix
 ```
 
 macOS'ta, bu başlatıcılar PATH'te değilse, uygulama paketine gömülü
 başlatıcıları kullanın:
 
 ```bash
-/Applications/Visual\ Studio\ Code.app/Contents/Resources/app/bin/code --install-extension ahdcode-0.1.3.vsix
-/Applications/Antigravity\ IDE.app/Contents/Resources/app/bin/antigravity-ide --install-extension ahdcode-0.1.3.vsix
+/Applications/Visual\ Studio\ Code.app/Contents/Resources/app/bin/code --install-extension ahdcode-0.1.4.vsix
+/Applications/Antigravity\ IDE.app/Contents/Resources/app/bin/antigravity-ide --install-extension ahdcode-0.1.4.vsix
 ```
 
 Aynı paket her iki editör tarafından da kullanılır. Eklenti API temel

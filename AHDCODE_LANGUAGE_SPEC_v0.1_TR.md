@@ -3710,12 +3710,14 @@ için örtük olarak bir frame'e dönüşmez, bu yüzden bir içindekiler slayd�
 dosyasını derler; `\includegraphics` gibi belgeye-göreli varlıkları girdi
 dosyasının dizinine göre çözer.
 
-Derleme, bir AhdCode kurulumuyla birlikte gelen bir Tectonic motoru ve
-yerel bir kaynak paketi kullanır. AhdCode, `PATH`'te bulunan bir
+Derleme, çevrimdışı bir Tectonic motoru ve yerel bir kaynak paketi
+kullanır. Bu dosyalar çekirdek (core) kurulumla birlikte gelmez;
+`package-latex` aracı kullanılarak Go ortamına açıkça hazırlanmaları
+(staged) gerekir. Hazırlandıktan (staged) sonra AhdCode, `PATH`'te bulunan bir
 `tectonic`'i asla çalıştırmaz, asla bir sistem TeX kurulumuna geri
 dönmez ve çalışma zamanında asla bir kaynak indirmez. Bu yüzden
 desteklenen bir belge, boş önbelleğe ve ağ bağlantısı olmayan taze bir
-makinede derlenir. Eksik bir paketlenmiş motor veya paket, bir
+makinede derlenir. Eksik bir hazırlanmış (staged) motor veya paket, bir
 `LatexError`'dır.
 
 ### 37.8 Güvenlik ve sınırlar

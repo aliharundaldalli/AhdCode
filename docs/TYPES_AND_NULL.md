@@ -12,6 +12,7 @@
 | `Real` | finite 64-bit floating point |
 | `String` | immutable Unicode text |
 | `Bool` | `true` or `false` |
+| `Complex` | complex number |
 | `List<T>` | ordered homogeneous mutable collection |
 | `Pair<K, V>` | insertion-ordered homogeneous key/value collection |
 | `Class` | class declaration and instance identity |

@@ -26,18 +26,21 @@ En iyi öğrenme yolu, örnekleri yalnızca okumak değil çalıştırmaktır. B
 - [17. Sınıflar (Class) ve Özellikler (Attributes)](#17-sınıflar-class-ve-özellikler-attributes)
 - [18. Hata yönetimi (`attempt`, `except`, `ultimately` ve `toss`)](#18-hata-yönetimi-attempt-except-ultimately-ve-toss)
 - [19. Modüller ve bring](#19-modüller-ve-bring)
-- [20. Temel işlevler modülü (Fundamentals)](#20-temel-işlevler-modülü-fundamentals)
-- [21. Matematik modülü (Math)](#21-matematik-modülü-math)
-- [22. Zaman modülü (Time)](#22-zaman-modülü-time)
-- [23. Latex modülü (Latex)](#23-latex-modülü-latex)
-- [24. Kod biçimlendirici (Formatter)](#24-kod-biçimlendirici-formatter)
-- [25. Komut satırı (CLI)](#25-komut-satırı-cli)
-- [26. Etkileşimli kabuk (REPL)](#26-etkileşimli-kabuk-repl)
-- [27. Başlangıçta sık yapılan hatalar](#27-başlangıçta-sık-yapılan-hatalar)
-- [28. Küçük Projeler](#28-küçük-projeler)
-- [29. Alıştırmalar](#29-alıştırmalar)
-- [30. Çözüm İpuçları](#30-çözüm-ipuçları)
-- [31. Sonraki adımlar ve teknik belgeler](#31-sonraki-adımlar-ve-teknik-belgeler)
+- [20. Fundamentals modülü](#20-fundamentals-modulu)
+- [21. Math modülü](#21-math-modulu)
+- [22. Time modülü](#22-time-modulu)
+- [23. Statistics modülü](#23-statistics-modulu)
+- [24. Plot modülü](#24-plot-modulu)
+- [25. Numeric modülü ve Complex](#25-numeric-modulu-ve-complex)
+- [26. Latex modülü](#26-latex-modulu)
+- [27. Kod Biçimlendirici (Formatter)](#27-kod-bicimlendirici-formatter)
+- [28. Komut satırı (CLI)](#28-komut-satiri-cli)
+- [29. Etkileşimli kabuk (REPL)](#29-etkilesimli-kabuk-repl)
+- [30. Sık yapılan başlangıç hataları](#30-sik-yapilan-baslangic-hatalari)
+- [31. Küçük Projeler](#31-kucuk-projeler)
+- [32. Egzersizler](#32-egzersizler)
+- [33. Çözüm İpuçları](#33-cozum-ipuclari)
+- [34. Sonraki adımlar ve teknik dokümanlar](#34-sonraki-adimlar-ve-teknik-dokumanlar)
 
 ## 1. AhdCode nedir?
 
@@ -68,9 +71,15 @@ AhdCode'u kaynak kodundan kurmak için bilgisayarınızda Go 1.25 veya daha yeni
 ```bash
 cd AhdCode
 go test ./...
-go install ./cmd/ahdcode
+go install ./cmd/ahdcode ./cmd/ahdnumeric ./cmd/ahdplot
 export PATH="$(go env GOPATH)/bin:$PATH"
 ahdcode --version
+```
+
+Eğer `Latex` modülünü kullanmayı planlıyorsanız, çevrimdışı (offline) Latex çalışma zamanını da hazırlamanız (stage) gerekir. Bu adım, sabitlenmiş kaynakları indirmek için bir defaya mahsus ağ bağlantısı kullanır:
+
+```bash
+go run ./tooling/latex/cmd/package-latex --output "$(go env GOPATH)"
 ```
 
 Son komut AhdCode sürümünü gösteriyorsa hazırsınız.
@@ -207,11 +216,12 @@ Bir değişkende ne tür bilgi tuttuğumuzu belirtmek için **türler** kullanı
 | `Real` | Ondalıklı sayı | `3.5`, `-0.25` |
 | `String` | Metin | `"Ayşe"` |
 | `Bool` | Doğru/yanlış değeri | `true`, `false` |
+| `Complex` | Karmaşık sayı | `2 + 3I` |
 | `List<T>` | Sıralı değerler | `[1, 2, 3]` |
 | `Pair<K, V>` | Anahtar-değer eşleşmeleri | `{"Ali": 90}` |
 | `Function` | Çalıştırılabilir bir fonksiyon | ileride göreceğiz |
 | `Class` | Kendi veri yapınızı tanımlar | ileride göreceğiz |
-| `Nothing` | Bir fonksiyonun değer döndürmediğini söyler | ileride göreceğiz |
+| `Nothing` | Fonksiyonun değer döndürmediğini belirtir | ileride göreceğiz |
 
 Basit bir örnek:
 
@@ -802,7 +812,19 @@ describe: Overload Function := (value: Real) -> String {
 
 AhdCode çağrının hangi sürüme ait olduğunu parametrelerden belirler. Tam eşleşme önce gelir; güvenli `Int -> Real` genişletmesi gerektiğinde kullanılabilir. Hangi sürümün seçileceği belirsizse derleyici tahmin etmek yerine hata verir.
 
-> **Teknik not:** Bu seçime *overload resolution* denir. İsimli Function bildirimleri `name: Function := (...) -> T { ... }` biçimini korur ve iç içe yazılamaz. Tek bir ifade için `lambda (x: Int) -> x > 0`, aynı `Function` türünde isimsiz bir değer oluşturur. Lambda parametreleri açıktır, dönüş türü çıkarılır ve blok veya deyim içermez.
+> **Teknik not:** Bu seçime *overload resolution* denir. İsimli Function bildirimleri `name: Function := (...) -> T { ... }` biçimini korur ve iç içe yazılamaz. Lambda ayrı bir tür değildir: var olan `Function` türünde bir değer yaratır. Her parametrenin türü açıkça (static olarak) belirtilmelidir, dönüş türü ifadeden çıkarılır ve katı tipleme (strict typing)/null güvenliği kuralları aynen geçerlidir. Lambda'nın bir bloğu (`{}`) veya deyimleri (statements) yoktur.
+
+Eğer lambda, kendi parametreleri dışındaki bir değişkeni kullanmak zorundaysa, bu değişkenleri parametrelerden hemen önce köşeli parantez içinde listelemelisiniz:
+
+```ahd
+minimum: Int := 50
+passed := values.filter(lambda [#minimum] (score: Int) -> score >= minimum)
+```
+
+- `#`, `Local` (yerel) yakalamalar içindir: lambdanın oluşturulduğu andaki değeri kopyalar.
+- `@`, `Global` yakalamalar içindir: doğrudan genel modül değişkenine kalıcı olarak bağlanır.
+
+Hiçbir dış bağımlılık (dependency) kendiliğinden dahil edilmez; bunları sizin belirtmeniz gerekir.
 
 ## 11. `Local` ve `Global`
 
@@ -978,36 +1000,7 @@ write(data.index(8)) // 1
 ### `map`, `filter` ve anahtara göre sıralama
 
 Bir listedeki her değeri dönüştürmek için `map`, bazılarını seçmek için
-`filter` kullanabilirsiniz. Çok adımlı mantık için isimli bir Function
-kullanışlı olmaya devam eder:
-
-```ahd
-double: Function := (value: Int) -> Int {
-    return value * 2
-}
-
-isEven: Function := (value: Int) -> Bool {
-    return value % 2 == 0
-}
-
-values: List<Int> := [3, -1, 4, -2]
-write(values.map(double))
-write(values.filter(isEven))
-```
-
-Kısa, tek bir ifade için doğrudan lambda geçebilirsiniz:
-
-```ahd
-squares := values.map(lambda (value: Int) -> value^2)
-positive := values.filter(lambda (value: Int) -> value > 0)
-values.sort(lambda (value: Int) -> -value)
-```
-
-Lambda ayrı bir tür değildir: mevcut `Function` türünde bir değer oluşturur.
-Her parametre açık bir statik tür ister, dönüş türü ifadeden gelir ve sıradan
-katı tip/null güvenliği kuralları uygulanmaya devam eder. Lambda blok veya
-deyim içermez ve v0.1.11'de çevreleyen bir `Local` bağlamayı yakalayamaz;
-normal bir Function kullanın veya değeri açıkça geçirin.
+`filter` kullanabilirsiniz.
 
 `map` ve `filter` kaynak List'i değiştirmez; yeni List döndürür.
 
@@ -1318,72 +1311,13 @@ write(person has name)
 
 > **Teknik not:** Alt sınıf nesnesini üst sınıf türünde tutmaya *upcasting*, çağrılacak metodun gerçek nesne türüne göre seçilmesine *dynamic dispatch* denir. İlk okumada bu terimleri ezberlemek zorunda değilsiniz.
 
-### Sınıf Protokol Metotları: `+`, `==`, `<` gibi operatörleri kendi sınıfınız için tanımlamak
+### Sınıf Protokol Metotları
 
-Kendi sınıfınızın `+`, `==`, `<` gibi operatörlerle çalışmasını isteyebilirsiniz. Bunun için AhdCode'da tam olarak on tane özel isimden biri kullanılır; bunlara **Sınıf Protokol Metotları** (Class Protocol Methods) denir:
+Kendi sınıfınızın `+`, `==`, `<` gibi operatörlerle çalışmasını isteyebilirsiniz. Bunun için AhdCode'da tam olarak on tane özel isimden biri kullanılır; bunlara **Sınıf Protokol Metotları** denir:
 
 ```text
 CEqual CCompare CAdd CSubtract CMultiply CDivide CRemainder CPower CNegate CStr
 ```
-
-Bu isimler yalnızca bir sınıfın metot konumunda özel anlam taşır; başka her yerde sıradan bir isimdirler. `C` harfi kendisi ayrılmış değildir — `Calculate`, `Create` veya `CWhatever` gibi isimler her zaman sıradan kalır.
-
-```ahd
-Vector2: Class<> := {
-    structure: Attributes := (
-        x: Real
-        y: Real
-    )
-
-    CEqual: Function := (
-        other: Vector2
-    ) -> Bool {
-        return attribute.x == other.x and attribute.y == other.y
-    }
-
-    CAdd: Function := (
-        other: Vector2
-    ) -> Vector2 {
-        return Vector2(x: attribute.x + other.x, y: attribute.y + other.y)
-    }
-
-    CNegate: Function := (
-    ) -> Vector2 {
-        return Vector2(x: -attribute.x, y: -attribute.y)
-    }
-
-    CStr: Function := (
-    ) -> String {
-        return "Vector2({attribute.x}, {attribute.y})"
-    }
-}
-
-a: Vector2 := Vector2(x: 1.0, y: 2.0)
-b: Vector2 := Vector2(x: 3.0, y: 4.0)
-
-write(a + b)
-write(-a)
-write(a == b)
-write(str(a))
-```
-
-Beklenen çıktı:
-
-```text
-Vector2(4.0, 6.0)
-Vector2(-1.0, -2.0)
-false
-Vector2(1.0, 2.0)
-```
-
-Kısa özet:
-- `==` ve `!=` -> `CEqual` (`!=` her zaman `CEqual` sonucunun tersidir; ayrı bir `CNotEqual` yoktur)
-- `<`, `<=`, `>`, `>=` -> hepsi tek bir `CCompare` çağrısına dayanır (ayrı `CLess` vb. yoktur)
-- `+ - * / % ^` -> `CAdd CSubtract CMultiply CDivide CRemainder CPower`
-- Tekli `-` -> `CNegate`
-- `str(nesne)` -> `CStr`
-
-Dağıtım (dispatch) her zaman **sol taraftaki** işlenene bakar: `vektor + 3` çalışıyorsa bu `3 + vektor` ifadesinin de çalışacağı anlamına gelmez — tersine bir operatör kuralı yoktur. Kalıtım ve `Override` sıradan metotlarla aynı şekilde çalışır. Daha fazla ayrıntı için [Class Protocol Methods](PROTOCOLS_TR.md) belgesine bakın.
 
 ## 18. Hata yönetimi (`attempt`, `except`, `ultimately` ve `toss`)
 
@@ -1408,20 +1342,6 @@ except DomainError as error {
 ```
 
 `attempt` içindeki kod denenir. Belirtilen hata oluşursa uygun `except` bloğu çalışır.
-
-Birden fazla hata türü için birden fazla `except` yazabilirsiniz:
-
-```ahd
-attempt {
-    // hata oluşturabilecek işlemler
-}
-except DomainError as error {
-    write("Sayı geçersiz")
-}
-except IndexError as error {
-    write("İndeks geçersiz")
-}
-```
 
 ### Ne olursa olsun çalışacak bölüm: `ultimately`
 
@@ -1451,67 +1371,16 @@ requirePositive: Function := (value: Int) -> Int {
 
 AhdCode'un sık karşılaşılan hata türleri arasında `DomainError`, `ValueError`, `IndexError`, `KeyError`, `OverflowError`, `DivisionByZeroError`, `NullError` ve `ConstantError` bulunur.
 
-### Kendi hata türünüzü oluşturmak
-
-İhtiyaç olduğunda `Error` sınıfından yeni hata türü türetebilirsiniz:
-
-```ahd
-InvalidAgeError: Class<Error> := {
-    structure: Attributes := (
-        message: String
-    )
-}
-```
-
-ve sonra:
-
-```ahd
-attempt {
-    age: Local Int := -5
-    if age < 0 {
-        toss (InvalidAgeError("Yaş negatif olamaz"))
-    }
-}
-except InvalidAgeError as error {
-    write(error.message)
-}
-```
-
-> **Teknik not:** AhdCode runtime hataları yakalanabilir normal Class değerleri olarak modellenir.
-
 ## 19. Modüller ve `bring`
 
-Program büyüdükçe her şeyi tek bir dosyaya yazmak istemezsiniz. Bir işi ayrı `.ahd` dosyasına koyup başka dosyadan kullanabilirsiniz. Buna **modül** diyebiliriz.
+Program büyüdükçe her şeyi tek bir dosyaya yazmak istemezsiniz. Bir işi ayrı `.ahd` dosyasına koyup başka dosyadan kullanabilirsiniz.
 
 ### Kendi modülünüzü oluşturmak
-
-Aynı klasörde iki dosya olduğunu düşünün:
-
-```text
-main.ahd
-Greeting.ahd
-```
-
-`Greeting.ahd`:
-
-```ahd
-greet: Function := (name: String) -> String {
-    return "Modülden merhaba, {name}"
-}
-```
-
-`main.ahd`:
 
 ```ahd
 from Greeting bring greet
 
 write(greet("Ayşe"))
-```
-
-Çıktı:
-
-```text
-Modülden merhaba, Ayşe
 ```
 
 ### Modülü hangi biçimde içe aktarabilirim?
@@ -1530,182 +1399,7 @@ from Greeting bring greet
 write(greet("Ayşe"))
 ```
 
-Birden fazla isim:
-
-```ahd
-from Greeting bring (
-    greet
-    farewell
-)
-```
-
-Tüm public isimler:
-
-```ahd
-from Greeting bring all
-```
-
-Aynı isimlerin çakışmasına yol açan importlar ve döngüsel modül bağımlılıkları derleme hatasıdır.
-
-### Modüle kısa bir ad vermek
-
-```ahd
-bring Time as T
-
-write(T.Calendar.isLeapYear(2028))
-```
-
-`as T` kullandığınızda bu import için `Time` yerine `T` kullanırsınız.
-
-Bu kısaltma tür adlarında kullanılmaz. Örneğin:
-
-```ahd
-bring Time as T
-from Time bring DateTime
-
-current: DateTime := T.now()
-```
-
-`T.DateTime` bir tür yazımı değildir; türü ayrıca içe aktarın.
-
-### File ve Path'e ilk bakış
-
-AhdCode'un hazır `Path` ve `File` modülleri de `bring` ile kullanılır:
-
-```ahd
-bring Path
-bring File
-
-path: String := Path.join(["notlar", "bugun.txt"])
-File.createDir("notlar")
-File.writeText(path, "merhaba")
-write(File.readText(path))
-```
-
-`Path` yol metinleriyle çalışır. `File` dosya ve klasör işlemleri yapar. Dosya işlemlerinde hata yakalamak istiyorsanız `FileError` türünü ayrıca içe aktarabilirsiniz:
-
-```ahd
-from File bring FileError
-
-attempt {
-    write(File.readText("olmayan.txt"))
-}
-except FileError as error {
-    write("Dosya okunamadı")
-}
-```
-
-`FileError`, `IOError` sınıfından türemiştir. Göreli yollar programın veya REPL oturumunun çalışma klasörünü kullanır.
-
-### Regex'e ilk bakış
-
-AhdCode'un hazır `Regex` modülü, bir deseni (pattern) bir `Pattern` değerine derler; ardından bu değeri kullanarak bir String hakkında sorular sormanızı sağlar:
-
-```ahd
-bring Regex
-from Regex bring Pattern
-
-digits: Pattern := Regex.compile("[0-9]+")
-
-write(digits.matches("order #482"))       // true
-write(digits.find("order #482, item #7")) // "482"
-write(digits.findAll("order #482, item #7")) // ["482", "7"]
-```
-
-`Regex.compile`'ın ürettiği Class'ın adı `Regex` değil `Pattern`'dır -- `bring Regex` zaten modülün kendisini isimlendirir, bu yüzden derlenmiş-desen türünün bir tür olarak yazılabilmesi için kendi adına (`from Regex bring Pattern`) ihtiyacı vardır.
-
-`find`, hiç eşleşme olmayabileceği için `String?` döndürür, bu yüzden onu kullanmadan önce, diğer null olabilen herhangi bir değer gibi kontrol edin:
-
-```ahd
-found: String? := digits.find("no numbers here")
-if found == null {
-    write("nothing found")
-}
-```
-
-Geçersiz bir desen `RegexError` fırlatır:
-
-```ahd
-from Regex bring RegexError
-
-attempt {
-    Regex.compile("(unterminated")
-}
-except RegexError as error {
-    write("could not compile: {error.message}")
-}
-```
-
-`replace`, `split` ve `groups` için [Regex modülü referansına](REGEX_TR.md) bakın.
-
-### CSV'ye ilk bakış
-
-`CSV`, metni ham String satırları veya başlık anahtarlı String kayıtları olarak
-taşır:
-
-```ahd
-bring CSV
-
-rows: List<List<String>> := CSV.parse("name,age\nAli,42\n")
-records: List<Pair<String, String>> := CSV.parseRecords("name,age\nAli,42\n")
-write(records[0]["name"])
-```
-
-CSV sayı veya tarih çıkarımı yapmaz. Bozuk girdi ve geçersiz kayıt şekilleri
-`CSVError` fırlatır. [CSV modülü referansına](CSV_TR.md) bakın.
-
-### Data tablolarına ilk bakış
-
-Metin içeri alındıktan sonra `Data`, üzerinde çalışabileceğiniz bir `Table`
-verir. Her hücre yine bir `String`'tir ve her işlem, elinizdekini değiştirmek
-yerine **yeni** bir tablo döndürür:
-
-```ahd
-bring Data
-from Data bring Table
-
-table: Table := Data.fromCSV("name,score\nAli,91\nAyse,78\n")
-
-write(table.rowCount())
-write(table.columns())
-
-passed: Table := table.filter(
-    lambda (row: Pair<String, String>) -> int(row["score"]) >= 80
-)
-
-write(passed.column("name"))
-write(table.rowCount())
-```
-
-=>
-
-```text
-2
-["name", "score"]
-["Ali"]
-2
-```
-
-Son satır asıl mesele: `filter` yeni bir tablo döndürdüğü için `table` hâlâ
-iki satıra sahiptir.
-
-`int(row["score"])` ifadesine dikkat edin. Data, `"91"`in bir sayı olduğunu
-asla tahmin etmez; ihtiyacınız olduğunda dönüştürürsünüz -- dilin geri
-kalanından zaten bildiğiniz kural. Sayısal bir sütunun tamamı da aynı şekilde
-çalışır:
-
-```ahd
-scores: List<Real> := table.column("score").map(
-    lambda (value: String) -> real(value)
-)
-```
-
-Ayrıca `sort`, `select`, `drop`, `rename`, `reverse`, `head`, `tail`,
-`transform`, `derive`, `unique`, `valueCounts` ve `groupBy` vardır. Var olmayan
-bir sütun istemek `DataError` fırlatır.
-[Data modülü referansına](DATA_TR.md) bakın.
-
-## 20. Temel işlevler modülü (Fundamentals)
+## 20. Fundamentals modülü
 
 Bazı araçları kullanmak için hiçbir `bring` yazmanız gerekmez. Bunlar AhdCode programında doğrudan hazırdır:
 
@@ -1713,103 +1407,7 @@ Bazı araçları kullanmak için hiçbir `bring` yazmanız gerekmez. Bunlar AhdC
 write take str int real len clear between abs sum min max type id
 ```
 
-Çoğunu zaten kullandık. Kısa bir özet:
-
-| Fonksiyon | Ne yapar? |
-|---|---|
-| `write(value)` | değeri ekrana yazar |
-| `take()` / `take(prompt)` | kullanıcıdan bir satır String okur |
-| `str(value)` | değeri String'e çevirir |
-| `int(...)` | uygun değeri `Int` yapar |
-| `real(...)` | uygun değeri `Real` yapar |
-| `len(value)` | String/List/Pair uzunluğunu verir |
-| `clear(collection)` | List veya Pair'i yerinde boşaltır |
-| `between(...)` | sayı aralığı üretir |
-| `abs(number)` | mutlak değer verir |
-| `sum(list)` | listedeki sayıları toplar |
-| `min(list)` / `max(list)` | en küçük / en büyük değeri bulur |
-
-Örnek:
-
-```ahd
-numbers: List<Int> := [3, -5, 10]
-
-write(len(numbers))
-write(sum(numbers))
-write(min(numbers))
-write(max(numbers))
-write(abs(-8))
-```
-
-`sum` boş List için `0` veya `0.0` verir. `min` ve `max` ise boş List'te `DomainError` üretir.
-
-`clear` mevcut koleksiyonu yerinde değiştirdiği için aynı koleksiyonu gösteren diğer alias'lar da boş hali görür. `sum`, `min` ve `max` yalnızca okur; List'i değiştirmez.
-
-### `type(value)`: bir değerin türünü öğrenmek
-
-`type(value)` bir değerin AhdCode türünü, `String` olarak döndürür. Özellikle REPL'de deneme yaparken kullanışlıdır:
-
-```ahd
-write(type(5))
-write(type(5.0))
-write(type("Ali"))
-write(type(true))
-write(type(null))
-write(type([1, 2, 3]))
-```
-
-Beklenen çıktı:
-
-```text
-Int
-Real
-String
-Bool
-Null
-List<Int>
-```
-
-`type`, bir Sınıf (Class) nesnesi için her zaman nesnenin **gerçek çalışma zamanı sınıfını** verir, değişkenin yazılı türünü değil:
-
-```ahd
-Animal: Class<> := { structure: Attributes := (name: String) }
-Dog: Class<Animal> := { structure: Attributes := (SuperClass.attributes) }
-
-pet: Animal := Dog(name: "Rex")
-write(type(pet)) // "Dog" yazar, "Animal" değil
-```
-
-`type`, bir tür nesnesi (reflection) döndürmez; yalnızca bir metin (String) döndürür.
-
-### `id(reference)`: çalışma zamanı kimliği
-
-`id(reference)` bir List, Pair veya Sınıf nesnesi için opak bir kimlik numarası (`Int`) döndürür. `Int`, `Real`, `String` ve `Bool` gibi ilkel değerler için kullanılamaz.
-
-```ahd
-a: List<Int> := [1, 2]
-b: List<Int> := a
-c: List<Int> := [1, 2]
-
-write(id(a) == id(b))
-write(id(a) == id(c))
-
-a.add(3)
-write(id(a) == id(b))
-```
-
-Beklenen çıktı:
-
-```text
-true
-false
-true
-```
-
-`a` ve `b` aynı List'i gösterdiği için kimlikleri aynıdır; `c` içerik olarak aynı olsa da FARKLI bir List olduğu için kimliği farklıdır. `a`'yı değiştirmek (`add`) kimliğini değiştirmez.
-
-Bu sayı bir bellek adresi değildir, programlar arasında saklı değildir ve yalnızca geçerli çalışma anında/oturumda anlamlıdır. Sıradan kimlik karşılaştırmaları için genellikle `same` operatörünü kullanın; `id` daha çok hata ayıklama (debugging) ve günlükleme (logging) için düşünülmüştür.
-
-## 21. Matematik modülü (Math)
+## 21. Math modülü
 
 Karekök, trigonometrik fonksiyonlar veya rastgele sayı gibi araçlar için `Math` modülünü kullanın:
 
@@ -1821,51 +1419,13 @@ write(Math.sqrt(81))
 write(Math.round(3.14159, 2))
 ```
 
-Çıktı:
-
-```text
-3.141592653589793
-9.0
-3.14
-```
-
-Sık kullanılanlar:
-
-| Öğe | Ne yapar? |
-|---|---|
-| `PI`, `E` | matematik sabitleri |
-| `round`, `floor`, `ceil` | yuvarlama işlemleri |
-| `sqrt`, `exp` | karekök ve $e^x$ |
-| `sin`, `cos`, `tan` | trigonometrik fonksiyonlar (radyan) |
-| `log`, `log10` | doğal ve 10 tabanında logaritma |
-| `seed`, `random`, `randomInt` | rastgele sayı üretimi |
-
-Üs alma için `Math.pow` yerine dilin `^` operatörünü kullanın. `abs`, `sum`, `min`, `max` ise `Math` içinde değil, doğrudan hazır Fundamentals işlevleridir.
-
-### Rastgele sayı üretmek
-
-```ahd
-bring Math
-
-write(Math.randomInt(1, 6))
-write(Math.random())
-```
-
-`randomInt(1, 6)` hem `1` hem `6` dahil olmak üzere bu aralıkta bir tam sayı üretir. `random()` ise `0.0 <= value < 1.0` aralığındadır.
-
-Test sırasında aynı sonuç dizisini tekrar elde etmek istiyorsanız bir seed verebilirsiniz:
-
-```ahd
-Math.seed(42)
-```
-
 Aynı seed tekrar verilirse aynı rastgele sayı dizisi baştan başlar. Seed verilmezse yeni program çalışması başlangıç durumunu işletim sisteminden alır.
 
-`Math.random`, `Math.randomInt` ve `List.shuffle` aynı paylaşılan rastgelelik durumunu kullanır; her çağrı diziyi ilerletir. `randomInt(5, 5)` ile boş/tek elemanlı `shuffle` rastgelelik durumunu tüketmez.
+`Math.random`, `Math.randomInt` ve `List.shuffle` aynı paylaşılan rastgelelik durumunu kullanır; her çağrı diziyi ilerletir.
 
 > **Dikkat:** Bu rastgele sayı üreticisini kriptografi veya güvenlik amacıyla kullanmayın.
 
-## 22. Zaman modülü (Time)
+## 22. Time modülü
 
 Tarih, saat ve bekleme işlemleri için `Time` modülü kullanılır.
 
@@ -1878,27 +1438,9 @@ from Time bring DateTime
 current: DateTime := Time.now()
 
 write(current.year)
-write(current.month)
-write(current.day)
-write(current.hour)
 ```
 
 `Time.now()` bilgisayarınızın yerel saatini, `Time.utc()` UTC'yi verir.
-`Time.timestamp()` işaretli Unix milisaniyesidir. AhdCode sabit dakika
-ofsetlerini destekler, ancak adlandırılmış/IANA saat dilimi veritabanı yoktur.
-
-Bir `DateTime` içinde şu bilgiler bulunur:
-
-```text
-year  month  day  hour  minute  second  millisecond  weekday  offsetMinutes
-```
-
-`weekday` Pazartesi için `1`, Pazar için `7` değerini kullanır. Bu alanlar yalnızca okunur.
-
-`Time.fromTimestamp(milliseconds)` UTC döndürür. `dateTimeUTC(...)` UTC,
-`dateTimeOffset(..., offsetMinutes: 180)` sabit ofsetli değer oluşturur.
-`toUTC()`, `toLocal()` ve `toOffset(...)` aynı anı korur; `timestamp()` Unix
-milisaniyesini verir. Ofset -840..840 arasında olmalıdır.
 
 ### Belirli bir tarih oluşturmak
 
@@ -1911,17 +1453,9 @@ birthday: DateTime := Time.dateTime(
     month: 2,
     day: 29
 )
-
-write(birthday.toString())
 ```
 
-Çıktı:
-
-```text
-2028-02-29 00:00:00
-```
-
-`hour`, `minute`, `second` ve `millisecond` verilmezse `0` olur. Geçersiz bir tarih `ValueError` üretir; örneğin AhdCode `2026-02-29` değerini sessizce başka güne çevirmek yerine reddeder.
+Geçersiz bir tarih `ValueError` üretir; örneğin AhdCode `2026-02-29` değerini sessizce başka güne çevirmek yerine reddeder.
 
 ### İki zamanı karşılaştırmak
 
@@ -2152,7 +1686,7 @@ Function ve Class tanımları, modüller, List/Pair nesneleri ve Math rastgeleli
 
 REPL öğrenirken çok kullanışlıdır: bir fikri hızlıca deneyip sonucu görebilirsiniz. Daha uzun programlarda `.ahd` dosyası kullanmak daha düzenlidir.
 
-## 27. Başlangıçta sık yapılan hatalar
+## 30. Sık yapılan başlangıç hataları
 
 Hata mesajı görmek programlamanın normal bir parçasıdır. Çoğu hata, bilgisayarın ne istediğinizi anlayamadığını söyler. Aşağıdaki örnekler yeni başlayanların sık karşılaştığı durumları ve nasıl düzelteceğinizi gösterir:
 
@@ -2256,7 +1790,7 @@ Hata mesajı görmek programlamanın normal bir parçasıdır. Çoğu hata, bilg
 - Neden: Tohum (seed) verilmemiş rastgelelik, OS entropisini kullanır ve tekrarlanamaz.
 - Doğru: Zar atmadan önce `Math.seed(42)` gibi bir tohum değeri verin.
 
-## 28. Küçük Projeler
+## 31. Küçük Projeler
 
 Bu küçük projeler rehberde öğretilenleri bir araya getirir. Onları tek başınıza kurmayı deneyin!
 
@@ -2268,7 +1802,7 @@ Bu küçük projeler rehberde öğretilenleri bir araya getirir. Onları tek ba�
 6. **Sınıflarla (Class) Öğrenci Kaydı**: Bir `Student` sınıfı ve bir `Course` (Kurs) sınıfı oluşturun. Course içinde bir `List<Student>` bulunsun. Kursa yeni bir öğrenci eklemek için bir metot, kursun genel not ortalamasını hesaplamak için başka bir metot yazın.
 7. **Tohumlu (Seeded) Rastgele Oyun**: `Math.seed(42)` kullanarak 1 ile 100 arasında "gizli bir sayı" üretin. Kullanıcıdan sayıyı tahmin etmesini isteyin. Doğru tahmin edene kadar "daha yüksek" veya "daha düşük" diye yönlendirin. Tohum kullanıldığı için, gizli sayı programı her çalıştırdığınızda aynı olacaktır—test yapmak için mükemmel!
 
-## 29. Alıştırmalar
+## 32. Egzersizler
 
 Tam çözümleri hemen aramak yerine her programı küçük adımlarla kurun.
 
@@ -2298,7 +1832,7 @@ Tam çözümleri hemen aramak yerine her programı küçük adımlarla kurun.
 19. `break` ve `continue` kullanarak çok geniş bir aralık içindeki ilk 5 çift sayıyı bulun, ancak 3'e bölünenleri `continue` ile atlayın.
 20. Dikdörtgen alanı hesaplayan bir fonksiyona sahip `MathUtils.ahd` adında bir modül oluşturun ve bir `main.ahd` içinden `bring` ile çağırarak kullanın.
 
-## 30. Çözüm İpuçları
+## 33. Çözüm İpuçları
 
 1. `take` sonucu String'dir; yaş için `int(...)` ve yeni yaş için `+ 1` kullanın.
 2. Formülü küçük parçalara ayırın; `real(take(...))` ile başlayın ve Real sayılarını kullanın.
@@ -2321,7 +1855,7 @@ Tam çözümleri hemen aramak yerine her programı küçük adımlarla kurun.
 19. `if i % 3 == 0 { continue }`. `if count == 5 { break }`.
 20. `from MathUtils bring alanHesapla` kullanabilirsiniz.
 
-## 31. Sonraki adımlar ve teknik belgeler
+## 34. Sonraki adımlar ve teknik belgeler
 
 Bu rehberi tamamladıktan sonra dilin ayrıntılarını şu belgelerden
 derinleştirebilirsiniz:
@@ -2341,10 +1875,14 @@ derinleştirebilirsiniz:
 - [List API](LIST_API_TR.md)
 - [Math](MATH_TR.md)
 - [Time](TIME_TR.md)
+- [Statistics](STATISTICS_TR.md)
+- [Plot](PLOT_TR.md)
+- [Numeric](NUMERIC_TR.md)
 - [Latex](LATEX_TR.md)
 - [File ve Path](FILESYSTEM_TR.md)
 - [Regex](REGEX_TR.md)
 - [CSV](CSV_TR.md)
+- [Data](DATA_TR.md)
 - [Tanılamalar](DIAGNOSTICS_TR.md)
 - [CLI](CLI_TR.md)
 - [Formatter](FORMATTER_TR.md)

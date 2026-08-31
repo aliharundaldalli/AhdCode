@@ -11,7 +11,7 @@ ahdcode
 ```
 
 ```text
-AhdCode v0.1.14
+AhdCode v0.1.15
 ahd> x := 5
 ahd> x = x + 1
 ahd> x
@@ -53,8 +53,7 @@ ahd> Math.random()
 
 Lambda Function değerleri de komutlar arasında kalır ve örneğin
 `values.map(lambda (x: Int) -> x^2)` biçiminde doğrudan callback olarak
-çalışır. Diğer yerlerde olduğu gibi yalnızca ifade içerir ve çevreleyen bir
-`Local` bağlamayı yakalayamaz.
+çalışır. Diğer yerlerde olduğu gibi yalnızca ifade içerir ve dış değişkenleri yakalamak için açıkça `#` veya `@` belirtimine ihtiyaç duyar.
 
 `take`, isteğini (prompt) yazdırır ve temizler (flush), ardından gerçek
 terminalden tam olarak bir cevap satırı tüketir. O cevap, başka bir REPL

@@ -3309,11 +3309,13 @@ become a frame, so a contents slide is written explicitly as
 resolving document-relative assets such as `\includegraphics` against the input
 file's directory.
 
-Compilation uses a Tectonic engine and a local resource bundle that ship with an
-AhdCode installation. AhdCode never runs a `tectonic` found on `PATH`, never
-falls back to a system TeX installation, and never downloads a resource at run
-time. A supported document therefore compiles on a fresh machine with an empty
-cache and no network. A missing bundled engine or bundle is a `LatexError`.
+Compilation uses an offline Tectonic engine and a local resource bundle. These
+files are not shipped in the core binary installation and must be explicitly
+staged into the Go environment using the `package-latex` tool. Once staged,
+AhdCode never runs a `tectonic` found on `PATH`, never falls back to a system
+TeX installation, and never downloads a resource at run time. A supported
+document therefore compiles on a fresh machine with an empty cache and no
+network. A missing staged engine or bundle is a `LatexError`.
 
 ### 37.8 Security and limits
 

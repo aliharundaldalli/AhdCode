@@ -12,6 +12,19 @@ AhdCode currently builds with Go 1.25 or newer.
 cd AhdCode
 go test ./...
 go install ./cmd/ahdcode ./cmd/ahdnumeric ./cmd/ahdplot
+```
+
+If you plan to use the `Latex` module, you must also stage the offline Latex runtime bundle. This step performs a one-time network fetch for pinned resources:
+
+```bash
+go run ./tooling/latex/cmd/package-latex --output "$(go env GOPATH)"
+```
+
+After staging, ordinary AhdCode Latex execution remains offline.
+
+Ensure Go's binary directory is on `PATH`:
+
+```bash
 export PATH="$(go env GOPATH)/bin:$PATH"
 ```
 

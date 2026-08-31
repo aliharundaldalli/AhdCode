@@ -17,6 +17,12 @@ ahdcode run examples/v0.1/02_input.ahd
 ahdcode run examples/v0.1/14_grade_app.ahd
 ```
 
+Before running `16_latex.ahd`, remember that the `Latex` module requires you to stage the offline compiler once using:
+
+```bash
+go run ./tooling/latex/cmd/package-latex --output "$(go env GOPATH)"
+```
+
 | Example | Topic |
 |---|---|
 | `01_hello.ahd` | declarations, interpolation, output |

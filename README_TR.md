@@ -74,6 +74,15 @@ go test ./...
 go install ./cmd/ahdcode ./cmd/ahdnumeric ./cmd/ahdplot
 ```
 
+Yukarıdaki komut, derleyiciyi ve yerel numeric/plot yardımcılarını (helpers) kurar.
+Eğer `Latex` modülünü kullanmayı planlıyorsanız, çevrimdışı (offline) Latex çalışma zamanını da hazırlamanız (stage) gerekir. Bu işlem, sabitlenmiş ve doğrulanmış kaynakları indirmek için bir defaya mahsus ağ bağlantısı kullanır:
+
+```bash
+go run ./tooling/latex/cmd/package-latex --output "$(go env GOPATH)"
+```
+
+Hazırlık (staging) aşamasından sonra, AhdCode'un normal Latex işlemleri tamamen çevrimdışı çalışmaya devam eder.
+
 Go'nun ikili dosya (binary) dizininin `PATH`'te olduğundan emin olun:
 
 ```bash
@@ -119,6 +128,7 @@ ve [REPL rehberine](docs/REPL_TR.md) bakın.
 - [CSV modülü](docs/CSV_TR.md)
 - [Data modülü](docs/DATA_TR.md)
 - [Statistics modülü](docs/STATISTICS_TR.md)
+- [Plot modülü](docs/PLOT_TR.md)
 - [Numeric modülü ve Complex skalerleri](docs/NUMERIC_TR.md)
 - [Tanılamaları anlama](docs/DIAGNOSTICS_TR.md)
 - [Yapay zekâ destekli yerel kurulum](FOR_AI.md)
@@ -135,7 +145,7 @@ ve [REPL rehberine](docs/REPL_TR.md) bakın.
 
 ## Mevcut sınırlamalar
 
-v0.1, kasıtlı olarak blok/deyim (statement) lambda'ları, lexical closure'lar,
+v0.1, kasıtlı olarak blok/deyim (statement) lambda'ları, örtük/genel değişken (mutable) closure hücreleri,
 tuple dönüş değerleri, reflection, interface, çoklu kalıtım (multiple
 inheritance), hata ayıklayıcı (debugger), LSP, paket arama yolları (package
 search paths) veya web çalışma zamanına sahip değildir. Operatör davranışı

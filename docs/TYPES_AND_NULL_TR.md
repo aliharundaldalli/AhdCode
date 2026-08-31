@@ -12,6 +12,7 @@
 | `Real` | sonlu 64-bit kayan noktalı sayı |
 | `String` | değiştirilemez (immutable) Unicode metin |
 | `Bool` | `true` veya `false` |
+| `Complex` | karmaşık sayı |
 | `List<T>` | sıralı, homojen, değiştirilebilir koleksiyon |
 | `Pair<K, V>` | ekleme sırasını (insertion-order) koruyan homojen anahtar/değer koleksiyonu |
 | `Class` | sınıf bildirimi ve örnek kimliği (instance identity) |
