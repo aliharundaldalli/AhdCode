@@ -525,7 +525,8 @@ func (a *analyzer) binaryOperatorType(operator string, left, right types.Type) t
 		if left.Kind() == types.IntKind && right.Kind() == types.IntKind {
 			return types.Int
 		}
-		if types.IsNumeric(left) && types.IsNumeric(right) {
+		if (left.Kind() == types.IntKind || left.Kind() == types.RealKind) &&
+			(right.Kind() == types.IntKind || right.Kind() == types.RealKind) {
 			return types.Real
 		}
 		return types.Invalid

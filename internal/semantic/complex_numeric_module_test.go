@@ -15,6 +15,9 @@ d: Complex := z ^ 2
 isEqual: Bool := z == (2.0 + 3I)`, true},
 		{"Complex ordering is absent", `z := 2 + 3I
 ordered: Bool := z < z`, false},
+		{"Complex power accepts only an Int exponent", `z: Complex := 2 + 3I
+r: Real := 2.0
+w := z ^ r`, false},
 		{"Numeric constructors and operations", `bring Numeric
 from Numeric bring Vector
 from Numeric bring Matrix
