@@ -1,0 +1,79 @@
+bring Plot
+from Plot bring Chart
+from Plot bring Figure
+from Plot bring PlotError
+
+// Plot is strict about numeric input: List<Int> and List<Real> are accepted,
+// widened safely to Real internally, but a List<String> never is.
+x: List<Int> := [1, 2, 3, 4, 5]
+y: List<Real> := [2.0, 3.0, 5.0, 4.0, 6.0]
+
+// Every chart-configuration method returns a new Chart; the receiver is
+// never mutated, the same convention Data's Table uses.
+line: Chart := Plot.line(x, y)
+line = line.title("Line").xLabel("x").yLabel("y")
+
+// A Chart built with Plot.new() starts empty; chart.line/chart.scatter add
+// series to it (or to any existing line/scatter Chart), which is how
+// multiple series -- line + scatter, or several lines -- end up on one
+// Chart, with legend labels.
+combined: Chart := Plot.new()
+combined = combined.line(x, y, "Measured")
+combined = combined.scatter(x, [2.2, 2.8, 5.3, 3.7, 6.1], "Predicted")
+combined = combined.legend(true)
+
+scatter: Chart := Plot.scatter(x, y)
+scatter = scatter.title("Scatter")
+
+bar: Chart := Plot.bar(
+    ["Math", "Physics", "Chemistry"],
+    [90.0, 86.5, 88.0]
+)
+
+histogram: Chart := Plot.histogram([1, 2, 2, 3, 3, 3, 4, 4, 4, 4], 4)
+
+box: Chart := Plot.box([1.0, 2.0, 2.0, 3.0, 4.0, 5.0, 9.0])
+
+errorBar: Chart := Plot.errorBar(
+    [1.0, 2.0, 3.0],
+    [2.0, 4.0, 3.0],
+    [0.2, 0.3, 0.1],
+    [0.3, 0.2, 0.4]
+)
+
+// save infers the output format from the file extension: PNG, SVG, or PDF.
+line.save("line.png")
+combined.save("combined.svg")
+bar.save("bar.pdf")
+
+// Plot.subplots composes several Charts into one Figure, row-major. Fewer
+// charts than rows * columns leaves the remaining cells blank.
+figure: Figure := Plot.subplots(
+    2, 2,
+    [line, bar, histogram, box]
+)
+figure.save("summary.png")
+
+write("charts saved")
+
+// chart.show() renders to a unique temporary image and opens it with the
+// platform's image viewer -- see 30_plot_show.ahd for a manual, interactive
+// smoke test. It is not run here, because CI and other headless
+// environments cannot open a viewer window.
+
+// Domain errors -- mismatched lengths, invalid bin counts, unsupported
+// output formats -- raise the catchable PlotError, never a raw Go error.
+empty: List<Real> := []
+attempt {
+    Plot.line(empty, empty)
+}
+except PlotError as error {
+    write(error.message)
+}
+
+attempt {
+    line.save("chart.bmp")
+}
+except PlotError as error {
+    write(error.message)
+}

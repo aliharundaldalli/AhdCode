@@ -3,10 +3,46 @@ package repl
 import (
 	"bytes"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 )
+
+var (
+	plotRuntimeOnce sync.Once
+	plotRuntimePath string
+)
+
+// plotRuntimeForTest builds the ahdplot renderer helper once per test binary
+// run and returns its path, skipping the calling test if the toolchain
+// cannot build it in this environment -- render/save parity is exercised
+// when possible, but a missing helper degrades gracefully rather than
+// failing the whole suite.
+func plotRuntimeForTest(t *testing.T) string {
+	t.Helper()
+	plotRuntimeOnce.Do(func() {
+		dir, err := os.MkdirTemp("", "ahdplot-test-*")
+		if err != nil {
+			return
+		}
+		path := filepath.Join(dir, "ahdplot")
+		root, err := filepath.Abs(filepath.Join("..", ".."))
+		if err != nil {
+			return
+		}
+		command := exec.Command("go", "build", "-o", path, "./cmd/ahdplot")
+		command.Dir = root
+		if err := command.Run(); err == nil {
+			plotRuntimePath = path
+		}
+	})
+	if plotRuntimePath == "" {
+		t.Skip("ahdplot helper could not be built in this environment; skipping Plot render/save test")
+	}
+	return plotRuntimePath
+}
 
 func TestIncompleteUsesCompilerTokens(t *testing.T) {
 	for _, text := range []string{"if true {\n", "add: Function := (\n", `text: String := """hello`} {
@@ -383,7 +419,7 @@ Maximum = 40
 write(check(50))
 `
 	var output, errors bytes.Buffer
-	Run(strings.NewReader(input), &output, &errors, "AhdCode v0.1.13")
+	Run(strings.NewReader(input), &output, &errors, "AhdCode v0.1.14")
 	text := output.String()
 	for _, want := range []string{
 		"[70, 90]\n",
@@ -423,7 +459,7 @@ multi: String := r"""
 write(multi)
 `
 	var output, errors bytes.Buffer
-	Run(strings.NewReader(input), &output, &errors, "AhdCode v0.1.13")
+	Run(strings.NewReader(input), &output, &errors, "AhdCode v0.1.14")
 	text := output.String()
 	for _, want := range []string{
 		"{name}\n",
@@ -439,6 +475,141 @@ write(multi)
 	}
 	if errors.Len() != 0 {
 		t.Fatalf("REPL errors: %s", errors.String())
+	}
+}
+
+// TestPlotDomainErrorsAndImmutabilityInThePersistentREPL exercises Plot's
+// runtime domain validation and input-immutability guarantees. None of this
+// needs the ahdplot renderer helper, since every case here is rejected (or
+// snapshotted) before rendering would begin.
+func TestPlotDomainErrorsAndImmutabilityInThePersistentREPL(t *testing.T) {
+	input := `bring Plot
+from Plot bring PlotError
+
+empty: List<Int> := []
+emptyLabels: List<String> := []
+attempt { Plot.line(empty, empty) } except PlotError as error { write(error.message) }
+attempt { Plot.scatter(empty, empty) } except PlotError as error { write(error.message) }
+attempt { Plot.bar(emptyLabels, empty) } except PlotError as error { write(error.message) }
+attempt { Plot.histogram(empty, 5) } except PlotError as error { write(error.message) }
+attempt { Plot.box(empty) } except PlotError as error { write(error.message) }
+attempt { Plot.errorBar(empty, empty, empty, empty) } except PlotError as error { write(error.message) }
+
+attempt { Plot.line([1, 2], [1]) } except PlotError as error { write(error.message) }
+attempt { Plot.bar(["a"], [1.0, 2.0]) } except PlotError as error { write(error.message) }
+attempt { Plot.histogram([1, 2, 3], 0) } except PlotError as error { write(error.message) }
+attempt { Plot.errorBar([1], [1], [-1.0], [1.0]) } except PlotError as error { write(error.message) }
+
+bars := Plot.bar(["a", "b"], [1.0, 2.0])
+attempt { bars.line([1], [1], "x") } except PlotError as error { write(error.message) }
+
+values: List<Int> := [3, 1, 4, 1, 5]
+histogram := Plot.histogram(values, 3)
+write(values)
+box := Plot.box(values)
+write(values)
+
+x: List<Int> := [1, 2, 3]
+base := Plot.line(x, x)
+extended := base.line(x, x, "again")
+write(base != extended)
+
+attempt { Plot.subplots(0, 2, []) } except PlotError as error { write(error.message) }
+attempt { Plot.subplots(1, 1, [base, extended]) } except PlotError as error { write(error.message) }
+`
+	var output, errors bytes.Buffer
+	Run(strings.NewReader(input), &output, &errors, "AhdCode v0.1.14")
+	text := output.String()
+	for _, want := range []string{
+		"line chart data must not be empty\n",
+		"scatter chart data must not be empty\n",
+		"bar chart data must not be empty\n",
+		"histogram data must not be empty\n",
+		"box plot data must not be empty\n",
+		"errorBar data must not be empty\n",
+		"x and y must have the same length\n",
+		"bar labels and values must have the same length\n",
+		"histogram bin count must be positive\n",
+		"lowerErrors must be non-negative\n",
+		"cannot add a line series to a bar chart\n",
+		"true\n",
+		"subplot rows and columns must be positive\n",
+		"more charts than subplot cells\n",
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("REPL output missing %q:\n%s", want, text)
+		}
+	}
+	// histogram/box never reorder or otherwise mutate the caller's List.
+	if got := strings.Count(text, "[3, 1, 4, 1, 5]"); got != 2 {
+		t.Fatalf("expected the caller's List to survive histogram+box unmutated twice, got %d occurrences:\n%s", got, text)
+	}
+	if errors.Len() != 0 {
+		t.Fatalf("REPL errors: %s", errors.String())
+	}
+}
+
+// TestPlotRenderAndSaveParityInThePersistentREPL exercises real rendering
+// through the bundled ahdplot helper: PNG/SVG/PDF save, an unsupported
+// extension, and a subplot Figure. This is render/save parity, not the
+// show() viewer-launch path -- see PART Q/V, which explicitly keep the OS
+// image viewer out of automated coverage.
+func TestPlotRenderAndSaveParityInThePersistentREPL(t *testing.T) {
+	t.Setenv("AHDCODE_PLOT_RUNTIME", plotRuntimeForTest(t))
+	directory := t.TempDir()
+	png := filepath.Join(directory, "chart.png")
+	svg := filepath.Join(directory, "chart.svg")
+	pdf := filepath.Join(directory, "chart.pdf")
+	bad := filepath.Join(directory, "chart.bmp")
+	figurePath := filepath.Join(directory, "figure.png")
+
+	input := `bring Plot
+from Plot bring PlotError
+
+x: List<Int> := [1, 2, 3, 4]
+y: List<Real> := [2.0, 5.0, 4.0, 8.0]
+chart := Plot.line(x, y)
+chart = chart.title("Test").xLabel("X").yLabel("Y").legend(true)
+chart.save("` + filepath.ToSlash(png) + `")
+chart.save("` + filepath.ToSlash(svg) + `")
+chart.save("` + filepath.ToSlash(pdf) + `")
+write("saved")
+
+attempt {
+    chart.save("` + filepath.ToSlash(bad) + `")
+}
+except PlotError as error {
+    write(error.message)
+}
+
+bar := Plot.bar(["Math", "Physics"], [90.0, 86.5])
+figure := Plot.subplots(1, 2, [chart, bar])
+figure.save("` + filepath.ToSlash(figurePath) + `")
+write("figure saved")
+`
+	var output, errors bytes.Buffer
+	Run(strings.NewReader(input), &output, &errors, "AhdCode v0.1.14")
+	text := output.String()
+	if !strings.Contains(text, "saved\n") || !strings.Contains(text, "figure saved\n") {
+		t.Fatalf("REPL output missing expected save confirmations:\n%s", text)
+	}
+	if !strings.Contains(text, "unsupported output format") {
+		t.Fatalf("REPL output missing unsupported-format PlotError:\n%s", text)
+	}
+	if errors.Len() != 0 {
+		t.Fatalf("REPL errors: %s", errors.String())
+	}
+	for _, path := range []string{png, svg, pdf, figurePath} {
+		info, err := os.Stat(path)
+		if err != nil {
+			t.Fatalf("expected %s to exist: %v", path, err)
+		}
+		if info.Size() == 0 {
+			t.Fatalf("expected %s to be non-empty", path)
+		}
+	}
+	if _, err := os.Stat(bad); err == nil {
+		t.Fatalf("expected %s to not be created after an unsupported-format error", bad)
 	}
 }
 
@@ -467,7 +638,7 @@ scores: List<Real> := students.column("grade").map(lambda (value: String) -> rea
 write(Statistics.mean(scores))
 `
 	var output, errors bytes.Buffer
-	Run(strings.NewReader(input), &output, &errors, "AhdCode v0.1.13")
+	Run(strings.NewReader(input), &output, &errors, "AhdCode v0.1.14")
 	text := output.String()
 	for _, want := range []string{
 		"14\n", "2.8\n", "3.0\n", "1\n", "2.56\n", "3.2\n",

@@ -172,6 +172,8 @@ func (session *Session) builtin(identity ir.CallableID, receiver any, arguments 
 		return session.statisticsBuiltin(strings.TrimPrefix(name, "builtin:Statistics::"), values(arguments))
 	case strings.HasPrefix(name, "builtin:Data::"):
 		return session.dataBuiltin(strings.TrimPrefix(name, "builtin:Data::"), values(arguments))
+	case strings.HasPrefix(name, "builtin:Plot::"):
+		return session.plotBuiltin(strings.TrimPrefix(name, "builtin:Plot::"), values(arguments))
 	}
 	session.raise("Error", "unsupported builtin "+name)
 	return nil
@@ -274,6 +276,9 @@ func (session *Session) core(name string, receiver any, arguments []any) any {
 	}
 	if strings.HasPrefix(name, "Table.") {
 		return session.dataOperation(name, receiver, arguments)
+	}
+	if strings.HasPrefix(name, "Chart.") || strings.HasPrefix(name, "Figure.") {
+		return session.plotOperation(name, receiver, arguments)
 	}
 	session.raise("Error", "unsupported Fundamentals operation "+name)
 	return nil

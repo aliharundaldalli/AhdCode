@@ -21,6 +21,7 @@ func StandardModuleInterfaces() map[string]*ModuleInterface {
 		"Latex":      latexModuleInterface(),
 		"Math":       mathModuleInterface(),
 		"Path":       pathModuleInterface(),
+		"Plot":       plotModuleInterface(),
 		"Regex":      regexModuleInterface(),
 		"Statistics": statisticsModuleInterface(),
 		"Time":       timeModuleInterface(),

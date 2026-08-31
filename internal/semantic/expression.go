@@ -642,6 +642,9 @@ func (a *analyzer) analyzeCallWithCallee(call *ast.CallExpr, callee expressionIn
 		if !supplied {
 			hint, supplied = dataConstructionHint(class.Symbol)
 		}
+		if !supplied {
+			hint, supplied = plotConstructionHint(class.Symbol)
+		}
 		if supplied {
 			// A compiler-supplied value is produced by a standard-module
 			// function that validates its arguments, never by direct
@@ -716,6 +719,9 @@ func typeOperationFor(receiver types.Type, name string) (TypeOperation, bool) {
 			return operation, true
 		}
 		if operation, ok := regexOperationFor(receiver, name); ok {
+			return operation, true
+		}
+		if operation, ok := plotOperationFor(receiver, name); ok {
 			return operation, true
 		}
 		return dataOperationFor(receiver, name)
@@ -897,6 +903,12 @@ func (a *analyzer) analyzeTypeOperation(call *ast.CallExpr, member *ast.MemberEx
 	if dataCallbackOperation(operation) {
 		return a.analyzeDataCallbackOperation(call, operation, current, flow), true
 	}
+	if shape, isPlot := plotOperationShapes()[operation]; isPlot {
+		return a.analyzePlotOperation(call, operation, shape, current, flow), true
+	}
+	if plotSeriesOperation(operation) {
+		return a.analyzePlotSeriesOperation(call, operation, current, flow), true
+	}
 	switch operation {
 	case ListAdd, ListEject, PairEject:
 		return a.analyzeCollectionMutation(call, operation, receiver, current, flow), true
@@ -932,6 +944,12 @@ func typeOperationFailure(operation TypeOperation, receiver types.Type) expressi
 	if result, known := dataOperationResult(operation); known {
 		return expressionInfo{typeValue: result, nullState: NonNull}
 	}
+	if shape, known := plotOperationShapes()[operation]; known {
+		return expressionInfo{typeValue: shape.result, nullState: NonNull}
+	}
+	if plotSeriesOperation(operation) {
+		return expressionInfo{typeValue: plotChartType(), nullState: NonNull}
+	}
 	switch operation {
 	case ListAdd, ListEject, PairEject, ListSort, ListReverse, ListShuffle:
 		return expressionInfo{typeValue: types.Nothing, nullState: NonNull}
@@ -959,6 +977,12 @@ func typeOperationHint(operation TypeOperation, receiver types.Type) string {
 	}
 	if dataCallbackOperation(operation) {
 		return dataCallbackHint(operation)
+	}
+	if shape, known := plotOperationShapes()[operation]; known {
+		return shape.hint
+	}
+	if plotSeriesOperation(operation) {
+		return "pass an x List, a y List, and a String label"
 	}
 	element := types.Invalid
 	if list, ok := receiver.(types.List); ok {

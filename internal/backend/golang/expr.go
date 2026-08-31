@@ -725,6 +725,9 @@ func (generator *generator) call(value *ir.CallExpr) string {
 	if strings.HasPrefix(string(value.Callable), statisticsModulePrefix) {
 		return generator.statisticsCall(value)
 	}
+	if strings.HasPrefix(string(value.Callable), plotModulePrefix) {
+		return generator.plotCall(value)
+	}
 	if method, ok := value.Callee.(*ir.MemberExpr); ok && method.Kind == ir.MethodMember {
 		function := generator.functions[method.Callable]
 		if function == nil {
@@ -954,6 +957,9 @@ func (generator *generator) builtinCall(value *ir.CallExpr) string {
 		}
 		if strings.HasPrefix(name, "Table.") {
 			return generator.dataOperation(name, value)
+		}
+		if strings.HasPrefix(name, "Chart.") || strings.HasPrefix(name, "Figure.") {
+			return generator.plotOperation(name, value)
 		}
 		return generator.unsupported("Fundamentals function "+name, meta.Span)
 	}

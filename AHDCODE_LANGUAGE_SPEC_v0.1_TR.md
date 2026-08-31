@@ -4926,4 +4926,177 @@ girdisinin ifade edilebilir bir sonucu yoktur. `mode` ve `Table.valueCounts`
 
 ---
 
+## 56. Plot Standart Modülü (v0.1.14)
+
+`Plot`, `Math`, `Time`, `Regex`, `CSV`, `Data` ve `Statistics` gibi açıktır
+(§33, §55): kullanılmadan önce içe aktarılmalıdır ve kanonik kimliği
+`builtin:Plot`'tur, bu yüzden kardeş bir `Plot.ahd` dosyası onun yerini
+alamaz (shadow edemez).
+
+```ahd
+bring Plot
+from Plot bring Chart
+from Plot bring Figure
+from Plot bring PlotError
+```
+
+Statistics gibi, Plot da kasıtlı olarak Data'ya bağımlı değildir: bir Table
+hücresi bir `String`'dir (§53.1), bu yüzden bir program bir sütunu
+çizmeden önce açıkça dönüştürür.
+
+### 56.1 Genel tipler
+
+Plot, yüzeyinin ihtiyaç duyduğu en küçük nesne modelini tanıtır: `Chart`,
+`Figure` ve `PlotError`. Tek bir grafik -- line, scatter, bar, histogram,
+box veya error bar -- bir `Chart`'tır. Çoklu-grafik kompozisyonu (§56.7)
+bir `Figure`'dır. Hiçbiri doğrudan oluşturulamaz; ikisi de yalnızca Plot'un
+modül fonksiyonları ve `Chart` için kendi metotları tarafından üretilir:
+
+```ahd
+Plot.line(x, y)                                -> Chart
+Plot.scatter(x, y)                             -> Chart
+Plot.bar(labels: List<String>, values)         -> Chart
+Plot.histogram(values, bins: Int)              -> Chart
+Plot.box(values)                               -> Chart
+Plot.errorBar(x, y, lowerErrors, upperErrors)  -> Chart
+Plot.new()                                     -> Chart
+Plot.subplots(rows: Int, columns: Int, charts: List<Chart>) -> Figure
+```
+
+### 56.2 Katı sayısal girdi
+
+Her sayısal argüman, bağımsız olarak `List<Int>` veya `List<Real>` kabul
+eder; bu, sıradan overload çözümlemesiyle (§16) çözülür ve bir `Int` List
+dahili olarak güvenle `Real`'a genişletilir -- Statistics'in genişletmesiyle
+aynıdır (§55.1). Bir `List<String>` -- rakam metni tutsa bile -- asla kabul
+edilmez; Plot hiçbir String-to-number zorlaması (coercion) tanıtmaz ve Data
+entegrasyonu, tıpkı Statistics için olduğu gibi açık kalır (§55, §53.1):
+
+```ahd
+scores: List<Int> := table.column("score").map(
+    lambda (value: String) -> int(value)
+)
+
+chart := Plot.histogram(scores, 10)
+```
+
+Her grafik oluşturucusu ve `Chart.line`/`Chart.scatter`, boş sayısal girdi
+için `PlotError` fırlatır -- `Statistics.mean([])`'in aldığı aynı alan
+(domain) hatası muamelesi (§55.3).
+
+### 56.3 Grafik meta verisi ve değiştirilemezlik
+
+```text
+chart.title(text: String)   -> Chart
+chart.xLabel(text: String)  -> Chart
+chart.yLabel(text: String)  -> Chart
+chart.legend(enabled: Bool) -> Chart
+chart.size(width: Int, height: Int) -> Chart
+```
+
+Her Chart metodu saftır (pure): yeni bir Chart döndürür ve alıcısını
+(receiver) asla değiştirmez -- her Table işleminin zaten kullandığı kural
+(§53.5). Yapılandırma, yerinde değişiklik yerine yeniden atama yoluyla
+zincirlenir:
+
+```ahd
+chart := Plot.line(x, y)
+chart = chart.title("Experiment")
+chart = chart.xLabel("Time")
+```
+
+`size`, pozitif çıktı boyutlarını ayarlar; bir Chart'ın varsayılan boyutu
+800x600'dür. Her Plot fonksiyonu ve Chart metodu, List argümanlarının bir
+anlık görüntüsünü (snapshot) okur ve çağıranın List'ini asla yeniden
+sıralamaz veya başka bir şekilde değiştirmez.
+
+### 56.4 Birden çok seri
+
+`chart.line(x, y, label)` ve `chart.scatter(x, y, label)`, bir Chart'a bir
+seri daha ekler; böylece bir line ve bir scatter serisi -- veya ikisinden
+birkaçı -- bir legend ile tek bir Chart'ı paylaşabilir. `Plot.line(x, y)`/
+`Plot.scatter(x, y)`, etiketsiz tek bir seriyle bir Chart başlatmanın
+kısayoludur; `chart.line`/`chart.scatter` onu genişletir veya bu şekilde
+zaten oluşturulmuş bir Chart'ı genişletir. Bir `bar`, `histogram`, `box`
+veya `errorBar` Chart'ına bir seri eklemek `PlotError` fırlatır: bu grafik
+türleri kendi kendine yeterlidir.
+
+### 56.5 Save (kaydetme)
+
+```text
+chart.save(path: String) -> Nothing
+figure.save(path: String) -> Nothing
+```
+
+Çıktı biçimi dosya uzantısından çıkarılır. Desteklenen biçimler PNG
+(`.png`), SVG (`.svg`) ve PDF'dir (`.pdf`); başka herhangi bir uzantı
+`PlotError` fırlatır. Göreli bir yol, programın çalışma dizinine göre
+çözülür -- File'ın kullandığı aynı kural. Bir render veya dosya sistemi
+hatası, ham bir arka uç hatası değil, her zaman `PlotError` fırlatır.
+
+### 56.6 Show (gösterme)
+
+```text
+chart.show() -> Nothing
+figure.show() -> Nothing
+```
+
+`show()`, AhdCode'a özgü bir geçici alanda benzersiz bir geçici PNG'ye
+render eder ve onu platformun standart görüntü açma mekanizmasıyla açar
+(macOS'ta `open`, Linux'ta `xdg-open`, Windows'ta kabuğun `start` komutu);
+böylece bir grafiği incelemek asla elle kaydedip dosyayı bulmayı
+gerektirmez. Geçici görüntü otomatik olarak silinmez, çünkü harici
+görüntüleyici `show()` döndükten sonra da onu okumaya devam eder. `show()`
+bir masaüstü oturumu gerektirir; başsız (headless) bir ortam, askıda kalmak
+yerine temiz bir şekilde `PlotError` ile başarısız olur.
+
+### 56.7 Subplot'lar
+
+```ahd
+figure := Plot.subplots(
+    2, 2,
+    [
+        Plot.line(x1, y1),
+        Plot.scatter(x2, y2),
+        Plot.histogram(values, 10),
+        Plot.box(values)
+    ]
+)
+
+figure.show()
+figure.save("summary.pdf")
+```
+
+`charts` satır-öncelikli (row-major) sıradadır. `rows` ve `columns`'ın her
+ikisi de pozitif olmalıdır ve grafik sayısı `rows * columns`'ı aşamaz; tam
+bir sayı gerektirmek yerine, hücrelerden daha az grafiğe izin verilir ve
+kalan hücreler boş bırakılır. Bir `Figure`, `Plot.subplots` tarafından
+üretilen açık, immutable bir değerdir -- v0.1.14'te mutable global bir
+"geçerli subplot" durumu yoktur. Bir Figure'ın save/show boyutu, grid
+boyutlarından belirlenimci (deterministic) şekilde türetilir; v0.1.14 bir
+`Figure.size` yayımlamaz.
+
+### 56.8 PlotError
+
+`PlotError`, doğrudan `Error`'dan türer (§7, §55.3'ün örüntüsü). Plot, her
+plot'a özgü çalışma zamanı hatası için onu fırlatır: eşleşmeyen `x`/`y`
+uzunlukları, boş grafik verisi, geçersiz bir bin sayısı, eşleşmeyen bar
+etiketleri/değerleri, eşleşmeyen error-bar verisi, negatif hata
+büyüklükleri, desteklenmeyen bir çıktı biçimi, geçersiz subplot boyutları,
+subplot hücrelerinden daha fazla grafik, bir render hatası, bir geçici
+dosya hatası ve bir görüntüleyici-açma hatası. Statik bir tip uyuşmazlığı,
+sıradan bir derleme-zamanı tanılaması olarak kalır; `PlotError` yalnızca
+tip denetleyicisinin önceden eleyemediği şeyleri kapsar.
+
+### 56.9 Bu sürümde olmayanlar
+
+v0.1.14 tam olarak altı grafik ailesini destekler: line, scatter, bar,
+histogram, box ve error bar. Pie, heatmap, contour, violin, stem, polar,
+3D, candlestick, area veya surface grafiği yoktur ve keyfi özel plotter
+enjeksiyonu yoktur. Bir `Numeric` tipi yoktur -- sayısal esneklik yalnızca
+`Int`/`Real` genişletmesidir, Statistics ile eşleşir -- genel bir GUI
+çerçevesi yoktur ve ikincil eksenler yoktur.
+
+---
+
 # AhdCode v0.1 Çekirdek Spesifikasyonu Sonu

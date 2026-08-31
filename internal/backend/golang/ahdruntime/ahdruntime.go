@@ -12,6 +12,7 @@ import (
 	cryptorand "crypto/rand"
 	"encoding/binary"
 	"encoding/csv"
+	"encoding/json"
 	"fmt"
 	"io"
 	"math"
@@ -19,6 +20,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -65,6 +67,7 @@ var (
 	AhdClassCSVError            = &AhdClass{Name: "CSVError", Parent: AhdClassError}
 	AhdClassDataError           = &AhdClass{Name: "DataError", Parent: AhdClassError}
 	AhdClassStatisticsError     = &AhdClass{Name: "StatisticsError", Parent: AhdClassError}
+	AhdClassPlotError           = &AhdClass{Name: "PlotError", Parent: AhdClassError}
 )
 
 // AhdInstance is every AhdCode Class instance. The generated interface of each
@@ -3745,4 +3748,479 @@ func AhdDataPivotCount(class *AhdClass, value AhdTable, rowName, columnName stri
 		result = append(result, line)
 	}
 	return ahdTableValue(schema, result)
+}
+
+// ---------------------------------------------------------------------------
+// Plot standard module
+// ---------------------------------------------------------------------------
+//
+// Gonum's plotting library cannot be linked into this file: it is embedded
+// verbatim into every natively-compiled AhdCode program, which builds in an
+// isolated, dependency-free workspace with no vendoring or network access.
+// Rendering therefore happens out-of-process, in the bundled ahdplot helper.
+// Both this runtime and the persistent evaluator drive that helper the same
+// way: write a JSON request to a temporary file, run
+// `ahdplot <request-file>`, and read a JSON response from its stdout. See
+// internal/plotproto for the canonical protocol shape (duplicated here,
+// field-for-field, since this file cannot import that package).
+
+// AhdChart is the runtime interchange shape for one Chart: every field a
+// Chart operation might read or write, laid out exactly like the AhdCode
+// Class's hidden storage fields. Kind discriminates which family-specific
+// fields are populated; the generated Chart struct's field getters produce
+// this same shape (see the generator's plotChartOfCode), and its all-fields
+// constructor consumes it (see emitPlotHelpers).
+type AhdChart struct {
+	Kind string
+
+	SeriesKinds  *AhdList[string]
+	SeriesLabels *AhdList[string]
+	SeriesX      *AhdList[*AhdList[float64]]
+	SeriesY      *AhdList[*AhdList[float64]]
+
+	BarLabels *AhdList[string]
+	BarValues *AhdList[float64]
+
+	HistogramValues *AhdList[float64]
+	HistogramBins   int64
+
+	BoxValues *AhdList[float64]
+
+	ErrorX, ErrorY, ErrorLower, ErrorUpper *AhdList[float64]
+
+	Title, XLabel, YLabel string
+	Legend                bool
+	Width, Height         int64
+}
+
+// The wire protocol structs below mirror internal/plotproto field-for-field;
+// see that package's doc comment for why this file cannot import it instead.
+type ahdPlotSeriesSpec struct {
+	Kind  string    `json:"kind"`
+	Label string    `json:"label,omitempty"`
+	X     []float64 `json:"x"`
+	Y     []float64 `json:"y"`
+}
+
+type ahdPlotChartSpec struct {
+	Present bool   `json:"present"`
+	Kind    string `json:"kind"`
+
+	Title  string `json:"title,omitempty"`
+	XLabel string `json:"x_label,omitempty"`
+	YLabel string `json:"y_label,omitempty"`
+	Legend bool   `json:"legend,omitempty"`
+
+	Series []ahdPlotSeriesSpec `json:"series,omitempty"`
+
+	BarLabels []string  `json:"bar_labels,omitempty"`
+	BarValues []float64 `json:"bar_values,omitempty"`
+
+	HistogramValues []float64 `json:"histogram_values,omitempty"`
+	HistogramBins   int       `json:"histogram_bins,omitempty"`
+
+	BoxValues []float64 `json:"box_values,omitempty"`
+
+	ErrorX     []float64 `json:"error_x,omitempty"`
+	ErrorY     []float64 `json:"error_y,omitempty"`
+	ErrorLower []float64 `json:"error_lower,omitempty"`
+	ErrorUpper []float64 `json:"error_upper,omitempty"`
+}
+
+type ahdPlotRequest struct {
+	OutputPath string             `json:"output_path"`
+	Width      int                `json:"width"`
+	Height     int                `json:"height"`
+	Rows       int                `json:"rows"`
+	Columns    int                `json:"columns"`
+	Charts     []ahdPlotChartSpec `json:"charts"`
+}
+
+type ahdPlotResponse struct {
+	OK      bool   `json:"ok"`
+	Message string `json:"message,omitempty"`
+}
+
+func ahdPlotFloats(list *AhdList[float64]) []float64 {
+	if list == nil {
+		return nil
+	}
+	return list.Snapshot()
+}
+
+func ahdPlotStrings(list *AhdList[string]) []string {
+	if list == nil {
+		return nil
+	}
+	return list.Snapshot()
+}
+
+func ahdPlotFloatGrid(list *AhdList[*AhdList[float64]]) [][]float64 {
+	if list == nil {
+		return nil
+	}
+	items := list.Snapshot()
+	grid := make([][]float64, len(items))
+	for index, row := range items {
+		grid[index] = ahdPlotFloats(row)
+	}
+	return grid
+}
+
+func ahdPlotFloatListSlice(list *AhdList[*AhdList[float64]]) []*AhdList[float64] {
+	if list == nil {
+		return nil
+	}
+	return list.Snapshot()
+}
+
+func ahdPlotChartSpecOf(chart AhdChart) ahdPlotChartSpec {
+	spec := ahdPlotChartSpec{
+		Present: true, Kind: chart.Kind,
+		Title: chart.Title, XLabel: chart.XLabel, YLabel: chart.YLabel, Legend: chart.Legend,
+	}
+	switch chart.Kind {
+	case "line-scatter":
+		kinds, labels := ahdPlotStrings(chart.SeriesKinds), ahdPlotStrings(chart.SeriesLabels)
+		xs, ys := ahdPlotFloatGrid(chart.SeriesX), ahdPlotFloatGrid(chart.SeriesY)
+		for index := range kinds {
+			spec.Series = append(spec.Series, ahdPlotSeriesSpec{
+				Kind: kinds[index], Label: labels[index], X: xs[index], Y: ys[index],
+			})
+		}
+	case "bar":
+		spec.BarLabels, spec.BarValues = ahdPlotStrings(chart.BarLabels), ahdPlotFloats(chart.BarValues)
+	case "histogram":
+		spec.HistogramValues = ahdPlotFloats(chart.HistogramValues)
+		spec.HistogramBins = int(chart.HistogramBins)
+	case "box":
+		spec.BoxValues = ahdPlotFloats(chart.BoxValues)
+	case "errorBar":
+		spec.ErrorX = ahdPlotFloats(chart.ErrorX)
+		spec.ErrorY = ahdPlotFloats(chart.ErrorY)
+		spec.ErrorLower = ahdPlotFloats(chart.ErrorLower)
+		spec.ErrorUpper = ahdPlotFloats(chart.ErrorUpper)
+	}
+	return spec
+}
+
+// ahdPlotTempDir is AhdCode's own temporary area for Plot render requests and
+// Chart.show/Figure.show preview images.
+func ahdPlotTempDir(class *AhdClass) string {
+	dir := filepath.Join(os.TempDir(), "ahdcode", "plot")
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		AhdRaiseClass(class, "creating temporary directory: "+err.Error())
+	}
+	return dir
+}
+
+// ahdPlotDiscoverRuntime locates the bundled ahdplot renderer helper: an
+// explicit override, then a path relative to the running executable,
+// mirroring this file's Latex-runtime discovery.
+func ahdPlotDiscoverRuntime() (string, error) {
+	if custom := os.Getenv("AHDCODE_PLOT_RUNTIME"); custom != "" {
+		return custom, nil
+	}
+	if executable, err := os.Executable(); err == nil {
+		bin := filepath.Dir(executable)
+		candidates := []string{
+			filepath.Join(bin, "ahdplot"),
+			filepath.Join(bin, "..", "libexec", "ahdcode", "ahdplot"),
+		}
+		if runtime.GOOS == "windows" {
+			candidates = append([]string{filepath.Join(bin, "ahdplot.exe")}, candidates...)
+		}
+		for _, candidate := range candidates {
+			if info, err := os.Stat(candidate); err == nil && !info.IsDir() {
+				return candidate, nil
+			}
+		}
+	}
+	return "", fmt.Errorf("the Plot renderer helper (ahdplot) was not found; set AHDCODE_PLOT_RUNTIME " +
+		"or reinstall AhdCode with the bundled Plot renderer")
+}
+
+// ahdPlotRender hands one render request to the ahdplot helper. Every
+// failure path -- missing helper, timeout, malformed response,
+// renderer-reported error -- becomes a PlotError, never a leaked Go/
+// filesystem error.
+func ahdPlotRender(class *AhdClass, request ahdPlotRequest) {
+	runtimePath, err := ahdPlotDiscoverRuntime()
+	if err != nil {
+		AhdRaiseClass(class, err.Error())
+	}
+	dir := ahdPlotTempDir(class)
+	requestFile, err := os.CreateTemp(dir, "request-*.json")
+	if err != nil {
+		AhdRaiseClass(class, "writing render request: "+err.Error())
+	}
+	defer os.Remove(requestFile.Name())
+	encoded, err := json.Marshal(request)
+	if err == nil {
+		_, err = requestFile.Write(encoded)
+	}
+	if closeErr := requestFile.Close(); err == nil {
+		err = closeErr
+	}
+	if err != nil {
+		AhdRaiseClass(class, "writing render request: "+err.Error())
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	output, runErr := exec.CommandContext(ctx, runtimePath, requestFile.Name()).Output()
+	var response ahdPlotResponse
+	_ = json.Unmarshal(output, &response)
+	if runErr != nil || !response.OK {
+		message := response.Message
+		if message == "" && runErr != nil {
+			message = runErr.Error()
+		}
+		AhdRaiseClass(class, "rendering chart: "+message)
+	}
+}
+
+// ahdPlotOpenViewer opens an image with the platform's standard
+// image-opening mechanism, passing the path as an argument rather than
+// through a shell string. A short timeout keeps a headless environment (no
+// handler registered) from hanging.
+func ahdPlotOpenViewer(class *AhdClass, path string) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	var command *exec.Cmd
+	switch runtime.GOOS {
+	case "darwin":
+		command = exec.CommandContext(ctx, "open", path)
+	case "windows":
+		command = exec.CommandContext(ctx, "cmd", "/c", "start", "", path)
+	default:
+		command = exec.CommandContext(ctx, "xdg-open", path)
+	}
+	if err := command.Run(); err != nil {
+		AhdRaiseClass(class, "opening chart viewer: "+err.Error())
+	}
+}
+
+func ahdPlotTempImagePath(class *AhdClass) string {
+	dir := ahdPlotTempDir(class)
+	file, err := os.CreateTemp(dir, "chart-*.png")
+	if err != nil {
+		AhdRaiseClass(class, "creating temporary file: "+err.Error())
+	}
+	path := file.Name()
+	file.Close()
+	return path
+}
+
+func ahdPlotRequireNonEmpty(class *AhdClass, count int, what string) {
+	if count == 0 {
+		AhdRaiseClass(class, what+" must not be empty")
+	}
+}
+
+func ahdPlotRequireNonNegative(class *AhdClass, values []float64, what string) {
+	for _, value := range values {
+		if value < 0 {
+			AhdRaiseClass(class, what+" must be non-negative")
+		}
+	}
+}
+
+// AhdPlotWidenList widens a List<Int> argument to List<Real>, so every Plot
+// rendering helper works on one canonical numeric representation regardless
+// of which Int/Real overload the frontend selected.
+func AhdPlotWidenList(values *AhdList[int64]) *AhdList[float64] {
+	if values == nil {
+		return nil
+	}
+	items := values.Snapshot()
+	widened := make([]float64, len(items))
+	for index, value := range items {
+		widened[index] = float64(value)
+	}
+	return AhdNewList(widened...)
+}
+
+// AhdPlotNew is Plot.new(): an empty Chart, ready for Chart.line/Chart.scatter
+// to build up a multi-series composite.
+func AhdPlotNew() AhdChart {
+	return AhdChart{Kind: "empty", Width: 800, Height: 600}
+}
+
+func AhdPlotLine(class *AhdClass, x, y *AhdList[float64]) AhdChart {
+	return ahdPlotNewSeries(class, "line", x, y)
+}
+
+func AhdPlotScatter(class *AhdClass, x, y *AhdList[float64]) AhdChart {
+	return ahdPlotNewSeries(class, "scatter", x, y)
+}
+
+func ahdPlotNewSeries(class *AhdClass, kind string, x, y *AhdList[float64]) AhdChart {
+	xs, ys := ahdPlotFloats(x), ahdPlotFloats(y)
+	if len(xs) != len(ys) {
+		AhdRaiseClass(class, "x and y must have the same length")
+	}
+	ahdPlotRequireNonEmpty(class, len(xs), kind+" chart data")
+	return AhdChart{
+		Kind: "line-scatter", SeriesKinds: AhdNewList(kind), SeriesLabels: AhdNewList(""),
+		SeriesX: AhdNewList(AhdNewList(xs...)), SeriesY: AhdNewList(AhdNewList(ys...)),
+		Width: 800, Height: 600,
+	}
+}
+
+func AhdPlotBar(class *AhdClass, labels *AhdList[string], values *AhdList[float64]) AhdChart {
+	ls, vs := ahdPlotStrings(labels), ahdPlotFloats(values)
+	if len(ls) != len(vs) {
+		AhdRaiseClass(class, "bar labels and values must have the same length")
+	}
+	ahdPlotRequireNonEmpty(class, len(vs), "bar chart data")
+	return AhdChart{Kind: "bar", BarLabels: AhdNewList(ls...), BarValues: AhdNewList(vs...), Width: 800, Height: 600}
+}
+
+func AhdPlotHistogram(class *AhdClass, values *AhdList[float64], bins int64) AhdChart {
+	vs := ahdPlotFloats(values)
+	if bins <= 0 {
+		AhdRaiseClass(class, "histogram bin count must be positive")
+	}
+	ahdPlotRequireNonEmpty(class, len(vs), "histogram data")
+	return AhdChart{Kind: "histogram", HistogramValues: AhdNewList(vs...), HistogramBins: bins, Width: 800, Height: 600}
+}
+
+func AhdPlotBox(class *AhdClass, values *AhdList[float64]) AhdChart {
+	vs := ahdPlotFloats(values)
+	ahdPlotRequireNonEmpty(class, len(vs), "box plot data")
+	return AhdChart{Kind: "box", BoxValues: AhdNewList(vs...), Width: 800, Height: 600}
+}
+
+func AhdPlotErrorBar(class *AhdClass, x, y, lower, upper *AhdList[float64]) AhdChart {
+	xs, ys, los, ups := ahdPlotFloats(x), ahdPlotFloats(y), ahdPlotFloats(lower), ahdPlotFloats(upper)
+	if len(xs) != len(ys) || len(ys) != len(los) || len(los) != len(ups) {
+		AhdRaiseClass(class, "errorBar x, y, lowerErrors, and upperErrors must have the same length")
+	}
+	ahdPlotRequireNonEmpty(class, len(xs), "errorBar data")
+	ahdPlotRequireNonNegative(class, los, "lowerErrors")
+	ahdPlotRequireNonNegative(class, ups, "upperErrors")
+	return AhdChart{
+		Kind: "errorBar", ErrorX: AhdNewList(xs...), ErrorY: AhdNewList(ys...),
+		ErrorLower: AhdNewList(los...), ErrorUpper: AhdNewList(ups...), Width: 800, Height: 600,
+	}
+}
+
+func AhdPlotChartTitle(chart AhdChart, text string) AhdChart  { chart.Title = text; return chart }
+func AhdPlotChartXLabel(chart AhdChart, text string) AhdChart { chart.XLabel = text; return chart }
+func AhdPlotChartYLabel(chart AhdChart, text string) AhdChart { chart.YLabel = text; return chart }
+func AhdPlotChartLegend(chart AhdChart, enabled bool) AhdChart {
+	chart.Legend = enabled
+	return chart
+}
+
+func AhdPlotChartSize(class *AhdClass, chart AhdChart, width, height int64) AhdChart {
+	if width <= 0 || height <= 0 {
+		AhdRaiseClass(class, "chart size must be positive")
+	}
+	chart.Width, chart.Height = width, height
+	return chart
+}
+
+// AhdPlotChartAddSeries implements Chart.line and Chart.scatter: append one
+// more series to a Chart that is either empty or already a line/scatter
+// composite. It never mutates the receiver's storage -- every List is
+// rebuilt fresh -- so an alias to the original Chart is unaffected.
+func AhdPlotChartAddSeries(class *AhdClass, chart AhdChart, kind string, x, y *AhdList[float64], label string) AhdChart {
+	if chart.Kind != "empty" && chart.Kind != "line-scatter" {
+		AhdRaiseClass(class, "cannot add a "+kind+" series to a "+chart.Kind+" chart")
+	}
+	xs, ys := ahdPlotFloats(x), ahdPlotFloats(y)
+	if len(xs) != len(ys) {
+		AhdRaiseClass(class, "x and y must have the same length")
+	}
+	ahdPlotRequireNonEmpty(class, len(xs), kind+" chart data")
+	chart.Kind = "line-scatter"
+	chart.SeriesKinds = AhdNewList(append(ahdPlotStrings(chart.SeriesKinds), kind)...)
+	chart.SeriesLabels = AhdNewList(append(ahdPlotStrings(chart.SeriesLabels), label)...)
+	chart.SeriesX = AhdNewList(append(ahdPlotFloatListSlice(chart.SeriesX), AhdNewList(xs...))...)
+	chart.SeriesY = AhdNewList(append(ahdPlotFloatListSlice(chart.SeriesY), AhdNewList(ys...))...)
+	return chart
+}
+
+func AhdPlotChartSave(class *AhdClass, chart AhdChart, path string) {
+	ahdPlotRender(class, ahdPlotRequest{
+		OutputPath: path, Width: int(chart.Width), Height: int(chart.Height),
+		Rows: 1, Columns: 1, Charts: []ahdPlotChartSpec{ahdPlotChartSpecOf(chart)},
+	})
+}
+
+func AhdPlotChartShow(class *AhdClass, chart AhdChart) {
+	path := ahdPlotTempImagePath(class)
+	ahdPlotRender(class, ahdPlotRequest{
+		OutputPath: path, Width: int(chart.Width), Height: int(chart.Height),
+		Rows: 1, Columns: 1, Charts: []ahdPlotChartSpec{ahdPlotChartSpecOf(chart)},
+	})
+	ahdPlotOpenViewer(class, path)
+}
+
+// AhdPlotSubplotsValidate checks Figure construction's domain rules (rows >
+// 0, columns > 0, chart count <= rows*columns), generically over whichever
+// generated Chart interface type the compiled program uses, and returns the
+// List unchanged so the generated Figure constructor can use it directly.
+func AhdPlotSubplotsValidate[T any](class *AhdClass, rows, columns int64, charts *AhdList[T]) *AhdList[T] {
+	if rows <= 0 || columns <= 0 {
+		AhdRaiseClass(class, "subplot rows and columns must be positive")
+	}
+	var count int64
+	if charts != nil {
+		count = int64(len(charts.Snapshot()))
+	}
+	if count > rows*columns {
+		AhdRaiseClass(class, "more charts than subplot cells")
+	}
+	return charts
+}
+
+// AhdPlotFigureDefaultSize is Figure's one deterministic size rule: a fixed
+// per-cell budget scaled by the grid dimensions. v0.1.14 publishes no
+// Figure.size method, keeping subplot sizing to this one predictable formula
+// rather than a second configuration surface.
+func AhdPlotFigureDefaultSize(rows, columns int64) (int64, int64) {
+	return columns * 500, rows * 400
+}
+
+// AhdPlotChartsFrom converts a List of the generated program's own Chart
+// values into the runtime's AhdChart interchange shape. This file cannot
+// know the generated Chart interface type, so the generator supplies the
+// per-element conversion closure.
+func AhdPlotChartsFrom[T any](list *AhdList[T], convert func(T) AhdChart) []AhdChart {
+	if list == nil {
+		return nil
+	}
+	items := list.Snapshot()
+	charts := make([]AhdChart, len(items))
+	for index, item := range items {
+		charts[index] = convert(item)
+	}
+	return charts
+}
+
+func ahdPlotFigureRequest(rows, columns int64, charts []AhdChart, path string, width, height int) ahdPlotRequest {
+	cells := make([]ahdPlotChartSpec, rows*columns)
+	for index := range cells {
+		if int64(index) < int64(len(charts)) {
+			cells[index] = ahdPlotChartSpecOf(charts[index])
+		}
+	}
+	return ahdPlotRequest{
+		OutputPath: path, Width: width, Height: height, Rows: int(rows), Columns: int(columns), Charts: cells,
+	}
+}
+
+func AhdPlotFigureSave(class *AhdClass, rows, columns int64, charts []AhdChart, path string) {
+	width, height := AhdPlotFigureDefaultSize(rows, columns)
+	ahdPlotRender(class, ahdPlotFigureRequest(rows, columns, charts, path, int(width), int(height)))
+}
+
+func AhdPlotFigureShow(class *AhdClass, rows, columns int64, charts []AhdChart) {
+	path := ahdPlotTempImagePath(class)
+	width, height := AhdPlotFigureDefaultSize(rows, columns)
+	ahdPlotRender(class, ahdPlotFigureRequest(rows, columns, charts, path, int(width), int(height)))
+	ahdPlotOpenViewer(class, path)
 }

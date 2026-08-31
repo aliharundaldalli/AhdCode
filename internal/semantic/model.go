@@ -280,6 +280,23 @@ const (
 	// DataToCSV and DataWriteCSV serialize through the CSV module's writer.
 	DataToCSV    TypeOperation = "Table.toCSV"
 	DataWriteCSV TypeOperation = "Table.writeCSV"
+
+	// The Plot standard module's Chart and Figure members. Every Chart
+	// operation is pure: it returns a new Chart and leaves the receiver
+	// untouched, matching the Table convention.
+	PlotChartTitle  TypeOperation = "Chart.title"
+	PlotChartXLabel TypeOperation = "Chart.xLabel"
+	PlotChartYLabel TypeOperation = "Chart.yLabel"
+	PlotChartLegend TypeOperation = "Chart.legend"
+	PlotChartSize   TypeOperation = "Chart.size"
+	// PlotChartLine and PlotChartScatter append one more series to a Chart
+	// that is either empty (Plot.new()) or already a line/scatter composite.
+	PlotChartLine    TypeOperation = "Chart.line"
+	PlotChartScatter TypeOperation = "Chart.scatter"
+	PlotChartSave    TypeOperation = "Chart.save"
+	PlotChartShow    TypeOperation = "Chart.show"
+	PlotFigureSave   TypeOperation = "Figure.save"
+	PlotFigureShow   TypeOperation = "Figure.show"
 )
 
 // listOperationMutates reports whether one List operation rewrites its

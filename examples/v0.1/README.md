@@ -46,5 +46,8 @@ ahdcode run examples/v0.1/14_grade_app.ahd
 | `25_statistics.ahd` | Statistics: sum, mean, median, mode, dispersion, quantile, and undefined-input errors |
 | `26_data_statistics.ahd` | Data and Statistics together: pivotCount, explicit conversion, and a captured threshold |
 | `27_raw_strings.ahd` | Raw String literals: no escapes, no interpolation, Regex quantifiers, and LaTeX source |
+| `28_plot.ahd` | Plot module: line, scatter, bar, histogram, box, errorBar, multiple series, save, and subplots |
+| `29_data_plot.ahd` | Data, Regex (with a raw String pattern), explicit conversion, Statistics, and Plot together |
+| `30_plot_show.ahd` | Manual smoke test for `chart.show()`/`figure.show()` -- not part of automated CI |
 
 `Greeting.ahd` is the sibling module used by `11_modules.ahd`.

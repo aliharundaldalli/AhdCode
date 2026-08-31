@@ -339,6 +339,7 @@ func (generator *generator) emitProgram() string {
 	// generation and before the bodies themselves.
 	generator.emitTimeHelpers(writer)
 	generator.emitDataHelpers(writer)
+	generator.emitPlotHelpers(writer)
 	writer.raw(bodies.String())
 	generator.emitInstaller(writer)
 	writer.open("func main() {")

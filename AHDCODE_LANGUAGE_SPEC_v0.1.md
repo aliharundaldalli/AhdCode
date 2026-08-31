@@ -4470,4 +4470,171 @@ result; `mode` and `Table.valueCounts` (§53.4) cover the common needs.
 
 ---
 
+## 56. Plot Standard Module (v0.1.14)
+
+`Plot` is explicit, like `Math`, `Time`, `Regex`, `CSV`, `Data`, and
+`Statistics` (§33, §55): it must be imported before use, and its canonical
+identity is `builtin:Plot`, so a sibling `Plot.ahd` cannot shadow it.
+
+```ahd
+bring Plot
+from Plot bring Chart
+from Plot bring Figure
+from Plot bring PlotError
+```
+
+Like Statistics, Plot deliberately does not depend on Data: a Table cell is
+a `String` (§53.1), so a program converts explicitly before plotting a
+column.
+
+### 56.1 Public types
+
+Plot introduces the smallest object model its surface needs: `Chart`,
+`Figure`, and `PlotError`. A single chart -- line, scatter, bar, histogram,
+box, or error bar -- is a `Chart`. A multi-chart composition (§56.7) is a
+`Figure`. Neither is constructible directly; both are produced only by
+Plot's module functions and, for `Chart`, by its own methods:
+
+```ahd
+Plot.line(x, y)                                -> Chart
+Plot.scatter(x, y)                             -> Chart
+Plot.bar(labels: List<String>, values)         -> Chart
+Plot.histogram(values, bins: Int)              -> Chart
+Plot.box(values)                               -> Chart
+Plot.errorBar(x, y, lowerErrors, upperErrors)  -> Chart
+Plot.new()                                     -> Chart
+Plot.subplots(rows: Int, columns: Int, charts: List<Chart>) -> Figure
+```
+
+### 56.2 Strict numeric input
+
+Every numeric argument accepts `List<Int>` or `List<Real>` independently,
+resolved by ordinary overload resolution (§16); an `Int` List is safely
+widened to `Real` internally, matching Statistics' widening (§55.1). A
+`List<String>` is never accepted, even one holding digit text -- Plot
+introduces no String-to-number coercion, and Data integration stays
+explicit, exactly as it does for Statistics (§55, §53.1):
+
+```ahd
+scores: List<Int> := table.column("score").map(
+    lambda (value: String) -> int(value)
+)
+
+chart := Plot.histogram(scores, 10)
+```
+
+Every chart constructor and `Chart.line`/`Chart.scatter` raise `PlotError`
+for empty numeric input, the same domain-error treatment
+`Statistics.mean([])` receives (§55.3).
+
+### 56.3 Chart metadata and immutability
+
+```text
+chart.title(text: String)   -> Chart
+chart.xLabel(text: String)  -> Chart
+chart.yLabel(text: String)  -> Chart
+chart.legend(enabled: Bool) -> Chart
+chart.size(width: Int, height: Int) -> Chart
+```
+
+Every Chart method is pure: it returns a new Chart and never modifies its
+receiver, the convention every Table operation already uses (§53.5).
+Configuration chains through reassignment rather than in-place mutation:
+
+```ahd
+chart := Plot.line(x, y)
+chart = chart.title("Experiment")
+chart = chart.xLabel("Time")
+```
+
+`size` sets positive output dimensions; a Chart's default size is 800x600.
+Every Plot function and Chart method reads a snapshot of its List
+arguments and never reorders or otherwise mutates the caller's List.
+
+### 56.4 Multiple series
+
+`chart.line(x, y, label)` and `chart.scatter(x, y, label)` add one more
+series to a Chart, so a line and a scatter series -- or several of either --
+can share one Chart with a legend. `Plot.line(x, y)`/`Plot.scatter(x, y)`
+are shorthand for starting a Chart with one unlabeled series;
+`chart.line`/`chart.scatter` extend it, or extend a Chart already built this
+way. Adding a series to a `bar`, `histogram`, `box`, or `errorBar` Chart
+raises `PlotError`: those chart kinds are self-contained.
+
+### 56.5 Save
+
+```text
+chart.save(path: String) -> Nothing
+figure.save(path: String) -> Nothing
+```
+
+The output format is inferred from the file extension. Supported formats are
+PNG (`.png`), SVG (`.svg`), and PDF (`.pdf`); any other extension raises
+`PlotError`. A relative path resolves against the program's working
+directory, the same rule File uses. A rendering or filesystem failure raises
+`PlotError`, never a raw backend error.
+
+### 56.6 Show
+
+```text
+chart.show() -> Nothing
+figure.show() -> Nothing
+```
+
+`show()` renders to a unique temporary PNG in an AhdCode-specific temporary
+area and opens it with the platform's standard image-opening mechanism
+(`open` on macOS, `xdg-open` on Linux, the shell's `start` command on
+Windows), so inspecting a chart never requires manually saving and locating
+a file. The temporary image is not automatically deleted, since the
+external viewer keeps reading it after `show()` returns. `show()` requires a
+desktop session; a headless environment fails cleanly with `PlotError`
+rather than hanging.
+
+### 56.7 Subplots
+
+```ahd
+figure := Plot.subplots(
+    2, 2,
+    [
+        Plot.line(x1, y1),
+        Plot.scatter(x2, y2),
+        Plot.histogram(values, 10),
+        Plot.box(values)
+    ]
+)
+
+figure.show()
+figure.save("summary.pdf")
+```
+
+`charts` is row-major. `rows` and `columns` must both be positive, and the
+chart count must not exceed `rows * columns`; fewer charts than cells is
+permitted and leaves the remaining cells blank. A `Figure` is an explicit,
+immutable value produced by `Plot.subplots` -- v0.1.14 has no mutable global
+"current subplot" state. A Figure's save/show size is derived
+deterministically from its grid dimensions; v0.1.14 publishes no
+`Figure.size`.
+
+### 56.8 PlotError
+
+`PlotError` derives directly from `Error` (§7, §55.3's pattern). Plot raises
+it for every plot-specific runtime failure: mismatched `x`/`y` lengths,
+empty chart data, an invalid bin count, mismatched bar labels/values,
+mismatched error-bar data, negative error magnitudes, an unsupported output
+format, invalid subplot dimensions, more charts than subplot cells, a
+rendering failure, a temporary-file failure, and a viewer-open failure. A
+static type mismatch remains an ordinary compile-time diagnostic;
+`PlotError` covers only what the type checker cannot rule out in advance.
+
+### 56.9 Not in this version
+
+v0.1.14 supports exactly six chart families: line, scatter, bar, histogram,
+box, and error bar. There is no pie, heatmap, contour, violin, stem, polar,
+3D, candlestick, area, or surface chart, and no arbitrary custom plotter
+injection. There is no `Numeric` type -- numeric flexibility is `Int`/`Real`
+widening only, matching Statistics -- no general GUI framework, and no
+secondary axes.
+
+---
+
 # End of AhdCode v0.1 Core Specification

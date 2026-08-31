@@ -1,0 +1,50 @@
+// Data -> Regex -> explicit conversion -> Statistics -> Plot, with no magic
+// integration between the modules: a Table cell is always a String, so
+// crossing into typed numeric territory is always one explicit conversion.
+bring Data
+from Data bring Table
+bring Regex
+from Regex bring Pattern
+bring Statistics
+bring Plot
+
+report: String := """student_code,name,department,score
+MATH-101,Ali,Mathematics,91
+PHYS-202,Ayse,Physics,78
+MATH-115,Mehmet,Mathematics,84
+CHEM-301,Elif,Chemistry,88
+MATH-208,Zeynep,Mathematics,95
+PHYS-110,Can,Physics,67
+MATH-X12,Hakan,Mathematics,72
+"""
+
+students: Table := Data.fromCSV(report)
+
+// A raw String makes the Mathematics-department course-code pattern exact
+// and readable: {3} needs no brace-escaping, unlike a normal String.
+pattern: Pattern := Regex.compile(
+    r"^MATH-[0-9]{3}$"
+)
+
+matched: Table := students.filter(
+    lambda [@pattern] (row: Pair<String, String>) -> pattern.matches(row["student_code"])
+)
+write(matched.rowCount())
+write(matched.column("name"))
+
+// Data never guesses a numeric type: the conversion is explicit.
+scores: List<Int> := matched.column("score").map(
+    lambda (value: String) -> int(value)
+)
+
+write(Statistics.mean(scores))
+
+// Plot never coerces Strings either: scores is already List<Int>, produced
+// by the explicit conversion above, not by handing Plot a Table column
+// directly.
+chart := Plot.histogram(scores, 5)
+chart = chart.title("Mathematics scores").xLabel("score").yLabel("count")
+chart.save("mathematics_scores.png")
+chart.save("mathematics_scores.pdf")
+
+write("chart saved")

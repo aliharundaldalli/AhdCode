@@ -1,0 +1,23 @@
+// Manual smoke test for chart.show() and figure.show() -- NOT part of the
+// automated example suite. Run this by hand on a desktop machine to confirm
+// the platform image viewer opens correctly:
+//
+//   ahdcode run examples/v0.1/30_plot_show.ahd
+//
+// show() renders to a unique temporary PNG and opens it with the platform's
+// standard image-opening mechanism (open on macOS, xdg-open on Linux, the
+// shell's start command on Windows). It requires a desktop session; a
+// headless environment (CI, a container with no display) will fail with a
+// PlotError rather than hang.
+bring Plot
+
+x: List<Int> := [1, 2, 3, 4, 5]
+y: List<Real> := [2.0, 3.0, 5.0, 4.0, 6.0]
+
+chart := Plot.line(x, y)
+chart = chart.title("Manual show() smoke test").xLabel("x").yLabel("y")
+chart.show()
+
+bar := Plot.bar(["Math", "Physics", "Chemistry"], [90.0, 86.5, 88.0])
+figure := Plot.subplots(1, 2, [chart, bar])
+figure.show()

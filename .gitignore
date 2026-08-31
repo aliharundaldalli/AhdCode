@@ -3,6 +3,7 @@
 editors/vscode/*.vsix
 # Build outputs
 /ahdcode
+/ahdplot
 
 # Benchmark test files
 speed*
