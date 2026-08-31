@@ -394,6 +394,11 @@ const (
 	// XMLNodeElements is only the child Element nodes, in document order;
 	// Text raises XMLError.
 	XMLNodeElements TypeOperation = "XMLNode.elements"
+	// XMLDocumentRoot is the XMLDocument's single root Element. The task
+	// specification's XMLDocument surface (parse/read/stringify/write/
+	// document) omits any way back from an XMLDocument to its XMLNode tree;
+	// root() is the smallest addition that closes that gap.
+	XMLDocumentRoot TypeOperation = "XMLDocument.root"
 )
 
 // listOperationMutates reports whether one List operation rewrites its

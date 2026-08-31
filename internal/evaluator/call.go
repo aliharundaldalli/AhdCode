@@ -180,6 +180,8 @@ func (session *Session) builtin(identity ir.CallableID, receiver any, arguments 
 		return session.wordBuiltin(strings.TrimPrefix(name, "builtin:Word::"), values(arguments))
 	case strings.HasPrefix(name, "builtin:JSON::"):
 		return session.jsonBuiltin(strings.TrimPrefix(name, "builtin:JSON::"), values(arguments))
+	case strings.HasPrefix(name, "builtin:XML::"):
+		return session.xmlBuiltin(strings.TrimPrefix(name, "builtin:XML::"), values(arguments))
 	}
 	session.raise("Error", "unsupported builtin "+name)
 	return nil
@@ -305,6 +307,9 @@ func (session *Session) core(name string, receiver any, arguments []any) any {
 	}
 	if strings.HasPrefix(name, "JSONValue.") {
 		return session.jsonOperation(name, receiver, arguments)
+	}
+	if strings.HasPrefix(name, "XMLNode.") || strings.HasPrefix(name, "XMLDocument.") {
+		return session.xmlOperation(name, receiver, arguments)
 	}
 	session.raise("Error", "unsupported Fundamentals operation "+name)
 	return nil

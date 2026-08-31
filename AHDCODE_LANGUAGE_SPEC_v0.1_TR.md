@@ -5409,4 +5409,79 @@ her JSON'a özgü hatayı uçtan uca kapsar — `JSON.read` ve `JSON.write`
 
 ---
 
+## 60. XML Standart Modülü (v0.1.17)
+
+`bring XML`, kanonik derleyici-kayıtlı `builtin:XML` modülünü içe aktarır.
+Modül derleyicinin sağladığı `XMLNode`, `XMLDocument` ve `XMLError`
+Class'larıyla şu yüzeyi dışa açar:
+
+```text
+XML.text(String)                             -> XMLNode
+XML.element(String, Pair<String,String>, List<XMLNode>) -> XMLNode
+XML.document(XMLNode)                        -> XMLDocument
+XML.parse(String)                            -> XMLDocument
+XML.read(String)                             -> XMLDocument
+XML.stringify(XMLDocument, Bool = false)     -> String
+XML.write(XMLDocument, String, Bool = false) -> Nothing
+
+XMLNode.kind()               -> String
+XMLNode.name()                -> String
+XMLNode.namespace()           -> String
+XMLNode.text()                 -> String
+XMLNode.attribute(String)     -> String?
+XMLNode.attributes()          -> Pair<String, String>
+XMLNode.children()            -> List<XMLNode>
+XMLNode.elements()            -> List<XMLNode>
+XMLDocument.root()            -> XMLNode
+```
+
+`XMLNode`, bilinçli olarak kapalı iki türlü bir modeldir, `Element` ve
+`Text`; tam bir DOM değildir: bu, Comment, CDATA, ProcessingInstruction,
+Doctype veya Entity için büyük bir Class hiyerarşisi olmadan sıralı karışık
+içeriği kapsar. Ayrıştırma, comment'leri ve processing instruction'ları yok
+sayar ve CDATA'yı sıradan Text olarak kurtarır. `XMLDocument`, tam olarak
+bir `Element` kökünü sarar; `XML.document`, bir `Text` kökü için `XMLError`
+fırlatır.
+
+`XMLDocument.root()`, görevin başlangıçta verdiği yüzeyin bir parçası
+değildir; o yüzey, ayrıştırılmış bir `XMLDocument`'tan `XMLNode` ağacına
+geri dönmenin bir yolunu sunmuyordu; bu, o boşluğu kapatan en küçük
+eklemedir.
+
+Ayrıştırma, `Word`'ün DOCX için kullandığı aynı yaklaşım olan Go'nun
+`encoding/xml` token decoder'ını kullanır. Bir belge tam olarak bir kök
+element'e sahip olmalıdır; bir element üzerinde yinelenen bir öznitelik
+geçersiz XML'dir. `kind()` ve `text()` dışındaki her erişimci yalnızca
+`Element` içindir ve bir `Text` alıcısında `XMLError` fırlatır. `text()`
+her iki türde de geçerlidir: bir `Text` node'u için kendi içeriği, veya bir
+`Element` için belge sırasındaki doğrudan `Text` çocuklarının birleşimi (iç
+içe geçmiş torun metni düzleştirilmez). `attribute(name)`, `String?`
+döndürür: `null`, özniteliğin yok olduğu anlamına gelir.
+
+Namespace desteği sınırlandırılmış ve açıktır: ayrıştırma, her element'in
+önekini `namespace()` aracılığıyla namespace URI'sine çözer (niteliksizse
+`""`), ancak orijinal önek yazımı tam olarak korunmaz ve `XML.element`
+yalnızca niteliksiz element'ler oluşturur — bu sürümde namespace-nitelikli
+oluşturma yoktur, yalnızca namespace-farkında ayrıştırma vardır.
+
+`XML.stringify`/`XML.write` her zaman doğru kaçışlar ve her zaman geçerli
+XML üretir. Kompakt çıktı, `XML.parse` üzerinden her zaman tam olarak
+round-trip yapar. Pretty çıktı sabit iki boşluklu bir girinti kullanır,
+ancak bunu yalnızca saf Element çocukları arasına ekler — bir Text
+çocuğunun yanına boşluk eklemek, orijinal ağaçta olmayan içerik eklemek
+anlamına gelir, bu yüzden yalnızca-metin ve karışık içerik her iki modda da
+her zaman satır içinde render edilir. `XML.write`, `Word.save` ve
+`JSON.write`'ın kullandığı aynı kuralla çıktısını aşamalı olarak hazırlar
+ve atomik olarak yayımlar.
+
+`XML.parse`/`XML.read` asla ağa erişmez. Go'nun `encoding/xml` decoder'ı
+harici bir DTD alt kümesini işlemez ve varsayılan olarak özel bir genel
+varlığı genişletmez; bu yüzden XXE ve billion-laughs saldırıları, bu
+modülün eklemediği ek kod olmadan erişilebilir değildir.
+
+`XMLError` doğrudan `Error`'dan türer ve dosya okuma/yazma hataları dahil
+her XML'e özgü hatayı uçtan uca kapsar.
+
+---
+
 # AhdCode v0.1 Çekirdek Spesifikasyonu Sonu

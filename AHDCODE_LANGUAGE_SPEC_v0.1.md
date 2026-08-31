@@ -4936,4 +4936,75 @@ failure end to end, including file read/write failures — `JSON.read` and
 
 ---
 
+## 60. XML Standard Module (v0.1.17)
+
+`bring XML` imports canonical compiler-registered module `builtin:XML`. It
+exports compiler-supplied `XMLNode`, `XMLDocument`, and `XMLError` Classes
+plus:
+
+```text
+XML.text(String)                             -> XMLNode
+XML.element(String, Pair<String,String>, List<XMLNode>) -> XMLNode
+XML.document(XMLNode)                        -> XMLDocument
+XML.parse(String)                            -> XMLDocument
+XML.read(String)                             -> XMLDocument
+XML.stringify(XMLDocument, Bool = false)     -> String
+XML.write(XMLDocument, String, Bool = false) -> Nothing
+
+XMLNode.kind()               -> String
+XMLNode.name()                -> String
+XMLNode.namespace()           -> String
+XMLNode.text()                 -> String
+XMLNode.attribute(String)     -> String?
+XMLNode.attributes()          -> Pair<String, String>
+XMLNode.children()            -> List<XMLNode>
+XMLNode.elements()            -> List<XMLNode>
+XMLDocument.root()            -> XMLNode
+```
+
+`XMLNode` is deliberately a closed two-kind model, `Element` and `Text`,
+not a full DOM: this covers ordered mixed content without a large Class
+hierarchy for Comment, CDATA, ProcessingInstruction, Doctype, or Entity.
+Parsing ignores comments and processing instructions and recovers CDATA as
+ordinary Text. `XMLDocument` wraps exactly one `Element` root;
+`XML.document` raises `XMLError` for a `Text` root.
+
+`XMLDocument.root()` is not part of the task specification's originally
+given surface, which offered no way back from a parsed `XMLDocument` into
+its `XMLNode` tree; it is the smallest addition that closes that gap.
+
+Parsing uses Go's `encoding/xml` token decoder, the same approach `Word`
+uses for DOCX. A document must have exactly one root element; a duplicate
+attribute on one element is invalid XML. Every accessor except `kind()` and
+`text()` is `Element`-only and raises `XMLError` on a `Text` receiver.
+`text()` is valid on both kinds: a `Text` node's own content, or an
+`Element`'s direct `Text` children concatenated in document order (nested
+descendant text is not flattened in). `attribute(name)` returns `String?`:
+`null` means the attribute is absent.
+
+Namespace support is bounded and explicit: parsing resolves each element's
+prefix to its namespace URI (`""` when unqualified) via `namespace()`, but
+the exact original prefix spelling is not preserved, and `XML.element`
+constructs unqualified elements only - there is no namespace-qualified
+construction in this release, only namespace-aware parsing.
+
+`XML.stringify`/`XML.write` always escape correctly and always produce
+valid XML. Compact output always round-trips exactly through
+`XML.parse`. Pretty output uses a fixed two-space indent, but only inserts
+it between purely-Element children - inserting whitespace next to a Text
+child would add content absent from the original tree, so text-only and
+mixed content are always rendered inline in both modes. `XML.write` stages
+and atomically publishes its output, the same convention `Word.save` and
+`JSON.write` use.
+
+`XML.parse`/`XML.read` never access the network. Go's `encoding/xml`
+decoder does not process an external DTD subset and does not expand a
+custom general entity by default, so XXE and billion-laughs attacks are not
+reachable without additional code this module does not add.
+
+`XMLError` derives directly from `Error` and covers every XML-specific
+failure end to end, including file read/write failures.
+
+---
+
 # End of AhdCode v0.1 Core Specification

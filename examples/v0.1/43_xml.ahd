@@ -1,0 +1,43 @@
+bring XML
+from XML bring XMLNode
+from XML bring XMLDocument
+from XML bring XMLError
+
+student: XMLNode := XML.element(
+    "student"
+    {"id": "42"}
+    [
+        XML.element("name", {}, [XML.text("Ali")])
+        XML.element("score", {}, [XML.text("91")])
+    ]
+)
+
+document: XMLDocument := XML.document(student)
+
+text: String := XML.stringify(document, true)
+write(text)
+
+parsed: XMLDocument := XML.parse(text)
+root: XMLNode := parsed.root()
+write(root.name())
+
+identifier: String? := root.attribute("id")
+if identifier != null {
+    write(identifier)
+}
+
+elements: List<XMLNode> := root.elements()
+write(len(elements))
+write(elements[0].name())
+write(elements[0].text())
+
+mixed: XMLDocument := XML.parse(r'<p>one<b>two</b>three</p>')
+mixedRoot: XMLNode := mixed.root()
+write(mixedRoot.text())
+
+attempt {
+    XML.parse("<a><b></a></b>")
+}
+except XMLError as error {
+    write(error.message)
+}

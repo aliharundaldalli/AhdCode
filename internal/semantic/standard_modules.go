@@ -28,6 +28,7 @@ func StandardModuleInterfaces() map[string]*ModuleInterface {
 		"Statistics": statisticsModuleInterface(),
 		"Time":       timeModuleInterface(),
 		"Word":       wordModuleInterface(),
+		"XML":        xmlModuleInterface(),
 	}
 }
 

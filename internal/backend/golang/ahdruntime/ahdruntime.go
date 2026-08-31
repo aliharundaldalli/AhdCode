@@ -80,6 +80,7 @@ var (
 	AhdClassNumericError        = &AhdClass{Name: "NumericError", Parent: AhdClassError}
 	AhdClassWordError           = &AhdClass{Name: "WordError", Parent: AhdClassError}
 	AhdClassJSONError           = &AhdClass{Name: "JSONError", Parent: AhdClassError}
+	AhdClassXMLError            = &AhdClass{Name: "XMLError", Parent: AhdClassError}
 )
 
 // AhdInstance is every AhdCode Class instance. The generated interface of each
@@ -7060,4 +7061,412 @@ func AhdJSONAt(class *AhdClass, text string, index int64) string {
 		AhdRaiseClass(class, "JSONValue array index is out of range")
 	}
 	return ahdJSONCanonicalText(node.items[resolved])
+}
+
+// --- XML standard module ---
+//
+// An XMLNode/XMLDocument is represented at rest as one hidden field holding
+// a private, opaque JSON encoding of an ahdXMLData tree (never published,
+// never valid XML on its own) - the same "hidden String field, reparsed by
+// helpers" pattern Word's Document uses for its block list and JSON's
+// JSONValue uses for its own canonical text. Unlike JSONValue, XML's own
+// encoding is a full nested struct rather than a flat canonical string,
+// since composing an Element from already-built child XMLNodes needs to
+// decode each child once and embed it directly - Go's encoding/json already
+// walks nested struct slices recursively, so no extra composition helper is
+// needed the way JSON's array()/object() needed one.
+//
+// Parsing uses encoding/xml.Decoder (the same token-walking style Word uses
+// for DOCX), not a hand-written grammar: Go's decoder already resolves
+// element namespaces to full URIs, already treats CDATA as ordinary
+// CharData, already ignores comments/processing instructions as separate
+// token kinds, and - critically for security - never expands a DTD's
+// external subset or a custom general entity by default (an unknown entity
+// is a parse error, not something to substitute), so it is not vulnerable
+// to XXE/billion-laughs without any extra code here.
+
+const (
+	ahdXMLMaxInputBytes = 8 * 1024 * 1024
+	ahdXMLMaxDepth      = 256
+)
+
+// ahdXMLData is the parsed/interchange form of one XMLNode, and is also
+// exactly what an XMLNode's/XMLDocument's hidden field encodes.
+type ahdXMLData struct {
+	Kind      string       `json:"kind"`
+	Name      string       `json:"name,omitempty"`
+	Namespace string       `json:"namespace,omitempty"`
+	Text      string       `json:"text,omitempty"`
+	AttrKeys  []string     `json:"attrKeys,omitempty"`
+	AttrVals  []string     `json:"attrVals,omitempty"`
+	Children  []ahdXMLData `json:"children,omitempty"`
+}
+
+func ahdXMLEncode(node ahdXMLData) string {
+	encoded, _ := json.Marshal(node)
+	return string(encoded)
+}
+
+func ahdXMLDecode(class *AhdClass, data string) ahdXMLData {
+	var node ahdXMLData
+	if err := json.Unmarshal([]byte(data), &node); err != nil {
+		AhdRaiseClass(class, "XML node storage is corrupted")
+	}
+	return node
+}
+
+func ahdXMLWrongKind(class *AhdClass, operation, kind string) {
+	AhdRaiseClass(class, operation+" cannot be called on a "+kind+" XMLNode")
+}
+
+// ---------------------------------------------------------------------------
+// Construction
+// ---------------------------------------------------------------------------
+
+func AhdXMLText(value string) string {
+	return ahdXMLEncode(ahdXMLData{Kind: "Text", Text: value})
+}
+
+// AhdXMLElement builds an Element from already-encoded child node data,
+// decoding each child once to embed it directly in the new node's tree.
+func AhdXMLElement(class *AhdClass, name string, attrKeys, attrVals []string, childrenData []string) string {
+	children := make([]ahdXMLData, len(childrenData))
+	for index, data := range childrenData {
+		children[index] = ahdXMLDecode(class, data)
+	}
+	return ahdXMLEncode(ahdXMLData{Kind: "Element", Name: name, AttrKeys: attrKeys, AttrVals: attrVals, Children: children})
+}
+
+// AhdXMLDocument validates that root is an Element and, since an
+// XMLDocument's hidden field is exactly its root Element's own encoding,
+// simply re-validates and returns it.
+func AhdXMLDocument(class *AhdClass, rootData string) string {
+	root := ahdXMLDecode(class, rootData)
+	if root.Kind != "Element" {
+		AhdRaiseClass(class, "an XMLDocument root must be an Element, not Text")
+	}
+	return rootData
+}
+
+// ---------------------------------------------------------------------------
+// Parsing
+// ---------------------------------------------------------------------------
+
+func ahdXMLParseDocument(class *AhdClass, source string) ahdXMLData {
+	if len(source) > ahdXMLMaxInputBytes {
+		AhdRaiseClass(class, "XML input is larger than the supported limit")
+	}
+	if !utf8.ValidString(source) {
+		AhdRaiseClass(class, "XML input is not valid UTF-8")
+	}
+	decoder := xml.NewDecoder(strings.NewReader(source))
+	var root *ahdXMLData
+	for {
+		token, err := decoder.Token()
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			AhdRaiseClass(class, "XML input does not parse: "+err.Error())
+		}
+		switch element := token.(type) {
+		case xml.StartElement:
+			if root != nil {
+				AhdRaiseClass(class, "XML input has more than one root element")
+			}
+			node := ahdXMLParseElement(class, decoder, element, 1)
+			root = &node
+		case xml.CharData:
+			if root == nil && strings.TrimSpace(string(element)) != "" {
+				AhdRaiseClass(class, "XML input has content before its root element")
+			}
+		}
+	}
+	if root == nil {
+		AhdRaiseClass(class, "XML input has no root element")
+	}
+	return *root
+}
+
+func ahdXMLParseElement(class *AhdClass, decoder *xml.Decoder, start xml.StartElement, depth int) ahdXMLData {
+	if depth > ahdXMLMaxDepth {
+		AhdRaiseClass(class, "XML input exceeds the maximum supported nesting depth")
+	}
+	node := ahdXMLData{Kind: "Element", Name: start.Name.Local, Namespace: start.Name.Space}
+	seen := make(map[string]bool, len(start.Attr))
+	for _, attr := range start.Attr {
+		if attr.Name.Space == "xmlns" || attr.Name.Local == "xmlns" {
+			continue
+		}
+		key := attr.Name.Local
+		if seen[key] {
+			AhdRaiseClass(class, "XML element has a duplicate attribute")
+		}
+		seen[key] = true
+		node.AttrKeys = append(node.AttrKeys, key)
+		node.AttrVals = append(node.AttrVals, attr.Value)
+	}
+	for {
+		token, err := decoder.Token()
+		if err != nil {
+			if err == io.EOF {
+				AhdRaiseClass(class, "XML input ends before an element is closed")
+			}
+			AhdRaiseClass(class, "XML input does not parse: "+err.Error())
+		}
+		switch element := token.(type) {
+		case xml.StartElement:
+			node.Children = append(node.Children, ahdXMLParseElement(class, decoder, element, depth+1))
+		case xml.EndElement:
+			return node
+		case xml.CharData:
+			if len(element) > 0 {
+				node.Children = append(node.Children, ahdXMLData{Kind: "Text", Text: string(element)})
+			}
+		}
+	}
+}
+
+func AhdXMLParse(class *AhdClass, source string) string {
+	return ahdXMLEncode(ahdXMLParseDocument(class, source))
+}
+
+func AhdXMLRead(class *AhdClass, path string) string {
+	content, err := os.ReadFile(path)
+	if err != nil {
+		AhdRaiseClass(class, "could not read the XML file: "+err.Error())
+	}
+	return ahdXMLEncode(ahdXMLParseDocument(class, string(content)))
+}
+
+// ---------------------------------------------------------------------------
+// Serialization
+// ---------------------------------------------------------------------------
+
+func ahdXMLEscapeText(value string) string {
+	var builder strings.Builder
+	for _, character := range value {
+		switch character {
+		case '&':
+			builder.WriteString("&amp;")
+		case '<':
+			builder.WriteString("&lt;")
+		case '>':
+			builder.WriteString("&gt;")
+		default:
+			builder.WriteRune(character)
+		}
+	}
+	return builder.String()
+}
+
+func ahdXMLEscapeAttr(value string) string {
+	var builder strings.Builder
+	for _, character := range value {
+		switch character {
+		case '&':
+			builder.WriteString("&amp;")
+		case '<':
+			builder.WriteString("&lt;")
+		case '"':
+			builder.WriteString("&quot;")
+		case '\n':
+			builder.WriteString("&#10;")
+		case '\r':
+			builder.WriteString("&#13;")
+		case '\t':
+			builder.WriteString("&#9;")
+		default:
+			builder.WriteRune(character)
+		}
+	}
+	return builder.String()
+}
+
+// ahdXMLStringifyNode renders one node. Pretty indentation is only inserted
+// between a run of purely-Element children: inserting whitespace next to a
+// Text child would add content that was not in the original tree, so mixed
+// or text-only content is always rendered inline, in both modes. Compact
+// output therefore always round-trips exactly; pretty output is a human
+// readability convenience that may not for content mixing text and
+// elements, the same well-known trade-off every XML pretty-printer makes.
+func ahdXMLStringifyNode(node ahdXMLData, pretty bool, depth int) string {
+	if node.Kind == "Text" {
+		return ahdXMLEscapeText(node.Text)
+	}
+	var builder strings.Builder
+	builder.WriteByte('<')
+	builder.WriteString(node.Name)
+	for index, key := range node.AttrKeys {
+		builder.WriteByte(' ')
+		builder.WriteString(key)
+		builder.WriteString(`="`)
+		builder.WriteString(ahdXMLEscapeAttr(node.AttrVals[index]))
+		builder.WriteByte('"')
+	}
+	if len(node.Children) == 0 {
+		builder.WriteString("/>")
+		return builder.String()
+	}
+	builder.WriteByte('>')
+	hasText := false
+	for _, child := range node.Children {
+		if child.Kind == "Text" {
+			hasText = true
+			break
+		}
+	}
+	indent := func(level int) string {
+		if !pretty || hasText {
+			return ""
+		}
+		return "\n" + strings.Repeat("  ", level)
+	}
+	for _, child := range node.Children {
+		builder.WriteString(indent(depth + 1))
+		builder.WriteString(ahdXMLStringifyNode(child, pretty, depth+1))
+	}
+	builder.WriteString(indent(depth))
+	builder.WriteString("</")
+	builder.WriteString(node.Name)
+	builder.WriteByte('>')
+	return builder.String()
+}
+
+func AhdXMLStringify(class *AhdClass, documentData string, pretty bool) string {
+	return ahdXMLStringifyNode(ahdXMLDecode(class, documentData), pretty, 0)
+}
+
+func ahdXMLPublish(data []byte, output string) error {
+	absolute, err := filepath.Abs(output)
+	if err != nil {
+		return err
+	}
+	directory := filepath.Dir(absolute)
+	if err := os.MkdirAll(directory, 0o755); err != nil {
+		return err
+	}
+	temporary, err := os.CreateTemp(directory, ".ahdcode-xml-output-*")
+	if err != nil {
+		return err
+	}
+	temporaryPath := temporary.Name()
+	defer func() { _ = os.Remove(temporaryPath) }()
+	_, writeError := temporary.Write(data)
+	syncError := temporary.Sync()
+	closeError := temporary.Close()
+	for _, candidate := range []error{writeError, syncError, closeError} {
+		if candidate != nil {
+			return candidate
+		}
+	}
+	return os.Rename(temporaryPath, absolute)
+}
+
+func AhdXMLWrite(class *AhdClass, documentData, path string, pretty bool) {
+	content := AhdXMLStringify(class, documentData, pretty)
+	if err := ahdXMLPublish([]byte(content), path); err != nil {
+		AhdRaiseClass(class, "could not write the XML file: "+err.Error())
+	}
+}
+
+// ---------------------------------------------------------------------------
+// XMLNode/XMLDocument accessors
+// ---------------------------------------------------------------------------
+
+func AhdXMLKind(class *AhdClass, data string) string {
+	return ahdXMLDecode(class, data).Kind
+}
+
+func AhdXMLName(class *AhdClass, data string) string {
+	node := ahdXMLDecode(class, data)
+	if node.Kind != "Element" {
+		ahdXMLWrongKind(class, "name()", node.Kind)
+	}
+	return node.Name
+}
+
+func AhdXMLNamespace(class *AhdClass, data string) string {
+	node := ahdXMLDecode(class, data)
+	if node.Kind != "Element" {
+		ahdXMLWrongKind(class, "namespace()", node.Kind)
+	}
+	return node.Namespace
+}
+
+// AhdXMLNodeText is the XMLNode.text() accessor (distinct from the
+// AhdXMLText constructor): a Text node's own content, or an Element's
+// direct Text children concatenated in document order.
+func AhdXMLNodeText(class *AhdClass, data string) string {
+	node := ahdXMLDecode(class, data)
+	if node.Kind == "Text" {
+		return node.Text
+	}
+	var builder strings.Builder
+	for _, child := range node.Children {
+		if child.Kind == "Text" {
+			builder.WriteString(child.Text)
+		}
+	}
+	return builder.String()
+}
+
+func AhdXMLAttribute(class *AhdClass, data, key string) *string {
+	node := ahdXMLDecode(class, data)
+	if node.Kind != "Element" {
+		ahdXMLWrongKind(class, "attribute()", node.Kind)
+	}
+	for index, candidate := range node.AttrKeys {
+		if candidate == key {
+			value := node.AttrVals[index]
+			return &value
+		}
+	}
+	return nil
+}
+
+func AhdXMLAttributeKeys(class *AhdClass, data string) []string {
+	node := ahdXMLDecode(class, data)
+	if node.Kind != "Element" {
+		ahdXMLWrongKind(class, "attributes()", node.Kind)
+	}
+	keys := make([]string, len(node.AttrKeys))
+	copy(keys, node.AttrKeys)
+	return keys
+}
+
+func AhdXMLAttributeValues(class *AhdClass, data string) []string {
+	node := ahdXMLDecode(class, data)
+	if node.Kind != "Element" {
+		ahdXMLWrongKind(class, "attributes()", node.Kind)
+	}
+	values := make([]string, len(node.AttrVals))
+	copy(values, node.AttrVals)
+	return values
+}
+
+func AhdXMLChildrenData(class *AhdClass, data string) []string {
+	node := ahdXMLDecode(class, data)
+	if node.Kind != "Element" {
+		ahdXMLWrongKind(class, "children()", node.Kind)
+	}
+	result := make([]string, len(node.Children))
+	for index, child := range node.Children {
+		result[index] = ahdXMLEncode(child)
+	}
+	return result
+}
+
+func AhdXMLElementsData(class *AhdClass, data string) []string {
+	node := ahdXMLDecode(class, data)
+	if node.Kind != "Element" {
+		ahdXMLWrongKind(class, "elements()", node.Kind)
+	}
+	var result []string
+	for _, child := range node.Children {
+		if child.Kind == "Element" {
+			result = append(result, ahdXMLEncode(child))
+		}
+	}
+	return result
 }
