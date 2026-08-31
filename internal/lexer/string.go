@@ -87,7 +87,7 @@ func (l *lexer) scanString() {
 	l.emitSynthetic(token.StringEnd, l.position())
 }
 
-// scanRawString scans r"...", r'...', r"""...""", and r”'...”' literals.
+// scanRawString scans r"...", r'...', r"""...""", and r"'..."' literals.
 // A raw String has no escape processing and no interpolation: backslashes
 // and braces are ordinary characters, and the resulting value is copied
 // verbatim from source. The StringStart token's span is widened to start at

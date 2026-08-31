@@ -4583,8 +4583,8 @@ figure.show() -> Nothing
 
 `show()` renders to a unique temporary PNG in an AhdCode-specific temporary
 area and opens it with the platform's standard image-opening mechanism
-(`open` on macOS, `xdg-open` on Linux, the shell's `start` command on
-Windows), so inspecting a chart never requires manually saving and locating
+(`open` on macOS, `xdg-open` on Linux, Windows' file-association
+mechanism), so inspecting a chart never requires manually saving and locating
 a file. The temporary image is not automatically deleted, since the
 external viewer keeps reading it after `show()` returns. `show()` requires a
 desktop session; a headless environment fails cleanly with `PlotError`

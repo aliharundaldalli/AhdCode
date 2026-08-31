@@ -171,7 +171,7 @@ figure.show() -> Nothing
 
 `show()`, benzersiz bir geçici PNG'ye render eder ve onu platformun standart
 görüntü açma mekanizmasıyla açar (macOS'ta `open`, Linux'ta `xdg-open`,
-Windows'ta kabuğun `start` komutu); böylece bir grafiği incelemek asla elle
+Windows'ta dosya ilişkilendirme mekanizması); böylece bir grafiği incelemek asla elle
 kaydedip dosyayı bulmayı gerektirmez. Geçici görüntü, sistem geçici
 dizininin altındaki AhdCode'a özgü bir alanda yaşar; otomatik olarak
 silinmez, çünkü harici görüntüleyicinin `show()` döndükten sonra da onu

@@ -3984,6 +3984,14 @@ func ahdPlotRender(class *AhdClass, request ahdPlotRequest) {
 // image-opening mechanism, passing the path as an argument rather than
 // through a shell string. A short timeout keeps a headless environment (no
 // handler registered) from hanging.
+//
+// Windows deliberately does not go through "cmd /c start": cmd.exe re-scans
+// its whole command line for its own metacharacters (&, |, ^, %, and so on)
+// after argv-level quoting has already happened, so a path containing one of
+// those could be reinterpreted as shell syntax even though it arrived as a
+// single, properly quoted argument. rundll32's url.dll,FileProtocolHandler
+// entry point invokes the same file-association mechanism "start" uses,
+// without a cmd.exe shell in between.
 func ahdPlotOpenViewer(class *AhdClass, path string) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -3992,7 +4000,7 @@ func ahdPlotOpenViewer(class *AhdClass, path string) {
 	case "darwin":
 		command = exec.CommandContext(ctx, "open", path)
 	case "windows":
-		command = exec.CommandContext(ctx, "cmd", "/c", "start", "", path)
+		command = exec.CommandContext(ctx, "rundll32", "url.dll,FileProtocolHandler", path)
 	default:
 		command = exec.CommandContext(ctx, "xdg-open", path)
 	}
