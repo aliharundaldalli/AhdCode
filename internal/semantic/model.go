@@ -263,6 +263,13 @@ const (
 	WordDocumentHeadings   TypeOperation = "Document.headings"
 	WordDocumentTables     TypeOperation = "Document.tables"
 
+	PDFDocumentHeading   TypeOperation = "PDFDocument.heading"
+	PDFDocumentParagraph TypeOperation = "PDFDocument.paragraph"
+	PDFDocumentTable     TypeOperation = "PDFDocument.table"
+	PDFDocumentImage     TypeOperation = "PDFDocument.image"
+	PDFDocumentPageBreak TypeOperation = "PDFDocument.pageBreak"
+	PDFDocumentSave      TypeOperation = "PDFDocument.save"
+
 	ExcelWorkbookAddSheet   TypeOperation = "Workbook.addSheet"
 	ExcelWorkbookSheet      TypeOperation = "Workbook.sheet"
 	ExcelWorkbookWithSheet  TypeOperation = "Workbook.withSheet"

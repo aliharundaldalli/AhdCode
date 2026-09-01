@@ -28,9 +28,11 @@ type GeneratedProgram struct {
 }
 
 const (
-	programFileName      = "ahdcode_program.go"
-	runtimeFileName      = "ahdcode_runtime.go"
-	excelRuntimeFileName = "ahdcode_excel_runtime.go"
+	programFileName        = "ahdcode_program.go"
+	runtimeFileName        = "ahdcode_runtime.go"
+	excelRuntimeFileName   = "ahdcode_excel_runtime.go"
+	pdfRuntimeFileName     = "ahdcode_pdf_runtime.go"
+	archiveRuntimeFileName = "ahdcode_archive_runtime.go"
 )
 
 // storage describes the Go representation chosen for one IR symbol.
@@ -103,10 +105,20 @@ func Generate(compilation *ir.Compilation) (*GeneratedProgram, []diagnostics.Dia
 	if err != nil {
 		return nil, append(generator.diagnostics, backendError(CodeFormatFailure, "embedded Excel runtime source is not valid Go: "+err.Error(), source.Span{}, "the Excel backend runtime must remain gofmt-clean"))
 	}
+	pdfRuntime, err := format.Source([]byte(pdfRuntimeSource()))
+	if err != nil {
+		return nil, append(generator.diagnostics, backendError(CodeFormatFailure, "embedded PDF runtime source is not valid Go: "+err.Error(), source.Span{}, "the PDF backend runtime must remain gofmt-clean"))
+	}
+	archiveRuntime, err := format.Source([]byte(archiveRuntimeSource()))
+	if err != nil {
+		return nil, append(generator.diagnostics, backendError(CodeFormatFailure, "embedded Archive runtime source is not valid Go: "+err.Error(), source.Span{}, "the Archive backend runtime must remain gofmt-clean"))
+	}
 	return &GeneratedProgram{Files: []GeneratedFile{
 		{Name: programFileName, Content: string(formatted)},
 		{Name: runtimeFileName, Content: string(runtime)},
 		{Name: excelRuntimeFileName, Content: string(excelRuntime)},
+		{Name: pdfRuntimeFileName, Content: string(pdfRuntime)},
+		{Name: archiveRuntimeFileName, Content: string(archiveRuntime)},
 	}, RequiresLatex: generator.usesLatex, RequiresPlot: generator.usesPlot, RequiresNumeric: generator.usesNumeric}, generator.diagnostics
 }
 
@@ -117,6 +129,14 @@ func runtimeSource() string {
 
 func excelRuntimeSource() string {
 	return strings.Replace(ahdruntime.ExcelSource, "package ahdruntime", "package main", 1)
+}
+
+func pdfRuntimeSource() string {
+	return strings.Replace(ahdruntime.PDFSource, "package ahdruntime", "package main", 1)
+}
+
+func archiveRuntimeSource() string {
+	return strings.Replace(ahdruntime.ArchiveSource, "package ahdruntime", "package main", 1)
 }
 
 func (generator *generator) hasErrors() bool {
@@ -356,6 +376,7 @@ func (generator *generator) emitProgram() string {
 	generator.emitPlotHelpers(writer)
 	generator.emitNumericHelpers(writer)
 	generator.emitWordHelpers(writer)
+	generator.emitPDFHelpers(writer)
 	generator.emitExcelHelpers(writer)
 	generator.emitJSONValueHelpers(writer)
 	generator.emitXMLHelpers(writer)

@@ -14,3 +14,18 @@ var Source string
 //
 //go:embed excel.go
 var ExcelSource string
+
+// PDFSource is emitted as a separate generated Go file, the same way
+// ExcelSource is. It shares the Latex module's low-level renderer
+// (ahdLatexCompile and friends, in ahdruntime.go) but keeps its own document
+// model and LaTeX-body construction reviewable on their own.
+//
+//go:embed pdf.go
+var PDFSource string
+
+// ArchiveSource is emitted as a separate generated Go file, the same way
+// ExcelSource is. It depends only on the Go standard library's archive/zip,
+// archive/tar, and compress/gzip packages.
+//
+//go:embed archive.go
+var ArchiveSource string

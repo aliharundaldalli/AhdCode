@@ -85,6 +85,8 @@ var (
 	AhdClassEnvError            = &AhdClass{Name: "EnvError", Parent: AhdClassError}
 	AhdClassListsError          = &AhdClass{Name: "ListsError", Parent: AhdClassError}
 	AhdClassKeyValueError       = &AhdClass{Name: "KeyValueError", Parent: AhdClassError}
+	AhdClassPDFError            = &AhdClass{Name: "PDFError", Parent: AhdClassError}
+	AhdClassArchiveError        = &AhdClass{Name: "ArchiveError", Parent: AhdClassError}
 )
 
 // AhdInstance is every AhdCode Class instance. The generated interface of each
@@ -728,9 +730,27 @@ func AhdLatexTable(headers *AhdList[string], rows *AhdList[*AhdList[string]], ma
 	return result.String()
 }
 
-func AhdLatexPDF(source, output string) {
+// AhdLatexPDF compiles source to output, and -- when sourceOutput is "tex" --
+// additionally publishes an exact byte-for-byte sidecar of the caller's own
+// source String next to it. sourceOutput "" preserves the original
+// two-argument contract exactly: PDF only, never a sidecar. The sidecar is
+// only ever written after the PDF has already compiled, been verified, and
+// been atomically published, so a sidecar-write failure can never leave an
+// unpublished or half-published PDF, and a compile failure never touches
+// either destination.
+func AhdLatexPDF(source, output, sourceOutput string) {
 	if output == "" {
 		AhdRaiseClass(AhdClassValueError, "Latex.pdf output path must not be empty")
+	}
+	if sourceOutput != "" && sourceOutput != "tex" {
+		ahdLatexRaise(`Latex.pdf sourceOutput must be "" or "tex"`)
+	}
+	var texOutput string
+	if sourceOutput == "tex" {
+		if !strings.EqualFold(filepath.Ext(output), ".pdf") {
+			ahdLatexRaise(`Latex.pdf sourceOutput "tex" requires an output path ending in .pdf`)
+		}
+		texOutput = strings.TrimSuffix(output, filepath.Ext(output)) + ".tex"
 	}
 	directory, err := os.MkdirTemp("", "ahdcode-latex-source-*")
 	if err != nil {
@@ -748,7 +768,12 @@ func AhdLatexPDF(source, output string) {
 	if err := os.WriteFile(input, []byte(source), 0o600); err != nil {
 		ahdLatexRaise("could not write temporary LaTeX source: " + err.Error())
 	}
-	ahdLatexCompile(input, directory, output)
+	ahdLatexCompile(AhdClassLatexError, input, directory, output)
+	if texOutput != "" {
+		if err := ahdLatexPublishBytes([]byte(source), texOutput); err != nil {
+			ahdLatexRaise("could not write output TEX: " + err.Error())
+		}
+	}
 }
 
 func ahdLatexStageAssets(source, base, destination string) error {
@@ -818,26 +843,31 @@ func AhdLatexPDFFile(input, output string) {
 		}
 		ahdLatexRaise("could not read LaTeX input " + input + ": " + err.Error())
 	}
-	ahdLatexCompile(absolute, filepath.Dir(absolute), output)
+	ahdLatexCompile(AhdClassLatexError, absolute, filepath.Dir(absolute), output)
 }
 
-func ahdLatexCompile(input, workingDirectory, output string) {
+// ahdLatexCompile is the shared low-level PDF renderer: it invokes the staged
+// offline Tectonic engine and publishes its output atomically. Latex.pdf,
+// Latex.pdfFile, and the PDF module all funnel through this one function, each
+// passing its own catchable error class so a renderer failure surfaces as the
+// caller's own domain error rather than a hardcoded one.
+func ahdLatexCompile(class *AhdClass, input, workingDirectory, output string) {
 	engine, bundle, err := ahdLatexRuntime()
 	if err != nil {
-		ahdLatexRaise(err.Error())
+		AhdRaiseClass(class, err.Error())
 	}
 	temporary, err := os.MkdirTemp("", "ahdcode-latex-build-*")
 	if err != nil {
-		ahdLatexRaise("could not create a secure build directory: " + err.Error())
+		AhdRaiseClass(class, "could not create a secure build directory: "+err.Error())
 	}
 	defer os.RemoveAll(temporary)
 	outputDirectory := filepath.Join(temporary, "output")
 	cacheDirectory := filepath.Join(temporary, "cache")
 	if err := os.Mkdir(outputDirectory, 0o700); err != nil {
-		ahdLatexRaise("could not prepare temporary PDF output: " + err.Error())
+		AhdRaiseClass(class, "could not prepare temporary PDF output: "+err.Error())
 	}
 	if err := os.Mkdir(cacheDirectory, 0o700); err != nil {
-		ahdLatexRaise("could not prepare isolated Tectonic cache: " + err.Error())
+		AhdRaiseClass(class, "could not prepare isolated Tectonic cache: "+err.Error())
 	}
 
 	contextValue, cancel := context.WithTimeout(context.Background(), ahdLatexCompileTimeout)
@@ -851,23 +881,23 @@ func ahdLatexCompile(input, workingDirectory, output string) {
 	command.Stdout, command.Stderr = log, log
 	err = command.Run()
 	if contextValue.Err() == context.DeadlineExceeded {
-		ahdLatexRaise("compilation timed out after 30 seconds")
+		AhdRaiseClass(class, "compilation timed out after 30 seconds")
 	}
 	if err != nil {
 		message := ahdLatexDiagnostic(log.String())
 		if message == "" {
 			message = err.Error()
 		}
-		ahdLatexRaise("compilation failed: " + message)
+		AhdRaiseClass(class, "compilation failed: "+message)
 	}
 
 	base := strings.TrimSuffix(filepath.Base(input), filepath.Ext(input)) + ".pdf"
 	generated := filepath.Join(outputDirectory, base)
 	if err := ahdLatexVerifyPDF(generated); err != nil {
-		ahdLatexRaise("Tectonic did not produce a valid PDF: " + err.Error())
+		AhdRaiseClass(class, "Tectonic did not produce a valid PDF: "+err.Error())
 	}
 	if err := ahdLatexPublish(generated, output); err != nil {
-		ahdLatexRaise("could not write output PDF: " + err.Error())
+		AhdRaiseClass(class, "could not write output PDF: "+err.Error())
 	}
 }
 
@@ -981,7 +1011,25 @@ func ahdLatexVerifyPDF(path string) error {
 	return nil
 }
 
+// ahdLatexPublish and ahdLatexPublishBytes both publish through the same
+// same-directory-temp-file-then-rename core (ahdLatexPublishReader), so the
+// PDF path and the "tex" sidecar path share one atomic-publish guarantee:
+// each individual destination is only ever replaced once its new content is
+// fully written and durable.
 func ahdLatexPublish(generated, output string) error {
+	source, err := os.Open(generated)
+	if err != nil {
+		return err
+	}
+	defer source.Close()
+	return ahdLatexPublishReader(source, output)
+}
+
+func ahdLatexPublishBytes(data []byte, output string) error {
+	return ahdLatexPublishReader(bytes.NewReader(data), output)
+}
+
+func ahdLatexPublishReader(source io.Reader, output string) error {
 	absolute, err := filepath.Abs(output)
 	if err != nil {
 		return err
@@ -994,16 +1042,10 @@ func ahdLatexPublish(generated, output string) error {
 	temporaryPath := temporary.Name()
 	cleanup := func() { _ = os.Remove(temporaryPath) }
 	defer cleanup()
-	source, err := os.Open(generated)
-	if err != nil {
-		_ = temporary.Close()
-		return err
-	}
 	_, copyError := io.Copy(temporary, source)
-	closeSourceError := source.Close()
 	syncError := temporary.Sync()
 	closeError := temporary.Close()
-	for _, candidate := range []error{copyError, closeSourceError, syncError, closeError} {
+	for _, candidate := range []error{copyError, syncError, closeError} {
 		if candidate != nil {
 			return candidate
 		}

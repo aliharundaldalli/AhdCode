@@ -180,6 +180,10 @@ func (session *Session) builtin(identity ir.CallableID, receiver any, arguments 
 		return session.wordBuiltin(strings.TrimPrefix(name, "builtin:Word::"), values(arguments))
 	case strings.HasPrefix(name, "builtin:Excel::"):
 		return session.excelBuiltin(strings.TrimPrefix(name, "builtin:Excel::"), values(arguments))
+	case strings.HasPrefix(name, "builtin:PDF::"):
+		return session.pdfBuiltin(strings.TrimPrefix(name, "builtin:PDF::"), values(arguments))
+	case strings.HasPrefix(name, "builtin:Archive::"):
+		return session.archiveBuiltin(strings.TrimPrefix(name, "builtin:Archive::"), values(arguments))
 	case strings.HasPrefix(name, "builtin:JSON::"):
 		return session.jsonBuiltin(strings.TrimPrefix(name, "builtin:JSON::"), values(arguments))
 	case strings.HasPrefix(name, "builtin:XML::"):
@@ -312,6 +316,9 @@ func (session *Session) core(name string, receiver any, arguments []any) any {
 	}
 	if strings.HasPrefix(name, "Document.") {
 		return session.wordOperation(name, receiver, arguments)
+	}
+	if strings.HasPrefix(name, "PDFDocument.") {
+		return session.pdfOperation(name, receiver, arguments)
 	}
 	if strings.HasPrefix(name, "Workbook.") || strings.HasPrefix(name, "Sheet.") || strings.HasPrefix(name, "Cell.") ||
 		strings.HasPrefix(name, "Range.") || strings.HasPrefix(name, "CellStyle.") {

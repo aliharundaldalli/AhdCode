@@ -682,6 +682,9 @@ func (a *analyzer) analyzeCallWithCallee(call *ast.CallExpr, callee expressionIn
 			hint, supplied = wordConstructionHint(class.Symbol)
 		}
 		if !supplied {
+			hint, supplied = pdfConstructionHint(class.Symbol)
+		}
+		if !supplied {
 			hint, supplied = excelConstructionHint(class.Symbol)
 		}
 		if !supplied {
@@ -776,6 +779,9 @@ func typeOperationFor(receiver types.Type, name string) (TypeOperation, bool) {
 			return operation, true
 		}
 		if operation, ok := wordOperationFor(receiver, name); ok {
+			return operation, true
+		}
+		if operation, ok := pdfOperationFor(receiver, name); ok {
 			return operation, true
 		}
 		if operation, ok := excelOperationFor(receiver, name); ok {
@@ -992,6 +998,9 @@ func (a *analyzer) analyzeTypeOperation(call *ast.CallExpr, member *ast.MemberEx
 	if shape, isWord := wordOperationShapes()[operation]; isWord {
 		return a.analyzeWordOperation(call, operation, shape, current, flow), true
 	}
+	if shape, isPDF := pdfOperationShapes()[operation]; isPDF {
+		return a.analyzePDFOperation(call, operation, shape, current, flow), true
+	}
 	if shape, isExcel := excelOperationShapes()[operation]; isExcel {
 		return a.analyzeExcelOperation(call, operation, shape, current, flow), true
 	}
@@ -1049,6 +1058,9 @@ func typeOperationFailure(operation TypeOperation, receiver types.Type) expressi
 		return expressionInfo{typeValue: plotChartType(), nullState: NonNull}
 	}
 	if shape, known := wordOperationShapes()[operation]; known {
+		return expressionInfo{typeValue: shape.result, nullState: NonNull}
+	}
+	if shape, known := pdfOperationShapes()[operation]; known {
 		return expressionInfo{typeValue: shape.result, nullState: NonNull}
 	}
 	if shape, known := excelOperationShapes()[operation]; known {
@@ -1113,6 +1125,9 @@ func typeOperationHint(operation TypeOperation, receiver types.Type) string {
 		return "pass an x List, a y List, and a String label"
 	}
 	if shape, known := wordOperationShapes()[operation]; known {
+		return shape.hint
+	}
+	if shape, known := pdfOperationShapes()[operation]; known {
 		return shape.hint
 	}
 	if shape, known := excelOperationShapes()[operation]; known {

@@ -106,6 +106,16 @@ func LowerCompilation(compilation module.CompilationResult) Result {
 					excelModule(ir.ModuleID(current.ID), current.Source.Name, current.Source.Path))
 				continue
 			}
+			if string(current.ID) == PDFModuleID {
+				result.Modules = append(result.Modules,
+					pdfModule(ir.ModuleID(current.ID), current.Source.Name, current.Source.Path))
+				continue
+			}
+			if string(current.ID) == ArchiveModuleID {
+				result.Modules = append(result.Modules,
+					archiveModule(ir.ModuleID(current.ID), current.Source.Name, current.Source.Path))
+				continue
+			}
 			if string(current.ID) == JSONModuleID {
 				result.Modules = append(result.Modules,
 					jsonModule(ir.ModuleID(current.ID), current.Source.Name, current.Source.Path))

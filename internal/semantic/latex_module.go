@@ -43,7 +43,8 @@ func latexModuleInterface() *ModuleInterface {
 
 	stringParameter := func(name string) types.Parameter { return types.Parameter{Name: name, Type: types.String} }
 	add(latexFunction("pdf", latexSignature(types.Nothing,
-		stringParameter("source"), stringParameter("output"))))
+		stringParameter("source"), stringParameter("output"),
+		types.Parameter{Name: "sourceOutput", Type: types.String, HasDefault: true})))
 	add(latexFunction("pdfFile", latexSignature(types.Nothing,
 		stringParameter("input"), stringParameter("output"))))
 	for _, name := range []string{"escape", "chapter", "section", "subsection", "center", "ref", "cite"} {

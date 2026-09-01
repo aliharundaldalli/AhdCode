@@ -26,7 +26,7 @@ func (generator *generator) latexCall(value *ir.CallExpr) string {
 	}
 	switch name {
 	case "pdf":
-		return "AhdLatexPDF(" + argument(0) + ", " + argument(1) + ")"
+		return "AhdLatexPDF(" + argument(0) + ", " + argument(1) + ", " + argument(2) + ")"
 	case "pdfFile":
 		return "AhdLatexPDFFile(" + argument(0) + ", " + argument(1) + ")"
 	case "escape":
