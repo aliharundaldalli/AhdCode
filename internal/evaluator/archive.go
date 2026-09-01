@@ -4,9 +4,20 @@ package evaluator
 // are ordinary file-system writes (no external process, no offline-renderer
 // staging concern), so unlike Latex.pdf/PDFDocument.save, these run for real
 // in the interactive evaluator: it imports ahdruntime and calls the exact
-// same AhdArchive* functions the native backend does, so the two paths can
-// never diverge in behavior.
-
+// same ArchiveZip/Tar/TarGzip core the native backend's AhdArchiveZip/Tar/
+// TarGzip wrappers call, so the two paths can never diverge in validation,
+// ordering, or writing behavior.
+//
+// That shared core reports failure by returning a Go error rather than by
+// panicking (unlike the AhdArchiveZip/Tar/TarGzip wrappers themselves, which
+// exist only for generated native programs and raise via the panic-based
+// ahdruntime.AhdRaiseClass -- a mechanism that requires the generated
+// program's own error-class registration, which the REPL never runs). Here,
+// the evaluator converts that returned error into its own catchable
+// ArchiveError with s.raise, exactly like every other module's evaluator
+// builtin does. It must not call the panicking AhdArchive* wrappers
+// directly: doing so previously let a Go panic escape the evaluator's own
+// error boundary instead of becoming a catchable AhdCode error.
 import (
 	"ahdcode/internal/backend/golang/ahdruntime"
 )
@@ -16,13 +27,17 @@ func (s *Session) archiveBuiltin(name string, args []any) any {
 	case "zip", "tar", "tarGzip":
 		output := args[0].(string)
 		entries := s.archivePairFrom(args[1])
+		var err error
 		switch name {
 		case "zip":
-			ahdruntime.AhdArchiveZip(output, entries)
+			err = ahdruntime.ArchiveZip(output, entries)
 		case "tar":
-			ahdruntime.AhdArchiveTar(output, entries)
+			err = ahdruntime.ArchiveTar(output, entries)
 		case "tarGzip":
-			ahdruntime.AhdArchiveTarGzip(output, entries)
+			err = ahdruntime.ArchiveTarGzip(output, entries)
+		}
+		if err != nil {
+			s.raise("ArchiveError", err.Error())
 		}
 		return Nothing
 	}

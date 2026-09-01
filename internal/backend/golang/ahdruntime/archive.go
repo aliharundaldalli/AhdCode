@@ -63,37 +63,46 @@ func ahdArchiveValidateMemberName(name string) error {
 // expansion step that could create new ones, so a member-name collision is
 // structurally unreachable here; the check below documents that invariant
 // rather than papering over a real gap.
-func ahdArchiveEntries(absoluteOutput string, entries *AhdPair[string, string]) []ahdArchiveEntry {
+//
+// This returns a Go error instead of raising directly, so the identical
+// validation logic backs both the panicking native wrapper (AhdArchiveZip
+// and friends, via ahdArchiveRaise) and the persistent evaluator's own
+// catchable-error path, without duplicating a second implementation of any
+// of these checks. entries.require() is the one exception: a null Pair
+// reaching here would mean AhdCode's own static non-null typing was
+// violated, which is a genuine host defect, not a normal Archive failure --
+// it still panics.
+func ahdArchiveEntries(absoluteOutput string, entries *AhdPair[string, string]) ([]ahdArchiveEntry, error) {
 	entries.require()
 	seen := make(map[string]bool, len(entries.keys))
 	result := make([]ahdArchiveEntry, 0, len(entries.keys))
 	for _, member := range entries.keys {
 		if err := ahdArchiveValidateMemberName(member); err != nil {
-			ahdArchiveRaise(err.Error())
+			return nil, err
 		}
 		if seen[member] {
-			ahdArchiveRaise("duplicate archive member name " + strconv.Quote(member))
+			return nil, fmt.Errorf("duplicate archive member name %s", strconv.Quote(member))
 		}
 		seen[member] = true
 		source := entries.values[member]
 		info, err := os.Lstat(source)
 		if err != nil {
-			ahdArchiveRaise("could not read archive source " + strconv.Quote(source) + ": " + err.Error())
+			return nil, fmt.Errorf("could not read archive source %s: %w", strconv.Quote(source), err)
 		}
 		if info.Mode()&os.ModeSymlink != 0 {
-			ahdArchiveRaise("archive source " + strconv.Quote(source) +
-				" is a symbolic link; v0.1.20 rejects symlink sources rather than following them")
+			return nil, fmt.Errorf("archive source %s is a symbolic link; v0.1.20 rejects symlink sources rather than following them",
+				strconv.Quote(source))
 		}
 		if !info.Mode().IsRegular() {
-			ahdArchiveRaise("archive source " + strconv.Quote(source) +
-				" is not a regular file; v0.1.20 Archive accepts regular files only")
+			return nil, fmt.Errorf("archive source %s is not a regular file; v0.1.20 Archive accepts regular files only",
+				strconv.Quote(source))
 		}
 		if absoluteSource, err := filepath.Abs(source); err == nil && absoluteSource == absoluteOutput {
-			ahdArchiveRaise("archive source " + strconv.Quote(source) + " must not be the destination archive itself")
+			return nil, fmt.Errorf("archive source %s must not be the destination archive itself", strconv.Quote(source))
 		}
 		result = append(result, ahdArchiveEntry{Member: member, Source: source})
 	}
-	return result
+	return result, nil
 }
 
 func ahdArchiveWriteZIP(entries []ahdArchiveEntry, destination io.Writer) error {
@@ -151,62 +160,93 @@ func ahdArchiveWriteTARGzip(entries []ahdArchiveEntry, destination io.Writer) er
 // ahdArchiveBuild writes the whole archive into a same-directory temporary
 // file, then atomically renames it over the destination -- the same
 // build-then-rename pattern excelAtomicWrite already uses for XLSX. A failed
-// build never touches an existing valid archive.
-func ahdArchiveBuild(output string, entries *AhdPair[string, string], write func([]ahdArchiveEntry, io.Writer) error) {
+// build never touches an existing valid archive. It returns a Go error
+// rather than raising directly, for the same shared-core reason
+// ahdArchiveEntries does.
+func ahdArchiveBuild(output string, entries *AhdPair[string, string], write func([]ahdArchiveEntry, io.Writer) error) error {
 	absolute, err := filepath.Abs(output)
 	if err != nil {
-		ahdArchiveRaise("could not resolve destination path: " + err.Error())
+		return fmt.Errorf("could not resolve destination path: %w", err)
 	}
-	resolved := ahdArchiveEntries(absolute, entries)
+	resolved, err := ahdArchiveEntries(absolute, entries)
+	if err != nil {
+		return err
+	}
 	directory := filepath.Dir(absolute)
 	temporary, err := os.CreateTemp(directory, ".ahdcode-archive-output-*")
 	if err != nil {
-		ahdArchiveRaise("could not create a secure temporary file: " + err.Error())
+		return fmt.Errorf("could not create a secure temporary file: %w", err)
 	}
 	temporaryPath := temporary.Name()
 	defer func() { _ = os.Remove(temporaryPath) }()
 	if err := temporary.Chmod(0o644); err != nil {
 		_ = temporary.Close()
-		ahdArchiveRaise("could not prepare the atomic output file: " + err.Error())
+		return fmt.Errorf("could not prepare the atomic output file: %w", err)
 	}
 	writeErr := write(resolved, temporary)
 	syncErr := temporary.Sync()
 	closeErr := temporary.Close()
 	if writeErr != nil {
-		ahdArchiveRaise("could not write archive: " + writeErr.Error())
+		return fmt.Errorf("could not write archive: %w", writeErr)
 	}
 	if syncErr != nil {
-		ahdArchiveRaise("could not write archive: " + syncErr.Error())
+		return fmt.Errorf("could not write archive: %w", syncErr)
 	}
 	if closeErr != nil {
-		ahdArchiveRaise("could not write archive: " + closeErr.Error())
+		return fmt.Errorf("could not write archive: %w", closeErr)
 	}
 	if err := os.Rename(temporaryPath, absolute); err != nil {
-		ahdArchiveRaise("could not atomically replace the destination archive: " + err.Error())
+		return fmt.Errorf("could not atomically replace the destination archive: %w", err)
 	}
+	return nil
 }
 
 func ahdArchiveHasTarGzipExtension(output string) bool {
 	return strings.HasSuffix(strings.ToLower(output), ".tar.gz")
 }
 
-func AhdArchiveZip(output string, entries *AhdPair[string, string]) {
+// ArchiveZip, ArchiveTar, and ArchiveTarGzip are the shared, non-panicking
+// Archive core: every validation, path-safety, ordering, writing, and
+// atomic-publication rule lives here exactly once. AhdArchiveZip/Tar/TarGzip
+// below (native codegen) and the persistent evaluator's Archive builtin both
+// call these and convert the returned error into their own error mechanism,
+// so the two execution paths can never validate or write archives
+// differently from each other.
+func ArchiveZip(output string, entries *AhdPair[string, string]) error {
 	if !strings.EqualFold(filepath.Ext(output), ".zip") {
-		ahdArchiveRaise("Archive.zip destination must use the .zip extension")
+		return fmt.Errorf("Archive.zip destination must use the .zip extension")
 	}
-	ahdArchiveBuild(output, entries, ahdArchiveWriteZIP)
+	return ahdArchiveBuild(output, entries, ahdArchiveWriteZIP)
+}
+
+func ArchiveTar(output string, entries *AhdPair[string, string]) error {
+	if !strings.EqualFold(filepath.Ext(output), ".tar") {
+		return fmt.Errorf("Archive.tar destination must use the .tar extension")
+	}
+	return ahdArchiveBuild(output, entries, ahdArchiveWriteTAR)
+}
+
+func ArchiveTarGzip(output string, entries *AhdPair[string, string]) error {
+	if !ahdArchiveHasTarGzipExtension(output) {
+		return fmt.Errorf("Archive.tarGzip destination must use the .tar.gz extension")
+	}
+	return ahdArchiveBuild(output, entries, ahdArchiveWriteTARGzip)
+}
+
+func AhdArchiveZip(output string, entries *AhdPair[string, string]) {
+	if err := ArchiveZip(output, entries); err != nil {
+		ahdArchiveRaise(err.Error())
+	}
 }
 
 func AhdArchiveTar(output string, entries *AhdPair[string, string]) {
-	if !strings.EqualFold(filepath.Ext(output), ".tar") {
-		ahdArchiveRaise("Archive.tar destination must use the .tar extension")
+	if err := ArchiveTar(output, entries); err != nil {
+		ahdArchiveRaise(err.Error())
 	}
-	ahdArchiveBuild(output, entries, ahdArchiveWriteTAR)
 }
 
 func AhdArchiveTarGzip(output string, entries *AhdPair[string, string]) {
-	if !ahdArchiveHasTarGzipExtension(output) {
-		ahdArchiveRaise("Archive.tarGzip destination must use the .tar.gz extension")
+	if err := ArchiveTarGzip(output, entries); err != nil {
+		ahdArchiveRaise(err.Error())
 	}
-	ahdArchiveBuild(output, entries, ahdArchiveWriteTARGzip)
 }

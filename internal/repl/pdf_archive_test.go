@@ -100,3 +100,97 @@ write("archived")
 		}
 	}
 }
+
+// TestArchiveErrorIsCatchableInThePersistentREPL is the regression test for
+// the bug where an Archive validation/I/O failure escaped the REPL as an
+// unrecoverable Go panic instead of a catchable ArchiveError. This is the
+// most important case: real AhdCode source using attempt/except must catch
+// it, print the caught message, and leave the session alive for the next
+// submission -- no panic, no crashed process.
+func TestArchiveErrorIsCatchableInThePersistentREPL(t *testing.T) {
+	program := `bring Archive
+from Archive bring ArchiveError
+
+attempt {
+    files: Local Pair<String, String> := {
+        "missing.txt": "definitely-missing.txt"
+    }
+
+    Archive.zip("out.zip", files)
+}
+except ArchiveError as error {
+    write("CAUGHT: {error.message}")
+}
+
+write("REPL STILL ALIVE")
+`
+	var output, errorOutput bytes.Buffer
+	Run(strings.NewReader(program), &output, &errorOutput, "AhdCode v0.1.19")
+	if errorOutput.Len() != 0 {
+		t.Fatalf("REPL errors: %s", errorOutput.String())
+	}
+	if !strings.Contains(output.String(), "CAUGHT:") {
+		t.Fatalf("REPL output missing the caught ArchiveError:\n%s", output.String())
+	}
+	if !strings.Contains(output.String(), "REPL STILL ALIVE") {
+		t.Fatalf("REPL did not remain usable after the caught error:\n%s", output.String())
+	}
+}
+
+// TestArchiveWrongExtensionErrorIsCatchableInThePersistentREPL exercises a
+// second Archive failure category (wrong destination extension, rather than
+// a missing source) through the same attempt/except path, to confirm the fix
+// is not narrowly specific to one validation error.
+func TestArchiveWrongExtensionErrorIsCatchableInThePersistentREPL(t *testing.T) {
+	directory := t.TempDir()
+	sourcePath := filepath.Join(directory, "a.txt")
+	if err := os.WriteFile(sourcePath, []byte("data"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	program := `bring Archive
+from Archive bring ArchiveError
+
+attempt {
+    files: Local Pair<String, String> := {"a.txt": ` + strconv.Quote(sourcePath) + `}
+    Archive.zip("out.tar", files)
+}
+except ArchiveError as error {
+    write("CAUGHT: {error.message}")
+}
+
+write("REPL STILL ALIVE")
+`
+	var output, errorOutput bytes.Buffer
+	Run(strings.NewReader(program), &output, &errorOutput, "AhdCode v0.1.19")
+	if errorOutput.Len() != 0 {
+		t.Fatalf("REPL errors: %s", errorOutput.String())
+	}
+	if !strings.Contains(output.String(), "CAUGHT:") {
+		t.Fatalf("REPL output missing the caught ArchiveError:\n%s", output.String())
+	}
+	if !strings.Contains(output.String(), "REPL STILL ALIVE") {
+		t.Fatalf("REPL did not remain usable after the caught error:\n%s", output.String())
+	}
+}
+
+// TestUncaughtArchiveErrorLeavesThePersistentREPLAlive checks the other half
+// of the fix: an ArchiveError that is NOT caught by the program must become
+// the evaluator's normal RuntimeError/REPL error output rather than a panic,
+// and the session must remain alive to run a subsequent submission --
+// mirroring how every other module's uncaught error already behaves.
+func TestUncaughtArchiveErrorLeavesThePersistentREPLAlive(t *testing.T) {
+	program := `bring Archive
+files: Pair<String, String> := {"missing.txt": "definitely-missing.txt"}
+Archive.zip("out.zip", files)
+write("after uncaught error")
+`
+	var output, errorOutput bytes.Buffer
+	Run(strings.NewReader(program), &output, &errorOutput, "AhdCode v0.1.19")
+	if !strings.Contains(errorOutput.String(), "ArchiveError") {
+		t.Fatalf("expected an uncaught ArchiveError in the REPL error output: %s", errorOutput.String())
+	}
+	if !strings.Contains(output.String(), "after uncaught error") {
+		t.Fatalf("REPL session did not survive the uncaught error and run the next statement:\noutput=%s\nerrors=%s",
+			output.String(), errorOutput.String())
+	}
+}

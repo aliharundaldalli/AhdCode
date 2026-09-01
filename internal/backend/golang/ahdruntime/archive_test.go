@@ -363,7 +363,9 @@ func TestArchiveFailedBuildPreservesExistingDestination(t *testing.T) {
 func TestArchiveDuplicateMemberNameRejected(t *testing.T) {
 	// Pair itself guarantees unique keys, so this exercises the defensive
 	// check directly rather than via the public API (which cannot construct
-	// a colliding Pair in the first place).
+	// a colliding Pair in the first place). ahdArchiveEntries is the shared,
+	// non-panicking core, so this checks the returned error directly rather
+	// than expecting a panic.
 	directory := t.TempDir()
 	path := archiveTestSourceFile(t, directory, "a.txt", "a")
 	output := filepath.Join(directory, "out.zip")
@@ -374,5 +376,85 @@ func TestArchiveDuplicateMemberNameRejected(t *testing.T) {
 	pair := archiveTestPair("a.txt", path)
 	pair.keys = append(pair.keys, "a.txt")
 	pair.values["a.txt"] = path
-	expectRaise(t, AhdClassArchiveError, func() { ahdArchiveEntries(absolute, pair) })
+	if _, err := ahdArchiveEntries(absolute, pair); err == nil {
+		t.Fatal("expected a duplicate-member error")
+	}
+}
+
+// TestArchiveCoreReturnsErrorsInsteadOfPanicking proves ArchiveZip/Tar/
+// TarGzip -- the shared core the evaluator now calls directly -- report every
+// documented failure category as a returned Go error rather than a panic,
+// while the success path through that same core still works.
+func TestArchiveCoreReturnsErrorsInsteadOfPanicking(t *testing.T) {
+	directory := t.TempDir()
+	path := archiveTestSourceFile(t, directory, "a.txt", "a")
+	entries := archiveTestPair("a.txt", path)
+
+	if err := ArchiveZip(filepath.Join(directory, "out.tar"), entries); err == nil {
+		t.Fatal("expected a wrong-extension error")
+	}
+	if err := ArchiveZip(filepath.Join(directory, "out.zip"), archiveTestPair("a.txt", filepath.Join(directory, "missing.txt"))); err == nil {
+		t.Fatal("expected a missing-source error")
+	}
+	if err := ArchiveZip(filepath.Join(directory, "out.zip"), archiveTestPair("../escape", path)); err == nil {
+		t.Fatal("expected an unsafe-member-path error")
+	}
+	if err := ArchiveTar(filepath.Join(directory, "out.tar.gz"), entries); err == nil {
+		t.Fatal("expected a wrong-extension error for Archive.tar")
+	}
+	if err := ArchiveTarGzip(filepath.Join(directory, "out.tgz"), entries); err == nil {
+		t.Fatal("expected a wrong-extension error for Archive.tarGzip")
+	}
+
+	link := filepath.Join(directory, "link.txt")
+	if err := os.Symlink(path, link); err != nil {
+		t.Skipf("could not create a symlink to test against: %v", err)
+	}
+	if err := ArchiveZip(filepath.Join(directory, "out.zip"), archiveTestPair("link.txt", link)); err == nil {
+		t.Fatal("expected a symlink-source error")
+	}
+
+	// The success path must still work through the same core.
+	if err := ArchiveZip(filepath.Join(directory, "ok.zip"), entries); err != nil {
+		t.Fatalf("unexpected error on the success path: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(directory, "ok.zip")); err != nil {
+		t.Fatalf("success path did not write a real archive: %v", err)
+	}
+}
+
+// TestArchiveNativeWrapperRaisesTheSameMessageTheCoreReturns proves the
+// panicking native wrapper (AhdArchiveZip, used by generated programs) and
+// the error-returning core (ArchiveZip, used directly by the evaluator) stay
+// in lockstep: one always raises exactly the message the other returns, so
+// native and REPL Archive failures can never drift apart.
+func TestArchiveNativeWrapperRaisesTheSameMessageTheCoreReturns(t *testing.T) {
+	directory := t.TempDir()
+	output := filepath.Join(directory, "out.zip")
+	entries := archiveTestPair("a.txt", filepath.Join(directory, "missing.txt"))
+
+	coreErr := ArchiveZip(output, entries)
+	if coreErr == nil {
+		t.Fatal("expected the shared core to return an error")
+	}
+
+	var raisedMessage string
+	func() {
+		defer func() {
+			recovered := recover()
+			signal, ok := recovered.(*AhdSignal)
+			if !ok {
+				t.Fatalf("expected an AhdSignal; received %v", recovered)
+			}
+			if signal.Instance.AhdClassOf() != AhdClassArchiveError {
+				t.Fatalf("expected ArchiveError; received %s", signal.Instance.AhdClassOf().Name)
+			}
+			raisedMessage = signal.Message
+		}()
+		AhdArchiveZip(output, entries)
+	}()
+
+	if raisedMessage != coreErr.Error() {
+		t.Fatalf("native raise message %q != core error message %q", raisedMessage, coreErr.Error())
+	}
 }
