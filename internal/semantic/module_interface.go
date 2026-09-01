@@ -63,6 +63,7 @@ func cloneInterfaceSymbol(symbol *Symbol, memo map[*Symbol]*Symbol) *Symbol {
 		InitialNull: symbol.InitialNull, Class: symbol.Class,
 		OwnerClass: symbol.OwnerClass, OriginModuleID: symbol.OriginModuleID,
 		ConstValue: cloneConstant(symbol.ConstValue), BuiltinLiteral: symbol.BuiltinLiteral,
+		ModuleOperation: symbol.ModuleOperation,
 	}
 	memo[symbol] = cloned
 	cloned.Callable = cloneCallable(symbol.Callable)

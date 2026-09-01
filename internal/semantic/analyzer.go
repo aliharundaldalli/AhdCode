@@ -47,6 +47,11 @@ type analyzer struct {
 	// reportedPairKeys keeps one invalid Pair key diagnostic per type
 	// reference, because a declaration's type is resolved more than once.
 	reportedPairKeys map[source.Span]bool
+	// calleeExpressions marks the expressions analyzed as the callee of a
+	// call. A type-directed module operation is valid only there: everywhere
+	// else it would have to become an unspecialized Function value, which
+	// AhdCode has no representation for.
+	calleeExpressions map[ast.Expr]bool
 }
 
 // Analyzer is the reusable parser.Result -> semantic.Result entry point.
@@ -82,7 +87,8 @@ func analyzeWithEnvironment(parsed parser.Result, environment Environment) Resul
 		functionOwner: make(map[*ast.FunctionDecl]*Symbol),
 		flow:          make(flowState),
 
-		reportedPairKeys: make(map[source.Span]bool),
+		reportedPairKeys:  make(map[source.Span]bool),
+		calleeExpressions: make(map[ast.Expr]bool),
 	}
 	a.result.ResolvedSymbols = make(map[ast.Node]*Symbol)
 	a.result.ExpressionTypes = make(map[ast.Expr]types.Type)
@@ -93,6 +99,7 @@ func analyzeWithEnvironment(parsed parser.Result, environment Environment) Resul
 	a.result.OverloadResolutions = make(map[*ast.CallExpr]ResolutionTrace)
 	a.result.SuperCalls = make(map[ast.Expr]bool)
 	a.result.TypeOperations = make(map[*ast.CallExpr]TypeOperation)
+	a.result.ModuleOperations = make(map[*ast.CallExpr]ModuleOperation)
 	a.module = newScope(nil, moduleScope)
 	a.installBuiltins()
 	if parsed.Program == nil {

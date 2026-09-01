@@ -135,7 +135,14 @@ type Symbol struct {
 	// of a compiler-supplied Constant. It lets lowering materialize standard
 	// module constants without inventing filesystem-backed storage.
 	BuiltinLiteral string
-	inference      *functionInference
+	// ModuleOperation names the compiler-supplied, type-directed standard
+	// module function this symbol denotes. Such a function has no single fixed
+	// signature: its result type is computed from the statically known
+	// argument types at each call site (see ModuleOperation). It is empty for
+	// every ordinary symbol, including the fixed-signature standard module
+	// functions built by standardFunction.
+	ModuleOperation ModuleOperation
+	inference       *functionInference
 }
 
 // ModuleInterface is an in-memory, compile-time-only public contract. Identity
@@ -401,6 +408,42 @@ const (
 	XMLDocumentRoot TypeOperation = "XMLDocument.root"
 )
 
+// ModuleOperation is one compiler-supplied standard module function whose
+// result type is computed from the statically known argument types at each
+// call site, rather than declared once as a fixed types.Signature.
+//
+// It is the module-function counterpart of TypeOperation: a TypeOperation is
+// selected by a receiver's static type after a dot, while a ModuleOperation is
+// selected by the resolved module symbol and then specialized against its
+// arguments. Both stay entirely inside the compiler: every call site still
+// resolves to one exact concrete type, so no Any, dynamic, or erased Object
+// representation exists anywhere in the public semantic types.
+type ModuleOperation string
+
+const (
+	// The Lists standard module. Every operation is a pure structural
+	// transformation of a List: the source List is never modified, and each
+	// returned List is a new structural collection over the same element
+	// references.
+	//
+	// ListsChunk splits a List into consecutive Lists of at most one size.
+	ListsChunk ModuleOperation = "Lists.chunk"
+	// ListsFlatten concatenates a List of Lists, exactly one level deep.
+	ListsFlatten ModuleOperation = "Lists.flatten"
+	// ListsTranspose exchanges the rows and columns of a rectangular List of
+	// Lists. Ragged input is a ListsError, never a silent repair.
+	ListsTranspose ModuleOperation = "Lists.transpose"
+	// ListsUnique keeps the first occurrence of each distinct element, using
+	// ordinary AhdCode == equality.
+	ListsUnique ModuleOperation = "Lists.unique"
+	// ListsValueCounts counts equal elements into a Pair keyed by the element,
+	// in first-occurrence order.
+	ListsValueCounts ModuleOperation = "Lists.valueCounts"
+	// ListsGroupBy partitions elements into Lists keyed by a key Function, in
+	// first-key-occurrence order.
+	ListsGroupBy ModuleOperation = "Lists.groupBy"
+)
+
 // listOperationMutates reports whether one List operation rewrites its
 // receiver, so the Constant rules apply to it.
 func listOperationMutates(operation TypeOperation) bool {
@@ -442,6 +485,12 @@ type Result struct {
 	// TypeOperations records the built-in String, List, and Pair operations,
 	// so lowering never has to rediscover them from member names.
 	TypeOperations map[*ast.CallExpr]TypeOperation
+	// ModuleOperations records the type-directed standard module calls, so a
+	// consumer can see which operation a call selected without re-deriving it
+	// from the resolved symbol. Lowering reads the specialized signature from
+	// SelectedCallables instead, and identifies the operation by the stable
+	// builtin CallableID.
+	ModuleOperations map[*ast.CallExpr]ModuleOperation
 	// LambdaExpressions preserves source order for deterministic lowering into
 	// the existing Function IR/runtime representation.
 	LambdaExpressions []*ast.LambdaExpr

@@ -314,6 +314,10 @@ func (a *analyzer) analyzeIdentifier(identifier *ast.IdentifierExpr, current *sc
 	if symbol.Kind == ClassSymbol {
 		typeValue = types.Class{Symbol: symbol.Class, Reference: true}
 	}
+	if operation, known := moduleOperationOf(symbol); known && !a.calleeExpressions[identifier] {
+		a.rejectModuleOperationValue(operation, identifier.Span())
+		typeValue = types.Invalid
+	}
 	constant := symbol.ConstValue
 	return expressionInfo{typeValue: typeValue, nullState: flow.state(symbol), symbol: symbol, constant: constant}
 }
@@ -612,6 +616,9 @@ func (a *analyzer) analyzeFunctionValueIdentifier(identifier *ast.IdentifierExpr
 }
 
 func (a *analyzer) analyzeCallExpected(call *ast.CallExpr, current *scope, flow flowState, expected types.Type) expressionInfo {
+	// A type-directed module operation is specialized against the arguments
+	// written at this call site, so it is legal here and nowhere else.
+	a.calleeExpressions[call.Callee] = true
 	if member, ok := call.Callee.(*ast.MemberExpr); ok {
 		// A member receiver is analyzed exactly once. Its statically known type
 		// decides whether the call is a built-in type operation or an ordinary
@@ -642,6 +649,13 @@ func (a *analyzer) analyzeCallWithCallee(call *ast.CallExpr, callee expressionIn
 		// an already-invalid callee is also non-callable.
 		a.analyzeCallArguments(call, current, flow, nil)
 		return expressionInfo{typeValue: types.Invalid, nullState: MaybeNull}
+	}
+	// A type-directed standard module function has no single declared
+	// signature; its exact concrete one is computed from this call's argument
+	// types. Both Lists.chunk(...) and an imported chunk(...) arrive here with
+	// the same resolved module symbol, so one dispatch covers both spellings.
+	if operation, known := moduleOperationOf(callee.symbol); known {
+		return a.analyzeModuleOperation(call, operation, current, flow)
 	}
 	// Only the built-in Fundamentals functions use the builtin call path; a
 	// built-in Class is constructed like any other Class.
@@ -1838,6 +1852,10 @@ func (a *analyzer) analyzeMemberOf(member *ast.MemberExpr, object expressionInfo
 		typeValue := resolved.Type
 		if resolved.Kind == ClassSymbol {
 			typeValue = types.Class{Symbol: resolved.Class, Reference: true}
+		}
+		if operation, known := moduleOperationOf(resolved); known && !a.calleeExpressions[member] {
+			a.rejectModuleOperationValue(operation, member.Span())
+			typeValue = types.Invalid
 		}
 		return expressionInfo{typeValue: typeValue, nullState: resolved.InitialNull, symbol: resolved}
 	}

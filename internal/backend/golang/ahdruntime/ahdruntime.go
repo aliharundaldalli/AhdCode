@@ -82,6 +82,7 @@ var (
 	AhdClassJSONError           = &AhdClass{Name: "JSONError", Parent: AhdClassError}
 	AhdClassXMLError            = &AhdClass{Name: "XMLError", Parent: AhdClassError}
 	AhdClassEnvError            = &AhdClass{Name: "EnvError", Parent: AhdClassError}
+	AhdClassListsError          = &AhdClass{Name: "ListsError", Parent: AhdClassError}
 )
 
 // AhdInstance is every AhdCode Class instance. The generated interface of each
@@ -7669,4 +7670,125 @@ func AhdEnvLoad(class *AhdClass, path string, override bool) {
 			AhdRaiseClass(class, "could not set the environment variable")
 		}
 	}
+}
+
+// ---------------------------------------------------------------------------
+// Lists and KeyValue: pure structural collection transformations
+//
+// Every helper below reads its source List/Pair and builds a new structural
+// collection; none mutates a source, so a Constant collection may be passed
+// safely. The transformation is shallow: element and value references are
+// carried over unchanged, never deep-copied.
+// ---------------------------------------------------------------------------
+
+// AhdListsChunk splits a List into consecutive Lists of at most size elements.
+// The final chunk is short rather than padded, and every returned inner List
+// is a new List over the same element references.
+func AhdListsChunk[T any](class *AhdClass, values *AhdList[T], size int64) *AhdList[*AhdList[T]] {
+	values.require()
+	if size <= 0 {
+		AhdRaiseClass(class, "chunk requires a size greater than zero; received "+strconv.FormatInt(size, 10))
+	}
+	result := AhdNewList[*AhdList[T]]()
+	length := int64(len(values.items))
+	for start := int64(0); start < length; start += size {
+		end := start + size
+		if end > length || end < start {
+			end = length
+		}
+		part := make([]T, end-start)
+		copy(part, values.items[start:end])
+		result.items = append(result.items, &AhdList[T]{items: part})
+	}
+	return result
+}
+
+// AhdListsFlatten concatenates a List of Lists, exactly one level deep.
+func AhdListsFlatten[T any](rows *AhdList[*AhdList[T]]) *AhdList[T] {
+	rows.require()
+	result := AhdNewList[T]()
+	for _, row := range rows.items {
+		row.require()
+		result.items = append(result.items, row.items...)
+	}
+	return result
+}
+
+// AhdListsTranspose exchanges rows and columns. Ragged input is a ListsError:
+// padding or truncating it would silently invent or destroy data.
+func AhdListsTranspose[T any](class *AhdClass, rows *AhdList[*AhdList[T]]) *AhdList[*AhdList[T]] {
+	rows.require()
+	result := AhdNewList[*AhdList[T]]()
+	if len(rows.items) == 0 {
+		return result
+	}
+	rows.items[0].require()
+	width := len(rows.items[0].items)
+	for index, row := range rows.items {
+		row.require()
+		if len(row.items) != width {
+			AhdRaiseClass(class, "transpose requires rectangular rows: row "+strconv.Itoa(index)+
+				" has "+strconv.Itoa(len(row.items))+" element(s); expected "+strconv.Itoa(width))
+		}
+	}
+	for column := 0; column < width; column++ {
+		items := make([]T, len(rows.items))
+		for index, row := range rows.items {
+			items[index] = row.items[column]
+		}
+		result.items = append(result.items, &AhdList[T]{items: items})
+	}
+	return result
+}
+
+// AhdListsUnique keeps the first occurrence of each distinct element, using
+// the same == equality the language defines for that element type.
+func AhdListsUnique[T any](values *AhdList[T], equal func(T, T) bool) *AhdList[T] {
+	values.require()
+	result := AhdNewList[T]()
+	for _, item := range values.items {
+		seen := false
+		for _, kept := range result.items {
+			if equal(kept, item) {
+				seen = true
+				break
+			}
+		}
+		if !seen {
+			result.items = append(result.items, item)
+		}
+	}
+	return result
+}
+
+// AhdListsValueCounts counts equal elements, keyed in first-occurrence order.
+func AhdListsValueCounts[K comparable](values *AhdList[K]) *AhdPair[K, int64] {
+	values.require()
+	result := AhdNewPair[K, int64]()
+	for _, item := range values.items {
+		result.values[item]++
+		if result.values[item] == 1 {
+			result.keys = append(result.keys, item)
+		}
+	}
+	return result
+}
+
+// AhdListsGroupBy partitions a snapshot of the elements into new Lists keyed by
+// a key Function, in first-key-occurrence order. Elements inside each group
+// keep their source order.
+func AhdListsGroupBy[T any, K comparable](values *AhdList[T], key func(T) K) *AhdPair[K, *AhdList[T]] {
+	items := values.Snapshot()
+	result := AhdNewPair[K, *AhdList[T]]()
+	for _, item := range items {
+		selected := key(item)
+		group, exists := result.values[selected]
+		if !exists {
+			group = AhdNewList[T]()
+			result.keys = append(result.keys, selected)
+			result.values[selected] = group
+		}
+		group.items = append(group.items, item)
+	}
+	return result
 }

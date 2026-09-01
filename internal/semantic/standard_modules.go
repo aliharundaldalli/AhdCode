@@ -21,6 +21,7 @@ func StandardModuleInterfaces() map[string]*ModuleInterface {
 		"File":       fileModuleInterface(),
 		"JSON":       jsonModuleInterface(),
 		"Latex":      latexModuleInterface(),
+		"Lists":      listsModuleInterface(),
 		"Math":       mathModuleInterface(),
 		"Numeric":    numericModuleInterface(),
 		"Path":       pathModuleInterface(),
