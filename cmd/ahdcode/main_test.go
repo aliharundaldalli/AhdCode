@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -26,7 +27,7 @@ func TestCommandDispatch(t *testing.T) {
 	if code := runWithIO(nil, bytes.NewBuffer(nil), &out, &errors); code != 0 {
 		t.Fatalf("expected REPL exit 0; received %d", code)
 	}
-	if !strings.Contains(out.String(), "AhdCode v0.1.20\nahd> ") {
+	if !strings.Contains(out.String(), "AhdCode v0.2.0\nahd> ") {
 		t.Fatalf("REPL banner/prompt = %q", out.String())
 	}
 	if code := run([]string{"nonsense"}); code != 2 {
@@ -114,7 +115,8 @@ func TestHelpVersionAndUnknownFlags(t *testing.T) {
 		contains  string
 	}{
 		{[]string{"--help"}, 0, "ahdcode format"},
-		{[]string{"--version"}, 0, "AhdCode v0.1.20"},
+		{[]string{"--help"}, 0, "ahdcode lsp"},
+		{[]string{"--version"}, 0, "AhdCode v0.2.0"},
 		{[]string{"run", "--bad"}, 2, "unknown flag"},
 		{[]string{"format", "--bad", "x.ahd"}, 2, "unknown flag"},
 	} {
@@ -173,5 +175,46 @@ func TestCLIReplUsesPersistentOrdinaryDeclarations(t *testing.T) {
 	}
 	if !strings.Contains(out.String(), "5\n") || !strings.Contains(out.String(), "7\n") || !strings.Contains(errors.String(), "already declared") {
 		t.Fatalf("stdout:\n%s\nstderr:\n%s", out.String(), errors.String())
+	}
+}
+
+func lspFrame(body string) string {
+	return fmt.Sprintf("Content-Length: %d\r\n\r\n%s", len(body), body)
+}
+
+// TestLSPSubcommandStdoutIsProtocolOnly proves `ahdcode lsp` never pollutes
+// its stdout with the version banner or any other human-readable text --
+// only Content-Length-framed JSON-RPC, exactly like every other subcommand
+// keeps diagnostics/human text off stdout and onto stderr.
+func TestLSPSubcommandStdoutIsProtocolOnly(t *testing.T) {
+	input := lspFrame(`{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}`) +
+		lspFrame(`{"jsonrpc":"2.0","method":"exit","params":{}}`)
+	var out, errors bytes.Buffer
+	code := runWithIO([]string{"lsp"}, strings.NewReader(input), &out, &errors)
+	if code != 0 {
+		t.Fatalf("ahdcode lsp exit code = %d, stderr = %q", code, errors.String())
+	}
+	if strings.Contains(out.String(), version) {
+		t.Fatalf("ahdcode lsp stdout leaked the human-readable version banner: %q", out.String())
+	}
+	if strings.Contains(out.String(), "usage:") {
+		t.Fatalf("ahdcode lsp stdout leaked CLI usage text: %q", out.String())
+	}
+	if !strings.HasPrefix(out.String(), "Content-Length:") {
+		t.Fatalf("ahdcode lsp stdout does not start with a valid frame header: %q", out.String())
+	}
+}
+
+func TestLSPSubcommandRejectsUnexpectedArguments(t *testing.T) {
+	var out, errors bytes.Buffer
+	code := runWithIO([]string{"lsp", "--port", "9999"}, strings.NewReader(""), &out, &errors)
+	if code == 0 {
+		t.Fatal("expected a nonzero exit for an unexpected ahdcode lsp argument")
+	}
+	if !strings.Contains(errors.String(), "unexpected argument") {
+		t.Fatalf("stderr = %q", errors.String())
+	}
+	if out.Len() != 0 {
+		t.Fatalf("expected no stdout output when rejecting arguments, got %q", out.String())
 	}
 }

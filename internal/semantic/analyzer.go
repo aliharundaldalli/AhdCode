@@ -335,7 +335,7 @@ func (a *analyzer) registerFunction(declaration *ast.FunctionDecl, targetScope *
 			}
 			for _, candidate := range existing.OverloadSet.Candidates {
 				if sameOverloadKey(candidate, callable) {
-					a.error(codeInvalidOverload, fmt.Sprintf("overload %q duplicates parameter signature %s", declaration.Name, formatSignature(callable.Signature)), declaration.Span(), "overloads must differ by parameter count and/or parameter type; return type alone cannot distinguish them")
+					a.error(codeInvalidOverload, fmt.Sprintf("overload %q duplicates parameter signature %s", declaration.Name, FormatSignature(callable.Signature)), declaration.Span(), "overloads must differ by parameter count and/or parameter type; return type alone cannot distinguish them")
 					a.functionNodes[declaration] = callable
 					a.functionOwner[declaration] = existing
 					a.result.ResolvedSymbols[declaration] = existing

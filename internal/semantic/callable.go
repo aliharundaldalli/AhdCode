@@ -85,6 +85,7 @@ func (a *analyzer) analyzeFunction(declaration *ast.FunctionDecl, class *Symbol)
 		functionScope.symbols[symbol.Name] = symbol
 		flow[symbol] = symbol.InitialNull
 		a.result.Symbols = append(a.result.Symbols, symbol)
+		a.result.ResolvedSymbols[parameter] = symbol
 		a.trackInference(symbol, functionScope)
 		if parameter.Default != nil {
 			value := a.analyzeExpressionExpected(parameter.Default, functionScope, flow, typeValue)
@@ -163,6 +164,7 @@ func (a *analyzer) analyzeStructure(declaration *ast.StructureDecl, class *Symbo
 		structureScope.symbols[symbol.Name] = symbol
 		flow[symbol] = nullState
 		a.result.Symbols = append(a.result.Symbols, symbol)
+		a.result.ResolvedSymbols[parameter] = symbol
 		a.trackInference(symbol, structureScope)
 		if parameter.Default != nil {
 			value := a.analyzeExpressionExpected(parameter.Default, structureScope, flow, typeValue)

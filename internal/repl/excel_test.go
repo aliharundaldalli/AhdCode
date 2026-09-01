@@ -31,7 +31,7 @@ loaded: Workbook := Excel.read(` + strconv.Quote(outputPath) + `)
 write(loaded.sheet("Data").cell(2, 1).string())
 `
 	var output, errorOutput bytes.Buffer
-	Run(strings.NewReader(program), &output, &errorOutput, "AhdCode v0.1.20")
+	Run(strings.NewReader(program), &output, &errorOutput, "AhdCode v0.2.0")
 	if errorOutput.Len() != 0 {
 		t.Fatalf("REPL errors: %s", errorOutput.String())
 	}

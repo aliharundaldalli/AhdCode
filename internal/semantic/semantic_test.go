@@ -66,6 +66,40 @@ func TestAssignmentCompatibility(t *testing.T) {
 	}
 }
 
+// TestParameterDeclarationsAreResolvedSymbols proves tooling (e.g. an LSP
+// hover) can resolve a parameter's own declaration site, not just its uses
+// inside the body -- the same guarantee every other declaration kind
+// (variables, functions, classes) already has via ResolvedSymbols.
+func TestParameterDeclarationsAreResolvedSymbols(t *testing.T) {
+	parsed, result := analyzeText(t, `square: Function := (
+    value: Int
+) -> Int {
+    return value * value
+}
+
+Student: Class<> := {
+    structure: Attributes := (
+        name: String
+    )
+}`)
+	requireSemanticClean(t, result)
+
+	function := parsed.Program.Statements[0].(*ast.FunctionDecl)
+	functionParameter := &function.Parameters[0]
+	symbol, ok := result.ResolvedSymbols[functionParameter]
+	if !ok || symbol.Name != "value" || symbol.Kind != ParameterSymbol || !types.Equal(symbol.Type, types.Int) {
+		t.Fatalf("function parameter symbol = %#v, ok = %v", symbol, ok)
+	}
+
+	class := parsed.Program.Statements[1].(*ast.ClassDecl)
+	structureDecl := class.Members[0].(*ast.StructureDecl)
+	structureParameter := &structureDecl.Parameters[0]
+	memberSymbol, memberOk := result.ResolvedSymbols[structureParameter]
+	if !memberOk || memberSymbol.Name != "name" || memberSymbol.Kind != ParameterSymbol || !types.Equal(memberSymbol.Type, types.String) {
+		t.Fatalf("structure parameter symbol = %#v, ok = %v", memberSymbol, memberOk)
+	}
+}
+
 func TestLambdaTypingCallsCallbacksAndNullability(t *testing.T) {
 	parsed, result := analyzeText(t, `Student: Class<> := {
     structure: Attributes := (score: Int)

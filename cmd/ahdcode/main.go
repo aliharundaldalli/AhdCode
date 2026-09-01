@@ -14,22 +14,24 @@ import (
 	"ahdcode/internal/build"
 	"ahdcode/internal/diagnostics"
 	"ahdcode/internal/formatter"
+	"ahdcode/internal/lsp"
 	"ahdcode/internal/repl"
 	"ahdcode/internal/source"
 )
 
-const usage = `AhdCode v0.1.20 toolchain
+const usage = `AhdCode v0.2.0 toolchain
 
 usage:
   ahdcode                                  start the interactive REPL
   ahdcode build <entry.ahd> [-o <output>]   compile to a native executable
   ahdcode run   <entry.ahd> [-- <args>...]  compile and run
   ahdcode format [--check] <file.ahd>        canonicalize source in place
+  ahdcode lsp                                start the language server (stdio)
   ahdcode --help                             show this help
   ahdcode --version                          print the compiler version
 `
 
-const version = "AhdCode v0.1.20"
+const version = "AhdCode v0.2.0"
 
 func main() {
 	os.Exit(run(os.Args[1:]))
@@ -50,6 +52,8 @@ func runWithIO(arguments []string, input io.Reader, output, errorOutput io.Write
 		return runRun(arguments[1:], input, output, errorOutput)
 	case "format":
 		return runFormat(arguments[1:], output, errorOutput)
+	case "lsp":
+		return runLSP(arguments[1:], input, output, errorOutput)
 	case "version", "--version", "-v":
 		if len(arguments) != 1 {
 			fmt.Fprintln(errorOutput, "ahdcode --version: no arguments are accepted")
@@ -123,6 +127,27 @@ func runRun(arguments []string, input io.Reader, output, errorOutput io.Writer) 
 	code, result := build.RunProgramIO(entry, programArguments, input, output, errorOutput)
 	reportTo(errorOutput, result)
 	return code
+}
+
+// runLSP starts the AhdCode language server over stdio. It contains no
+// language-server semantic implementation of its own -- internal/lsp owns
+// the protocol, and internal/analysis owns the compiler-backed diagnostics
+// and hover facts it serves; this function only wires them to the process's
+// standard streams. output must never receive anything except LSP
+// Content-Length-framed protocol bytes, so unlike every other subcommand
+// here, nothing is ever written to it directly from this function -- not a
+// version banner, not a usage message, nothing.
+func runLSP(arguments []string, input io.Reader, output, errorOutput io.Writer) int {
+	if len(arguments) != 0 {
+		fmt.Fprintf(errorOutput, "ahdcode lsp: unexpected argument %q\n", arguments[0])
+		return 2
+	}
+	server := lsp.NewServer(errorOutput)
+	if err := server.Run(input, output); err != nil {
+		fmt.Fprintf(errorOutput, "ahdcode lsp: %v\n", err)
+		return 1
+	}
+	return 0
 }
 
 func report(result build.Result) {

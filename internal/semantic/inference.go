@@ -172,7 +172,7 @@ func (a *analyzer) constrainConcreteFunction(symbol *Symbol, signature *types.Si
 	inference := symbol.inference
 	if inference.fixed != nil {
 		if !types.Equal(types.Function{Signature: inference.fixed}, types.Function{Signature: signature}) {
-			a.inferenceConflict(symbol, span, fmt.Sprintf("assigned signatures %s and %s", formatSignature(inference.fixed), formatSignature(signature)))
+			a.inferenceConflict(symbol, span, fmt.Sprintf("assigned signatures %s and %s", FormatSignature(inference.fixed), FormatSignature(signature)))
 		}
 		return
 	}
@@ -288,7 +288,11 @@ func nonNullParameters(count int) []NullState {
 	return states
 }
 
-func formatSignature(signature *types.Signature) string {
+// FormatSignature renders a callable's signature the same way diagnostics
+// already do (e.g. "(x: Int, y: Int := default) -> Real"), so tooling that
+// needs a human-readable signature -- such as an LSP hover -- reuses this
+// exact rendering instead of inventing a second one.
+func FormatSignature(signature *types.Signature) string {
 	if signature == nil {
 		return "Function<?>"
 	}

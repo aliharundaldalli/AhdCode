@@ -34,7 +34,7 @@ func (a *analyzer) resolveOverloadCall(call *ast.CallExpr, set *OverloadSet, arg
 	var applicable []rankedCallable
 	for _, candidate := range set.Candidates {
 		score, reason, ok := assessCallCandidate(call, candidate, arguments)
-		decision := CandidateDecision{Signature: formatSignature(candidate.Signature), Applicable: ok, Reason: reason, Widenings: score.widenings, Defaults: score.defaults}
+		decision := CandidateDecision{Signature: FormatSignature(candidate.Signature), Applicable: ok, Reason: reason, Widenings: score.widenings, Defaults: score.defaults}
 		trace.Candidates = append(trace.Candidates, decision)
 		if ok {
 			applicable = append(applicable, rankedCallable{callable: candidate, score: score})
@@ -60,13 +60,13 @@ func (a *analyzer) resolveOverloadCall(call *ast.CallExpr, set *OverloadSet, arg
 	if len(finalists) != 1 {
 		signatures := make([]string, len(finalists))
 		for index, candidate := range finalists {
-			signatures[index] = formatSignature(candidate.Signature)
+			signatures[index] = FormatSignature(candidate.Signature)
 		}
 		a.result.OverloadResolutions[call] = trace
 		a.error(codeAmbiguousOverload, fmt.Sprintf("call to overloaded Function %q is ambiguous", set.Name), call.Span(), "equally ranked candidates: "+strings.Join(signatures, "; "))
 		return nil
 	}
-	trace.Selected = formatSignature(finalists[0].Signature)
+	trace.Selected = FormatSignature(finalists[0].Signature)
 	a.result.OverloadResolutions[call] = trace
 	return finalists[0]
 }
@@ -171,7 +171,7 @@ func (a *analyzer) selectFunctionValue(set *OverloadSet, expected *types.Signatu
 		}
 	}
 	if len(best) == 0 {
-		a.error(codeNoMatchingOverload, fmt.Sprintf("no overload of %q matches callback type %s", set.Name, formatSignature(expected)), expression.Span(), "use a Function whose parameters and return type satisfy the callback context")
+		a.error(codeNoMatchingOverload, fmt.Sprintf("no overload of %q matches callback type %s", set.Name, FormatSignature(expected)), expression.Span(), "use a Function whose parameters and return type satisfy the callback context")
 		return nil
 	}
 	if len(best) > 1 {
