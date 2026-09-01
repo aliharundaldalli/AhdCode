@@ -12,15 +12,18 @@ AhdCode is an experimental statically checked general-purpose programming
 language focused on readable syntax, explicit intent, predictable semantics,
 and native compilation.
 
-The current release is **v0.1.20**. The core language works end to end, but
+The current release is **v0.2.0**. The core language works end to end, but
 the project is not production-ready and breaking changes may occur before 1.0.
 
-v0.1.20 — PDF & Archive — adds the [PDF](docs/PDF.md) module (immutable
-`PDFDocument` values rendered offline to real `.pdf` files, including
-semantic `PDF.fromWord`/`PDF.fromExcel` conversion), the
-[Archive](docs/ARCHIVE.md) module (creation-only ZIP/TAR/TAR.GZ packaging
-using only the Go standard library), and an optional `sourceOutput: "tex"`
-argument on `Latex.pdf` to publish an exact source sidecar alongside the PDF.
+v0.2.0 — LSP Foundation — adds [`ahdcode lsp`](docs/LSP.md), a standard
+stdio Language Server Protocol server backed directly by the real compiler
+frontend: compiler-accurate diagnostics and hover on unsaved editor buffers,
+with full document synchronization. The bundled [VS Code
+extension](editors/vscode) now launches the same server. v0.2.0 is a
+deliberately narrow foundation release -- no completion, go-to-definition, or
+workspace indexing yet; language semantics are unchanged from v0.1.20, which
+added the [PDF](docs/PDF.md) and [Archive](docs/ARCHIVE.md) modules and a
+`Latex.pdf` source sidecar.
 
 ```ahd
 greet: Function := (
@@ -87,6 +90,10 @@ for name in names {
   type-directed: each call's exact result type is computed from its argument
   types, with no generic syntax and nothing erased.
 - The formatter defines one canonical presentation while preserving comments.
+- The [language server](docs/LSP.md) (`ahdcode lsp`) exposes the compiler's
+  own diagnostics and hover over standard stdio LSP -- no second parser, no
+  hand-maintained symbol catalog, and no writes to a document's file while
+  it's open and unsaved in an editor.
 
 ## Build from source
 
@@ -128,8 +135,8 @@ ahdcode format --check examples/v0.1/01_hello.ahd
 ahdcode
 ```
 
-See the [CLI guide](docs/CLI.md), [formatter guide](docs/FORMATTER.md), and
-[REPL guide](docs/REPL.md).
+See the [CLI guide](docs/CLI.md), [formatter guide](docs/FORMATTER.md),
+[REPL guide](docs/REPL.md), and [language server guide](docs/LSP.md).
 
 ## Documentation
 
@@ -168,6 +175,7 @@ See the [CLI guide](docs/CLI.md), [formatter guide](docs/FORMATTER.md), and
 - [Lists module](docs/LISTS.md)
 - [KeyValue module](docs/KEYVALUE.md)
 - [Understanding diagnostics](docs/DIAGNOSTICS.md)
+- [Language server](docs/LSP.md)
 - [AI-assisted local setup](FOR_AI.md)
 - [Curated v0.1 examples](examples/v0.1/README.md)
 - [Full v0.1 language specification](AHDCODE_LANGUAGE_SPEC_v0.1.md)
@@ -175,15 +183,19 @@ See the [CLI guide](docs/CLI.md), [formatter guide](docs/FORMATTER.md), and
 ## Editor extension
 
 The local VS Code-compatible extension in [`editors/vscode`](editors/vscode)
-recognizes `.ahd`, provides syntax highlighting, and runs the active file from
-the editor title play button, Command Palette, or `F6`. The same VSIX targets
-VS Code and Antigravity. See its [installation guide](editors/vscode/README.md).
+recognizes `.ahd`, provides syntax highlighting, runs the active file from
+the editor title play button, Command Palette, or `F6`, and connects to the
+[language server](docs/LSP.md) (`ahdcode lsp`) for compiler-backed
+diagnostics and hover. The same VSIX targets VS Code and Antigravity. See its
+[installation guide](editors/vscode/README.md).
 
 ## Current limitations
 
 v0.1 intentionally has no block/statement lambdas, implicit/general mutable closure cells, tuple
-returns, reflection, interfaces, multiple inheritance, debugger, LSP, package
-search paths, or web runtime.
+returns, reflection, interfaces, multiple inheritance, debugger, package
+search paths, or web runtime. The [v0.2.0 language server](docs/LSP.md)
+implements diagnostics and hover only -- no completion, go-to-definition,
+find references, rename, or workspace-wide indexing yet.
 Operator behavior is user-definable only through the ten fixed
 [Class Protocol Methods](docs/PROTOCOLS.md), not a general overloading
 mechanism. Modules are sibling `.ahd` files, and the editor extension is a

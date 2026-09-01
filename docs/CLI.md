@@ -2,7 +2,7 @@
 
 [English] · [Türkçe](CLI_TR.md)
 
-[Back to README](../README.md) · [Formatter](FORMATTER.md) · [REPL](REPL.md)
+[Back to README](../README.md) · [Formatter](FORMATTER.md) · [REPL](REPL.md) · [Language server](LSP.md)
 
 The current command surface is:
 
@@ -11,6 +11,7 @@ ahdcode
 ahdcode build <entry.ahd> [-o <output>]
 ahdcode run <entry.ahd> [-- <args>...]
 ahdcode format [--check] <file.ahd>
+ahdcode lsp
 ahdcode --help
 ahdcode --version
 ```
@@ -28,3 +29,8 @@ available. Compiler invocations use argument arrays rather than shell command
 strings.
 
 Running `ahdcode` without a command starts the REPL.
+
+`lsp` starts the language server described in the [Language server
+guide](LSP.md): stdio-only JSON-RPC, compiler-backed diagnostics and hover.
+It accepts no arguments and never writes anything but protocol frames to
+stdout.

@@ -12,17 +12,20 @@ AhdCode; okunabilir sözdizimi, açık niyet (explicit intent), öngörülebilir
 anlambilim (semantics) ve yerel (native) derlemeye odaklanan, deneysel,
 statik olarak denetlenen genel amaçlı bir programlama dilidir.
 
-Mevcut sürüm **v0.1.20**'dir. Çekirdek dil uçtan uca çalışır, ancak proje
+Mevcut sürüm **v0.2.0**'dır. Çekirdek dil uçtan uca çalışır, ancak proje
 üretime hazır değildir ve 1.0'dan önce kırıcı (breaking) değişiklikler
 olabilir.
 
-v0.1.20 — PDF & Archive — [PDF](docs/PDF_TR.md) modülünü ekler (çevrimdışı
-gerçek `.pdf` dosyalarına render edilen değiştirilemez `PDFDocument`
-değerleri, `PDF.fromWord`/`PDF.fromExcel` anlamsal dönüşümü dahil),
-[Archive](docs/ARCHIVE_TR.md) modülünü ekler (yalnızca Go standart
-kütüphanesini kullanan, yalnızca oluşturma amaçlı ZIP/TAR/TAR.GZ
-paketlemesi) ve `Latex.pdf`'e PDF'in yanında tam kaynak yan dosyası
-yayınlamak için isteğe bağlı bir `sourceOutput: "tex"` argümanı ekler.
+v0.2.0 — LSP Temeli — doğrudan gerçek derleyici önyüzü (frontend) tarafından
+desteklenen standart bir stdio Language Server Protocol sunucusu olan
+[`ahdcode lsp`](docs/LSP_TR.md)'yi ekler: kaydedilmemiş editör tamponları
+üzerinde derleyici-doğruluğunda tanılamalar ve hover, tam belge
+senkronizasyonuyla. Birlikte gelen [VS Code eklentisi](editors/vscode) artık
+aynı sunucuyu başlatıyor. v0.2.0 kasıtlı olarak dar kapsamlı bir temel
+(foundation) sürümüdür — henüz completion, tanıma git (go-to-definition)
+veya workspace indeksleme yoktur; dil anlambilimi v0.1.20'den değişmemiştir.
+v0.1.20, [PDF](docs/PDF_TR.md) ve [Archive](docs/ARCHIVE_TR.md) modüllerini
+ve bir `Latex.pdf` kaynak yan dosyasını eklemişti.
 
 ```ahd
 greet: Function := (
@@ -93,6 +96,10 @@ for name in names {
   türlerinden hesaplanır, genel (generic) sözdizimi olmadan ve hiçbir şey
   silinmeden.
 - Formatter, yorumları korurken tek bir kanonik (standart) sunum tanımlar.
+- [Dil sunucusu](docs/LSP_TR.md) (`ahdcode lsp`), derleyicinin kendi
+  tanılamalarını ve hover'ını standart stdio LSP üzerinden sunar — ikinci
+  bir ayrıştırıcı yok, elle bakımı yapılan bir sembol kataloğu yok ve bir
+  belge editörde açık ve kaydedilmemişken dosyasına asla yazılmaz.
 
 ## Kaynak koddan derleme
 
@@ -135,8 +142,9 @@ ahdcode format --check examples/v0.1/01_hello.ahd
 ahdcode
 ```
 
-[CLI rehberine](docs/CLI_TR.md), [formatter rehberine](docs/FORMATTER_TR.md)
-ve [REPL rehberine](docs/REPL_TR.md) bakın.
+[CLI rehberine](docs/CLI_TR.md), [formatter rehberine](docs/FORMATTER_TR.md),
+[REPL rehberine](docs/REPL_TR.md) ve [dil sunucusu rehberine](docs/LSP_TR.md)
+bakın.
 
 ## Dokümantasyon
 
@@ -175,6 +183,7 @@ ve [REPL rehberine](docs/REPL_TR.md) bakın.
 - [Lists modülü](docs/LISTS_TR.md)
 - [KeyValue modülü](docs/KEYVALUE_TR.md)
 - [Tanılamaları anlama](docs/DIAGNOSTICS_TR.md)
+- [Dil sunucusu](docs/LSP_TR.md)
 - [Yapay zekâ destekli yerel kurulum](FOR_AI.md)
 - [Derlenmiş v0.1 örnekleri](examples/v0.1/README_TR.md)
 - [Tam v0.1 dil spesifikasyonu](AHDCODE_LANGUAGE_SPEC_v0.1_TR.md)
@@ -182,18 +191,23 @@ ve [REPL rehberine](docs/REPL_TR.md) bakın.
 ## Editör eklentisi
 
 [`editors/vscode`](editors/vscode) içindeki yerel, VS Code uyumlu eklenti,
-`.ahd` dosyalarını tanır, sözdizimi vurgulama sağlar ve editör başlık
+`.ahd` dosyalarını tanır, sözdizimi vurgulama sağlar, editör başlık
 çubuğundaki oynat düğmesi, Komut Paleti veya `F6` ile aktif dosyayı
-çalıştırır. Aynı VSIX, hem VS Code hem de Antigravity'i hedefler.
+çalıştırır ve derleyici destekli tanılamalar ve hover için
+[dil sunucusuna](docs/LSP_TR.md) (`ahdcode lsp`) bağlanır. Aynı VSIX, hem
+VS Code hem de Antigravity'i hedefler.
 [Kurulum rehberine](editors/vscode/README_TR.md) bakın.
 
 ## Mevcut sınırlamalar
 
 v0.1, kasıtlı olarak blok/deyim (statement) lambda'ları, örtük/genel değişken (mutable) closure hücreleri,
 tuple dönüş değerleri, reflection, interface, çoklu kalıtım (multiple
-inheritance), hata ayıklayıcı (debugger), LSP, paket arama yolları (package
-search paths) veya web çalışma zamanına sahip değildir. Operatör davranışı
-yalnızca on sabit
+inheritance), hata ayıklayıcı (debugger), paket arama yolları (package
+search paths) veya web çalışma zamanına sahip değildir.
+[v0.2.0 dil sunucusu](docs/LSP_TR.md) yalnızca tanılamalar ve hover uygular —
+henüz completion, tanıma git (go-to-definition), referans bulma, yeniden
+adlandırma (rename) veya workspace genelinde indeksleme yoktur. Operatör
+davranışı yalnızca on sabit
 [Class Protocol Methods](docs/PROTOCOLS_TR.md) aracılığıyla
 kullanıcı-tanımlıdır (user-definable), genel bir aşırı yükleme (overloading)
 mekanizması değildir. Modüller kardeş (sibling) `.ahd` dosyalarıdır ve

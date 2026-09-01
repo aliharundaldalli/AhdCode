@@ -2,7 +2,7 @@
 
 [English](CLI.md) · [Türkçe]
 
-[README'ye dön](../README_TR.md) · [Formatter](FORMATTER_TR.md) · [REPL](REPL_TR.md)
+[README'ye dön](../README_TR.md) · [Formatter](FORMATTER_TR.md) · [REPL](REPL_TR.md) · [Dil sunucusu](LSP_TR.md)
 
 Mevcut komut yüzeyi (command surface) şudur:
 
@@ -11,6 +11,7 @@ ahdcode
 ahdcode build <entry.ahd> [-o <output>]
 ahdcode run <entry.ahd> [-- <args>...]
 ahdcode format [--check] <file.ahd>
+ahdcode lsp
 ahdcode --help
 ahdcode --version
 ```
@@ -29,3 +30,8 @@ ve varsa bir ipucu içerir. Derleyici çağrıları, kabuk (shell) komut
 dizeleri yerine argüman dizileri kullanır.
 
 Herhangi bir komut olmadan `ahdcode` çalıştırmak REPL'i başlatır.
+
+`lsp`, [Dil sunucusu rehberinde](LSP_TR.md) açıklanan dil sunucusunu
+başlatır: yalnızca stdio üzerinden JSON-RPC, derleyici destekli tanılamalar
+ve hover. Hiçbir argüman kabul etmez ve stdout'a protokol çerçeveleri
+dışında hiçbir şey yazmaz.

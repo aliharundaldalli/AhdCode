@@ -3,8 +3,9 @@
 [English](README.md) · [Türkçe]
 
 Bu minimal eklenti, VS Code uyumlu editörlere AhdCode dosya tanıma, hafif
-sözdizimi vurgulama (syntax highlighting) ve bir **AhdCode Dosyasını
-Çalıştır** oynat düğmesi ekler.
+sözdizimi vurgulama (syntax highlighting), bir **AhdCode Dosyasını
+Çalıştır** oynat düğmesi ve AhdCode dil sunucusuna (derleyici destekli
+tanılamalar ve hover) bir bağlantı ekler.
 
 Eklenti, AhdCode paket markalaşması ve açık/koyu dil simgeleri sağlar. Aktif
 bir üçüncü taraf File Icon Theme, dil simgesini geçersiz kılabilir; dosya
@@ -40,6 +41,33 @@ Alternatif olarak `ahdcode.executablePath`'i çalıştırılabilir dosyanın
 mutlak yoluna ayarlayın. Ayar, kasıtlı olarak varsayılan olarak boştur ve
 makineye özgü bir yol içermez.
 
+## Dil sunucusu
+
+Run File'a ek olarak, eklenti aktive olduğunda aynı `ahdcode` çalıştırılabilir
+dosyasını arka planda bir [dil sunucusu](../../docs/LSP_TR.md) olarak
+(`ahdcode lsp`) bir kez başlatır — tam olarak Run File'ın kullandığı aynı
+`ahdcode.executablePath` ayarı / `PATH` araması üzerinden çözümlenir. Yalnızca
+stdio üzerinden iletişim kurar; hiçbir şekilde bir ağ portu açmaz. Size
+şunları sağlar:
+
+- **Tanılamalar**: gerçek derleyici önyüzünden lexer, parser, modül/import ve
+  anlamsal hatalar; normal editör sorun işaretleri olarak gösterilir —
+  kaydedilmemiş tamponlar dahil yazarken canlı tutulur ve düzelttiğinizde
+  otomatik olarak temizlenir.
+- **Hover**: bir değişkeni, `Constant`/`Local` bildirimini veya kullanımını,
+  bir fonksiyon bildirimini veya çağrısını, bir fonksiyon/structure
+  parametresini, bir `Class`'ı veya içe aktarılan bir standart modül üyesini
+  hover'lamak, derleyicinin çözümlediği türü veya imzasını gösterir.
+
+Sunucu, yalnızca analiz etmek için açık bir belgeyi asla diskteki dosyasına
+geri yazmaz.
+
+Çalıştırılabilir dosya bulunamazsa veya sunucu başlatılamazsa, her tuş
+vuruşunda değil, tek bir kısa hata mesajı gösterilir ve Run File normal
+şekilde çalışmaya devam eder. v0.2.0'ın sunucusu yalnızca tanılamalar ve
+hover uygular; henüz kasıtlı olarak eksik olanlar (completion, tanıma git
+vb.) için [sınırlamalarına](../../docs/LSP_TR.md#v020da-olmayanlar) bakın.
+
 ## Geliştirme
 
 1. VS Code'da `editors/vscode`'u açın.
@@ -68,21 +96,21 @@ VS Code'da Komut Paleti'nden **Extensions: Install from VSIX...** ile veya
 şununla kurun:
 
 ```bash
-code --install-extension ahdcode-0.1.4.vsix
+code --install-extension ahdcode-0.2.0.vsix
 ```
 
 Google Antigravity IDE 1.107, aynı yerel VSIX CLI işlemini sunar:
 
 ```bash
-antigravity-ide --install-extension ahdcode-0.1.4.vsix
+antigravity-ide --install-extension ahdcode-0.2.0.vsix
 ```
 
 macOS'ta, bu başlatıcılar PATH'te değilse, uygulama paketine gömülü
 başlatıcıları kullanın:
 
 ```bash
-/Applications/Visual\ Studio\ Code.app/Contents/Resources/app/bin/code --install-extension ahdcode-0.1.4.vsix
-/Applications/Antigravity\ IDE.app/Contents/Resources/app/bin/antigravity-ide --install-extension ahdcode-0.1.4.vsix
+/Applications/Visual\ Studio\ Code.app/Contents/Resources/app/bin/code --install-extension ahdcode-0.2.0.vsix
+/Applications/Antigravity\ IDE.app/Contents/Resources/app/bin/antigravity-ide --install-extension ahdcode-0.2.0.vsix
 ```
 
 Aynı paket her iki editör tarafından da kullanılır. Eklenti API temel
@@ -91,9 +119,14 @@ Aynı paket her iki editör tarafından da kullanılır. Eklenti API temel
 
 ## Kapsam ve sınırlamalar
 
-Bu, kasıtlı olarak küçük bir çalıştır-ve-vurgula (run-and-highlight)
-entegrasyonudur. LSP, tamamlama (completion), semantik vurgulama, bir hata
+Bu, kasıtlı olarak küçük bir eklentidir: sözdizimi vurgulama, Run File ve
+yalnızca tanılamalar ve hover ile sınırlı bir [dil sunucusu](../../docs/LSP_TR.md).
+Tamamlama (completion), tanıma git (go to definition), referans bulma,
+yeniden adlandırma (rename), signature help, semantik vurgulama, bir hata
 ayıklayıcı (debugger), kesme noktaları (breakpoints) veya Marketplace
-yayınlaması sağlamaz. Derleyici ve çalışma zamanı tanılamaları, normal görev
-terminali çıktısı olarak gösterilir; editör sorun (problem) girdilerine
-dönüştürülmezler.
+yayınlaması sağlamaz. Run File'ın kendi çıktısı (çalışan programın
+`write`/hataları) hâlâ, öncekiyle tamamen aynı şekilde, yalnızca görev
+terminali çıktısı olarak gösterilir — bu, çalışan bir programın
+stdout/stderr'idir, bir derleyici tanılaması değildir. Derleyici
+tanılamalarının kendisi (lexer/parser/modül/anlamsal hatalar) dil
+sunucusundan gelir ve normal editör sorun (problem) girdileri olarak görünür.
