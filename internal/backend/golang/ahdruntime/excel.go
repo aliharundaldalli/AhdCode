@@ -675,11 +675,12 @@ func ExcelSheetCells(sheetText, rangeText string) ([][]string, error) {
 	return result, nil
 }
 
-func ExcelSheetUsedRange(sheetText string) (*string, error) {
-	sheet, err := excelSheet(sheetText)
-	if err != nil {
-		return nil, fmt.Errorf("Sheet.usedRange: %w", err)
-	}
+// excelUsedRange computes the Sheet's supported used range: any Cell with
+// non-Blank content or an applied style, plus every merged Range. Row-height
+// and column-width metadata alone never extends it. This is the single
+// source of truth behind both Sheet.usedRange and the worksheet's derived
+// <dimension> element, so the two can never disagree.
+func excelUsedRange(sheet excelSheetData) (excelRangeData, bool) {
 	var result excelRangeData
 	set := false
 	include := func(startRow, startColumn, endRow, endColumn int64) {
@@ -709,6 +710,15 @@ func ExcelSheetUsedRange(sheetText string) (*string, error) {
 	for _, merge := range sheet.Merges {
 		include(merge.StartRow, merge.StartColumn, merge.EndRow, merge.EndColumn)
 	}
+	return result, set
+}
+
+func ExcelSheetUsedRange(sheetText string) (*string, error) {
+	sheet, err := excelSheet(sheetText)
+	if err != nil {
+		return nil, fmt.Errorf("Sheet.usedRange: %w", err)
+	}
+	result, set := excelUsedRange(sheet)
 	if !set {
 		return nil, nil
 	}
@@ -1351,6 +1361,16 @@ func excelWorksheetXML(sheet excelSheetData, catalog excelStyleCatalog) string {
 	var builder strings.Builder
 	builder.WriteString(excelXMLHeader)
 	builder.WriteString(`<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">`)
+	if used, set := excelUsedRange(sheet); set {
+		start := excelCellAddress(used.StartRow, used.StartColumn)
+		if used.StartRow == used.EndRow && used.StartColumn == used.EndColumn {
+			builder.WriteString(`<dimension ref="` + start + `"/>`)
+		} else {
+			builder.WriteString(`<dimension ref="` + start + `:` + excelCellAddress(used.EndRow, used.EndColumn) + `"/>`)
+		}
+	} else {
+		builder.WriteString(`<dimension ref="A1"/>`)
+	}
 	if len(sheet.ColumnWidths) > 0 {
 		builder.WriteString(`<cols>`)
 		for _, dimension := range sheet.ColumnWidths {
