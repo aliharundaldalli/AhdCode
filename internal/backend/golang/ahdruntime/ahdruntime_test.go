@@ -37,7 +37,7 @@ func init() {
 		AhdClassError, AhdClassConstantError, AhdClassDivisionByZeroError, AhdClassDomainError,
 		AhdClassIndexError, AhdClassIOError, AhdClassKeyError, AhdClassNullError, AhdClassOverflowError, AhdClassValueError,
 		AhdClassLatexError, AhdClassFileError, AhdClassWordError, AhdClassJSONError, AhdClassXMLError, AhdClassEnvError,
-		AhdClassListsError, AhdClassKeyValueError,
+		AhdClassListsError, AhdClassKeyValueError, AhdClassPDFError, AhdClassArchiveError,
 	} {
 		target := class
 		AhdRegisterError(target, func(message string) AhdInstance {
@@ -980,7 +980,7 @@ printf '%%PDF-fake' > "$out/$base.pdf"
 		t.Fatal(err)
 	}
 	output := filepath.Join(outputDirectory, "result (safe).pdf")
-	AhdLatexPDF("\\documentclass{article}\\begin{document}ok\\end{document}", output)
+	AhdLatexPDF("\\documentclass{article}\\begin{document}ok\\end{document}", output, "")
 	content, err := os.ReadFile(output)
 	if err != nil || string(content) != "%PDF-fake" {
 		t.Fatalf("published output = %q, %v", content, err)
@@ -1006,7 +1006,7 @@ func TestLatexFailuresRaiseLatexErrorAndPreserveDestination(t *testing.T) {
 	}
 	root := t.TempDir()
 	t.Setenv("AHDCODE_LATEX_RUNTIME", root)
-	expectRaise(t, AhdClassLatexError, func() { AhdLatexPDF("bad", filepath.Join(t.TempDir(), "x.pdf")) })
+	expectRaise(t, AhdClassLatexError, func() { AhdLatexPDF("bad", filepath.Join(t.TempDir(), "x.pdf"), "") })
 
 	if err := os.WriteFile(filepath.Join(root, "ahdcode-latex.ttb"), []byte("fixture"), 0o600); err != nil {
 		t.Fatal(err)
@@ -1018,7 +1018,7 @@ func TestLatexFailuresRaiseLatexErrorAndPreserveDestination(t *testing.T) {
 	if err := os.WriteFile(destination, []byte("%PDF-existing"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	expectRaise(t, AhdClassLatexError, func() { AhdLatexPDF("bad", destination) })
+	expectRaise(t, AhdClassLatexError, func() { AhdLatexPDF("bad", destination, "") })
 	content, err := os.ReadFile(destination)
 	if err != nil || string(content) != "%PDF-existing" {
 		t.Fatalf("a failed compile changed the destination: %q, %v", content, err)
@@ -1041,7 +1041,7 @@ func TestLatexTimeoutIsBoundedAndRaisesLatexError(t *testing.T) {
 	ahdLatexCompileTimeout = 20 * time.Millisecond
 	t.Cleanup(func() { ahdLatexCompileTimeout = previous })
 	started := time.Now()
-	expectRaise(t, AhdClassLatexError, func() { AhdLatexPDF("loop", filepath.Join(t.TempDir(), "x.pdf")) })
+	expectRaise(t, AhdClassLatexError, func() { AhdLatexPDF("loop", filepath.Join(t.TempDir(), "x.pdf"), "") })
 	if elapsed := time.Since(started); elapsed > time.Second {
 		t.Fatalf("timeout took %s", elapsed)
 	}
