@@ -101,6 +101,11 @@ func LowerCompilation(compilation module.CompilationResult) Result {
 					wordModule(ir.ModuleID(current.ID), current.Source.Name, current.Source.Path))
 				continue
 			}
+			if string(current.ID) == ExcelModuleID {
+				result.Modules = append(result.Modules,
+					excelModule(ir.ModuleID(current.ID), current.Source.Name, current.Source.Path))
+				continue
+			}
 			if string(current.ID) == JSONModuleID {
 				result.Modules = append(result.Modules,
 					jsonModule(ir.ModuleID(current.ID), current.Source.Name, current.Source.Path))

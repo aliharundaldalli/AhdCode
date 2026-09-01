@@ -178,6 +178,8 @@ func (session *Session) builtin(identity ir.CallableID, receiver any, arguments 
 		return session.numericBuiltin(strings.TrimPrefix(name, "builtin:Numeric::"), values(arguments))
 	case strings.HasPrefix(name, "builtin:Word::"):
 		return session.wordBuiltin(strings.TrimPrefix(name, "builtin:Word::"), values(arguments))
+	case strings.HasPrefix(name, "builtin:Excel::"):
+		return session.excelBuiltin(strings.TrimPrefix(name, "builtin:Excel::"), values(arguments))
 	case strings.HasPrefix(name, "builtin:JSON::"):
 		return session.jsonBuiltin(strings.TrimPrefix(name, "builtin:JSON::"), values(arguments))
 	case strings.HasPrefix(name, "builtin:XML::"):
@@ -310,6 +312,10 @@ func (session *Session) core(name string, receiver any, arguments []any) any {
 	}
 	if strings.HasPrefix(name, "Document.") {
 		return session.wordOperation(name, receiver, arguments)
+	}
+	if strings.HasPrefix(name, "Workbook.") || strings.HasPrefix(name, "Sheet.") || strings.HasPrefix(name, "Cell.") ||
+		strings.HasPrefix(name, "Range.") || strings.HasPrefix(name, "CellStyle.") {
+		return session.excelOperation(name, receiver, arguments)
 	}
 	if strings.HasPrefix(name, "JSONValue.") {
 		return session.jsonOperation(name, receiver, arguments)

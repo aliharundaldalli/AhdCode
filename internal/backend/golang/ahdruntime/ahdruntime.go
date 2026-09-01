@@ -79,6 +79,7 @@ var (
 	AhdClassPlotError           = &AhdClass{Name: "PlotError", Parent: AhdClassError}
 	AhdClassNumericError        = &AhdClass{Name: "NumericError", Parent: AhdClassError}
 	AhdClassWordError           = &AhdClass{Name: "WordError", Parent: AhdClassError}
+	AhdClassExcelError          = &AhdClass{Name: "ExcelError", Parent: AhdClassError}
 	AhdClassJSONError           = &AhdClass{Name: "JSONError", Parent: AhdClassError}
 	AhdClassXMLError            = &AhdClass{Name: "XMLError", Parent: AhdClassError}
 	AhdClassEnvError            = &AhdClass{Name: "EnvError", Parent: AhdClassError}

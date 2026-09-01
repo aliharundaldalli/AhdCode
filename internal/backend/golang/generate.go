@@ -28,8 +28,9 @@ type GeneratedProgram struct {
 }
 
 const (
-	programFileName = "ahdcode_program.go"
-	runtimeFileName = "ahdcode_runtime.go"
+	programFileName      = "ahdcode_program.go"
+	runtimeFileName      = "ahdcode_runtime.go"
+	excelRuntimeFileName = "ahdcode_excel_runtime.go"
 )
 
 // storage describes the Go representation chosen for one IR symbol.
@@ -98,15 +99,24 @@ func Generate(compilation *ir.Compilation) (*GeneratedProgram, []diagnostics.Dia
 	if err != nil {
 		return nil, append(generator.diagnostics, backendError(CodeFormatFailure, "embedded runtime source is not valid Go: "+err.Error(), source.Span{}, "the backend runtime must remain gofmt-clean"))
 	}
+	excelRuntime, err := format.Source([]byte(excelRuntimeSource()))
+	if err != nil {
+		return nil, append(generator.diagnostics, backendError(CodeFormatFailure, "embedded Excel runtime source is not valid Go: "+err.Error(), source.Span{}, "the Excel backend runtime must remain gofmt-clean"))
+	}
 	return &GeneratedProgram{Files: []GeneratedFile{
 		{Name: programFileName, Content: string(formatted)},
 		{Name: runtimeFileName, Content: string(runtime)},
+		{Name: excelRuntimeFileName, Content: string(excelRuntime)},
 	}, RequiresLatex: generator.usesLatex, RequiresPlot: generator.usesPlot, RequiresNumeric: generator.usesNumeric}, generator.diagnostics
 }
 
 // runtimeSource re-points the shared runtime package at the generated program.
 func runtimeSource() string {
 	return strings.Replace(ahdruntime.Source, "package ahdruntime", "package main", 1)
+}
+
+func excelRuntimeSource() string {
+	return strings.Replace(ahdruntime.ExcelSource, "package ahdruntime", "package main", 1)
 }
 
 func (generator *generator) hasErrors() bool {
@@ -346,6 +356,7 @@ func (generator *generator) emitProgram() string {
 	generator.emitPlotHelpers(writer)
 	generator.emitNumericHelpers(writer)
 	generator.emitWordHelpers(writer)
+	generator.emitExcelHelpers(writer)
 	generator.emitJSONValueHelpers(writer)
 	generator.emitXMLHelpers(writer)
 	writer.raw(bodies.String())

@@ -760,6 +760,9 @@ func (generator *generator) call(value *ir.CallExpr) string {
 	if strings.HasPrefix(string(value.Callable), wordModulePrefix) {
 		return generator.wordCall(value)
 	}
+	if strings.HasPrefix(string(value.Callable), excelModulePrefix) {
+		return generator.excelCall(value)
+	}
 	if strings.HasPrefix(string(value.Callable), jsonModulePrefix) {
 		return generator.jsonCall(value)
 	}
@@ -1016,6 +1019,10 @@ func (generator *generator) builtinCall(value *ir.CallExpr) string {
 		}
 		if strings.HasPrefix(name, "Document.") {
 			return generator.wordOperation(name, value)
+		}
+		if strings.HasPrefix(name, "Workbook.") || strings.HasPrefix(name, "Sheet.") || strings.HasPrefix(name, "Cell.") ||
+			strings.HasPrefix(name, "Range.") || strings.HasPrefix(name, "CellStyle.") {
+			return generator.excelOperation(name, value)
 		}
 		if strings.HasPrefix(name, "JSONValue.") {
 			return generator.jsonOperation(name, value)
