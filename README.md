@@ -99,7 +99,11 @@ go install ./cmd/ahdcode ./cmd/ahdnumeric ./cmd/ahdplot
 ```
 
 The command above installs the compiler and the local numeric/plot rendering helpers.
-If you plan to use the `Latex` module, you must also stage the offline Latex runtime bundle. This requires a one-time network fetch to download pinned, checksummed resources:
+If you plan to use the `Latex` module **or** the `PDF` module's `.save()` (they
+share one offline renderer), you must also stage the offline Latex/Tectonic
+runtime bundle. `Archive` needs no such staging -- it is Go-standard-library
+only. Staging requires a one-time network fetch to download pinned,
+checksummed resources:
 
 ```bash
 go run ./tooling/latex/cmd/package-latex --output "$(go env GOPATH)"

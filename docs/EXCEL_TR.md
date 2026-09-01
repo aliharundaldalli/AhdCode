@@ -181,8 +181,9 @@ reddedilir. Harici bağlantılar açılmaz ve ağ isteği yapılmaz.
 seçmeden önce açık JSONValue tür denetimi kullanın. Excel bu modülleri
 çoğaltmaz ve `Table`, `Pair` veya `JSONValue` için `Any` köprüsü kabul etmez.
 
-v0.1.19 yalnızca XLSX'tir. `.xls`, `.xlsm`, makrolar, grafikler, görseller,
+v0.1.20 yalnızca XLSX'tir. `.xls`, `.xlsm`, makrolar, grafikler, görseller,
 pivot tablolar, zengin metin parçaları, formula hesaplama, tarih çıkarımı,
-şifreleme, baskı düzeni veya kullanıcıya açık ZIP API'si içermez. Özellikle
-PDF dışa aktarımı yoktur; Word/Excel/PDF bileşimi planlanan v0.1.20 PDF
-katmanına ertelenmiştir.
+şifreleme, baskı düzeni veya kullanıcıya açık ZIP API'si içermez. `Excel`'in
+kendisinin PDF dışa aktarımı yoktur, ancak `PDF.fromExcel(workbook)`, Excel'i
+hiç kullanmadan bir Workbook'u PDF belgesine dönüştürür — bkz.
+[PDF](PDF_TR.md).

@@ -157,9 +157,10 @@ Vector2: Class<> := {
 
 Use `attempt`, `except`, `ultimately`, and `toss` for catchable errors. Use
 `bring ModuleName` for a namespace or `from ModuleName bring name` for a direct
-symbol. Local modules are sibling files. `Math`, `Time`, `Latex`, `Word`, `Excel`, `Path`,
-`Regex`, `CSV`, `Data`, `File`, `Statistics`, `Plot`, `Numeric`, `JSON`, `XML`, `Env`, `Lists`, and `KeyValue` are explicit standard modules; their domain and
-file failures are catchable AhdCode errors.
+symbol. Local modules are sibling files. `Math`, `Time`, `Latex`, `Word`, `Excel`,
+`PDF`, `Archive`, `Path`, `Regex`, `CSV`, `Data`, `File`, `Statistics`, `Plot`,
+`Numeric`, `JSON`, `XML`, `Env`, `Lists`, and `KeyValue` are explicit standard
+modules; their domain and file failures are catchable AhdCode errors.
 
 Continue with [Functions](FUNCTIONS.md), [Classes](CLASSES.md),
 [Class Protocol Methods](PROTOCOLS.md), [Collections](COLLECTIONS.md), and
@@ -168,5 +169,9 @@ transports String rows and records, and Data turns them into an immutable
 `Table` of String cells; JSON and XML are typed structured-data models, and
 Env reads process/`.env` configuration; Lists and KeyValue are the pure
 structural transformation layer over `List` and `Pair`; Excel adds typed,
-immutable XLSX workbooks. See [Time](TIME.md), [CSV](CSV.md), [Data](DATA.md), [Statistics](STATISTICS.md), [Plot](PLOT.md), [Numeric](NUMERIC.md), [Word](WORD.md), [Excel](EXCEL.md), [JSON](JSON.md), [XML](XML.md), [Env](ENV.md), [Lists](LISTS.md), [KeyValue](KEYVALUE.md), and the
+immutable XLSX workbooks; PDF builds immutable documents and renders them
+offline to real `.pdf` files (sharing Latex's staged Tectonic renderer), with
+semantic `PDF.fromWord`/`PDF.fromExcel` conversion; Archive packages files
+into real ZIP/TAR/TAR.GZ archives, creation-only, using nothing beyond the Go
+standard library. See [Time](TIME.md), [CSV](CSV.md), [Data](DATA.md), [Statistics](STATISTICS.md), [Plot](PLOT.md), [Numeric](NUMERIC.md), [Word](WORD.md), [Excel](EXCEL.md), [PDF](PDF.md), [Archive](ARCHIVE.md), [JSON](JSON.md), [XML](XML.md), [Env](ENV.md), [Lists](LISTS.md), [KeyValue](KEYVALUE.md), and the
 [diagnostics guide](DIAGNOSTICS.md).

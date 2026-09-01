@@ -17,11 +17,17 @@ ahdcode run examples/v0.1/02_input.ahd
 ahdcode run examples/v0.1/14_grade_app.ahd
 ```
 
-Before running `16_latex.ahd`, remember that the `Latex` module requires you to stage the offline compiler once using:
+`Latex` and `PDF` share one offline renderer. Before running any example that
+compiles a PDF -- `16_latex.ahd`, `34_latex_report.ahd`, `35_latex_beamer.ahd`,
+`36_full_workflow.ahd`, `41_latex_beamer_themes.ahd`, `55_pdf_basic.ahd`,
+`56_pdf_word_excel.ahd`, or `58_latex_pdf_tex_archive.ahd` -- stage it once:
 
 ```bash
 go run ./tooling/latex/cmd/package-latex --output "$(go env GOPATH)"
 ```
+
+`57_archive.ahd` needs no such staging: `Archive` uses only the Go standard
+library and runs anywhere, offline, with no external renderer.
 
 | Example | Topic |
 |---|---|

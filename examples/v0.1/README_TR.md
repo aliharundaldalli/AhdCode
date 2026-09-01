@@ -17,11 +17,19 @@ ahdcode run examples/v0.1/02_input.ahd
 ahdcode run examples/v0.1/14_grade_app.ahd
 ```
 
-`16_latex.ahd` örneğini çalıştırmadan önce, `Latex` modülünün çevrimdışı derleyiciyi bir kez hazırlamanızı (stage) gerektirdiğini unutmayın:
+`Latex` ve `PDF`, tek bir çevrimdışı render motorunu paylaşır. Bir PDF
+derleyen herhangi bir örneği çalıştırmadan önce -- `16_latex.ahd`,
+`34_latex_report.ahd`, `35_latex_beamer.ahd`, `36_full_workflow.ahd`,
+`41_latex_beamer_themes.ahd`, `55_pdf_basic.ahd`, `56_pdf_word_excel.ahd`
+veya `58_latex_pdf_tex_archive.ahd` -- onu bir kez hazırlayın (stage):
 
 ```bash
 go run ./tooling/latex/cmd/package-latex --output "$(go env GOPATH)"
 ```
+
+`57_archive.ahd` böyle bir hazırlığa ihtiyaç duymaz: `Archive` yalnızca Go
+standart kütüphanesini kullanır ve harici bir render motoru olmadan, her
+yerde, çevrimdışı çalışır.
 
 | Örnek | Konu |
 |---|---|

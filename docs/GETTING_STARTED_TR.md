@@ -12,7 +12,11 @@ go test ./...
 go install ./cmd/ahdcode ./cmd/ahdnumeric ./cmd/ahdplot
 ```
 
-Eğer `Latex` modülünü kullanmayı planlıyorsanız, çevrimdışı (offline) Latex çalışma zamanını da hazırlamanız (stage) gerekir. Bu adım, sabitlenmiş kaynakları indirmek için bir defaya mahsus ağ bağlantısı kullanır:
+Eğer `Latex` modülünü veya `PDF` modülünün `.save()` metodunu kullanmayı
+planlıyorsanız (ikisi de aynı çevrimdışı render motorunu paylaşır),
+çevrimdışı (offline) Latex/Tectonic çalışma zamanını da hazırlamanız (stage)
+gerekir. `Archive` böyle bir hazırlığa ihtiyaç duymaz. Bu adım, sabitlenmiş
+kaynakları indirmek için bir defaya mahsus ağ bağlantısı kullanır:
 
 ```bash
 go run ./tooling/latex/cmd/package-latex --output "$(go env GOPATH)"
@@ -94,5 +98,6 @@ kanonik (standart) biçimde olup olmadığını yalnızca kontrol eder.
 
 Sırada: [dil turunu](LANGUAGE_TOUR_TR.md) ve
 [tanılama rehberini](DIAGNOSTICS_TR.md) okuyun veya UTC Time ve CSV dahil
-[derlenmiş örnekleri](../examples/v0.1/README_TR.md) ve
-[Data tablolarını](DATA_TR.md) çalıştırın.
+[derlenmiş örnekleri](../examples/v0.1/README_TR.md),
+[Data tablolarını](DATA_TR.md), [PDF](PDF_TR.md) üretimini ve
+[Archive](ARCHIVE_TR.md) paketlemesini çalıştırın.

@@ -105,7 +105,12 @@ go install ./cmd/ahdcode ./cmd/ahdnumeric ./cmd/ahdplot
 ```
 
 Yukarıdaki komut, derleyiciyi ve yerel numeric/plot yardımcılarını (helpers) kurar.
-Eğer `Latex` modülünü kullanmayı planlıyorsanız, çevrimdışı (offline) Latex çalışma zamanını da hazırlamanız (stage) gerekir. Bu işlem, sabitlenmiş ve doğrulanmış kaynakları indirmek için bir defaya mahsus ağ bağlantısı kullanır:
+Eğer `Latex` modülünü **veya** `PDF` modülünün `.save()` metodunu kullanmayı
+planlıyorsanız (ikisi de aynı çevrimdışı render motorunu paylaşır),
+çevrimdışı (offline) Latex/Tectonic çalışma zamanını da hazırlamanız (stage)
+gerekir. `Archive` böyle bir hazırlığa ihtiyaç duymaz — yalnızca Go standart
+kütüphanesini kullanır. Hazırlık işlemi, sabitlenmiş ve doğrulanmış
+kaynakları indirmek için bir defaya mahsus ağ bağlantısı kullanır:
 
 ```bash
 go run ./tooling/latex/cmd/package-latex --output "$(go env GOPATH)"

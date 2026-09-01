@@ -10,8 +10,10 @@ Start a persistent interactive session:
 ahdcode
 ```
 
+Startup prints a version banner matching `ahdcode --version` (currently
+`AhdCode v0.1.20`), then the `ahd>` prompt:
+
 ```text
-AhdCode v0.1.16
 ahd> x := 5
 ahd> x = x + 1
 ahd> x
@@ -73,3 +75,17 @@ prompt `...>`. Ordinary declaration rules remain: redeclaring `x` in the same
 scope is an error; mutation uses `=`. A failed semantic submission or an
 uncaught AhdCode Error does not terminate the REPL or erase the preceding
 successfully committed source context.
+
+## Latex and PDF in the REPL
+
+`Latex`'s markup-building helpers (`document`, `table`, `section`, `escape`,
+and the rest) and `PDF`'s document-building operations (`PDF.new()`,
+`heading`, `paragraph`, `table`, `image`, `pageBreak`, `PDF.fromWord`,
+`PDF.fromExcel`) all work normally in the REPL -- they only build values in
+memory. Actually compiling a PDF invokes the offline Tectonic renderer as an
+external process, which the persistent evaluator does not support:
+`Latex.pdf(...)`, `Latex.pdfFile(...)`, and `PDFDocument.save(...)` all raise
+an error (`LatexError`/`PDFError`) when called interactively. Run them from a
+`.ahd` file with `ahdcode run` or `ahdcode build` instead. `Archive` has no
+such limitation -- `Archive.zip`/`tar`/`tarGzip` work fully in the REPL,
+since archiving uses only the Go standard library.

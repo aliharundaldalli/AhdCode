@@ -10,8 +10,10 @@ Kalıcı (persistent) bir etkileşimli oturum başlatın:
 ahdcode
 ```
 
+Başlangıçta `ahdcode --version` ile eşleşen bir sürüm başlığı (şu anda
+`AhdCode v0.1.20`) yazdırılır, ardından `ahd>` istemi gelir:
+
 ```text
-AhdCode v0.1.16
 ahd> x := 5
 ahd> x = x + 1
 ahd> x
@@ -77,3 +79,18 @@ eder: aynı kapsamda `x`'i yeniden bildirmek bir hatadır; değişiklik için
 `=` kullanılır. Başarısız bir semantik gönderim (submission) veya
 yakalanmamış bir AhdCode Error, REPL'i sonlandırmaz veya önceki başarıyla
 işlenmiş kaynak bağlamını (context) silmez.
+
+## REPL'de Latex ve PDF
+
+`Latex`'in markup oluşturma yardımcıları (`document`, `table`, `section`,
+`escape` ve diğerleri) ve `PDF`'in belge oluşturma işlemleri (`PDF.new()`,
+`heading`, `paragraph`, `table`, `image`, `pageBreak`, `PDF.fromWord`,
+`PDF.fromExcel`) REPL'de normal şekilde çalışır — bunlar yalnızca bellekte
+değer oluşturur. Gerçekten bir PDF derlemek, çevrimdışı Tectonic render
+motorunu harici bir işlem olarak çağırır; kalıcı evaluator bunu desteklemez:
+`Latex.pdf(...)`, `Latex.pdfFile(...)` ve `PDFDocument.save(...)`,
+etkileşimli olarak çağrıldığında bir hata fırlatır (`LatexError`/`PDFError`).
+Bunları bir `.ahd` dosyasından `ahdcode run` veya `ahdcode build` ile
+çalıştırın. `Archive`'ın böyle bir sınırlaması yoktur — `Archive.zip`/`tar`/
+`tarGzip` REPL'de tamamen çalışır, çünkü arşivleme yalnızca Go standart
+kütüphanesini kullanır.

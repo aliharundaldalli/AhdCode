@@ -184,6 +184,6 @@ bridge.
 
 v0.1.20 is XLSX-only. It does not include `.xls`, `.xlsm`, macros, charts,
 images, pivot tables, rich-text runs, formula calculation, date inference,
-encryption, print layout, or a user-facing ZIP API. In particular, there is no
-PDF export; Word/Excel/PDF composition is deferred to the planned v0.1.20 PDF
-layer.
+encryption, print layout, or a user-facing ZIP API. `Excel` itself has no PDF
+export, but `PDF.fromExcel(workbook)` converts a Workbook into a PDF document
+without going through Excel at all -- see [PDF](PDF.md).

@@ -92,7 +92,11 @@ shell profile. For a temporary current-shell setting only:
 export PATH="$(go env GOPATH)/bin:$PATH"
 ```
 
-If the user wants Latex support, explicitly ask for permission to stage the Latex runtime, as this performs an installation-time network operation to fetch pinned/checksummed resources. Do not use a system TeX fallback.
+If the user wants `Latex` support **or** `PDF`'s `.save()` (they share one
+offline renderer), explicitly ask for permission to stage the Latex/Tectonic
+runtime, as this performs an installation-time network operation to fetch
+pinned/checksummed resources. Do not use a system TeX fallback. `Archive`
+needs no such staging -- it is Go-standard-library only.
 
 ```bash
 go run ./tooling/latex/cmd/package-latex --output "$(go env GOPATH)"
@@ -202,7 +206,11 @@ $env:Path = "$(go env GOPATH)\bin;$env:Path"
 
 Do not persist it to the user or system environment without permission.
 
-If the user wants Latex support, explicitly ask for permission to stage the Latex runtime, as this performs an installation-time network operation to fetch pinned/checksummed resources. Do not use a system TeX fallback.
+If the user wants `Latex` support **or** `PDF`'s `.save()` (they share one
+offline renderer), explicitly ask for permission to stage the Latex/Tectonic
+runtime, as this performs an installation-time network operation to fetch
+pinned/checksummed resources. Do not use a system TeX fallback. `Archive`
+needs no such staging -- it is Go-standard-library only.
 
 ```powershell
 go run ./tooling/latex/cmd/package-latex --output "$(go env GOPATH)"

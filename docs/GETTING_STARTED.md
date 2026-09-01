@@ -14,7 +14,10 @@ go test ./...
 go install ./cmd/ahdcode ./cmd/ahdnumeric ./cmd/ahdplot
 ```
 
-If you plan to use the `Latex` module, you must also stage the offline Latex runtime bundle. This step performs a one-time network fetch for pinned resources:
+If you plan to use the `Latex` module or the `PDF` module's `.save()` (they
+share one offline renderer), you must also stage the offline Latex/Tectonic
+runtime bundle. `Archive` needs no such staging. This step performs a
+one-time network fetch for pinned resources:
 
 ```bash
 go run ./tooling/latex/cmd/package-latex --output "$(go env GOPATH)"
@@ -95,5 +98,6 @@ the file is already canonical.
 
 Next: read the [language tour](LANGUAGE_TOUR.md), learn how to act on
 [diagnostics](DIAGNOSTICS.md), or run the
-[curated examples](../examples/v0.1/README.md), including UTC Time, CSV, and
-[Data tables](DATA.md).
+[curated examples](../examples/v0.1/README.md), including UTC Time, CSV,
+[Data tables](DATA.md), [PDF](PDF.md) generation, and
+[Archive](ARCHIVE.md) packaging.
