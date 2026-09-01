@@ -2,7 +2,7 @@
 
 [English](DATA.md) · [Türkçe]
 
-[README'ye dön](../README_TR.md) · [CSV](CSV_TR.md) · [Modüller](MODULES_TR.md)
+[README'ye dön](../README_TR.md) · [KeyValue](KEYVALUE_TR.md) · [CSV](CSV_TR.md) · [Modüller](MODULES_TR.md)
 
 Data; mevcut String, List, Pair, Function, Lambda ve CSV altyapısı üzerine
 kurulmuş küçük, katı (strict) ve değiştirilemez (immutable) bir tablo

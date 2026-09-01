@@ -158,7 +158,7 @@ Vector2: Class<> := {
 Use `attempt`, `except`, `ultimately`, and `toss` for catchable errors. Use
 `bring ModuleName` for a namespace or `from ModuleName bring name` for a direct
 symbol. Local modules are sibling files. `Math`, `Time`, `Latex`, `Word`, `Path`,
-`Regex`, `CSV`, `Data`, `File`, `Statistics`, `Plot`, `Numeric`, `JSON`, `XML`, and `Env` are explicit standard modules; their domain and
+`Regex`, `CSV`, `Data`, `File`, `Statistics`, `Plot`, `Numeric`, `JSON`, `XML`, `Env`, `Lists`, and `KeyValue` are explicit standard modules; their domain and
 file failures are catchable AhdCode errors.
 
 Continue with [Functions](FUNCTIONS.md), [Classes](CLASSES.md),
@@ -166,5 +166,6 @@ Continue with [Functions](FUNCTIONS.md), [Classes](CLASSES.md),
 [Modules](MODULES.md). Time covers local, UTC, and fixed-offset instants; CSV
 transports String rows and records, and Data turns them into an immutable
 `Table` of String cells; JSON and XML are typed structured-data models, and
-Env reads process/`.env` configuration. See [Time](TIME.md), [CSV](CSV.md), [Data](DATA.md), [Statistics](STATISTICS.md), [Plot](PLOT.md), [Numeric](NUMERIC.md), [Word](WORD.md), [JSON](JSON.md), [XML](XML.md), [Env](ENV.md), and the
+Env reads process/`.env` configuration; Lists and KeyValue are the pure
+structural transformation layer over `List` and `Pair`. See [Time](TIME.md), [CSV](CSV.md), [Data](DATA.md), [Statistics](STATISTICS.md), [Plot](PLOT.md), [Numeric](NUMERIC.md), [Word](WORD.md), [JSON](JSON.md), [XML](XML.md), [Env](ENV.md), [Lists](LISTS.md), [KeyValue](KEYVALUE.md), and the
 [diagnostics guide](DIAGNOSTICS.md).

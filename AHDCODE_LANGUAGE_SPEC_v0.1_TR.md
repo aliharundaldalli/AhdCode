@@ -5536,6 +5536,224 @@ ve `override = true` ile `.env` değeri her zaman kazanır.
 `EnvError` doğrudan `Error`'dan türer ve her Env'e özgü hatayı uçtan uca
 kapsar.
 
+## 62. Tür-Yönelimli Standart Modül İşlemleri (v0.1.18)
+
+Standart modül fonksiyonlarının çoğu tek bir sabit imza yayımlar ve sıradan
+çağrı yolu bunu denetler. Birkaçı bu şekilde tanımlanamaz. `Lists.chunk`, bir
+`List<Int>` ve bir `List<String>` üzerinde iki farklı ama aynı ölçüde kesin
+sonuç türüne sahiptir; ne silinmiş bir eleman türü ne de eleman başına aşırı
+yükleme ailesi bunları korur.
+
+Bir *tür-yönelimli modül işlemi*, kesin somut imzası her çağrı yerinde orada
+yazılan statik olarak bilinen argüman türlerinden hesaplanan, derleyici
+tarafından sağlanan bir standart modül fonksiyonudur. §12 ve §27'deki
+alıcı-yönelimli tür işlemlerinin modül-fonksiyonu karşılığıdır: bir tür işlemi
+noktadan sonra alıcının statik türüyle seçilir, bir modül işlemi ise çözülen
+modül sembolüyle seçilir ve ardından argümanlarına göre özelleştirilir.
+
+Bu tamamen bir iç derleyici mekanizmasıdır. Hiçbir sözdizimi eklemez:
+
+- kullanıcıya açık genel (generic) `Function` sözdizimi yoktur ve
+  `Lists.chunk<Int>(...)` AhdCode değildir;
+- hiçbir argüman `List<Object>`, `Pair<Object, Object>`, `Any` veya `dynamic`
+  olarak ele alınmaz;
+- eleman başına aşırı yükleme ailesi üretilmez;
+- anlamsal denetleyici kesin sonuç türünü derleme zamanında bilir; alçaltma
+  (lowering), yerel arka uç, değerlendirici, REPL ve `build` aynı
+  özelleştirilmiş imzayı okur.
+
+Genel değişmezlik (generic invariance, §13) değişmez. `Lists.chunk(List<Int>,
+2)` `List<List<Int>>`'tir, asla `List<List<Real>>` değildir; `KeyValue.merge`,
+değer null olabilirliği dahil tam olarak aynı türde iki `Pair` ister. Yapısal
+null olabilirlik (§14) silinmez, korunur ve `Pair` anahtarları null olamaz,
+`String`, `Int` ve `Bool` ile sınırlıdır (§11.3).
+
+Her iki çağrı yazımı da aynı analize çözülür:
+
+```ahd
+bring Lists
+from Lists bring chunk
+
+parts := Lists.chunk(values, 10)
+same := chunk(values, 10)
+```
+
+**İç/dış sınır.** Bir çağrı kendi argümanlarına göre özelleştirildiği için
+tür-yönelimli bir işlemin tek bir somut `Function` türü, dolayısıyla
+özelleştirilmemiş bir `Function` değeri yoktur:
+
+```ahd
+stored := Lists.chunk
+```
+
+derleme zamanı tanısıdır. Bunu desteklemek ya dinamik çok biçimli bir
+`Function` değeri ya da kullanıcıya açık genel `Function` sözdizimi
+gerektirirdi; v0.1'de ikisi de yoktur. Çağıran, istediği biçimi sıradan bir
+`Function`'a sarar. Bu sınır bilinçlidir ve bir kusur değildir.
+
+## 63. Lists Standart Modülü (v0.1.18)
+
+`bring Lists`, kanonik derleyici-kayıtlı `builtin:Lists` modülünü içe aktarır.
+Kardeş bir `Lists.ahd` onu gölgeleyemez. Modül derleyicinin sağladığı
+`ListsError` artı altı tür-yönelimli işlemi (§62) dışa açar:
+
+```text
+Lists.chunk(List<T>, Int)                     -> List<List<T>>
+Lists.flatten(List<List<T>>)                  -> List<T>
+Lists.transpose(List<List<T>>)                -> List<List<T>>
+Lists.unique(List<T>)                         -> List<T>
+Lists.valueCounts(List<K>)                    -> Pair<K, Int>
+Lists.groupBy(List<T>, Function(T) -> K)      -> Pair<K, List<T>>
+```
+
+`T` ve `K` spesifikasyon meta-değişkenleridir, AhdCode sözdizimi değildir.
+`K`, null olamayan bir `Pair` anahtar türü olmalıdır (§11.3).
+
+Lists, çekirdek `List` türünün zaten sağladığı hiçbir şeyi tekrarlamaz:
+`add`, `eject`, `sort`, `reverse`, `shuffle`, `count`, `index`, `map`,
+`filter`, dilimleme ve `List + List` `List` üyeleri olarak kalır (§27).
+
+`chunk`, bir `List`'i kaynak sırasında en fazla `size` elemanlı ardışık
+Listelere böler. Son parça doldurulmaz, kısa kalır. Boş bir kaynak doğru
+türde boş bir sonuç üretir; uzunluktan büyük bir `size` tek bir parça üretir.
+`size` sıfırdan büyük olmalıdır; `0` veya negatif bir değer `ListsError`
+yükseltir.
+
+`flatten` tam olarak bir yuvalanma düzeyini birleştirir. Özyinelemeli
+değildir. İç Listeler null olamaz: `List<List<T>?>` derleme zamanı tür
+hatasıdır, çünkü null bir iç List'in tanımlı bir katkısı yoktur ve onu
+atlamak veriyi sessizce düşürürdü.
+
+`transpose` satırlarla sütunları değiştirir ve dikdörtgen girdi ister: her
+satırın uzunluğu tam olarak aynı olmalıdır. Düzensiz girdi, kusurlu satırın 0
+tabanlı indeksini, uzunluğunu ve beklenen uzunluğu belirten bir `ListsError`
+yükseltir. Hiçbir şey doldurulmaz, kırpılmaz veya çıkarsanmaz. `[]`, `[]`'ye;
+`[[], []]`, `[]`'ye; `[[1, 2, 3]]` ise `[[1], [2], [3]]`'e transpoze olur.
+İki kez transpoze etmek özgün biçimi geri getirir.
+
+`unique`, sıradan `==` eşitliğini (§10) kullanarak her farklı elemanın ilk
+oluşumunu ilk-oluşum sırasında korur. Değerler asla metne çevrilmez veya
+nesne adresi üzerinden karşılaştırılmaz; bu yüzden `List` ve `Pair` elemanları
+derin, `Class` örnekleri ise `==` için zaten tanımlı biçimde karşılaştırılır.
+Null olabilen bir eleman türünde `null` sıradan, ayrı bir değerdir. Bir
+`List<Function>` reddedilir, çünkü `==`, `Function` değerleri için bir
+karşılaştırma tanımlamaz.
+
+`valueCounts`, eşit elemanları elemanın kendisiyle anahtarlanmış bir `Pair`
+içinde ilk-oluşum sırasında sayar. Eleman türü null olamayan bir `Pair`
+anahtar türü olmalıdır; `List<Real>`, `List<Class>`, `List<List<T>>` ve
+`List<String?>` derleme zamanı hatalarıdır ve uydurmak için hiçbir şey
+`String`'e çevrilmez.
+
+`groupBy`, elemanları bir anahtar `Function`'ı ile anahtarlanmış yeni
+Listelere böler. Anahtar sırası ilk-anahtar-oluşumdur ve üyeler kaynak
+sırasını korur. Anahtar `Function`'ının parametresi tam olarak `List`'in
+eleman türü — null olabilirliği dahil — olmalı, sonucu ise null olamayan bir
+`Pair` anahtar türü olmalıdır; `Nothing` sonucu derleme zamanı hatasıdır.
+Kaynağın sığ bir anlık görüntüsü üzerinde, soldan sağa, eleman başına tam
+olarak bir kez çalışır; bu `List.map`/`List.filter` ile aynıdır (§27). Hata
+yükselten bir geri çağırım kendi hatasını değişmeden yayar ve kısmi bir sonuç
+üretilmez.
+
+Her işlem koleksiyon yapısı açısından saftır: kaynak `List` asla
+değiştirilmez, bu yüzden bir `Constant List` geçirilebilir ve döndürülen her
+`List` yeni bir yapısal koleksiyondur. Dönüşüm sığdır — başvurulan elemanlar
+referansla taşınır, asla derin kopyalanmaz.
+
+`ListsError` doğrudan `Error`'dan türer ve sıfır veya daha küçük bir `chunk`
+boyutunu ve düzensiz `transpose` girdisini kapsar. Tür bakımından geçersiz
+çağrılar derleme zamanı tür hatası olarak kalır; bir geri çağırım kendi hata
+türünü korur ve asla sarmalanmaz.
+
+## 64. KeyValue Standart Modülü (v0.1.18)
+
+`bring KeyValue`, kanonik derleyici-kayıtlı `builtin:KeyValue` modülünü içe
+aktarır. Kardeş bir `KeyValue.ahd` onu gölgeleyemez. Modül derleyicinin
+sağladığı `KeyValueError` artı on bir tür-yönelimli işlemi (§62) dışa açar:
+
+```text
+KeyValue.keys(Pair<K, V>)                        -> List<K>
+KeyValue.values(Pair<K, V>)                      -> List<V>
+KeyValue.combine(List<K>, List<V>)               -> Pair<K, V>
+KeyValue.with(Pair<K, V>, K, V)                  -> Pair<K, V>
+KeyValue.without(Pair<K, V>, K)                  -> Pair<K, V>
+KeyValue.select(Pair<K, V>, List<K>)             -> Pair<K, V>
+KeyValue.drop(Pair<K, V>, List<K>)               -> Pair<K, V>
+KeyValue.rename(Pair<K, V>, K, K)                -> Pair<K, V>
+KeyValue.mapValues(Pair<K, V>, Function(V) -> U) -> Pair<K, U>
+KeyValue.merge(Pair<K, V>, Pair<K, V>)           -> Pair<K, V>
+KeyValue.overlay(Pair<K, V>, Pair<K, V>)         -> Pair<K, V>
+```
+
+KeyValue yeni bir kapsayıcı getirmez. `Pair<K, V>` (§11) dilin sıralı, homojen
+anahtar/değer türü olarak kalır; `Dictionary`, `Map`, `Record`, `Struct`,
+`Tuple` veya `Any` anahtarlı bir kapsayıcı yoktur ve KeyValue yalnızca `Pair`
+üzerinde saf bir dönüşüm katmanıdır.
+
+`keys` ve `values`, `Pair` ekleme sırasında taze `List` anlık görüntüleri
+döndürür; bir anlık görüntüyü değiştirmek asla `Pair`'e ulaşmaz. `values`,
+`Pair`'in yapısal değer null olabilirliğini korur.
+
+`combine`, bir anahtar `List`'i ve bir değer `List`'inden anahtar-List
+sırasında bir `Pair` kurar. Uzunluklar tam olarak eşit olmalıdır — hiçbir şey
+doldurulmaz veya kırpılmaz — ve tekrarlanan bir anahtar son-yazan-kazanır ile
+çözülmek yerine reddedilir; ikisi de `KeyValueError` yükseltir. İki boş tipli
+List doğru türde boş bir `Pair` üretir.
+
+`with`, `pair[key] = value` ifadesinin saf karşılığıdır: var olan bir anahtar
+tam konumunu korur ve yeni değeri alır, olmayan bir anahtar sona eklenir.
+Kaynak `Pair` asla değiştirilmez.
+
+`without` bir anahtarı kaldırır ve kalan her girdinin sırasını korur. Olmayan
+bir anahtar mevcut `KeyError`'ı yükseltir (§11.2); bu `Pair.eject` ile
+eşleşir ve istek asla sessizce yok sayılmaz.
+
+`select` tam olarak istenen anahtarları **istenen anahtar-List sırasında**
+tutar, kaynak sırasında değil. `drop` tam olarak istenen anahtarları kaldırır
+ve korunanların kaynak sırasını korur. İkisinde de bilinmeyen bir anahtar
+`KeyError`, iki kez istenen bir anahtar `KeyValueError` yükseltir; istekler
+asla sessizce tekilleştirilmez. Boş bir anahtar `List`'i `select` için boş bir
+`Pair`, `drop` için yapısal bir kopya verir.
+
+`rename` bir anahtarı yerinde yeniden adlandırır, konumunu ve değerini korur.
+Olmayan bir eski anahtar `KeyError`; zaten başka bir girdiye ait olan yeni bir
+anahtar `KeyValueError` yükseltir. Bir anahtarı kendisiyle yeniden
+adlandırmak, hata yerine taze ve yapısal olarak eşdeğer bir `Pair` döndürür.
+
+`mapValues` her değeri bir `Function` ile yeniden yazar, anahtar kümesini ve
+sırasını korur. Geri çağırımın parametresi tam olarak `Pair`'in değer türü —
+null olabilirliği dahil — olmalıdır; sonucunun türü yeni değer türü olur ve
+sonuç null olabilirliği korunur, böylece `Function(V) -> U?`, `Pair<K, U?>`
+verir. `Nothing` sonucu derleme zamanı hatasıdır. Geri çağırım `Pair` ekleme
+sırasında değer başına tam olarak bir kez çalışır ve hata yükselten bir geri
+çağırım kendi hatasını değişmeden yayar.
+
+`merge` ve `overlay`, `Bool` bayraklı tek bir fonksiyon yerine iki adlandırılmış
+fonksiyondur; çünkü niyeti belirten şey addır. `merge` güvenli bir ayrık
+birleşimdir: önce sol sıra, sonra sağ sıra; iki `Pair`'de birden bulunan bir
+anahtar, sessizce bir kazanan seçmek yerine `KeyValueError` yükseltir.
+`overlay` açıkça adlandırılmış değişiklikler-kazanır işlemidir: var olan bir
+taban anahtarı konumunu korur ve yeni değeri alır, yalnızca `changes` içindeki
+bir anahtar `changes` ekleme sırasında sona eklenir. İkisi de değer null
+olabilirliği dahil tam olarak aynı `Pair` türünü ister.
+
+Her işlem koleksiyon yapısı açısından saftır: hiçbir kaynak değiştirilmez, bu
+yüzden bir `Constant Pair` geçirilebilir ve döndürülen her koleksiyon yapısal
+olarak bağımsızdır. Dönüşüm sığdır — anahtarlar ve değerler referansla
+taşınır, asla derin kopyalanmaz.
+
+`KeyValueError` doğrudan `Error`'dan türer ve bir `combine` uzunluk
+uyuşmazlığını, tekrarlanan bir `combine` anahtarını, tekrarlanan bir
+`select`/`drop` isteğini, bir `rename` çakışmasını ve bir `merge` çakışmasını
+kapsar. Gerçekten olmayan bir `Pair` anahtarı mevcut `KeyError`'ı kullanır.
+Tür bakımından geçersiz çağrılar derleme zamanı tür hatası olarak kalır ve bir
+geri çağırım kendi hata türünü korur.
+
+Bir JSON nesne değeri sıradan bir `Pair<String, JSONValue>` olduğundan (§59),
+bir JSON belgesi tipli gösterimden hiç çıkmadan `KeyValue.with` ile
+güncellenir; v0.1.18 bilinçli olarak JSON'a özgü bir değiştirme API'si
+eklemez.
+
 ---
 
 # AhdCode v0.1 Çekirdek Spesifikasyonu Sonu

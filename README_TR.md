@@ -12,14 +12,16 @@ AhdCode; okunabilir sözdizimi, açık niyet (explicit intent), öngörülebilir
 anlambilim (semantics) ve yerel (native) derlemeye odaklanan, deneysel,
 statik olarak denetlenen genel amaçlı bir programlama dilidir.
 
-Mevcut sürüm **v0.1.17**'dir. Çekirdek dil uçtan uca çalışır, ancak proje
+Mevcut sürüm **v0.1.18**'dir. Çekirdek dil uçtan uca çalışır, ancak proje
 üretime hazır değildir ve 1.0'dan önce kırıcı (breaking) değişiklikler
 olabilir.
 
-v0.1.17 — Yapılandırılmış Veri ve Konfigürasyon — tipli [JSON](docs/JSON_TR.md)
-ve [XML](docs/XML_TR.md) modüllerini ve işlem/`.env` yapılandırması için
-kompakt bir [Env](docs/ENV_TR.md) modülünü ekler, ve doğrulanmış bir Word
-merge'li tablo okuma/kaydetme sessiz veri kaybı hatasını düzeltir.
+v0.1.18 — Koleksiyon ve Kayıt Yardımcıları — [Lists](docs/LISTS_TR.md) ve
+[KeyValue](docs/KEYVALUE_TR.md) modüllerini ekler: çekirdek `List` ve `Pair`
+türleri üzerinde saf yapısal dönüşümlerden oluşan küçük, güçlü tipli ve
+belirlenimci bir sözcük dağarcığı; böylece JSON, Data ve gelecekteki depolama
+modülleri her biri kendi dönüşüm katmanını icat etmek yerine tek bir katmanı
+paylaşabilir.
 
 ```ahd
 greet: Function := (
@@ -70,6 +72,13 @@ for name in names {
 - [Word modülü](docs/WORD_TR.md), Office veya harici çalışma zamanı
   gerektirmeden immutable biçimlendirilmiş belgeler, merge edilmiş tablolar,
   gömülü Plot görselleri ve sınırlandırılmış anlamsal DOCX okuma sağlar.
+- [Lists](docs/LISTS_TR.md) ve [KeyValue](docs/KEYVALUE_TR.md), `List` ve
+  `Pair` üzerinde saf yapısal dönüşümler ekler — `chunk`, `flatten`,
+  `transpose`, `unique`, `valueCounts`, `groupBy` ve `keys`, `values`,
+  `combine`, `with`, `select`, `drop`, `rename`, `mapValues`, `merge`,
+  `overlay`. Tür-yönelimlidirler: her çağrının kesin sonuç türü argüman
+  türlerinden hesaplanır, genel (generic) sözdizimi olmadan ve hiçbir şey
+  silinmeden.
 - Formatter, yorumları korurken tek bir kanonik (standart) sunum tanımlar.
 
 ## Kaynak koddan derleme
@@ -142,6 +151,8 @@ ve [REPL rehberine](docs/REPL_TR.md) bakın.
 - [JSON modülü](docs/JSON_TR.md)
 - [XML modülü](docs/XML_TR.md)
 - [Env modülü](docs/ENV_TR.md)
+- [Lists modülü](docs/LISTS_TR.md)
+- [KeyValue modülü](docs/KEYVALUE_TR.md)
 - [Tanılamaları anlama](docs/DIAGNOSTICS_TR.md)
 - [Yapay zekâ destekli yerel kurulum](FOR_AI.md)
 - [Derlenmiş v0.1 örnekleri](examples/v0.1/README_TR.md)

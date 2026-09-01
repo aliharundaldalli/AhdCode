@@ -2,7 +2,7 @@
 
 [English] · [Türkçe](COLLECTIONS_TR.md)
 
-[Back to README](../README.md) · [List API](LIST_API.md)
+[Back to README](../README.md) · [List API](LIST_API.md) · [Lists](LISTS.md) · [KeyValue](KEYVALUE.md)
 
 ## Lists
 
@@ -79,3 +79,13 @@ v0.1 does not yet publish `copy` or `deepCopy`.
 
 Iteration over List elements and Pair keys uses a shallow snapshot. Structural
 mutation does not change what the active loop visits.
+
+## Structural transformations
+
+The [Lists](LISTS.md) and [KeyValue](KEYVALUE.md) standard modules add pure
+structural transformations of these two types — `chunk`, `flatten`,
+`transpose`, `unique`, `valueCounts`, `groupBy`, and `keys`, `values`,
+`combine`, `with`, `without`, `select`, `drop`, `rename`, `mapValues`,
+`merge`, `overlay`. None of them modifies the collection it is given, so a
+`Constant` collection may be passed safely, and each returns a new structural
+collection over the same element and value references.

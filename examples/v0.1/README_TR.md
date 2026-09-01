@@ -71,6 +71,10 @@ go run ./tooling/latex/cmd/package-latex --output "$(go env GOPATH)"
 | `44_env.ahd` | Env modülü: kendi kurduğu bir `.env` fixture'ı, load/get/getOr/exists/set/unset, override önceliği, EnvError |
 | `45_structured_data_report.ahd` | JSON'dan Data'ya, Statistics/Plot'a ve Word'e: küçük bir yapılandırılmış-veri raporlama iş akışı |
 | `46_word_roundtrip.ahd` | düzeltilmiş Word merge'li tablo anlamsal okuma/kaydetme davranışı (v0.1.17) |
+| `47_lists.ahd` | Lists modülü: chunk, flatten, transpose, unique, valueCounts, groupBy ve ListsError |
+| `48_key_value.ahd` | KeyValue modülü: keys, values, combine, with, without, select, drop, rename, mapValues, merge, overlay ve KeyValueError |
+| `49_json_record_update.ahd` | bir JSON nesnesinin tek alanını `KeyValue.with` ile güncelleme; stringify/parse gidiş-dönüşü olmadan |
+| `50_data_records.ahd` | başlıklar ve değer satırlarından `KeyValue.combine` ile `Data.Table` |
 
 `Greeting.ahd`, `11_modules.ahd` tarafından kullanılan kardeş (sibling)
 modüldür.

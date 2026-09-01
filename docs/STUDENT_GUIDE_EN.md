@@ -37,6 +37,7 @@ The best way to learn is not just by reading the examples, but by running them. 
 - [JSON module](#json-module)
 - [XML module](#xml-module)
 - [Env module](#env-module)
+- [Lists and KeyValue modules](#lists-and-keyvalue-modules)
 - [27. Code Formatter](#27-code-formatter)
 - [28. Command line (CLI)](#28-command-line-cli)
 - [29. Interactive shell (REPL)](#29-interactive-shell-repl)
@@ -2149,6 +2150,37 @@ port: Int := int(Env.getOr("PORT", "8080"))
 
 `Env.get(name)` returns `String?` so absence and an explicit empty value stay
 distinguishable. See the [Env module reference](ENV.md).
+
+## Lists and KeyValue modules
+
+These two modules transform Lists and Pairs without changing the original:
+
+```ahd
+bring Lists
+bring KeyValue
+
+write(Lists.chunk([1, 2, 3, 4, 5], 2))
+write(Lists.valueCounts(["Math", "Physics", "Math"]))
+
+record := KeyValue.combine(["name", "score"], ["Ali", "91"])
+write(KeyValue.with(record, "score", "95"))
+write(record)
+```
+
+```text
+[[1, 2], [3, 4], [5]]
+{"Math": 2, "Physics": 1}
+{"name": "Ali", "score": "95"}
+{"name": "Ali", "score": "91"}
+```
+
+Notice the last two lines: `KeyValue.with` returned a *new* `Pair`, and
+`record` is unchanged. Every operation in both modules works that way.
+
+`Lists` also has `flatten`, `transpose`, `unique`, and `groupBy`; `KeyValue`
+also has `keys`, `values`, `without`, `select`, `drop`, `rename`, `mapValues`,
+`merge`, and `overlay`. See the [Lists](LISTS.md) and [KeyValue](KEYVALUE.md)
+module references.
 
 ## 24. Code Formatter
 

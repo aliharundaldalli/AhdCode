@@ -12,13 +12,14 @@ AhdCode is an experimental statically checked general-purpose programming
 language focused on readable syntax, explicit intent, predictable semantics,
 and native compilation.
 
-The current release is **v0.1.17**. The core language works end to end, but
+The current release is **v0.1.18**. The core language works end to end, but
 the project is not production-ready and breaking changes may occur before 1.0.
 
-v0.1.17 — Structured Data & Configuration — adds typed [JSON](docs/JSON.md)
-and [XML](docs/XML.md) modules and a compact [Env](docs/ENV.md) module for
-process/`.env` configuration, and fixes a confirmed Word merged-table
-silent data-loss bug on read/save round-trips.
+v0.1.18 — Collection & Record Utilities — adds the [Lists](docs/LISTS.md) and
+[KeyValue](docs/KEYVALUE.md) modules: a small, strongly typed, deterministic
+vocabulary of pure structural transformations over the core `List` and `Pair`
+types, so JSON, Data, and future storage modules can share one conversion
+layer instead of each inventing its own.
 
 ```ahd
 greet: Function := (
@@ -67,6 +68,12 @@ for name in names {
 - The [Word module](docs/WORD.md) builds immutable formatted documents, merged
   tables, embedded Plot images, and bounded semantic DOCX read-back without
   requiring Office or an external runtime.
+- [Lists](docs/LISTS.md) and [KeyValue](docs/KEYVALUE.md) add pure structural
+  transformations of `List` and `Pair` — `chunk`, `flatten`, `transpose`,
+  `unique`, `valueCounts`, `groupBy`, and `keys`, `values`, `combine`, `with`,
+  `select`, `drop`, `rename`, `mapValues`, `merge`, `overlay`. They are
+  type-directed: each call's exact result type is computed from its argument
+  types, with no generic syntax and nothing erased.
 - The formatter defines one canonical presentation while preserving comments.
 
 ## Build from source
@@ -139,6 +146,8 @@ See the [CLI guide](docs/CLI.md), [formatter guide](docs/FORMATTER.md), and
 - [JSON module](docs/JSON.md)
 - [XML module](docs/XML.md)
 - [Env module](docs/ENV.md)
+- [Lists module](docs/LISTS.md)
+- [KeyValue module](docs/KEYVALUE.md)
 - [Understanding diagnostics](docs/DIAGNOSTICS.md)
 - [AI-assisted local setup](FOR_AI.md)
 - [Curated v0.1 examples](examples/v0.1/README.md)

@@ -5057,6 +5057,220 @@ absent-vs-empty-aware way as `exists`) is left untouched, and with
 `EnvError` derives directly from `Error` and covers every Env-specific
 failure end to end.
 
+## 62. Type-Directed Standard Module Operations (v0.1.18)
+
+Most standard module functions publish one fixed signature, and the ordinary
+call path checks it. A few cannot be described that way. `Lists.chunk` over a
+`List<Int>` and over a `List<String>` has two different, equally exact result
+types, and neither an erased element type nor a family of per-element
+overloads preserves them.
+
+A *type-directed module operation* is a compiler-supplied standard module
+function whose exact concrete signature is computed at each call site from the
+statically known argument types written there. It is the module-function
+counterpart of the receiver-directed type operations of §12 and §27: a type
+operation is selected by a receiver's static type after a dot, while a module
+operation is selected by the resolved module symbol and then specialized
+against its arguments.
+
+This is entirely an internal compiler mechanism. It adds no syntax:
+
+- there is no user-facing generic `Function` syntax, and
+  `Lists.chunk<Int>(...)` is not AhdCode;
+- no argument is ever treated as `List<Object>`, `Pair<Object, Object>`,
+  `Any`, or `dynamic`;
+- no per-element overload family is generated;
+- the semantic checker knows the exact result type at compile time, and
+  lowering, the native backend, the evaluator, the REPL, and `build` all read
+  that same specialized signature.
+
+Generic invariance (§13) is unchanged. `Lists.chunk(List<Int>, 2)` is
+`List<List<Int>>` and never `List<List<Real>>`; `KeyValue.merge` requires two
+`Pair`s of exactly the same type, including value nullability. Structural
+nullability (§14) is preserved rather than erased, and `Pair` keys stay
+non-null and restricted to `String`, `Int`, and `Bool` (§11.3).
+
+Both call spellings resolve to the same analysis:
+
+```ahd
+bring Lists
+from Lists bring chunk
+
+parts := Lists.chunk(values, 10)
+same := chunk(values, 10)
+```
+
+**The internal/public boundary.** Because a call is specialized against its own
+arguments, a type-directed operation has no single concrete `Function` type,
+and therefore no unspecialized `Function` value:
+
+```ahd
+stored := Lists.chunk
+```
+
+is a compile-time diagnostic. Supporting it would require either a dynamic
+polymorphic `Function` value or user-facing generic `Function` syntax, and
+v0.1 has neither. A caller wraps the shape it wants in an ordinary `Function`
+instead. This boundary is deliberate and is not a defect.
+
+## 63. Lists Standard Module (v0.1.18)
+
+`bring Lists` imports canonical compiler-registered module `builtin:Lists`. A
+sibling `Lists.ahd` cannot shadow it. It exports compiler-supplied
+`ListsError` plus six type-directed operations (§62):
+
+```text
+Lists.chunk(List<T>, Int)                     -> List<List<T>>
+Lists.flatten(List<List<T>>)                  -> List<T>
+Lists.transpose(List<List<T>>)                -> List<List<T>>
+Lists.unique(List<T>)                         -> List<T>
+Lists.valueCounts(List<K>)                    -> Pair<K, Int>
+Lists.groupBy(List<T>, Function(T) -> K)      -> Pair<K, List<T>>
+```
+
+`T` and `K` are specification metavariables, not AhdCode syntax. `K` must be a
+non-null `Pair` key type (§11.3).
+
+Lists duplicates nothing the core `List` type already provides: `add`,
+`eject`, `sort`, `reverse`, `shuffle`, `count`, `index`, `map`, `filter`,
+slicing, and `List + List` remain `List` members (§27).
+
+`chunk` splits a `List` into consecutive Lists of at most `size` elements in
+source order. The final chunk is short rather than padded. An empty source
+produces a correctly typed empty result, and a `size` greater than the length
+produces one chunk. `size` must be greater than zero; `0` or a negative size
+raises `ListsError`.
+
+`flatten` concatenates exactly one nesting level. It is not recursive. The
+inner Lists must be non-null: `List<List<T>?>` is a compile-time type error,
+because a null inner List has no defined contribution and skipping it would
+silently drop data.
+
+`transpose` exchanges rows and columns and requires rectangular input: every
+row must have exactly the same length. Ragged input raises `ListsError` naming
+the offending 0-based row index, its length, and the expected length. Nothing
+is padded, truncated, or inferred. `[]` transposes to `[]`, `[[], []]` to
+`[]`, and `[[1, 2, 3]]` to `[[1], [2], [3]]`. Transposing twice restores the
+original shape.
+
+`unique` keeps the first occurrence of each distinct element, in
+first-occurrence order, using ordinary `==` equality (§10). Values are never
+stringified or compared by object address, so `List` and `Pair` elements
+compare deeply and `Class` instances compare as `==` already defines. With a
+nullable element type, `null` is one ordinary distinct value. A
+`List<Function>` is rejected, because `==` defines no comparison for
+`Function` values.
+
+`valueCounts` counts equal elements into a `Pair` keyed by the element itself,
+in first-occurrence order. The element type must be a non-null `Pair` key
+type; `List<Real>`, `List<Class>`, `List<List<T>>`, and `List<String?>` are
+compile-time errors, and nothing is converted to `String` to make it fit.
+
+`groupBy` partitions elements into new Lists keyed by a key `Function`. Key
+order is first-key-occurrence and members keep their source order. The key
+`Function`'s parameter must be exactly the `List`'s element type including its
+nullability, and its result must be a non-null `Pair` key type; a `Nothing`
+result is a compile-time error. It runs exactly once per element, left to
+right, over a shallow snapshot of the source, matching `List.map`/`List.filter`
+(§27). A raising callback propagates its own error unchanged and no partial
+result is produced.
+
+Every operation is pure with respect to collection structure: the source
+`List` is never modified, so a `Constant List` may be passed, and every
+returned `List` is a new structural collection. The transformation is shallow -
+referenced elements are carried over by reference and never deep-copied.
+
+`ListsError` derives directly from `Error` and covers a `chunk` size of zero
+or less and ragged `transpose` input. Type-invalid calls stay compile-time
+type errors; a callback keeps its own error type and is never wrapped.
+
+## 64. KeyValue Standard Module (v0.1.18)
+
+`bring KeyValue` imports canonical compiler-registered module
+`builtin:KeyValue`. A sibling `KeyValue.ahd` cannot shadow it. It exports
+compiler-supplied `KeyValueError` plus eleven type-directed operations (§62):
+
+```text
+KeyValue.keys(Pair<K, V>)                        -> List<K>
+KeyValue.values(Pair<K, V>)                      -> List<V>
+KeyValue.combine(List<K>, List<V>)               -> Pair<K, V>
+KeyValue.with(Pair<K, V>, K, V)                  -> Pair<K, V>
+KeyValue.without(Pair<K, V>, K)                  -> Pair<K, V>
+KeyValue.select(Pair<K, V>, List<K>)             -> Pair<K, V>
+KeyValue.drop(Pair<K, V>, List<K>)               -> Pair<K, V>
+KeyValue.rename(Pair<K, V>, K, K)                -> Pair<K, V>
+KeyValue.mapValues(Pair<K, V>, Function(V) -> U) -> Pair<K, U>
+KeyValue.merge(Pair<K, V>, Pair<K, V>)           -> Pair<K, V>
+KeyValue.overlay(Pair<K, V>, Pair<K, V>)         -> Pair<K, V>
+```
+
+KeyValue introduces no new container. `Pair<K, V>` (§11) remains the language's
+ordered, homogeneous key/value type; there is no `Dictionary`, `Map`, `Record`,
+`Struct`, `Tuple`, or `Any`-keyed container, and KeyValue is only a pure
+transformation layer over `Pair`.
+
+`keys` and `values` return fresh `List` snapshots in `Pair` insertion order;
+mutating a snapshot never reaches the `Pair`. `values` preserves the `Pair`'s
+structural value nullability.
+
+`combine` builds a `Pair` from a key `List` and a value `List`, in key-List
+order. The lengths must be exactly equal - nothing is padded or truncated -
+and a duplicate key is rejected rather than resolved by last-one-wins; both
+raise `KeyValueError`. Two empty typed Lists produce a correctly typed empty
+`Pair`.
+
+`with` is the pure counterpart of `pair[key] = value`: an existing key keeps
+its exact position and takes the new value, and an absent key is appended at
+the end. The source `Pair` is never modified.
+
+`without` removes one key and preserves the order of every remaining entry. A
+missing key raises the existing `KeyError` (§11.2), matching `Pair.eject`; it
+is never silently ignored.
+
+`select` keeps exactly the requested keys, **in the requested key-List order**,
+not in source order. `drop` removes exactly the requested keys and preserves
+the source order of the retained ones. For both, an unknown key raises
+`KeyError` and a key requested twice raises `KeyValueError`; requests are never
+silently deduplicated. An empty key `List` gives an empty `Pair` for `select`
+and a structural copy for `drop`.
+
+`rename` renames one key in place, preserving its position and value. A missing
+old key raises `KeyError`; a new key that already belongs to a different entry
+raises `KeyValueError`. Renaming a key to itself returns a fresh, structurally
+equivalent `Pair` rather than an error.
+
+`mapValues` rewrites every value through a `Function`, preserving the key set
+and its order. The callback's parameter must be exactly the `Pair`'s value type
+including its nullability; its result type becomes the new value type, and its
+result nullability is preserved, so `Function(V) -> U?` gives `Pair<K, U?>`. A
+`Nothing` result is a compile-time error. The callback runs exactly once per
+value in `Pair` insertion order, and a raising callback propagates its own
+error unchanged.
+
+`merge` and `overlay` are two named functions rather than one with a `Bool`
+flag, because the name is what states the intent. `merge` is a safe disjoint
+union: left order first, then right order, and a key present in both `Pair`s
+raises `KeyValueError` rather than silently choosing a winner. `overlay` is the
+explicitly named changes-win operation: an existing base key keeps its position
+and takes the new value, and a changes-only key is appended in `changes`
+insertion order. Both require exactly the same `Pair` type, including value
+nullability.
+
+Every operation is pure with respect to collection structure: neither source is
+modified, so a `Constant Pair` may be passed, and every returned collection is
+structurally independent. The transformation is shallow - keys and values are
+carried over by reference and never deep-copied.
+
+`KeyValueError` derives directly from `Error` and covers a `combine` length
+mismatch, a duplicate `combine` key, a duplicate `select`/`drop` request, a
+`rename` collision, and a `merge` collision. A genuinely missing `Pair` key uses
+the existing `KeyError`. Type-invalid calls stay compile-time type errors, and a
+callback keeps its own error type.
+
+Because a JSON object value is an ordinary `Pair<String, JSONValue>` (§59), a
+JSON document is updated through `KeyValue.with` without leaving the typed
+representation; v0.1.18 deliberately adds no JSON-specific mutation API.
+
 ---
 
 # End of AhdCode v0.1 Core Specification

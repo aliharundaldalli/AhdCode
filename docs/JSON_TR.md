@@ -226,6 +226,31 @@ uygulama ayrıntılarıdır ve gözden geçirilebilir, ancak bozuk veya kötü n
 bir belgenin patolojik özyinelemeye veya sınırsız bellek kullanımına neden
 olmasını önlemek için her zaman uygulanır.
 
+## String cerrahisi olmadan bir nesneyi güncelleme
+
+Bir JSON nesne değeri sıradan bir `Pair<String, JSONValue>`'dur; bu yüzden
+[KeyValue](KEYVALUE_TR.md) bir belgeyi tipli gösterimden hiç çıkmadan
+günceller:
+
+```ahd
+object: Pair<String, JSONValue> := data.object()
+
+updatedObject: Pair<String, JSONValue> := KeyValue.with(
+    object
+    "books"
+    JSON.array(newBooks)
+)
+
+JSON.write(JSON.object(updatedObject), "library.json", true)
+```
+
+`KeyValue.with`, değiştirilen anahtarı mevcut konumunda tutar ve diğer tüm kök
+alanları dokunulmadan bırakır. Bir JSON belgesini güncellemenin amaçlanan yolu
+budur; `JSON.stringify` → String birleştirme → `JSON.parse` değildir ve bu
+sürüm bilinçli olarak JSON'a özgü bir değiştirme API'si eklemez, çünkü
+`KeyValue` sorunu genel olarak çözer. Bkz.
+`examples/v0.1/49_json_record_update.ahd`.
+
 ## Kapsam dışı
 
 JSON, bir şema veya sorgu dili değil, tipli bir veri değişim modülüdür: JSON

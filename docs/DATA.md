@@ -2,7 +2,7 @@
 
 [English] · [Türkçe](DATA_TR.md)
 
-[Back to README](../README.md) · [CSV](CSV.md) · [Modules](MODULES.md)
+[Back to README](../README.md) · [KeyValue](KEYVALUE.md) · [CSV](CSV.md) · [Modules](MODULES.md)
 
 Data is a small, strict, immutable table layer built on the existing String,
 List, Pair, Function, Lambda, and CSV machinery. It is explicit, like Math,

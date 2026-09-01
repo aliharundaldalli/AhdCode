@@ -1,0 +1,63 @@
+// KeyValue: pure structural transformations of the core Pair type.
+// Pair stays the language's ordered, homogeneous key/value type; KeyValue
+// only transforms it, and never modifies the Pair it is given.
+
+bring KeyValue
+from KeyValue bring KeyValueError
+
+columns: List<String> := ["name", "score", "department"]
+
+// combine builds a Pair from a key List and a value List of exactly equal
+// length. A mismatch or a duplicate key is a KeyValueError, never a silent
+// truncation or a last-one-wins overwrite.
+record: Pair<String, String> := KeyValue.combine(columns, ["Ali", "91", "Mathematics"])
+write(record)
+
+// keys and values are fresh Lists in Pair insertion order; mutating one
+// never reaches the Pair.
+write(KeyValue.keys(record))
+write(KeyValue.values(record))
+
+// with is the pure counterpart of index assignment: an existing key keeps
+// its position, and a new key is appended at the end.
+write(KeyValue.with(record, "score", "95"))
+write(KeyValue.with(record, "year", "2"))
+write(record)
+
+// without removes one existing key; a missing key is the language's
+// ordinary KeyError, never a silently ignored request.
+write(KeyValue.without(record, "score"))
+
+// select keeps exactly the requested keys, in the requested order.
+// drop removes them and keeps the source order of everything else.
+write(KeyValue.select(record, ["department", "name"]))
+write(KeyValue.drop(record, ["score"]))
+
+// rename keeps the renamed entry exactly where it was.
+write(KeyValue.rename(record, "name", "student"))
+
+// mapValues rewrites every value and keeps the key order untouched.
+write(KeyValue.mapValues(record, lambda (value: String) -> len(value)))
+
+// merge is a disjoint union: a key in both Pairs is an error, because the
+// module will not silently decide which side should win.
+write(KeyValue.merge({"a": 1, "b": 2}, {"c": 3}))
+
+attempt {
+    write(KeyValue.merge({"a": 1}, {"a": 9}))
+}
+except KeyValueError as error {
+    write(error.message)
+}
+
+// overlay is the explicitly named changes-win operation: an existing key
+// keeps its position and takes the new value, and a changes-only key is
+// appended in changes order.
+write(KeyValue.overlay({"a": 1, "b": 2}, {"b": 9, "c": 3}))
+
+attempt {
+    write(KeyValue.combine(["a", "b"], ["1"]))
+}
+except KeyValueError as error {
+    write(error.message)
+}

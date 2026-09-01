@@ -82,7 +82,7 @@ ahdcode_exe="$(go env GOPATH)/bin/ahdcode"
 "$ahdcode_exe" --version
 ```
 
-The expected current result is `AhdCode v0.1.17`. Using the explicit
+The expected current result is `AhdCode v0.1.18`. Using the explicit
 `$ahdcode_exe` path proves which binary was tested. If the user wants the
 short `ahdcode` command and that directory is not already on `PATH`, explain
 the temporary or persistent options and obtain permission before editing a
@@ -191,7 +191,7 @@ $AhdCodeExe = Join-Path (go env GOPATH) "bin\ahdcode.exe"
 & $AhdCodeExe --version
 ```
 
-The expected current result is `AhdCode v0.1.17`. The explicit executable path
+The expected current result is `AhdCode v0.1.18`. The explicit executable path
 avoids accidentally testing an older global installation. If the Go binary
 directory is not on `PATH`, explain the choice before changing anything. A
 temporary current-PowerShell-process change is:
@@ -241,6 +241,57 @@ VS Code and verify file association, syntax highlighting,
 the editor-title play command, and `F6`. If VS Code cannot see the newly
 installed CLI, restart VS Code after a permitted `PATH` change or configure
 the absolute `ahdcode.executablePath`; do not edit settings silently.
+
+## Writing AhdCode, not another language
+
+Coding agents import habits from Python, JavaScript, and Go. AhdCode has its
+own collection vocabulary; use it instead of recreating those idioms.
+
+**Use `Lists` and `KeyValue` for structural `List`/`Pair` work.** They are
+compiler-registered standard modules (`bring Lists`, `bring KeyValue`):
+
+```text
+Lists.chunk, Lists.flatten, Lists.transpose,
+Lists.unique, Lists.valueCounts, Lists.groupBy
+
+KeyValue.keys, KeyValue.values, KeyValue.combine,
+KeyValue.with, KeyValue.without, KeyValue.select, KeyValue.drop,
+KeyValue.rename, KeyValue.mapValues, KeyValue.merge, KeyValue.overlay
+```
+
+Counting occurrences is `Lists.valueCounts(values)`, not three hand-written
+counter variables. Pairing a header row with a value row is
+`KeyValue.combine(columns, row)`. Every operation is pure: it never modifies
+the collection it is given, and it returns a new one.
+
+**`Pair` is not a Python `dict`.** It is ordered and homogeneous: its keys are
+`String`, `Int`, or `Bool` and never null, and one `Pair` has one value type.
+There is no `Any`, no `dynamic`, no `Dictionary`, and no `Map`.
+
+**AhdCode v0.1.18 has no `Tuple` and no Python-style `zip`.** Do not reach for
+`Lists.zip`, `Lists.unzip`, `dict(...)`, `tuple(...)`, or a `Function<T>`
+generic spelling — none of them exist. `Lists` and `KeyValue` operations are
+type-directed: the compiler computes each call's exact result type from the
+argument types written at that call site, so `Lists.chunk(List<Int>, 2)` is
+`List<List<Int>>` with no generic syntax anywhere. One consequence: such an
+operation cannot be stored as an unspecialized `Function` value; call it
+directly, or wrap the exact shape you need in your own `Function`.
+
+**Never build or update JSON by String concatenation.** A `JSONValue` object
+*is* an ordinary `Pair<String, JSONValue>`, so it can be updated in place
+without leaving the typed representation. Do not do
+`JSON.stringify` → String interpolation → `JSON.parse`. The correct pattern
+is:
+
+```ahd
+root := data.object()
+root = KeyValue.with(root, "books", JSON.array(books))
+data = JSON.object(root)
+```
+
+Every other root field survives untouched and keeps its position. The same
+applies to XML and to Data records: build typed values and transform them,
+rather than assembling text and re-parsing it.
 
 ## Completion report
 

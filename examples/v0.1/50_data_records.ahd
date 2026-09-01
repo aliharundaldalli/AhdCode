@@ -1,0 +1,46 @@
+// Headers and value rows -> KeyValue.combine -> Data.fromRecords.
+//
+// Ordinary typed values are the whole integration: Data does not know about
+// KeyValue, and KeyValue does not know about Data.
+
+bring KeyValue
+bring Lists
+bring Data
+from Data bring Table
+
+columns: List<String> := ["name", "department", "score"]
+
+rows: List<List<String>> := [
+    ["Ali", "Mathematics", "91"]
+    ["Ayse", "Physics", "78"]
+    ["Bora", "Mathematics", "84"]
+]
+
+records: List<Pair<String, String>> := []
+for row in rows {
+    records.add(KeyValue.combine(columns, row))
+}
+
+table: Table := Data.fromRecords(records)
+write(table.columns())
+write(table.rowCount())
+write(table.row(0))
+
+// A Table row is itself a Pair<String, String>, so KeyValue transforms it
+// without any conversion layer.
+first: Pair<String, String> := table.row(0)
+write(KeyValue.select(first, ["score", "name"]))
+write(KeyValue.drop(first, ["department"]))
+
+// keys/values move between the record-oriented and column-oriented shapes,
+// and transpose turns a header row plus value rows into columns.
+grid: List<List<String>> := [KeyValue.keys(first)]
+for record in records {
+    grid.add(KeyValue.values(record))
+}
+write(Lists.transpose(grid))
+
+// Counting a column is one call rather than a hand-written tally.
+departments: List<String> := table.column("department")
+write(Lists.valueCounts(departments))
+write(Lists.groupBy(departments, lambda (name: String) -> name[0]))

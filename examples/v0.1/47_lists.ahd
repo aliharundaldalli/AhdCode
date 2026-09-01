@@ -1,0 +1,54 @@
+// Lists: pure structural transformations of the core List type.
+// Every operation returns a new List and never modifies its source.
+
+bring Lists
+from Lists bring ListsError
+
+scores: List<Int> := [91, 78, 84, 66, 95]
+
+// chunk splits into consecutive Lists of at most one size; the final chunk
+// is short rather than padded, and the source is untouched.
+pages: List<List<Int>> := Lists.chunk(scores, 2)
+write(pages)
+write(scores)
+
+// flatten removes exactly one nesting level.
+write(Lists.flatten(pages))
+
+// transpose exchanges rows and columns. Every row must have the same
+// length: ragged input is a ListsError, never a silent pad or truncation.
+table: List<List<String>> := [
+    ["Ali", "Ayse", "Bora"]
+    ["Math", "Physics", "Math"]
+]
+write(Lists.transpose(table))
+
+attempt {
+    write(Lists.transpose([[1, 2, 3], [4, 5]]))
+}
+except ListsError as error {
+    write(error.message)
+}
+
+// unique keeps the first occurrence of each distinct value, using == .
+departments: List<String> := ["Math", "Physics", "Math", "History", "Physics"]
+write(Lists.unique(departments))
+
+// valueCounts counts equal values into a Pair keyed by the value itself,
+// in first-occurrence order. The element type must be a Pair key type.
+write(Lists.valueCounts(departments))
+write(Lists.valueCounts([1, 1, 3, 2, 1, 3]))
+
+// groupBy partitions into Lists keyed by a key Function. Key order is
+// first-occurrence; members keep their source order.
+names: List<String> := ["Ali", "Ayse", "Bora", "Ahmet"]
+write(Lists.groupBy(names, lambda (name: String) -> name[0]))
+
+// A size of zero or less has no meaning, so it is an error rather than a
+// guess about what the caller wanted.
+attempt {
+    write(Lists.chunk(scores, 0))
+}
+except ListsError as error {
+    write(error.message)
+}

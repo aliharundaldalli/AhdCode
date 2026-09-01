@@ -1,0 +1,61 @@
+// Updating one field of a JSON object, safely.
+//
+// A JSONValue object is an ordinary Pair<String, JSONValue>, so KeyValue
+// updates it directly. There is no stringify -> String concatenation ->
+// parse round trip anywhere here: the document never stops being typed.
+
+bring JSON
+bring KeyValue
+bring File
+from JSON bring JSONValue
+
+path: String := "ahdcode-v018-library.json"
+
+book: Function := (title: String, categoryId: Int) -> JSONValue {
+    return JSON.object(KeyValue.combine(
+        ["title", "categoryId"]
+        [JSON.fromString(title), JSON.fromInt(categoryId)]
+    ))
+}
+
+category: Function := (identifier: Int, name: String) -> JSONValue {
+    return JSON.object(KeyValue.combine(
+        ["id", "name"]
+        [JSON.fromInt(identifier), JSON.fromString(name)]
+    ))
+}
+
+root: Pair<String, JSONValue> := KeyValue.combine(
+    ["categories", "books"]
+    [
+        JSON.array([category(1, "Fiction"), category(3, "History")])
+        JSON.array([book("Dune", 1), book("Cosmos", 3)])
+    ]
+)
+JSON.write(JSON.object(root), path, true)
+
+// Read it back, take the root object, and change only "books".
+object: Pair<String, JSONValue> := JSON.read(path).object()
+
+books: List<JSONValue> := object["books"].array()
+books.add(book("Sapiens", 1))
+
+updated: Pair<String, JSONValue> := KeyValue.with(object, "books", JSON.array(books))
+JSON.write(JSON.object(updated), path, true)
+
+// "categories" was never touched, and "books" kept its position.
+reread: Pair<String, JSONValue> := JSON.read(path).object()
+write(KeyValue.keys(reread))
+write(len(reread["categories"].array()))
+write(len(reread["books"].array()))
+
+titles: List<String> := []
+for entry in reread["books"].array() {
+    title: Local JSONValue? := entry.get("title")
+    if title != null {
+        titles.add(title.string())
+    }
+}
+write(titles)
+
+File.delete(path)

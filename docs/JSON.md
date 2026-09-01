@@ -220,6 +220,31 @@ implementation details of this release and may be revisited, but are always
 enforced before a malformed or adversarial document could otherwise cause
 pathological recursion or unbounded memory use.
 
+## Updating an object without String surgery
+
+A JSON object value is an ordinary `Pair<String, JSONValue>`, so
+[KeyValue](KEYVALUE.md) updates a document without ever leaving the typed
+representation:
+
+```ahd
+object: Pair<String, JSONValue> := data.object()
+
+updatedObject: Pair<String, JSONValue> := KeyValue.with(
+    object
+    "books"
+    JSON.array(newBooks)
+)
+
+JSON.write(JSON.object(updatedObject), "library.json", true)
+```
+
+`KeyValue.with` keeps the replaced key in its existing position and leaves
+every other root field untouched. This is the intended way to update a JSON
+document; `JSON.stringify` → String concatenation → `JSON.parse` is not, and
+this release deliberately adds no JSON-specific mutation API, because
+`KeyValue` solves the problem generally. See
+`examples/v0.1/49_json_record_update.ahd`.
+
 ## Non-goals
 
 JSON is a typed data-interchange module, not a schema or query language:

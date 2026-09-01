@@ -2,7 +2,7 @@
 
 [English](COLLECTIONS.md) · [Türkçe]
 
-[README'ye dön](../README_TR.md) · [List API](LIST_API_TR.md)
+[README'ye dön](../README_TR.md) · [Lists](LISTS_TR.md) · [KeyValue](KEYVALUE_TR.md) · [List API](LIST_API_TR.md)
 
 ## List'ler
 
@@ -84,3 +84,13 @@ veya `deepCopy` yayınlamaz.
 List elemanları ve Pair anahtarları üzerinde yineleme, sığ bir anlık görüntü
 (shallow snapshot) kullanır. Yapısal değişiklik, aktif döngünün ziyaret
 ettiği şeyi değiştirmez.
+
+## Yapısal dönüşümler
+
+[Lists](LISTS_TR.md) ve [KeyValue](KEYVALUE_TR.md) standart modülleri bu iki
+tür üzerinde saf yapısal dönüşümler ekler — `chunk`, `flatten`, `transpose`,
+`unique`, `valueCounts`, `groupBy` ve `keys`, `values`, `combine`, `with`,
+`without`, `select`, `drop`, `rename`, `mapValues`, `merge`, `overlay`.
+Hiçbiri kendisine verilen koleksiyonu değiştirmez, bu yüzden bir `Constant`
+koleksiyon güvenle geçirilebilir ve her biri aynı eleman ve değer referansları
+üzerinde yeni bir yapısal koleksiyon döndürür.

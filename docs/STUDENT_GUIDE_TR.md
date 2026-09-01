@@ -37,6 +37,7 @@ En iyi öğrenme yolu, örnekleri yalnızca okumak değil çalıştırmaktır. B
 - [JSON modülü](#json-modulu)
 - [XML modülü](#xml-modulu)
 - [Env modülü](#env-modulu)
+- [Lists ve KeyValue modülleri](#lists-ve-keyvalue-modulleri)
 - [27. Kod Biçimlendirici (Formatter)](#27-kod-bicimlendirici-formatter)
 - [28. Komut satırı (CLI)](#28-komut-satiri-cli)
 - [29. Etkileşimli kabuk (REPL)](#29-etkilesimli-kabuk-repl)
@@ -1631,6 +1632,37 @@ port: Int := int(Env.getOr("PORT", "8080"))
 `Env.get(name)`, `String?` döndürür; böylece yokluk ile açıkça boş bir değer
 ayırt edilebilir kalır. Ayrıntılar için [Env modül referansına](ENV_TR.md)
 bakın.
+
+## Lists ve KeyValue modülleri
+
+Bu iki modül, orijinali değiştirmeden Listeleri ve Pair'leri dönüştürür:
+
+```ahd
+bring Lists
+bring KeyValue
+
+write(Lists.chunk([1, 2, 3, 4, 5], 2))
+write(Lists.valueCounts(["Math", "Physics", "Math"]))
+
+record := KeyValue.combine(["name", "score"], ["Ali", "91"])
+write(KeyValue.with(record, "score", "95"))
+write(record)
+```
+
+```text
+[[1, 2], [3, 4], [5]]
+{"Math": 2, "Physics": 1}
+{"name": "Ali", "score": "95"}
+{"name": "Ali", "score": "91"}
+```
+
+Son iki satıra dikkat edin: `KeyValue.with` *yeni* bir `Pair` döndürdü ve
+`record` değişmedi. Her iki modüldeki her işlem böyle çalışır.
+
+`Lists` ayrıca `flatten`, `transpose`, `unique` ve `groupBy` içerir;
+`KeyValue` ayrıca `keys`, `values`, `without`, `select`, `drop`, `rename`,
+`mapValues`, `merge` ve `overlay` içerir. Ayrıntılar için [Lists](LISTS_TR.md)
+ve [KeyValue](KEYVALUE_TR.md) modül referanslarına bakın.
 
 ## 24. Kod biçimlendirici (Formatter)
 

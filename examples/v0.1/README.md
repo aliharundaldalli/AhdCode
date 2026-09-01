@@ -71,5 +71,9 @@ go run ./tooling/latex/cmd/package-latex --output "$(go env GOPATH)"
 | `44_env.ahd` | Env module: a self-created `.env` fixture, load/get/getOr/exists/set/unset, override precedence, EnvError |
 | `45_structured_data_report.ahd` | JSON to Data to Statistics/Plot to Word: a small structured-data reporting workflow |
 | `46_word_roundtrip.ahd` | the fixed Word merged-table semantic read/save behavior (v0.1.17) |
+| `47_lists.ahd` | Lists module: chunk, flatten, transpose, unique, valueCounts, groupBy, and ListsError |
+| `48_key_value.ahd` | KeyValue module: keys, values, combine, with, without, select, drop, rename, mapValues, merge, overlay, and KeyValueError |
+| `49_json_record_update.ahd` | updating one JSON object field with `KeyValue.with`, with no stringify/parse round trip |
+| `50_data_records.ahd` | headers plus value rows through `KeyValue.combine` into a `Data.Table` |
 
 `Greeting.ahd` is the sibling module used by `11_modules.ahd`.

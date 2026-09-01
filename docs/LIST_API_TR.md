@@ -2,7 +2,7 @@
 
 [English](LIST_API.md) · [Türkçe]
 
-[README'ye dön](../README_TR.md) · [Koleksiyonlar](COLLECTIONS_TR.md) · [Math](MATH_TR.md)
+[README'ye dön](../README_TR.md) · [Lists](LISTS_TR.md) · [Koleksiyonlar](COLLECTIONS_TR.md) · [Math](MATH_TR.md)
 
 `List<T>` için:
 
