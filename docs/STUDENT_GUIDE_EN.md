@@ -34,6 +34,7 @@ The best way to learn is not just by reading the examples, but by running them. 
 - [25. Numeric module and Complex](#25-numeric-module-and-complex)
 - [26. Latex module](#26-latex-module)
 - [Word module](#word-module)
+- [Excel module](#excel-module)
 - [JSON module](#json-module)
 - [XML module](#xml-module)
 - [Env module](#env-module)
@@ -2092,6 +2093,29 @@ its result. Document methods are positional-only and return a new Document.
 Word can also embed Plot-generated PNG files and read text, headings, and
 tables from a bounded semantic DOCX subset. See the [Word module
 reference](WORD.md).
+
+## Excel module
+
+Excel creates and reads real `.xlsx` workbooks without Microsoft Office:
+
+```ahd
+bring Excel
+from Excel bring Workbook
+from Excel bring Sheet
+
+book: Workbook := Excel.new().addSheet("Scores")
+sheet: Sheet := book.sheet("Scores")
+sheet = sheet.setRow(1, 1, [Excel.fromString("Name"), Excel.fromString("Score")])
+sheet = sheet.setRow(2, 1, [Excel.fromString("Ali"), Excel.fromInt(91)])
+book = book.withSheet(sheet)
+book.save("scores.xlsx")
+```
+
+Rows and columns are 1-based. Cell values are explicit: use `fromString`,
+`fromInt`, `fromReal`, `fromBool`, or `formula`. A String beginning with `=` is
+still text unless `Excel.formula(...)` is used. Workbook and Sheet operations
+return new values, and unsafe merges never discard covered cell content. See
+the [Excel module reference](EXCEL.md).
 
 ## JSON module
 

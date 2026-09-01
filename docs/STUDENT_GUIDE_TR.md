@@ -34,6 +34,7 @@ En iyi öğrenme yolu, örnekleri yalnızca okumak değil çalıştırmaktır. B
 - [25. Numeric modülü ve Complex](#25-numeric-modulu-ve-complex)
 - [26. Latex modülü](#26-latex-modulu)
 - [Word modülü](#word-modulu)
+- [Excel modülü](#excel-modulu)
 - [JSON modülü](#json-modulu)
 - [XML modülü](#xml-modulu)
 - [Env modülü](#env-modulu)
@@ -1572,6 +1573,30 @@ Document metotları yalnızca konumsaldır ve yeni bir Document döndürür. Wor
 Plot ile üretilen PNG dosyalarını gömebilir ve sınırlandırılmış anlamsal DOCX
 alt kümesinden metin, heading ve table okuyabilir. Ayrıntılar için [Word modül
 referansına](WORD_TR.md) bakın.
+
+## Excel modülü
+
+Excel, Microsoft Office gerektirmeden gerçek `.xlsx` çalışma kitapları
+oluşturur ve okur:
+
+```ahd
+bring Excel
+from Excel bring Workbook
+from Excel bring Sheet
+
+book: Workbook := Excel.new().addSheet("Scores")
+sheet: Sheet := book.sheet("Scores")
+sheet = sheet.setRow(1, 1, [Excel.fromString("Name"), Excel.fromString("Score")])
+sheet = sheet.setRow(2, 1, [Excel.fromString("Ali"), Excel.fromInt(91)])
+book = book.withSheet(sheet)
+book.save("scores.xlsx")
+```
+
+Satır ve sütunlar 1 tabanlıdır. Cell değerleri açıktır: `fromString`,
+`fromInt`, `fromReal`, `fromBool` veya `formula` kullanın. `=` ile başlayan
+String, `Excel.formula(...)` kullanılmadıkça metin olarak kalır. Workbook ve
+Sheet işlemleri yeni değerler döndürür; güvensiz merge'ler kapsanan Cell
+içeriğini asla atmaz. [Excel modül referansına](EXCEL_TR.md) bakın.
 
 ## JSON modülü
 

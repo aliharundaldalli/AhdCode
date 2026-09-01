@@ -82,7 +82,7 @@ ahdcode_exe="$(go env GOPATH)/bin/ahdcode"
 "$ahdcode_exe" --version
 ```
 
-The expected current result is `AhdCode v0.1.18`. Using the explicit
+The expected current result is `AhdCode v0.1.19`. Using the explicit
 `$ahdcode_exe` path proves which binary was tested. If the user wants the
 short `ahdcode` command and that directory is not already on `PATH`, explain
 the temporary or persistent options and obtain permission before editing a
@@ -191,7 +191,7 @@ $AhdCodeExe = Join-Path (go env GOPATH) "bin\ahdcode.exe"
 & $AhdCodeExe --version
 ```
 
-The expected current result is `AhdCode v0.1.18`. The explicit executable path
+The expected current result is `AhdCode v0.1.19`. The explicit executable path
 avoids accidentally testing an older global installation. If the Go binary
 directory is not on `PATH`, explain the choice before changing anything. A
 temporary current-PowerShell-process change is:
@@ -268,7 +268,7 @@ the collection it is given, and it returns a new one.
 `String`, `Int`, or `Bool` and never null, and one `Pair` has one value type.
 There is no `Any`, no `dynamic`, no `Dictionary`, and no `Map`.
 
-**AhdCode v0.1.18 has no `Tuple` and no Python-style `zip`.** Do not reach for
+**AhdCode v0.1.19 has no `Tuple` and no Python-style `zip`.** Do not reach for
 `Lists.zip`, `Lists.unzip`, `dict(...)`, `tuple(...)`, or a `Function<T>`
 generic spelling — none of them exist. `Lists` and `KeyValue` operations are
 type-directed: the compiler computes each call's exact result type from the
@@ -292,6 +292,19 @@ data = JSON.object(root)
 Every other root field survives untouched and keeps its position. The same
 applies to XML and to Data records: build typed values and transform them,
 rather than assembling text and re-parsing it.
+
+**Excel Cells are closed typed values, not `Any`.** Use
+`Excel.fromString`, `Excel.fromInt`, `Excel.fromReal`, `Excel.fromBool`, and
+`Excel.formula` explicitly. A String beginning with `=` remains a String;
+only `Excel.formula(text)` expresses formula intent. Excel coordinates are
+1-based row/column values, not Python/openpyxl-style indices.
+
+Use `Lists` for `List<List<Cell>>` transformations, `KeyValue` for record
+keys/values, and `Data` for String-table semantics. Handle each `JSONValue`
+kind explicitly before choosing a Cell constructor. Do not manually assemble
+XLSX ZIP/XML in AhdCode source, do not invent an `Excel.fromData`/`Data.toExcel`
+bridge, and do not expect PDF export from Excel v0.1.19; PDF is deferred to a
+later document-rendering layer.
 
 ## Completion report
 

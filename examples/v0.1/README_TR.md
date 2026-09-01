@@ -75,6 +75,10 @@ go run ./tooling/latex/cmd/package-latex --output "$(go env GOPATH)"
 | `48_key_value.ahd` | KeyValue modülü: keys, values, combine, with, without, select, drop, rename, mapValues, merge, overlay ve KeyValueError |
 | `49_json_record_update.ahd` | bir JSON nesnesinin tek alanını `KeyValue.with` ile güncelleme; stringify/parse gidiş-dönüşü olmadan |
 | `50_data_records.ahd` | başlıklar ve değer satırlarından `KeyValue.combine` ile `Data.Table` |
+| `51_excel_basic.ahd` | tipli Workbook/Sheet/Cell oluşturma, Formula ve XLSX save |
+| `52_excel_styles.ahd` | Range stilleri, güvenli merge, sayı biçimleri, genişlikler ve yükseklikler |
+| `53_excel_data.ahd` | Data ve KeyValue kayıtlarından açık Cell dönüşümü; Lists transpose |
+| `54_excel_roundtrip.ahd` | XLSX save/read/save/read ve Formula-String güvenliği |
 
 `Greeting.ahd`, `11_modules.ahd` tarafından kullanılan kardeş (sibling)
 modüldür.

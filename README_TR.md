@@ -12,16 +12,15 @@ AhdCode; okunabilir sözdizimi, açık niyet (explicit intent), öngörülebilir
 anlambilim (semantics) ve yerel (native) derlemeye odaklanan, deneysel,
 statik olarak denetlenen genel amaçlı bir programlama dilidir.
 
-Mevcut sürüm **v0.1.18**'dir. Çekirdek dil uçtan uca çalışır, ancak proje
+Mevcut sürüm **v0.1.19**'dur. Çekirdek dil uçtan uca çalışır, ancak proje
 üretime hazır değildir ve 1.0'dan önce kırıcı (breaking) değişiklikler
 olabilir.
 
-v0.1.18 — Koleksiyon ve Kayıt Yardımcıları — [Lists](docs/LISTS_TR.md) ve
-[KeyValue](docs/KEYVALUE_TR.md) modüllerini ekler: çekirdek `List` ve `Pair`
-türleri üzerinde saf yapısal dönüşümlerden oluşan küçük, güçlü tipli ve
-belirlenimci bir sözcük dağarcığı; böylece JSON, Data ve gelecekteki depolama
-modülleri her biri kendi dönüşüm katmanını icat etmek yerine tek bir katmanı
-paylaşabilir.
+v0.1.19 — Excel / XLSX — [Excel](docs/EXCEL_TR.md) modülünü ekler:
+değiştirilemez `Workbook` ve `Sheet` değerleri, kapalı tipli Cell'ler,
+Range'ler, Formula'lar, güvenli merge'ler, temel stiller ve boyutlar ile Office
+çalışma zamanı veya ağ gerektirmeyen belirlenimci atomik XLSX yazma ve
+sınırlandırılmış anlamsal okuma.
 
 ```ahd
 greet: Function := (
@@ -72,6 +71,10 @@ for name in names {
 - [Word modülü](docs/WORD_TR.md), Office veya harici çalışma zamanı
   gerektirmeden immutable biçimlendirilmiş belgeler, merge edilmiş tablolar,
   gömülü Plot görselleri ve sınırlandırılmış anlamsal DOCX okuma sağlar.
+- [Excel modülü](docs/EXCEL_TR.md), tipli ve değiştirilemez Workbook/Sheet/
+  Cell/Range değerleriyle gerçek `.xlsx` paketlerini okur ve yazar. Formula
+  niyeti açıktır, merge değer kaybını reddeder ve native çalıştırılabilirler
+  çevrimdışı ve taşınabilir kalır.
 - [Lists](docs/LISTS_TR.md) ve [KeyValue](docs/KEYVALUE_TR.md), `List` ve
   `Pair` üzerinde saf yapısal dönüşümler ekler — `chunk`, `flatten`,
   `transpose`, `unique`, `valueCounts`, `groupBy` ve `keys`, `values`,
@@ -141,6 +144,7 @@ ve [REPL rehberine](docs/REPL_TR.md) bakın.
 - [Time modülü](docs/TIME_TR.md)
 - [Latex modülü](docs/LATEX_TR.md)
 - [Word modülü](docs/WORD_TR.md)
+- [Excel modülü](docs/EXCEL_TR.md)
 - [File ve Path modülleri](docs/FILESYSTEM_TR.md)
 - [Regex modülü](docs/REGEX_TR.md)
 - [CSV modülü](docs/CSV_TR.md)

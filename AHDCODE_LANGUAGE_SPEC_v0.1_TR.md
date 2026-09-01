@@ -5754,6 +5754,145 @@ bir JSON belgesi tipli gösterimden hiç çıkmadan `KeyValue.with` ile
 güncellenir; v0.1.18 bilinçli olarak JSON'a özgü bir değiştirme API'si
 eklemez.
 
+## 65. Excel Standart Modülü (v0.1.19)
+
+`bring Excel`, derleyici tarafından sağlanan `builtin:Excel` modülüne
+çözülür; kardeş `Excel.ahd` onu gölgeleyemez. Modül, derleyici tarafından
+sağlanan `Workbook`, `Sheet`, `Cell`, `Range`, `CellStyle` ve `ExcelError`
+Class'larını dışa aktarır. Yeni sözdizimi eklemez ve çekirdek koleksiyon veya
+tür sistemini değiştirmez.
+
+Sabit modül fonksiyonları şunlardır:
+
+```text
+Excel.new()                   -> Workbook
+Excel.read(path: String)     -> Workbook
+Excel.blank()                -> Cell
+Excel.fromString(String)     -> Cell
+Excel.fromInt(Int)           -> Cell
+Excel.fromReal(Real)         -> Cell
+Excel.fromBool(Bool)         -> Cell
+Excel.formula(String)        -> Cell
+Excel.style()                -> CellStyle
+```
+
+`Workbook` ve `Sheet`, değiştirilemez açık değerlerdir. Her dönüşüm bağımsız
+yeni bir değer döndürür; `Workbook.sheet` ile dönen Sheet'in kaynak Workbook'u
+değiştirebilen geri bağlantısı yoktur. Workbook üyeleri yalnızca konumsal,
+derleyici-sağlanan işlemlerdir:
+
+```text
+addSheet(String) -> Workbook       sheet(String) -> Sheet
+withSheet(Sheet) -> Workbook       sheets() -> List<String>
+sheetCount() -> Int                save(String) -> Nothing
+```
+
+`Excel.new()` sıfır Sheet içerir ve varsayılan Sheet üretmez. `addSheet` boş
+bir Sheet'i sona ekler; adlar boş olamaz, en çok 31 Unicode karakter olabilir,
+`: \ / ? * [ ]` ve XML-geçersiz denetim karakterlerini içeremez ve Workbook
+içinde büyük/küçük harfe duyarsız olarak benzersizdir. Geçersiz ad
+temizlenmez. `sheet` tam var olan adı ister. `withSheet`, var olan tam-adlı
+Sheet'i konumunda değiştirir ve olmayanı eklemez. `sheets()` sıralı yeni bir
+kopyadır. Sıfır Sheet içeren Workbook'u veya `.xlsx` uzantısız hedefi
+kaydetmek `ExcelError` yükseltir.
+
+Elektronik tablo koordinatları 1 tabanlıdır. `(1, 1)`, `A1`'dir; geçerli
+satırlar `1..1048576`, sütunlar `1..16384` (`XFD`) aralığındadır.
+Koordinatlar sarılmaz veya sıkıştırılmaz. `Sheet` şunları yayımlar:
+
+```text
+name() -> String
+cell(Int, Int) -> Cell
+setCell(Int, Int, Cell) -> Sheet
+range(Int, Int, Int, Int) -> Range
+setRow(Int, Int, List<Cell>) -> Sheet
+setRange(Range, List<List<Cell>>) -> Sheet
+cells(Range) -> List<List<Cell>>
+usedRange() -> Range?
+merge(Range) -> Sheet
+merges() -> List<Range>
+style(Range, CellStyle) -> Sheet
+columnWidth(Int, Real) -> Sheet
+rowHeight(Int, Real) -> Sheet
+```
+
+Ayarlanmamış koordinat Blank Cell olarak okunur. `setCell` içeriği değiştirir
+ve mevcut stili korur; Blank ayarlamak stili silmeden içeriği temizler.
+Skalerden Cell'e örtük dönüşüm yoktur. `setRow` ardışık Cell'ler yazar ve boş
+tipli List no-op'tur. `setRange`, tam Range satır sayısını ve her satırda tam
+sütun sayısını ister. Uyuşmazlık gözlemlenebilir sonuçtan önce `ExcelError`
+yükseltir; doldurma, kesme, düzensiz satır onarımı veya kısmi sonuç yoktur.
+`cells`, ayarlanmamış koordinatlar için açık Blank Cell içeren tam
+dikdörtgenin yeni kopyasını döndürür.
+
+`Range`, başlangıcı sonunu aşmayan değiştirilemez dikdörtgen koordinat
+değeridir. Argümansız `startRow`, `startColumn`, `endRow`, `endColumn`,
+`rowCount`, `columnCount`, `address` üyelerini yayımlar. `address()`, `A1:D3`
+gibi kanonik A1 yazımı kullanır. Boş Sheet'in `usedRange` sonucu null'dır;
+aksi halde sonuç Blank olmayan Cell, Formula, stilli Cell ve merge edilmiş
+Range'leri içeren en küçük dikdörtgendir. Boyutlar tek başına genişletmez.
+
+Merge sol üst anchor'ı korur. Kapsanan anchor olmayan her Cell Blank olmalıdır;
+aksi halde `merge`, hiçbir şeyi atmadan veya taşımadan `ExcelError` yükseltir.
+Merge Range'leri çakışamaz; aynı var olan merge idempotent'tir. `setCell`,
+`setRow` veya `setRange` ile merge edilmiş anchor olmayan koordinata Blank
+olmayan içerik yazmak `ExcelError` yükseltir. `merges()` sıralı yeni kopyadır.
+
+`Cell`, tam `kind()` sonuçları `"Blank"`, `"String"`, `"Int"`, `"Real"`,
+`"Bool"`, `"Formula"` olan kapalı içerik modelidir. Argümansız `kind`,
+`isBlank`, `string`, `int`, `real`, `bool`, `formula` üyelerini yayımlar.
+Yanlış tür erişimcisi `ExcelError` yükseltir. `real()`, güvenli Int-to-Real
+genişletmesiyle Int Cell'i de kabul eder; `int()` Real'i asla daraltmaz. Real
+oluşturma NaN ve sonsuzluğu reddeder. String Unicode'u korur, XML için
+güvensiz metni ve Excel'in 32767 karakter Cell sınırını aşan değerleri
+reddeder ve asla otomatik Formula olmaz.
+
+Formula oluşturma, başta `=`, sonrasında içerik, XML-güvenli metin ve
+desteklenen Excel Formula uzunluğunu ister. `=` dahil açık yazım korunur.
+AhdCode ayrıştırmaz, tip denetlemez, hesaplamaz, harici bağlantı çalıştırmaz
+ve önbelleklenmiş sonuç yayımlamaz. Bu nedenle `Excel.fromString("=A1+1")`
+String, `Excel.formula("=A1+1")` Formula'dır.
+
+`CellStyle`, değiştirilemez tipli yamadır. Yalnızca konumsal işlemleri
+`bold(Bool)`, `italic(Bool)`, `underline(Bool)`, `fontSize(Real)`,
+`textColor(String)`, `fillColor(String)`, `horizontal(String)`,
+`vertical(String)`, `wrap(Bool)`, `numberFormat(String)`,
+`border(String, String)`'dir. Yama yalnızca açıkça belirtilen özellikleri
+değiştirir; açık `bold(false)` bold'u kapatırken belirtilmemiş bold değiştirmez.
+Renkler büyük harfli `#RRGGBB`'dir. Yatay değerler `left`, `center`, `right`;
+dikey değerler `top`, `center`, `bottom`; kenarlık stilleri `none`, `thin`,
+`medium`, `thick`, `dashed`, `dotted`, `double`'dır. Font ve boyutlar pozitif,
+sonlu ve belgelenen Excel-uyumlu sınırlarda olmalıdır. Sayı biçimleri açık
+String kalır; tarih, para birimi veya yüzde türü çıkarmaz.
+
+`Workbook.save`, aynı Workbook için belirlenimci üye sırası, Sheet/ilişki/stil
+kimlikleri ve baytlarla gerçek XLSX/OOXML ZIP paketi üretir. Hedefi atomik
+değiştirmeden önce tam üretilen paketi doğrular; başarısız save mevcut hedefi
+korur. Üretilen String'ler inline String kodlaması kullanır ve Formula'lar
+açılışta normal yeniden hesaplama ister.
+
+`Excel.read`; sıralı Sheet, shared/inline String, Blank/Int/Real/Bool/Formula
+Cell, desteklenen stiller, merge'ler, satır yükseklikleri ve sütun
+genişlikleri için sınırlandırılmış anlamsal okuyucudur. Sayısal sözcüksel
+yazım türü belirler: `91` Int; `1.0`, `3.14`, `1e3` Real'dir; sayı biçimleri
+başka tür çıkarmaz. İçeriği güvenle gösterilemeyen desteklenmeyen error/date
+Cell veya ileri shared/array Formula gösterimleri `ExcelError` yükseltir.
+Okuyucu bozuk ZIP/XML, DTD, yinelenen veya kaçış yapan üyeler, boyut/
+sıkıştırma sınırı ihlalleri, eksik parçalar ve bozuk ya da harici gerekli
+ilişkileri reddeder. Paket dışında dosya çözümleme, ağ veya komut çalıştırma
+yapmaz.
+
+Excel; Lists, KeyValue, Data ve JSON'dan bağımsız kalır. Programlar
+`Lists.transpose`, `KeyValue.keys/values`, Data'nın String kayıtları ve Cell
+kurucusu seçmeden önce açık JSONValue tür denetimi kullanır. `Any` köprüsü,
+`Excel.fromData` veya Excel'e özgü yapısal yardımcı yoktur.
+
+v0.1.19 yalnızca XLSX'tir. `.xls`/`.xlsm`/`.xlsb`/`.ods`, makro, native grafik,
+görsel, pivot tablo, zengin metin Cell API'si, Formula motoru, tarih çıkarımı,
+şifreleme, baskı düzeni, kullanıcıya açık ZIP API'si veya PDF dışa aktarımı
+yoktur. PDF dönüşümü bilinçli olarak planlanan v0.1.20 belge/PDF katmanına
+ertelenmiştir.
+
 ---
 
 # AhdCode v0.1 Çekirdek Spesifikasyonu Sonu

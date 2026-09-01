@@ -5271,6 +5271,149 @@ Because a JSON object value is an ordinary `Pair<String, JSONValue>` (§59), a
 JSON document is updated through `KeyValue.with` without leaving the typed
 representation; v0.1.18 deliberately adds no JSON-specific mutation API.
 
+## 65. Excel Standard Module (v0.1.19)
+
+`bring Excel` resolves to the compiler-supplied module `builtin:Excel`; a
+sibling `Excel.ahd` cannot shadow it. The module exports the compiler-supplied
+Classes `Workbook`, `Sheet`, `Cell`, `Range`, `CellStyle`, and `ExcelError`.
+It adds no syntax and does not change the core collection or type system.
+
+The fixed module functions are:
+
+```text
+Excel.new()                   -> Workbook
+Excel.read(path: String)     -> Workbook
+Excel.blank()                -> Cell
+Excel.fromString(String)     -> Cell
+Excel.fromInt(Int)           -> Cell
+Excel.fromReal(Real)         -> Cell
+Excel.fromBool(Bool)         -> Cell
+Excel.formula(String)        -> Cell
+Excel.style()                -> CellStyle
+```
+
+`Workbook` and `Sheet` are immutable public values. Every transformation
+returns an independent new value; a `Sheet` returned by `Workbook.sheet` has
+no back-reference that can mutate its source Workbook. The Workbook members
+are positional-only compiler-supplied operations:
+
+```text
+addSheet(String) -> Workbook       sheet(String) -> Sheet
+withSheet(Sheet) -> Workbook       sheets() -> List<String>
+sheetCount() -> Int                save(String) -> Nothing
+```
+
+`Excel.new()` has zero Sheets and does not invent a default Sheet. `addSheet`
+appends a blank Sheet; names are non-empty, at most 31 Unicode characters,
+free of `: \ / ? * [ ]` and XML-invalid controls, and unique in a Workbook
+under case-insensitive comparison. No invalid name is sanitized. `sheet`
+requires an exact existing name. `withSheet` replaces the existing exact-name
+Sheet in place and does not add a missing Sheet. `sheets()` is a fresh ordered
+snapshot. Saving a zero-Sheet Workbook or a destination without the `.xlsx`
+extension raises `ExcelError`.
+
+Spreadsheet coordinates are 1-based. `(1, 1)` is `A1`; valid rows are
+`1..1048576` and valid columns are `1..16384` (`XFD`). Coordinates never wrap
+or clamp. `Sheet` publishes:
+
+```text
+name() -> String
+cell(Int, Int) -> Cell
+setCell(Int, Int, Cell) -> Sheet
+range(Int, Int, Int, Int) -> Range
+setRow(Int, Int, List<Cell>) -> Sheet
+setRange(Range, List<List<Cell>>) -> Sheet
+cells(Range) -> List<List<Cell>>
+usedRange() -> Range?
+merge(Range) -> Sheet
+merges() -> List<Range>
+style(Range, CellStyle) -> Sheet
+columnWidth(Int, Real) -> Sheet
+rowHeight(Int, Real) -> Sheet
+```
+
+An unset coordinate reads as a Blank Cell. `setCell` changes content while
+preserving existing style; setting Blank clears content without clearing
+style. No scalar implicitly converts to Cell. `setRow` writes consecutive
+Cells and an empty typed List is a no-op. `setRange` requires exactly the
+Range's row count and exactly its column count in every row. A mismatch raises
+`ExcelError` before any observable result; no padding, truncation, ragged
+repair, or partial result exists. `cells` returns a fresh exact rectangle with
+explicit Blank Cells for unset coordinates.
+
+A `Range` is an immutable rectangular coordinate value whose start does not
+exceed its end. It publishes `startRow`, `startColumn`, `endRow`, `endColumn`,
+`rowCount`, `columnCount`, and `address`, all without arguments. `address()`
+uses canonical A1 spelling such as `A1:D3`. An empty Sheet has null
+`usedRange`; otherwise the result is the smallest rectangle containing every
+non-Blank Cell, Formula, styled Cell, and merged Range. Dimensions alone do
+not expand it.
+
+A merge preserves its top-left anchor. Every covered non-anchor Cell must be
+Blank; otherwise `merge` raises `ExcelError` and discards or moves nothing.
+Merged Ranges cannot overlap; an identical existing merge is idempotent.
+Writing non-Blank content into a merged non-anchor coordinate through
+`setCell`, `setRow`, or `setRange` raises `ExcelError`. `merges()` is a fresh
+ordered snapshot.
+
+`Cell` is a closed content model with exact `kind()` results `"Blank"`,
+`"String"`, `"Int"`, `"Real"`, `"Bool"`, and `"Formula"`. It publishes
+`kind`, `isBlank`, `string`, `int`, `real`, `bool`, and `formula`, all without
+arguments. A wrong-kind accessor raises `ExcelError`. `real()` also accepts
+an Int Cell by safe Int-to-Real widening; `int()` never narrows Real. Real
+construction rejects NaN and infinity. Strings preserve Unicode, reject text
+unsafe for XML and values over Excel's 32767-character cell limit, and are
+never automatically treated as formulas.
+
+Formula construction requires a leading `=`, content after it, XML-safe text,
+and the supported Excel formula length. The public spelling including `=` is
+preserved. AhdCode does not parse, type-check, evaluate, execute external
+links, or expose a cached result. Thus `Excel.fromString("=A1+1")` is String
+while `Excel.formula("=A1+1")` is Formula.
+
+`CellStyle` is an immutable typed patch. Its positional-only operations are
+`bold(Bool)`, `italic(Bool)`, `underline(Bool)`, `fontSize(Real)`,
+`textColor(String)`, `fillColor(String)`, `horizontal(String)`,
+`vertical(String)`, `wrap(Bool)`, `numberFormat(String)`, and
+`border(String, String)`. A patch changes only explicitly specified
+properties; in particular explicit `bold(false)` disables bold while an
+unspecified bold leaves it unchanged. Colors are uppercase `#RRGGBB`.
+Horizontal values are `left`, `center`, `right`; vertical values are `top`,
+`center`, `bottom`; border styles are `none`, `thin`, `medium`, `thick`,
+`dashed`, `dotted`, `double`. Font sizes and dimensions must be positive,
+finite, and within the documented Excel-compatible limits. Number formats
+remain explicit Strings and never cause date, currency, or percentage type
+inference.
+
+`Workbook.save` emits a genuine XLSX/OOXML ZIP package with deterministic
+member ordering, sheet/relationship/style identities, and bytes for the same
+Workbook. It validates the complete generated package before atomically
+replacing the destination; a failed save preserves an existing destination.
+Generated Strings use inline String encoding and formulas request normal
+recalculation on open.
+
+`Excel.read` is a bounded semantic reader for ordered Sheets, shared and
+inline Strings, Blank/Int/Real/Bool/Formula Cells, supported styles, merges,
+row heights, and column widths. Numeric lexical spelling determines kind:
+`91` is Int, while `1.0`, `3.14`, and `1e3` are Real; number formats never
+infer another type. Unsupported error/date Cells or advanced shared/array
+formula representations raise `ExcelError` when their content cannot be
+represented safely. The reader rejects malformed ZIP/XML, DTDs, duplicate or
+traversing members, bounded-size/compression violations, missing parts, and
+broken or external required relationships. It performs no filesystem
+resolution outside the package and no network or command execution.
+
+Excel remains independent of Lists, KeyValue, Data, and JSON. Programs use
+`Lists.transpose`, `KeyValue.keys/values`, Data's String records, and explicit
+JSONValue kind handling before selecting a Cell constructor. No `Any` bridge,
+`Excel.fromData`, or Excel-specific structural helper exists.
+
+v0.1.19 is XLSX-only. It has no `.xls`/`.xlsm`/`.xlsb`/`.ods`, macros, native
+charts, images, pivot tables, rich-text Cell API, formula engine, date
+inference, encryption, print layout, user-facing ZIP API, or PDF export. PDF
+conversion is deliberately deferred to the planned v0.1.20 document/PDF
+layer.
+
 ---
 
 # End of AhdCode v0.1 Core Specification

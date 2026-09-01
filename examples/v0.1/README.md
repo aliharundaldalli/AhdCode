@@ -75,5 +75,9 @@ go run ./tooling/latex/cmd/package-latex --output "$(go env GOPATH)"
 | `48_key_value.ahd` | KeyValue module: keys, values, combine, with, without, select, drop, rename, mapValues, merge, overlay, and KeyValueError |
 | `49_json_record_update.ahd` | updating one JSON object field with `KeyValue.with`, with no stringify/parse round trip |
 | `50_data_records.ahd` | headers plus value rows through `KeyValue.combine` into a `Data.Table` |
+| `51_excel_basic.ahd` | typed Workbook/Sheet/Cell construction, Formula, and XLSX save |
+| `52_excel_styles.ahd` | Range styling, safe merge, number formats, widths, and heights |
+| `53_excel_data.ahd` | Data and KeyValue records converted explicitly to Cells; Lists transpose |
+| `54_excel_roundtrip.ahd` | XLSX save/read/save/read and Formula-versus-String safety |
 
 `Greeting.ahd` is the sibling module used by `11_modules.ahd`.

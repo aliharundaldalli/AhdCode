@@ -12,14 +12,13 @@ AhdCode is an experimental statically checked general-purpose programming
 language focused on readable syntax, explicit intent, predictable semantics,
 and native compilation.
 
-The current release is **v0.1.18**. The core language works end to end, but
+The current release is **v0.1.19**. The core language works end to end, but
 the project is not production-ready and breaking changes may occur before 1.0.
 
-v0.1.18 — Collection & Record Utilities — adds the [Lists](docs/LISTS.md) and
-[KeyValue](docs/KEYVALUE.md) modules: a small, strongly typed, deterministic
-vocabulary of pure structural transformations over the core `List` and `Pair`
-types, so JSON, Data, and future storage modules can share one conversion
-layer instead of each inventing its own.
+v0.1.19 — Excel / XLSX — adds the [Excel](docs/EXCEL.md) module: immutable
+`Workbook` and `Sheet` values, closed typed Cells, ranges, formulas, safe
+merges, basic styles and dimensions, plus deterministic atomic XLSX writing
+and bounded semantic reading with no Office runtime or network dependency.
 
 ```ahd
 greet: Function := (
@@ -68,6 +67,10 @@ for name in names {
 - The [Word module](docs/WORD.md) builds immutable formatted documents, merged
   tables, embedded Plot images, and bounded semantic DOCX read-back without
   requiring Office or an external runtime.
+- The [Excel module](docs/EXCEL.md) reads and writes real `.xlsx` packages
+  through typed immutable Workbook/Sheet/Cell/Range values. Formula intent is
+  explicit, merges reject value loss, and native executables remain offline
+  and relocation-safe.
 - [Lists](docs/LISTS.md) and [KeyValue](docs/KEYVALUE.md) add pure structural
   transformations of `List` and `Pair` — `chunk`, `flatten`, `transpose`,
   `unique`, `valueCounts`, `groupBy`, and `keys`, `values`, `combine`, `with`,
@@ -136,6 +139,7 @@ See the [CLI guide](docs/CLI.md), [formatter guide](docs/FORMATTER.md), and
 - [Time module](docs/TIME.md)
 - [Latex module](docs/LATEX.md)
 - [Word module](docs/WORD.md)
+- [Excel module](docs/EXCEL.md)
 - [File and Path modules](docs/FILESYSTEM.md)
 - [Regex module](docs/REGEX.md)
 - [CSV module](docs/CSV.md)
