@@ -442,6 +442,40 @@ const (
 	// ListsGroupBy partitions elements into Lists keyed by a key Function, in
 	// first-key-occurrence order.
 	ListsGroupBy ModuleOperation = "Lists.groupBy"
+
+	// The KeyValue standard module. Every operation is a pure structural
+	// transformation of the core ordered Pair type; KeyValue introduces no new
+	// container of its own.
+	//
+	// KeyValueKeys is a new List of the keys, in Pair insertion order.
+	KeyValueKeys ModuleOperation = "KeyValue.keys"
+	// KeyValueValues is a new List of the values, in Pair insertion order.
+	KeyValueValues ModuleOperation = "KeyValue.values"
+	// KeyValueCombine builds a Pair from a key List and a value List of
+	// exactly equal length.
+	KeyValueCombine ModuleOperation = "KeyValue.combine"
+	// KeyValueWith is the pure counterpart of Pair index assignment: an
+	// existing key keeps its position, a new key is appended.
+	KeyValueWith ModuleOperation = "KeyValue.with"
+	// KeyValueWithout removes one existing key, preserving the order of the
+	// remaining entries.
+	KeyValueWithout ModuleOperation = "KeyValue.without"
+	// KeyValueSelect keeps exactly the requested keys, in the requested order.
+	KeyValueSelect ModuleOperation = "KeyValue.select"
+	// KeyValueDrop removes exactly the requested keys, keeping the source
+	// order of the retained entries.
+	KeyValueDrop ModuleOperation = "KeyValue.drop"
+	// KeyValueRename renames one key in place, preserving its position.
+	KeyValueRename ModuleOperation = "KeyValue.rename"
+	// KeyValueMapValues rewrites every value through a Function, preserving
+	// the key set and its order.
+	KeyValueMapValues ModuleOperation = "KeyValue.mapValues"
+	// KeyValueMerge is a disjoint union: a key present in both Pairs is a
+	// KeyValueError rather than a silent left- or right-wins choice.
+	KeyValueMerge ModuleOperation = "KeyValue.merge"
+	// KeyValueOverlay is the explicitly named changes-win counterpart of
+	// merge.
+	KeyValueOverlay ModuleOperation = "KeyValue.overlay"
 )
 
 // listOperationMutates reports whether one List operation rewrites its

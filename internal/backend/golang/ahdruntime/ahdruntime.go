@@ -83,6 +83,7 @@ var (
 	AhdClassXMLError            = &AhdClass{Name: "XMLError", Parent: AhdClassError}
 	AhdClassEnvError            = &AhdClass{Name: "EnvError", Parent: AhdClassError}
 	AhdClassListsError          = &AhdClass{Name: "ListsError", Parent: AhdClassError}
+	AhdClassKeyValueError       = &AhdClass{Name: "KeyValueError", Parent: AhdClassError}
 )
 
 // AhdInstance is every AhdCode Class instance. The generated interface of each
@@ -7789,6 +7790,187 @@ func AhdListsGroupBy[T any, K comparable](values *AhdList[T], key func(T) K) *Ah
 			result.values[selected] = group
 		}
 		group.items = append(group.items, item)
+	}
+	return result
+}
+
+// AhdKeyValueKeys is a new List of the keys, in Pair insertion order.
+func AhdKeyValueKeys[K comparable, V any](pair *AhdPair[K, V]) *AhdList[K] {
+	return &AhdList[K]{items: pair.Keys()}
+}
+
+// AhdKeyValueValues is a new List of the values, in Pair insertion order.
+func AhdKeyValueValues[K comparable, V any](pair *AhdPair[K, V]) *AhdList[V] {
+	pair.require()
+	items := make([]V, len(pair.keys))
+	for index, key := range pair.keys {
+		items[index] = pair.values[key]
+	}
+	return &AhdList[V]{items: items}
+}
+
+// AhdKeyValueCombine builds a Pair from a key List and a value List of exactly
+// equal length. A length mismatch or a duplicate key is a KeyValueError, never
+// a silent truncation or a last-one-wins overwrite.
+func AhdKeyValueCombine[K comparable, V any](class *AhdClass, keys *AhdList[K], values *AhdList[V]) *AhdPair[K, V] {
+	keys.require()
+	values.require()
+	if len(keys.items) != len(values.items) {
+		AhdRaiseClass(class, "combine requires equal lengths; received "+strconv.Itoa(len(keys.items))+
+			" key(s) and "+strconv.Itoa(len(values.items))+" value(s)")
+	}
+	result := AhdNewPair[K, V]()
+	for index, key := range keys.items {
+		if _, exists := result.values[key]; exists {
+			AhdRaiseClass(class, "combine received the duplicate key "+ahdKeyText(key))
+		}
+		result.keys = append(result.keys, key)
+		result.values[key] = values.items[index]
+	}
+	return result
+}
+
+// ahdPairCopy is the shallow structural copy every KeyValue operation starts
+// from: a new Pair over the same key and value references.
+func ahdPairCopy[K comparable, V any](pair *AhdPair[K, V]) *AhdPair[K, V] {
+	pair.require()
+	result := AhdNewPair[K, V]()
+	result.keys = append(result.keys, pair.keys...)
+	for key, value := range pair.values {
+		result.values[key] = value
+	}
+	return result
+}
+
+// AhdKeyValueWith replaces an existing key's value in place, or appends a new
+// key at the end. The source Pair is never modified.
+func AhdKeyValueWith[K comparable, V any](pair *AhdPair[K, V], key K, value V) *AhdPair[K, V] {
+	result := ahdPairCopy(pair)
+	result.Set(key, value)
+	return result
+}
+
+// AhdKeyValueWithout removes one existing key. A missing key is a KeyError,
+// matching Pair's own eject semantics.
+func AhdKeyValueWithout[K comparable, V any](pair *AhdPair[K, V], key K) *AhdPair[K, V] {
+	pair.require()
+	if _, exists := pair.values[key]; !exists {
+		AhdRaiseClass(AhdClassKeyError, "Pair has no key "+ahdKeyText(key))
+	}
+	result := ahdPairCopy(pair)
+	result.Remove(key)
+	return result
+}
+
+// ahdRequestedKeys validates a requested key List left to right: every key must
+// exist in the source Pair, and no key may be requested twice.
+func ahdRequestedKeys[K comparable, V any](class *AhdClass, operation string, pair *AhdPair[K, V], keys *AhdList[K]) map[K]bool {
+	pair.require()
+	keys.require()
+	requested := make(map[K]bool, len(keys.items))
+	for _, key := range keys.items {
+		if _, exists := pair.values[key]; !exists {
+			AhdRaiseClass(AhdClassKeyError, "Pair has no key "+ahdKeyText(key))
+		}
+		if requested[key] {
+			AhdRaiseClass(class, operation+" received the duplicate key "+ahdKeyText(key))
+		}
+		requested[key] = true
+	}
+	return requested
+}
+
+// AhdKeyValueSelect keeps exactly the requested keys, in the requested order.
+func AhdKeyValueSelect[K comparable, V any](class *AhdClass, pair *AhdPair[K, V], keys *AhdList[K]) *AhdPair[K, V] {
+	ahdRequestedKeys(class, "select", pair, keys)
+	result := AhdNewPair[K, V]()
+	for _, key := range keys.items {
+		result.keys = append(result.keys, key)
+		result.values[key] = pair.values[key]
+	}
+	return result
+}
+
+// AhdKeyValueDrop removes exactly the requested keys, keeping the source order
+// of every retained entry.
+func AhdKeyValueDrop[K comparable, V any](class *AhdClass, pair *AhdPair[K, V], keys *AhdList[K]) *AhdPair[K, V] {
+	removed := ahdRequestedKeys(class, "drop", pair, keys)
+	result := AhdNewPair[K, V]()
+	for _, key := range pair.keys {
+		if removed[key] {
+			continue
+		}
+		result.keys = append(result.keys, key)
+		result.values[key] = pair.values[key]
+	}
+	return result
+}
+
+// AhdKeyValueRename renames one key in place, preserving its position. A
+// missing old key is a KeyError; a new key already used by a different entry is
+// a KeyValueError. Renaming a key to itself is a harmless structural copy.
+func AhdKeyValueRename[K comparable, V any](class *AhdClass, pair *AhdPair[K, V], oldKey, newKey K) *AhdPair[K, V] {
+	pair.require()
+	if _, exists := pair.values[oldKey]; !exists {
+		AhdRaiseClass(AhdClassKeyError, "Pair has no key "+ahdKeyText(oldKey))
+	}
+	if oldKey == newKey {
+		return ahdPairCopy(pair)
+	}
+	if _, exists := pair.values[newKey]; exists {
+		AhdRaiseClass(class, "rename cannot rename "+ahdKeyText(oldKey)+" to "+ahdKeyText(newKey)+
+			"; that key already exists")
+	}
+	result := AhdNewPair[K, V]()
+	for _, key := range pair.keys {
+		if key == oldKey {
+			result.keys = append(result.keys, newKey)
+			result.values[newKey] = pair.values[oldKey]
+			continue
+		}
+		result.keys = append(result.keys, key)
+		result.values[key] = pair.values[key]
+	}
+	return result
+}
+
+// AhdKeyValueMapValues rewrites every value through a Function, preserving the
+// key set and its order. The callback runs once per value, in Pair order.
+func AhdKeyValueMapValues[K comparable, V any, U any](pair *AhdPair[K, V], transform func(V) U) *AhdPair[K, U] {
+	pair.require()
+	keys := pair.Keys()
+	result := AhdNewPair[K, U]()
+	for _, key := range keys {
+		result.keys = append(result.keys, key)
+		result.values[key] = transform(pair.values[key])
+	}
+	return result
+}
+
+// AhdKeyValueMerge is a disjoint union: left order first, then right order. A
+// key present in both Pairs is a KeyValueError rather than a silent choice of
+// which side wins.
+func AhdKeyValueMerge[K comparable, V any](class *AhdClass, left, right *AhdPair[K, V]) *AhdPair[K, V] {
+	right.require()
+	result := ahdPairCopy(left)
+	for _, key := range right.keys {
+		if _, exists := result.values[key]; exists {
+			AhdRaiseClass(class, "merge received the key "+ahdKeyText(key)+" in both Pairs")
+		}
+		result.keys = append(result.keys, key)
+		result.values[key] = right.values[key]
+	}
+	return result
+}
+
+// AhdKeyValueOverlay is the explicitly named changes-win counterpart of merge:
+// an existing base key keeps its position and takes the new value, and a
+// changes-only key is appended in changes order.
+func AhdKeyValueOverlay[K comparable, V any](base, changes *AhdPair[K, V]) *AhdPair[K, V] {
+	changes.require()
+	result := ahdPairCopy(base)
+	for _, key := range changes.keys {
+		result.Set(key, changes.values[key])
 	}
 	return result
 }

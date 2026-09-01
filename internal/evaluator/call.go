@@ -186,6 +186,8 @@ func (session *Session) builtin(identity ir.CallableID, receiver any, arguments 
 		return session.envBuiltin(strings.TrimPrefix(name, "builtin:Env::"), values(arguments))
 	case strings.HasPrefix(name, "builtin:Lists::"):
 		return session.listsBuiltin(strings.TrimPrefix(name, "builtin:Lists::"), values(arguments))
+	case strings.HasPrefix(name, "builtin:KeyValue::"):
+		return session.keyValueBuiltin(strings.TrimPrefix(name, "builtin:KeyValue::"), values(arguments))
 	}
 	session.raise("Error", "unsupported builtin "+name)
 	return nil

@@ -41,7 +41,10 @@ type moduleOperationShape struct {
 // module owns its own table, the same way each TypeOperation module owns its
 // own operation shapes.
 func moduleOperationShapeOf(operation ModuleOperation) moduleOperationShape {
-	return listsOperationShapes[operation]
+	if shape, known := listsOperationShapes[operation]; known {
+		return shape
+	}
+	return keyValueOperationShapes[operation]
 }
 
 // moduleOperationSymbol builds the module-root symbol of one type-directed
@@ -120,6 +123,9 @@ func (a *analyzer) analyzeModuleOperation(call *ast.CallExpr, operation ModuleOp
 		return moduleOperationFailure()
 	}
 	if info, handled := a.analyzeListsOperation(call, operation, current, flow); handled {
+		return info
+	}
+	if info, handled := a.analyzeKeyValueOperation(call, operation, current, flow); handled {
 		return info
 	}
 	return moduleOperationFailure()

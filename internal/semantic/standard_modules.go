@@ -20,6 +20,7 @@ func StandardModuleInterfaces() map[string]*ModuleInterface {
 		"Env":        envModuleInterface(),
 		"File":       fileModuleInterface(),
 		"JSON":       jsonModuleInterface(),
+		"KeyValue":   keyValueModuleInterface(),
 		"Latex":      latexModuleInterface(),
 		"Lists":      listsModuleInterface(),
 		"Math":       mathModuleInterface(),
