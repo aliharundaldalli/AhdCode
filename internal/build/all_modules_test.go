@@ -7,8 +7,9 @@ import (
 	"testing"
 )
 
-// TestAllStandardModulesCoexist imports every v0.1.17 standard module in
-// one ordinary program and confirms there is no module identity conflict,
+// TestAllStandardModulesCoexist imports every standard module of the current
+// release in one ordinary program and confirms there is no module identity
+// conflict,
 // no runtime configurator overwrite, and no helper-discovery regression
 // when they are all wired together. Latex is intentionally excluded: it
 // requires staging an offline compiler payload that is not available in
@@ -17,7 +18,9 @@ import (
 // staging rather than about module coexistence.
 func TestAllStandardModulesCoexist(t *testing.T) {
 	directory := t.TempDir()
-	source := `bring JSON
+	source := `bring Lists
+bring KeyValue
+bring JSON
 bring XML
 bring Env
 bring Data
@@ -28,6 +31,11 @@ bring Word
 from JSON bring JSONValue
 from XML bring XMLNode
 from Word bring Document
+
+write(Lists.chunk([1, 2, 3, 4, 5], 2))
+write(Lists.valueCounts(["a", "b", "a"]))
+record: Pair<String, String> := KeyValue.combine(["name", "score"], ["Ali", "91"])
+write(KeyValue.overlay(record, {"score": "95"}))
 
 value: JSONValue := JSON.fromInt(91)
 write(value.int())
@@ -55,7 +63,11 @@ write(document.text())
 	if code != 0 || stderr != "" {
 		t.Fatalf("all-module coexistence program failed: code=%d stdout=%q stderr=%q", code, stdout, stderr)
 	}
-	for _, want := range []string{"91\n", "hello\n", "false\n", "2\n", "2.0\n", "Coexistence\n"} {
+	for _, want := range []string{
+		"[[1, 2], [3, 4], [5]]\n", "{\"a\": 2, \"b\": 1}\n",
+		"{\"name\": \"Ali\", \"score\": \"95\"}\n",
+		"91\n", "hello\n", "false\n", "2\n", "2.0\n", "Coexistence\n",
+	} {
 		if !strings.Contains(stdout, want) {
 			t.Fatalf("coexistence output omitted %q:\n%s", want, stdout)
 		}
