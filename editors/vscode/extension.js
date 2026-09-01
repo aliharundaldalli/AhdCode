@@ -12,10 +12,88 @@ const SAVE_FAILED_MESSAGE =
   "AhdCode could not save the active file. The program was not run.";
 const INVALID_EDITOR_MESSAGE =
   "Open a saved .ahd file before running AhdCode.";
+const LSP_START_FAILED_MESSAGE =
+  "AhdCode language server could not be started.\n" +
+  "Diagnostics and hover will be unavailable, but Run File still works.";
 
-function activate(context) {
-  const disposable = vscode.commands.registerCommand(COMMAND_ID, () => runFile());
+// The one argument `ahdcode lsp` accepts: start the stdio language server.
+// Diagnostics and hover are the only features this client requests.
+const LSP_ARGS = ["lsp"];
+
+// activate returns the promise VS Code awaits before considering the
+// extension ready. Starting the language server is awaited here (rather
+// than fired-and-forgotten) so a host or test never observes a half-started
+// client, and so any startup failure is fully handled -- reported once via
+// showErrorMessage -- before activate resolves.
+async function activate(context, vscodeApi = vscode, runtime = {}, clientFactory = defaultClientFactory) {
+  const disposable = vscodeApi.commands.registerCommand(COMMAND_ID, () => runFile(vscodeApi, runtime));
   context.subscriptions.push(disposable);
+  await startLanguageClient(context, vscodeApi, runtime, clientFactory);
+}
+
+// languageClient is the one client this extension ever runs. startLanguageClient
+// is idempotent -- called more than once (activate should only ever run once
+// per extension host lifetime, but nothing prevents a caller from invoking it
+// again) it starts nothing a second time.
+let languageClient;
+
+async function startLanguageClient(context, vscodeApi = vscode, runtime = {}, clientFactory = defaultClientFactory) {
+  if (languageClient) {
+    return;
+  }
+  const configuredPath = vscodeApi.workspace
+    .getConfiguration("ahdcode")
+    .get("executablePath", "")
+    .trim();
+  const executable = await findExecutable(
+    configuredPath || "ahdcode",
+    runtime.env || process.env,
+    runtime.platform || process.platform,
+  );
+  if (!executable) {
+    // Reported once, at activation, not on every hover or keystroke: Run
+    // File already explains the same missing-executable problem when the
+    // user tries to run something, so this is the same root cause surfaced
+    // once up front rather than a second, repeated complaint.
+    void vscodeApi.window.showErrorMessage(MISSING_EXECUTABLE_MESSAGE);
+    return;
+  }
+  try {
+    const client = clientFactory(
+      { command: executable, args: LSP_ARGS },
+      { documentSelector: [{ scheme: "file", language: "ahdcode" }] },
+    );
+    languageClient = client;
+    context.subscriptions.push({ dispose: () => void stopLanguageClient() });
+    await client.start();
+  } catch (_error) {
+    languageClient = undefined;
+    void vscodeApi.window.showErrorMessage(LSP_START_FAILED_MESSAGE);
+  }
+}
+
+// defaultClientFactory is the only place this file touches
+// vscode-languageclient. serverOptions is the same {command, args} shape
+// findExecutable/runFile already produce; run and debug are identical here
+// since v0.2.0 has no separate debug transport.
+function defaultClientFactory(serverOptions, clientOptions) {
+  const { LanguageClient, TransportKind } = require("vscode-languageclient/node");
+  const transported = { ...serverOptions, transport: TransportKind.stdio };
+  return new LanguageClient(
+    "ahdcode",
+    "AhdCode Language Server",
+    { run: transported, debug: transported },
+    clientOptions,
+  );
+}
+
+async function stopLanguageClient() {
+  if (!languageClient) {
+    return;
+  }
+  const client = languageClient;
+  languageClient = undefined;
+  await client.stop();
 }
 
 async function runFile(vscodeApi = vscode, runtime = {}) {
@@ -210,7 +288,12 @@ async function isExecutableFile(candidate, platform) {
   }
 }
 
-function deactivate() {}
+// deactivate returns stopLanguageClient()'s promise so VS Code awaits a
+// clean server shutdown (the LSP shutdown/exit sequence) before the
+// extension host tears the process down.
+function deactivate() {
+  return stopLanguageClient();
+}
 
 module.exports = {
   activate,
@@ -222,8 +305,12 @@ module.exports = {
   runFile,
   findExecutable,
   isRunnableDocument,
+  startLanguageClient,
+  stopLanguageClient,
   COMMAND_ID,
   INVALID_EDITOR_MESSAGE,
   MISSING_EXECUTABLE_MESSAGE,
   SAVE_FAILED_MESSAGE,
+  LSP_START_FAILED_MESSAGE,
+  LSP_ARGS,
 };

@@ -113,6 +113,36 @@ function reset() {
   state.handlers.clear();
 }
 
+// fakeClient stands in for a real vscode-languageclient LanguageClient, so
+// tests never load that package or spawn a real process. It records the
+// (serverOptions, clientOptions) it was built with and how many times
+// start/stop were called.
+function fakeClientFactory(calls) {
+  return (serverOptions, clientOptions) => {
+    const client = {
+      serverOptions,
+      clientOptions,
+      started: 0,
+      stopped: 0,
+      async start() {
+        this.started += 1;
+      },
+      async stop() {
+        this.stopped += 1;
+      },
+    };
+    calls.push(client);
+    return client;
+  };
+}
+
+test.beforeEach(async () => {
+  reset();
+  // Forget any language client a previous test started, so each test begins
+  // from a clean slate regardless of what ran before it.
+  await extension.stopLanguageClient();
+});
+
 function documentFor(filePath, options = {}) {
   return {
     isUntitled: false,
@@ -133,13 +163,17 @@ function makeExecutable(directory) {
   return executable;
 }
 
-test.beforeEach(reset);
-
-test("activate registers ahdcode.runFile", () => {
+test("activate registers ahdcode.runFile", async () => {
   const subscriptions = [];
-  extension.activate({ subscriptions });
+  const calls = [];
+  await extension.activate({ subscriptions }, vscodeMock, { env: { PATH: "" } }, fakeClientFactory(calls));
+  // No ahdcode executable is reachable with an empty PATH, so the language
+  // client never starts and only the run-file command's disposable is
+  // registered -- Run File activation is unaffected by adding the client.
   assert.equal(subscriptions.length, 1);
   assert.equal(typeof state.handlers.get("ahdcode.runFile"), "function");
+  assert.equal(calls.length, 0);
+  assert.deepEqual(state.errors, [extension.MISSING_EXECUTABLE_MESSAGE]);
 });
 
 test("rejects a missing, untitled, or non-AhdCode editor", async () => {
@@ -359,7 +393,7 @@ test("findExecutable resolves ahdcode from PATH", async () => {
 test("manifest exposes the portable command, menu, keybinding, and language", () => {
   const manifest = require("../package.json");
   assert.equal(manifest.main, "./extension.js");
-  assert.equal(manifest.version, "0.1.4");
+  assert.equal(manifest.version, "0.2.0");
   assert.equal(manifest.icon, "images/ahdcode-icon.png");
   assert.equal(manifest.engines.vscode, "^1.107.0");
   assert.equal(manifest.contributes.commands[0].command, "ahdcode.runFile");
@@ -407,4 +441,140 @@ test("TextMate grammar follows the frozen v0.1 lexical surface", () => {
   for (const word of ["default", "same", "is", "has", "lambda", "structure", "attribute", "SuperClass"]) {
     assert.equal(grammarText.includes(word), true);
   }
+});
+
+test("the language client resolves the same executable Run File would use", async () => {
+  const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "ahdcode-lsp-exec-"));
+  const executable = makeExecutable(temporary);
+  state.configurationPath = executable;
+
+  const calls = [];
+  await extension.startLanguageClient({ subscriptions: [] }, vscodeMock, {}, fakeClientFactory(calls));
+
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].serverOptions.command, executable);
+
+  // The exact same configuredPath/PATH resolution Run File itself uses.
+  state.activeTextEditor = { document: documentFor("/tmp/test.ahd") };
+  await extension.runFile(vscodeMock, {});
+  assert.equal(state.errors.length, 0);
+  assert.equal(state.tasks.length, 1);
+  assert.equal(state.tasks[0].execution.process, executable);
+
+  fs.rmSync(temporary, { recursive: true, force: true });
+});
+
+test("the language server is launched with exactly the lsp argument", async () => {
+  const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "ahdcode-lsp-args-"));
+  const executable = makeExecutable(temporary);
+  state.configurationPath = executable;
+
+  const calls = [];
+  await extension.startLanguageClient({ subscriptions: [] }, vscodeMock, {}, fakeClientFactory(calls));
+
+  assert.equal(calls.length, 1);
+  assert.deepEqual(calls[0].serverOptions.args, extension.LSP_ARGS);
+  assert.deepEqual(calls[0].serverOptions.args, ["lsp"]);
+  assert.equal(calls[0].started, 1);
+
+  fs.rmSync(temporary, { recursive: true, force: true });
+});
+
+test("Run File still uses run and the file path, unaffected by the language client", async () => {
+  const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "ahdcode-lsp-runfile-"));
+  const executable = makeExecutable(temporary);
+  state.configurationPath = executable;
+  state.activeTextEditor = { document: documentFor("/tmp/program.ahd") };
+
+  const calls = [];
+  await extension.startLanguageClient({ subscriptions: [] }, vscodeMock, {}, fakeClientFactory(calls));
+  await extension.runFile(vscodeMock, {});
+
+  assert.deepEqual(calls[0].serverOptions.args, ["lsp"]);
+  assert.deepEqual(state.tasks[0].execution.args, ["run", "/tmp/program.ahd"]);
+
+  fs.rmSync(temporary, { recursive: true, force: true });
+});
+
+test("activation starts the language client only once", async () => {
+  const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "ahdcode-lsp-once-"));
+  const executable = makeExecutable(temporary);
+  state.configurationPath = executable;
+
+  const calls = [];
+  const factory = fakeClientFactory(calls);
+  const context = { subscriptions: [] };
+  await extension.startLanguageClient(context, vscodeMock, {}, factory);
+  await extension.startLanguageClient(context, vscodeMock, {}, factory);
+  await extension.activate({ subscriptions: [] }, vscodeMock, {}, factory);
+
+  assert.equal(calls.length, 1, "a client must be created at most once per extension host lifetime");
+  assert.equal(calls[0].started, 1);
+
+  fs.rmSync(temporary, { recursive: true, force: true });
+});
+
+test("a missing executable reports one concise message and starts no client", async () => {
+  const calls = [];
+  await extension.startLanguageClient({ subscriptions: [] }, vscodeMock, { env: { PATH: "" } }, fakeClientFactory(calls));
+
+  assert.equal(calls.length, 0);
+  assert.deepEqual(state.errors, [extension.MISSING_EXECUTABLE_MESSAGE]);
+});
+
+test("a client start failure is caught and reported without throwing", async () => {
+  const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "ahdcode-lsp-fail-"));
+  const executable = makeExecutable(temporary);
+  state.configurationPath = executable;
+
+  const throwingFactory = () => ({
+    async start() {
+      throw new Error("spawn failed");
+    },
+    async stop() {},
+  });
+
+  await assert.doesNotReject(
+    extension.startLanguageClient({ subscriptions: [] }, vscodeMock, {}, throwingFactory),
+  );
+  assert.deepEqual(state.errors, [extension.LSP_START_FAILED_MESSAGE]);
+
+  fs.rmSync(temporary, { recursive: true, force: true });
+});
+
+test("deactivate stops the running language client cleanly", async () => {
+  const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "ahdcode-lsp-stop-"));
+  const executable = makeExecutable(temporary);
+  state.configurationPath = executable;
+
+  const calls = [];
+  await extension.startLanguageClient({ subscriptions: [] }, vscodeMock, {}, fakeClientFactory(calls));
+  assert.equal(calls[0].stopped, 0);
+
+  await extension.deactivate();
+
+  assert.equal(calls[0].stopped, 1);
+
+  // A second deactivate (or a repeated stop) must not throw or double-stop.
+  await extension.deactivate();
+  assert.equal(calls[0].stopped, 1);
+
+  fs.rmSync(temporary, { recursive: true, force: true });
+});
+
+test("the client teardown disposable stops the client via context.subscriptions", async () => {
+  const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "ahdcode-lsp-dispose-"));
+  const executable = makeExecutable(temporary);
+  state.configurationPath = executable;
+
+  const calls = [];
+  const context = { subscriptions: [] };
+  await extension.startLanguageClient(context, vscodeMock, {}, fakeClientFactory(calls));
+
+  // The command disposable plus the client teardown disposable.
+  assert.equal(context.subscriptions.length, 1);
+  await context.subscriptions[0].dispose();
+  assert.equal(calls[0].stopped, 1);
+
+  fs.rmSync(temporary, { recursive: true, force: true });
 });
