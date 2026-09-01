@@ -1542,7 +1542,7 @@ Burada sırasıyla:
 - `Latex.section(text)` / `subsection(text)`: başlık üretir.
 - `Latex.equation(math)`: matematik ifadesini LaTeX olarak ekler.
 - `Latex.document(content)`: parçaları tam bir belgeye dönüştürür.
-- `Latex.pdf(source, output)`: String olarak verdiğiniz LaTeX kaynağını derleyip PDF dosyasına yazar.
+- `Latex.pdf(source, output, sourceOutput = "")`: String olarak verdiğiniz LaTeX kaynağını derleyip PDF dosyasına yazar. Eğer `sourceOutput` argümanını `"tex"` olarak verirseniz, tam kaynak kodunu içeren bir `.tex` yan dosyası da üretilir.
 - `Latex.pdfFile(input, output)`: zaten var olan `.tex` dosyasını derleyip PDF üretir.
 
 Hata türünü `except LatexError` içinde kullanacaksanız `from Latex bring LatexError` ile içe aktarın.
