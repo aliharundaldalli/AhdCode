@@ -79,6 +79,10 @@ go run ./tooling/latex/cmd/package-latex --output "$(go env GOPATH)"
 | `52_excel_styles.ahd` | Range stilleri, güvenli merge, sayı biçimleri, genişlikler ve yükseklikler |
 | `53_excel_data.ahd` | Data ve KeyValue kayıtlarından açık Cell dönüşümü; Lists transpose |
 | `54_excel_roundtrip.ahd` | XLSX save/read/save/read ve Formula-String güvenliği |
+| `55_pdf_basic.ahd` | tipli PDFDocument oluşturma: heading, paragraph, table, page break, save |
+| `56_pdf_word_excel.ahd` | `PDF.fromWord` ve `PDF.fromExcel` ile PDF'e anlamsal dönüşüm |
+| `57_archive.ahd` | Archive modülü: yalnızca oluşturma amaçlı ZIP, TAR ve TAR.GZ paketleme |
+| `58_latex_pdf_tex_archive.ahd` | `Latex.pdf(..., "tex")` kaynak yan dosyasının Archive ile ZIP'lenmesi |
 
 `Greeting.ahd`, `11_modules.ahd` tarafından kullanılan kardeş (sibling)
 modüldür.

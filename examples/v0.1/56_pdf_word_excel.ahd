@@ -1,0 +1,27 @@
+bring Word
+bring Excel
+bring PDF
+from Word bring Document
+from Excel bring Workbook
+from Excel bring Sheet
+from PDF bring PDFDocument
+
+wordDocument: Document := Word.new()
+wordDocument = wordDocument.heading("Report", 1)
+wordDocument = wordDocument.paragraph("Hello from Word.")
+
+pdfFromWord: PDFDocument := PDF.fromWord(wordDocument)
+pdfFromWord.save("from-word.pdf")
+
+book: Workbook := Excel.new().addSheet("Results")
+sheet: Sheet := book.sheet("Results")
+sheet = sheet.setCell(1, 1, Excel.fromString("Name"))
+sheet = sheet.setCell(1, 2, Excel.fromString("Score"))
+sheet = sheet.setCell(2, 1, Excel.fromString("Ada"))
+sheet = sheet.setCell(2, 2, Excel.fromInt(91))
+book = book.withSheet(sheet)
+
+pdfFromExcel: PDFDocument := PDF.fromExcel(book)
+pdfFromExcel.save("from-excel.pdf")
+
+write("from-word.pdf and from-excel.pdf saved")

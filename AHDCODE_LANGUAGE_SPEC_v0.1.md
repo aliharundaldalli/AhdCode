@@ -5414,6 +5414,142 @@ inference, encryption, print layout, user-facing ZIP API, or PDF export. PDF
 conversion is deliberately deferred to the planned v0.1.20 document/PDF
 layer.
 
+## 66. PDF Standard Module (v0.1.20)
+
+`bring PDF` resolves to the compiler-supplied module `builtin:PDF`; a sibling
+`PDF.ahd` cannot shadow it. The module exports the compiler-supplied Classes
+`PDFDocument` and `PDFError`. It adds no syntax and does not change the core
+collection or type system.
+
+```text
+PDF.new()                              -> PDFDocument
+PDF.fromWord(document: Word.Document)  -> PDFDocument
+PDF.fromExcel(workbook: Excel.Workbook) -> PDFDocument
+```
+
+`PDFDocument` is an immutable public value stored, like `Word.Document`, as
+one hidden ordered List of private JSON-encoded content blocks. Every
+transformation returns an independent new value. Its positional-only
+compiler-supplied operations are:
+
+```text
+heading(String, Int) -> PDFDocument
+paragraph(String, String = "left", Bool = false, Bool = false, Bool = false) -> PDFDocument
+table(List<String>, List<List<String>>, String = "left") -> PDFDocument
+image(String, Pair<String, Real> = {}) -> PDFDocument
+pageBreak() -> PDFDocument
+save(String) -> Nothing
+```
+
+Heading levels are `1..6`; another value raises `PDFError`. Paragraph align
+is exactly `"left"`, `"center"`, `"right"`, or `"justify"`. Every table row
+must have exactly `headers`' width and at least one column is required; a
+mismatch raises `PDFError` before anything renders, with no padding,
+truncation, or repair. Table align is `"left"`, `"center"`, or `"right"`.
+Images are read and embedded as PNG/JPEG bytes immediately, exactly like
+`Word.image`; `size` accepts only `"width"`/`"height"` in centimeters,
+positive and finite. Every String reaching a `PDFDocument` operation is
+escaped before it can reach the renderer: `\ { } $ & # % _ ^ ~` always appear
+as ordinary text. `PDF` exposes no raw-markup escape hatch; use `Latex`
+directly for LaTeX source control.
+
+v0.1.20 uses a fixed A4 portrait layout with a 2.54cm margin; there is no
+page-size, orientation, or margin configuration.
+
+`save(path)` requires a `.pdf` destination; another extension raises
+`PDFError`. It builds the PDFDocument's blocks into an internal LaTeX body,
+compiles it through the same low-level offline Tectonic renderer `Latex.pdf`
+uses (the same engine invocation, secure temporary workspace, `%PDF-`
+signature verification, and atomic same-directory publish), and raises
+`PDFError` — never `LatexError` — for a rendering failure. A failed compile
+never replaces an existing destination. `PDF` never writes a `.tex` sidecar.
+
+`PDF.fromWord` and `PDF.fromExcel` are semantic conversions, not Office print
+emulation; neither reads nor mutates its source value. `fromWord` preserves
+headings, paragraph text/align/bold/italic/underline, table content, images,
+and page breaks; a table's merge geometry has no PDF equivalent and is
+dropped. `fromExcel` renders every Sheet, in Workbook order, as a heading (the
+Sheet name) followed by a table over its used range, with the first row as
+the table header; String/Int/Real/Bool cells are shown deterministically,
+Blank stays empty, and a Formula cell shows its formula source text — never a
+fabricated result, because AhdCode does not evaluate Excel formulas. A
+merge's non-anchor cells are already guaranteed Blank by Excel's own model,
+so the plain grid never loses a value; no multi-column cell spanning is
+attempted. A zero-Sheet Workbook, or a Sheet whose used range exceeds 10
+columns, raises `PDFError` rather than silently dropping content.
+
+## 67. Archive Standard Module (v0.1.20)
+
+`bring Archive` resolves to the compiler-supplied module `builtin:Archive`; a
+sibling `Archive.ahd` cannot shadow it. The module exports the
+compiler-supplied Class `ArchiveError`. Archive is creation-only: it adds no
+extraction, listing, or archive object model, and none is planned.
+
+```text
+Archive.zip(String, Pair<String, String>)     -> Nothing
+Archive.tar(String, Pair<String, String>)     -> Nothing
+Archive.tarGzip(String, Pair<String, String>) -> Nothing
+```
+
+`entries` is an ordinary `Pair<String, String>`: each key is the destination
+path *inside* the archive, each value is the *source filesystem path*.
+Archive never guesses a destination name from a source path.
+
+v0.1.20 accepts regular files only: a directory, symbolic-link, or other
+non-regular source raises `ArchiveError` rather than being followed,
+expanded, or dereferenced. Archive member names are canonical relative
+forward-slash paths; an empty name, an absolute path, a `.`/`..` segment, a
+doubled slash, a backslash, a NUL byte, or a drive-prefix-like segment all
+raise `ArchiveError` rather than being silently normalized. `Pair` already
+guarantees unique keys, so no two entries can collide on the same member
+name. A source path resolving to the destination archive itself is rejected.
+
+Archive member order follows `Pair` insertion order. Archive metadata that
+would otherwise vary run to run — timestamps, owner/group, gzip header
+fields — is normalized so two archives built from equivalent entries are
+byte-for-byte identical; file content is preserved exactly. The function
+called selects the format; a mismatched destination extension (`.zip`,
+`.tar`, `.tar.gz`) still raises `ArchiveError` rather than writing the wrong
+bytes under the wrong name. An empty `entries` Pair produces a valid empty
+archive in all three formats.
+
+Archive builds the whole archive into a same-directory temporary file, then
+atomically renames it over the destination, the same pattern
+`Excel.save`/`Word.save`/`Latex.pdf` use; a failed build never touches an
+existing valid destination archive. Archive depends only on the Go standard
+library (`archive/zip`, `archive/tar`, `compress/gzip`) and needs no staged
+runtime resources.
+
+## 68. Latex `pdf` Source-Sidecar Mode (v0.1.20)
+
+`Latex.pdf` gains one optional third parameter, `sourceOutput`, defaulting to
+`""`:
+
+```text
+Latex.pdf(source: String, output: String, sourceOutput: String = "") -> Nothing
+```
+
+The existing two-argument call `Latex.pdf(source, output)` — and the
+explicit three-argument `Latex.pdf(source, output, "")` — lower and behave
+exactly as before: only the `.pdf` at `output` is published, with no sidecar.
+`sourceOutput: "tex"` additionally publishes a sibling `.tex` file containing
+the caller's exact `source` bytes as UTF-8, with no transformed temporary
+source, compiler-added content, temporary path, or renderer metadata. The
+sibling path is derived by replacing `output`'s trailing `.pdf` with `.tex`
+(`report.pdf` → `report.tex`); when `sourceOutput` is `"tex"`, `output` must
+already end in `.pdf`, or `LatexError` is raised before compiling. Any
+`sourceOutput` value other than the exact, case-sensitive `""` or `"tex"`
+raises `LatexError`; there is no other passthrough mode.
+
+Publication order is: compile and verify the PDF, publish it atomically, and
+only then write the `.tex` sidecar. A compile failure publishes neither file
+and never touches an existing destination. Because there is no
+filesystem-wide two-file transaction, publication is two individually atomic
+renames rather than one atomic pair: a PDF that already published
+successfully stays published even if the subsequent sidecar write fails.
+`Latex.pdfFile` is unchanged — it still takes exactly `(input, output)`,
+because its caller already owns the `.tex` file on disk.
+
 ---
 
 # End of AhdCode v0.1 Core Specification

@@ -12,13 +12,15 @@ AhdCode is an experimental statically checked general-purpose programming
 language focused on readable syntax, explicit intent, predictable semantics,
 and native compilation.
 
-The current release is **v0.1.19**. The core language works end to end, but
+The current release is **v0.1.20**. The core language works end to end, but
 the project is not production-ready and breaking changes may occur before 1.0.
 
-v0.1.19 — Excel / XLSX — adds the [Excel](docs/EXCEL.md) module: immutable
-`Workbook` and `Sheet` values, closed typed Cells, ranges, formulas, safe
-merges, basic styles and dimensions, plus deterministic atomic XLSX writing
-and bounded semantic reading with no Office runtime or network dependency.
+v0.1.20 — PDF & Archive — adds the [PDF](docs/PDF.md) module (immutable
+`PDFDocument` values rendered offline to real `.pdf` files, including
+semantic `PDF.fromWord`/`PDF.fromExcel` conversion), the
+[Archive](docs/ARCHIVE.md) module (creation-only ZIP/TAR/TAR.GZ packaging
+using only the Go standard library), and an optional `sourceOutput: "tex"`
+argument on `Latex.pdf` to publish an exact source sidecar alongside the PDF.
 
 ```ahd
 greet: Function := (
@@ -71,6 +73,13 @@ for name in names {
   through typed immutable Workbook/Sheet/Cell/Range values. Formula intent is
   explicit, merges reject value loss, and native executables remain offline
   and relocation-safe.
+- The [PDF module](docs/PDF.md) builds immutable `PDFDocument` values and
+  renders them offline to real `.pdf` files through the same staged Tectonic
+  renderer `Latex` uses, plus semantic `PDF.fromWord`/`PDF.fromExcel`
+  conversion of another module's own typed document.
+- The [Archive module](docs/ARCHIVE.md) packages files into real ZIP, TAR,
+  and TAR.GZ archives offline, creation-only, using nothing beyond the Go
+  standard library.
 - [Lists](docs/LISTS.md) and [KeyValue](docs/KEYVALUE.md) add pure structural
   transformations of `List` and `Pair` — `chunk`, `flatten`, `transpose`,
   `unique`, `valueCounts`, `groupBy`, and `keys`, `values`, `combine`, `with`,
@@ -140,6 +149,8 @@ See the [CLI guide](docs/CLI.md), [formatter guide](docs/FORMATTER.md), and
 - [Latex module](docs/LATEX.md)
 - [Word module](docs/WORD.md)
 - [Excel module](docs/EXCEL.md)
+- [PDF module](docs/PDF.md)
+- [Archive module](docs/ARCHIVE.md)
 - [File and Path modules](docs/FILESYSTEM.md)
 - [Regex module](docs/REGEX.md)
 - [CSV module](docs/CSV.md)

@@ -19,7 +19,7 @@ alamaz. Her argüman `NonNull` olmalıdır.
 ## Yüzey (Surface)
 
 ```text
-pdf(source: String, output: String)      -> Nothing
+pdf(source: String, output: String, sourceOutput: String = "") -> Nothing
 pdfFile(input: String, output: String)   -> Nothing
 
 escape(text: String)                     -> String
@@ -338,6 +338,49 @@ v0.1.14 davranışına bakın; v0.1.15 için bu konuda hiçbir şey değişmedi.
 `pdf`, bir kaynak String'i derler; `pdfFile`, var olan bir `.tex` dosyasını
 derler ve `\includegraphics` gibi belgeye göreli varlıkları (assets) girdi
 dosyasının dizinine göre çözer.
+
+`pdf`, isteğe bağlı üçüncü bir `sourceOutput` argümanı alır, `""` (varsayılan)
+veya `"tex"`:
+
+```ahd
+pdf(source: String, output: String, sourceOutput: String = "") -> Nothing
+```
+
+`sourceOutput: ""` — mevcut, değişmemiş sözleşme: yalnızca `output` (bir
+`.pdf`) yayınlanır. `sourceOutput: "tex"` ayrıca çağıranın tam `source`
+baytlarını içeren kardeş bir `.tex` dosyası yayınlar:
+
+```ahd
+attempt {
+    L.pdf(document, "cikti.pdf", "tex")
+    write("PDF ve TEX başarıyla oluşturuldu!")
+}
+except LatexError as error {
+    write("Dosyalar oluşturulamadı: {error.message}")
+}
+```
+
+`cikti.pdf` ve `cikti.tex` üretir. Kardeş yol, sondaki `.pdf`'in `.tex` ile
+değiştirilmesiyle türetilir (`report.pdf` → `report.tex`,
+`folder/report.pdf` → `folder/report.tex`); `sourceOutput` `"tex"` olduğunda
+`output` `.pdf` ile bitmelidir, aksi halde derlemeden önce `LatexError`
+fırlatılır. `""` veya `"tex"`'in tam, büyük/küçük harfe duyarlı değeri
+dışında herhangi bir `sourceOutput` değeri de `LatexError` fırlatır —
+keyfi bir geçiş dizesi yoktur.
+
+`.tex` yan dosyası, çağıranın kendi kaynağıdır, olduğu gibi: dönüştürülmüş
+bir geçici Tectonic girdisi değil, derleyicinin eklediği hata ayıklama
+içeriği değil, geçici bir yol değil ve render motoru meta verisi değil.
+Yayınlama sırası: önce PDF'i derle ve doğrula, sonra — yalnızca PDF zaten
+atomik olarak yayınlandıktan sonra — `.tex` yan dosyasını yaz. Bir derleme
+hatası hiçbir dosyayı yayınlamaz ve mevcut bir hedefe asla dokunmaz.
+Dosya sistemi genelinde iki dosyalı bir işlem olmadığından, başarılı bir PDF
+yayınından sonraki bir `.tex` yan dosyası yazma hatası, yeni PDF'i yayınlanmış
+ve yan dosyayı yazılmamış bırakır; bu, tek bir iki-dosyalı atomik işlem değil,
+iki ayrı atomik yeniden adlandırmadır.
+
+`pdfFile` değişmedi: hâlâ tam olarak `(input, output)` alır, çünkü çağıranı
+`.tex` dosyasını zaten diskte sahiplenir.
 
 Derleme, çevrimdışı Tectonic motoru ve yerel bir kaynak paketi tarafından yapılır. Kaynak koddan yapılan standart `go install` adımı LaTeX runtime dosyalarını kurmaz. LaTeX kullanmak isteyen kullanıcı, bunları `package-latex` aracıyla bir kez ayrıca hazırlar (stage):
 

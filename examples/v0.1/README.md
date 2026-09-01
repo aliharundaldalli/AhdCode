@@ -79,5 +79,9 @@ go run ./tooling/latex/cmd/package-latex --output "$(go env GOPATH)"
 | `52_excel_styles.ahd` | Range styling, safe merge, number formats, widths, and heights |
 | `53_excel_data.ahd` | Data and KeyValue records converted explicitly to Cells; Lists transpose |
 | `54_excel_roundtrip.ahd` | XLSX save/read/save/read and Formula-versus-String safety |
+| `55_pdf_basic.ahd` | typed PDFDocument construction: heading, paragraph, table, page break, save |
+| `56_pdf_word_excel.ahd` | `PDF.fromWord` and `PDF.fromExcel` semantic conversion into PDF |
+| `57_archive.ahd` | Archive module: creation-only ZIP, TAR, and TAR.GZ packaging |
+| `58_latex_pdf_tex_archive.ahd` | `Latex.pdf(..., "tex")` source sidecar packaged into a ZIP with Archive |
 
 `Greeting.ahd` is the sibling module used by `11_modules.ahd`.

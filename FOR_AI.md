@@ -82,7 +82,7 @@ ahdcode_exe="$(go env GOPATH)/bin/ahdcode"
 "$ahdcode_exe" --version
 ```
 
-The expected current result is `AhdCode v0.1.19`. Using the explicit
+The expected current result is `AhdCode v0.1.20`. Using the explicit
 `$ahdcode_exe` path proves which binary was tested. If the user wants the
 short `ahdcode` command and that directory is not already on `PATH`, explain
 the temporary or persistent options and obtain permission before editing a
@@ -191,7 +191,7 @@ $AhdCodeExe = Join-Path (go env GOPATH) "bin\ahdcode.exe"
 & $AhdCodeExe --version
 ```
 
-The expected current result is `AhdCode v0.1.19`. The explicit executable path
+The expected current result is `AhdCode v0.1.20`. The explicit executable path
 avoids accidentally testing an older global installation. If the Go binary
 directory is not on `PATH`, explain the choice before changing anything. A
 temporary current-PowerShell-process change is:
@@ -268,7 +268,7 @@ the collection it is given, and it returns a new one.
 `String`, `Int`, or `Bool` and never null, and one `Pair` has one value type.
 There is no `Any`, no `dynamic`, no `Dictionary`, and no `Map`.
 
-**AhdCode v0.1.19 has no `Tuple` and no Python-style `zip`.** Do not reach for
+**AhdCode v0.1.20 has no `Tuple` and no Python-style `zip`.** Do not reach for
 `Lists.zip`, `Lists.unzip`, `dict(...)`, `tuple(...)`, or a `Function<T>`
 generic spelling — none of them exist. `Lists` and `KeyValue` operations are
 type-directed: the compiler computes each call's exact result type from the
@@ -302,9 +302,35 @@ only `Excel.formula(text)` expresses formula intent. Excel coordinates are
 Use `Lists` for `List<List<Cell>>` transformations, `KeyValue` for record
 keys/values, and `Data` for String-table semantics. Handle each `JSONValue`
 kind explicitly before choosing a Cell constructor. Do not manually assemble
-XLSX ZIP/XML in AhdCode source, do not invent an `Excel.fromData`/`Data.toExcel`
-bridge, and do not expect PDF export from Excel v0.1.19; PDF is deferred to a
-later document-rendering layer.
+XLSX ZIP/XML in AhdCode source, and do not invent an `Excel.fromData`/`Data.toExcel`
+bridge. `PDF.fromExcel(workbook)` (v0.1.20+) covers "export a Workbook as
+PDF" — see below.
+
+**PDF text is text; do not inject raw LaTeX.** Every `PDFDocument` operation
+(`heading`, `paragraph`, `table`) escapes its String arguments before they
+ever reach the renderer — `\ { } $ & # % _ ^ ~` all appear as ordinary text.
+`PDF` has no raw-content escape hatch. Use [`Latex`](docs/LATEX.md) directly
+when actual LaTeX source control is the goal, not `PDF`.
+
+**`Latex.pdf(source, output, "tex")` means PDF + exact source sidecar.** The
+third argument is `""` (default, unchanged 2-argument behavior) or `"tex"`
+only — not an arbitrary passthrough string. When the user explicitly asked
+for `Latex.pdf(..., "tex")`, that call already writes the sibling `.tex` file
+with the exact source bytes; do not also call `File.writeText` to write the
+same source a second time.
+
+**Archive is creation-only.** `Archive.zip/tar/tarGzip(output, entries)` takes
+a `Pair<String, String>` where the key is the destination path *inside* the
+archive and the value is the *source filesystem path*. Never invent
+`Archive.extract`, `Archive.open`, or any read/listing API — none exists, and
+none is planned. Do not shell out to `zip`/`tar`/`unzip` from AhdCode-adjacent
+tooling when `Archive` already covers the packaging need.
+
+**`PDF.fromWord`/`PDF.fromExcel` are semantic exports, not Office print
+emulation.** They convert another module's own typed document directly (no
+DOCX/XLSX round trip, no LibreOffice/Office dependency) and never mutate the
+source Document/Workbook. Do not expect pixel-perfect fidelity with what
+Word/Excel itself would render.
 
 ## Completion report
 

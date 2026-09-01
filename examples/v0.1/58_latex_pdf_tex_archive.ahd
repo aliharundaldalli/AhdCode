@@ -1,0 +1,22 @@
+bring Latex as L
+bring Archive
+from Latex bring LatexError
+
+body: String := L.section("Findings")
+body += L.equation("E = mc^2")
+source: String := L.document(body: body, title: "Article", author: "AhdCode")
+
+attempt {
+    L.pdf(source, "article.pdf", "tex")
+    write("article.pdf and article.tex saved")
+}
+except LatexError as error {
+    write("compilation failed: {error.message}")
+}
+
+files := {
+    "article/article.pdf": "article.pdf"
+    "article/article.tex": "article.tex"
+}
+Archive.zip("article-package.zip", files)
+write("article-package.zip saved")

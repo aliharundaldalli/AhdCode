@@ -182,7 +182,7 @@ handling before choosing a Cell constructor. Excel does not duplicate those
 modules and does not accept `Table`, `Pair`, or `JSONValue` through an `Any`
 bridge.
 
-v0.1.19 is XLSX-only. It does not include `.xls`, `.xlsm`, macros, charts,
+v0.1.20 is XLSX-only. It does not include `.xls`, `.xlsm`, macros, charts,
 images, pivot tables, rich-text runs, formula calculation, date inference,
 encryption, print layout, or a user-facing ZIP API. In particular, there is no
 PDF export; Word/Excel/PDF composition is deferred to the planned v0.1.20 PDF

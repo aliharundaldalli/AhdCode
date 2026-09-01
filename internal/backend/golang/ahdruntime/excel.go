@@ -1959,7 +1959,7 @@ func excelDecodeWorksheetCell(source excelWorksheetCellXML, sharedStrings []stri
 	case "e":
 		return excelCellData{}, errors.New("error Cells are not supported because their value cannot be represented by the closed Cell model")
 	case "d":
-		return excelCellData{}, errors.New("ISO date Cells are not supported; dates are not inferred in Excel v0.1.19")
+		return excelCellData{}, errors.New("ISO date Cells are not supported; dates are not inferred in Excel v0.1.20")
 	default:
 		return excelCellData{}, fmt.Errorf("Cell type %q is not supported", source.Type)
 	}

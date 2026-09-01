@@ -1,0 +1,16 @@
+bring PDF
+from PDF bring PDFDocument
+
+doc: PDFDocument := PDF.new()
+doc = doc.heading("Quarterly Report", 1)
+doc = doc.paragraph("Prepared offline, no Office dependency.")
+doc = doc.paragraph("Approved & confirmed.", "center", true, false, false)
+doc = doc.table(
+    ["Region", "Q1", "Q2"]
+    [["North", "10", "12"], ["South", "8", "11"]]
+    "center"
+)
+doc = doc.pageBreak()
+doc = doc.paragraph("Second page.", "left", false, true, true)
+doc.save("report.pdf")
+write("report.pdf saved")

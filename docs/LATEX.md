@@ -19,7 +19,7 @@ it. Every argument must be `NonNull`.
 ## Surface
 
 ```text
-pdf(source: String, output: String)      -> Nothing
+pdf(source: String, output: String, sourceOutput: String = "") -> Nothing
 pdfFile(input: String, output: String)   -> Nothing
 
 escape(text: String)                     -> String
@@ -328,6 +328,48 @@ behavior above; nothing about it changed for v0.1.15.
 `pdf` compiles a source String; `pdfFile` compiles an existing `.tex` file and
 resolves document-relative assets such as `\includegraphics` against the input
 file's directory.
+
+`pdf` takes an optional third `sourceOutput` argument, `"" `(default) or
+`"tex"`:
+
+```ahd
+pdf(source: String, output: String, sourceOutput: String = "") -> Nothing
+```
+
+`sourceOutput: ""` — the existing, unchanged contract: only `output` (a
+`.pdf`) is published. `sourceOutput: "tex"` additionally publishes a sibling
+`.tex` file containing the caller's exact `source` bytes:
+
+```ahd
+attempt {
+    L.pdf(document, "cikti.pdf", "tex")
+    write("PDF ve TEX başarıyla oluşturuldu!")
+}
+except LatexError as error {
+    write("Dosyalar oluşturulamadı: {error.message}")
+}
+```
+
+produces `cikti.pdf` and `cikti.tex`. The sibling path is derived by
+replacing the trailing `.pdf` with `.tex` (`report.pdf` → `report.tex`,
+`folder/report.pdf` → `folder/report.tex`); `output` must end in `.pdf` when
+`sourceOutput` is `"tex"`, or `LatexError` is raised before compiling. Any
+`sourceOutput` value other than the exact, case-sensitive `""` or `"tex"`
+also raises `LatexError` — there is no arbitrary passthrough string.
+
+The `.tex` sidecar is the caller's own source, verbatim: not a transformed
+temporary Tectonic input, not compiler-added debugging content, not a
+temporary path, and not renderer metadata. Publication order is: compile and
+verify the PDF first, then — only once the PDF has already been atomically
+published — write the `.tex` sidecar. A compile failure publishes neither
+file and never touches an existing destination. Because there is no
+filesystem-wide two-file transaction, a `.tex`-sidecar write failure after a
+successful PDF publish leaves the new PDF published and the sidecar
+unwritten; this is two individually atomic renames, not one two-file atomic
+transaction.
+
+`pdfFile` is unchanged: it still takes exactly `(input, output)`, because its
+caller already owns the `.tex` file on disk.
 
 Compilation is done by the offline Tectonic engine and a local resource bundle. The standard source installation (`go install`) does not install the LaTeX runtime files. A user who wants to use LaTeX must explicitly stage them once using the `package-latex` tool:
 

@@ -12,15 +12,17 @@ AhdCode; okunabilir sözdizimi, açık niyet (explicit intent), öngörülebilir
 anlambilim (semantics) ve yerel (native) derlemeye odaklanan, deneysel,
 statik olarak denetlenen genel amaçlı bir programlama dilidir.
 
-Mevcut sürüm **v0.1.19**'dur. Çekirdek dil uçtan uca çalışır, ancak proje
+Mevcut sürüm **v0.1.20**'dir. Çekirdek dil uçtan uca çalışır, ancak proje
 üretime hazır değildir ve 1.0'dan önce kırıcı (breaking) değişiklikler
 olabilir.
 
-v0.1.19 — Excel / XLSX — [Excel](docs/EXCEL_TR.md) modülünü ekler:
-değiştirilemez `Workbook` ve `Sheet` değerleri, kapalı tipli Cell'ler,
-Range'ler, Formula'lar, güvenli merge'ler, temel stiller ve boyutlar ile Office
-çalışma zamanı veya ağ gerektirmeyen belirlenimci atomik XLSX yazma ve
-sınırlandırılmış anlamsal okuma.
+v0.1.20 — PDF & Archive — [PDF](docs/PDF_TR.md) modülünü ekler (çevrimdışı
+gerçek `.pdf` dosyalarına render edilen değiştirilemez `PDFDocument`
+değerleri, `PDF.fromWord`/`PDF.fromExcel` anlamsal dönüşümü dahil),
+[Archive](docs/ARCHIVE_TR.md) modülünü ekler (yalnızca Go standart
+kütüphanesini kullanan, yalnızca oluşturma amaçlı ZIP/TAR/TAR.GZ
+paketlemesi) ve `Latex.pdf`'e PDF'in yanında tam kaynak yan dosyası
+yayınlamak için isteğe bağlı bir `sourceOutput: "tex"` argümanı ekler.
 
 ```ahd
 greet: Function := (
@@ -75,6 +77,14 @@ for name in names {
   Cell/Range değerleriyle gerçek `.xlsx` paketlerini okur ve yazar. Formula
   niyeti açıktır, merge değer kaybını reddeder ve native çalıştırılabilirler
   çevrimdışı ve taşınabilir kalır.
+- [PDF modülü](docs/PDF_TR.md), değiştirilemez `PDFDocument` değerleri
+  oluşturur ve bunları `Latex`'in kullandığı aynı konuşlandırılmış Tectonic
+  render motoru üzerinden çevrimdışı gerçek `.pdf` dosyalarına render eder;
+  ayrıca başka bir modülün kendi tipli belgesinin anlamsal dönüşümü olan
+  `PDF.fromWord`/`PDF.fromExcel` sağlar.
+- [Archive modülü](docs/ARCHIVE_TR.md), dosyaları yalnızca Go standart
+  kütüphanesini kullanarak çevrimdışı gerçek ZIP, TAR ve TAR.GZ arşivlerine
+  paketler, yalnızca oluşturma amaçlıdır.
 - [Lists](docs/LISTS_TR.md) ve [KeyValue](docs/KEYVALUE_TR.md), `List` ve
   `Pair` üzerinde saf yapısal dönüşümler ekler — `chunk`, `flatten`,
   `transpose`, `unique`, `valueCounts`, `groupBy` ve `keys`, `values`,
@@ -145,6 +155,8 @@ ve [REPL rehberine](docs/REPL_TR.md) bakın.
 - [Latex modülü](docs/LATEX_TR.md)
 - [Word modülü](docs/WORD_TR.md)
 - [Excel modülü](docs/EXCEL_TR.md)
+- [PDF modülü](docs/PDF_TR.md)
+- [Archive modülü](docs/ARCHIVE_TR.md)
 - [File ve Path modülleri](docs/FILESYSTEM_TR.md)
 - [Regex modülü](docs/REGEX_TR.md)
 - [CSV modülü](docs/CSV_TR.md)

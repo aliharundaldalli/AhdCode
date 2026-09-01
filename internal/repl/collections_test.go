@@ -111,7 +111,7 @@ var collectionsExpectedOutput = []string{
 
 func TestCollectionModulesInThePersistentREPL(t *testing.T) {
 	var output, errorOutput bytes.Buffer
-	Run(strings.NewReader(collectionsProgram), &output, &errorOutput, "AhdCode v0.1.19")
+	Run(strings.NewReader(collectionsProgram), &output, &errorOutput, "AhdCode v0.1.20")
 	if errorOutput.Len() != 0 {
 		t.Fatalf("REPL errors: %s", errorOutput.String())
 	}

@@ -5893,6 +5893,131 @@ görsel, pivot tablo, zengin metin Cell API'si, Formula motoru, tarih çıkarım
 yoktur. PDF dönüşümü bilinçli olarak planlanan v0.1.20 belge/PDF katmanına
 ertelenmiştir.
 
+## 66. PDF Standart Modülü (v0.1.20)
+
+`bring PDF`, derleyici tarafından sağlanan `builtin:PDF` modülüne çözülür;
+bir kardeş `PDF.ahd` onu gölgeleyemez. Modül, derleyici tarafından sağlanan
+`PDFDocument` ve `PDFError` Class'larını dışa aktarır. Hiçbir sözdizimi
+eklemez ve çekirdek koleksiyon veya tür sistemini değiştirmez.
+
+```text
+PDF.new()                              -> PDFDocument
+PDF.fromWord(document: Word.Document)  -> PDFDocument
+PDF.fromExcel(workbook: Excel.Workbook) -> PDFDocument
+```
+
+`PDFDocument`, `Word.Document` gibi, gizli sıralı bir özel JSON-kodlu içerik
+blok Listesi olarak saklanan değiştirilemez bir genel değerdir. Her dönüşüm
+bağımsız yeni bir değer döndürür. Yalnızca konumsal derleyici-sağlanan
+işlemleri:
+
+```text
+heading(String, Int) -> PDFDocument
+paragraph(String, String = "left", Bool = false, Bool = false, Bool = false) -> PDFDocument
+table(List<String>, List<List<String>>, String = "left") -> PDFDocument
+image(String, Pair<String, Real> = {}) -> PDFDocument
+pageBreak() -> PDFDocument
+save(String) -> Nothing
+```
+
+Başlık seviyeleri `1..6`'dır; başka bir değer `PDFError` fırlatır. Paragraf
+hizalaması tam olarak `"left"`, `"center"`, `"right"` veya `"justify"`'dır.
+Her tablo satırı tam olarak `headers` genişliğine sahip olmalı ve en az bir
+sütun gereklidir; bir uyumsuzluk hiçbir şey render edilmeden önce `PDFError`
+fırlatır, doldurma, kesme veya onarım yapılmadan. Tablo hizalaması `"left"`,
+`"center"` veya `"right"`'dır. Görseller, tam olarak `Word.image` gibi, PNG/
+JPEG baytları olarak hemen okunur ve gömülür; `size` yalnızca santimetre
+cinsinden, pozitif ve sonlu `"width"`/`"height"` kabul eder. Bir
+`PDFDocument` işlemine ulaşan her String, render motoruna ulaşmadan önce
+kaçışlanır: `\ { } $ & # % _ ^ ~` her zaman sıradan metin olarak görünür.
+`PDF`'in ham işaretleme kaçış yolu yoktur; LaTeX kaynak denetimi için
+doğrudan `Latex` kullanın.
+
+v0.1.20, 2.54cm kenar boşluklu sabit bir A4 dikey düzen kullanır; sayfa
+boyutu, yönü veya kenar boşluğu yapılandırması yoktur.
+
+`save(path)` bir `.pdf` hedefi gerektirir; başka bir uzantı `PDFError`
+fırlatır. PDFDocument'in bloklarını dahili bir LaTeX gövdesine dönüştürür,
+`Latex.pdf`'in kullandığı aynı düşük seviye çevrimdışı Tectonic render
+motoru üzerinden derler (aynı motor çağrısı, güvenli geçici çalışma alanı,
+`%PDF-` imza doğrulaması ve atomik aynı-dizin yayını) ve bir render hatası
+için `LatexError` değil `PDFError` fırlatır. Başarısız bir derleme mevcut
+bir hedefi asla değiştirmez. `PDF` asla bir `.tex` yan dosyası yazmaz.
+
+`PDF.fromWord` ve `PDF.fromExcel` anlamsal dönüşümlerdir, Office yazdırma
+taklidi değildir; ikisi de kaynak değerini okumaz veya değiştirmez.
+`fromWord`, başlıkları, paragraf metni/hizalama/kalın/italik/altı çizili
+durumunu, tablo içeriğini, görselleri ve sayfa sonlarını korur; bir tablonun
+birleştirme geometrisinin PDF karşılığı yoktur ve atılır. `fromExcel`, her
+Sheet'i, Workbook sırasına göre, bir başlık (Sheet adı) ve ardından
+kullanılan aralık üzerinde ilk satırı başlık olan bir tablo olarak render
+eder; bir Formula hücresi formül kaynak metnini gösterir — asla uydurulmuş
+bir sonuç değil, çünkü AhdCode Excel formüllerini hesaplamaz. Sıfır Sheet'li
+bir Workbook veya kullanılan aralığı 10 sütunu aşan bir Sheet, içeriği
+sessizce atmak yerine `PDFError` fırlatır.
+
+## 67. Archive Standart Modülü (v0.1.20)
+
+`bring Archive`, derleyici tarafından sağlanan `builtin:Archive` modülüne
+çözülür; bir kardeş `Archive.ahd` onu gölgeleyemez. Modül, derleyici
+tarafından sağlanan `ArchiveError` Class'ını dışa aktarır. Archive yalnızca
+oluşturma amaçlıdır: çıkarma, listeleme veya arşiv nesne modeli eklemez ve
+hiçbiri planlanmamaktadır.
+
+```text
+Archive.zip(String, Pair<String, String>)     -> Nothing
+Archive.tar(String, Pair<String, String>)     -> Nothing
+Archive.tarGzip(String, Pair<String, String>) -> Nothing
+```
+
+`entries` sıradan bir `Pair<String, String>`'dır: her anahtar arşiv
+*içindeki* hedef yoldur, her değer *kaynak dosya sistemi yoludur*.
+
+v0.1.20 yalnızca normal dosyaları kabul eder: bir dizin, sembolik bağlantı
+veya başka bir normal olmayan kaynak, izlenmek veya genişletilmek yerine
+`ArchiveError` fırlatır. Archive üye adları kanonik göreli ileri-eğik-çizgi
+yollarıdır; boş bir ad, mutlak bir yol, bir `.`/`..` parçası, çift eğik
+çizgi, ters eğik çizgi, NUL baytı veya sürücü-ön-eki benzeri bir parça,
+sessizce normalleştirilmek yerine `ArchiveError` fırlatır. `Pair` zaten
+benzersiz anahtarlar garanti eder. Hedef arşivin kendisine çözülen bir kaynak
+yol reddedilir.
+
+Archive üye sırası `Pair` ekleme sırasını izler. Aksi takdirde çalıştırmadan
+çalıştırmaya değişebilecek meta veri normalleştirilir; dosya içeriği tam
+olarak korunur. Çağrılan fonksiyon biçimi seçer; uyumsuz bir hedef uzantısı
+yine de `ArchiveError` fırlatır. Boş bir `entries` Pair, üç biçimde de
+geçerli boş bir arşiv üretir.
+
+Archive, tam arşivi aynı dizinde bir geçici dosyaya inşa eder, sonra hedefin
+üzerine atomik olarak yeniden adlandırır; başarısız bir inşa mevcut geçerli
+bir hedef arşive asla dokunmaz. Archive yalnızca Go standart kütüphanesine
+bağımlıdır ve konuşlandırılmış çalışma zamanı kaynaklarına ihtiyaç duymaz.
+
+## 68. Latex `pdf` Kaynak Yan Dosyası Modu (v0.1.20)
+
+`Latex.pdf`, varsayılan olarak `""` olan isteğe bağlı üçüncü bir
+`sourceOutput` parametresi kazanır:
+
+```text
+Latex.pdf(source: String, output: String, sourceOutput: String = "") -> Nothing
+```
+
+Mevcut iki argümanlı çağrı `Latex.pdf(source, output)` — ve açık üç
+argümanlı `Latex.pdf(source, output, "")` — tam olarak öncekiyle aynı
+şekilde davranır: yalnızca `output`'taki `.pdf` yayınlanır, yan dosya yoktur.
+`sourceOutput: "tex"` ayrıca çağıranın tam `source` baytlarını UTF-8 olarak
+içeren kardeş bir `.tex` dosyası yayınlar. Kardeş yol, `output`'un sondaki
+`.pdf`'inin `.tex` ile değiştirilmesiyle türetilir; `sourceOutput` `"tex"`
+olduğunda `output` zaten `.pdf` ile bitmelidir, aksi halde derlemeden önce
+`LatexError` fırlatılır. `""` veya `"tex"`'in tam değeri dışında herhangi bir
+`sourceOutput` değeri de `LatexError` fırlatır.
+
+Yayınlama sırası: PDF'i derle ve doğrula, atomik olarak yayınla, ve
+yalnızca o zaman `.tex` yan dosyasını yaz. Bir derleme hatası hiçbir dosyayı
+yayınlamaz ve mevcut bir hedefe asla dokunmaz. Dosya sistemi genelinde
+iki-dosyalı bir işlem olmadığından, yayınlama tek bir atomik çift yerine iki
+ayrı atomik yeniden adlandırmadır. `Latex.pdfFile` değişmedi.
+
 ---
 
 # AhdCode v0.1 Çekirdek Spesifikasyonu Sonu

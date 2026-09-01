@@ -1,0 +1,13 @@
+bring Archive
+bring File
+
+File.writeText("data.json", "\{\"ok\": true\}")
+File.writeText("chart.png", "fake-png-bytes")
+
+files := {"data/data.json": "data.json", "images/chart.png": "chart.png"}
+
+Archive.zip("submission.zip", files)
+Archive.tar("submission.tar", files)
+Archive.tarGzip("submission.tar.gz", files)
+
+write("submission.zip, submission.tar, and submission.tar.gz saved")
