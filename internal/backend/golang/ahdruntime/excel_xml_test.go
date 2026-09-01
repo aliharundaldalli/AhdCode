@@ -12,6 +12,122 @@ import (
 	"testing"
 )
 
+// TestExcelFormulaCellsCarryCalculationInteroperabilityMetadata is the
+// regression for the confirmed real-world defect where a Formula Cell with
+// no cached <v> and no workbook calcId left B2:B4 blank in real Microsoft
+// Excel until the user pressed F9, even though fullCalcOnLoad/forceFullCalc
+// were already present. Verified empirically against real Microsoft Excel
+// and real Apple Numbers (both installed on the build machine): opening the
+// generated file displays every formula's correct result immediately, with
+// no editing, F9, or re-entry. This test checks the generated XML contract
+// that produces that behavior, not the applications themselves.
+func TestExcelFormulaCellsCarryCalculationInteroperabilityMetadata(t *testing.T) {
+	workbook := excelTestValue(ExcelWorkbookAddSheet(ExcelNew(), "Sheet1"))
+	sheet := excelTestValue(ExcelWorkbookSheet(workbook, "Sheet1"))
+	formulas := []string{
+		`=SUM(A2:A4)`, `=AVERAGE(A2:A4)`, `=MAX(A2:A4)`,
+		`=1+2`, `=A2+A3`, `=IF(A2<20,"yes","no")`, `=A2*2.5`, `=IF(A2<>A3,"different","same")`,
+	}
+	for index, expression := range formulas {
+		cell := excelTestValue(ExcelFormula(expression))
+		sheet = excelTestValue(ExcelSheetSetCell(sheet, int64(index+1), 1, cell))
+	}
+	// Excel.fromString must never be reinterpreted as a Formula, before or
+	// after this fix.
+	literal := excelTestValue(ExcelFromString(`=SUM(A2:A4)`))
+	sheet = excelTestValue(ExcelSheetSetCell(sheet, int64(len(formulas)+1), 1, literal))
+	workbook = excelTestValue(ExcelWorkbookWithSheet(workbook, sheet))
+
+	directory := t.TempDir()
+	path := filepath.Join(directory, "formulas.xlsx")
+	if err := ExcelWorkbookSave(workbook, path); err != nil {
+		t.Fatalf("save: %v", err)
+	}
+
+	data := excelTestReadFile(t, path)
+	reader, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
+	if err != nil {
+		t.Fatalf("not a valid ZIP: %v", err)
+	}
+	parts := make(map[string]string, len(reader.File))
+	for _, file := range reader.File {
+		opened, openErr := file.Open()
+		if openErr != nil {
+			t.Fatal(openErr)
+		}
+		content, readErr := io.ReadAll(opened)
+		_ = opened.Close()
+		if readErr != nil {
+			t.Fatal(readErr)
+		}
+		parts[file.Name] = string(content)
+		decoder := xml.NewDecoder(bytes.NewReader(content))
+		var parseErr error
+		for {
+			if _, parseErr = decoder.Token(); parseErr != nil {
+				break
+			}
+		}
+		if !errors.Is(parseErr, io.EOF) {
+			t.Fatalf("%s is not well-formed XML: %v", file.Name, parseErr)
+		}
+	}
+
+	workbookXML := parts["xl/workbook.xml"]
+	for _, required := range []string{`calcId="124519"`, `fullCalcOnLoad="1"`, `forceFullCalc="1"`} {
+		if !strings.Contains(workbookXML, required) {
+			t.Fatalf("xl/workbook.xml calcPr missing %s:\n%s", required, workbookXML)
+		}
+	}
+
+	sheetXML := parts["xl/worksheets/sheet1.xml"]
+	for _, expression := range formulas {
+		// Each formula's escaped source must be immediately followed by a
+		// cached <v> placeholder within the same cell.
+		escaped := excelEscapeXML(strings.TrimPrefix(expression, "="))
+		want := "<f>" + escaped + "</f><v>0</v>"
+		if !strings.Contains(sheetXML, want) {
+			t.Fatalf("formula cell for %q missing cached placeholder %q:\n%s", expression, want, sheetXML)
+		}
+	}
+	if !strings.Contains(sheetXML, `t="inlineStr"><is><t xml:space="preserve">=SUM(A2:A4)</t>`) {
+		t.Fatalf("literal String cell lost its exact text:\n%s", sheetXML)
+	}
+
+	// The public contract: kind()/formula() only ever see the caller's exact
+	// source, never the cached placeholder.
+	loaded := excelTestValue(ExcelRead(path))
+	loadedSheet := excelTestValue(ExcelWorkbookSheet(loaded, "Sheet1"))
+	for index, expression := range formulas {
+		cell := excelTestValue(ExcelSheetCell(loadedSheet, int64(index+1), 1))
+		if kind := excelTestValue(ExcelCellKind(cell)); kind != "Formula" {
+			t.Fatalf("row %d kind = %q; want Formula", index+1, kind)
+		}
+		if got := excelTestValue(ExcelCellFormula(cell)); got != expression {
+			t.Fatalf("row %d formula = %q; want %q", index+1, got, expression)
+		}
+	}
+	literalCell := excelTestValue(ExcelSheetCell(loadedSheet, int64(len(formulas)+1), 1))
+	if kind := excelTestValue(ExcelCellKind(literalCell)); kind != "String" {
+		t.Fatalf("literal cell kind = %q; want String", kind)
+	}
+	if got := excelTestValue(ExcelCellString(literalCell)); got != `=SUM(A2:A4)` {
+		t.Fatalf("literal cell text = %q", got)
+	}
+
+	// save -> read -> save -> read must remain byte-for-byte deterministic
+	// with the new cached placeholder and calcPr metadata in play.
+	resaved := filepath.Join(directory, "formulas-2.xlsx")
+	if err := ExcelWorkbookSave(loaded, resaved); err != nil {
+		t.Fatalf("resave: %v", err)
+	}
+	first := excelTestReadFile(t, path)
+	second := excelTestReadFile(t, resaved)
+	if !bytes.Equal(first, second) {
+		t.Fatal("save -> read -> save did not produce byte-identical output")
+	}
+}
+
 func excelTestReadFile(t *testing.T, path string) []byte {
 	t.Helper()
 	data, err := os.ReadFile(path)

@@ -87,6 +87,15 @@ sınırına uymalıdır. AhdCode ifadeyi saklar ve XML için kaçışlar; ayrı�
 tip denetlemez, hesaplamaz, bağlantı çalıştırmaz veya ağ içeriği almaz. Okuma,
 başındaki `=` işaretini döndürür ve önbelleklenmiş sonucu yok sayar.
 
+Kaydedilen çalışma kitapları her Formula Cell'i yeniden hesaplama için
+işaretler: üretilen XLSX bir yer tutucu önbellek değeri ve çalışma kitabı
+hesaplama meta verisi taşır (`fullCalcOnLoad`, `forceFullCalc`, gerçek bir
+`calcId`), böylece Excel, Numbers ve diğer elektronik tablo uygulamaları
+dosya açılır açılmaz gerçek sonucu yeniden hesaplayıp gösterir; kullanıcının
+F9'a basmasına veya formülü yeniden girmesine gerek kalmaz. Yer tutucu yalnızca
+XLSX birlikte çalışabilirlik meta verisidir; AhdCode onu asla hesaplamaz ve
+`Cell.formula()` onu asla döndürmez.
+
 ## Koordinatlar, Range ve toplu yazma
 
 Excel koordinatları bilinçli olarak 1 tabanlıdır: `(1, 1)`, `A1`'dir. Satırlar

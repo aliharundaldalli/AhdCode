@@ -85,6 +85,14 @@ formula length. AhdCode stores and XML-escapes the expression but does not
 parse, type-check, calculate, execute links, or fetch network content. Reading
 returns the leading `=` and ignores cached results.
 
+Saved workbooks mark every Formula Cell for recalculation: the generated XLSX
+carries a placeholder cached value and workbook calculation metadata
+(`fullCalcOnLoad`, `forceFullCalc`, a real `calcId`) so Excel, Numbers, and
+other spreadsheet applications recompute and display the real result as soon
+as the file is opened, without the user pressing F9 or re-entering the
+formula. The placeholder is XLSX interoperability metadata only; AhdCode never
+computes it and `Cell.formula()` never returns it.
+
 ## Coordinates, ranges, and bulk writes
 
 Excel coordinates are deliberately 1-based: `(1, 1)` is `A1`. Rows are

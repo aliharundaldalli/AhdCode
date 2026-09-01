@@ -1147,7 +1147,14 @@ func excelWorkbookXML(workbook excelWorkbookData) string {
 		identifier := strconv.Itoa(index + 1)
 		builder.WriteString(`<sheet name="` + excelEscapeXML(sheet.Name) + `" sheetId="` + identifier + `" r:id="rId` + identifier + `"/>`)
 	}
-	builder.WriteString(`</sheets><calcPr calcMode="auto" fullCalcOnLoad="1" forceFullCalc="1"/></workbook>`)
+	// calcId names a real historical Excel calculation-engine build (the same
+	// value XlsxWriter and openpyxl both use). Without it, some Excel builds
+	// do not reliably treat fullCalcOnLoad/forceFullCalc as "this workbook's
+	// cached values are untrustworthy" and leave Formula cells showing blank
+	// until the user manually recalculates (F9). calcId's own value is not
+	// meaningful to AhdCode; it exists only so real spreadsheet applications
+	// recalculate on open.
+	builder.WriteString(`</sheets><calcPr calcId="124519" calcMode="auto" fullCalcOnLoad="1" forceFullCalc="1"/></workbook>`)
 	return builder.String()
 }
 
@@ -1351,7 +1358,13 @@ func excelCellXML(entry excelCellEntry, styleID int) string {
 		}
 		return `<c r="` + address + `"` + style + ` t="b"><v>` + value + `</v></c>`
 	case "Formula":
-		return `<c r="` + address + `"` + style + `><f>` + excelEscapeXML(strings.TrimPrefix(entry.Cell.Text, "=")) + `</f></c>`
+		// The cached <v> is a placeholder, not a computed result: AhdCode does
+		// not evaluate Excel formulas. It exists purely so a spreadsheet
+		// application that (for whatever reason) does not honor calcPr's
+		// fullCalcOnLoad/forceFullCalc still finds a well-formed numeric cell
+		// rather than an empty one. Excel.read ignores it entirely -- only
+		// the <f> text is ever read back as the Formula Cell's value.
+		return `<c r="` + address + `"` + style + `><f>` + excelEscapeXML(strings.TrimPrefix(entry.Cell.Text, "=")) + `</f><v>0</v></c>`
 	default:
 		panic("ahdcode: unsupported validated Excel Cell kind")
 	}
