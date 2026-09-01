@@ -5575,7 +5575,7 @@ bring Lists
 from Lists bring chunk
 
 parts := Lists.chunk(values, 10)
-same := chunk(values, 10)
+alsoParts := chunk(values, 10)
 ```
 
 **İç/dış sınır.** Bir çağrı kendi argümanlarına göre özelleştirildiği için

@@ -90,6 +90,7 @@ source: String := L.document(
     color: "#1F4E79"
     cover: cover
     theorems: theoremTypes
+    theme: "Default"
 )
 ```
 

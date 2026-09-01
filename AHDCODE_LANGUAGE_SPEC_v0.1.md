@@ -5097,7 +5097,7 @@ bring Lists
 from Lists bring chunk
 
 parts := Lists.chunk(values, 10)
-same := chunk(values, 10)
+alsoParts := chunk(values, 10)
 ```
 
 **The internal/public boundary.** Because a call is specialized against its own

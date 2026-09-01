@@ -49,10 +49,29 @@ produces from any of them. Write whichever valid form is convenient --
 generated code that mixes styles across a file is fine -- and let the
 formatter normalize it.
 
-The one placement rule that is not just style: the expression on the right
-of `:=` or `=` must start on the same physical line as the operator. Every
-other line break, including the one right after `:=`/`=` and before an
-opening bracket, is free.
+The one placement rule that is not just style: the token immediately
+following `:=` or `=` must appear on the same physical line as the operator.
+This holds even when that token opens a bracket -- writing `[`, `(`, or `{`
+on the operator's own line is required; a line break *between* `:=`/`=` and
+the bracket is rejected. Once the opening bracket itself sits on the
+operator's line, every line break inside it is free:
+
+```ahd
+values: List<Int> := [
+    1
+    2
+    3
+]
+```
+
+is valid (`[` opens right after `:=`), while
+
+```ahd
+values: List<Int> :=
+    [1, 2, 3]
+```
+
+is rejected, because the newline falls between `:=` and `[`.
 
 A short call, several equally valid spellings:
 

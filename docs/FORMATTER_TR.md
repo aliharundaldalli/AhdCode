@@ -51,10 +51,30 @@ Hangi geçerli biçim rahatınıza geliyorsa onu yazın — bir dosya genelinde
 stilleri karıştıran üretilmiş (generated) kod sorun değildir — ve
 formatter'ın onu normalleştirmesine izin verin.
 
-Sadece stil olmayan tek yerleştirme kuralı şudur: `:=` veya `=` işaretinin
-sağındaki ifade, işaretle aynı fiziksel satırda başlamalıdır. `:=`/`=`
-işaretinden hemen sonraki ve açılış parantezinden önceki satır sonu dahil,
-diğer her satır sonu serbesttir.
+Sadece stil olmayan tek yerleştirme kuralı şudur: `:=` veya `=`
+işaretinden hemen sonraki token, işaretle aynı fiziksel satırda
+görünmelidir. Bu, o token bir açılış parantezi olsa bile geçerlidir —
+`[`, `(` veya `{` işaretini işaretin kendi satırında yazmak zorunludur;
+`:=`/`=` ile parantez *arasında* bir satır sonu reddedilir. Açılış
+parantezinin kendisi işaretin satırında olduğunda, içindeki her satır sonu
+serbesttir:
+
+```ahd
+values: List<Int> := [
+    1
+    2
+    3
+]
+```
+
+geçerlidir (`[`, `:=`'nin hemen ardından açılır), oysa
+
+```ahd
+values: List<Int> :=
+    [1, 2, 3]
+```
+
+reddedilir, çünkü satır sonu `:=` ile `[` arasına düşer.
 
 Kısa bir çağrı, eşit derecede geçerli birkaç yazım:
 
