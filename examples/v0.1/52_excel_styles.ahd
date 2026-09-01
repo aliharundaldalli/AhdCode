@@ -7,18 +7,26 @@ book: Workbook := Excel.new().addSheet("Report")
 sheet: Sheet := book.sheet("Report")
 sheet = sheet.setCell(1, 1, Excel.fromString("University Results"))
 sheet = sheet.merge(sheet.range(1, 1, 1, 4))
-sheet = sheet.setRow(2, 1, [
-    Excel.fromString("Name")
-    Excel.fromString("Exam")
-    Excel.fromString("Project")
-    Excel.fromString("Average")
-])
-sheet = sheet.setRow(3, 1, [
-    Excel.fromString("Ayşe")
-    Excel.fromInt(88)
-    Excel.fromReal(92.5)
-    Excel.formula("=AVERAGE(B3:C3)")
-])
+sheet = sheet.setRow(
+    2
+    1
+    [
+        Excel.fromString("Name")
+        Excel.fromString("Exam")
+        Excel.fromString("Project")
+        Excel.fromString("Average")
+    ]
+)
+sheet = sheet.setRow(
+    3
+    1
+    [
+        Excel.fromString("Ayşe")
+        Excel.fromInt(88)
+        Excel.fromReal(92.5)
+        Excel.formula("=AVERAGE(B3:C3)")
+    ]
+)
 
 header: CellStyle := Excel.style()
 header = header.bold(true).fillColor("#1F4E79").textColor("#FFFFFF")

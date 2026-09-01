@@ -16,20 +16,21 @@ table: Table := Data.fromRecords(records)
 
 book: Workbook := Excel.new().addSheet("Data")
 sheet: Sheet := book.sheet("Data")
-headers: List<Cell> := table.columns().map(
+columnNames: List<String> := table.columns()
+headers: List<Cell> := columnNames.map(
     lambda (text: String) -> Excel.fromString(text)
 )
 sheet = sheet.setRow(1, 1, headers)
 
 rowIndex: Int := 2
 for record in table.rows() {
-    values: Local List<Cell> := KeyValue.values(record).map(
+    texts: Local List<String> := KeyValue.values(record)
+    values: Local List<Cell> := texts.map(
         lambda (text: String) -> Excel.fromString(text)
     )
     sheet = sheet.setRow(rowIndex, 1, values)
     rowIndex = rowIndex + 1
 }
-
 // List<List<Cell>> stays ordinary List structure. Lists.transpose owns the
 // structural operation; Excel does not duplicate it.
 grid: List<List<Cell>> := sheet.cells(sheet.range(1, 1, 3, 3))

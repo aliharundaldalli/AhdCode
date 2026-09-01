@@ -5,18 +5,26 @@ from Excel bring Sheet
 book: Workbook := Excel.new().addSheet("Students")
 sheet: Sheet := book.sheet("Students")
 
-sheet = sheet.setRow(1, 1, [
-    Excel.fromString("Name")
-    Excel.fromString("Score")
-    Excel.fromString("Active")
-    Excel.fromString("Adjusted")
-])
-sheet = sheet.setRow(2, 1, [
-    Excel.fromString("Ali")
-    Excel.fromInt(91)
-    Excel.fromBool(true)
-    Excel.formula("=B2+5")
-])
+sheet = sheet.setRow(
+    1
+    1
+    [
+        Excel.fromString("Name")
+        Excel.fromString("Score")
+        Excel.fromString("Active")
+        Excel.fromString("Adjusted")
+    ]
+)
+sheet = sheet.setRow(
+    2
+    1
+    [
+        Excel.fromString("Ali")
+        Excel.fromInt(91)
+        Excel.fromBool(true)
+        Excel.formula("=B2+5")
+    ]
+)
 
 book = book.withSheet(sheet)
 book.save("excel-basic.xlsx")
