@@ -33,20 +33,22 @@ The best way to learn is not just by reading the examples, but by running them. 
 - [24. Plot module](#24-plot-module)
 - [25. Numeric module and Complex](#25-numeric-module-and-complex)
 - [26. Latex module](#26-latex-module)
-- [Word module](#word-module)
-- [Excel module](#excel-module)
-- [JSON module](#json-module)
-- [XML module](#xml-module)
-- [Env module](#env-module)
-- [Lists and KeyValue modules](#lists-and-keyvalue-modules)
-- [27. Code Formatter](#27-code-formatter)
-- [28. Command line (CLI)](#28-command-line-cli)
-- [29. Interactive shell (REPL)](#29-interactive-shell-repl)
-- [30. Common beginner mistakes](#30-common-beginner-mistakes)
-- [31. Small Projects](#31-small-projects)
-- [32. Exercises](#32-exercises)
-- [33. Solution Hints](#33-solution-hints)
-- [34. Next steps and technical docs](#34-next-steps-and-technical-docs)
+- [27. Word module](#27-word-module)
+- [28. Excel module](#28-excel-module)
+- [29. PDF module](#29-pdf-module)
+- [30. Archive module](#30-archive-module)
+- [31. JSON module](#31-json-module)
+- [32. XML module](#32-xml-module)
+- [33. Env module](#33-env-module)
+- [34. Lists and KeyValue modules](#34-lists-and-keyvalue-modules)
+- [35. Code Formatter](#35-code-formatter)
+- [36. Command line (CLI)](#36-command-line-cli)
+- [37. Interactive shell (REPL)](#37-interactive-shell-repl)
+- [38. Common beginner mistakes](#38-common-beginner-mistakes)
+- [39. Small Projects](#39-small-projects)
+- [40. Exercises](#40-exercises)
+- [41. Solution Hints](#41-solution-hints)
+- [42. Next steps and technical docs](#42-next-steps-and-technical-docs)
 
 ## 1. What is AhdCode?
 
@@ -2057,11 +2059,9 @@ A basic example:
 bring Latex as L
 from Latex bring LatexError
 
-doc: String := L.document(
-    type: "Article",
-    contents: L.section("My First Document") +
-              L.escape("Hello! This is a regular text section.")
-)
+body: String := L.section("My First Document") +
+    L.escape("Hello! This is a regular text section.")
+doc: String := L.document(body: body, type: "Article")
 
 attempt {
     L.pdf(doc, "output.pdf")
@@ -2071,9 +2071,15 @@ except LatexError as e {
 }
 ```
 
-Beyond basic articles, you can use `document(type: "Report")` or `document(type: "Beamer")`. Beamer supports the bounded `"Default"`, `"Madrid"`, and `"Warsaw"` themes. The module also supports `date`, `margin`, `color`, `figure`, `image`, `theorem`, `ref`, `cite`, and `bibliography`. For more advanced capabilities, see the [Latex module reference](LATEX.md).
+`document`'s first parameter is `body` -- the assembled content String -- not
+`contents`. Beyond basic articles, you can use `document(body: body, type:
+"Report")` or `document(body: body, type: "Beamer")`. Beamer supports the
+bounded `"Default"`, `"Madrid"`, and `"Warsaw"` themes. The module also
+supports `date`, `margin`, `color`, `figure`, `image`, `theorem`, `ref`,
+`cite`, and `bibliography`. For more advanced capabilities, see the [Latex
+module reference](LATEX.md).
 
-## Word module
+## 27. Word module
 
 Word builds immutable DOCX documents without requiring Microsoft Office:
 
@@ -2094,7 +2100,7 @@ Word can also embed Plot-generated PNG files and read text, headings, and
 tables from a bounded semantic DOCX subset. See the [Word module
 reference](WORD.md).
 
-## Excel module
+## 28. Excel module
 
 Excel creates and reads real `.xlsx` workbooks without Microsoft Office:
 
@@ -2117,7 +2123,120 @@ still text unless `Excel.formula(...)` is used. Workbook and Sheet operations
 return new values, and unsafe merges never discard covered cell content. See
 the [Excel module reference](EXCEL.md).
 
-## JSON module
+## 29. PDF module
+
+`PDF` builds an immutable `PDFDocument` (headings, paragraphs, tables, images,
+page breaks) and renders it offline to a real `.pdf` file -- no Microsoft
+Office, LibreOffice, or network access:
+
+```ahd
+bring PDF
+from PDF bring PDFDocument
+
+doc: PDFDocument := PDF.new()
+doc = doc.heading("Quarterly Report", 1)
+doc = doc.paragraph("Prepared offline, no Office dependency.")
+doc = doc.table(["Region", "Q1", "Q2"], [["North", "10", "12"]])
+doc.save("report.pdf")
+```
+
+Like `Document` and `Table`, every `PDFDocument` operation is positional-only
+and returns a *new* `PDFDocument` -- the receiver never changes. `save()`
+returns `Nothing`, so call it as a statement. Every String you pass in
+(headings, paragraphs, table cells) is escaped before rendering, so
+characters like `\ { } $ & #` always show up as ordinary text -- `PDF` has no
+way to inject raw LaTeX.
+
+`PDF` can also build a document directly from another module's own typed
+document, with no manual copying:
+
+```ahd
+bring Word
+from Word bring Document
+
+wordDocument: Document := Word.new()
+wordDocument = wordDocument.heading("Report", 1)
+wordDocument = wordDocument.paragraph("Hello")
+
+pdfFromWord: PDFDocument := PDF.fromWord(wordDocument)
+pdfFromWord.save("report-from-word.pdf")
+```
+
+`.save()` uses the same offline renderer as `Latex.pdf` -- see [installation
+and your first program](#2-installation-and-your-first-program) for the
+one-time staging step. See the [PDF module reference](PDF.md) for image
+sizing, page layout, and error details.
+
+## 30. Archive module
+
+`Archive` packages files into real, deterministic `.zip`, `.tar`, or
+`.tar.gz` archives -- creation-only, and it needs no renderer or extra setup
+at all, since it only uses the Go standard library:
+
+```ahd
+bring Archive
+
+files: Pair<String, String> := {
+    "report.pdf": "report.pdf"
+    "data.xlsx": "results.xlsx"
+}
+
+Archive.zip("submission.zip", files)
+```
+
+The key in `files` is the path *inside* the archive; the value is the source
+file's path on disk. Unsafe entry paths (like `../secret`) and symlink
+sources are rejected with an `ArchiveError` rather than silently skipped.
+There is no extraction, listing, or read API in v0.1.20 -- `Archive` only
+creates archives. See the [Archive module reference](ARCHIVE.md).
+
+### Putting it together
+
+Two small workflows show how PDF, Excel, and Archive combine in real
+v0.1.20 programs.
+
+**Report packaging** -- turn a Workbook into a PDF, then bundle both into one
+ZIP:
+
+```ahd
+bring Excel
+bring PDF
+bring Archive
+from Excel bring Workbook
+from Excel bring Sheet
+
+book: Workbook := Excel.new().addSheet("Scores")
+sheet: Sheet := book.sheet("Scores")
+sheet = sheet.setRow(1, 1, [Excel.fromString("Name"), Excel.fromInt(91)])
+book = book.withSheet(sheet)
+book.save("report.xlsx")
+
+pdf := PDF.fromExcel(book)
+pdf.save("report.pdf")
+
+files: Pair<String, String> := {
+    "report.xlsx": "report.xlsx"
+    "report.pdf": "report.pdf"
+}
+
+Archive.zip("report.zip", files)
+```
+
+**Latex source sidecar** -- publish the compiled PDF together with its exact
+LaTeX source:
+
+```ahd
+bring Latex as L
+
+source: String := L.document(body: L.section("Findings"), title: "Report")
+L.pdf(source, "article.pdf", "tex")
+```
+
+This produces both `article.pdf` and `article.tex` from one call; the third
+argument only accepts `""` (the default, PDF-only) or `"tex"`. Pack them the
+same way with `Archive.zip("article-bundle.zip", {"article.pdf": "article.pdf", "article.tex": "article.tex"})`.
+
+## 31. JSON module
 
 JSON reads and builds typed `JSONValue`s — no `Any`, no dynamic typing:
 
@@ -2143,7 +2262,7 @@ key can genuinely be absent. Write literal JSON braces with a raw String
 (`r'{"a":1}'`) so AhdCode doesn't read them as string interpolation. See the
 [JSON module reference](JSON.md).
 
-## XML module
+## 32. XML module
 
 XML builds and reads a small `Element`/`Text` node model:
 
@@ -2160,7 +2279,7 @@ write(XML.stringify(document, true))
 except `kind()` and `text()` raises `XMLError` on a `Text` node. See the
 [XML module reference](XML.md).
 
-## Env module
+## 33. Env module
 
 Env reads process environment variables and `.env` files, always as
 `String`:
@@ -2175,7 +2294,7 @@ port: Int := int(Env.getOr("PORT", "8080"))
 `Env.get(name)` returns `String?` so absence and an explicit empty value stay
 distinguishable. See the [Env module reference](ENV.md).
 
-## Lists and KeyValue modules
+## 34. Lists and KeyValue modules
 
 These two modules transform Lists and Pairs without changing the original:
 
@@ -2206,7 +2325,7 @@ also has `keys`, `values`, `without`, `select`, `drop`, `rename`, `mapValues`,
 `merge`, and `overlay`. See the [Lists](LISTS.md) and [KeyValue](KEYVALUE.md)
 module references.
 
-## 24. Code Formatter
+## 35. Code Formatter
 
 Even if the code works, if everyone uses different spacing and line layouts, it becomes hard to read. The AhdCode formatter converts valid code to a common style:
 
@@ -2259,7 +2378,7 @@ values: List<Int> :=
 
 The formatter is idempotent; running it again on the same file produces no new changes.
 
-## 25. Command line (CLI)
+## 36. Command line (CLI)
 
 You can use AhdCode from the terminal with a few basic commands:
 
@@ -2290,7 +2409,7 @@ Shows help and version information.
 
 If you are a beginner, the command you will use most of the time will be `ahdcode run ...`.
 
-## 26. Interactive shell (REPL)
+## 37. Interactive shell (REPL)
 
 You don't have to create a file every time you want to try something small. In the terminal, just run:
 
@@ -2298,39 +2417,40 @@ You don't have to create a file every time you want to try something small. In t
 ahdcode
 ```
 
-The REPL opens, and you can try AhdCode commands one by one:
+Starting it prints a version banner matching `ahdcode --version`, then the
+REPL opens and you can try AhdCode commands one by one at the `ahd>` prompt:
 
 ```text
-> x: Int := 5
-> x = x + 1
-> x
+ahd> x: Int := 5
+ahd> x = x + 1
+ahd> x
 6
 ```
 
 The REPL acts like a **session**. It remembers the values you created in previous successful commands:
 
 ```text
-> name: String := "Ali"
-> write(name)
+ahd> name: String := "Ali"
+ahd> write(name)
 Ali
 ```
 
 Making a mistake in one command does not erase your previously working state:
 
 ```text
-> x: Int := 5
-> x: Int := 7
+ahd> x: Int := 5
+ahd> x: Int := 7
 error: duplicate declaration
-> x
+ahd> x
 5
 ```
 
 The side effects of previous commands are not rerun. For example:
 
 ```text
-> write("one")
+ahd> write("one")
 one
-> write("two")
+ahd> write("two")
 two
 ```
 
@@ -2339,9 +2459,9 @@ two
 `take()` waits for real user input even inside the REPL:
 
 ```text
-> name: String := take("Name: ")
+ahd> name: String := take("Name: ")
 Name: Ali
-> write(name)
+ahd> write(name)
 Ali
 ```
 
@@ -2349,7 +2469,15 @@ Function and Class definitions, modules, List/Pair objects, and the Math randomn
 
 The REPL is very useful when learning: you can quickly try an idea and see the result. For longer programs, using an `.ahd` file is more organized.
 
-## 30. Common beginner mistakes
+Building a `PDFDocument` or Latex source String works fine in the REPL, but
+actually compiling to a `.pdf` does not: `Latex.pdf(...)`, `Latex.pdfFile(...)`,
+and `PDFDocument.save(...)` all raise an error interactively, because
+compiling invokes an external renderer that the persistent evaluator does
+not support. Run those calls from a `.ahd` file instead. `Archive` has no
+such limit -- it works fully in the REPL. See the [REPL reference](REPL.md)
+for details.
+
+## 38. Common beginner mistakes
 
 Seeing an error message is a normal part of programming. Most errors simply tell you that the computer couldn't understand what you wanted. The following examples show common situations beginners encounter and how to fix them:
 
@@ -2453,7 +2581,7 @@ Seeing an error message is a normal part of programming. Most errors simply tell
 - Why: Unseeded randomness uses OS entropy and cannot be repeated.
 - Correct: Provide a seed value like `Math.seed(42)` before throwing the dice.
 
-## 31. Small Projects
+## 39. Small Projects
 
 These small projects bring together what is taught in the guide. Try building them on your own!
 
@@ -2465,7 +2593,7 @@ These small projects bring together what is taught in the guide. Try building th
 6. **Student Registry with Classes**: Create a `Student` class and a `Course` class. Let the Course have a `List<Student>` inside it. Write a method to add a new student to the course, and another method to calculate the overall average grade of the course.
 7. **Seeded Random Game**: Generate a "secret number" between 1 and 100 using `Math.seed(42)`. Ask the user to guess the number. Guide them with "higher" or "lower" until they guess correctly. Because a seed is used, the secret number will be the same every time you run the program—perfect for testing!
 
-## 32. Exercises
+## 40. Exercises
 
 Instead of immediately looking for full solutions, build each program in small steps.
 
@@ -2495,7 +2623,7 @@ Instead of immediately looking for full solutions, build each program in small s
 19. Use `break` and `continue` to find the first 5 even numbers within a very large range, but skip multiples of 3 with `continue`.
 20. Create a module named `MathUtils.ahd` containing a function that calculates rectangle area, and use it from inside `main.ahd` by calling it with `bring`.
 
-## 33. Solution Hints
+## 41. Solution Hints
 
 1. The result of `take` is a String; use `int(...)` for age, and `+ 1` for the new age.
 2. Break the formula into small parts; start with `real(take(...))` and use Real numbers.
@@ -2518,7 +2646,7 @@ Instead of immediately looking for full solutions, build each program in small s
 19. `if i % 3 == 0 { continue }`. `if count == 5 { break }`.
 20. You can use `from MathUtils bring calculateArea`.
 
-## 34. Next steps and technical docs
+## 42. Next steps and technical docs
 
 After finishing this guide, you can deepen your knowledge of the language details from these documents:
 
@@ -2541,6 +2669,15 @@ After finishing this guide, you can deepen your knowledge of the language detail
 - [Plot](PLOT.md)
 - [Numeric](NUMERIC.md)
 - [Latex](LATEX.md)
+- [Word](WORD.md)
+- [Excel](EXCEL.md)
+- [PDF](PDF.md)
+- [Archive](ARCHIVE.md)
+- [JSON](JSON.md)
+- [XML](XML.md)
+- [Env](ENV.md)
+- [Lists](LISTS.md)
+- [KeyValue](KEYVALUE.md)
 - [File and Path](FILESYSTEM.md)
 - [Regex](REGEX.md)
 - [CSV](CSV.md)

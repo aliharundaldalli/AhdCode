@@ -26,27 +26,29 @@ En iyi öğrenme yolu, örnekleri yalnızca okumak değil çalıştırmaktır. B
 - [17. Sınıflar (Class) ve Özellikler (Attributes)](#17-sınıflar-class-ve-özellikler-attributes)
 - [18. Hata yönetimi (`attempt`, `except`, `ultimately` ve `toss`)](#18-hata-yönetimi-attempt-except-ultimately-ve-toss)
 - [19. Modüller ve bring](#19-modüller-ve-bring)
-- [20. Fundamentals modülü](#20-fundamentals-modulu)
-- [21. Math modülü](#21-math-modulu)
-- [22. Time modülü](#22-time-modulu)
-- [23. Statistics modülü](#23-statistics-modulu)
-- [24. Plot modülü](#24-plot-modulu)
-- [25. Numeric modülü ve Complex](#25-numeric-modulu-ve-complex)
-- [26. Latex modülü](#26-latex-modulu)
-- [Word modülü](#word-modulu)
-- [Excel modülü](#excel-modulu)
-- [JSON modülü](#json-modulu)
-- [XML modülü](#xml-modulu)
-- [Env modülü](#env-modulu)
-- [Lists ve KeyValue modülleri](#lists-ve-keyvalue-modulleri)
-- [27. Kod Biçimlendirici (Formatter)](#27-kod-bicimlendirici-formatter)
-- [28. Komut satırı (CLI)](#28-komut-satiri-cli)
-- [29. Etkileşimli kabuk (REPL)](#29-etkilesimli-kabuk-repl)
-- [30. Sık yapılan başlangıç hataları](#30-sik-yapilan-baslangic-hatalari)
-- [31. Küçük Projeler](#31-kucuk-projeler)
-- [32. Egzersizler](#32-egzersizler)
-- [33. Çözüm İpuçları](#33-cozum-ipuclari)
-- [34. Sonraki adımlar ve teknik dokümanlar](#34-sonraki-adimlar-ve-teknik-dokumanlar)
+- [20. Fundamentals modülü](#20-fundamentals-modülü)
+- [21. Math modülü](#21-math-modülü)
+- [22. Time modülü](#22-time-modülü)
+- [23. Statistics modülü](#23-statistics-modülü)
+- [24. Plot modülü](#24-plot-modülü)
+- [25. Numeric modülü ve Complex](#25-numeric-modülü-ve-complex)
+- [26. Latex modülü (Latex)](#26-latex-modülü-latex)
+- [27. Word modülü](#27-word-modülü)
+- [28. Excel modülü](#28-excel-modülü)
+- [29. PDF modülü](#29-pdf-modülü)
+- [30. Archive modülü](#30-archive-modülü)
+- [31. JSON modülü](#31-json-modülü)
+- [32. XML modülü](#32-xml-modülü)
+- [33. Env modülü](#33-env-modülü)
+- [34. Lists ve KeyValue modülleri](#34-lists-ve-keyvalue-modülleri)
+- [35. Kod Biçimlendirici (Formatter)](#35-kod-biçimlendirici-formatter)
+- [36. Komut satırı (CLI)](#36-komut-satırı-cli)
+- [37. Etkileşimli kabuk (REPL)](#37-etkileşimli-kabuk-repl)
+- [38. Sık yapılan başlangıç hataları](#38-sık-yapılan-başlangıç-hataları)
+- [39. Küçük Projeler](#39-küçük-projeler)
+- [40. Egzersizler](#40-egzersizler)
+- [41. Çözüm İpuçları](#41-çözüm-i̇puçları)
+- [42. Sonraki adımlar ve teknik belgeler](#42-sonraki-adımlar-ve-teknik-belgeler)
 
 ## 1. AhdCode nedir?
 
@@ -1379,14 +1381,37 @@ AhdCode'un sık karşılaşılan hata türleri arasında `DomainError`, `ValueEr
 
 ## 19. Modüller ve `bring`
 
-Program büyüdükçe her şeyi tek bir dosyaya yazmak istemezsiniz. Bir işi ayrı `.ahd` dosyasına koyup başka dosyadan kullanabilirsiniz.
+Program büyüdükçe her şeyi tek bir dosyaya yazmak istemezsiniz. Bir işi ayrı bir `.ahd` dosyasına koyup başka bir dosyadan kullanabilirsiniz. Buna **modül** diyebiliriz.
 
 ### Kendi modülünüzü oluşturmak
+
+Aynı klasörde iki dosyanız olduğunu düşünün:
+
+```text
+main.ahd
+Greeting.ahd
+```
+
+`Greeting.ahd`:
+
+```ahd
+greet: Function := (name: String) -> String {
+    return "Hello from module, {name}"
+}
+```
+
+`main.ahd`:
 
 ```ahd
 from Greeting bring greet
 
 write(greet("Ayşe"))
+```
+
+Çıktı:
+
+```text
+Hello from module, Ayşe
 ```
 
 ### Modülü hangi biçimde içe aktarabilirim?
@@ -1404,6 +1429,170 @@ Yalnız istediğiniz ismi alarak:
 from Greeting bring greet
 write(greet("Ayşe"))
 ```
+
+Birden çok isim:
+
+```ahd
+from Greeting bring (
+    greet
+    farewell
+)
+```
+
+Tüm public isimler:
+
+```ahd
+from Greeting bring all
+```
+
+Aynı ismin çakışmasına yol açan içe aktarımlar ve döngüsel modül bağımlılıkları derleme zamanı hatasıdır.
+
+### Bir modüle kısa isim vermek
+
+```ahd
+bring Time as T
+
+write(T.Calendar.isLeapYear(2028))
+```
+
+`as T` kullandığınızda, bu içe aktarım için `Time` yerine `T` kullanırsınız.
+
+Bu kısaltma tür bildirimlerinde kullanılmaz. Örneğin:
+
+```ahd
+bring Time as T
+from Time bring DateTime
+
+current: DateTime := T.now()
+```
+
+`T.DateTime`, geçerli bir tür bildirim sözdizimi değildir; türü ayrıca içe aktarın.
+
+### İlk bakış: File ve Path
+
+AhdCode'un gömülü `Path` ve `File` modülleri de `bring` ile kullanılır:
+
+```ahd
+bring Path
+bring File
+
+path: String := Path.join(["notes", "today.txt"])
+File.createDir("notes")
+File.writeText(path, "hello")
+write(File.readText(path))
+```
+
+`Path`, yol String'leriyle çalışır. `File`, dosya ve klasör işlemleri yapar. Dosya işlemlerindeki hataları yakalamak isterseniz `FileError` türünü ek olarak içe aktarabilirsiniz:
+
+```ahd
+from File bring FileError
+
+attempt {
+    write(File.readText("missing.txt"))
+}
+except FileError as error {
+    write("File could not be read")
+}
+```
+
+`FileError`, `IOError` sınıfından türer. Göreli yollar, programın veya REPL oturumunun çalışma klasörünü kullanır.
+
+### İlk bakış: Regex
+
+AhdCode'un gömülü `Regex` modülü bir deseni (pattern) bir `Pattern` değerine derler, ardından onu kullanarak bir String hakkında sorular sormanızı sağlar:
+
+```ahd
+bring Regex
+from Regex bring Pattern
+
+digits: Pattern := Regex.compile("[0-9]+")
+
+write(digits.matches("order #482"))       // true
+write(digits.find("order #482, item #7")) // "482"
+write(digits.findAll("order #482, item #7")) // ["482", "7"]
+```
+
+`Regex.compile`'ın ürettiği sınıfın adı `Pattern`'dır, `Regex` değil — `bring Regex` zaten modülün kendisini adlandırır, bu yüzden derlenmiş desen türünün kendi ismine ihtiyacı vardır (`from Regex bring Pattern`).
+
+`find`, `String?` döndürür çünkü hiç eşleşme olmayabilir; bu yüzden diğer her null olabilen değer gibi kullanmadan önce kontrol edin:
+
+```ahd
+found: String? := digits.find("no numbers here")
+if found == null {
+    write("nothing found")
+}
+```
+
+Geçersiz bir desen `RegexError` fırlatır:
+
+```ahd
+from Regex bring RegexError
+
+attempt {
+    Regex.compile("(unterminated")
+}
+except RegexError as error {
+    write("could not compile: {error.message}")
+}
+```
+
+`replace`, `split` ve `groups` için [Regex modül referansına](REGEX_TR.md) bakın.
+
+### İlk bakış: CSV
+
+`CSV`, metni ham String satırları veya başlık anahtarlı String kayıtları olarak taşır:
+
+```ahd
+bring CSV
+
+rows: List<List<String>> := CSV.parse("name,age\nAli,42\n")
+records: List<Pair<String, String>> := CSV.parseRecords("name,age\nAli,42\n")
+write(records[0]["name"])
+```
+
+CSV asla sayı veya tarih çıkarımı yapmaz. Hatalı biçimlendirilmiş girdi ve geçersiz kayıt şekilleri `CSVError` fırlatır. Ayrıntılar için [CSV modül referansına](CSV_TR.md) bakın.
+
+### İlk bakış: Data tabloları
+
+Metin içeri girdikten sonra, `Data` üzerinde çalışacağınız bir `Table` verir. Her hücre hâlâ bir `String`'dir ve her işlem, elinizdekini değiştirmek yerine **yeni** bir tablo döndürür:
+
+```ahd
+bring Data
+from Data bring Table
+
+table: Table := Data.fromCSV("name,score\nAli,91\nAyse,78\n")
+
+write(table.rowCount())
+write(table.columns())
+
+passed: Table := table.filter(
+    lambda (row: Pair<String, String>) -> int(row["score"]) >= 80
+)
+
+write(passed.column("name"))
+write(table.rowCount())
+```
+
+=>
+
+```text
+2
+["name", "score"]
+["Ali"]
+2
+```
+
+Son satır önemli olan yer: `table` hâlâ her iki satıra da sahip, çünkü `filter` yeni bir tablo döndürdü.
+
+`int(row["score"])`'a dikkat edin. Data, `"91"`'in bir sayı olduğunu asla tahmin etmez, bu yüzden ihtiyaç duyduğunuzda dönüştürürsünüz — dilin geri kalanından zaten bildiğiniz aynı kural. Tam bir sayısal sütun da aynı şekilde çalışır:
+
+```ahd
+scores: List<Real> := table.column("score").map(
+    lambda (value: String) -> real(value)
+)
+```
+
+Ayrıca `sort`, `select`, `drop`, `rename`, `reverse`, `head`, `tail`, `transform`, `derive`, `unique`, `valueCounts` ve `groupBy` da vardır. Var olmayan bir sütun istemek `DataError` fırlatır. Ayrıntılar için [Data modül referansına](DATA_TR.md) bakın.
 
 ## 20. Fundamentals modülü
 
@@ -1510,7 +1699,79 @@ write(elapsed >= 0.5)
 
 `Time.sleep(...)` **milisaniye**, `Time.monotonic()` ise **saniye** kullanır. `Time.monotonic()` tarih değildir; iki ölçüm arasındaki süreyi hesaplamak için kullanılır. Negatif `sleep` değeri `ValueError` üretir.
 
-## 23. Latex modülü (Latex)
+## 23. Statistics modülü
+
+`Statistics` modülü, `List<Int>` veya `List<Real>` için betimleyici istatistik
+sağlar. Grafik çizmez (görselleştirme için `Plot`'a bakın).
+
+```ahd
+bring Statistics
+
+scores: List<Int> := [70, 80, 90]
+write(Statistics.mean(scores))
+write(Statistics.median(scores))
+```
+
+Ayrıntılar için [Statistics modül referansına](STATISTICS_TR.md) bakın.
+
+## 24. Plot modülü
+
+`Plot` modülü, sayısal veriden grafik oluşturur ve bunları görsel dosyalar
+(`.png`, `.svg`, `.pdf`) olarak kaydeder.
+
+```ahd
+bring Plot
+
+chart := Plot.line([1, 2, 3], [2, 4, 3])
+chart.save("chart.png")
+```
+
+Kaydetmeden önce grafiği özelleştirebilirsiniz:
+
+```ahd
+chart = chart.title("Growth").xLabel("Days")
+```
+
+Plot yalnızca sayısal türleri kabul eder (`List<Int>`, `List<Real>` veya
+`Numeric` Vector'leri). Metni otomatik olarak ayrıştırmaz (parse etmez).
+Ayrıntılar için [Plot modül referansına](PLOT_TR.md) bakın.
+
+## 25. Numeric modülü ve Complex
+
+`Numeric` modülü, doğrusal cebir işlemleri sağlar (Vector ve Matrix).
+
+```ahd
+bring Numeric
+
+v := Numeric.vector([1, 2, 3])
+m := Numeric.matrix([[1, 2], [3, 4]])
+write(m.determinant())
+```
+
+Bir `Numeric` Vector'ü, düz bir List yerine doğrudan `Plot.line` veya
+`Plot.scatter`'a da geçirebilirsiniz. Ayrıntılar için [Numeric modül
+referansına](NUMERIC_TR.md) bakın.
+
+### Complex sayılar
+
+AhdCode, çekirdek bir tür olarak `Complex` sayıları da destekler (`Real`
+bileşenlerden oluşur). Birini oluşturmak için bir sayıya doğrudan büyük harf
+`I` ekleyin:
+
+```ahd
+z := 2 + 3I
+write(z)       // 2.0+3.0I
+```
+
+- `3I` geçerlidir.
+- `3i` geçersizdir.
+- `3 I` (aralarında boşlukla) geçersizdir.
+
+Bir `Complex` gerektiği yerde bir `Int` veya `Real` güvenle kullanılabilir.
+`Complex` değerleri toplanabilir, çarpılabilir ve bölünebilir, ancak
+sıralanamazlar (`<` veya `>` kullanamazsınız).
+
+## 26. Latex modülü (Latex)
 
 AhdCode ile doğrudan PDF üretmek istiyorsanız `Latex` modülünü kullanabilirsiniz. Modül gerekli Tectonic motorunu kendi kurulumuyla birlikte getirir; ayrıca TeX Live veya MiKTeX kurmanız gerekmez.
 
@@ -1553,7 +1814,7 @@ Beamer belgeleri sınırlı `"Default"`, `"Madrid"` ve `"Warsaw"` theme'lerini
 destekler. Geçersiz theme veya Beamer dışında Default olmayan theme
 `ValueError` fırlatır.
 
-## Word modülü
+## 27. Word modülü
 
 Word, Microsoft Office gerektirmeden immutable DOCX belgeleri oluşturur:
 
@@ -1574,7 +1835,7 @@ Plot ile üretilen PNG dosyalarını gömebilir ve sınırlandırılmış anlams
 alt kümesinden metin, heading ve table okuyabilir. Ayrıntılar için [Word modül
 referansına](WORD_TR.md) bakın.
 
-## Excel modülü
+## 28. Excel modülü
 
 Excel, Microsoft Office gerektirmeden gerçek `.xlsx` çalışma kitapları
 oluşturur ve okur:
@@ -1598,7 +1859,123 @@ String, `Excel.formula(...)` kullanılmadıkça metin olarak kalır. Workbook ve
 Sheet işlemleri yeni değerler döndürür; güvensiz merge'ler kapsanan Cell
 içeriğini asla atmaz. [Excel modül referansına](EXCEL_TR.md) bakın.
 
-## JSON modülü
+## 29. PDF modülü
+
+`PDF`, değiştirilemez bir `PDFDocument` oluşturur (heading, paragraph, table,
+image, page break) ve bunu çevrimdışı gerçek bir `.pdf` dosyasına render
+eder — Microsoft Office, LibreOffice veya ağ bağlantısı gerekmez:
+
+```ahd
+bring PDF
+from PDF bring PDFDocument
+
+doc: PDFDocument := PDF.new()
+doc = doc.heading("Quarterly Report", 1)
+doc = doc.paragraph("Prepared offline, no Office dependency.")
+doc = doc.table(["Region", "Q1", "Q2"], [["North", "10", "12"]])
+doc.save("report.pdf")
+```
+
+`Document` ve `Table` gibi, her `PDFDocument` işlemi yalnızca konumsaldır ve
+*yeni* bir `PDFDocument` döndürür — alıcı hiç değişmez. `save()`, `Nothing`
+döndürür; bu yüzden onu bir statement olarak çağırın. Verdiğiniz her String
+(heading, paragraph, table hücresi) render edilmeden önce kaçışlanır, bu
+yüzden `\ { } $ & #` gibi karakterler her zaman sıradan metin olarak görünür
+— `PDF`'in ham LaTeX enjekte etmenin bir yolu yoktur.
+
+`PDF`, başka bir modülün kendi tipli belgesinden de doğrudan, elle kopyalama
+gerekmeden bir belge oluşturabilir:
+
+```ahd
+bring Word
+from Word bring Document
+
+wordDocument: Document := Word.new()
+wordDocument = wordDocument.heading("Report", 1)
+wordDocument = wordDocument.paragraph("Hello")
+
+pdfFromWord: PDFDocument := PDF.fromWord(wordDocument)
+pdfFromWord.save("report-from-word.pdf")
+```
+
+`.save()`, `Latex.pdf` ile aynı çevrimdışı render motorunu kullanır — bir
+kerelik hazırlık adımı için [kurulum ve ilk programınız](#2-kurulum-ve-ilk-programınız)
+bölümüne bakın. Görsel boyutlandırma, sayfa düzeni ve hata ayrıntıları için
+[PDF modül referansına](PDF_TR.md) bakın.
+
+## 30. Archive modülü
+
+`Archive`, dosyaları gerçek, deterministik `.zip`, `.tar` veya `.tar.gz`
+arşivlerine paketler — yalnızca oluşturma amaçlıdır ve hiçbir render motoru
+veya ek kuruluma ihtiyaç duymaz, çünkü yalnızca Go standart kütüphanesini
+kullanır:
+
+```ahd
+bring Archive
+
+files: Pair<String, String> := {
+    "report.pdf": "report.pdf"
+    "data.xlsx": "results.xlsx"
+}
+
+Archive.zip("submission.zip", files)
+```
+
+`files` içindeki anahtar arşivin *içindeki* yoldur; değer ise diskteki
+kaynak dosyanın yoludur. Güvensiz giriş yolları (`../secret` gibi) ve
+symlink kaynakları, sessizce atlanmak yerine bir `ArchiveError` ile
+reddedilir. v0.1.20'de çıkarma (extraction), listeleme veya okuma API'si
+yoktur — `Archive` yalnızca arşiv oluşturur. Ayrıntılar için [Archive modül
+referansına](ARCHIVE_TR.md) bakın.
+
+### Hepsini bir araya getirmek
+
+İki küçük iş akışı, PDF, Excel ve Archive'ın gerçek v0.1.20 programlarında
+nasıl birleştiğini gösterir.
+
+**Rapor paketleme** — bir Workbook'u PDF'e dönüştürün, sonra ikisini tek bir
+ZIP'te birleştirin:
+
+```ahd
+bring Excel
+bring PDF
+bring Archive
+from Excel bring Workbook
+from Excel bring Sheet
+
+book: Workbook := Excel.new().addSheet("Scores")
+sheet: Sheet := book.sheet("Scores")
+sheet = sheet.setRow(1, 1, [Excel.fromString("Name"), Excel.fromInt(91)])
+book = book.withSheet(sheet)
+book.save("report.xlsx")
+
+pdf := PDF.fromExcel(book)
+pdf.save("report.pdf")
+
+files: Pair<String, String> := {
+    "report.xlsx": "report.xlsx"
+    "report.pdf": "report.pdf"
+}
+
+Archive.zip("report.zip", files)
+```
+
+**Latex kaynak yan dosyası** — derlenmiş PDF'i, tam LaTeX kaynağıyla birlikte
+yayınlayın:
+
+```ahd
+bring Latex as L
+
+source: String := L.document(body: L.section("Findings"), title: "Report")
+L.pdf(source, "article.pdf", "tex")
+```
+
+Bu, tek bir çağrıdan hem `article.pdf` hem de `article.tex` üretir; üçüncü
+argüman yalnızca `""` (varsayılan, yalnızca PDF) veya `"tex"` kabul eder.
+İkisini `Archive.zip("article-bundle.zip", {"article.pdf": "article.pdf", "article.tex": "article.tex"})`
+ile aynı şekilde paketleyebilirsiniz.
+
+## 31. JSON modülü
 
 JSON, tipli `JSONValue`'lar okur ve oluşturur — `Any` yok, dinamik tipleme
 yok:
@@ -1625,7 +2002,7 @@ anahtar gerçekten yok olabilir. AhdCode'un onları string interpolation olarak
 okumaması için literal JSON süslü parantezlerini bir raw String ile yazın
 (`r'{"a":1}'`). Ayrıntılar için [JSON modül referansına](JSON_TR.md) bakın.
 
-## XML modülü
+## 32. XML modülü
 
 XML, küçük bir `Element`/`Text` node modeli oluşturur ve okur:
 
@@ -1642,7 +2019,7 @@ write(XML.stringify(document, true))
 dışındaki her `XMLNode` erişimcisi bir `Text` node'unda `XMLError` fırlatır.
 Ayrıntılar için [XML modül referansına](XML_TR.md) bakın.
 
-## Env modülü
+## 33. Env modülü
 
 Env, işlem ortam değişkenlerini ve `.env` dosyalarını, her zaman `String`
 olarak okur:
@@ -1658,7 +2035,7 @@ port: Int := int(Env.getOr("PORT", "8080"))
 ayırt edilebilir kalır. Ayrıntılar için [Env modül referansına](ENV_TR.md)
 bakın.
 
-## Lists ve KeyValue modülleri
+## 34. Lists ve KeyValue modülleri
 
 Bu iki modül, orijinali değiştirmeden Listeleri ve Pair'leri dönüştürür:
 
@@ -1689,7 +2066,7 @@ Son iki satıra dikkat edin: `KeyValue.with` *yeni* bir `Pair` döndürdü ve
 `mapValues`, `merge` ve `overlay` içerir. Ayrıntılar için [Lists](LISTS_TR.md)
 ve [KeyValue](KEYVALUE_TR.md) modül referanslarına bakın.
 
-## 24. Kod biçimlendirici (Formatter)
+## 35. Kod biçimlendirici (Formatter)
 
 Kod çalışsa bile herkes farklı boşluk ve satır düzeni kullanırsa okumak zorlaşır. AhdCode formatter, geçerli kodu ortak bir stile dönüştürür:
 
@@ -1742,7 +2119,7 @@ values :=
 
 Formatter idempotent'tir; aynı dosyada tekrar çalıştırmak yeni değişiklik üretmez.
 
-## 25. Komut satırı (CLI)
+## 36. Komut satırı (CLI)
 
 AhdCode'u terminalden birkaç temel komutla kullanabilirsiniz:
 
@@ -1773,7 +2150,7 @@ Yardım ve sürüm bilgisini gösterir.
 
 Yeni başlıyorsanız çoğu zaman kullanacağınız komut `ahdcode run ...` olacaktır.
 
-## 26. Etkileşimli kabuk (REPL)
+## 37. Etkileşimli kabuk (REPL)
 
 Küçük bir şeyi denemek için her seferinde dosya oluşturmak zorunda değilsiniz. Terminalde yalnızca:
 
@@ -1781,39 +2158,41 @@ Küçük bir şeyi denemek için her seferinde dosya oluşturmak zorunda değils
 ahdcode
 ```
 
-çalıştırın. REPL açılır ve AhdCode komutlarını tek tek deneyebilirsiniz:
+çalıştırın. Başlangıçta `ahdcode --version` ile eşleşen bir sürüm başlığı
+yazdırılır, ardından REPL açılır ve AhdCode komutlarını `ahd>` isteminde tek
+tek deneyebilirsiniz:
 
 ```text
-> x: Int := 5
-> x = x + 1
-> x
+ahd> x: Int := 5
+ahd> x = x + 1
+ahd> x
 6
 ```
 
 REPL bir **oturum** gibi davranır. Önceki başarılı komutlarda oluşturduğunuz değerleri hatırlar:
 
 ```text
-> name: String := "Ali"
-> write(name)
+ahd> name: String := "Ali"
+ahd> write(name)
 Ali
 ```
 
 Bir komutta hata yapmanız önceki çalışan durumu silmez:
 
 ```text
-> x: Int := 5
-> x: Int := 7
+ahd> x: Int := 5
+ahd> x: Int := 7
 error: duplicate declaration
-> x
+ahd> x
 5
 ```
 
 Önceki komutların yan etkileri yeniden çalıştırılmaz. Örneğin:
 
 ```text
-> write("bir")
+ahd> write("bir")
 bir
-> write("iki")
+ahd> write("iki")
 iki
 ```
 
@@ -1822,9 +2201,9 @@ ikinci komutta `bir` tekrar yazılmaz.
 `take()` REPL içinde de gerçek kullanıcı girdisini bekler:
 
 ```text
-> name: String := take("İsim: ")
+ahd> name: String := take("İsim: ")
 İsim: Ali
-> write(name)
+ahd> write(name)
 Ali
 ```
 
@@ -1832,7 +2211,15 @@ Function ve Class tanımları, modüller, List/Pair nesneleri ve Math rastgeleli
 
 REPL öğrenirken çok kullanışlıdır: bir fikri hızlıca deneyip sonucu görebilirsiniz. Daha uzun programlarda `.ahd` dosyası kullanmak daha düzenlidir.
 
-## 30. Sık yapılan başlangıç hataları
+Bir `PDFDocument` veya Latex kaynak String'i oluşturmak REPL'de sorunsuz
+çalışır, ama gerçekten bir `.pdf`'e derlemek çalışmaz: `Latex.pdf(...)`,
+`Latex.pdfFile(...)` ve `PDFDocument.save(...)` etkileşimli olarak
+çağrıldığında hata fırlatır, çünkü derleme kalıcı evaluator'ın desteklemediği
+harici bir render motorunu çağırır. Bu çağrıları bir `.ahd` dosyasından
+çalıştırın. `Archive`'ın böyle bir sınırlaması yoktur — REPL'de tamamen
+çalışır. Ayrıntılar için [REPL referansına](REPL_TR.md) bakın.
+
+## 38. Sık yapılan başlangıç hataları
 
 Hata mesajı görmek programlamanın normal bir parçasıdır. Çoğu hata, bilgisayarın ne istediğinizi anlayamadığını söyler. Aşağıdaki örnekler yeni başlayanların sık karşılaştığı durumları ve nasıl düzelteceğinizi gösterir:
 
@@ -1936,7 +2323,7 @@ Hata mesajı görmek programlamanın normal bir parçasıdır. Çoğu hata, bilg
 - Neden: Tohum (seed) verilmemiş rastgelelik, OS entropisini kullanır ve tekrarlanamaz.
 - Doğru: Zar atmadan önce `Math.seed(42)` gibi bir tohum değeri verin.
 
-## 31. Küçük Projeler
+## 39. Küçük Projeler
 
 Bu küçük projeler rehberde öğretilenleri bir araya getirir. Onları tek başınıza kurmayı deneyin!
 
@@ -1948,7 +2335,7 @@ Bu küçük projeler rehberde öğretilenleri bir araya getirir. Onları tek ba�
 6. **Sınıflarla (Class) Öğrenci Kaydı**: Bir `Student` sınıfı ve bir `Course` (Kurs) sınıfı oluşturun. Course içinde bir `List<Student>` bulunsun. Kursa yeni bir öğrenci eklemek için bir metot, kursun genel not ortalamasını hesaplamak için başka bir metot yazın.
 7. **Tohumlu (Seeded) Rastgele Oyun**: `Math.seed(42)` kullanarak 1 ile 100 arasında "gizli bir sayı" üretin. Kullanıcıdan sayıyı tahmin etmesini isteyin. Doğru tahmin edene kadar "daha yüksek" veya "daha düşük" diye yönlendirin. Tohum kullanıldığı için, gizli sayı programı her çalıştırdığınızda aynı olacaktır—test yapmak için mükemmel!
 
-## 32. Egzersizler
+## 40. Egzersizler
 
 Tam çözümleri hemen aramak yerine her programı küçük adımlarla kurun.
 
@@ -1978,7 +2365,7 @@ Tam çözümleri hemen aramak yerine her programı küçük adımlarla kurun.
 19. `break` ve `continue` kullanarak çok geniş bir aralık içindeki ilk 5 çift sayıyı bulun, ancak 3'e bölünenleri `continue` ile atlayın.
 20. Dikdörtgen alanı hesaplayan bir fonksiyona sahip `MathUtils.ahd` adında bir modül oluşturun ve bir `main.ahd` içinden `bring` ile çağırarak kullanın.
 
-## 33. Çözüm İpuçları
+## 41. Çözüm İpuçları
 
 1. `take` sonucu String'dir; yaş için `int(...)` ve yeni yaş için `+ 1` kullanın.
 2. Formülü küçük parçalara ayırın; `real(take(...))` ile başlayın ve Real sayılarını kullanın.
@@ -2001,7 +2388,7 @@ Tam çözümleri hemen aramak yerine her programı küçük adımlarla kurun.
 19. `if i % 3 == 0 { continue }`. `if count == 5 { break }`.
 20. `from MathUtils bring alanHesapla` kullanabilirsiniz.
 
-## 34. Sonraki adımlar ve teknik belgeler
+## 42. Sonraki adımlar ve teknik belgeler
 
 Bu rehberi tamamladıktan sonra dilin ayrıntılarını şu belgelerden
 derinleştirebilirsiniz:
@@ -2025,6 +2412,15 @@ derinleştirebilirsiniz:
 - [Plot](PLOT_TR.md)
 - [Numeric](NUMERIC_TR.md)
 - [Latex](LATEX_TR.md)
+- [Word](WORD_TR.md)
+- [Excel](EXCEL_TR.md)
+- [PDF](PDF_TR.md)
+- [Archive](ARCHIVE_TR.md)
+- [JSON](JSON_TR.md)
+- [XML](XML_TR.md)
+- [Env](ENV_TR.md)
+- [Lists](LISTS_TR.md)
+- [KeyValue](KEYVALUE_TR.md)
 - [File ve Path](FILESYSTEM_TR.md)
 - [Regex](REGEX_TR.md)
 - [CSV](CSV_TR.md)
