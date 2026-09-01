@@ -1,0 +1,34 @@
+bring Excel
+from Excel bring Workbook
+from Excel bring Sheet
+from Excel bring CellStyle
+
+book: Workbook := Excel.new().addSheet("Report")
+sheet: Sheet := book.sheet("Report")
+sheet = sheet.setCell(1, 1, Excel.fromString("University Results"))
+sheet = sheet.merge(sheet.range(1, 1, 1, 4))
+sheet = sheet.setRow(2, 1, [
+    Excel.fromString("Name")
+    Excel.fromString("Exam")
+    Excel.fromString("Project")
+    Excel.fromString("Average")
+])
+sheet = sheet.setRow(3, 1, [
+    Excel.fromString("Ayşe")
+    Excel.fromInt(88)
+    Excel.fromReal(92.5)
+    Excel.formula("=AVERAGE(B3:C3)")
+])
+
+header: CellStyle := Excel.style()
+header = header.bold(true).fillColor("#1F4E79").textColor("#FFFFFF")
+header = header.horizontal("center").vertical("center").wrap(true)
+header = header.border("thin", "#000000")
+sheet = sheet.style(sheet.range(1, 1, 2, 4), header)
+sheet = sheet.style(sheet.range(3, 2, 3, 4), Excel.style().numberFormat("0.00"))
+sheet = sheet.columnWidth(1, 24.0).columnWidth(2, 12.0)
+sheet = sheet.rowHeight(1, 28.0)
+
+book = book.withSheet(sheet)
+book.save("excel-styles.xlsx")
+write("excel-styles.xlsx saved")

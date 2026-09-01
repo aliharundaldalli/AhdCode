@@ -9,17 +9,15 @@ import (
 
 // TestAllStandardModulesCoexist imports every standard module of the current
 // release in one ordinary program and confirms there is no module identity
-// conflict,
-// no runtime configurator overwrite, and no helper-discovery regression
-// when they are all wired together. Latex is intentionally excluded: it
-// requires staging an offline compiler payload that is not available in
-// this test environment (see examples/v0.1/16_latex.ahd's note), so
-// including it here would make this test's failures about missing local
-// staging rather than about module coexistence.
+// conflict, no runtime configurator overwrite, and no helper-discovery
+// regression when they are all wired together. Latex is imported to prove
+// identity coexistence but not exercised, so no offline payload is needed.
 func TestAllStandardModulesCoexist(t *testing.T) {
 	directory := t.TempDir()
 	source := `bring Lists
 bring KeyValue
+bring Excel
+bring Latex
 bring JSON
 bring XML
 bring Env
@@ -31,6 +29,8 @@ bring Word
 from JSON bring JSONValue
 from XML bring XMLNode
 from Word bring Document
+from Excel bring Workbook
+from Excel bring Sheet
 
 write(Lists.chunk([1, 2, 3, 4, 5], 2))
 write(Lists.valueCounts(["a", "b", "a"]))
@@ -54,6 +54,11 @@ write(Statistics.mean(vector.values()))
 document: Document := Word.new()
 document = document.heading("Coexistence", 1)
 write(document.text())
+
+workbook: Workbook := Excel.new().addSheet("Data")
+excelSheet: Sheet := workbook.sheet("Data").setCell(1, 1, Excel.fromString("xlsx"))
+workbook = workbook.withSheet(excelSheet)
+write(workbook.sheetCount())
 `
 	entry := filepath.Join(directory, "main.ahd")
 	if err := os.WriteFile(entry, []byte(source), 0o600); err != nil {
@@ -66,7 +71,7 @@ write(document.text())
 	for _, want := range []string{
 		"[[1, 2], [3, 4], [5]]\n", "{\"a\": 2, \"b\": 1}\n",
 		"{\"name\": \"Ali\", \"score\": \"95\"}\n",
-		"91\n", "hello\n", "false\n", "2\n", "2.0\n", "Coexistence\n",
+		"91\n", "hello\n", "false\n", "2\n", "2.0\n", "Coexistence\n", "1\n",
 	} {
 		if !strings.Contains(stdout, want) {
 			t.Fatalf("coexistence output omitted %q:\n%s", want, stdout)

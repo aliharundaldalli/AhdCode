@@ -1,0 +1,40 @@
+bring Excel
+bring Lists
+bring KeyValue
+bring Data
+from Excel bring Workbook
+from Excel bring Sheet
+from Excel bring Cell
+from Data bring Table
+
+columns: List<String> := ["Name", "Score", "Department"]
+records: List<Pair<String, String>> := [
+    KeyValue.combine(columns, ["Ali", "91", "Mathematics"])
+    KeyValue.combine(columns, ["Ayşe", "88", "Physics"])
+]
+table: Table := Data.fromRecords(records)
+
+book: Workbook := Excel.new().addSheet("Data")
+sheet: Sheet := book.sheet("Data")
+headers: List<Cell> := table.columns().map(
+    lambda (text: String) -> Excel.fromString(text)
+)
+sheet = sheet.setRow(1, 1, headers)
+
+rowIndex: Int := 2
+for record in table.rows() {
+    values: Local List<Cell> := KeyValue.values(record).map(
+        lambda (text: String) -> Excel.fromString(text)
+    )
+    sheet = sheet.setRow(rowIndex, 1, values)
+    rowIndex = rowIndex + 1
+}
+
+// List<List<Cell>> stays ordinary List structure. Lists.transpose owns the
+// structural operation; Excel does not duplicate it.
+grid: List<List<Cell>> := sheet.cells(sheet.range(1, 1, 3, 3))
+columnsAsCells: List<List<Cell>> := Lists.transpose(grid)
+write(len(columnsAsCells))
+
+book = book.withSheet(sheet)
+book.save("excel-data.xlsx")

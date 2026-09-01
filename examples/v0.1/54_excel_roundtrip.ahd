@@ -1,0 +1,24 @@
+bring Excel
+from Excel bring Workbook
+from Excel bring Sheet
+
+book: Workbook := Excel.new().addSheet("Data")
+sheet: Sheet := book.sheet("Data")
+sheet = sheet.setRow(1, 1, [
+    Excel.fromString("literal =SUM(A1:A3)")
+    Excel.fromString("=SUM(A1:A3)")
+    Excel.formula("=SUM(A1:A3)")
+])
+book = book.withSheet(sheet)
+book.save("excel-roundtrip.xlsx")
+
+loaded: Workbook := Excel.read("excel-roundtrip.xlsx")
+loadedSheet: Sheet := loaded.sheet("Data")
+write(loadedSheet.cell(1, 2).kind())
+write(loadedSheet.cell(1, 2).string())
+write(loadedSheet.cell(1, 3).kind())
+write(loadedSheet.cell(1, 3).formula())
+
+loaded.save("excel-roundtrip-resaved.xlsx")
+reread: Workbook := Excel.read("excel-roundtrip-resaved.xlsx")
+write(reread.sheet("Data").cell(1, 3).formula())
