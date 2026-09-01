@@ -112,6 +112,141 @@ loaded.save(` + strconv.Quote(filepath.Join(directory, "roundtrip.xlsx")) + `)
 	}
 }
 
+// TestExcelStyleFontSizeIntArgumentWidensThroughEveryStage is the regression
+// for the v0.1.19 QA release blocker where CellStyle.fontSize(0) (an Int
+// literal into a Real parameter) passed semantic analysis under AhdCode's
+// normal safe Int -> Real widening rule, but the native Go backend emitted
+// int64(0) into a call expecting float64, so `ahdcode build` failed with a
+// BCK005 code-generation defect instead of producing a program that raises
+// the intended runtime ExcelError. It covers the full pipeline: semantic
+// analysis, the Go backend, and a real native build and run.
+func TestExcelStyleFontSizeIntArgumentWidensThroughEveryStage(t *testing.T) {
+	t.Run("Int and Real literals widen identically", func(t *testing.T) {
+		directory := t.TempDir()
+		output := filepath.Join(directory, "fontsize.xlsx")
+		source := `bring Excel
+from Excel bring Workbook
+from Excel bring Sheet
+from Excel bring CellStyle
+
+book: Workbook := Excel.new().addSheet("S")
+sheet: Sheet := book.sheet("S")
+sheet = sheet.setCell(1, 1, Excel.fromString("a"))
+sheet = sheet.setCell(2, 1, Excel.fromString("b"))
+intStyle: CellStyle := Excel.style().fontSize(12)
+realStyle: CellStyle := Excel.style().fontSize(12.0)
+sheet = sheet.style(sheet.range(1, 1, 1, 1), intStyle)
+sheet = sheet.style(sheet.range(2, 1, 2, 1), realStyle)
+book = book.withSheet(sheet)
+book.save(` + strconv.Quote(output) + `)
+write("styled ok")
+`
+		entry := filepath.Join(directory, "main.ahd")
+		if err := os.WriteFile(entry, []byte(source), 0600); err != nil {
+			t.Fatal(err)
+		}
+		stdout, stderr, code := buildAndRun(t, entry, "")
+		if code != 0 || stderr != "" {
+			t.Fatalf("fontSize(Int) program failed: code=%d stdout=%q stderr=%q", code, stdout, stderr)
+		}
+		if stdout != "styled ok\n" {
+			t.Fatalf("stdout = %q", stdout)
+		}
+		data, err := os.ReadFile(output)
+		if err != nil {
+			t.Fatal(err)
+		}
+		reader, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		var stylesXML []byte
+		for _, file := range reader.File {
+			if file.Name != "xl/styles.xml" {
+				continue
+			}
+			opened, openErr := file.Open()
+			if openErr != nil {
+				t.Fatal(openErr)
+			}
+			stylesXML, err = io.ReadAll(opened)
+			_ = opened.Close()
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+		if stylesXML == nil {
+			t.Fatal("xl/styles.xml is missing")
+		}
+		// fontSize(12) (Int, widened to Real) and fontSize(12.0) (Real) must
+		// produce byte-identical CellStyle representations, so the style
+		// catalog collapses them into the same single custom <font>: the
+		// base Calibri font plus exactly one "12" font, never two.
+		if count := bytes.Count(stylesXML, []byte("<font>")); count != 2 {
+			t.Fatalf("expected exactly 2 <font> elements (base + one deduplicated custom font); got %d:\n%s", count, stylesXML)
+		}
+		if !bytes.Contains(stylesXML, []byte(`<sz val="12"/>`)) {
+			t.Fatalf("styles.xml missing the widened font size:\n%s", stylesXML)
+		}
+	})
+
+	for _, invalid := range []string{"0", "-5"} {
+		t.Run("fontSize("+invalid+") builds natively and fails at runtime", func(t *testing.T) {
+			directory := t.TempDir()
+			source := `bring Excel
+from Excel bring CellStyle
+
+style: CellStyle := Excel.style()
+style = style.fontSize(` + invalid + `)
+write("unreachable")
+`
+			entry := filepath.Join(directory, "main.ahd")
+			if err := os.WriteFile(entry, []byte(source), 0600); err != nil {
+				t.Fatal(err)
+			}
+			stdout, stderr, code := buildAndRun(t, entry, "")
+			if code == 0 {
+				t.Fatalf("expected a nonzero exit for fontSize(%s); stdout=%q stderr=%q", invalid, stdout, stderr)
+			}
+			for _, forbidden := range []string{"BCK005", "code generation defect", "panic", "goroutine "} {
+				if strings.Contains(stdout+stderr, forbidden) {
+					t.Fatalf("fontSize(%s) surfaced a compiler/runtime internal (%q) instead of a controlled ExcelError:\nstdout=%s\nstderr=%s", invalid, forbidden, stdout, stderr)
+				}
+			}
+			if !strings.Contains(stderr, "ExcelError") || !strings.Contains(stderr, "fontSize") {
+				t.Fatalf("fontSize(%s) did not raise the intended ExcelError: stdout=%q stderr=%q", invalid, stdout, stderr)
+			}
+		})
+	}
+}
+
+// TestNumericVectorScaleIntArgumentStillWidens is a non-Excel regression for
+// an existing compiler-supplied TypeOperation with a Real parameter
+// (Vector.scale), guarding against the fontSize fix regressing the older
+// single-expected-type lowering path every other TypeOperation module still
+// uses.
+func TestNumericVectorScaleIntArgumentStillWidens(t *testing.T) {
+	source := `bring Numeric
+from Numeric bring Vector
+
+v: Vector := Numeric.vector([1, 2, 3])
+scaled: Vector := v.scale(2)
+write(scaled.values())
+`
+	directory := t.TempDir()
+	entry := filepath.Join(directory, "main.ahd")
+	if err := os.WriteFile(entry, []byte(source), 0600); err != nil {
+		t.Fatal(err)
+	}
+	stdout, stderr, code := buildAndRun(t, entry, "")
+	if code != 0 || stderr != "" {
+		t.Fatalf("Vector.scale(Int) program failed: code=%d stdout=%q stderr=%q", code, stdout, stderr)
+	}
+	if stdout != "[2.0, 4.0, 6.0]\n" {
+		t.Fatalf("stdout = %q", stdout)
+	}
+}
+
 func TestExcelNativeExecutableRelocatesWithoutSourceOrRuntimeBundle(t *testing.T) {
 	output := filepath.Join(t.TempDir(), "relocated.xlsx")
 	sourceDirectory := t.TempDir()

@@ -535,11 +535,28 @@ func (lowerer *moduleLowerer) lowerTypeOperation(call *ast.CallExpr, operation s
 	if receiver == nil {
 		return nil
 	}
-	argumentType, typed := typeOperationArgument(operation, receiver.ExprMeta().Type)
 	result := &ir.CallExpr{
 		ExprBase: base, Callable: ir.CallableID("builtin:core::" + string(operation)),
 		Callee: receiver, ReturnNull: ir.NonNull,
 	}
+	// A compiler-supplied operation whose call site recorded its exact
+	// concrete signature (the same mechanism moduleOperationResult uses for
+	// Lists and KeyValue) gives each argument its own expected type, so
+	// heterogeneous-parameter operations such as CellStyle.fontSize(Real) or
+	// Sheet.columnWidth(Int, Real) widen correctly. Everything else falls
+	// back to the single receiver-derived expected type below.
+	if selected := lowerer.semantic.SelectedCallables[call]; selected != nil && selected.Signature != nil {
+		parameters := selected.Signature.Parameters
+		for index, argument := range call.Arguments {
+			value := lowerer.lowerExpr(argument.Value)
+			if index < len(parameters) {
+				value = lowerer.lowerExprExpected(argument.Value, lowerType(parameters[index].Type))
+			}
+			result.Arguments = append(result.Arguments, ir.Argument{ParameterIndex: index, Value: value})
+		}
+		return result
+	}
+	argumentType, typed := typeOperationArgument(operation, receiver.ExprMeta().Type)
 	for index, argument := range call.Arguments {
 		// A callback argument already carries its own concrete Function type,
 		// so only value arguments are lowered against an expected type.

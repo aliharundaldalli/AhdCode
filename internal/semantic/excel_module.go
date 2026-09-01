@@ -218,5 +218,21 @@ func (a *analyzer) analyzeExcelOperation(call *ast.CallExpr, operation TypeOpera
 			a.typeMismatch(call.Arguments[index].Span(), expected, argument.typeValue, string(operation)+" argument")
 		}
 	}
+	// Excel operations take positional-only arguments whose parameter types
+	// differ per index (for example CellStyle.fontSize expects Real while
+	// Sheet.columnWidth expects Int then Real), so a single receiver-derived
+	// expected type cannot describe them the way typeOperationArgument does
+	// for the homogeneous TypeOperation modules. Recording the exact
+	// per-call signature here lets lowering give each argument its own
+	// expected type -- including safe Int -> Real widening -- the same way
+	// moduleOperationResult already does for Lists and KeyValue.
+	parameters := make([]types.Parameter, len(shape.parameters))
+	for index, parameterType := range shape.parameters {
+		parameters[index] = types.Parameter{Type: parameterType}
+	}
+	a.result.SelectedCallables[call] = &Callable{
+		Signature:  &types.Signature{Parameters: parameters, Return: shape.result},
+		ReturnNull: nullState,
+	}
 	return result
 }
