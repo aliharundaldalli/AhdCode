@@ -31,16 +31,14 @@ never hand-listed for the editor: they come from the same
 a future standard module participates in diagnostics and hover automatically,
 with no separate catalog to update.
 
-## v0.2.0 capabilities
-
-This is a foundation release. It implements exactly:
+## Capabilities
 
 - **Document synchronization** -- `textDocument/didOpen`, `didChange`,
   `didClose`, using **full** document sync (`TextDocumentSyncKind.Full`).
   Every `didChange` carries the document's complete new text; the server
   re-analyzes the whole document from that snapshot. There is no incremental
-  edit application and no incremental compiler in v0.2.0 -- correctness comes
-  before that optimization.
+  edit application and no incremental compiler -- correctness comes before
+  that optimization.
 - **Diagnostics** (`textDocument/publishDiagnostics`) -- lexer, parser,
   module/import, and semantic diagnostics, each carrying the compiler's own
   stable code, severity, message, and source range. A diagnostic's `source`
@@ -53,6 +51,30 @@ This is a foundation release. It implements exactly:
   structure parameter; a `Class`; or an imported standard-module member.
   Hovering anywhere else (an operator, a literal, whitespace) returns no
   hover rather than a guess.
+- **Go to Definition** (`textDocument/definition`) -- jumps from any use to
+  its declaration, including across a `bring`/`from` import into the module
+  that actually declares it (a `Class` member declared in another file
+  included).
+- **Document Symbols** (`textDocument/documentSymbol`) -- a document's
+  outline: every top-level declaration, and every `Class`'s own methods and
+  attributes as children.
+- **Signature Help** (`textDocument/signatureHelp`) -- the signature of the
+  call the cursor is inside, with the active parameter tracked as the cursor
+  moves between arguments, including while the call is still being typed
+  (an unclosed parenthesis).
+- **Find References** (`textDocument/references`) -- every use of the
+  symbol at the cursor, scoped to the current compile graph: the open
+  document plus everything it transitively imports. This is not a
+  workspace-wide index; a use in a file nothing here imports and that does
+  not import this file is not found.
+- **Completion** (`textDocument/completion`) -- module names after
+  `bring`/`from`; a module's exported names after `from <module> bring`;
+  a namespace or Class instance's members after `.`; locals, parameters,
+  and module-root declarations in scope; and a small, restrained set of
+  control-flow keywords. Every candidate list comes from a compiler fact
+  (`StandardModuleInterfaces`, a compiled sibling module's own interface,
+  `ResolvedSymbols`, `ExpressionTypes`) -- there is no hand-maintained name
+  catalog.
 
 The server analyzes **unsaved editor text**. It never writes an open
 document's buffer back to its file on disk merely to compile it -- the same
@@ -61,16 +83,14 @@ generalized to any number of open documents. An imported module that is also
 open in the editor is analyzed from its own unsaved buffer too; anything not
 open is read from the real filesystem.
 
-## Not in v0.2.0
+## Not implemented
 
-Completion, go to definition, document symbols, find references, rename,
-signature help, semantic tokens/highlighting, inlay hints, code actions,
-quick fixes, auto import, refactoring, workspace-wide indexing, an
-incremental compiler or parser, and a persistent compiler cache are all
-unimplemented in this release. The `initialize` response advertises exactly
-the capabilities above and nothing else, so a client never believes it can
-request a feature this version does not have. Later releases are expected to
-add individual features on top of this same foundation.
+Rename, semantic tokens/highlighting, inlay hints, code actions, quick
+fixes, auto import, refactoring, a full workspace-wide index (beyond one
+document's own compile graph), an incremental compiler or parser, and a
+persistent compiler cache remain unimplemented. The `initialize` response
+advertises exactly the capabilities above and nothing else, so a client
+never believes it can request a feature this version does not have.
 
 ## Position encoding
 

@@ -12,18 +12,19 @@ AhdCode is an experimental statically checked general-purpose programming
 language focused on readable syntax, explicit intent, predictable semantics,
 and native compilation.
 
-The current release is **v0.2.0**. The core language works end to end, but
+The current release is **v0.2.1**. The core language works end to end, but
 the project is not production-ready and breaking changes may occur before 1.0.
 
-v0.2.0 — LSP Foundation — adds [`ahdcode lsp`](docs/LSP.md), a standard
-stdio Language Server Protocol server backed directly by the real compiler
-frontend: compiler-accurate diagnostics and hover on unsaved editor buffers,
-with full document synchronization. The bundled [VS Code
-extension](editors/vscode) now launches the same server. v0.2.0 is a
-deliberately narrow foundation release -- no completion, go-to-definition, or
-workspace indexing yet; language semantics are unchanged from v0.1.20, which
-added the [PDF](docs/PDF.md) and [Archive](docs/ARCHIVE.md) modules and a
-`Latex.pdf` source sidecar.
+v0.2.1 adds [`ahdcode lsp`](docs/LSP.md), a standard stdio Language Server
+Protocol server backed directly by the real compiler frontend: diagnostics,
+hover, go to definition, document symbols, signature help, find references
+(scoped to one document's own compile graph), and completion (modules,
+`from ... bring` exports, namespace/Class members, in-scope locals and
+parameters, and a restrained keyword set), all on unsaved editor buffers with
+full document synchronization. The bundled [VS Code extension](editors/vscode)
+launches the same server. Language semantics are unchanged from v0.1.20,
+which added the [PDF](docs/PDF.md) and [Archive](docs/ARCHIVE.md) modules and
+a `Latex.pdf` source sidecar.
 
 ```ahd
 greet: Function := (
@@ -91,9 +92,10 @@ for name in names {
   types, with no generic syntax and nothing erased.
 - The formatter defines one canonical presentation while preserving comments.
 - The [language server](docs/LSP.md) (`ahdcode lsp`) exposes the compiler's
-  own diagnostics and hover over standard stdio LSP -- no second parser, no
-  hand-maintained symbol catalog, and no writes to a document's file while
-  it's open and unsaved in an editor.
+  own diagnostics, hover, go to definition, document symbols, signature
+  help, find references, and completion over standard stdio LSP -- no
+  second parser, no hand-maintained symbol catalog, and no writes to a
+  document's file while it's open and unsaved in an editor.
 
 ## Build from source
 
@@ -193,9 +195,9 @@ diagnostics and hover. The same VSIX targets VS Code and Antigravity. See its
 
 v0.1 intentionally has no block/statement lambdas, implicit/general mutable closure cells, tuple
 returns, reflection, interfaces, multiple inheritance, debugger, package
-search paths, or web runtime. The [v0.2.0 language server](docs/LSP.md)
-implements diagnostics and hover only -- no completion, go-to-definition,
-find references, rename, or workspace-wide indexing yet.
+search paths, or web runtime. The [language server](docs/LSP.md) has no
+rename or semantic tokens yet, and find references is scoped to one
+document's own compile graph rather than a full workspace-wide index.
 Operator behavior is user-definable only through the ten fixed
 [Class Protocol Methods](docs/PROTOCOLS.md), not a general overloading
 mechanism. Modules are sibling `.ahd` files, and the editor extension is a

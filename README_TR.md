@@ -12,20 +12,22 @@ AhdCode; okunabilir sözdizimi, açık niyet (explicit intent), öngörülebilir
 anlambilim (semantics) ve yerel (native) derlemeye odaklanan, deneysel,
 statik olarak denetlenen genel amaçlı bir programlama dilidir.
 
-Mevcut sürüm **v0.2.0**'dır. Çekirdek dil uçtan uca çalışır, ancak proje
+Mevcut sürüm **v0.2.1**'dir. Çekirdek dil uçtan uca çalışır, ancak proje
 üretime hazır değildir ve 1.0'dan önce kırıcı (breaking) değişiklikler
 olabilir.
 
-v0.2.0 — LSP Temeli — doğrudan gerçek derleyici önyüzü (frontend) tarafından
-desteklenen standart bir stdio Language Server Protocol sunucusu olan
-[`ahdcode lsp`](docs/LSP_TR.md)'yi ekler: kaydedilmemiş editör tamponları
-üzerinde derleyici-doğruluğunda tanılamalar ve hover, tam belge
-senkronizasyonuyla. Birlikte gelen [VS Code eklentisi](editors/vscode) artık
-aynı sunucuyu başlatıyor. v0.2.0 kasıtlı olarak dar kapsamlı bir temel
-(foundation) sürümüdür — henüz completion, tanıma git (go-to-definition)
-veya workspace indeksleme yoktur; dil anlambilimi v0.1.20'den değişmemiştir.
-v0.1.20, [PDF](docs/PDF_TR.md) ve [Archive](docs/ARCHIVE_TR.md) modüllerini
-ve bir `Latex.pdf` kaynak yan dosyasını eklemişti.
+v0.2.1, doğrudan gerçek derleyici önyüzü (frontend) tarafından desteklenen
+standart bir stdio Language Server Protocol sunucusu olan
+[`ahdcode lsp`](docs/LSP_TR.md)'yi ekler: tanılamalar, hover, tanıma git
+(go to definition), belge sembolleri, signature help, referans bulma
+(bir belgenin kendi derleme grafiğiyle sınırlı) ve completion (modüller,
+`from ... bring` dışa aktarımları, namespace/Class üyeleri, kapsamdaki yerel
+değişkenler ve parametreler, ve ölçülü bir anahtar kelime kümesi) —
+kaydedilmemiş editör tamponları üzerinde, tam belge senkronizasyonuyla.
+Birlikte gelen [VS Code eklentisi](editors/vscode) aynı sunucuyu başlatıyor.
+Dil anlambilimi v0.1.20'den değişmemiştir; v0.1.20, [PDF](docs/PDF_TR.md) ve
+[Archive](docs/ARCHIVE_TR.md) modüllerini ve bir `Latex.pdf` kaynak yan
+dosyasını eklemişti.
 
 ```ahd
 greet: Function := (
@@ -97,9 +99,11 @@ for name in names {
   silinmeden.
 - Formatter, yorumları korurken tek bir kanonik (standart) sunum tanımlar.
 - [Dil sunucusu](docs/LSP_TR.md) (`ahdcode lsp`), derleyicinin kendi
-  tanılamalarını ve hover'ını standart stdio LSP üzerinden sunar — ikinci
-  bir ayrıştırıcı yok, elle bakımı yapılan bir sembol kataloğu yok ve bir
-  belge editörde açık ve kaydedilmemişken dosyasına asla yazılmaz.
+  tanılamalarını, hover'ını, tanıma git özelliğini, belge sembollerini,
+  signature help'ini, referans bulmasını ve completion'ını standart stdio
+  LSP üzerinden sunar — ikinci bir ayrıştırıcı yok, elle bakımı yapılan bir
+  sembol kataloğu yok ve bir belge editörde açık ve kaydedilmemişken
+  dosyasına asla yazılmaz.
 
 ## Kaynak koddan derleme
 
@@ -204,9 +208,9 @@ v0.1, kasıtlı olarak blok/deyim (statement) lambda'ları, örtük/genel deği�
 tuple dönüş değerleri, reflection, interface, çoklu kalıtım (multiple
 inheritance), hata ayıklayıcı (debugger), paket arama yolları (package
 search paths) veya web çalışma zamanına sahip değildir.
-[v0.2.0 dil sunucusu](docs/LSP_TR.md) yalnızca tanılamalar ve hover uygular —
-henüz completion, tanıma git (go-to-definition), referans bulma, yeniden
-adlandırma (rename) veya workspace genelinde indeksleme yoktur. Operatör
+[Dil sunucusunda](docs/LSP_TR.md) henüz yeniden adlandırma (rename) veya
+semantic token yoktur, ve referans bulma workspace genelinde bir indeks
+yerine bir belgenin kendi derleme grafiğiyle sınırlıdır. Operatör
 davranışı yalnızca on sabit
 [Class Protocol Methods](docs/PROTOCOLS_TR.md) aracılığıyla
 kullanıcı-tanımlıdır (user-definable), genel bir aşırı yükleme (overloading)

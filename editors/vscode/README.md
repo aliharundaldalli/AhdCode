@@ -2,7 +2,7 @@
 
 [English] · [Türkçe](README_TR.md)
 
-This minimal extension adds AhdCode file recognition, lightweight syntax highlighting, a **Run AhdCode File** play button, and a connection to the AhdCode language server (compiler-backed diagnostics and hover) to VS Code-compatible editors.
+This minimal extension adds AhdCode file recognition, lightweight syntax highlighting, a **Run AhdCode File** play button, and a connection to the AhdCode language server (compiler-backed diagnostics, hover, go to definition, document symbols, signature help, find references, and completion) to VS Code-compatible editors.
 
 The extension supplies AhdCode package branding and light/dark language icons.
 An active third-party File Icon Theme may override the language icon; file
@@ -36,10 +36,11 @@ Alongside Run File, the extension starts the same `ahdcode` executable as a back
 
 - **Diagnostics**: lexer, parser, module/import, and semantic errors from the real compiler frontend, shown as normal editor problem markers -- kept live as you type, including in unsaved buffers, and cleared automatically once you fix them.
 - **Hover**: hovering a variable, `Constant`/`Local` declaration or use, a function declaration or call, a function/structure parameter, a `Class`, or an imported standard-module member shows its compiler-resolved type or signature.
+- **Go to Definition**, **Document Symbols** (the outline view), **Signature Help** while typing a call's arguments, **Find References** (scoped to the open document's own compile graph), and **Completion** for module names, `from ... bring` exports, namespace/Class members, in-scope locals and parameters, and a small set of keywords.
 
 The server never writes an open document back to its file on disk merely to analyze it.
 
-If the executable cannot be found, or the server fails to start, one concise error message is shown -- not one per keystroke -- and Run File keeps working normally regardless. v0.2.0's server implements diagnostics and hover only; see [its limitations](../../docs/LSP.md#not-in-v020) for what's intentionally still missing (completion, go to definition, and so on).
+If the executable cannot be found, or the server fails to start, one concise error message is shown -- not one per keystroke -- and Run File keeps working normally regardless. See [the language server's limitations](../../docs/LSP.md#not-implemented) for what's intentionally still missing (rename, semantic highlighting, and so on).
 
 ## Development
 
@@ -66,24 +67,24 @@ This runs `@vscode/vsce package` and creates a local `.vsix`; it does not publis
 Install in VS Code from the Command Palette with **Extensions: Install from VSIX...**, or with:
 
 ```bash
-code --install-extension ahdcode-0.2.0.vsix
+code --install-extension ahdcode-0.2.1.vsix
 ```
 
 Google Antigravity IDE 1.107 exposes the same local VSIX CLI operation:
 
 ```bash
-antigravity-ide --install-extension ahdcode-0.2.0.vsix
+antigravity-ide --install-extension ahdcode-0.2.1.vsix
 ```
 
 On macOS, if those launchers are not on PATH, use the application-bundled launchers:
 
 ```bash
-/Applications/Visual\ Studio\ Code.app/Contents/Resources/app/bin/code --install-extension ahdcode-0.2.0.vsix
-/Applications/Antigravity\ IDE.app/Contents/Resources/app/bin/antigravity-ide --install-extension ahdcode-0.2.0.vsix
+/Applications/Visual\ Studio\ Code.app/Contents/Resources/app/bin/code --install-extension ahdcode-0.2.1.vsix
+/Applications/Antigravity\ IDE.app/Contents/Resources/app/bin/antigravity-ide --install-extension ahdcode-0.2.1.vsix
 ```
 
 The same package is used by both editors. The extension API baseline is VS Code 1.107, matching the tested Antigravity standalone extension host.
 
 ## Scope and limitations
 
-This is intentionally a small extension: syntax highlighting, Run File, and a [language server](../../docs/LSP.md) limited to diagnostics and hover. It does not provide completion, go to definition, find references, rename, signature help, semantic highlighting, a debugger, breakpoints, or Marketplace publishing. Run File's own output (the running program's `write`/errors) still shows only as task-terminal output, exactly as before -- that is a running program's stdout/stderr, not a compiler diagnostic. Compiler diagnostics themselves (lexer/parser/module/semantic errors) come from the language server and appear as normal editor problem entries.
+This is intentionally a small extension: syntax highlighting, Run File, and a [language server](../../docs/LSP.md) with diagnostics, hover, go to definition, document symbols, signature help, find references, and completion. It does not provide rename, semantic highlighting, a debugger, breakpoints, or Marketplace publishing, and find references does not index the whole workspace -- only the open document's own compile graph. Run File's own output (the running program's `write`/errors) still shows only as task-terminal output, exactly as before -- that is a running program's stdout/stderr, not a compiler diagnostic. Compiler diagnostics themselves (lexer/parser/module/semantic errors) come from the language server and appear as normal editor problem entries.
