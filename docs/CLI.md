@@ -31,9 +31,12 @@ strings.
 Running `ahdcode` without a command starts the REPL.
 
 `lsp` starts the language server described in the [Language server
-guide](LSP.md): stdio-only JSON-RPC, compiler-backed diagnostics, hover, go
-to definition, document symbols, signature help, find references, and
-completion. It accepts no arguments other than an optional `--stdio`
+guide](LSP.md): stdio-only JSON-RPC and the v0.2.2 practical everyday feature
+set (diagnostics, hover, completion with auto import, go to definition,
+document symbols, signature help, find references, rename, semantic tokens,
+inlay hints, code actions, formatting, workspace symbols, folding ranges, and
+selection ranges), all compiler-backed. It accepts no arguments other than an
+optional `--stdio`
 (accepted and ignored -- real LSP client libraries append it automatically
 when they launch a server over stdio transport; `ahdcode lsp` never supports
 any other transport, so the flag is a no-op) and never writes anything but

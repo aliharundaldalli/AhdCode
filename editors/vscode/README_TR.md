@@ -3,10 +3,12 @@
 [English](README.md) · [Türkçe]
 
 Bu minimal eklenti, VS Code uyumlu editörlere AhdCode dosya tanıma, hafif
-sözdizimi vurgulama (syntax highlighting), bir **AhdCode Dosyasını
-Çalıştır** oynat düğmesi ve AhdCode dil sunucusuna (derleyici destekli
-tanılamalar, hover, tanıma git, belge sembolleri, signature help, referans
-bulma ve completion) bir bağlantı ekler.
+sözdizimi vurgulama, bir **AhdCode Dosyasını Çalıştır** oynat düğmesi ve
+AhdCode dil sunucusuna (v0.2.2 özellik seti: tanılamalar, hover, otomatik
+import ve erişim-farkında Class üyeleriyle completion, tanıma git, belge
+sembolleri, signature help, referans bulma, rename, semantic vurgulama, inlay
+hint, quick fix, biçimlendirme, workspace sembolleri, katlama ve seçim
+aralıkları) bir bağlantı ekler.
 
 Eklenti, AhdCode paket markalaşması ve açık/koyu dil simgeleri sağlar. Aktif
 bir üçüncü taraf File Icon Theme, dil simgesini geçersiz kılabilir; dosya
@@ -51,29 +53,18 @@ dosyasını arka planda bir [dil sunucusu](../../docs/LSP_TR.md) olarak
 stdio üzerinden iletişim kurar; hiçbir şekilde bir ağ portu açmaz. Size
 şunları sağlar:
 
-- **Tanılamalar**: gerçek derleyici önyüzünden lexer, parser, modül/import ve
-  anlamsal hatalar; normal editör sorun işaretleri olarak gösterilir —
-  kaydedilmemiş tamponlar dahil yazarken canlı tutulur ve düzelttiğinizde
-  otomatik olarak temizlenir.
-- **Hover**: bir değişkeni, `Constant`/`Local` bildirimini veya kullanımını,
-  bir fonksiyon bildirimini veya çağrısını, bir fonksiyon/structure
-  parametresini, bir `Class`'ı veya içe aktarılan bir standart modül üyesini
-  hover'lamak, derleyicinin çözümlediği türü veya imzasını gösterir.
-- **Tanıma git**, **belge sembolleri** (outline görünümü), bir çağrının
-  argümanlarını yazarken **signature help**, **referans bulma** (açık
-  belgenin kendi derleme grafiğiyle sınırlı) ve modül adları,
-  `from ... bring` dışa aktarımları, namespace/Class üyeleri, kapsamdaki
-  yerel değişkenler/parametreler ve küçük bir anahtar kelime kümesi için
-  **completion**.
+- **Tanılamalar**, **Hover**, **Tanıma git**, **belge sembolleri**,
+  **signature help**, **referans bulma** (derleme grafiği kapsamında),
+  **completion** (otomatik import dahil), **rename**, **semantic vurgulama**,
+  **inlay hint**, **quick fix**, **biçimlendirme**, **workspace sembolleri**,
+  **katlama** ve **seçim aralığı** — hepsi standart LSP yetenek müzakeresiyle.
 
 Sunucu, yalnızca analiz etmek için açık bir belgeyi asla diskteki dosyasına
 geri yazmaz.
 
-Çalıştırılabilir dosya bulunamazsa veya sunucu başlatılamazsa, her tuş
-vuruşunda değil, tek bir kısa hata mesajı gösterilir ve Run File normal
-şekilde çalışmaya devam eder. Kasıtlı olarak hâlâ eksik olanlar (yeniden
-adlandırma, semantic highlighting vb.) için
-[dil sunucusunun sınırlamalarına](../../docs/LSP_TR.md#uygulanmayanlar)
+Çalıştırılabilir dosya bulunamazsa veya sunucu başlatılamazsa, tek bir kısa
+hata mesajı gösterilir ve Run File normal şekilde çalışmaya devam eder.
+Kapsam ve sınırlamalar için [dil sunucusu rehberine](../../docs/LSP_TR.md)
 bakın.
 
 ## Geliştirme
@@ -104,21 +95,21 @@ VS Code'da Komut Paleti'nden **Extensions: Install from VSIX...** ile veya
 şununla kurun:
 
 ```bash
-code --install-extension ahdcode-0.2.1.vsix
+code --install-extension ahdcode-0.2.2.vsix
 ```
 
 Google Antigravity IDE 1.107, aynı yerel VSIX CLI işlemini sunar:
 
 ```bash
-antigravity-ide --install-extension ahdcode-0.2.1.vsix
+antigravity-ide --install-extension ahdcode-0.2.2.vsix
 ```
 
 macOS'ta, bu başlatıcılar PATH'te değilse, uygulama paketine gömülü
 başlatıcıları kullanın:
 
 ```bash
-/Applications/Visual\ Studio\ Code.app/Contents/Resources/app/bin/code --install-extension ahdcode-0.2.1.vsix
-/Applications/Antigravity\ IDE.app/Contents/Resources/app/bin/antigravity-ide --install-extension ahdcode-0.2.1.vsix
+/Applications/Visual\ Studio\ Code.app/Contents/Resources/app/bin/code --install-extension ahdcode-0.2.2.vsix
+/Applications/Antigravity\ IDE.app/Contents/Resources/app/bin/antigravity-ide --install-extension ahdcode-0.2.2.vsix
 ```
 
 Aynı paket her iki editör tarafından da kullanılır. Eklenti API temel

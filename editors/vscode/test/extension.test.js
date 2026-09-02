@@ -414,7 +414,7 @@ test("findExecutable resolves ahdcode from PATH", async () => {
 test("manifest exposes the portable command, menu, keybinding, and language", () => {
   const manifest = require("../package.json");
   assert.equal(manifest.main, "./extension.js");
-  assert.equal(manifest.version, "0.2.1");
+  assert.equal(manifest.version, "0.2.2");
   assert.equal(manifest.icon, "images/ahdcode-icon.png");
   assert.equal(manifest.engines.vscode, "^1.107.0");
   assert.equal(manifest.contributes.commands[0].command, "ahdcode.runFile");

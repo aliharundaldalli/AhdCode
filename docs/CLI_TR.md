@@ -32,9 +32,11 @@ dizeleri yerine argüman dizileri kullanır.
 Herhangi bir komut olmadan `ahdcode` çalıştırmak REPL'i başlatır.
 
 `lsp`, [Dil sunucusu rehberinde](LSP_TR.md) açıklanan dil sunucusunu
-başlatır: yalnızca stdio üzerinden JSON-RPC, derleyici destekli tanılamalar,
-hover, tanıma git, belge sembolleri, signature help, referans bulma ve
-completion. İsteğe bağlı bir `--stdio` dışında argüman kabul etmez (kabul
+başlatır: yalnızca stdio üzerinden JSON-RPC ve v0.2.2 pratik günlük özellik
+seti (tanılamalar, hover, otomatik importlu completion, tanıma git, belge
+sembolleri, signature help, referans bulma, rename, semantic token, inlay
+hint, code action, biçimlendirme, workspace sembolleri, katlama ve seçim
+aralıkları) — hepsi derleyici destekli. İsteğe bağlı bir `--stdio` dışında argüman kabul etmez (kabul
 edilir ve yok sayılır — gerçek LSP istemci kütüphaneleri, sunucuyu stdio
 transport üzerinden başlatırken bunu otomatik olarak ekler; `ahdcode lsp`
 zaten başka hiçbir transport'u desteklemediği için bu bayrak bir no-op'tur)

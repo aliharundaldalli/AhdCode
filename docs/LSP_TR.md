@@ -21,85 +21,62 @@ eklentisi olası istemcilerden yalnızca biridir, özel bir durum değildir.
 ## Neyi derleyici karar verir, LSP değil
 
 Dil sunucusunun kendine ait bir ayrıştırıcısı (parser), tür denetleyicisi
-veya sembol kataloğu yoktur. Her tanılama (diagnostic) ve her hover,
-`ahdcode build` ve `ahdcode run`'ın kullandığı aynı sözcüksel çözümleyici
-(lexer), ayrıştırıcı ve anlamsal analizciden — ince bir belge-farkında
-derleme katmanı (`internal/analysis`) ve bir LSP protokol çeviri katmanı
-(`internal/lsp`) aracılığıyla — doğrudan gelir. Bir standart modülün dışa
-aktarılan üyeleri (`Math.PI`, `Excel.read` vb.) editör için asla elle
-listelenmez: bunlar derleyicinin `bring`'i çözümlemek için zaten kullandığı
-aynı `StandardModuleInterfaces()`'ten gelir, bu yüzden gelecekteki bir
-standart modül, ayrı bir katalog güncellemeden otomatik olarak tanılama ve
-hover'a katılır.
+veya sembol kataloğu yoktur. Her tanılama, hover, completion öğesi, rename
+hedefi, semantic token, inlay hint ve quick fix, `ahdcode build` ve
+`ahdcode run`'ın kullandığı aynı sözcüksel çözümleyici, ayrıştırıcı ve
+anlamsal analizciden — `internal/analysis` ve `internal/lsp` katmanları
+aracılığıyla — doğrudan gelir. Standart modül üyeleri asla elle listelenmez:
+bunlar derleyicinin `bring`'i çözümlemek için kullandığı
+`StandardModuleInterfaces()`'ten gelir.
 
-## Yetenekler
+## Yetenekler (v0.2.2)
 
-- **Belge senkronizasyonu** — `textDocument/didOpen`, `didChange`,
-  `didClose`, **tam (full)** belge senkronizasyonu kullanılarak
-  (`TextDocumentSyncKind.Full`). Her `didChange`, belgenin tam yeni metnini
-  taşır; sunucu tüm belgeyi bu anlık görüntüden yeniden analiz eder. Artımlı
-  (incremental) düzenleme uygulaması ve artımlı bir derleyici yoktur —
-  doğruluk bu optimizasyondan önce gelir.
-- **Tanılamalar** (`textDocument/publishDiagnostics`) — lexer, parser,
-  modül/import ve anlamsal tanılamalar; her biri derleyicinin kendi sabit
-  kodunu, önem derecesini (severity), mesajını ve kaynak aralığını taşır.
-  Bir tanılamanın `source`'u her zaman `"ahdcode"`'dur. Bir belgeyi
-  düzeltmek boş bir tanılama listesi yayınlar, böylece eski işaretler
-  temizlenir. İçe aktarılan bir modüldeki hata, içe aktaran dosyaya
-  katıştırılmak yerine o modülün kendi belgesi altında yayınlanır.
-- **Hover** (`textDocument/hover`) — derleyicinin güvenle gerçek bir sembole
-  çözümlediği bir tanımlayıcı için: bir değişken, `Constant` veya `Local`
-  bildirimi veya kullanımı; bir fonksiyon bildirimi veya çağrısı; bir
-  fonksiyon veya structure parametresi; bir `Class`; veya içe aktarılan bir
-  standart modül üyesi. Başka herhangi bir yeri (operatör, literal, boşluk)
-  hover'lamak tahmin yerine hover döndürmez.
-- **Tanıma git** (`textDocument/definition`) — herhangi bir kullanımdan
-  kendi bildirimine atlar; `bring`/`from` ile başka bir dosyaya (o sembolü
-  gerçekten bildiren modüle, bir `Class` üyesi dahil) geçiş de dahildir.
-- **Belge sembolleri** (`textDocument/documentSymbol`) — bir belgenin
-  ana hatları: her üst düzey bildirim ve her `Class`'ın kendi metotları ile
-  öznitelikleri alt öğeler olarak.
-- **Signature help** (`textDocument/signatureHelp`) — imlecin içinde
-  bulunduğu çağrının imzası; imleç argümanlar arasında hareket ettikçe aktif
-  parametre izlenir, çağrı hâlâ yazılıyorken (kapatılmamış bir parantez)
-  dahil.
-- **Referans bulma** (`textDocument/references`) — imleçteki sembolün her
-  kullanımı, geçerli derleme grafiğiyle sınırlı: açık belge artı onun
-  geçişli olarak içe aktardığı her şey. Bu, workspace genelinde bir indeks
-  değildir; buranın içe aktarmadığı ve bu dosyayı içe aktarmayan bir
-  dosyadaki kullanım bulunmaz.
-- **Completion** (`textDocument/completion`) — `bring`/`from`'dan sonra
-  modül adları; `from <modül> bring`'den sonra bir modülün dışa aktarılan
-  adları; `.`'dan sonra bir namespace veya Class örneğinin üyeleri;
-  kapsamdaki yerel değişkenler, parametreler ve üst düzey bildirimler; ve
-  küçük, ölçülü bir kontrol akışı anahtar kelime kümesi. Her aday listesi
-  bir derleyici olgusundan gelir (`StandardModuleInterfaces`, derlenmiş bir
-  kardeş modülün kendi arayüzü, `ResolvedSymbols`, `ExpressionTypes`) — elle
-  tutulan bir isim kataloğu yoktur.
+Pratik günlük AhdCode LSP özellik seti v0.2.2 ile **tamamlanmıştır**.
+`initialize` yanıtı yalnızca aşağıdakileri duyurur (artımlı senkronizasyon,
+aralık biçimlendirme, semantic-token delta, call/type hierarchy, debugger
+yok).
 
-Sunucu **kaydedilmemiş editör metnini** analiz eder. Bir açık belgenin
-tamponunu, yalnızca derlemek için asla diskteki dosyasına geri yazmaz — REPL'in
-kendi oturum kaynağı için zaten kullandığı bellek-içi giriş (in-memory entry)
-yaklaşımının, herhangi sayıda açık belgeye genelleştirilmiş hâli. Editörde de
-açık olan içe aktarılmış bir modül de kendi kaydedilmemiş tamponundan analiz
-edilir; açık olmayan her şey gerçek dosya sisteminden okunur.
+- **Belge senkronizasyonu** — tam (full) belge senkronizasyonu; artımlı
+  derleyici yok.
+- **Tanılamalar**, **Hover**, **Tanıma git**, **Belge sembolleri**,
+  **Signature help**, **Referans bulma** (geçerli **derleme grafiği** ile
+  sınırlı; workspace genelinde indeks değil).
+- **Completion** — modül adları, `from ... bring` dışa aktarımları,
+  namespace/Class üyeleri (**erişim-farkında Confidential üyeler**: yalnızca
+  derleyici erişilebilir dediğinde önerilir), kapsamdaki yereller,
+  otomatik import ve ölçülü anahtar kelimeler.
+- **Rename** — Definition/References ile aynı semantik kimlik; derleme
+  grafiği kapsamında.
+- **Semantic Tokens** — derleyici/AST olgularından; UTF-16 doğru konumlar.
+- **Inlay Hints** — çıkarılan türler ve ölçülü parametre-adı ipuçları.
+- **Code Actions** — yalnızca yapılandırılmış tanılama kodlarına bağlı
+  quick fix'ler: `SEM006` (eksik `Local`), `PAR009` (geçersiz `for`
+  bağlaması `Local`), export-bulunamadı import tanılamaları.
+- **Belge biçimlendirme** — mevcut biçimlendirici kütüphanesi bellek-içi;
+  diske yazmaz, shell-out yok.
+- **Workspace Symbols** — workspace kökleri ve giriş dizininde isteğe bağlı
+  tarama; kalıcı indeks yok.
+- **Folding Range** ve **Selection Range** — AST destekli.
 
-## Uygulanmayanlar
+Sunucu **kaydedilmemiş editör metnini** analiz eder; açık belgeyi yalnızca
+derlemek için diske geri yazmaz.
 
-Yeniden adlandırma (rename), semantic token/vurgulama, inlay hint, code
-action, quick fix, otomatik import, refactoring, tam workspace genelinde bir
-indeks (bir belgenin kendi derleme grafiğinin ötesinde), artımlı bir
-derleyici veya ayrıştırıcı ve kalıcı bir derleyici önbelleği hâlâ
-uygulanmamıştır. `initialize` yanıtı tam olarak yukarıdaki yetenekleri ve
-başka hiçbir şeyi duyurur, bu yüzden bir istemci bu sürümde olmayan bir
-özelliği isteyebileceğine asla inanmaz.
+## Otomatik import ve modül keşfi
 
-## Konum kodlaması (position encoding)
+Kullanıcı modülleri `initialize`'dan gelen workspace kökleri ile giriş
+belgesinin dizinindeki kardeş `.ahd` dosyalarının sınırlı taramasıyla
+bulunur. Sabit sembol kataloğu, arka plan izleyici veya kalıcı veritabanı
+yoktur. Aynı ad iki modülde varsa completion ayrı girişler gösterir.
 
-AhdCode kaynak konumları, Unicode kod noktalarıyla sayılan bir-tabanlı
-(one-based) satır/sütunlardır. LSP konumları sıfır-tabanlı satır/UTF-16 kod
-birimleridir. Sunucu, her istekte gerçek kaynak metnini kullanarak ikisi
-arasında dönüştürme yapar — asla yalın bir "birden çıkar" değil — böylece
-BMP-dışı bir karakterden (çoğu emoji gibi) sonraki bir konum, bir UTF-16
-vekil çift (surrogate pair) yarısı kadar kaymış değil, doğru editör
-karakterine iner.
+## Bilerek uygulanmayanlar
+
+Artımlı ayrıştırıcı/derleyici, kalıcı workspace indeksi, semantic-token
+delta, aralık biçimlendirme, call/type hierarchy, code lens, debugger/DAP,
+AI completion ve üretken code action'lar kapsam dışıdır.
+
+## Konum kodlaması
+
+AhdCode kaynak konumları Unicode kod noktalarıyla bir-tabanlı satır/sütundur.
+LSP konumları sıfır-tabanlı satır/UTF-16 kod birimleridir. Sunucu her
+istekte gerçek kaynak metnini kullanarak dönüştürür; emoji gibi BMP-dışı
+karakterlerden sonra doğru editör konumunu verir.

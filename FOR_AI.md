@@ -82,7 +82,7 @@ ahdcode_exe="$(go env GOPATH)/bin/ahdcode"
 "$ahdcode_exe" --version
 ```
 
-The expected current result is `AhdCode v0.2.1`. Using the explicit
+The expected current result is `AhdCode v0.2.2`. Using the explicit
 `$ahdcode_exe` path proves which binary was tested. If the user wants the
 short `ahdcode` command and that directory is not already on `PATH`, explain
 the temporary or persistent options and obtain permission before editing a
@@ -195,7 +195,7 @@ $AhdCodeExe = Join-Path (go env GOPATH) "bin\ahdcode.exe"
 & $AhdCodeExe --version
 ```
 
-The expected current result is `AhdCode v0.2.1`. The explicit executable path
+The expected current result is `AhdCode v0.2.2`. The explicit executable path
 avoids accidentally testing an older global installation. If the Go binary
 directory is not on `PATH`, explain the choice before changing anything. A
 temporary current-PowerShell-process change is:
@@ -276,7 +276,7 @@ the collection it is given, and it returns a new one.
 `String`, `Int`, or `Bool` and never null, and one `Pair` has one value type.
 There is no `Any`, no `dynamic`, no `Dictionary`, and no `Map`.
 
-**AhdCode v0.2.1 has no `Tuple` and no Python-style `zip`.** Do not reach for
+**AhdCode v0.2.2 has no `Tuple` and no Python-style `zip`.** Do not reach for
 `Lists.zip`, `Lists.unzip`, `dict(...)`, `tuple(...)`, or a `Function<T>`
 generic spelling — none of them exist. `Lists` and `KeyValue` operations are
 type-directed: the compiler computes each call's exact result type from the

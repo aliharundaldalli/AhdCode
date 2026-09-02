@@ -12,19 +12,21 @@ AhdCode is an experimental statically checked general-purpose programming
 language focused on readable syntax, explicit intent, predictable semantics,
 and native compilation.
 
-The current release is **v0.2.1**. The core language works end to end, but
+The current release is **v0.2.2**. The core language works end to end, but
 the project is not production-ready and breaking changes may occur before 1.0.
 
-v0.2.1 adds [`ahdcode lsp`](docs/LSP.md), a standard stdio Language Server
-Protocol server backed directly by the real compiler frontend: diagnostics,
-hover, go to definition, document symbols, signature help, find references
-(scoped to one document's own compile graph), and completion (modules,
-`from ... bring` exports, namespace/Class members, in-scope locals and
-parameters, and a restrained keyword set), all on unsaved editor buffers with
-full document synchronization. The bundled [VS Code extension](editors/vscode)
-launches the same server. Language semantics are unchanged from v0.1.20,
-which added the [PDF](docs/PDF.md) and [Archive](docs/ARCHIVE.md) modules and
-a `Latex.pdf` source sidecar.
+v0.2.2 completes the practical everyday AhdCode language server on top of
+v0.2.1's diagnostics, hover, completion, go to definition, document symbols,
+signature help, and find references. v0.2.2 adds rename, semantic highlighting,
+inlay hints, code actions/quick fixes, auto import, document formatting,
+workspace symbol search, folding ranges, and selection ranges — all backed
+directly by the real compiler frontend on unsaved editor buffers with full
+document synchronization. See [`docs/LSP.md`](docs/LSP.md) for scope and
+honest limitations (compile-graph-scoped references/rename, on-demand module
+discovery, no persistent workspace index). The bundled
+[VS Code extension](editors/vscode) launches the same server. Language
+semantics are unchanged from v0.1.20, which added the [PDF](docs/PDF.md) and
+[Archive](docs/ARCHIVE.md) modules and a `Latex.pdf` source sidecar.
 
 ```ahd
 greet: Function := (

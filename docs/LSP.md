@@ -21,76 +21,100 @@ not a special case.
 ## What the compiler, not the LSP, decides
 
 The language server has no parser, type checker, or symbol catalog of its
-own. Every diagnostic and every hover comes directly from the real AhdCode
-frontend -- the same lexer, parser, and semantic analyzer `ahdcode build` and
+own. Every diagnostic, hover, completion item, rename target, semantic token,
+inlay hint, and quick fix comes directly from the real AhdCode frontend --
+the same lexer, parser, and semantic analyzer `ahdcode build` and
 `ahdcode run` use -- through a thin document-aware compilation layer
 (`internal/analysis`) and an LSP protocol translation layer (`internal/lsp`).
 A standard module's exported members (`Math.PI`, `Excel.read`, and so on) are
 never hand-listed for the editor: they come from the same
-`StandardModuleInterfaces()` the compiler itself resolves `bring` against, so
-a future standard module participates in diagnostics and hover automatically,
-with no separate catalog to update.
+`StandardModuleInterfaces()` the compiler itself resolves `bring` against.
 
-## Capabilities
+## Capabilities (v0.2.2)
+
+The practical everyday AhdCode LSP feature set is **complete** as of v0.2.2.
+The `initialize` response advertises exactly what exists below and nothing
+else (no incremental sync, no range formatting, no semantic-token deltas, no
+call/type hierarchy, no debugger).
 
 - **Document synchronization** -- `textDocument/didOpen`, `didChange`,
-  `didClose`, using **full** document sync (`TextDocumentSyncKind.Full`).
-  Every `didChange` carries the document's complete new text; the server
-  re-analyzes the whole document from that snapshot. There is no incremental
-  edit application and no incremental compiler -- correctness comes before
-  that optimization.
+  `didClose`, using **full** document sync. Every `didChange` carries the
+  document's complete new text; the server re-analyzes the whole document
+  from that snapshot. There is no incremental compiler.
 - **Diagnostics** (`textDocument/publishDiagnostics`) -- lexer, parser,
-  module/import, and semantic diagnostics, each carrying the compiler's own
-  stable code, severity, message, and source range. A diagnostic's `source`
-  is always `"ahdcode"`. Fixing a document publishes an empty diagnostic list
-  so stale markers clear. An error in an imported module is published under
-  that module's own document, not folded into the importing file.
-- **Hover** (`textDocument/hover`) -- for an identifier the compiler
-  confidently resolved to a real symbol: a variable, `Constant`, or `Local`
-  declaration or use; a function declaration or call; a function or
-  structure parameter; a `Class`; or an imported standard-module member.
-  Hovering anywhere else (an operator, a literal, whitespace) returns no
-  hover rather than a guess.
-- **Go to Definition** (`textDocument/definition`) -- jumps from any use to
-  its declaration, including across a `bring`/`from` import into the module
-  that actually declares it (a `Class` member declared in another file
-  included).
-- **Document Symbols** (`textDocument/documentSymbol`) -- a document's
-  outline: every top-level declaration, and every `Class`'s own methods and
-  attributes as children.
-- **Signature Help** (`textDocument/signatureHelp`) -- the signature of the
-  call the cursor is inside, with the active parameter tracked as the cursor
-  moves between arguments, including while the call is still being typed
-  (an unclosed parenthesis).
+  module/import, and semantic diagnostics with stable compiler codes.
+  Fixing a document publishes an empty list so stale markers clear.
+- **Hover** (`textDocument/hover`) -- compiler-resolved symbols only; no
+  guesses on literals, operators, or whitespace.
+- **Go to Definition** (`textDocument/definition`) -- across the compile
+  graph, including imported modules.
+- **Document Symbols** (`textDocument/documentSymbol`) -- top-level
+  declarations and Class members as children.
+- **Signature Help** (`textDocument/signatureHelp`) -- active call
+  signature with parameter tracking.
 - **Find References** (`textDocument/references`) -- every use of the
-  symbol at the cursor, scoped to the current compile graph: the open
-  document plus everything it transitively imports. This is not a
-  workspace-wide index; a use in a file nothing here imports and that does
-  not import this file is not found.
+  symbol at the cursor, scoped to the **current compile graph** (the open
+  entry document plus everything it transitively imports). This is not a
+  workspace-wide index.
 - **Completion** (`textDocument/completion`) -- module names after
-  `bring`/`from`; a module's exported names after `from <module> bring`;
-  a namespace or Class instance's members after `.`; locals, parameters,
-  and module-root declarations in scope; and a small, restrained set of
-  control-flow keywords. Every candidate list comes from a compiler fact
-  (`StandardModuleInterfaces`, a compiled sibling module's own interface,
-  `ResolvedSymbols`, `ExpressionTypes`) -- there is no hand-maintained name
-  catalog.
+  `bring`/`from`; exported names after `from <module> bring`; namespace or
+  Class members after `.` (including **access-aware Confidential members**:
+  suggested only when the compiler says they are accessible from the cursor
+  context); in-scope locals, parameters, and module-root declarations; auto
+  import for uniquely discoverable exported symbols from sibling user modules;
+  and a restrained keyword set.
+- **Rename** (`textDocument/prepareRename`, `textDocument/rename`) --
+  semantic-symbol renames using the same identity as Definition and
+  References, scoped to the compile graph. Invalid identifiers, keywords,
+  literals, operators, builtins, and unresolved symbols are rejected.
+  `prepareRename` validates new names with the real lexer rules.
+- **Semantic Tokens** (`textDocument/semanticTokens/full`) -- highlighting
+  from compiler/AST facts (namespace, type, function, method, parameter,
+  variable, property, keyword, string, number, comment; declaration and
+  readonly modifiers where truthful). Positions are UTF-16 correct.
+- **Inlay Hints** (`textDocument/inlayHint`) -- inferred types on
+  declarations that omit an explicit type, and restrained parameter-name
+  hints on positional call arguments when the selected callable is known.
+- **Code Actions** (`textDocument/codeAction`) -- conservative quick fixes
+  only, each tied to a structured compiler diagnostic:
+  - `SEM006` -- add missing `Local` in a nested executable scope
+  - `PAR009` (for-loop binding message) -- remove invalid `Local` from a
+    `for` iteration binding
+  - export-not-found import diagnostics -- import the missing symbol when
+    uniquely identified
+- **Document Formatting** (`textDocument/formatting`) -- calls the existing
+  in-process formatter on the open buffer; never shells out and never writes
+  the file to disk.
+- **Workspace Symbols** (`workspace/symbol`) -- on-demand search across
+  discoverable `.ahd` modules in workspace roots and the entry document's
+  directory. No persistent index; Confidential exports are omitted
+  cross-module.
+- **Folding Range** (`textDocument/foldingRange`) -- function/Class bodies,
+  control-flow blocks, and similar AST-backed spans.
+- **Selection Range** (`textDocument/selectionRange`) -- progressive
+  expansion through AST ancestors.
 
 The server analyzes **unsaved editor text**. It never writes an open
-document's buffer back to its file on disk merely to compile it -- the same
-in-memory-entry approach the REPL already uses for its own session source,
-generalized to any number of open documents. An imported module that is also
-open in the editor is analyzed from its own unsaved buffer too; anything not
-open is read from the real filesystem.
+document's buffer back to its file on disk merely to compile it. An imported
+module that is also open in the editor is analyzed from its own unsaved
+buffer; anything not open is read from the filesystem.
 
-## Not implemented
+## Auto import and module discovery
 
-Rename, semantic tokens/highlighting, inlay hints, code actions, quick
-fixes, auto import, refactoring, a full workspace-wide index (beyond one
-document's own compile graph), an incremental compiler or parser, and a
-persistent compiler cache remain unimplemented. The `initialize` response
-advertises exactly the capabilities above and nothing else, so a client
-never believes it can request a feature this version does not have.
+Auto import and workspace symbols discover user modules by scanning workspace
+roots (from LSP `initialize`) plus the entry document's directory for sibling
+`.ahd` files. Standard modules come from `StandardModuleInterfaces()`. There
+is no hard-coded symbol registry, no background watcher, and no persistent
+database. When two modules export the same name, completion shows distinct
+entries with module details rather than silently picking one.
+
+## Not implemented (by design)
+
+Incremental parser/compiler, persistent workspace indexing, semantic-token
+deltas, range formatting, call/type hierarchy, code lens, debugger/DAP, AI
+completion, and generative code actions remain out of scope. Later releases
+may improve performance and add richer refactorings without changing the v0.2.2
+feature boundary above.
 
 ## Position encoding
 

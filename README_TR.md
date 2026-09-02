@@ -12,22 +12,23 @@ AhdCode; okunabilir sözdizimi, açık niyet (explicit intent), öngörülebilir
 anlambilim (semantics) ve yerel (native) derlemeye odaklanan, deneysel,
 statik olarak denetlenen genel amaçlı bir programlama dilidir.
 
-Mevcut sürüm **v0.2.1**'dir. Çekirdek dil uçtan uca çalışır, ancak proje
+Mevcut sürüm **v0.2.2**'dir. Çekirdek dil uçtan uca çalışır, ancak proje
 üretime hazır değildir ve 1.0'dan önce kırıcı (breaking) değişiklikler
 olabilir.
 
-v0.2.1, doğrudan gerçek derleyici önyüzü (frontend) tarafından desteklenen
-standart bir stdio Language Server Protocol sunucusu olan
-[`ahdcode lsp`](docs/LSP_TR.md)'yi ekler: tanılamalar, hover, tanıma git
-(go to definition), belge sembolleri, signature help, referans bulma
-(bir belgenin kendi derleme grafiğiyle sınırlı) ve completion (modüller,
-`from ... bring` dışa aktarımları, namespace/Class üyeleri, kapsamdaki yerel
-değişkenler ve parametreler, ve ölçülü bir anahtar kelime kümesi) —
-kaydedilmemiş editör tamponları üzerinde, tam belge senkronizasyonuyla.
-Birlikte gelen [VS Code eklentisi](editors/vscode) aynı sunucuyu başlatıyor.
-Dil anlambilimi v0.1.20'den değişmemiştir; v0.1.20, [PDF](docs/PDF_TR.md) ve
-[Archive](docs/ARCHIVE_TR.md) modüllerini ve bir `Latex.pdf` kaynak yan
-dosyasını eklemişti.
+v0.2.2, v0.2.1'in tanılama, hover, completion, tanıma git, belge sembolleri,
+signature help ve referans bulma özelliklerinin üzerine pratik günlük AhdCode
+dil sunucusunu tamamlar. v0.2.2; yeniden adlandırma, semantic vurgulama,
+inlay hint, code action/quick fix, otomatik import, belge biçimlendirme,
+workspace sembol araması, katlama aralıkları ve seçim aralıkları ekler — hepsi
+gerçek derleyici önyüzü tarafından desteklenir, kaydedilmemiş editör
+tamponları üzerinde, tam belge senkronizasyonuyla. Kapsam ve dürüst
+sınırlamalar için [`docs/LSP_TR.md`](docs/LSP_TR.md)'ye bakın (derleme
+grafiğiyle sınırlı referans/rename, isteğe bağlı modül keşfi, kalıcı
+workspace indeksi yok). Birlikte gelen [VS Code eklentisi](editors/vscode)
+aynı sunucuyu başlatır. Dil anlambilimi v0.1.20'den değişmemiştir; v0.1.20,
+[PDF](docs/PDF_TR.md) ve [Archive](docs/ARCHIVE_TR.md) modüllerini ve bir
+`Latex.pdf` kaynak yan dosyasını eklemişti.
 
 ```ahd
 greet: Function := (
