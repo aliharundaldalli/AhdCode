@@ -1098,6 +1098,346 @@ func ahdHTTPTestResetClock() {
 	ahdHTTPTimeNow = time.Now
 }
 
+const (
+	ahdHTTPDefaultClientTimeout = 30
+	ahdHTTPDefaultClientMaxBody = 8388608
+	ahdHTTPMaxRedirects         = 10
+)
+
+var (
+	errHTTPTooManyRedirects = errors.New("too many redirects")
+	errHTTPHTTPSDowngrade   = errors.New("https to http redirect")
+)
+
+type ahdHTTPClientRequestData struct {
+	Method  string              `json:"method"`
+	URL     string              `json:"url"`
+	Headers []ahdHTTPHeaderPair `json:"headers"`
+	Body    string              `json:"body"`
+}
+
+type ahdHTTPClientResponseData struct {
+	Status  int                 `json:"status"`
+	Body    string              `json:"body"`
+	Headers []ahdHTTPHeaderPair `json:"headers"`
+	URL     string              `json:"url"`
+}
+
+type ahdHTTPClientState struct {
+	timeout          time.Duration
+	maxResponseBytes int64
+	followRedirects  bool
+	http             *http.Client
+}
+
+var (
+	ahdHTTPClients      = map[string]*ahdHTTPClientState{}
+	ahdHTTPClientsMu    sync.Mutex
+	ahdHTTPClientNextID atomic.Int64
+)
+
+func AhdHTTPClient(class *AhdClass, timeoutSeconds, maxResponseBytes int64, followRedirects bool) string {
+	if timeoutSeconds <= 0 {
+		AhdRaiseClass(class, "HTTP client timeoutSeconds must be greater than 0")
+	}
+	if maxResponseBytes <= 0 {
+		AhdRaiseClass(class, "HTTP client maxResponseBytes must be greater than 0")
+	}
+	base, ok := http.DefaultTransport.(*http.Transport)
+	if !ok {
+		AhdRaiseClass(class, "HTTP client transport is unavailable")
+	}
+	transport := base.Clone()
+	state := &ahdHTTPClientState{
+		timeout:          time.Duration(timeoutSeconds) * time.Second,
+		maxResponseBytes: maxResponseBytes,
+		followRedirects:  followRedirects,
+	}
+	state.http = &http.Client{
+		Timeout:   state.timeout,
+		Transport: transport,
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			return ahdHTTPClientRedirect(state, req, via)
+		},
+	}
+	id := strconv.FormatInt(ahdHTTPClientNextID.Add(1), 10)
+	ahdHTTPClientsMu.Lock()
+	ahdHTTPClients[id] = state
+	ahdHTTPClientsMu.Unlock()
+	return id
+}
+
+func ahdHTTPClientRedirect(state *ahdHTTPClientState, req *http.Request, via []*http.Request) error {
+	if !state.followRedirects {
+		return http.ErrUseLastResponse
+	}
+	if len(via) >= ahdHTTPMaxRedirects {
+		return errHTTPTooManyRedirects
+	}
+	previous := via[len(via)-1]
+	if previous.URL.Scheme == "https" && req.URL.Scheme == "http" {
+		return errHTTPHTTPSDowngrade
+	}
+	if !ahdHTTPSameRedirectHost(previous.URL, req.URL) {
+		req.Header.Del("Authorization")
+		req.Header.Del("Cookie")
+	}
+	return nil
+}
+
+func ahdHTTPSameRedirectHost(from, to *url.URL) bool {
+	return strings.EqualFold(from.Hostname(), to.Hostname()) && from.Port() == to.Port()
+}
+
+func AhdHTTPClientRequest(class *AhdClass, method, rawURL string) string {
+	if !ahdHTTPMethodToken(method) {
+		AhdRaiseClass(class, "HTTP client method "+ahdHTMLQuote(method)+" is not valid")
+	}
+	ahdHTTPRequireClientURL(class, rawURL)
+	return ahdHTTPEncodeClientRequest(class, ahdHTTPClientRequestData{Method: method, URL: rawURL})
+}
+
+func AhdHTTPClientRequestWithHeader(class *AhdClass, data, name, value string) string {
+	ahdHTTPRequireClientHeader(class, name, value)
+	request := ahdHTTPDecodeClientRequest(class, data)
+	canonical := textproto.CanonicalMIMEHeaderKey(name)
+	replaced := false
+	headers := make([]ahdHTTPHeaderPair, 0, len(request.Headers)+1)
+	for _, header := range request.Headers {
+		if textproto.CanonicalMIMEHeaderKey(header.Name) == canonical {
+			if !replaced {
+				headers = append(headers, ahdHTTPHeaderPair{Name: name, Value: value})
+				replaced = true
+			}
+			continue
+		}
+		headers = append(headers, header)
+	}
+	if !replaced {
+		headers = append(headers, ahdHTTPHeaderPair{Name: name, Value: value})
+	}
+	request.Headers = headers
+	return ahdHTTPEncodeClientRequest(class, request)
+}
+
+func AhdHTTPClientRequestAddHeader(class *AhdClass, data, name, value string) string {
+	ahdHTTPRequireClientHeader(class, name, value)
+	request := ahdHTTPDecodeClientRequest(class, data)
+	request.Headers = append(append([]ahdHTTPHeaderPair(nil), request.Headers...), ahdHTTPHeaderPair{Name: name, Value: value})
+	return ahdHTTPEncodeClientRequest(class, request)
+}
+
+func AhdHTTPClientRequestWithBody(class *AhdClass, data, body string) string {
+	request := ahdHTTPDecodeClientRequest(class, data)
+	request.Body = body
+	return ahdHTTPEncodeClientRequest(class, request)
+}
+
+func AhdHTTPClientSend(class *AhdClass, handle, requestData string) string {
+	state := ahdHTTPLookupClient(class, handle)
+	request := ahdHTTPDecodeClientRequest(class, requestData)
+	ahdHTTPRequireClientURL(class, request.URL)
+	var body io.Reader
+	if request.Body != "" || request.Method == "POST" || request.Method == "PUT" || request.Method == "PATCH" {
+		body = io.NopCloser(strings.NewReader(request.Body))
+	}
+	httpRequest, err := http.NewRequest(request.Method, request.URL, body)
+	if err != nil {
+		ahdHTTPRaiseClientFailure(class, err)
+	}
+	httpRequest.GetBody = nil
+	if body != nil {
+		httpRequest.ContentLength = int64(len(request.Body))
+	}
+	httpRequest.Header = make(http.Header)
+	for _, header := range request.Headers {
+		httpRequest.Header.Add(header.Name, header.Value)
+	}
+	httpRequest.Header.Del("Content-Length")
+	response, err := state.http.Do(httpRequest)
+	if err != nil {
+		ahdHTTPRaiseClientFailure(class, err)
+	}
+	defer response.Body.Close()
+	limited := io.LimitReader(response.Body, state.maxResponseBytes+1)
+	raw, err := io.ReadAll(limited)
+	if err != nil {
+		ahdHTTPRaiseClientFailure(class, err)
+	}
+	if int64(len(raw)) > state.maxResponseBytes {
+		AhdRaiseClass(class, "HTTP response body exceeds maxResponseBytes")
+	}
+	if !utf8.Valid(raw) {
+		AhdRaiseClass(class, "HTTP response body is not valid UTF-8")
+	}
+	headers := make([]ahdHTTPHeaderPair, 0)
+	for name, values := range response.Header {
+		for _, value := range values {
+			headers = append(headers, ahdHTTPHeaderPair{Name: name, Value: value})
+		}
+	}
+	finalURL := request.URL
+	if response.Request != nil && response.Request.URL != nil {
+		finalURL = response.Request.URL.String()
+	}
+	return ahdHTTPEncodeClientResponse(class, ahdHTTPClientResponseData{
+		Status: response.StatusCode, Body: string(raw), Headers: headers, URL: finalURL,
+	})
+}
+
+func AhdHTTPClientGet(class *AhdClass, handle, rawURL string) string {
+	return AhdHTTPClientSend(class, handle, AhdHTTPClientRequest(class, "GET", rawURL))
+}
+
+func AhdHTTPClientPost(class *AhdClass, handle, rawURL, body, contentType string) string {
+	if contentType == "" {
+		contentType = "text/plain; charset=utf-8"
+	}
+	request := AhdHTTPClientRequest(class, "POST", rawURL)
+	request = AhdHTTPClientRequestWithHeader(class, request, "Content-Type", contentType)
+	request = AhdHTTPClientRequestWithBody(class, request, body)
+	return AhdHTTPClientSend(class, handle, request)
+}
+
+func AhdHTTPClientResponseStatus(data string) int64 {
+	return int64(ahdHTTPDecodeClientResponse(AhdClassHTTPError, data).Status)
+}
+
+func AhdHTTPClientResponseBody(class *AhdClass, data string) string {
+	return ahdHTTPDecodeClientResponse(class, data).Body
+}
+
+func AhdHTTPClientResponseURL(class *AhdClass, data string) string {
+	return ahdHTTPDecodeClientResponse(class, data).URL
+}
+
+func AhdHTTPClientResponseHeader(class *AhdClass, data, name string) *string {
+	canonical := textproto.CanonicalMIMEHeaderKey(name)
+	for _, header := range ahdHTTPDecodeClientResponse(class, data).Headers {
+		if textproto.CanonicalMIMEHeaderKey(header.Name) == canonical {
+			value := header.Value
+			return &value
+		}
+	}
+	return nil
+}
+
+func AhdHTTPClientResponseHeaderAll(class *AhdClass, data, name string) *AhdList[string] {
+	canonical := textproto.CanonicalMIMEHeaderKey(name)
+	var values []string
+	for _, header := range ahdHTTPDecodeClientResponse(class, data).Headers {
+		if textproto.CanonicalMIMEHeaderKey(header.Name) == canonical {
+			values = append(values, header.Value)
+		}
+	}
+	return ahdHTTPList(values)
+}
+
+func ahdHTTPRequireClientURL(class *AhdClass, raw string) *url.URL {
+	parsed, err := url.Parse(raw)
+	if err != nil || parsed == nil || parsed.Scheme == "" || parsed.Host == "" {
+		AhdRaiseClass(class, "HTTP client URL must be an absolute http or https URL with a host")
+	}
+	if parsed.Scheme != "http" && parsed.Scheme != "https" {
+		AhdRaiseClass(class, "HTTP client URL scheme must be http or https")
+	}
+	if parsed.Fragment != "" || strings.Contains(raw, "#") {
+		AhdRaiseClass(class, "HTTP client URL must not contain a fragment")
+	}
+	if parsed.User != nil {
+		AhdRaiseClass(class, "HTTP client URL must not contain userinfo; use an Authorization header")
+	}
+	if parsed.Hostname() == "" {
+		AhdRaiseClass(class, "HTTP client URL must include a host")
+	}
+	return parsed
+}
+
+func ahdHTTPRequireClientHeader(class *AhdClass, name, value string) {
+	if !ahdHTTPHeaderNameOK(name) {
+		AhdRaiseClass(class, "HTTP header name "+ahdHTMLQuote(name)+" is not valid")
+	}
+	if strings.ContainsAny(value, "\r\n") {
+		AhdRaiseClass(class, "HTTP header value must not contain CR or LF")
+	}
+	if strings.EqualFold(name, "Content-Length") {
+		AhdRaiseClass(class, "HTTP Content-Length is set from the request body")
+	}
+	if strings.EqualFold(name, "Host") {
+		AhdRaiseClass(class, "HTTP Host is taken from the request URL")
+	}
+}
+
+func ahdHTTPLookupClient(class *AhdClass, handle string) *ahdHTTPClientState {
+	ahdHTTPClientsMu.Lock()
+	state := ahdHTTPClients[handle]
+	ahdHTTPClientsMu.Unlock()
+	if state == nil {
+		AhdRaiseClass(class, "HTTP Client storage is corrupted")
+	}
+	return state
+}
+
+func ahdHTTPRaiseClientFailure(class *AhdClass, err error) {
+	if err == nil {
+		AhdRaiseClass(class, "HTTP request failed")
+	}
+	var urlErr *url.Error
+	if errors.As(err, &urlErr) && urlErr != nil && urlErr.Timeout() {
+		AhdRaiseClass(class, "HTTP request timed out")
+	}
+	if errors.Is(err, errHTTPTooManyRedirects) {
+		AhdRaiseClass(class, "HTTP request exceeded 10 redirects")
+	}
+	if errors.Is(err, errHTTPHTTPSDowngrade) {
+		AhdRaiseClass(class, "HTTP HTTPS to HTTP redirect is not allowed")
+	}
+	if errors.Is(err, context.DeadlineExceeded) {
+		AhdRaiseClass(class, "HTTP request timed out")
+	}
+	var timeout net.Error
+	if errors.As(err, &timeout) && timeout.Timeout() {
+		AhdRaiseClass(class, "HTTP request timed out")
+	}
+	message := strings.ToLower(err.Error())
+	if strings.Contains(message, "tls") || strings.Contains(message, "certificate") || strings.Contains(message, "x509") {
+		AhdRaiseClass(class, "HTTP TLS verification failed")
+	}
+	AhdRaiseClass(class, "HTTP request failed")
+}
+
+func ahdHTTPEncodeClientRequest(class *AhdClass, request ahdHTTPClientRequestData) string {
+	encoded, err := json.Marshal(request)
+	if err != nil {
+		AhdRaiseClass(class, "HTTP ClientRequest storage is corrupted")
+	}
+	return string(encoded)
+}
+
+func ahdHTTPDecodeClientRequest(class *AhdClass, data string) ahdHTTPClientRequestData {
+	var request ahdHTTPClientRequestData
+	if err := json.Unmarshal([]byte(data), &request); err != nil {
+		AhdRaiseClass(class, "HTTP ClientRequest storage is corrupted")
+	}
+	return request
+}
+
+func ahdHTTPEncodeClientResponse(class *AhdClass, response ahdHTTPClientResponseData) string {
+	encoded, err := json.Marshal(response)
+	if err != nil {
+		AhdRaiseClass(class, "HTTP ClientResponse storage is corrupted")
+	}
+	return string(encoded)
+}
+
+func ahdHTTPDecodeClientResponse(class *AhdClass, data string) ahdHTTPClientResponseData {
+	var response ahdHTTPClientResponseData
+	if err := json.Unmarshal([]byte(data), &response); err != nil {
+		AhdRaiseClass(class, "HTTP ClientResponse storage is corrupted")
+	}
+	return response
+}
+
 type ahdModuleError struct {
 	AhdBase
 	message string

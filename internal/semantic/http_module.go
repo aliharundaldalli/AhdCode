@@ -13,13 +13,16 @@ const httpModuleID = "builtin:HTTP"
 var (
 	httpErrorParent = &types.ClassSymbol{ModuleID: "builtin:core", Name: "Error",
 		Parent: &types.ClassSymbol{ModuleID: "builtin:core", Name: "Object"}}
-	httpErrorClass        = &types.ClassSymbol{ModuleID: httpModuleID, Name: "HTTPError", Parent: httpErrorParent}
-	httpServerClass       = &types.ClassSymbol{ModuleID: httpModuleID, Name: "Server"}
-	httpRequestClass      = &types.ClassSymbol{ModuleID: httpModuleID, Name: "Request"}
-	httpResponseClass     = &types.ClassSymbol{ModuleID: httpModuleID, Name: "Response"}
-	httpCookieClass       = &types.ClassSymbol{ModuleID: httpModuleID, Name: "Cookie"}
-	httpSessionStoreClass = &types.ClassSymbol{ModuleID: httpModuleID, Name: "SessionStore"}
-	httpSessionClass      = &types.ClassSymbol{ModuleID: httpModuleID, Name: "Session"}
+	httpErrorClass          = &types.ClassSymbol{ModuleID: httpModuleID, Name: "HTTPError", Parent: httpErrorParent}
+	httpServerClass         = &types.ClassSymbol{ModuleID: httpModuleID, Name: "Server"}
+	httpRequestClass        = &types.ClassSymbol{ModuleID: httpModuleID, Name: "Request"}
+	httpResponseClass       = &types.ClassSymbol{ModuleID: httpModuleID, Name: "Response"}
+	httpCookieClass         = &types.ClassSymbol{ModuleID: httpModuleID, Name: "Cookie"}
+	httpSessionStoreClass   = &types.ClassSymbol{ModuleID: httpModuleID, Name: "SessionStore"}
+	httpSessionClass        = &types.ClassSymbol{ModuleID: httpModuleID, Name: "Session"}
+	httpClientClass         = &types.ClassSymbol{ModuleID: httpModuleID, Name: "Client"}
+	httpClientRequestClass  = &types.ClassSymbol{ModuleID: httpModuleID, Name: "ClientRequest"}
+	httpClientResponseClass = &types.ClassSymbol{ModuleID: httpModuleID, Name: "ClientResponse"}
 )
 
 // HTTPErrorIdentity, HTTPServerIdentity, HTTPRequestIdentity, and
@@ -32,6 +35,13 @@ func HTTPResponseIdentity() *types.ClassSymbol     { return httpResponseClass }
 func HTTPCookieIdentity() *types.ClassSymbol       { return httpCookieClass }
 func HTTPSessionStoreIdentity() *types.ClassSymbol { return httpSessionStoreClass }
 func HTTPSessionIdentity() *types.ClassSymbol      { return httpSessionClass }
+func HTTPClientIdentity() *types.ClassSymbol       { return httpClientClass }
+func HTTPClientRequestIdentity() *types.ClassSymbol {
+	return httpClientRequestClass
+}
+func HTTPClientResponseIdentity() *types.ClassSymbol {
+	return httpClientResponseClass
+}
 
 // HTTPServerOperations, HTTPRequestOperations, and HTTPResponseOperations
 // name the members each Class publishes through built-in type operations, so
@@ -46,6 +56,9 @@ var HTTPResponseOperations = []string{"withHeader", "withCookie"}
 var HTTPCookieOperations = []string{"withPath", "withHttpOnly", "withSecure", "withSameSite", "withMaxAge"}
 var HTTPSessionStoreOperations = []string{"open", "commit"}
 var HTTPSessionOperations = []string{"get", "has", "set", "remove", "clear", "rotate", "destroy"}
+var HTTPClientOperations = []string{"send", "get", "post"}
+var HTTPClientRequestOperations = []string{"withHeader", "addHeader", "withBody"}
+var HTTPClientResponseOperations = []string{"status", "body", "header", "headerAll", "url"}
 
 func httpServerType() types.Type       { return types.Class{Symbol: httpServerClass} }
 func httpRequestType() types.Type      { return types.Class{Symbol: httpRequestClass} }
@@ -53,6 +66,13 @@ func httpResponseType() types.Type     { return types.Class{Symbol: httpResponse
 func httpCookieType() types.Type       { return types.Class{Symbol: httpCookieClass} }
 func httpSessionStoreType() types.Type { return types.Class{Symbol: httpSessionStoreClass} }
 func httpSessionType() types.Type      { return types.Class{Symbol: httpSessionClass} }
+func httpClientType() types.Type       { return types.Class{Symbol: httpClientClass} }
+func httpClientRequestType() types.Type {
+	return types.Class{Symbol: httpClientRequestClass}
+}
+func httpClientResponseType() types.Type {
+	return types.Class{Symbol: httpClientResponseClass}
+}
 
 func httpHandlerType() types.Type {
 	return types.Function{Signature: &types.Signature{
@@ -70,7 +90,8 @@ func httpModuleInterface() *ModuleInterface {
 		{"HTTPError", httpErrorClass}, {"Server", httpServerClass},
 		{"Request", httpRequestClass}, {"Response", httpResponseClass},
 		{"Cookie", httpCookieClass}, {"SessionStore", httpSessionStoreClass},
-		{"Session", httpSessionClass},
+		{"Session", httpSessionClass}, {"Client", httpClientClass},
+		{"ClientRequest", httpClientRequestClass}, {"ClientResponse", httpClientResponseClass},
 	}
 	for _, entry := range classes {
 		symbol := &Symbol{
@@ -108,6 +129,13 @@ func httpModuleInterface() *ModuleInterface {
 		types.Parameter{Name: "maxAgeSeconds", Type: types.Int, HasDefault: true},
 		types.Parameter{Name: "secure", Type: types.Bool, HasDefault: true},
 		types.Parameter{Name: "sameSite", Type: types.String, HasDefault: true}))
+	addStandardExport(module, standardFunction(httpModuleID, "client", httpClientType(),
+		types.Parameter{Name: "timeoutSeconds", Type: types.Int, HasDefault: true},
+		types.Parameter{Name: "maxResponseBytes", Type: types.Int, HasDefault: true},
+		types.Parameter{Name: "followRedirects", Type: types.Bool, HasDefault: true}))
+	addStandardExport(module, standardFunction(httpModuleID, "clientRequest", httpClientRequestType(),
+		types.Parameter{Name: "method", Type: types.String},
+		types.Parameter{Name: "url", Type: types.String}))
 	sort.Strings(module.ExportNames)
 	return module
 }
@@ -129,6 +157,12 @@ func httpConstructionHint(identity *types.ClassSymbol) (string, bool) {
 		return "create a SessionStore with HTTP.sessions", true
 	case "Session":
 		return "Session values are produced by SessionStore.open", true
+	case "Client":
+		return "create a Client with HTTP.client", true
+	case "ClientRequest":
+		return "create a ClientRequest with HTTP.clientRequest", true
+	case "ClientResponse":
+		return "ClientResponse values are produced by Client.send, Client.get, or Client.post", true
 	}
 	return "", false
 }
@@ -181,6 +215,20 @@ func httpOperationShapes() map[TypeOperation]httpOperationShape {
 		HTTPSessionClear:   {none, types.Nothing, false, "call clear with no argument"},
 		HTTPSessionRotate:  {none, types.Nothing, false, "call rotate with no argument"},
 		HTTPSessionDestroy: {none, types.Nothing, false, "call destroy with no argument"},
+
+		HTTPClientSend: {[]types.Type{httpClientRequestType()}, httpClientResponseType(), false, "pass one ClientRequest"},
+		HTTPClientGet:  {[]types.Type{types.String}, httpClientResponseType(), false, "pass one String URL"},
+		HTTPClientPost: {[]types.Type{types.String, types.String, types.String}, httpClientResponseType(), false, "pass a URL String, a body String, and optionally a Content-Type String"},
+
+		HTTPClientRequestWithHeader: {[]types.Type{types.String, types.String}, httpClientRequestType(), false, "pass a header name String and a header value String"},
+		HTTPClientRequestAddHeader:  {[]types.Type{types.String, types.String}, httpClientRequestType(), false, "pass a header name String and a header value String"},
+		HTTPClientRequestWithBody:   {[]types.Type{types.String}, httpClientRequestType(), false, "pass one String body"},
+
+		HTTPClientResponseStatus:    {none, types.Int, false, "call status with no argument"},
+		HTTPClientResponseBody:      {none, types.String, false, "call body with no argument"},
+		HTTPClientResponseHeader:    {[]types.Type{types.String}, types.String, true, "pass one String header name"},
+		HTTPClientResponseHeaderAll: {[]types.Type{types.String}, strings, false, "pass one String header name"},
+		HTTPClientResponseURL:       {none, types.String, false, "call url with no argument"},
 	}
 }
 
@@ -207,6 +255,16 @@ var httpOperationNames = map[string]map[string]TypeOperation{
 		"remove": HTTPSessionRemove, "clear": HTTPSessionClear,
 		"rotate": HTTPSessionRotate, "destroy": HTTPSessionDestroy,
 	},
+	"Client": {"send": HTTPClientSend, "get": HTTPClientGet, "post": HTTPClientPost},
+	"ClientRequest": {
+		"withHeader": HTTPClientRequestWithHeader, "addHeader": HTTPClientRequestAddHeader,
+		"withBody": HTTPClientRequestWithBody,
+	},
+	"ClientResponse": {
+		"status": HTTPClientResponseStatus, "body": HTTPClientResponseBody,
+		"header": HTTPClientResponseHeader, "headerAll": HTTPClientResponseHeaderAll,
+		"url": HTTPClientResponseURL,
+	},
 }
 
 func httpOperationFor(receiver types.Type, name string) (TypeOperation, bool) {
@@ -224,8 +282,17 @@ func (a *analyzer) analyzeHTTPOperation(call *ast.CallExpr, operation TypeOperat
 		nullState = MaybeNull
 	}
 	result := expressionInfo{typeValue: shape.result, nullState: nullState}
-	if len(call.Arguments) != len(shape.parameters) {
-		a.error(codeCallArguments, fmt.Sprintf("%s expects %d argument(s); received %d", operation, len(shape.parameters), len(call.Arguments)), call.Span(), shape.hint)
+	optional := 0
+	if operation == HTTPClientPost {
+		optional = 1
+	}
+	minimum := len(shape.parameters) - optional
+	if len(call.Arguments) < minimum || len(call.Arguments) > len(shape.parameters) {
+		expected := fmt.Sprintf("%d", len(shape.parameters))
+		if optional > 0 {
+			expected = fmt.Sprintf("%d to %d", minimum, len(shape.parameters))
+		}
+		a.error(codeCallArguments, fmt.Sprintf("%s expects %s argument(s); received %d", operation, expected, len(call.Arguments)), call.Span(), shape.hint)
 		a.analyzeTypeOperationArguments(call, current, flow, nil)
 		return result
 	}
@@ -256,7 +323,7 @@ func (a *analyzer) analyzeHTTPOperation(call *ast.CallExpr, operation TypeOperat
 	}
 	parameters := make([]types.Parameter, len(shape.parameters))
 	for index, expected := range shape.parameters {
-		parameters[index] = types.Parameter{Type: expected}
+		parameters[index] = types.Parameter{Type: expected, HasDefault: optional > 0 && index >= len(shape.parameters)-optional}
 	}
 	a.result.SelectedCallables[call] = &Callable{
 		Signature:  &types.Signature{Parameters: parameters, Return: shape.result},

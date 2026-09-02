@@ -340,7 +340,8 @@ func (session *Session) core(name string, receiver any, arguments []any) any {
 		return session.sqliteOperation(name, receiver, arguments)
 	}
 	if strings.HasPrefix(name, "Server.") || strings.HasPrefix(name, "Request.") || strings.HasPrefix(name, "Response.") ||
-		strings.HasPrefix(name, "Cookie.") || strings.HasPrefix(name, "SessionStore.") || strings.HasPrefix(name, "Session.") {
+		strings.HasPrefix(name, "Cookie.") || strings.HasPrefix(name, "SessionStore.") || strings.HasPrefix(name, "Session.") ||
+		strings.HasPrefix(name, "Client.") || strings.HasPrefix(name, "ClientRequest.") || strings.HasPrefix(name, "ClientResponse.") {
 		return session.httpOperation(name, receiver, arguments)
 	}
 	session.raise("Error", "unsupported Fundamentals operation "+name)

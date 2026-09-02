@@ -8,13 +8,16 @@ import (
 const HTTPModuleID = "builtin:HTTP"
 
 const (
-	httpServerClassID       = ir.ClassID(HTTPModuleID + "::class::Server")
-	httpRequestClassID      = ir.ClassID(HTTPModuleID + "::class::Request")
-	httpResponseClassID     = ir.ClassID(HTTPModuleID + "::class::Response")
-	httpCookieClassID       = ir.ClassID(HTTPModuleID + "::class::Cookie")
-	httpSessionStoreClassID = ir.ClassID(HTTPModuleID + "::class::SessionStore")
-	httpSessionClassID      = ir.ClassID(HTTPModuleID + "::class::Session")
-	httpErrorClassID        = ir.ClassID(HTTPModuleID + "::class::HTTPError")
+	httpServerClassID         = ir.ClassID(HTTPModuleID + "::class::Server")
+	httpRequestClassID        = ir.ClassID(HTTPModuleID + "::class::Request")
+	httpResponseClassID       = ir.ClassID(HTTPModuleID + "::class::Response")
+	httpCookieClassID         = ir.ClassID(HTTPModuleID + "::class::Cookie")
+	httpSessionStoreClassID   = ir.ClassID(HTTPModuleID + "::class::SessionStore")
+	httpSessionClassID        = ir.ClassID(HTTPModuleID + "::class::Session")
+	httpClientClassID         = ir.ClassID(HTTPModuleID + "::class::Client")
+	httpClientRequestClassID  = ir.ClassID(HTTPModuleID + "::class::ClientRequest")
+	httpClientResponseClassID = ir.ClassID(HTTPModuleID + "::class::ClientResponse")
+	httpErrorClassID          = ir.ClassID(HTTPModuleID + "::class::HTTPError")
 )
 
 var (
@@ -24,6 +27,9 @@ var (
 	HTTPCookieDataFieldID         = ir.FieldID(string(httpCookieClassID) + "::field::data")
 	HTTPSessionStoreHandleFieldID = ir.FieldID(string(httpSessionStoreClassID) + "::field::handle")
 	HTTPSessionDataFieldID        = ir.FieldID(string(httpSessionClassID) + "::field::data")
+	HTTPClientHandleFieldID       = ir.FieldID(string(httpClientClassID) + "::field::handle")
+	HTTPClientRequestDataFieldID  = ir.FieldID(string(httpClientRequestClassID) + "::field::data")
+	HTTPClientResponseDataFieldID = ir.FieldID(string(httpClientResponseClassID) + "::field::data")
 )
 
 func httpModule(id ir.ModuleID, name, path string) *ir.Module {
@@ -41,6 +47,9 @@ func httpModule(id ir.ModuleID, name, path string) *ir.Module {
 		{httpCookieClassID, "Cookie", HTTPCookieDataFieldID, "data", semantic.HTTPCookieOperations},
 		{httpSessionStoreClassID, "SessionStore", HTTPSessionStoreHandleFieldID, "handle", semantic.HTTPSessionStoreOperations},
 		{httpSessionClassID, "Session", HTTPSessionDataFieldID, "data", semantic.HTTPSessionOperations},
+		{httpClientClassID, "Client", HTTPClientHandleFieldID, "handle", semantic.HTTPClientOperations},
+		{httpClientRequestClassID, "ClientRequest", HTTPClientRequestDataFieldID, "data", semantic.HTTPClientRequestOperations},
+		{httpClientResponseClassID, "ClientResponse", HTTPClientResponseDataFieldID, "data", semantic.HTTPClientResponseOperations},
 	}
 	for _, spec := range specs {
 		field := ir.Field{ID: spec.field, Name: spec.fieldName, Type: ir.Type{Kind: ir.StringType}, NullState: ir.NonNull, Hidden: true}

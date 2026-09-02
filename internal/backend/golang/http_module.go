@@ -15,6 +15,9 @@ var (
 	httpCookieClass             = ir.ClassID("builtin:HTTP::class::Cookie")
 	httpSessionStoreClass       = ir.ClassID("builtin:HTTP::class::SessionStore")
 	httpSessionClass            = ir.ClassID("builtin:HTTP::class::Session")
+	httpClientClass             = ir.ClassID("builtin:HTTP::class::Client")
+	httpClientRequestClass      = ir.ClassID("builtin:HTTP::class::ClientRequest")
+	httpClientResponseClass     = ir.ClassID("builtin:HTTP::class::ClientResponse")
 	httpErrorClass              = ir.ClassID("builtin:HTTP::class::HTTPError")
 	httpServerHandleField       = ir.FieldID("builtin:HTTP::class::Server::field::handle")
 	httpRequestDataField        = ir.FieldID("builtin:HTTP::class::Request::field::data")
@@ -22,6 +25,9 @@ var (
 	httpCookieDataField         = ir.FieldID("builtin:HTTP::class::Cookie::field::data")
 	httpSessionStoreHandleField = ir.FieldID("builtin:HTTP::class::SessionStore::field::handle")
 	httpSessionDataField        = ir.FieldID("builtin:HTTP::class::Session::field::data")
+	httpClientHandleField       = ir.FieldID("builtin:HTTP::class::Client::field::handle")
+	httpClientRequestDataField  = ir.FieldID("builtin:HTTP::class::ClientRequest::field::data")
+	httpClientResponseDataField = ir.FieldID("builtin:HTTP::class::ClientResponse::field::data")
 )
 
 func (generator *generator) httpCall(value *ir.CallExpr) string {
@@ -69,6 +75,12 @@ func (generator *generator) httpCall(value *ir.CallExpr) string {
 	case "sessions":
 		return generator.httpValueFrom(httpSessionStoreClass, "AhdHTTPSessions("+errorClass+", "+
 			text(0, `"ahd_session"`)+", "+integer(1, "int64(86400)")+", "+boolean(2, "false")+", "+text(3, `"Lax"`)+")", meta)
+	case "client":
+		return generator.httpValueFrom(httpClientClass, "AhdHTTPClient("+errorClass+", "+
+			integer(0, "int64(30)")+", "+integer(1, "int64(8388608)")+", "+boolean(2, "true")+")", meta)
+	case "clientRequest":
+		return generator.httpValueFrom(httpClientRequestClass, "AhdHTTPClientRequest("+errorClass+", "+
+			text(0, `""`)+", "+text(1, `""`)+")", meta)
 	default:
 		return generator.unsupported("HTTP function "+name, meta.Span)
 	}
@@ -165,6 +177,40 @@ func (generator *generator) httpOperation(name string, value *ir.CallExpr) strin
 		return generator.httpSessionMutate(value, "AhdHTTPSessionRotate("+errorClass+", %s)")
 	case "Session.destroy":
 		return generator.httpSessionMutate(value, "AhdHTTPSessionDestroy("+errorClass+", %s)")
+	case "Client.send":
+		return generator.httpValueFrom(httpClientResponseClass, "AhdHTTPClientSend("+errorClass+", "+
+			generator.httpDataOf(httpClientClass, httpClientHandleField, value.Callee)+", "+
+			generator.httpDataOf(httpClientRequestClass, httpClientRequestDataField, value.Arguments[0].Value)+")", meta)
+	case "Client.get":
+		return generator.httpValueFrom(httpClientResponseClass, "AhdHTTPClientGet("+errorClass+", "+
+			generator.httpDataOf(httpClientClass, httpClientHandleField, value.Callee)+", "+text(0)+")", meta)
+	case "Client.post":
+		contentType := `"text/plain; charset=utf-8"`
+		if len(value.Arguments) > 2 && value.Arguments[2].Value != nil {
+			contentType = text(2)
+		}
+		return generator.httpValueFrom(httpClientResponseClass, "AhdHTTPClientPost("+errorClass+", "+
+			generator.httpDataOf(httpClientClass, httpClientHandleField, value.Callee)+", "+
+			text(0)+", "+text(1)+", "+contentType+")", meta)
+	case "ClientRequest.withHeader":
+		return generator.httpValueFrom(httpClientRequestClass, "AhdHTTPClientRequestWithHeader("+errorClass+", "+
+			generator.httpDataOf(httpClientRequestClass, httpClientRequestDataField, value.Callee)+", "+text(0)+", "+text(1)+")", meta)
+	case "ClientRequest.addHeader":
+		return generator.httpValueFrom(httpClientRequestClass, "AhdHTTPClientRequestAddHeader("+errorClass+", "+
+			generator.httpDataOf(httpClientRequestClass, httpClientRequestDataField, value.Callee)+", "+text(0)+", "+text(1)+")", meta)
+	case "ClientRequest.withBody":
+		return generator.httpValueFrom(httpClientRequestClass, "AhdHTTPClientRequestWithBody("+errorClass+", "+
+			generator.httpDataOf(httpClientRequestClass, httpClientRequestDataField, value.Callee)+", "+text(0)+")", meta)
+	case "ClientResponse.status":
+		return "AhdHTTPClientResponseStatus(" + generator.httpDataOf(httpClientResponseClass, httpClientResponseDataField, value.Callee) + ")"
+	case "ClientResponse.body":
+		return "AhdHTTPClientResponseBody(" + errorClass + ", " + generator.httpDataOf(httpClientResponseClass, httpClientResponseDataField, value.Callee) + ")"
+	case "ClientResponse.header":
+		return "AhdHTTPClientResponseHeader(" + errorClass + ", " + generator.httpDataOf(httpClientResponseClass, httpClientResponseDataField, value.Callee) + ", " + text(0) + ")"
+	case "ClientResponse.headerAll":
+		return "AhdHTTPClientResponseHeaderAll(" + errorClass + ", " + generator.httpDataOf(httpClientResponseClass, httpClientResponseDataField, value.Callee) + ", " + text(0) + ")"
+	case "ClientResponse.url":
+		return "AhdHTTPClientResponseURL(" + errorClass + ", " + generator.httpDataOf(httpClientResponseClass, httpClientResponseDataField, value.Callee) + ")"
 	default:
 		return generator.unsupported("HTTP operation "+name, meta.Span)
 	}
@@ -222,6 +268,7 @@ func (generator *generator) emitHTTPHelpers(writer *emitter) {
 	for _, class := range []ir.ClassID{
 		httpServerClass, httpRequestClass, httpResponseClass,
 		httpCookieClass, httpSessionStoreClass, httpSessionClass,
+		httpClientClass, httpClientRequestClass, httpClientResponseClass,
 	} {
 		name, known := generator.timeHelpers[class]
 		if !known {
