@@ -11,12 +11,14 @@ AhdCode currently builds with Go 1.25 or newer.
 ```bash
 cd AhdCode
 go test ./...
-go install ./cmd/ahdcode ./cmd/ahdnumeric ./cmd/ahdplot
+go install ./cmd/ahdcode ./cmd/ahdnumeric ./cmd/ahdplot ./cmd/ahdsqlite
 ```
 
 If you plan to use the `Latex` module or the `PDF` module's `.save()` (they
 share one offline renderer), you must also stage the offline Latex/Tectonic
-runtime bundle. `Archive` needs no such staging. This step performs a
+runtime bundle. `Archive` needs no such staging. `SQLite` uses the bundled
+`ahdsqlite` helper installed above; it does not need a system `sqlite3`. This
+step performs a
 one-time network fetch for pinned resources:
 
 ```bash

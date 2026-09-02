@@ -77,12 +77,12 @@ From the repository root:
 
 ```bash
 go test ./...
-go install ./cmd/ahdcode ./cmd/ahdnumeric ./cmd/ahdplot
+go install ./cmd/ahdcode ./cmd/ahdnumeric ./cmd/ahdplot ./cmd/ahdsqlite
 ahdcode_exe="$(go env GOPATH)/bin/ahdcode"
 "$ahdcode_exe" --version
 ```
 
-The expected current result is `AhdCode v0.2.2`. Using the explicit
+The expected current result is `AhdCode v0.3.0`. Using the explicit
 `$ahdcode_exe` path proves which binary was tested. If the user wants the
 short `ahdcode` command and that directory is not already on `PATH`, explain
 the temporary or persistent options and obtain permission before editing a
@@ -190,12 +190,12 @@ From the repository root:
 
 ```powershell
 go test ./...
-go install ./cmd/ahdcode ./cmd/ahdnumeric ./cmd/ahdplot
+go install ./cmd/ahdcode ./cmd/ahdnumeric ./cmd/ahdplot ./cmd/ahdsqlite
 $AhdCodeExe = Join-Path (go env GOPATH) "bin\ahdcode.exe"
 & $AhdCodeExe --version
 ```
 
-The expected current result is `AhdCode v0.2.2`. The explicit executable path
+The expected current result is `AhdCode v0.3.0`. The explicit executable path
 avoids accidentally testing an older global installation. If the Go binary
 directory is not on `PATH`, explain the choice before changing anything. A
 temporary current-PowerShell-process change is:
@@ -276,7 +276,7 @@ the collection it is given, and it returns a new one.
 `String`, `Int`, or `Bool` and never null, and one `Pair` has one value type.
 There is no `Any`, no `dynamic`, no `Dictionary`, and no `Map`.
 
-**AhdCode v0.2.2 has no `Tuple` and no Python-style `zip`.** Do not reach for
+**AhdCode v0.3.0 has no `Tuple` and no Python-style `zip`.** Do not reach for
 `Lists.zip`, `Lists.unzip`, `dict(...)`, `tuple(...)`, or a `Function<T>`
 generic spelling — none of them exist. `Lists` and `KeyValue` operations are
 type-directed: the compiler computes each call's exact result type from the
@@ -300,6 +300,28 @@ data = JSON.object(root)
 Every other root field survives untouched and keeps its position. The same
 applies to XML and to Data records: build typed values and transform them,
 rather than assembling text and re-parsing it.
+
+**Never interpolate values into SQL.** `SQLite` is a compiler-registered
+standard module (`bring SQLite`). Users write real SQL; AhdCode binds
+positional `?` parameters and converts storage-class values. There is no ORM,
+query builder, or migration framework. A query row is
+`Pair<String, SQLiteValue>`. SQL `NULL` is a `SQLiteValue` of kind `Null`,
+not AhdCode `null`. Wrong-kind accessors raise `SQLiteError`. `BLOB` is
+unsupported. Duplicate result-column labels raise `SQLiteError`; use `AS`.
+Do not invent a shared `Database` interface for a future MySQL module.
+
+The correct insert is:
+
+```ahd
+db.execute(
+    "INSERT INTO notes (title, body) VALUES (?, ?)",
+    [SQLite.fromString(title), SQLite.fromString(body)]
+)
+```
+
+Do not write `"INSERT INTO notes (title) VALUES ('{title}')"`. A title such
+as `Robert'); DROP TABLE notes;--` must remain data. See
+[`docs/SQLITE.md`](docs/SQLITE.md).
 
 **Excel Cells are closed typed values, not `Any`.** Use
 `Excel.fromString`, `Excel.fromInt`, `Excel.fromReal`, `Excel.fromBool`, and

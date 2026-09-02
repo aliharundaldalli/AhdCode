@@ -12,10 +12,15 @@ AhdCode is an experimental statically checked general-purpose programming
 language focused on readable syntax, explicit intent, predictable semantics,
 and native compilation.
 
-The current release is **v0.2.2**. The core language works end to end, but
+The current release is **v0.3.0**. The core language works end to end, but
 the project is not production-ready and breaking changes may occur before 1.0.
 
-v0.2.2 completes the practical everyday AhdCode language server on top of
+v0.3.0 begins AhdCode's practical application-development phase with a typed
+[SQLite](docs/SQLITE.md) bridge: a real local database, parameterized SQL,
+CRUD, transactions, and a persistent notes example. HTTP is not in this
+release; it comes after SQLite.
+
+v0.2.2 completed the practical everyday AhdCode language server on top of
 v0.2.1's diagnostics, hover, completion, go to definition, document symbols,
 signature help, and find references. v0.2.2 adds rename, semantic highlighting,
 inlay hints, code actions/quick fixes, auto import, document formatting,
@@ -106,10 +111,10 @@ AhdCode currently requires Go 1.25 or newer.
 ```bash
 cd AhdCode
 go test ./...
-go install ./cmd/ahdcode ./cmd/ahdnumeric ./cmd/ahdplot
+go install ./cmd/ahdcode ./cmd/ahdnumeric ./cmd/ahdplot ./cmd/ahdsqlite
 ```
 
-The command above installs the compiler and the local numeric/plot rendering helpers.
+The command above installs the compiler and the local numeric, plot, and SQLite helpers.
 If you plan to use the `Latex` module **or** the `PDF` module's `.save()` (they
 share one offline renderer), you must also stage the offline Latex/Tectonic
 runtime bundle. `Archive` needs no such staging -- it is Go-standard-library
@@ -174,6 +179,7 @@ See the [CLI guide](docs/CLI.md), [formatter guide](docs/FORMATTER.md),
 - [Plot module](docs/PLOT.md)
 - [Numeric module and Complex scalars](docs/NUMERIC.md)
 - [JSON module](docs/JSON.md)
+- [SQLite module](docs/SQLITE.md)
 - [XML module](docs/XML.md)
 - [Env module](docs/ENV.md)
 - [Lists module](docs/LISTS.md)
@@ -182,6 +188,7 @@ See the [CLI guide](docs/CLI.md), [formatter guide](docs/FORMATTER.md),
 - [Language server](docs/LSP.md)
 - [AI-assisted local setup](FOR_AI.md)
 - [Curated v0.1 examples](examples/v0.1/README.md)
+- [v0.3 SQLite Notes App](examples/v0.3/README.md)
 - [Full v0.1 language specification](AHDCODE_LANGUAGE_SPEC_v0.1.md)
 
 ## Editor extension
@@ -212,10 +219,12 @@ lightweight run-and-highlight integration. See the
 cmd/ahdcode/       CLI entry point
 cmd/ahdnumeric/    bundled advanced linear-algebra helper
 cmd/ahdplot/       bundled chart-rendering helper
+cmd/ahdsqlite/     bundled CGO-free SQLite helper
 internal/          compiler, runtime, formatter, and REPL
 editors/vscode/    VS Code / Antigravity extension
 docs/              end-user guides
 examples/v0.1/     curated working programs
+examples/v0.3/     SQLite Notes App
 AHDCODE_LANGUAGE_SPEC_v0.1.md
                    authoritative language contract
 ```

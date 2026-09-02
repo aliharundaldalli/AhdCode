@@ -1,4 +1,4 @@
-# AhdCode v0.2.2 Türkçe Öğrenci Rehberi
+# AhdCode v0.3.0 Türkçe Öğrenci Rehberi
 
 Bu rehber, **daha önce hiç programlama yapmamış birinin de takip edebilmesi** için hazırlanmıştır. Baştan sona sırayla okuyabilirsiniz; her bölümde önce ne yapmak istediğimizi görecek, sonra çalışan bir örnek yazacak, en son gerekli kuralları öğreneceksiniz.
 
@@ -41,14 +41,15 @@ En iyi öğrenme yolu, örnekleri yalnızca okumak değil çalıştırmaktır. B
 - [32. XML modülü](#32-xml-modülü)
 - [33. Env modülü](#33-env-modülü)
 - [34. Lists ve KeyValue modülleri](#34-lists-ve-keyvalue-modülleri)
-- [35. Kod Biçimlendirici (Formatter)](#35-kod-biçimlendirici-formatter)
-- [36. Komut satırı (CLI)](#36-komut-satırı-cli)
-- [37. Etkileşimli kabuk (REPL)](#37-etkileşimli-kabuk-repl)
-- [38. Sık yapılan başlangıç hataları](#38-sık-yapılan-başlangıç-hataları)
-- [39. Küçük Projeler](#39-küçük-projeler)
-- [40. Egzersizler](#40-egzersizler)
-- [41. Çözüm İpuçları](#41-çözüm-i̇puçları)
-- [42. Sonraki adımlar ve teknik belgeler](#42-sonraki-adımlar-ve-teknik-belgeler)
+- [35. SQLite: hatırlayan bir veritabanı](#35-sqlite-hatırlayan-bir-veritabanı)
+- [36. Kod Biçimlendirici (Formatter)](#36-kod-biçimlendirici-formatter)
+- [37. Komut satırı (CLI)](#37-komut-satırı-cli)
+- [38. Etkileşimli kabuk (REPL)](#38-etkileşimli-kabuk-repl)
+- [39. Sık yapılan başlangıç hataları](#39-sık-yapılan-başlangıç-hataları)
+- [40. Küçük Projeler](#40-küçük-projeler)
+- [41. Egzersizler](#41-egzersizler)
+- [42. Çözüm İpuçları](#42-çözüm-i̇puçları)
+- [43. Sonraki adımlar ve teknik belgeler](#43-sonraki-adımlar-ve-teknik-belgeler)
 
 ## 1. AhdCode nedir?
 
@@ -68,7 +69,7 @@ Merhaba!
 
 AhdCode, programı çalıştırmadan önce yazdığınız kodu kontrol eder. Örneğin bir metni sayı gibi kullanmaya çalışırsanız veya `null` olabilecek bir değeri kontrol etmeden kullanırsanız, mümkün olduğunda hatayı daha program başlamadan söyler. Ama başlangıçta bunun ayrıntılarını düşünmeniz gerekmiyor; ilerleyen bölümlerde örneklerle göreceğiz.
 
-AhdCode v0.2.2 güncel sürümdür. Küçük komut satırı programlarını çalıştırabilir, onları tek başına çalışan yerel uygulamalara dönüştürebilir ve dil sunucusunu (`ahdcode lsp`) VS Code gibi bir editörden kullanabilirsiniz.
+AhdCode v0.3.0 güncel sürümdür. Küçük komut satırı programlarını çalıştırabilir, onları tek başına çalışan yerel uygulamalara dönüştürebilir, veriyi yerel bir SQLite veritabanında tutabilir ve dil sunucusunu (`ahdcode lsp`) VS Code gibi bir editörden kullanabilirsiniz. v0.2.2 pratik günlük dil sunucusunu tamamladı; v0.3.0 gerçek uygulama geliştirmenin başlangıcıdır.
 
 > **Teknik not:** Program çalışmadan önce türlerin kontrol edilmesine *static checking* denir.
 
@@ -79,7 +80,7 @@ AhdCode'u kaynak kodundan kurmak için bilgisayarınızda Go 1.25 veya daha yeni
 ```bash
 cd AhdCode
 go test ./...
-go install ./cmd/ahdcode ./cmd/ahdnumeric ./cmd/ahdplot
+go install ./cmd/ahdcode ./cmd/ahdnumeric ./cmd/ahdplot ./cmd/ahdsqlite
 export PATH="$(go env GOPATH)/bin:$PATH"
 ahdcode --version
 ```
@@ -2740,7 +2741,155 @@ Beklenen çıktı:
 
 Her imza için [Lists](LISTS_TR.md) ve [KeyValue](KEYVALUE_TR.md) referanslarına bakın.
 
-## 35. Kod biçimlendirici (Formatter)
+## 35. SQLite: hatırlayan bir veritabanı
+
+Şimdiye kadar programdaki değerler, program bitince kayboluyordu. Bir **veritabanı**, program kapandıktan sonra da satırları duran bir dosyadır. **SQLite**, bilgisayarınızda tek bir dosyada (veya denemek için bellekte) yaşayan küçük bir veritabanı motorudur. Siz sıradan SQL yazarsınız; AhdCode güvenli ve tipli bir köprüdür: parametreleri bağlar ve değerleri dönüştürür. ORM değildir, sorgu oluşturucu değildir, migration aracı değildir.
+
+```ahd
+bring SQLite
+from SQLite bring Database
+from SQLite bring SQLiteValue
+from SQLite bring SQLiteError
+
+db: Database := SQLite.open("notes.db")
+```
+
+`SQLite.open("notes.db")` o dosyayı çalışma dizininde açar; yoksa oluşturur. `SQLite.open(":memory:")` kapattığınızda kaybolan özel bir bellek veritabanıdır. Üst klasörler **sizin için oluşturulmaz**: `data/` yoksa `SQLite.open("data/app.db")` `SQLiteError` fırlatır.
+
+Basit bir not defteri tablosu:
+
+```ahd
+db.execute("""
+    CREATE TABLE IF NOT EXISTS notes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        title TEXT NOT NULL,
+        body TEXT NOT NULL
+    )
+    """)
+```
+
+`execute`, değişen satır sayısını döndürür. `CREATE TABLE` hiçbir satırı değiştirmez, bu yüzden `0` döner. Bu normaldir.
+
+### Parametreyle not eklemek
+
+SQL'e değer koymanın güvenli yolu **parametre bağlamadır**. Her `?`, SQLite'ın bir `SQLiteValue` ile doldurduğu bir deliktir. SQL metni asla yeniden yazılmaz:
+
+```ahd
+changed: Int := db.execute(
+    "INSERT INTO notes (title, body) VALUES (?, ?)",
+    [
+        SQLite.fromString("Alışveriş")
+        SQLite.fromString("süt, ekmek, çay")
+    ]
+)
+write(changed)
+write(db.lastInsertId())
+```
+
+Beklenen çıktı (yeni bir dosyadaki ilk not):
+
+```text
+1
+1
+```
+
+`lastInsertId()`, SQLite'ın bağlantıya özel son eklenen satır kimliğidir. Önemli olan `INSERT`'ten hemen sonra çağırın.
+
+Kullanıcı metnini SQL cümlesine interpolasyonla yerleştirmeyin. Aşağıdaki başlık SQL gibi durur; `?` ile sıradan metin olarak saklanır ve tablo durur:
+
+```ahd
+db.execute(
+    "INSERT INTO notes (title, body) VALUES (?, ?)",
+    [
+        SQLite.fromString("Robert'); DROP TABLE notes;--")
+        SQLite.fromString("bu veri olarak kalır")
+    ]
+)
+```
+
+Tırnak, noktalı virgül, satır sonu, ters eğik çizgi, Türkçe karakterler ve emoji, parametre olarak gittiklerinde yalnızca veridir.
+
+### Satır okumak
+
+```ahd
+rows: List<Pair<String, SQLiteValue>> := db.query(
+    "SELECT id, title, body FROM notes ORDER BY id"
+)
+for row in rows {
+    write("{row["id"].int()} {row["title"].string()}")
+}
+```
+
+Bir satır bir `Pair`'dir: anahtarlar, SELECT'in listelediği **sütun etiketleridir**. SQL'den `SQLiteValue` ile çıkarsınız, sonra bir AhdCode tipi istersiniz:
+
+| `kind()`   | Okuma         | AhdCode tipi |
+| ---------- | ------------- | ------------ |
+| `"Null"`   | `isNull()`    | —            |
+| `"Int"`    | `int()`       | `Int`        |
+| `"Real"`   | `real()`      | `Real`       |
+| `"String"` | `string()`    | `String`     |
+
+SQL `NULL`, AhdCode `null`'ı değil, `Null` türünde bir `SQLiteValue`'dur. Satır yapısal olarak `Pair<String, SQLiteValue>` kalır. Yanlış türde erişim `SQLiteError` fırlatır: bir String asla sayı olarak ayrıştırılmaz. `real()` ayrıca `Int` türünü de kabul eder (`x: Real := 3` genişlemesiyle aynı). v0.3.0'da `BLOB` desteklenmez: sorgulamak `SQLiteError` fırlatır.
+
+İki sütunun aynı etiketi varsa (`SELECT a.id, b.id`) AhdCode `SQLiteError` fırlatır. `AS` yazın:
+
+```sql
+SELECT a.id AS a_id, b.id AS b_id
+```
+
+### Sıra, güncelleme, silme, kapatma
+
+SQLite, `ORDER BY` olmadan satır sırası **vaat etmez**. AhdCode `List`'i SQLite'ın döndürdüğü sırayı korur; kendisi bir sıra uydurmaz. Sıra önemliyse `ORDER BY` yazın.
+
+```ahd
+db.execute(
+    "UPDATE notes SET body = ? WHERE id = ?",
+    [SQLite.fromString("süt, ekmek, çay, bal"), SQLite.fromInt(1)]
+)
+db.execute("DELETE FROM notes WHERE id = ?", [SQLite.fromInt(2)])
+db.close()
+```
+
+`close()` sonrasında o `Database` üzerindeki (ve onun takma adlarındaki) her işlem `SQLiteError` fırlatır. İkinci kapatma başarılıdır. İşlem (transaction) açıkken kapatmak `SQLiteError` fırlatır: önce `commit()` veya `rollback()` çağırın. Hiçbir şey sessizce kaydedilmez.
+
+Aynı dosyayı yeni bir programda yeniden açın: notlar durur. v0.3.0'ın noktası budur.
+
+### İşlemler (transactions)
+
+Bir transaction, birkaç ifadeyi hepsi başarılı ya da hiçbiri olmasın diye gruplar:
+
+```ahd
+db.begin()
+attempt {
+    db.execute(
+        "UPDATE accounts SET balance = balance - ? WHERE id = ?",
+        [SQLite.fromReal(10.0), SQLite.fromInt(1)]
+    )
+    db.execute(
+        "UPDATE accounts SET balance = balance + ? WHERE id = ?",
+        [SQLite.fromReal(10.0), SQLite.fromInt(2)]
+    )
+    db.commit()
+}
+except SQLiteError as error {
+    db.rollback()
+    write(error.message)
+}
+```
+
+Bir `Database`'de aynı anda yalnızca bir transaction vardır. İç içe `begin()` `SQLiteError` fırlatır. v0.3.0'da savepoint yoktur.
+
+### SQLite Not Defteri
+
+Tam yürüyüş [`examples/v0.3/01_sqlite_notes.ahd`](../examples/v0.3/01_sqlite_notes.ahd) dosyasındadır. Onu bir **geçici dizine** kopyalayın, çalıştırın, sonra bir daha çalıştırın: ilk çalıştırmanın notları hâlâ `notes.db` içindedir. Bu dosya sıradan bir SQLite veritabanıdır; AhdCode programının parçası değildir.
+
+v0.3.0 editörleri mevcut dil sunucusu üzerinden `SQLite`'ı keşfeder: `bring SQL` yazın, completion `SQLite` önerir. Ek bir eklenti gerekmez.
+
+**Siz deneyin:** `":memory:"` açın, boş bırakılabilir `nickname TEXT` sütunlu bir `people` tablosu oluşturun, `SQLite.nullValue()` ile bir satır ekleyin, sorgulayın ve `kind()` ile `isNull()` yazdırın.
+
+[SQLite modül referansına](SQLITE_TR.md) bakın.
+
+## 36. Kod biçimlendirici (Formatter)
 
 Kod çalışsa bile herkes farklı boşluk ve satır düzeni kullanırsa okumak zorlaşır. AhdCode formatter, geçerli kodu ortak bir stile dönüştürür:
 
@@ -2793,7 +2942,7 @@ values :=
 
 Formatter idempotent'tir; aynı dosyada tekrar çalıştırmak yeni değişiklik üretmez.
 
-## 36. Komut satırı (CLI)
+## 37. Komut satırı (CLI)
 
 AhdCode'u terminalden birkaç temel komutla kullanabilirsiniz:
 
@@ -2830,7 +2979,7 @@ Yardım ve sürüm bilgisini gösterir.
 
 Yeni başlıyorsanız çoğu zaman kullanacağınız komut `ahdcode run ...` olacaktır.
 
-## 37. Etkileşimli kabuk (REPL)
+## 38. Etkileşimli kabuk (REPL)
 
 Küçük bir şeyi denemek için her seferinde dosya oluşturmak zorunda değilsiniz. Terminalde yalnızca:
 
@@ -2899,7 +3048,7 @@ harici bir render motorunu çağırır. Bu çağrıları bir `.ahd` dosyasından
 çalıştırın. `Archive`'ın böyle bir sınırlaması yoktur — REPL'de tamamen
 çalışır. Ayrıntılar için [REPL referansına](REPL_TR.md) bakın.
 
-## 38. Sık yapılan başlangıç hataları
+## 39. Sık yapılan başlangıç hataları
 
 Hata mesajı görmek programlamanın normal bir parçasıdır. Çoğu hata, bilgisayarın ne istediğinizi anlayamadığını söyler. Aşağıdaki örnekler yeni başlayanların sık karşılaştığı durumları ve nasıl düzelteceğinizi gösterir:
 
@@ -3003,7 +3152,12 @@ Hata mesajı görmek programlamanın normal bir parçasıdır. Çoğu hata, bilg
 - Neden: Tohum (seed) verilmemiş rastgelelik, OS entropisini kullanır ve tekrarlanamaz.
 - Doğru: Zar atmadan önce `Math.seed(42)` gibi bir tohum değeri verin.
 
-## 39. Küçük Projeler
+**21. Kullanıcı metnini SQL'e String interpolasyonuyla koymak**
+- Yanlış: `db.execute("INSERT INTO notes (title) VALUES ('{title}')")`
+- Neden: Bu, başlığı SQL'e yapıştırır. `Robert'); DROP TABLE notes;--` gibi bir başlık artık veri değildir.
+- Doğru: `?` yer tutucusu ve `SQLite.fromString(title)` kullanın. Parametre bağlama metni veri olarak tutar.
+
+## 40. Küçük Projeler
 
 Bu küçük projeler rehberde öğretilenleri bir araya getirir. Onları tek başınıza kurmayı deneyin!
 
@@ -3014,8 +3168,9 @@ Bu küçük projeler rehberde öğretilenleri bir araya getirir. Onları tek ba�
 5. **Menülü Program**: Bir `until` döngüsü kullanarak küçük bir banka simülasyonu yapın. Bir menü gösterin: 1. Para Yatır, 2. Para Çek, 3. Bakiye, 0. Çıkış. Bakiyeyi bir `Int` içinde saklayın ve kullanıcı 0 girene kadar programı döndürün.
 6. **Sınıflarla (Class) Öğrenci Kaydı**: Bir `Student` sınıfı ve bir `Course` (Kurs) sınıfı oluşturun. Course içinde bir `List<Student>` bulunsun. Kursa yeni bir öğrenci eklemek için bir metot, kursun genel not ortalamasını hesaplamak için başka bir metot yazın.
 7. **Tohumlu (Seeded) Rastgele Oyun**: `Math.seed(42)` kullanarak 1 ile 100 arasında "gizli bir sayı" üretin. Kullanıcıdan sayıyı tahmin etmesini isteyin. Doğru tahmin edene kadar "daha yüksek" veya "daha düşük" diye yönlendirin. Tohum kullanıldığı için, gizli sayı programı her çalıştırdığınızda aynı olacaktır—test yapmak için mükemmel!
+8. **SQLite Not Defteri**: `notes.db` açın, yoksa bir `notes` tablosu oluşturun ve kullanıcının not eklemesine, listelemesine, başlığa göre aramasına, güncellemesine ve silmesine izin verin. Her değer için `?` parametreleri kullanın. Programı kapatıp yeniden çalıştırın: eski notlar durmalıdır.
 
-## 40. Egzersizler
+## 41. Egzersizler
 
 Tam çözümleri hemen aramak yerine her programı küçük adımlarla kurun.
 
@@ -3044,8 +3199,9 @@ Tam çözümleri hemen aramak yerine her programı küçük adımlarla kurun.
 18. Parametre olarak bir `String` alan ve metnin içindeki her karakterin kaç defa geçtiğini sayan bir `Pair` döndüren bir fonksiyon yazın.
 19. `break` ve `continue` kullanarak çok geniş bir aralık içindeki ilk 5 çift sayıyı bulun, ancak 3'e bölünenleri `continue` ile atlayın.
 20. Dikdörtgen alanı hesaplayan bir fonksiyona sahip `MathUtils.ahd` adında bir modül oluşturun ve bir `main.ahd` içinden `bring` ile çağırarak kullanın.
+21. Küçük bir SQLite not defteri kurun: parametrelerle iki not ekleyin, `ORDER BY id` ile listeleyin, bir gövdeyi güncelleyin, bir satırı silin, veritabanını kapatın, aynı dosyayı yeniden açın ve kalan başlıkları yazdırın.
 
-## 41. Çözüm İpuçları
+## 42. Çözüm İpuçları
 
 1. `take` sonucu String'dir; yaş için `int(...)` ve yeni yaş için `+ 1` kullanın.
 2. Formülü küçük parçalara ayırın; `real(take(...))` ile başlayın ve Real sayılarını kullanın.
@@ -3067,8 +3223,9 @@ Tam çözümleri hemen aramak yerine her programı küçük adımlarla kurun.
 18. String'in içindeki her harfi döngüye alın, Pair'in içinde var mı diye kontrol edip sayısını 1 artırın.
 19. `if i % 3 == 0 { continue }`. `if count == 5 { break }`.
 20. `from MathUtils bring alanHesapla` kullanabilirsiniz.
+21. `SQLite.open("notes.db")`, `CREATE TABLE IF NOT EXISTS`, `SQLite.fromString` ile `INSERT ... VALUES (?, ?)`, sonra `ORDER BY id` ile `query`. `close()` sonrası aynı yolu yeniden açın.
 
-## 42. Sonraki adımlar ve teknik belgeler
+## 43. Sonraki adımlar ve teknik belgeler
 
 Bu rehberi tamamladıktan sonra dilin ayrıntılarını şu belgelerden
 derinleştirebilirsiniz:
@@ -3097,6 +3254,7 @@ derinleştirebilirsiniz:
 - [PDF](PDF_TR.md)
 - [Archive](ARCHIVE_TR.md)
 - [JSON](JSON_TR.md)
+- [SQLite](SQLITE_TR.md)
 - [XML](XML_TR.md)
 - [Env](ENV_TR.md)
 - [Lists](LISTS_TR.md)
@@ -3113,4 +3271,4 @@ derinleştirebilirsiniz:
 - [Tam v0.1 spesifikasyonu](../AHDCODE_LANGUAGE_SPEC_v0.1_TR.md)
 
 Çalışan daha fazla örnek için [derlenmiş v0.1 örnekleri](../examples/v0.1/README_TR.md)
-klasörünü inceleyin.
+klasörüne ve [v0.3 SQLite Not Defteri](../examples/v0.3/README_TR.md) örneğine bakın.

@@ -162,7 +162,7 @@ kullanın. Bir isim uzayı (namespace) için `bring ModülAdı`, doğrudan bir
 sembol için `from ModülAdı bring isim` kullanın. Yerel modüller kardeş
 (sibling) dosyalardır. `Math`, `Time`, `Latex`, `Word`, `Excel`, `PDF`, `Archive`,
 `Path`, `Regex`, `CSV`, `Data`, `File`, `Statistics`, `Plot`, `Numeric`, `JSON`,
-`XML`, `Env`, `Lists` ve `KeyValue` açık standart modüllerdir; alan ve dosya
+`SQLite`, `XML`, `Env`, `Lists` ve `KeyValue` açık standart modüllerdir; alan ve dosya
 hataları yakalanabilir AhdCode hatalarıdır.
 
 Devamı için [Fonksiyonlar](FUNCTIONS_TR.md), [Sınıflar](CLASSES_TR.md),
@@ -170,7 +170,8 @@ Devamı için [Fonksiyonlar](FUNCTIONS_TR.md), [Sınıflar](CLASSES_TR.md),
 ve [Modüller](MODULES_TR.md)'e bakın. Time yerel, UTC ve sabit-ofsetli anları;
 CSV String satırları ve kayıtlarını kapsar; Data ise bunları String
 hücrelerden oluşan değiştirilemez bir `Table`'a dönüştürür; JSON ve XML tipli
-yapılandırılmış-veri modelleridir, Env ise işlem/`.env` yapılandırmasını okur;
+yapılandırılmış-veri modelleridir, SQLite tipli bir yerel-veritabanı köprüsüdür,
+Env ise işlem/`.env` yapılandırmasını okur;
 Lists ve KeyValue ise `List` ve `Pair` üzerindeki saf yapısal dönüşüm
 katmanıdır; Excel tipli, değiştirilemez XLSX çalışma kitapları ekler; PDF
 değiştirilemez belgeler oluşturur ve bunları çevrimdışı gerçek `.pdf`
@@ -178,4 +179,4 @@ dosyalarına render eder (Latex'in konuşlandırılmış Tectonic render motorun
 paylaşarak), `PDF.fromWord`/`PDF.fromExcel` anlamsal dönüşümüyle birlikte;
 Archive ise dosyaları yalnızca Go standart kütüphanesini kullanarak, yalnızca
 oluşturma amaçlı, gerçek ZIP/TAR/TAR.GZ arşivlerine paketler. Ayrıca
-[Time](TIME_TR.md), [CSV](CSV_TR.md), [Data](DATA_TR.md), [Statistics](STATISTICS_TR.md), [Plot](PLOT_TR.md), [Numeric](NUMERIC_TR.md), [Word](WORD_TR.md), [Excel](EXCEL_TR.md), [PDF](PDF_TR.md), [Archive](ARCHIVE_TR.md), [JSON](JSON_TR.md), [XML](XML_TR.md), [Env](ENV_TR.md), [Lists](LISTS_TR.md), [KeyValue](KEYVALUE_TR.md) ve [tanılama rehberine](DIAGNOSTICS_TR.md) bakın.
+[Time](TIME_TR.md), [CSV](CSV_TR.md), [Data](DATA_TR.md), [Statistics](STATISTICS_TR.md), [Plot](PLOT_TR.md), [Numeric](NUMERIC_TR.md), [Word](WORD_TR.md), [Excel](EXCEL_TR.md), [PDF](PDF_TR.md), [Archive](ARCHIVE_TR.md), [JSON](JSON_TR.md), [SQLite](SQLITE_TR.md), [XML](XML_TR.md), [Env](ENV_TR.md), [Lists](LISTS_TR.md), [KeyValue](KEYVALUE_TR.md) ve [tanılama rehberine](DIAGNOSTICS_TR.md) bakın.

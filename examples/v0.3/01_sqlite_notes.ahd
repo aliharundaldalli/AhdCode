@@ -1,0 +1,78 @@
+// SQLite Notes App: a small notebook that survives program restarts.
+//
+// Run it once, then run it again from the same directory. The notes saved by
+// the first run are still in notes.db, because they live on disk, not in the
+// program. Every value that reaches SQL travels as a bound parameter, so even
+// a title that looks like SQL is stored as ordinary text.
+bring SQLite
+from SQLite bring Database
+from SQLite bring SQLiteValue
+
+addNote: Function := (db: Database, title: String, body: String) -> Int {
+    db.execute(
+        "INSERT INTO notes (title, body) VALUES (?, ?)"
+        [SQLite.fromString(title), SQLite.fromString(body)]
+    )
+    return db.lastInsertId()
+}
+
+listNotes: Function := (db: Database, heading: String) -> Nothing {
+    write(heading)
+    rows: Local List<Pair<String, SQLiteValue>> := db.query(
+        "SELECT id, title, body FROM notes ORDER BY id"
+    )
+    for row in rows {
+        write(
+            "  #{row["id"].int()} {row["title"].string()} - {row["body"].string()}"
+        )
+    }
+}
+
+db: Database := SQLite.open("notes.db")
+
+db.execute("""
+    CREATE TABLE IF NOT EXISTS notes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        title TEXT NOT NULL,
+        body TEXT NOT NULL
+    )
+    """)
+
+existing: Int := db.query(
+    "SELECT COUNT(*) AS total FROM notes"
+)[0]["total"].int()
+write("Notes already stored from earlier runs: {existing}")
+
+first: Int := addNote(db, "Shopping", "milk, bread, tea")
+second: Int := addNote(
+    db
+    "Robert'); DROP TABLE notes;--"
+    "parameters keep this as plain text"
+)
+write("Added notes #{first} and #{second}")
+
+listNotes(db, "All notes:")
+
+changed: Int := db.execute(
+    "UPDATE notes SET body = ? WHERE id = ?"
+    [SQLite.fromString("milk, bread, tea, honey"), SQLite.fromInt(first)]
+)
+write("Updated {changed} note")
+
+deleted: Int := db.execute(
+    "DELETE FROM notes WHERE id = ?"
+    [SQLite.fromInt(second)]
+)
+write("Deleted {deleted} note")
+
+matches: List<Pair<String, SQLiteValue>> := db.query(
+    "SELECT id, title FROM notes WHERE title LIKE ? ORDER BY id"
+    [SQLite.fromString("%Shop%")]
+)
+write("Notes whose title contains 'Shop': {len(matches)}")
+
+db.close()
+// Reopen the file: the data was never only in memory.
+again: Database := SQLite.open("notes.db")
+listNotes(again, "After reopening notes.db:")
+again.close()

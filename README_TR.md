@@ -12,9 +12,14 @@ AhdCode; okunabilir sözdizimi, açık niyet (explicit intent), öngörülebilir
 anlambilim (semantics) ve yerel (native) derlemeye odaklanan, deneysel,
 statik olarak denetlenen genel amaçlı bir programlama dilidir.
 
-Mevcut sürüm **v0.2.2**'dir. Çekirdek dil uçtan uca çalışır, ancak proje
+Mevcut sürüm **v0.3.0**'dır. Çekirdek dil uçtan uca çalışır, ancak proje
 üretime hazır değildir ve 1.0'dan önce kırıcı (breaking) değişiklikler
 olabilir.
+
+v0.3.0, AhdCode'un pratik uygulama geliştirme evresini tipli bir
+[SQLite](docs/SQLITE_TR.md) köprüsüyle başlatır: gerçek yerel veritabanı,
+parametreli SQL, CRUD, işlemler (transactions) ve kalıcı bir not defteri
+örneği. HTTP bu sürümde yoktur; SQLite'tan sonra gelir.
 
 v0.2.2, v0.2.1'in tanılama, hover, completion, tanıma git, belge sembolleri,
 signature help ve referans bulma özelliklerinin üzerine pratik günlük AhdCode
@@ -113,10 +118,10 @@ AhdCode şu anda Go 1.25 veya daha yeni bir sürüm gerektirir.
 ```bash
 cd AhdCode
 go test ./...
-go install ./cmd/ahdcode ./cmd/ahdnumeric ./cmd/ahdplot
+go install ./cmd/ahdcode ./cmd/ahdnumeric ./cmd/ahdplot ./cmd/ahdsqlite
 ```
 
-Yukarıdaki komut, derleyiciyi ve yerel numeric/plot yardımcılarını (helpers) kurar.
+Yukarıdaki komut, derleyiciyi ve yerel numeric, plot ve SQLite yardımcılarını (helpers) kurar.
 Eğer `Latex` modülünü **veya** `PDF` modülünün `.save()` metodunu kullanmayı
 planlıyorsanız (ikisi de aynı çevrimdışı render motorunu paylaşır),
 çevrimdışı (offline) Latex/Tectonic çalışma zamanını da hazırlamanız (stage)
@@ -183,6 +188,7 @@ bakın.
 - [Plot modülü](docs/PLOT_TR.md)
 - [Numeric modülü ve Complex skalerleri](docs/NUMERIC_TR.md)
 - [JSON modülü](docs/JSON_TR.md)
+- [SQLite modülü](docs/SQLITE_TR.md)
 - [XML modülü](docs/XML_TR.md)
 - [Env modülü](docs/ENV_TR.md)
 - [Lists modülü](docs/LISTS_TR.md)
@@ -191,6 +197,7 @@ bakın.
 - [Dil sunucusu](docs/LSP_TR.md)
 - [Yapay zekâ destekli yerel kurulum](FOR_AI.md)
 - [Derlenmiş v0.1 örnekleri](examples/v0.1/README_TR.md)
+- [v0.3 SQLite Not Defteri](examples/v0.3/README_TR.md)
 - [Tam v0.1 dil spesifikasyonu](AHDCODE_LANGUAGE_SPEC_v0.1_TR.md)
 
 ## Editör eklentisi
@@ -225,10 +232,12 @@ editör eklentisi hafif bir çalıştır-ve-vurgula entegrasyonudur. Bkz.
 cmd/ahdcode/       CLI giriş noktası
 cmd/ahdnumeric/    paketli ileri doğrusal-cebir yardımcısı
 cmd/ahdplot/       paketli grafik render yardımcısı
+cmd/ahdsqlite/     paketli CGO'suz SQLite yardımcısı
 internal/          derleyici, çalışma zamanı, formatter ve REPL
 editors/vscode/    VS Code / Antigravity eklentisi
 docs/              son kullanıcı rehberleri
 examples/v0.1/     derlenmiş çalışan programlar
+examples/v0.3/     SQLite Not Defteri
 AHDCODE_LANGUAGE_SPEC_v0.1.md
                    yetkili (authoritative) dil sözleşmesi
 ```

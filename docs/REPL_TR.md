@@ -11,7 +11,7 @@ ahdcode
 ```
 
 Başlangıçta `ahdcode --version` ile eşleşen bir sürüm başlığı (şu anda
-`AhdCode v0.1.20`) yazdırılır, ardından `ahd>` istemi gelir:
+`AhdCode v0.3.0`) yazdırılır, ardından `ahd>` istemi gelir:
 
 ```text
 ahd> x := 5
@@ -79,6 +79,22 @@ eder: aynı kapsamda `x`'i yeniden bildirmek bir hatadır; değişiklik için
 `=` kullanılır. Başarısız bir semantik gönderim (submission) veya
 yakalanmamış bir AhdCode Error, REPL'i sonlandırmaz veya önceki başarıyla
 işlenmiş kaynak bağlamını (context) silmez.
+
+## REPL'de SQLite
+
+`SQLite` kalıcı oturumda çalışır. Bellekteki bir `Database`, birbirini izleyen
+başarılı girdilerde durur; başarısız bir SQL komutu `SQLiteError` bildirir
+ve oturumu bozmaz:
+
+```text
+ahd> bring SQLite
+ahd> db := SQLite.open(":memory:")
+ahd> db.execute("CREATE TABLE items (id INTEGER PRIMARY KEY, name TEXT)")
+0
+```
+
+Göreli dosya yolları, REPL'in başlatıldığı dizine göre çözülür. Bkz.
+[SQLite](SQLITE_TR.md).
 
 ## REPL'de Latex ve PDF
 

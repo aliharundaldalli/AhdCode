@@ -11,7 +11,7 @@ ahdcode
 ```
 
 Startup prints a version banner matching `ahdcode --version` (currently
-`AhdCode v0.1.20`), then the `ahd>` prompt:
+`AhdCode v0.3.0`), then the `ahd>` prompt:
 
 ```text
 ahd> x := 5
@@ -75,6 +75,22 @@ prompt `...>`. Ordinary declaration rules remain: redeclaring `x` in the same
 scope is an error; mutation uses `=`. A failed semantic submission or an
 uncaught AhdCode Error does not terminate the REPL or erase the preceding
 successfully committed source context.
+
+## SQLite in the REPL
+
+`SQLite` works in the persistent session. An in-memory `Database` survives
+successive successful entries; a failing SQL command reports `SQLiteError`
+and leaves the session intact:
+
+```text
+ahd> bring SQLite
+ahd> db := SQLite.open(":memory:")
+ahd> db.execute("CREATE TABLE items (id INTEGER PRIMARY KEY, name TEXT)")
+0
+```
+
+Relative file paths are resolved against the directory the REPL was started
+in. See [SQLite](SQLITE.md).
 
 ## Latex and PDF in the REPL
 

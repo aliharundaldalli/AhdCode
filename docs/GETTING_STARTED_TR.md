@@ -9,13 +9,15 @@ AhdCode şu anda Go 1.25 veya daha yeni bir sürümle derlenir.
 ```bash
 cd AhdCode
 go test ./...
-go install ./cmd/ahdcode ./cmd/ahdnumeric ./cmd/ahdplot
+go install ./cmd/ahdcode ./cmd/ahdnumeric ./cmd/ahdplot ./cmd/ahdsqlite
 ```
 
 Eğer `Latex` modülünü veya `PDF` modülünün `.save()` metodunu kullanmayı
 planlıyorsanız (ikisi de aynı çevrimdışı render motorunu paylaşır),
 çevrimdışı (offline) Latex/Tectonic çalışma zamanını da hazırlamanız (stage)
-gerekir. `Archive` böyle bir hazırlığa ihtiyaç duymaz. Bu adım, sabitlenmiş
+gerekir. `Archive` böyle bir hazırlığa ihtiyaç duymaz. `SQLite`, yukarıda
+kurulan paketli `ahdsqlite` yardımcısını kullanır; sistem `sqlite3` gerekmez.
+Bu adım, sabitlenmiş
 kaynakları indirmek için bir defaya mahsus ağ bağlantısı kullanır:
 
 ```bash

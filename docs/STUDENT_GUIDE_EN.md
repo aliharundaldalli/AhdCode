@@ -1,4 +1,4 @@
-# AhdCode v0.2.2 English Student Guide
+# AhdCode v0.3.0 English Student Guide
 
 This guide is designed so that **even someone who has never programmed before** can follow along. You can read it in order from beginning to end; in each section, you will first see what we want to achieve, then write a working example, and finally learn the necessary rules.
 
@@ -41,14 +41,15 @@ The best way to learn is not just by reading the examples, but by running them. 
 - [32. XML module](#32-xml-module)
 - [33. Env module](#33-env-module)
 - [34. Lists and KeyValue modules](#34-lists-and-keyvalue-modules)
-- [35. Code Formatter](#35-code-formatter)
-- [36. Command line (CLI)](#36-command-line-cli)
-- [37. Interactive shell (REPL)](#37-interactive-shell-repl)
-- [38. Common beginner mistakes](#38-common-beginner-mistakes)
-- [39. Small Projects](#39-small-projects)
-- [40. Exercises](#40-exercises)
-- [41. Solution Hints](#41-solution-hints)
-- [42. Next steps and technical docs](#42-next-steps-and-technical-docs)
+- [35. SQLite: a database that remembers](#35-sqlite-a-database-that-remembers)
+- [36. Code Formatter](#36-code-formatter)
+- [37. Command line (CLI)](#37-command-line-cli)
+- [38. Interactive shell (REPL)](#38-interactive-shell-repl)
+- [39. Common beginner mistakes](#39-common-beginner-mistakes)
+- [40. Small Projects](#40-small-projects)
+- [41. Exercises](#41-exercises)
+- [42. Solution Hints](#42-solution-hints)
+- [43. Next steps and technical docs](#43-next-steps-and-technical-docs)
 
 ## 1. What is AhdCode?
 
@@ -68,7 +69,7 @@ Hello!
 
 AhdCode checks the code you wrote before running the program. For example, if you try to use text like a number, or if you use a value that could be `null` without checking it, it will tell you the error before the program even starts, whenever possible. But you don't need to think about these details at the beginning; we'll see examples in later sections.
 
-AhdCode v0.2.2 is the current release. You can run small command-line programs, compile them into standalone local applications, and use the language server (`ahdcode lsp`) from an editor such as VS Code.
+AhdCode v0.3.0 is the current release. You can run small command-line programs, compile them into standalone local applications, keep data in a local SQLite database, and use the language server (`ahdcode lsp`) from an editor such as VS Code. v0.2.2 completed the everyday language server; v0.3.0 is the start of practical application development.
 
 > **Technical note:** Checking types before the program runs is called *static checking*.
 
@@ -79,7 +80,7 @@ To build AhdCode from source, you must have Go 1.25 or newer installed on your c
 ```bash
 cd AhdCode
 go test ./...
-go install ./cmd/ahdcode ./cmd/ahdnumeric ./cmd/ahdplot
+go install ./cmd/ahdcode ./cmd/ahdnumeric ./cmd/ahdplot ./cmd/ahdsqlite
 export PATH="$(go env GOPATH)/bin:$PATH"
 ahdcode --version
 ```
@@ -2719,7 +2720,155 @@ Expected output:
 
 See [Lists](LISTS.md) and [KeyValue](KEYVALUE.md) for every signature.
 
-## 35. Code Formatter
+## 35. SQLite: a database that remembers
+
+Until now, the values in a program disappeared when the program ended. A **database** is a file that keeps rows of data after the program closes. **SQLite** is a small database engine that lives in a single file on your computer (or in memory while you practice). You write ordinary SQL; AhdCode is a safe typed bridge: it binds parameters and converts values. It is not an ORM, not a query builder, and not a migration tool.
+
+```ahd
+bring SQLite
+from SQLite bring Database
+from SQLite bring SQLiteValue
+from SQLite bring SQLiteError
+
+db: Database := SQLite.open("notes.db")
+```
+
+`SQLite.open("notes.db")` opens that file in the current directory, creating it if it does not exist. `SQLite.open(":memory:")` is a private in-memory database that disappears when you close it. Parent folders are **not** created for you: if `data/` does not exist, `SQLite.open("data/app.db")` raises `SQLiteError`.
+
+A simple notebook table:
+
+```ahd
+db.execute("""
+    CREATE TABLE IF NOT EXISTS notes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        title TEXT NOT NULL,
+        body TEXT NOT NULL
+    )
+    """)
+```
+
+`execute` returns how many rows changed. `CREATE TABLE` changes no rows, so it returns `0`. That is normal.
+
+### Adding a note with parameters
+
+The safe way to put values into SQL is **parameter binding**. Each `?` is a hole that SQLite fills with a `SQLiteValue`. The SQL text is never rewritten:
+
+```ahd
+changed: Int := db.execute(
+    "INSERT INTO notes (title, body) VALUES (?, ?)",
+    [
+        SQLite.fromString("Shopping")
+        SQLite.fromString("milk, bread, tea")
+    ]
+)
+write(changed)
+write(db.lastInsertId())
+```
+
+Expected output (the first note in a new file):
+
+```text
+1
+1
+```
+
+`lastInsertId()` is SQLite's connection-local last inserted row id. Call it immediately after the `INSERT` that matters.
+
+Never build SQL by interpolating user text into the statement. This title looks like SQL, but with `?` it is stored as ordinary text and the table still exists:
+
+```ahd
+db.execute(
+    "INSERT INTO notes (title, body) VALUES (?, ?)",
+    [
+        SQLite.fromString("Robert'); DROP TABLE notes;--")
+        SQLite.fromString("this stays data")
+    ]
+)
+```
+
+Quotes, semicolons, newlines, backslashes, Turkish characters, and emoji are all just data when they travel as parameters.
+
+### Reading rows
+
+```ahd
+rows: List<Pair<String, SQLiteValue>> := db.query(
+    "SELECT id, title, body FROM notes ORDER BY id"
+)
+for row in rows {
+    write("{row["id"].int()} {row["title"].string()}")
+}
+```
+
+A row is a `Pair`: the keys are the column labels **in the order the SELECT listed them**. You leave SQL with a `SQLiteValue`, then you ask for an AhdCode type:
+
+| `kind()`   | Read with     | AhdCode type |
+| ---------- | ------------- | ------------ |
+| `"Null"`   | `isNull()`    | —            |
+| `"Int"`    | `int()`       | `Int`        |
+| `"Real"`   | `real()`      | `Real`       |
+| `"String"` | `string()`    | `String`     |
+
+SQL `NULL` is a `SQLiteValue` of kind `Null`, **not** AhdCode `null`. The row stays `Pair<String, SQLiteValue>`. Wrong-kind access raises `SQLiteError`: a String is never parsed as a number. `real()` also accepts kind `Int` (the same widening as `x: Real := 3`). `BLOB` values are not supported in v0.3.0: querying one raises `SQLiteError`.
+
+If two columns have the same label (`SELECT a.id, b.id`), AhdCode raises `SQLiteError`. Write `AS`:
+
+```sql
+SELECT a.id AS a_id, b.id AS b_id
+```
+
+### Order, update, delete, close
+
+SQLite does **not** promise row order without `ORDER BY`. The AhdCode `List` keeps whatever order SQLite returned; it does not invent one. Write `ORDER BY` whenever order matters.
+
+```ahd
+db.execute(
+    "UPDATE notes SET body = ? WHERE id = ?",
+    [SQLite.fromString("milk, bread, tea, honey"), SQLite.fromInt(1)]
+)
+db.execute("DELETE FROM notes WHERE id = ?", [SQLite.fromInt(2)])
+db.close()
+```
+
+After `close()`, every later operation on that `Database` (and on aliases of it) raises `SQLiteError`. Closing twice succeeds. Closing while a transaction is still open raises `SQLiteError`: you must `commit()` or `rollback()` first. Nothing is committed silently.
+
+Open the same file again in a new program: the notes are still there. That is the point of v0.3.0.
+
+### Transactions
+
+A transaction groups several statements so they all succeed or none of them do:
+
+```ahd
+db.begin()
+attempt {
+    db.execute(
+        "UPDATE accounts SET balance = balance - ? WHERE id = ?",
+        [SQLite.fromReal(10.0), SQLite.fromInt(1)]
+    )
+    db.execute(
+        "UPDATE accounts SET balance = balance + ? WHERE id = ?",
+        [SQLite.fromReal(10.0), SQLite.fromInt(2)]
+    )
+    db.commit()
+}
+except SQLiteError as error {
+    db.rollback()
+    write(error.message)
+}
+```
+
+Only one transaction is active per `Database`. Nested `begin()` raises `SQLiteError`. There are no savepoints in v0.3.0.
+
+### SQLite Notes App
+
+The full walkthrough lives in [`examples/v0.3/01_sqlite_notes.ahd`](../examples/v0.3/01_sqlite_notes.ahd). Copy it to a **temporary directory**, run it, then run it again: the notes from the first run are still in `notes.db`. That file is an ordinary SQLite database; it is not part of the AhdCode program.
+
+v0.3.0 editors discover `SQLite` through the existing language server: type `bring SQL` and completion offers `SQLite`. No extra editor plugin is needed.
+
+**Try it yourself:** open `":memory:"`, create a `people` table with a nullable `nickname TEXT` column, insert one row with `SQLite.nullValue()`, query it, and print `kind()` and `isNull()`.
+
+See [the SQLite module reference](SQLITE.md).
+
+## 36. Code Formatter
 
 Even if the code works, if everyone uses different spacing and line layouts, it becomes hard to read. The AhdCode formatter converts valid code to a common style:
 
@@ -2772,7 +2921,7 @@ values: List<Int> :=
 
 The formatter is idempotent; running it again on the same file produces no new changes.
 
-## 36. Command line (CLI)
+## 37. Command line (CLI)
 
 You can use AhdCode from the terminal with a few basic commands:
 
@@ -2809,7 +2958,7 @@ Shows help and version information.
 
 If you are a beginner, the command you will use most of the time will be `ahdcode run ...`.
 
-## 37. Interactive shell (REPL)
+## 38. Interactive shell (REPL)
 
 You don't have to create a file every time you want to try something small. In the terminal, just run:
 
@@ -2877,7 +3026,7 @@ not support. Run those calls from a `.ahd` file instead. `Archive` has no
 such limit -- it works fully in the REPL. See the [REPL reference](REPL.md)
 for details.
 
-## 38. Common beginner mistakes
+## 39. Common beginner mistakes
 
 Seeing an error message is a normal part of programming. Most errors simply tell you that the computer couldn't understand what you wanted. The following examples show common situations beginners encounter and how to fix them:
 
@@ -2981,7 +3130,12 @@ Seeing an error message is a normal part of programming. Most errors simply tell
 - Why: Unseeded randomness uses OS entropy and cannot be repeated.
 - Correct: Provide a seed value like `Math.seed(42)` before throwing the dice.
 
-## 39. Small Projects
+**21. Putting user text into SQL with String interpolation**
+- Wrong: `db.execute("INSERT INTO notes (title) VALUES ('{title}')")`
+- Why: That splices the title into SQL. A title such as `Robert'); DROP TABLE notes;--` is no longer data.
+- Correct: Use a `?` placeholder and `SQLite.fromString(title)`. Parameter binding keeps the text as data.
+
+## 40. Small Projects
 
 These small projects bring together what is taught in the guide. Try building them on your own!
 
@@ -2992,8 +3146,9 @@ These small projects bring together what is taught in the guide. Try building th
 5. **Menu Program**: Make a small bank simulation using an `until` loop. Show a menu: 1. Deposit, 2. Withdraw, 3. Balance, 0. Exit. Store the balance in an `Int` and loop the program until the user enters 0.
 6. **Student Registry with Classes**: Create a `Student` class and a `Course` class. Let the Course have a `List<Student>` inside it. Write a method to add a new student to the course, and another method to calculate the overall average grade of the course.
 7. **Seeded Random Game**: Generate a "secret number" between 1 and 100 using `Math.seed(42)`. Ask the user to guess the number. Guide them with "higher" or "lower" until they guess correctly. Because a seed is used, the secret number will be the same every time you run the program—perfect for testing!
+8. **SQLite Notes App**: Open `notes.db`, create a `notes` table if it is missing, and let the user add a note, list notes, search by title, update a note, and delete a note. Use `?` parameters for every value. Close the program and run it again: the old notes must still be there.
 
-## 40. Exercises
+## 41. Exercises
 
 Instead of immediately looking for full solutions, build each program in small steps.
 
@@ -3022,8 +3177,9 @@ Instead of immediately looking for full solutions, build each program in small s
 18. Write a function that takes a `String` as a parameter and returns a `Pair` counting how many times each character inside the text appears.
 19. Use `break` and `continue` to find the first 5 even numbers within a very large range, but skip multiples of 3 with `continue`.
 20. Create a module named `MathUtils.ahd` containing a function that calculates rectangle area, and use it from inside `main.ahd` by calling it with `bring`.
+21. Build a tiny SQLite notebook: insert two notes with parameters, list them with `ORDER BY id`, update one body, delete one row, close the database, reopen the same file, and print the remaining titles.
 
-## 41. Solution Hints
+## 42. Solution Hints
 
 1. The result of `take` is a String; use `int(...)` for age, and `+ 1` for the new age.
 2. Break the formula into small parts; start with `real(take(...))` and use Real numbers.
@@ -3045,8 +3201,9 @@ Instead of immediately looking for full solutions, build each program in small s
 18. Loop over every letter in the String, check if it exists in the Pair, and increment its count by 1.
 19. `if i % 3 == 0 { continue }`. `if count == 5 { break }`.
 20. You can use `from MathUtils bring calculateArea`.
+21. `SQLite.open("notes.db")`, `CREATE TABLE IF NOT EXISTS`, `INSERT ... VALUES (?, ?)` with `SQLite.fromString`, then `query` with `ORDER BY id`. After `close()`, open the same path again.
 
-## 42. Next steps and technical docs
+## 43. Next steps and technical docs
 
 After finishing this guide, you can deepen your knowledge of the language details from these documents:
 
@@ -3074,6 +3231,7 @@ After finishing this guide, you can deepen your knowledge of the language detail
 - [PDF](PDF.md)
 - [Archive](ARCHIVE.md)
 - [JSON](JSON.md)
+- [SQLite](SQLITE.md)
 - [XML](XML.md)
 - [Env](ENV.md)
 - [Lists](LISTS.md)
@@ -3089,4 +3247,4 @@ After finishing this guide, you can deepen your knowledge of the language detail
 - [Language server](LSP.md)
 - [Full v0.1 specification](../AHDCODE_LANGUAGE_SPEC_v0.1.md)
 
-Check the [curated v0.1 examples](../examples/v0.1/README.md) folder for more working examples.
+Check the [curated v0.1 examples](../examples/v0.1/README.md) folder and the [v0.3 SQLite Notes App](../examples/v0.3/README.md) for more working programs.
