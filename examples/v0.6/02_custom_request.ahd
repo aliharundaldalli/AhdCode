@@ -1,0 +1,17 @@
+// ClientRequest is immutable: each withHeader / withBody returns a new value.
+//
+// Change the URL if you want to POST somewhere you control. example.com may
+// answer 405; that is still a ClientResponse, not HTTPError.
+bring HTTP
+from HTTP bring Client
+from HTTP bring ClientRequest
+from HTTP bring ClientResponse
+
+client: Client := HTTP.client()
+request: ClientRequest := HTTP.clientRequest("POST", "https://example.com/")
+request = request.withHeader("Accept", "text/html")
+request = request.withHeader("Content-Type", "text/plain; charset=utf-8")
+request = request.withBody("hello from AhdCode")
+response: ClientResponse := client.send(request)
+write("status {str(response.status())}")
+write(response.body())

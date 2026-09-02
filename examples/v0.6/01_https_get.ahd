@@ -1,0 +1,12 @@
+// Simple outbound HTTPS GET with the system certificate store.
+//
+// TLS verification is on. There is no insecure-skip option.
+bring HTTP
+from HTTP bring Client
+from HTTP bring ClientResponse
+
+client: Client := HTTP.client()
+response: ClientResponse := client.get("https://example.com/")
+write("status {str(response.status())}")
+write("url {response.url()}")
+write(response.body())

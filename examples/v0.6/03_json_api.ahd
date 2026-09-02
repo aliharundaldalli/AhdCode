@@ -1,0 +1,45 @@
+// Generic JSON API request using the existing JSON and Env modules.
+//
+// Set API_URL and API_TOKEN in the environment or a local .env file.
+// Do not commit a real token.
+bring HTTP
+from HTTP bring Client
+from HTTP bring ClientRequest
+from HTTP bring ClientResponse
+from HTTP bring HTTPError
+bring JSON
+from JSON bring JSONValue
+bring Env
+from Env bring EnvError
+
+attempt {
+    Env.load(".env")
+} except EnvError as ignored {
+    write("No local .env file; using the process environment")
+}
+url: String? := Env.get("API_URL")
+token: String? := Env.get("API_TOKEN")
+if url == null {
+    write("Set API_URL to an absolute http or https endpoint")
+} else {
+    if token == null {
+        write("Set API_TOKEN; send it with an Authorization header")
+    } else {
+        client: Local Client := HTTP.client()
+        payload: Local JSONValue := JSON.object({
+            "question": JSON.fromString("2+2")
+        })
+        request: Local ClientRequest := HTTP.clientRequest("POST", url)
+        request = request.withHeader("Authorization", "Bearer {token}")
+        request = request.withHeader("Content-Type", "application/json")
+        request = request.withHeader("Accept", "application/json")
+        request = request.withBody(JSON.stringify(payload))
+        attempt {
+            response: Local ClientResponse := client.send(request)
+            write("status {str(response.status())}")
+            write(response.body())
+        } except HTTPError as error {
+            write(error.message)
+        }
+    }
+}
