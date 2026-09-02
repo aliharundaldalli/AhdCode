@@ -74,6 +74,18 @@
         "when": "editorTextFocus && editorLangId == ahdcode"
       }
     ],
+    "taskDefinitions": [
+      {
+        "type": "ahdcode",
+        "required": ["task"],
+        "properties": {
+          "task": {
+            "type": "string",
+            "description": "The AhdCode task name."
+          }
+        }
+      }
+    ],
     "configuration": {
       "title": "AhdCode",
       "properties": {

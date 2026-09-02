@@ -12,6 +12,7 @@ const state = {
   configurationPath: "",
   errors: [],
   tasks: [],
+  taskProviders: [],
   terminals: [],
   workspaceFolder: { name: "workspace" },
   handlers: new Map(),
@@ -85,6 +86,10 @@ const vscodeMock = {
       state.tasks.push(task);
       return { task };
     },
+    registerTaskProvider(type, provider) {
+      state.taskProviders.push({ type, provider });
+      return { dispose() {} };
+    },
   },
   ProcessExecution,
   Task,
@@ -108,6 +113,7 @@ function reset() {
   state.configurationPath = "";
   state.errors.length = 0;
   state.tasks.length = 0;
+  state.taskProviders.length = 0;
   state.terminals.length = 0;
   state.workspaceFolder = { name: "workspace" };
   state.handlers.clear();
@@ -168,12 +174,27 @@ test("activate registers ahdcode.runFile", async () => {
   const calls = [];
   await extension.activate({ subscriptions }, vscodeMock, { env: { PATH: "" } }, fakeClientFactory(calls));
   // No ahdcode executable is reachable with an empty PATH, so the language
-  // client never starts and only the run-file command's disposable is
-  // registered -- Run File activation is unaffected by adding the client.
-  assert.equal(subscriptions.length, 1);
+  // client never starts and only the run-file command's and the task
+  // provider's disposables are registered -- Run File activation is
+  // unaffected by adding the client.
+  assert.equal(subscriptions.length, 2);
   assert.equal(typeof state.handlers.get("ahdcode.runFile"), "function");
   assert.equal(calls.length, 0);
   assert.deepEqual(state.errors, [extension.MISSING_EXECUTABLE_MESSAGE]);
+});
+
+// TestActivateRegistersAhdcodeTaskProvider is a regression test: some
+// VS Code-compatible hosts (Antigravity IDE, at least) refuse to run a Task
+// of a custom type unless a TaskProvider was registered for that exact
+// type, even when the Task itself is already fully resolved with a
+// concrete execution -- failing with "there is no registered task type
+// 'ahdcode'". activate must register one for "ahdcode" every time.
+test("activate registers a TaskProvider for the ahdcode task type", async () => {
+  const subscriptions = [];
+  await extension.activate({ subscriptions }, vscodeMock, { env: { PATH: "" } }, fakeClientFactory([]));
+  assert.equal(state.taskProviders.length, 1);
+  assert.equal(state.taskProviders[0].type, "ahdcode");
+  assert.deepEqual(state.taskProviders[0].provider.provideTasks(), []);
 });
 
 test("rejects a missing, untitled, or non-AhdCode editor", async () => {

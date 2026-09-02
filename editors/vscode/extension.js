@@ -24,6 +24,29 @@ const LSP_START_FAILED_MESSAGE =
 // matching client-side change here.
 const LSP_ARGS = ["lsp"];
 
+// TASK_TYPE matches the "type" this extension declares in package.json's
+// contributes.taskDefinitions and the "type" runFile stamps on every Task
+// it builds. Run File always constructs a fully-formed Task (definition,
+// scope, and a concrete ProcessExecution) and hands it straight to
+// tasks.executeTask -- plain VS Code accepts that without ever asking a
+// TaskProvider for anything, since the task needs no resolving. Some
+// VS Code-compatible hosts (Antigravity IDE, at least) validate the task's
+// declared type against a *registered* provider before running it at all,
+// independent of whether the task was already fully resolved, and refuse
+// it with "there is no registered task type" otherwise. provideTasks
+// returns none because Run File never asks the host to discover a task on
+// its own (there is nothing to list in a "Run Task..." picker); this
+// provider exists purely to satisfy that registration check.
+const TASK_TYPE = "ahdcode";
+const ahdcodeTaskProvider = {
+  provideTasks() {
+    return [];
+  },
+  resolveTask(task) {
+    return task;
+  },
+};
+
 // activate returns the promise VS Code awaits before considering the
 // extension ready. Starting the language server is awaited here (rather
 // than fired-and-forgotten) so a host or test never observes a half-started
@@ -32,6 +55,7 @@ const LSP_ARGS = ["lsp"];
 async function activate(context, vscodeApi = vscode, runtime = {}, clientFactory = defaultClientFactory) {
   const disposable = vscodeApi.commands.registerCommand(COMMAND_ID, () => runFile(vscodeApi, runtime));
   context.subscriptions.push(disposable);
+  context.subscriptions.push(vscodeApi.tasks.registerTaskProvider(TASK_TYPE, ahdcodeTaskProvider));
   await startLanguageClient(context, vscodeApi, runtime, clientFactory);
 }
 
@@ -156,7 +180,7 @@ async function runFile(vscodeApi = vscode, runtime = {}) {
   );
   const scope = workspaceFolder || vscodeApi.TaskScope.Global;
   const task = new vscodeApi.Task(
-    { type: "ahdcode", task: "runFile" },
+    { type: TASK_TYPE, task: "runFile" },
     scope,
     taskName,
     "AhdCode",
