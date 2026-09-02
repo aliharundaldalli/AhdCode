@@ -92,6 +92,9 @@ func removeForLocalFix(path, text string, item diagnostics.Diagnostic) (CodeActi
 	}
 	start := item.Span.Start.Offset + localIndex
 	end := start + len("Local")
+	if start > 0 && text[start-1] == ' ' {
+		start--
+	}
 	edit := TextEdit{
 		Path:    path,
 		Span:    source.Span{Start: source.Position{Offset: start}, End: source.Position{Offset: end}},
@@ -118,6 +121,9 @@ func unresolvedImportFix(path, text string, item diagnostics.Diagnostic) (CodeAc
 	}
 	importEdit, ok := buildImportEdit(path, text, ImportEdit{ModuleName: moduleName, SymbolName: symbolName})
 	if !ok {
+		importEdit, ok = removeInvalidFromImportLine(path, text, moduleName, symbolName)
+	}
+	if !ok {
 		return CodeAction{}, false
 	}
 	return CodeAction{
@@ -134,4 +140,28 @@ func importModuleFromMessage(message string) string {
 		}
 	}
 	return ""
+}
+
+func removeInvalidFromImportLine(path, text, moduleName, symbolName string) (TextEdit, bool) {
+	want := "from " + moduleName + " bring " + symbolName
+	for _, line := range strings.Split(text, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if trimmed != want {
+			continue
+		}
+		start := strings.Index(text, line)
+		if start < 0 {
+			continue
+		}
+		end := start + len(line)
+		if end < len(text) && text[end] == '\n' {
+			end++
+		}
+		return TextEdit{
+			Path:    path,
+			Span:    source.Span{Start: source.Position{Offset: start}, End: source.Position{Offset: end}},
+			NewText: "",
+		}, true
+	}
+	return TextEdit{}, false
 }
