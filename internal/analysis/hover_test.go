@@ -190,7 +190,7 @@ func TestHoverUnicodeSource(t *testing.T) {
 }
 
 func TestHoverHTTPCookieAndSessionArriveThroughTheModuleInterface(t *testing.T) {
-	text := "bring HTTP\nfrom HTTP bring Session\ncookie := HTTP.cookie(\"a\", \"1\")\n"
+	text := "bring HTTP\nfrom HTTP bring Session\ncookie := HTTP.cookie(\"a\", \"1\")\nclient := HTTP.client()\n"
 	directory := t.TempDir()
 	path := filepath.Join(directory, "main.ahd")
 	store := NewStore()
@@ -199,5 +199,9 @@ func TestHoverHTTPCookieAndSessionArriveThroughTheModuleInterface(t *testing.T) 
 	hover, ok := store.Hover(path, offsetOf(t, text, "HTTP.cookie")+len("HTTP."))
 	if !ok || !strings.Contains(hover.Text, "cookie") || !strings.Contains(hover.Text, "Cookie") {
 		t.Fatalf("HTTP.cookie hover = %#v, ok = %v", hover, ok)
+	}
+	clientHover, ok := store.Hover(path, offsetOf(t, text, "HTTP.client()")+len("HTTP."))
+	if !ok || !strings.Contains(clientHover.Text, "client") || !strings.Contains(clientHover.Text, "Client") {
+		t.Fatalf("HTTP.client hover = %#v, ok = %v", clientHover, ok)
 	}
 }

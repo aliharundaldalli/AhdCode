@@ -88,7 +88,12 @@ func TestCompletionHTTPAndHTMLArriveThroughTheGenericModulePath(t *testing.T) {
 	}
 	text := "bring HTTP\nx := HTTP.\n"
 	items = completionAt(t, text, "file:///main.ahd", len(text)-1)
-	for _, label := range []string{"server", "text", "html", "response", "redirect", "cookie", "deleteCookie", "sessions", "Server", "Request", "Response", "Cookie", "Session", "SessionStore", "HTTPError"} {
+	for _, label := range []string{
+		"server", "text", "html", "response", "redirect", "cookie", "deleteCookie", "sessions",
+		"client", "clientRequest",
+		"Server", "Request", "Response", "Cookie", "Session", "SessionStore",
+		"Client", "ClientRequest", "ClientResponse", "HTTPError",
+	} {
 		if !hasCompletionLabel(items, label) {
 			t.Fatalf("expected %s among HTTP member completions, got %#v", label, items)
 		}
@@ -109,6 +114,11 @@ func TestCompletionHTTPAndHTMLArriveThroughTheGenericModulePath(t *testing.T) {
 	items = completionAt(t, text, "file:///main.ahd", len(text)-1)
 	if !hasCompletionLabel(items, "Session") || !hasCompletionLabel(items, "SessionStore") {
 		t.Fatalf("expected Session/SessionStore exports, got %#v", items)
+	}
+	text = "from HTTP bring Cli\n"
+	items = completionAt(t, text, "file:///main.ahd", len(text)-1)
+	if !hasCompletionLabel(items, "Client") || !hasCompletionLabel(items, "ClientRequest") || !hasCompletionLabel(items, "ClientResponse") {
+		t.Fatalf("expected Client exports, got %#v", items)
 	}
 	text = "from HTML bring HTML\n"
 	items = completionAt(t, text, "file:///main.ahd", len(text)-1)

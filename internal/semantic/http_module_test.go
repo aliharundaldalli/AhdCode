@@ -7,7 +7,7 @@ import (
 	"ahdcode/internal/types"
 )
 
-const httpPreamble = "bring HTTP\nfrom HTTP bring Server\nfrom HTTP bring Request\nfrom HTTP bring Response\nfrom HTTP bring Cookie\nfrom HTTP bring SessionStore\nfrom HTTP bring Session\nfrom HTTP bring HTTPError\n\n"
+const httpPreamble = "bring HTTP\nfrom HTTP bring Server\nfrom HTTP bring Request\nfrom HTTP bring Response\nfrom HTTP bring Cookie\nfrom HTTP bring SessionStore\nfrom HTTP bring Session\nfrom HTTP bring Client\nfrom HTTP bring ClientRequest\nfrom HTTP bring ClientResponse\nfrom HTTP bring HTTPError\n\n"
 
 func TestHTTPModuleValidUsage(t *testing.T) {
 	result := analyzeWithStandardModules(t, httpPreamble+`home: Function := (request: Request) -> Response {
@@ -54,6 +54,24 @@ store = HTTP.sessions("user_session")
 store = HTTP.sessions("user_session", 3600)
 store = HTTP.sessions("user_session", 3600, false)
 store = HTTP.sessions("user_session", 3600, false, "Lax")
+
+client: Client := HTTP.client()
+client = HTTP.client(15)
+client = HTTP.client(15, 1024)
+client = HTTP.client(15, 1024, false)
+request: ClientRequest := HTTP.clientRequest("GET", "https://example.com/")
+request = request.withHeader("Accept", "application/json")
+request = request.addHeader("X-Trace", "a")
+request = request.withBody("")
+fetched: ClientResponse := client.get("https://example.com/")
+posted: ClientResponse := client.post("https://example.com/", "hi")
+posted = client.post("https://example.com/", r'{"ok":true}', "application/json")
+sent: ClientResponse := client.send(request)
+status: Int := sent.status()
+payload: String := sent.body()
+header: String? := sent.header("Content-Type")
+headers: List<String> := sent.headerAll("Set-Cookie")
+finalURL: String := sent.url()
 
 app: Server := HTTP.server("127.0.0.1", 8080)
 app = HTTP.server("127.0.0.1", 8080, 2048)
@@ -123,6 +141,12 @@ func TestHTTPTypesAreNotConstructedDirectly(t *testing.T) {
 	requireSemanticFailure(t, result)
 	result = analyzeWithStandardModules(t, httpPreamble+"session: Session := Session()\n")
 	requireSemanticFailure(t, result)
+	result = analyzeWithStandardModules(t, httpPreamble+"client: Client := Client()\n")
+	requireSemanticFailure(t, result)
+	result = analyzeWithStandardModules(t, httpPreamble+"request: ClientRequest := ClientRequest()\n")
+	requireSemanticFailure(t, result)
+	result = analyzeWithStandardModules(t, httpPreamble+"response: ClientResponse := ClientResponse()\n")
+	requireSemanticFailure(t, result)
 }
 
 func TestHTTPModuleInterfaceExportsExactSurface(t *testing.T) {
@@ -131,21 +155,24 @@ func TestHTTPModuleInterfaceExportsExactSurface(t *testing.T) {
 		t.Fatalf("HTTP is not a registered builtin module: %#v", module)
 	}
 	wantExports := []string{
-		"Cookie", "HTTPError", "Request", "Response", "Server", "Session", "SessionStore",
-		"cookie", "deleteCookie", "html", "redirect", "response", "server", "sessions", "text",
+		"Client", "ClientRequest", "ClientResponse", "Cookie", "HTTPError", "Request", "Response",
+		"Server", "Session", "SessionStore",
+		"client", "clientRequest", "cookie", "deleteCookie", "html", "redirect", "response", "server", "sessions", "text",
 	}
 	if strings.Join(module.ExportNames, ",") != strings.Join(wantExports, ",") {
 		t.Fatalf("HTTP exports %v; want %v", module.ExportNames, wantExports)
 	}
 	signatures := map[string]string{
-		"server":       "(host: String, port: Int, maxBodyBytes: Int := default) -> Server",
-		"text":         "(body: String, status: Int := default) -> Response",
-		"html":         "(body: String, status: Int := default) -> Response",
-		"response":     "(status: Int, body: String, contentType: String) -> Response",
-		"redirect":     "(location: String, status: Int := default) -> Response",
-		"cookie":       "(name: String, value: String) -> Cookie",
-		"deleteCookie": "(name: String, path: String := default) -> Cookie",
-		"sessions":     "(cookieName: String := default, maxAgeSeconds: Int := default, secure: Bool := default, sameSite: String := default) -> SessionStore",
+		"server":        "(host: String, port: Int, maxBodyBytes: Int := default) -> Server",
+		"text":          "(body: String, status: Int := default) -> Response",
+		"html":          "(body: String, status: Int := default) -> Response",
+		"response":      "(status: Int, body: String, contentType: String) -> Response",
+		"redirect":      "(location: String, status: Int := default) -> Response",
+		"cookie":        "(name: String, value: String) -> Cookie",
+		"deleteCookie":  "(name: String, path: String := default) -> Cookie",
+		"sessions":      "(cookieName: String := default, maxAgeSeconds: Int := default, secure: Bool := default, sameSite: String := default) -> SessionStore",
+		"client":        "(timeoutSeconds: Int := default, maxResponseBytes: Int := default, followRedirects: Bool := default) -> Client",
+		"clientRequest": "(method: String, url: String) -> ClientRequest",
 	}
 	for name, want := range signatures {
 		symbol := module.Exports[name]

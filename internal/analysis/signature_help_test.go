@@ -109,7 +109,7 @@ func TestSignatureHelpAfterATrailingCommaTargetsTheNextParameter(t *testing.T) {
 }
 
 func TestSignatureHelpHTTPCookieAndSessions(t *testing.T) {
-	text := "bring HTTP\nvalue := HTTP.cookie(\"a\", \"1\")\nstore := HTTP.sessions(\n"
+	text := "bring HTTP\nvalue := HTTP.cookie(\"a\", \"1\")\nstore := HTTP.sessions(\nclient := HTTP.client(\n"
 	directory := t.TempDir()
 	path := filepath.Join(directory, "main.ahd")
 	store := NewStore()
@@ -119,9 +119,13 @@ func TestSignatureHelpHTTPCookieAndSessions(t *testing.T) {
 	if !ok || !strings.Contains(cookieHelp.Label, "Cookie") {
 		t.Fatalf("HTTP.cookie signature = %#v, ok = %v", cookieHelp, ok)
 	}
-	sessionsHelp, ok := store.SignatureHelp(path, len(text)-1)
+	sessionsHelp, ok := store.SignatureHelp(path, offsetOf(t, text, "HTTP.sessions(")+len("HTTP.sessions("))
 	if !ok || !strings.Contains(sessionsHelp.Label, "SessionStore") {
 		t.Fatalf("HTTP.sessions signature = %#v, ok = %v", sessionsHelp, ok)
+	}
+	clientHelp, ok := store.SignatureHelp(path, len(text)-1)
+	if !ok || !strings.Contains(clientHelp.Label, "Client") {
+		t.Fatalf("HTTP.client signature = %#v, ok = %v", clientHelp, ok)
 	}
 }
 
