@@ -36,6 +36,34 @@ func descend(node ast.Node, offset int) ast.Node {
 	return node
 }
 
+// ancestorsAtOffset returns every node whose span covers offset, from the
+// program root down to the innermost match -- the same structural descent
+// findNodeAtOffset performs, except it keeps the whole path instead of only
+// its last element. Signature Help needs the path rather than just the
+// innermost node: the innermost node at a cursor sitting between two
+// arguments of a call is often an argument expression itself, not the
+// enclosing *ast.CallExpr, so a caller must walk back out through ancestors
+// to find the nearest call.
+func ancestorsAtOffset(program *ast.Program, offset int) []ast.Node {
+	if program == nil {
+		return nil
+	}
+	var path []ast.Node
+	node := ast.Node(program)
+	for node != nil && containsOffset(node.Span(), offset) {
+		path = append(path, node)
+		var next ast.Node
+		for _, child := range children(node) {
+			if containsOffset(child.Span(), offset) {
+				next = child
+				break
+			}
+		}
+		node = next
+	}
+	return path
+}
+
 func containsOffset(span source.Span, offset int) bool {
 	return offset >= span.Start.Offset && offset <= span.End.Offset
 }

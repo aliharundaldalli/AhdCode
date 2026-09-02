@@ -296,6 +296,19 @@ func FormatSignature(signature *types.Signature) string {
 	if signature == nil {
 		return "Function<?>"
 	}
+	parameters := FormatParameters(signature)
+	return fmt.Sprintf("(%s) -> %s", strings.Join(parameters, ", "), types.Display(signature.Return))
+}
+
+// FormatParameters renders each of a callable's parameters the same way
+// FormatSignature renders them within its own parentheses, one label per
+// parameter -- so tooling that needs to highlight a single parameter, such
+// as an LSP signature-help "active parameter", reuses this exact per-item
+// rendering instead of inventing a second one.
+func FormatParameters(signature *types.Signature) []string {
+	if signature == nil {
+		return nil
+	}
 	parameters := make([]string, len(signature.Parameters))
 	for index, parameter := range signature.Parameters {
 		prefix := ""
@@ -307,5 +320,5 @@ func FormatSignature(signature *types.Signature) string {
 			parameters[index] += " := default"
 		}
 	}
-	return fmt.Sprintf("(%s) -> %s", strings.Join(parameters, ", "), types.Display(signature.Return))
+	return parameters
 }

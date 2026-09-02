@@ -23,14 +23,15 @@ func (store *Store) Hover(path string, offset int) (Hover, bool) {
 	store.mutex.Lock()
 	cached := store.entries[canonical]
 	store.mutex.Unlock()
-	if cached == nil || cached.module == nil || cached.module.Parsed.Program == nil {
+	entryModule := cached.entryModule()
+	if entryModule == nil || entryModule.Parsed.Program == nil {
 		return Hover{}, false
 	}
-	node := findNodeAtOffset(cached.module.Parsed.Program, offset)
+	node := findNodeAtOffset(entryModule.Parsed.Program, offset)
 	if node == nil {
 		return Hover{}, false
 	}
-	symbol, ok := cached.module.Semantic.ResolvedSymbols[node]
+	symbol, ok := entryModule.Semantic.ResolvedSymbols[node]
 	if !ok || symbol == nil {
 		return Hover{}, false
 	}

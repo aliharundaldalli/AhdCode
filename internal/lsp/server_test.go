@@ -92,11 +92,25 @@ func TestInitializeAdvertisesOnlyImplementedCapabilities(t *testing.T) {
 	if !result.Capabilities.HoverProvider {
 		t.Fatal("expected hoverProvider = true")
 	}
-	// Confirm the raw JSON never mentions any out-of-scope capability.
+	if !result.Capabilities.DefinitionProvider {
+		t.Fatal("expected definitionProvider = true")
+	}
+	if !result.Capabilities.DocumentSymbolProvider {
+		t.Fatal("expected documentSymbolProvider = true")
+	}
+	if !result.Capabilities.ReferencesProvider {
+		t.Fatal("expected referencesProvider = true")
+	}
+	if len(result.Capabilities.SignatureHelpProvider.TriggerCharacters) == 0 {
+		t.Fatal("expected a non-empty signatureHelpProvider.triggerCharacters")
+	}
+	if len(result.Capabilities.CompletionProvider.TriggerCharacters) == 0 {
+		t.Fatal("expected a non-empty completionProvider.triggerCharacters")
+	}
+	// Confirm the raw JSON never mentions a capability still out of scope.
 	raw := string(response.Result)
 	for _, forbidden := range []string{
-		"completionProvider", "definitionProvider", "referencesProvider", "renameProvider",
-		"documentSymbolProvider", "signatureHelpProvider", "semanticTokensProvider",
+		"renameProvider", "semanticTokensProvider",
 		"codeActionProvider", "documentFormattingProvider", "foldingRangeProvider",
 		"callHierarchyProvider", "inlayHintProvider",
 	} {
@@ -179,7 +193,7 @@ func TestNotificationReceivesNoResponse(t *testing.T) {
 func TestUnsupportedMethodGetsMethodNotFound(t *testing.T) {
 	client := &testClient{}
 	client.request(1, "initialize", map[string]any{})
-	client.request(2, "textDocument/completion", map[string]any{})
+	client.request(2, "textDocument/rename", map[string]any{})
 	client.notify("exit", nil)
 	messages := runServer(t, client)
 

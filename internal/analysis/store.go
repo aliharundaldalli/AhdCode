@@ -22,11 +22,37 @@ type Result struct {
 }
 
 // entry is what the Store caches per open document: its most recent
-// analysis result plus enough of the compiled entry module to answer a
-// hover query without recompiling.
+// analysis result plus the whole compiled module graph (the entry document
+// and everything it transitively imports), so a query can resolve a symbol
+// declared in an imported module -- not only ones declared in the entry
+// document itself -- without recompiling.
 type entry struct {
-	result Result
-	module *module.Module
+	result     Result
+	entryModID module.ModuleID
+	modules    map[module.ModuleID]*module.Module
+	fileToPath map[source.FileID]string
+}
+
+// entryModule returns the compiled entry document's own module.
+func (e *entry) entryModule() *module.Module {
+	if e == nil {
+		return nil
+	}
+	return e.modules[e.entryModID]
+}
+
+// moduleForFile returns the module whose compiled file has this FileID,
+// within this same compile graph.
+func (e *entry) moduleForFile(fileID source.FileID) *module.Module {
+	if e == nil {
+		return nil
+	}
+	for _, candidate := range e.modules {
+		if candidate != nil && candidate.File.ID == fileID {
+			return candidate
+		}
+	}
+	return nil
 }
 
 // Store is the in-memory, document-aware analysis layer. It holds the
@@ -60,6 +86,25 @@ func (store *Store) text(path string) (string, bool) {
 // exactly the text the client's own cursor position is relative to.
 func (store *Store) Text(path string) (string, bool) {
 	return store.text(canonicalPath(path))
+}
+
+// TextFor returns the exact source text targetPath was most recently
+// compiled from as part of entryPath's own compile graph -- the same text a
+// Location or diagnostic pointing into targetPath already describes,
+// whether targetPath is an open overlay or was read straight from disk.
+// Callers converting a cross-file Definition/References result's Span into
+// an editor position for a file other than the one that was queried should
+// use this rather than Text, which only ever knows about open overlays.
+func (store *Store) TextFor(entryPath, targetPath string) (string, bool) {
+	canonical := canonicalPath(entryPath)
+	store.mutex.Lock()
+	cached := store.entries[canonical]
+	store.mutex.Unlock()
+	if cached == nil {
+		return "", false
+	}
+	text, ok := cached.result.Text[targetPath]
+	return text, ok
 }
 
 // Open registers a document's initial content and analyzes it as an entry
@@ -108,15 +153,11 @@ func (store *Store) set(path, text string) Result {
 	grouped := make(map[string][]diagnostics.Diagnostic)
 	texts := make(map[string]string)
 	fileToPath := make(map[source.FileID]string, len(compiled.Modules))
-	var entryModule *module.Module
 	for _, item := range compiled.Modules {
 		if item == nil || item.File.ID == 0 {
 			continue
 		}
 		fileToPath[item.File.ID] = item.File.Path
-		if item.ID == compiled.Entry {
-			entryModule = item
-		}
 		if _, exists := grouped[item.File.Path]; !exists {
 			grouped[item.File.Path] = nil
 		}
@@ -132,7 +173,12 @@ func (store *Store) set(path, text string) Result {
 
 	result := Result{EntryPath: canonical, Diagnostics: grouped, Text: texts}
 	store.mutex.Lock()
-	store.entries[canonical] = &entry{result: result, module: entryModule}
+	store.entries[canonical] = &entry{
+		result:     result,
+		entryModID: compiled.Entry,
+		modules:    compiled.Modules,
+		fileToPath: fileToPath,
+	}
 	store.mutex.Unlock()
 	return result
 }

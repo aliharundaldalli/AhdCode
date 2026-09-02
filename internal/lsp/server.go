@@ -114,6 +114,16 @@ func (server *Server) dispatch(m message) (exit bool) {
 		server.handleDidClose(m)
 	case "textDocument/hover":
 		server.handleHover(m)
+	case "textDocument/definition":
+		server.handleDefinition(m)
+	case "textDocument/documentSymbol":
+		server.handleDocumentSymbol(m)
+	case "textDocument/signatureHelp":
+		server.handleSignatureHelp(m)
+	case "textDocument/references":
+		server.handleReferences(m)
+	case "textDocument/completion":
+		server.handleCompletion(m)
 	default:
 		if !m.isNotification() {
 			server.sendErrorResponse(m.ID, errCodeMethodNotFound, fmt.Sprintf("method not found: %s", m.Method))
@@ -195,12 +205,19 @@ func (server *Server) publishOne(path, text string, items []diagnostics.Diagnost
 	for _, item := range items {
 		converted = append(converted, convertDiagnostic(item, index))
 	}
-	uri, ok := server.clientURI[path]
-	if !ok {
-		uri = PathToURI(path)
-	}
 	server.notify("textDocument/publishDiagnostics", publishDiagnosticsParams{
-		URI:         uri,
+		URI:         server.uriFor(path),
 		Diagnostics: converted,
 	})
+}
+
+// uriFor returns the URI a client should see for path: the exact URI string
+// the client itself used to open it, if it has one open, or else
+// PathToURI's best-available synthesis of its canonical form (a sibling
+// module the client never opened directly, for instance).
+func (server *Server) uriFor(path string) string {
+	if uri, ok := server.clientURI[path]; ok {
+		return uri
+	}
+	return PathToURI(path)
 }

@@ -14,10 +14,14 @@ const INVALID_EDITOR_MESSAGE =
   "Open a saved .ahd file before running AhdCode.";
 const LSP_START_FAILED_MESSAGE =
   "AhdCode language server could not be started.\n" +
-  "Diagnostics and hover will be unavailable, but Run File still works.";
+  "Diagnostics, hover, and other language features will be unavailable, but Run File still works.";
 
 // The one argument `ahdcode lsp` accepts: start the stdio language server.
-// Diagnostics and hover are the only features this client requests.
+// This client requests no specific feature of its own -- vscode-languageclient
+// wires up whatever the server's own `initialize` response advertises
+// (diagnostics, hover, definition, document symbols, signature help,
+// references, completion), so a server-side capability change never needs a
+// matching client-side change here.
 const LSP_ARGS = ["lsp"];
 
 // activate returns the promise VS Code awaits before considering the
