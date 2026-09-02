@@ -1,4 +1,4 @@
-# AhdCode v0.5.0 Türkçe Öğrenci Rehberi
+# AhdCode v0.6.0 Türkçe Öğrenci Rehberi
 
 Bu rehber, **daha önce hiç programlama yapmamış birinin de takip edebilmesi** için hazırlanmıştır. Baştan sona sırayla okuyabilirsiniz; her bölümde önce ne yapmak istediğimizi görecek, sonra çalışan bir örnek yazacak, en son gerekli kuralları öğreneceksiniz.
 
@@ -44,14 +44,15 @@ En iyi öğrenme yolu, örnekleri yalnızca okumak değil çalıştırmaktır. B
 - [35. SQLite: hatırlayan bir veritabanı](#35-sqlite-hatırlayan-bir-veritabanı)
 - [36. Küçük bir web sayfası](#36-küçük-bir-web-sayfası)
 - [37. Çerezler ve oturumlar](#37-çerezler-ve-oturumlar)
-- [38. Kod biçimlendirici (Formatter)](#38-kod-biçimlendirici-formatter)
-- [39. Komut satırı (CLI)](#39-komut-satırı-cli)
-- [40. Etkileşimli kabuk (REPL)](#40-etkileşimli-kabuk-repl)
-- [41. Sık yapılan başlangıç hataları](#41-sık-yapılan-başlangıç-hataları)
-- [42. Küçük Projeler](#42-küçük-projeler)
-- [43. Egzersizler](#43-egzersizler)
-- [44. Çözüm İpuçları](#44-çözüm-i̇puçları)
-- [45. Sonraki adımlar ve teknik belgeler](#45-sonraki-adımlar-ve-teknik-belgeler)
+- [38. HTTP Client](#38-http-client)
+- [39. Kod biçimlendirici (Formatter)](#39-kod-biçimlendirici-formatter)
+- [40. Komut satırı (CLI)](#40-komut-satırı-cli)
+- [41. Etkileşimli kabuk (REPL)](#41-etkileşimli-kabuk-repl)
+- [42. Sık yapılan başlangıç hataları](#42-sık-yapılan-başlangıç-hataları)
+- [43. Küçük Projeler](#43-küçük-projeler)
+- [44. Egzersizler](#44-egzersizler)
+- [45. Çözüm İpuçları](#45-çözüm-i̇puçları)
+- [46. Sonraki adımlar ve teknik belgeler](#46-sonraki-adımlar-ve-teknik-belgeler)
 
 ## 1. AhdCode nedir?
 
@@ -71,7 +72,7 @@ Merhaba!
 
 AhdCode, programı çalıştırmadan önce yazdığınız kodu kontrol eder. Örneğin bir metni sayı gibi kullanmaya çalışırsanız veya `null` olabilecek bir değeri kontrol etmeden kullanırsanız, mümkün olduğunda hatayı daha program başlamadan söyler. Ama başlangıçta bunun ayrıntılarını düşünmeniz gerekmiyor; ilerleyen bölümlerde örneklerle göreceğiz.
 
-AhdCode v0.5.0 güncel sürümdür. Küçük komut satırı programlarını çalıştırabilir veya yerel executable uygulamalara derleyebilirsiniz; veriyi yerel bir SQLite veritabanında tutabilir, bu makineden HTTP ile bir sayfa sunabilir, tarayıcı başına bellek içi oturum değerleri tutabilir ve dil sunucusunu (`ahdcode lsp`) VS Code gibi bir editörden kullanabilirsiniz. Bazı standart modüller, örneğin SQLite, derlenmiş uygulamanın yanında AhdCode'un sağladığı yardımcı çalışma zamanı bileşenlerini kullanabilir. HTTP, HTML, çerez ve oturum, çalışma zamanının içindeki Go standart kütüphanesini kullanır; ayrı bir HTTP veya oturum yardımcısı eklemezler. v0.2.2 pratik günlük dil sunucusunu tamamladı; v0.3.0 SQLite ekledi; v0.4.0 tarayıcıdan kullanılan ilk AhdCode uygulama fazıdır; v0.5.0 çerez ve sunucu taraflı oturum ekler.
+AhdCode v0.6.0 güncel sürümdür. Küçük komut satırı programlarını çalıştırabilir veya yerel executable uygulamalara derleyebilirsiniz; veriyi yerel bir SQLite veritabanında tutabilir, bu makineden HTTP ile bir sayfa sunabilir, tarayıcı başına bellek içi oturum değerleri tutabilir, dış bir HTTP veya HTTPS API çağırabilir ve dil sunucusunu (`ahdcode lsp`) VS Code gibi bir editörden kullanabilirsiniz. Bazı standart modüller, örneğin SQLite, derlenmiş uygulamanın yanında AhdCode'un sağladığı yardımcı çalışma zamanı bileşenlerini kullanabilir. HTTP, HTML, çerez, oturum ve HTTP Client, çalışma zamanının içindeki Go standart kütüphanesini kullanır; ayrı bir HTTP yardımcısı eklemezler. v0.2.2 pratik günlük dil sunucusunu tamamladı; v0.3.0 SQLite ekledi; v0.4.0 tarayıcıdan kullanılan ilk AhdCode uygulama fazıdır; v0.5.0 çerez ve sunucu taraflı oturum ekler; v0.6.0 giden HTTP Client ekler.
 
 > **Teknik not:** Program çalışmadan önce türlerin kontrol edilmesine *static checking* denir.
 
@@ -3127,7 +3128,104 @@ tarayıcıda yenileyin, sayıların bağımsız kaldığını görün.
 
 Ayrıntılar için [HTTP modül referansına](HTTP_TR.md) bakın.
 
-## 38. Kod biçimlendirici (Formatter)
+## 38. HTTP Client
+
+v0.5.0 bir tarayıcının değerini sakladı. v0.6.0 bir AhdCode programının dış
+bir HTTP veya HTTPS hizmetini çağırmasını sağlar. Sunucu türleri (`Request`,
+`Response`) ile istemci türleri (`ClientRequest`, `ClientResponse`) ayrıdır.
+Yapay zeka satıcı modülü yoktur. JSON'u mevcut JSON modülüyle üretir, String'i
+kendiniz gönderirsiniz.
+
+### Basit HTTPS GET
+
+```ahd
+bring HTTP
+from HTTP bring Client
+from HTTP bring ClientResponse
+
+client: Client := HTTP.client()
+response: ClientResponse := client.get("https://example.com/")
+write(str(response.status()))
+write(response.body())
+```
+
+HTTPS, sistemin güvenilen kökleriyle sertifikayı doğrular. Doğrulamayı kapatan
+bir seçenek yoktur.
+
+### Özel istek, başlıklar, POST
+
+```ahd
+bring HTTP
+from HTTP bring Client
+from HTTP bring ClientRequest
+from HTTP bring ClientResponse
+
+client: Client := HTTP.client()
+request: ClientRequest := HTTP.clientRequest("POST", "https://example.com/")
+request = request.withHeader("Content-Type", "text/plain; charset=utf-8")
+request = request.withBody("hello")
+response: ClientResponse := client.send(request)
+```
+
+`withHeader` o adı değiştirir. `addHeader` başka bir değer ekler. Orijinal
+istek değişmez.
+
+### JSON API ve Env jetonu
+
+```ahd
+bring HTTP
+from HTTP bring Client
+from HTTP bring ClientRequest
+from HTTP bring ClientResponse
+bring JSON
+from JSON bring JSONValue
+bring Env
+
+client: Client := HTTP.client()
+token: String := Env.getOr("API_TOKEN", "")
+payload: JSONValue := JSON.object({"question": JSON.fromString("2+2")})
+request: ClientRequest := HTTP.clientRequest("POST", "https://api.example.com/v1/chat")
+request = request.withHeader("Authorization", "Bearer {token}")
+request = request.withHeader("Content-Type", "application/json")
+request = request.withBody(JSON.stringify(payload))
+response: ClientResponse := client.send(request)
+parsed: JSONValue := JSON.parse(response.body())
+```
+
+Bu genel bir API şeklidir. AhdCode bir OpenAI, Anthropic veya Gemini modülü
+göndermez.
+
+### Hatalar, zaman aşımı, 4xx/5xx
+
+`401`, `429` ve `500` yine `ClientResponse` döner. `status()` ve `body()`'yi
+kendiniz okursunuz. Taşıma sorunları — bozuk URL, DNS, TLS, zaman aşımı, çok
+büyük veya UTF-8 olmayan gövde — `HTTPError` fırlatır.
+
+```ahd
+bring HTTP
+from HTTP bring Client
+from HTTP bring ClientResponse
+from HTTP bring HTTPError
+
+client: Client := HTTP.client(1)
+attempt {
+    response: Local ClientResponse := client.get("https://example.com/")
+    if response.status() >= 400 {
+        write("API durumu {str(response.status())}")
+    } else {
+        write(response.body())
+    }
+} except HTTPError as error {
+    write(error.message)
+}
+```
+
+`HTTP.client(1)` tüm istek için en fazla bir saniye bekler.
+
+Ayrıntılar için [HTTP modül referansına](HTTP_TR.md) ve
+[`examples/v0.6`](../examples/v0.6/README_TR.md) bakın.
+
+## 39. Kod biçimlendirici (Formatter)
 
 Kod çalışsa bile herkes farklı boşluk ve satır düzeni kullanırsa okumak zorlaşır. AhdCode formatter, geçerli kodu ortak bir stile dönüştürür:
 
@@ -3180,7 +3278,7 @@ values :=
 
 Formatter idempotent'tir; aynı dosyada tekrar çalıştırmak yeni değişiklik üretmez.
 
-## 39. Komut satırı (CLI)
+## 40. Komut satırı (CLI)
 
 AhdCode'u terminalden birkaç temel komutla kullanabilirsiniz:
 
@@ -3217,7 +3315,7 @@ Yardım ve sürüm bilgisini gösterir.
 
 Yeni başlıyorsanız çoğu zaman kullanacağınız komut `ahdcode run ...` olacaktır.
 
-## 40. Etkileşimli kabuk (REPL)
+## 41. Etkileşimli kabuk (REPL)
 
 Küçük bir şeyi denemek için her seferinde dosya oluşturmak zorunda değilsiniz. Terminalde yalnızca:
 
@@ -3286,7 +3384,7 @@ harici bir render motorunu çağırır. Bu çağrıları bir `.ahd` dosyasından
 çalıştırın. `Archive`'ın böyle bir sınırlaması yoktur — REPL'de tamamen
 çalışır. Ayrıntılar için [REPL referansına](REPL_TR.md) bakın.
 
-## 41. Sık yapılan başlangıç hataları
+## 42. Sık yapılan başlangıç hataları
 
 Hata mesajı görmek programlamanın normal bir parçasıdır. Çoğu hata, bilgisayarın ne istediğinizi anlayamadığını söyler. Aşağıdaki örnekler yeni başlayanların sık karşılaştığı durumları ve nasıl düzelteceğinizi gösterir:
 
@@ -3395,7 +3493,7 @@ Hata mesajı görmek programlamanın normal bir parçasıdır. Çoğu hata, bilg
 - Neden: Bu, başlığı SQL'e yapıştırır. `Robert'); DROP TABLE notes;--` gibi bir başlık artık veri değildir.
 - Doğru: `?` yer tutucusu ve `SQLite.fromString(title)` kullanın. Parametre bağlama metni veri olarak tutar.
 
-## 42. Küçük Projeler
+## 43. Küçük Projeler
 
 Bu küçük projeler rehberde öğretilenleri bir araya getirir. Onları tek başınıza kurmayı deneyin!
 
@@ -3409,7 +3507,7 @@ Bu küçük projeler rehberde öğretilenleri bir araya getirir. Onları tek ba�
 8. **SQLite Not Defteri**: `notes.db` açın, yoksa bir `notes` tablosu oluşturun ve kullanıcının not eklemesine, listelemesine, başlığa göre aramasına, güncellemesine ve silmesine izin verin. Her değer için `?` parametreleri kullanın. Programı kapatıp yeniden çalıştırın: eski notlar durmalıdır.
 9. **Web Not Defteri**: Notları `127.0.0.1` üzerinde bir tarayıcıda sunun. Notları `HTML.text` ile listeleyin, POST `/notes` ve bağlı SQLite parametreleriyle not ekleyin, sonra `/` adresine yönlendirin. Dinamik metin ham HTML'e birleştirilmemelidir.
 
-## 43. Egzersizler
+## 44. Egzersizler
 
 Tam çözümleri hemen aramak yerine her programı küçük adımlarla kurun.
 
@@ -3440,8 +3538,9 @@ Tam çözümleri hemen aramak yerine her programı küçük adımlarla kurun.
 20. Dikdörtgen alanı hesaplayan bir fonksiyona sahip `MathUtils.ahd` adında bir modül oluşturun ve bir `main.ahd` içinden `bring` ile çağırarak kullanın.
 21. Küçük bir SQLite not defteri kurun: parametrelerle iki not ekleyin, `ORDER BY id` ile listeleyin, bir gövdeyi güncelleyin, bir satırı silin, veritabanını kapatın, aynı dosyayı yeniden açın ve kalan başlıkları yazdırın.
 22. `127.0.0.1` üzerinde `GET /ok` için `HTTP.text("ok")` sunun ve tarayıcıda açın.
+23. Genel bir HTTPS sayfasında `HTTP.client().get` kullanın, `status()` yazın ve `HTTPError` ile 404 `ClientResponse` ayrımını yapın.
 
-## 44. Çözüm İpuçları
+## 45. Çözüm İpuçları
 
 1. `take` sonucu String'dir; yaş için `int(...)` ve yeni yaş için `+ 1` kullanın.
 2. Formülü küçük parçalara ayırın; `real(take(...))` ile başlayın ve Real sayılarını kullanın.
@@ -3465,8 +3564,9 @@ Tam çözümleri hemen aramak yerine her programı küçük adımlarla kurun.
 20. `from MathUtils bring alanHesapla` kullanabilirsiniz.
 21. `SQLite.open("notes.db")`, `CREATE TABLE IF NOT EXISTS`, `SQLite.fromString` ile `INSERT ... VALUES (?, ?)`, sonra `ORDER BY id` ile `query`. `close()` sonrası aynı yolu yeniden açın.
 22. `HTTP.server("127.0.0.1", 8080)`, `app.get("/ok", handler)`, `HTTP.text("ok")`, sonra `app.start()`.
+23. `HTTP.client()`, `client.get("https://example.com/")`, `response.status()`. 404 hâlâ `ClientResponse`; TLS veya zaman aşımı `HTTPError`.
 
-## 45. Sonraki adımlar ve teknik belgeler
+## 46. Sonraki adımlar ve teknik belgeler
 
 Bu rehberi tamamladıktan sonra dilin ayrıntılarını şu belgelerden
 derinleştirebilirsiniz:

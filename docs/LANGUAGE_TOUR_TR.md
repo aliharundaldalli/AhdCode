@@ -171,7 +171,7 @@ ve [Modüller](MODULES_TR.md)'e bakın. Time yerel, UTC ve sabit-ofsetli anları
 CSV String satırları ve kayıtlarını kapsar; Data ise bunları String
 hücrelerden oluşan değiştirilemez bir `Table`'a dönüştürür; JSON ve XML tipli
 yapılandırılmış-veri modelleridir, SQLite tipli bir yerel-veritabanı köprüsüdür,
-HTTP yerel bir web sunucusudur (çerez ve bellek içi oturumlarla), HTML küçük güvenli bir HTML oluşturucudur,
+HTTP yerel bir web sunucusudur (çerez, bellek içi oturumlar ve giden HTTP/HTTPS Client ile), HTML küçük güvenli bir HTML oluşturucudur,
 Env ise işlem/`.env` yapılandırmasını okur;
 Lists ve KeyValue ise `List` ve `Pair` üzerindeki saf yapısal dönüşüm
 katmanıdır; Excel tipli, değiştirilemez XLSX çalışma kitapları ekler; PDF

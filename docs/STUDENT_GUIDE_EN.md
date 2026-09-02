@@ -1,4 +1,4 @@
-# AhdCode v0.5.0 English Student Guide
+# AhdCode v0.6.0 English Student Guide
 
 This guide is designed so that **even someone who has never programmed before** can follow along. You can read it in order from beginning to end; in each section, you will first see what we want to achieve, then write a working example, and finally learn the necessary rules.
 
@@ -44,14 +44,15 @@ The best way to learn is not just by reading the examples, but by running them. 
 - [35. SQLite: a database that remembers](#35-sqlite-a-database-that-remembers)
 - [36. A small web page](#36-a-small-web-page)
 - [37. Cookies and sessions](#37-cookies-and-sessions)
-- [38. Code Formatter](#38-code-formatter)
-- [39. Command line (CLI)](#39-command-line-cli)
-- [40. Interactive shell (REPL)](#40-interactive-shell-repl)
-- [41. Common beginner mistakes](#41-common-beginner-mistakes)
-- [42. Small Projects](#42-small-projects)
-- [43. Exercises](#43-exercises)
-- [44. Solution Hints](#44-solution-hints)
-- [45. Next steps and technical docs](#45-next-steps-and-technical-docs)
+- [38. HTTP Client](#38-http-client)
+- [39. Code Formatter](#39-code-formatter)
+- [40. Command line (CLI)](#40-command-line-cli)
+- [41. Interactive shell (REPL)](#41-interactive-shell-repl)
+- [42. Common beginner mistakes](#42-common-beginner-mistakes)
+- [43. Small Projects](#43-small-projects)
+- [44. Exercises](#44-exercises)
+- [45. Solution Hints](#45-solution-hints)
+- [46. Next steps and technical docs](#46-next-steps-and-technical-docs)
 
 ## 1. What is AhdCode?
 
@@ -71,7 +72,7 @@ Hello!
 
 AhdCode checks the code you wrote before running the program. For example, if you try to use text like a number, or if you use a value that could be `null` without checking it, it will tell you the error before the program even starts, whenever possible. But you don't need to think about these details at the beginning; we'll see examples in later sections.
 
-AhdCode v0.5.0 is the current release. You can run small command-line programs or compile them into local executables, keep data in a local SQLite database, serve a page from this machine over HTTP, remember per-browser values with an in-memory session, and use the language server (`ahdcode lsp`) from an editor such as VS Code. Some standard modules, such as SQLite, may use companion runtime helpers supplied with AhdCode. HTTP, HTML, cookies, and sessions use the Go standard library inside the runtime; they do not add an HTTP or session helper. v0.2.2 completed the everyday language server; v0.3.0 added SQLite; v0.4.0 is the first browser-facing AhdCode application phase; v0.5.0 adds cookies and server-side sessions.
+AhdCode v0.6.0 is the current release. You can run small command-line programs or compile them into local executables, keep data in a local SQLite database, serve a page from this machine over HTTP, remember per-browser values with an in-memory session, call an external HTTP or HTTPS API, and use the language server (`ahdcode lsp`) from an editor such as VS Code. Some standard modules, such as SQLite, may use companion runtime helpers supplied with AhdCode. HTTP, HTML, cookies, sessions, and the HTTP Client use the Go standard library inside the runtime; they do not add an HTTP helper. v0.2.2 completed the everyday language server; v0.3.0 added SQLite; v0.4.0 is the first browser-facing AhdCode application phase; v0.5.0 adds cookies and server-side sessions; v0.6.0 adds the outbound HTTP Client.
 
 > **Technical note:** Checking types before the program runs is called *static checking*.
 
@@ -3104,7 +3105,104 @@ in two browsers, and watch the counts stay independent.
 
 See [the HTTP module reference](HTTP.md) for Cookie and Session details.
 
-## 38. Code Formatter
+## 38. HTTP Client
+
+v0.5.0 kept a value for one browser. v0.6.0 lets an AhdCode program call an
+external HTTP or HTTPS service. The server types (`Request`, `Response`) and
+the client types (`ClientRequest`, `ClientResponse`) are different. There is
+no AI vendor module. You build JSON with the existing JSON module and send
+the String yourself.
+
+### Simple HTTPS GET
+
+```ahd
+bring HTTP
+from HTTP bring Client
+from HTTP bring ClientResponse
+
+client: Client := HTTP.client()
+response: ClientResponse := client.get("https://example.com/")
+write(str(response.status()))
+write(response.body())
+```
+
+HTTPS checks the certificate with the system's trusted roots. There is no
+option to turn verification off.
+
+### Custom request, headers, POST
+
+```ahd
+bring HTTP
+from HTTP bring Client
+from HTTP bring ClientRequest
+from HTTP bring ClientResponse
+
+client: Client := HTTP.client()
+request: ClientRequest := HTTP.clientRequest("POST", "https://example.com/")
+request = request.withHeader("Content-Type", "text/plain; charset=utf-8")
+request = request.withBody("hello")
+response: ClientResponse := client.send(request)
+```
+
+`withHeader` replaces that name. `addHeader` appends another value. The
+original request does not change.
+
+### JSON API and an Env token
+
+```ahd
+bring HTTP
+from HTTP bring Client
+from HTTP bring ClientRequest
+from HTTP bring ClientResponse
+bring JSON
+from JSON bring JSONValue
+bring Env
+
+client: Client := HTTP.client()
+token: String := Env.getOr("API_TOKEN", "")
+payload: JSONValue := JSON.object({"question": JSON.fromString("2+2")})
+request: ClientRequest := HTTP.clientRequest("POST", "https://api.example.com/v1/chat")
+request = request.withHeader("Authorization", "Bearer {token}")
+request = request.withHeader("Content-Type", "application/json")
+request = request.withBody(JSON.stringify(payload))
+response: ClientResponse := client.send(request)
+parsed: JSONValue := JSON.parse(response.body())
+```
+
+This is a generic API shape. AhdCode does not ship an OpenAI, Anthropic, or
+Gemini module.
+
+### Errors, timeouts, 4xx/5xx
+
+`401`, `429`, and `500` still return `ClientResponse`. Read `status()` and
+`body()` yourself. Transport problems — bad URL, DNS, TLS, timeout, a body
+that is too large or not UTF-8 — raise `HTTPError`.
+
+```ahd
+bring HTTP
+from HTTP bring Client
+from HTTP bring ClientResponse
+from HTTP bring HTTPError
+
+client: Client := HTTP.client(1)
+attempt {
+    response: Local ClientResponse := client.get("https://example.com/")
+    if response.status() >= 400 {
+        write("API status {str(response.status())}")
+    } else {
+        write(response.body())
+    }
+} except HTTPError as error {
+    write(error.message)
+}
+```
+
+`HTTP.client(1)` waits at most one second for the whole request.
+
+See [the HTTP module reference](HTTP.md) and
+[`examples/v0.6`](../examples/v0.6/README.md).
+
+## 39. Code Formatter
 
 Even if the code works, if everyone uses different spacing and line layouts, it becomes hard to read. The AhdCode formatter converts valid code to a common style:
 
@@ -3157,7 +3255,7 @@ values: List<Int> :=
 
 The formatter is idempotent; running it again on the same file produces no new changes.
 
-## 39. Command line (CLI)
+## 40. Command line (CLI)
 
 You can use AhdCode from the terminal with a few basic commands:
 
@@ -3194,7 +3292,7 @@ Shows help and version information.
 
 If you are a beginner, the command you will use most of the time will be `ahdcode run ...`.
 
-## 40. Interactive shell (REPL)
+## 41. Interactive shell (REPL)
 
 You don't have to create a file every time you want to try something small. In the terminal, just run:
 
@@ -3262,7 +3360,7 @@ not support. Run those calls from a `.ahd` file instead. `Archive` has no
 such limit -- it works fully in the REPL. See the [REPL reference](REPL.md)
 for details.
 
-## 41. Common beginner mistakes
+## 42. Common beginner mistakes
 
 Seeing an error message is a normal part of programming. Most errors simply tell you that the computer couldn't understand what you wanted. The following examples show common situations beginners encounter and how to fix them:
 
@@ -3371,7 +3469,7 @@ Seeing an error message is a normal part of programming. Most errors simply tell
 - Why: That splices the title into SQL. A title such as `Robert'); DROP TABLE notes;--` is no longer data.
 - Correct: Use a `?` placeholder and `SQLite.fromString(title)`. Parameter binding keeps the text as data.
 
-## 42. Small Projects
+## 43. Small Projects
 
 These small projects bring together what is taught in the guide. Try building them on your own!
 
@@ -3385,7 +3483,7 @@ These small projects bring together what is taught in the guide. Try building th
 8. **SQLite Notes App**: Open `notes.db`, create a `notes` table if it is missing, and let the user add a note, list notes, search by title, update a note, and delete a note. Use `?` parameters for every value. Close the program and run it again: the old notes must still be there.
 9. **Web Notes App**: Serve notes in a browser on `127.0.0.1`. List notes with `HTML.text`, add a note with POST `/notes` and bound SQLite parameters, then redirect to `/`. Dynamic text must not be concatenated into raw HTML.
 
-## 43. Exercises
+## 44. Exercises
 
 Instead of immediately looking for full solutions, build each program in small steps.
 
@@ -3416,8 +3514,9 @@ Instead of immediately looking for full solutions, build each program in small s
 20. Create a module named `MathUtils.ahd` containing a function that calculates rectangle area, and use it from inside `main.ahd` by calling it with `bring`.
 21. Build a tiny SQLite notebook: insert two notes with parameters, list them with `ORDER BY id`, update one body, delete one row, close the database, reopen the same file, and print the remaining titles.
 22. Serve `HTTP.text("ok")` on `GET /ok` at `127.0.0.1` and open it in a browser.
+23. Use `HTTP.client().get` on a public HTTPS page, print `status()`, and treat `HTTPError` separately from a 404 `ClientResponse`.
 
-## 44. Solution Hints
+## 45. Solution Hints
 
 1. The result of `take` is a String; use `int(...)` for age, and `+ 1` for the new age.
 2. Break the formula into small parts; start with `real(take(...))` and use Real numbers.
@@ -3441,8 +3540,9 @@ Instead of immediately looking for full solutions, build each program in small s
 20. You can use `from MathUtils bring calculateArea`.
 21. `SQLite.open("notes.db")`, `CREATE TABLE IF NOT EXISTS`, `INSERT ... VALUES (?, ?)` with `SQLite.fromString`, then `query` with `ORDER BY id`. After `close()`, open the same path again.
 22. `HTTP.server("127.0.0.1", 8080)`, `app.get("/ok", handler)`, `HTTP.text("ok")`, then `app.start()`.
+23. `HTTP.client()`, `client.get("https://example.com/")`, `response.status()`. A 404 is still `ClientResponse`; a TLS or timeout failure is `HTTPError`.
 
-## 45. Next steps and technical docs
+## 46. Next steps and technical docs
 
 After finishing this guide, you can deepen your knowledge of the language details from these documents:
 

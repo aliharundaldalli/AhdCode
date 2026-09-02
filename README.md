@@ -12,19 +12,20 @@ AhdCode is an experimental statically checked general-purpose programming
 language focused on readable syntax, explicit intent, predictable semantics,
 and native compilation.
 
-The current release is **v0.5.0**. The core language works end to end, but
+The current release is **v0.6.0**. The core language works end to end, but
 the project is not production-ready and breaking changes may occur before 1.0.
 
-v0.5.0 adds HTTP cookies and in-memory server-side sessions on top of the
-v0.4.0 web foundation: a typed [HTTP](docs/HTTP.md) server, Request/Response
-values, and a small safe [HTML](docs/HTML.md) builder, so an AhdCode program
-can be opened in a browser on this machine. A session cookie holds only an
-opaque random identifier; session values stay on the server and disappear
-when the process exits. This is not an authentication framework. v0.3.0 began
-practical application development with a typed [SQLite](docs/SQLITE.md)
-bridge. HTTP uses Go's `net/http` inside the runtime; there is no companion
-HTTP, cookie, or session helper. HTTPS, multipart, and WebSocket are not in
-this release.
+v0.6.0 adds an outbound [HTTP](docs/HTTP.md) Client with HTTPS, timeouts, and
+explicit JSON/Env API interoperability. v0.5.0 added HTTP cookies and
+in-memory server-side sessions on top of the v0.4.0 web foundation: a typed
+HTTP server, Request/Response values, and a small safe [HTML](docs/HTML.md)
+builder, so an AhdCode program can be opened in a browser on this machine. A
+session cookie holds only an opaque random identifier; session values stay on
+the server and disappear when the process exits. This is not an authentication
+framework. v0.3.0 began practical application development with a typed
+[SQLite](docs/SQLITE.md) bridge. HTTP uses Go's `net/http` inside the runtime;
+there is no companion HTTP, cookie, session, or client helper. Multipart,
+WebSocket, and an AI vendor module are not in this release.
 
 v0.2.2 completed the practical everyday AhdCode language server on top of
 v0.2.1's diagnostics, hover, completion, go to definition, document symbols,
@@ -199,6 +200,7 @@ See the [CLI guide](docs/CLI.md), [formatter guide](docs/FORMATTER.md),
 - [v0.3 SQLite Notes App](examples/v0.3/README.md)
 - [v0.4 Web Notes App](examples/v0.4/README.md)
 - [v0.5 cookies and sessions](examples/v0.5/README.md)
+- [v0.6 HTTP Client](examples/v0.6/README.md)
 - [v0.4 Library Demo](https://github.com/aliharundaldalli/ahdcode-library-demo) (separate beginner web app)
 - [v0.4 Seminar Demo](https://github.com/aliharundaldalli/ahdcode-seminer-demo) (Hatay, multi-page)
 - [Full v0.1 language specification](AHDCODE_LANGUAGE_SPEC_v0.1.md)
@@ -239,6 +241,7 @@ examples/v0.1/     curated working programs
 examples/v0.3/     SQLite Notes App
 examples/v0.4/     Web Notes App
 examples/v0.5/     cookies and in-memory sessions
+examples/v0.6/     outbound HTTP Client and JSON APIs
 AHDCODE_LANGUAGE_SPEC_v0.1.md
                    authoritative language contract
 ```

@@ -42,7 +42,9 @@ circular dependencies are compile-time errors.
 
 `Math`, `Time`, `Latex`, `Word`, `Excel`, `PDF`, `Archive`, `Path`, `File`, `Regex`, `CSV`, `Data`, `Statistics`, `Plot`, `Numeric`, `JSON`, `SQLite`, `HTTP`, `HTML`, `XML`, `Env`, `Lists`, and `KeyValue` are compiler-registered and use
 these same import forms. A local file cannot shadow a standard module of the
-same name. They can also use the ordinary namespace alias form:
+same name. `HTTP` is both the inbound server (`Server` / `Request` /
+`Response`, cookies, sessions) and the outbound `Client` / `ClientRequest` /
+`ClientResponse` surface. They can also use the ordinary namespace alias form:
 
 ```ahd
 bring File as F

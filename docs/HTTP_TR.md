@@ -2,7 +2,7 @@
 
 [English](HTTP.md) · [Türkçe]
 
-[README'ye dön](../README_TR.md) · [Modüller](MODULES_TR.md) · [HTML](HTML_TR.md) · [Öğrenci Rehberi](STUDENT_GUIDE_TR.md#37-çerezler-ve-oturumlar)
+[README'ye dön](../README_TR.md) · [Modüller](MODULES_TR.md) · [HTML](HTML_TR.md) · [Öğrenci Rehberi](STUDENT_GUIDE_TR.md#38-http-client)
 
 `HTTP`, AhdCode v0.4.0 ile gelen, derleyici tarafından kayıtlı
 `builtin:HTTP` modülüdür. Açıkça getirilir ve yanındaki bir `HTTP.ahd`
@@ -17,15 +17,21 @@ from HTTP bring HTTPError
 from HTTP bring Cookie
 from HTTP bring SessionStore
 from HTTP bring Session
+from HTTP bring Client
+from HTTP bring ClientRequest
+from HTTP bring ClientResponse
 ```
 
-`HTTP` küçük, tipli yerel bir web sunucusudur. Tam yolları kaydeder, her
-isteğin bir anlık kopyasını okur ve bir `Response` döndürürsünüz. v0.5.0 HTTP
-çerezleri ve bellek içi sunucu taraflı `SessionStore` ekler. Middleware,
-yönlendirici DSL'si, HTTPS, multipart, WebSocket, yol parametresi veya kimlik
-doğrulama çerçevesi yoktur. Uygulama, AhdCode çalışma zamanının içindeki Go
-`net/http` paketini kullanır; ayrı bir HTTP, çerez veya oturum yardımcı
-süreci yoktur.
+`HTTP` küçük, tipli yerel bir web sunucusu **ve** giden bir HTTP/HTTPS
+istemcisidir. Tam yolları kaydeder, her isteğin bir anlık kopyasını okur ve
+bir `Response` döndürürsünüz. v0.5.0 HTTP çerezleri ve bellek içi sunucu
+taraflı `SessionStore` ekler. v0.6.0, dış HTTP ve HTTPS API'lerini çağırmak
+için `Client`, `ClientRequest` ve `ClientResponse` ekler. Sunucu
+`Request`/`Response` ile giden `ClientRequest`/`ClientResponse` ayrı türlerdir.
+Middleware, yönlendirici DSL'si, multipart, WebSocket, yol parametresi, kimlik
+doğrulama çerçevesi veya yapay zeka satıcı modülü yoktur. Uygulama, AhdCode
+çalışma zamanının içindeki Go `net/http` paketini kullanır; ayrı bir HTTP,
+çerez, oturum veya istemci yardımcı süreci yoktur.
 
 ## Genel yüzey
 
@@ -43,6 +49,12 @@ HTTP.sessions(
     secure: Bool := false
     sameSite: String := "Lax"
 ) -> SessionStore
+HTTP.client(
+    timeoutSeconds: Int := 30
+    maxResponseBytes: Int := 8388608
+    followRedirects: Bool := true
+) -> Client
+HTTP.clientRequest(method: String, url: String) -> ClientRequest
 
 Server.get(path: String, handler: Function)   -> Nothing
 Server.post(path: String, handler: Function)  -> Nothing
@@ -81,13 +93,31 @@ Session.clear()                           -> Nothing
 Session.rotate()                          -> Nothing
 Session.destroy()                         -> Nothing
 
+Client.send(request: ClientRequest) -> ClientResponse
+Client.get(url: String)             -> ClientResponse
+Client.post(
+    url: String
+    body: String
+    contentType: String := "text/plain; charset=utf-8"
+) -> ClientResponse
+
+ClientRequest.withHeader(name: String, value: String) -> ClientRequest
+ClientRequest.addHeader(name: String, value: String)  -> ClientRequest
+ClientRequest.withBody(body: String)                  -> ClientRequest
+
+ClientResponse.status()              -> Int
+ClientResponse.body()                -> String
+ClientResponse.header(name: String)  -> String?
+ClientResponse.headerAll(name: String) -> List<String>
+ClientResponse.url()                 -> String
+
 HTTPError  (Error'dan türer)
 ```
 
-`Server`, `Request`, `Response`, `Cookie`, `SessionStore` ve `Session` opak
-yerleşik Sınıflardır: `Server()`, `Request()`, `Response()`, `Cookie()`,
-`SessionStore()` veya `Session()` ile oluşturulamazlar. Atlanan
+`Server`, `Request`, `Response`, `Cookie`, `SessionStore`, `Session`, `Client`,
+`ClientRequest` ve `ClientResponse` opak yerleşik Sınıflardır. Atlanan
 `HTTP.sessions` argümanları `ahd_session`, `86400`, `false` ve `"Lax"`'tır.
+Atlanan `HTTP.client` argümanları `30`, `8388608` ve `true`'dur.
 
 ## İşleyici imzası
 
@@ -219,11 +249,38 @@ yazmaz; `commit` yeni bir `Response` döndürür.
 sonrası `get` `null`, `has` `false`; mutasyon `HTTPError` fırlatır.
 `remove` bir anahtarı, `clear` değerleri, `destroy` oturumu siler.
 
+## Giden istemci
+
+`HTTP.client` yeniden kullanılabilir bir `Client` üretir. `close()` yoktur.
+`timeoutSeconds` toplam istek zaman aşımıdır ve 0'dan büyük olmalıdır.
+`maxResponseBytes` tamponlanan gövde sınırıdır (varsayılan 8 MiB). Tam `N`
+bayt başarılıdır; `N + 1` `HTTPError` fırlatır. Otomatik yeniden deneme
+yoktur.
+
+`HTTP.clientRequest` yöntemi sessizce büyültmez. URL mutlak `http` veya
+`https` olmalı, konak boş olmamalıdır. Parça, userinfo, `file:` / `ftp:` /
+`data:` / `javascript:` ve bozuk URL'ler `HTTPError` fırlatır.
+
+`withHeader` o başlık adını büyük/küçük harf duyarsız değiştirir.
+`addHeader` ekler. `withBody` String gövdeyi değiştirir. `Content-Length` ve
+`Host` reddedilir. Gizli başlık değerleri hata iletilerine yazılmaz.
+
+`400`/`401`/`403`/`404`/`429`/`500`/`503` yine `ClientResponse` döner.
+`HTTPError` geçersiz sözleşme, DNS, bağlantı, TLS, zaman aşımı, yönlendirme
+politikası, aşırı büyük gövde ve geçersiz UTF-8 içindir. Geçersiz UTF-8
+U+FFFD ile değiştirilmez. HTTPS sistem köklerini doğrular; güvensiz TLS seçeneği
+yoktur. `http://` localhost için desteklenir.
+
+`followRedirects = false` ilk 3xx yanıtını döndürür. `true` en fazla 10
+yönlendirme izler. **HTTPS → HTTP yönlendirmesi reddedilir.** Konak veya
+port değişince `Authorization` ve `Cookie` iletilmez.
+
 ## Hatalar ve sınırlama
 
 `HTTPError`, `Error`'dan türer. İşleyici herhangi bir Error fırlatırsa istemci
 **500** `Internal Server Error` alır. İç ileti stderr'e yazılır, istemciye
-değil. Sunucu sonraki isteklere hizmet etmeye devam eder.
+değil. Sunucu sonraki isteklere hizmet etmeye devam eder. 400 ve üzeri HTTP
+durum kodu tek başına `HTTPError` değildir.
 
 ## Eşzamanlılık
 
@@ -233,7 +290,10 @@ sunucuda iki işleyici aynı anda çalışmaz.
 
 ## Bu modülün yapmadıkları
 
-HTTPS/TLS, HTTP/2 API, HTTP/3, WebSocket, SSE, multipart, dosya yükleme,
-statik dosya sunucusu, veritabanı oturumu, kimlik doğrulama, CSRF, middleware, yol
-parametreleri, joker, regex yolları, ters vekil, sıkıştırma API'si veya
-önbellekleme yoktur. Oturum değerleri String'dir.
+Gelen sunucunun HTTPS dinleyicisi yoktur. Giden istemcinin çerez kavanozu,
+ikili gövde, akış API'si, SSE, WebSocket, multipart, dosya yükleme, otomatik
+yeniden deneme, OAuth, özel CA, istemci sertifikası, güvensiz TLS baypası,
+vekil API'si veya yapay zeka satıcı modülü yoktur. HTTP/2 veya HTTP/3 API'si,
+statik dosya sunucusu, veritabanı oturumu, kimlik doğrulama çerçevesi, CSRF,
+middleware, yol parametreleri, joker, regex yolları, ters vekil, sıkıştırma
+API'si veya önbellekleme yoktur. JSON, HTTP tarafından ima edilmez.

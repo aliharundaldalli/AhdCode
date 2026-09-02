@@ -38,7 +38,8 @@ sembolleri, signature help, referans bulma, rename, semantic token, inlay
 hint, code action, biçimlendirme, workspace sembolleri, katlama ve seçim
 aralıkları) — hepsi derleyici destekli. v0.4.0 modülleri (`HTTP` ve `HTML`
 gibi) aynı derleyici modül arayüzünden görünür; v0.5.0 `cookie`/`sessions`
-dışa aktarımları da aynı yoldandır. HTTP/çerez/oturuma özel bir LSP
+ve v0.6.0 `client`/`clientRequest`/`Client` dışa aktarımları da aynı
+yoldandır. HTTP/çerez/oturum/istemciye özel bir LSP
 kataloğu yoktur. v0.3.0'ın `SQLite`'ı aynı yolu kullanır.
 İsteğe bağlı bir `--stdio` dışında argüman kabul etmez (kabul
 edilir ve yok sayılır — gerçek LSP istemci kütüphaneleri, sunucuyu stdio

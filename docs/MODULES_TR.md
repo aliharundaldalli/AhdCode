@@ -46,7 +46,9 @@ dependencies) derleme zamanı hatalarıdır.
 `Math`, `Time`, `Latex`, `Word`, `Excel`, `PDF`, `Archive`, `Path`, `File`, `Regex`, `CSV`, `Data`, `Statistics`, `Plot`, `Numeric`, `JSON`, `SQLite`, `HTTP`, `HTML`, `XML`, `Env`, `Lists` ve `KeyValue` derleyici tarafından
 kayıtlıdır (compiler-registered) ve aynı içe aktarım biçimlerini kullanır.
 Yerel bir dosya, aynı isimdeki standart bir modülün yerini alamaz (shadow
-edemez). Ayrıca sıradan isim uzayı takma adı (namespace alias) biçimini de
+edemez). `HTTP` hem gelen sunucu (`Server` / `Request` / `Response`, çerezler,
+oturumlar) hem de giden `Client` / `ClientRequest` / `ClientResponse`
+yüzeyidir. Ayrıca sıradan isim uzayı takma adı (namespace alias) biçimini de
 kullanabilirler:
 
 ```ahd

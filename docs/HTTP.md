@@ -2,7 +2,7 @@
 
 [English] · [Türkçe](HTTP_TR.md)
 
-[Back to README](../README.md) · [Modules](MODULES.md) · [HTML](HTML.md) · [Student Guide](STUDENT_GUIDE_EN.md#37-cookies-and-sessions)
+[Back to README](../README.md) · [Modules](MODULES.md) · [HTML](HTML.md) · [Student Guide](STUDENT_GUIDE_EN.md#38-http-client)
 
 `HTTP` is the compiler-registered `builtin:HTTP` module, introduced in
 AhdCode v0.4.0. It is explicit and a sibling `HTTP.ahd` cannot shadow it:
@@ -16,14 +16,21 @@ from HTTP bring HTTPError
 from HTTP bring Cookie
 from HTTP bring SessionStore
 from HTTP bring Session
+from HTTP bring Client
+from HTTP bring ClientRequest
+from HTTP bring ClientResponse
 ```
 
-`HTTP` is a small, typed local web server. You register exact routes, read a
-snapshot of each request, and return a `Response`. v0.5.0 adds HTTP cookies
-and an in-memory server-side `SessionStore`. There is no middleware, router
-DSL, HTTPS, multipart, WebSocket, path parameters, or authentication
-framework. The implementation uses Go's `net/http` inside the AhdCode
-runtime; there is no companion HTTP, cookie, or session helper process.
+`HTTP` is a small, typed local web server **and** an outbound HTTP/HTTPS
+client. You register exact routes, read a snapshot of each request, and return
+a `Response`. v0.5.0 adds HTTP cookies and an in-memory server-side
+`SessionStore`. v0.6.0 adds `Client`, `ClientRequest`, and `ClientResponse` so
+a program can call external HTTP and HTTPS APIs. Server `Request`/`Response`
+and outbound `ClientRequest`/`ClientResponse` are distinct types. There is no
+middleware, router DSL, multipart, WebSocket, path parameters, authentication
+framework, or AI vendor module. The implementation uses Go's `net/http` inside
+the AhdCode runtime; there is no companion HTTP, cookie, session, or client
+helper process.
 
 ## Public surface
 
@@ -41,6 +48,12 @@ HTTP.sessions(
     secure: Bool := false
     sameSite: String := "Lax"
 ) -> SessionStore
+HTTP.client(
+    timeoutSeconds: Int := 30
+    maxResponseBytes: Int := 8388608
+    followRedirects: Bool := true
+) -> Client
+HTTP.clientRequest(method: String, url: String) -> ClientRequest
 
 Server.get(path: String, handler: Function)   -> Nothing
 Server.post(path: String, handler: Function)  -> Nothing
@@ -79,17 +92,37 @@ Session.clear()                           -> Nothing
 Session.rotate()                          -> Nothing
 Session.destroy()                         -> Nothing
 
+Client.send(request: ClientRequest) -> ClientResponse
+Client.get(url: String)             -> ClientResponse
+Client.post(
+    url: String
+    body: String
+    contentType: String := "text/plain; charset=utf-8"
+) -> ClientResponse
+
+ClientRequest.withHeader(name: String, value: String) -> ClientRequest
+ClientRequest.addHeader(name: String, value: String)  -> ClientRequest
+ClientRequest.withBody(body: String)                  -> ClientRequest
+
+ClientResponse.status()              -> Int
+ClientResponse.body()                -> String
+ClientResponse.header(name: String)  -> String?
+ClientResponse.headerAll(name: String) -> List<String>
+ClientResponse.url()                 -> String
+
 HTTPError  (derives from Error)
 ```
 
-`Server`, `Request`, `Response`, `Cookie`, `SessionStore`, and `Session` are
-opaque built-in Classes: they cannot be constructed with `Server()`,
-`Request()`, `Response()`, `Cookie()`, `SessionStore()`, or `Session()`, have
-no public attributes, and are obtained only from the functions above. All
+`Server`, `Request`, `Response`, `Cookie`, `SessionStore`, `Session`, `Client`,
+`ClientRequest`, and `ClientResponse` are opaque built-in Classes: they cannot
+be constructed with `Server()`, `Client()`, or the other type names, have no
+public attributes, and are obtained only from the functions above. All
 arguments are positional. Omitted `maxBodyBytes` is `1048576`. Omitted
 `HTTP.text` / `HTTP.html` status is `200`. Omitted redirect status is `303`.
 Omitted `HTTP.deleteCookie` path is `"/"`. Omitted `HTTP.sessions` arguments
-are `ahd_session`, `86400`, `false`, and `"Lax"`.
+are `ahd_session`, `86400`, `false`, and `"Lax"`. Omitted `HTTP.client`
+arguments are `30`, `8388608`, and `true`. Omitted `Client.post` content type
+is `text/plain; charset=utf-8`.
 
 ## Handler signature
 
@@ -305,8 +338,12 @@ mutation creates stored state.
 routes, invalid status, invalid redirect status, invalid headers, invalid
 cookies (name, value, path, SameSite, Max-Age), invalid session options,
 session lifecycle misuse after `destroy`, bind failures, and invalid UTF-8
-`body()` access raise `HTTPError`. Unknown or expired session cookies are not
-errors; they become a new anonymous session.
+`body()` access raise `HTTPError`. Client contract and transport failures
+(invalid URL, invalid client headers, DNS, connection, TLS verification,
+timeout, more than 10 redirects, HTTPS-to-HTTP redirect, oversize body,
+invalid response UTF-8) also raise `HTTPError`. An HTTP status of 400 or
+higher is not an `HTTPError` by itself. Unknown or expired session cookies are
+not errors; they become a new anonymous session.
 
 If a handler raises any Error (or panics in the runtime), the client receives
 **500** `Internal Server Error`. The internal message is written to stderr, not
@@ -319,10 +356,74 @@ Go's `net/http` accepts connections concurrently. AhdCode handlers on one
 at the same time on the same server. There is no AhdCode thread, goroutine,
 async, or lock API.
 
+## Outbound client
+
+`HTTP.client` builds a reusable `Client`. There is no `close()`. The runtime
+reuses HTTP connections internally. `timeoutSeconds` is the **total** request
+timeout and must be greater than 0. `maxResponseBytes` bounds the buffered
+response body and must be greater than 0. The default body limit is 8 MiB
+(`8388608`). The runtime reads at most `maxResponseBytes + 1` bytes; exactly
+`N` bytes succeed and `N + 1` raises `HTTPError`. There is no millisecond or
+floating timeout API.
+
+`HTTP.clientRequest(method, url)` does **not** uppercase the method. `"GET"`
+is GET; `"get"` stays `"get"` if it is a valid HTTP token. The URL must be
+absolute `http` or `https` with a non-empty host. Fragments, userinfo,
+`file:`, `ftp:`, `data:`, `javascript:`, and malformed URLs raise `HTTPError`.
+Send credentials with headers, not embedded userinfo.
+
+`withHeader` replaces that header name case-insensitively. `addHeader`
+appends another value. `withBody` replaces the String body. The original
+request is unchanged. There is no binary body, automatic JSON, form encoding,
+or multipart. Applications use the existing JSON module when they need JSON.
+
+Header names and values are validated. CR, LF, invalid names, `Content-Length`,
+and `Host` raise `HTTPError`. `Authorization`, `Content-Type`, `Accept`, and
+`User-Agent` work normally. Failures never include secret header values in
+`HTTPError.message` or stderr diagnostics.
+
+`Client.send` performs one intended application request. There are **no
+automatic retries**, including POST. HTTP status codes `400`, `401`, `403`,
+`404`, `429`, `500`, and `503` still return `ClientResponse`. Applications
+decide what those statuses mean. `HTTPError` is for invalid URLs, invalid
+request contracts, DNS/connection/TLS failures, timeouts, redirect-policy
+violations, a response larger than `maxResponseBytes`, and a body that is not
+valid UTF-8. Invalid UTF-8 is rejected without U+FFFD replacement and without
+truncation. An empty body is `""`; `204` works.
+
+`Client.get(url)` is a GET with no custom headers or body. `Client.post`
+sets the body and `Content-Type`. For anything richer, build a
+`ClientRequest` and `send` it.
+
+`ClientResponse` is an immutable buffered snapshot. `status()` is the status
+code. `body()` is the UTF-8 String. `header(name)` is the first value or
+`null`. `headerAll(name)` is every value, or `[]`, in observed order.
+`url()` is the final response URL after redirects. There is no public stream
+and no cookie jar.
+
+### HTTPS and HTTP
+
+HTTPS uses the platform/system trusted roots. Certificate chain and hostname
+verification are on. There is no `insecureSkipVerify`, custom CA, or client
+certificate API. An untrusted, self-signed, or expired certificate raises
+`HTTPError`. Plain `http://` remains supported for localhost and tests.
+
+### Redirects
+
+`followRedirects = false` returns the first 3xx `ClientResponse`.
+`followRedirects = true` follows ordinary redirects, at most 10, then
+`HTTPError`. **HTTPS to HTTP redirects are rejected** with `HTTPError`.
+`Authorization` and `Cookie` are not forwarded when the host or port changes.
+Same-host HTTP redirects keep those headers.
+
 ## What this module does not do
 
-No HTTPS/TLS, HTTP/2 API, HTTP/3, WebSocket, SSE, multipart, file upload,
-static-file server, database-backed sessions, authentication, CSRF, middleware, path
-parameters, wildcards, regex routes, reverse proxy, compression API, or
-caching. Bodies are bounded Strings, not a binary type. Session values are
-Strings; structured data is the application's conversion.
+The inbound server still has no HTTPS listener. The outbound client has no
+cookie jar, binary body, streaming API, SSE, WebSocket, multipart, file
+upload, automatic retries, OAuth, custom CA, client certificates, insecure TLS
+bypass, proxy API, or AI/OpenAI/Anthropic/Gemini module. There is no HTTP/2
+or HTTP/3 API, static-file server, database-backed sessions, authentication
+framework, CSRF, middleware, path parameters, wildcards, regex routes, reverse
+proxy, compression API, or caching. Bodies are bounded Strings, not a binary
+type. Session values are Strings; structured data is the application's
+conversion. JSON is never implied by HTTP.
