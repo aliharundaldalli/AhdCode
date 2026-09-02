@@ -69,7 +69,7 @@ Hello!
 
 AhdCode checks the code you wrote before running the program. For example, if you try to use text like a number, or if you use a value that could be `null` without checking it, it will tell you the error before the program even starts, whenever possible. But you don't need to think about these details at the beginning; we'll see examples in later sections.
 
-AhdCode v0.3.0 is the current release. You can run small command-line programs, compile them into standalone local applications, keep data in a local SQLite database, and use the language server (`ahdcode lsp`) from an editor such as VS Code. v0.2.2 completed the everyday language server; v0.3.0 is the start of practical application development.
+AhdCode v0.3.0 is the current release. You can run small command-line programs or compile them into local executables, keep data in a local SQLite database, and use the language server (`ahdcode lsp`) from an editor such as VS Code. Some standard modules, such as SQLite, may use companion runtime helpers supplied with AhdCode. v0.2.2 completed the everyday language server; v0.3.0 is the start of practical application development.
 
 > **Technical note:** Checking types before the program runs is called *static checking*.
 

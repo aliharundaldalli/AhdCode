@@ -69,7 +69,7 @@ Merhaba!
 
 AhdCode, programı çalıştırmadan önce yazdığınız kodu kontrol eder. Örneğin bir metni sayı gibi kullanmaya çalışırsanız veya `null` olabilecek bir değeri kontrol etmeden kullanırsanız, mümkün olduğunda hatayı daha program başlamadan söyler. Ama başlangıçta bunun ayrıntılarını düşünmeniz gerekmiyor; ilerleyen bölümlerde örneklerle göreceğiz.
 
-AhdCode v0.3.0 güncel sürümdür. Küçük komut satırı programlarını çalıştırabilir, onları tek başına çalışan yerel uygulamalara dönüştürebilir, veriyi yerel bir SQLite veritabanında tutabilir ve dil sunucusunu (`ahdcode lsp`) VS Code gibi bir editörden kullanabilirsiniz. v0.2.2 pratik günlük dil sunucusunu tamamladı; v0.3.0 gerçek uygulama geliştirmenin başlangıcıdır.
+AhdCode v0.3.0 güncel sürümdür. Küçük komut satırı programlarını çalıştırabilir veya yerel executable uygulamalara derleyebilirsiniz; veriyi yerel bir SQLite veritabanında tutabilir ve dil sunucusunu (`ahdcode lsp`) VS Code gibi bir editörden kullanabilirsiniz. Bazı standart modüller, örneğin SQLite, derlenmiş uygulamanın yanında AhdCode'un sağladığı yardımcı çalışma zamanı bileşenlerini kullanabilir. v0.2.2 pratik günlük dil sunucusunu tamamladı; v0.3.0 gerçek uygulama geliştirmenin başlangıcıdır.
 
 > **Teknik not:** Program çalışmadan önce türlerin kontrol edilmesine *static checking* denir.
 
