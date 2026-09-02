@@ -77,3 +77,37 @@ func TestCompletionSQLiteArrivesThroughTheGenericModulePath(t *testing.T) {
 		t.Fatalf("expected SQLiteError/SQLiteValue exports, got %#v", items)
 	}
 }
+
+// TestCompletionHTTPAndHTMLArriveThroughTheGenericModulePath is the v0.4.0
+// counterpart: HTTP and HTML reach completion with no module-specific code
+// anywhere in internal/lsp.
+func TestCompletionHTTPAndHTMLArriveThroughTheGenericModulePath(t *testing.T) {
+	items := completionAt(t, "bring HT\n", "file:///main.ahd", len("bring HT"))
+	if !hasCompletionLabel(items, "HTTP") || !hasCompletionLabel(items, "HTML") {
+		t.Fatalf("expected HTTP and HTML among module completions, got %#v", items)
+	}
+	text := "bring HTTP\nx := HTTP.\n"
+	items = completionAt(t, text, "file:///main.ahd", len(text)-1)
+	for _, label := range []string{"server", "text", "html", "response", "redirect", "Server", "Request", "Response", "HTTPError"} {
+		if !hasCompletionLabel(items, label) {
+			t.Fatalf("expected %s among HTTP member completions, got %#v", label, items)
+		}
+	}
+	text = "bring HTML\nx := HTML.\n"
+	items = completionAt(t, text, "file:///main.ahd", len(text)-1)
+	for _, label := range []string{"text", "element", "render", "document", "HTMLNode", "HTMLError"} {
+		if !hasCompletionLabel(items, label) {
+			t.Fatalf("expected %s among HTML member completions, got %#v", label, items)
+		}
+	}
+	text = "from HTTP bring HTTP\n"
+	items = completionAt(t, text, "file:///main.ahd", len(text)-1)
+	if !hasCompletionLabel(items, "HTTPError") {
+		t.Fatalf("expected HTTPError export, got %#v", items)
+	}
+	text = "from HTML bring HTML\n"
+	items = completionAt(t, text, "file:///main.ahd", len(text)-1)
+	if !hasCompletionLabel(items, "HTMLError") || !hasCompletionLabel(items, "HTMLNode") {
+		t.Fatalf("expected HTMLError/HTMLNode exports, got %#v", items)
+	}
+}
