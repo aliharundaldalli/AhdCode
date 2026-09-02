@@ -21,10 +21,6 @@
     "AhdCode",
     "language"
   ],
-  "activationEvents": [
-    "onLanguage:ahdcode",
-    "onCommand:ahdcode.runFile"
-  ],
   "main": "./extension.js",
   "contributes": {
     "languages": [
