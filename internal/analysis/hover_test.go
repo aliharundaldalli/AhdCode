@@ -188,3 +188,16 @@ func TestHoverUnicodeSource(t *testing.T) {
 		t.Fatalf("use hover with Unicode source = %#v, ok = %v", use, ok)
 	}
 }
+
+func TestHoverHTTPCookieAndSessionArriveThroughTheModuleInterface(t *testing.T) {
+	text := "bring HTTP\nfrom HTTP bring Session\ncookie := HTTP.cookie(\"a\", \"1\")\n"
+	directory := t.TempDir()
+	path := filepath.Join(directory, "main.ahd")
+	store := NewStore()
+	store.Open(path, text)
+
+	hover, ok := store.Hover(path, offsetOf(t, text, "HTTP.cookie")+len("HTTP."))
+	if !ok || !strings.Contains(hover.Text, "cookie") || !strings.Contains(hover.Text, "Cookie") {
+		t.Fatalf("HTTP.cookie hover = %#v, ok = %v", hover, ok)
+	}
+}

@@ -12,7 +12,7 @@ write(HTML.render(HTML.text("<script>alert(1)</script>")))
 write(HTML.document("Tom & Jerry", [HTML.text("Ayşe ☕")]))
 `
 	var output, errorOutput bytes.Buffer
-	Run(strings.NewReader(input), &output, &errorOutput, "AhdCode v0.4.0")
+	Run(strings.NewReader(input), &output, &errorOutput, "AhdCode v0.5.0")
 	text := output.String()
 	if strings.Contains(text, "<script>") || !strings.Contains(text, "&lt;script&gt;") {
 		t.Fatalf("REPL HTML output was not escaped:\n%s\nerrors:\n%s", text, errorOutput.String())

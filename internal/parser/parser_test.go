@@ -1113,3 +1113,20 @@ func TestSameExpressionMemberChainRemainsValid(t *testing.T) {
 		t.Fatalf("valid same-expression chain reported %+v", result.Diagnostics)
 	}
 }
+
+func TestMemberHasAfterDotParsesAsACall(t *testing.T) {
+	result := parseText(t, "present := session.has(\"count\")\n")
+	requireClean(t, result)
+	decl, ok := result.Program.Statements[0].(*ast.VariableDecl)
+	if !ok {
+		t.Fatalf("statement = %T", result.Program.Statements[0])
+	}
+	call, ok := decl.Initializer.(*ast.CallExpr)
+	if !ok {
+		t.Fatalf("initializer = %T", decl.Initializer)
+	}
+	member, ok := call.Callee.(*ast.MemberExpr)
+	if !ok || member.Name != "has" {
+		t.Fatalf("callee = %#v", call.Callee)
+	}
+}

@@ -83,7 +83,7 @@ except SQLiteError as error {
 write("session alive")
 `
 	var output, errorOutput bytes.Buffer
-	Run(strings.NewReader(input), &output, &errorOutput, "AhdCode v0.4.0")
+	Run(strings.NewReader(input), &output, &errorOutput, "AhdCode v0.5.0")
 	text := output.String()
 	for _, want := range []string{
 		"1\n",   // lastInsertId
@@ -132,7 +132,7 @@ db.execute("INSERT INTO notes (title, body) VALUES (?, ?)", [SQLite.fromString("
 db.close()
 `
 	var output, errorOutput bytes.Buffer
-	Run(strings.NewReader(first), &output, &errorOutput, "AhdCode v0.4.0")
+	Run(strings.NewReader(first), &output, &errorOutput, "AhdCode v0.5.0")
 	if errorOutput.Len() != 0 {
 		t.Fatalf("first REPL session errors: %s", errorOutput.String())
 	}
@@ -145,7 +145,7 @@ db.close()
 `
 	output.Reset()
 	errorOutput.Reset()
-	Run(strings.NewReader(second), &output, &errorOutput, "AhdCode v0.4.0")
+	Run(strings.NewReader(second), &output, &errorOutput, "AhdCode v0.5.0")
 	if errorOutput.Len() != 0 {
 		t.Fatalf("second REPL session errors: %s", errorOutput.String())
 	}

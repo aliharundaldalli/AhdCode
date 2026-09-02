@@ -7,7 +7,7 @@ import (
 	"ahdcode/internal/types"
 )
 
-const httpPreamble = "bring HTTP\nfrom HTTP bring Server\nfrom HTTP bring Request\nfrom HTTP bring Response\nfrom HTTP bring HTTPError\n\n"
+const httpPreamble = "bring HTTP\nfrom HTTP bring Server\nfrom HTTP bring Request\nfrom HTTP bring Response\nfrom HTTP bring Cookie\nfrom HTTP bring SessionStore\nfrom HTTP bring Session\nfrom HTTP bring HTTPError\n\n"
 
 func TestHTTPModuleValidUsage(t *testing.T) {
 	result := analyzeWithStandardModules(t, httpPreamble+`home: Function := (request: Request) -> Response {
@@ -20,7 +20,24 @@ func TestHTTPModuleValidUsage(t *testing.T) {
     body: Local String := request.body()
     title: Local String? := request.form("title")
     tags: Local List<String> := request.formAll("tag")
-    return HTTP.text("ok")
+    theme: Local String? := request.cookie("theme")
+    themes: Local List<String> := request.cookieAll("theme")
+    cookie: Local Cookie := HTTP.cookie("theme", "dark")
+    cookie = cookie.withPath("/")
+    cookie = cookie.withHttpOnly(true)
+    cookie = cookie.withSecure(false)
+    cookie = cookie.withSameSite("Lax")
+    cookie = cookie.withMaxAge(60)
+    store: Local SessionStore := HTTP.sessions()
+    session: Local Session := store.open(request)
+    present: Local Bool := session.has("count")
+    count: Local String? := session.get("count")
+    session.set("count", "1")
+    session.remove("gone")
+    session.clear()
+    session.rotate()
+    session.destroy()
+    return store.commit(session, HTTP.text("ok").withCookie(cookie).withCookie(HTTP.deleteCookie("old")))
 }
 
 created: Response := HTTP.text("ok")
@@ -30,6 +47,13 @@ created = HTTP.response(204, "", "text/plain")
 created = HTTP.redirect("/")
 created = HTTP.redirect("/notes", 303)
 created = created.withHeader("X-App", "AhdCode")
+created = created.withCookie(HTTP.cookie("a", "1"))
+
+store: SessionStore := HTTP.sessions()
+store = HTTP.sessions("user_session")
+store = HTTP.sessions("user_session", 3600)
+store = HTTP.sessions("user_session", 3600, false)
+store = HTTP.sessions("user_session", 3600, false, "Lax")
 
 app: Server := HTTP.server("127.0.0.1", 8080)
 app = HTTP.server("127.0.0.1", 8080, 2048)
@@ -93,6 +117,12 @@ func TestHTTPTypesAreNotConstructedDirectly(t *testing.T) {
 	requireSemanticFailure(t, result)
 	result = analyzeWithStandardModules(t, httpPreamble+"response: Response := Response()\n")
 	requireSemanticFailure(t, result)
+	result = analyzeWithStandardModules(t, httpPreamble+"cookie: Cookie := Cookie()\n")
+	requireSemanticFailure(t, result)
+	result = analyzeWithStandardModules(t, httpPreamble+"store: SessionStore := SessionStore()\n")
+	requireSemanticFailure(t, result)
+	result = analyzeWithStandardModules(t, httpPreamble+"session: Session := Session()\n")
+	requireSemanticFailure(t, result)
 }
 
 func TestHTTPModuleInterfaceExportsExactSurface(t *testing.T) {
@@ -100,16 +130,22 @@ func TestHTTPModuleInterfaceExportsExactSurface(t *testing.T) {
 	if module == nil || module.ModuleID != "builtin:HTTP" {
 		t.Fatalf("HTTP is not a registered builtin module: %#v", module)
 	}
-	wantExports := []string{"HTTPError", "Request", "Response", "Server", "html", "redirect", "response", "server", "text"}
+	wantExports := []string{
+		"Cookie", "HTTPError", "Request", "Response", "Server", "Session", "SessionStore",
+		"cookie", "deleteCookie", "html", "redirect", "response", "server", "sessions", "text",
+	}
 	if strings.Join(module.ExportNames, ",") != strings.Join(wantExports, ",") {
 		t.Fatalf("HTTP exports %v; want %v", module.ExportNames, wantExports)
 	}
 	signatures := map[string]string{
-		"server":   "(host: String, port: Int, maxBodyBytes: Int := default) -> Server",
-		"text":     "(body: String, status: Int := default) -> Response",
-		"html":     "(body: String, status: Int := default) -> Response",
-		"response": "(status: Int, body: String, contentType: String) -> Response",
-		"redirect": "(location: String, status: Int := default) -> Response",
+		"server":       "(host: String, port: Int, maxBodyBytes: Int := default) -> Server",
+		"text":         "(body: String, status: Int := default) -> Response",
+		"html":         "(body: String, status: Int := default) -> Response",
+		"response":     "(status: Int, body: String, contentType: String) -> Response",
+		"redirect":     "(location: String, status: Int := default) -> Response",
+		"cookie":       "(name: String, value: String) -> Cookie",
+		"deleteCookie": "(name: String, path: String := default) -> Cookie",
+		"sessions":     "(cookieName: String := default, maxAgeSeconds: Int := default, secure: Bool := default, sameSite: String := default) -> SessionStore",
 	}
 	for name, want := range signatures {
 		symbol := module.Exports[name]
@@ -142,6 +178,26 @@ app.get("/", home)
 }
 app: Server := HTTP.server("127.0.0.1", 8080)
 app.get("/", home)
+`)
+	requireSemanticFailure(t, result)
+}
+
+func TestHTTPSessionValuesAreStringsOnly(t *testing.T) {
+	result := analyzeWithStandardModules(t, httpPreamble+`home: Function := (request: Request) -> Response {
+    store: Local SessionStore := HTTP.sessions()
+    session: Local Session := store.open(request)
+    session.set("count", 1)
+    return HTTP.text("ok")
+}
+`)
+	requireSemanticFailure(t, result)
+}
+
+func TestHTTPNullableCookieAndSessionGet(t *testing.T) {
+	result := analyzeWithStandardModules(t, httpPreamble+`home: Function := (request: Request) -> Response {
+    theme: Local String := request.cookie("theme")
+    return HTTP.text("ok")
+}
 `)
 	requireSemanticFailure(t, result)
 }

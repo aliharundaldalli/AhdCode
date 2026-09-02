@@ -2,6 +2,7 @@ package analysis
 
 import (
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -104,6 +105,23 @@ func TestSignatureHelpAfterATrailingCommaTargetsTheNextParameter(t *testing.T) {
 	}
 	if help.ActiveParameter != 1 {
 		t.Fatalf("help.ActiveParameter = %d, want 1", help.ActiveParameter)
+	}
+}
+
+func TestSignatureHelpHTTPCookieAndSessions(t *testing.T) {
+	text := "bring HTTP\nvalue := HTTP.cookie(\"a\", \"1\")\nstore := HTTP.sessions(\n"
+	directory := t.TempDir()
+	path := filepath.Join(directory, "main.ahd")
+	store := NewStore()
+	store.Open(path, text)
+
+	cookieHelp, ok := store.SignatureHelp(path, offsetOf(t, text, "HTTP.cookie(\"a\"")+len("HTTP.cookie("))
+	if !ok || !strings.Contains(cookieHelp.Label, "Cookie") {
+		t.Fatalf("HTTP.cookie signature = %#v, ok = %v", cookieHelp, ok)
+	}
+	sessionsHelp, ok := store.SignatureHelp(path, len(text)-1)
+	if !ok || !strings.Contains(sessionsHelp.Label, "SessionStore") {
+		t.Fatalf("HTTP.sessions signature = %#v, ok = %v", sessionsHelp, ok)
 	}
 }
 
