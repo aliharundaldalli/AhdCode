@@ -1,4 +1,4 @@
-# AhdCode v0.1 English Student Guide
+# AhdCode v0.2.2 English Student Guide
 
 This guide is designed so that **even someone who has never programmed before** can follow along. You can read it in order from beginning to end; in each section, you will first see what we want to achieve, then write a working example, and finally learn the necessary rules.
 
@@ -68,7 +68,7 @@ Hello!
 
 AhdCode checks the code you wrote before running the program. For example, if you try to use text like a number, or if you use a value that could be `null` without checking it, it will tell you the error before the program even starts, whenever possible. But you don't need to think about these details at the beginning; we'll see examples in later sections.
 
-AhdCode v0.1 is still an evolving release. You can run small command-line programs directly or compile them into standalone local applications.
+AhdCode v0.2.2 is the current release. You can run small command-line programs, compile them into standalone local applications, and use the language server (`ahdcode lsp`) from an editor such as VS Code.
 
 > **Technical note:** Checking types before the program runs is called *static checking*.
 
@@ -1591,21 +1591,44 @@ current: DateTime := T.now()
 
 ### A first look at File and Path
 
-AhdCode's built-in `Path` and `File` modules are also used via `bring`:
+Sooner or later a program needs to remember something after it exits: a note, a small log, a file the user asked you to read. `Path` builds and inspects path *Strings*. `File` actually talks to the filesystem. They are two modules on purpose — a path is just text until `File` uses it.
+
+Relative paths are resolved against the working folder of the program or REPL session (the folder where you ran `ahdcode`, not necessarily the folder that contains the `.ahd` file).
+
+A tiny notes workflow:
 
 ```ahd
 bring Path
 bring File
 
-path: String := Path.join(["notes", "today.txt"])
-File.createDir("notes")
-File.writeText(path, "hello")
+notesDir: String := "notes"
+path: String := Path.join([notesDir, "today.txt"])
+
+if not File.exists(notesDir) {
+    File.createDir(notesDir)
+}
+
+File.writeText(path, "Buy milk.\n")
 write(File.readText(path))
+write(Path.base(path))
+write(File.exists(path))
 ```
 
-`Path` works with path strings. `File` performs file and folder operations. If you want to catch errors in file operations, you can additionally import the `FileError` type:
+Expected output:
+
+```text
+Buy milk.
+
+today.txt
+true
+```
+
+`Path.join` builds a path from parts. `Path.base` is the last component (`today.txt`); `Path.dir` and `Path.ext` are the other common inspections. `File.exists` returns `false` for a missing path instead of raising. `File.createDir` makes a directory. `File.writeText` overwrites (or creates) a UTF-8 text file; `File.readText` reads it back. `File.append` adds to the end without replacing the whole file.
+
+When the path is missing *and* you asked to read it, that is a `FileError` (it inherits from `IOError`):
 
 ```ahd
+bring File
 from File bring FileError
 
 attempt {
@@ -1616,11 +1639,13 @@ except FileError as error {
 }
 ```
 
-`FileError` inherits from the `IOError` class. Relative paths use the working folder of the program or REPL session.
+**Try it yourself:** Change the note text, run the program twice, then switch `writeText` to `append` and see both lines in the file.
+
+The full list of operations lives in the [File and Path reference](FILESYSTEM.md).
 
 ### A first look at Regex
 
-AhdCode's built-in `Regex` module compiles a pattern into a `Pattern` value, then lets you ask questions about a String using it:
+A regular expression is a tiny language for describing text shapes: “one or more digits”, “starts with a letter”, “an email-like token”. In AhdCode you compile that description once into a `Pattern`, then ask questions about Strings with it.
 
 ```ahd
 bring Regex
@@ -1628,25 +1653,44 @@ from Regex bring Pattern
 
 digits: Pattern := Regex.compile("[0-9]+")
 
-write(digits.matches("order #482"))       // true
-write(digits.find("order #482, item #7")) // "482"
-write(digits.findAll("order #482, item #7")) // ["482", "7"]
+write(digits.matches("order #482"))
+write(digits.find("order #482, item #7"))
+write(digits.findAll("order #482, item #7"))
+write(digits.replace("room 12 and room 7", "N"))
+write(digits.split("a12b34c"))
 ```
 
-The Class produced by `Regex.compile` is called `Pattern`, not `Regex` -- `bring Regex` already names the module itself, so the compiled-pattern type needs its own name (`from Regex bring Pattern`) to be written as a type.
+Expected output:
 
-`find` returns `String?` because there might be no match at all, so check it before use, exactly like any other nullable value:
+```text
+true
+482
+["482", "7"]
+room N and room N
+["a", "b", "c"]
+```
+
+The Class produced by `Regex.compile` is called `Pattern`, not `Regex` — `bring Regex` already names the module, so the compiled-pattern type needs its own name (`from Regex bring Pattern`) when you write it as a type.
+
+`matches` is true if the pattern occurs *anywhere* in the text (anchor it yourself with `^` / `$` when you need “the whole string”). `find` returns `String?` because there might be no match — check it before use, exactly like any other nullable value:
 
 ```ahd
+bring Regex
+from Regex bring Pattern
+
+digits: Pattern := Regex.compile("[0-9]+")
 found: String? := digits.find("no numbers here")
 if found == null {
     write("nothing found")
 }
 ```
 
-An invalid pattern raises `RegexError`:
+`findAll` returns every match. `replace` returns a **new** String (the original text is unchanged). `split` cuts the text at each match. `groups` returns the captured groups of the first match as `List<String>?`.
+
+An invalid pattern raises `RegexError` at compile-pattern time, not later during `find`:
 
 ```ahd
+bring Regex
 from Regex bring RegexError
 
 attempt {
@@ -1657,34 +1701,60 @@ except RegexError as error {
 }
 ```
 
-See [the Regex module reference](REGEX.md) for `replace`, `split`, and `groups`.
+**Try it yourself:** Compile a pattern that matches a simple three-letter word and test it against `"cat"` and `"catalog"`.
+
+See [the Regex module reference](REGEX.md) for `groups` details and the full pattern syntax.
 
 ### A first look at CSV
 
-`CSV` transports text as raw String rows or header-keyed String records:
+CSV is the spreadsheet-as-text format: commas (or another delimiter) between cells, newlines between rows. `CSV` only transports **String**. It never decides that `"42"` is an `Int` or that `"2026-01-01"` is a date — you convert when *you* know what the column means.
+
+There are two first-use shapes:
+
+- **rows** — `List<List<String>>`: each inner list is one row, including the header
+- **records** — `List<Pair<String, String>>`: each Pair uses the header as keys
 
 ```ahd
 bring CSV
 
-rows: List<List<String>> := CSV.parse("name,age\nAli,42\n")
-records: List<Pair<String, String>> := CSV.parseRecords("name,age\nAli,42\n")
+text: String := "name,age\nAli,42\nMerve,19\n"
+
+rows: List<List<String>> := CSV.parse(text)
+records: List<Pair<String, String>> := CSV.parseRecords(text)
+
+write(rows[1][0])
 write(records[0]["name"])
+
+ages: List<Int> := []
+for record in records {
+    ages.add(int(record["age"]))
+}
+write(sum(ages))
 ```
 
-CSV never infers numbers or dates. Malformed input and invalid record shapes
-raise `CSVError`. See [the CSV module reference](CSV.md).
+Expected output:
+
+```text
+Ali
+Ali
+61
+```
+
+Malformed quoting, a bad delimiter, or a record that does not match the header raises `CSVError`. You can also `CSV.read` / `CSV.write` a file path, and `stringify` / `stringifyRecords` to go back to text.
+
+**Try it yourself:** Add a third person to the CSV text and print that record's `age` after converting with `int(...)`.
+
+See [the CSV module reference](CSV.md) for delimiters, files, and error details.
 
 ### A first look at Data tables
 
-Once text is in, `Data` gives you a `Table` to work with. Every cell is still a
-`String`, and every operation returns a **new** table instead of changing the
-one you had:
+Once text is in, `Data` gives you a `Table`: named columns, rows you can filter and reshape. Every cell is still a `String`. Every transformation returns a **new** table — the one you already have does not change.
 
 ```ahd
 bring Data
 from Data bring Table
 
-table: Table := Data.fromCSV("name,score\nAli,91\nAyse,78\n")
+table: Table := Data.fromCSV("name,score,city\nAli,91,Adana\nAyse,78,Ankara\nDeniz,85,Adana\n")
 
 write(table.rowCount())
 write(table.columns())
@@ -1692,37 +1762,69 @@ write(table.columns())
 passed: Table := table.filter(
     lambda (row: Pair<String, String>) -> int(row["score"]) >= 80
 )
+namesOnly: Table := passed.select(["name", "score"])
 
-write(passed.column("name"))
+write(namesOnly.column("name"))
 write(table.rowCount())
 ```
 
-=>
+Expected output:
 
 ```text
-2
-["name", "score"]
-["Ali"]
-2
+3
+["name", "score", "city"]
+["Ali", "Deniz"]
+3
 ```
 
-The last line is the point: `table` still has both rows, because `filter`
-returned a new table.
+The last line is the point: `table` still has three rows, because `filter` and `select` returned new tables. `drop(["city"])` would hide a column instead of keeping a list of names.
 
-Notice `int(row["score"])`. Data never guesses that `"91"` is a number, so you
-convert when you need one — the same rule you already know from the rest of the
-language. A whole numeric column works the same way:
+Notice `int(row["score"])`. Data never guesses that `"91"` is a number. A whole numeric column works the same way:
 
 ```ahd
+bring Data
+from Data bring Table
+
+table: Table := Data.fromCSV("name,score\nAli,91\nAyse,78\n")
 scores: List<Real> := table.column("score").map(
     lambda (value: String) -> real(value)
 )
+write(scores)
 ```
 
-There is also `sort`, `select`, `drop`, `rename`, `reverse`, `head`, `tail`,
-`transform`, `derive`, `unique`, `valueCounts`, and `groupBy`. Asking for a
-column that does not exist raises `DataError`. See
-[the Data module reference](DATA.md).
+A realistic second step is “keep the people who passed, drop the city, write CSV text”:
+
+```ahd
+bring Data
+from Data bring Table
+
+table: Table := Data.fromCSV("name,score,city\nAli,91,Adana\nAyse,78,Ankara\n")
+passed: Table := table.filter(
+    lambda (row: Pair<String, String>) -> int(row["score"]) >= 80
+)
+namesOnly: Table := passed.select(["name", "score"])
+write(namesOnly.toCSV())
+```
+
+Asking for a column that does not exist raises `DataError`:
+
+```ahd
+bring Data
+from Data bring Table
+from Data bring DataError
+
+table: Table := Data.fromCSV("name,score\nAli,91\n")
+attempt {
+    write(table.column("grade"))
+}
+except DataError as error {
+    write("no such column")
+}
+```
+
+**Try it yourself:** Change the filter to `>= 90` and print how many rows remain in `passed` with `rowCount()`.
+
+There is also `sort`, `rename`, `reverse`, `head`, `tail`, `transform`, `derive`, `unique`, `valueCounts`, and `groupBy`. See [the Data module reference](DATA.md).
 
 ## 20. Fundamentals module
 
@@ -1861,6 +1963,21 @@ Commonly used ones:
 
 For exponentiation, use the language's `^` operator instead of `Math.pow`. `abs`, `sum`, `min`, and `max` are not in `Math`; they are directly available Fundamentals functions.
 
+A tiny numerical example — hypotenuse:
+
+```ahd
+bring Math
+
+a: Real := 3.0
+b: Real := 4.0
+c: Real := Math.sqrt((a ^ 2.0) + (b ^ 2.0))
+write(c)
+```
+
+```text
+5.0
+```
+
 ### Generating random numbers
 
 ```ahd
@@ -1875,6 +1992,8 @@ write(Math.random())
 If you want to obtain the exact same sequence of results again during testing, you can provide a seed:
 
 ```ahd
+bring Math
+
 Math.seed(42)
 ```
 
@@ -1883,6 +2002,8 @@ If the same seed is provided again, the same sequence of random numbers starts o
 `Math.random`, `Math.randomInt`, and `List.shuffle` use the same shared randomness state; every call advances the sequence. `randomInt(5, 5)` or an empty/single-element `shuffle` do not consume the randomness state.
 
 > **Caution:** Do not use this random number generator for cryptography or security purposes.
+
+**Try it yourself:** Call `Math.seed(1)`, print `randomInt(1, 6)` three times, run the program again, and confirm you get the same three numbers.
 
 ## 22. Time module
 
@@ -1945,6 +2066,9 @@ If `hour`, `minute`, `second`, and `millisecond` are not provided, they default 
 ### Comparing two times
 
 ```ahd
+bring Time
+from Time bring DateTime
+
 morning: DateTime := Time.dateTime(year: 2026, month: 1, day: 1, hour: 9)
 evening: DateTime := Time.dateTime(year: 2026, month: 1, day: 1, hour: 21)
 
@@ -1958,6 +2082,8 @@ Instead of `<` and `>`, these readable methods are used for dates.
 ### Duration between two times
 
 ```ahd
+bring Time
+from Time bring DateTime
 from Time bring Duration
 
 first: DateTime := Time.dateTime(year: 2026, month: 1, day: 1)
@@ -1973,6 +2099,8 @@ write(gap.seconds)
 ### Calendar information
 
 ```ahd
+bring Time
+
 write(Time.Calendar.isLeapYear(2028))
 write(Time.Calendar.daysInMonth(2028, 2))
 write(Time.Calendar.weekday(2026, 8, 29))
@@ -1981,6 +2109,8 @@ write(Time.Calendar.weekday(2026, 8, 29))
 ### Delaying a task or measuring its duration
 
 ```ahd
+bring Time
+
 start: Real := Time.monotonic()
 Time.sleep(500)
 elapsed: Real := Time.monotonic() - start
@@ -1991,137 +2121,287 @@ write(elapsed >= 0.5)
 
 ## 23. Statistics module
 
-The `Statistics` module provides descriptive statistics for `List<Int>` or `List<Real>`. It does not draw charts (for visualization, see `Plot`).
+A list of numbers is not yet an answer. “What is typical?”, “how spread out is this?”, “what is the middle value?” — those questions belong to `Statistics`. The module does **not** draw pictures (that is `Plot`) and it does **not** read table cells as text (that is `Data`). You hand it a `List<Int>` or a `List<Real>` and it returns a number.
 
 ```ahd
 bring Statistics
 
-scores: List<Int> := [70, 80, 90]
+scores: List<Int> := [70, 80, 80, 90, 100]
+
 write(Statistics.mean(scores))
 write(Statistics.median(scores))
+write(Statistics.mode(scores))
+write(Statistics.stdDev(scores))
+write(Statistics.min(scores))
+write(Statistics.max(scores))
 ```
+
+Expected output:
+
+```text
+84.0
+80.0
+80
+10.198039027185569
+70
+100
+```
+
+What these mean in ordinary language:
+
+- `mean` — arithmetic average (always `Real`, even for `List<Int>`)
+- `median` — middle value after sorting; with an even count it averages the two middle values, so it is also always `Real` (`median([1, 2, 3, 4])` is `2.5`)
+- `mode` — the most common value; keeps the element type (`Int` here)
+- `stdDev` / `variance` — **population** spread (divide by `n`)
+- `sampleStdDev` / `sampleVariance` — **sample** spread (divide by `n - 1`; need at least two values)
+- `min` / `max` / `range` — smallest, largest, and `max - min`, keeping the element type
+- `quantile(values, probability: p)` — value at probability `p` between `0.0` and `1.0`
+
+`sum` here is the Statistics overload (empty list → `0` / `0.0`), not a different spelling of the Fundamentals `sum`. Empty input is otherwise a `StatisticsError` — not a silent zero:
+
+```ahd
+bring Statistics
+from Statistics bring StatisticsError
+
+empty: List<Int> := []
+attempt {
+    write(Statistics.mean(empty))
+}
+except StatisticsError as error {
+    write("no mean of an empty list")
+}
+```
+
+This does **not** compile, because Statistics never parses digit text:
+
+```text
+Statistics.mean(["10", "20"])
+```
+
+Convert first, the same way you already do with Data:
+
+```ahd
+bring Data
+from Data bring Table
+bring Statistics
+
+table: Table := Data.fromCSV("name,score\nAli,91\nAyse,78\n")
+numbers: List<Int> := table.column("score").map(
+    lambda (value: String) -> int(value)
+)
+write(Statistics.mean(numbers))
+```
+
+**Try it yourself:** Compute `median` of `[4, 1, 3, 2]` and check that you get `2.5`.
+
+See [the Statistics module reference](STATISTICS.md) for the exact formulas.
 
 ## 24. Plot module
 
-The `Plot` module creates charts from numeric data and saves them as images (`.png`, `.svg`, `.pdf`).
+`Plot` turns numeric lists into a picture file: `.png`, `.svg`, or `.pdf`. A beginner can produce a useful graph from this section alone. Like Statistics, Plot never parses `"91"` as a number.
 
 ```ahd
 bring Plot
+from Plot bring Chart
 
-chart := Plot.line([1, 2, 3], [2, 4, 3])
-chart.save("chart.png")
+weeks: List<Int> := [1, 2, 3, 4]
+scores: List<Int> := [62, 71, 68, 80]
+
+chart: Chart := Plot.line(weeks, scores)
+chart = chart.title("Exam scores")
+chart = chart.xLabel("Week")
+chart = chart.yLabel("Score")
+chart.save("exam-scores.png")
 ```
 
-You can customize the chart before saving:
+`title`, `xLabel`, and `yLabel` each return a **new** `Chart`. The original value does not change, so you reassign (`chart = chart.title(...)`) the same way you reassign a Word document. `save` returns `Nothing` — call it as a statement, not `chart = chart.save(...)`.
+
+A second common chart is a bar chart of named categories:
 
 ```ahd
-chart = chart.title("Growth").xLabel("Days")
+bring Plot
+from Plot bring Chart
+
+subjects: List<String> := ["Math", "Physics", "History"]
+averages: List<Real> := [88.0, 74.5, 91.0]
+
+bars: Chart := Plot.bar(subjects, averages)
+bars = bars.title("Class averages")
+bars.save("averages.svg")
 ```
 
-Plot only accepts numeric types (`List<Int>`, `List<Real>`, or `Numeric` Vectors). It does not automatically parse text.
+`Plot.scatter` is the same shape as `line` (x and y numeric lists) when you want points rather than a polyline. `List<Int>` and `List<Real>` may be mixed; a `Numeric` Vector is also accepted. Empty data raises `PlotError`.
+
+**Try it yourself:** Change the title to your course name and save as `"exam-scores.pdf"` instead of `.png`.
+
+See [the Plot module reference](PLOT.md) for histogram, box, error bars, and subplots.
 
 ## 25. Numeric module and Complex
 
-The `Numeric` module provides linear algebra operations (Vectors and Matrices).
+`Numeric` is linear algebra: a `Vector` is an ordered list of numbers with a length, a `Matrix` is a grid with rows and columns. Elements are `Int` or `Real`. Operations return new values; they do not rewrite the Vector or Matrix you already have.
 
 ```ahd
 bring Numeric
+from Numeric bring Vector
+from Numeric bring Matrix
 
-v := Numeric.vector([1, 2, 3])
-m := Numeric.matrix([[1, 2], [3, 4]])
+v: Vector := Numeric.vector([1, 2, 3])
+write(v.length())
+
+m: Matrix := Numeric.matrix([[1, 2], [3, 4]])
 write(m.determinant())
+write(m.transpose().rowCount())
 ```
 
-A `Numeric` Vector can also be passed directly to `Plot.line` or `Plot.scatter` instead of a plain List.
+`determinant` is defined on a square matrix. A shape mismatch — adding two vectors of different length, or multiplying matrices whose inner sizes do not agree — raises `NumericError` instead of silently padding.
 
-### Complex Numbers
+A `Vector` can be passed to `Plot.line` or `Plot.scatter` in place of a plain List, which is useful when the same numbers are both computed and drawn.
 
-AhdCode also supports `Complex` numbers (composed of `Real` components) as a core type. To create one, attach an uppercase `I` directly to a number:
+### Complex numbers
+
+`Complex` is a **core type**, not a `Numeric` submodule. A value has a real part and an imaginary part, both `Real`. Write an uppercase `I` glued to a number:
 
 ```ahd
-z := 2 + 3I
-write(z)       // 2.0+3.0I
+z: Complex := 2 + 3I
+write(z)
+write((z * z))
+```
+
+Expected output:
+
+```text
+2.0+3.0I
+-5.0+12.0I
 ```
 
 - `3I` is valid.
 - `3i` is invalid.
 - `3 I` (with a space) is invalid.
 
-An `Int` or `Real` can be safely used where a `Complex` is required. `Complex` values can be added, multiplied, and divided, but they are unordered (you cannot use `<` or `>`).
+An `Int` or `Real` can be used where a `Complex` is required (safe widening). You can add, multiply, and divide Complex values, but they are unordered — `<` and `>` are not allowed.
+
+See [the Numeric module reference](NUMERIC.md) for inverse, solve, and decompositions.
 
 ## 26. Latex module
 
-If you want to directly produce a PDF with AhdCode, you can use the `Latex` module. The module brings the necessary engine with its own installation.
+If you want to produce a PDF from structured text — a short article, a report, a slide deck — `Latex` is the module that writes real LaTeX and compiles it **offline**. You do not install TeX Live. Staging the renderer is the one-time step in [Installation and your first program](#2-installation-and-your-first-program).
 
-A basic example:
+A document is a String you assemble, then wrap with `document`, then compile with `pdf`:
 
 ```ahd
 bring Latex as L
 from Latex bring LatexError
 
 body: String := L.section("My First Document") +
-    L.escape("Hello! This is a regular text section.")
-doc: String := L.document(body: body, type: "Article")
+    L.escape("Hello! Cost is $5, and 100% of the class passed.") +
+    L.subsection("Energy") +
+    L.equation("E = mc^2")
+
+doc: String := L.document(body: body, title: "Notes", type: "Article")
 
 attempt {
     L.pdf(doc, "output.pdf")
 }
-except LatexError as e {
-    write("Could not create PDF: {e.message}")
+except LatexError as error {
+    write("Could not create PDF: {error.message}")
 }
 ```
 
-`document`'s first parameter is `body` -- the assembled content String -- not
-`contents`. Beyond basic articles, you can use `document(body: body, type:
-"Report")` or `document(body: body, type: "Beamer")`. Beamer supports the
-bounded `"Default"`, `"Madrid"`, and `"Warsaw"` themes. The module also
-supports `date`, `margin`, `color`, `figure`, `image`, `theorem`, `ref`,
-`cite`, and `bibliography`. For more advanced capabilities, see the [Latex
-module reference](LATEX.md).
+Two different kinds of text:
+
+- **`escape`** — ordinary language. Characters like `$ % & { }` become visible text instead of LaTeX commands.
+- **`equation`** — raw math. It is *not* escaped, because `$` and `^` are the math.
+
+`section` / `subsection` titles are escaped for you. `document`'s first real payload is named `body` (a positional `L.document(body)` still works). `type` may be `"Article"` (default), `"Report"`, or `"Beamer"`. Beamer themes are only `"Default"`, `"Madrid"`, and `"Warsaw"`.
+
+`L.pdf(doc, "output.pdf", "tex")` also writes `output.tex` beside the PDF — useful when you want the exact source. `LatexError` is the compile/engine failure; invalid theme or type is a `ValueError`.
+
+**Try it yourself:** Change `type` to `"Report"` and add a second `subsection`.
+
+Do not copy every theorem/table/bibliography helper into a first program. See [the Latex module reference](LATEX.md).
 
 ## 27. Word module
 
-Word builds immutable DOCX documents without requiring Microsoft Office:
+Word builds **immutable** `.docx` documents. Microsoft Office is not required. Each method returns a **new** `Document`; the previous value stays as it was. `save` writes the file and returns `Nothing`, so you call it as a statement.
 
 ```ahd
 bring Word
 from Word bring Document
 
 document: Document := Word.new()
-document = document.heading("Class report", 1)
+document = document.heading("Lab report", 1)
 document = document.paragraph("Prepared with AhdCode.", "center", true)
-document = document.table(["Name", "Score"], [["Ali", "91"]])
-document.save("class-report.docx")
+document = document.table(
+    ["Sample", "pH"]
+    [["A", "7.1"], ["B", "6.8"]]
+)
+document.save("lab-report.docx")
 ```
 
-`save()` returns `Nothing`, so call it as a statement rather than assigning
-its result. Document methods are positional-only and return a new Document.
-Word can also embed Plot-generated PNG files and read text, headings, and
-tables from a bounded semantic DOCX subset. See the [Word module
-reference](WORD.md).
+`heading(text, level)` uses heading levels `1`..`6`. `paragraph` is positional-only: text, then optional align (`"left"` / `"center"` / `"right"`), then optional `bold`, `italic`, `underline`. `table` takes header strings and a list of rows. `image(path)` embeds a PNG (including one you just saved from Plot) when you need a figure.
+
+`Word.read(path)` loads a bounded semantic subset (paragraphs, headings, tables) back into a `Document`. That is useful for “open, add a heading, save again” — not for pixel-perfect round-trips with every Word feature.
+
+**Try it yourself:** Add a second heading at level `2` and a short paragraph under it before `save`.
+
+See [the Word module reference](WORD.md) for merges, image sizing, and `WordError`.
 
 ## 28. Excel module
 
-Excel creates and reads real `.xlsx` workbooks without Microsoft Office:
+Excel creates and reads real `.xlsx` workbooks without Microsoft Office. The mental model has three layers:
+
+- **Workbook** — the file
+- **Sheet** — a named grid inside the workbook
+- **Cell** — one typed value at a 1-based row/column (`(1, 1)` is A1)
+
+`Excel.new()` starts **empty** — there is no automatic `Sheet1`. Transformations return new values. A sheet you get with `book.sheet("Scores")` has no hidden back-pointer; after you edit it, put it back with `book.withSheet(sheet)`.
 
 ```ahd
 bring Excel
 from Excel bring Workbook
 from Excel bring Sheet
+from Excel bring Cell
 
 book: Workbook := Excel.new().addSheet("Scores")
 sheet: Sheet := book.sheet("Scores")
 sheet = sheet.setRow(1, 1, [Excel.fromString("Name"), Excel.fromString("Score")])
 sheet = sheet.setRow(2, 1, [Excel.fromString("Ali"), Excel.fromInt(91)])
+sheet = sheet.setCell(3, 1, Excel.fromString("Merve"))
+sheet = sheet.setCell(3, 2, Excel.fromInt(88))
+sheet = sheet.setCell(4, 2, Excel.formula("=SUM(B2:B3)"))
 book = book.withSheet(sheet)
 book.save("scores.xlsx")
 ```
 
-Rows and columns are 1-based. Cell values are explicit: use `fromString`,
-`fromInt`, `fromReal`, `fromBool`, or `formula`. A String beginning with `=` is
-still text unless `Excel.formula(...)` is used. Workbook and Sheet operations
-return new values, and unsafe merges never discard covered cell content. See
-the [Excel module reference](EXCEL.md).
+Cell values are explicit constructors: `fromString`, `fromInt`, `fromReal`, `fromBool`, `blank`, `formula`. A String that happens to start with `=` is still **text** unless you use `Excel.formula(...)`. AhdCode **stores** formulas; it does not evaluate them like Excel the application would.
+
+Read the same file back:
+
+```ahd
+bring Excel
+from Excel bring Workbook
+from Excel bring Sheet
+from Excel bring Cell
+
+book: Workbook := Excel.new().addSheet("Scores")
+sheet: Sheet := book.sheet("Scores")
+sheet = sheet.setCell(1, 1, Excel.fromString("Ali"))
+sheet = sheet.setCell(1, 2, Excel.fromInt(91))
+book = book.withSheet(sheet)
+book.save("scores.xlsx")
+
+loaded: Workbook := Excel.read("scores.xlsx")
+page: Sheet := loaded.sheet("Scores")
+score: Cell := page.cell(1, 2)
+write(score.kind())
+write(score.int())
+```
+
+Wrong-kind access (`int()` on a String cell) raises `ExcelError`. Unknown sheet names and saving a workbook with zero sheets also raise `ExcelError`.
+
+**Try it yourself:** Add a third student row, keep the formula covering the new cell, and save again.
+
+Merge and style exist for later; they are not required for a first grade sheet. See [the Excel module reference](EXCEL.md).
 
 ## 29. PDF module
 
@@ -2175,25 +2455,32 @@ at all, since it only uses the Go standard library:
 
 ```ahd
 bring Archive
+bring File
+
+File.writeText("notes.txt", "pack me")
+File.writeText("data.csv", "a,b\n1,2\n")
 
 files: Pair<String, String> := {
-    "report.pdf": "report.pdf"
-    "data.xlsx": "results.xlsx"
+    "notes.txt": "notes.txt"
+    "data.csv": "data.csv"
 }
 
 Archive.zip("submission.zip", files)
+write(File.exists("submission.zip"))
 ```
 
+`Archive.zip`, `Archive.tar`, and `Archive.tarGzip` are the three creation
+calls. The output extension must match (`.zip` / `.tar` / `.tar.gz`).
 The key in `files` is the path *inside* the archive; the value is the source
 file's path on disk. Unsafe entry paths (like `../secret`) and symlink
 sources are rejected with an `ArchiveError` rather than silently skipped.
-There is no extraction, listing, or read API in v0.1.20 -- `Archive` only
+There is no extraction, listing, or read API — `Archive` only
 creates archives. See the [Archive module reference](ARCHIVE.md).
 
 ### Putting it together
 
 Two small workflows show how PDF, Excel, and Archive combine in real
-v0.1.20 programs.
+programs.
 
 **Report packaging** -- turn a Workbook into a PDF, then bundle both into one
 ZIP:
@@ -2238,92 +2525,178 @@ same way with `Archive.zip("article-bundle.zip", {"article.pdf": "article.pdf", 
 
 ## 31. JSON module
 
-JSON reads and builds typed `JSONValue`s — no `Any`, no dynamic typing:
+JSON reads and builds typed `JSONValue`s. There is no `Any` and no dynamic typing: a JSON value is exactly one of Null, Bool, Int, Real, String, Array, or Object, and the compiler knows which accessors are legal only after you ask `kind()` or pick a typed getter.
 
 ```ahd
 bring JSON
 from JSON bring JSONValue
+from JSON bring JSONError
 
 student: JSONValue := JSON.object({
     "name": JSON.fromString("Ali")
     "score": JSON.fromInt(91)
+    "passed": JSON.fromBool(true)
 })
+
 text: String := JSON.stringify(student, true)
 parsed: JSONValue := JSON.parse(text)
+write(parsed.kind())
+
 name: JSONValue? := parsed.get("name")
 if name != null {
     write(name.string())
 }
+
+missing: JSONValue? := parsed.get("nickname")
+if missing == null {
+    write("no nickname")
+}
 ```
 
-Every accessor (`int()`, `string()`, `array()`, ...) raises `JSONError` if
-the value's `kind()` doesn't match; `get(key)` returns `JSONValue?` because a
-key can genuinely be absent. Write literal JSON braces with a raw String
-(`r'{"a":1}'`) so AhdCode doesn't read them as string interpolation. See the
-[JSON module reference](JSON.md).
+Expected output (pretty-printed `stringify` may add spaces/newlines; `kind` and the two writes are stable):
+
+```text
+Object
+Ali
+no nickname
+```
+
+Constructors you will actually use: `fromString`, `fromInt`, `fromReal`, `fromBool`, `array`, `object`, and `nullValue` (not `JSON.null()`). `parse` reads a String; use a **raw** String for literal JSON so `{` is not interpolation: `JSON.parse(r'{"a":1}')`.
+
+`get(key)` returns `JSONValue?` because a key can be absent. After you have a non-null `JSONValue`, `string()`, `int()`, `array()`, … raise `JSONError` when `kind()` does not match. That is the beginner trap: `"Ali"` is JSON String, so `.int()` fails.
+
+```ahd
+bring JSON
+from JSON bring JSONError
+
+attempt {
+    write(JSON.fromString("Ali").int())
+}
+except JSONError as error {
+    write("wrong kind")
+}
+```
+
+**Try it yourself:** `parse` a small object, request a missing key, and print a default name when the result is `null`.
+
+See [the JSON module reference](JSON.md).
 
 ## 32. XML module
 
-XML builds and reads a small `Element`/`Text` node model:
+XML is a small closed node model: every node is either an **Element** (a named tag, optional attributes, children) or **Text** (character data). There is no `Any`, no full DOM, and no comment/CDATA public types. You build nodes, wrap one Element as a document, stringify or parse.
 
 ```ahd
 bring XML
 from XML bring XMLNode
+from XML bring XMLDocument
 
-root: XMLNode := XML.element("student", {"id": "42"}, [XML.text("Ali")])
-document := XML.document(root)
+student: XMLNode := XML.element(
+    "student"
+    {"id": "42"}
+    [
+        XML.element("name", {}, [XML.text("Ali")])
+        XML.element("score", {}, [XML.text("91")])
+    ]
+)
+document: XMLDocument := XML.document(student)
 write(XML.stringify(document, true))
+write(student.kind())
+idAttr: String? := student.attribute("id")
+if idAttr != null {
+    write(idAttr)
+}
 ```
 
-`XML.document(root)` requires an `Element` root. Every `XMLNode` accessor
-except `kind()` and `text()` raises `XMLError` on a `Text` node. See the
-[XML module reference](XML.md).
+`XML.document(root)` requires an Element root — a Text node there raises `XMLError`. `kind()` works on every node. `name`, `attribute`, `children`, `elements` are for Elements. On a Text node, those accessors raise `XMLError`; use `text()` for the character data.
+
+`XML.parse` reads a String back into an `XMLDocument` (exactly one root element). Attributes you construct are unqualified (no namespace).
+
+**Try it yourself:** Add a `city` child element and print `stringify` again.
+
+See [the XML module reference](XML.md).
 
 ## 33. Env module
 
-Env reads process environment variables and `.env` files, always as
-`String`:
+An **environment variable** is a named String the operating system (or a `.env` file) gives your program: a port number, a data folder, a flag. `Env` always returns `String`. It never decides that `"8080"` is an `Int`.
 
 ```ahd
 bring Env
 
-Env.load(".env")
+found: String? := Env.get("PORT")
+if found == null {
+    write("PORT is not set")
+}
+
 port: Int := int(Env.getOr("PORT", "8080"))
+write(port)
 ```
 
-`Env.get(name)` returns `String?` so absence and an explicit empty value stay
-distinguishable. See the [Env module reference](ENV.md).
+- `get` → `String?`. `null` means the name is absent.
+- `getOr(name, fallback)` uses the fallback only when the name is absent. An explicitly empty value `""` is returned as empty, not replaced.
+- `exists(name)` is the Bool test (`has` is a reserved keyword, so the method is not called `has`).
+
+`Env.load(".env")` reads a file of `NAME=value` lines into the process environment. By default it does not override names that are already set (`override` defaults to `false`). A malformed `.env` raises `EnvError`. `Env.read(path)` returns the pairs without changing the process environment.
+
+Do not hard-code secrets into source files; a `.env` file that you do not commit is the usual place for local configuration.
+
+**Try it yourself:** Call `getOr` with a name you have not set and confirm you see the fallback, then `int(...)` that String.
+
+See [the Env module reference](ENV.md).
 
 ## 34. Lists and KeyValue modules
 
-These two modules transform Lists and Pairs without changing the original:
+These two **modules** are not the same thing as the List and Pair *types* you already use. `list.add(...)` changes the existing List. `Lists.chunk(...)` and `KeyValue.with(...)` return **new** values and leave the original alone.
 
 ```ahd
 bring Lists
 bring KeyValue
 
-write(Lists.chunk([1, 2, 3, 4, 5], 2))
+numbers: List<Int> := [1, 2, 3, 4, 5]
+write(Lists.chunk(numbers, 2))
+write(Lists.flatten([[1, 2], [3]]))
+write(Lists.unique([1, 1, 2, 2, 3]))
 write(Lists.valueCounts(["Math", "Physics", "Math"]))
-
-record := KeyValue.combine(["name", "score"], ["Ali", "91"])
-write(KeyValue.with(record, "score", "95"))
-write(record)
+write(numbers)
 ```
+
+Expected output:
 
 ```text
 [[1, 2], [3, 4], [5]]
+[1, 2, 3]
+[1, 2, 3]
 {"Math": 2, "Physics": 1}
+[1, 2, 3, 4, 5]
+```
+
+`numbers` is unchanged. `transpose` turns rows into columns (ragged input raises `ListsError`). `groupBy` groups elements by a callback key.
+
+For Pair, `KeyValue` is the structural toolkit:
+
+```ahd
+bring KeyValue
+
+record: Pair<String, String> := KeyValue.combine(["name", "score"], ["Ali", "91"])
+updated: Pair<String, String> := KeyValue.with(record, "score", "95")
+slim: Pair<String, String> := KeyValue.select(updated, ["name"])
+write(KeyValue.keys(record))
+write(updated)
+write(record)
+```
+
+Expected output:
+
+```text
+["name", "score"]
 {"name": "Ali", "score": "95"}
 {"name": "Ali", "score": "91"}
 ```
 
-Notice the last two lines: `KeyValue.with` returned a *new* `Pair`, and
-`record` is unchanged. Every operation in both modules works that way.
+`with` / `without` add or remove a key. `select` / `drop` keep or hide keys. `rename` and `mapValues` rewrite names or values. `merge` requires disjoint keys; `overlay` lets the second Pair win on collisions.
 
-`Lists` also has `flatten`, `transpose`, `unique`, and `groupBy`; `KeyValue`
-also has `keys`, `values`, `without`, `select`, `drop`, `rename`, `mapValues`,
-`merge`, and `overlay`. See the [Lists](LISTS.md) and [KeyValue](KEYVALUE.md)
-module references.
+**Try it yourself:** `chunk` the list with size `3`, then print the original list again to prove it did not change.
+
+See [Lists](LISTS.md) and [KeyValue](KEYVALUE.md) for every signature.
 
 ## 35. Code Formatter
 
@@ -2399,6 +2772,12 @@ ahdcode format file.ahd
 ```
 
 Formats the file according to the common style.
+
+```text
+ahdcode lsp
+```
+
+Starts the language server used by editors (VS Code / Antigravity). It talks over stdio only; optional `--stdio` is accepted and ignored. See the [language server guide](LSP.md) for the v0.2.2 feature set.
 
 ```text
 ahdcode --help
@@ -2686,6 +3065,7 @@ After finishing this guide, you can deepen your knowledge of the language detail
 - [CLI](CLI.md)
 - [Formatter](FORMATTER.md)
 - [REPL](REPL.md)
+- [Language server](LSP.md)
 - [Full v0.1 specification](../AHDCODE_LANGUAGE_SPEC_v0.1.md)
 
 Check the [curated v0.1 examples](../examples/v0.1/README.md) folder for more working examples.

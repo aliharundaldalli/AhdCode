@@ -1,4 +1,4 @@
-# AhdCode v0.1 Türkçe Öğrenci Rehberi
+# AhdCode v0.2.2 Türkçe Öğrenci Rehberi
 
 Bu rehber, **daha önce hiç programlama yapmamış birinin de takip edebilmesi** için hazırlanmıştır. Baştan sona sırayla okuyabilirsiniz; her bölümde önce ne yapmak istediğimizi görecek, sonra çalışan bir örnek yazacak, en son gerekli kuralları öğreneceksiniz.
 
@@ -68,7 +68,7 @@ Merhaba!
 
 AhdCode, programı çalıştırmadan önce yazdığınız kodu kontrol eder. Örneğin bir metni sayı gibi kullanmaya çalışırsanız veya `null` olabilecek bir değeri kontrol etmeden kullanırsanız, mümkün olduğunda hatayı daha program başlamadan söyler. Ama başlangıçta bunun ayrıntılarını düşünmeniz gerekmiyor; ilerleyen bölümlerde örneklerle göreceğiz.
 
-AhdCode v0.1 hâlâ gelişen bir sürümdür. Küçük komut satırı programlarını doğrudan çalıştırabilir veya onları tek başına çalışan yerel uygulamalara dönüştürebilirsiniz.
+AhdCode v0.2.2 güncel sürümdür. Küçük komut satırı programlarını çalıştırabilir, onları tek başına çalışan yerel uygulamalara dönüştürebilir ve dil sunucusunu (`ahdcode lsp`) VS Code gibi bir editörden kullanabilirsiniz.
 
 > **Teknik not:** Program çalışmadan önce türlerin kontrol edilmesine *static checking* denir.
 
@@ -1470,36 +1470,61 @@ current: DateTime := T.now()
 
 ### İlk bakış: File ve Path
 
-AhdCode'un gömülü `Path` ve `File` modülleri de `bring` ile kullanılır:
+Program bir süre sonra kapandıktan sonra da bir şeyi hatırlamak ister: bir not, küçük bir günlük, kullanıcının okunmasını istediği bir dosya. `Path` yol *String*'lerini kurar ve inceler. `File` gerçekten dosya sistemine gider. İki ayrı modül olmalarının nedeni budur — bir yol, `File` onu kullanana kadar yalnızca metindir.
+
+Göreli yollar, programın veya REPL oturumunun çalışma klasörüne göre çözülür (`ahdcode`'u çalıştırdığınız klasör; `.ahd` dosyasının bulunduğu klasör olmak zorunda değildir).
+
+Küçük bir not defteri iş akışı:
 
 ```ahd
 bring Path
 bring File
 
-path: String := Path.join(["notes", "today.txt"])
-File.createDir("notes")
-File.writeText(path, "hello")
+notesDir: String := "notes"
+path: String := Path.join([notesDir, "bugun.txt"])
+
+if not File.exists(notesDir) {
+    File.createDir(notesDir)
+}
+
+File.writeText(path, "Süt al.\n")
 write(File.readText(path))
+write(Path.base(path))
+write(File.exists(path))
 ```
 
-`Path`, yol String'leriyle çalışır. `File`, dosya ve klasör işlemleri yapar. Dosya işlemlerindeki hataları yakalamak isterseniz `FileError` türünü ek olarak içe aktarabilirsiniz:
+Beklenen çıktı:
+
+```text
+Süt al.
+
+bugun.txt
+true
+```
+
+`Path.join` parçalardan yol kurar. `Path.base` son bileşendir (`bugun.txt`); `Path.dir` ve `Path.ext` diğer sık kullanılan incelemelerdir. `File.exists` eksik yolda hata fırlatmaz, `false` döner. `File.createDir` klasör oluşturur. `File.writeText` UTF-8 metin dosyasını yazar (veya üzerine yazar); `File.readText` geri okur. `File.append` dosyanın sonuna ekler.
+
+Yol yokken *okumayı* istediğinizde bu bir `FileError`'dır (`IOError`'dan türer):
 
 ```ahd
+bring File
 from File bring FileError
 
 attempt {
-    write(File.readText("missing.txt"))
+    write(File.readText("yok.txt"))
 }
 except FileError as error {
-    write("File could not be read")
+    write("Dosya okunamadı")
 }
 ```
 
-`FileError`, `IOError` sınıfından türer. Göreli yollar, programın veya REPL oturumunun çalışma klasörünü kullanır.
+**Siz deneyin:** Not metnini değiştirip programı iki kez çalıştırın, sonra `writeText` yerine `append` kullanın ve dosyada iki satır görün.
+
+Tüm işlem listesi [File ve Path referansındadır](FILESYSTEM_TR.md).
 
 ### İlk bakış: Regex
 
-AhdCode'un gömülü `Regex` modülü bir deseni (pattern) bir `Pattern` değerine derler, ardından onu kullanarak bir String hakkında sorular sormanızı sağlar:
+Düzenli ifade, metin şekillerini tarif eden küçük bir dildir: “bir veya daha fazla rakam”, “harfle başlar”. AhdCode'da bu tarifi bir kez `Pattern`'a derler, sonra String'lere soru sorarsınız.
 
 ```ahd
 bring Regex
@@ -1507,92 +1532,178 @@ from Regex bring Pattern
 
 digits: Pattern := Regex.compile("[0-9]+")
 
-write(digits.matches("order #482"))       // true
-write(digits.find("order #482, item #7")) // "482"
-write(digits.findAll("order #482, item #7")) // ["482", "7"]
+write(digits.matches("siparis #482"))
+write(digits.find("siparis #482, urun #7"))
+write(digits.findAll("siparis #482, urun #7"))
+write(digits.replace("oda 12 ve oda 7", "N"))
+write(digits.split("a12b34c"))
 ```
 
-`Regex.compile`'ın ürettiği sınıfın adı `Pattern`'dır, `Regex` değil — `bring Regex` zaten modülün kendisini adlandırır, bu yüzden derlenmiş desen türünün kendi ismine ihtiyacı vardır (`from Regex bring Pattern`).
+Beklenen çıktı:
 
-`find`, `String?` döndürür çünkü hiç eşleşme olmayabilir; bu yüzden diğer her null olabilen değer gibi kullanmadan önce kontrol edin:
+```text
+true
+482
+["482", "7"]
+oda N ve oda N
+["a", "b", "c"]
+```
+
+`Regex.compile`'ın ürettiği sınıfın adı `Pattern`'dır, `Regex` değil — `bring Regex` zaten modülü adlandırır; tür olarak yazmak için `from Regex bring Pattern` gerekir.
+
+`matches`, desen metnin *herhangi bir yerinde* geçerse doğrudur (tüm String için `^` / `$` ile sınırlayın). `find` `String?` döndürür çünkü eşleşme olmayabilir:
 
 ```ahd
-found: String? := digits.find("no numbers here")
+bring Regex
+from Regex bring Pattern
+
+digits: Pattern := Regex.compile("[0-9]+")
+found: String? := digits.find("rakam yok")
 if found == null {
-    write("nothing found")
+    write("bulunamadi")
 }
 ```
 
-Geçersiz bir desen `RegexError` fırlatır:
+`findAll` tüm eşleşmeleri verir. `replace` **yeni** bir String döndürür (orijinal değişmez). `split` her eşleşmede metni keser. `groups` ilk eşleşmenin yakalanan gruplarını `List<String>?` olarak verir.
+
+Geçersiz desen, `find` sırasında değil, `compile` anında `RegexError` fırlatır:
 
 ```ahd
+bring Regex
 from Regex bring RegexError
 
 attempt {
-    Regex.compile("(unterminated")
+    Regex.compile("(kapanmamis")
 }
 except RegexError as error {
-    write("could not compile: {error.message}")
+    write("derlenemedi: {error.message}")
 }
 ```
 
-`replace`, `split` ve `groups` için [Regex modül referansına](REGEX_TR.md) bakın.
+**Siz deneyin:** Üç harfli bir sözcüğü eşleyen bir desen derleyip `"kedi"` ve `"kediler"` üzerinde deneyin.
+
+Ayrıntılar için [Regex modül referansına](REGEX_TR.md) bakın.
 
 ### İlk bakış: CSV
 
-`CSV`, metni ham String satırları veya başlık anahtarlı String kayıtları olarak taşır:
+CSV, metin olarak elektronik tablodur: hücreler arasında virgül (veya başka ayırıcı), satırlar arasında yeni satır. `CSV` yalnızca **String** taşır. `"42"`nin `Int` veya `"2026-01-01"`in tarih olduğuna karar vermez — sütunun ne anlama geldiğini *siz* bildiğinizde dönüştürürsünüz.
+
+İki ilk kullanım şekli:
+
+- **satırlar** — `List<List<String>>`: her iç liste bir satırdır, başlık dahil
+- **kayıtlar** — `List<Pair<String, String>>`: her Pair başlığı anahtar olarak kullanır
 
 ```ahd
 bring CSV
 
-rows: List<List<String>> := CSV.parse("name,age\nAli,42\n")
-records: List<Pair<String, String>> := CSV.parseRecords("name,age\nAli,42\n")
-write(records[0]["name"])
+text: String := "ad,yas\nAli,42\nMerve,19\n"
+
+rows: List<List<String>> := CSV.parse(text)
+records: List<Pair<String, String>> := CSV.parseRecords(text)
+
+write(rows[1][0])
+write(records[0]["ad"])
+
+ages: List<Int> := []
+for record in records {
+    ages.add(int(record["yas"]))
+}
+write(sum(ages))
 ```
 
-CSV asla sayı veya tarih çıkarımı yapmaz. Hatalı biçimlendirilmiş girdi ve geçersiz kayıt şekilleri `CSVError` fırlatır. Ayrıntılar için [CSV modül referansına](CSV_TR.md) bakın.
+Beklenen çıktı:
+
+```text
+Ali
+Ali
+61
+```
+
+Bozuk tırnaklama, kötü ayırıcı veya başlıkla uyuşmayan kayıt `CSVError` fırlatır. Dosya için `CSV.read` / `CSV.write`, metne dönüş için `stringify` / `stringifyRecords` vardır.
+
+**Siz deneyin:** CSV metnine üçüncü bir kişi ekleyip o kaydın yaşını `int(...)` ile yazdırın.
+
+[CSV modül referansına](CSV_TR.md) bakın.
 
 ### İlk bakış: Data tabloları
 
-Metin içeri girdikten sonra, `Data` üzerinde çalışacağınız bir `Table` verir. Her hücre hâlâ bir `String`'dir ve her işlem, elinizdekini değiştirmek yerine **yeni** bir tablo döndürür:
+Metin girdikten sonra `Data` size bir `Table` verir: adlı sütunlar, süzüp şekil verebileceğiniz satırlar. Her hücre hâlâ `String`'dir. Her dönüşüm **yeni** bir tablo döndürür — elinizdeki tablo değişmez.
 
 ```ahd
 bring Data
 from Data bring Table
 
-table: Table := Data.fromCSV("name,score\nAli,91\nAyse,78\n")
+table: Table := Data.fromCSV("ad,puan,sehir\nAli,91,Adana\nAyse,78,Ankara\nDeniz,85,Adana\n")
 
 write(table.rowCount())
 write(table.columns())
 
 passed: Table := table.filter(
-    lambda (row: Pair<String, String>) -> int(row["score"]) >= 80
+    lambda (row: Pair<String, String>) -> int(row["puan"]) >= 80
 )
+namesOnly: Table := passed.select(["ad", "puan"])
 
-write(passed.column("name"))
+write(namesOnly.column("ad"))
 write(table.rowCount())
 ```
 
-=>
+Beklenen çıktı:
 
 ```text
-2
-["name", "score"]
-["Ali"]
-2
+3
+["ad", "puan", "sehir"]
+["Ali", "Deniz"]
+3
 ```
 
-Son satır önemli olan yer: `table` hâlâ her iki satıra da sahip, çünkü `filter` yeni bir tablo döndürdü.
+Son satır önemli: `table` hâlâ üç satırlıdır, çünkü `filter` ve `select` yeni tablo döndürdü. `drop(["sehir"])` bir sütunu gizler.
 
-`int(row["score"])`'a dikkat edin. Data, `"91"`'in bir sayı olduğunu asla tahmin etmez, bu yüzden ihtiyaç duyduğunuzda dönüştürürsünüz — dilin geri kalanından zaten bildiğiniz aynı kural. Tam bir sayısal sütun da aynı şekilde çalışır:
+`int(row["puan"])`'a dikkat edin. Data `"91"`in sayı olduğunu tahmin etmez. Tüm sayısal sütun aynı kuraldadır:
 
 ```ahd
-scores: List<Real> := table.column("score").map(
+bring Data
+from Data bring Table
+
+table: Table := Data.fromCSV("ad,puan\nAli,91\nAyse,78\n")
+scores: List<Real> := table.column("puan").map(
     lambda (value: String) -> real(value)
 )
+write(scores)
 ```
 
-Ayrıca `sort`, `select`, `drop`, `rename`, `reverse`, `head`, `tail`, `transform`, `derive`, `unique`, `valueCounts` ve `groupBy` da vardır. Var olmayan bir sütun istemek `DataError` fırlatır. Ayrıntılar için [Data modül referansına](DATA_TR.md) bakın.
+Gerçekçi ikinci adım: geçenleri tutup CSV metni yazmak:
+
+```ahd
+bring Data
+from Data bring Table
+
+table: Table := Data.fromCSV("ad,puan,sehir\nAli,91,Adana\nAyse,78,Ankara\n")
+passed: Table := table.filter(
+    lambda (row: Pair<String, String>) -> int(row["puan"]) >= 80
+)
+namesOnly: Table := passed.select(["ad", "puan"])
+write(namesOnly.toCSV())
+```
+
+Olmayan sütun `DataError` fırlatır:
+
+```ahd
+bring Data
+from Data bring Table
+from Data bring DataError
+
+table: Table := Data.fromCSV("ad,puan\nAli,91\n")
+attempt {
+    write(table.column("not"))
+}
+except DataError as error {
+    write("boyle bir sutun yok")
+}
+```
+
+**Siz deneyin:** Filtreyi `>= 90` yapıp `passed.rowCount()` ile kaç satır kaldığına bakın.
+
+Ayrıca `sort`, `rename`, `reverse`, `head`, `tail`, `transform`, `derive`, `unique`, `valueCounts` ve `groupBy` vardır. [Data modül referansına](DATA_TR.md) bakın.
 
 ## 20. Fundamentals modülü
 
@@ -1602,9 +1713,109 @@ Bazı araçları kullanmak için hiçbir `bring` yazmanız gerekmez. Bunlar AhdC
 write take str int real len clear between abs sum min max type id
 ```
 
+Çoğunu zaten kullandık. Kısa özet:
+
+| İşlev | Ne yapar |
+|---|---|
+| `write(value)` | değeri ekrana yazar |
+| `take()` / `take(prompt)` | kullanıcıdan bir satır `String` okur |
+| `str(value)` | değeri String'e çevirir |
+| `int(...)` | uygun değeri `Int`'e çevirir |
+| `real(...)` | uygun değeri `Real`'e çevirir |
+| `len(value)` | String/List/Pair uzunluğunu verir |
+| `clear(collection)` | List veya Pair'i yerinde boşaltır |
+| `between(...)` | sayı aralığı üretir |
+| `abs(number)` | mutlak değeri verir |
+| `sum(list)` | listedeki sayıları toplar |
+| `min(list)` / `max(list)` | en küçük / en büyük değeri bulur |
+
+Örnek:
+
+```ahd
+numbers: List<Int> := [3, -5, 10]
+
+write(len(numbers))
+write(sum(numbers))
+write(min(numbers))
+write(max(numbers))
+write(abs(-8))
+```
+
+`take` her zaman `String` döndürür; yaş veya not istiyorsanız `int(...)` veya `real(...)` ile açıkça dönüştürün. String sessizce sayı olmaz.
+
+`sum` boş List için `0` veya `0.0` verir. `min` ve `max` boş List'te `DomainError` üretir.
+
+`clear` mevcut koleksiyonu yerinde değiştirdiği için aynı koleksiyona bakan diğer takma adlar da boşalmış görür. `sum`, `min` ve `max` yalnızca okur; List'i değiştirmezler.
+
+### `type(value)`: bir değerin türünü öğrenmek
+
+`type(value)` değerin AhdCode türünü bir `String` olarak döndürür. Özellikle REPL'de deneme yaparken işe yarar:
+
+```ahd
+write(type(5))
+write(type(5.0))
+write(type("Ali"))
+write(type(true))
+write(type(null))
+write(type([1, 2, 3]))
+```
+
+Beklenen çıktı:
+
+```text
+Int
+Real
+String
+Bool
+Null
+List<Int>
+```
+
+Bir Class örneğinde `type` her zaman değişkenin bildirilen türünü değil, nesnenin **gerçek çalışma zamanı Class**'ını yazar:
+
+```ahd
+Animal: Class<> := { structure: Attributes := (name: String) }
+Dog: Class<Animal> := { structure: Attributes := (SuperClass.attributes) }
+
+pet: Animal := Dog(name: "Rex")
+write(type(pet))
+```
+
+Bu program `Animal` değil `Dog` yazdırır.
+
+`type` bir yansıma (reflection) nesnesi döndürmez — yalnızca düz bir String.
+
+### `id(reference)`: çalışma zamanı kimliği
+
+`id(reference)` bir List, Pair veya Class örneği için opak bir kimlik sayısı (`Int`) döndürür. `Int`, `Real`, `String` veya `Bool` gibi ilkel değerlerde kullanılamaz.
+
+```ahd
+a: List<Int> := [1, 2]
+b: List<Int> := a
+c: List<Int> := [1, 2]
+
+write(id(a) == id(b))
+write(id(a) == id(c))
+
+a.add(3)
+write(id(a) == id(b))
+```
+
+Beklenen çıktı:
+
+```text
+true
+false
+true
+```
+
+`a` ile `b` aynı List'e bakar, bu yüzden kimlikleri eşleşir; `c` içeriği aynı görünse bile **farklı** bir List'tir. `a`'yı `add` ile değiştirmek kimliğini değiştirmez.
+
+Bu sayı bir bellek adresi değildir, program çalıştırmaları arasında korunmaz ve yalnızca bu oturumda anlamlıdır. Sıradan kimlik karşılaştırması için `same` kullanın; `id` asıl olarak hata ayıklama ve günlük içindir.
+
 ## 21. Math modülü
 
-Karekök, trigonometrik fonksiyonlar veya rastgele sayı gibi araçlar için `Math` modülünü kullanın:
+Karekök, trigonometri veya rastgele sayı gibi araçlar için `Math` modülünü kullanın:
 
 ```ahd
 bring Math
@@ -1614,11 +1825,68 @@ write(Math.sqrt(81))
 write(Math.round(3.14159, 2))
 ```
 
-Aynı seed tekrar verilirse aynı rastgele sayı dizisi baştan başlar. Seed verilmezse yeni program çalışması başlangıç durumunu işletim sisteminden alır.
+Çıktı:
 
-`Math.random`, `Math.randomInt` ve `List.shuffle` aynı paylaşılan rastgelelik durumunu kullanır; her çağrı diziyi ilerletir.
+```text
+3.141592653589793
+9.0
+3.14
+```
 
-> **Dikkat:** Bu rastgele sayı üreticisini kriptografi veya güvenlik amacıyla kullanmayın.
+Sık kullanılanlar:
+
+| Öğe | Ne yapar |
+|---|---|
+| `PI`, `E` | matematiksel sabitler |
+| `round`, `floor`, `ceil` | yuvarlama |
+| `sqrt`, `exp` | karekök ve $e^x$ |
+| `sin`, `cos`, `tan` | trigonometri (**radyan**) |
+| `log`, `log10` | doğal ve 10 tabanlı logaritma |
+| `seed`, `random`, `randomInt` | rastgele sayı |
+
+Üs almak için `Math.pow` yoktur; dilin `^` işleci kullanılır. `abs`, `sum`, `min` ve `max` `Math`'te değildir; Fundamentals'tadır.
+
+Küçük bir sayısal örnek — hipotenüs:
+
+```ahd
+bring Math
+
+a: Real := 3.0
+b: Real := 4.0
+c: Real := Math.sqrt((a ^ 2.0) + (b ^ 2.0))
+write(c)
+```
+
+```text
+5.0
+```
+
+### Rastgele sayı üretmek
+
+```ahd
+bring Math
+
+write(Math.randomInt(1, 6))
+write(Math.random())
+```
+
+`randomInt(1, 6)` her iki ucu da dahil bir tam sayı üretir. `random()` aralığı `0.0 <= value < 1.0`'dır.
+
+Testte aynı diziyi yeniden istiyorsanız tohum verin:
+
+```ahd
+bring Math
+
+Math.seed(42)
+```
+
+Aynı tohum tekrar verilirse aynı dizi baştan başlar. Tohum yoksa yeni çalışma işletim sisteminden başlangıç alır.
+
+`Math.random`, `Math.randomInt` ve `List.shuffle` **aynı** paylaşılan rastgelelik durumunu kullanır; her çağrı diziyi ilerletir. `randomInt(5, 5)` veya boş/`1` elemanlı `shuffle` rastgelelik durumunu tüketmez.
+
+> **Dikkat:** Bu üreteci kriptografi veya güvenlik için kullanmayın.
+
+**Siz deneyin:** `Math.seed(1)` deyip üç kez `randomInt(1, 6)` yazdırın, programı yeniden çalıştırıp aynı üç sayıyı doğrulayın.
 
 ## 22. Time modülü
 
@@ -1633,9 +1901,22 @@ from Time bring DateTime
 current: DateTime := Time.now()
 
 write(current.year)
+write(current.month)
+write(current.day)
+write(current.hour)
 ```
 
-`Time.now()` bilgisayarınızın yerel saatini, `Time.utc()` UTC'yi verir.
+`Time.now()` bilgisayarınızın yerel saatini verir. `Time.utc()` UTC'yi verir. `Time.timestamp()` işaretli Unix milisaniyesidir. AhdCode sabit dakika ofsetlerini destekler; adlı/IANA zaman dilimi veritabanı yoktur.
+
+Bir `DateTime` şunları içerir:
+
+```text
+year  month  day  hour  minute  second  millisecond  weekday  offsetMinutes
+```
+
+`weekday` Pazartesi için `1`, Pazar için `7`'dir. Bu alanlar salt okunurdur.
+
+`Time.fromTimestamp(milliseconds)` UTC döndürür. `dateTimeUTC(...)` UTC kurar, `dateTimeOffset(..., offsetMinutes: 180)` sabit ofsetli değer kurar. `toUTC()`, `toLocal()` ve `toOffset(...)` anı korur; `timestamp()` Unix milisaniyesini geri verir. Ofsetler -840..840 aralığındadır.
 
 ### Belirli bir tarih oluşturmak
 
@@ -1648,13 +1929,24 @@ birthday: DateTime := Time.dateTime(
     month: 2,
     day: 29
 )
+
+write(birthday.toString())
 ```
 
-Geçersiz bir tarih `ValueError` üretir; örneğin AhdCode `2026-02-29` değerini sessizce başka güne çevirmek yerine reddeder.
+Çıktı:
+
+```text
+2028-02-29 00:00:00
+```
+
+`hour`, `minute`, `second` ve `millisecond` verilmezse `0` olur. Geçersiz tarih `ValueError` üretir; örneğin AhdCode `2026-02-29`'u sessizce başka güne çevirmez, reddeder.
 
 ### İki zamanı karşılaştırmak
 
 ```ahd
+bring Time
+from Time bring DateTime
+
 morning: DateTime := Time.dateTime(year: 2026, month: 1, day: 1, hour: 9)
 evening: DateTime := Time.dateTime(year: 2026, month: 1, day: 1, hour: 21)
 
@@ -1668,6 +1960,8 @@ Tarihler için `<` ve `>` yerine bu okunaklı metotlar kullanılır.
 ### İki zaman arasındaki süre
 
 ```ahd
+bring Time
+from Time bring DateTime
 from Time bring Duration
 
 first: DateTime := Time.dateTime(year: 2026, month: 1, day: 1)
@@ -1683,6 +1977,8 @@ write(gap.seconds)
 ### Takvim bilgileri
 
 ```ahd
+bring Time
+
 write(Time.Calendar.isLeapYear(2028))
 write(Time.Calendar.daysInMonth(2028, 2))
 write(Time.Calendar.weekday(2026, 8, 29))
@@ -1691,6 +1987,8 @@ write(Time.Calendar.weekday(2026, 8, 29))
 ### Bir işi bekletmek veya süresini ölçmek
 
 ```ahd
+bring Time
+
 start: Real := Time.monotonic()
 Time.sleep(500)
 elapsed: Real := Time.monotonic() - start
@@ -1701,163 +1999,287 @@ write(elapsed >= 0.5)
 
 ## 23. Statistics modülü
 
-`Statistics` modülü, `List<Int>` veya `List<Real>` için betimleyici istatistik
-sağlar. Grafik çizmez (görselleştirme için `Plot`'a bakın).
+Bir sayı listesi henüz cevap değildir. “Tipik değer nedir?”, “ne kadar yayılmış?”, “ortadaki değer hangisi?” — bunlar `Statistics`'e aittir. Modül resim çizmez (o `Plot`) ve tablo hücrelerini metin olarak okumaz (o `Data`). Ona `List<Int>` veya `List<Real>` verirsiniz, o bir sayı döndürür.
 
 ```ahd
 bring Statistics
 
-scores: List<Int> := [70, 80, 90]
+scores: List<Int> := [70, 80, 80, 90, 100]
+
 write(Statistics.mean(scores))
 write(Statistics.median(scores))
+write(Statistics.mode(scores))
+write(Statistics.stdDev(scores))
+write(Statistics.min(scores))
+write(Statistics.max(scores))
 ```
 
-Ayrıntılar için [Statistics modül referansına](STATISTICS_TR.md) bakın.
+Beklenen çıktı:
+
+```text
+84.0
+80.0
+80
+10.198039027185569
+70
+100
+```
+
+Sıradan dilde:
+
+- `mean` — aritmetik ortalama (`List<Int>` olsa bile her zaman `Real`)
+- `median` — sıralanınca ortadaki değer; çift sayıda elemanda iki ortanın ortalaması, bu yüzden yine her zaman `Real` (`median([1, 2, 3, 4])` → `2.5`)
+- `mode` — en sık değer; eleman türünü korur
+- `stdDev` / `variance` — **yığın** yayılımı (`n`'ye böler)
+- `sampleStdDev` / `sampleVariance` — **örneklem** yayılımı (`n - 1`'e böler; en az iki değer)
+- `min` / `max` / `range` — en küçük, en büyük ve `max - min`
+- `quantile(values, probability: p)` — `0.0` ile `1.0` arasında olasılık `p`'deki değer
+
+Buradaki `sum` Statistics aşırı yüklemesidir (boş liste → `0` / `0.0`). Boş girdi aksi halde sessiz sıfır değil `StatisticsError`'dır:
+
+```ahd
+bring Statistics
+from Statistics bring StatisticsError
+
+empty: List<Int> := []
+attempt {
+    write(Statistics.mean(empty))
+}
+except StatisticsError as error {
+    write("bos listenin ortalamasi yok")
+}
+```
+
+Bu **derlenmez**, çünkü Statistics rakam metnini ayrıştırmaz:
+
+```text
+Statistics.mean(["10", "20"])
+```
+
+Önce dönüştürün, Data'da yaptığınız gibi:
+
+```ahd
+bring Data
+from Data bring Table
+bring Statistics
+
+table: Table := Data.fromCSV("ad,puan\nAli,91\nAyse,78\n")
+numbers: List<Int> := table.column("puan").map(
+    lambda (value: String) -> int(value)
+)
+write(Statistics.mean(numbers))
+```
+
+**Siz deneyin:** `[4, 1, 3, 2]` listesinin `median`'ının `2.5` olduğunu doğrulayın.
+
+Formüller için [Statistics modül referansına](STATISTICS_TR.md) bakın.
 
 ## 24. Plot modülü
 
-`Plot` modülü, sayısal veriden grafik oluşturur ve bunları görsel dosyalar
-(`.png`, `.svg`, `.pdf`) olarak kaydeder.
+`Plot` sayı listelerini resim dosyasına çevirir: `.png`, `.svg` veya `.pdf`. Bu bölümden tek başına işe yarar bir grafik üretebilirsiniz. Statistics gibi Plot da `"91"`i sayı olarak okumaz.
 
 ```ahd
 bring Plot
+from Plot bring Chart
 
-chart := Plot.line([1, 2, 3], [2, 4, 3])
-chart.save("chart.png")
+weeks: List<Int> := [1, 2, 3, 4]
+scores: List<Int> := [62, 71, 68, 80]
+
+chart: Chart := Plot.line(weeks, scores)
+chart = chart.title("Sinav puanlari")
+chart = chart.xLabel("Hafta")
+chart = chart.yLabel("Puan")
+chart.save("sinav-puanlari.png")
 ```
 
-Kaydetmeden önce grafiği özelleştirebilirsiniz:
+`title`, `xLabel` ve `yLabel` her biri **yeni** bir `Chart` döndürür. Orijinal değişmez; Word belgesinde olduğu gibi yeniden atarsınız. `save` `Nothing` döndürür — `chart = chart.save(...)` yazılmaz.
+
+İkinci sık grafik, adlı kategorilerin çubuk grafiğidir:
 
 ```ahd
-chart = chart.title("Growth").xLabel("Days")
+bring Plot
+from Plot bring Chart
+
+subjects: List<String> := ["Matematik", "Fizik", "Tarih"]
+averages: List<Real> := [88.0, 74.5, 91.0]
+
+bars: Chart := Plot.bar(subjects, averages)
+bars = bars.title("Sinif ortalamalari")
+bars.save("ortalamalar.svg")
 ```
 
-Plot yalnızca sayısal türleri kabul eder (`List<Int>`, `List<Real>` veya
-`Numeric` Vector'leri). Metni otomatik olarak ayrıştırmaz (parse etmez).
-Ayrıntılar için [Plot modül referansına](PLOT_TR.md) bakın.
+`Plot.scatter`, nokta istediğinizde `line` ile aynı şekildedir (x ve y sayı listeleri). `List<Int>` ile `List<Real>` karışabilir; bir `Numeric` Vector de kabul edilir. Boş veri `PlotError` fırlatır.
+
+**Siz deneyin:** Başlığı dersinizin adına çevirip `"sinav-puanlari.pdf"` olarak kaydedin.
+
+Histogram, kutu ve alt grafikler için [Plot modül referansına](PLOT_TR.md) bakın.
 
 ## 25. Numeric modülü ve Complex
 
-`Numeric` modülü, doğrusal cebir işlemleri sağlar (Vector ve Matrix).
+`Numeric` doğrusal cebirdir: `Vector` uzunluğu olan sıralı sayılar, `Matrix` satır ve sütunlu bir ızgaradır. Elemanlar `Int` veya `Real`'dir. İşlemler yeni değer döndürür; elinizdeki Vector veya Matrix yeniden yazılmaz.
 
 ```ahd
 bring Numeric
+from Numeric bring Vector
+from Numeric bring Matrix
 
-v := Numeric.vector([1, 2, 3])
-m := Numeric.matrix([[1, 2], [3, 4]])
+v: Vector := Numeric.vector([1, 2, 3])
+write(v.length())
+
+m: Matrix := Numeric.matrix([[1, 2], [3, 4]])
 write(m.determinant())
+write(m.transpose().rowCount())
 ```
 
-Bir `Numeric` Vector'ü, düz bir List yerine doğrudan `Plot.line` veya
-`Plot.scatter`'a da geçirebilirsiniz. Ayrıntılar için [Numeric modül
-referansına](NUMERIC_TR.md) bakın.
+`determinant` kare matriste tanımlıdır. Uzunlukları uymayan iki vektörü toplamak veya iç boyutları uyuşmayan matrisleri çarpmak sessizce doldurmak yerine `NumericError` fırlatır.
+
+Bir `Vector`, düz List yerine `Plot.line` veya `Plot.scatter`'a verilebilir — aynı sayıları hem hesaplayıp hem çizmek için.
 
 ### Complex sayılar
 
-AhdCode, çekirdek bir tür olarak `Complex` sayıları da destekler (`Real`
-bileşenlerden oluşur). Birini oluşturmak için bir sayıya doğrudan büyük harf
-`I` ekleyin:
+`Complex` bir **çekirdek türdür**, `Numeric` alt modülü değil. Gerçek ve sanal kısımları `Real`'dir. Sayıya yapışık büyük harf `I` yazın:
 
 ```ahd
-z := 2 + 3I
-write(z)       // 2.0+3.0I
+z: Complex := 2 + 3I
+write(z)
+write((z * z))
+```
+
+Beklenen çıktı:
+
+```text
+2.0+3.0I
+-5.0+12.0I
 ```
 
 - `3I` geçerlidir.
 - `3i` geçersizdir.
-- `3 I` (aralarında boşlukla) geçersizdir.
+- `3 I` (aralarında boşluk) geçersizdir.
 
-Bir `Complex` gerektiği yerde bir `Int` veya `Real` güvenle kullanılabilir.
-`Complex` değerleri toplanabilir, çarpılabilir ve bölünebilir, ancak
-sıralanamazlar (`<` veya `>` kullanamazsınız).
+`Complex` gereken yerde `Int` veya `Real` güvenle kullanılır. Toplama, çarpma, bölme vardır ama sıralama yoktur — `<` ve `>` yok.
+
+Ters, çözme ve ayrışımlar için [Numeric modül referansına](NUMERIC_TR.md) bakın.
 
 ## 26. Latex modülü (Latex)
 
-AhdCode ile doğrudan PDF üretmek istiyorsanız `Latex` modülünü kullanabilirsiniz. Modül gerekli Tectonic motorunu kendi kurulumuyla birlikte getirir; ayrıca TeX Live veya MiKTeX kurmanız gerekmez.
+Yapılandırılmış metinden PDF üretmek — kısa makale, rapor, slayt — için `Latex` gerçek LaTeX yazar ve **çevrimdışı** derler. TeX Live kurmazsınız. Render motorunu bir kez hazırlamak [Kurulum ve ilk programınız](#2-kurulum-ve-ilk-programınız) adımıdır.
 
-İlk örnek:
+Belge, birleştirdiğiniz bir String'dir; `document` ile sarılır, `pdf` ile derlenir:
 
 ```ahd
 bring Latex as L
 from Latex bring LatexError
 
-document: String := L.document(
-    L.section("İlk Belgem") +
-    L.escape("Merhaba! Bu sıradan bir metin bölümüdür.") +
-    L.subsection("Matematik Örneği") +
+body: String := L.section("Ilk belgem") +
+    L.escape("Merhaba! Maliyet $5, sinifin %100'u gecti.") +
+    L.subsection("Enerji") +
     L.equation("E = mc^2")
-)
+
+doc: String := L.document(body: body, title: "Notlar", type: "Article")
 
 attempt {
-    L.pdf(document, "cikti.pdf")
-    write("PDF başarıyla oluşturuldu!")
+    L.pdf(doc, "cikti.pdf")
 }
 except LatexError as error {
-    write("PDF oluşturulamadı: {error.message}")
+    write("PDF olusturulamadi: {error.message}")
 }
 ```
 
-Burada sırasıyla:
+İki farklı metin:
 
-- `Latex.escape(text)`: normal metni LaTeX özel karakterlerine karşı kaçışlı hale getirir.
-- `Latex.section(text)` / `subsection(text)`: başlık üretir.
-- `Latex.equation(math)`: matematik ifadesini LaTeX olarak ekler.
-- `Latex.document(content)`: parçaları tam bir belgeye dönüştürür.
-- `Latex.pdf(source, output, sourceOutput = "")`: String olarak verdiğiniz LaTeX kaynağını derleyip PDF dosyasına yazar. Eğer `sourceOutput` argümanını `"tex"` olarak verirseniz, tam kaynak kodunu içeren bir `.tex` yan dosyası da üretilir.
-- `Latex.pdfFile(input, output)`: zaten var olan `.tex` dosyasını derleyip PDF üretir.
+- **`escape`** — sıradan dil. `$ % & { }` görünür metin olur, LaTeX komutu olmaz.
+- **`equation`** — ham matematik. Kaçışlanmaz, çünkü `$` ve `^` matematiğin kendisidir.
 
-Hata türünü `except LatexError` içinde kullanacaksanız `from Latex bring LatexError` ile içe aktarın.
+`section` / `subsection` başlıkları sizin yerinize kaçışlanır. `document`'in asıl yükü adlı `body` parametresidir (konumsal `L.document(body)` de çalışır). `type` `"Article"` (varsayılan), `"Report"` veya `"Beamer"` olabilir. Beamer temaları yalnızca `"Default"`, `"Madrid"` ve `"Warsaw"`.
 
-Modül çevrimdışı çalışacak biçimde tasarlanmıştır ve shell escape kapalıdır. Daha gelişmiş tablo ve LaTeX ayrıntıları için `docs/LATEX.md` belgesine bakabilirsiniz.
+`L.pdf(doc, "cikti.pdf", "tex")` PDF'in yanına `cikti.tex` de yazar. Derleme/motor hatası `LatexError`; geçersiz tema veya tür `ValueError`.
 
-Beamer belgeleri sınırlı `"Default"`, `"Madrid"` ve `"Warsaw"` theme'lerini
-destekler. Geçersiz theme veya Beamer dışında Default olmayan theme
-`ValueError` fırlatır.
+**Siz deneyin:** `type`'ı `"Report"` yapıp ikinci bir `subsection` ekleyin.
+
+Teorem/tablo/kaynakça yardımcılarının tümünü ilk programa kopyalamayın. [Latex modül referansına](LATEX_TR.md) bakın.
 
 ## 27. Word modülü
 
-Word, Microsoft Office gerektirmeden immutable DOCX belgeleri oluşturur:
+Word **değiştirilemez** `.docx` belgeler üretir. Microsoft Office gerekmez. Her metot **yeni** bir `Document` döndürür; önceki değer olduğu gibi kalır. `save` dosyayı yazar ve `Nothing` döndürür; statement olarak çağırın.
 
 ```ahd
 bring Word
 from Word bring Document
 
 document: Document := Word.new()
-document = document.heading("Sınıf raporu", 1)
-document = document.paragraph("AhdCode ile hazırlandı.", "center", true)
-document = document.table(["Ad", "Puan"], [["Ali", "91"]])
-document.save("sinif-raporu.docx")
+document = document.heading("Laboratuvar raporu", 1)
+document = document.paragraph("AhdCode ile hazirlandi.", "center", true)
+document = document.table(
+    ["Ornek", "pH"]
+    [["A", "7.1"], ["B", "6.8"]]
+)
+document.save("lab-raporu.docx")
 ```
 
-`save()` `Nothing` döndürür; sonucunu atamak yerine statement olarak çağırın.
-Document metotları yalnızca konumsaldır ve yeni bir Document döndürür. Word,
-Plot ile üretilen PNG dosyalarını gömebilir ve sınırlandırılmış anlamsal DOCX
-alt kümesinden metin, heading ve table okuyabilir. Ayrıntılar için [Word modül
-referansına](WORD_TR.md) bakın.
+`heading(text, level)` başlık düzeyleri `1`..`6`. `paragraph` yalnızca konumsaldır: metin, sonra isteğe bağlı hizalama (`"left"` / `"center"` / `"right"`), sonra isteğe bağlı `bold`, `italic`, `underline`. `table` başlık dizeleri ve satır listesi alır. `image(path)` PNG gömer (Plot'tan kaydettiğiniz bir figür dahil).
+
+`Word.read(path)` sınırlı anlamsal alt kümeyi (paragraf, başlık, tablo) geri `Document`'e yükler. “Aç, başlık ekle, tekrar kaydet” için işe yarar — her Word özelliğiyle piksel mükemmel tur değil.
+
+**Siz deneyin:** `save` öncesi 2. düzey bir başlık ve kısa bir paragraf ekleyin.
+
+Birleştirme ve görsel boyutu için [Word modül referansına](WORD_TR.md) bakın.
 
 ## 28. Excel modülü
 
-Excel, Microsoft Office gerektirmeden gerçek `.xlsx` çalışma kitapları
-oluşturur ve okur:
+Excel, Microsoft Office olmadan gerçek `.xlsx` çalışma kitapları oluşturur ve okur. Üç katmanlı model:
+
+- **Workbook** — dosya
+- **Sheet** — çalışma kitabının içindeki adlı ızgara
+- **Cell** — 1 tabanlı satır/sütunda tek tipli değer (`(1, 1)` A1'dir)
+
+`Excel.new()` **boş** başlar — otomatik `Sheet1` yoktur. Dönüşümler yeni değer döndürür. `book.sheet("Scores")` ile aldığınız sayfanın gizli geri işaretçisi yoktur; düzenledikten sonra `book.withSheet(sheet)` ile geri koyarsınız.
 
 ```ahd
 bring Excel
 from Excel bring Workbook
 from Excel bring Sheet
+from Excel bring Cell
 
-book: Workbook := Excel.new().addSheet("Scores")
-sheet: Sheet := book.sheet("Scores")
-sheet = sheet.setRow(1, 1, [Excel.fromString("Name"), Excel.fromString("Score")])
+book: Workbook := Excel.new().addSheet("Puanlar")
+sheet: Sheet := book.sheet("Puanlar")
+sheet = sheet.setRow(1, 1, [Excel.fromString("Ad"), Excel.fromString("Puan")])
 sheet = sheet.setRow(2, 1, [Excel.fromString("Ali"), Excel.fromInt(91)])
+sheet = sheet.setCell(3, 1, Excel.fromString("Merve"))
+sheet = sheet.setCell(3, 2, Excel.fromInt(88))
+sheet = sheet.setCell(4, 2, Excel.formula("=SUM(B2:B3)"))
 book = book.withSheet(sheet)
-book.save("scores.xlsx")
+book.save("puanlar.xlsx")
 ```
 
-Satır ve sütunlar 1 tabanlıdır. Cell değerleri açıktır: `fromString`,
-`fromInt`, `fromReal`, `fromBool` veya `formula` kullanın. `=` ile başlayan
-String, `Excel.formula(...)` kullanılmadıkça metin olarak kalır. Workbook ve
-Sheet işlemleri yeni değerler döndürür; güvensiz merge'ler kapsanan Cell
-içeriğini asla atmaz. [Excel modül referansına](EXCEL_TR.md) bakın.
+Hücre değerleri açık kuruculardır: `fromString`, `fromInt`, `fromReal`, `fromBool`, `blank`, `formula`. `=` ile başlayan String, `Excel.formula(...)` kullanılmadıkça **metindir**. AhdCode formülleri **saklar**; Excel uygulaması gibi hesaplamaz.
+
+Aynı dosyayı okuyun:
+
+```ahd
+bring Excel
+from Excel bring Workbook
+from Excel bring Sheet
+from Excel bring Cell
+
+book: Workbook := Excel.new().addSheet("Puanlar")
+sheet: Sheet := book.sheet("Puanlar")
+sheet = sheet.setCell(1, 1, Excel.fromString("Ali"))
+sheet = sheet.setCell(1, 2, Excel.fromInt(91))
+book = book.withSheet(sheet)
+book.save("puanlar.xlsx")
+
+loaded: Workbook := Excel.read("puanlar.xlsx")
+page: Sheet := loaded.sheet("Puanlar")
+score: Cell := page.cell(1, 2)
+write(score.kind())
+write(score.int())
+```
+
+Yanlış tür erişimi (`int()` bir String hücrede) `ExcelError` fırlatır. Bilinmeyen sayfa adı ve sıfır sayfalı kitap kaydetmek de `ExcelError`'dır.
+
+**Siz deneyin:** Üçüncü bir öğrenci satırı ekleyip formülün yeni hücreyi kapsamasını sağlayın.
+
+Birleştirme ve stil ilk not defteri için gerekmez. [Excel modül referansına](EXCEL_TR.md) bakın.
 
 ## 29. PDF modülü
 
@@ -1912,25 +2334,32 @@ kullanır:
 
 ```ahd
 bring Archive
+bring File
+
+File.writeText("notlar.txt", "paketle")
+File.writeText("veri.csv", "a,b\n1,2\n")
 
 files: Pair<String, String> := {
-    "report.pdf": "report.pdf"
-    "data.xlsx": "results.xlsx"
+    "notlar.txt": "notlar.txt"
+    "veri.csv": "veri.csv"
 }
 
-Archive.zip("submission.zip", files)
+Archive.zip("teslim.zip", files)
+write(File.exists("teslim.zip"))
 ```
 
 `files` içindeki anahtar arşivin *içindeki* yoldur; değer ise diskteki
 kaynak dosyanın yoludur. Güvensiz giriş yolları (`../secret` gibi) ve
 symlink kaynakları, sessizce atlanmak yerine bir `ArchiveError` ile
-reddedilir. v0.1.20'de çıkarma (extraction), listeleme veya okuma API'si
-yoktur — `Archive` yalnızca arşiv oluşturur. Ayrıntılar için [Archive modül
+reddedilir. Çıkarma (extraction), listeleme veya okuma API'si
+yoktur — `Archive` yalnızca arşiv oluşturur. `zip`, `tar` ve `tarGzip`
+üç oluşturma çağrısıdır; çıktı uzantısı eşleşmelidir (`.zip` / `.tar` /
+`.tar.gz`). Ayrıntılar için [Archive modül
 referansına](ARCHIVE_TR.md) bakın.
 
 ### Hepsini bir araya getirmek
 
-İki küçük iş akışı, PDF, Excel ve Archive'ın gerçek v0.1.20 programlarında
+İki küçük iş akışı, PDF, Excel ve Archive'ın gerçek programlarda
 nasıl birleştiğini gösterir.
 
 **Rapor paketleme** — bir Workbook'u PDF'e dönüştürün, sonra ikisini tek bir
@@ -1977,94 +2406,178 @@ ile aynı şekilde paketleyebilirsiniz.
 
 ## 31. JSON modülü
 
-JSON, tipli `JSONValue`'lar okur ve oluşturur — `Any` yok, dinamik tipleme
-yok:
+JSON, tipli `JSONValue` okur ve kurar. `Any` yok, dinamik tipleme yok: bir JSON değeri tam olarak Null, Bool, Int, Real, String, Array veya Object'tir; derleyici hangi erişimcinin yasal olduğunu `kind()` veya tipli alıcıdan sonra bilir.
 
 ```ahd
 bring JSON
 from JSON bring JSONValue
+from JSON bring JSONError
 
 student: JSONValue := JSON.object({
-    "name": JSON.fromString("Ali")
-    "score": JSON.fromInt(91)
+    "ad": JSON.fromString("Ali")
+    "puan": JSON.fromInt(91)
+    "gecti": JSON.fromBool(true)
 })
+
 text: String := JSON.stringify(student, true)
 parsed: JSONValue := JSON.parse(text)
-name: JSONValue? := parsed.get("name")
+write(parsed.kind())
+
+name: JSONValue? := parsed.get("ad")
 if name != null {
     write(name.string())
 }
+
+missing: JSONValue? := parsed.get("takma")
+if missing == null {
+    write("takma ad yok")
+}
 ```
 
-Her erişimci (`int()`, `string()`, `array()`, ...), değerin `kind()`'ı
-uyuşmazsa `JSONError` fırlatır; `get(key)`, `JSONValue?` döndürür çünkü bir
-anahtar gerçekten yok olabilir. AhdCode'un onları string interpolation olarak
-okumaması için literal JSON süslü parantezlerini bir raw String ile yazın
-(`r'{"a":1}'`). Ayrıntılar için [JSON modül referansına](JSON_TR.md) bakın.
+Beklenen çıktı (`stringify` boşluk/satır ekleyebilir; `kind` ve iki yazı kararlıdır):
+
+```text
+Object
+Ali
+takma ad yok
+```
+
+Kullanacağınız kurucular: `fromString`, `fromInt`, `fromReal`, `fromBool`, `array`, `object` ve `nullValue` (`JSON.null()` değil). `parse` bir String okur; `{` interpolasyon olmasın diye literal JSON'u **raw** String ile yazın: `JSON.parse(r'{"a":1}')`.
+
+`get(key)` `JSONValue?` döndürür çünkü anahtar yok olabilir. Non-null bir `JSONValue` üzerinde `string()`, `int()`, `array()` `kind()` uyuşmazsa `JSONError` fırlatır. `"Ali"` JSON String'dir; `.int()` başarısız olur.
+
+```ahd
+bring JSON
+from JSON bring JSONError
+
+attempt {
+    write(JSON.fromString("Ali").int())
+}
+except JSONError as error {
+    write("yanlis tur")
+}
+```
+
+**Siz deneyin:** Küçük bir nesneyi `parse` edin, olmayan bir anahtar isteyin, sonuç `null` ise varsayılan bir ad yazdırın.
+
+[JSON modül referansına](JSON_TR.md) bakın.
 
 ## 32. XML modülü
 
-XML, küçük bir `Element`/`Text` node modeli oluşturur ve okur:
+XML küçük, kapalı bir düğüm modelidir: her düğüm ya **Element** (adlı etiket, isteğe bağlı öznitelikler, çocuklar) ya **Text** (karakter verisi). `Any` yok, tam DOM yok. Düğüm kurar, bir Element'i belge olarak sarar, yazıya dökersiniz veya ayrıştırırsınız.
 
 ```ahd
 bring XML
 from XML bring XMLNode
+from XML bring XMLDocument
 
-root: XMLNode := XML.element("student", {"id": "42"}, [XML.text("Ali")])
-document := XML.document(root)
+student: XMLNode := XML.element(
+    "ogrenci"
+    {"id": "42"}
+    [
+        XML.element("ad", {}, [XML.text("Ali")])
+        XML.element("puan", {}, [XML.text("91")])
+    ]
+)
+document: XMLDocument := XML.document(student)
 write(XML.stringify(document, true))
+write(student.kind())
+idAttr: String? := student.attribute("id")
+if idAttr != null {
+    write(idAttr)
+}
 ```
 
-`XML.document(root)`, bir `Element` kökü gerektirir. `kind()` ve `text()`
-dışındaki her `XMLNode` erişimcisi bir `Text` node'unda `XMLError` fırlatır.
-Ayrıntılar için [XML modül referansına](XML_TR.md) bakın.
+`XML.document(root)` Element kök ister — Text orada `XMLError` fırlatır. `kind()` her düğümde çalışır. `name`, `attribute`, `children`, `elements` Element içindir. Text düğümünde bunlar `XMLError` fırlatır; karakter için `text()` kullanın.
+
+`XML.parse` String'i `XMLDocument`'e okur (tam bir kök element). Kurduğunuz öznitelikler niteliksizdir (ad alanı yok).
+
+**Siz deneyin:** Bir `sehir` çocuk elementi ekleyip `stringify`'ı tekrar yazdırın.
+
+[XML modül referansına](XML_TR.md) bakın.
 
 ## 33. Env modülü
 
-Env, işlem ortam değişkenlerini ve `.env` dosyalarını, her zaman `String`
-olarak okur:
+**Ortam değişkeni**, işletim sisteminin (veya bir `.env` dosyasının) programınıza verdiği adlı bir String'dir: port, veri klasörü, bir bayrak. `Env` her zaman `String` döndürür. `"8080"`ün `Int` olduğuna karar vermez.
 
 ```ahd
 bring Env
 
-Env.load(".env")
+found: String? := Env.get("PORT")
+if found == null {
+    write("PORT ayarli degil")
+}
+
 port: Int := int(Env.getOr("PORT", "8080"))
+write(port)
 ```
 
-`Env.get(name)`, `String?` döndürür; böylece yokluk ile açıkça boş bir değer
-ayırt edilebilir kalır. Ayrıntılar için [Env modül referansına](ENV_TR.md)
-bakın.
+- `get` → `String?`. `null` adın yokluğu demektir.
+- `getOr(name, fallback)` yedek değeri yalnızca ad yoksa kullanır. Açıkça boş `""` boş kalır, yedekle değiştirilmez.
+- `exists(name)` Bool testidir (`has` ayrılmış sözcüktür; metot `has` değildir).
+
+`Env.load(".env")` `NAME=value` satırlarını süreç ortamına okur. Varsayılan olarak zaten tanımlı adların üzerine yazmaz (`override` `false`). Bozuk `.env` `EnvError` fırlatır. `Env.read(path)` çiftleri süreç ortamını değiştirmeden döndürür.
+
+Sırları kaynak dosyaya gömmeyin; commit etmediğiniz bir `.env` yerel yapılandırma için olağan yerdir.
+
+**Siz deneyin:** Ayarlamadığınız bir adla `getOr` çağırıp yedeği gördüğünüzü doğrulayın, sonra o String'i `int(...)` edin.
+
+[Env modül referansına](ENV_TR.md) bakın.
 
 ## 34. Lists ve KeyValue modülleri
 
-Bu iki modül, orijinali değiştirmeden Listeleri ve Pair'leri dönüştürür:
+Bu iki **modül**, zaten kullandığınız List ve Pair *türleriyle* aynı şey değildir. `list.add(...)` mevcut List'i değiştirir. `Lists.chunk(...)` ve `KeyValue.with(...)` **yeni** değer döndürür, orijinali bırakır.
 
 ```ahd
 bring Lists
 bring KeyValue
 
-write(Lists.chunk([1, 2, 3, 4, 5], 2))
-write(Lists.valueCounts(["Math", "Physics", "Math"]))
-
-record := KeyValue.combine(["name", "score"], ["Ali", "91"])
-write(KeyValue.with(record, "score", "95"))
-write(record)
+numbers: List<Int> := [1, 2, 3, 4, 5]
+write(Lists.chunk(numbers, 2))
+write(Lists.flatten([[1, 2], [3]]))
+write(Lists.unique([1, 1, 2, 2, 3]))
+write(Lists.valueCounts(["Matematik", "Fizik", "Matematik"]))
+write(numbers)
 ```
+
+Beklenen çıktı:
 
 ```text
 [[1, 2], [3, 4], [5]]
-{"Math": 2, "Physics": 1}
-{"name": "Ali", "score": "95"}
-{"name": "Ali", "score": "91"}
+[1, 2, 3]
+[1, 2, 3]
+{"Matematik": 2, "Fizik": 1}
+[1, 2, 3, 4, 5]
 ```
 
-Son iki satıra dikkat edin: `KeyValue.with` *yeni* bir `Pair` döndürdü ve
-`record` değişmedi. Her iki modüldeki her işlem böyle çalışır.
+`numbers` değişmedi. `transpose` satırları sütun yapar (düzensiz girdi `ListsError`). `groupBy` elemanları bir geri çağırım anahtarına göre gruplar.
 
-`Lists` ayrıca `flatten`, `transpose`, `unique` ve `groupBy` içerir;
-`KeyValue` ayrıca `keys`, `values`, `without`, `select`, `drop`, `rename`,
-`mapValues`, `merge` ve `overlay` içerir. Ayrıntılar için [Lists](LISTS_TR.md)
-ve [KeyValue](KEYVALUE_TR.md) modül referanslarına bakın.
+Pair için `KeyValue` yapısal araçtır:
+
+```ahd
+bring KeyValue
+
+record: Pair<String, String> := KeyValue.combine(["ad", "puan"], ["Ali", "91"])
+updated: Pair<String, String> := KeyValue.with(record, "puan", "95")
+slim: Pair<String, String> := KeyValue.select(updated, ["ad"])
+write(KeyValue.keys(record))
+write(updated)
+write(record)
+```
+
+Beklenen çıktı:
+
+```text
+["ad", "puan"]
+{"ad": "Ali", "puan": "95"}
+{"ad": "Ali", "puan": "91"}
+```
+
+`with` / `without` anahtar ekler veya siler. `select` / `drop` anahtar tutar veya gizler. `rename` ve `mapValues` ad veya değer yazar. `merge` ayrık anahtar ister; `overlay`'de ikinci Pair çakışmada kazanır.
+
+**Siz deneyin:** Listeyi `3` boyutunda `chunk` edin, sonra orijinal listenin değişmediğini yazdırın.
+
+Her imza için [Lists](LISTS_TR.md) ve [KeyValue](KEYVALUE_TR.md) referanslarına bakın.
 
 ## 35. Kod biçimlendirici (Formatter)
 
@@ -2140,6 +2653,12 @@ ahdcode format file.ahd
 ```
 
 Dosyayı ortak stile göre biçimlendirir.
+
+```text
+ahdcode lsp
+```
+
+Editörlerin (VS Code / Antigravity) kullandığı dil sunucusunu başlatır. Yalnızca stdio konuşur; isteğe bağlı `--stdio` kabul edilir ve yok sayılır. v0.2.2 özellik kümesi için [dil sunucusu rehberine](LSP_TR.md) bakın.
 
 ```text
 ahdcode --help
@@ -2429,6 +2948,7 @@ derinleştirebilirsiniz:
 - [CLI](CLI_TR.md)
 - [Formatter](FORMATTER_TR.md)
 - [REPL](REPL_TR.md)
+- [Dil sunucusu](LSP_TR.md)
 - [Tam v0.1 spesifikasyonu](../AHDCODE_LANGUAGE_SPEC_v0.1_TR.md)
 
 Çalışan daha fazla örnek için [derlenmiş v0.1 örnekleri](../examples/v0.1/README_TR.md)
