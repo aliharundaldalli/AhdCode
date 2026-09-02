@@ -784,6 +784,9 @@ func (generator *generator) call(value *ir.CallExpr) string {
 	if strings.HasPrefix(string(value.Callable), keyValueModulePrefix) {
 		return generator.keyValueCall(value)
 	}
+	if strings.HasPrefix(string(value.Callable), sqliteModulePrefix) {
+		return generator.sqliteCall(value)
+	}
 	if method, ok := value.Callee.(*ir.MemberExpr); ok && method.Kind == ir.MethodMember {
 		function := generator.functions[method.Callable]
 		if function == nil {
@@ -1038,6 +1041,9 @@ func (generator *generator) builtinCall(value *ir.CallExpr) string {
 		}
 		if strings.HasPrefix(name, "XMLNode.") || strings.HasPrefix(name, "XMLDocument.") {
 			return generator.xmlOperation(name, value)
+		}
+		if strings.HasPrefix(name, "Database.") || strings.HasPrefix(name, "SQLiteValue.") {
+			return generator.sqliteOperation(name, value)
 		}
 		return generator.unsupported("Fundamentals function "+name, meta.Span)
 	}

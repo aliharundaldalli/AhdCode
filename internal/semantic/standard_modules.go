@@ -31,6 +31,7 @@ func StandardModuleInterfaces() map[string]*ModuleInterface {
 		"PDF":        pdfModuleInterface(),
 		"Plot":       plotModuleInterface(),
 		"Regex":      regexModuleInterface(),
+		"SQLite":     sqliteModuleInterface(),
 		"Statistics": statisticsModuleInterface(),
 		"Time":       timeModuleInterface(),
 		"Word":       wordModuleInterface(),

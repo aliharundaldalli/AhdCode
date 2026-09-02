@@ -430,6 +430,25 @@ const (
 	// JSONValueAt indexes one Array element by List index rules.
 	JSONValueAt TypeOperation = "JSONValue.at"
 
+	// The SQLite standard module's Database members. A Database is one
+	// logical SQLite connection; every member raises SQLiteError once the
+	// Database is closed or when SQLite itself reports a failure.
+	SQLiteDatabaseExecute      TypeOperation = "Database.execute"
+	SQLiteDatabaseQuery        TypeOperation = "Database.query"
+	SQLiteDatabaseLastInsertID TypeOperation = "Database.lastInsertId"
+	SQLiteDatabaseBegin        TypeOperation = "Database.begin"
+	SQLiteDatabaseCommit       TypeOperation = "Database.commit"
+	SQLiteDatabaseRollback     TypeOperation = "Database.rollback"
+	SQLiteDatabaseClose        TypeOperation = "Database.close"
+	// The SQLiteValue members. SQLiteValue is a closed, immutable value of
+	// exactly one SQLite storage class (Null, Int, Real, or String); every
+	// typed accessor raises SQLiteError when the kind does not match.
+	SQLiteValueKind   TypeOperation = "SQLiteValue.kind"
+	SQLiteValueIsNull TypeOperation = "SQLiteValue.isNull"
+	SQLiteValueInt    TypeOperation = "SQLiteValue.int"
+	SQLiteValueReal   TypeOperation = "SQLiteValue.real"
+	SQLiteValueString TypeOperation = "SQLiteValue.string"
+
 	// The XML standard module's XMLNode members. XMLNode is a closed,
 	// immutable Element/Text value.
 	XMLNodeKind TypeOperation = "XMLNode.kind"

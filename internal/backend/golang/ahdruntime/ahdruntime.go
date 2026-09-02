@@ -87,6 +87,7 @@ var (
 	AhdClassKeyValueError       = &AhdClass{Name: "KeyValueError", Parent: AhdClassError}
 	AhdClassPDFError            = &AhdClass{Name: "PDFError", Parent: AhdClassError}
 	AhdClassArchiveError        = &AhdClass{Name: "ArchiveError", Parent: AhdClassError}
+	AhdClassSQLiteError         = &AhdClass{Name: "SQLiteError", Parent: AhdClassError}
 )
 
 // AhdInstance is every AhdCode Class instance. The generated interface of each

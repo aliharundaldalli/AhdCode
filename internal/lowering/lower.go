@@ -141,6 +141,11 @@ func LowerCompilation(compilation module.CompilationResult) Result {
 					keyValueModule(ir.ModuleID(current.ID), current.Source.Name, current.Source.Path))
 				continue
 			}
+			if string(current.ID) == SQLiteModuleID {
+				result.Modules = append(result.Modules,
+					sqliteModule(ir.ModuleID(current.ID), current.Source.Name, current.Source.Path))
+				continue
+			}
 			result.Modules = append(result.Modules, &ir.Module{
 				ID: ir.ModuleID(current.ID), Name: current.Source.Name, SourcePath: current.Source.Path,
 			})

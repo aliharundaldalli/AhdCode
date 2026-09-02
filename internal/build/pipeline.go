@@ -177,6 +177,7 @@ func BuildProgram(entryPath, outputPath string) (string, Result) {
 	result.Program = configureLatexRuntime(result.Program)
 	result.Program = configurePlotRuntime(result.Program)
 	result.Program = configureNumericRuntime(result.Program)
+	result.Program = configureSQLiteRuntime(result.Program)
 	workspace, failures := NewWorkspace(result.Program)
 	if len(failures) != 0 {
 		result.Diagnostics = append(result.Diagnostics, failures...)
@@ -263,6 +264,7 @@ func RunProgramIO(entryPath string, arguments []string, stdin io.Reader, stdout,
 	result.Program = configureLatexRuntime(result.Program)
 	result.Program = configurePlotRuntime(result.Program)
 	result.Program = configureNumericRuntime(result.Program)
+	result.Program = configureSQLiteRuntime(result.Program)
 	executable, cleanup, failures := runExecutable(result.Program)
 	defer cleanup()
 	result.Diagnostics = append(result.Diagnostics, failures...)
@@ -346,6 +348,55 @@ func configureNumericRuntime(program *backend.GeneratedProgram) *backend.Generat
 	copyProgram.Files = append([]backend.GeneratedFile(nil), program.Files...)
 	copyProgram.Files = append(copyProgram.Files, backend.GeneratedFile{Name: "ahdcode_numeric_runtime.go", Content: "package main\n\nfunc init() { AhdNumericRuntimeHint = " + strconv.Quote(root) + " }\n"})
 	return &copyProgram
+}
+
+// configureSQLiteRuntime records the installed ahdsqlite helper's directory
+// in programs that actually use SQLite, mirroring configureNumericRuntime.
+// The runtime still validates the helper exists and raises SQLiteError if it
+// is missing at run time.
+func configureSQLiteRuntime(program *backend.GeneratedProgram) *backend.GeneratedProgram {
+	if program == nil || !program.RequiresSQLite {
+		return program
+	}
+	root := findHelperRuntimeRoot("ahdsqlite", "AHDCODE_SQLITE_RUNTIME")
+	if root == "" {
+		return program
+	}
+	copyProgram := *program
+	copyProgram.RequiresSQLite = true
+	copyProgram.Files = append([]backend.GeneratedFile(nil), program.Files...)
+	copyProgram.Files = append(copyProgram.Files, backend.GeneratedFile{Name: "ahdcode_sqlite_runtime_hint.go", Content: "package main\n\nfunc init() { AhdSQLiteRuntimeHint = " + strconv.Quote(root) + " }\n"})
+	return &copyProgram
+}
+
+// findHelperRuntimeRoot locates the directory holding one bundled helper
+// executable: an explicit override (a file or its directory), then the
+// compiler's own bin/ directory, then a sibling libexec/ahdcode/ directory.
+func findHelperRuntimeRoot(name, override string) string {
+	if filepath.Ext(os.Args[0]) == ".exe" {
+		name += ".exe"
+	}
+	var candidates []string
+	if custom := os.Getenv(override); custom != "" {
+		if info, err := os.Stat(custom); err == nil && info.Mode().IsRegular() {
+			candidates = append(candidates, filepath.Dir(custom))
+		} else {
+			candidates = append(candidates, custom)
+		}
+	}
+	if executable, err := os.Executable(); err == nil {
+		bin := filepath.Dir(executable)
+		candidates = append(candidates, bin, filepath.Join(bin, "..", "libexec", "ahdcode"))
+	}
+	for _, candidate := range candidates {
+		helper := filepath.Join(filepath.Clean(candidate), name)
+		if info, err := os.Stat(helper); err == nil && info.Mode().IsRegular() {
+			if absolute, err := filepath.Abs(candidate); err == nil {
+				return absolute
+			}
+		}
+	}
+	return ""
 }
 
 func findNumericRuntimeRoot() string {

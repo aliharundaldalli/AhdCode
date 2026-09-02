@@ -55,3 +55,25 @@ func TestCompletionNamespaceMember(t *testing.T) {
 		t.Fatalf("expected PI among completions, got %#v", items)
 	}
 }
+
+// TestCompletionSQLiteArrivesThroughTheGenericModulePath is the v0.3.0
+// acceptance check for the v0.2.2 architecture: the SQLite module reaches the
+// protocol layer with no SQLite-specific code anywhere in internal/lsp.
+func TestCompletionSQLiteArrivesThroughTheGenericModulePath(t *testing.T) {
+	items := completionAt(t, "bring SQL\n", "file:///main.ahd", len("bring SQL"))
+	if !hasCompletionLabel(items, "SQLite") {
+		t.Fatalf("expected SQLite among module completions, got %#v", items)
+	}
+	text := "bring SQLite\nx := SQLite.\n"
+	items = completionAt(t, text, "file:///main.ahd", len(text)-1)
+	for _, label := range []string{"open", "nullValue", "fromInt", "fromReal", "fromString", "Database", "SQLiteValue", "SQLiteError"} {
+		if !hasCompletionLabel(items, label) {
+			t.Fatalf("expected %s among SQLite member completions, got %#v", label, items)
+		}
+	}
+	text = "from SQLite bring SQL\n"
+	items = completionAt(t, text, "file:///main.ahd", len(text)-1)
+	if !hasCompletionLabel(items, "SQLiteError") || !hasCompletionLabel(items, "SQLiteValue") {
+		t.Fatalf("expected SQLiteError/SQLiteValue exports, got %#v", items)
+	}
+}

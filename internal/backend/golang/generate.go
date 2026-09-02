@@ -25,6 +25,7 @@ type GeneratedProgram struct {
 	RequiresLatex   bool
 	RequiresPlot    bool
 	RequiresNumeric bool
+	RequiresSQLite  bool
 }
 
 const (
@@ -33,6 +34,7 @@ const (
 	excelRuntimeFileName   = "ahdcode_excel_runtime.go"
 	pdfRuntimeFileName     = "ahdcode_pdf_runtime.go"
 	archiveRuntimeFileName = "ahdcode_archive_runtime.go"
+	sqliteRuntimeFileName  = "ahdcode_sqlite_runtime.go"
 )
 
 // storage describes the Go representation chosen for one IR symbol.
@@ -59,6 +61,7 @@ type generator struct {
 	usesLatex   bool
 	usesPlot    bool
 	usesNumeric bool
+	usesSQLite  bool
 	// frames tracks the enclosing loop and attempt structure so break,
 	// continue, and return transfer through error handling correctly.
 	frames []frame
@@ -113,13 +116,18 @@ func Generate(compilation *ir.Compilation) (*GeneratedProgram, []diagnostics.Dia
 	if err != nil {
 		return nil, append(generator.diagnostics, backendError(CodeFormatFailure, "embedded Archive runtime source is not valid Go: "+err.Error(), source.Span{}, "the Archive backend runtime must remain gofmt-clean"))
 	}
+	sqliteRuntime, err := format.Source([]byte(sqliteRuntimeSource()))
+	if err != nil {
+		return nil, append(generator.diagnostics, backendError(CodeFormatFailure, "embedded SQLite runtime source is not valid Go: "+err.Error(), source.Span{}, "the SQLite backend runtime must remain gofmt-clean"))
+	}
 	return &GeneratedProgram{Files: []GeneratedFile{
 		{Name: programFileName, Content: string(formatted)},
 		{Name: runtimeFileName, Content: string(runtime)},
 		{Name: excelRuntimeFileName, Content: string(excelRuntime)},
 		{Name: pdfRuntimeFileName, Content: string(pdfRuntime)},
 		{Name: archiveRuntimeFileName, Content: string(archiveRuntime)},
-	}, RequiresLatex: generator.usesLatex, RequiresPlot: generator.usesPlot, RequiresNumeric: generator.usesNumeric}, generator.diagnostics
+		{Name: sqliteRuntimeFileName, Content: string(sqliteRuntime)},
+	}, RequiresLatex: generator.usesLatex, RequiresPlot: generator.usesPlot, RequiresNumeric: generator.usesNumeric, RequiresSQLite: generator.usesSQLite}, generator.diagnostics
 }
 
 // runtimeSource re-points the shared runtime package at the generated program.
@@ -137,6 +145,10 @@ func pdfRuntimeSource() string {
 
 func archiveRuntimeSource() string {
 	return strings.Replace(ahdruntime.ArchiveSource, "package ahdruntime", "package main", 1)
+}
+
+func sqliteRuntimeSource() string {
+	return strings.Replace(ahdruntime.SQLiteSource, "package ahdruntime", "package main", 1)
 }
 
 func (generator *generator) hasErrors() bool {
@@ -380,6 +392,7 @@ func (generator *generator) emitProgram() string {
 	generator.emitExcelHelpers(writer)
 	generator.emitJSONValueHelpers(writer)
 	generator.emitXMLHelpers(writer)
+	generator.emitSQLiteHelpers(writer)
 	writer.raw(bodies.String())
 	generator.emitInstaller(writer)
 	writer.open("func main() {")

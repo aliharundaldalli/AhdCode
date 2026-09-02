@@ -29,3 +29,10 @@ var PDFSource string
 //
 //go:embed archive.go
 var ArchiveSource string
+
+// SQLiteSource is emitted as a separate generated Go file, the same way
+// ExcelSource is. It is the stdlib-only client of the bundled ahdsqlite
+// helper; the SQLite engine itself never enters a generated workspace.
+//
+//go:embed sqlite.go
+var SQLiteSource string
