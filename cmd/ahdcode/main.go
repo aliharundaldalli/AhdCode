@@ -137,10 +137,21 @@ func runRun(arguments []string, input io.Reader, output, errorOutput io.Writer) 
 // Content-Length-framed protocol bytes, so unlike every other subcommand
 // here, nothing is ever written to it directly from this function -- not a
 // version banner, not a usage message, nothing.
+//
+// "--stdio" is accepted and ignored: it is not an AhdCode-invented flag but
+// the argument real LSP client libraries (e.g. vscode-languageclient's Node
+// transport) unconditionally append when they launch a server configured
+// for stdio transport, to select that transport among several a server
+// might support. ahdcode lsp only ever speaks stdio, so the flag is a no-op
+// here, but rejecting it -- as an arbitrary unrecognized argument would be
+// -- breaks every real editor integration outright. Anything else is still
+// rejected clearly.
 func runLSP(arguments []string, input io.Reader, output, errorOutput io.Writer) int {
-	if len(arguments) != 0 {
-		fmt.Fprintf(errorOutput, "ahdcode lsp: unexpected argument %q\n", arguments[0])
-		return 2
+	for _, argument := range arguments {
+		if argument != "--stdio" {
+			fmt.Fprintf(errorOutput, "ahdcode lsp: unexpected argument %q\n", argument)
+			return 2
+		}
 	}
 	server := lsp.NewServer(errorOutput)
 	if err := server.Run(input, output); err != nil {

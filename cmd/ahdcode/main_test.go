@@ -205,6 +205,29 @@ func TestLSPSubcommandStdoutIsProtocolOnly(t *testing.T) {
 	}
 }
 
+// TestLSPSubcommandAcceptsStdioFlag is a regression test: real LSP client
+// libraries (vscode-languageclient's Node transport, confirmed against its
+// installed source) unconditionally append "--stdio" when launching a
+// server configured for stdio transport. ahdcode lsp must accept it as a
+// no-op rather than exit with "unexpected argument", or every real editor
+// integration fails immediately with "Server process exited with code 2"
+// before a single protocol byte is exchanged.
+func TestLSPSubcommandAcceptsStdioFlag(t *testing.T) {
+	input := lspFrame(`{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}`) +
+		lspFrame(`{"jsonrpc":"2.0","method":"exit","params":{}}`)
+	var out, errors bytes.Buffer
+	code := runWithIO([]string{"lsp", "--stdio"}, strings.NewReader(input), &out, &errors)
+	if code != 0 {
+		t.Fatalf("ahdcode lsp --stdio exit code = %d, stderr = %q", code, errors.String())
+	}
+	if errors.Len() != 0 {
+		t.Fatalf("unexpected stderr: %q", errors.String())
+	}
+	if !strings.HasPrefix(out.String(), "Content-Length:") {
+		t.Fatalf("ahdcode lsp --stdio did not behave like a normal LSP session: %q", out.String())
+	}
+}
+
 func TestLSPSubcommandRejectsUnexpectedArguments(t *testing.T) {
 	var out, errors bytes.Buffer
 	code := runWithIO([]string{"lsp", "--port", "9999"}, strings.NewReader(""), &out, &errors)
