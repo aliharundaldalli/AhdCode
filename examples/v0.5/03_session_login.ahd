@@ -1,0 +1,95 @@
+// Local login-style demo with rotate and destroy.
+//
+// This is not an authentication framework. The program stores a name in the
+// server-side session after rotate(). Two browsers can stay logged in as
+// different names at the same time. Restarting the process forgets sessions.
+bring HTTP
+from HTTP bring Server
+from HTTP bring Request
+from HTTP bring Response
+from HTTP bring SessionStore
+from HTTP bring Session
+bring HTML
+
+sessions: SessionStore := HTTP.sessions(
+    "ahd_session"
+    3600
+    false
+    "Lax"
+)
+
+home: Function := (request: Request) -> Response {
+    sessions: Global SessionStore
+    session: Local Session := sessions.open(request)
+    name: Local String? := session.get("name")
+    if name != null {
+        return sessions.commit(session, HTTP.redirect("/panel"))
+    }
+    return sessions.commit(
+        session
+        HTTP.html(
+            r"""
+            <!doctype html>
+            <html>
+            <body>
+                <form method="post" action="/login">
+                    <input name="name" placeholder="Ali or Mehmet">
+                    <button type="submit">Continue</button>
+                </form>
+            </body>
+            </html>
+            """
+        )
+    )
+}
+
+login: Function := (request: Request) -> Response {
+    sessions: Global SessionStore
+    session: Local Session := sessions.open(request)
+    name: Local String? := request.form("name")
+    if name == null {
+        return sessions.commit(session, HTTP.text("name is required", 400))
+    }
+    session.rotate()
+    session.set("name", name)
+    return sessions.commit(session, HTTP.redirect("/panel"))
+}
+
+panel: Function := (request: Request) -> Response {
+    sessions: Global SessionStore
+    session: Local Session := sessions.open(request)
+    name: Local String? := session.get("name")
+    if name == null {
+        return sessions.commit(session, HTTP.redirect("/"))
+    }
+    return sessions.commit(
+        session
+        HTTP.html(
+            HTML.document(
+                "Hello"
+                [
+                    HTML.element("p", {}, [HTML.text("Hello {name}")])
+                    HTML.element(
+                        "form"
+                        {"method": "post", "action": "/logout"}
+                        [HTML.element("button", {"type": "submit"}, [HTML.text("Log out")])]
+                    )
+                ]
+            )
+        )
+    )
+}
+
+logout: Function := (request: Request) -> Response {
+    sessions: Global SessionStore
+    session: Local Session := sessions.open(request)
+    session.destroy()
+    return sessions.commit(session, HTTP.redirect("/"))
+}
+
+app: Server := HTTP.server("127.0.0.1", 8080)
+app.get("/", home)
+app.post("/login", login)
+app.get("/panel", panel)
+app.post("/logout", logout)
+app.start()

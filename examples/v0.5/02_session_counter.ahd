@@ -1,0 +1,29 @@
+// Per-browser counter using an in-memory SessionStore.
+//
+// Each browser gets its own count. The stored value is a String; conversion
+// to Int is explicit. Restarting the process forgets every session.
+bring HTTP
+from HTTP bring Server
+from HTTP bring Request
+from HTTP bring Response
+from HTTP bring SessionStore
+from HTTP bring Session
+
+sessions: SessionStore := HTTP.sessions()
+
+count: Function := (request: Request) -> Response {
+    sessions: Global SessionStore
+    session: Local Session := sessions.open(request)
+    raw: Local String? := session.get("count")
+    value: Local Int := 0
+    if raw != null {
+        value = int(raw)
+    }
+    value = value + 1
+    session.set("count", str(value))
+    return sessions.commit(session, HTTP.text("count = {str(value)}"))
+}
+
+app: Server := HTTP.server("127.0.0.1", 8080)
+app.get("/", count)
+app.start()

@@ -82,7 +82,7 @@ ahdcode_exe="$(go env GOPATH)/bin/ahdcode"
 "$ahdcode_exe" --version
 ```
 
-The expected current result is `AhdCode v0.4.0`. Using the explicit
+The expected current result is `AhdCode v0.5.0`. Using the explicit
 `$ahdcode_exe` path proves which binary was tested. If the user wants the
 short `ahdcode` command and that directory is not already on `PATH`, explain
 the temporary or persistent options and obtain permission before editing a
@@ -195,7 +195,7 @@ $AhdCodeExe = Join-Path (go env GOPATH) "bin\ahdcode.exe"
 & $AhdCodeExe --version
 ```
 
-The expected current result is `AhdCode v0.4.0`. The explicit executable path
+The expected current result is `AhdCode v0.5.0`. The explicit executable path
 avoids accidentally testing an older global installation. If the Go binary
 directory is not on `PATH`, explain the choice before changing anything. A
 temporary current-PowerShell-process change is:
@@ -322,6 +322,14 @@ db.execute(
 Do not write `"INSERT INTO notes (title) VALUES ('{title}')"`. A title such
 as `Robert'); DROP TABLE notes;--` must remain data. See
 [`docs/SQLITE.md`](docs/SQLITE.md).
+
+**HTTP cookies are not session values.** `HTTP.cookie` / `Request.cookie` /
+`Response.withCookie` are header primitives. `HTTP.sessions` is an in-memory
+server-side store; the browser cookie holds only an opaque random id. Values
+are String only and disappear when the process exits. `Session.set` does not
+write headers — `SessionStore.commit` returns a new Response. This is not an
+authentication framework. There is no `ahdsession` helper. See
+[`docs/HTTP.md`](docs/HTTP.md).
 
 **Excel Cells are closed typed values, not `Any`.** Use
 `Excel.fromString`, `Excel.fromInt`, `Excel.fromReal`, `Excel.fromBool`, and

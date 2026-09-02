@@ -1,0 +1,42 @@
+// Read, set, and delete an HTTP cookie.
+//
+// Run it, then open http://127.0.0.1:8080/ in a browser. Click Set, reload,
+// then Delete. Bind 127.0.0.1 so the page stays on this machine.
+bring HTTP
+from HTTP bring Server
+from HTTP bring Request
+from HTTP bring Response
+from HTTP bring Cookie
+bring HTML
+
+home: Function := (request: Request) -> Response {
+    theme: Local String? := request.cookie("theme")
+    shown: Local String := "(none)"
+    if theme != null {
+        shown = theme
+    }
+    page: Local String := HTML.document(
+        "Cookie"
+        [
+            HTML.element("p", {}, [HTML.text("theme cookie: {shown}")])
+            HTML.element("p", {}, [HTML.element("a", {"href": "/set"}, [HTML.text("Set theme=dark")])])
+            HTML.element("p", {}, [HTML.element("a", {"href": "/delete"}, [HTML.text("Delete theme")])])
+        ]
+    )
+    return HTTP.html(page)
+}
+
+set: Function := (request: Request) -> Response {
+    cookie: Local Cookie := HTTP.cookie("theme", "dark").withMaxAge(3600)
+    return HTTP.redirect("/").withCookie(cookie)
+}
+
+del: Function := (request: Request) -> Response {
+    return HTTP.redirect("/").withCookie(HTTP.deleteCookie("theme"))
+}
+
+app: Server := HTTP.server("127.0.0.1", 8080)
+app.get("/", home)
+app.get("/set", set)
+app.get("/delete", del)
+app.start()

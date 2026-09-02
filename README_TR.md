@@ -12,17 +12,20 @@ AhdCode; okunabilir sözdizimi, açık niyet (explicit intent), öngörülebilir
 anlambilim (semantics) ve yerel (native) derlemeye odaklanan, deneysel,
 statik olarak denetlenen genel amaçlı bir programlama dilidir.
 
-Mevcut sürüm **v0.4.0**'dır. Çekirdek dil uçtan uca çalışır, ancak proje
+Mevcut sürüm **v0.5.0**'dır. Çekirdek dil uçtan uca çalışır, ancak proje
 üretime hazır değildir ve 1.0'dan önce kırıcı (breaking) değişiklikler
 olabilir.
 
-v0.4.0 web temeli fazıdır: tipli bir [HTTP](docs/HTTP_TR.md) sunucusu,
+v0.5.0, v0.4.0 web temelinin üzerine HTTP çerezleri ve bellek içi sunucu
+taraflı oturumlar ekler: tipli bir [HTTP](docs/HTTP_TR.md) sunucusu,
 Request/Response değerleri ve küçük, güvenli bir [HTML](docs/HTML_TR.md)
 oluşturucu; böylece bir AhdCode programı bu makinenin tarayıcısında açılabilir.
-v0.3.0 pratik uygulama geliştirmeyi tipli bir [SQLite](docs/SQLITE_TR.md)
-köprüsüyle başlatmıştı. HTTP, çalışma zamanının içindeki Go `net/http`
-paketini kullanır; ayrı bir HTTP yardımcısı yoktur. HTTPS, çerez, oturum,
-multipart ve WebSocket bu sürümde yoktur.
+Bir oturum çerezi yalnızca opak rastgele bir kimlik taşır; oturum değerleri
+sunucuda kalır ve süreç bitince kaybolur. Bu bir kimlik doğrulama çerçevesi
+değildir. v0.3.0 pratik uygulama geliştirmeyi tipli bir
+[SQLite](docs/SQLITE_TR.md) köprüsüyle başlatmıştı. HTTP, çalışma zamanının
+içindeki Go `net/http` paketini kullanır; ayrı bir HTTP, çerez veya oturum
+yardımcısı yoktur. HTTPS, multipart ve WebSocket bu sürümde yoktur.
 
 v0.2.2, v0.2.1'in tanılama, hover, completion, tanıma git, belge sembolleri,
 signature help ve referans bulma özelliklerinin üzerine pratik günlük AhdCode
@@ -204,6 +207,7 @@ bakın.
 - [Derlenmiş v0.1 örnekleri](examples/v0.1/README_TR.md)
 - [v0.3 SQLite Not Defteri](examples/v0.3/README_TR.md)
 - [v0.4 Web Not Defteri](examples/v0.4/README_TR.md)
+- [v0.5 çerezler ve oturumlar](examples/v0.5/README_TR.md)
 - [v0.4 Kütüphane Demosu](https://github.com/aliharundaldalli/ahdcode-library-demo) (ayrı başlangıç web uygulaması)
 - [v0.4 Seminer Demosu](https://github.com/aliharundaldalli/ahdcode-seminer-demo) (Hatay, çok sayfalı)
 - [Tam v0.1 dil spesifikasyonu](AHDCODE_LANGUAGE_SPEC_v0.1_TR.md)
@@ -247,6 +251,7 @@ docs/              son kullanıcı rehberleri
 examples/v0.1/     derlenmiş çalışan programlar
 examples/v0.3/     SQLite Not Defteri
 examples/v0.4/     Web Not Defteri
+examples/v0.5/     çerezler ve bellek içi oturumlar
 AHDCODE_LANGUAGE_SPEC_v0.1.md
                    yetkili (authoritative) dil sözleşmesi
 ```

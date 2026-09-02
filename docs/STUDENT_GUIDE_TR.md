@@ -1,4 +1,4 @@
-# AhdCode v0.4.0 Türkçe Öğrenci Rehberi
+# AhdCode v0.5.0 Türkçe Öğrenci Rehberi
 
 Bu rehber, **daha önce hiç programlama yapmamış birinin de takip edebilmesi** için hazırlanmıştır. Baştan sona sırayla okuyabilirsiniz; her bölümde önce ne yapmak istediğimizi görecek, sonra çalışan bir örnek yazacak, en son gerekli kuralları öğreneceksiniz.
 
@@ -43,14 +43,15 @@ En iyi öğrenme yolu, örnekleri yalnızca okumak değil çalıştırmaktır. B
 - [34. Lists ve KeyValue modülleri](#34-lists-ve-keyvalue-modülleri)
 - [35. SQLite: hatırlayan bir veritabanı](#35-sqlite-hatırlayan-bir-veritabanı)
 - [36. Küçük bir web sayfası](#36-küçük-bir-web-sayfası)
-- [37. Kod Biçimlendirici (Formatter)](#37-kod-biçimlendirici-formatter)
-- [38. Komut satırı (CLI)](#38-komut-satırı-cli)
-- [39. Etkileşimli kabuk (REPL)](#39-etkileşimli-kabuk-repl)
-- [40. Sık yapılan başlangıç hataları](#40-sık-yapılan-başlangıç-hataları)
-- [41. Küçük Projeler](#41-küçük-projeler)
-- [42. Egzersizler](#42-egzersizler)
-- [43. Çözüm İpuçları](#43-çözüm-i̇puçları)
-- [44. Sonraki adımlar ve teknik belgeler](#44-sonraki-adımlar-ve-teknik-belgeler)
+- [37. Çerezler ve oturumlar](#37-çerezler-ve-oturumlar)
+- [38. Kod biçimlendirici (Formatter)](#38-kod-biçimlendirici-formatter)
+- [39. Komut satırı (CLI)](#39-komut-satırı-cli)
+- [40. Etkileşimli kabuk (REPL)](#40-etkileşimli-kabuk-repl)
+- [41. Sık yapılan başlangıç hataları](#41-sık-yapılan-başlangıç-hataları)
+- [42. Küçük Projeler](#42-küçük-projeler)
+- [43. Egzersizler](#43-egzersizler)
+- [44. Çözüm İpuçları](#44-çözüm-i̇puçları)
+- [45. Sonraki adımlar ve teknik belgeler](#45-sonraki-adımlar-ve-teknik-belgeler)
 
 ## 1. AhdCode nedir?
 
@@ -70,7 +71,7 @@ Merhaba!
 
 AhdCode, programı çalıştırmadan önce yazdığınız kodu kontrol eder. Örneğin bir metni sayı gibi kullanmaya çalışırsanız veya `null` olabilecek bir değeri kontrol etmeden kullanırsanız, mümkün olduğunda hatayı daha program başlamadan söyler. Ama başlangıçta bunun ayrıntılarını düşünmeniz gerekmiyor; ilerleyen bölümlerde örneklerle göreceğiz.
 
-AhdCode v0.4.0 güncel sürümdür. Küçük komut satırı programlarını çalıştırabilir veya yerel executable uygulamalara derleyebilirsiniz; veriyi yerel bir SQLite veritabanında tutabilir, bu makineden HTTP ile bir sayfa sunabilir ve dil sunucusunu (`ahdcode lsp`) VS Code gibi bir editörden kullanabilirsiniz. Bazı standart modüller, örneğin SQLite, derlenmiş uygulamanın yanında AhdCode'un sağladığı yardımcı çalışma zamanı bileşenlerini kullanabilir. HTTP ve HTML, çalışma zamanının içindeki Go standart kütüphanesini kullanır; ayrı bir HTTP yardımcısı eklemezler. v0.2.2 pratik günlük dil sunucusunu tamamladı; v0.3.0 SQLite ekledi; v0.4.0 tarayıcıdan kullanılan ilk AhdCode uygulama fazıdır.
+AhdCode v0.5.0 güncel sürümdür. Küçük komut satırı programlarını çalıştırabilir veya yerel executable uygulamalara derleyebilirsiniz; veriyi yerel bir SQLite veritabanında tutabilir, bu makineden HTTP ile bir sayfa sunabilir, tarayıcı başına bellek içi oturum değerleri tutabilir ve dil sunucusunu (`ahdcode lsp`) VS Code gibi bir editörden kullanabilirsiniz. Bazı standart modüller, örneğin SQLite, derlenmiş uygulamanın yanında AhdCode'un sağladığı yardımcı çalışma zamanı bileşenlerini kullanabilir. HTTP, HTML, çerez ve oturum, çalışma zamanının içindeki Go standart kütüphanesini kullanır; ayrı bir HTTP veya oturum yardımcısı eklemezler. v0.2.2 pratik günlük dil sunucusunu tamamladı; v0.3.0 SQLite ekledi; v0.4.0 tarayıcıdan kullanılan ilk AhdCode uygulama fazıdır; v0.5.0 çerez ve sunucu taraflı oturum ekler.
 
 > **Teknik not:** Program çalışmadan önce türlerin kontrol edilmesine *static checking* denir.
 
@@ -3037,7 +3038,96 @@ v0.4.0 editörleri mevcut dil sunucusu üzerinden `HTTP` ve `HTML`'i keşfeder:
 [HTTP modül referansına](HTTP_TR.md) ve [HTML modül referansına](HTML_TR.md)
 bakın.
 
-## 37. Kod biçimlendirici (Formatter)
+## 37. Çerezler ve oturumlar
+
+v0.4.0 bir sayfa sundu. v0.5.0, **bu tarayıcının** değerini **o tarayıcıyla**
+paylaşmadan tutmayı ekler. Çerez yalnızca rastgele bir kimlik taşır. Değerler
+sunucuda, bellektedir. Bu bir giriş çerçevesi değildir. Bir formdan sonra adı
+kendiniz saklayabilirsiniz.
+
+Modül düzeyindeki `SessionStore`, her işleyicide diğer modül bağlamaları gibi
+`Global` ile bildirilir.
+
+### İstek çerezi
+
+```ahd
+theme: Local String? := request.cookie("theme")
+values: Local List<String> := request.cookieAll("theme")
+```
+
+`cookie` ilk değerdir veya `null`. `cookieAll` tüm değerlerdir veya `[]`.
+
+### Yanıt çerezi
+
+```ahd
+return HTTP.redirect("/").withCookie(HTTP.cookie("theme", "dark"))
+```
+
+`HTTP.deleteCookie("theme")` tarayıcıya unutmasını söyler. `withCookie` ile
+gönderin. Çerezler değişmezdir: `withHttpOnly(true)` yeni bir Cookie döndürür.
+
+### SessionStore, String değerler, açık commit
+
+```ahd
+sessions: SessionStore := HTTP.sessions()
+
+count: Function := (request: Request) -> Response {
+    sessions: Global SessionStore
+    session: Local Session := sessions.open(request)
+    raw: Local String? := session.get("count")
+    value: Local Int := 0
+    if raw != null {
+        value = int(raw)
+    }
+    value = value + 1
+    session.set("count", str(value))
+    return sessions.commit(session, HTTP.text("count = {str(value)}"))
+}
+```
+
+`set` başlık yazmaz. `commit` yeni bir Response döndürür. Değerler yalnızca
+String'dir; `int(...)` sıradan dil dönüşümüdür.
+
+`set`/`rotate` olmadan `open` kalıcı oturum veya `Set-Cookie` üretmez.
+
+### Giriş tarzı rotate ve çıkış destroy
+
+Bir adı kabul ettikten sonra (veya daha sonra parolayı kendiniz doğruladıktan
+sonra):
+
+```ahd
+session.rotate()
+session.set("name", name)
+return sessions.commit(session, HTTP.redirect("/panel"))
+```
+
+`rotate()` eski çerez kimliğini işe yaramaz kılar. Çıkışta:
+
+```ahd
+session.destroy()
+return sessions.commit(session, HTTP.redirect("/"))
+```
+
+`remove` bir anahtarı siler. `clear` değerleri boşaltır ama oturumu tutar.
+`destroy` sunucu oturumunu ve tarayıcı çerezini siler.
+
+### İki tarayıcı, sonra yeniden başlatma
+
+[Oturum giriş örneğini](../examples/v0.5/03_session_login.ahd) iki tarayıcıda
+(veya bir pencere ve bir gizli pencerede) açın. Birinde Ali, diğerinde Mehmet
+olarak devam edin. İkisi de oturumda kalır. Ali çıkış yapsın: Mehmet hâlâ
+Mehmet'tir.
+
+Programı durdurup yeniden başlatın. Aynı tarayıcı çerezi adı geri getirmez.
+Bellek oturumları tasarım gereği kaybolur. Kendinizin sakladığı SQLite
+satırları duruyor olabilir.
+
+**Siz deneyin:** `examples/v0.5/02_session_counter.ahd` çalıştırın, iki
+tarayıcıda yenileyin, sayıların bağımsız kaldığını görün.
+
+Ayrıntılar için [HTTP modül referansına](HTTP_TR.md) bakın.
+
+## 38. Kod biçimlendirici (Formatter)
 
 Kod çalışsa bile herkes farklı boşluk ve satır düzeni kullanırsa okumak zorlaşır. AhdCode formatter, geçerli kodu ortak bir stile dönüştürür:
 
@@ -3090,7 +3180,7 @@ values :=
 
 Formatter idempotent'tir; aynı dosyada tekrar çalıştırmak yeni değişiklik üretmez.
 
-## 38. Komut satırı (CLI)
+## 39. Komut satırı (CLI)
 
 AhdCode'u terminalden birkaç temel komutla kullanabilirsiniz:
 
@@ -3127,7 +3217,7 @@ Yardım ve sürüm bilgisini gösterir.
 
 Yeni başlıyorsanız çoğu zaman kullanacağınız komut `ahdcode run ...` olacaktır.
 
-## 39. Etkileşimli kabuk (REPL)
+## 40. Etkileşimli kabuk (REPL)
 
 Küçük bir şeyi denemek için her seferinde dosya oluşturmak zorunda değilsiniz. Terminalde yalnızca:
 
@@ -3196,7 +3286,7 @@ harici bir render motorunu çağırır. Bu çağrıları bir `.ahd` dosyasından
 çalıştırın. `Archive`'ın böyle bir sınırlaması yoktur — REPL'de tamamen
 çalışır. Ayrıntılar için [REPL referansına](REPL_TR.md) bakın.
 
-## 40. Sık yapılan başlangıç hataları
+## 41. Sık yapılan başlangıç hataları
 
 Hata mesajı görmek programlamanın normal bir parçasıdır. Çoğu hata, bilgisayarın ne istediğinizi anlayamadığını söyler. Aşağıdaki örnekler yeni başlayanların sık karşılaştığı durumları ve nasıl düzelteceğinizi gösterir:
 
@@ -3305,7 +3395,7 @@ Hata mesajı görmek programlamanın normal bir parçasıdır. Çoğu hata, bilg
 - Neden: Bu, başlığı SQL'e yapıştırır. `Robert'); DROP TABLE notes;--` gibi bir başlık artık veri değildir.
 - Doğru: `?` yer tutucusu ve `SQLite.fromString(title)` kullanın. Parametre bağlama metni veri olarak tutar.
 
-## 41. Küçük Projeler
+## 42. Küçük Projeler
 
 Bu küçük projeler rehberde öğretilenleri bir araya getirir. Onları tek başınıza kurmayı deneyin!
 
@@ -3319,7 +3409,7 @@ Bu küçük projeler rehberde öğretilenleri bir araya getirir. Onları tek ba�
 8. **SQLite Not Defteri**: `notes.db` açın, yoksa bir `notes` tablosu oluşturun ve kullanıcının not eklemesine, listelemesine, başlığa göre aramasına, güncellemesine ve silmesine izin verin. Her değer için `?` parametreleri kullanın. Programı kapatıp yeniden çalıştırın: eski notlar durmalıdır.
 9. **Web Not Defteri**: Notları `127.0.0.1` üzerinde bir tarayıcıda sunun. Notları `HTML.text` ile listeleyin, POST `/notes` ve bağlı SQLite parametreleriyle not ekleyin, sonra `/` adresine yönlendirin. Dinamik metin ham HTML'e birleştirilmemelidir.
 
-## 42. Egzersizler
+## 43. Egzersizler
 
 Tam çözümleri hemen aramak yerine her programı küçük adımlarla kurun.
 
@@ -3351,7 +3441,7 @@ Tam çözümleri hemen aramak yerine her programı küçük adımlarla kurun.
 21. Küçük bir SQLite not defteri kurun: parametrelerle iki not ekleyin, `ORDER BY id` ile listeleyin, bir gövdeyi güncelleyin, bir satırı silin, veritabanını kapatın, aynı dosyayı yeniden açın ve kalan başlıkları yazdırın.
 22. `127.0.0.1` üzerinde `GET /ok` için `HTTP.text("ok")` sunun ve tarayıcıda açın.
 
-## 43. Çözüm İpuçları
+## 44. Çözüm İpuçları
 
 1. `take` sonucu String'dir; yaş için `int(...)` ve yeni yaş için `+ 1` kullanın.
 2. Formülü küçük parçalara ayırın; `real(take(...))` ile başlayın ve Real sayılarını kullanın.
@@ -3376,7 +3466,7 @@ Tam çözümleri hemen aramak yerine her programı küçük adımlarla kurun.
 21. `SQLite.open("notes.db")`, `CREATE TABLE IF NOT EXISTS`, `SQLite.fromString` ile `INSERT ... VALUES (?, ?)`, sonra `ORDER BY id` ile `query`. `close()` sonrası aynı yolu yeniden açın.
 22. `HTTP.server("127.0.0.1", 8080)`, `app.get("/ok", handler)`, `HTTP.text("ok")`, sonra `app.start()`.
 
-## 44. Sonraki adımlar ve teknik belgeler
+## 45. Sonraki adımlar ve teknik belgeler
 
 Bu rehberi tamamladıktan sonra dilin ayrıntılarını şu belgelerden
 derinleştirebilirsiniz:
@@ -3424,5 +3514,6 @@ derinleştirebilirsiniz:
 - [Tam v0.1 spesifikasyonu](../AHDCODE_LANGUAGE_SPEC_v0.1_TR.md)
 
 Çalışan daha fazla örnek için [derlenmiş v0.1 örnekleri](../examples/v0.1/README_TR.md)
-klasörüne, [v0.3 SQLite Not Defteri](../examples/v0.3/README_TR.md) ve
-[v0.4 Web Not Defteri](../examples/v0.4/README_TR.md) örneklerine bakın.
+klasörüne, [v0.3 SQLite Not Defteri](../examples/v0.3/README_TR.md),
+[v0.4 Web Not Defteri](../examples/v0.4/README_TR.md) ve
+[v0.5 çerezler ve oturumlar](../examples/v0.5/README_TR.md) örneklerine bakın.

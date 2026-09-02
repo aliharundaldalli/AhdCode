@@ -2,7 +2,7 @@
 
 [English](HTTP.md) · [Türkçe]
 
-[README'ye dön](../README_TR.md) · [Modüller](MODULES_TR.md) · [HTML](HTML_TR.md) · [Öğrenci Rehberi](STUDENT_GUIDE_TR.md#36-küçük-bir-web-sayfası)
+[README'ye dön](../README_TR.md) · [Modüller](MODULES_TR.md) · [HTML](HTML_TR.md) · [Öğrenci Rehberi](STUDENT_GUIDE_TR.md#37-çerezler-ve-oturumlar)
 
 `HTTP`, AhdCode v0.4.0 ile gelen, derleyici tarafından kayıtlı
 `builtin:HTTP` modülüdür. Açıkça getirilir ve yanındaki bir `HTTP.ahd`
@@ -14,13 +14,18 @@ from HTTP bring Server
 from HTTP bring Request
 from HTTP bring Response
 from HTTP bring HTTPError
+from HTTP bring Cookie
+from HTTP bring SessionStore
+from HTTP bring Session
 ```
 
 `HTTP` küçük, tipli yerel bir web sunucusudur. Tam yolları kaydeder, her
-isteğin bir anlık kopyasını okur ve bir `Response` döndürürsünüz. Middleware,
-yönlendirici DSL'si, HTTPS, çerez, oturum, multipart, WebSocket veya yol
-parametresi yoktur. Uygulama, AhdCode çalışma zamanının içindeki Go
-`net/http` paketini kullanır; ayrı bir HTTP yardımcı süreci yoktur.
+isteğin bir anlık kopyasını okur ve bir `Response` döndürürsünüz. v0.5.0 HTTP
+çerezleri ve bellek içi sunucu taraflı `SessionStore` ekler. Middleware,
+yönlendirici DSL'si, HTTPS, multipart, WebSocket, yol parametresi veya kimlik
+doğrulama çerçevesi yoktur. Uygulama, AhdCode çalışma zamanının içindeki Go
+`net/http` paketini kullanır; ayrı bir HTTP, çerez veya oturum yardımcı
+süreci yoktur.
 
 ## Genel yüzey
 
@@ -30,6 +35,14 @@ HTTP.response(status: Int, body: String, contentType: String)      -> Response
 HTTP.text(body: String, status: Int := 200)                        -> Response
 HTTP.html(body: String, status: Int := 200)                        -> Response
 HTTP.redirect(location: String, status: Int := 303)                -> Response
+HTTP.cookie(name: String, value: String)                           -> Cookie
+HTTP.deleteCookie(name: String, path: String := "/")               -> Cookie
+HTTP.sessions(
+    cookieName: String := "ahd_session"
+    maxAgeSeconds: Int := 86400
+    secure: Bool := false
+    sameSite: String := "Lax"
+) -> SessionStore
 
 Server.get(path: String, handler: Function)   -> Nothing
 Server.post(path: String, handler: Function)  -> Nothing
@@ -45,17 +58,36 @@ Request.headerAll(name: String)    -> List<String>
 Request.body()                     -> String
 Request.form(name: String)         -> String?
 Request.formAll(name: String)      -> List<String>
+Request.cookie(name: String)       -> String?
+Request.cookieAll(name: String)    -> List<String>
 
 Response.withHeader(name: String, value: String) -> Response
+Response.withCookie(cookie: Cookie)              -> Response
+
+Cookie.withPath(path: String)       -> Cookie
+Cookie.withHttpOnly(value: Bool)    -> Cookie
+Cookie.withSecure(value: Bool)      -> Cookie
+Cookie.withSameSite(mode: String)   -> Cookie
+Cookie.withMaxAge(seconds: Int)     -> Cookie
+
+SessionStore.open(request: Request) -> Session
+SessionStore.commit(session: Session, response: Response) -> Response
+
+Session.get(name: String)                 -> String?
+Session.has(name: String)                 -> Bool
+Session.set(name: String, value: String)  -> Nothing
+Session.remove(name: String)              -> Nothing
+Session.clear()                           -> Nothing
+Session.rotate()                          -> Nothing
+Session.destroy()                         -> Nothing
 
 HTTPError  (Error'dan türer)
 ```
 
-`Server`, `Request` ve `Response` opak yerleşik Sınıflardır: `Server()`,
-`Request()` veya `Response()` ile oluşturulamazlar, herkese açık öznitelikleri
-yoktur ve yalnızca yukarıdaki işlevlerden elde edilirler. Tüm argümanlar
-konumsaldır. Atlanan `maxBodyBytes` `1048576`'dır. Atlanan `HTTP.text` /
-`HTTP.html` durumu `200`'dür. Atlanan yönlendirme durumu `303`'tür.
+`Server`, `Request`, `Response`, `Cookie`, `SessionStore` ve `Session` opak
+yerleşik Sınıflardır: `Server()`, `Request()`, `Response()`, `Cookie()`,
+`SessionStore()` veya `Session()` ile oluşturulamazlar. Atlanan
+`HTTP.sessions` argümanları `ahd_session`, `86400`, `false` ve `"Lax"`'tır.
 
 ## İşleyici imzası
 
@@ -119,7 +151,11 @@ Sorgudaki bozuk yüzde kodlaması (`%`, `%2`, `%ZZ`) ve yüzde çözülmüş ge�
 UTF-8 (`%80`, `%C0%80`) **400** döner; işleyici çalışmaz. U+FFFD yerine koyma
 ve anahtarları sessizce düşürme yoktur.
 
-`header` / `headerAll` büyük/küçük harfe duyarsızdır. `body()` UTF-8 gövdedir;
+`header` / `headerAll` büyük/küçük harfe duyarsızdır. `cookie(name)` o addaki
+ilk Cookie değeri veya `null`'dır. `cookieAll` istek sırasındaki tüm
+eşleşmelerdir, yoksa `[]`. Çerez adları büyük/küçük harfe duyarlıdır.
+
+`body()` UTF-8 gövdedir;
 geçersiz UTF-8 `HTTPError` fırlatır (sessiz değiştirme yoktur).
 
 Formlar yalnızca `Content-Type` `application/x-www-form-urlencoded` iken
@@ -135,7 +171,53 @@ verisi işleyiciden **önce** **400** döner. Gövde, işleyiciden **önce**
 işaretleme (`r"""..."""`) veya `HTML.document` / `HTML.render` çıktısı için
 kullanın. Durum kodları `100..599` olmalıdır. `HTTP.redirect` yalnızca
 `301`, `302`, `303`, `307` veya `308` kabul eder. `withHeader` yeni bir
-`Response` döndürür; CR/LF yasaktır.
+`Response` döndürür; CR/LF yasaktır. `Set-Cookie` `withCookie` ile eklenir;
+`withHeader` birden fazla çerezi tek başlıkta ezmez.
+
+## Çerezler
+
+`HTTP.cookie(name, value)` değişmez bir `Cookie` üretir. Oluşturucular yeni
+bir Cookie döndürür; asıl değer değişmez.
+
+Varsayılanlar: Path `/`, HttpOnly `false`, Secure `false`, SameSite `"Lax"`,
+Max-Age yok. SameSite yalnızca `"Lax"`, `"Strict"`, `"None"` kabul eder.
+`"lax"` sessizce düzeltilmez. `"None"` için `Secure=true` gerekir.
+
+Çerez değerleri cookie-octet'tir (ASCII; `"`, `,`, `;`, `\` yok). CR/LF,
+denetim karakterleri ve rastgele Unicode `HTTPError` fırlatır; sessizce
+silinmez veya kodlanmaz. Oturum kimlikleri bu sözleşmeyi sağlar.
+
+`HTTP.deleteCookie(name)` `Max-Age=0` içeren bir silme çerezi döndürür.
+`withCookie` ile gönderin.
+
+## Oturumlar
+
+`HTTP.sessions` bağımsız, bellek içi bir `SessionStore` oluşturur. İki store
+durum paylaşmaz. Oturum çerezi yalnızca opak rastgele bir kimlik taşır
+(`crypto/rand`, en az 256 bit, padding'siz base64url). Değerler yalnızca
+String'dir ve sunucudadır. Süreç bitince kaybolur; bu tasarım gereğidir, hata
+değildir. Kimlik doğrulama çerçevesi yoktur.
+
+Varsayılan oturum çerezi: Path `/`, HttpOnly her zaman `true`, Max-Age =
+`maxAgeSeconds`. HttpOnly kapatılamaz. Süresi dolmuş oturumlar kabul edilmez.
+Temizlik `open`/`commit` sırasında tembeldir.
+
+İşleyici içinde modül düzeyindeki store `Global` ile bildirilir:
+
+```ahd
+sessions: Global SessionStore
+session: Local Session := sessions.open(request)
+```
+
+Bilinmeyen veya süresi dolmuş çerez yeni anonim oturum olur; saldırgan
+kimliği sunucu kimliği olarak kullanılmaz. `set`/`remove`/`clear`/`rotate`
+olmadan `open` kalıcı durum veya `Set-Cookie` üretmez. `Session.set` başlık
+yazmaz; `commit` yeni bir `Response` döndürür.
+
+`rotate()` eski kimliği geçersiz kılar, değerleri korur, yeni çerez gönderir.
+`destroy()` sunucu durumunu siler; `commit` silme çerezi gönderir. Destroy
+sonrası `get` `null`, `has` `false`; mutasyon `HTTPError` fırlatır.
+`remove` bir anahtarı, `clear` değerleri, `destroy` oturumu siler.
 
 ## Hatalar ve sınırlama
 
@@ -152,6 +234,6 @@ sunucuda iki işleyici aynı anda çalışmaz.
 ## Bu modülün yapmadıkları
 
 HTTPS/TLS, HTTP/2 API, HTTP/3, WebSocket, SSE, multipart, dosya yükleme,
-statik dosya sunucusu, çerez, oturum, kimlik doğrulama, CSRF, middleware, yol
+statik dosya sunucusu, veritabanı oturumu, kimlik doğrulama, CSRF, middleware, yol
 parametreleri, joker, regex yolları, ters vekil, sıkıştırma API'si veya
-önbellekleme yoktur. Gövdeler sınırlı String'lerdir.
+önbellekleme yoktur. Oturum değerleri String'dir.

@@ -36,8 +36,9 @@ set (diagnostics, hover, completion with auto import, go to definition,
 document symbols, signature help, find references, rename, semantic tokens,
 inlay hints, code actions, formatting, workspace symbols, folding ranges, and
 selection ranges), all compiler-backed. v0.4.0 modules such as `HTTP` and `HTML`
-appear through that same compiler module interface; there is no HTTP-specific
-or HTML-specific LSP catalog. v0.3.0's `SQLite` uses the same path. It accepts no arguments other than an
+appear through that same compiler module interface; v0.5.0 `cookie`,
+`sessions`, `Cookie`, `Session`, and `SessionStore` use that path too. There is
+no HTTP-specific, Cookie-specific, or Session-specific LSP catalog. v0.3.0's `SQLite` uses the same path. It accepts no arguments other than an
 optional `--stdio`
 (accepted and ignored -- real LSP client libraries append it automatically
 when they launch a server over stdio transport; `ahdcode lsp` never supports

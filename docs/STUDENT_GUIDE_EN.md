@@ -1,4 +1,4 @@
-# AhdCode v0.4.0 English Student Guide
+# AhdCode v0.5.0 English Student Guide
 
 This guide is designed so that **even someone who has never programmed before** can follow along. You can read it in order from beginning to end; in each section, you will first see what we want to achieve, then write a working example, and finally learn the necessary rules.
 
@@ -43,14 +43,15 @@ The best way to learn is not just by reading the examples, but by running them. 
 - [34. Lists and KeyValue modules](#34-lists-and-keyvalue-modules)
 - [35. SQLite: a database that remembers](#35-sqlite-a-database-that-remembers)
 - [36. A small web page](#36-a-small-web-page)
-- [37. Code Formatter](#37-code-formatter)
-- [38. Command line (CLI)](#38-command-line-cli)
-- [39. Interactive shell (REPL)](#39-interactive-shell-repl)
-- [40. Common beginner mistakes](#40-common-beginner-mistakes)
-- [41. Small Projects](#41-small-projects)
-- [42. Exercises](#42-exercises)
-- [43. Solution Hints](#43-solution-hints)
-- [44. Next steps and technical docs](#44-next-steps-and-technical-docs)
+- [37. Cookies and sessions](#37-cookies-and-sessions)
+- [38. Code Formatter](#38-code-formatter)
+- [39. Command line (CLI)](#39-command-line-cli)
+- [40. Interactive shell (REPL)](#40-interactive-shell-repl)
+- [41. Common beginner mistakes](#41-common-beginner-mistakes)
+- [42. Small Projects](#42-small-projects)
+- [43. Exercises](#43-exercises)
+- [44. Solution Hints](#44-solution-hints)
+- [45. Next steps and technical docs](#45-next-steps-and-technical-docs)
 
 ## 1. What is AhdCode?
 
@@ -70,7 +71,7 @@ Hello!
 
 AhdCode checks the code you wrote before running the program. For example, if you try to use text like a number, or if you use a value that could be `null` without checking it, it will tell you the error before the program even starts, whenever possible. But you don't need to think about these details at the beginning; we'll see examples in later sections.
 
-AhdCode v0.4.0 is the current release. You can run small command-line programs or compile them into local executables, keep data in a local SQLite database, serve a page from this machine over HTTP, and use the language server (`ahdcode lsp`) from an editor such as VS Code. Some standard modules, such as SQLite, may use companion runtime helpers supplied with AhdCode. HTTP and HTML use the Go standard library inside the runtime; they do not add an HTTP helper. v0.2.2 completed the everyday language server; v0.3.0 added SQLite; v0.4.0 is the first browser-facing AhdCode application phase.
+AhdCode v0.5.0 is the current release. You can run small command-line programs or compile them into local executables, keep data in a local SQLite database, serve a page from this machine over HTTP, remember per-browser values with an in-memory session, and use the language server (`ahdcode lsp`) from an editor such as VS Code. Some standard modules, such as SQLite, may use companion runtime helpers supplied with AhdCode. HTTP, HTML, cookies, and sessions use the Go standard library inside the runtime; they do not add an HTTP or session helper. v0.2.2 completed the everyday language server; v0.3.0 added SQLite; v0.4.0 is the first browser-facing AhdCode application phase; v0.5.0 adds cookies and server-side sessions.
 
 > **Technical note:** Checking types before the program runs is called *static checking*.
 
@@ -3014,7 +3015,96 @@ open `http://127.0.0.1:8080/ok`.
 
 See [the HTTP module reference](HTTP.md) and [the HTML module reference](HTML.md).
 
-## 37. Code Formatter
+## 37. Cookies and sessions
+
+v0.4.0 served a page. v0.5.0 lets **this browser** keep a value that **that
+browser** does not share. The cookie holds only a random id. The values live
+on the server, in memory. This is not a login framework. You can store a name
+yourself after you check a form.
+
+A module-level `SessionStore` is declared `Global` inside each handler, like
+any other module binding.
+
+### Request cookie
+
+```ahd
+theme: Local String? := request.cookie("theme")
+values: Local List<String> := request.cookieAll("theme")
+```
+
+`cookie` is the first value, or `null`. `cookieAll` is every value, or `[]`.
+
+### Response cookie
+
+```ahd
+return HTTP.redirect("/").withCookie(HTTP.cookie("theme", "dark"))
+```
+
+`HTTP.deleteCookie("theme")` is a cookie that tells the browser to forget it.
+Send it with `withCookie`. Cookies are immutable: `withHttpOnly(true)` returns
+a new Cookie.
+
+### SessionStore, String values, explicit commit
+
+```ahd
+sessions: SessionStore := HTTP.sessions()
+
+count: Function := (request: Request) -> Response {
+    sessions: Global SessionStore
+    session: Local Session := sessions.open(request)
+    raw: Local String? := session.get("count")
+    value: Local Int := 0
+    if raw != null {
+        value = int(raw)
+    }
+    value = value + 1
+    session.set("count", str(value))
+    return sessions.commit(session, HTTP.text("count = {str(value)}"))
+}
+```
+
+`set` does not write a header. `commit` returns a new Response. Values are
+String only; `int(...)` is ordinary language conversion.
+
+Opening a session and returning without `set`/`rotate` does not create a
+stored session or a `Set-Cookie` header.
+
+### Login-style rotate and logout destroy
+
+After you accept a name (or later, after you verify a password yourself):
+
+```ahd
+session.rotate()
+session.set("name", name)
+return sessions.commit(session, HTTP.redirect("/panel"))
+```
+
+`rotate()` makes the old cookie id useless. On logout:
+
+```ahd
+session.destroy()
+return sessions.commit(session, HTTP.redirect("/"))
+```
+
+`remove` deletes one key. `clear` empties values but keeps the session.
+`destroy` deletes the server session and the browser cookie.
+
+### Two browsers, then restart
+
+Open the [session login example](../examples/v0.5/03_session_login.ahd) in two
+browsers (or a window and a private window). Continue as Ali in one and Mehmet
+in the other. Both stay signed in. Log out Ali: Mehmet is still Mehmet.
+
+Stop the program and start it again. The same browser cookie no longer restores
+the name. Memory sessions disappear by design. SQLite rows you stored yourself
+can still be there.
+
+**Try it yourself:** run `examples/v0.5/02_session_counter.ahd`, click reload
+in two browsers, and watch the counts stay independent.
+
+See [the HTTP module reference](HTTP.md) for Cookie and Session details.
+
+## 38. Code Formatter
 
 Even if the code works, if everyone uses different spacing and line layouts, it becomes hard to read. The AhdCode formatter converts valid code to a common style:
 
@@ -3067,7 +3157,7 @@ values: List<Int> :=
 
 The formatter is idempotent; running it again on the same file produces no new changes.
 
-## 38. Command line (CLI)
+## 39. Command line (CLI)
 
 You can use AhdCode from the terminal with a few basic commands:
 
@@ -3104,7 +3194,7 @@ Shows help and version information.
 
 If you are a beginner, the command you will use most of the time will be `ahdcode run ...`.
 
-## 39. Interactive shell (REPL)
+## 40. Interactive shell (REPL)
 
 You don't have to create a file every time you want to try something small. In the terminal, just run:
 
@@ -3172,7 +3262,7 @@ not support. Run those calls from a `.ahd` file instead. `Archive` has no
 such limit -- it works fully in the REPL. See the [REPL reference](REPL.md)
 for details.
 
-## 40. Common beginner mistakes
+## 41. Common beginner mistakes
 
 Seeing an error message is a normal part of programming. Most errors simply tell you that the computer couldn't understand what you wanted. The following examples show common situations beginners encounter and how to fix them:
 
@@ -3281,7 +3371,7 @@ Seeing an error message is a normal part of programming. Most errors simply tell
 - Why: That splices the title into SQL. A title such as `Robert'); DROP TABLE notes;--` is no longer data.
 - Correct: Use a `?` placeholder and `SQLite.fromString(title)`. Parameter binding keeps the text as data.
 
-## 41. Small Projects
+## 42. Small Projects
 
 These small projects bring together what is taught in the guide. Try building them on your own!
 
@@ -3295,7 +3385,7 @@ These small projects bring together what is taught in the guide. Try building th
 8. **SQLite Notes App**: Open `notes.db`, create a `notes` table if it is missing, and let the user add a note, list notes, search by title, update a note, and delete a note. Use `?` parameters for every value. Close the program and run it again: the old notes must still be there.
 9. **Web Notes App**: Serve notes in a browser on `127.0.0.1`. List notes with `HTML.text`, add a note with POST `/notes` and bound SQLite parameters, then redirect to `/`. Dynamic text must not be concatenated into raw HTML.
 
-## 42. Exercises
+## 43. Exercises
 
 Instead of immediately looking for full solutions, build each program in small steps.
 
@@ -3327,7 +3417,7 @@ Instead of immediately looking for full solutions, build each program in small s
 21. Build a tiny SQLite notebook: insert two notes with parameters, list them with `ORDER BY id`, update one body, delete one row, close the database, reopen the same file, and print the remaining titles.
 22. Serve `HTTP.text("ok")` on `GET /ok` at `127.0.0.1` and open it in a browser.
 
-## 43. Solution Hints
+## 44. Solution Hints
 
 1. The result of `take` is a String; use `int(...)` for age, and `+ 1` for the new age.
 2. Break the formula into small parts; start with `real(take(...))` and use Real numbers.
@@ -3352,7 +3442,7 @@ Instead of immediately looking for full solutions, build each program in small s
 21. `SQLite.open("notes.db")`, `CREATE TABLE IF NOT EXISTS`, `INSERT ... VALUES (?, ?)` with `SQLite.fromString`, then `query` with `ORDER BY id`. After `close()`, open the same path again.
 22. `HTTP.server("127.0.0.1", 8080)`, `app.get("/ok", handler)`, `HTTP.text("ok")`, then `app.start()`.
 
-## 44. Next steps and technical docs
+## 45. Next steps and technical docs
 
 After finishing this guide, you can deepen your knowledge of the language details from these documents:
 
@@ -3398,4 +3488,4 @@ After finishing this guide, you can deepen your knowledge of the language detail
 - [Language server](LSP.md)
 - [Full v0.1 specification](../AHDCODE_LANGUAGE_SPEC_v0.1.md)
 
-Check the [curated v0.1 examples](../examples/v0.1/README.md) folder, the [v0.3 SQLite Notes App](../examples/v0.3/README.md), and the [v0.4 Web Notes App](../examples/v0.4/README.md) for more working programs.
+Check the [curated v0.1 examples](../examples/v0.1/README.md) folder, the [v0.3 SQLite Notes App](../examples/v0.3/README.md), the [v0.4 Web Notes App](../examples/v0.4/README.md), and the [v0.5 cookies and sessions](../examples/v0.5/README.md) examples for more working programs.
