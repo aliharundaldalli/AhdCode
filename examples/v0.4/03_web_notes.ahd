@@ -1,0 +1,177 @@
+// Web Notes App: SQLite notes served as escaped HTML.
+//
+// Copy this file to a temporary directory so notes.db is not created inside
+// the repository. Run it, then open http://127.0.0.1:8080/ in a browser.
+// Each handler opens notes.db, does one small operation, and closes it.
+// Dynamic title/body text always travels through HTML.text, never raw HTML.
+bring HTTP
+from HTTP bring Server
+from HTTP bring Request
+from HTTP bring Response
+bring HTML
+from HTML bring HTMLNode
+bring SQLite
+from SQLite bring Database
+from SQLite bring SQLiteValue
+
+openNotes: Function := () -> Database {
+    db: Local Database := SQLite.open("notes.db")
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS notes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL,
+            body TEXT NOT NULL
+        )
+        """)
+    return db
+}
+
+home: Function := (request: Request) -> Response {
+    db: Local Database := openNotes()
+    q: Local String? := request.query("q")
+    rows: Local List<Pair<String, SQLiteValue>> := []
+    searchValue: Local String := ""
+    if q != null {
+        searchValue = q
+        term: Local String := "%" + q + "%"
+        rows = db.query(
+            "SELECT id, title, body FROM notes WHERE title LIKE ? OR body LIKE ? ORDER BY id"
+            [SQLite.fromString(term), SQLite.fromString(term)]
+        )
+    }
+    else {
+        rows = db.query("SELECT id, title, body FROM notes ORDER BY id")
+    }
+    db.close()
+
+    items: Local List<HTMLNode> := []
+    for row in rows {
+        idText: Local String := "{row["id"].int()}"
+        items.add(
+            HTML.element(
+                "li"
+                {}
+                [
+                    HTML.element(
+                        "strong"
+                        {}
+                        [HTML.text(row["title"].string())]
+                    )
+                    HTML.text(" — ")
+                    HTML.text(row["body"].string())
+                    HTML.element(
+                        "form"
+                        {"method": "post", "action": "/delete"}
+                        [
+                            HTML.element(
+                                "input"
+                                {
+                                    "type": "hidden"
+                                    "name": "id"
+                                    "value": idText
+                                }
+                                []
+                            )
+                            HTML.element(
+                                "button"
+                                {"type": "submit"}
+                                [HTML.text("Delete")]
+                            )
+                        ]
+                    )
+                ]
+            )
+        )
+    }
+
+    page: Local String := HTML.document(
+        "Notes"
+        [
+            HTML.element("h1", {}, [HTML.text("Notes")])
+            HTML.element(
+                "form"
+                {"method": "get", "action": "/"}
+                [
+                    HTML.element(
+                        "input"
+                        {"name": "q", "value": searchValue}
+                        []
+                    )
+                    HTML.element(
+                        "button"
+                        {"type": "submit"}
+                        [HTML.text("Search")]
+                    )
+                ]
+            )
+            HTML.element("ul", {}, items)
+            HTML.element(
+                "form"
+                {"method": "post", "action": "/notes"}
+                [
+                    HTML.element(
+                        "p"
+                        {}
+                        [
+                            HTML.text("Title: ")
+                            HTML.element("input", {"name": "title"}, [])
+                        ]
+                    )
+                    HTML.element(
+                        "p"
+                        {}
+                        [
+                            HTML.text("Body: ")
+                            HTML.element("input", {"name": "body"}, [])
+                        ]
+                    )
+                    HTML.element(
+                        "button"
+                        {"type": "submit"}
+                        [HTML.text("Add")]
+                    )
+                ]
+            )
+        ]
+    )
+    return HTTP.html(page)
+}
+
+createNote: Function := (request: Request) -> Response {
+    title: Local String? := request.form("title")
+    body: Local String? := request.form("body")
+    if title == null {
+        return HTTP.text("title is required", 400)
+    }
+    if body == null {
+        return HTTP.text("body is required", 400)
+    }
+    if len(title.trim()) == 0 {
+        return HTTP.text("title is required", 400)
+    }
+    db: Local Database := openNotes()
+    db.execute(
+        "INSERT INTO notes (title, body) VALUES (?, ?)"
+        [SQLite.fromString(title), SQLite.fromString(body)]
+    )
+    db.close()
+    return HTTP.redirect("/")
+}
+
+deleteNote: Function := (request: Request) -> Response {
+    idText: Local String? := request.form("id")
+    if idText == null {
+        return HTTP.text("id is required", 400)
+    }
+    id: Local Int := int(idText)
+    db: Local Database := openNotes()
+    db.execute("DELETE FROM notes WHERE id = ?", [SQLite.fromInt(id)])
+    db.close()
+    return HTTP.redirect("/")
+}
+
+app: Server := HTTP.server("127.0.0.1", 8080)
+app.get("/", home)
+app.post("/notes", createNote)
+app.post("/delete", deleteNote)
+app.start()

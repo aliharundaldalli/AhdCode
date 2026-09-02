@@ -1,0 +1,33 @@
+// Read a query parameter and a URL-encoded form.
+//
+// GET  /hello?name=Ayşe
+// POST /form  with title=First+Note&body=Hello%20World
+bring HTTP
+from HTTP bring Server
+from HTTP bring Request
+from HTTP bring Response
+
+hello: Function := (request: Request) -> Response {
+    name: Local String? := request.query("name")
+    if name != null {
+        return HTTP.text("Hello {name}")
+    }
+    return HTTP.text("Hello")
+}
+
+notes: Function := (request: Request) -> Response {
+    title: Local String? := request.form("title")
+    body: Local String? := request.form("body")
+    if title == null {
+        return HTTP.text("title is required", 400)
+    }
+    if body == null {
+        return HTTP.text("body is required", 400)
+    }
+    return HTTP.text("saved: {title} / {body}")
+}
+
+app: Server := HTTP.server("127.0.0.1", 8080)
+app.get("/hello", hello)
+app.post("/form", notes)
+app.start()
