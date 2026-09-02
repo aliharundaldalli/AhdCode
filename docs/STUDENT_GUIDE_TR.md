@@ -820,19 +820,7 @@ describe: Overload Function := (value: Real) -> String {
 
 AhdCode çağrının hangi sürüme ait olduğunu parametrelerden belirler. Tam eşleşme önce gelir; güvenli `Int -> Real` genişletmesi gerektiğinde kullanılabilir. Hangi sürümün seçileceği belirsizse derleyici tahmin etmek yerine hata verir.
 
-> **Teknik not:** Bu seçime *overload resolution* denir. İsimli Function bildirimleri `name: Function := (...) -> T { ... }` biçimini korur ve iç içe yazılamaz. Lambda ayrı bir tür değildir: var olan `Function` türünde bir değer yaratır. Her parametrenin türü açıkça (static olarak) belirtilmelidir, dönüş türü ifadeden çıkarılır ve katı tipleme (strict typing)/null güvenliği kuralları aynen geçerlidir. Lambda'nın bir bloğu (`{}`) veya deyimleri (statements) yoktur.
-
-Eğer lambda, kendi parametreleri dışındaki bir değişkeni kullanmak zorundaysa, bu değişkenleri parametrelerden hemen önce köşeli parantez içinde listelemelisiniz:
-
-```ahd
-minimum: Int := 50
-passed := values.filter(lambda [#minimum] (score: Int) -> score >= minimum)
-```
-
-- `#`, `Local` (yerel) yakalamalar içindir: lambdanın oluşturulduğu andaki değeri kopyalar.
-- `@`, `Global` yakalamalar içindir: doğrudan genel modül değişkenine kalıcı olarak bağlanır.
-
-Hiçbir dış bağımlılık (dependency) kendiliğinden dahil edilmez; bunları sizin belirtmeniz gerekir.
+> **Teknik not:** Bu seçime *overload resolution* denir. İsimli Function bildirimleri `name: Function := (...) -> T { ... }` biçimini korur ve iç içe yazılamaz. Tek ifadeli kısa işler için `lambda (x: Int) -> x > 0`, aynı `Function` türünde isimsiz bir değer oluşturur. Lambda parametreleri açıkça türlenir, dönüş türü ifadeden çıkarılır ve lambda'nın bloğu veya deyimleri yoktur.
 
 ## 11. `Local` ve `Global`
 
@@ -1008,7 +996,56 @@ write(data.index(8)) // 1
 ### `map`, `filter` ve anahtara göre sıralama
 
 Bir listedeki her değeri dönüştürmek için `map`, bazılarını seçmek için
-`filter` kullanabilirsiniz.
+`filter` kullanabilirsiniz. Birden fazla adım gerektiren işlemlerde isimli
+Function kullanmak okunaklıdır:
+
+```ahd
+double: Function := (value: Int) -> Int {
+    return value * 2
+}
+
+isEven: Function := (value: Int) -> Bool {
+    return value % 2 == 0
+}
+
+values: List<Int> := [3, -1, 4, -2]
+write(values.map(double))
+write(values.filter(isEven))
+```
+
+Tek ifadeli kısa işlemlerde lambdayı doğrudan verebilirsiniz:
+
+```ahd
+values: List<Int> := [3, -1, 4, -2]
+squares := values.map(lambda (value: Int) -> value^2)
+positive := values.filter(lambda (value: Int) -> value > 0)
+values.sort(lambda (value: Int) -> -value)
+
+write(squares)
+write(positive)
+write(values)
+```
+
+Lambda ayrı bir tür değildir; var olan `Function` türünde bir değer oluşturur.
+Her parametrenin statik türü açıkça yazılır, dönüş türü ifadeden çıkarılır ve
+normal katı tipleme/null güvenliği kuralları geçerlidir. Lambda'nın bloğu veya
+deyimleri yoktur.
+
+Lambda kendi parametreleri dışındaki bir değişkeni kullanacaksa bu değişkeni
+parametrelerden önce köşeli parantez içinde açıkça **yakalar**:
+
+```ahd
+scores: List<Int> := [35, 50, 72, 90]
+minimum: Int := 50
+passed := scores.filter(lambda [@minimum] (score: Int) -> score >= minimum)
+write(passed)
+```
+
+- `#`, `Local` yakalamadır: lambda oluşturulduğu andaki değer kopyalanır.
+- `@`, `Global` yakalamadır: canlı modül değişkenine bağlanır.
+
+Dış bağımlılıklar kendiliğinden çıkarılmaz; kullanacağınız her yakalamayı
+listelemelisiniz.
 
 `map` ve `filter` kaynak List'i değiştirmez; yeni List döndürür.
 
@@ -1149,20 +1186,21 @@ Bazen bir değerin henüz bulunmaması normaldir. Örneğin bir kullanıcı arı
 kayıt yok      -> değer yok
 ```
 
-AhdCode'da `null`, "burada şu anda bir değer yok" demektir.
-
-Normal bir değişkene `null` atayabilirsiniz ancak AhdCode onu kullanmanıza hemen izin vermez:
+AhdCode'da `null`, "burada şu anda bir değer yok" demektir. Yalın `T` türü
+null olamaz; değer `null` da olabilecekse türü `T?` yazarsınız. Null olmayan
+bir `T`, güvenle `T?` olarak kullanılabilir; ters yön için önce kontrol gerekir.
 
 ```ahd
-name: String := null
+name: String? := null
 ```
 
 Bu, `name` değişkeninin bir `String` veya `null` tutabileceğini söyler.
+`name: String := null` ise geçersizdir; çünkü `String` null olamaz.
 
 ### Kullanmadan önce kontrol edin
 
 ```ahd
-message: String := null
+message: String? := null
 
 if message == null {
     message = "hazır"
@@ -1178,7 +1216,7 @@ Derleyici `message != null` kontrolünden sonra bu bloğun içinde gerçekten bi
 Kontrol etmeden şunu yazmak geçersizdir:
 
 ```ahd
-message: String := null
+message: String? := null
 // write(message.upper()) // HATA: message null olabilir
 ```
 
@@ -1187,24 +1225,42 @@ message: String := null
 Şu kullanım geçersizdir:
 
 ```ahd
-// value := null // HATA: tür belirtilmeli
+// value := null // HATA: null temel türü belirleyemez
 ```
 
-Çünkü AhdCode bunun `String`, `User` veya başka hangi tür olduğunu bilemez. Türü belirtin:
+Çünkü AhdCode bunun `String`, `User` veya başka hangi tür olduğunu bilemez.
+Açıkça yazılan türün kendisi de null olabilir olmalıdır; `value: String := null`
+da geçersizdir. Doğrusu:
 
 ```ahd
-value: String := null
+value: String? := null
 ```
 
-Eğer bir fonksiyon `User` döndürüyor ama sonuç `null` olabiliyorsa:
+Bir arama fonksiyonu `User` veya `null` döndürebiliyorsa dönüş türü ve sonucu
+alan değişken `User?` olur:
 
 ```ahd
-user: User := fetchUser()
+user: User? := fetchUser()
 ```
+
+`fetchUser()` gerçek bir `User` bulursa bu null olmayan değer güvenle `User?`
+türüne genişler. `user` değerini `User` olarak kullanmadan önce null olmadığını
+kontrol edin.
 
 ### Koleksiyonlarda null kullanımı
 
-Koleksiyonlarda, örneğin `List<User>`, listenin kendisi `null` olabileceği gibi, liste geçerli bir nesne olup içindeki elemanlar `null` olabilir. Bu ayrım AhdCode tarafından tamamen aynı akış analizi (null refinement) mantığı ile yönetilir.
+`?` tam olarak yazıldığı seviyeye uygulanır:
+
+```text
+List<User>    null olmayan List; User elemanları da null olamaz
+List<User>?   kendisi null olabilen List; User elemanları null olamaz
+List<User?>   null olmayan List; User elemanları null olabilir
+List<User?>?  hem kendisi hem User elemanları null olabilir
+```
+
+Null olabilen bir List üzerinde indeks veya metot kullanmadan önce List'i
+kontrol etmelisiniz. `List<User?>` içindeki her eleman da `User` olarak
+kullanılmadan önce ayrı ayrı kontrol edilir.
 
 > **Teknik not:** Derleyicinin bir kontrol sonrasında değer hakkında daha kesin bilgi edinmesine *null refinement* denir. Belgelendirmelerde akış durumları `Null`, `MaybeNull` ve `NonNull` olarak adlandırılabilir.
 
@@ -1327,6 +1383,68 @@ Kendi sınıfınızın `+`, `==`, `<` gibi operatörlerle çalışmasını istey
 CEqual CCompare CAdd CSubtract CMultiply CDivide CRemainder CPower CNegate CStr
 ```
 
+```ahd
+Vector2: Class<> := {
+    structure: Attributes := (
+        x: Real
+        y: Real
+    )
+
+    CEqual: Function := (
+        other: Vector2
+    ) -> Bool {
+        return attribute.x == other.x and attribute.y == other.y
+    }
+
+    CAdd: Function := (
+        other: Vector2
+    ) -> Vector2 {
+        return Vector2(x: attribute.x + other.x, y: attribute.y + other.y)
+    }
+
+    CNegate: Function := (
+    ) -> Vector2 {
+        return Vector2(x: -attribute.x, y: -attribute.y)
+    }
+
+    CStr: Function := (
+    ) -> String {
+        return "Vector2({attribute.x}, {attribute.y})"
+    }
+}
+
+a: Vector2 := Vector2(x: 1.0, y: 2.0)
+b: Vector2 := Vector2(x: 3.0, y: 4.0)
+
+write(a + b)
+write(-a)
+write(a == b)
+write(str(a))
+```
+
+Beklenen çıktı:
+
+```text
+Vector2(4.0, 6.0)
+Vector2(-1.0, -2.0)
+false
+Vector2(1.0, 2.0)
+```
+
+Kısa eşleştirme şöyledir:
+
+- `==` ve `!=` → `CEqual`; `!=`, `CEqual` sonucunun tersidir, ayrı bir `CNotEqual` yoktur.
+- `<`, `<=`, `>` ve `>=` → `CCompare`; ayrı karşılaştırma protokolleri yoktur.
+- `+ - * / % ^` → sırasıyla `CAdd CSubtract CMultiply CDivide CRemainder CPower`.
+- Tekli `-` → `CNegate`.
+- `str(object)` → `CStr`.
+
+Protokol seçimi her zaman **sol taraftaki** değere göre yapılır. `vector + 3`
+çalışıyorsa bu, `3 + vector` işleminin de çalışacağı anlamına gelmez; ters
+operatör kuralı yoktur. Kalıtım ve `Override`, sıradan metotlarda olduğu gibi
+çalışır. Tam kurallar için [Sınıf Protokol Metotları](PROTOCOLS_TR.md)
+referansına bakın.
+
 ## 18. Hata yönetimi (`attempt`, `except`, `ultimately` ve `toss`)
 
 Bazı hatalar programı yazarken değil, program çalışırken ortaya çıkabilir. Örneğin kullanıcıdan sayı beklerken `abc` yazabilir.
@@ -1350,6 +1468,20 @@ except DomainError as error {
 ```
 
 `attempt` içindeki kod denenir. Belirtilen hata oluşursa uygun `except` bloğu çalışır.
+
+Farklı hata türleri için birden fazla `except` bloğu yazabilirsiniz:
+
+```ahd
+attempt {
+    write([10, 20][5])
+}
+except DomainError as error {
+    write("Sayı geçersiz")
+}
+except IndexError as error {
+    write("İndeks geçersiz")
+}
+```
 
 ### Ne olursa olsun çalışacak bölüm: `ultimately`
 
@@ -1378,6 +1510,32 @@ requirePositive: Function := (value: Int) -> Int {
 ```
 
 AhdCode'un sık karşılaşılan hata türleri arasında `DomainError`, `ValueError`, `IndexError`, `KeyError`, `OverflowError`, `DivisionByZeroError`, `NullError` ve `ConstantError` bulunur.
+
+### Kendi hata türünüzü oluşturmak
+
+Gerektiğinde `Error` sınıfından yeni bir hata türü türetebilir, bu hatayı
+`toss` ile fırlatıp kendi türüyle yakalayabilirsiniz:
+
+```ahd
+InvalidAgeError: Class<Error> := {
+    structure: Attributes := (
+        message: String
+    )
+}
+
+attempt {
+    age: Local Int := -5
+    if age < 0 {
+        toss (InvalidAgeError("Yaş negatif olamaz"))
+    }
+}
+except InvalidAgeError as error {
+    write(error.message)
+}
+```
+
+> **Teknik not:** AhdCode çalışma zamanı hataları, yakalanabilen sıradan Class
+> değerleri olarak modellenir.
 
 ## 19. Modüller ve `bring`
 
@@ -2658,7 +2816,7 @@ Dosyayı ortak stile göre biçimlendirir.
 ahdcode lsp
 ```
 
-Editörlerin (VS Code / Antigravity) kullandığı dil sunucusunu başlatır. Yalnızca stdio konuşur; isteğe bağlı `--stdio` kabul edilir ve yok sayılır. v0.2.2 özellik kümesi için [dil sunucusu rehberine](LSP_TR.md) bakın.
+Editörlerin kullandığı dil sunucusunu başlatır. v0.2.2 editör desteği; tanılamalar, hover, completion ve otomatik import, tanıma gitme ve referans bulma, rename, signature help, semantik renklendirme, inlay hints, quick fix'ler ve biçimlendirme içerir. Ayrıntılar için [dil sunucusu rehberine](LSP_TR.md) bakın.
 
 ```text
 ahdcode --help

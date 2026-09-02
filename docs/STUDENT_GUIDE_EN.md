@@ -1021,8 +1021,10 @@ lambda has no block or statements.
 If a lambda needs to use a variable from outside its own parameters, you must list it explicitly in square brackets before the parameters:
 
 ```ahd
+values: List<Int> := [35, 50, 72, 90]
 minimum: Int := 50
-passed := values.filter(lambda [#minimum] (score: Int) -> score >= minimum)
+passed := values.filter(lambda [@minimum] (score: Int) -> score >= minimum)
+write(passed)
 ```
 
 - `#` is for `Local` captures: it copies the value at the moment the lambda is created.
@@ -1169,20 +1171,22 @@ Sometimes it is normal for a value not to exist yet. For example, we search for 
 no record      -> no value
 ```
 
-In AhdCode, `null` means "there is no value here right now."
-
-You can assign `null` to a regular variable, but AhdCode won't allow you to use it immediately:
+In AhdCode, `null` means "there is no value here right now." A plain type `T`
+is non-nullable; write `T?` when the value may also be `null`. A non-null `T`
+can safely be used where `T?` is expected, but the reverse requires a check.
 
 ```ahd
-name: String := null
+name: String? := null
 ```
 
-This tells us that the `name` variable can hold a `String` or `null`.
+This tells us that the `name` variable can hold either a `String` or `null`.
+Writing `name: String := null` would be invalid because `String` is
+non-nullable.
 
 ### Check before using
 
 ```ahd
-message: String := null
+message: String? := null
 
 if message == null {
     message = "ready"
@@ -1198,7 +1202,7 @@ The compiler knows that there is indeed a String inside this block after the `me
 Writing the following without checking is invalid:
 
 ```ahd
-message: String := null
+message: String? := null
 // write(message.upper()) // ERROR: message could be null
 ```
 
@@ -1207,24 +1211,41 @@ message: String := null
 The following usage is invalid:
 
 ```ahd
-// value := null // ERROR: variables must have explicit types
+// value := null // ERROR: null does not reveal an underlying type
 ```
 
-Because AhdCode wouldn't know if this is a `String`, a `User`, or some other type. Specify the type:
+Because AhdCode wouldn't know if this is a `String`, a `User`, or some other
+type. The explicit type must itself be nullable; `value: String := null` is
+also invalid. Write:
 
 ```ahd
-value: String := null
+value: String? := null
 ```
 
-If a function returns `User` but the result could be `null`:
+If a lookup function can return either a `User` or `null`, its return type and
+the receiving variable are `User?`:
 
 ```ahd
-user: User := fetchUser()
+user: User? := fetchUser()
 ```
+
+If `fetchUser()` finds a real `User`, that non-null `User` safely widens to
+`User?`. Before using `user` as a `User`, check that it is not `null`.
 
 ### Null usage in collections
 
-In collections, for example `List<User>`, the list itself could be `null`, or the list could be a valid object but the elements inside it could be `null`. This distinction is managed entirely by the same flow analysis (null refinement) logic in AhdCode.
+The `?` applies exactly where it is written:
+
+```text
+List<User>    non-null List with non-null User elements
+List<User>?   nullable List with non-null User elements
+List<User?>   non-null List whose User elements may be null
+List<User?>?  nullable List whose User elements may be null
+```
+
+A nullable List must be checked before indexing or calling its methods. In a
+`List<User?>`, each element needs its own check before it can be used as a
+`User`.
 
 > **Technical note:** The compiler gaining more precise information about a nullable value after a check is called *null refinement*. In the documentation, flow states can be referred to as `Null`, `MaybeNull`, and `NonNull`.
 
@@ -2777,7 +2798,7 @@ Formats the file according to the common style.
 ahdcode lsp
 ```
 
-Starts the language server used by editors (VS Code / Antigravity). It talks over stdio only; optional `--stdio` is accepted and ignored. See the [language server guide](LSP.md) for the v0.2.2 feature set.
+Starts the language server used by editors. The v0.2.2 editor support includes diagnostics, hover, completion with auto import, definition navigation and references, rename, signature help, semantic highlighting, inlay hints, quick fixes, and formatting. See the [language server guide](LSP.md) for details.
 
 ```text
 ahdcode --help
