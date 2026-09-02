@@ -350,10 +350,49 @@ func TestHTTPClientTrustedHTTPSIfNetworkAvailable(t *testing.T) {
 	}
 }
 
-func TestHTTPClientInvalidConfiguration(t *testing.T) {
+func TestHTTPClientConfigurationBounds(t *testing.T) {
 	class := AhdClassHTTPError
-	expectRaise(t, class, func() { AhdHTTPClient(class, 0, 1024, true) })
-	expectRaise(t, class, func() { AhdHTTPClient(class, 1, 0, true) })
+	message := mustRaiseHTTP(t, func() { AhdHTTPClient(class, 0, 1024, true) })
+	if !strings.Contains(message, "timeoutSeconds") || !strings.Contains(message, "1") || !strings.Contains(message, "9223372036") {
+		t.Fatalf("timeout 0 message = %q", message)
+	}
+	if AhdHTTPClient(class, 1, 1024, true) == "" {
+		t.Fatal("timeoutSeconds 1 must be accepted")
+	}
+	if AhdHTTPClient(class, ahdHTTPMaxClientTimeoutSeconds, 1024, true) == "" {
+		t.Fatal("timeoutSeconds 9223372036 must be accepted")
+	}
+	message = mustRaiseHTTP(t, func() { AhdHTTPClient(class, ahdHTTPMaxClientTimeoutSeconds+1, 1024, true) })
+	if !strings.Contains(message, "timeoutSeconds") {
+		t.Fatalf("timeout 9223372037 message = %q", message)
+	}
+	message = mustRaiseHTTP(t, func() { AhdHTTPClient(class, 18446744074, 1024, true) })
+	if !strings.Contains(message, "timeoutSeconds") {
+		t.Fatalf("timeout 18446744074 message = %q", message)
+	}
+	message = mustRaiseHTTP(t, func() { AhdHTTPClient(class, 1, 0, true) })
+	if !strings.Contains(message, "maxResponseBytes") || !strings.Contains(message, "9223372036854775806") {
+		t.Fatalf("maxResponseBytes 0 message = %q", message)
+	}
+	if AhdHTTPClient(class, 1, 1, true) == "" {
+		t.Fatal("maxResponseBytes 1 must be accepted")
+	}
+	if AhdHTTPClient(class, 1, ahdHTTPMaxClientResponseBytes, true) == "" {
+		t.Fatal("maxResponseBytes 9223372036854775806 must be accepted")
+	}
+	message = mustRaiseHTTP(t, func() { AhdHTTPClient(class, 1, ahdHTTPMaxClientResponseBytes+1, true) })
+	if !strings.Contains(message, "maxResponseBytes") {
+		t.Fatalf("maxResponseBytes MaxInt64 message = %q", message)
+	}
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		_, _ = io.WriteString(writer, "ok")
+	}))
+	defer server.Close()
+	ordinary := AhdHTTPClient(class, ahdHTTPDefaultClientTimeout, ahdHTTPDefaultClientMaxBody, true)
+	got := ahdHTTPDecodeClientResponse(class, AhdHTTPClientGet(class, ordinary, server.URL))
+	if got.Status != 200 || got.Body != "ok" {
+		t.Fatalf("ordinary client = %#v", got)
+	}
 }
 
 func TestHTTPClientRace(t *testing.T) {

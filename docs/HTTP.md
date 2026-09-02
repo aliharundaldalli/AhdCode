@@ -360,8 +360,9 @@ async, or lock API.
 
 `HTTP.client` builds a reusable `Client`. There is no `close()`. The runtime
 reuses HTTP connections internally. `timeoutSeconds` is the **total** request
-timeout and must be greater than 0. `maxResponseBytes` bounds the buffered
-response body and must be greater than 0. The default body limit is 8 MiB
+timeout and must be in `1..9223372036`. `maxResponseBytes` bounds the buffered
+response body and must be in `1..9223372036854775806`. Values outside either
+range raise `HTTPError`; they are not clamped. The default body limit is 8 MiB
 (`8388608`). The runtime reads at most `maxResponseBytes + 1` bytes; exactly
 `N` bytes succeed and `N + 1` raises `HTTPError`. There is no millisecond or
 floating timeout API.

@@ -1102,6 +1102,12 @@ const (
 	ahdHTTPDefaultClientTimeout = 30
 	ahdHTTPDefaultClientMaxBody = 8388608
 	ahdHTTPMaxRedirects         = 10
+	// ahdHTTPMaxClientTimeoutSeconds is the largest whole-second timeout that
+	// still fits in a time.Duration after conversion to nanoseconds.
+	ahdHTTPMaxClientTimeoutSeconds = 9223372036
+	// ahdHTTPMaxClientResponseBytes leaves room for the bounded read of
+	// maxResponseBytes + 1 used to detect an oversized body.
+	ahdHTTPMaxClientResponseBytes = 9223372036854775806
 )
 
 var (
@@ -1137,11 +1143,11 @@ var (
 )
 
 func AhdHTTPClient(class *AhdClass, timeoutSeconds, maxResponseBytes int64, followRedirects bool) string {
-	if timeoutSeconds <= 0 {
-		AhdRaiseClass(class, "HTTP client timeoutSeconds must be greater than 0")
+	if timeoutSeconds < 1 || timeoutSeconds > ahdHTTPMaxClientTimeoutSeconds {
+		AhdRaiseClass(class, "HTTP client timeoutSeconds must be between 1 and 9223372036")
 	}
-	if maxResponseBytes <= 0 {
-		AhdRaiseClass(class, "HTTP client maxResponseBytes must be greater than 0")
+	if maxResponseBytes < 1 || maxResponseBytes > ahdHTTPMaxClientResponseBytes {
+		AhdRaiseClass(class, "HTTP client maxResponseBytes must be between 1 and 9223372036854775806")
 	}
 	base, ok := http.DefaultTransport.(*http.Transport)
 	if !ok {

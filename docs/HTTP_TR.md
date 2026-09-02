@@ -252,10 +252,11 @@ sonrası `get` `null`, `has` `false`; mutasyon `HTTPError` fırlatır.
 ## Giden istemci
 
 `HTTP.client` yeniden kullanılabilir bir `Client` üretir. `close()` yoktur.
-`timeoutSeconds` toplam istek zaman aşımıdır ve 0'dan büyük olmalıdır.
-`maxResponseBytes` tamponlanan gövde sınırıdır (varsayılan 8 MiB). Tam `N`
-bayt başarılıdır; `N + 1` `HTTPError` fırlatır. Otomatik yeniden deneme
-yoktur.
+`timeoutSeconds` toplam istek zaman aşımıdır ve `1..9223372036` aralığında
+olmalıdır. `maxResponseBytes` tamponlanan gövde sınırıdır ve
+`1..9223372036854775806` aralığında olmalıdır (varsayılan 8 MiB). Aralık dışı
+değerler `HTTPError` fırlatır; sıkıştırılmaz. Tam `N` bayt başarılıdır;
+`N + 1` `HTTPError` fırlatır. Otomatik yeniden deneme yoktur.
 
 `HTTP.clientRequest` yöntemi sessizce büyültmez. URL mutlak `http` veya
 `https` olmalı, konak boş olmamalıdır. Parça, userinfo, `file:` / `ftp:` /
