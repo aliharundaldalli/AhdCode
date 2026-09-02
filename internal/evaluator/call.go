@@ -196,6 +196,10 @@ func (session *Session) builtin(identity ir.CallableID, receiver any, arguments 
 		return session.keyValueBuiltin(strings.TrimPrefix(name, "builtin:KeyValue::"), values(arguments))
 	case strings.HasPrefix(name, "builtin:SQLite::"):
 		return session.sqliteBuiltin(strings.TrimPrefix(name, "builtin:SQLite::"), values(arguments))
+	case strings.HasPrefix(name, "builtin:HTTP::"):
+		return session.httpBuiltin(strings.TrimPrefix(name, "builtin:HTTP::"), values(arguments))
+	case strings.HasPrefix(name, "builtin:HTML::"):
+		return session.htmlBuiltin(strings.TrimPrefix(name, "builtin:HTML::"), values(arguments))
 	}
 	session.raise("Error", "unsupported builtin "+name)
 	return nil
@@ -334,6 +338,9 @@ func (session *Session) core(name string, receiver any, arguments []any) any {
 	}
 	if strings.HasPrefix(name, "Database.") || strings.HasPrefix(name, "SQLiteValue.") {
 		return session.sqliteOperation(name, receiver, arguments)
+	}
+	if strings.HasPrefix(name, "Server.") || strings.HasPrefix(name, "Request.") || strings.HasPrefix(name, "Response.") {
+		return session.httpOperation(name, receiver, arguments)
 	}
 	session.raise("Error", "unsupported Fundamentals operation "+name)
 	return nil

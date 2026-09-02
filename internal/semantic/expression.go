@@ -696,6 +696,12 @@ func (a *analyzer) analyzeCallWithCallee(call *ast.CallExpr, callee expressionIn
 		if !supplied {
 			hint, supplied = sqliteConstructionHint(class.Symbol)
 		}
+		if !supplied {
+			hint, supplied = httpConstructionHint(class.Symbol)
+		}
+		if !supplied {
+			hint, supplied = htmlConstructionHint(class.Symbol)
+		}
 		if supplied {
 			// A compiler-supplied value is produced by a standard-module
 			// function that validates its arguments, never by direct
@@ -797,6 +803,9 @@ func typeOperationFor(receiver types.Type, name string) (TypeOperation, bool) {
 			return operation, true
 		}
 		if operation, ok := sqliteOperationFor(receiver, name); ok {
+			return operation, true
+		}
+		if operation, ok := httpOperationFor(receiver, name); ok {
 			return operation, true
 		}
 		return dataOperationFor(receiver, name)
@@ -1019,6 +1028,9 @@ func (a *analyzer) analyzeTypeOperation(call *ast.CallExpr, member *ast.MemberEx
 	if shape, isSQLite := sqliteOperationShapes()[operation]; isSQLite {
 		return a.analyzeSQLiteOperation(call, operation, shape, current, flow), true
 	}
+	if shape, isHTTP := httpOperationShapes()[operation]; isHTTP {
+		return a.analyzeHTTPOperation(call, operation, shape, current, flow), true
+	}
 	switch operation {
 	case ListAdd, ListEject, PairEject:
 		return a.analyzeCollectionMutation(call, operation, receiver, current, flow), true
@@ -1096,6 +1108,13 @@ func typeOperationFailure(operation TypeOperation, receiver types.Type) expressi
 	if shape, known := sqliteOperationShapes()[operation]; known {
 		return expressionInfo{typeValue: shape.result, nullState: NonNull}
 	}
+	if shape, known := httpOperationShapes()[operation]; known {
+		nullState := NonNull
+		if shape.resultNullable {
+			nullState = MaybeNull
+		}
+		return expressionInfo{typeValue: shape.result, nullState: nullState}
+	}
 	switch operation {
 	case ListAdd, ListEject, PairEject, ListSort, ListReverse, ListShuffle:
 		return expressionInfo{typeValue: types.Nothing, nullState: NonNull}
@@ -1146,6 +1165,9 @@ func typeOperationHint(operation TypeOperation, receiver types.Type) string {
 		return shape.hint
 	}
 	if shape, known := sqliteOperationShapes()[operation]; known {
+		return shape.hint
+	}
+	if shape, known := httpOperationShapes()[operation]; known {
 		return shape.hint
 	}
 	element := types.Invalid

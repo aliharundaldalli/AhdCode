@@ -36,3 +36,9 @@ var ArchiveSource string
 //
 //go:embed sqlite.go
 var SQLiteSource string
+
+//go:embed http.go
+var HTTPSource string
+
+//go:embed html.go
+var HTMLSource string

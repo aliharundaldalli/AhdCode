@@ -146,6 +146,16 @@ func LowerCompilation(compilation module.CompilationResult) Result {
 					sqliteModule(ir.ModuleID(current.ID), current.Source.Name, current.Source.Path))
 				continue
 			}
+			if string(current.ID) == HTTPModuleID {
+				result.Modules = append(result.Modules,
+					httpModule(ir.ModuleID(current.ID), current.Source.Name, current.Source.Path))
+				continue
+			}
+			if string(current.ID) == HTMLModuleID {
+				result.Modules = append(result.Modules,
+					htmlModule(ir.ModuleID(current.ID), current.Source.Name, current.Source.Path))
+				continue
+			}
 			result.Modules = append(result.Modules, &ir.Module{
 				ID: ir.ModuleID(current.ID), Name: current.Source.Name, SourcePath: current.Source.Path,
 			})

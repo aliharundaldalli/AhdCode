@@ -21,6 +21,8 @@ func StandardModuleInterfaces() map[string]*ModuleInterface {
 		"Env":        envModuleInterface(),
 		"Excel":      excelModuleInterface(),
 		"File":       fileModuleInterface(),
+		"HTML":       htmlModuleInterface(),
+		"HTTP":       httpModuleInterface(),
 		"JSON":       jsonModuleInterface(),
 		"KeyValue":   keyValueModuleInterface(),
 		"Latex":      latexModuleInterface(),

@@ -449,6 +449,21 @@ const (
 	SQLiteValueReal   TypeOperation = "SQLiteValue.real"
 	SQLiteValueString TypeOperation = "SQLiteValue.string"
 
+	HTTPServerGet          TypeOperation = "Server.get"
+	HTTPServerPost         TypeOperation = "Server.post"
+	HTTPServerRoute        TypeOperation = "Server.route"
+	HTTPServerStart        TypeOperation = "Server.start"
+	HTTPRequestMethod      TypeOperation = "Request.method"
+	HTTPRequestPath        TypeOperation = "Request.path"
+	HTTPRequestQuery       TypeOperation = "Request.query"
+	HTTPRequestQueryAll    TypeOperation = "Request.queryAll"
+	HTTPRequestHeader      TypeOperation = "Request.header"
+	HTTPRequestHeaderAll   TypeOperation = "Request.headerAll"
+	HTTPRequestBody        TypeOperation = "Request.body"
+	HTTPRequestForm        TypeOperation = "Request.form"
+	HTTPRequestFormAll     TypeOperation = "Request.formAll"
+	HTTPResponseWithHeader TypeOperation = "Response.withHeader"
+
 	// The XML standard module's XMLNode members. XMLNode is a closed,
 	// immutable Element/Text value.
 	XMLNodeKind TypeOperation = "XMLNode.kind"

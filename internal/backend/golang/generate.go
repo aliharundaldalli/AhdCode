@@ -35,6 +35,8 @@ const (
 	pdfRuntimeFileName     = "ahdcode_pdf_runtime.go"
 	archiveRuntimeFileName = "ahdcode_archive_runtime.go"
 	sqliteRuntimeFileName  = "ahdcode_sqlite_runtime.go"
+	httpRuntimeFileName    = "ahdcode_http_runtime.go"
+	htmlRuntimeFileName    = "ahdcode_html_runtime.go"
 )
 
 // storage describes the Go representation chosen for one IR symbol.
@@ -120,6 +122,14 @@ func Generate(compilation *ir.Compilation) (*GeneratedProgram, []diagnostics.Dia
 	if err != nil {
 		return nil, append(generator.diagnostics, backendError(CodeFormatFailure, "embedded SQLite runtime source is not valid Go: "+err.Error(), source.Span{}, "the SQLite backend runtime must remain gofmt-clean"))
 	}
+	httpRuntime, err := format.Source([]byte(httpRuntimeSource()))
+	if err != nil {
+		return nil, append(generator.diagnostics, backendError(CodeFormatFailure, "embedded HTTP runtime source is not valid Go: "+err.Error(), source.Span{}, "the HTTP backend runtime must remain gofmt-clean"))
+	}
+	htmlRuntime, err := format.Source([]byte(htmlRuntimeSource()))
+	if err != nil {
+		return nil, append(generator.diagnostics, backendError(CodeFormatFailure, "embedded HTML runtime source is not valid Go: "+err.Error(), source.Span{}, "the HTML backend runtime must remain gofmt-clean"))
+	}
 	return &GeneratedProgram{Files: []GeneratedFile{
 		{Name: programFileName, Content: string(formatted)},
 		{Name: runtimeFileName, Content: string(runtime)},
@@ -127,6 +137,8 @@ func Generate(compilation *ir.Compilation) (*GeneratedProgram, []diagnostics.Dia
 		{Name: pdfRuntimeFileName, Content: string(pdfRuntime)},
 		{Name: archiveRuntimeFileName, Content: string(archiveRuntime)},
 		{Name: sqliteRuntimeFileName, Content: string(sqliteRuntime)},
+		{Name: httpRuntimeFileName, Content: string(httpRuntime)},
+		{Name: htmlRuntimeFileName, Content: string(htmlRuntime)},
 	}, RequiresLatex: generator.usesLatex, RequiresPlot: generator.usesPlot, RequiresNumeric: generator.usesNumeric, RequiresSQLite: generator.usesSQLite}, generator.diagnostics
 }
 
@@ -149,6 +161,14 @@ func archiveRuntimeSource() string {
 
 func sqliteRuntimeSource() string {
 	return strings.Replace(ahdruntime.SQLiteSource, "package ahdruntime", "package main", 1)
+}
+
+func httpRuntimeSource() string {
+	return strings.Replace(ahdruntime.HTTPSource, "package ahdruntime", "package main", 1)
+}
+
+func htmlRuntimeSource() string {
+	return strings.Replace(ahdruntime.HTMLSource, "package ahdruntime", "package main", 1)
 }
 
 func (generator *generator) hasErrors() bool {
@@ -393,6 +413,8 @@ func (generator *generator) emitProgram() string {
 	generator.emitJSONValueHelpers(writer)
 	generator.emitXMLHelpers(writer)
 	generator.emitSQLiteHelpers(writer)
+	generator.emitHTTPHelpers(writer)
+	generator.emitHTMLHelpers(writer)
 	writer.raw(bodies.String())
 	generator.emitInstaller(writer)
 	writer.open("func main() {")
