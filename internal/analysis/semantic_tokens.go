@@ -247,7 +247,7 @@ func isDeclarationNode(node ast.Node, symbol *semantic.Symbol) bool {
 	}
 	if variableDecl, ok := symbol.Declaration.(*ast.VariableDecl); ok {
 		if identifier, ok := variableDecl.Target.(*ast.IdentifierExpr); ok && identifier == node {
-		 return true
+			return true
 		}
 	}
 	if functionDecl, ok := symbol.Declaration.(*ast.FunctionDecl); ok && functionDecl == node {

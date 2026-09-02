@@ -1,15 +1,18 @@
 package lsp
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"os"
+)
 
 type workspaceSymbolParams struct {
 	Query string `json:"query"`
 }
 
 type workspaceSymbolItem struct {
-	Name          string `json:"name"`
-	Kind          int    `json:"kind"`
-	ContainerName string `json:"containerName,omitempty"`
+	Name          string      `json:"name"`
+	Kind          int         `json:"kind"`
+	ContainerName string      `json:"containerName,omitempty"`
 	Location      lspLocation `json:"location"`
 }
 
@@ -27,7 +30,15 @@ func (server *Server) handleWorkspaceSymbol(m message) {
 	symbols := server.store.WorkspaceSymbols(entryPath, params.Query)
 	converted := make([]workspaceSymbolItem, 0, len(symbols))
 	for _, symbol := range symbols {
-		targetText, _ := server.store.TextFor(entryPath, symbol.Path)
+		targetText, ok := server.store.Text(symbol.Path)
+		if !ok {
+			targetText, ok = server.store.TextFor(entryPath, symbol.Path)
+		}
+		if !ok || targetText == "" {
+			if data, err := os.ReadFile(symbol.Path); err == nil {
+				targetText = string(data)
+			}
+		}
 		if targetText == "" {
 			continue
 		}

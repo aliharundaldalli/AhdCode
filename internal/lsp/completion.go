@@ -3,8 +3,8 @@ package lsp
 import "encoding/json"
 
 type lspCompletionItem struct {
-	Label              string     `json:"label"`
-	Detail             string     `json:"detail,omitempty"`
+	Label               string     `json:"label"`
+	Detail              string     `json:"detail,omitempty"`
 	AdditionalTextEdits []textEdit `json:"additionalTextEdits,omitempty"`
 }
 

@@ -92,7 +92,7 @@ func TestRenameLocalDoesNotTouchShadowedRoot(t *testing.T) {
 	store := NewStore()
 	store.Open(path, text)
 
-	offset := offsetOf(t, text, "write(value)")
+	offset := offsetOf(t, text, "write(value)") + len("write(")
 	edits, ok := store.Rename(path, offset, "total")
 	if !ok {
 		t.Fatal("rename failed")
@@ -157,7 +157,7 @@ func TestSemanticTokensUTF16Length(t *testing.T) {
 }
 
 func TestSemanticTokensUnicodeLine(t *testing.T) {
-	text := "emoji 🙂 score: Int := 1\n"
+	text := "/* 🙂 */ score: Int := 1\n"
 	directory := t.TempDir()
 	path := filepath.Join(directory, "main.ahd")
 	store := NewStore()
@@ -220,6 +220,26 @@ func TestCodeActionMissingLocal(t *testing.T) {
 	actions := store.CodeActions(path, diagOffset)
 	if len(actions) == 0 {
 		t.Fatal("expected quick fix for missing Local")
+	}
+}
+
+func TestAutoImportReflectsUnsavedModuleEdit(t *testing.T) {
+	directory := t.TempDir()
+	researchPath := filepath.Join(directory, "ResearchTools.ahd")
+	if err := os.WriteFile(researchPath, []byte("specialFunction: Function := (value: Int) -> Int { return value }\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	mainPath := filepath.Join(directory, "main.ahd")
+	store := NewStore()
+	store.Open(mainPath, "ren\n")
+	store.Open(researchPath, "renamedFunction: Function := (value: Int) -> Int { return value }\n")
+
+	items := store.Completion(mainPath, len("ren"))
+	if hasLabel(items, "specialFunction") {
+		t.Fatalf("stale specialFunction still offered after unsaved rename, got %#v", items)
+	}
+	if !hasLabel(items, "renamedFunction") {
+		t.Fatalf("expected renamedFunction from unsaved module, got %#v", items)
 	}
 }
 

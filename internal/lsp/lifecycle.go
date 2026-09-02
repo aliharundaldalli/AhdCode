@@ -20,21 +20,21 @@ type initializeParams struct {
 }
 
 type serverCapabilities struct {
-	TextDocumentSync           int                      `json:"textDocumentSync"`
-	HoverProvider              bool                     `json:"hoverProvider"`
-	DefinitionProvider         bool                     `json:"definitionProvider"`
-	DocumentSymbolProvider     bool                     `json:"documentSymbolProvider"`
-	SignatureHelpProvider      signatureHelpOptions     `json:"signatureHelpProvider"`
-	ReferencesProvider         bool                     `json:"referencesProvider"`
-	CompletionProvider         completionOptions        `json:"completionProvider"`
-	RenameProvider             bool                     `json:"renameProvider"`
-	SemanticTokensProvider     semanticTokensOptions    `json:"semanticTokensProvider"`
-	InlayHintProvider          bool                     `json:"inlayHintProvider"`
-	CodeActionProvider         codeActionOptions        `json:"codeActionProvider"`
-	DocumentFormattingProvider bool                     `json:"documentFormattingProvider"`
-	WorkspaceSymbolProvider    bool                     `json:"workspaceSymbolProvider"`
-	FoldingRangeProvider       bool                     `json:"foldingRangeProvider"`
-	SelectionRangeProvider     bool                     `json:"selectionRangeProvider"`
+	TextDocumentSync           int                   `json:"textDocumentSync"`
+	HoverProvider              bool                  `json:"hoverProvider"`
+	DefinitionProvider         bool                  `json:"definitionProvider"`
+	DocumentSymbolProvider     bool                  `json:"documentSymbolProvider"`
+	SignatureHelpProvider      signatureHelpOptions  `json:"signatureHelpProvider"`
+	ReferencesProvider         bool                  `json:"referencesProvider"`
+	CompletionProvider         completionOptions     `json:"completionProvider"`
+	RenameProvider             bool                  `json:"renameProvider"`
+	SemanticTokensProvider     semanticTokensOptions `json:"semanticTokensProvider"`
+	InlayHintProvider          bool                  `json:"inlayHintProvider"`
+	CodeActionProvider         codeActionOptions     `json:"codeActionProvider"`
+	DocumentFormattingProvider bool                  `json:"documentFormattingProvider"`
+	WorkspaceSymbolProvider    bool                  `json:"workspaceSymbolProvider"`
+	FoldingRangeProvider       bool                  `json:"foldingRangeProvider"`
+	SelectionRangeProvider     bool                  `json:"selectionRangeProvider"`
 }
 
 type codeActionOptions struct {

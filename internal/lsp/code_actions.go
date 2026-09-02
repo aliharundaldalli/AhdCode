@@ -14,10 +14,10 @@ type codeActionContext struct {
 }
 
 type codeActionItem struct {
-	Title   string                 `json:"title"`
-	Kind    string                 `json:"kind,omitempty"`
-	Edit    *workspaceEdit         `json:"edit,omitempty"`
-	IsPreferred bool               `json:"isPreferred,omitempty"`
+	Title       string         `json:"title"`
+	Kind        string         `json:"kind,omitempty"`
+	Edit        *workspaceEdit `json:"edit,omitempty"`
+	IsPreferred bool           `json:"isPreferred,omitempty"`
 }
 
 func (server *Server) handleCodeAction(m message) {

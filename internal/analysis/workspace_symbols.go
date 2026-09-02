@@ -41,11 +41,11 @@ func (store *Store) WorkspaceSymbols(entryPath, query string) []WorkspaceSymbol 
 					continue
 				}
 				results = append(results, WorkspaceSymbol{
-					Name:       symbol.Name,
-					Kind:       symbol.Kind,
-					Detail:     symbol.Detail,
-					ModuleName: moduleName,
-					Path:       modulePath,
+					Name:        symbol.Name,
+					Kind:        symbol.Kind,
+					Detail:      symbol.Detail,
+					ModuleName:  moduleName,
+					Path:        modulePath,
 					StartOffset: symbol.Span.Start.Offset,
 					EndOffset:   symbol.Span.End.Offset,
 				})
