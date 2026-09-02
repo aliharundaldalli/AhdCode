@@ -9,13 +9,19 @@ import (
 const httpModulePrefix = "builtin:HTTP::"
 
 var (
-	httpServerClass       = ir.ClassID("builtin:HTTP::class::Server")
-	httpRequestClass      = ir.ClassID("builtin:HTTP::class::Request")
-	httpResponseClass     = ir.ClassID("builtin:HTTP::class::Response")
-	httpErrorClass        = ir.ClassID("builtin:HTTP::class::HTTPError")
-	httpServerHandleField = ir.FieldID("builtin:HTTP::class::Server::field::handle")
-	httpRequestDataField  = ir.FieldID("builtin:HTTP::class::Request::field::data")
-	httpResponseDataField = ir.FieldID("builtin:HTTP::class::Response::field::data")
+	httpServerClass             = ir.ClassID("builtin:HTTP::class::Server")
+	httpRequestClass            = ir.ClassID("builtin:HTTP::class::Request")
+	httpResponseClass           = ir.ClassID("builtin:HTTP::class::Response")
+	httpCookieClass             = ir.ClassID("builtin:HTTP::class::Cookie")
+	httpSessionStoreClass       = ir.ClassID("builtin:HTTP::class::SessionStore")
+	httpSessionClass            = ir.ClassID("builtin:HTTP::class::Session")
+	httpErrorClass              = ir.ClassID("builtin:HTTP::class::HTTPError")
+	httpServerHandleField       = ir.FieldID("builtin:HTTP::class::Server::field::handle")
+	httpRequestDataField        = ir.FieldID("builtin:HTTP::class::Request::field::data")
+	httpResponseDataField       = ir.FieldID("builtin:HTTP::class::Response::field::data")
+	httpCookieDataField         = ir.FieldID("builtin:HTTP::class::Cookie::field::data")
+	httpSessionStoreHandleField = ir.FieldID("builtin:HTTP::class::SessionStore::field::handle")
+	httpSessionDataField        = ir.FieldID("builtin:HTTP::class::Session::field::data")
 )
 
 func (generator *generator) httpCall(value *ir.CallExpr) string {
@@ -34,6 +40,12 @@ func (generator *generator) httpCall(value *ir.CallExpr) string {
 		}
 		return generator.value(value.Arguments[index].Value, ir.Type{Kind: ir.IntType}, false)
 	}
+	boolean := func(index int, fallback string) string {
+		if index >= len(value.Arguments) || value.Arguments[index].Value == nil {
+			return fallback
+		}
+		return generator.value(value.Arguments[index].Value, ir.Type{Kind: ir.BoolType}, false)
+	}
 	switch name {
 	case "server":
 		return generator.httpValueFrom(httpServerClass, "AhdHTTPServer("+errorClass+", "+text(0, `""`)+", "+
@@ -50,6 +62,13 @@ func (generator *generator) httpCall(value *ir.CallExpr) string {
 	case "redirect":
 		return generator.httpValueFrom(httpResponseClass, "AhdHTTPRedirect("+errorClass+", "+text(0, `""`)+", "+
 			integer(1, "int64(303)")+")", meta)
+	case "cookie":
+		return generator.httpValueFrom(httpCookieClass, "AhdHTTPCookie("+errorClass+", "+text(0, `""`)+", "+text(1, `""`)+")", meta)
+	case "deleteCookie":
+		return generator.httpValueFrom(httpCookieClass, "AhdHTTPDeleteCookie("+errorClass+", "+text(0, `""`)+", "+text(1, `"/"`)+")", meta)
+	case "sessions":
+		return generator.httpValueFrom(httpSessionStoreClass, "AhdHTTPSessions("+errorClass+", "+
+			text(0, `"ahd_session"`)+", "+integer(1, "int64(86400)")+", "+boolean(2, "false")+", "+text(3, `"Lax"`)+")", meta)
 	default:
 		return generator.unsupported("HTTP function "+name, meta.Span)
 	}
@@ -60,6 +79,12 @@ func (generator *generator) httpOperation(name string, value *ir.CallExpr) strin
 	errorClass := generator.descriptorName(httpErrorClass)
 	text := func(index int) string {
 		return generator.value(value.Arguments[index].Value, ir.Type{Kind: ir.StringType}, false)
+	}
+	boolean := func(index int) string {
+		return generator.value(value.Arguments[index].Value, ir.Type{Kind: ir.BoolType}, false)
+	}
+	integer := func(index int) string {
+		return generator.value(value.Arguments[index].Value, ir.Type{Kind: ir.IntType}, false)
 	}
 	switch name {
 	case "Server.get":
@@ -91,9 +116,55 @@ func (generator *generator) httpOperation(name string, value *ir.CallExpr) strin
 		return "AhdHTTPRequestForm(" + errorClass + ", " + generator.httpDataOf(httpRequestClass, httpRequestDataField, value.Callee) + ", " + text(0) + ")"
 	case "Request.formAll":
 		return "AhdHTTPRequestFormAll(" + errorClass + ", " + generator.httpDataOf(httpRequestClass, httpRequestDataField, value.Callee) + ", " + text(0) + ")"
+	case "Request.cookie":
+		return "AhdHTTPRequestCookie(" + errorClass + ", " + generator.httpDataOf(httpRequestClass, httpRequestDataField, value.Callee) + ", " + text(0) + ")"
+	case "Request.cookieAll":
+		return "AhdHTTPRequestCookieAll(" + errorClass + ", " + generator.httpDataOf(httpRequestClass, httpRequestDataField, value.Callee) + ", " + text(0) + ")"
 	case "Response.withHeader":
 		return generator.httpValueFrom(httpResponseClass, "AhdHTTPResponseWithHeader("+errorClass+", "+
 			generator.httpDataOf(httpResponseClass, httpResponseDataField, value.Callee)+", "+text(0)+", "+text(1)+")", meta)
+	case "Response.withCookie":
+		return generator.httpValueFrom(httpResponseClass, "AhdHTTPResponseWithCookie("+errorClass+", "+
+			generator.httpDataOf(httpResponseClass, httpResponseDataField, value.Callee)+", "+
+			generator.httpDataOf(httpCookieClass, httpCookieDataField, value.Arguments[0].Value)+")", meta)
+	case "Cookie.withPath":
+		return generator.httpValueFrom(httpCookieClass, "AhdHTTPCookieWithPath("+errorClass+", "+
+			generator.httpDataOf(httpCookieClass, httpCookieDataField, value.Callee)+", "+text(0)+")", meta)
+	case "Cookie.withHttpOnly":
+		return generator.httpValueFrom(httpCookieClass, "AhdHTTPCookieWithHttpOnly("+errorClass+", "+
+			generator.httpDataOf(httpCookieClass, httpCookieDataField, value.Callee)+", "+boolean(0)+")", meta)
+	case "Cookie.withSecure":
+		return generator.httpValueFrom(httpCookieClass, "AhdHTTPCookieWithSecure("+errorClass+", "+
+			generator.httpDataOf(httpCookieClass, httpCookieDataField, value.Callee)+", "+boolean(0)+")", meta)
+	case "Cookie.withSameSite":
+		return generator.httpValueFrom(httpCookieClass, "AhdHTTPCookieWithSameSite("+errorClass+", "+
+			generator.httpDataOf(httpCookieClass, httpCookieDataField, value.Callee)+", "+text(0)+")", meta)
+	case "Cookie.withMaxAge":
+		return generator.httpValueFrom(httpCookieClass, "AhdHTTPCookieWithMaxAge("+errorClass+", "+
+			generator.httpDataOf(httpCookieClass, httpCookieDataField, value.Callee)+", "+integer(0)+")", meta)
+	case "SessionStore.open":
+		return generator.httpValueFrom(httpSessionClass, "AhdHTTPSessionStoreOpen("+errorClass+", "+
+			generator.httpDataOf(httpSessionStoreClass, httpSessionStoreHandleField, value.Callee)+", "+
+			generator.httpDataOf(httpRequestClass, httpRequestDataField, value.Arguments[0].Value)+")", meta)
+	case "SessionStore.commit":
+		return generator.httpValueFrom(httpResponseClass, "AhdHTTPSessionStoreCommit("+errorClass+", "+
+			generator.httpDataOf(httpSessionStoreClass, httpSessionStoreHandleField, value.Callee)+", "+
+			generator.httpDataOf(httpSessionClass, httpSessionDataField, value.Arguments[0].Value)+", "+
+			generator.httpDataOf(httpResponseClass, httpResponseDataField, value.Arguments[1].Value)+")", meta)
+	case "Session.get":
+		return "AhdHTTPSessionGet(" + errorClass + ", " + generator.httpDataOf(httpSessionClass, httpSessionDataField, value.Callee) + ", " + text(0) + ")"
+	case "Session.has":
+		return "AhdHTTPSessionHas(" + errorClass + ", " + generator.httpDataOf(httpSessionClass, httpSessionDataField, value.Callee) + ", " + text(0) + ")"
+	case "Session.set":
+		return generator.httpSessionMutate(value, "AhdHTTPSessionSet("+errorClass+", %s, "+text(0)+", "+text(1)+")")
+	case "Session.remove":
+		return generator.httpSessionMutate(value, "AhdHTTPSessionRemove("+errorClass+", %s, "+text(0)+")")
+	case "Session.clear":
+		return generator.httpSessionMutate(value, "AhdHTTPSessionClear("+errorClass+", %s)")
+	case "Session.rotate":
+		return generator.httpSessionMutate(value, "AhdHTTPSessionRotate("+errorClass+", %s)")
+	case "Session.destroy":
+		return generator.httpSessionMutate(value, "AhdHTTPSessionDestroy("+errorClass+", %s)")
 	default:
 		return generator.unsupported("HTTP operation "+name, meta.Span)
 	}
@@ -126,6 +197,15 @@ func (generator *generator) httpDataOf(class ir.ClassID, field ir.FieldID, expre
 	return "func(value " + generator.interfaceName(class) + ") string { return value." + getter + " }(" + rendered + ")"
 }
 
+func (generator *generator) httpSessionMutate(value *ir.CallExpr, call string) string {
+	receiver := generator.expr(value.Callee)
+	sessionType := generator.interfaceName(httpSessionClass)
+	getter := generator.fieldName(httpSessionDataField) + "_get()"
+	setter := generator.fieldName(httpSessionDataField) + "_set"
+	updated := strings.Replace(call, "%s", "session."+getter, 1)
+	return "func(session " + sessionType + ") { session." + setter + "(" + updated + ") }(" + receiver + ")"
+}
+
 func (generator *generator) httpHelper(class ir.ClassID) (string, bool) {
 	if generator.layouts[class] == nil {
 		return "", false
@@ -139,7 +219,10 @@ func (generator *generator) httpHelper(class ir.ClassID) (string, bool) {
 }
 
 func (generator *generator) emitHTTPHelpers(writer *emitter) {
-	for _, class := range []ir.ClassID{httpServerClass, httpRequestClass, httpResponseClass} {
+	for _, class := range []ir.ClassID{
+		httpServerClass, httpRequestClass, httpResponseClass,
+		httpCookieClass, httpSessionStoreClass, httpSessionClass,
+	} {
 		name, known := generator.timeHelpers[class]
 		if !known {
 			continue

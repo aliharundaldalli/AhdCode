@@ -463,6 +463,23 @@ const (
 	HTTPRequestForm        TypeOperation = "Request.form"
 	HTTPRequestFormAll     TypeOperation = "Request.formAll"
 	HTTPResponseWithHeader TypeOperation = "Response.withHeader"
+	HTTPResponseWithCookie TypeOperation = "Response.withCookie"
+	HTTPRequestCookie      TypeOperation = "Request.cookie"
+	HTTPRequestCookieAll   TypeOperation = "Request.cookieAll"
+	HTTPCookieWithPath     TypeOperation = "Cookie.withPath"
+	HTTPCookieWithHttpOnly TypeOperation = "Cookie.withHttpOnly"
+	HTTPCookieWithSecure   TypeOperation = "Cookie.withSecure"
+	HTTPCookieWithSameSite TypeOperation = "Cookie.withSameSite"
+	HTTPCookieWithMaxAge   TypeOperation = "Cookie.withMaxAge"
+	HTTPSessionStoreOpen   TypeOperation = "SessionStore.open"
+	HTTPSessionStoreCommit TypeOperation = "SessionStore.commit"
+	HTTPSessionGet         TypeOperation = "Session.get"
+	HTTPSessionHas         TypeOperation = "Session.has"
+	HTTPSessionSet         TypeOperation = "Session.set"
+	HTTPSessionRemove      TypeOperation = "Session.remove"
+	HTTPSessionClear       TypeOperation = "Session.clear"
+	HTTPSessionRotate      TypeOperation = "Session.rotate"
+	HTTPSessionDestroy     TypeOperation = "Session.destroy"
 
 	// The XML standard module's XMLNode members. XMLNode is a closed,
 	// immutable Element/Text value.

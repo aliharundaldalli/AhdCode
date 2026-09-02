@@ -2,6 +2,8 @@ package ahdruntime
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -29,6 +31,8 @@ const (
 	ahdHTTPWriteTimeout      = 15 * time.Second
 	ahdHTTPIdleTimeout       = 60 * time.Second
 	ahdHTTPDefaultMaxBody    = 1048576
+	ahdHTTPSessionIDBytes    = 32
+	ahdHTTPDefaultCookiePath = "/"
 )
 
 type AhdHTTPHandler func(requestData string) string
@@ -50,16 +54,17 @@ type ahdHTTPServerState struct {
 }
 
 type ahdHTTPRequestData struct {
-	Method    string              `json:"method"`
-	Path      string              `json:"path"`
-	Query     map[string][]string `json:"query"`
-	Headers   map[string][]string `json:"headers"`
-	Body      string              `json:"body"`
-	BodyUTF8  bool                `json:"bodyUTF8"`
-	Form      map[string][]string `json:"form"`
-	FormOK    bool                `json:"formOK"`
-	FormError string              `json:"formError,omitempty"`
-	IsForm    bool                `json:"isForm"`
+	Method    string               `json:"method"`
+	Path      string               `json:"path"`
+	Query     map[string][]string  `json:"query"`
+	Headers   map[string][]string  `json:"headers"`
+	Body      string               `json:"body"`
+	BodyUTF8  bool                 `json:"bodyUTF8"`
+	Form      map[string][]string  `json:"form"`
+	FormOK    bool                 `json:"formOK"`
+	FormError string               `json:"formError,omitempty"`
+	IsForm    bool                 `json:"isForm"`
+	Cookies   []ahdHTTPCookieEntry `json:"cookies"`
 }
 
 type ahdHTTPResponseData struct {
@@ -67,12 +72,59 @@ type ahdHTTPResponseData struct {
 	Body        string              `json:"body"`
 	ContentType string              `json:"contentType"`
 	Headers     []ahdHTTPHeaderPair `json:"headers"`
+	Cookies     []ahdHTTPCookieData `json:"cookies"`
 }
 
 type ahdHTTPHeaderPair struct {
 	Name  string `json:"name"`
 	Value string `json:"value"`
 }
+
+type ahdHTTPCookieEntry struct {
+	Name  string `json:"name"`
+	Value string `json:"value"`
+}
+
+// ahdHTTPCookieData is the immutable Cookie value. MaxAge == nil means the
+// attribute is omitted. MaxAge == 0 is the deletion encoding (Max-Age=0).
+type ahdHTTPCookieData struct {
+	Name     string `json:"name"`
+	Value    string `json:"value"`
+	Path     string `json:"path"`
+	HttpOnly bool   `json:"httpOnly"`
+	Secure   bool   `json:"secure"`
+	SameSite string `json:"sameSite"`
+	MaxAge   *int64 `json:"maxAge"`
+}
+
+type ahdHTTPSessionData struct {
+	StoreID   string            `json:"storeId"`
+	ID        string            `json:"id"`
+	Values    map[string]string `json:"values"`
+	Dirty     bool              `json:"dirty"`
+	Destroyed bool              `json:"destroyed"`
+}
+
+type ahdHTTPStoredSession struct {
+	values    map[string]string
+	expiresAt time.Time
+}
+
+type ahdHTTPSessionStoreState struct {
+	mutex         sync.Mutex
+	cookieName    string
+	maxAgeSeconds int64
+	secure        bool
+	sameSite      string
+	sessions      map[string]*ahdHTTPStoredSession
+}
+
+var (
+	ahdHTTPSessionStores   = map[string]*ahdHTTPSessionStoreState{}
+	ahdHTTPSessionStoresMu sync.Mutex
+	ahdHTTPSessionNextID   atomic.Int64
+	ahdHTTPTimeNow         = time.Now
+)
 
 var (
 	ahdHTTPServers   = map[string]*ahdHTTPServerState{}
@@ -233,7 +285,32 @@ func AhdHTTPRequestFormAll(class *AhdClass, data, name string) *AhdList[string] 
 	return ahdHTTPList(request.Form[name])
 }
 
+func AhdHTTPRequestCookie(class *AhdClass, data, name string) *string {
+	request := ahdHTTPDecodeRequest(data)
+	for _, cookie := range request.Cookies {
+		if cookie.Name == name {
+			value := cookie.Value
+			return &value
+		}
+	}
+	return nil
+}
+
+func AhdHTTPRequestCookieAll(class *AhdClass, data, name string) *AhdList[string] {
+	request := ahdHTTPDecodeRequest(data)
+	var values []string
+	for _, cookie := range request.Cookies {
+		if cookie.Name == name {
+			values = append(values, cookie.Value)
+		}
+	}
+	return ahdHTTPList(values)
+}
+
 func AhdHTTPResponseWithHeader(class *AhdClass, data, name, value string) string {
+	if strings.EqualFold(name, "Set-Cookie") {
+		AhdRaiseClass(class, "HTTP Set-Cookie must be set with Response.withCookie")
+	}
 	if !ahdHTTPHeaderNameOK(name) {
 		AhdRaiseClass(class, "HTTP header name "+ahdHTMLQuote(name)+" is not valid")
 	}
@@ -258,6 +335,16 @@ func AhdHTTPResponseWithHeader(class *AhdClass, data, name, value string) string
 		headers = append(headers, ahdHTTPHeaderPair{Name: name, Value: value})
 	}
 	response.Headers = headers
+	return ahdHTTPEncodeResponse(class, response)
+}
+
+func AhdHTTPResponseWithCookie(class *AhdClass, data, cookieData string) string {
+	response := ahdHTTPDecodeResponse(class, data)
+	cookie := ahdHTTPDecodeCookie(class, cookieData)
+	copied := make([]ahdHTTPCookieData, len(response.Cookies)+1)
+	copy(copied, response.Cookies)
+	copied[len(response.Cookies)] = cookie
+	response.Cookies = copied
 	return ahdHTTPEncodeResponse(class, response)
 }
 
@@ -392,6 +479,9 @@ func ahdHTTPMaterialize(request *http.Request, body []byte) (ahdHTTPRequestData,
 	if snapshot.BodyUTF8 {
 		snapshot.Body = string(body)
 	}
+	for _, cookie := range request.Cookies() {
+		snapshot.Cookies = append(snapshot.Cookies, ahdHTTPCookieEntry{Name: cookie.Name, Value: cookie.Value})
+	}
 	mediaType, _, _ := mime.ParseMediaType(request.Header.Get("Content-Type"))
 	if mediaType == "application/x-www-form-urlencoded" {
 		snapshot.IsForm = true
@@ -523,6 +613,9 @@ func ahdHTTPDecodeRequest(data string) ahdHTTPRequestData {
 	if request.Form == nil {
 		request.Form = map[string][]string{}
 	}
+	if request.Cookies == nil {
+		request.Cookies = []ahdHTTPCookieEntry{}
+	}
 	return request
 }
 
@@ -553,6 +646,9 @@ func ahdHTTPWriteEncoded(writer http.ResponseWriter, data string) {
 	}
 	for _, header := range response.Headers {
 		writer.Header().Set(header.Name, header.Value)
+	}
+	for _, cookie := range response.Cookies {
+		writer.Header().Add("Set-Cookie", ahdHTTPCookieWire(cookie))
 	}
 	status := response.Status
 	if status == 0 {
@@ -593,6 +689,413 @@ func ahdHTTPLogFailure(recovered any) {
 		return
 	}
 	fmt.Fprintf(os.Stderr, "ahdcode: HTTP handler panic: %v\n", recovered)
+}
+
+func AhdHTTPCookie(class *AhdClass, name, value string) string {
+	return ahdHTTPEncodeCookie(class, ahdHTTPRequireCookie(class, ahdHTTPCookieData{
+		Name: name, Value: value, Path: ahdHTTPDefaultCookiePath, SameSite: "Lax",
+	}))
+}
+
+func AhdHTTPDeleteCookie(class *AhdClass, name, path string) string {
+	if path == "" {
+		path = ahdHTTPDefaultCookiePath
+	}
+	zero := int64(0)
+	return ahdHTTPEncodeCookie(class, ahdHTTPRequireCookie(class, ahdHTTPCookieData{
+		Name: name, Value: "", Path: path, SameSite: "Lax", MaxAge: &zero,
+	}))
+}
+
+func AhdHTTPCookieWithPath(class *AhdClass, data, path string) string {
+	cookie := ahdHTTPDecodeCookie(class, data)
+	cookie.Path = path
+	return ahdHTTPEncodeCookie(class, ahdHTTPRequireCookie(class, cookie))
+}
+
+func AhdHTTPCookieWithHttpOnly(class *AhdClass, data string, value bool) string {
+	cookie := ahdHTTPDecodeCookie(class, data)
+	cookie.HttpOnly = value
+	return ahdHTTPEncodeCookie(class, ahdHTTPRequireCookie(class, cookie))
+}
+
+func AhdHTTPCookieWithSecure(class *AhdClass, data string, value bool) string {
+	cookie := ahdHTTPDecodeCookie(class, data)
+	cookie.Secure = value
+	return ahdHTTPEncodeCookie(class, ahdHTTPRequireCookie(class, cookie))
+}
+
+func AhdHTTPCookieWithSameSite(class *AhdClass, data, mode string) string {
+	cookie := ahdHTTPDecodeCookie(class, data)
+	cookie.SameSite = mode
+	return ahdHTTPEncodeCookie(class, ahdHTTPRequireCookie(class, cookie))
+}
+
+func AhdHTTPCookieWithMaxAge(class *AhdClass, data string, seconds int64) string {
+	if seconds < 0 {
+		AhdRaiseClass(class, "HTTP cookie Max-Age must not be negative")
+	}
+	cookie := ahdHTTPDecodeCookie(class, data)
+	cookie.MaxAge = &seconds
+	return ahdHTTPEncodeCookie(class, ahdHTTPRequireCookie(class, cookie))
+}
+
+func AhdHTTPSessions(class *AhdClass, cookieName string, maxAgeSeconds int64, secure bool, sameSite string) string {
+	ahdHTTPRequireCookieName(class, cookieName)
+	if maxAgeSeconds <= 0 {
+		AhdRaiseClass(class, "HTTP session maxAgeSeconds must be greater than 0")
+	}
+	ahdHTTPRequireSameSite(class, sameSite, secure)
+	id := strconv.FormatInt(ahdHTTPSessionNextID.Add(1), 10)
+	ahdHTTPSessionStoresMu.Lock()
+	ahdHTTPSessionStores[id] = &ahdHTTPSessionStoreState{
+		cookieName: cookieName, maxAgeSeconds: maxAgeSeconds, secure: secure, sameSite: sameSite,
+		sessions: make(map[string]*ahdHTTPStoredSession),
+	}
+	ahdHTTPSessionStoresMu.Unlock()
+	return id
+}
+
+func AhdHTTPSessionStoreOpen(class *AhdClass, storeHandle, requestData string) string {
+	store := ahdHTTPLookupSessionStore(class, storeHandle)
+	request := ahdHTTPDecodeRequest(requestData)
+	now := ahdHTTPTimeNow()
+	session := ahdHTTPSessionData{StoreID: storeHandle, Values: map[string]string{}}
+	store.mutex.Lock()
+	store.cleanupExpiredLocked(now)
+	for _, cookie := range request.Cookies {
+		if cookie.Name != store.cookieName {
+			continue
+		}
+		if stored := store.sessions[cookie.Value]; stored != nil && stored.expiresAt.After(now) {
+			session.ID = cookie.Value
+			session.Values = ahdHTTPCopyStringMap(stored.values)
+		}
+		break
+	}
+	store.mutex.Unlock()
+	return ahdHTTPEncodeSession(class, session)
+}
+
+func AhdHTTPSessionStoreCommit(class *AhdClass, storeHandle, sessionData, responseData string) string {
+	store := ahdHTTPLookupSessionStore(class, storeHandle)
+	session := ahdHTTPDecodeSession(class, sessionData)
+	if session.StoreID != storeHandle {
+		AhdRaiseClass(class, "HTTP session does not belong to this SessionStore")
+	}
+	now := ahdHTTPTimeNow()
+	if session.Destroyed {
+		store.mutex.Lock()
+		store.cleanupExpiredLocked(now)
+		if session.ID != "" {
+			delete(store.sessions, session.ID)
+		}
+		store.mutex.Unlock()
+		return AhdHTTPResponseWithCookie(class, responseData, AhdHTTPDeleteCookie(class, store.cookieName, ahdHTTPDefaultCookiePath))
+	}
+	if !session.Dirty {
+		return responseData
+	}
+	if session.ID == "" {
+		session.ID = ahdHTTPNewSessionID(class)
+	}
+	store.mutex.Lock()
+	store.cleanupExpiredLocked(now)
+	store.sessions[session.ID] = &ahdHTTPStoredSession{
+		values: ahdHTTPCopyStringMap(session.Values), expiresAt: now.Add(time.Duration(store.maxAgeSeconds) * time.Second),
+	}
+	cookieName := store.cookieName
+	maxAge := store.maxAgeSeconds
+	secure := store.secure
+	sameSite := store.sameSite
+	store.mutex.Unlock()
+	cookie := ahdHTTPRequireCookie(class, ahdHTTPCookieData{
+		Name: cookieName, Value: session.ID, Path: ahdHTTPDefaultCookiePath,
+		HttpOnly: true, Secure: secure, SameSite: sameSite, MaxAge: &maxAge,
+	})
+	response := ahdHTTPDecodeResponse(class, responseData)
+	response.Cookies = append(append([]ahdHTTPCookieData(nil), response.Cookies...), cookie)
+	return ahdHTTPEncodeResponse(class, response)
+}
+
+func AhdHTTPSessionGet(class *AhdClass, data, name string) *string {
+	session := ahdHTTPDecodeSession(class, data)
+	if session.Destroyed {
+		return nil
+	}
+	value, ok := session.Values[name]
+	if !ok {
+		return nil
+	}
+	copied := value
+	return &copied
+}
+
+func AhdHTTPSessionHas(class *AhdClass, data, name string) bool {
+	session := ahdHTTPDecodeSession(class, data)
+	if session.Destroyed {
+		return false
+	}
+	_, ok := session.Values[name]
+	return ok
+}
+
+func AhdHTTPSessionSet(class *AhdClass, data, name, value string) string {
+	session := ahdHTTPRequireMutableSession(class, data)
+	ahdHTTPRequireSessionKey(class, name)
+	if session.Values == nil {
+		session.Values = map[string]string{}
+	}
+	session.Values[name] = value
+	session.Dirty = true
+	return ahdHTTPEncodeSession(class, session)
+}
+
+func AhdHTTPSessionRemove(class *AhdClass, data, name string) string {
+	session := ahdHTTPRequireMutableSession(class, data)
+	ahdHTTPRequireSessionKey(class, name)
+	if _, exists := session.Values[name]; exists {
+		delete(session.Values, name)
+		session.Dirty = true
+	}
+	return ahdHTTPEncodeSession(class, session)
+}
+
+func AhdHTTPSessionClear(class *AhdClass, data string) string {
+	session := ahdHTTPRequireMutableSession(class, data)
+	if len(session.Values) != 0 {
+		session.Values = map[string]string{}
+		session.Dirty = true
+	}
+	return ahdHTTPEncodeSession(class, session)
+}
+
+func AhdHTTPSessionRotate(class *AhdClass, data string) string {
+	session := ahdHTTPRequireMutableSession(class, data)
+	store := ahdHTTPLookupSessionStore(class, session.StoreID)
+	oldID := session.ID
+	session.ID = ahdHTTPNewSessionID(class)
+	session.Dirty = true
+	if oldID != "" {
+		store.mutex.Lock()
+		delete(store.sessions, oldID)
+		store.mutex.Unlock()
+	}
+	return ahdHTTPEncodeSession(class, session)
+}
+
+func AhdHTTPSessionDestroy(class *AhdClass, data string) string {
+	session := ahdHTTPRequireMutableSession(class, data)
+	store := ahdHTTPLookupSessionStore(class, session.StoreID)
+	oldID := session.ID
+	session.Destroyed = true
+	session.Dirty = false
+	session.Values = map[string]string{}
+	if oldID != "" {
+		store.mutex.Lock()
+		delete(store.sessions, oldID)
+		store.mutex.Unlock()
+	}
+	return ahdHTTPEncodeSession(class, session)
+}
+
+func ahdHTTPRequireCookie(class *AhdClass, cookie ahdHTTPCookieData) ahdHTTPCookieData {
+	ahdHTTPRequireCookieName(class, cookie.Name)
+	ahdHTTPRequireCookieValue(class, cookie.Value)
+	ahdHTTPRequireCookiePath(class, cookie.Path)
+	if cookie.MaxAge != nil && *cookie.MaxAge < 0 {
+		AhdRaiseClass(class, "HTTP cookie Max-Age must not be negative")
+	}
+	ahdHTTPRequireSameSite(class, cookie.SameSite, cookie.Secure)
+	return cookie
+}
+
+func ahdHTTPRequireCookieName(class *AhdClass, name string) {
+	if !ahdHTTPCookieNameOK(name) {
+		AhdRaiseClass(class, "HTTP cookie name "+ahdHTMLQuote(name)+" is not valid")
+	}
+}
+
+func ahdHTTPRequireCookieValue(class *AhdClass, value string) {
+	if !ahdHTTPCookieValueOK(value) {
+		AhdRaiseClass(class, "HTTP cookie value is not a cookie-octet string")
+	}
+}
+
+func ahdHTTPRequireCookiePath(class *AhdClass, path string) {
+	if path == "" || !ahdHTTPCookiePathOK(path) {
+		AhdRaiseClass(class, "HTTP cookie path "+ahdHTMLQuote(path)+" is not valid")
+	}
+}
+
+func ahdHTTPRequireSameSite(class *AhdClass, mode string, secure bool) {
+	switch mode {
+	case "Lax", "Strict":
+	case "None":
+		if !secure {
+			AhdRaiseClass(class, `HTTP SameSite "None" requires Secure=true`)
+		}
+	default:
+		AhdRaiseClass(class, "HTTP SameSite must be Lax, Strict, or None")
+	}
+}
+
+func ahdHTTPRequireSessionKey(class *AhdClass, name string) {
+	if name == "" {
+		AhdRaiseClass(class, "HTTP session key must not be empty")
+	}
+	for i := 0; i < len(name); i++ {
+		if name[i] < 0x20 || name[i] == 0x7f {
+			AhdRaiseClass(class, "HTTP session key must not contain control characters")
+		}
+	}
+}
+
+func ahdHTTPRequireMutableSession(class *AhdClass, data string) ahdHTTPSessionData {
+	session := ahdHTTPDecodeSession(class, data)
+	if session.Destroyed {
+		AhdRaiseClass(class, "HTTP session has been destroyed")
+	}
+	if session.Values == nil {
+		session.Values = map[string]string{}
+	}
+	return session
+}
+
+func ahdHTTPLookupSessionStore(class *AhdClass, handle string) *ahdHTTPSessionStoreState {
+	ahdHTTPSessionStoresMu.Lock()
+	store := ahdHTTPSessionStores[handle]
+	ahdHTTPSessionStoresMu.Unlock()
+	if store == nil {
+		AhdRaiseClass(class, "HTTP SessionStore storage is corrupted")
+	}
+	return store
+}
+
+func (store *ahdHTTPSessionStoreState) cleanupExpiredLocked(now time.Time) {
+	for id, session := range store.sessions {
+		if !session.expiresAt.After(now) {
+			delete(store.sessions, id)
+		}
+	}
+}
+
+func ahdHTTPNewSessionID(class *AhdClass) string {
+	var raw [ahdHTTPSessionIDBytes]byte
+	if _, err := rand.Read(raw[:]); err != nil {
+		AhdRaiseClass(class, "HTTP session identifier could not be generated")
+	}
+	return base64.RawURLEncoding.EncodeToString(raw[:])
+}
+
+func ahdHTTPCookieNameOK(name string) bool {
+	return ahdHTTPMethodToken(name)
+}
+
+func ahdHTTPCookieValueOK(value string) bool {
+	for i := 0; i < len(value); i++ {
+		c := value[i]
+		if c < 0x21 || c > 0x7e || c == '"' || c == ',' || c == ';' || c == '\\' {
+			return false
+		}
+	}
+	return true
+}
+
+func ahdHTTPCookiePathOK(path string) bool {
+	for i := 0; i < len(path); i++ {
+		c := path[i]
+		if c < 0x20 || c > 0x7e || c == ';' {
+			return false
+		}
+	}
+	return true
+}
+
+func ahdHTTPCookieWire(cookie ahdHTTPCookieData) string {
+	item := http.Cookie{
+		Name: cookie.Name, Value: cookie.Value, Path: cookie.Path,
+		HttpOnly: cookie.HttpOnly, Secure: cookie.Secure,
+	}
+	switch cookie.SameSite {
+	case "Strict":
+		item.SameSite = http.SameSiteStrictMode
+	case "None":
+		item.SameSite = http.SameSiteNoneMode
+	default:
+		item.SameSite = http.SameSiteLaxMode
+	}
+	if cookie.MaxAge != nil {
+		if *cookie.MaxAge == 0 {
+			item.MaxAge = -1
+			item.Expires = time.Unix(0, 0).UTC()
+		} else {
+			item.MaxAge = int(*cookie.MaxAge)
+		}
+	}
+	return item.String()
+}
+
+func ahdHTTPEncodeCookie(class *AhdClass, cookie ahdHTTPCookieData) string {
+	encoded, err := json.Marshal(cookie)
+	if err != nil {
+		AhdRaiseClass(class, "HTTP cookie could not be encoded")
+	}
+	return string(encoded)
+}
+
+func ahdHTTPDecodeCookie(class *AhdClass, data string) ahdHTTPCookieData {
+	var cookie ahdHTTPCookieData
+	if err := json.Unmarshal([]byte(data), &cookie); err != nil {
+		AhdRaiseClass(class, "HTTP Cookie storage is corrupted")
+	}
+	return cookie
+}
+
+func ahdHTTPEncodeSession(class *AhdClass, session ahdHTTPSessionData) string {
+	if session.Values == nil {
+		session.Values = map[string]string{}
+	}
+	encoded, err := json.Marshal(session)
+	if err != nil {
+		AhdRaiseClass(class, "HTTP session could not be encoded")
+	}
+	return string(encoded)
+}
+
+func ahdHTTPDecodeSession(class *AhdClass, data string) ahdHTTPSessionData {
+	var session ahdHTTPSessionData
+	if err := json.Unmarshal([]byte(data), &session); err != nil {
+		AhdRaiseClass(class, "HTTP Session storage is corrupted")
+	}
+	if session.Values == nil {
+		session.Values = map[string]string{}
+	}
+	return session
+}
+
+func ahdHTTPCopyStringMap(values map[string]string) map[string]string {
+	copied := make(map[string]string, len(values))
+	for key, value := range values {
+		copied[key] = value
+	}
+	return copied
+}
+
+func ahdHTTPTestStoreSize(handle string) int {
+	ahdHTTPSessionStoresMu.Lock()
+	store := ahdHTTPSessionStores[handle]
+	ahdHTTPSessionStoresMu.Unlock()
+	if store == nil {
+		return 0
+	}
+	store.mutex.Lock()
+	defer store.mutex.Unlock()
+	return len(store.sessions)
+}
+
+func ahdHTTPTestResetClock() {
+	ahdHTTPTimeNow = time.Now
 }
 
 type ahdModuleError struct {

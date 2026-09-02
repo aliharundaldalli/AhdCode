@@ -308,6 +308,12 @@ func (p *parser) parseCall(callee ast.Expr) ast.Expr {
 
 func (p *parser) parseMember(object ast.Expr) ast.Expr {
 	p.advance()
+	// `has` is a keyword for the `x has y` operator, but after a `.` it is an
+	// ordinary member name so Session.has(name) can parse.
+	if p.check(token.KeywordHas) {
+		name := p.advance()
+		return &ast.MemberExpr{Base: p.base(spanStart(object), name.Span.End), Object: object, Name: "has"}
+	}
 	name := p.expect(token.Identifier, "expected member name after .")
 	return &ast.MemberExpr{Base: p.base(spanStart(object), name.Span.End), Object: object, Name: name.Value}
 }

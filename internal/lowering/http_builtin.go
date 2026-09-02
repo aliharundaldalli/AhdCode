@@ -8,16 +8,22 @@ import (
 const HTTPModuleID = "builtin:HTTP"
 
 const (
-	httpServerClassID   = ir.ClassID(HTTPModuleID + "::class::Server")
-	httpRequestClassID  = ir.ClassID(HTTPModuleID + "::class::Request")
-	httpResponseClassID = ir.ClassID(HTTPModuleID + "::class::Response")
-	httpErrorClassID    = ir.ClassID(HTTPModuleID + "::class::HTTPError")
+	httpServerClassID       = ir.ClassID(HTTPModuleID + "::class::Server")
+	httpRequestClassID      = ir.ClassID(HTTPModuleID + "::class::Request")
+	httpResponseClassID     = ir.ClassID(HTTPModuleID + "::class::Response")
+	httpCookieClassID       = ir.ClassID(HTTPModuleID + "::class::Cookie")
+	httpSessionStoreClassID = ir.ClassID(HTTPModuleID + "::class::SessionStore")
+	httpSessionClassID      = ir.ClassID(HTTPModuleID + "::class::Session")
+	httpErrorClassID        = ir.ClassID(HTTPModuleID + "::class::HTTPError")
 )
 
 var (
-	HTTPServerHandleFieldID = ir.FieldID(string(httpServerClassID) + "::field::handle")
-	HTTPRequestDataFieldID  = ir.FieldID(string(httpRequestClassID) + "::field::data")
-	HTTPResponseDataFieldID = ir.FieldID(string(httpResponseClassID) + "::field::data")
+	HTTPServerHandleFieldID       = ir.FieldID(string(httpServerClassID) + "::field::handle")
+	HTTPRequestDataFieldID        = ir.FieldID(string(httpRequestClassID) + "::field::data")
+	HTTPResponseDataFieldID       = ir.FieldID(string(httpResponseClassID) + "::field::data")
+	HTTPCookieDataFieldID         = ir.FieldID(string(httpCookieClassID) + "::field::data")
+	HTTPSessionStoreHandleFieldID = ir.FieldID(string(httpSessionStoreClassID) + "::field::handle")
+	HTTPSessionDataFieldID        = ir.FieldID(string(httpSessionClassID) + "::field::data")
 )
 
 func httpModule(id ir.ModuleID, name, path string) *ir.Module {
@@ -32,6 +38,9 @@ func httpModule(id ir.ModuleID, name, path string) *ir.Module {
 		{httpServerClassID, "Server", HTTPServerHandleFieldID, "handle", semantic.HTTPServerOperations},
 		{httpRequestClassID, "Request", HTTPRequestDataFieldID, "data", semantic.HTTPRequestOperations},
 		{httpResponseClassID, "Response", HTTPResponseDataFieldID, "data", semantic.HTTPResponseOperations},
+		{httpCookieClassID, "Cookie", HTTPCookieDataFieldID, "data", semantic.HTTPCookieOperations},
+		{httpSessionStoreClassID, "SessionStore", HTTPSessionStoreHandleFieldID, "handle", semantic.HTTPSessionStoreOperations},
+		{httpSessionClassID, "Session", HTTPSessionDataFieldID, "data", semantic.HTTPSessionOperations},
 	}
 	for _, spec := range specs {
 		field := ir.Field{ID: spec.field, Name: spec.fieldName, Type: ir.Type{Kind: ir.StringType}, NullState: ir.NonNull, Hidden: true}

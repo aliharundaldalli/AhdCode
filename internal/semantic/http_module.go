@@ -13,19 +13,25 @@ const httpModuleID = "builtin:HTTP"
 var (
 	httpErrorParent = &types.ClassSymbol{ModuleID: "builtin:core", Name: "Error",
 		Parent: &types.ClassSymbol{ModuleID: "builtin:core", Name: "Object"}}
-	httpErrorClass    = &types.ClassSymbol{ModuleID: httpModuleID, Name: "HTTPError", Parent: httpErrorParent}
-	httpServerClass   = &types.ClassSymbol{ModuleID: httpModuleID, Name: "Server"}
-	httpRequestClass  = &types.ClassSymbol{ModuleID: httpModuleID, Name: "Request"}
-	httpResponseClass = &types.ClassSymbol{ModuleID: httpModuleID, Name: "Response"}
+	httpErrorClass        = &types.ClassSymbol{ModuleID: httpModuleID, Name: "HTTPError", Parent: httpErrorParent}
+	httpServerClass       = &types.ClassSymbol{ModuleID: httpModuleID, Name: "Server"}
+	httpRequestClass      = &types.ClassSymbol{ModuleID: httpModuleID, Name: "Request"}
+	httpResponseClass     = &types.ClassSymbol{ModuleID: httpModuleID, Name: "Response"}
+	httpCookieClass       = &types.ClassSymbol{ModuleID: httpModuleID, Name: "Cookie"}
+	httpSessionStoreClass = &types.ClassSymbol{ModuleID: httpModuleID, Name: "SessionStore"}
+	httpSessionClass      = &types.ClassSymbol{ModuleID: httpModuleID, Name: "Session"}
 )
 
 // HTTPErrorIdentity, HTTPServerIdentity, HTTPRequestIdentity, and
 // HTTPResponseIdentity expose the canonical identities to lowering without
 // coupling the public module interface to a backend.
-func HTTPErrorIdentity() *types.ClassSymbol    { return httpErrorClass }
-func HTTPServerIdentity() *types.ClassSymbol   { return httpServerClass }
-func HTTPRequestIdentity() *types.ClassSymbol  { return httpRequestClass }
-func HTTPResponseIdentity() *types.ClassSymbol { return httpResponseClass }
+func HTTPErrorIdentity() *types.ClassSymbol        { return httpErrorClass }
+func HTTPServerIdentity() *types.ClassSymbol       { return httpServerClass }
+func HTTPRequestIdentity() *types.ClassSymbol      { return httpRequestClass }
+func HTTPResponseIdentity() *types.ClassSymbol     { return httpResponseClass }
+func HTTPCookieIdentity() *types.ClassSymbol       { return httpCookieClass }
+func HTTPSessionStoreIdentity() *types.ClassSymbol { return httpSessionStoreClass }
+func HTTPSessionIdentity() *types.ClassSymbol      { return httpSessionClass }
 
 // HTTPServerOperations, HTTPRequestOperations, and HTTPResponseOperations
 // name the members each Class publishes through built-in type operations, so
@@ -34,12 +40,19 @@ func HTTPResponseIdentity() *types.ClassSymbol { return httpResponseClass }
 var HTTPServerOperations = []string{"get", "post", "route", "start"}
 var HTTPRequestOperations = []string{
 	"method", "path", "query", "queryAll", "header", "headerAll", "body", "form", "formAll",
+	"cookie", "cookieAll",
 }
-var HTTPResponseOperations = []string{"withHeader"}
+var HTTPResponseOperations = []string{"withHeader", "withCookie"}
+var HTTPCookieOperations = []string{"withPath", "withHttpOnly", "withSecure", "withSameSite", "withMaxAge"}
+var HTTPSessionStoreOperations = []string{"open", "commit"}
+var HTTPSessionOperations = []string{"get", "has", "set", "remove", "clear", "rotate", "destroy"}
 
-func httpServerType() types.Type   { return types.Class{Symbol: httpServerClass} }
-func httpRequestType() types.Type  { return types.Class{Symbol: httpRequestClass} }
-func httpResponseType() types.Type { return types.Class{Symbol: httpResponseClass} }
+func httpServerType() types.Type       { return types.Class{Symbol: httpServerClass} }
+func httpRequestType() types.Type      { return types.Class{Symbol: httpRequestClass} }
+func httpResponseType() types.Type     { return types.Class{Symbol: httpResponseClass} }
+func httpCookieType() types.Type       { return types.Class{Symbol: httpCookieClass} }
+func httpSessionStoreType() types.Type { return types.Class{Symbol: httpSessionStoreClass} }
+func httpSessionType() types.Type      { return types.Class{Symbol: httpSessionClass} }
 
 func httpHandlerType() types.Type {
 	return types.Function{Signature: &types.Signature{
@@ -56,6 +69,8 @@ func httpModuleInterface() *ModuleInterface {
 	}{
 		{"HTTPError", httpErrorClass}, {"Server", httpServerClass},
 		{"Request", httpRequestClass}, {"Response", httpResponseClass},
+		{"Cookie", httpCookieClass}, {"SessionStore", httpSessionStoreClass},
+		{"Session", httpSessionClass},
 	}
 	for _, entry := range classes {
 		symbol := &Symbol{
@@ -83,6 +98,16 @@ func httpModuleInterface() *ModuleInterface {
 	addStandardExport(module, standardFunction(httpModuleID, "text", httpResponseType(), body, status))
 	addStandardExport(module, standardFunction(httpModuleID, "html", httpResponseType(), body, status))
 	addStandardExport(module, standardFunction(httpModuleID, "redirect", httpResponseType(), location, status))
+	addStandardExport(module, standardFunction(httpModuleID, "cookie", httpCookieType(),
+		types.Parameter{Name: "name", Type: types.String}, types.Parameter{Name: "value", Type: types.String}))
+	addStandardExport(module, standardFunction(httpModuleID, "deleteCookie", httpCookieType(),
+		types.Parameter{Name: "name", Type: types.String},
+		types.Parameter{Name: "path", Type: types.String, HasDefault: true}))
+	addStandardExport(module, standardFunction(httpModuleID, "sessions", httpSessionStoreType(),
+		types.Parameter{Name: "cookieName", Type: types.String, HasDefault: true},
+		types.Parameter{Name: "maxAgeSeconds", Type: types.Int, HasDefault: true},
+		types.Parameter{Name: "secure", Type: types.Bool, HasDefault: true},
+		types.Parameter{Name: "sameSite", Type: types.String, HasDefault: true}))
 	sort.Strings(module.ExportNames)
 	return module
 }
@@ -98,6 +123,12 @@ func httpConstructionHint(identity *types.ClassSymbol) (string, bool) {
 		return "Request values are produced by the HTTP server for each incoming request", true
 	case "Response":
 		return "create a Response with HTTP.text, HTTP.html, HTTP.response, or HTTP.redirect", true
+	case "Cookie":
+		return "create a Cookie with HTTP.cookie or HTTP.deleteCookie", true
+	case "SessionStore":
+		return "create a SessionStore with HTTP.sessions", true
+	case "Session":
+		return "Session values are produced by SessionStore.open", true
 	}
 	return "", false
 }
@@ -128,8 +159,28 @@ func httpOperationShapes() map[TypeOperation]httpOperationShape {
 		HTTPRequestBody:      {none, types.String, false, "call body with no argument"},
 		HTTPRequestForm:      {[]types.Type{types.String}, types.String, true, "pass one String form field name"},
 		HTTPRequestFormAll:   {[]types.Type{types.String}, strings, false, "pass one String form field name"},
+		HTTPRequestCookie:    {[]types.Type{types.String}, types.String, true, "pass one String cookie name"},
+		HTTPRequestCookieAll: {[]types.Type{types.String}, strings, false, "pass one String cookie name"},
 
 		HTTPResponseWithHeader: {[]types.Type{types.String, types.String}, httpResponseType(), false, "pass a header name String and a header value String"},
+		HTTPResponseWithCookie: {[]types.Type{httpCookieType()}, httpResponseType(), false, "pass one Cookie"},
+
+		HTTPCookieWithPath:     {[]types.Type{types.String}, httpCookieType(), false, "pass one String path"},
+		HTTPCookieWithHttpOnly: {[]types.Type{types.Bool}, httpCookieType(), false, "pass one Bool"},
+		HTTPCookieWithSecure:   {[]types.Type{types.Bool}, httpCookieType(), false, "pass one Bool"},
+		HTTPCookieWithSameSite: {[]types.Type{types.String}, httpCookieType(), false, "pass Lax, Strict, or None"},
+		HTTPCookieWithMaxAge:   {[]types.Type{types.Int}, httpCookieType(), false, "pass Max-Age in seconds as Int"},
+
+		HTTPSessionStoreOpen:   {[]types.Type{httpRequestType()}, httpSessionType(), false, "pass the current Request"},
+		HTTPSessionStoreCommit: {[]types.Type{httpSessionType(), httpResponseType()}, httpResponseType(), false, "pass the Session and a Response"},
+
+		HTTPSessionGet:     {[]types.Type{types.String}, types.String, true, "pass one String session key"},
+		HTTPSessionHas:     {[]types.Type{types.String}, types.Bool, false, "pass one String session key"},
+		HTTPSessionSet:     {[]types.Type{types.String, types.String}, types.Nothing, false, "pass a String key and a String value"},
+		HTTPSessionRemove:  {[]types.Type{types.String}, types.Nothing, false, "pass one String session key"},
+		HTTPSessionClear:   {none, types.Nothing, false, "call clear with no argument"},
+		HTTPSessionRotate:  {none, types.Nothing, false, "call rotate with no argument"},
+		HTTPSessionDestroy: {none, types.Nothing, false, "call destroy with no argument"},
 	}
 }
 
@@ -142,8 +193,20 @@ var httpOperationNames = map[string]map[string]TypeOperation{
 		"query": HTTPRequestQuery, "queryAll": HTTPRequestQueryAll,
 		"header": HTTPRequestHeader, "headerAll": HTTPRequestHeaderAll,
 		"body": HTTPRequestBody, "form": HTTPRequestForm, "formAll": HTTPRequestFormAll,
+		"cookie": HTTPRequestCookie, "cookieAll": HTTPRequestCookieAll,
 	},
-	"Response": {"withHeader": HTTPResponseWithHeader},
+	"Response": {"withHeader": HTTPResponseWithHeader, "withCookie": HTTPResponseWithCookie},
+	"Cookie": {
+		"withPath": HTTPCookieWithPath, "withHttpOnly": HTTPCookieWithHttpOnly,
+		"withSecure": HTTPCookieWithSecure, "withSameSite": HTTPCookieWithSameSite,
+		"withMaxAge": HTTPCookieWithMaxAge,
+	},
+	"SessionStore": {"open": HTTPSessionStoreOpen, "commit": HTTPSessionStoreCommit},
+	"Session": {
+		"get": HTTPSessionGet, "has": HTTPSessionHas, "set": HTTPSessionSet,
+		"remove": HTTPSessionRemove, "clear": HTTPSessionClear,
+		"rotate": HTTPSessionRotate, "destroy": HTTPSessionDestroy,
+	},
 }
 
 func httpOperationFor(receiver types.Type, name string) (TypeOperation, bool) {
