@@ -32,3 +32,8 @@ HTTP, HTML, SQLite ve Env’i bir araya getiren ayrı bir başlangıç kütüpha
 demosu:
 [ahdcode-library-demo](https://github.com/aliharundaldalli/ahdcode-library-demo)
 (`v0.1.0`).
+
+Ana sayfa, kayıt, giriş ve kişi başına bir seminer metni olan Hatay seminer
+defteri:
+[ahdcode-seminer-demo](https://github.com/aliharundaldalli/ahdcode-seminer-demo)
+(`v0.1.0`).

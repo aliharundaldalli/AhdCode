@@ -205,6 +205,7 @@ bakın.
 - [v0.3 SQLite Not Defteri](examples/v0.3/README_TR.md)
 - [v0.4 Web Not Defteri](examples/v0.4/README_TR.md)
 - [v0.4 Kütüphane Demosu](https://github.com/aliharundaldalli/ahdcode-library-demo) (ayrı başlangıç web uygulaması)
+- [v0.4 Seminer Demosu](https://github.com/aliharundaldalli/ahdcode-seminer-demo) (Hatay, çok sayfalı)
 - [Tam v0.1 dil spesifikasyonu](AHDCODE_LANGUAGE_SPEC_v0.1_TR.md)
 
 ## Editör eklentisi

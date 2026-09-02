@@ -30,3 +30,8 @@ A separate beginner demo that combines HTTP, HTML, SQLite, and Env as a small
 library desk lives in
 [ahdcode-library-demo](https://github.com/aliharundaldalli/ahdcode-library-demo)
 (`v0.1.0`).
+
+A multi-page Hatay seminar desk (home, register, login, one seminar note per
+name) lives in
+[ahdcode-seminer-demo](https://github.com/aliharundaldalli/ahdcode-seminer-demo)
+(`v0.1.0`).
