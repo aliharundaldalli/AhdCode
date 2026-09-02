@@ -112,14 +112,21 @@ Bilinmeyen yollar **404** döner. Başka bir yöntem için var olan bir yol
 Her işleyici, canlı bir Go isteği değil, değişmez bir kopya alır. `path()`
 sorgu olmadan URL yoludur. `query(name)` ilk değerdir, yoksa `null`.
 `queryAll(name)` tüm değerlerdir, yoksa boş liste. Yinelenen anahtarlar sıra
-korunarak saklanır.
+korunarak saklanır. Geçerli UTF-8 yüzde kod çözümü değişmez (`Ay%C5%9Fe`,
+`%20`, `+`, emoji).
+
+Sorgudaki bozuk yüzde kodlaması (`%`, `%2`, `%ZZ`) ve yüzde çözülmüş geçersiz
+UTF-8 (`%80`, `%C0%80`) **400** döner; işleyici çalışmaz. U+FFFD yerine koyma
+ve anahtarları sessizce düşürme yoktur.
 
 `header` / `headerAll` büyük/küçük harfe duyarsızdır. `body()` UTF-8 gövdedir;
 geçersiz UTF-8 `HTTPError` fırlatır (sessiz değiştirme yoktur).
 
 Formlar yalnızca `Content-Type` `application/x-www-form-urlencoded` iken
-ayrıştırılır. Gövde, işleyiciden **önce** `maxBodyBytes` ile sınırlanır;
-aşım **413** döner.
+ayrıştırılır. `form` / `formAll` sorgu erişicileri gibi davranır. Aynı katı
+yüzde kod çözümü form gövdesine de uygulanır: bozuk veya UTF-8 olmayan form
+verisi işleyiciden **önce** **400** döner. Gövde, işleyiciden **önce**
+`maxBodyBytes` ile sınırlanır; aşım **413** döner.
 
 ## Yanıt
 

@@ -2955,6 +2955,27 @@ sends that already-safe String with the HTML content type.
 ### POST form and redirect
 
 ```ahd
+bring HTTP
+from HTTP bring Server
+from HTTP bring Request
+from HTTP bring Response
+
+home: Function := (request: Request) -> Response {
+    return HTTP.html(
+        r"""
+        <!doctype html>
+        <html>
+        <body>
+            <form method="post" action="/notes">
+                <input name="title">
+                <button type="submit">Save</button>
+            </form>
+        </body>
+        </html>
+        """
+    )
+}
+
 save: Function := (request: Request) -> Response {
     title: Local String? := request.form("title")
     if title == null {
@@ -2963,12 +2984,15 @@ save: Function := (request: Request) -> Response {
     return HTTP.redirect("/")
 }
 
+app: Server := HTTP.server("127.0.0.1", 8080)
+app.get("/", home)
 app.post("/notes", save)
+app.start()
 ```
 
-Forms use `application/x-www-form-urlencoded`. After a successful POST, return
-`HTTP.redirect("/")` (status 303) so the browser GETs the list instead of
-resubmitting the form.
+Run it, then open `http://127.0.0.1:8080/`. Submit the form. Forms use
+`application/x-www-form-urlencoded`. After a successful POST, `HTTP.redirect("/")`
+(status 303) makes the browser GET the page instead of resubmitting the form.
 
 ### Combine with SQLite: Web Notes App
 

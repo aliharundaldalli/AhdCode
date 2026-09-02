@@ -370,6 +370,134 @@ func TestHTTPRequestNativeQueryAndForm(t *testing.T) {
 	}
 }
 
+func TestHTTPNativeRejectsMalformedQueryAndFormBeforeHandler(t *testing.T) {
+	port := freeLoopbackPort(t)
+	source := `bring HTTP
+from HTTP bring Server
+from HTTP bring Request
+from HTTP bring Response
+
+hits: Int := 0
+
+search: Function := (request: Request) -> Response {
+    hits: Global Int
+    hits = hits + 1
+    q: Local String? := request.query("q")
+    if q != null {
+        return HTTP.text(q)
+    }
+    return HTTP.text("missing")
+}
+
+save: Function := (request: Request) -> Response {
+    hits: Global Int
+    hits = hits + 1
+    title: Local String? := request.form("title")
+    if title != null {
+        return HTTP.text(title)
+    }
+    return HTTP.text("missing")
+}
+
+status: Function := (request: Request) -> Response {
+    hits: Global Int
+    return HTTP.text(str(hits))
+}
+
+ok: Function := (request: Request) -> Response {
+    return HTTP.text("ok")
+}
+
+app: Server := HTTP.server("127.0.0.1", ` + strconv.Itoa(port) + `)
+app.get("/search", search)
+app.post("/form", save)
+app.get("/hits", status)
+app.get("/ok", ok)
+app.start()
+`
+	executable := buildSQLiteProgram(t, source)
+	base := startBuiltHTTP(t, executable, t.TempDir(), port)
+	client := &http.Client{Timeout: 3 * time.Second}
+	hits := func() string {
+		t.Helper()
+		response, err := client.Get(base + "/hits")
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer response.Body.Close()
+		body, _ := io.ReadAll(response.Body)
+		return string(body)
+	}
+	getRaw := func(rawQuery string) (int, string) {
+		t.Helper()
+		request, err := http.NewRequest(http.MethodGet, base+"/search", nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		request.URL.RawQuery = rawQuery
+		response, err := client.Do(request)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer response.Body.Close()
+		body, _ := io.ReadAll(response.Body)
+		return response.StatusCode, string(body)
+	}
+	postForm := func(raw string) (int, string) {
+		t.Helper()
+		response, err := client.Post(base+"/form", "application/x-www-form-urlencoded", strings.NewReader(raw))
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer response.Body.Close()
+		body, _ := io.ReadAll(response.Body)
+		return response.StatusCode, string(body)
+	}
+
+	if hits() != "0" {
+		t.Fatalf("hits before = %q", hits())
+	}
+	for _, raw := range []string{"q=%", "q=%2", "q=%ZZ", "q=%80", "q=%C0%80"} {
+		status, body := getRaw(raw)
+		if status != 400 || strings.Contains(body, "\uFFFD") {
+			t.Fatalf("GET /search?%s = %d %q", raw, status, body)
+		}
+		if hits() != "0" {
+			t.Fatalf("query handler ran after %s: hits=%s", raw, hits())
+		}
+	}
+	for _, raw := range []string{"title=%", "title=%2", "title=%ZZ", "title=%80", "title=%C0%80"} {
+		status, body := postForm(raw)
+		if status != 400 || strings.Contains(body, "\uFFFD") {
+			t.Fatalf("POST /form %s = %d %q", raw, status, body)
+		}
+		if hits() != "0" {
+			t.Fatalf("form handler ran after %s: hits=%s", raw, hits())
+		}
+	}
+	status, body := getRaw("q=Ay%C5%9Fe")
+	if status != 200 || body != "Ayşe" {
+		t.Fatalf("Turkish query = %d %q", status, body)
+	}
+	status, body = getRaw("q=a+b")
+	if status != 200 || body != "a b" {
+		t.Fatalf("+ query = %d %q", status, body)
+	}
+	status, body = postForm("title=Hello%20World")
+	if status != 200 || body != "Hello World" {
+		t.Fatalf("form %%20 = %d %q", status, body)
+	}
+	response, err := client.Get(base + "/ok")
+	if err != nil {
+		t.Fatal(err)
+	}
+	payload, _ := io.ReadAll(response.Body)
+	_ = response.Body.Close()
+	if response.StatusCode != 200 || string(payload) != "ok" {
+		t.Fatalf("GET /ok afterward = %d %q", response.StatusCode, payload)
+	}
+}
+
 func TestHTTPBodyLimitSurvivesOnNativeProgram(t *testing.T) {
 	port := freeLoopbackPort(t)
 	source := `bring HTTP

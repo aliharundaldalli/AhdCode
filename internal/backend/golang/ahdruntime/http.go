@@ -341,7 +341,11 @@ func (dispatcher ahdHTTPDispatcher) ServeHTTP(writer http.ResponseWriter, reques
 		return
 	}
 
-	snapshot := ahdHTTPMaterialize(request, body)
+	snapshot, err := ahdHTTPMaterialize(request, body)
+	if err != nil {
+		ahdHTTPWritePlain(writer, http.StatusBadRequest, "Bad Request")
+		return
+	}
 	var encoded string
 	failed := false
 	func() {
@@ -366,14 +370,23 @@ func (dispatcher ahdHTTPDispatcher) ServeHTTP(writer http.ResponseWriter, reques
 	ahdHTTPWriteEncoded(writer, encoded)
 }
 
-func ahdHTTPMaterialize(request *http.Request, body []byte) ahdHTTPRequestData {
-	query := request.URL.Query()
+func ahdHTTPMaterialize(request *http.Request, body []byte) (ahdHTTPRequestData, error) {
+	rawQuery := ""
+	path := ""
+	if request.URL != nil {
+		rawQuery = request.URL.RawQuery
+		path = request.URL.Path
+	}
+	query, err := ahdHTTPParseEncoded(rawQuery)
+	if err != nil {
+		return ahdHTTPRequestData{}, err
+	}
 	headers := map[string][]string{}
 	for name, values := range request.Header {
 		headers[textproto.CanonicalMIMEHeaderKey(name)] = append([]string(nil), values...)
 	}
 	snapshot := ahdHTTPRequestData{
-		Method: request.Method, Path: request.URL.Path,
+		Method: request.Method, Path: path,
 		Query: query, Headers: headers, BodyUTF8: utf8.Valid(body),
 	}
 	if snapshot.BodyUTF8 {
@@ -383,18 +396,44 @@ func ahdHTTPMaterialize(request *http.Request, body []byte) ahdHTTPRequestData {
 	if mediaType == "application/x-www-form-urlencoded" {
 		snapshot.IsForm = true
 		if !snapshot.BodyUTF8 {
-			snapshot.FormError = "HTTP form body is not valid UTF-8"
-			return snapshot
+			return ahdHTTPRequestData{}, errHTTPEncodedUTF8
 		}
-		values, err := url.ParseQuery(snapshot.Body)
+		values, err := ahdHTTPParseEncoded(snapshot.Body)
 		if err != nil {
-			snapshot.FormError = "HTTP form body is not valid URL encoding"
-			return snapshot
+			return ahdHTTPRequestData{}, err
 		}
 		snapshot.Form = values
 		snapshot.FormOK = true
 	}
-	return snapshot
+	return snapshot, nil
+}
+
+var errHTTPEncodedUTF8 = errors.New("HTTP encoded parameter is not valid UTF-8")
+
+// ahdHTTPParseEncoded strictly decodes application/x-www-form-urlencoded data.
+// It does not use URL.Query's error-discarding path. Malformed percent
+// escapes and percent-decoded invalid UTF-8 are errors; valid UTF-8, '+',
+// '%20', and duplicate keys are preserved in order.
+func ahdHTTPParseEncoded(raw string) (map[string][]string, error) {
+	parsed, err := url.ParseQuery(raw)
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[string][]string, len(parsed))
+	for key, values := range parsed {
+		if !utf8.ValidString(key) {
+			return nil, errHTTPEncodedUTF8
+		}
+		copied := make([]string, len(values))
+		for index, value := range values {
+			if !utf8.ValidString(value) {
+				return nil, errHTTPEncodedUTF8
+			}
+			copied[index] = value
+		}
+		out[key] = copied
+	}
+	return out, nil
 }
 
 func ahdHTTPRequireForm(class *AhdClass, data string) ahdHTTPRequestData {

@@ -2977,6 +2977,27 @@ olarak göndermeyin.
 ### POST form ve yönlendirme
 
 ```ahd
+bring HTTP
+from HTTP bring Server
+from HTTP bring Request
+from HTTP bring Response
+
+home: Function := (request: Request) -> Response {
+    return HTTP.html(
+        r"""
+        <!doctype html>
+        <html>
+        <body>
+            <form method="post" action="/notes">
+                <input name="title">
+                <button type="submit">Save</button>
+            </form>
+        </body>
+        </html>
+        """
+    )
+}
+
 save: Function := (request: Request) -> Response {
     title: Local String? := request.form("title")
     if title == null {
@@ -2985,12 +3006,16 @@ save: Function := (request: Request) -> Response {
     return HTTP.redirect("/")
 }
 
+app: Server := HTTP.server("127.0.0.1", 8080)
+app.get("/", home)
 app.post("/notes", save)
+app.start()
 ```
 
-Formlar `application/x-www-form-urlencoded` kullanır. Başarılı bir POST'tan
-sonra `HTTP.redirect("/")` (durum 303) döndürün ki tarayıcı formu yeniden
-göndermek yerine listeyi GET etsin.
+Çalıştırın, sonra `http://127.0.0.1:8080/` açın. Formu gönderin. Formlar
+`application/x-www-form-urlencoded` kullanır. Başarılı bir POST'tan sonra
+`HTTP.redirect("/")` (durum 303) tarayıcının formu yeniden göndermek yerine
+sayfayı GET etmesini sağlar.
 
 ### SQLite ile birleştirmek: Web Not Defteri
 

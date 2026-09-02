@@ -114,16 +114,21 @@ Unknown paths return **404**. A path that exists for another method returns
 Each handler receives an immutable snapshot, not a live Go request. `path()`
 is the URL path without the query. `query(name)` is the first value, or
 `null` if the name is absent. `queryAll(name)` is every value, or an empty
-list. Duplicate keys are preserved in order.
+list. Duplicate keys are preserved in order. Valid UTF-8 percent-decoding is
+unchanged (`Ay%C5%9Fe`, `%20`, `+`, emoji).
+
+Malformed percent-encoding (`%`, `%2`, `%ZZ`) and percent-decoded invalid
+UTF-8 (`%80`, `%C0%80`) in the query string return **400** and the handler is
+not called. There is no U+FFFD replacement and no silent dropping of keys.
 
 `header(name)` / `headerAll(name)` are case-insensitive. `body()` is the UTF-8
 request body; invalid UTF-8 raises `HTTPError` (no silent replacement).
 
 Forms are parsed only when `Content-Type` is `application/x-www-form-urlencoded`.
-`form(name)` / `formAll(name)` then behave like query accessors. A malformed
-or non-UTF-8 form body raises `HTTPError` when the handler calls `form` /
-`formAll`. Multipart, files, and JSON bodies are not a form API; read
-`body()` for a raw String.
+`form(name)` / `formAll(name)` then behave like query accessors. The same
+strict percent-decoding rules apply to form bodies: malformed or non-UTF-8
+form data returns **400** before the handler runs. Multipart, files, and JSON
+bodies are not a form API; read `body()` for a raw String.
 
 The body is limited with `http.MaxBytesReader` **before** the handler runs.
 A body larger than `maxBodyBytes` returns **413** and the handler is not
@@ -144,7 +149,7 @@ contain CR or LF.
 
 `HTTPError` derives from `Error`. Invalid host/port, invalid or duplicate
 routes, invalid status, invalid redirect status, invalid headers, bind
-failures, and invalid UTF-8 body/form access raise `HTTPError`.
+failures, and invalid UTF-8 `body()` access raise `HTTPError`.
 
 If a handler raises any Error (or panics in the runtime), the client receives
 **500** `Internal Server Error`. The internal message is written to stderr, not

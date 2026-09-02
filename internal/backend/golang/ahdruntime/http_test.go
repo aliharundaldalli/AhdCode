@@ -234,6 +234,169 @@ func TestHTTPQueryFormHeadersAndDuplicates(t *testing.T) {
 	}
 }
 
+func TestHTTPRejectsMalformedQueryAndFormBeforeHandler(t *testing.T) {
+	var queryHits atomic.Int64
+	var formHits atomic.Int64
+	base, _ := startHTTP(t, ahdHTTPDefaultMaxBody, func(handle string) {
+		AhdHTTPServerGet(AhdClassHTTPError, handle, "/search", func(data string) string {
+			queryHits.Add(1)
+			all := AhdHTTPRequestQueryAll(AhdClassHTTPError, data, "q")
+			first := AhdHTTPRequestQuery(AhdClassHTTPError, data, "q")
+			text := strings.Join(all.Snapshot(), ",")
+			if first != nil {
+				text = *first + "|" + text
+			}
+			return AhdHTTPText(AhdClassHTTPError, text, 200)
+		})
+		AhdHTTPServerPost(AhdClassHTTPError, handle, "/form", func(data string) string {
+			formHits.Add(1)
+			title := AhdHTTPRequestForm(AhdClassHTTPError, data, "title")
+			text := ""
+			if title != nil {
+				text = *title
+			}
+			all := AhdHTTPRequestFormAll(AhdClassHTTPError, data, "title")
+			return AhdHTTPText(AhdClassHTTPError, text+"|"+strings.Join(all.Snapshot(), ","), 200)
+		})
+		AhdHTTPServerGet(AhdClassHTTPError, handle, "/ok", func(string) string {
+			return AhdHTTPText(AhdClassHTTPError, "ok", 200)
+		})
+	})
+	client := &http.Client{Timeout: 2 * time.Second}
+
+	getRaw := func(rawQuery string) (int, string) {
+		t.Helper()
+		request, err := http.NewRequest(http.MethodGet, base+"/search", nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		request.URL.RawQuery = rawQuery
+		response, err := client.Do(request)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer response.Body.Close()
+		body, _ := io.ReadAll(response.Body)
+		return response.StatusCode, string(body)
+	}
+	postForm := func(raw string) (int, string) {
+		t.Helper()
+		response, err := client.Post(base+"/form", "application/x-www-form-urlencoded", strings.NewReader(raw))
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer response.Body.Close()
+		body, _ := io.ReadAll(response.Body)
+		return response.StatusCode, string(body)
+	}
+	assertOK := func() {
+		t.Helper()
+		response, err := client.Get(base + "/ok")
+		if err != nil {
+			t.Fatal(err)
+		}
+		body, _ := io.ReadAll(response.Body)
+		_ = response.Body.Close()
+		if response.StatusCode != 200 || string(body) != "ok" {
+			t.Fatalf("GET /ok = %d %q", response.StatusCode, body)
+		}
+	}
+
+	invalid := []string{"q=%", "q=%2", "q=%ZZ", "q=%80", "q=%C0%80"}
+	for _, raw := range invalid {
+		queryHits.Store(0)
+		status, body := getRaw(raw)
+		if status != 400 {
+			t.Fatalf("GET /search?%s = %d %q, want 400", raw, status, body)
+		}
+		if strings.Contains(body, "\uFFFD") {
+			t.Fatalf("GET /search?%s body contained U+FFFD: %q", raw, body)
+		}
+		if queryHits.Load() != 0 {
+			t.Fatalf("GET /search?%s entered handler (hits=%d)", raw, queryHits.Load())
+		}
+		assertOK()
+	}
+	for _, raw := range []string{"title=%", "title=%2", "title=%ZZ", "title=%80", "title=%C0%80"} {
+		formHits.Store(0)
+		status, body := postForm(raw)
+		if status != 400 {
+			t.Fatalf("POST /form %s = %d %q, want 400", raw, status, body)
+		}
+		if strings.Contains(body, "\uFFFD") {
+			t.Fatalf("POST /form %s body contained U+FFFD: %q", raw, body)
+		}
+		if formHits.Load() != 0 {
+			t.Fatalf("POST /form %s entered handler (hits=%d)", raw, formHits.Load())
+		}
+		assertOK()
+	}
+
+	queryHits.Store(0)
+	status, body := getRaw("q=Ay%C5%9Fe")
+	if status != 200 || body != "Ayşe|Ayşe" || queryHits.Load() != 1 {
+		t.Fatalf("Turkish query = %d %q hits=%d", status, body, queryHits.Load())
+	}
+	status, body = getRaw("q=%F0%9F%98%80")
+	if status != 200 || body != "😀|😀" {
+		t.Fatalf("emoji query = %d %q", status, body)
+	}
+	status, body = getRaw("q=AhdCode&q=SQLite")
+	if status != 200 || body != "AhdCode|AhdCode,SQLite" {
+		t.Fatalf("duplicate query = %d %q", status, body)
+	}
+	status, body = getRaw("q=a+b")
+	if status != 200 || body != "a b|a b" {
+		t.Fatalf("+ query = %d %q", status, body)
+	}
+	status, body = getRaw("q=a%20b")
+	if status != 200 || body != "a b|a b" {
+		t.Fatalf("%%20 query = %d %q", status, body)
+	}
+
+	formHits.Store(0)
+	status, body = postForm("title=Ay%C5%9Fe")
+	if status != 200 || body != "Ayşe|Ayşe" || formHits.Load() != 1 {
+		t.Fatalf("Turkish form = %d %q hits=%d", status, body, formHits.Load())
+	}
+	status, body = postForm("title=%F0%9F%98%80")
+	if status != 200 || body != "😀|😀" {
+		t.Fatalf("emoji form = %d %q", status, body)
+	}
+	status, body = postForm("title=a&title=b&title=c")
+	if status != 200 || body != "a|a,b,c" {
+		t.Fatalf("duplicate form = %d %q", status, body)
+	}
+	status, body = postForm("title=First+Note")
+	if status != 200 || body != "First Note|First Note" {
+		t.Fatalf("+ form = %d %q", status, body)
+	}
+	status, body = postForm("title=Hello%20World")
+	if status != 200 || body != "Hello World|Hello World" {
+		t.Fatalf("%%20 form = %d %q", status, body)
+	}
+	assertOK()
+}
+
+func TestAhdHTTPParseEncodedRejectsMalformedAndInvalidUTF8(t *testing.T) {
+	for _, raw := range []string{"q=%", "q=%2", "q=%ZZ", "q=%80", "q=%C0%80"} {
+		values, err := ahdHTTPParseEncoded(raw)
+		if err == nil {
+			t.Fatalf("ParseEncoded(%q) succeeded: %#v", raw, values)
+		}
+	}
+	values, err := ahdHTTPParseEncoded("q=Ay%C5%9Fe&q=%F0%9F%98%80&plus=a+b&sp=a%20b")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.Join(values["q"], ","); got != "Ayşe,😀" {
+		t.Fatalf("q = %q", got)
+	}
+	if values["plus"][0] != "a b" || values["sp"][0] != "a b" {
+		t.Fatalf("plus/sp = %#v", values)
+	}
+}
+
 func TestHTTPBodyLimitAndHeaderInjection(t *testing.T) {
 	base, _ := startHTTP(t, 16, func(handle string) {
 		AhdHTTPServerPost(AhdClassHTTPError, handle, "/echo", func(data string) string {
