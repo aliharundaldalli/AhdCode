@@ -1,4 +1,4 @@
-# AhdCode v0.3.0 Türkçe Öğrenci Rehberi
+# AhdCode v0.4.0 Türkçe Öğrenci Rehberi
 
 Bu rehber, **daha önce hiç programlama yapmamış birinin de takip edebilmesi** için hazırlanmıştır. Baştan sona sırayla okuyabilirsiniz; her bölümde önce ne yapmak istediğimizi görecek, sonra çalışan bir örnek yazacak, en son gerekli kuralları öğreneceksiniz.
 
@@ -42,14 +42,15 @@ En iyi öğrenme yolu, örnekleri yalnızca okumak değil çalıştırmaktır. B
 - [33. Env modülü](#33-env-modülü)
 - [34. Lists ve KeyValue modülleri](#34-lists-ve-keyvalue-modülleri)
 - [35. SQLite: hatırlayan bir veritabanı](#35-sqlite-hatırlayan-bir-veritabanı)
-- [36. Kod Biçimlendirici (Formatter)](#36-kod-biçimlendirici-formatter)
-- [37. Komut satırı (CLI)](#37-komut-satırı-cli)
-- [38. Etkileşimli kabuk (REPL)](#38-etkileşimli-kabuk-repl)
-- [39. Sık yapılan başlangıç hataları](#39-sık-yapılan-başlangıç-hataları)
-- [40. Küçük Projeler](#40-küçük-projeler)
-- [41. Egzersizler](#41-egzersizler)
-- [42. Çözüm İpuçları](#42-çözüm-i̇puçları)
-- [43. Sonraki adımlar ve teknik belgeler](#43-sonraki-adımlar-ve-teknik-belgeler)
+- [36. Küçük bir web sayfası](#36-küçük-bir-web-sayfası)
+- [37. Kod Biçimlendirici (Formatter)](#37-kod-biçimlendirici-formatter)
+- [38. Komut satırı (CLI)](#38-komut-satırı-cli)
+- [39. Etkileşimli kabuk (REPL)](#39-etkileşimli-kabuk-repl)
+- [40. Sık yapılan başlangıç hataları](#40-sık-yapılan-başlangıç-hataları)
+- [41. Küçük Projeler](#41-küçük-projeler)
+- [42. Egzersizler](#42-egzersizler)
+- [43. Çözüm İpuçları](#43-çözüm-i̇puçları)
+- [44. Sonraki adımlar ve teknik belgeler](#44-sonraki-adımlar-ve-teknik-belgeler)
 
 ## 1. AhdCode nedir?
 
@@ -69,7 +70,7 @@ Merhaba!
 
 AhdCode, programı çalıştırmadan önce yazdığınız kodu kontrol eder. Örneğin bir metni sayı gibi kullanmaya çalışırsanız veya `null` olabilecek bir değeri kontrol etmeden kullanırsanız, mümkün olduğunda hatayı daha program başlamadan söyler. Ama başlangıçta bunun ayrıntılarını düşünmeniz gerekmiyor; ilerleyen bölümlerde örneklerle göreceğiz.
 
-AhdCode v0.3.0 güncel sürümdür. Küçük komut satırı programlarını çalıştırabilir veya yerel executable uygulamalara derleyebilirsiniz; veriyi yerel bir SQLite veritabanında tutabilir ve dil sunucusunu (`ahdcode lsp`) VS Code gibi bir editörden kullanabilirsiniz. Bazı standart modüller, örneğin SQLite, derlenmiş uygulamanın yanında AhdCode'un sağladığı yardımcı çalışma zamanı bileşenlerini kullanabilir. v0.2.2 pratik günlük dil sunucusunu tamamladı; v0.3.0 gerçek uygulama geliştirmenin başlangıcıdır.
+AhdCode v0.4.0 güncel sürümdür. Küçük komut satırı programlarını çalıştırabilir veya yerel executable uygulamalara derleyebilirsiniz; veriyi yerel bir SQLite veritabanında tutabilir, bu makineden HTTP ile bir sayfa sunabilir ve dil sunucusunu (`ahdcode lsp`) VS Code gibi bir editörden kullanabilirsiniz. Bazı standart modüller, örneğin SQLite, derlenmiş uygulamanın yanında AhdCode'un sağladığı yardımcı çalışma zamanı bileşenlerini kullanabilir. HTTP ve HTML, çalışma zamanının içindeki Go standart kütüphanesini kullanır; ayrı bir HTTP yardımcısı eklemezler. v0.2.2 pratik günlük dil sunucusunu tamamladı; v0.3.0 SQLite ekledi; v0.4.0 tarayıcıdan kullanılan ilk AhdCode uygulama fazıdır.
 
 > **Teknik not:** Program çalışmadan önce türlerin kontrol edilmesine *static checking* denir.
 
@@ -2889,7 +2890,129 @@ v0.3.0 editörleri mevcut dil sunucusu üzerinden `SQLite`'ı keşfeder: `bring 
 
 [SQLite modül referansına](SQLITE_TR.md) bakın.
 
-## 36. Kod biçimlendirici (Formatter)
+## 36. Küçük bir web sayfası
+
+v0.3.0, program kapansa da hatırlayan bir veritabanı öğretti. v0.4.0, bu
+veriyi bu makinenin tarayıcısında açmanın yolunu ekler: yerel sunucu için
+`HTTP`, kullanıcı metninin etiket olmaması için `HTML`.
+
+`127.0.0.1` **yalnızca bu bilgisayar** demektir. Açacağınız adres
+`http://127.0.0.1:8080/` şeklindedir. `0.0.0.0` bağlamayı gelişigüzel
+yapmayın. `Server.start()` programı durdurana kadar terminali meşgul tutar.
+
+### İlk GET yolu
+
+```ahd
+bring HTTP
+from HTTP bring Server
+from HTTP bring Request
+from HTTP bring Response
+
+home: Function := (request: Request) -> Response {
+    return HTTP.html(
+        r"""
+        <!doctype html>
+        <html>
+        <body>
+            <h1>Hello from AhdCode</h1>
+        </body>
+        </html>
+        """
+    )
+}
+
+app: Server := HTTP.server("127.0.0.1", 8080)
+app.get("/", home)
+app.start()
+```
+
+Çalıştırın, sonra tarayıcıda `http://127.0.0.1:8080/` açın. **Hello from
+AhdCode** görmelisiniz. `HTTP.html`, **sizin** yazdığınız işaretleme içindir.
+Kaçırmaz. Bu yüzden merhaba sayfası ham String `r"""..."""` kullanır.
+
+Bir işleyici her zaman `(request: Request) -> Response` şeklindedir. Derleyici
+bunu program çalışmadan önce denetler.
+
+### İstek yöntemi, yol ve sorgu
+
+```ahd
+hello: Function := (request: Request) -> Response {
+    write(request.method())
+    write(request.path())
+    name: Local String? := request.query("name")
+    if name != null {
+        return HTTP.text("Hello {name}")
+    }
+    return HTTP.text("Hello")
+}
+
+app.get("/hello", hello)
+```
+
+`GET /hello?name=Ayşe` için `request.query("name")` `Ayşe` String'idir; ad yoksa
+`null`'dır. `queryAll` yinelenenlerin hepsini döndürür. Yol, `?` sorgusunu
+içermez.
+
+### Dinamik metin için güvenli HTML
+
+Metin sorgudan, formdan veya SQLite'tan geliyorsa `HTML.text` kullanın.
+Oluşturucu `<`, `>`, `&` ve tırnakları kaçırır:
+
+```ahd
+bring HTML
+
+page: String := HTML.document(
+    "Notes"
+    [HTML.element("p", {}, [HTML.text(userText)])]
+)
+return HTTP.html(page)
+```
+
+`HTML.document` tam bir sayfa kurar ve başlığı kaçırır. `HTTP.html` bu zaten
+güvenli String'i HTML içerik türüyle gönderir.
+
+Kullanıcı metnini **asla** `"<p>" + userText + "</p>"` diye birleştirip HTML
+olarak göndermeyin.
+
+### POST form ve yönlendirme
+
+```ahd
+save: Function := (request: Request) -> Response {
+    title: Local String? := request.form("title")
+    if title == null {
+        return HTTP.text("title is required", 400)
+    }
+    return HTTP.redirect("/")
+}
+
+app.post("/notes", save)
+```
+
+Formlar `application/x-www-form-urlencoded` kullanır. Başarılı bir POST'tan
+sonra `HTTP.redirect("/")` (durum 303) döndürün ki tarayıcı formu yeniden
+göndermek yerine listeyi GET etsin.
+
+### SQLite ile birleştirmek: Web Not Defteri
+
+Her işleyicide `notes.db` açın, `?` parametreleriyle küçük bir SQL deyimi
+çalıştırın, dönmeden önce `close()` çağırın. Saklanan her başlık ve gövdeyi
+`HTML.text` ile çizin. Silme formundaki `id`'yi `int(...)` ile dönüştürün.
+
+Tam yürüyüş [`examples/v0.4/03_web_notes.ahd`](../examples/v0.4/03_web_notes.ahd)
+dosyasındadır. `notes.db` depo içinde oluşmasın diye onu bir **geçici dizine**
+kopyalayın. `<script>alert(1)</script>` ve `Robert'); DROP TABLE notes;--`
+gibi başlıklar sıradan veri kalır: bağlı SQL parametreleri ve kaçırılmış HTML.
+
+v0.4.0 editörleri mevcut dil sunucusu üzerinden `HTTP` ve `HTML`'i keşfeder:
+`bring HT` yazın, completion ikisini de önerir. Ek bir eklenti gerekmez.
+
+**Siz deneyin:** `GET /ok` üzerinde `HTTP.text("ok")` sunun, sonra tarayıcıda
+`http://127.0.0.1:8080/ok` açın.
+
+[HTTP modül referansına](HTTP_TR.md) ve [HTML modül referansına](HTML_TR.md)
+bakın.
+
+## 37. Kod biçimlendirici (Formatter)
 
 Kod çalışsa bile herkes farklı boşluk ve satır düzeni kullanırsa okumak zorlaşır. AhdCode formatter, geçerli kodu ortak bir stile dönüştürür:
 
@@ -2942,7 +3065,7 @@ values :=
 
 Formatter idempotent'tir; aynı dosyada tekrar çalıştırmak yeni değişiklik üretmez.
 
-## 37. Komut satırı (CLI)
+## 38. Komut satırı (CLI)
 
 AhdCode'u terminalden birkaç temel komutla kullanabilirsiniz:
 
@@ -2979,7 +3102,7 @@ Yardım ve sürüm bilgisini gösterir.
 
 Yeni başlıyorsanız çoğu zaman kullanacağınız komut `ahdcode run ...` olacaktır.
 
-## 38. Etkileşimli kabuk (REPL)
+## 39. Etkileşimli kabuk (REPL)
 
 Küçük bir şeyi denemek için her seferinde dosya oluşturmak zorunda değilsiniz. Terminalde yalnızca:
 
@@ -3048,7 +3171,7 @@ harici bir render motorunu çağırır. Bu çağrıları bir `.ahd` dosyasından
 çalıştırın. `Archive`'ın böyle bir sınırlaması yoktur — REPL'de tamamen
 çalışır. Ayrıntılar için [REPL referansına](REPL_TR.md) bakın.
 
-## 39. Sık yapılan başlangıç hataları
+## 40. Sık yapılan başlangıç hataları
 
 Hata mesajı görmek programlamanın normal bir parçasıdır. Çoğu hata, bilgisayarın ne istediğinizi anlayamadığını söyler. Aşağıdaki örnekler yeni başlayanların sık karşılaştığı durumları ve nasıl düzelteceğinizi gösterir:
 
@@ -3157,7 +3280,7 @@ Hata mesajı görmek programlamanın normal bir parçasıdır. Çoğu hata, bilg
 - Neden: Bu, başlığı SQL'e yapıştırır. `Robert'); DROP TABLE notes;--` gibi bir başlık artık veri değildir.
 - Doğru: `?` yer tutucusu ve `SQLite.fromString(title)` kullanın. Parametre bağlama metni veri olarak tutar.
 
-## 40. Küçük Projeler
+## 41. Küçük Projeler
 
 Bu küçük projeler rehberde öğretilenleri bir araya getirir. Onları tek başınıza kurmayı deneyin!
 
@@ -3169,8 +3292,9 @@ Bu küçük projeler rehberde öğretilenleri bir araya getirir. Onları tek ba�
 6. **Sınıflarla (Class) Öğrenci Kaydı**: Bir `Student` sınıfı ve bir `Course` (Kurs) sınıfı oluşturun. Course içinde bir `List<Student>` bulunsun. Kursa yeni bir öğrenci eklemek için bir metot, kursun genel not ortalamasını hesaplamak için başka bir metot yazın.
 7. **Tohumlu (Seeded) Rastgele Oyun**: `Math.seed(42)` kullanarak 1 ile 100 arasında "gizli bir sayı" üretin. Kullanıcıdan sayıyı tahmin etmesini isteyin. Doğru tahmin edene kadar "daha yüksek" veya "daha düşük" diye yönlendirin. Tohum kullanıldığı için, gizli sayı programı her çalıştırdığınızda aynı olacaktır—test yapmak için mükemmel!
 8. **SQLite Not Defteri**: `notes.db` açın, yoksa bir `notes` tablosu oluşturun ve kullanıcının not eklemesine, listelemesine, başlığa göre aramasına, güncellemesine ve silmesine izin verin. Her değer için `?` parametreleri kullanın. Programı kapatıp yeniden çalıştırın: eski notlar durmalıdır.
+9. **Web Not Defteri**: Notları `127.0.0.1` üzerinde bir tarayıcıda sunun. Notları `HTML.text` ile listeleyin, POST `/notes` ve bağlı SQLite parametreleriyle not ekleyin, sonra `/` adresine yönlendirin. Dinamik metin ham HTML'e birleştirilmemelidir.
 
-## 41. Egzersizler
+## 42. Egzersizler
 
 Tam çözümleri hemen aramak yerine her programı küçük adımlarla kurun.
 
@@ -3200,8 +3324,9 @@ Tam çözümleri hemen aramak yerine her programı küçük adımlarla kurun.
 19. `break` ve `continue` kullanarak çok geniş bir aralık içindeki ilk 5 çift sayıyı bulun, ancak 3'e bölünenleri `continue` ile atlayın.
 20. Dikdörtgen alanı hesaplayan bir fonksiyona sahip `MathUtils.ahd` adında bir modül oluşturun ve bir `main.ahd` içinden `bring` ile çağırarak kullanın.
 21. Küçük bir SQLite not defteri kurun: parametrelerle iki not ekleyin, `ORDER BY id` ile listeleyin, bir gövdeyi güncelleyin, bir satırı silin, veritabanını kapatın, aynı dosyayı yeniden açın ve kalan başlıkları yazdırın.
+22. `127.0.0.1` üzerinde `GET /ok` için `HTTP.text("ok")` sunun ve tarayıcıda açın.
 
-## 42. Çözüm İpuçları
+## 43. Çözüm İpuçları
 
 1. `take` sonucu String'dir; yaş için `int(...)` ve yeni yaş için `+ 1` kullanın.
 2. Formülü küçük parçalara ayırın; `real(take(...))` ile başlayın ve Real sayılarını kullanın.
@@ -3224,8 +3349,9 @@ Tam çözümleri hemen aramak yerine her programı küçük adımlarla kurun.
 19. `if i % 3 == 0 { continue }`. `if count == 5 { break }`.
 20. `from MathUtils bring alanHesapla` kullanabilirsiniz.
 21. `SQLite.open("notes.db")`, `CREATE TABLE IF NOT EXISTS`, `SQLite.fromString` ile `INSERT ... VALUES (?, ?)`, sonra `ORDER BY id` ile `query`. `close()` sonrası aynı yolu yeniden açın.
+22. `HTTP.server("127.0.0.1", 8080)`, `app.get("/ok", handler)`, `HTTP.text("ok")`, sonra `app.start()`.
 
-## 43. Sonraki adımlar ve teknik belgeler
+## 44. Sonraki adımlar ve teknik belgeler
 
 Bu rehberi tamamladıktan sonra dilin ayrıntılarını şu belgelerden
 derinleştirebilirsiniz:
@@ -3255,6 +3381,8 @@ derinleştirebilirsiniz:
 - [Archive](ARCHIVE_TR.md)
 - [JSON](JSON_TR.md)
 - [SQLite](SQLITE_TR.md)
+- [HTTP](HTTP_TR.md)
+- [HTML](HTML_TR.md)
 - [XML](XML_TR.md)
 - [Env](ENV_TR.md)
 - [Lists](LISTS_TR.md)
@@ -3271,4 +3399,5 @@ derinleştirebilirsiniz:
 - [Tam v0.1 spesifikasyonu](../AHDCODE_LANGUAGE_SPEC_v0.1_TR.md)
 
 Çalışan daha fazla örnek için [derlenmiş v0.1 örnekleri](../examples/v0.1/README_TR.md)
-klasörüne ve [v0.3 SQLite Not Defteri](../examples/v0.3/README_TR.md) örneğine bakın.
+klasörüne, [v0.3 SQLite Not Defteri](../examples/v0.3/README_TR.md) ve
+[v0.4 Web Not Defteri](../examples/v0.4/README_TR.md) örneklerine bakın.

@@ -35,9 +35,9 @@ guide](LSP.md): stdio-only JSON-RPC and the v0.2.2 practical everyday feature
 set (diagnostics, hover, completion with auto import, go to definition,
 document symbols, signature help, find references, rename, semantic tokens,
 inlay hints, code actions, formatting, workspace symbols, folding ranges, and
-selection ranges), all compiler-backed. v0.3.0 modules such as `SQLite` appear
-through that same compiler module interface; there is no SQLite-specific LSP
-catalog. It accepts no arguments other than an
+selection ranges), all compiler-backed. v0.4.0 modules such as `HTTP` and `HTML`
+appear through that same compiler module interface; there is no HTTP-specific
+or HTML-specific LSP catalog. v0.3.0's `SQLite` uses the same path. It accepts no arguments other than an
 optional `--stdio`
 (accepted and ignored -- real LSP client libraries append it automatically
 when they launch a server over stdio transport; `ahdcode lsp` never supports

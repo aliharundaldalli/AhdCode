@@ -36,8 +36,9 @@ başlatır: yalnızca stdio üzerinden JSON-RPC ve v0.2.2 pratik günlük özell
 seti (tanılamalar, hover, otomatik importlu completion, tanıma git, belge
 sembolleri, signature help, referans bulma, rename, semantic token, inlay
 hint, code action, biçimlendirme, workspace sembolleri, katlama ve seçim
-aralıkları) — hepsi derleyici destekli. v0.3.0 modülleri (`SQLite` gibi) aynı
-derleyici modül arayüzünden görünür; SQLite'a özel bir LSP kataloğu yoktur.
+aralıkları) — hepsi derleyici destekli. v0.4.0 modülleri (`HTTP` ve `HTML`
+gibi) aynı derleyici modül arayüzünden görünür; HTTP/HTML'e özel bir LSP
+kataloğu yoktur. v0.3.0'ın `SQLite`'ı aynı yolu kullanır.
 İsteğe bağlı bir `--stdio` dışında argüman kabul etmez (kabul
 edilir ve yok sayılır — gerçek LSP istemci kütüphaneleri, sunucuyu stdio
 transport üzerinden başlatırken bunu otomatik olarak ekler; `ahdcode lsp`

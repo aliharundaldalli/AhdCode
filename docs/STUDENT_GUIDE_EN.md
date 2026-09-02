@@ -1,4 +1,4 @@
-# AhdCode v0.3.0 English Student Guide
+# AhdCode v0.4.0 English Student Guide
 
 This guide is designed so that **even someone who has never programmed before** can follow along. You can read it in order from beginning to end; in each section, you will first see what we want to achieve, then write a working example, and finally learn the necessary rules.
 
@@ -42,14 +42,15 @@ The best way to learn is not just by reading the examples, but by running them. 
 - [33. Env module](#33-env-module)
 - [34. Lists and KeyValue modules](#34-lists-and-keyvalue-modules)
 - [35. SQLite: a database that remembers](#35-sqlite-a-database-that-remembers)
-- [36. Code Formatter](#36-code-formatter)
-- [37. Command line (CLI)](#37-command-line-cli)
-- [38. Interactive shell (REPL)](#38-interactive-shell-repl)
-- [39. Common beginner mistakes](#39-common-beginner-mistakes)
-- [40. Small Projects](#40-small-projects)
-- [41. Exercises](#41-exercises)
-- [42. Solution Hints](#42-solution-hints)
-- [43. Next steps and technical docs](#43-next-steps-and-technical-docs)
+- [36. A small web page](#36-a-small-web-page)
+- [37. Code Formatter](#37-code-formatter)
+- [38. Command line (CLI)](#38-command-line-cli)
+- [39. Interactive shell (REPL)](#39-interactive-shell-repl)
+- [40. Common beginner mistakes](#40-common-beginner-mistakes)
+- [41. Small Projects](#41-small-projects)
+- [42. Exercises](#42-exercises)
+- [43. Solution Hints](#43-solution-hints)
+- [44. Next steps and technical docs](#44-next-steps-and-technical-docs)
 
 ## 1. What is AhdCode?
 
@@ -69,7 +70,7 @@ Hello!
 
 AhdCode checks the code you wrote before running the program. For example, if you try to use text like a number, or if you use a value that could be `null` without checking it, it will tell you the error before the program even starts, whenever possible. But you don't need to think about these details at the beginning; we'll see examples in later sections.
 
-AhdCode v0.3.0 is the current release. You can run small command-line programs or compile them into local executables, keep data in a local SQLite database, and use the language server (`ahdcode lsp`) from an editor such as VS Code. Some standard modules, such as SQLite, may use companion runtime helpers supplied with AhdCode. v0.2.2 completed the everyday language server; v0.3.0 is the start of practical application development.
+AhdCode v0.4.0 is the current release. You can run small command-line programs or compile them into local executables, keep data in a local SQLite database, serve a page from this machine over HTTP, and use the language server (`ahdcode lsp`) from an editor such as VS Code. Some standard modules, such as SQLite, may use companion runtime helpers supplied with AhdCode. HTTP and HTML use the Go standard library inside the runtime; they do not add an HTTP helper. v0.2.2 completed the everyday language server; v0.3.0 added SQLite; v0.4.0 is the first browser-facing AhdCode application phase.
 
 > **Technical note:** Checking types before the program runs is called *static checking*.
 
@@ -2868,7 +2869,128 @@ v0.3.0 editors discover `SQLite` through the existing language server: type `bri
 
 See [the SQLite module reference](SQLITE.md).
 
-## 36. Code Formatter
+## 36. A small web page
+
+v0.3.0 taught a database that remembers after the program closes. v0.4.0 adds a
+way to open that data in a browser on this machine: `HTTP` for a local server,
+and `HTML` so user text cannot become tags.
+
+`127.0.0.1` means **this computer only**. The address you open is
+`http://127.0.0.1:8080/`. Do not casually bind `0.0.0.0`. `Server.start()`
+occupies the terminal until you stop the program.
+
+### First GET route
+
+```ahd
+bring HTTP
+from HTTP bring Server
+from HTTP bring Request
+from HTTP bring Response
+
+home: Function := (request: Request) -> Response {
+    return HTTP.html(
+        r"""
+        <!doctype html>
+        <html>
+        <body>
+            <h1>Hello from AhdCode</h1>
+        </body>
+        </html>
+        """
+    )
+}
+
+app: Server := HTTP.server("127.0.0.1", 8080)
+app.get("/", home)
+app.start()
+```
+
+Run it, then open `http://127.0.0.1:8080/` in a browser. You should see
+**Hello from AhdCode**. `HTTP.html` is for markup **you** wrote. It does not
+escape. That is why the hello page uses a raw String `r"""..."""`.
+
+A handler is always `(request: Request) -> Response`. The compiler checks that
+before the program runs.
+
+### Request method, path, and query
+
+```ahd
+hello: Function := (request: Request) -> Response {
+    write(request.method())
+    write(request.path())
+    name: Local String? := request.query("name")
+    if name != null {
+        return HTTP.text("Hello {name}")
+    }
+    return HTTP.text("Hello")
+}
+
+app.get("/hello", hello)
+```
+
+`GET /hello?name=Ayşe` makes `request.query("name")` the String `Ayşe`, or
+`null` if the name is missing. `queryAll` returns every duplicate. The path
+does not include the `?` query.
+
+### Safe HTML for dynamic text
+
+When the text comes from a query, a form, or SQLite, put it through `HTML.text`.
+The builder escapes `<`, `>`, `&`, and quotes:
+
+```ahd
+bring HTML
+
+page: String := HTML.document(
+    "Notes"
+    [HTML.element("p", {}, [HTML.text(userText)])]
+)
+return HTTP.html(page)
+```
+
+`HTML.document` builds a full page and escapes the title. `HTTP.html` then
+sends that already-safe String with the HTML content type.
+
+**Never** write `"<p>" + userText + "</p>"` and send it as HTML.
+
+### POST form and redirect
+
+```ahd
+save: Function := (request: Request) -> Response {
+    title: Local String? := request.form("title")
+    if title == null {
+        return HTTP.text("title is required", 400)
+    }
+    return HTTP.redirect("/")
+}
+
+app.post("/notes", save)
+```
+
+Forms use `application/x-www-form-urlencoded`. After a successful POST, return
+`HTTP.redirect("/")` (status 303) so the browser GETs the list instead of
+resubmitting the form.
+
+### Combine with SQLite: Web Notes App
+
+Open `notes.db` inside each handler, run one small SQL statement with `?`
+parameters, then `close()` before returning. Render every stored title and body
+with `HTML.text`. Convert a delete form's `id` with `int(...)`.
+
+The full walkthrough lives in [`examples/v0.4/03_web_notes.ahd`](../examples/v0.4/03_web_notes.ahd).
+Copy it to a **temporary directory** so `notes.db` is not created in the
+repository. Titles such as `<script>alert(1)</script>` and
+`Robert'); DROP TABLE notes;--` stay ordinary data: bound SQL parameters and
+escaped HTML.
+
+v0.4.0 editors discover `HTTP` and `HTML` through the existing language server:
+type `bring HT` and completion offers both. No extra editor plugin is needed.
+
+**Try it yourself:** serve `HTTP.text("ok")` on `GET /ok`, then in the browser
+open `http://127.0.0.1:8080/ok`.
+
+See [the HTTP module reference](HTTP.md) and [the HTML module reference](HTML.md).
+
+## 37. Code Formatter
 
 Even if the code works, if everyone uses different spacing and line layouts, it becomes hard to read. The AhdCode formatter converts valid code to a common style:
 
@@ -2921,7 +3043,7 @@ values: List<Int> :=
 
 The formatter is idempotent; running it again on the same file produces no new changes.
 
-## 37. Command line (CLI)
+## 38. Command line (CLI)
 
 You can use AhdCode from the terminal with a few basic commands:
 
@@ -2958,7 +3080,7 @@ Shows help and version information.
 
 If you are a beginner, the command you will use most of the time will be `ahdcode run ...`.
 
-## 38. Interactive shell (REPL)
+## 39. Interactive shell (REPL)
 
 You don't have to create a file every time you want to try something small. In the terminal, just run:
 
@@ -3026,7 +3148,7 @@ not support. Run those calls from a `.ahd` file instead. `Archive` has no
 such limit -- it works fully in the REPL. See the [REPL reference](REPL.md)
 for details.
 
-## 39. Common beginner mistakes
+## 40. Common beginner mistakes
 
 Seeing an error message is a normal part of programming. Most errors simply tell you that the computer couldn't understand what you wanted. The following examples show common situations beginners encounter and how to fix them:
 
@@ -3135,7 +3257,7 @@ Seeing an error message is a normal part of programming. Most errors simply tell
 - Why: That splices the title into SQL. A title such as `Robert'); DROP TABLE notes;--` is no longer data.
 - Correct: Use a `?` placeholder and `SQLite.fromString(title)`. Parameter binding keeps the text as data.
 
-## 40. Small Projects
+## 41. Small Projects
 
 These small projects bring together what is taught in the guide. Try building them on your own!
 
@@ -3147,8 +3269,9 @@ These small projects bring together what is taught in the guide. Try building th
 6. **Student Registry with Classes**: Create a `Student` class and a `Course` class. Let the Course have a `List<Student>` inside it. Write a method to add a new student to the course, and another method to calculate the overall average grade of the course.
 7. **Seeded Random Game**: Generate a "secret number" between 1 and 100 using `Math.seed(42)`. Ask the user to guess the number. Guide them with "higher" or "lower" until they guess correctly. Because a seed is used, the secret number will be the same every time you run the program—perfect for testing!
 8. **SQLite Notes App**: Open `notes.db`, create a `notes` table if it is missing, and let the user add a note, list notes, search by title, update a note, and delete a note. Use `?` parameters for every value. Close the program and run it again: the old notes must still be there.
+9. **Web Notes App**: Serve notes in a browser on `127.0.0.1`. List notes with `HTML.text`, add a note with POST `/notes` and bound SQLite parameters, then redirect to `/`. Dynamic text must not be concatenated into raw HTML.
 
-## 41. Exercises
+## 42. Exercises
 
 Instead of immediately looking for full solutions, build each program in small steps.
 
@@ -3178,8 +3301,9 @@ Instead of immediately looking for full solutions, build each program in small s
 19. Use `break` and `continue` to find the first 5 even numbers within a very large range, but skip multiples of 3 with `continue`.
 20. Create a module named `MathUtils.ahd` containing a function that calculates rectangle area, and use it from inside `main.ahd` by calling it with `bring`.
 21. Build a tiny SQLite notebook: insert two notes with parameters, list them with `ORDER BY id`, update one body, delete one row, close the database, reopen the same file, and print the remaining titles.
+22. Serve `HTTP.text("ok")` on `GET /ok` at `127.0.0.1` and open it in a browser.
 
-## 42. Solution Hints
+## 43. Solution Hints
 
 1. The result of `take` is a String; use `int(...)` for age, and `+ 1` for the new age.
 2. Break the formula into small parts; start with `real(take(...))` and use Real numbers.
@@ -3202,8 +3326,9 @@ Instead of immediately looking for full solutions, build each program in small s
 19. `if i % 3 == 0 { continue }`. `if count == 5 { break }`.
 20. You can use `from MathUtils bring calculateArea`.
 21. `SQLite.open("notes.db")`, `CREATE TABLE IF NOT EXISTS`, `INSERT ... VALUES (?, ?)` with `SQLite.fromString`, then `query` with `ORDER BY id`. After `close()`, open the same path again.
+22. `HTTP.server("127.0.0.1", 8080)`, `app.get("/ok", handler)`, `HTTP.text("ok")`, then `app.start()`.
 
-## 43. Next steps and technical docs
+## 44. Next steps and technical docs
 
 After finishing this guide, you can deepen your knowledge of the language details from these documents:
 
@@ -3232,6 +3357,8 @@ After finishing this guide, you can deepen your knowledge of the language detail
 - [Archive](ARCHIVE.md)
 - [JSON](JSON.md)
 - [SQLite](SQLITE.md)
+- [HTTP](HTTP.md)
+- [HTML](HTML.md)
 - [XML](XML.md)
 - [Env](ENV.md)
 - [Lists](LISTS.md)
@@ -3247,4 +3374,4 @@ After finishing this guide, you can deepen your knowledge of the language detail
 - [Language server](LSP.md)
 - [Full v0.1 specification](../AHDCODE_LANGUAGE_SPEC_v0.1.md)
 
-Check the [curated v0.1 examples](../examples/v0.1/README.md) folder and the [v0.3 SQLite Notes App](../examples/v0.3/README.md) for more working programs.
+Check the [curated v0.1 examples](../examples/v0.1/README.md) folder, the [v0.3 SQLite Notes App](../examples/v0.3/README.md), and the [v0.4 Web Notes App](../examples/v0.4/README.md) for more working programs.

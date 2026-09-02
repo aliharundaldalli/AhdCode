@@ -11,7 +11,7 @@ ahdcode
 ```
 
 Startup prints a version banner matching `ahdcode --version` (currently
-`AhdCode v0.3.0`), then the `ahd>` prompt:
+`AhdCode v0.4.0`), then the `ahd>` prompt:
 
 ```text
 ahd> x := 5

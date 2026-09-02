@@ -12,14 +12,17 @@ AhdCode; okunabilir sözdizimi, açık niyet (explicit intent), öngörülebilir
 anlambilim (semantics) ve yerel (native) derlemeye odaklanan, deneysel,
 statik olarak denetlenen genel amaçlı bir programlama dilidir.
 
-Mevcut sürüm **v0.3.0**'dır. Çekirdek dil uçtan uca çalışır, ancak proje
+Mevcut sürüm **v0.4.0**'dır. Çekirdek dil uçtan uca çalışır, ancak proje
 üretime hazır değildir ve 1.0'dan önce kırıcı (breaking) değişiklikler
 olabilir.
 
-v0.3.0, AhdCode'un pratik uygulama geliştirme evresini tipli bir
-[SQLite](docs/SQLITE_TR.md) köprüsüyle başlatır: gerçek yerel veritabanı,
-parametreli SQL, CRUD, işlemler (transactions) ve kalıcı bir not defteri
-örneği. HTTP bu sürümde yoktur; SQLite'tan sonra gelir.
+v0.4.0 web temeli fazıdır: tipli bir [HTTP](docs/HTTP_TR.md) sunucusu,
+Request/Response değerleri ve küçük, güvenli bir [HTML](docs/HTML_TR.md)
+oluşturucu; böylece bir AhdCode programı bu makinenin tarayıcısında açılabilir.
+v0.3.0 pratik uygulama geliştirmeyi tipli bir [SQLite](docs/SQLITE_TR.md)
+köprüsüyle başlatmıştı. HTTP, çalışma zamanının içindeki Go `net/http`
+paketini kullanır; ayrı bir HTTP yardımcısı yoktur. HTTPS, çerez, oturum,
+multipart ve WebSocket bu sürümde yoktur.
 
 v0.2.2, v0.2.1'in tanılama, hover, completion, tanıma git, belge sembolleri,
 signature help ve referans bulma özelliklerinin üzerine pratik günlük AhdCode
@@ -189,6 +192,8 @@ bakın.
 - [Numeric modülü ve Complex skalerleri](docs/NUMERIC_TR.md)
 - [JSON modülü](docs/JSON_TR.md)
 - [SQLite modülü](docs/SQLITE_TR.md)
+- [HTTP modülü](docs/HTTP_TR.md)
+- [HTML modülü](docs/HTML_TR.md)
 - [XML modülü](docs/XML_TR.md)
 - [Env modülü](docs/ENV_TR.md)
 - [Lists modülü](docs/LISTS_TR.md)
@@ -198,6 +203,7 @@ bakın.
 - [Yapay zekâ destekli yerel kurulum](FOR_AI.md)
 - [Derlenmiş v0.1 örnekleri](examples/v0.1/README_TR.md)
 - [v0.3 SQLite Not Defteri](examples/v0.3/README_TR.md)
+- [v0.4 Web Not Defteri](examples/v0.4/README_TR.md)
 - [Tam v0.1 dil spesifikasyonu](AHDCODE_LANGUAGE_SPEC_v0.1_TR.md)
 
 ## Editör eklentisi
@@ -238,6 +244,7 @@ editors/vscode/    VS Code / Antigravity eklentisi
 docs/              son kullanıcı rehberleri
 examples/v0.1/     derlenmiş çalışan programlar
 examples/v0.3/     SQLite Not Defteri
+examples/v0.4/     Web Not Defteri
 AHDCODE_LANGUAGE_SPEC_v0.1.md
                    yetkili (authoritative) dil sözleşmesi
 ```
