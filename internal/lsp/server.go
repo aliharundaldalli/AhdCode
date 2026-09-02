@@ -124,6 +124,24 @@ func (server *Server) dispatch(m message) (exit bool) {
 		server.handleReferences(m)
 	case "textDocument/completion":
 		server.handleCompletion(m)
+	case "textDocument/prepareRename":
+		server.handlePrepareRename(m)
+	case "textDocument/rename":
+		server.handleRename(m)
+	case "textDocument/semanticTokens/full":
+		server.handleSemanticTokensFull(m)
+	case "textDocument/inlayHint":
+		server.handleInlayHint(m)
+	case "textDocument/codeAction":
+		server.handleCodeAction(m)
+	case "textDocument/formatting":
+		server.handleFormatting(m)
+	case "workspace/symbol":
+		server.handleWorkspaceSymbol(m)
+	case "textDocument/foldingRange":
+		server.handleFoldingRange(m)
+	case "textDocument/selectionRange":
+		server.handleSelectionRange(m)
 	default:
 		if !m.isNotification() {
 			server.sendErrorResponse(m.ID, errCodeMethodNotFound, fmt.Sprintf("method not found: %s", m.Method))

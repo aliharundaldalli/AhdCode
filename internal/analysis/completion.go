@@ -16,6 +16,16 @@ import (
 type CompletionItem struct {
 	Label  string
 	Detail string
+	// Import, when set, tells the LSP layer to add an import for this symbol
+	// via additionalTextEdits when the item is selected.
+	Import *ImportEdit
+}
+
+// ImportEdit describes one import to add when an auto-import completion is
+// accepted.
+type ImportEdit struct {
+	ModuleName string
+	SymbolName string
 }
 
 // statementKeywords is a deliberately small, restrained set of keywords
@@ -44,6 +54,10 @@ func (store *Store) Completion(path string, offset int) []CompletionItem {
 	cached := store.entries[canonical]
 	store.mutex.Unlock()
 
+	if cached == nil {
+		return nil
+	}
+	entryPath := cached.result.EntryPath
 	entryModule := cached.entryModule()
 	if entryModule == nil || entryModule.Parsed.Program == nil {
 		return nil
@@ -58,9 +72,9 @@ func (store *Store) Completion(path string, offset int) []CompletionItem {
 		return bringCompletions(cached, entryModule, bring, offset)
 	}
 	if member, ok := innermost.(*ast.MemberExpr); ok {
-		return memberCompletions(entryModule, member)
+		return store.memberCompletions(cached, entryModule, member, ancestors)
 	}
-	return scopeCompletions(entryModule, ancestors, offset)
+	return store.scopeCompletions(cached, entryPath, entryModule, ancestors, offset)
 }
 
 // bringCompletions completes a `bring <module>`, `from <module>`, or
@@ -167,7 +181,7 @@ func moduleInterfaceNamed(cached *entry, name string) *semantic.ModuleInterface 
 // `<instance>.<partial>` member access, using whichever compiler fact
 // already describes the receiver: ResolvedSymbols for a namespace, or
 // ExpressionTypes for a Class-typed value.
-func memberCompletions(entryModule *module.Module, member *ast.MemberExpr) []CompletionItem {
+func (store *Store) memberCompletions(cached *entry, entryModule *module.Module, member *ast.MemberExpr, ancestors []ast.Node) []CompletionItem {
 	if receiver, ok := entryModule.Semantic.ResolvedSymbols[member.Object]; ok && receiver != nil && receiver.Kind == semantic.NamespaceSymbol && receiver.Namespace != nil {
 		var items []CompletionItem
 		for _, name := range receiver.Namespace.ExportNames {
@@ -178,6 +192,11 @@ func memberCompletions(entryModule *module.Module, member *ast.MemberExpr) []Com
 		sort.Slice(items, func(i, j int) bool { return items[i].Label < items[j].Label })
 		return items
 	}
+	if identifier, ok := member.Object.(*ast.IdentifierExpr); ok {
+		if items := store.qualifiedModuleMemberCompletions(cached, identifier.Name, member.Name); len(items) > 0 {
+			return items
+		}
+	}
 	receiverType, ok := entryModule.Semantic.ExpressionTypes[member.Object]
 	if !ok {
 		return nil
@@ -186,6 +205,7 @@ func memberCompletions(entryModule *module.Module, member *ast.MemberExpr) []Com
 	if !ok {
 		return nil
 	}
+	enclosingClass := enclosingClassAt(entryModule, ancestors)
 	seen := make(map[string]bool)
 	var items []CompletionItem
 	for identity := class.Symbol; identity != nil; identity = identity.Parent {
@@ -200,17 +220,10 @@ func memberCompletions(entryModule *module.Module, member *ast.MemberExpr) []Com
 		sort.Strings(names)
 		for _, name := range names {
 			candidate := classSymbol.Members[name]
-			// Members is the analyzer's own internal lookup table -- it
-			// carries every member regardless of visibility, unlike a
-			// module's ExportNames (which BuildModuleInterface already
-			// filters). A Confidential member is only reachable from
-			// inside its declaring Class hierarchy (see
-			// canAccessConfidentialMember in internal/semantic); this
-			// completion has no notion of "the class body the cursor is
-			// currently inside", so it always excludes Confidential
-			// members rather than risk suggesting one from outside its
-			// class -- a missing suggestion, never a wrong one.
-			if seen[name] || candidate == nil || candidate.Confidential || !strings.HasPrefix(name, member.Name) {
+			if seen[name] || candidate == nil || !strings.HasPrefix(name, member.Name) {
+				continue
+			}
+			if candidate.Confidential && !semantic.CanAccessConfidentialMember(enclosingClass, candidate.OwnerClass) {
 				continue
 			}
 			seen[name] = true
@@ -218,6 +231,36 @@ func memberCompletions(entryModule *module.Module, member *ast.MemberExpr) []Com
 		}
 	}
 	return items
+}
+
+// qualifiedModuleMemberCompletions completes ModuleName.partial for a module
+// not yet in the compile graph by on-demand discovery.
+func (store *Store) qualifiedModuleMemberCompletions(cached *entry, moduleName, prefix string) []CompletionItem {
+	if moduleInterfaceNamed(cached, moduleName) != nil {
+		return nil
+	}
+	for _, discovered := range store.discoverUserModules(cached.result.EntryPath) {
+		if discovered.Name != moduleName {
+			continue
+		}
+		iface := store.moduleInterfaceAt(discovered.Path)
+		if iface == nil {
+			return nil
+		}
+		var items []CompletionItem
+		for _, name := range iface.ExportNames {
+			if !strings.HasPrefix(name, prefix) {
+				continue
+			}
+			exported := iface.Exports[name]
+			if exported != nil && !exported.Confidential {
+				items = append(items, CompletionItem{Label: name, Detail: renderHover(exported)})
+			}
+		}
+		sort.Slice(items, func(i, j int) bool { return items[i].Label < items[j].Label })
+		return items
+	}
+	return nil
 }
 
 // classSymbolNamed finds the *semantic.Symbol describing a Class identity
@@ -238,7 +281,7 @@ func classSymbolNamed(entryModule *module.Module, identity *types.ClassSymbol) *
 // declaration (visible everywhere in the module), every parameter and
 // local binding structurally enclosing the cursor, and the restrained
 // keyword list.
-func scopeCompletions(entryModule *module.Module, ancestors []ast.Node, offset int) []CompletionItem {
+func (store *Store) scopeCompletions(cached *entry, entryPath string, entryModule *module.Module, ancestors []ast.Node, offset int) []CompletionItem {
 	prefix := ""
 	if identifier, ok := ancestors[len(ancestors)-1].(*ast.IdentifierExpr); ok {
 		prefix = identifier.Name
@@ -253,7 +296,6 @@ func scopeCompletions(entryModule *module.Module, ancestors []ast.Node, offset i
 		seen[name] = true
 		items = append(items, CompletionItem{Label: name, Detail: detail})
 	}
-
 	for _, symbol := range entryModule.Semantic.Symbols {
 		if symbol != nil && symbol.ModuleRoot && !symbol.Builtin {
 			add(symbol.Name, renderHover(symbol))
@@ -265,9 +307,48 @@ func scopeCompletions(entryModule *module.Module, ancestors []ast.Node, offset i
 	for _, keyword := range statementKeywords {
 		add(keyword, "keyword")
 	}
+	store.autoImportCompletions(cached, entryPath, entryModule, prefix, seen, &items)
 
 	sort.Slice(items, func(i, j int) bool { return items[i].Label < items[j].Label })
 	return items
+}
+
+// autoImportCompletions adds completion entries for exported symbols from
+// discoverable user modules that are not already in scope.
+func (store *Store) autoImportCompletions(cached *entry, entryPath string, entryModule *module.Module, prefix string, seen map[string]bool, items *[]CompletionItem) {
+	inScope := make(map[string]bool)
+	for name := range seen {
+		inScope[name] = true
+	}
+	for _, symbol := range entryModule.Semantic.Symbols {
+		if symbol != nil && !symbol.Builtin {
+			inScope[symbol.Name] = true
+		}
+	}
+	for _, discovered := range store.discoverUserModules(entryPath) {
+		if discovered.Path == entryPath {
+			continue
+		}
+		iface := store.moduleInterfaceAt(discovered.Path)
+		if iface == nil {
+			continue
+		}
+		for _, name := range iface.ExportNames {
+			if inScope[name] || !strings.HasPrefix(name, prefix) {
+				continue
+			}
+			exported := iface.Exports[name]
+			if exported == nil || exported.Confidential {
+				continue
+			}
+			inScope[name] = true
+			*items = append(*items, CompletionItem{
+				Label:  name,
+				Detail: "from " + discovered.Name,
+				Import: &ImportEdit{ModuleName: discovered.Name, SymbolName: name},
+			})
+		}
+	}
 }
 
 // enclosingScopeNodes approximates the locals visible at offset by walking
@@ -317,6 +398,20 @@ func enclosingScopeNodes(ancestors []ast.Node, offset int, entryModule *module.M
 				}
 				if symbol, ok := resolved[declaration]; ok && symbol != nil {
 					items = append(items, CompletionItem{Label: symbol.Name, Detail: renderHover(symbol)})
+				}
+			}
+		case *ast.AttemptStmt:
+			for _, clause := range node.Excepts {
+				if clause.Name == "" || clause.Body == nil {
+					continue
+				}
+				if !containsOffset(clause.Body.Span(), offset) {
+					continue
+				}
+				for _, symbol := range entryModule.Semantic.Symbols {
+					if symbol != nil && symbol.Kind == semantic.ExceptSymbol && symbol.Name == clause.Name && symbol.Span == clause.Span() {
+						items = append(items, CompletionItem{Label: symbol.Name, Detail: renderHover(symbol)})
+					}
 				}
 			}
 		}

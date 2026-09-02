@@ -107,12 +107,35 @@ func TestInitializeAdvertisesOnlyImplementedCapabilities(t *testing.T) {
 	if len(result.Capabilities.CompletionProvider.TriggerCharacters) == 0 {
 		t.Fatal("expected a non-empty completionProvider.triggerCharacters")
 	}
+	if !result.Capabilities.RenameProvider {
+		t.Fatal("expected renameProvider = true")
+	}
+	if !result.Capabilities.InlayHintProvider {
+		t.Fatal("expected inlayHintProvider = true")
+	}
+	if !result.Capabilities.DocumentFormattingProvider {
+		t.Fatal("expected documentFormattingProvider = true")
+	}
+	if !result.Capabilities.WorkspaceSymbolProvider {
+		t.Fatal("expected workspaceSymbolProvider = true")
+	}
+	if !result.Capabilities.FoldingRangeProvider {
+		t.Fatal("expected foldingRangeProvider = true")
+	}
+	if !result.Capabilities.SelectionRangeProvider {
+		t.Fatal("expected selectionRangeProvider = true")
+	}
+	if len(result.Capabilities.SemanticTokensProvider.Legend.TokenTypes) == 0 {
+		t.Fatal("expected semantic token legend")
+	}
+	if len(result.Capabilities.CodeActionProvider.CodeActionKinds) == 0 {
+		t.Fatal("expected code action kinds")
+	}
 	// Confirm the raw JSON never mentions a capability still out of scope.
 	raw := string(response.Result)
 	for _, forbidden := range []string{
-		"renameProvider", "semanticTokensProvider",
-		"codeActionProvider", "documentFormattingProvider", "foldingRangeProvider",
-		"callHierarchyProvider", "inlayHintProvider",
+		"callHierarchyProvider", "typeHierarchyProvider",
+		"documentRangeFormattingProvider", "implementationProvider",
 	} {
 		if bytes.Contains([]byte(raw), []byte(forbidden)) {
 			t.Fatalf("initialize result advertises out-of-scope capability %q: %s", forbidden, raw)
@@ -193,7 +216,7 @@ func TestNotificationReceivesNoResponse(t *testing.T) {
 func TestUnsupportedMethodGetsMethodNotFound(t *testing.T) {
 	client := &testClient{}
 	client.request(1, "initialize", map[string]any{})
-	client.request(2, "textDocument/rename", map[string]any{})
+	client.request(2, "textDocument/callHierarchy/incomingCalls", map[string]any{})
 	client.notify("exit", nil)
 	messages := runServer(t, client)
 

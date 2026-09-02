@@ -62,9 +62,10 @@ func (e *entry) moduleForFile(fileID source.FileID) *module.Module {
 // real filesystem, and an open document's saved-on-disk bytes are never
 // consulted while it is open.
 type Store struct {
-	mutex     sync.Mutex
-	documents map[string]string
-	entries   map[string]*entry
+	mutex          sync.Mutex
+	documents      map[string]string
+	entries        map[string]*entry
+	workspaceRoots []string
 }
 
 // NewStore creates an empty document store.
@@ -78,6 +79,18 @@ func (store *Store) text(path string) (string, bool) {
 	defer store.mutex.Unlock()
 	value, ok := store.documents[path]
 	return value, ok
+}
+
+// PrimaryOpenPath returns any currently open document path, used as the
+// workspace-symbol search entry when the client does not tie the request to
+// one document.
+func (store *Store) PrimaryOpenPath() string {
+	store.mutex.Lock()
+	defer store.mutex.Unlock()
+	for path := range store.documents {
+		return path
+	}
+	return ""
 }
 
 // Text returns the open-buffer content for a document path, if it is
