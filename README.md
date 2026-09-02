@@ -195,6 +195,7 @@ See the [CLI guide](docs/CLI.md), [formatter guide](docs/FORMATTER.md),
 - [Curated v0.1 examples](examples/v0.1/README.md)
 - [v0.3 SQLite Notes App](examples/v0.3/README.md)
 - [v0.4 Web Notes App](examples/v0.4/README.md)
+- [v0.4 Library Demo](https://github.com/aliharundaldalli/ahdcode-library-demo) (separate beginner web app)
 - [Full v0.1 language specification](AHDCODE_LANGUAGE_SPEC_v0.1.md)
 
 ## Editor extension

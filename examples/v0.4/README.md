@@ -25,3 +25,8 @@ ahdcode run 03_web_notes.ahd
 | `01_http_hello.ahd` | Trusted static HTML over HTTP |
 | `02_http_request.ahd` | Query parameters and `application/x-www-form-urlencoded` forms |
 | `03_web_notes.ahd` | Web Notes App: SQLite persistence, escaped HTML, POST-redirect-GET |
+
+A separate beginner demo that combines HTTP, HTML, SQLite, and Env as a small
+library desk lives in
+[ahdcode-library-demo](https://github.com/aliharundaldalli/ahdcode-library-demo)
+(`v0.1.0`).

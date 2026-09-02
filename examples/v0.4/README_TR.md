@@ -27,3 +27,8 @@ ahdcode run 03_web_notes.ahd
 | `01_http_hello.ahd` | HTTP üzerinden güvenilir statik HTML |
 | `02_http_request.ahd` | Sorgu parametreleri ve `application/x-www-form-urlencoded` formlar |
 | `03_web_notes.ahd` | Web Not Defteri: SQLite kalıcılığı, kaçırılmış HTML, POST-redirect-GET |
+
+HTTP, HTML, SQLite ve Env’i bir araya getiren ayrı bir başlangıç kütüphane
+demosu:
+[ahdcode-library-demo](https://github.com/aliharundaldalli/ahdcode-library-demo)
+(`v0.1.0`).
