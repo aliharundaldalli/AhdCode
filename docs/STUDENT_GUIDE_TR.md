@@ -1383,6 +1383,9 @@ Kendi sınıfınızın `+`, `==`, `<` gibi operatörlerle çalışmasını istey
 CEqual CCompare CAdd CSubtract CMultiply CDivide CRemainder CPower CNegate CStr
 ```
 
+Bu adlar yalnızca bir Class içindeki metot yuvasında özel anlam taşır. Başka
+yerlerde sıradan tanımlayıcılardır; `C` harfinin kendisi ayrılmış değildir.
+
 ```ahd
 Vector2: Class<> := {
     structure: Attributes := (
