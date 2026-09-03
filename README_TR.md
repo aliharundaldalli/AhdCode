@@ -12,11 +12,16 @@ AhdCode; okunabilir sözdizimi, açık niyet (explicit intent), öngörülebilir
 anlambilim (semantics) ve yerel (native) derlemeye odaklanan, deneysel,
 statik olarak denetlenen genel amaçlı bir programlama dilidir.
 
-Mevcut sürüm **v0.8.0**'dır. Çekirdek dil uçtan uca çalışır, ancak proje
+Mevcut sürüm **v0.9.0**'dır. Çekirdek dil uçtan uca çalışır, ancak proje
 üretime hazır değildir ve 1.0'dan önce kırıcı (breaking) değişiklikler
 olabilir.
 
-v0.8.0, multipart form işlemeyi ve güvenli dosya yüklemeyi ekler: bir
+v0.9.0, yalnızca gönderim yapan [SMTP](docs/SMTP_TR.md) postası ekler:
+değiştirilemez bir `SMTPClient` host, port ve güvenliği (`starttls`, `tls`
+veya açık `none`) yapılandırır; değiştirilemez bir `SMTPMessage` To/Cc/Bcc,
+Reply-To, UTF-8 konu ve metin ve/veya HTML gövde taşır; `send` her ileti
+için bir SMTP bağlantısı açar ve AUTH PLAIN yalnızca TLS sonrasındadır.
+IMAP, ek, posta kuyruğu ve sağlayıcı kısayolu yoktur. v0.8.0, multipart form işlemeyi ve güvenli dosya yüklemeyi ekler: bir
 işleyici yüklenen dosyaları `Request.file` / `Request.files` ile okur;
 `originalName`, `size` ve hem bildirilen hem de içerikten algılanan MIME
 türünü inceler; birini `UploadedFile.save(directory)` ile yükleyenin
@@ -44,7 +49,7 @@ kimlik doğrulama çerçevesi değildir. v0.3.0 pratik uygulama geliştirmeyi ti
 bir [SQLite](docs/SQLITE_TR.md) köprüsüyle başlatmıştı. HTTP, çalışma zamanının
 içindeki Go `net/http` paketini kullanır; ayrı bir HTTP, çerez, oturum veya
 istemci yardımcısı yoktur. Gelen multipart yüklemeler v0.8.0 ile geldi; giden
-multipart, WebSocket ve bir yapay zeka satıcı modülü hâlâ sürümün parçası
+dosya ekleri, WebSocket ve bir yapay zeka satıcı modülü hâlâ sürümün parçası
 değildir.
 
 v0.2.2, v0.2.1'in tanılama, hover, completion, tanıma git, belge sembolleri,
@@ -217,6 +222,7 @@ bakın.
 - [SQLite modülü](docs/SQLITE_TR.md)
 - [HTTP modülü](docs/HTTP_TR.md)
 - [HTML modülü](docs/HTML_TR.md)
+- [SMTP modülü](docs/SMTP_TR.md)
 - [XML modülü](docs/XML_TR.md)
 - [Env modülü](docs/ENV_TR.md)
 - [Lists modülü](docs/LISTS_TR.md)
@@ -231,6 +237,7 @@ bakın.
 - [v0.6 HTTP Client](examples/v0.6/README_TR.md)
 - [v0.7 HTML ayrıştırma ve web kazıma](examples/v0.7/README_TR.md)
 - [v0.8 multipart formlar ve dosya yükleme](examples/v0.8/README_TR.md)
+- [v0.9 SMTP posta gönderimi](examples/v0.9/README_TR.md)
 - [v0.4 Kütüphane Demosu](https://github.com/aliharundaldalli/ahdcode-library-demo) (ayrı başlangıç web uygulaması)
 - [v0.4 Seminer Demosu](https://github.com/aliharundaldalli/ahdcode-seminer-demo) (Hatay, çok sayfalı)
 - [Tam v0.1 dil spesifikasyonu](AHDCODE_LANGUAGE_SPEC_v0.1_TR.md)
@@ -278,6 +285,7 @@ examples/v0.5/     çerezler ve bellek içi oturumlar
 examples/v0.6/     giden HTTP Client ve JSON API'ler
 examples/v0.7/     HTML ayrıştırma, seçiciler ve web kazıma
 examples/v0.8/     multipart formlar, dosya yükleme ve yükleme meta verisi
+examples/v0.9/     Env yapılandırmalı SMTP metin/HTML postası
 AHDCODE_LANGUAGE_SPEC_v0.1.md
                    yetkili (authoritative) dil sözleşmesi
 ```

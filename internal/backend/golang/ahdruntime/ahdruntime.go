@@ -90,6 +90,7 @@ var (
 	AhdClassSQLiteError         = &AhdClass{Name: "SQLiteError", Parent: AhdClassError}
 	AhdClassHTTPError           = &AhdClass{Name: "HTTPError", Parent: AhdClassError}
 	AhdClassHTMLError           = &AhdClass{Name: "HTMLError", Parent: AhdClassError}
+	AhdClassSMTPError           = &AhdClass{Name: "SMTPError", Parent: AhdClassError}
 )
 
 // AhdInstance is every AhdCode Class instance. The generated interface of each

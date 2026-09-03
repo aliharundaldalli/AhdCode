@@ -37,6 +37,7 @@ const (
 	sqliteRuntimeFileName  = "ahdcode_sqlite_runtime.go"
 	httpRuntimeFileName    = "ahdcode_http_runtime.go"
 	htmlRuntimeFileName    = "ahdcode_html_runtime.go"
+	smtpRuntimeFileName    = "ahdcode_smtp_runtime.go"
 )
 
 // storage describes the Go representation chosen for one IR symbol.
@@ -130,6 +131,10 @@ func Generate(compilation *ir.Compilation) (*GeneratedProgram, []diagnostics.Dia
 	if err != nil {
 		return nil, append(generator.diagnostics, backendError(CodeFormatFailure, "embedded HTML runtime source is not valid Go: "+err.Error(), source.Span{}, "the HTML backend runtime must remain gofmt-clean"))
 	}
+	smtpRuntime, err := format.Source([]byte(smtpRuntimeSource()))
+	if err != nil {
+		return nil, append(generator.diagnostics, backendError(CodeFormatFailure, "embedded SMTP runtime source is not valid Go: "+err.Error(), source.Span{}, "the SMTP backend runtime must remain gofmt-clean"))
+	}
 	return &GeneratedProgram{Files: []GeneratedFile{
 		{Name: programFileName, Content: string(formatted)},
 		{Name: runtimeFileName, Content: string(runtime)},
@@ -139,6 +144,7 @@ func Generate(compilation *ir.Compilation) (*GeneratedProgram, []diagnostics.Dia
 		{Name: sqliteRuntimeFileName, Content: string(sqliteRuntime)},
 		{Name: httpRuntimeFileName, Content: string(httpRuntime)},
 		{Name: htmlRuntimeFileName, Content: string(htmlRuntime)},
+		{Name: smtpRuntimeFileName, Content: string(smtpRuntime)},
 	}, RequiresLatex: generator.usesLatex, RequiresPlot: generator.usesPlot, RequiresNumeric: generator.usesNumeric, RequiresSQLite: generator.usesSQLite}, generator.diagnostics
 }
 
@@ -169,6 +175,10 @@ func httpRuntimeSource() string {
 
 func htmlRuntimeSource() string {
 	return strings.Replace(ahdruntime.HTMLSource, "package ahdruntime", "package main", 1)
+}
+
+func smtpRuntimeSource() string {
+	return strings.Replace(ahdruntime.SMTPSource, "package ahdruntime", "package main", 1)
 }
 
 func (generator *generator) hasErrors() bool {
@@ -415,6 +425,7 @@ func (generator *generator) emitProgram() string {
 	generator.emitSQLiteHelpers(writer)
 	generator.emitHTTPHelpers(writer)
 	generator.emitHTMLHelpers(writer)
+	generator.emitSMTPHelpers(writer)
 	writer.raw(bodies.String())
 	generator.emitInstaller(writer)
 	writer.open("func main() {")

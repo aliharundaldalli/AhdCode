@@ -793,6 +793,9 @@ func (generator *generator) call(value *ir.CallExpr) string {
 	if strings.HasPrefix(string(value.Callable), htmlModulePrefix) {
 		return generator.htmlCall(value)
 	}
+	if strings.HasPrefix(string(value.Callable), smtpModulePrefix) {
+		return generator.smtpCall(value)
+	}
 	if method, ok := value.Callee.(*ir.MemberExpr); ok && method.Kind == ir.MethodMember {
 		function := generator.functions[method.Callable]
 		if function == nil {
@@ -1058,6 +1061,9 @@ func (generator *generator) builtinCall(value *ir.CallExpr) string {
 		}
 		if strings.HasPrefix(name, "HTMLDocument.") || strings.HasPrefix(name, "HTMLElement.") {
 			return generator.htmlOperation(name, value)
+		}
+		if strings.HasPrefix(name, "SMTPClient.") || strings.HasPrefix(name, "SMTPMessage.") {
+			return generator.smtpOperation(name, value)
 		}
 		return generator.unsupported("Fundamentals function "+name, meta.Span)
 	}

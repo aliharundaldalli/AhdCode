@@ -42,3 +42,6 @@ var HTTPSource string
 
 //go:embed html.go
 var HTMLSource string
+
+//go:embed smtp.go
+var SMTPSource string

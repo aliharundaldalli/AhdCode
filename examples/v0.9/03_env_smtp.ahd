@@ -1,0 +1,42 @@
+// Configure SMTP through Env. Never hardcode a real password.
+//
+//   export SMTP_HOST=127.0.0.1
+//   export SMTP_PORT=2525
+//   export SMTP_SECURITY=starttls
+//   export SMTP_USERNAME=qa-user
+//   export SMTP_PASSWORD=SMTP_QA_PASSWORD_7f91_secret
+//   ahdcode run 03_env_smtp.ahd
+bring Env
+bring SMTP
+from SMTP bring SMTPClient
+from SMTP bring SMTPMessage
+from SMTP bring SMTPError
+
+host := Env.getOr("SMTP_HOST", "127.0.0.1")
+port := int(Env.getOr("SMTP_PORT", "2525"))
+security := Env.getOr("SMTP_SECURITY", "none")
+username := Env.getOr("SMTP_USERNAME", "")
+password := Env.getOr("SMTP_PASSWORD", "")
+fromAddress := Env.getOr("SMTP_FROM", "sender@example.com")
+toAddress := Env.getOr("SMTP_TO", "student@example.com")
+
+client: SMTPClient := SMTP.client(host, port, security)
+if username != "" {
+    client = client.withPlainAuth(username, password)
+}
+
+message: SMTPMessage := SMTP.message(
+    fromAddress
+    [toAddress]
+    "AHD Seminer Kaydınız"
+)
+message = message.withReplyTo(fromAddress)
+message = message.withText("Merhaba, kaydınız alınmıştır.")
+message = message.withHtml("<p>Merhaba, kaydınız alınmıştır.</p>")
+
+attempt {
+    client.send(message)
+    write("sent")
+} except SMTPError as error {
+    write(error.message)
+}

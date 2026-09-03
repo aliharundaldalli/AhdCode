@@ -43,12 +43,13 @@ from Utilities bring all
 aktarım çakışmaları (import collisions) ve döngüsel bağımlılıklar (circular
 dependencies) derleme zamanı hatalarıdır.
 
-`Math`, `Time`, `Latex`, `Word`, `Excel`, `PDF`, `Archive`, `Path`, `File`, `Regex`, `CSV`, `Data`, `Statistics`, `Plot`, `Numeric`, `JSON`, `SQLite`, `HTTP`, `HTML`, `XML`, `Env`, `Lists` ve `KeyValue` derleyici tarafından
+`Math`, `Time`, `Latex`, `Word`, `Excel`, `PDF`, `Archive`, `Path`, `File`, `Regex`, `CSV`, `Data`, `Statistics`, `Plot`, `Numeric`, `JSON`, `SQLite`, `HTTP`, `HTML`, `SMTP`, `XML`, `Env`, `Lists` ve `KeyValue` derleyici tarafından
 kayıtlıdır (compiler-registered) ve aynı içe aktarım biçimlerini kullanır.
 Yerel bir dosya, aynı isimdeki standart bir modülün yerini alamaz (shadow
 edemez). `HTTP` hem gelen sunucu (`Server` / `Request` / `Response`, çerezler,
 oturumlar) hem de giden `Client` / `ClientRequest` / `ClientResponse`
-yüzeyidir. Ayrıca sıradan isim uzayı takma adı (namespace alias) biçimini de
+yüzeyidir. `SMTP` yalnızca gönderim yapan postadır (`SMTPClient` /
+`SMTPMessage`). Ayrıca sıradan isim uzayı takma adı (namespace alias) biçimini de
 kullanabilirler:
 
 ```ahd
@@ -57,7 +58,7 @@ F.writeText("note.txt", "hello")
 ```
 
 Tipli yüzeyleri ve yakalanabilir alan hataları için [Time](TIME_TR.md),
-[CSV](CSV_TR.md), [Data](DATA_TR.md), [Statistics](STATISTICS_TR.md), [Plot](PLOT_TR.md), [Numeric](NUMERIC_TR.md), [Word](WORD_TR.md), [Excel](EXCEL_TR.md), [PDF](PDF_TR.md), [Archive](ARCHIVE_TR.md), [JSON](JSON_TR.md), [SQLite](SQLITE_TR.md), [HTTP](HTTP_TR.md), [HTML](HTML_TR.md), [XML](XML_TR.md), [Env](ENV_TR.md), [Lists](LISTS_TR.md), [KeyValue](KEYVALUE_TR.md) ve diğer modül referanslarına bakın.
+[CSV](CSV_TR.md), [Data](DATA_TR.md), [Statistics](STATISTICS_TR.md), [Plot](PLOT_TR.md), [Numeric](NUMERIC_TR.md), [Word](WORD_TR.md), [Excel](EXCEL_TR.md), [PDF](PDF_TR.md), [Archive](ARCHIVE_TR.md), [JSON](JSON_TR.md), [SQLite](SQLITE_TR.md), [HTTP](HTTP_TR.md), [HTML](HTML_TR.md), [SMTP](SMTP_TR.md), [XML](XML_TR.md), [Env](ENV_TR.md), [Lists](LISTS_TR.md), [KeyValue](KEYVALUE_TR.md) ve diğer modül referanslarına bakın.
 
 `Lists` ve `KeyValue`, çekirdek `List` ve `Pair` türleri üzerindeki yapısal
 dönüşüm katmanıdır. İşlemleri *tür-yönelimlidir*: derleyici her çağrının kesin

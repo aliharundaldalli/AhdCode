@@ -549,6 +549,17 @@ const (
 	HTMLElementHasAttr TypeOperation = "HTMLElement.hasAttr"
 	HTMLElementSelect  TypeOperation = "HTMLElement.select"
 	HTMLElementFirst   TypeOperation = "HTMLElement.first"
+
+	// SMTP (v0.9.0) is send-only mail. SMTPClient is immutable configuration;
+	// SMTPMessage is an immutable MIME/envelope value. Network activity happens
+	// only on SMTPClient.send.
+	SMTPClientWithPlainAuth TypeOperation = "SMTPClient.withPlainAuth"
+	SMTPClientSend          TypeOperation = "SMTPClient.send"
+	SMTPMessageWithCc       TypeOperation = "SMTPMessage.withCc"
+	SMTPMessageWithBcc      TypeOperation = "SMTPMessage.withBcc"
+	SMTPMessageWithReplyTo  TypeOperation = "SMTPMessage.withReplyTo"
+	SMTPMessageWithText     TypeOperation = "SMTPMessage.withText"
+	SMTPMessageWithHtml     TypeOperation = "SMTPMessage.withHtml"
 )
 
 // ModuleOperation is one compiler-supplied standard module function whose

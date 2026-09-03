@@ -1,4 +1,4 @@
-# AhdCode v0.8.0 English Student Guide
+# AhdCode v0.9.0 English Student Guide
 
 This guide is designed so that **even someone who has never programmed before** can follow along. You can read it in order from beginning to end; in each section, you will first see what we want to achieve, then write a working example, and finally learn the necessary rules.
 
@@ -47,14 +47,15 @@ The best way to learn is not just by reading the examples, but by running them. 
 - [38. HTTP Client](#38-http-client)
 - [39. HTML parsing and web scraping](#39-html-parsing-and-web-scraping)
 - [40. File uploads](#40-file-uploads)
-- [41. Code Formatter](#41-code-formatter)
-- [42. Command line (CLI)](#42-command-line-cli)
-- [43. Interactive shell (REPL)](#43-interactive-shell-repl)
-- [44. Common beginner mistakes](#44-common-beginner-mistakes)
-- [45. Small Projects](#45-small-projects)
-- [46. Exercises](#46-exercises)
-- [47. Solution Hints](#47-solution-hints)
-- [48. Next steps and technical docs](#48-next-steps-and-technical-docs)
+- [41. Sending email (SMTP)](#41-sending-email-smtp)
+- [42. Code Formatter](#42-code-formatter)
+- [43. Command line (CLI)](#43-command-line-cli)
+- [44. Interactive shell (REPL)](#44-interactive-shell-repl)
+- [45. Common beginner mistakes](#45-common-beginner-mistakes)
+- [46. Small Projects](#46-small-projects)
+- [47. Exercises](#47-exercises)
+- [48. Solution Hints](#48-solution-hints)
+- [49. Next steps and technical docs](#49-next-steps-and-technical-docs)
 
 ## 1. What is AhdCode?
 
@@ -3447,7 +3448,130 @@ ahdcode kill app.run
 See [the HTTP module reference](HTTP.md) and
 [`examples/v0.8`](../examples/v0.8/README.md).
 
-## 41. Code Formatter
+## 41. Sending email (SMTP)
+
+AhdCode can send real email through SMTP. This is send-only: there is no inbox,
+no IMAP, and no file attachments yet.
+
+Never put a real SMTP password in your source. Read it with `Env`.
+
+### 1. Create a client
+
+```ahd
+bring SMTP
+from SMTP bring SMTPClient
+from SMTP bring SMTPMessage
+from SMTP bring SMTPError
+
+client: SMTPClient := SMTP.client("127.0.0.1", 2525, "none")
+```
+
+`SMTP.client` does not connect. The network is used only when you call `send`.
+
+### 2. Security modes
+
+Use the exact lowercase value:
+
+- `"starttls"` — connect, require STARTTLS, verify TLS (the default)
+- `"tls"` — TLS immediately, often called implicit TLS
+- `"none"` — explicit plaintext, useful for a local test server
+
+If you ask for STARTTLS and the server does not advertise it, you get
+`SMTPError`. AhdCode will not quietly continue in plaintext.
+
+### 3. A message
+
+```ahd
+message: SMTPMessage := SMTP.message(
+    "sender@example.com"
+    ["student@example.com"]
+    "AhdCode Semineri"
+)
+```
+
+Each list item is one mailbox. Do not write `"a@example.com, b@example.com"`
+as a single String.
+
+### 4. Text mail
+
+```ahd
+message = message.withText("Merhaba AhdCode")
+```
+
+### 5. HTML mail
+
+```ahd
+message = message.withHtml("<p>Merhaba <strong>Hatay</strong></p>")
+```
+
+If both text and HTML are set, the mail is `multipart/alternative` (text first,
+HTML second). SMTP does **not** sanitize HTML. If the content came from a user,
+your application must clean it first.
+
+### 6. To, Cc, and Bcc
+
+```ahd
+message = message.withCc(["bob@example.com"])
+message = message.withBcc(["secret@example.com"])
+```
+
+Bcc recipients are sent to the SMTP server as envelope recipients, but **no
+Bcc header** is written into the mail DATA. Other recipients do not see the
+Bcc address.
+
+### 7. Reply-To
+
+```ahd
+message = message.withReplyTo("reply@example.com")
+```
+
+Calling `withReplyTo` again replaces the previous value.
+
+### 8. Env credentials
+
+```ahd
+bring Env
+
+host := Env.getOr("SMTP_HOST", "127.0.0.1")
+port := int(Env.getOr("SMTP_PORT", "2525"))
+security := Env.getOr("SMTP_SECURITY", "starttls")
+username := Env.getOr("SMTP_USERNAME", "")
+password := Env.getOr("SMTP_PASSWORD", "")
+
+client := SMTP.client(host, port, security)
+if username != "" {
+    client = client.withPlainAuth(username, password)
+}
+```
+
+AUTH PLAIN is the only authentication method in v0.9. It is refused on
+plaintext (`"none"`) before the password is sent.
+
+### 9. STARTTLS and TLS
+
+For a real mail server, prefer `"starttls"` on port 587 or `"tls"` on port 465.
+The runtime verifies the certificate chain and the hostname against system
+trust. There is no "skip verify" switch.
+
+### 10. SMTPError
+
+```ahd
+attempt {
+    client.send(message)
+    write("sent")
+} except SMTPError as error {
+    write(error.message)
+}
+```
+
+A rejected recipient, a TLS failure, a timeout, or a missing body all raise
+`SMTPError`. One `send` is one transaction: AhdCode does not retry, because a
+retry could deliver the same mail twice.
+
+See [the SMTP module reference](SMTP.md) and
+[`examples/v0.9`](../examples/v0.9/README.md).
+
+## 42. Code Formatter
 
 Even if the code works, if everyone uses different spacing and line layouts, it becomes hard to read. The AhdCode formatter converts valid code to a common style:
 
@@ -3500,7 +3624,7 @@ values: List<Int> :=
 
 The formatter is idempotent; running it again on the same file produces no new changes.
 
-## 42. Command line (CLI)
+## 43. Command line (CLI)
 
 You can use AhdCode from the terminal with a few basic commands:
 
@@ -3537,7 +3661,7 @@ Shows help and version information.
 
 If you are a beginner, the command you will use most of the time will be `ahdcode run ...`.
 
-## 43. Interactive shell (REPL)
+## 44. Interactive shell (REPL)
 
 You don't have to create a file every time you want to try something small. In the terminal, just run:
 
@@ -3605,7 +3729,7 @@ not support. Run those calls from a `.ahd` file instead. `Archive` has no
 such limit -- it works fully in the REPL. See the [REPL reference](REPL.md)
 for details.
 
-## 44. Common beginner mistakes
+## 45. Common beginner mistakes
 
 Seeing an error message is a normal part of programming. Most errors simply tell you that the computer couldn't understand what you wanted. The following examples show common situations beginners encounter and how to fix them:
 
@@ -3714,7 +3838,7 @@ Seeing an error message is a normal part of programming. Most errors simply tell
 - Why: That splices the title into SQL. A title such as `Robert'); DROP TABLE notes;--` is no longer data.
 - Correct: Use a `?` placeholder and `SQLite.fromString(title)`. Parameter binding keeps the text as data.
 
-## 45. Small Projects
+## 46. Small Projects
 
 These small projects bring together what is taught in the guide. Try building them on your own!
 
@@ -3728,7 +3852,7 @@ These small projects bring together what is taught in the guide. Try building th
 8. **SQLite Notes App**: Open `notes.db`, create a `notes` table if it is missing, and let the user add a note, list notes, search by title, update a note, and delete a note. Use `?` parameters for every value. Close the program and run it again: the old notes must still be there.
 9. **Web Notes App**: Serve notes in a browser on `127.0.0.1`. List notes with `HTML.text`, add a note with POST `/notes` and bound SQLite parameters, then redirect to `/`. Dynamic text must not be concatenated into raw HTML.
 
-## 46. Exercises
+## 47. Exercises
 
 Instead of immediately looking for full solutions, build each program in small steps.
 
@@ -3761,7 +3885,7 @@ Instead of immediately looking for full solutions, build each program in small s
 22. Serve `HTTP.text("ok")` on `GET /ok` at `127.0.0.1` and open it in a browser.
 23. Use `HTTP.client().get` on a public HTTPS page, print `status()`, and treat `HTTPError` separately from a 404 `ClientResponse`.
 
-## 47. Solution Hints
+## 48. Solution Hints
 
 1. The result of `take` is a String; use `int(...)` for age, and `+ 1` for the new age.
 2. Break the formula into small parts; start with `real(take(...))` and use Real numbers.
@@ -3787,7 +3911,7 @@ Instead of immediately looking for full solutions, build each program in small s
 22. `HTTP.server("127.0.0.1", 8080)`, `app.get("/ok", handler)`, `HTTP.text("ok")`, then `app.start()`.
 23. `HTTP.client()`, `client.get("https://example.com/")`, `response.status()`. A 404 is still `ClientResponse`; a TLS or timeout failure is `HTTPError`.
 
-## 48. Next steps and technical docs
+## 49. Next steps and technical docs
 
 After finishing this guide, you can deepen your knowledge of the language details from these documents:
 
