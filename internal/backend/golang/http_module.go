@@ -70,6 +70,11 @@ func (generator *generator) httpCall(value *ir.CallExpr) string {
 	case "redirect":
 		return generator.httpValueFrom(httpResponseClass, "AhdHTTPRedirect("+errorClass+", "+text(0, `""`)+", "+
 			integer(1, "int64(303)")+")", meta)
+	case "file":
+		return generator.httpValueFrom(httpResponseClass, "AhdHTTPFile("+errorClass+", "+text(0, `""`)+", "+text(1, `""`)+")", meta)
+	case "download":
+		return generator.httpValueFrom(httpResponseClass, "AhdHTTPDownload("+errorClass+", "+
+			text(0, `""`)+", "+text(1, `""`)+", "+text(2, `""`)+")", meta)
 	case "cookie":
 		return generator.httpValueFrom(httpCookieClass, "AhdHTTPCookie("+errorClass+", "+text(0, `""`)+", "+text(1, `""`)+")", meta)
 	case "deleteCookie":

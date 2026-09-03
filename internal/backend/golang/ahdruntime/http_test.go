@@ -122,7 +122,8 @@ func TestHTTPMultipleSetCookieHeadersReachTheClient(t *testing.T) {
 		AhdHTTPCookie(class, "b", "2"),
 	)
 	recorder := httptest.NewRecorder()
-	ahdHTTPWriteEncoded(recorder, encoded)
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	ahdHTTPWriteEncoded(recorder, req, encoded)
 	headers := recorder.Result().Header["Set-Cookie"]
 	if len(headers) != 2 {
 		t.Fatalf("Set-Cookie headers = %#v", headers)
@@ -344,10 +345,10 @@ func TestHTTPDeleteCookieClearsARealJar(t *testing.T) {
 	class := AhdClassHTTPError
 	mux := http.NewServeMux()
 	mux.HandleFunc("/set", func(writer http.ResponseWriter, request *http.Request) {
-		ahdHTTPWriteEncoded(writer, AhdHTTPResponseWithCookie(class, AhdHTTPText(class, "set", 200), AhdHTTPCookie(class, "theme", "dark")))
+		ahdHTTPWriteEncoded(writer, request, AhdHTTPResponseWithCookie(class, AhdHTTPText(class, "set", 200), AhdHTTPCookie(class, "theme", "dark")))
 	})
 	mux.HandleFunc("/delete", func(writer http.ResponseWriter, request *http.Request) {
-		ahdHTTPWriteEncoded(writer, AhdHTTPResponseWithCookie(class, AhdHTTPText(class, "del", 200), AhdHTTPDeleteCookie(class, "theme", "/")))
+		ahdHTTPWriteEncoded(writer, request, AhdHTTPResponseWithCookie(class, AhdHTTPText(class, "del", 200), AhdHTTPDeleteCookie(class, "theme", "/")))
 	})
 	server := httptest.NewServer(mux)
 	t.Cleanup(server.Close)

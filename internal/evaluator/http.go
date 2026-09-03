@@ -171,6 +171,10 @@ func (session *Session) httpBuiltin(name string, args []any) any {
 		return session.httpResponse(ahdruntime.AhdHTTPResponse(class, args[0].(int64), args[1].(string), args[2].(string)))
 	case "redirect":
 		return session.httpResponse(ahdruntime.AhdHTTPRedirect(class, args[0].(string), session.httpIntArg(args, 1, 303)))
+	case "file":
+		return session.httpResponse(ahdruntime.AhdHTTPFile(class, args[0].(string), args[1].(string)))
+	case "download":
+		return session.httpResponse(ahdruntime.AhdHTTPDownload(class, args[0].(string), args[1].(string), args[2].(string)))
 	case "cookie":
 		return session.httpCookie(ahdruntime.AhdHTTPCookie(class, args[0].(string), args[1].(string)))
 	case "deleteCookie":

@@ -134,6 +134,11 @@ func httpModuleInterface() *ModuleInterface {
 	addStandardExport(module, standardFunction(httpModuleID, "text", httpResponseType(), body, status))
 	addStandardExport(module, standardFunction(httpModuleID, "html", httpResponseType(), body, status))
 	addStandardExport(module, standardFunction(httpModuleID, "redirect", httpResponseType(), location, status))
+	filePath := types.Parameter{Name: "path", Type: types.String}
+	fileContentType := types.Parameter{Name: "contentType", Type: types.String}
+	fileName := types.Parameter{Name: "fileName", Type: types.String}
+	addStandardExport(module, standardFunction(httpModuleID, "file", httpResponseType(), filePath, fileContentType))
+	addStandardExport(module, standardFunction(httpModuleID, "download", httpResponseType(), filePath, fileContentType, fileName))
 	addStandardExport(module, standardFunction(httpModuleID, "cookie", httpCookieType(),
 		types.Parameter{Name: "name", Type: types.String}, types.Parameter{Name: "value", Type: types.String}))
 	addStandardExport(module, standardFunction(httpModuleID, "deleteCookie", httpCookieType(),

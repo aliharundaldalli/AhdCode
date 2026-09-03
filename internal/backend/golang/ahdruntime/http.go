@@ -82,6 +82,14 @@ type ahdHTTPResponseData struct {
 	ContentType string              `json:"contentType"`
 	Headers     []ahdHTTPHeaderPair `json:"headers"`
 	Cookies     []ahdHTTPCookieData `json:"cookies"`
+	// IsFile marks a binary-safe file response built by HTTP.file / HTTP.download.
+	// Body stays empty for these; the runtime opens FilePath and streams it to
+	// the client only when the response is committed. This split keeps file
+	// bytes off the AhdCode String path entirely, so JSON's UTF-8 requirement
+	// on Body never touches them.
+	IsFile           bool   `json:"isFile,omitempty"`
+	FilePath         string `json:"filePath,omitempty"`
+	FileDownloadName string `json:"fileDownloadName,omitempty"`
 }
 
 type ahdHTTPHeaderPair struct {
@@ -195,6 +203,54 @@ func AhdHTTPRedirect(class *AhdClass, location string, status int64) string {
 		Status: int(status), Body: "", ContentType: "text/plain; charset=utf-8",
 		Headers: []ahdHTTPHeaderPair{{Name: "Location", Value: location}},
 	})
+}
+
+// AhdHTTPFile is HTTP.file(path, contentType): serve the exact bytes of the
+// file at path with no forced Content-Disposition. path is the application's
+// own filesystem path, not a request-supplied string; the caller is
+// responsible for not passing untrusted input through directly. The file is
+// not opened here — only when the response is committed — so a missing or
+// unreadable path surfaces as a controlled failure at send time, never here.
+func AhdHTTPFile(class *AhdClass, path, contentType string) string {
+	if strings.TrimSpace(path) == "" {
+		AhdRaiseClass(class, "HTTP.file requires a path")
+	}
+	ahdHTTPRequireFileContentType(class, contentType)
+	return ahdHTTPEncodeResponse(class, ahdHTTPResponseData{
+		Status: 200, ContentType: contentType, IsFile: true, FilePath: path,
+	})
+}
+
+// AhdHTTPDownload is HTTP.download(path, contentType, fileName): serve the
+// exact bytes of the file at path with Content-Disposition: attachment,
+// presented under fileName. fileName is independent of path: it never
+// affects the filesystem lookup and is encoded safely for the header.
+func AhdHTTPDownload(class *AhdClass, path, contentType, fileName string) string {
+	if strings.TrimSpace(path) == "" {
+		AhdRaiseClass(class, "HTTP.download requires a path")
+	}
+	ahdHTTPRequireFileContentType(class, contentType)
+	if strings.TrimSpace(fileName) == "" {
+		AhdRaiseClass(class, "HTTP.download requires a fileName")
+	}
+	if strings.ContainsAny(fileName, "\r\n") {
+		AhdRaiseClass(class, "HTTP download fileName must not contain a line break")
+	}
+	return ahdHTTPEncodeResponse(class, ahdHTTPResponseData{
+		Status: 200, ContentType: contentType, IsFile: true, FilePath: path, FileDownloadName: fileName,
+	})
+}
+
+func ahdHTTPRequireFileContentType(class *AhdClass, contentType string) {
+	if strings.TrimSpace(contentType) == "" {
+		AhdRaiseClass(class, "HTTP file contentType must not be empty")
+	}
+	if strings.ContainsAny(contentType, "\r\n") {
+		AhdRaiseClass(class, "HTTP file contentType must not contain a line break")
+	}
+	if _, _, err := mime.ParseMediaType(contentType); err != nil {
+		AhdRaiseClass(class, "HTTP file contentType is not a valid media type")
+	}
 }
 
 func AhdHTTPServerGet(class *AhdClass, handle, path string, handler AhdHTTPHandler) {
@@ -468,7 +524,7 @@ func (dispatcher ahdHTTPDispatcher) ServeHTTP(writer http.ResponseWriter, reques
 		}
 		return
 	}
-	ahdHTTPWriteEncoded(writer, encoded)
+	ahdHTTPWriteEncoded(writer, request, encoded)
 }
 
 // ahdHTTPMaterialize snapshots one request. The returned id slice names every
@@ -667,10 +723,14 @@ func ahdHTTPDecodeResponse(class *AhdClass, data string) ahdHTTPResponseData {
 	return response
 }
 
-func ahdHTTPWriteEncoded(writer http.ResponseWriter, data string) {
+func ahdHTTPWriteEncoded(writer http.ResponseWriter, request *http.Request, data string) {
 	var response ahdHTTPResponseData
 	if err := json.Unmarshal([]byte(data), &response); err != nil {
 		ahdHTTPWritePlain(writer, http.StatusInternalServerError, "Internal Server Error")
+		return
+	}
+	if response.IsFile {
+		ahdHTTPWriteFile(writer, request, response)
 		return
 	}
 	if response.ContentType != "" {
@@ -688,6 +748,88 @@ func ahdHTTPWriteEncoded(writer http.ResponseWriter, data string) {
 	}
 	writer.WriteHeader(status)
 	_, _ = io.WriteString(writer, response.Body)
+}
+
+// ahdHTTPWriteFile commits a HTTP.file / HTTP.download response. The file is
+// opened here, at send time, and always closed before returning, including
+// on a missing path, a directory, or a write failure partway through — never
+// held open beyond this one response. http.ServeContent streams the body
+// (it never buffers the whole file) and, because writer/request are the
+// genuine net/http pair, also supplies Range and conditional-request
+// handling for free; passing a zero modtime keeps Last-Modified/ETag out of
+// scope rather than inventing a cache-validator story.
+func ahdHTTPWriteFile(writer http.ResponseWriter, request *http.Request, response ahdHTTPResponseData) {
+	file, err := os.Open(response.FilePath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			ahdHTTPWritePlain(writer, http.StatusNotFound, "Not Found")
+		} else {
+			fmt.Fprintf(os.Stderr, "ahdcode: HTTP.file could not open the stored path: %v\n", err)
+			ahdHTTPWritePlain(writer, http.StatusInternalServerError, "Internal Server Error")
+		}
+		return
+	}
+	defer func() { _ = file.Close() }()
+
+	info, err := file.Stat()
+	if err != nil || info.IsDir() {
+		fmt.Fprintf(os.Stderr, "ahdcode: HTTP.file path is not a servable regular file\n")
+		ahdHTTPWritePlain(writer, http.StatusInternalServerError, "Internal Server Error")
+		return
+	}
+
+	if response.ContentType != "" {
+		writer.Header().Set("Content-Type", response.ContentType)
+	}
+	for _, header := range response.Headers {
+		writer.Header().Set(header.Name, header.Value)
+	}
+	for _, cookie := range response.Cookies {
+		writer.Header().Add("Set-Cookie", ahdHTTPCookieWire(cookie))
+	}
+	if response.FileDownloadName != "" {
+		writer.Header().Set("Content-Disposition", ahdHTTPContentDisposition(response.FileDownloadName))
+	}
+	http.ServeContent(writer, request, "", time.Time{}, file)
+}
+
+// ahdHTTPContentDisposition builds a safe attachment Content-Disposition
+// value for fileName: an ASCII quoted-string fallback plus an RFC 5987
+// filename* so non-ASCII presentation names (Turkish included) survive for
+// clients that support it. fileName is presentation-only and already
+// validated to carry no CR/LF by the caller.
+func ahdHTTPContentDisposition(fileName string) string {
+	return `attachment; filename="` + ahdHTTPASCIIFallbackFilename(fileName) + `"; filename*=UTF-8''` + ahdHTTPRFC5987Encode(fileName)
+}
+
+func ahdHTTPASCIIFallbackFilename(value string) string {
+	var buf strings.Builder
+	for _, r := range value {
+		if r > 127 || r < 0x20 || r == 0x7f || r == '"' || r == '\\' {
+			buf.WriteByte('_')
+			continue
+		}
+		buf.WriteRune(r)
+	}
+	result := buf.String()
+	if result == "" {
+		return "download"
+	}
+	return result
+}
+
+func ahdHTTPRFC5987Encode(value string) string {
+	var buf strings.Builder
+	for i := 0; i < len(value); i++ {
+		c := value[i]
+		if (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') ||
+			c == '-' || c == '.' || c == '_' || c == '~' {
+			buf.WriteByte(c)
+			continue
+		}
+		fmt.Fprintf(&buf, "%%%02X", c)
+	}
+	return buf.String()
 }
 
 func ahdHTTPWritePlain(writer http.ResponseWriter, status int, body string) {

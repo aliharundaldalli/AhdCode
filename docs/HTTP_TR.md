@@ -26,8 +26,10 @@ from HTTP bring ClientResponse
 istemcisidir. Tam yolları kaydeder, her isteğin bir anlık kopyasını okur ve
 bir `Response` döndürürsünüz. v0.5.0 HTTP çerezleri ve bellek içi sunucu
 taraflı `SessionStore` ekler. v0.6.0, dış HTTP ve HTTPS API'lerini çağırmak
-için `Client`, `ClientRequest` ve `ClientResponse` ekler. Sunucu
-`Request`/`Response` ile giden `ClientRequest`/`ClientResponse` ayrı türlerdir.
+için `Client`, `ClientRequest` ve `ClientResponse` ekler. v0.9.1, diskteki bir
+dosya için ikili-güvenli yanıtlar sağlayan `HTTP.file` ve `HTTP.download`
+ekler. Sunucu `Request`/`Response` ile giden `ClientRequest`/`ClientResponse`
+ayrı türlerdir.
 Middleware, yönlendirici DSL'si, multipart, WebSocket, yol parametresi, kimlik
 doğrulama çerçevesi veya yapay zeka satıcı modülü yoktur. Uygulama, AhdCode
 çalışma zamanının içindeki Go `net/http` paketini kullanır; ayrı bir HTTP,
@@ -41,6 +43,8 @@ HTTP.response(status: Int, body: String, contentType: String)      -> Response
 HTTP.text(body: String, status: Int := 200)                        -> Response
 HTTP.html(body: String, status: Int := 200)                        -> Response
 HTTP.redirect(location: String, status: Int := 303)                -> Response
+HTTP.file(path: String, contentType: String)                       -> Response
+HTTP.download(path: String, contentType: String, fileName: String) -> Response
 HTTP.cookie(name: String, value: String)                           -> Cookie
 HTTP.deleteCookie(name: String, path: String := "/")               -> Cookie
 HTTP.sessions(
@@ -337,6 +341,47 @@ kullanın. Durum kodları `100..599` olmalıdır. `HTTP.redirect` yalnızca
 `Response` döndürür; CR/LF yasaktır. `Set-Cookie` `withCookie` ile eklenir;
 `withHeader` birden fazla çerezi tek başlıkta ezmez.
 
+## İkili dosya yanıtları
+
+`HTTP.text`, `HTTP.html` ve `HTTP.response` bir `String` gövde taşır. v0.9.1
+ile eklenen `HTTP.file` ve `HTTP.download` ise diskteki bir dosyanın tam
+baytlarını, hiçbir zaman UTF-8 olarak çözmeden veya bir AhdCode `String`ine
+dönüştürmeden sunar:
+
+```text
+HTTP.file(path: String, contentType: String)                       -> Response
+HTTP.download(path: String, contentType: String, fileName: String) -> Response
+```
+
+`HTTP.file` dosyayı satır içi sunar (zorunlu bir disposition yoktur).
+`HTTP.download` `fileName` altında sunulan `Content-Disposition: attachment`
+ekler. İkisi de sıradan bir `Response` döndürür: `withHeader` ve `withCookie`
+tıpkı metin yanıtlarında olduğu gibi çalışır ve sonuç aynı şekilde
+değişmezdir.
+
+`path`, uygulamanızın zaten güvendiği bir **depolama** yoludur -- genellikle
+`UploadedFile.save`'in döndürdüğü değer. Bu bir statik dosya kökü değildir;
+istekten gelen dizeler doğrudan buraya asla ulaşmamalıdır.
+
+`contentType` sizin açık beyanınızdır ve `Content-Type` olarak olduğu gibi
+gönderilir; yoldan, dosya baytlarından veya istemcinin verdiği bir addan asla
+koklanmaz (sniff edilmez). Geçerli, başlık için güvenli bir medya türü
+olmalıdır: CR/LF yasaktır, boş olamaz.
+
+`HTTP.download`'daki `fileName` yalnızca sunum amaçlıdır; dosya sisteminde
+aramayı asla etkilemez ve `path`'ten bağımsızdır. CR/LF içeremez. ASCII
+olmayan adlar (Türkçe dahil) güvenli bir ASCII yedeğiyle birlikte
+standartlara uygun bir `filename*` (RFC 5987) ile kodlanır.
+
+Dosya yalnızca yanıt gönderilirken açılır, tüm dosyayı belleğe almadan
+istemciye akıtılır ve -- istemci bağlantıyı yarıda kesse bile -- her zaman
+kapatılır. Eksik bir yol `404`; bir dizin veya açılamayan bir yol denetimli
+bir `500`'dür; hiçbiri panic üretmez.
+
+`HTTP.file`/`HTTP.download` bir statik dosya kökü, URL-yol eşlemesi, dizin
+listeleme veya herhangi bir web-root soyutlaması eklemez: yalnızca
+uygulamanın verdiği tek yolu sunar.
+
 ## Çerezler
 
 `HTTP.cookie(name, value)` değişmez bir `Cookie` üretir. Oluşturucular yeni
@@ -425,9 +470,12 @@ sunucuda iki işleyici aynı anda çalışmaz.
 ## Bu modülün yapmadıkları
 
 Gelen sunucunun HTTPS dinleyicisi yoktur. Gelen yüklemeler asla genel bir
-Bytes tipine, veritabanı BLOB'una, indirme/statik dosya sunucusuna, ilerleme
-API'sine ya da parçalı/sürdürülebilir aktarıma dönüşmez; yüklenen bir belgeyi
-hiçbir şey ayrıştırmaz, çizmez veya taramaz. Giden istemcinin çerez kavanozu,
+Bytes tipine ya da veritabanı BLOB'una dönüşmez; yüklenen bir belgeyi hiçbir
+şey ayrıştırmaz, çizmez veya taramaz. `HTTP.file`/`HTTP.download` (v0.9.1)
+yalnızca uygulamanın adlandırdığı tek bir yolu sunar; bunlar bir statik
+dosya kökü, URL-yol eşlemesi, dizin tarayıcı, medya akış çerçevesi, önbellek/
+ETag çerçevesi ya da ilerleme API'si değildir ve parçalı/sürdürülebilir
+yükleme yoktur. Giden istemcinin çerez kavanozu,
 ikili gövde, akış API'si, SSE, WebSocket, multipart, dosya yükleme, otomatik
 yeniden deneme, OAuth, özel CA, istemci sertifikası, güvensiz TLS baypası,
 vekil API'si veya yapay zeka satıcı modülü yoktur. HTTP/2 veya HTTP/3 API'si,

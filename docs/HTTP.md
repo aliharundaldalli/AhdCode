@@ -25,7 +25,8 @@ from HTTP bring ClientResponse
 client. You register exact routes, read a snapshot of each request, and return
 a `Response`. v0.5.0 adds HTTP cookies and an in-memory server-side
 `SessionStore`. v0.6.0 adds `Client`, `ClientRequest`, and `ClientResponse` so
-a program can call external HTTP and HTTPS APIs. Server `Request`/`Response`
+a program can call external HTTP and HTTPS APIs. v0.9.1 adds `HTTP.file` and
+`HTTP.download`, binary-safe responses for a file already on disk. Server `Request`/`Response`
 and outbound `ClientRequest`/`ClientResponse` are distinct types. There is no
 middleware, router DSL, multipart, WebSocket, path parameters, authentication
 framework, or AI vendor module. The implementation uses Go's `net/http` inside
@@ -40,6 +41,8 @@ HTTP.response(status: Int, body: String, contentType: String)      -> Response
 HTTP.text(body: String, status: Int := 200)                        -> Response
 HTTP.html(body: String, status: Int := 200)                        -> Response
 HTTP.redirect(location: String, status: Int := 303)                -> Response
+HTTP.file(path: String, contentType: String)                       -> Response
+HTTP.download(path: String, contentType: String, fileName: String) -> Response
 HTTP.cookie(name: String, value: String)                           -> Cookie
 HTTP.deleteCookie(name: String, path: String := "/")               -> Cookie
 HTTP.sessions(
@@ -350,6 +353,59 @@ or `308`. `withHeader` returns a new `Response`; header names/values must not
 contain CR or LF. `Set-Cookie` must be added with `withCookie`, not
 `withHeader`, so multiple cookies are not collapsed.
 
+## Binary file responses
+
+`HTTP.text`, `HTTP.html`, and `HTTP.response` carry a `String` body. `HTTP.file`
+and `HTTP.download`, added in v0.9.1, instead serve the exact bytes of a file
+already on disk, without ever decoding them as UTF-8 or materializing them as
+an AhdCode `String`:
+
+```text
+HTTP.file(path: String, contentType: String)                       -> Response
+HTTP.download(path: String, contentType: String, fileName: String) -> Response
+```
+
+`HTTP.file` serves the file inline (no forced disposition). `HTTP.download`
+adds `Content-Disposition: attachment` presented under `fileName`. Both return
+an ordinary `Response`: `withHeader` and `withCookie` work on them exactly as
+on a text response, and the result is just as immutable.
+
+`path` is a **storage** path your application already trusts -- typically the
+value `UploadedFile.save` returned, or a path your own code constructed. It is
+not a static-files root, and request-supplied strings must never reach it
+directly:
+
+```ahd
+storedPath := row["stored_path"].string()  // e.g. data/ozetler/14aa9132...
+return HTTP.file(storedPath, "application/pdf")
+```
+
+`contentType` is your explicit declaration, sent verbatim as `Content-Type`.
+It is never sniffed from the path, the file's bytes, or a client-supplied
+name, and it must be a valid, header-safe media type: no CR/LF, no empty
+string.
+
+`fileName` in `HTTP.download` is presentation-only. It never affects the
+filesystem lookup and is independent of `path` -- a completely opaque, unnamed
+stored file can still download as `"ozet.pdf"`. It must not contain CR or LF.
+Non-ASCII names (Turkish included) are encoded with a safe ASCII fallback plus
+a standards-correct `filename*` (RFC 5987) for clients that support it, so
+`"Özet Çalışması.pdf"` survives without risking header injection.
+
+The file is opened only when the response is being sent, streamed to the
+client without buffering the whole file in memory, and always closed
+afterward -- including when the client disconnects mid-transfer. A missing
+path is `404`. A directory, or a path that cannot be opened, is a contained
+`500`; neither panics. `Content-Length` is set from the file's size when it is
+an ordinary regular file. Range requests and conditional HEAD/GET arrive
+through the same underlying HTTP primitive as everything else the server
+sends, so a `Range` header gets a correct `206 Partial Content` without a
+separate range API.
+
+`HTTP.file`/`HTTP.download` do not add a static-files root, a URL-to-path
+mapping, directory listing, or any web-root abstraction: they serve exactly
+the one path the application passed, and only that path.
+
 ## Cookies
 
 `HTTP.cookie(name, value)` builds an immutable `Cookie`. Builders return a
@@ -551,9 +607,12 @@ Same-host HTTP redirects keep those headers.
 ## What this module does not do
 
 The inbound server still has no HTTPS listener. Inbound uploads never become
-a public Bytes type, a database BLOB, a download/static-file server, a
-progress API, or chunked/resumable transfers, and nothing parses, renders, or
-scans an uploaded document. The outbound client has no
+a public Bytes type or a database BLOB, and nothing parses, renders, or scans
+an uploaded document. `HTTP.file`/`HTTP.download` (v0.9.1) serve one
+application-named path each; they are not a static-files root, a
+URL-to-path mapping, a directory browser, a media-streaming framework, a
+cache/ETag framework, or a progress API, and there is no chunked/resumable
+upload. The outbound client has no
 cookie jar, binary body, streaming API, SSE, WebSocket, multipart, file
 upload, automatic retries, OAuth, custom CA, client certificates, insecure TLS
 bypass, proxy API, or AI/OpenAI/Anthropic/Gemini module. There is no HTTP/2

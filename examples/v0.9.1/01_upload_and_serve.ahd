@@ -1,0 +1,101 @@
+// Store an uploaded PDF under an opaque, extensionless name, keep its stored
+// path and content type in SQLite, then serve it back two ways: inline with
+// HTTP.file and as a named download with HTTP.download. The stored path
+// never needs an extension; the presentation filename is independent of it.
+bring HTTP
+from HTTP bring Server
+from HTTP bring Request
+from HTTP bring Response
+from HTTP bring UploadedFile
+bring SQLite
+from SQLite bring Database
+from SQLite bring SQLiteValue
+
+openPapers: Function := () -> Database {
+    db: Local Database := SQLite.open("papers.db")
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS papers (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            content_type TEXT NOT NULL,
+            stored_path TEXT NOT NULL
+        )
+        """)
+    return db
+}
+
+upload: Function := (request: Request) -> Response {
+    paper: Local UploadedFile? := request.file("paper")
+    if paper == null {
+        return HTTP.text("paper is required", 400)
+    }
+    if paper.detectedContentType() != "application/pdf" {
+        return HTTP.text("rejected: detected " + paper.detectedContentType(), 415)
+    }
+    storedPath: Local String := paper.save("data/ozetler")
+    db: Local Database := openPapers()
+    db.execute(
+        "INSERT INTO papers (content_type, stored_path) VALUES (?, ?)"
+        [SQLite.fromString(paper.detectedContentType()), SQLite.fromString(storedPath)]
+    )
+    id: Local Int := db.lastInsertId()
+    db.close()
+    return HTTP.text(str(id))
+}
+
+view: Function := (request: Request) -> Response {
+    idText: Local String? := request.query("id")
+    if idText == null {
+        return HTTP.text("id is required", 400)
+    }
+    db: Local Database := openPapers()
+    rows: Local List<Pair<String, SQLiteValue>> := db.query(
+        "SELECT content_type, stored_path FROM papers WHERE id = ?"
+        [SQLite.fromInt(int(idText))]
+    )
+    db.close()
+    found: Local Bool := false
+    contentType: Local String := ""
+    storedPath: Local String := ""
+    for row in rows {
+        contentType = row["content_type"].string()
+        storedPath = row["stored_path"].string()
+        found = true
+    }
+    if found == false {
+        return HTTP.text("not found", 404)
+    }
+    // Inline, no forced attachment: a browser renders the PDF directly.
+    return HTTP.file(storedPath, contentType)
+}
+
+download: Function := (request: Request) -> Response {
+    idText: Local String? := request.query("id")
+    if idText == null {
+        return HTTP.text("id is required", 400)
+    }
+    db: Local Database := openPapers()
+    rows: Local List<Pair<String, SQLiteValue>> := db.query(
+        "SELECT content_type, stored_path FROM papers WHERE id = ?"
+        [SQLite.fromInt(int(idText))]
+    )
+    db.close()
+    found: Local Bool := false
+    contentType: Local String := ""
+    storedPath: Local String := ""
+    for row in rows {
+        contentType = row["content_type"].string()
+        storedPath = row["stored_path"].string()
+        found = true
+    }
+    if found == false {
+        return HTTP.text("not found", 404)
+    }
+    // Same opaque stored path; the download name is independent of it.
+    return HTTP.download(storedPath, contentType, "ozet.pdf")
+}
+
+app: Server := HTTP.server("127.0.0.1", 8080, 26214400)
+app.post("/upload", upload)
+app.get("/view", view)
+app.get("/download", download)
+app.start()

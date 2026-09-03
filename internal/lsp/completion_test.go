@@ -89,7 +89,7 @@ func TestCompletionHTTPAndHTMLArriveThroughTheGenericModulePath(t *testing.T) {
 	text := "bring HTTP\nx := HTTP.\n"
 	items = completionAt(t, text, "file:///main.ahd", len(text)-1)
 	for _, label := range []string{
-		"server", "text", "html", "response", "redirect", "cookie", "deleteCookie", "sessions",
+		"server", "text", "html", "response", "redirect", "file", "download", "cookie", "deleteCookie", "sessions",
 		"client", "clientRequest",
 		"Server", "Request", "Response", "Cookie", "Session", "SessionStore",
 		"Client", "ClientRequest", "ClientResponse", "HTTPError",
