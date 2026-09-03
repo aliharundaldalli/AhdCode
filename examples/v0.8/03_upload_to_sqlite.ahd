@@ -1,0 +1,91 @@
+// Store the uploaded file on disk and only its path and metadata in SQLite.
+//
+// The PDF bytes never enter the database: rows carry the stored path, the
+// original display name, both content types, and the exact size.
+bring HTTP
+from HTTP bring Server
+from HTTP bring Request
+from HTTP bring Response
+from HTTP bring UploadedFile
+bring SQLite
+from SQLite bring Database
+from SQLite bring SQLiteValue
+
+openPapers: Function := () -> Database {
+    db: Local Database := SQLite.open("papers.db")
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS papers (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL,
+            original_name TEXT NOT NULL,
+            stored_path TEXT NOT NULL,
+            declared_content_type TEXT NOT NULL,
+            detected_content_type TEXT NOT NULL,
+            size INTEGER NOT NULL
+        )
+        """)
+    return db
+}
+
+upload: Function := (request: Request) -> Response {
+    title: Local String? := request.form("title")
+    paper: Local UploadedFile? := request.file("paper")
+    if title == null {
+        return HTTP.text("title is required", 400)
+    }
+    if paper == null {
+        return HTTP.text("paper is required", 400)
+    }
+    if paper.detectedContentType() != "application/pdf" {
+        return HTTP.text(
+            "rejected: detected " + paper.detectedContentType()
+            415
+        )
+    }
+    declared: Local String? := paper.declaredContentType()
+    declaredText: Local String := "none"
+    if declared != null {
+        declaredText = declared
+    }
+    storedPath: Local String := paper.save("uploads/papers")
+    db: Local Database := openPapers()
+    db.execute(
+        "INSERT INTO papers (title, original_name, stored_path, declared_content_type, detected_content_type, size) VALUES (?, ?, ?, ?, ?, ?)"
+        [
+            SQLite.fromString(title)
+            SQLite.fromString(paper.originalName())
+            SQLite.fromString(storedPath)
+            SQLite.fromString(declaredText)
+            SQLite.fromString(paper.detectedContentType())
+            SQLite.fromInt(paper.size())
+        ]
+    )
+    db.close()
+    return HTTP.text("stored " + storedPath)
+}
+
+papers: Function := (request: Request) -> Response {
+    db: Local Database := openPapers()
+    rows: Local List<Pair<String, SQLiteValue>> := db.query(
+        "SELECT id, title, original_name, stored_path, size FROM papers ORDER BY id"
+    )
+    listing: Local String := ""
+    for row in rows {
+        listing = listing + str(
+            row["id"].int()
+        ) + " | " + row["title"].string(
+            
+        ) + " | " + row["original_name"].string(
+            
+        ) + " | " + row["stored_path"].string(
+            
+        ) + " | " + str(row["size"].int()) + "\n"
+    }
+    db.close()
+    return HTTP.text(listing)
+}
+
+app: Server := HTTP.server("127.0.0.1", 8080, 26214400)
+app.post("/upload", upload)
+app.get("/papers", papers)
+app.start()

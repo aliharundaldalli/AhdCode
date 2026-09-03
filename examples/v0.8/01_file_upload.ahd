@@ -1,0 +1,79 @@
+// Accept a multipart/form-data upload and report what arrived.
+//
+// Run it, then open http://127.0.0.1:8080/ in a browser and submit the form.
+// Stop it later with: ahdcode kill 01_file_upload.run
+bring HTTP
+from HTTP bring Server
+from HTTP bring Request
+from HTTP bring Response
+from HTTP bring UploadedFile
+bring HTML
+from HTML bring HTMLNode
+
+form: Function := (request: Request) -> Response {
+    return HTTP.html(
+        HTML.document(
+            "Upload a file"
+            [
+                HTML.element("h1", {}, [HTML.text("Upload a file")])
+                HTML.element(
+                    "form"
+                    {
+                        "method": "post"
+                        "action": "/upload"
+                        "enctype": "multipart/form-data"
+                    }
+                    [
+                        HTML.element(
+                            "input"
+                            {"type": "text", "name": "title"}
+                            []
+                        )
+                        HTML.element(
+                            "input"
+                            {"type": "file", "name": "document"}
+                            []
+                        )
+                        HTML.element(
+                            "button"
+                            {"type": "submit"}
+                            [HTML.text("Send")]
+                        )
+                    ]
+                )
+            ]
+        )
+    )
+}
+
+upload: Function := (request: Request) -> Response {
+    // A multipart text field is read with the ordinary form API.
+    title: Local String? := request.form("title")
+    // A file field is read with file(); it is null when nothing was sent.
+    document: Local UploadedFile? := request.file("document")
+    if document == null {
+        return HTTP.text("no file was uploaded", 400)
+    }
+    declared: Local String? := document.declaredContentType()
+    declaredText: Local String := "none"
+    if declared != null {
+        declaredText = declared
+    }
+    heading: Local String := "untitled"
+    if title != null {
+        heading = title
+    }
+    return HTTP.text(
+        "title: " + heading + "\noriginal name: " + document.originalName(
+            
+        ) + "\ndeclared type: " + declaredText + "\ndetected type: " + document.detectedContentType(
+            
+        ) + "\nsize: " + str(document.size()) + " bytes"
+    )
+}
+// enctype="multipart/form-data" bodies still obey the server's total body
+// limit; 8 MiB here.
+app: Server := HTTP.server("127.0.0.1", 8080, 8388608)
+app.get("/", form)
+app.post("/upload", upload)
+app.start()

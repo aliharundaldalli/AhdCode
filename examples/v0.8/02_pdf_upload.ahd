@@ -1,0 +1,43 @@
+// Accept only real PDFs, then store them safely on disk.
+//
+// The filename, its extension, and the browser's declared Content-Type are
+// all supplied by whoever is uploading. Only the sniffed bytes decide, and
+// only save() decides where the file lands.
+bring HTTP
+from HTTP bring Server
+from HTTP bring Request
+from HTTP bring Response
+from HTTP bring UploadedFile
+
+upload: Function := (request: Request) -> Response {
+    paper: Local UploadedFile? := request.file("paper")
+    if paper == null {
+        return HTTP.text("paper is required", 400)
+    }
+    if paper.size() == 0 {
+        return HTTP.text("an empty file is not a PDF", 400)
+    }
+    // The application chooses its own per-file policy; the server's
+    // maxBodyBytes is the runtime bound.
+    if paper.size() > 10485760 {
+        return HTTP.text("please upload a PDF smaller than 10 MB", 413)
+    }
+    // Never trust declaredContentType() for this decision: a text file can
+    // claim application/pdf, and an extension proves nothing.
+    if paper.detectedContentType() != "application/pdf" {
+        return HTTP.text(
+            "rejected: the bytes look like " + paper.detectedContentType(
+                
+            ) + ", not application/pdf"
+            415
+        )
+    }
+    // Never build a path from originalName(). save() generates a random
+    // basename inside the directory you name, and never overwrites.
+    storedPath: Local String := paper.save("uploads/papers")
+    return HTTP.text("saved " + paper.originalName() + " as " + storedPath)
+}
+
+app: Server := HTTP.server("127.0.0.1", 8080, 26214400)
+app.post("/upload", upload)
+app.start()
