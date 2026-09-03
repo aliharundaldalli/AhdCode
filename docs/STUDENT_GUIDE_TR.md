@@ -3933,6 +3933,82 @@ Tam çözümleri hemen aramak yerine her programı küçük adımlarla kurun.
 22. `HTTP.server("127.0.0.1", 8080)`, `app.get("/ok", handler)`, `HTTP.text("ok")`, sonra `app.start()`.
 23. `HTTP.client()`, `client.get("https://example.com/")`, `response.status()`. 404 hâlâ `ClientResponse`; TLS veya zaman aşımı `HTTPError`.
 
+## 50. Güvenlik: parola hashleme ve güvenli belirteçler
+
+`Security` modülü (v0.10.0) üç odaklı araç sunar: Argon2id parola hashleme,
+opak rastgele belirteçler ve sabit zamanlı dizi karşılaştırma.
+
+### 50.1 Parola hashleme
+
+```ahd
+bring Security
+from Security bring SecurityError
+
+hash: String := Security.passwordHash("kullanici-parolasi")
+write(hash)  // $argon2id$v=19$m=65536,t=3,p=1$...$...
+```
+
+`passwordHash`, rastgele bir tuz üretir, Argon2id çalıştırır ve tek bir
+kendi kendini tanımlayan PHC dizisi döndürür. Bu diziyi veritabanınıza kaydedin.
+Düz metin parolayı asla saklamayın.
+
+### 50.2 Parola doğrulama
+
+```ahd
+ok: Bool := Security.passwordVerify("kullanici-parolasi", sakliHash)
+if ok {
+    write("giriş kabul edildi")
+} else {
+    write("giriş reddedildi")
+}
+```
+
+Yanlış parola `false` döndürür. Hatalı biçimlendirilmiş bir hash `SecurityError`
+yükseltir — bozulmuş depolama durumunu yanlış paroladan ayırt etmek için ayrıca
+yakalayın.
+
+### 50.3 Güvenli belirteç üretme
+
+```ahd
+tok: String := Security.token()
+write(len(tok))  // her zaman 43
+```
+
+`Security.token`, işletim sisteminden 32 rastgele bayt okur ve bunları 43
+URL güvenli base64 karakteri olarak kodlar (256 bit entropi). CSRF gizli
+alanları, parola sıfırlama bağlantıları ve API anahtarları için kullanın.
+
+### 50.4 Sabit zamanlı karşılaştırma
+
+```ahd
+ayni: Bool := Security.secureEqual(sakliToken, alinanToken)
+```
+
+Güvenilmeyen bir kaynaktan gelen bir değeri bilinen bir sırla karşılaştırırken
+`==` yerine `secureEqual` kullanın.
+
+### 50.5 CSRF kalıbı
+
+```ahd
+tok := Security.token()
+session.set("csrf", tok)
+
+saklanan: String? := session.get("csrf")
+gonderilen: String? := req.field("csrf")
+
+if saklanan == null or gonderilen == null {
+    return HTTP.text("reddedildi", 403)
+}
+if Security.secureEqual(saklanan, gonderilen) {
+    session.set("csrf", Security.token())
+    return HTTP.text("kabul edildi")
+}
+return HTTP.text("reddedildi", 403)
+```
+
+Tam belge için [SECURITY_TR.md](SECURITY_TR.md) ve
+[v0.10 örnekleri](../examples/v0.10/README.md) sayfalarına bakın.
+
 ## 49. Sonraki adımlar ve teknik belgeler
 
 Bu rehberi tamamladıktan sonra dilin ayrıntılarını şu belgelerden

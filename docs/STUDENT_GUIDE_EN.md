@@ -3911,6 +3911,94 @@ Instead of immediately looking for full solutions, build each program in small s
 22. `HTTP.server("127.0.0.1", 8080)`, `app.get("/ok", handler)`, `HTTP.text("ok")`, then `app.start()`.
 23. `HTTP.client()`, `client.get("https://example.com/")`, `response.status()`. A 404 is still `ClientResponse`; a TLS or timeout failure is `HTTPError`.
 
+## 50. Security: password hashing and secure tokens
+
+The `Security` module (v0.10.0) provides three focused tools: Argon2id
+password hashing, opaque random tokens, and constant-time string comparison.
+
+### 50.1 Hashing a password
+
+```ahd
+bring Security
+from Security bring SecurityError
+
+hash: String := Security.passwordHash("the-user-supplied-password")
+write(hash)  // $argon2id$v=19$m=65536,t=3,p=1$...$...
+```
+
+`passwordHash` generates a fresh random salt, runs Argon2id, and returns
+a single self-describing PHC string. Store that string in your database.
+Never store the plaintext password.
+
+### 50.2 Verifying a password
+
+```ahd
+ok: Bool := Security.passwordVerify("the-user-supplied-password", storedHash)
+if ok {
+    write("login accepted")
+} else {
+    write("login rejected")
+}
+```
+
+A wrong password returns `false`. A malformed or corrupt stored hash raises
+`SecurityError` — catch it separately so you can tell the two cases apart.
+
+```ahd
+attempt {
+    ok := Security.passwordVerify(candidate, row["hash"].string())
+    if ok { write("ok") } else { write("wrong password") }
+} except SecurityError as error {
+    write("hash storage is corrupted: " + error.message)
+}
+```
+
+### 50.3 Generating a secure token
+
+```ahd
+tok: String := Security.token()
+// e.g. "aBcDeFgHiJkLmNoPqRsTuVwXyZ0123456789_-ABCDE"
+write(len(tok))  // always 43
+```
+
+`Security.token` reads 32 random bytes from the operating system and encodes
+them as 43 URL-safe base64 characters (256 bits of entropy). Use tokens for:
+CSRF hidden fields, password-reset links, and API keys.
+
+### 50.4 Constant-time comparison
+
+```ahd
+same: Bool := Security.secureEqual(storedToken, receivedToken)
+```
+
+Use `secureEqual` — not `==` — whenever you compare a value from an untrusted
+source against a known secret. Ordinary `==` may reveal information about the
+secret through timing differences.
+
+### 50.5 CSRF pattern
+
+```ahd
+// On GET /form: store a fresh token in the session
+tok := Security.token()
+session.set("csrf", tok)
+
+// On POST /submit: compare in constant time
+stored: String? := session.get("csrf")
+submitted: String? := req.field("csrf")
+
+if stored == null or submitted == null {
+    return HTTP.text("rejected", 403)
+}
+if Security.secureEqual(stored, submitted) {
+    session.set("csrf", Security.token())  // rotate after successful use
+    return HTTP.text("ok")
+}
+return HTTP.text("rejected", 403)
+```
+
+See [the full CSRF example](../examples/v0.10/03_csrf_session.ahd) and
+[SECURITY.md](SECURITY.md) for complete documentation.
+
 ## 49. Next steps and technical docs
 
 After finishing this guide, you can deepen your knowledge of the language details from these documents:
@@ -3941,6 +4029,7 @@ After finishing this guide, you can deepen your knowledge of the language detail
 - [JSON](JSON.md)
 - [SQLite](SQLITE.md)
 - [HTTP](HTTP.md)
+- [Security](SECURITY.md)
 - [HTML](HTML.md)
 - [XML](XML.md)
 - [Env](ENV.md)
@@ -3957,4 +4046,4 @@ After finishing this guide, you can deepen your knowledge of the language detail
 - [Language server](LSP.md)
 - [Full v0.1 specification](../AHDCODE_LANGUAGE_SPEC_v0.1.md)
 
-Check the [curated v0.1 examples](../examples/v0.1/README.md) folder, the [v0.3 SQLite Notes App](../examples/v0.3/README.md), the [v0.4 Web Notes App](../examples/v0.4/README.md), the [v0.5 cookies and sessions](../examples/v0.5/README.md), the [v0.6 HTTP Client](../examples/v0.6/README.md), the [v0.7 HTML parsing and web scraping](../examples/v0.7/README.md), and the [v0.8 file uploads](../examples/v0.8/README.md) examples for more working programs.
+Check the [curated v0.1 examples](../examples/v0.1/README.md) folder, the [v0.3 SQLite Notes App](../examples/v0.3/README.md), the [v0.4 Web Notes App](../examples/v0.4/README.md), the [v0.5 cookies and sessions](../examples/v0.5/README.md), the [v0.6 HTTP Client](../examples/v0.6/README.md), the [v0.7 HTML parsing and web scraping](../examples/v0.7/README.md), the [v0.8 file uploads](../examples/v0.8/README.md), and the [v0.10 Security examples](../examples/v0.10/README.md) for more working programs.
