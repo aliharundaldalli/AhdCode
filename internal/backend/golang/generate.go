@@ -29,16 +29,16 @@ type GeneratedProgram struct {
 }
 
 const (
-	programFileName        = "ahdcode_program.go"
-	runtimeFileName        = "ahdcode_runtime.go"
-	excelRuntimeFileName   = "ahdcode_excel_runtime.go"
-	pdfRuntimeFileName     = "ahdcode_pdf_runtime.go"
-	archiveRuntimeFileName = "ahdcode_archive_runtime.go"
-	sqliteRuntimeFileName  = "ahdcode_sqlite_runtime.go"
-	httpRuntimeFileName    = "ahdcode_http_runtime.go"
-	htmlRuntimeFileName    = "ahdcode_html_runtime.go"
-	smtpRuntimeFileName        = "ahdcode_smtp_runtime.go"
-	securityRuntimeFileName    = "ahdcode_security_runtime.go"
+	programFileName         = "ahdcode_program.go"
+	runtimeFileName         = "ahdcode_runtime.go"
+	excelRuntimeFileName    = "ahdcode_excel_runtime.go"
+	pdfRuntimeFileName      = "ahdcode_pdf_runtime.go"
+	archiveRuntimeFileName  = "ahdcode_archive_runtime.go"
+	sqliteRuntimeFileName   = "ahdcode_sqlite_runtime.go"
+	httpRuntimeFileName     = "ahdcode_http_runtime.go"
+	htmlRuntimeFileName     = "ahdcode_html_runtime.go"
+	smtpRuntimeFileName     = "ahdcode_smtp_runtime.go"
+	securityRuntimeFileName = "ahdcode_security_runtime.go"
 )
 
 // storage describes the Go representation chosen for one IR symbol.
