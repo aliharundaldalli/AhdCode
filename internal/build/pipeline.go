@@ -257,6 +257,14 @@ func RunProgram(entryPath string, arguments []string, stdin *os.File, stdout, st
 // file compilation and interactive execution on the exact same compiler,
 // lowering, backend, native-build, and runtime path.
 func RunProgramIO(entryPath string, arguments []string, stdin io.Reader, stdout, stderr io.Writer) (int, Result) {
+	return RunProgramObserved(entryPath, arguments, stdin, stdout, stderr, nil)
+}
+
+// RunProgramObserved is RunProgramIO with one hook invoked after the compiled
+// program has started, carrying the running process id. The CLI uses it to
+// write an AhdCode run descriptor for `ahdcode kill`; every other caller
+// passes nil and behaves exactly as before.
+func RunProgramObserved(entryPath string, arguments []string, stdin io.Reader, stdout, stderr io.Writer, started func(pid int)) (int, Result) {
 	result := Compile(entryPath)
 	if result.HasErrors() || result.Program == nil {
 		return 1, result
@@ -275,7 +283,14 @@ func RunProgramIO(entryPath string, arguments []string, stdin io.Reader, stdout,
 	command.Stdin = stdin
 	command.Stdout = stdout
 	command.Stderr = stderr
-	if err := command.Run(); err != nil {
+	if err := command.Start(); err != nil {
+		result.Diagnostics = append(result.Diagnostics, workspaceFailure("could not run the generated executable: "+err.Error()))
+		return 1, result
+	}
+	if started != nil && command.Process != nil {
+		started(command.Process.Pid)
+	}
+	if err := command.Wait(); err != nil {
 		var exit *exec.ExitError
 		if errors.As(err, &exit) {
 			return exit.ExitCode(), result

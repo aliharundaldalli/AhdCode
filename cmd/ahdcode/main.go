@@ -8,8 +8,11 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"strings"
+	"syscall"
+	"time"
 
 	"ahdcode/internal/build"
 	"ahdcode/internal/diagnostics"
@@ -25,6 +28,7 @@ usage:
   ahdcode                                  start the interactive REPL
   ahdcode build <entry.ahd> [-o <output>]   compile to a native executable
   ahdcode run   <entry.ahd> [-- <args>...]  compile and run
+  ahdcode kill  [--force] <app.run>          stop an application started by run
   ahdcode format [--check] <file.ahd>        canonicalize source in place
   ahdcode lsp                                start the language server (stdio)
   ahdcode --help                             show this help
@@ -50,6 +54,8 @@ func runWithIO(arguments []string, input io.Reader, output, errorOutput io.Write
 		return runBuild(arguments[1:], output, errorOutput)
 	case "run":
 		return runRun(arguments[1:], input, output, errorOutput)
+	case "kill":
+		return runKill(arguments[1:], output, errorOutput)
 	case "format":
 		return runFormat(arguments[1:], output, errorOutput)
 	case "lsp":
@@ -124,9 +130,109 @@ func runRun(arguments []string, input io.Reader, output, errorOutput io.Writer) 
 	if len(programArguments) > 0 && programArguments[0] == "--" {
 		programArguments = programArguments[1:]
 	}
-	code, result := build.RunProgramIO(entry, programArguments, input, output, errorOutput)
+
+	// While this application runs, a sibling app.run descriptor names it, so
+	// `ahdcode kill app.run` can stop it later. A descriptor whose process is
+	// still alive means this source is already running: say so rather than
+	// starting a second copy that will collide on the same port.
+	runFile := runFileFor(entry)
+	if err := claimRunFile(runFile); err != nil {
+		fmt.Fprintf(errorOutput, "ahdcode run: %v\n", err)
+		return 1
+	}
+	running := 0
+	defer func() {
+		if running != 0 {
+			removeOwnRunDescriptor(runFile, running)
+		}
+	}()
+	stopSignals := make(chan os.Signal, 1)
+	signal.Notify(stopSignals, os.Interrupt, syscall.SIGTERM)
+	defer signal.Stop(stopSignals)
+	go func() {
+		for range stopSignals {
+			// Ctrl-C would otherwise end this process without cleanup; the
+			// child receives the same terminal signal and exits on its own.
+			if running != 0 {
+				removeOwnRunDescriptor(runFile, running)
+			}
+		}
+	}()
+
+	code, result := build.RunProgramObserved(entry, programArguments, input, output, errorOutput, func(pid int) {
+		running = pid
+		if err := startRunDescriptor(runFile, entry, pid); err != nil {
+			fmt.Fprintf(errorOutput, "ahdcode run: could not write the run file: %v\n", err)
+		}
+	})
 	reportTo(errorOutput, result)
 	return code
+}
+
+// runKill stops the application named by one AhdCode run descriptor. The
+// descriptor is the application's identity: a bare numeric pid is deliberately
+// not accepted, so this command can never be pointed at an arbitrary process.
+func runKill(arguments []string, output, errorOutput io.Writer) int {
+	force := false
+	target := ""
+	for _, argument := range arguments {
+		switch {
+		case argument == "--force":
+			force = true
+		case strings.HasPrefix(argument, "-"):
+			fmt.Fprintf(errorOutput, "ahdcode kill: unknown flag %q\n", argument)
+			return 2
+		case target == "":
+			target = argument
+		default:
+			fmt.Fprintln(errorOutput, "ahdcode kill: exactly one run file is expected")
+			return 2
+		}
+	}
+	if target == "" {
+		fmt.Fprintln(errorOutput, "ahdcode kill: a run file is required, as in: ahdcode kill app.run")
+		return 2
+	}
+
+	descriptor, err := readRunDescriptor(target)
+	if err != nil {
+		if os.IsNotExist(err) {
+			fmt.Fprintf(errorOutput, "ahdcode kill: no run file at %s\n", target)
+			return 1
+		}
+		fmt.Fprintf(errorOutput, "ahdcode kill: %s is not a usable AhdCode run file (%v); no process was stopped\n", target, err)
+		return 1
+	}
+	if !processAlive(descriptor.PID) {
+		if removeErr := os.Remove(target); removeErr != nil {
+			fmt.Fprintf(errorOutput, "ahdcode kill: the application is not running, but the stale run file could not be removed: %v\n", removeErr)
+			return 1
+		}
+		fmt.Fprintf(output, "AhdCode application is not running; removed the stale run file %s\n", target)
+		return 0
+	}
+	if err := terminateProcess(descriptor.PID, force); err != nil {
+		fmt.Fprintf(errorOutput, "ahdcode kill: could not stop process %d: %v\n", descriptor.PID, err)
+		return 1
+	}
+	stopped := false
+	for attempt := 0; attempt < 50; attempt++ {
+		if !processAlive(descriptor.PID) {
+			stopped = true
+			break
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	if !stopped {
+		fmt.Fprintf(errorOutput, "ahdcode kill: process %d did not stop; retry with: ahdcode kill --force %s\n", descriptor.PID, target)
+		return 1
+	}
+	if err := os.Remove(target); err != nil && !os.IsNotExist(err) {
+		fmt.Fprintf(errorOutput, "ahdcode kill: stopped process %d but could not remove %s: %v\n", descriptor.PID, target, err)
+		return 1
+	}
+	fmt.Fprintf(output, "Stopped the AhdCode application (pid %d) and removed %s\n", descriptor.PID, target)
+	return 0
 }
 
 // runLSP starts the AhdCode language server over stdio. It contains no
