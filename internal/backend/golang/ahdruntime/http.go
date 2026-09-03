@@ -1873,7 +1873,7 @@ func (value *ahdModuleError) AhdFreezeGraph(visited map[AhdFreezable]bool) {
 }
 
 func init() {
-	for _, class := range []*AhdClass{AhdClassHTTPError, AhdClassHTMLError} {
+	for _, class := range []*AhdClass{AhdClassHTTPError, AhdClassHTMLError, AhdClassSMTPError} {
 		target := class
 		AhdRegisterError(target, func(message string) AhdInstance {
 			instance := &ahdModuleError{message: message}

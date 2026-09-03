@@ -200,6 +200,8 @@ func (session *Session) builtin(identity ir.CallableID, receiver any, arguments 
 		return session.httpBuiltin(strings.TrimPrefix(name, "builtin:HTTP::"), values(arguments))
 	case strings.HasPrefix(name, "builtin:HTML::"):
 		return session.htmlBuiltin(strings.TrimPrefix(name, "builtin:HTML::"), values(arguments))
+	case strings.HasPrefix(name, "builtin:SMTP::"):
+		return session.smtpBuiltin(strings.TrimPrefix(name, "builtin:SMTP::"), values(arguments))
 	}
 	session.raise("Error", "unsupported builtin "+name)
 	return nil
@@ -346,6 +348,9 @@ func (session *Session) core(name string, receiver any, arguments []any) any {
 	}
 	if strings.HasPrefix(name, "HTMLDocument.") || strings.HasPrefix(name, "HTMLElement.") {
 		return session.htmlOperation(name, receiver, arguments)
+	}
+	if strings.HasPrefix(name, "SMTPClient.") || strings.HasPrefix(name, "SMTPMessage.") {
+		return session.smtpOperation(name, receiver, arguments)
 	}
 	session.raise("Error", "unsupported Fundamentals operation "+name)
 	return nil
