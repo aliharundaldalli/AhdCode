@@ -157,7 +157,7 @@ func TestHTTPModuleInterfaceExportsExactSurface(t *testing.T) {
 	wantExports := []string{
 		"Client", "ClientRequest", "ClientResponse", "Cookie", "HTTPError", "Request", "Response",
 		"Server", "Session", "SessionStore", "UploadedFile",
-		"client", "clientRequest", "cookie", "deleteCookie", "html", "redirect", "response", "server", "sessions", "text",
+		"client", "clientRequest", "cookie", "deleteCookie", "download", "file", "html", "redirect", "response", "server", "sessions", "text",
 	}
 	if strings.Join(module.ExportNames, ",") != strings.Join(wantExports, ",") {
 		t.Fatalf("HTTP exports %v; want %v", module.ExportNames, wantExports)
@@ -168,6 +168,8 @@ func TestHTTPModuleInterfaceExportsExactSurface(t *testing.T) {
 		"html":          "(body: String, status: Int := default) -> Response",
 		"response":      "(status: Int, body: String, contentType: String) -> Response",
 		"redirect":      "(location: String, status: Int := default) -> Response",
+		"file":          "(path: String, contentType: String) -> Response",
+		"download":      "(path: String, contentType: String, fileName: String) -> Response",
 		"cookie":        "(name: String, value: String) -> Cookie",
 		"deleteCookie":  "(name: String, path: String := default) -> Cookie",
 		"sessions":      "(cookieName: String := default, maxAgeSeconds: Int := default, secure: Bool := default, sameSite: String := default) -> SessionStore",

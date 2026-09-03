@@ -29,7 +29,7 @@ jobs:
       - name: Run race tests
         # internal/build compiles many native programs under the race detector.
         # On GitHub runners that package can exceed Go's default 10m timeout.
-        run: go test -race -count=1 -timeout 20m -parallel 2 ./...
+        run: go test -race -count=1 -timeout 25m -parallel 2 ./...
 
       - name: Check formatting (gofmt)
         run: |
