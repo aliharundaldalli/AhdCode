@@ -57,15 +57,70 @@ func runFileFor(entry string) string {
 	return strings.TrimSuffix(absolute, extension) + runDescriptorSuffix
 }
 
+// writeRunDescriptor publishes a descriptor so that its bytes are never
+// readable by anyone else, even for an instant.
+//
+// os.WriteFile's permission argument applies only when it creates the file:
+// writing over an existing 0644 leftover keeps that 0644 inode, which would
+// publish the control token world-readably, and chmod-after-write would still
+// leave a window where the secret is exposed. Renaming an existing 0644 file
+// into place would carry the wrong mode with it.
+//
+// So the descriptor is written to a fresh private file in the destination's
+// own directory, forced to 0600 before anything secret reaches it, and then
+// renamed over the destination. The rename is atomic on Unix and replaces on
+// Windows, and it replaces a symlink at the destination rather than following
+// it, so descriptor contents are never written through a link to somewhere
+// else.
 func writeRunDescriptor(path string, descriptor runDescriptor) error {
 	encoded, err := json.Marshal(descriptor)
 	if err != nil {
 		return err
 	}
-	// 0600: the descriptor carries a control capability, so it is never
-	// world-readable where the platform enforces permissions.
-	return os.WriteFile(path, append(encoded, '\n'), 0o600)
+	encoded = append(encoded, '\n')
+
+	directory := filepath.Dir(path)
+	if err := os.MkdirAll(directory, 0o755); err != nil {
+		return err
+	}
+	// CreateTemp already creates with 0600; the explicit Chmod states the
+	// requirement rather than relying on that default, and runs before any
+	// secret byte is written.
+	temporary, err := os.CreateTemp(directory, ".ahdcode-run-*")
+	if err != nil {
+		return err
+	}
+	temporaryPath := temporary.Name()
+	cleanup := func() {
+		_ = temporary.Close()
+		_ = os.Remove(temporaryPath)
+	}
+	if err := temporary.Chmod(0o600); err != nil {
+		// Where chmod is unsupported the file is still created privately by
+		// CreateTemp, so only a real failure aborts publication.
+		if !errors.Is(err, os.ErrInvalid) && !errors.Is(err, errUnsupportedChmod) {
+			cleanup()
+			return err
+		}
+	}
+	if _, err := temporary.Write(encoded); err != nil {
+		cleanup()
+		return err
+	}
+	if err := temporary.Close(); err != nil {
+		_ = os.Remove(temporaryPath)
+		return err
+	}
+	if err := os.Rename(temporaryPath, path); err != nil {
+		_ = os.Remove(temporaryPath)
+		return err
+	}
+	return nil
 }
+
+// errUnsupportedChmod names the platforms where changing a mode is a no-op
+// rather than a failure worth aborting publication for.
+var errUnsupportedChmod = errors.ErrUnsupported
 
 var errRunDescriptorShape = errors.New("not an AhdCode run file")
 

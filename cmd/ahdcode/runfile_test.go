@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -99,5 +100,122 @@ func TestKillRequiresARunFileArgument(t *testing.T) {
 	errorOutput.Reset()
 	if code := runKill([]string{"12345"}, &out, &errorOutput); code == 0 {
 		t.Fatal("a bare pid must not be accepted as a kill target")
+	}
+}
+
+// TestRunDescriptorPermissionsArePrivate is the security gate for the
+// descriptor's control token: publishing must never leave the secret in a
+// file anyone else can read, including when a permissive stale descriptor is
+// already sitting at the destination.
+func TestRunDescriptorPermissionsArePrivate(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("POSIX permission bits are not meaningful on Windows")
+	}
+	token, err := newRunControlToken()
+	if err != nil {
+		t.Fatal(err)
+	}
+	cases := map[string]struct {
+		existing string
+		mode     os.FileMode
+	}{
+		"absent":                      {},
+		"stale 0644":                  {existing: `{"schema":"ahdcode.run","version":2,"pid":1,"source":"/x","controlPort":5000}`, mode: 0o644},
+		"stale 0666":                  {existing: `{"schema":"ahdcode.run","version":2,"pid":1,"source":"/x","controlPort":5000}`, mode: 0o666},
+		"malformed stale 0644":        {existing: "definitely not a descriptor", mode: 0o644},
+		"world-writable garbage 0666": {existing: "", mode: 0o666},
+	}
+	for name, test := range cases {
+		t.Run(name, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "app.run")
+			if test.mode != 0 {
+				if err := os.WriteFile(path, []byte(test.existing), test.mode); err != nil {
+					t.Fatal(err)
+				}
+				// os.WriteFile does not change an existing file's mode, so
+				// confirm the hostile starting state is really in place.
+				if err := os.Chmod(path, test.mode); err != nil {
+					t.Fatal(err)
+				}
+				before, err := os.Stat(path)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if before.Mode().Perm() != test.mode {
+					t.Fatalf("precondition: existing mode %v; want %v", before.Mode().Perm(), test.mode)
+				}
+			}
+
+			if err := startRunDescriptor(path, "app.ahd", os.Getpid(), 45678, token); err != nil {
+				t.Fatal(err)
+			}
+
+			info, err := os.Stat(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := info.Mode().Perm(); got != 0o600 {
+				t.Fatalf("published descriptor mode %v; want 0600 (the control token must not be readable by others)", got)
+			}
+			// The published descriptor is the new one, not the leftover.
+			descriptor, err := readRunDescriptor(path)
+			if err != nil {
+				t.Fatalf("published descriptor does not parse: %v", err)
+			}
+			if descriptor.ControlToken != token || descriptor.ControlPort != 45678 {
+				t.Fatalf("stale content survived publication: %+v", descriptor)
+			}
+			// No temporary publication file is left behind.
+			entries, err := os.ReadDir(filepath.Dir(path))
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, entry := range entries {
+				if strings.HasPrefix(entry.Name(), ".ahdcode-run-") {
+					t.Fatalf("temporary publication file left behind: %s", entry.Name())
+				}
+			}
+		})
+	}
+}
+
+// TestRunDescriptorDoesNotFollowASymlink keeps descriptor contents from being
+// written through a link into an unrelated file.
+func TestRunDescriptorDoesNotFollowASymlink(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symlink creation is not reliably available on Windows here")
+	}
+	directory := t.TempDir()
+	target := filepath.Join(directory, "unrelated.txt")
+	if err := os.WriteFile(target, []byte("original contents\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(directory, "app.run")
+	if err := os.Symlink(target, path); err != nil {
+		t.Skipf("cannot create a symlink here: %v", err)
+	}
+	token, err := newRunControlToken()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := startRunDescriptor(path, "app.ahd", os.Getpid(), 45678, token); err != nil {
+		t.Fatal(err)
+	}
+	contents, err := os.ReadFile(target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(contents) != "original contents\n" {
+		t.Fatal("descriptor contents were written through the symlink into its target")
+	}
+	info, err := os.Lstat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Mode()&os.ModeSymlink != 0 {
+		t.Fatal("the symlink survived publication; the descriptor should have replaced it")
+	}
+	if got := info.Mode().Perm(); got != 0o600 {
+		t.Fatalf("replacement descriptor mode %v; want 0600", got)
 	}
 }
