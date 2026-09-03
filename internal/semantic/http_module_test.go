@@ -156,7 +156,7 @@ func TestHTTPModuleInterfaceExportsExactSurface(t *testing.T) {
 	}
 	wantExports := []string{
 		"Client", "ClientRequest", "ClientResponse", "Cookie", "HTTPError", "Request", "Response",
-		"Server", "Session", "SessionStore",
+		"Server", "Session", "SessionStore", "UploadedFile",
 		"client", "clientRequest", "cookie", "deleteCookie", "html", "redirect", "response", "server", "sessions", "text",
 	}
 	if strings.Join(module.ExportNames, ",") != strings.Join(wantExports, ",") {
@@ -236,5 +236,65 @@ func TestHTTPHandlerTypeShape(t *testing.T) {
 	}
 	if !types.Equal(handler.Signature.Parameters[0].Type, httpRequestType()) || !types.Equal(handler.Signature.Return, httpResponseType()) {
 		t.Fatalf("handler signature = %s", types.Display(handler))
+	}
+}
+
+const httpUploadPreamble = "bring HTTP\nfrom HTTP bring Request\nfrom HTTP bring Response\nfrom HTTP bring UploadedFile\n\n"
+
+func TestHTTPUploadedFileValidUsage(t *testing.T) {
+	result := analyzeWithStandardModules(t, httpUploadPreamble+`handle: Function := (request: Request) -> Response {
+    paper: Local UploadedFile? := request.file("paper")
+    every: Local List<UploadedFile> := request.files("papers")
+    if paper != null {
+        name: Local String := paper.originalName()
+        declared: Local String? := paper.declaredContentType()
+        detected: Local String := paper.detectedContentType()
+        size: Local Int := paper.size()
+        stored: Local String := paper.save("uploads/papers")
+    }
+    return HTTP.text("ok")
+}
+`)
+	requireSemanticClean(t, result)
+}
+
+func TestHTTPUploadedFileRejectsWrongUsage(t *testing.T) {
+	tests := []string{
+		// file() is nullable; it may not bind to a non-null UploadedFile.
+		`handle: Function := (request: Request) -> Response {
+    paper: Local UploadedFile := request.file("paper")
+    return HTTP.text("ok")
+}`,
+		// save requires a directory argument.
+		`handle: Function := (request: Request) -> Response {
+    paper: Local UploadedFile? := request.file("paper")
+    if paper != null {
+        stored: Local String := paper.save()
+    }
+    return HTTP.text("ok")
+}`,
+		// size is an Int, not a String.
+		`handle: Function := (request: Request) -> Response {
+    paper: Local UploadedFile? := request.file("paper")
+    if paper != null {
+        size: Local String := paper.size()
+    }
+    return HTTP.text("ok")
+}`,
+		// There is no public bytes() escape hatch.
+		`handle: Function := (request: Request) -> Response {
+    paper: Local UploadedFile? := request.file("paper")
+    if paper != null {
+        raw: Local String := paper.bytes()
+    }
+    return HTTP.text("ok")
+}`,
+		// UploadedFile is not constructed directly.
+		`paper: UploadedFile := UploadedFile()`,
+	}
+	for _, source := range tests {
+		t.Run(source, func(t *testing.T) {
+			requireSemanticFailure(t, analyzeWithStandardModules(t, httpUploadPreamble+source+"\n"))
+		})
 	}
 }
