@@ -341,7 +341,7 @@ func (session *Session) core(name string, receiver any, arguments []any) any {
 	}
 	if strings.HasPrefix(name, "Server.") || strings.HasPrefix(name, "Request.") || strings.HasPrefix(name, "Response.") ||
 		strings.HasPrefix(name, "Cookie.") || strings.HasPrefix(name, "SessionStore.") || strings.HasPrefix(name, "Session.") ||
-		strings.HasPrefix(name, "Client.") || strings.HasPrefix(name, "ClientRequest.") || strings.HasPrefix(name, "ClientResponse.") {
+		strings.HasPrefix(name, "Client.") || strings.HasPrefix(name, "ClientRequest.") || strings.HasPrefix(name, "ClientResponse.") || strings.HasPrefix(name, "UploadedFile.") {
 		return session.httpOperation(name, receiver, arguments)
 	}
 	if strings.HasPrefix(name, "HTMLDocument.") || strings.HasPrefix(name, "HTMLElement.") {

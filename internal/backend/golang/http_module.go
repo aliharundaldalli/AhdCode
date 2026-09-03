@@ -28,6 +28,8 @@ var (
 	httpClientHandleField       = ir.FieldID("builtin:HTTP::class::Client::field::handle")
 	httpClientRequestDataField  = ir.FieldID("builtin:HTTP::class::ClientRequest::field::data")
 	httpClientResponseDataField = ir.FieldID("builtin:HTTP::class::ClientResponse::field::data")
+	httpUploadedFileClass       = ir.ClassID("builtin:HTTP::class::UploadedFile")
+	httpUploadedFileDataField   = ir.FieldID("builtin:HTTP::class::UploadedFile::field::data")
 )
 
 func (generator *generator) httpCall(value *ir.CallExpr) string {
@@ -211,6 +213,22 @@ func (generator *generator) httpOperation(name string, value *ir.CallExpr) strin
 		return "AhdHTTPClientResponseHeaderAll(" + errorClass + ", " + generator.httpDataOf(httpClientResponseClass, httpClientResponseDataField, value.Callee) + ", " + text(0) + ")"
 	case "ClientResponse.url":
 		return "AhdHTTPClientResponseURL(" + errorClass + ", " + generator.httpDataOf(httpClientResponseClass, httpClientResponseDataField, value.Callee) + ")"
+	case "Request.file":
+		return generator.httpOptionalUploadResult("AhdHTTPRequestFile("+errorClass+", "+
+			generator.httpDataOf(httpRequestClass, httpRequestDataField, value.Callee)+", "+text(0)+")", meta)
+	case "Request.files":
+		return generator.httpUploadListResult("AhdHTTPRequestFiles("+errorClass+", "+
+			generator.httpDataOf(httpRequestClass, httpRequestDataField, value.Callee)+", "+text(0)+")", meta)
+	case "UploadedFile.originalName":
+		return "AhdHTTPUploadedFileOriginalName(" + errorClass + ", " + generator.httpDataOf(httpUploadedFileClass, httpUploadedFileDataField, value.Callee) + ")"
+	case "UploadedFile.declaredContentType":
+		return "AhdHTTPUploadedFileDeclaredContentType(" + errorClass + ", " + generator.httpDataOf(httpUploadedFileClass, httpUploadedFileDataField, value.Callee) + ")"
+	case "UploadedFile.detectedContentType":
+		return "AhdHTTPUploadedFileDetectedContentType(" + errorClass + ", " + generator.httpDataOf(httpUploadedFileClass, httpUploadedFileDataField, value.Callee) + ")"
+	case "UploadedFile.size":
+		return "AhdHTTPUploadedFileSize(" + errorClass + ", " + generator.httpDataOf(httpUploadedFileClass, httpUploadedFileDataField, value.Callee) + ")"
+	case "UploadedFile.save":
+		return "AhdHTTPUploadedFileSave(" + errorClass + ", " + generator.httpDataOf(httpUploadedFileClass, httpUploadedFileDataField, value.Callee) + ", " + text(0) + ")"
 	default:
 		return generator.unsupported("HTTP operation "+name, meta.Span)
 	}
@@ -227,6 +245,31 @@ func (generator *generator) httpHandler(value *ir.CallExpr, index int) string {
 	getter := generator.fieldName(httpResponseDataField) + "_get()"
 	return "func(handler func(" + reqType + ") " + resType + ") AhdHTTPHandler { " +
 		"return func(data string) string { return handler(" + helper + "(data))." + getter + " } }(" + handler + ")"
+}
+
+// httpUploadListResult wraps a []string of encoded upload metadata back
+// into a List<UploadedFile>.
+func (generator *generator) httpUploadListResult(dataExpr string, meta ir.ExprBase) string {
+	helper, ok := generator.httpHelper(httpUploadedFileClass)
+	if !ok {
+		return generator.unsupported("an UploadedFile without its Class declaration", meta.Span)
+	}
+	element := generator.interfaceName(httpUploadedFileClass)
+	return "func(items []string) *AhdList[" + element + "] { " +
+		"result := make([]" + element + ", len(items)); " +
+		"for index, data := range items { result[index] = " + helper + "(data) }; " +
+		"return AhdNewList(result...) }(" + dataExpr + ")"
+}
+
+// httpOptionalUploadResult wraps a *string (nil when the field carried no
+// file) back into a nullable UploadedFile.
+func (generator *generator) httpOptionalUploadResult(dataExpr string, meta ir.ExprBase) string {
+	helper, ok := generator.httpHelper(httpUploadedFileClass)
+	if !ok {
+		return generator.unsupported("an UploadedFile without its Class declaration", meta.Span)
+	}
+	element := generator.interfaceName(httpUploadedFileClass)
+	return "func(data *string) " + element + " { if data == nil { return nil }; return " + helper + "(*data) }(" + dataExpr + ")"
 }
 
 func (generator *generator) httpValueFrom(class ir.ClassID, data string, meta ir.ExprBase) string {
@@ -269,6 +312,7 @@ func (generator *generator) emitHTTPHelpers(writer *emitter) {
 		httpServerClass, httpRequestClass, httpResponseClass,
 		httpCookieClass, httpSessionStoreClass, httpSessionClass,
 		httpClientClass, httpClientRequestClass, httpClientResponseClass,
+		httpUploadedFileClass,
 	} {
 		name, known := generator.timeHelpers[class]
 		if !known {

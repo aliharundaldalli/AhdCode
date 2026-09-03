@@ -15,6 +15,7 @@ const (
 	evaluatorHTTPClientClass         = ir.ClassID("builtin:HTTP::class::Client")
 	evaluatorHTTPClientRequestClass  = ir.ClassID("builtin:HTTP::class::ClientRequest")
 	evaluatorHTTPClientResponseClass = ir.ClassID("builtin:HTTP::class::ClientResponse")
+	evaluatorHTTPUploadedFileClass   = ir.ClassID("builtin:HTTP::class::UploadedFile")
 )
 
 var (
@@ -27,6 +28,7 @@ var (
 	evaluatorHTTPClientField         = ir.FieldID("builtin:HTTP::class::Client::field::handle")
 	evaluatorHTTPClientRequestField  = ir.FieldID("builtin:HTTP::class::ClientRequest::field::data")
 	evaluatorHTTPClientResponseField = ir.FieldID("builtin:HTTP::class::ClientResponse::field::data")
+	evaluatorHTTPUploadedFileField   = ir.FieldID("builtin:HTTP::class::UploadedFile::field::data")
 )
 
 func (session *Session) httpServer(handle string) *Instance {
@@ -63,6 +65,27 @@ func (session *Session) httpClientRequest(data string) *Instance {
 
 func (session *Session) httpClientResponse(data string) *Instance {
 	return &Instance{Class: evaluatorHTTPClientResponseClass, Fields: map[ir.FieldID]any{evaluatorHTTPClientResponseField: data}}
+}
+
+func (session *Session) httpUploadedFile(data string) *Instance {
+	return &Instance{Class: evaluatorHTTPUploadedFileClass, Fields: map[ir.FieldID]any{evaluatorHTTPUploadedFileField: data}}
+}
+
+// httpUploadList wraps the runtime's encoded upload metadata as a
+// List<UploadedFile>; httpOptionalUpload maps "no such file" to null.
+func (session *Session) httpUploadList(items []string) *List {
+	result := make([]any, len(items))
+	for index, data := range items {
+		result[index] = session.httpUploadedFile(data)
+	}
+	return &List{Items: result}
+}
+
+func (session *Session) httpOptionalUpload(value *string) any {
+	if value == nil {
+		return nil
+	}
+	return session.httpUploadedFile(*value)
 }
 
 func (session *Session) httpHandleOf(value any) string {
@@ -298,6 +321,27 @@ func (session *Session) httpOperation(name string, receiver any, args []any) any
 			session.httpDataOf(receiver, evaluatorHTTPClientResponseClass, evaluatorHTTPClientResponseField, "ClientResponse"), arg(0)))
 	case "ClientResponse.url":
 		return ahdruntime.AhdHTTPClientResponseURL(class, session.httpDataOf(receiver, evaluatorHTTPClientResponseClass, evaluatorHTTPClientResponseField, "ClientResponse"))
+	case "Request.file":
+		return session.httpOptionalUpload(ahdruntime.AhdHTTPRequestFile(class,
+			session.httpDataOf(receiver, evaluatorHTTPRequestClass, evaluatorHTTPRequestField, "Request"), arg(0)))
+	case "Request.files":
+		return session.httpUploadList(ahdruntime.AhdHTTPRequestFiles(class,
+			session.httpDataOf(receiver, evaluatorHTTPRequestClass, evaluatorHTTPRequestField, "Request"), arg(0)))
+	case "UploadedFile.originalName":
+		return ahdruntime.AhdHTTPUploadedFileOriginalName(class,
+			session.httpDataOf(receiver, evaluatorHTTPUploadedFileClass, evaluatorHTTPUploadedFileField, "UploadedFile"))
+	case "UploadedFile.declaredContentType":
+		return session.httpOptional(ahdruntime.AhdHTTPUploadedFileDeclaredContentType(class,
+			session.httpDataOf(receiver, evaluatorHTTPUploadedFileClass, evaluatorHTTPUploadedFileField, "UploadedFile")))
+	case "UploadedFile.detectedContentType":
+		return ahdruntime.AhdHTTPUploadedFileDetectedContentType(class,
+			session.httpDataOf(receiver, evaluatorHTTPUploadedFileClass, evaluatorHTTPUploadedFileField, "UploadedFile"))
+	case "UploadedFile.size":
+		return ahdruntime.AhdHTTPUploadedFileSize(class,
+			session.httpDataOf(receiver, evaluatorHTTPUploadedFileClass, evaluatorHTTPUploadedFileField, "UploadedFile"))
+	case "UploadedFile.save":
+		return ahdruntime.AhdHTTPUploadedFileSave(class,
+			session.httpDataOf(receiver, evaluatorHTTPUploadedFileClass, evaluatorHTTPUploadedFileField, "UploadedFile"), arg(0))
 	}
 	session.raise("Error", "unsupported HTTP operation "+name)
 	return nil

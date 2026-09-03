@@ -23,6 +23,7 @@ var (
 	httpClientClass         = &types.ClassSymbol{ModuleID: httpModuleID, Name: "Client"}
 	httpClientRequestClass  = &types.ClassSymbol{ModuleID: httpModuleID, Name: "ClientRequest"}
 	httpClientResponseClass = &types.ClassSymbol{ModuleID: httpModuleID, Name: "ClientResponse"}
+	httpUploadedFileClass   = &types.ClassSymbol{ModuleID: httpModuleID, Name: "UploadedFile"}
 )
 
 // HTTPErrorIdentity, HTTPServerIdentity, HTTPRequestIdentity, and
@@ -42,6 +43,9 @@ func HTTPClientRequestIdentity() *types.ClassSymbol {
 func HTTPClientResponseIdentity() *types.ClassSymbol {
 	return httpClientResponseClass
 }
+func HTTPUploadedFileIdentity() *types.ClassSymbol {
+	return httpUploadedFileClass
+}
 
 // HTTPServerOperations, HTTPRequestOperations, and HTTPResponseOperations
 // name the members each Class publishes through built-in type operations, so
@@ -50,7 +54,7 @@ func HTTPClientResponseIdentity() *types.ClassSymbol {
 var HTTPServerOperations = []string{"get", "post", "route", "start"}
 var HTTPRequestOperations = []string{
 	"method", "path", "query", "queryAll", "header", "headerAll", "body", "form", "formAll",
-	"cookie", "cookieAll",
+	"cookie", "cookieAll", "file", "files",
 }
 var HTTPResponseOperations = []string{"withHeader", "withCookie"}
 var HTTPCookieOperations = []string{"withPath", "withHttpOnly", "withSecure", "withSameSite", "withMaxAge"}
@@ -59,6 +63,13 @@ var HTTPSessionOperations = []string{"get", "has", "set", "remove", "clear", "ro
 var HTTPClientOperations = []string{"send", "get", "post"}
 var HTTPClientRequestOperations = []string{"withHeader", "addHeader", "withBody"}
 var HTTPClientResponseOperations = []string{"status", "body", "header", "headerAll", "url"}
+
+// HTTPUploadedFileOperations is the read-only v0.8.0 upload surface. There
+// is deliberately no bytes()/raw()/stream()/tempPath(): the payload stays
+// opaque and is persisted only through save.
+var HTTPUploadedFileOperations = []string{
+	"originalName", "declaredContentType", "detectedContentType", "size", "save",
+}
 
 func httpServerType() types.Type       { return types.Class{Symbol: httpServerClass} }
 func httpRequestType() types.Type      { return types.Class{Symbol: httpRequestClass} }
@@ -72,6 +83,9 @@ func httpClientRequestType() types.Type {
 }
 func httpClientResponseType() types.Type {
 	return types.Class{Symbol: httpClientResponseClass}
+}
+func httpUploadedFileType() types.Type {
+	return types.Class{Symbol: httpUploadedFileClass}
 }
 
 func httpHandlerType() types.Type {
@@ -92,6 +106,7 @@ func httpModuleInterface() *ModuleInterface {
 		{"Cookie", httpCookieClass}, {"SessionStore", httpSessionStoreClass},
 		{"Session", httpSessionClass}, {"Client", httpClientClass},
 		{"ClientRequest", httpClientRequestClass}, {"ClientResponse", httpClientResponseClass},
+		{"UploadedFile", httpUploadedFileClass},
 	}
 	for _, entry := range classes {
 		symbol := &Symbol{
@@ -163,6 +178,8 @@ func httpConstructionHint(identity *types.ClassSymbol) (string, bool) {
 		return "create a ClientRequest with HTTP.clientRequest", true
 	case "ClientResponse":
 		return "ClientResponse values are produced by Client.send, Client.get, or Client.post", true
+	case "UploadedFile":
+		return "UploadedFile values are produced by Request.file or Request.files", true
 	}
 	return "", false
 }
@@ -229,6 +246,15 @@ func httpOperationShapes() map[TypeOperation]httpOperationShape {
 		HTTPClientResponseHeader:    {[]types.Type{types.String}, types.String, true, "pass one String header name"},
 		HTTPClientResponseHeaderAll: {[]types.Type{types.String}, strings, false, "pass one String header name"},
 		HTTPClientResponseURL:       {none, types.String, false, "call url with no argument"},
+
+		HTTPRequestFile:  {[]types.Type{types.String}, httpUploadedFileType(), true, "pass one String file field name"},
+		HTTPRequestFiles: {[]types.Type{types.String}, types.List{Element: httpUploadedFileType()}, false, "pass one String file field name"},
+
+		HTTPUploadedFileOriginalName:        {none, types.String, false, "call originalName with no argument"},
+		HTTPUploadedFileDeclaredContentType: {none, types.String, true, "call declaredContentType with no argument"},
+		HTTPUploadedFileDetectedContentType: {none, types.String, false, "call detectedContentType with no argument"},
+		HTTPUploadedFileSize:                {none, types.Int, false, "call size with no argument"},
+		HTTPUploadedFileSave:                {[]types.Type{types.String}, types.String, false, "pass one String directory path"},
 	}
 }
 
@@ -241,6 +267,7 @@ var httpOperationNames = map[string]map[string]TypeOperation{
 		"query": HTTPRequestQuery, "queryAll": HTTPRequestQueryAll,
 		"header": HTTPRequestHeader, "headerAll": HTTPRequestHeaderAll,
 		"body": HTTPRequestBody, "form": HTTPRequestForm, "formAll": HTTPRequestFormAll,
+		"file": HTTPRequestFile, "files": HTTPRequestFiles,
 		"cookie": HTTPRequestCookie, "cookieAll": HTTPRequestCookieAll,
 	},
 	"Response": {"withHeader": HTTPResponseWithHeader, "withCookie": HTTPResponseWithCookie},
@@ -264,6 +291,12 @@ var httpOperationNames = map[string]map[string]TypeOperation{
 		"status": HTTPClientResponseStatus, "body": HTTPClientResponseBody,
 		"header": HTTPClientResponseHeader, "headerAll": HTTPClientResponseHeaderAll,
 		"url": HTTPClientResponseURL,
+	},
+	"UploadedFile": {
+		"originalName":        HTTPUploadedFileOriginalName,
+		"declaredContentType": HTTPUploadedFileDeclaredContentType,
+		"detectedContentType": HTTPUploadedFileDetectedContentType,
+		"size":                HTTPUploadedFileSize, "save": HTTPUploadedFileSave,
 	},
 }
 

@@ -1,6 +1,7 @@
 package ahdruntime
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"encoding/base64"
@@ -9,11 +10,13 @@ import (
 	"fmt"
 	"io"
 	"mime"
+	"mime/multipart"
 	"net"
 	"net/http"
 	"net/textproto"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -54,17 +57,23 @@ type ahdHTTPServerState struct {
 }
 
 type ahdHTTPRequestData struct {
-	Method    string               `json:"method"`
-	Path      string               `json:"path"`
-	Query     map[string][]string  `json:"query"`
-	Headers   map[string][]string  `json:"headers"`
-	Body      string               `json:"body"`
-	BodyUTF8  bool                 `json:"bodyUTF8"`
-	Form      map[string][]string  `json:"form"`
-	FormOK    bool                 `json:"formOK"`
-	FormError string               `json:"formError,omitempty"`
-	IsForm    bool                 `json:"isForm"`
-	Cookies   []ahdHTTPCookieEntry `json:"cookies"`
+	Method    string              `json:"method"`
+	Path      string              `json:"path"`
+	Query     map[string][]string `json:"query"`
+	Headers   map[string][]string `json:"headers"`
+	Body      string              `json:"body"`
+	BodyUTF8  bool                `json:"bodyUTF8"`
+	Form      map[string][]string `json:"form"`
+	FormOK    bool                `json:"formOK"`
+	FormError string              `json:"formError,omitempty"`
+	IsForm    bool                `json:"isForm"`
+	// IsMultipart marks a multipart/form-data request. Its raw body is
+	// legitimately binary, so the urlencoded "body must be UTF-8" rule does
+	// not apply to it; each multipart text field is validated as UTF-8
+	// individually while parsing instead.
+	IsMultipart bool                 `json:"isMultipart,omitempty"`
+	Cookies     []ahdHTTPCookieEntry `json:"cookies"`
+	Files       []ahdHTTPUploadEntry `json:"files,omitempty"`
 }
 
 type ahdHTTPResponseData struct {
@@ -428,11 +437,16 @@ func (dispatcher ahdHTTPDispatcher) ServeHTTP(writer http.ResponseWriter, reques
 		return
 	}
 
-	snapshot, err := ahdHTTPMaterialize(request, body)
+	snapshot, uploadIDs, err := ahdHTTPMaterialize(request, body)
 	if err != nil {
 		ahdHTTPWritePlain(writer, http.StatusBadRequest, "Bad Request")
 		return
 	}
+	// Every upload this request registered is released once the handler is
+	// done, on every path out: a normal response, a rejected upload, or a
+	// panicking handler. Saved files have already moved out of the registry's
+	// temporary storage and survive; everything else is deleted.
+	defer ahdHTTPReleaseUploads(uploadIDs)
 	var encoded string
 	failed := false
 	func() {
@@ -457,7 +471,12 @@ func (dispatcher ahdHTTPDispatcher) ServeHTTP(writer http.ResponseWriter, reques
 	ahdHTTPWriteEncoded(writer, encoded)
 }
 
-func ahdHTTPMaterialize(request *http.Request, body []byte) (ahdHTTPRequestData, error) {
+// ahdHTTPMaterialize snapshots one request. The returned id slice names every
+// uploaded file registered for this request; the caller must release it once
+// the handler has finished, so unsaved temporary files never outlive the
+// request that produced them.
+func ahdHTTPMaterialize(request *http.Request, body []byte) (ahdHTTPRequestData, []string, error) {
+	var uploadIDs []string
 	rawQuery := ""
 	path := ""
 	if request.URL != nil {
@@ -466,7 +485,7 @@ func ahdHTTPMaterialize(request *http.Request, body []byte) (ahdHTTPRequestData,
 	}
 	query, err := ahdHTTPParseEncoded(rawQuery)
 	if err != nil {
-		return ahdHTTPRequestData{}, err
+		return ahdHTTPRequestData{}, nil, err
 	}
 	headers := map[string][]string{}
 	for name, values := range request.Header {
@@ -482,21 +501,34 @@ func ahdHTTPMaterialize(request *http.Request, body []byte) (ahdHTTPRequestData,
 	for _, cookie := range request.Cookies() {
 		snapshot.Cookies = append(snapshot.Cookies, ahdHTTPCookieEntry{Name: cookie.Name, Value: cookie.Value})
 	}
-	mediaType, _, _ := mime.ParseMediaType(request.Header.Get("Content-Type"))
+	mediaType, parameters, _ := mime.ParseMediaType(request.Header.Get("Content-Type"))
 	if mediaType == "application/x-www-form-urlencoded" {
 		snapshot.IsForm = true
 		if !snapshot.BodyUTF8 {
-			return ahdHTTPRequestData{}, errHTTPEncodedUTF8
+			return ahdHTTPRequestData{}, nil, errHTTPEncodedUTF8
 		}
 		values, err := ahdHTTPParseEncoded(snapshot.Body)
 		if err != nil {
-			return ahdHTTPRequestData{}, err
+			return ahdHTTPRequestData{}, nil, err
 		}
 		snapshot.Form = values
 		snapshot.FormOK = true
 	}
-	return snapshot, nil
+	if mediaType == "multipart/form-data" {
+		boundary := parameters["boundary"]
+		if boundary == "" {
+			return ahdHTTPRequestData{}, nil, errHTTPMultipartBoundary
+		}
+		ids, err := ahdHTTPParseMultipart(body, boundary, &snapshot)
+		if err != nil {
+			return ahdHTTPRequestData{}, nil, err
+		}
+		uploadIDs = ids
+	}
+	return snapshot, uploadIDs, nil
 }
+
+var errHTTPMultipartBoundary = errors.New("multipart/form-data request has no boundary")
 
 var errHTTPEncodedUTF8 = errors.New("HTTP encoded parameter is not valid UTF-8")
 
@@ -531,7 +563,7 @@ func ahdHTTPRequireForm(class *AhdClass, data string) ahdHTTPRequestData {
 	if request.IsForm && request.FormError != "" {
 		AhdRaiseClass(class, request.FormError)
 	}
-	if !request.BodyUTF8 && request.IsForm {
+	if !request.BodyUTF8 && request.IsForm && !request.IsMultipart {
 		AhdRaiseClass(class, "HTTP request body is not valid UTF-8")
 	}
 	return request
@@ -1442,6 +1474,388 @@ func ahdHTTPDecodeClientResponse(class *AhdClass, data string) ahdHTTPClientResp
 		AhdRaiseClass(class, "HTTP ClientResponse storage is corrupted")
 	}
 	return response
+}
+
+// --- multipart/form-data uploads (v0.8.0) ---
+//
+// An uploaded file is never carried as an AhdCode String: a PDF is not text.
+// Each file part is streamed to a private temporary file during request
+// materialization, and the request snapshot carries only metadata plus an
+// opaque, unguessable registry id. UploadedFile's hidden field encodes that
+// metadata and id, so no Go file handle, multipart.File, or pointer is ever
+// reachable from AhdCode.
+//
+// The registry entry lives exactly as long as the request: ServeHTTP
+// releases every id it created once the handler returns, whether the handler
+// responded normally, rejected the upload, or panicked. Saving moves the
+// bytes out of that lifetime; everything unsaved is deleted.
+//
+// The stored basename is always crypto/rand hex, never the browser-supplied
+// filename, so an attacker-controlled name can neither escape the
+// application's directory nor overwrite an existing file.
+
+const (
+	ahdHTTPUploadIDBytes    = 16
+	ahdHTTPUploadNameBytes  = 16
+	ahdHTTPUploadSniffBytes = 512
+	ahdHTTPUploadNameTries  = 8
+)
+
+// ahdHTTPUploadEntry is one uploaded file as seen by the request snapshot.
+// Size is the exact payload length in bytes. Declared is the client-supplied
+// Content-Type (never trusted); Detected is sniffed from the leading bytes.
+type ahdHTTPUploadEntry struct {
+	Field        string `json:"field"`
+	ID           string `json:"id"`
+	OriginalName string `json:"originalName"`
+	Declared     string `json:"declared,omitempty"`
+	HasDeclared  bool   `json:"hasDeclared"`
+	Detected     string `json:"detected"`
+	Size         int64  `json:"size"`
+}
+
+// ahdHTTPUploadRecord is the private server-side backing for one uploaded
+// file. It never leaves the runtime.
+type ahdHTTPUploadRecord struct {
+	tempPath string
+	saved    bool
+}
+
+var ahdHTTPUploads = struct {
+	mutex   sync.Mutex
+	records map[string]*ahdHTTPUploadRecord
+}{records: map[string]*ahdHTTPUploadRecord{}}
+
+func ahdHTTPUploadRandomHex(size int) (string, error) {
+	buffer := make([]byte, size)
+	if _, err := rand.Read(buffer); err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%x", buffer), nil
+}
+
+// ahdHTTPUploadSafeName reduces a browser-supplied filename to a display-only
+// basename. Both '/' and '\\' are treated as separators regardless of host
+// platform, a Windows drive prefix is dropped, and "."/".."/empty collapse to
+// a neutral name, so originalName can never carry operative path traversal.
+// A NUL byte is a structurally invalid filename and is rejected.
+func ahdHTTPUploadSafeName(raw string) (string, error) {
+	if strings.IndexByte(raw, 0) >= 0 {
+		return "", errors.New("multipart filename contains a NUL byte")
+	}
+	name := raw
+	if index := strings.LastIndexAny(name, `/\`); index >= 0 {
+		name = name[index+1:]
+	}
+	if len(name) >= 2 && name[1] == ':' {
+		name = name[2:]
+	}
+	name = strings.TrimSpace(name)
+	if name == "" || name == "." || name == ".." {
+		return "file", nil
+	}
+	if !utf8.ValidString(name) {
+		return "", errors.New("multipart filename is not valid UTF-8")
+	}
+	return name, nil
+}
+
+// ahdHTTPUploadMediaType returns the bare media type of a MIME header value,
+// dropping parameters such as charset. An unparsable value yields "".
+func ahdHTTPUploadMediaType(value string) string {
+	if strings.TrimSpace(value) == "" {
+		return ""
+	}
+	mediaType, _, err := mime.ParseMediaType(value)
+	if err != nil {
+		return ""
+	}
+	return strings.ToLower(strings.TrimSpace(mediaType))
+}
+
+// ahdHTTPUploadDetect sniffs a media type from the leading bytes only. The
+// filename and the client-declared Content-Type deliberately play no part.
+// Zero bytes have no content to resemble, so they report the documented
+// application/octet-stream fallback rather than being called text.
+func ahdHTTPUploadDetect(head []byte, size int64) string {
+	if size == 0 {
+		return "application/octet-stream"
+	}
+	detected := ahdHTTPUploadMediaType(http.DetectContentType(head))
+	if detected == "" {
+		return "application/octet-stream"
+	}
+	return detected
+}
+
+// ahdHTTPParseMultipart streams every part of a multipart/form-data body.
+// Text parts join the ordinary form/formAll values; file parts are written to
+// private temporary files and registered. The caller owns releasing the
+// returned ids.
+func ahdHTTPParseMultipart(body []byte, boundary string, snapshot *ahdHTTPRequestData) ([]string, error) {
+	reader := multipart.NewReader(bytes.NewReader(body), boundary)
+	form := map[string][]string{}
+	var ids []string
+	release := func() {
+		ahdHTTPReleaseUploads(ids)
+	}
+	for {
+		part, err := reader.NextPart()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			release()
+			return nil, err
+		}
+		field := part.FormName()
+		if part.FileName() == "" {
+			value, readErr := io.ReadAll(part)
+			_ = part.Close()
+			if readErr != nil {
+				release()
+				return nil, readErr
+			}
+			if !utf8.Valid(value) {
+				release()
+				return nil, errHTTPEncodedUTF8
+			}
+			form[field] = append(form[field], string(value))
+			continue
+		}
+		entry, id, fileErr := ahdHTTPStoreUploadPart(part, field)
+		_ = part.Close()
+		if fileErr != nil {
+			release()
+			return nil, fileErr
+		}
+		ids = append(ids, id)
+		snapshot.Files = append(snapshot.Files, entry)
+	}
+	snapshot.Form = form
+	snapshot.FormOK = true
+	snapshot.IsForm = true
+	snapshot.IsMultipart = true
+	return ids, nil
+}
+
+// ahdHTTPStoreUploadPart writes one file part to a temporary file and
+// registers it, returning the metadata the request snapshot carries.
+func ahdHTTPStoreUploadPart(part *multipart.Part, field string) (ahdHTTPUploadEntry, string, error) {
+	name, err := ahdHTTPUploadSafeName(part.FileName())
+	if err != nil {
+		return ahdHTTPUploadEntry{}, "", err
+	}
+	id, err := ahdHTTPUploadRandomHex(ahdHTTPUploadIDBytes)
+	if err != nil {
+		return ahdHTTPUploadEntry{}, "", err
+	}
+	file, err := os.CreateTemp("", "ahdcode-upload-*")
+	if err != nil {
+		return ahdHTTPUploadEntry{}, "", err
+	}
+	tempPath := file.Name()
+	head := make([]byte, 0, ahdHTTPUploadSniffBytes)
+	buffer := make([]byte, 32*1024)
+	var size int64
+	for {
+		read, readErr := part.Read(buffer)
+		if read > 0 {
+			if len(head) < ahdHTTPUploadSniffBytes {
+				room := ahdHTTPUploadSniffBytes - len(head)
+				if room > read {
+					room = read
+				}
+				head = append(head, buffer[:room]...)
+			}
+			written, writeErr := file.Write(buffer[:read])
+			size += int64(written)
+			if writeErr != nil {
+				_ = file.Close()
+				_ = os.Remove(tempPath)
+				return ahdHTTPUploadEntry{}, "", writeErr
+			}
+		}
+		if readErr == io.EOF {
+			break
+		}
+		if readErr != nil {
+			_ = file.Close()
+			_ = os.Remove(tempPath)
+			return ahdHTTPUploadEntry{}, "", readErr
+		}
+	}
+	if err := file.Close(); err != nil {
+		_ = os.Remove(tempPath)
+		return ahdHTTPUploadEntry{}, "", err
+	}
+	declared := ahdHTTPUploadMediaType(part.Header.Get("Content-Type"))
+	entry := ahdHTTPUploadEntry{
+		Field: field, ID: id, OriginalName: name,
+		Declared: declared, HasDeclared: declared != "",
+		Detected: ahdHTTPUploadDetect(head, size), Size: size,
+	}
+	ahdHTTPUploads.mutex.Lock()
+	ahdHTTPUploads.records[id] = &ahdHTTPUploadRecord{tempPath: tempPath}
+	ahdHTTPUploads.mutex.Unlock()
+	return entry, id, nil
+}
+
+// ahdHTTPReleaseUploads drops every listed upload from the registry and
+// deletes any temporary file that was never saved. It is safe to call twice.
+func ahdHTTPReleaseUploads(ids []string) {
+	if len(ids) == 0 {
+		return
+	}
+	var stale []string
+	ahdHTTPUploads.mutex.Lock()
+	for _, id := range ids {
+		record, found := ahdHTTPUploads.records[id]
+		if !found {
+			continue
+		}
+		delete(ahdHTTPUploads.records, id)
+		if !record.saved {
+			stale = append(stale, record.tempPath)
+		}
+	}
+	ahdHTTPUploads.mutex.Unlock()
+	for _, path := range stale {
+		_ = os.Remove(path)
+	}
+}
+
+func ahdHTTPUploadEntryFor(class *AhdClass, data string) ahdHTTPUploadEntry {
+	var entry ahdHTTPUploadEntry
+	if err := json.Unmarshal([]byte(data), &entry); err != nil {
+		AhdRaiseClass(class, "HTTP UploadedFile storage is corrupted")
+	}
+	return entry
+}
+
+func ahdHTTPEncodeUpload(class *AhdClass, entry ahdHTTPUploadEntry) string {
+	encoded, err := json.Marshal(entry)
+	if err != nil {
+		AhdRaiseClass(class, "HTTP UploadedFile storage is corrupted")
+	}
+	return string(encoded)
+}
+
+// AhdHTTPRequestFile is Request.file(name): the first uploaded file for that
+// field, or null when the field carried no file.
+func AhdHTTPRequestFile(class *AhdClass, data, name string) *string {
+	request := ahdHTTPRequireForm(class, data)
+	for _, entry := range request.Files {
+		if entry.Field == name {
+			encoded := ahdHTTPEncodeUpload(class, entry)
+			return &encoded
+		}
+	}
+	return nil
+}
+
+// AhdHTTPRequestFiles is Request.files(name): every uploaded file for that
+// field in request order, or an empty List.
+func AhdHTTPRequestFiles(class *AhdClass, data, name string) []string {
+	request := ahdHTTPRequireForm(class, data)
+	var result []string
+	for _, entry := range request.Files {
+		if entry.Field == name {
+			result = append(result, ahdHTTPEncodeUpload(class, entry))
+		}
+	}
+	return result
+}
+
+func AhdHTTPUploadedFileOriginalName(class *AhdClass, data string) string {
+	return ahdHTTPUploadEntryFor(class, data).OriginalName
+}
+
+func AhdHTTPUploadedFileDeclaredContentType(class *AhdClass, data string) *string {
+	entry := ahdHTTPUploadEntryFor(class, data)
+	if !entry.HasDeclared {
+		return nil
+	}
+	declared := entry.Declared
+	return &declared
+}
+
+func AhdHTTPUploadedFileDetectedContentType(class *AhdClass, data string) string {
+	return ahdHTTPUploadEntryFor(class, data).Detected
+}
+
+func AhdHTTPUploadedFileSize(class *AhdClass, data string) int64 {
+	return ahdHTTPUploadEntryFor(class, data).Size
+}
+
+// AhdHTTPUploadedFileSave persists the upload inside directory under a
+// crypto-random basename and returns the stored path. The browser-supplied
+// filename never reaches the filesystem. An upload can be saved once: a
+// second save raises rather than silently writing a duplicate copy.
+func AhdHTTPUploadedFileSave(class *AhdClass, data, directory string) string {
+	entry := ahdHTTPUploadEntryFor(class, data)
+	if strings.TrimSpace(directory) == "" {
+		AhdRaiseClass(class, "UploadedFile.save requires a directory")
+	}
+	ahdHTTPUploads.mutex.Lock()
+	record, found := ahdHTTPUploads.records[entry.ID]
+	if found && record.saved {
+		ahdHTTPUploads.mutex.Unlock()
+		AhdRaiseClass(class, "this uploaded file has already been saved")
+	}
+	if !found {
+		ahdHTTPUploads.mutex.Unlock()
+		AhdRaiseClass(class, "this uploaded file is no longer available; save it while its request is still being handled")
+	}
+	tempPath := record.tempPath
+	ahdHTTPUploads.mutex.Unlock()
+
+	if err := os.MkdirAll(directory, 0o755); err != nil {
+		AhdRaiseClass(class, "could not create the upload directory: "+err.Error())
+	}
+	source, err := os.Open(tempPath)
+	if err != nil {
+		AhdRaiseClass(class, "could not read the uploaded file: "+err.Error())
+	}
+	defer func() { _ = source.Close() }()
+
+	var stored *os.File
+	storedPath := ""
+	for attempt := 0; attempt < ahdHTTPUploadNameTries; attempt++ {
+		basename, randErr := ahdHTTPUploadRandomHex(ahdHTTPUploadNameBytes)
+		if randErr != nil {
+			AhdRaiseClass(class, "could not generate a stored file name: "+randErr.Error())
+		}
+		candidate := filepath.Join(directory, basename)
+		file, openErr := os.OpenFile(candidate, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644)
+		if openErr == nil {
+			stored, storedPath = file, candidate
+			break
+		}
+		if !os.IsExist(openErr) {
+			AhdRaiseClass(class, "could not create the stored file: "+openErr.Error())
+		}
+	}
+	if stored == nil {
+		AhdRaiseClass(class, "could not create a unique stored file name")
+	}
+	if _, err := io.Copy(stored, source); err != nil {
+		_ = stored.Close()
+		_ = os.Remove(storedPath)
+		AhdRaiseClass(class, "could not write the stored file: "+err.Error())
+	}
+	if err := stored.Close(); err != nil {
+		_ = os.Remove(storedPath)
+		AhdRaiseClass(class, "could not finish writing the stored file: "+err.Error())
+	}
+
+	ahdHTTPUploads.mutex.Lock()
+	if current, ok := ahdHTTPUploads.records[entry.ID]; ok {
+		current.saved = true
+	}
+	ahdHTTPUploads.mutex.Unlock()
+	_ = os.Remove(tempPath)
+	return storedPath
 }
 
 type ahdModuleError struct {

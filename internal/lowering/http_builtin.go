@@ -17,6 +17,7 @@ const (
 	httpClientClassID         = ir.ClassID(HTTPModuleID + "::class::Client")
 	httpClientRequestClassID  = ir.ClassID(HTTPModuleID + "::class::ClientRequest")
 	httpClientResponseClassID = ir.ClassID(HTTPModuleID + "::class::ClientResponse")
+	httpUploadedFileClassID   = ir.ClassID(HTTPModuleID + "::class::UploadedFile")
 	httpErrorClassID          = ir.ClassID(HTTPModuleID + "::class::HTTPError")
 )
 
@@ -30,6 +31,7 @@ var (
 	HTTPClientHandleFieldID       = ir.FieldID(string(httpClientClassID) + "::field::handle")
 	HTTPClientRequestDataFieldID  = ir.FieldID(string(httpClientRequestClassID) + "::field::data")
 	HTTPClientResponseDataFieldID = ir.FieldID(string(httpClientResponseClassID) + "::field::data")
+	HTTPUploadedFileDataFieldID   = ir.FieldID(string(httpUploadedFileClassID) + "::field::data")
 )
 
 func httpModule(id ir.ModuleID, name, path string) *ir.Module {
@@ -50,6 +52,7 @@ func httpModule(id ir.ModuleID, name, path string) *ir.Module {
 		{httpClientClassID, "Client", HTTPClientHandleFieldID, "handle", semantic.HTTPClientOperations},
 		{httpClientRequestClassID, "ClientRequest", HTTPClientRequestDataFieldID, "data", semantic.HTTPClientRequestOperations},
 		{httpClientResponseClassID, "ClientResponse", HTTPClientResponseDataFieldID, "data", semantic.HTTPClientResponseOperations},
+		{httpUploadedFileClassID, "UploadedFile", HTTPUploadedFileDataFieldID, "data", semantic.HTTPUploadedFileOperations},
 	}
 	for _, spec := range specs {
 		field := ir.Field{ID: spec.field, Name: spec.fieldName, Type: ir.Type{Kind: ir.StringType}, NullState: ir.NonNull, Hidden: true}

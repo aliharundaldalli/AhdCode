@@ -492,6 +492,23 @@ const (
 	HTTPClientResponseHeaderAll TypeOperation = "ClientResponse.headerAll"
 	HTTPClientResponseURL       TypeOperation = "ClientResponse.url"
 
+	// multipart/form-data uploads (v0.8.0). Request.file/files expose the
+	// uploaded files of one field; UploadedFile is an opaque, read-only
+	// handle whose bytes never become an AhdCode String.
+	HTTPRequestFile  TypeOperation = "Request.file"
+	HTTPRequestFiles TypeOperation = "Request.files"
+	// HTTPUploadedFileOriginalName is display metadata only: it is the
+	// browser-supplied name reduced to a safe basename, never a storage path.
+	HTTPUploadedFileOriginalName TypeOperation = "UploadedFile.originalName"
+	// HTTPUploadedFileDeclaredContentType is the client's claim, never trusted.
+	HTTPUploadedFileDeclaredContentType TypeOperation = "UploadedFile.declaredContentType"
+	// HTTPUploadedFileDetectedContentType is sniffed from the leading bytes.
+	HTTPUploadedFileDetectedContentType TypeOperation = "UploadedFile.detectedContentType"
+	HTTPUploadedFileSize                TypeOperation = "UploadedFile.size"
+	// HTTPUploadedFileSave persists the upload under a crypto-random basename
+	// inside the application-supplied directory and returns the stored path.
+	HTTPUploadedFileSave TypeOperation = "UploadedFile.save"
+
 	// The XML standard module's XMLNode members. XMLNode is a closed,
 	// immutable Element/Text value.
 	XMLNodeKind TypeOperation = "XMLNode.kind"
