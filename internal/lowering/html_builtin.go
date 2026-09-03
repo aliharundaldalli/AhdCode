@@ -8,22 +8,40 @@ import (
 const HTMLModuleID = "builtin:HTML"
 
 const (
-	htmlNodeClassID  = ir.ClassID(HTMLModuleID + "::class::HTMLNode")
-	htmlErrorClassID = ir.ClassID(HTMLModuleID + "::class::HTMLError")
+	htmlNodeClassID     = ir.ClassID(HTMLModuleID + "::class::HTMLNode")
+	htmlDocumentClassID = ir.ClassID(HTMLModuleID + "::class::HTMLDocument")
+	htmlElementClassID  = ir.ClassID(HTMLModuleID + "::class::HTMLElement")
+	htmlErrorClassID    = ir.ClassID(HTMLModuleID + "::class::HTMLError")
 )
 
-var HTMLNodeDataFieldID = ir.FieldID(string(htmlNodeClassID) + "::field::data")
+var (
+	HTMLNodeDataFieldID     = ir.FieldID(string(htmlNodeClassID) + "::field::data")
+	HTMLDocumentDataFieldID = ir.FieldID(string(htmlDocumentClassID) + "::field::data")
+	HTMLElementDataFieldID  = ir.FieldID(string(htmlElementClassID) + "::field::data")
+)
 
 func htmlModule(id ir.ModuleID, name, path string) *ir.Module {
 	module := &ir.Module{ID: id, Name: name, SourcePath: path}
-	field := ir.Field{ID: HTMLNodeDataFieldID, Name: "data", Type: ir.Type{Kind: ir.StringType}, NullState: ir.NonNull, Hidden: true}
-	nodeClass := &ir.Class{
-		ID: htmlNodeClassID, Symbol: ir.SymbolID(string(htmlNodeClassID) + "::symbol"),
-		Name: "HTMLNode", Operations: semantic.HTMLNodeOperations, Fields: []ir.Field{field},
-		Constructor: ir.CallableID(string(htmlNodeClassID) + "::constructor::(data:String)->Nothing"),
+	specs := []struct {
+		id         ir.ClassID
+		name       string
+		field      ir.FieldID
+		operations []string
+	}{
+		{htmlNodeClassID, "HTMLNode", HTMLNodeDataFieldID, semantic.HTMLNodeOperations},
+		{htmlDocumentClassID, "HTMLDocument", HTMLDocumentDataFieldID, semantic.HTMLDocumentOperations},
+		{htmlElementClassID, "HTMLElement", HTMLElementDataFieldID, semantic.HTMLElementOperations},
 	}
-	module.Classes = append(module.Classes, nodeClass)
-	module.Functions = append(module.Functions, htmlValueConstructor(nodeClass))
+	for _, spec := range specs {
+		field := ir.Field{ID: spec.field, Name: "data", Type: ir.Type{Kind: ir.StringType}, NullState: ir.NonNull, Hidden: true}
+		class := &ir.Class{
+			ID: spec.id, Symbol: ir.SymbolID(string(spec.id) + "::symbol"),
+			Name: spec.name, Operations: spec.operations, Fields: []ir.Field{field},
+			Constructor: ir.CallableID(string(spec.id) + "::constructor::(data:String)->Nothing"),
+		}
+		module.Classes = append(module.Classes, class)
+		module.Functions = append(module.Functions, htmlValueConstructor(class))
+	}
 
 	parentID := ir.ClassID("builtin:core::class::Error")
 	errorClass := &ir.Class{

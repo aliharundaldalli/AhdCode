@@ -344,6 +344,9 @@ func (session *Session) core(name string, receiver any, arguments []any) any {
 		strings.HasPrefix(name, "Client.") || strings.HasPrefix(name, "ClientRequest.") || strings.HasPrefix(name, "ClientResponse.") {
 		return session.httpOperation(name, receiver, arguments)
 	}
+	if strings.HasPrefix(name, "HTMLDocument.") || strings.HasPrefix(name, "HTMLElement.") {
+		return session.htmlOperation(name, receiver, arguments)
+	}
 	session.raise("Error", "unsupported Fundamentals operation "+name)
 	return nil
 }

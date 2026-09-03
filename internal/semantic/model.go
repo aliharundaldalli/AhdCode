@@ -520,6 +520,18 @@ const (
 	// document) omits any way back from an XMLDocument to its XMLNode tree;
 	// root() is the smallest addition that closes that gap.
 	XMLDocumentRoot TypeOperation = "XMLDocument.root"
+
+	// The HTML standard module's parsed HTMLDocument/HTMLElement members
+	// (v0.7.0). These are distinct from the builder's HTMLNode, which
+	// remains a members-free value (HTMLNodeOperations).
+	HTMLDocumentSelect TypeOperation = "HTMLDocument.select"
+	HTMLDocumentFirst  TypeOperation = "HTMLDocument.first"
+	HTMLElementTag     TypeOperation = "HTMLElement.tag"
+	HTMLElementText    TypeOperation = "HTMLElement.text"
+	HTMLElementAttr    TypeOperation = "HTMLElement.attr"
+	HTMLElementHasAttr TypeOperation = "HTMLElement.hasAttr"
+	HTMLElementSelect  TypeOperation = "HTMLElement.select"
+	HTMLElementFirst   TypeOperation = "HTMLElement.first"
 )
 
 // ModuleOperation is one compiler-supplied standard module function whose

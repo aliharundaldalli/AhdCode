@@ -1056,6 +1056,9 @@ func (generator *generator) builtinCall(value *ir.CallExpr) string {
 			strings.HasPrefix(name, "Client.") || strings.HasPrefix(name, "ClientRequest.") || strings.HasPrefix(name, "ClientResponse.") {
 			return generator.httpOperation(name, value)
 		}
+		if strings.HasPrefix(name, "HTMLDocument.") || strings.HasPrefix(name, "HTMLElement.") {
+			return generator.htmlOperation(name, value)
+		}
 		return generator.unsupported("Fundamentals function "+name, meta.Span)
 	}
 }
