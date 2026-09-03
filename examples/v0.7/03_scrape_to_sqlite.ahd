@@ -1,0 +1,73 @@
+// HTML extraction + SQLite persistence: scrape once, keep the structured
+// rows, query them back. Uses an in-memory database so running this example
+// never leaves a file behind; swap SQLite.open(":memory:") for a real path
+// (see examples/v0.3) to keep the rows across runs.
+bring HTML
+from HTML bring HTMLDocument
+from HTML bring HTMLElement
+bring SQLite
+from SQLite bring Database
+from SQLite bring SQLiteValue
+
+source: String := """
+<!doctype html>
+<html>
+<body>
+  <article class="card" data-id="1">
+    <h2>Riesz &amp; Banach</h2>
+    <a href="/notes/1">Read</a>
+  </article>
+  <article class="card featured" data-id="2">
+    <h2>Functional Analysis</h2>
+    <a href="/notes/2">Read</a>
+  </article>
+</body>
+</html>
+"""
+
+document: HTMLDocument := HTML.parse(source)
+
+db: Database := SQLite.open(":memory:")
+db.execute("""
+    CREATE TABLE notes (
+        id TEXT PRIMARY KEY,
+        title TEXT NOT NULL,
+        href TEXT NOT NULL
+    )
+    """)
+
+articles: List<HTMLElement> := document.select("article.card")
+for article in articles {
+    id: Local String? := article.attr("data-id")
+    title: Local HTMLElement? := article.first("h2")
+    link: Local HTMLElement? := article.first("a")
+    if id != null {
+        if title != null {
+            if link != null {
+                href: Local String? := link.attr("href")
+                if href != null {
+                    db.execute(
+                        "INSERT INTO notes (id, title, href) VALUES (?, ?, ?)"
+                        [
+                            SQLite.fromString(id)
+                            SQLite.fromString(title.text())
+                            SQLite.fromString(href)
+                        ]
+                    )
+                }
+            }
+        }
+    }
+}
+
+rows: List<Pair<String, SQLiteValue>> := db.query(
+    "SELECT id, title, href FROM notes ORDER BY id"
+)
+write("persisted rows: {str(len(rows))}")
+for row in rows {
+    write(
+        "{row["id"].string()} | {row["title"].string()} | {row["href"].string()}"
+    )
+}
+
+db.close()

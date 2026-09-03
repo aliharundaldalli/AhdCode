@@ -1,0 +1,49 @@
+// Parse a literal HTML String: no network, no file, just HTML.parse.
+bring HTML
+from HTML bring HTMLDocument
+from HTML bring HTMLElement
+
+source: String := """
+<!doctype html>
+<html>
+<body>
+  <article class="card" data-id="1">
+    <h2>Riesz &amp; Banach</h2>
+    <a href="/notes/1">Read</a>
+  </article>
+  <article class="card featured" data-id="2">
+    <h2>Functional Analysis</h2>
+    <a href="/notes/2">Read</a>
+  </article>
+</body>
+</html>
+"""
+
+document: HTMLDocument := HTML.parse(source)
+
+heading: HTMLElement? := document.first("h2")
+if heading != null {
+    write("first h2: {heading.text()}")
+}
+
+cards: List<HTMLElement> := document.select("article.card")
+write("article.card count: {str(len(cards))}")
+
+for card in cards {
+    id: Local String? := card.attr("data-id")
+    title: Local HTMLElement? := card.first("h2")
+    link: Local HTMLElement? := card.first("a")
+    if id != null {
+        if title != null {
+            if link != null {
+                href: Local String? := link.attr("href")
+                if href != null {
+                    write("#{id}: {title.text()} -> {href}")
+                }
+            }
+        }
+    }
+}
+
+featured: List<HTMLElement> := document.select(".card.featured")
+write("featured count: {str(len(featured))}")

@@ -1,0 +1,33 @@
+// HTTP Client + HTML.parse: two independent capabilities used together.
+//
+// This example needs internet access. Set SCRAPE_URL to point at a page you
+// control; it defaults to https://example.com/, a small stable static page.
+bring HTTP
+from HTTP bring Client
+from HTTP bring ClientResponse
+bring HTML
+from HTML bring HTMLDocument
+from HTML bring HTMLElement
+bring Env
+
+url: String := Env.getOr("SCRAPE_URL", "https://example.com/")
+
+client: Client := HTTP.client()
+response: ClientResponse := client.get(url)
+document: HTMLDocument := HTML.parse(response.body())
+
+write("status: {str(response.status())}")
+
+heading: HTMLElement? := document.first("h1")
+if heading != null {
+    write("h1: {heading.text()}")
+}
+
+links: List<HTMLElement> := document.select("a")
+write("link count: {str(len(links))}")
+for link in links {
+    href: Local String? := link.attr("href")
+    if href != null {
+        write("href: {href}")
+    }
+}
