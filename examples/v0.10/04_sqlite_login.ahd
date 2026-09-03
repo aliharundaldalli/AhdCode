@@ -1,0 +1,67 @@
+// SQLite-backed register / login with Argon2id password hashing.
+//
+// The password hash is stored in a single TEXT column (PHC format). No
+// separate salt column is needed — salt is embedded in the PHC string.
+//
+//   ahdcode run 04_sqlite_login.ahd
+bring Security
+bring SQLite
+from Security bring SecurityError
+from SQLite bring Database
+from SQLite bring SQLiteError
+
+db: Database := SQLite.open(":memory:")
+db.execute("CREATE TABLE users (id INTEGER PRIMARY KEY, username TEXT UNIQUE, hash TEXT NOT NULL)")
+
+// Register two users with the same fake password; their hashes must differ.
+fakePassword: String := "fake_qa_login_password_7r21"
+
+db.execute("INSERT INTO users (username, hash) VALUES (?, ?)",
+    [SQLite.fromString("alice"), SQLite.fromString(Security.passwordHash(fakePassword))])
+db.execute("INSERT INTO users (username, hash) VALUES (?, ?)",
+    [SQLite.fromString("bob"),   SQLite.fromString(Security.passwordHash(fakePassword))])
+
+// Retrieve both hashes and confirm they differ (independent random salts).
+rows := db.query("SELECT username, hash FROM users ORDER BY id")
+aliceHash: String := ""
+bobHash: String := ""
+for row in rows {
+    uname: Local String := row["username"].string()
+    phc: Local String   := row["hash"].string()
+    write(uname + ": " + phc[:32] + "...")
+    if uname == "alice" { aliceHash = phc }
+    if uname == "bob"   { bobHash   = phc }
+}
+
+if aliceHash == bobHash {
+    write("ERROR: alice and bob have the same hash")
+} else {
+    write("good: hashes differ (independent salts)")
+}
+
+// Login verification
+doLogin: Function := (database: Database, user: String, candidate: String) -> Bool {
+    result: Local := database.query("SELECT hash FROM users WHERE username = ?",
+        [SQLite.fromString(user)])
+    if len(result) == 0 {
+        return false
+    }
+    storedHash: Local String := result[0]["hash"].string()
+    return Security.passwordVerify(candidate, storedHash)
+}
+
+write("alice correct:  {doLogin(db, "alice", fakePassword)}")
+write("alice wrong:    {doLogin(db, "alice", "totally_wrong")}")
+write("unknown user:   {doLogin(db, "carol", fakePassword)}")
+
+// Inserting a malformed hash and verifying raises SecurityError
+db.execute("INSERT INTO users (username, hash) VALUES (?, ?)",
+    [SQLite.fromString("mallory"), SQLite.fromString("not-a-valid-hash")])
+
+attempt {
+    doLogin(db, "mallory", fakePassword)
+} except SecurityError as error {
+    write("malformed hash caught: " + error.message)
+}
+
+db.close()

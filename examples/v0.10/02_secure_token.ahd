@@ -1,0 +1,25 @@
+// Secure random tokens and constant-time comparison.
+//
+// Security.token() generates 32 random bytes encoded as 43 unpadded base64url
+// characters. It is suitable for CSRF tokens, session IDs, and password-reset
+// links — not JWT (it carries no claims).
+//
+// Security.secureEqual compares two strings in constant time to prevent
+// timing attacks. Use it whenever you compare a value that was received from
+// an untrusted source against a known secret.
+//
+//   ahdcode run 02_secure_token.ahd
+bring Security
+
+tok1: String := Security.token()
+tok2: String := Security.token()
+
+write("token 1: " + tok1)
+write("token 2: " + tok2)
+write("length:  {len(tok1)}")
+
+eq1: Bool := Security.secureEqual(tok1, tok1)
+write("secureEqual(tok1, tok1): {eq1}")
+
+eq2: Bool := Security.secureEqual(tok1, tok2)
+write("secureEqual(tok1, tok2): {eq2}")

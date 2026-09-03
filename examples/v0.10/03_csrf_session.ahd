@@ -1,0 +1,62 @@
+// CSRF protection pattern using Security.token and HTTP sessions.
+//
+// The form page stores a fresh CSRF token in the session and embeds it in a
+// hidden field. The POST handler reads the stored token from the session
+// and compares it in constant time with the submitted value.
+//
+//   ahdcode run 03_csrf_session.ahd
+bring HTTP
+bring Security
+from HTTP bring Server
+from HTTP bring Request
+from HTTP bring Response
+from HTTP bring SessionStore
+from HTTP bring Session
+
+sessions: SessionStore := HTTP.sessions(
+    "csrf_demo"
+    3600
+    false
+    "Lax"
+)
+
+showForm: Function := (request: Request) -> Response {
+    sessions: Global SessionStore
+    session: Local Session := sessions.open(request)
+    token: Local String? := session.get("csrf")
+    if token == null {
+        token = Security.token()
+        session.set("csrf", token)
+    }
+    page: Local String := """<!doctype html><html><body>
+<form method="post" action="/submit">
+<input type="hidden" name="csrf" value="{token}"/>
+<button type="submit">Submit</button>
+</form></body></html>"""
+    return sessions.commit(session, HTTP.html(page))
+}
+
+handleSubmit: Function := (request: Request) -> Response {
+    sessions: Global SessionStore
+    session: Local Session := sessions.open(request)
+    storedToken: Local String? := session.get("csrf")
+    submittedToken: Local String? := request.form("csrf")
+
+    if storedToken == null {
+        return sessions.commit(session, HTTP.text("rejected: no session token", 403))
+    }
+    if submittedToken == null {
+        return sessions.commit(session, HTTP.text("rejected: missing csrf field", 403))
+    }
+    if Security.secureEqual(storedToken, submittedToken) {
+        session.set("csrf", Security.token())
+        return sessions.commit(session, HTTP.text("accepted"))
+    }
+    return sessions.commit(session, HTTP.text("rejected: token mismatch", 403))
+}
+
+app: Server := HTTP.server("127.0.0.1", 9080)
+app.get("/form", showForm)
+app.post("/submit", handleSubmit)
+write("Listening on http://127.0.0.1:9080")
+app.start()
