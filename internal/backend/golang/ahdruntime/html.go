@@ -682,6 +682,13 @@ func (p *ahdHTMLSelectorParser) parseComplex() ahdHTMLComplex {
 func (p *ahdHTMLSelectorParser) parseCompound() (ahdHTMLCompound, bool) {
 	var compound ahdHTMLCompound
 	found := false
+	// A compound selector has at most one type-selector slot, filled by
+	// either a bare '*' or one tag identifier, and it must come first
+	// (immediately after the previous combinator, before any #id/.class/
+	// [attr] suffix). "**", "div*", "*div", and "div.card*" all attempt to
+	// fill that slot twice and are rejected here, not silently accepted or
+	// skipped.
+	hasTypeSelector := false
 	for {
 		r, ok := p.peek()
 		if !ok {
@@ -689,9 +696,17 @@ func (p *ahdHTMLSelectorParser) parseCompound() (ahdHTMLCompound, bool) {
 		}
 		switch {
 		case r == '*':
+			if hasTypeSelector {
+				p.fail("the universal selector '*' cannot follow another type selector")
+			}
+			hasTypeSelector = true
 			p.pos++
 			found = true
 		case isHTMLIdentStart(r):
+			if hasTypeSelector {
+				p.fail("a compound selector can have at most one type selector")
+			}
+			hasTypeSelector = true
 			compound.Tag = strings.ToLower(p.readIdent())
 			found = true
 		case r == '#':

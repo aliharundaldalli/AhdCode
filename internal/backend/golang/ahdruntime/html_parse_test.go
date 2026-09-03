@@ -159,8 +159,60 @@ func TestHTMLSelectorInvalidRejected(t *testing.T) {
 	invalid := []string{
 		"", ",", "div,", "> div", "div >", "div >> p", "div..card",
 		"[", "[href", "[href=]", ":nth-child(2)", "div + p", "div ~ p",
+		"**", "div*", "*div", "div*p", "article**", "*.card*", "*#main*", "div.card*",
 	}
 	for _, selector := range invalid {
+		func() {
+			defer func() {
+				recovered := recover()
+				if recovered == nil {
+					t.Errorf("selector %q: expected a panic (HTMLError), got none", selector)
+					return
+				}
+				if _, ok := recovered.(*AhdSignal); !ok {
+					t.Errorf("selector %q: expected an AhdSignal panic, got %T", selector, recovered)
+				}
+			}()
+			ahdHTMLParseSelector(class, selector)
+		}()
+	}
+}
+
+// TestHTMLUniversalSelectorCompoundGrammar exercises the type-selector slot
+// invariant directly: a compound selector may open with at most one type
+// selector (a bare '*' or one tag), which must come before any #id/.class/
+// [attr] suffix. "*.card"/"*#main"/"*[href]" combine the universal selector
+// with a suffix and remain valid; a second type-selector token anywhere in
+// the same compound is rejected.
+func TestHTMLUniversalSelectorCompoundGrammar(t *testing.T) {
+	class := AhdClassHTMLError
+	source := `<div id="main">
+  <article class="card" data-id="1"><h2>One</h2></article>
+  <article class="card featured" data-id="2"><h2>Two</h2></article>
+</div>`
+	doc := AhdHTMLParse(class, source)
+
+	valid := []struct {
+		selector string
+		count    int
+	}{
+		{"*.card", 2},
+		{"*#main", 1},
+		{"*[data-id]", 2},
+		{"div.card", 0},
+		{"article.card.featured", 1},
+	}
+	for _, tc := range valid {
+		got := AhdHTMLDocumentSelect(class, doc, tc.selector)
+		if len(got) != tc.count {
+			t.Errorf("selector %q: expected %d matches, got %d", tc.selector, tc.count, len(got))
+		}
+	}
+
+	rejected := []string{
+		"**", "div*", "*div", "div*p", "article**", "*.card*", "*#main*", "div.card*",
+	}
+	for _, selector := range rejected {
 		func() {
 			defer func() {
 				recovered := recover()
