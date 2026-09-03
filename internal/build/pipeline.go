@@ -261,10 +261,10 @@ func RunProgramIO(entryPath string, arguments []string, stdin io.Reader, stdout,
 }
 
 // RunProgramObserved is RunProgramIO with one hook invoked after the compiled
-// program has started, carrying the running process id. The CLI uses it to
-// write an AhdCode run descriptor for `ahdcode kill`; every other caller
-// passes nil and behaves exactly as before.
-func RunProgramObserved(entryPath string, arguments []string, stdin io.Reader, stdout, stderr io.Writer, started func(pid int)) (int, Result) {
+// program has started, carrying the running process. The CLI uses it to own
+// that process for `ahdcode kill` and to write an AhdCode run descriptor;
+// every other caller passes nil and behaves exactly as before.
+func RunProgramObserved(entryPath string, arguments []string, stdin io.Reader, stdout, stderr io.Writer, started func(process *os.Process)) (int, Result) {
 	result := Compile(entryPath)
 	if result.HasErrors() || result.Program == nil {
 		return 1, result
@@ -288,7 +288,7 @@ func RunProgramObserved(entryPath string, arguments []string, stdin io.Reader, s
 		return 1, result
 	}
 	if started != nil && command.Process != nil {
-		started(command.Process.Pid)
+		started(command.Process)
 	}
 	if err := command.Wait(); err != nil {
 		var exit *exec.ExitError

@@ -24,11 +24,10 @@ upload: Function := (request: Request) -> Response {
     }
     // Never trust declaredContentType() for this decision: a text file can
     // claim application/pdf, and an extension proves nothing.
-    if paper.detectedContentType() != "application/pdf" {
+    detected: Local String := paper.detectedContentType()
+    if detected != "application/pdf" {
         return HTTP.text(
-            "rejected: the bytes look like " + paper.detectedContentType(
-                
-            ) + ", not application/pdf"
+            "rejected: the bytes look like " + detected + ", not application/pdf"
             415
         )
     }

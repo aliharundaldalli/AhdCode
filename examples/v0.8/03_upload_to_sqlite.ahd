@@ -71,15 +71,12 @@ papers: Function := (request: Request) -> Response {
     )
     listing: Local String := ""
     for row in rows {
-        listing = listing + str(
-            row["id"].int()
-        ) + " | " + row["title"].string(
-            
-        ) + " | " + row["original_name"].string(
-            
-        ) + " | " + row["stored_path"].string(
-            
-        ) + " | " + str(row["size"].int()) + "\n"
+        id: Local String := str(row["id"].int())
+        title: Local String := row["title"].string()
+        name: Local String := row["original_name"].string()
+        stored: Local String := row["stored_path"].string()
+        size: Local String := str(row["size"].int())
+        listing = listing + id + " | " + title + " | " + name + " | " + stored + " | " + size + "\n"
     }
     db.close()
     return HTTP.text(listing)

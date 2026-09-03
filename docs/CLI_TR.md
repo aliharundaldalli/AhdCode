@@ -33,17 +33,40 @@ ahdcode kill app.run
 
 Bu, süreci `lsof -i :8080` ile portundan bulup sonra `kill <pid>` çalıştırma
 alışkanlığının yerini alır. `kill` nazik bir durdurma ister;
-`ahdcode kill --force app.run` uygulamayı hemen durdurur. Run dosyası
-uygulamanın kimliğidir: çıplak bir pid bilinçli olarak kabul edilmez ve
-düzgün biçimli bir AhdCode run tanımlayıcısı olmayan bir dosya, hiçbir şeye
-sinyal gönderilmeden reddedilir. Süreci çoktan gitmiş bir tanımlayıcı, işlem
-yapılmak yerine bayat (stale) olarak bildirilip silinir; canlı bir
-tanımlayıcı varken ikinci bir `run` başlatmak ise portta sessizce çakışmak
-yerine pid'i ve kullanılacak `kill` komutunu bildirerek başarısız olur.
+`ahdcode kill --force app.run` uygulamayı hemen durdurur.
+
+**`kill`, run dosyasında yazan süreç kimliğine asla sinyal göndermez.** Bir
+dosyadaki süreç kimliği hiçbir şey kanıtlamaz: dosyayı yazabilen herkes
+ilgisiz bir süreci adlandırabilir ve işletim sistemleri kimlikleri yeniden
+kullanır; bu yüzden bayat bir tanımlayıcı zamanla bambaşka bir şeyi
+adlandırabilir. Bunun yerine, canlı bir `ahdcode run` yalnızca loopback'e
+bağlı bir kontrol portunu dinler ve 256 bitlik rastgele bir jeton tutar;
+tanımlayıcı da ona nasıl ulaşılacağını kaydeder. `kill`, `127.0.0.1`
+üzerinden o porta bağlanır, jetonu sunar ve çalışan süpervizör, kendi
+başlattığı ve sahibi olduğu çocuk süreci sonlandırır.
+
+Sonuçları asıl meseledir:
+
+- ilgisiz, canlı bir süreci adlandıran sahte bir tanımlayıcı hiçbir şeyi
+  durdurmaz, çünkü onun adına yanıt veren bir süpervizör yoktur;
+- yeniden kullanılmış bir süreç kimliği aynı nedenle zararsızdır;
+- yanlış bir jeton reddedilir ve hiçbir şey durdurulmaz;
+- canlı süpervizörü olmayan bir tanımlayıcı, hiçbir sürece sinyal
+  gönderilmeden bayat olarak bildirilip silinir;
+- düzgün biçimli bir AhdCode run tanımlayıcısı olmayan bir dosya — çıplak bir
+  pid dahil — doğrudan reddedilir.
+
+`--force` yalnızca süpervizörün kendi çocuğunu nasıl sonlandırdığını
+değiştirir; dosyadan doğrudan sinyal göndermeyi asla geri getirmez. Bir
+tanımlayıcının süpervizörü hâlâ yanıt verirken ikinci bir `run` başlatmak,
+portta sessizce çakışmak yerine pid'i ve kullanılacak `kill` komutunu
+bildirerek başarısız olur; süpervizörü gitmiş bir tanımlayıcı ise yeni
+çalıştırma sürebilsin diye temizlenir.
 
 Tanımlayıcı dahili CLI meta verisidir, dil düzeyinde bir biçim değildir:
-standart kütüphanede onu okuyan ya da yazan hiçbir şey yoktur; bir süreç
-yöneticisi, arka plan servis kaydı veya `dev`/izleme kipi değildir.
+standart kütüphanede onu okuyan ya da yazan hiçbir şey yoktur; bir kontrol
+yetkisi taşıdığı için `0600` izinle yazılır; bir süreç yöneticisi, arka plan
+servis kaydı veya `dev`/izleme kipi değildir.
 
 `build`, üretilen çalıştırılabilir dosyanın yolunu yazdırır. `-o` olmadan,
 derleyici geçerli çalışma dizininde giriş modülünün temel (base) adını

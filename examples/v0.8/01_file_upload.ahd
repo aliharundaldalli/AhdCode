@@ -63,12 +63,11 @@ upload: Function := (request: Request) -> Response {
     if title != null {
         heading = title
     }
+    name: Local String := document.originalName()
+    detected: Local String := document.detectedContentType()
+    size: Local String := str(document.size())
     return HTTP.text(
-        "title: " + heading + "\noriginal name: " + document.originalName(
-            
-        ) + "\ndeclared type: " + declaredText + "\ndetected type: " + document.detectedContentType(
-            
-        ) + "\nsize: " + str(document.size()) + " bytes"
+        "title: " + heading + "\noriginal name: " + name + "\ndeclared type: " + declaredText + "\ndetected type: " + detected + "\nsize: " + size + " bytes"
     )
 }
 // enctype="multipart/form-data" bodies still obey the server's total body

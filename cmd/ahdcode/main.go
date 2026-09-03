@@ -5,6 +5,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -131,21 +132,23 @@ func runRun(arguments []string, input io.Reader, output, errorOutput io.Writer) 
 		programArguments = programArguments[1:]
 	}
 
-	// While this application runs, a sibling app.run descriptor names it, so
-	// `ahdcode kill app.run` can stop it later. A descriptor whose process is
-	// still alive means this source is already running: say so rather than
-	// starting a second copy that will collide on the same port.
+	// While this application runs, a sibling app.run descriptor names it so
+	// `ahdcode kill app.run` can stop it later. The descriptor points at this
+	// process's loopback control channel rather than granting authority over a
+	// process id; see runcontrol.go.
 	runFile := runFileFor(entry)
 	if err := claimRunFile(runFile); err != nil {
 		fmt.Fprintf(errorOutput, "ahdcode run: %v\n", err)
 		return 1
 	}
-	running := 0
-	defer func() {
-		if running != 0 {
-			removeOwnRunDescriptor(runFile, running)
-		}
-	}()
+	control, err := startRunControlServer()
+	if err != nil {
+		fmt.Fprintf(errorOutput, "ahdcode run: could not start the run control channel: %v\n", err)
+		return 1
+	}
+	defer control.close()
+	defer removeOwnRunDescriptor(runFile, control.port())
+
 	stopSignals := make(chan os.Signal, 1)
 	signal.Notify(stopSignals, os.Interrupt, syscall.SIGTERM)
 	defer signal.Stop(stopSignals)
@@ -153,25 +156,33 @@ func runRun(arguments []string, input io.Reader, output, errorOutput io.Writer) 
 		for range stopSignals {
 			// Ctrl-C would otherwise end this process without cleanup; the
 			// child receives the same terminal signal and exits on its own.
-			if running != 0 {
-				removeOwnRunDescriptor(runFile, running)
-			}
+			removeOwnRunDescriptor(runFile, control.port())
 		}
 	}()
 
-	code, result := build.RunProgramObserved(entry, programArguments, input, output, errorOutput, func(pid int) {
-		running = pid
-		if err := startRunDescriptor(runFile, entry, pid); err != nil {
+	code, result := build.RunProgramObserved(entry, programArguments, input, output, errorOutput, func(process *os.Process) {
+		// The supervisor owns this process; it is the only thing that will
+		// ever terminate it.
+		control.attach(process)
+		// The descriptor is written only once the control channel is ready,
+		// so a descriptor never names an endpoint that cannot answer.
+		if err := startRunDescriptor(runFile, entry, process.Pid, control.port(), control.token); err != nil {
 			fmt.Fprintf(errorOutput, "ahdcode run: could not write the run file: %v\n", err)
+			return
 		}
+		control.ownDescriptor(runFile)
 	})
 	reportTo(errorOutput, result)
 	return code
 }
 
-// runKill stops the application named by one AhdCode run descriptor. The
-// descriptor is the application's identity: a bare numeric pid is deliberately
-// not accepted, so this command can never be pointed at an arbitrary process.
+// runKill stops the application named by one AhdCode run descriptor.
+//
+// It never signals the pid recorded in the file. A descriptor only locates the
+// live supervisor: kill authenticates to that supervisor's loopback control
+// channel, and the supervisor terminates the child it actually owns. A forged
+// descriptor naming an unrelated process therefore stops nothing, and a
+// recycled pid is harmless.
 func runKill(arguments []string, output, errorOutput io.Writer) int {
 	force := false
 	target := ""
@@ -203,32 +214,39 @@ func runKill(arguments []string, output, errorOutput io.Writer) int {
 		fmt.Fprintf(errorOutput, "ahdcode kill: %s is not a usable AhdCode run file (%v); no process was stopped\n", target, err)
 		return 1
 	}
-	if !processAlive(descriptor.PID) {
-		if removeErr := os.Remove(target); removeErr != nil {
-			fmt.Fprintf(errorOutput, "ahdcode kill: the application is not running, but the stale run file could not be removed: %v\n", removeErr)
-			return 1
-		}
-		fmt.Fprintf(output, "AhdCode application is not running; removed the stale run file %s\n", target)
-		return 0
+
+	action := runControlStop
+	if force {
+		action = runControlForceStop
 	}
-	if err := terminateProcess(descriptor.PID, force); err != nil {
-		fmt.Fprintf(errorOutput, "ahdcode kill: could not stop process %d: %v\n", descriptor.PID, err)
+	if err := requestRunControl(descriptor.ControlPort, descriptor.ControlToken, action); err != nil {
+		if errors.Is(err, errRunControlUnreachable) {
+			// Nothing answered for this descriptor, so there is no AhdCode
+			// application here to stop. The recorded pid is deliberately left
+			// alone: it may belong to something else entirely.
+			if removeErr := os.Remove(target); removeErr != nil {
+				fmt.Fprintf(errorOutput, "ahdcode kill: the application is not running, but the stale run file could not be removed: %v\n", removeErr)
+				return 1
+			}
+			fmt.Fprintf(output, "AhdCode application is not running; removed the stale run file %s (no process was signalled)\n", target)
+			return 0
+		}
+		fmt.Fprintf(errorOutput, "ahdcode kill: %v; no process was stopped\n", err)
 		return 1
 	}
-	stopped := false
+
+	// The supervisor stopped its child and removes its own descriptor as it
+	// exits; wait briefly for that, then clean up the file we authenticated
+	// against if the supervisor did not get to it.
 	for attempt := 0; attempt < 50; attempt++ {
-		if !processAlive(descriptor.PID) {
-			stopped = true
-			break
+		if _, statErr := os.Stat(target); os.IsNotExist(statErr) {
+			fmt.Fprintf(output, "Stopped the AhdCode application (pid %d) and removed %s\n", descriptor.PID, target)
+			return 0
 		}
 		time.Sleep(100 * time.Millisecond)
 	}
-	if !stopped {
-		fmt.Fprintf(errorOutput, "ahdcode kill: process %d did not stop; retry with: ahdcode kill --force %s\n", descriptor.PID, target)
-		return 1
-	}
 	if err := os.Remove(target); err != nil && !os.IsNotExist(err) {
-		fmt.Fprintf(errorOutput, "ahdcode kill: stopped process %d but could not remove %s: %v\n", descriptor.PID, target, err)
+		fmt.Fprintf(errorOutput, "ahdcode kill: stopped the application but could not remove %s: %v\n", target, err)
 		return 1
 	}
 	fmt.Fprintf(output, "Stopped the AhdCode application (pid %d) and removed %s\n", descriptor.PID, target)
