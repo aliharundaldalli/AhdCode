@@ -1,4 +1,4 @@
-# AhdCode v0.8.0 Türkçe Öğrenci Rehberi
+# AhdCode v0.9.0 Türkçe Öğrenci Rehberi
 
 Bu rehber, **daha önce hiç programlama yapmamış birinin de takip edebilmesi** için hazırlanmıştır. Baştan sona sırayla okuyabilirsiniz; her bölümde önce ne yapmak istediğimizi görecek, sonra çalışan bir örnek yazacak, en son gerekli kuralları öğreneceksiniz.
 
@@ -47,14 +47,15 @@ En iyi öğrenme yolu, örnekleri yalnızca okumak değil çalıştırmaktır. B
 - [38. HTTP Client](#38-http-client)
 - [39. HTML ayrıştırma ve web kazıma (scraping)](#39-html-ayrıştırma-ve-web-kazıma-scraping)
 - [40. Dosya yüklemeleri](#40-dosya-yüklemeleri)
-- [41. Kod biçimlendirici (Formatter)](#41-kod-biçimlendirici-formatter)
-- [42. Komut satırı (CLI)](#42-komut-satırı-cli)
-- [43. Etkileşimli kabuk (REPL)](#43-etkileşimli-kabuk-repl)
-- [44. Sık yapılan başlangıç hataları](#44-sık-yapılan-başlangıç-hataları)
-- [45. Küçük Projeler](#45-küçük-projeler)
-- [46. Egzersizler](#46-egzersizler)
-- [47. Çözüm İpuçları](#47-çözüm-i̇puçları)
-- [48. Sonraki adımlar ve teknik belgeler](#48-sonraki-adımlar-ve-teknik-belgeler)
+- [41. E-posta gönderme (SMTP)](#41-e-posta-gönderme-smtp)
+- [42. Kod biçimlendirici (Formatter)](#42-kod-biçimlendirici-formatter)
+- [43. Komut satırı (CLI)](#43-komut-satırı-cli)
+- [44. Etkileşimli kabuk (REPL)](#44-etkileşimli-kabuk-repl)
+- [45. Sık yapılan başlangıç hataları](#45-sık-yapılan-başlangıç-hataları)
+- [46. Küçük Projeler](#46-küçük-projeler)
+- [47. Egzersizler](#47-egzersizler)
+- [48. Çözüm İpuçları](#48-çözüm-i̇puçları)
+- [49. Sonraki adımlar ve teknik belgeler](#49-sonraki-adımlar-ve-teknik-belgeler)
 
 ## 1. AhdCode nedir?
 
@@ -3469,7 +3470,129 @@ ahdcode kill app.run
 Ayrıntılar için [HTTP modül referansına](HTTP_TR.md) ve
 [`examples/v0.8`](../examples/v0.8/README_TR.md) bakın.
 
-## 41. Kod biçimlendirici (Formatter)
+## 41. E-posta gönderme (SMTP)
+
+AhdCode, SMTP üzerinden gerçek e-posta gönderebilir. Bu yalnızca gönderimdir:
+gelen kutusu, IMAP ve dosya eki henüz yoktur.
+
+Gerçek bir SMTP parolasını kaynağa yazmayın. `Env` ile okuyun.
+
+### 1. İstemci oluşturmak
+
+```ahd
+bring SMTP
+from SMTP bring SMTPClient
+from SMTP bring SMTPMessage
+from SMTP bring SMTPError
+
+client: SMTPClient := SMTP.client("127.0.0.1", 2525, "none")
+```
+
+`SMTP.client` bağlanmaz. Ağ yalnızca `send` çağrıldığında kullanılır.
+
+### 2. Güvenlik kipleri
+
+Tam küçük harf değeri kullanın:
+
+- `"starttls"` — bağlan, STARTTLS iste, TLS doğrula (varsayılan)
+- `"tls"` — hemen TLS, örtük TLS
+- `"none"` — açık düz metin, yerel test sunucusu için
+
+STARTTLS isterseniz ve sunucu onu ilan etmezse `SMTPError` alırsınız. AhdCode
+sessizce düz metne devam etmez.
+
+### 3. İleti
+
+```ahd
+message: SMTPMessage := SMTP.message(
+    "sender@example.com"
+    ["student@example.com"]
+    "AhdCode Semineri"
+)
+```
+
+Her liste öğesi bir postadır. Tek bir String olarak
+`"a@example.com, b@example.com"` yazmayın.
+
+### 4. Metin postası
+
+```ahd
+message = message.withText("Merhaba AhdCode")
+```
+
+### 5. HTML postası
+
+```ahd
+message = message.withHtml("<p>Merhaba <strong>Hatay</strong></p>")
+```
+
+İkisi de ayarlanırsa posta `multipart/alternative` olur (önce metin, sonra
+HTML). SMTP HTML'i **temizlemez**. İçerik kullanıcıdan geldiyse uygulamanız
+önce onu temizlemelidir.
+
+### 6. To, Cc ve Bcc
+
+```ahd
+message = message.withCc(["bob@example.com"])
+message = message.withBcc(["secret@example.com"])
+```
+
+Bcc alıcıları SMTP sunucusuna zarf alıcısı olarak gönderilir, ancak posta
+DATA'sına **Bcc başlığı yazılmaz**. Diğer alıcılar Bcc adresini görmez.
+
+### 7. Reply-To
+
+```ahd
+message = message.withReplyTo("reply@example.com")
+```
+
+`withReplyTo` tekrar çağrılırsa önceki değeri değiştirir.
+
+### 8. Env kimlik bilgileri
+
+```ahd
+bring Env
+
+host := Env.getOr("SMTP_HOST", "127.0.0.1")
+port := int(Env.getOr("SMTP_PORT", "2525"))
+security := Env.getOr("SMTP_SECURITY", "starttls")
+username := Env.getOr("SMTP_USERNAME", "")
+password := Env.getOr("SMTP_PASSWORD", "")
+
+client := SMTP.client(host, port, security)
+if username != "" {
+    client = client.withPlainAuth(username, password)
+}
+```
+
+v0.9'daki tek kimlik doğrulama AUTH PLAIN'dir. Düz metinde (`"none"`) parola
+gönderilmeden reddedilir.
+
+### 9. STARTTLS ve TLS
+
+Gerçek bir posta sunucusu için 587'de `"starttls"` veya 465'te `"tls"` tercih
+edin. Çalışma zamanı sertifika zincirini ve makine adını sistem güvenine göre
+doğrular. "Doğrulamayı atla" anahtarı yoktur.
+
+### 10. SMTPError
+
+```ahd
+attempt {
+    client.send(message)
+    write("sent")
+} except SMTPError as error {
+    write(error.message)
+}
+```
+
+Reddedilen bir alıcı, TLS hatası, zaman aşımı veya eksik gövde `SMTPError`
+yükseltir. Bir `send` bir işlemdir: AhdCode yeniden denemez, çünkü yeniden
+deneme aynı postayı iki kez teslim edebilir.
+
+Ayrıntılar için [SMTP modül referansına](SMTP_TR.md) ve
+[`examples/v0.9`](../examples/v0.9/README_TR.md) bakın.
+
+## 42. Kod biçimlendirici (Formatter)
 
 Kod çalışsa bile herkes farklı boşluk ve satır düzeni kullanırsa okumak zorlaşır. AhdCode formatter, geçerli kodu ortak bir stile dönüştürür:
 
@@ -3522,7 +3645,7 @@ values :=
 
 Formatter idempotent'tir; aynı dosyada tekrar çalıştırmak yeni değişiklik üretmez.
 
-## 42. Komut satırı (CLI)
+## 43. Komut satırı (CLI)
 
 AhdCode'u terminalden birkaç temel komutla kullanabilirsiniz:
 
@@ -3559,7 +3682,7 @@ Yardım ve sürüm bilgisini gösterir.
 
 Yeni başlıyorsanız çoğu zaman kullanacağınız komut `ahdcode run ...` olacaktır.
 
-## 43. Etkileşimli kabuk (REPL)
+## 44. Etkileşimli kabuk (REPL)
 
 Küçük bir şeyi denemek için her seferinde dosya oluşturmak zorunda değilsiniz. Terminalde yalnızca:
 
@@ -3628,7 +3751,7 @@ harici bir render motorunu çağırır. Bu çağrıları bir `.ahd` dosyasından
 çalıştırın. `Archive`'ın böyle bir sınırlaması yoktur — REPL'de tamamen
 çalışır. Ayrıntılar için [REPL referansına](REPL_TR.md) bakın.
 
-## 44. Sık yapılan başlangıç hataları
+## 45. Sık yapılan başlangıç hataları
 
 Hata mesajı görmek programlamanın normal bir parçasıdır. Çoğu hata, bilgisayarın ne istediğinizi anlayamadığını söyler. Aşağıdaki örnekler yeni başlayanların sık karşılaştığı durumları ve nasıl düzelteceğinizi gösterir:
 
@@ -3737,7 +3860,7 @@ Hata mesajı görmek programlamanın normal bir parçasıdır. Çoğu hata, bilg
 - Neden: Bu, başlığı SQL'e yapıştırır. `Robert'); DROP TABLE notes;--` gibi bir başlık artık veri değildir.
 - Doğru: `?` yer tutucusu ve `SQLite.fromString(title)` kullanın. Parametre bağlama metni veri olarak tutar.
 
-## 45. Küçük Projeler
+## 46. Küçük Projeler
 
 Bu küçük projeler rehberde öğretilenleri bir araya getirir. Onları tek başınıza kurmayı deneyin!
 
@@ -3751,7 +3874,7 @@ Bu küçük projeler rehberde öğretilenleri bir araya getirir. Onları tek ba�
 8. **SQLite Not Defteri**: `notes.db` açın, yoksa bir `notes` tablosu oluşturun ve kullanıcının not eklemesine, listelemesine, başlığa göre aramasına, güncellemesine ve silmesine izin verin. Her değer için `?` parametreleri kullanın. Programı kapatıp yeniden çalıştırın: eski notlar durmalıdır.
 9. **Web Not Defteri**: Notları `127.0.0.1` üzerinde bir tarayıcıda sunun. Notları `HTML.text` ile listeleyin, POST `/notes` ve bağlı SQLite parametreleriyle not ekleyin, sonra `/` adresine yönlendirin. Dinamik metin ham HTML'e birleştirilmemelidir.
 
-## 46. Egzersizler
+## 47. Egzersizler
 
 Tam çözümleri hemen aramak yerine her programı küçük adımlarla kurun.
 
@@ -3784,7 +3907,7 @@ Tam çözümleri hemen aramak yerine her programı küçük adımlarla kurun.
 22. `127.0.0.1` üzerinde `GET /ok` için `HTTP.text("ok")` sunun ve tarayıcıda açın.
 23. Genel bir HTTPS sayfasında `HTTP.client().get` kullanın, `status()` yazın ve `HTTPError` ile 404 `ClientResponse` ayrımını yapın.
 
-## 47. Çözüm İpuçları
+## 48. Çözüm İpuçları
 
 1. `take` sonucu String'dir; yaş için `int(...)` ve yeni yaş için `+ 1` kullanın.
 2. Formülü küçük parçalara ayırın; `real(take(...))` ile başlayın ve Real sayılarını kullanın.
@@ -3810,7 +3933,7 @@ Tam çözümleri hemen aramak yerine her programı küçük adımlarla kurun.
 22. `HTTP.server("127.0.0.1", 8080)`, `app.get("/ok", handler)`, `HTTP.text("ok")`, sonra `app.start()`.
 23. `HTTP.client()`, `client.get("https://example.com/")`, `response.status()`. 404 hâlâ `ClientResponse`; TLS veya zaman aşımı `HTTPError`.
 
-## 48. Sonraki adımlar ve teknik belgeler
+## 49. Sonraki adımlar ve teknik belgeler
 
 Bu rehberi tamamladıktan sonra dilin ayrıntılarını şu belgelerden
 derinleştirebilirsiniz:
