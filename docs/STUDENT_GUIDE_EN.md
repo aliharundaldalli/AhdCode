@@ -1,4 +1,4 @@
-# AhdCode v0.7.0 English Student Guide
+# AhdCode v0.8.0 English Student Guide
 
 This guide is designed so that **even someone who has never programmed before** can follow along. You can read it in order from beginning to end; in each section, you will first see what we want to achieve, then write a working example, and finally learn the necessary rules.
 
@@ -46,14 +46,15 @@ The best way to learn is not just by reading the examples, but by running them. 
 - [37. Cookies and sessions](#37-cookies-and-sessions)
 - [38. HTTP Client](#38-http-client)
 - [39. HTML parsing and web scraping](#39-html-parsing-and-web-scraping)
-- [40. Code Formatter](#40-code-formatter)
-- [41. Command line (CLI)](#41-command-line-cli)
-- [42. Interactive shell (REPL)](#42-interactive-shell-repl)
-- [43. Common beginner mistakes](#43-common-beginner-mistakes)
-- [44. Small Projects](#44-small-projects)
-- [45. Exercises](#45-exercises)
-- [46. Solution Hints](#46-solution-hints)
-- [47. Next steps and technical docs](#47-next-steps-and-technical-docs)
+- [40. File uploads](#40-file-uploads)
+- [41. Code Formatter](#41-code-formatter)
+- [42. Command line (CLI)](#42-command-line-cli)
+- [43. Interactive shell (REPL)](#43-interactive-shell-repl)
+- [44. Common beginner mistakes](#44-common-beginner-mistakes)
+- [45. Small Projects](#45-small-projects)
+- [46. Exercises](#46-exercises)
+- [47. Solution Hints](#47-solution-hints)
+- [48. Next steps and technical docs](#48-next-steps-and-technical-docs)
 
 ## 1. What is AhdCode?
 
@@ -3338,7 +3339,115 @@ for article in articles {
 See [the HTML module reference](HTML.md) and
 [`examples/v0.7`](../examples/v0.7/README.md).
 
-## 40. Code Formatter
+## 40. File uploads
+
+A `<form>` that carries a file must say so with
+`enctype="multipart/form-data"`. Text fields still arrive through
+`request.form`; files arrive through `request.file`.
+
+### The form
+
+```ahd
+HTML.element("form", {"method": "post", "action": "/upload", "enctype": "multipart/form-data"}, [
+    HTML.element("input", {"type": "text", "name": "title"}, [])
+    HTML.element("input", {"type": "file", "name": "paper", "accept": "application/pdf"}, [])
+    HTML.element("button", {"type": "submit"}, [HTML.text("Upload")])
+])
+```
+
+### Reading the upload
+
+```ahd
+upload: Function := (request: Request) -> Response {
+    title: Local String? := request.form("title")
+    paper: Local UploadedFile? := request.file("paper")
+    if paper == null {
+        return HTTP.text("please choose a file", 400)
+    }
+    write(paper.originalName())          // "paper.pdf" - display only
+    write(str(paper.size()))             // exact bytes
+    return HTTP.text("received")
+}
+```
+
+`request.file(name)` is `null` when that field carried no file, so it needs
+the usual `!= null` guard. For `<input type="file" name="papers" multiple>`,
+`request.files("papers")` gives every file in order.
+
+### Two content types, only one you can trust
+
+```ahd
+paper.declaredContentType()   // what the browser claimed
+paper.detectedContentType()   // what the bytes actually look like
+```
+
+Anyone can rename `virus.exe` to `paper.pdf` and claim `application/pdf`. The
+extension and the declaration are just text that arrived with the request.
+Only `detectedContentType()` looks at the file's own bytes:
+
+```ahd
+if paper.detectedContentType() != "application/pdf" {
+    return HTTP.text("that is not a PDF", 415)
+}
+```
+
+**Technical note.** Detection recognizes the *shape* of common formats. It
+does not scan for viruses and does not prove a PDF is safe to open.
+
+### Saving it safely
+
+This is the single most important rule of this section:
+
+```ahd
+// NEVER do this
+storedPath := "uploads/" + paper.originalName()
+```
+
+The uploader chooses that name. A name like `../../etc/passwd` would then
+write outside your folder, and two people uploading `paper.pdf` would
+overwrite each other. Do this instead:
+
+```ahd
+storedPath := paper.save("uploads/papers")
+```
+
+`save` picks a random file name inside the directory *you* named, never
+overwrites an existing file, and returns the path it actually used, such as
+`uploads/papers/8e8f30c65c4d4d23...`. Each upload may be saved once.
+
+### Keep the file on disk, the facts in the database
+
+```ahd
+db.execute(
+    "INSERT INTO papers (title, original_name, stored_path, detected_content_type, size) VALUES (?, ?, ?, ?, ?)"
+    [
+        SQLite.fromString(title)
+        SQLite.fromString(paper.originalName())
+        SQLite.fromString(storedPath)
+        SQLite.fromString(paper.detectedContentType())
+        SQLite.fromInt(paper.size())
+    ]
+)
+```
+
+The PDF itself stays in `uploads/papers/`; the database keeps only where it
+is and what it is. If you never save an upload, it is deleted automatically
+when the request ends.
+
+### Stopping your server
+
+While `ahdcode run app.ahd` is running it keeps an `app.run` file beside your
+source. To stop the application, you do not need to find the port or the
+process id:
+
+```bash
+ahdcode kill app.run
+```
+
+See [the HTTP module reference](HTTP.md) and
+[`examples/v0.8`](../examples/v0.8/README.md).
+
+## 41. Code Formatter
 
 Even if the code works, if everyone uses different spacing and line layouts, it becomes hard to read. The AhdCode formatter converts valid code to a common style:
 
@@ -3391,7 +3500,7 @@ values: List<Int> :=
 
 The formatter is idempotent; running it again on the same file produces no new changes.
 
-## 41. Command line (CLI)
+## 42. Command line (CLI)
 
 You can use AhdCode from the terminal with a few basic commands:
 
@@ -3428,7 +3537,7 @@ Shows help and version information.
 
 If you are a beginner, the command you will use most of the time will be `ahdcode run ...`.
 
-## 42. Interactive shell (REPL)
+## 43. Interactive shell (REPL)
 
 You don't have to create a file every time you want to try something small. In the terminal, just run:
 
@@ -3496,7 +3605,7 @@ not support. Run those calls from a `.ahd` file instead. `Archive` has no
 such limit -- it works fully in the REPL. See the [REPL reference](REPL.md)
 for details.
 
-## 43. Common beginner mistakes
+## 44. Common beginner mistakes
 
 Seeing an error message is a normal part of programming. Most errors simply tell you that the computer couldn't understand what you wanted. The following examples show common situations beginners encounter and how to fix them:
 
@@ -3605,7 +3714,7 @@ Seeing an error message is a normal part of programming. Most errors simply tell
 - Why: That splices the title into SQL. A title such as `Robert'); DROP TABLE notes;--` is no longer data.
 - Correct: Use a `?` placeholder and `SQLite.fromString(title)`. Parameter binding keeps the text as data.
 
-## 44. Small Projects
+## 45. Small Projects
 
 These small projects bring together what is taught in the guide. Try building them on your own!
 
@@ -3619,7 +3728,7 @@ These small projects bring together what is taught in the guide. Try building th
 8. **SQLite Notes App**: Open `notes.db`, create a `notes` table if it is missing, and let the user add a note, list notes, search by title, update a note, and delete a note. Use `?` parameters for every value. Close the program and run it again: the old notes must still be there.
 9. **Web Notes App**: Serve notes in a browser on `127.0.0.1`. List notes with `HTML.text`, add a note with POST `/notes` and bound SQLite parameters, then redirect to `/`. Dynamic text must not be concatenated into raw HTML.
 
-## 45. Exercises
+## 46. Exercises
 
 Instead of immediately looking for full solutions, build each program in small steps.
 
@@ -3652,7 +3761,7 @@ Instead of immediately looking for full solutions, build each program in small s
 22. Serve `HTTP.text("ok")` on `GET /ok` at `127.0.0.1` and open it in a browser.
 23. Use `HTTP.client().get` on a public HTTPS page, print `status()`, and treat `HTTPError` separately from a 404 `ClientResponse`.
 
-## 46. Solution Hints
+## 47. Solution Hints
 
 1. The result of `take` is a String; use `int(...)` for age, and `+ 1` for the new age.
 2. Break the formula into small parts; start with `real(take(...))` and use Real numbers.
@@ -3678,7 +3787,7 @@ Instead of immediately looking for full solutions, build each program in small s
 22. `HTTP.server("127.0.0.1", 8080)`, `app.get("/ok", handler)`, `HTTP.text("ok")`, then `app.start()`.
 23. `HTTP.client()`, `client.get("https://example.com/")`, `response.status()`. A 404 is still `ClientResponse`; a TLS or timeout failure is `HTTPError`.
 
-## 47. Next steps and technical docs
+## 48. Next steps and technical docs
 
 After finishing this guide, you can deepen your knowledge of the language details from these documents:
 
@@ -3724,4 +3833,4 @@ After finishing this guide, you can deepen your knowledge of the language detail
 - [Language server](LSP.md)
 - [Full v0.1 specification](../AHDCODE_LANGUAGE_SPEC_v0.1.md)
 
-Check the [curated v0.1 examples](../examples/v0.1/README.md) folder, the [v0.3 SQLite Notes App](../examples/v0.3/README.md), the [v0.4 Web Notes App](../examples/v0.4/README.md), the [v0.5 cookies and sessions](../examples/v0.5/README.md), the [v0.6 HTTP Client](../examples/v0.6/README.md), and the [v0.7 HTML parsing and web scraping](../examples/v0.7/README.md) examples for more working programs.
+Check the [curated v0.1 examples](../examples/v0.1/README.md) folder, the [v0.3 SQLite Notes App](../examples/v0.3/README.md), the [v0.4 Web Notes App](../examples/v0.4/README.md), the [v0.5 cookies and sessions](../examples/v0.5/README.md), the [v0.6 HTTP Client](../examples/v0.6/README.md), the [v0.7 HTML parsing and web scraping](../examples/v0.7/README.md), and the [v0.8 file uploads](../examples/v0.8/README.md) examples for more working programs.

@@ -55,6 +55,15 @@ HTTP.client(
 ) -> Client
 HTTP.clientRequest(method: String, url: String) -> ClientRequest
 
+Request.file(name: String)  -> UploadedFile?
+Request.files(name: String) -> List<UploadedFile>
+
+UploadedFile.originalName()        -> String
+UploadedFile.declaredContentType() -> String?
+UploadedFile.detectedContentType() -> String
+UploadedFile.size()                -> Int
+UploadedFile.save(directory: String) -> String
+
 Server.get(path: String, handler: Function)   -> Nothing
 Server.post(path: String, handler: Function)  -> Nothing
 Server.route(method: String, path: String, handler: Function) -> Nothing
@@ -197,15 +206,137 @@ case-sensitive. Cookie parsing is part of the immutable request snapshot.
 `body()` is the UTF-8
 request body; invalid UTF-8 raises `HTTPError` (no silent replacement).
 
-Forms are parsed only when `Content-Type` is `application/x-www-form-urlencoded`.
-`form(name)` / `formAll(name)` then behave like query accessors. The same
-strict percent-decoding rules apply to form bodies: malformed or non-UTF-8
-form data returns **400** before the handler runs. Multipart, files, and JSON
-bodies are not a form API; read `body()` for a raw String.
+Forms are parsed when `Content-Type` is `application/x-www-form-urlencoded`
+or `multipart/form-data`. `form(name)` / `formAll(name)` then behave like
+query accessors, and multipart **text** fields arrive through that same API --
+there is no second multipart-only text accessor. The same strict
+percent-decoding rules apply to urlencoded form bodies: malformed or non-UTF-8
+form data returns **400** before the handler runs. Multipart **file** parts
+are read with `file` / `files` (see below). JSON bodies are not a form API;
+read `body()` for a raw String.
 
 The body is limited with `http.MaxBytesReader` **before** the handler runs.
 A body larger than `maxBodyBytes` returns **413** and the handler is not
 called. The exact limit is accepted; one extra byte is 413.
+
+## File uploads
+
+A `multipart/form-data` request carries text fields and file parts together.
+Text fields are read with `form`/`formAll`; file parts are read with
+`file`/`files`:
+
+```ahd
+handle: Function := (request: Request) -> Response {
+    title: Local String? := request.form("title")
+    paper: Local UploadedFile? := request.file("paper")
+    if paper == null {
+        return HTTP.text("paper is required", 400)
+    }
+    if paper.detectedContentType() != "application/pdf" {
+        return HTTP.text("rejected", 415)
+    }
+    storedPath: Local String := paper.save("uploads/papers")
+    return HTTP.text("saved " + storedPath)
+}
+```
+
+`file(name)` is the first uploaded file for that field, or `null` when the
+field carried no file. `files(name)` is every uploaded file for that field in
+request order, or `[]` -- so `<input type="file" name="papers" multiple>`
+never silently discards duplicates.
+
+`UploadedFile` is opaque and read-only. There is no `bytes()`, `raw()`,
+`stream()`, `tempPath()`, file handle, or pointer: an uploaded PDF is not a
+`String`, and AhdCode does not pretend binary content is text. The bytes
+reach the filesystem only through `save`.
+
+### The uploader controls the name; you control the path
+
+`originalName()` is **display metadata only**. It is the browser-supplied
+filename reduced to a safe basename: `/` and `\` are both treated as
+separators regardless of platform, a `C:` drive prefix is dropped, `.`/`..`
+and empty names collapse to `file`, and a NUL byte is rejected as
+structurally invalid. `../../evil.pdf` therefore surfaces as `evil.pdf`.
+
+Never build a path from it:
+
+```ahd
+storedPath := "uploads/" + paper.originalName()   // do not do this
+storedPath := paper.save("uploads/papers")        // do this
+```
+
+`save(directory)` creates the directory if needed and writes the upload under
+a **cryptographically random** basename such as
+`uploads/papers/8e8f30c65c4d4d23...`, created exclusively so it can never
+overwrite an existing file. It returns the actual stored path. Two uploads
+with the same original name always get different stored paths. Because the
+generated basename contains no separator, the stored file is always a direct
+child of the directory the application named -- an uploaded filename cannot
+reach a parent directory.
+
+The directory argument is the application's decision, not the uploader's;
+AhdCode does not sandbox filesystem access in general.
+
+An upload is persisted **once**. Calling `save` a second time on the same
+`UploadedFile` raises `HTTPError` rather than quietly creating a duplicate
+copy. Metadata methods keep working after a save.
+
+### Declared type versus detected type
+
+```text
+declaredContentType()  what the client claimed   (never trust this)
+detectedContentType()  what the bytes look like  (decide with this)
+```
+
+`declaredContentType()` is the part's own `Content-Type` header, normalized
+to a bare media type (`text/plain; charset=utf-8` becomes `text/plain`), or
+`null` when the part declared none. `detectedContentType()` sniffs the
+leading bytes with Go's `net/http.DetectContentType`, also normalized.
+
+The filename and its extension never influence detection. A text file named
+`malware.pdf` claiming `application/pdf` reports:
+
+```text
+originalName()         malware.pdf
+declaredContentType()  application/pdf
+detectedContentType()  text/plain
+```
+
+so the application can reject the mismatch. A zero-byte upload has no content
+to resemble and reports the documented `application/octet-stream` fallback
+with `size()` of `0`; it is never mistaken for a valid PDF.
+
+Detection answers roughly *"what content family do these bytes resemble?"* It
+is **not** malware scanning, virus detection, or format validation: it does
+not tell you a PDF is safe to open, that an image will decode, or that a
+document carries no macros. There is no antivirus integration.
+
+### Limits, lifetime, and cleanup
+
+The server's `maxBodyBytes` still bounds the **whole** request body, multipart
+included, and still returns **413** before any handler or persistence runs;
+uploads have no separate unbounded path. There is no built-in per-file limit:
+check `size()` and apply your own policy. An application expecting PDFs should
+raise the server limit explicitly, as in
+`HTTP.server("127.0.0.1", 8080, 26214400)`.
+
+Each upload is backed by a private temporary file for the lifetime of its
+request. When the handler finishes -- whether it responded normally, rejected
+the upload, or raised -- every upload it did not save is deleted and its
+registry entry dropped. Saved files have already moved out of that lifetime
+and survive. Saving after the request has ended raises `HTTPError` rather than
+resurrecting a deleted temporary file.
+
+Malformed multipart syntax (a missing or invalid boundary, a truncated part,
+malformed part headers) returns **400** before the handler runs, like any
+other malformed request. It never panics and never becomes a 500.
+
+`body()` keeps its existing contract: it returns the UTF-8 request body and
+raises `HTTPError` for a body that is not valid UTF-8. A binary multipart body
+is therefore not readable through `body()` -- that is deliberate. Use
+`file`/`files` for uploads and `form`/`formAll` for multipart text fields.
+
+There is no outbound multipart in v0.8.0: `ClientRequest` cannot attach a file.
 
 ## Response
 
@@ -419,7 +550,10 @@ Same-host HTTP redirects keep those headers.
 
 ## What this module does not do
 
-The inbound server still has no HTTPS listener. The outbound client has no
+The inbound server still has no HTTPS listener. Inbound uploads never become
+a public Bytes type, a database BLOB, a download/static-file server, a
+progress API, or chunked/resumable transfers, and nothing parses, renders, or
+scans an uploaded document. The outbound client has no
 cookie jar, binary body, streaming API, SSE, WebSocket, multipart, file
 upload, automatic retries, OAuth, custom CA, client certificates, insecure TLS
 bypass, proxy API, or AI/OpenAI/Anthropic/Gemini module. There is no HTTP/2

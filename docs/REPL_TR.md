@@ -11,7 +11,7 @@ ahdcode
 ```
 
 Başlangıçta `ahdcode --version` ile eşleşen bir sürüm başlığı (şu anda
-`AhdCode v0.7.0` yazdırılır, ardından `ahd>` istemi gelir:
+`AhdCode v0.8.0` yazdırılır, ardından `ahd>` istemi gelir:
 
 ```text
 ahd> x := 5

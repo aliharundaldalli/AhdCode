@@ -168,7 +168,8 @@ Continue with [Functions](FUNCTIONS.md), [Classes](CLASSES.md),
 transports String rows and records, and Data turns them into an immutable
 `Table` of String cells; JSON and XML are typed structured-data models; SQLite
 is a typed local-database bridge; HTTP is a local web server with Request and
-Response values, cookies, and in-memory server-side sessions, plus an outbound
+Response values, cookies, in-memory server-side sessions, and multipart form
+handling with safe `UploadedFile` persistence, plus an outbound
 Client for HTTP/HTTPS APIs; HTML is a small safe structured builder plus a
 parser and CSS-like selector query surface (`HTML.parse`, `HTMLDocument`,
 `HTMLElement`); Env reads process/`.env` configuration; Lists and KeyValue are the pure

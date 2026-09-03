@@ -10,6 +10,7 @@ The current command surface is:
 ahdcode
 ahdcode build <entry.ahd> [-o <output>]
 ahdcode run <entry.ahd> [-- <args>...]
+ahdcode kill [--force] <app.run>
 ahdcode format [--check] <file.ahd>
 ahdcode lsp
 ahdcode --help
@@ -20,6 +21,29 @@ ahdcode --version
 native result. Arguments after the entry (optionally after `--`) are forwarded
 to the generated process, although v0.1 publishes no language-level argument
 API yet.
+
+While `run` is running, it keeps a small `app.run` descriptor beside the
+entry module (`app.ahd` produces `app.run` in the same directory) and removes
+it when the run ends. `kill` uses that descriptor to stop the application:
+
+```bash
+ahdcode run app.ahd
+ahdcode kill app.run
+```
+
+That replaces looking the process up by port with `lsof -i :8080` and then
+`kill <pid>`. `kill` requests a graceful stop; `ahdcode kill --force app.run`
+stops the application immediately. The run file is the application's identity:
+a bare pid is deliberately not accepted, and a file that is not a well-formed
+AhdCode run descriptor is refused without signalling anything. A descriptor
+whose process is already gone is reported as stale and removed rather than
+acted on, and starting a second `run` while a live descriptor exists fails
+with the pid and the `kill` command to use instead of silently colliding on
+the port.
+
+The descriptor is internal CLI metadata, not a language-level format: nothing
+in the standard library reads or writes it, and it is not a process manager,
+daemon registry, or `dev`/watch mode.
 
 `build` prints the produced executable path. Without `-o`, the compiler uses
 the entry module's base name in the current working directory.

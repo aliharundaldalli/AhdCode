@@ -12,10 +12,20 @@ AhdCode is an experimental statically checked general-purpose programming
 language focused on readable syntax, explicit intent, predictable semantics,
 and native compilation.
 
-The current release is **v0.7.0**. The core language works end to end, but
+The current release is **v0.8.0**. The core language works end to end, but
 the project is not production-ready and breaking changes may occur before 1.0.
 
-v0.7.0 adds HTML parsing and a small CSS-like selector language on top of the
+v0.8.0 adds multipart form handling and safe file uploads: a handler reads
+uploaded files with `Request.file` / `Request.files`, inspects
+`originalName`, `size`, and both the declared and the content-sniffed MIME
+type, and persists one with `UploadedFile.save(directory)` under a
+crypto-random name the uploader cannot influence — so a hostile filename can
+neither escape the directory nor overwrite an existing file. Uploaded bytes
+are never an AhdCode `String` and never a database BLOB: applications store
+the file on disk and keep only its path and metadata in
+[SQLite](docs/SQLITE.md). It also adds `ahdcode kill app.run`, which stops an
+application started with `ahdcode run` without looking up ports and pids by
+hand. v0.7.0 adds HTML parsing and a small CSS-like selector language on top of the
 existing [HTML](docs/HTML.md) builder: `HTML.parse(source)` turns an HTML
 String -- typically an `HTTP` Client response body -- into a read-only
 `HTMLDocument`, and `select`/`first` find `HTMLElement` values in it by tag,
@@ -31,8 +41,9 @@ session cookie holds only an opaque random identifier; session values stay on
 the server and disappear when the process exits. This is not an authentication
 framework. v0.3.0 began practical application development with a typed
 [SQLite](docs/SQLITE.md) bridge. HTTP uses Go's `net/http` inside the runtime;
-there is no companion HTTP, cookie, session, or client helper. Multipart,
-WebSocket, and an AI vendor module are not in this release.
+there is no companion HTTP, cookie, session, or client helper. Inbound
+multipart uploads arrived in v0.8.0; outbound multipart, WebSocket, and an AI
+vendor module are still not part of the release.
 
 v0.2.2 completed the practical everyday AhdCode language server on top of
 v0.2.1's diagnostics, hover, completion, go to definition, document symbols,
@@ -209,6 +220,7 @@ See the [CLI guide](docs/CLI.md), [formatter guide](docs/FORMATTER.md),
 - [v0.5 cookies and sessions](examples/v0.5/README.md)
 - [v0.6 HTTP Client](examples/v0.6/README.md)
 - [v0.7 HTML parsing and web scraping](examples/v0.7/README.md)
+- [v0.8 multipart forms and file uploads](examples/v0.8/README.md)
 - [v0.4 Library Demo](https://github.com/aliharundaldalli/ahdcode-library-demo) (separate beginner web app)
 - [v0.4 Seminar Demo](https://github.com/aliharundaldalli/ahdcode-seminer-demo) (Hatay, multi-page)
 - [Full v0.1 language specification](AHDCODE_LANGUAGE_SPEC_v0.1.md)
@@ -251,6 +263,7 @@ examples/v0.4/     Web Notes App
 examples/v0.5/     cookies and in-memory sessions
 examples/v0.6/     outbound HTTP Client and JSON APIs
 examples/v0.7/     HTML parsing, selectors, and web scraping
+examples/v0.8/     multipart forms, file uploads, and upload metadata
 AHDCODE_LANGUAGE_SPEC_v0.1.md
                    authoritative language contract
 ```

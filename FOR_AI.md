@@ -82,7 +82,7 @@ ahdcode_exe="$(go env GOPATH)/bin/ahdcode"
 "$ahdcode_exe" --version
 ```
 
-The expected current result is `AhdCode v0.7.0`. Using the explicit
+The expected current result is `AhdCode v0.8.0`. Using the explicit
 `$ahdcode_exe` path proves which binary was tested. If the user wants the
 short `ahdcode` command and that directory is not already on `PATH`, explain
 the temporary or persistent options and obtain permission before editing a
@@ -195,7 +195,7 @@ $AhdCodeExe = Join-Path (go env GOPATH) "bin\ahdcode.exe"
 & $AhdCodeExe --version
 ```
 
-The expected current result is `AhdCode v0.7.0`. The explicit executable path
+The expected current result is `AhdCode v0.8.0`. The explicit executable path
 avoids accidentally testing an older global installation. If the Go binary
 directory is not on `PATH`, explain the choice before changing anything. A
 temporary current-PowerShell-process change is:
@@ -330,6 +330,25 @@ are String only and disappear when the process exits. `Session.set` does not
 write headers — `SessionStore.commit` returns a new Response. This is not an
 authentication framework. There is no `ahdsession` helper. See
 [`docs/HTTP.md`](docs/HTTP.md).
+
+**An uploaded file is not a String, and its filename is not a path.** With
+`multipart/form-data`, text fields still come from `request.form`/`formAll`;
+files come from `request.file`/`files` as opaque `UploadedFile` values. There
+is no `bytes()`, `stream()`, or `tempPath()` — do not try to read upload
+content as text, and do not store it as a SQLite BLOB. The correct shape is
+file-on-disk, metadata-in-database:
+
+```ahd
+storedPath := paper.save("uploads/papers")   // random basename, never overwrites
+```
+
+Never write `"uploads/" + paper.originalName()`: `originalName()` is
+attacker-supplied display metadata, and `save` is what decides the path.
+Never branch on the filename extension or on `declaredContentType()` — those
+are claims. `detectedContentType()` sniffs the bytes, and it is content
+sniffing, not malware scanning. An unsaved upload is deleted when its request
+ends, so persist it inside the handler. Outbound multipart does not exist:
+there is no `ClientRequest.withFile`. See [`docs/HTTP.md`](docs/HTTP.md).
 
 **`HTML.parse` is a parser, not a browser.** `HTML.parse(source: String) ->
 HTMLDocument` takes no URL and makes no network request; getting a page and

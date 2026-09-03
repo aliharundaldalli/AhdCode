@@ -56,6 +56,15 @@ HTTP.client(
 ) -> Client
 HTTP.clientRequest(method: String, url: String) -> ClientRequest
 
+Request.file(name: String)  -> UploadedFile?
+Request.files(name: String) -> List<UploadedFile>
+
+UploadedFile.originalName()        -> String
+UploadedFile.declaredContentType() -> String?
+UploadedFile.detectedContentType() -> String
+UploadedFile.size()                -> Int
+UploadedFile.save(directory: String) -> String
+
 Server.get(path: String, handler: Function)   -> Nothing
 Server.post(path: String, handler: Function)  -> Nothing
 Server.route(method: String, path: String, handler: Function) -> Nothing
@@ -188,11 +197,135 @@ eşleşmelerdir, yoksa `[]`. Çerez adları büyük/küçük harfe duyarlıdır.
 `body()` UTF-8 gövdedir;
 geçersiz UTF-8 `HTTPError` fırlatır (sessiz değiştirme yoktur).
 
-Formlar yalnızca `Content-Type` `application/x-www-form-urlencoded` iken
-ayrıştırılır. `form` / `formAll` sorgu erişicileri gibi davranır. Aynı katı
-yüzde kod çözümü form gövdesine de uygulanır: bozuk veya UTF-8 olmayan form
-verisi işleyiciden **önce** **400** döner. Gövde, işleyiciden **önce**
+Formlar `Content-Type` `application/x-www-form-urlencoded` veya
+`multipart/form-data` iken ayrıştırılır. `form` / `formAll` sorgu erişicileri
+gibi davranır ve multipart **metin** alanları da aynı API'den gelir --
+multipart'a özel ikinci bir metin erişicisi yoktur. Aynı katı yüzde kod
+çözümü urlencoded form gövdesine uygulanır: bozuk veya UTF-8 olmayan form
+verisi işleyiciden **önce** **400** döner. Multipart **dosya** parçaları
+`file` / `files` ile okunur (aşağıya bakın). Gövde, işleyiciden **önce**
 `maxBodyBytes` ile sınırlanır; aşım **413** döner.
+
+## Dosya yüklemeleri
+
+Bir `multipart/form-data` isteği metin alanlarını ve dosya parçalarını
+birlikte taşır. Metin alanları `form`/`formAll` ile, dosya parçaları
+`file`/`files` ile okunur:
+
+```ahd
+handle: Function := (request: Request) -> Response {
+    title: Local String? := request.form("title")
+    paper: Local UploadedFile? := request.file("paper")
+    if paper == null {
+        return HTTP.text("paper is required", 400)
+    }
+    if paper.detectedContentType() != "application/pdf" {
+        return HTTP.text("rejected", 415)
+    }
+    storedPath: Local String := paper.save("uploads/papers")
+    return HTTP.text("saved " + storedPath)
+}
+```
+
+`file(name)` o alandaki ilk yüklenen dosyadır; alan dosya taşımıyorsa
+`null`'dır. `files(name)` o alandaki tüm dosyaları istek sırasıyla verir,
+yoksa `[]` -- yani `<input type="file" name="papers" multiple>` yinelenenleri
+asla sessizce atmaz.
+
+`UploadedFile` opak ve salt okunurdur. `bytes()`, `raw()`, `stream()`,
+`tempPath()`, dosya tanıtıcısı veya işaretçi yoktur: yüklenen bir PDF bir
+`String` değildir ve AhdCode ikili içeriği metinmiş gibi göstermez. Baytlar
+dosya sistemine yalnızca `save` ile ulaşır.
+
+### Adı yükleyen belirler, yolu siz belirlersiniz
+
+`originalName()` **yalnızca görüntüleme meta verisidir**. Tarayıcının verdiği
+dosya adının güvenli bir temel ada indirgenmiş halidir: platformdan bağımsız
+olarak hem `/` hem `\` ayırıcı sayılır, `C:` sürücü öneki atılır, `.`/`..`
+ve boş adlar `file`'a dönüşür ve NUL baytı yapısal olarak geçersiz sayılıp
+reddedilir. Bu yüzden `../../evil.pdf` dışarıya `evil.pdf` olarak yansır.
+
+Ondan asla yol kurmayın:
+
+```ahd
+storedPath := "uploads/" + paper.originalName()   // bunu yapmayın
+storedPath := paper.save("uploads/papers")        // bunu yapın
+```
+
+`save(directory)` gerekirse dizini oluşturur ve yüklemeyi
+`uploads/papers/8e8f30c65c4d4d23...` gibi **kriptografik rastgele** bir temel
+adla, mevcut bir dosyayı asla ezemeyecek şekilde dışlamalı (exclusive) olarak
+yazar. Gerçek kayıt yolunu döndürür. Aynı orijinal ada sahip iki yükleme her
+zaman farklı kayıt yolları alır. Üretilen temel ad ayırıcı içermediği için
+kaydedilen dosya her zaman uygulamanın belirttiği dizinin doğrudan çocuğudur
+-- yüklenen bir dosya adı üst dizine ulaşamaz.
+
+Dizin argümanı yükleyenin değil, uygulamanın kararıdır; AhdCode genel olarak
+dosya sistemi erişimini kum havuzuna almaz.
+
+Bir yükleme **bir kez** kalıcılaştırılır. Aynı `UploadedFile` üzerinde ikinci
+kez `save` çağırmak, sessizce kopya oluşturmak yerine `HTTPError` fırlatır.
+Meta veri metotları kayıttan sonra da çalışır.
+
+### Bildirilen tür ve algılanan tür
+
+```text
+declaredContentType()  istemcinin iddiası      (buna asla güvenmeyin)
+detectedContentType()  baytların görünümü      (kararı bununla verin)
+```
+
+`declaredContentType()` parçanın kendi `Content-Type` başlığıdır; yalın medya
+türüne normalleştirilir (`text/plain; charset=utf-8` → `text/plain`) veya
+parça tür bildirmediyse `null`'dır. `detectedContentType()` baştaki baytları
+Go'nun `net/http.DetectContentType` işleviyle inceler ve aynı şekilde
+normalleştirir.
+
+Dosya adı ve uzantısı algılamayı asla etkilemez. `application/pdf` iddia eden,
+`malware.pdf` adlı bir metin dosyası şunu bildirir:
+
+```text
+originalName()         malware.pdf
+declaredContentType()  application/pdf
+detectedContentType()  text/plain
+```
+
+böylece uygulama uyuşmazlığı reddedebilir. Sıfır baytlık bir yüklemenin
+benzeyeceği içerik yoktur; belgelenmiş `application/octet-stream` geri
+dönüşünü ve `0` `size()` değerini bildirir, asla geçerli bir PDF sanılmaz.
+
+Algılama kabaca *"bu baytlar hangi içerik ailesine benziyor?"* sorusunu
+yanıtlar. Kötü amaçlı yazılım taraması, virüs tespiti veya biçim doğrulaması
+**değildir**: bir PDF'in açılmasının güvenli olduğunu, bir görüntünün
+çözüleceğini veya bir belgenin makro taşımadığını söylemez. Antivirüs
+entegrasyonu yoktur.
+
+### Sınırlar, ömür ve temizlik
+
+Sunucunun `maxBodyBytes` değeri multipart dahil **tüm** istek gövdesini
+sınırlamaya devam eder ve herhangi bir işleyici veya kalıcılaştırma
+çalışmadan **önce** **413** döndürür; yüklemelerin ayrı, sınırsız bir yolu
+yoktur. Yerleşik dosya başına sınır yoktur: `size()` değerini kontrol edip
+kendi politikanızı uygulayın. PDF bekleyen bir uygulama sunucu sınırını
+açıkça yükseltmelidir; örneğin
+`HTTP.server("127.0.0.1", 8080, 26214400)`.
+
+Her yükleme, kendi isteğinin ömrü boyunca özel bir geçici dosyayla
+desteklenir. İşleyici bittiğinde -- normal yanıt verse de, yüklemeyi
+reddetse de, hata fırlatsa da -- kaydetmediği her yükleme silinir ve kaydı
+düşürülür. Kaydedilen dosyalar bu ömrün dışına çıkmıştır ve yaşamaya devam
+eder. İstek bittikten sonra kaydetmek, silinmiş geçici dosyayı diriltmek
+yerine `HTTPError` fırlatır.
+
+Bozuk multipart söz dizimi (eksik veya geçersiz sınır, kesilmiş parça, bozuk
+parça başlıkları) işleyici çalışmadan **önce** **400** döndürür; tıpkı başka
+herhangi bir bozuk istek gibi. Asla panic üretmez ve asla 500'e dönüşmez.
+
+`body()` mevcut sözleşmesini korur: UTF-8 istek gövdesini döndürür ve geçerli
+UTF-8 olmayan bir gövde için `HTTPError` fırlatır. Bu nedenle ikili bir
+multipart gövdesi `body()` ile okunamaz -- bu bilinçlidir. Yüklemeler için
+`file`/`files`, multipart metin alanları için `form`/`formAll` kullanın.
+
+v0.8.0'da giden multipart yoktur: `ClientRequest` bir dosya ekleyemez.
 
 ## Yanıt
 
@@ -291,7 +424,10 @@ sunucuda iki işleyici aynı anda çalışmaz.
 
 ## Bu modülün yapmadıkları
 
-Gelen sunucunun HTTPS dinleyicisi yoktur. Giden istemcinin çerez kavanozu,
+Gelen sunucunun HTTPS dinleyicisi yoktur. Gelen yüklemeler asla genel bir
+Bytes tipine, veritabanı BLOB'una, indirme/statik dosya sunucusuna, ilerleme
+API'sine ya da parçalı/sürdürülebilir aktarıma dönüşmez; yüklenen bir belgeyi
+hiçbir şey ayrıştırmaz, çizmez veya taramaz. Giden istemcinin çerez kavanozu,
 ikili gövde, akış API'si, SSE, WebSocket, multipart, dosya yükleme, otomatik
 yeniden deneme, OAuth, özel CA, istemci sertifikası, güvensiz TLS baypası,
 vekil API'si veya yapay zeka satıcı modülü yoktur. HTTP/2 veya HTTP/3 API'si,

@@ -1,4 +1,4 @@
-# AhdCode v0.7.0 Türkçe Öğrenci Rehberi
+# AhdCode v0.8.0 Türkçe Öğrenci Rehberi
 
 Bu rehber, **daha önce hiç programlama yapmamış birinin de takip edebilmesi** için hazırlanmıştır. Baştan sona sırayla okuyabilirsiniz; her bölümde önce ne yapmak istediğimizi görecek, sonra çalışan bir örnek yazacak, en son gerekli kuralları öğreneceksiniz.
 
@@ -46,14 +46,15 @@ En iyi öğrenme yolu, örnekleri yalnızca okumak değil çalıştırmaktır. B
 - [37. Çerezler ve oturumlar](#37-çerezler-ve-oturumlar)
 - [38. HTTP Client](#38-http-client)
 - [39. HTML ayrıştırma ve web kazıma (scraping)](#39-html-ayrıştırma-ve-web-kazıma-scraping)
-- [40. Kod biçimlendirici (Formatter)](#40-kod-biçimlendirici-formatter)
-- [41. Komut satırı (CLI)](#41-komut-satırı-cli)
-- [42. Etkileşimli kabuk (REPL)](#42-etkileşimli-kabuk-repl)
-- [43. Sık yapılan başlangıç hataları](#43-sık-yapılan-başlangıç-hataları)
-- [44. Küçük Projeler](#44-küçük-projeler)
-- [45. Egzersizler](#45-egzersizler)
-- [46. Çözüm İpuçları](#46-çözüm-i̇puçları)
-- [47. Sonraki adımlar ve teknik belgeler](#47-sonraki-adımlar-ve-teknik-belgeler)
+- [40. Dosya yüklemeleri](#40-dosya-yüklemeleri)
+- [41. Kod biçimlendirici (Formatter)](#41-kod-biçimlendirici-formatter)
+- [42. Komut satırı (CLI)](#42-komut-satırı-cli)
+- [43. Etkileşimli kabuk (REPL)](#43-etkileşimli-kabuk-repl)
+- [44. Sık yapılan başlangıç hataları](#44-sık-yapılan-başlangıç-hataları)
+- [45. Küçük Projeler](#45-küçük-projeler)
+- [46. Egzersizler](#46-egzersizler)
+- [47. Çözüm İpuçları](#47-çözüm-i̇puçları)
+- [48. Sonraki adımlar ve teknik belgeler](#48-sonraki-adımlar-ve-teknik-belgeler)
 
 ## 1. AhdCode nedir?
 
@@ -3361,7 +3362,114 @@ for article in articles {
 Ayrıntılar için [HTML modül referansına](HTML_TR.md) ve
 [`examples/v0.7`](../examples/v0.7/README_TR.md) bakın.
 
-## 40. Kod biçimlendirici (Formatter)
+## 40. Dosya yüklemeleri
+
+Dosya taşıyan bir `<form>` bunu `enctype="multipart/form-data"` ile
+belirtmelidir. Metin alanları yine `request.form` ile, dosyalar
+`request.file` ile gelir.
+
+### Form
+
+```ahd
+HTML.element("form", {"method": "post", "action": "/upload", "enctype": "multipart/form-data"}, [
+    HTML.element("input", {"type": "text", "name": "title"}, [])
+    HTML.element("input", {"type": "file", "name": "paper", "accept": "application/pdf"}, [])
+    HTML.element("button", {"type": "submit"}, [HTML.text("Yükle")])
+])
+```
+
+### Yüklemeyi okumak
+
+```ahd
+upload: Function := (request: Request) -> Response {
+    title: Local String? := request.form("title")
+    paper: Local UploadedFile? := request.file("paper")
+    if paper == null {
+        return HTTP.text("lütfen bir dosya seçin", 400)
+    }
+    write(paper.originalName())          // "paper.pdf" - yalnızca görüntüleme
+    write(str(paper.size()))             // tam bayt sayısı
+    return HTTP.text("alındı")
+}
+```
+
+`request.file(name)`, o alan dosya taşımadığında `null`'dır; bu yüzden her
+zamanki `!= null` koruması gerekir. `<input type="file" name="papers" multiple>`
+için `request.files("papers")` tüm dosyaları sırasıyla verir.
+
+### İki içerik türü, yalnızca birine güvenebilirsiniz
+
+```ahd
+paper.declaredContentType()   // tarayıcının iddiası
+paper.detectedContentType()   // baytların gerçekte neye benzediği
+```
+
+Herkes `virus.exe` dosyasının adını `paper.pdf` yapıp `application/pdf`
+iddia edebilir. Uzantı ve bildirim, istekle birlikte gelen sadece birer
+metindir. Yalnızca `detectedContentType()` dosyanın kendi baytlarına bakar:
+
+```ahd
+if paper.detectedContentType() != "application/pdf" {
+    return HTTP.text("bu bir PDF değil", 415)
+}
+```
+
+**Teknik not.** Algılama yaygın biçimlerin *şeklini* tanır. Virüs taraması
+yapmaz ve bir PDF'in açılmasının güvenli olduğunu kanıtlamaz.
+
+### Güvenli kaydetmek
+
+Bu bölümün en önemli kuralı:
+
+```ahd
+// ASLA böyle yapmayın
+storedPath := "uploads/" + paper.originalName()
+```
+
+O adı yükleyen kişi seçer. `../../etc/passwd` gibi bir ad klasörünüzün
+dışına yazardı ve `paper.pdf` yükleyen iki kişi birbirinin dosyasını ezerdi.
+Bunun yerine şunu yapın:
+
+```ahd
+storedPath := paper.save("uploads/papers")
+```
+
+`save`, *sizin* belirttiğiniz dizinin içinde rastgele bir dosya adı seçer,
+mevcut bir dosyayı asla ezmez ve gerçekten kullandığı yolu döndürür; örneğin
+`uploads/papers/8e8f30c65c4d4d23...`. Her yükleme bir kez kaydedilebilir.
+
+### Dosya diskte, bilgiler veritabanında
+
+```ahd
+db.execute(
+    "INSERT INTO papers (title, original_name, stored_path, detected_content_type, size) VALUES (?, ?, ?, ?, ?)"
+    [
+        SQLite.fromString(title)
+        SQLite.fromString(paper.originalName())
+        SQLite.fromString(storedPath)
+        SQLite.fromString(paper.detectedContentType())
+        SQLite.fromInt(paper.size())
+    ]
+)
+```
+
+PDF'in kendisi `uploads/papers/` içinde kalır; veritabanı yalnızca nerede
+olduğunu ve ne olduğunu tutar. Bir yüklemeyi hiç kaydetmezseniz, istek
+bittiğinde otomatik olarak silinir.
+
+### Sunucunuzu durdurmak
+
+`ahdcode run app.ahd` çalışırken kaynağınızın yanında bir `app.run` dosyası
+tutar. Uygulamayı durdurmak için portu veya süreç kimliğini bulmanız gerekmez:
+
+```bash
+ahdcode kill app.run
+```
+
+Ayrıntılar için [HTTP modül referansına](HTTP_TR.md) ve
+[`examples/v0.8`](../examples/v0.8/README_TR.md) bakın.
+
+## 41. Kod biçimlendirici (Formatter)
 
 Kod çalışsa bile herkes farklı boşluk ve satır düzeni kullanırsa okumak zorlaşır. AhdCode formatter, geçerli kodu ortak bir stile dönüştürür:
 
@@ -3414,7 +3522,7 @@ values :=
 
 Formatter idempotent'tir; aynı dosyada tekrar çalıştırmak yeni değişiklik üretmez.
 
-## 41. Komut satırı (CLI)
+## 42. Komut satırı (CLI)
 
 AhdCode'u terminalden birkaç temel komutla kullanabilirsiniz:
 
@@ -3451,7 +3559,7 @@ Yardım ve sürüm bilgisini gösterir.
 
 Yeni başlıyorsanız çoğu zaman kullanacağınız komut `ahdcode run ...` olacaktır.
 
-## 42. Etkileşimli kabuk (REPL)
+## 43. Etkileşimli kabuk (REPL)
 
 Küçük bir şeyi denemek için her seferinde dosya oluşturmak zorunda değilsiniz. Terminalde yalnızca:
 
@@ -3520,7 +3628,7 @@ harici bir render motorunu çağırır. Bu çağrıları bir `.ahd` dosyasından
 çalıştırın. `Archive`'ın böyle bir sınırlaması yoktur — REPL'de tamamen
 çalışır. Ayrıntılar için [REPL referansına](REPL_TR.md) bakın.
 
-## 43. Sık yapılan başlangıç hataları
+## 44. Sık yapılan başlangıç hataları
 
 Hata mesajı görmek programlamanın normal bir parçasıdır. Çoğu hata, bilgisayarın ne istediğinizi anlayamadığını söyler. Aşağıdaki örnekler yeni başlayanların sık karşılaştığı durumları ve nasıl düzelteceğinizi gösterir:
 
@@ -3629,7 +3737,7 @@ Hata mesajı görmek programlamanın normal bir parçasıdır. Çoğu hata, bilg
 - Neden: Bu, başlığı SQL'e yapıştırır. `Robert'); DROP TABLE notes;--` gibi bir başlık artık veri değildir.
 - Doğru: `?` yer tutucusu ve `SQLite.fromString(title)` kullanın. Parametre bağlama metni veri olarak tutar.
 
-## 44. Küçük Projeler
+## 45. Küçük Projeler
 
 Bu küçük projeler rehberde öğretilenleri bir araya getirir. Onları tek başınıza kurmayı deneyin!
 
@@ -3643,7 +3751,7 @@ Bu küçük projeler rehberde öğretilenleri bir araya getirir. Onları tek ba�
 8. **SQLite Not Defteri**: `notes.db` açın, yoksa bir `notes` tablosu oluşturun ve kullanıcının not eklemesine, listelemesine, başlığa göre aramasına, güncellemesine ve silmesine izin verin. Her değer için `?` parametreleri kullanın. Programı kapatıp yeniden çalıştırın: eski notlar durmalıdır.
 9. **Web Not Defteri**: Notları `127.0.0.1` üzerinde bir tarayıcıda sunun. Notları `HTML.text` ile listeleyin, POST `/notes` ve bağlı SQLite parametreleriyle not ekleyin, sonra `/` adresine yönlendirin. Dinamik metin ham HTML'e birleştirilmemelidir.
 
-## 45. Egzersizler
+## 46. Egzersizler
 
 Tam çözümleri hemen aramak yerine her programı küçük adımlarla kurun.
 
@@ -3676,7 +3784,7 @@ Tam çözümleri hemen aramak yerine her programı küçük adımlarla kurun.
 22. `127.0.0.1` üzerinde `GET /ok` için `HTTP.text("ok")` sunun ve tarayıcıda açın.
 23. Genel bir HTTPS sayfasında `HTTP.client().get` kullanın, `status()` yazın ve `HTTPError` ile 404 `ClientResponse` ayrımını yapın.
 
-## 46. Çözüm İpuçları
+## 47. Çözüm İpuçları
 
 1. `take` sonucu String'dir; yaş için `int(...)` ve yeni yaş için `+ 1` kullanın.
 2. Formülü küçük parçalara ayırın; `real(take(...))` ile başlayın ve Real sayılarını kullanın.
@@ -3702,7 +3810,7 @@ Tam çözümleri hemen aramak yerine her programı küçük adımlarla kurun.
 22. `HTTP.server("127.0.0.1", 8080)`, `app.get("/ok", handler)`, `HTTP.text("ok")`, sonra `app.start()`.
 23. `HTTP.client()`, `client.get("https://example.com/")`, `response.status()`. 404 hâlâ `ClientResponse`; TLS veya zaman aşımı `HTTPError`.
 
-## 47. Sonraki adımlar ve teknik belgeler
+## 48. Sonraki adımlar ve teknik belgeler
 
 Bu rehberi tamamladıktan sonra dilin ayrıntılarını şu belgelerden
 derinleştirebilirsiniz:
@@ -3754,4 +3862,5 @@ klasörüne, [v0.3 SQLite Not Defteri](../examples/v0.3/README_TR.md),
 [v0.4 Web Not Defteri](../examples/v0.4/README_TR.md),
 [v0.5 çerezler ve oturumlar](../examples/v0.5/README_TR.md),
 [v0.6 HTTP Client](../examples/v0.6/README_TR.md) ve
-[v0.7 HTML ayrıştırma ve web kazıma](../examples/v0.7/README_TR.md) örneklerine bakın.
+[v0.7 HTML ayrıştırma ve web kazıma](../examples/v0.7/README_TR.md) ve
+[v0.8 dosya yükleme](../examples/v0.8/README_TR.md) örneklerine bakın.

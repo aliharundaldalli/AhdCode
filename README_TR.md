@@ -12,10 +12,20 @@ AhdCode; okunabilir sözdizimi, açık niyet (explicit intent), öngörülebilir
 anlambilim (semantics) ve yerel (native) derlemeye odaklanan, deneysel,
 statik olarak denetlenen genel amaçlı bir programlama dilidir.
 
-Mevcut sürüm **v0.7.0**'dır. Çekirdek dil uçtan uca çalışır, ancak proje
+Mevcut sürüm **v0.8.0**'dır. Çekirdek dil uçtan uca çalışır, ancak proje
 üretime hazır değildir ve 1.0'dan önce kırıcı (breaking) değişiklikler
 olabilir.
 
+v0.8.0, multipart form işlemeyi ve güvenli dosya yüklemeyi ekler: bir
+işleyici yüklenen dosyaları `Request.file` / `Request.files` ile okur;
+`originalName`, `size` ve hem bildirilen hem de içerikten algılanan MIME
+türünü inceler; birini `UploadedFile.save(directory)` ile yükleyenin
+etkileyemeyeceği kriptografik rastgele bir adla kalıcılaştırır — böylece
+düşmanca bir dosya adı ne dizinden kaçabilir ne de mevcut bir dosyayı ezebilir.
+Yüklenen baytlar asla bir AhdCode `String`'i ve asla veritabanı BLOB'u
+değildir: uygulamalar dosyayı diskte tutar, [SQLite](docs/SQLITE_TR.md)'ta
+yalnızca yolunu ve meta verisini saklar. Ayrıca `ahdcode run` ile başlatılan
+bir uygulamayı port ve pid aramadan durduran `ahdcode kill app.run` gelir.
 v0.7.0, mevcut [HTML](docs/HTML_TR.md) oluşturucusunun üzerine HTML
 ayrıştırma ve küçük bir CSS benzeri seçici dili ekler: `HTML.parse(source)`,
 bir HTML String'ini -- tipik olarak bir `HTTP` Client yanıt gövdesini --
@@ -33,8 +43,9 @@ taşır; oturum değerleri sunucuda kalır ve süreç bitince kaybolur. Bu bir
 kimlik doğrulama çerçevesi değildir. v0.3.0 pratik uygulama geliştirmeyi tipli
 bir [SQLite](docs/SQLITE_TR.md) köprüsüyle başlatmıştı. HTTP, çalışma zamanının
 içindeki Go `net/http` paketini kullanır; ayrı bir HTTP, çerez, oturum veya
-istemci yardımcısı yoktur. Multipart, WebSocket ve bir yapay zeka satıcı
-modülü bu sürümde yoktur.
+istemci yardımcısı yoktur. Gelen multipart yüklemeler v0.8.0 ile geldi; giden
+multipart, WebSocket ve bir yapay zeka satıcı modülü hâlâ sürümün parçası
+değildir.
 
 v0.2.2, v0.2.1'in tanılama, hover, completion, tanıma git, belge sembolleri,
 signature help ve referans bulma özelliklerinin üzerine pratik günlük AhdCode
@@ -219,6 +230,7 @@ bakın.
 - [v0.5 çerezler ve oturumlar](examples/v0.5/README_TR.md)
 - [v0.6 HTTP Client](examples/v0.6/README_TR.md)
 - [v0.7 HTML ayrıştırma ve web kazıma](examples/v0.7/README_TR.md)
+- [v0.8 multipart formlar ve dosya yükleme](examples/v0.8/README_TR.md)
 - [v0.4 Kütüphane Demosu](https://github.com/aliharundaldalli/ahdcode-library-demo) (ayrı başlangıç web uygulaması)
 - [v0.4 Seminer Demosu](https://github.com/aliharundaldalli/ahdcode-seminer-demo) (Hatay, çok sayfalı)
 - [Tam v0.1 dil spesifikasyonu](AHDCODE_LANGUAGE_SPEC_v0.1_TR.md)
@@ -265,6 +277,7 @@ examples/v0.4/     Web Not Defteri
 examples/v0.5/     çerezler ve bellek içi oturumlar
 examples/v0.6/     giden HTTP Client ve JSON API'ler
 examples/v0.7/     HTML ayrıştırma, seçiciler ve web kazıma
+examples/v0.8/     multipart formlar, dosya yükleme ve yükleme meta verisi
 AHDCODE_LANGUAGE_SPEC_v0.1.md
                    yetkili (authoritative) dil sözleşmesi
 ```
