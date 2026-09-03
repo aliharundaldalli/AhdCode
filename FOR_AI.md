@@ -82,7 +82,7 @@ ahdcode_exe="$(go env GOPATH)/bin/ahdcode"
 "$ahdcode_exe" --version
 ```
 
-The expected current result is `AhdCode v0.6.0`. Using the explicit
+The expected current result is `AhdCode v0.7.0`. Using the explicit
 `$ahdcode_exe` path proves which binary was tested. If the user wants the
 short `ahdcode` command and that directory is not already on `PATH`, explain
 the temporary or persistent options and obtain permission before editing a
@@ -195,7 +195,7 @@ $AhdCodeExe = Join-Path (go env GOPATH) "bin\ahdcode.exe"
 & $AhdCodeExe --version
 ```
 
-The expected current result is `AhdCode v0.6.0`. The explicit executable path
+The expected current result is `AhdCode v0.7.0`. The explicit executable path
 avoids accidentally testing an older global installation. If the Go binary
 directory is not on `PATH`, explain the choice before changing anything. A
 temporary current-PowerShell-process change is:
@@ -330,6 +330,20 @@ are String only and disappear when the process exits. `Session.set` does not
 write headers — `SessionStore.commit` returns a new Response. This is not an
 authentication framework. There is no `ahdsession` helper. See
 [`docs/HTTP.md`](docs/HTTP.md).
+
+**`HTML.parse` is a parser, not a browser.** `HTML.parse(source: String) ->
+HTMLDocument` takes no URL and makes no network request; getting a page and
+parsing it are two separate steps: `document := HTML.parse(client.get(url).body())`.
+There is no JavaScript engine, no DOM scripting, no CSS layout, and no
+headless Chrome — do not reach for those ideas, and do not invent an
+`ahdscrape`/`Scraper` module. Do not confuse the parsed, read-only
+`HTMLElement` with the existing builder's `HTMLNode`; there is no conversion
+between them. Selectors are a small frozen subset (tag, `#id`, `.class`,
+`[attr]`, `[attr="value"]`, descendant/child combinators, comma lists) — not
+a full CSS engine and not jQuery/BeautifulSoup: pseudo-classes, sibling
+combinators, and `^=`/`$=`/`*=` all raise `HTMLError` rather than
+approximating. `attr("href")` never resolves a relative URL against a base;
+there is no `baseURL`. See [`docs/HTML.md`](docs/HTML.md).
 
 **Excel Cells are closed typed values, not `Any`.** Use
 `Excel.fromString`, `Excel.fromInt`, `Excel.fromReal`, `Excel.fromBool`, and

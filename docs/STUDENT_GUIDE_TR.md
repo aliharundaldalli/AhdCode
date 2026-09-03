@@ -1,4 +1,4 @@
-# AhdCode v0.6.0 Türkçe Öğrenci Rehberi
+# AhdCode v0.7.0 Türkçe Öğrenci Rehberi
 
 Bu rehber, **daha önce hiç programlama yapmamış birinin de takip edebilmesi** için hazırlanmıştır. Baştan sona sırayla okuyabilirsiniz; her bölümde önce ne yapmak istediğimizi görecek, sonra çalışan bir örnek yazacak, en son gerekli kuralları öğreneceksiniz.
 
@@ -45,14 +45,15 @@ En iyi öğrenme yolu, örnekleri yalnızca okumak değil çalıştırmaktır. B
 - [36. Küçük bir web sayfası](#36-küçük-bir-web-sayfası)
 - [37. Çerezler ve oturumlar](#37-çerezler-ve-oturumlar)
 - [38. HTTP Client](#38-http-client)
-- [39. Kod biçimlendirici (Formatter)](#39-kod-biçimlendirici-formatter)
-- [40. Komut satırı (CLI)](#40-komut-satırı-cli)
-- [41. Etkileşimli kabuk (REPL)](#41-etkileşimli-kabuk-repl)
-- [42. Sık yapılan başlangıç hataları](#42-sık-yapılan-başlangıç-hataları)
-- [43. Küçük Projeler](#43-küçük-projeler)
-- [44. Egzersizler](#44-egzersizler)
-- [45. Çözüm İpuçları](#45-çözüm-i̇puçları)
-- [46. Sonraki adımlar ve teknik belgeler](#46-sonraki-adımlar-ve-teknik-belgeler)
+- [39. HTML ayrıştırma ve web kazıma (scraping)](#39-html-ayrıştırma-ve-web-kazıma-scraping)
+- [40. Kod biçimlendirici (Formatter)](#40-kod-biçimlendirici-formatter)
+- [41. Komut satırı (CLI)](#41-komut-satırı-cli)
+- [42. Etkileşimli kabuk (REPL)](#42-etkileşimli-kabuk-repl)
+- [43. Sık yapılan başlangıç hataları](#43-sık-yapılan-başlangıç-hataları)
+- [44. Küçük Projeler](#44-küçük-projeler)
+- [45. Egzersizler](#45-egzersizler)
+- [46. Çözüm İpuçları](#46-çözüm-i̇puçları)
+- [47. Sonraki adımlar ve teknik belgeler](#47-sonraki-adımlar-ve-teknik-belgeler)
 
 ## 1. AhdCode nedir?
 
@@ -3225,7 +3226,142 @@ attempt {
 Ayrıntılar için [HTTP modül referansına](HTTP_TR.md) ve
 [`examples/v0.6`](../examples/v0.6/README_TR.md) bakın.
 
-## 39. Kod biçimlendirici (Formatter)
+## 39. HTML ayrıştırma ve web kazıma (scraping)
+
+36. bölüm `HTML`'i sayfa *kurmak* için kullandı. v0.7.0 diğer yönü ekliyor:
+bir yerden aldığınız HTML metnini arayabileceğiniz bir ağaca dönüştürmek.
+`HTML.parse` kendi başına **hiçbir şey indirmez** -- yalnızca elinizde
+zaten olan String'i okur.
+
+### Sabit bir String'i ayrıştırmak
+
+```ahd
+bring HTML
+
+document := HTML.parse("<h1>Hello &amp; AhdCode</h1>")
+heading := document.first("h1")
+if heading != null {
+    write(heading.text())
+}
+```
+
+`document.first(selector)`, eşleşen ilk öğeyi ya da hiçbir şey eşleşmezse
+`null` döndürür -- `heading`'in `if ... != null` koruması gerektirmesinin
+sebebi budur, tıpkı başka herhangi bir null olabilir değer gibi. `text()`
+size öğenin metin içeriğini verir; `&amp;` zaten `&`'e çözülmüş olarak.
+
+### Öznitelikler ve `select`
+
+```ahd
+bring HTML
+
+document := HTML.parse("<a href=\"/notes/1\" class=\"link\">Read</a>")
+link := document.first("a")
+if link != null {
+    write(link.tag())        // "a" -- tag() her zaman küçük harflidir
+    write(link.hasAttr("href"))  // true
+    href := link.attr("href")
+    if href != null {
+        write(href)           // "/notes/1" -- asla mutlak bir URL'ye dönüştürülmez
+    }
+}
+
+cards := document.select(".card")
+write(str(len(cards)))
+```
+
+`select(selector)`, her eşleşmeyi belgedeki sırasıyla bir
+`List<HTMLElement>` olarak döndürür. `selector`, küçük bir CSS benzeri
+örüntü kümesini anlar: bir etiket adı, `#id`, `.class`, `[attr]`,
+`[attr="değer"]`, bunların birleşimleri, "içinde bir yerde" için boşluk
+(`article a`), "doğrudan çocuk" için `>` (`article > h2`) ve "bunlardan
+biri" için virgül (`h1, h2`). Bunların dışındaki her şey --
+`:nth-child(...)`, `+`, `~` vb. -- ne demek istediğinizi tahmin etmek
+yerine `HTMLError` fırlatır.
+
+### İç içe seçim
+
+Bir `HTMLElement` üzerinde `.select`/`.first` çağırmak yalnızca *o öğenin
+içini* arar, tüm belgeyi değil:
+
+```ahd
+articles := document.select("article.card")
+firstArticle := articles[0]
+title := firstArticle.first("h2")
+```
+
+`title` yalnızca `firstArticle`'ın içinden gelebilir -- farklı bir
+makaledeki eşleşen bir `h2` asla döndürülmez.
+
+### HTTP Client + HTML.parse: gerçek bir sayfayı ALMAK VE ayrıştırmak
+
+`HTML.parse` ile 38. bölümdeki HTTP Client, doğal olarak birleşen iki ayrı
+araçtır. Sayfayı almak bir çağrı, onu ayrıştırmak başka bir çağrıdır:
+
+```ahd
+bring HTTP
+from HTTP bring Client
+from HTTP bring ClientResponse
+bring HTML
+from HTML bring HTMLDocument
+from HTML bring HTMLElement
+
+client: Client := HTTP.client()
+response: ClientResponse := client.get("https://example.com/notes")
+document: HTMLDocument := HTML.parse(response.body())
+
+articles: List<HTMLElement> := document.select("article.card")
+for article in articles {
+    heading: Local := article.first("h2")
+    if heading != null {
+        write(heading.text())
+    }
+}
+```
+
+**Teknik not.** `HTML.parse` kendi başına asla bir ağ isteği yapmaz -- hiç
+URL argümanı bile yoktur. Ayrıca hiçbir şeyi asla çalıştırmaz: sayfadaki bir
+`<script>` etiketi, `HTML.parse` için tıpkı bir `<p>` etiketi gibi yalnızca
+metindir. AhdCode içinde tarayıcı, JavaScript motoru veya DOM yoktur --
+yalnızca `select`/`first` ile arayabileceğiniz bir ağaç vardır.
+
+### Kazıdığınızı kaydetmek
+
+35. bölüm `SQLite`'ı tanıttı. İkisi doğrudan birleşir: `HTML` ile
+çıkarın, `SQLite` ile saklayın, tıpkı öncekiyle aynı şekilde bağlı
+parametreler kullanarak -- asla String birleştirmesiyle değil:
+
+```ahd
+db: Database := SQLite.open("scraped.db")
+db.execute("""
+    CREATE TABLE IF NOT EXISTS notes (
+        id TEXT PRIMARY KEY,
+        title TEXT NOT NULL,
+        href TEXT NOT NULL
+    )
+    """)
+
+for article in articles {
+    heading: Local := article.first("h2")
+    link: Local := article.first("a")
+    if heading != null {
+        if link != null {
+            href: Local String? := link.attr("href")
+            if href != null {
+                db.execute(
+                    "INSERT OR REPLACE INTO notes (id, title, href) VALUES (?, ?, ?)"
+                    [SQLite.fromString(href), SQLite.fromString(heading.text()), SQLite.fromString(href)]
+                )
+            }
+        }
+    }
+}
+```
+
+Ayrıntılar için [HTML modül referansına](HTML_TR.md) ve
+[`examples/v0.7`](../examples/v0.7/README_TR.md) bakın.
+
+## 40. Kod biçimlendirici (Formatter)
 
 Kod çalışsa bile herkes farklı boşluk ve satır düzeni kullanırsa okumak zorlaşır. AhdCode formatter, geçerli kodu ortak bir stile dönüştürür:
 
@@ -3278,7 +3414,7 @@ values :=
 
 Formatter idempotent'tir; aynı dosyada tekrar çalıştırmak yeni değişiklik üretmez.
 
-## 40. Komut satırı (CLI)
+## 41. Komut satırı (CLI)
 
 AhdCode'u terminalden birkaç temel komutla kullanabilirsiniz:
 
@@ -3315,7 +3451,7 @@ Yardım ve sürüm bilgisini gösterir.
 
 Yeni başlıyorsanız çoğu zaman kullanacağınız komut `ahdcode run ...` olacaktır.
 
-## 41. Etkileşimli kabuk (REPL)
+## 42. Etkileşimli kabuk (REPL)
 
 Küçük bir şeyi denemek için her seferinde dosya oluşturmak zorunda değilsiniz. Terminalde yalnızca:
 
@@ -3384,7 +3520,7 @@ harici bir render motorunu çağırır. Bu çağrıları bir `.ahd` dosyasından
 çalıştırın. `Archive`'ın böyle bir sınırlaması yoktur — REPL'de tamamen
 çalışır. Ayrıntılar için [REPL referansına](REPL_TR.md) bakın.
 
-## 42. Sık yapılan başlangıç hataları
+## 43. Sık yapılan başlangıç hataları
 
 Hata mesajı görmek programlamanın normal bir parçasıdır. Çoğu hata, bilgisayarın ne istediğinizi anlayamadığını söyler. Aşağıdaki örnekler yeni başlayanların sık karşılaştığı durumları ve nasıl düzelteceğinizi gösterir:
 
@@ -3493,7 +3629,7 @@ Hata mesajı görmek programlamanın normal bir parçasıdır. Çoğu hata, bilg
 - Neden: Bu, başlığı SQL'e yapıştırır. `Robert'); DROP TABLE notes;--` gibi bir başlık artık veri değildir.
 - Doğru: `?` yer tutucusu ve `SQLite.fromString(title)` kullanın. Parametre bağlama metni veri olarak tutar.
 
-## 43. Küçük Projeler
+## 44. Küçük Projeler
 
 Bu küçük projeler rehberde öğretilenleri bir araya getirir. Onları tek başınıza kurmayı deneyin!
 
@@ -3507,7 +3643,7 @@ Bu küçük projeler rehberde öğretilenleri bir araya getirir. Onları tek ba�
 8. **SQLite Not Defteri**: `notes.db` açın, yoksa bir `notes` tablosu oluşturun ve kullanıcının not eklemesine, listelemesine, başlığa göre aramasına, güncellemesine ve silmesine izin verin. Her değer için `?` parametreleri kullanın. Programı kapatıp yeniden çalıştırın: eski notlar durmalıdır.
 9. **Web Not Defteri**: Notları `127.0.0.1` üzerinde bir tarayıcıda sunun. Notları `HTML.text` ile listeleyin, POST `/notes` ve bağlı SQLite parametreleriyle not ekleyin, sonra `/` adresine yönlendirin. Dinamik metin ham HTML'e birleştirilmemelidir.
 
-## 44. Egzersizler
+## 45. Egzersizler
 
 Tam çözümleri hemen aramak yerine her programı küçük adımlarla kurun.
 
@@ -3540,7 +3676,7 @@ Tam çözümleri hemen aramak yerine her programı küçük adımlarla kurun.
 22. `127.0.0.1` üzerinde `GET /ok` için `HTTP.text("ok")` sunun ve tarayıcıda açın.
 23. Genel bir HTTPS sayfasında `HTTP.client().get` kullanın, `status()` yazın ve `HTTPError` ile 404 `ClientResponse` ayrımını yapın.
 
-## 45. Çözüm İpuçları
+## 46. Çözüm İpuçları
 
 1. `take` sonucu String'dir; yaş için `int(...)` ve yeni yaş için `+ 1` kullanın.
 2. Formülü küçük parçalara ayırın; `real(take(...))` ile başlayın ve Real sayılarını kullanın.
@@ -3566,7 +3702,7 @@ Tam çözümleri hemen aramak yerine her programı küçük adımlarla kurun.
 22. `HTTP.server("127.0.0.1", 8080)`, `app.get("/ok", handler)`, `HTTP.text("ok")`, sonra `app.start()`.
 23. `HTTP.client()`, `client.get("https://example.com/")`, `response.status()`. 404 hâlâ `ClientResponse`; TLS veya zaman aşımı `HTTPError`.
 
-## 46. Sonraki adımlar ve teknik belgeler
+## 47. Sonraki adımlar ve teknik belgeler
 
 Bu rehberi tamamladıktan sonra dilin ayrıntılarını şu belgelerden
 derinleştirebilirsiniz:
@@ -3615,5 +3751,7 @@ derinleştirebilirsiniz:
 
 Çalışan daha fazla örnek için [derlenmiş v0.1 örnekleri](../examples/v0.1/README_TR.md)
 klasörüne, [v0.3 SQLite Not Defteri](../examples/v0.3/README_TR.md),
-[v0.4 Web Not Defteri](../examples/v0.4/README_TR.md) ve
-[v0.5 çerezler ve oturumlar](../examples/v0.5/README_TR.md) örneklerine bakın.
+[v0.4 Web Not Defteri](../examples/v0.4/README_TR.md),
+[v0.5 çerezler ve oturumlar](../examples/v0.5/README_TR.md),
+[v0.6 HTTP Client](../examples/v0.6/README_TR.md) ve
+[v0.7 HTML ayrıştırma ve web kazıma](../examples/v0.7/README_TR.md) örneklerine bakın.

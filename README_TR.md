@@ -12,10 +12,17 @@ AhdCode; okunabilir sözdizimi, açık niyet (explicit intent), öngörülebilir
 anlambilim (semantics) ve yerel (native) derlemeye odaklanan, deneysel,
 statik olarak denetlenen genel amaçlı bir programlama dilidir.
 
-Mevcut sürüm **v0.6.0**'dır. Çekirdek dil uçtan uca çalışır, ancak proje
+Mevcut sürüm **v0.7.0**'dır. Çekirdek dil uçtan uca çalışır, ancak proje
 üretime hazır değildir ve 1.0'dan önce kırıcı (breaking) değişiklikler
 olabilir.
 
+v0.7.0, mevcut [HTML](docs/HTML_TR.md) oluşturucusunun üzerine HTML
+ayrıştırma ve küçük bir CSS benzeri seçici dili ekler: `HTML.parse(source)`,
+bir HTML String'ini -- tipik olarak bir `HTTP` Client yanıt gövdesini --
+salt okunur bir `HTMLDocument`'e dönüştürür; `select`/`first` de bunun
+içinde etiket, id, class, öznitelik ve soy/çocuk birleştiricileriyle
+`HTMLElement` değerleri bulur. Ayrıştırma asla bir ağ kaynağı getirmez ve
+asla betik içeriği çalıştırmaz; yalnızca belirteçler ve bir ağaç kurar.
 v0.6.0, HTTPS, zaman aşımı ve açık JSON/Env API birlikte çalışması olan giden
 bir [HTTP](docs/HTTP_TR.md) Client ekler. v0.5.0, v0.4.0 web temelinin üzerine
 HTTP çerezleri ve bellek içi sunucu taraflı oturumlar eklemişti: tipli bir
@@ -211,6 +218,7 @@ bakın.
 - [v0.4 Web Not Defteri](examples/v0.4/README_TR.md)
 - [v0.5 çerezler ve oturumlar](examples/v0.5/README_TR.md)
 - [v0.6 HTTP Client](examples/v0.6/README_TR.md)
+- [v0.7 HTML ayrıştırma ve web kazıma](examples/v0.7/README_TR.md)
 - [v0.4 Kütüphane Demosu](https://github.com/aliharundaldalli/ahdcode-library-demo) (ayrı başlangıç web uygulaması)
 - [v0.4 Seminer Demosu](https://github.com/aliharundaldalli/ahdcode-seminer-demo) (Hatay, çok sayfalı)
 - [Tam v0.1 dil spesifikasyonu](AHDCODE_LANGUAGE_SPEC_v0.1_TR.md)
@@ -256,6 +264,7 @@ examples/v0.3/     SQLite Not Defteri
 examples/v0.4/     Web Not Defteri
 examples/v0.5/     çerezler ve bellek içi oturumlar
 examples/v0.6/     giden HTTP Client ve JSON API'ler
+examples/v0.7/     HTML ayrıştırma, seçiciler ve web kazıma
 AHDCODE_LANGUAGE_SPEC_v0.1.md
                    yetkili (authoritative) dil sözleşmesi
 ```

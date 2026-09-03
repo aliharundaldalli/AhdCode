@@ -1,4 +1,4 @@
-# AhdCode v0.6.0 English Student Guide
+# AhdCode v0.7.0 English Student Guide
 
 This guide is designed so that **even someone who has never programmed before** can follow along. You can read it in order from beginning to end; in each section, you will first see what we want to achieve, then write a working example, and finally learn the necessary rules.
 
@@ -45,14 +45,15 @@ The best way to learn is not just by reading the examples, but by running them. 
 - [36. A small web page](#36-a-small-web-page)
 - [37. Cookies and sessions](#37-cookies-and-sessions)
 - [38. HTTP Client](#38-http-client)
-- [39. Code Formatter](#39-code-formatter)
-- [40. Command line (CLI)](#40-command-line-cli)
-- [41. Interactive shell (REPL)](#41-interactive-shell-repl)
-- [42. Common beginner mistakes](#42-common-beginner-mistakes)
-- [43. Small Projects](#43-small-projects)
-- [44. Exercises](#44-exercises)
-- [45. Solution Hints](#45-solution-hints)
-- [46. Next steps and technical docs](#46-next-steps-and-technical-docs)
+- [39. HTML parsing and web scraping](#39-html-parsing-and-web-scraping)
+- [40. Code Formatter](#40-code-formatter)
+- [41. Command line (CLI)](#41-command-line-cli)
+- [42. Interactive shell (REPL)](#42-interactive-shell-repl)
+- [43. Common beginner mistakes](#43-common-beginner-mistakes)
+- [44. Small Projects](#44-small-projects)
+- [45. Exercises](#45-exercises)
+- [46. Solution Hints](#46-solution-hints)
+- [47. Next steps and technical docs](#47-next-steps-and-technical-docs)
 
 ## 1. What is AhdCode?
 
@@ -3202,7 +3203,142 @@ attempt {
 See [the HTTP module reference](HTTP.md) and
 [`examples/v0.6`](../examples/v0.6/README.md).
 
-## 39. Code Formatter
+## 39. HTML parsing and web scraping
+
+Section 36 used `HTML` to *build* pages. v0.7.0 adds the other direction:
+turning HTML text you received from somewhere into a tree you can search.
+`HTML.parse` does **not** download anything by itself — it only reads the
+String you already have.
+
+### Parse a literal String
+
+```ahd
+bring HTML
+
+document := HTML.parse("<h1>Hello &amp; AhdCode</h1>")
+heading := document.first("h1")
+if heading != null {
+    write(heading.text())
+}
+```
+
+`document.first(selector)` returns the first matching element, or `null` if
+nothing matches — that is why `heading` needs the `if ... != null` guard,
+exactly like any other nullable value. `text()` gives you the element's
+text content, with `&amp;` already decoded to `&`.
+
+### Attributes and `select`
+
+```ahd
+bring HTML
+
+document := HTML.parse("<a href=\"/notes/1\" class=\"link\">Read</a>")
+link := document.first("a")
+if link != null {
+    write(link.tag())        // "a" — tag() is always lowercase
+    write(link.hasAttr("href"))  // true
+    href := link.attr("href")
+    if href != null {
+        write(href)           // "/notes/1" — never turned into an absolute URL
+    }
+}
+
+cards := document.select(".card")
+write(str(len(cards)))
+```
+
+`select(selector)` returns every match as a `List<HTMLElement>`, in the
+order they appear in the document. `selector` understands a small set of
+CSS-like patterns: a tag name, `#id`, `.class`, `[attr]`,
+`[attr="value"]`, combinations of those, a space for "somewhere inside"
+(`article a`), `>` for "direct child" (`article > h2`), and a comma for
+"either of these" (`h1, h2`). Anything else — `:nth-child(...)`, `+`, `~`,
+and so on — raises `HTMLError` instead of guessing what you meant.
+
+### Nested selection
+
+Calling `.select`/`.first` on an `HTMLElement` searches only *inside* that
+element, not the whole document:
+
+```ahd
+articles := document.select("article.card")
+firstArticle := articles[0]
+title := firstArticle.first("h2")
+```
+
+`title` can only come from inside `firstArticle` — a matching `h2` in a
+different article is never returned.
+
+### HTTP Client + HTML.parse: getting AND parsing a real page
+
+`HTML.parse` and the HTTP Client from section 38 are two separate tools
+that combine naturally. Getting the page is one call; parsing it is
+another:
+
+```ahd
+bring HTTP
+from HTTP bring Client
+from HTTP bring ClientResponse
+bring HTML
+from HTML bring HTMLDocument
+from HTML bring HTMLElement
+
+client: Client := HTTP.client()
+response: ClientResponse := client.get("https://example.com/notes")
+document: HTMLDocument := HTML.parse(response.body())
+
+articles: List<HTMLElement> := document.select("article.card")
+for article in articles {
+    heading: Local := article.first("h2")
+    if heading != null {
+        write(heading.text())
+    }
+}
+```
+
+**Technical note.** `HTML.parse` never makes a network request on its own —
+it has no URL argument at all. It also never runs anything: a `<script>`
+tag in the page is just text to `HTML.parse`, the same as a `<p>` tag. There
+is no browser, no JavaScript engine, and no DOM inside AhdCode — only a
+tree you can search with `select`/`first`.
+
+### Saving what you scraped
+
+Section 35 introduced `SQLite`. The two combine directly: extract with
+`HTML`, store with `SQLite`, using bound parameters exactly as before —
+never String concatenation:
+
+```ahd
+db: Database := SQLite.open("scraped.db")
+db.execute("""
+    CREATE TABLE IF NOT EXISTS notes (
+        id TEXT PRIMARY KEY,
+        title TEXT NOT NULL,
+        href TEXT NOT NULL
+    )
+    """)
+
+for article in articles {
+    heading: Local := article.first("h2")
+    link: Local := article.first("a")
+    if heading != null {
+        if link != null {
+            href: Local String? := link.attr("href")
+            if href != null {
+                db.execute(
+                    "INSERT OR REPLACE INTO notes (id, title, href) VALUES (?, ?, ?)"
+                    [SQLite.fromString(href), SQLite.fromString(heading.text()), SQLite.fromString(href)]
+                )
+            }
+        }
+    }
+}
+```
+
+See [the HTML module reference](HTML.md) and
+[`examples/v0.7`](../examples/v0.7/README.md).
+
+## 40. Code Formatter
 
 Even if the code works, if everyone uses different spacing and line layouts, it becomes hard to read. The AhdCode formatter converts valid code to a common style:
 
@@ -3255,7 +3391,7 @@ values: List<Int> :=
 
 The formatter is idempotent; running it again on the same file produces no new changes.
 
-## 40. Command line (CLI)
+## 41. Command line (CLI)
 
 You can use AhdCode from the terminal with a few basic commands:
 
@@ -3292,7 +3428,7 @@ Shows help and version information.
 
 If you are a beginner, the command you will use most of the time will be `ahdcode run ...`.
 
-## 41. Interactive shell (REPL)
+## 42. Interactive shell (REPL)
 
 You don't have to create a file every time you want to try something small. In the terminal, just run:
 
@@ -3360,7 +3496,7 @@ not support. Run those calls from a `.ahd` file instead. `Archive` has no
 such limit -- it works fully in the REPL. See the [REPL reference](REPL.md)
 for details.
 
-## 42. Common beginner mistakes
+## 43. Common beginner mistakes
 
 Seeing an error message is a normal part of programming. Most errors simply tell you that the computer couldn't understand what you wanted. The following examples show common situations beginners encounter and how to fix them:
 
@@ -3469,7 +3605,7 @@ Seeing an error message is a normal part of programming. Most errors simply tell
 - Why: That splices the title into SQL. A title such as `Robert'); DROP TABLE notes;--` is no longer data.
 - Correct: Use a `?` placeholder and `SQLite.fromString(title)`. Parameter binding keeps the text as data.
 
-## 43. Small Projects
+## 44. Small Projects
 
 These small projects bring together what is taught in the guide. Try building them on your own!
 
@@ -3483,7 +3619,7 @@ These small projects bring together what is taught in the guide. Try building th
 8. **SQLite Notes App**: Open `notes.db`, create a `notes` table if it is missing, and let the user add a note, list notes, search by title, update a note, and delete a note. Use `?` parameters for every value. Close the program and run it again: the old notes must still be there.
 9. **Web Notes App**: Serve notes in a browser on `127.0.0.1`. List notes with `HTML.text`, add a note with POST `/notes` and bound SQLite parameters, then redirect to `/`. Dynamic text must not be concatenated into raw HTML.
 
-## 44. Exercises
+## 45. Exercises
 
 Instead of immediately looking for full solutions, build each program in small steps.
 
@@ -3516,7 +3652,7 @@ Instead of immediately looking for full solutions, build each program in small s
 22. Serve `HTTP.text("ok")` on `GET /ok` at `127.0.0.1` and open it in a browser.
 23. Use `HTTP.client().get` on a public HTTPS page, print `status()`, and treat `HTTPError` separately from a 404 `ClientResponse`.
 
-## 45. Solution Hints
+## 46. Solution Hints
 
 1. The result of `take` is a String; use `int(...)` for age, and `+ 1` for the new age.
 2. Break the formula into small parts; start with `real(take(...))` and use Real numbers.
@@ -3542,7 +3678,7 @@ Instead of immediately looking for full solutions, build each program in small s
 22. `HTTP.server("127.0.0.1", 8080)`, `app.get("/ok", handler)`, `HTTP.text("ok")`, then `app.start()`.
 23. `HTTP.client()`, `client.get("https://example.com/")`, `response.status()`. A 404 is still `ClientResponse`; a TLS or timeout failure is `HTTPError`.
 
-## 46. Next steps and technical docs
+## 47. Next steps and technical docs
 
 After finishing this guide, you can deepen your knowledge of the language details from these documents:
 
@@ -3588,4 +3724,4 @@ After finishing this guide, you can deepen your knowledge of the language detail
 - [Language server](LSP.md)
 - [Full v0.1 specification](../AHDCODE_LANGUAGE_SPEC_v0.1.md)
 
-Check the [curated v0.1 examples](../examples/v0.1/README.md) folder, the [v0.3 SQLite Notes App](../examples/v0.3/README.md), the [v0.4 Web Notes App](../examples/v0.4/README.md), and the [v0.5 cookies and sessions](../examples/v0.5/README.md) examples for more working programs.
+Check the [curated v0.1 examples](../examples/v0.1/README.md) folder, the [v0.3 SQLite Notes App](../examples/v0.3/README.md), the [v0.4 Web Notes App](../examples/v0.4/README.md), the [v0.5 cookies and sessions](../examples/v0.5/README.md), the [v0.6 HTTP Client](../examples/v0.6/README.md), and the [v0.7 HTML parsing and web scraping](../examples/v0.7/README.md) examples for more working programs.

@@ -12,11 +12,18 @@ AhdCode is an experimental statically checked general-purpose programming
 language focused on readable syntax, explicit intent, predictable semantics,
 and native compilation.
 
-The current release is **v0.6.0**. The core language works end to end, but
+The current release is **v0.7.0**. The core language works end to end, but
 the project is not production-ready and breaking changes may occur before 1.0.
 
-v0.6.0 adds an outbound [HTTP](docs/HTTP.md) Client with HTTPS, timeouts, and
-explicit JSON/Env API interoperability. v0.5.0 added HTTP cookies and
+v0.7.0 adds HTML parsing and a small CSS-like selector language on top of the
+existing [HTML](docs/HTML.md) builder: `HTML.parse(source)` turns an HTML
+String -- typically an `HTTP` Client response body -- into a read-only
+`HTMLDocument`, and `select`/`first` find `HTMLElement` values in it by tag,
+id, class, attribute, and descendant/child combinators. Parsing never fetches
+a network resource and never executes script content; it only tokenizes and
+builds a tree. v0.6.0 adds an outbound [HTTP](docs/HTTP.md) Client with
+HTTPS, timeouts, and explicit JSON/Env API interoperability. v0.5.0 added
+HTTP cookies and
 in-memory server-side sessions on top of the v0.4.0 web foundation: a typed
 HTTP server, Request/Response values, and a small safe [HTML](docs/HTML.md)
 builder, so an AhdCode program can be opened in a browser on this machine. A
@@ -201,6 +208,7 @@ See the [CLI guide](docs/CLI.md), [formatter guide](docs/FORMATTER.md),
 - [v0.4 Web Notes App](examples/v0.4/README.md)
 - [v0.5 cookies and sessions](examples/v0.5/README.md)
 - [v0.6 HTTP Client](examples/v0.6/README.md)
+- [v0.7 HTML parsing and web scraping](examples/v0.7/README.md)
 - [v0.4 Library Demo](https://github.com/aliharundaldalli/ahdcode-library-demo) (separate beginner web app)
 - [v0.4 Seminar Demo](https://github.com/aliharundaldalli/ahdcode-seminer-demo) (Hatay, multi-page)
 - [Full v0.1 language specification](AHDCODE_LANGUAGE_SPEC_v0.1.md)
@@ -242,6 +250,7 @@ examples/v0.3/     SQLite Notes App
 examples/v0.4/     Web Notes App
 examples/v0.5/     cookies and in-memory sessions
 examples/v0.6/     outbound HTTP Client and JSON APIs
+examples/v0.7/     HTML parsing, selectors, and web scraping
 AHDCODE_LANGUAGE_SPEC_v0.1.md
                    authoritative language contract
 ```
