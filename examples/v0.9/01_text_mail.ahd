@@ -1,0 +1,36 @@
+// Send a plain-text message through SMTP.
+//
+// Point this at a local test server. It will not guess a real mailbox.
+//
+//   export SMTP_HOST=127.0.0.1
+//   export SMTP_PORT=2525
+//   export SMTP_SECURITY=none
+//   export SMTP_FROM=sender@example.com
+//   export SMTP_TO=student@example.com
+//   ahdcode run 01_text_mail.ahd
+bring Env
+bring SMTP
+from SMTP bring SMTPClient
+from SMTP bring SMTPMessage
+from SMTP bring SMTPError
+
+host := Env.getOr("SMTP_HOST", "127.0.0.1")
+port := int(Env.getOr("SMTP_PORT", "2525"))
+security := Env.getOr("SMTP_SECURITY", "none")
+fromAddress := Env.getOr("SMTP_FROM", "sender@example.com")
+toAddress := Env.getOr("SMTP_TO", "student@example.com")
+
+client: SMTPClient := SMTP.client(host, port, security)
+message: SMTPMessage := SMTP.message(
+    fromAddress
+    [toAddress]
+    "AhdCode Test"
+)
+message = message.withText("Merhaba AhdCode")
+
+attempt {
+    client.send(message)
+    write("sent")
+} except SMTPError as error {
+    write(error.message)
+}
