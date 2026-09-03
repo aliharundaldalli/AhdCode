@@ -56,6 +56,47 @@ func TestHTMLEvaluatorRejectsInvalidNamesAndVoidChildren(t *testing.T) {
 	})
 }
 
+func TestHTMLEvaluatorParseSelectAndAccessors(t *testing.T) {
+	session := newLatexTestSession()
+	source := `<article class="card" data-id="1"><h2>Riesz &amp; Banach</h2><a href="/notes/1">Read</a></article>`
+	doc := session.htmlBuiltin("parse", []any{source})
+	articles := session.htmlOperation("HTMLDocument.select", doc, []any{"article.card"}).(*List)
+	if len(articles.Items) != 1 {
+		t.Fatalf("expected 1 article.card, got %d", len(articles.Items))
+	}
+	article := articles.Items[0]
+	if session.htmlOperation("HTMLElement.tag", article, nil) != "article" {
+		t.Fatalf("expected tag() article")
+	}
+	h2 := session.htmlOperation("HTMLElement.first", article, []any{"h2"})
+	if h2 == nil {
+		t.Fatalf("expected h2 to be found")
+	}
+	if got := session.htmlOperation("HTMLElement.text", h2, nil); got != "Riesz & Banach" {
+		t.Fatalf("expected decoded entity text, got %v", got)
+	}
+	a := session.htmlOperation("HTMLElement.first", article, []any{"a"})
+	href := session.htmlOperation("HTMLElement.attr", a, []any{"href"})
+	if href != "/notes/1" {
+		t.Fatalf("expected relative href, got %v", href)
+	}
+	if session.htmlOperation("HTMLElement.hasAttr", article, []any{"data-id"}) != true {
+		t.Fatalf("expected hasAttr data-id true")
+	}
+	missing := session.htmlOperation("HTMLDocument.first", doc, []any{"section"})
+	if missing != nil {
+		t.Fatalf("expected first() to return nil when nothing matches")
+	}
+}
+
+func TestHTMLEvaluatorInvalidSelectorRaisesHTMLError(t *testing.T) {
+	session := newLatexTestSession()
+	doc := session.htmlBuiltin("parse", []any{"<div></div>"})
+	expectEvaluatorRaise(t, "HTMLError", func() {
+		session.htmlOperation("HTMLDocument.select", doc, []any{":nth-child(2)"})
+	})
+}
+
 func TestHTMLEvaluatorDoesNotMutateSourceCollections(t *testing.T) {
 	session := newLatexTestSession()
 	child := session.htmlBuiltin("text", []any{"Hi"})

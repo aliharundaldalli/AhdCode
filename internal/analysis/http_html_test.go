@@ -60,12 +60,15 @@ func TestHTTPAndHTMLNamespaceMembersCarryRealSignatures(t *testing.T) {
 	store.Open(path, text)
 	items = store.Completion(path, offsetOf(t, text, "HTML.")+len("HTML."))
 	wantHTML := map[string]string{
-		"text":      "text: (value: String) -> HTMLNode",
-		"element":   "element: (name: String, attributes: Pair<String, String>, children: List<HTMLNode>) -> HTMLNode",
-		"render":    "render: (node: HTMLNode) -> String",
-		"document":  "document: (title: String, body: List<HTMLNode>) -> String",
-		"HTMLNode":  "Class HTMLNode",
-		"HTMLError": "Class HTMLError",
+		"text":         "text: (value: String) -> HTMLNode",
+		"element":      "element: (name: String, attributes: Pair<String, String>, children: List<HTMLNode>) -> HTMLNode",
+		"render":       "render: (node: HTMLNode) -> String",
+		"document":     "document: (title: String, body: List<HTMLNode>) -> String",
+		"parse":        "parse: (source: String) -> HTMLDocument",
+		"HTMLNode":     "Class HTMLNode",
+		"HTMLDocument": "Class HTMLDocument",
+		"HTMLElement":  "Class HTMLElement",
+		"HTMLError":    "Class HTMLError",
 	}
 	for label, detail := range wantHTML {
 		if detailOf(items, label) != detail {

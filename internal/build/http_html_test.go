@@ -4,12 +4,14 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -651,5 +653,214 @@ func TestWebNotesRequiresSQLiteHelper(t *testing.T) {
 	}
 	if result.Program == nil || !result.Program.RequiresSQLite {
 		t.Fatal("Web Notes must require the SQLite helper")
+	}
+}
+
+// --- v0.7.0 HTML parsing / web scraping native-binary acceptance ---
+
+const scrapeFixtureHTML = `<!doctype html>
+<html>
+<body>
+  <article class="card" data-id="1">
+    <h2>Riesz &amp; Banach</h2>
+    <a href="/notes/1">Read</a>
+  </article>
+  <article class="card featured" data-id="2">
+    <h2>Functional Analysis</h2>
+    <a href="/notes/2">Read</a>
+  </article>
+</body>
+</html>`
+
+func httpScrapeSource(url string) string {
+	return `bring HTTP
+from HTTP bring Client
+from HTTP bring ClientResponse
+bring HTML
+from HTML bring HTMLDocument
+from HTML bring HTMLElement
+
+client: Client := HTTP.client()
+response: ClientResponse := client.get("` + url + `")
+document: HTMLDocument := HTML.parse(response.body())
+
+articles: List<HTMLElement> := document.select("article.card")
+write("count {str(len(articles))}")
+
+for article in articles {
+    heading: Local := article.first("h2")
+    link: Local := article.first("a")
+    if heading != null {
+        write(heading.text())
+    }
+    if link != null {
+        href: Local := link.attr("href")
+        if href != null {
+            write(href)
+        }
+    }
+}
+`
+}
+
+// TestHTMLParseHTTPScrapeNativeProgram is the primary v0.7.0 scraping
+// acceptance: HTTP Client -> HTML.parse -> select("article.card") -> h2/a
+// extraction, compiled and run as a native binary against a real (local)
+// HTTP server.
+func TestHTMLParseHTTPScrapeNativeProgram(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		writer.Header().Set("Content-Type", "text/html; charset=utf-8")
+		_, _ = writer.Write([]byte(scrapeFixtureHTML))
+	}))
+	defer server.Close()
+
+	directory := writeSources(t, map[string]string{"main.ahd": httpScrapeSource(server.URL)})
+	out, errorOutput, code := buildAndRun(t, filepath.Join(directory, "main.ahd"), "")
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, errorOutput)
+	}
+	want := "count 2\nRiesz & Banach\n/notes/1\nFunctional Analysis\n/notes/2\n"
+	if out != want {
+		t.Fatalf("stdout = %q; want %q", out, want)
+	}
+}
+
+// TestHTMLParseMakesNoResourceRequests proves HTML.parse never fetches a
+// network resource: img/script/link/iframe URLs and a <script> body calling
+// fetch() must never cause a request to a local trap server whose only job
+// is to count hits.
+func TestHTMLParseMakesNoResourceRequests(t *testing.T) {
+	var hits int64
+	trap := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		atomic.AddInt64(&hits, 1)
+		writer.WriteHeader(200)
+	}))
+	defer trap.Close()
+
+	source := `bring HTML
+from HTML bring HTMLDocument
+from HTML bring HTMLElement
+
+source: String := "<img src=\"` + trap.URL + `/image\">" +
+    "<script src=\"` + trap.URL + `/script\"></script>" +
+    "<link rel=\"stylesheet\" href=\"` + trap.URL + `/style\">" +
+    "<iframe src=\"` + trap.URL + `/frame\"></iframe>" +
+    "<script>fetch(\"` + trap.URL + `/executed\")</script>" +
+    "<div onload=\"fetch('` + trap.URL + `/onload')\" onclick=\"fetch('` + trap.URL + `/onclick')\">hi</div>"
+
+document: HTMLDocument := HTML.parse(source)
+elements: List<HTMLElement> := document.select("*")
+write("elements {str(len(elements))}")
+`
+	directory := writeSources(t, map[string]string{"main.ahd": source})
+	out, errorOutput, code := buildAndRun(t, filepath.Join(directory, "main.ahd"), "")
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, errorOutput)
+	}
+	if !strings.Contains(out, "elements ") {
+		t.Fatalf("stdout = %q", out)
+	}
+	if got := atomic.LoadInt64(&hits); got != 0 {
+		t.Fatalf("trap server received %d requests; HTML.parse must never fetch resources or execute script", got)
+	}
+}
+
+// TestHTMLParseInvalidSelectorIsCatchableHTMLError confirms an invalid
+// selector raises a catchable HTMLError in a compiled native binary,
+// matching the evaluator/semantic behavior exactly.
+func TestHTMLParseInvalidSelectorIsCatchableHTMLError(t *testing.T) {
+	source := `bring HTML
+from HTML bring HTMLDocument
+from HTML bring HTMLError
+
+document: HTMLDocument := HTML.parse("<div></div>")
+attempt {
+    document.select(":nth-child(2)")
+    write("unreachable")
+} except HTMLError as error {
+    write("caught")
+}
+`
+	directory := writeSources(t, map[string]string{"main.ahd": source})
+	out, errorOutput, code := buildAndRun(t, filepath.Join(directory, "main.ahd"), "")
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, errorOutput)
+	}
+	if out != "caught\n" {
+		t.Fatalf("stdout = %q", out)
+	}
+}
+
+func scrapeToSQLiteSource(url string) string {
+	return `bring HTTP
+from HTTP bring Client
+from HTTP bring ClientResponse
+bring HTML
+from HTML bring HTMLDocument
+from HTML bring HTMLElement
+bring SQLite
+from SQLite bring Database
+from SQLite bring SQLiteValue
+
+client: Client := HTTP.client()
+response: ClientResponse := client.get("` + url + `")
+document: HTMLDocument := HTML.parse(response.body())
+
+db: Database := SQLite.open(":memory:")
+db.execute("""
+    CREATE TABLE notes (
+        id TEXT PRIMARY KEY,
+        title TEXT NOT NULL,
+        href TEXT NOT NULL
+    )
+    """)
+
+articles: List<HTMLElement> := document.select("article.card")
+for article in articles {
+    id: Local := article.attr("data-id")
+    heading: Local := article.first("h2")
+    link: Local := article.first("a")
+    if id != null {
+        if heading != null {
+            if link != null {
+                href: Local := link.attr("href")
+                if href != null {
+                    db.execute(
+                        "INSERT INTO notes (id, title, href) VALUES (?, ?, ?)"
+                        [SQLite.fromString(id), SQLite.fromString(heading.text()), SQLite.fromString(href)]
+                    )
+                }
+            }
+        }
+    }
+}
+
+rows: List<Pair<String, SQLiteValue>> := db.query("SELECT id, title, href FROM notes ORDER BY id")
+for row in rows {
+    write(row["id"].string() + " | " + row["title"].string() + " | " + row["href"].string())
+}
+db.close()
+`
+}
+
+// TestHTMLParseScrapeToSQLiteNativeProgram is the section 34 cross-module
+// acceptance: HTTP Client + HTML.parse + SQLite bound-parameter persistence,
+// as one native binary.
+func TestHTMLParseScrapeToSQLiteNativeProgram(t *testing.T) {
+	sqliteHelperForTest(t)
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		writer.Header().Set("Content-Type", "text/html; charset=utf-8")
+		_, _ = writer.Write([]byte(scrapeFixtureHTML))
+	}))
+	defer server.Close()
+
+	executable := buildSQLiteProgram(t, scrapeToSQLiteSource(server.URL))
+	out, errorOutput, code := runIn(t, executable, t.TempDir())
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, errorOutput)
+	}
+	want := "1 | Riesz & Banach | /notes/1\n2 | Functional Analysis | /notes/2\n"
+	if out != want {
+		t.Fatalf("stdout = %q; want %q", out, want)
 	}
 }

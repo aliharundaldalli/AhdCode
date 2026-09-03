@@ -7,6 +7,8 @@ import (
 
 const htmlPreamble = "bring HTML\nfrom HTML bring HTMLNode\nfrom HTML bring HTMLError\n\n"
 
+const htmlParsePreamble = "bring HTML\nfrom HTML bring HTMLDocument\nfrom HTML bring HTMLElement\nfrom HTML bring HTMLError\n\n"
+
 func TestHTMLModuleValidUsage(t *testing.T) {
 	result := analyzeWithStandardModules(t, htmlPreamble+`node: HTMLNode := HTML.text("Hello")
 node = HTML.element("h1", {}, [HTML.text("Hello")])
@@ -41,12 +43,56 @@ func TestHTMLNodeIsNotConstructedDirectly(t *testing.T) {
 	requireSemanticFailure(t, result)
 }
 
+func TestHTMLParseModuleValidUsage(t *testing.T) {
+	result := analyzeWithStandardModules(t, htmlParsePreamble+`document: HTMLDocument := HTML.parse("<h1>Hi</h1>")
+elements: List<HTMLElement> := document.select("h1")
+heading: HTMLElement? := document.first("h1")
+if heading != null {
+    tag: Local String := heading.tag()
+    text: Local String := heading.text()
+    attr: Local String? := heading.attr("id")
+    present: Local Bool := heading.hasAttr("id")
+    nested: Local List<HTMLElement> := heading.select("span")
+    firstNested: Local HTMLElement? := heading.first("span")
+}
+`)
+	requireSemanticClean(t, result)
+}
+
+func TestHTMLParseOperationsRejectWrongArityAndTypes(t *testing.T) {
+	tests := []string{
+		`HTML.parse()`,
+		`HTML.parse(1)`,
+		`document: HTMLDocument := HTML.parse("x")
+document.select()`,
+		`document: HTMLDocument := HTML.parse("x")
+document.select(1)`,
+		`document: HTMLDocument := HTML.parse("x")
+document.first()`,
+		`document: HTMLDocument := HTML.parse("x")
+element: HTMLElement := document.first("h1")`,
+	}
+	for _, source := range tests {
+		t.Run(source, func(t *testing.T) {
+			result := analyzeWithStandardModules(t, htmlParsePreamble+source+"\n")
+			requireSemanticFailure(t, result)
+		})
+	}
+}
+
+func TestHTMLDocumentAndElementAreNotConstructedDirectly(t *testing.T) {
+	result := analyzeWithStandardModules(t, htmlParsePreamble+"document: HTMLDocument := HTMLDocument()\n")
+	requireSemanticFailure(t, result)
+	result = analyzeWithStandardModules(t, htmlParsePreamble+"element: HTMLElement := HTMLElement()\n")
+	requireSemanticFailure(t, result)
+}
+
 func TestHTMLModuleInterfaceExportsExactSurface(t *testing.T) {
 	module := StandardModuleInterfaces()["HTML"]
 	if module == nil || module.ModuleID != "builtin:HTML" {
 		t.Fatalf("HTML is not a registered builtin module: %#v", module)
 	}
-	wantExports := []string{"HTMLError", "HTMLNode", "document", "element", "render", "text"}
+	wantExports := []string{"HTMLDocument", "HTMLElement", "HTMLError", "HTMLNode", "document", "element", "parse", "render", "text"}
 	if strings.Join(module.ExportNames, ",") != strings.Join(wantExports, ",") {
 		t.Fatalf("HTML exports %v; want %v", module.ExportNames, wantExports)
 	}
@@ -55,6 +101,7 @@ func TestHTMLModuleInterfaceExportsExactSurface(t *testing.T) {
 		"element":  "(name: String, attributes: Pair<String, String>, children: List<HTMLNode>) -> HTMLNode",
 		"render":   "(node: HTMLNode) -> String",
 		"document": "(title: String, body: List<HTMLNode>) -> String",
+		"parse":    "(source: String) -> HTMLDocument",
 	}
 	for name, want := range signatures {
 		symbol := module.Exports[name]
