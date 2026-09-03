@@ -37,7 +37,8 @@ const (
 	sqliteRuntimeFileName  = "ahdcode_sqlite_runtime.go"
 	httpRuntimeFileName    = "ahdcode_http_runtime.go"
 	htmlRuntimeFileName    = "ahdcode_html_runtime.go"
-	smtpRuntimeFileName    = "ahdcode_smtp_runtime.go"
+	smtpRuntimeFileName        = "ahdcode_smtp_runtime.go"
+	securityRuntimeFileName    = "ahdcode_security_runtime.go"
 )
 
 // storage describes the Go representation chosen for one IR symbol.
@@ -135,6 +136,10 @@ func Generate(compilation *ir.Compilation) (*GeneratedProgram, []diagnostics.Dia
 	if err != nil {
 		return nil, append(generator.diagnostics, backendError(CodeFormatFailure, "embedded SMTP runtime source is not valid Go: "+err.Error(), source.Span{}, "the SMTP backend runtime must remain gofmt-clean"))
 	}
+	securityRuntime, err := format.Source([]byte(securityRuntimeSource()))
+	if err != nil {
+		return nil, append(generator.diagnostics, backendError(CodeFormatFailure, "embedded Security runtime source is not valid Go: "+err.Error(), source.Span{}, "the Security backend runtime must remain gofmt-clean"))
+	}
 	return &GeneratedProgram{Files: []GeneratedFile{
 		{Name: programFileName, Content: string(formatted)},
 		{Name: runtimeFileName, Content: string(runtime)},
@@ -145,6 +150,7 @@ func Generate(compilation *ir.Compilation) (*GeneratedProgram, []diagnostics.Dia
 		{Name: httpRuntimeFileName, Content: string(httpRuntime)},
 		{Name: htmlRuntimeFileName, Content: string(htmlRuntime)},
 		{Name: smtpRuntimeFileName, Content: string(smtpRuntime)},
+		{Name: securityRuntimeFileName, Content: string(securityRuntime)},
 	}, RequiresLatex: generator.usesLatex, RequiresPlot: generator.usesPlot, RequiresNumeric: generator.usesNumeric, RequiresSQLite: generator.usesSQLite}, generator.diagnostics
 }
 
@@ -179,6 +185,10 @@ func htmlRuntimeSource() string {
 
 func smtpRuntimeSource() string {
 	return strings.Replace(ahdruntime.SMTPSource, "package ahdruntime", "package main", 1)
+}
+
+func securityRuntimeSource() string {
+	return strings.Replace(ahdruntime.SecuritySource, "package ahdruntime", "package main", 1)
 }
 
 func (generator *generator) hasErrors() bool {

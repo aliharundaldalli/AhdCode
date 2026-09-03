@@ -156,6 +156,11 @@ func LowerCompilation(compilation module.CompilationResult) Result {
 					htmlModule(ir.ModuleID(current.ID), current.Source.Name, current.Source.Path))
 				continue
 			}
+			if string(current.ID) == SecurityModuleID {
+				result.Modules = append(result.Modules,
+					securityModule(ir.ModuleID(current.ID), current.Source.Name, current.Source.Path))
+				continue
+			}
 			if string(current.ID) == SMTPModuleID {
 				result.Modules = append(result.Modules,
 					smtpModule(ir.ModuleID(current.ID), current.Source.Name, current.Source.Path))

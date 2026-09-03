@@ -45,3 +45,11 @@ var HTMLSource string
 
 //go:embed smtp.go
 var SMTPSource string
+
+// SecuritySource is emitted as a separate generated Go file. It contains a
+// self-contained Argon2id implementation built only from the Go standard
+// library (crypto/rand, crypto/subtle, math/bits, encoding/base64), so the
+// generated workspace remains dependency-free.
+//
+//go:embed security.go
+var SecuritySource string
