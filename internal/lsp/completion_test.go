@@ -126,3 +126,28 @@ func TestCompletionHTTPAndHTMLArriveThroughTheGenericModulePath(t *testing.T) {
 		t.Fatalf("expected HTMLError/HTMLNode exports, got %#v", items)
 	}
 }
+
+// TestCompletionMySQLArrivesThroughTheGenericModulePath is the v0.11.0
+// counterpart of the SQLite check above: MySQL reaches the protocol layer
+// with no MySQL-specific code anywhere in internal/lsp.
+func TestCompletionMySQLArrivesThroughTheGenericModulePath(t *testing.T) {
+	items := completionAt(t, "bring MyS\n", "file:///main.ahd", len("bring MyS"))
+	if !hasCompletionLabel(items, "MySQL") {
+		t.Fatalf("expected MySQL among module completions, got %#v", items)
+	}
+	text := "bring MySQL\nx := MySQL.\n"
+	items = completionAt(t, text, "file:///main.ahd", len(text)-1)
+	for _, label := range []string{
+		"connect", "nullValue", "fromInt", "fromReal", "fromString",
+		"MySQLDatabase", "MySQLTransaction", "MySQLResult", "MySQLValue", "MySQLError",
+	} {
+		if !hasCompletionLabel(items, label) {
+			t.Fatalf("expected %s among MySQL member completions, got %#v", label, items)
+		}
+	}
+	text = "from MySQL bring MySQL\n"
+	items = completionAt(t, text, "file:///main.ahd", len(text)-1)
+	if !hasCompletionLabel(items, "MySQLDatabase") || !hasCompletionLabel(items, "MySQLValue") {
+		t.Fatalf("expected MySQLDatabase/MySQLValue exports, got %#v", items)
+	}
+}
