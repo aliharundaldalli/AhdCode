@@ -98,8 +98,24 @@ ahdcode format --check hello.ahd
 İlk komut dosyayı atomik olarak günceller. İkincisi ise dosyanın zaten
 kanonik (standart) biçimde olup olmadığını yalnızca kontrol eder.
 
+## Bir web uygulaması kurun
+
+```ahd
+bring Web
+
+home: Function := (request: Request) -> Response {
+    return Web.html(Web.UI.h1("Merhaba"))
+}
+```
+
+`bring Web` birinci taraf web çatısıdır: yönlendirme, yanıtlar ve anlamsal bir
+HTML bileşen katmanı tek bir içe aktarmada, paket yöneticisi olmadan
+çevrimdışı çözülür. Bkz. [Web rehberi](WEB_TR.md) ve çalıştırılabilir
+[Ahd Akademi örneği](../examples/v0.15/ahd_academi).
+
 Sırada: [dil turunu](LANGUAGE_TOUR_TR.md) ve
-[tanılama rehberini](DIAGNOSTICS_TR.md) okuyun veya UTC Time ve CSV dahil
+[tanılama rehberini](DIAGNOSTICS_TR.md) okuyun, bir
+[web uygulaması](WEB_TR.md) kurun veya UTC Time ve CSV dahil
 [derlenmiş örnekleri](../examples/v0.1/README_TR.md),
 [Data tablolarını](DATA_TR.md), [PDF](PDF_TR.md) üretimini ve
 [Archive](ARCHIVE_TR.md) paketlemesini çalıştırın.

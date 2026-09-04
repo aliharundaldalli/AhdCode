@@ -98,8 +98,23 @@ ahdcode format --check hello.ahd
 The first command updates the file atomically. The second only checks whether
 the file is already canonical.
 
+## Build a web application
+
+```ahd
+bring Web
+
+home: Function := (request: Request) -> Response {
+    return Web.html(Web.UI.h1("Merhaba"))
+}
+```
+
+`bring Web` is the first-party web framework: routing, responses, and a
+semantic HTML component layer in one import, resolved offline with no package
+manager. See the [Web guide](WEB.md) and the runnable
+[Ahd Akademi example](../examples/v0.15/ahd_academi).
+
 Next: read the [language tour](LANGUAGE_TOUR.md), learn how to act on
-[diagnostics](DIAGNOSTICS.md), or run the
+[diagnostics](DIAGNOSTICS.md), build a [web application](WEB.md), or run the
 [curated examples](../examples/v0.1/README.md), including UTC Time, CSV,
 [Data tables](DATA.md), [PDF](PDF.md) generation, and
 [Archive](ARCHIVE.md) packaging.

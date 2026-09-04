@@ -1,0 +1,15 @@
+// A component that renders whatever text it is handed.
+//
+// The text below often comes from a form submission, which is exactly why it
+// goes through Web.UI: every String that becomes page content is escaped, so
+// a visitor who types <script>alert(1)</script> into the form sees those
+// characters on the page instead of running them.
+bring Web
+from Web bring HTMLNode
+
+notice: Function := (title: String, message: String) -> HTMLNode {
+    return Web.UI.section(
+        [Web.UI.h2(title), Web.UI.p(message)]
+        {"class": "notice"}
+    )
+}

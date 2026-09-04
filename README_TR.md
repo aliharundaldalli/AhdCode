@@ -12,9 +12,32 @@ AhdCode; okunabilir sözdizimi, açık niyet (explicit intent), öngörülebilir
 anlambilim (semantics) ve yerel (native) derlemeye odaklanan, deneysel,
 statik olarak denetlenen genel amaçlı bir programlama dilidir.
 
-Mevcut sürüm **v0.14.1**'dir. Çekirdek dil uçtan uca çalışır, ancak proje
-üretime hazır değildir ve 1.0'dan önce kırıcı (breaking) değişiklikler
-olabilir.
+Mevcut sürüm **v0.14.1**'dir; **v0.15.0** aday aşamasındadır. Çekirdek dil
+uçtan uca çalışır, ancak proje üretime hazır değildir ve 1.0'dan önce kırıcı
+(breaking) değişiklikler olabilir.
+
+v0.15.0, **Web Temelleri (Web Foundations)**, [`Web`](docs/WEB_TR.md)'i
+ekler: çoğunlukla AhdCode'un kendisiyle yazılmış ve derleyiciye gömülü
+birinci taraf bir web çatısı. Böylece `bring Web` çevrimdışı çözülür — paket
+yöneticisi, kayıt defteri, manifest veya kilit dosyası yoktur — ve üretilen
+çalıştırılabilir dosya çatı kaynağına çalışma zamanında bağımlı kalmaz.
+Mevcut HTTP ve HTML ilkellerini değiştirmez, bileştirir ve türlerini
+değiştirmeden yeniden dışa aktarır: `Web` üzerinden ulaşılan bir `Request`,
+HTTP'nin `Request`'idir.
+[`Web.UI`](docs/WEB_TR.md#9-webui) anlamsal bir HTML bileşen katmanıdır —
+`section`, `h1`, `p`, `a`, `img`, `table`, `form` ve gerisi — her metin giriş
+noktası kaçışlar ve hiçbir yerde ham işaretleme yardımcısı yoktur.
+Sayfalar, Yerleşimler ve Bileşenler `HTMLNode` döndüren sıradan
+Function'lardır: sanal DOM yok, hydration yok, şablon dili yok, JavaScript
+çalışma zamanı yok. Dondurulmuş bir ortam sözleşmesi (`APP_NAME`, `APP_ENV`,
+`APP_HOST`, `APP_PROTOCOL`, `SERVER_HOST`, `SERVER_PORT`) ters vekil
+dağıtımları için genel URL ile bağlanma adresini ayrı tutar; sessiz
+varsayılan yoktur ve hiçbir `.env` değeri bir ikiliye gömülmez. Bilinçli
+olarak kapsam dışı kalanlar: ORM, form/doğrulama, ara katman, yetkilendirme,
+paketleyici ve tarayıcı canlı yenilemesi. `<APP_HOST>.test` için yerel
+güvenilir HTTPS, yaklaşık bir çözüm üretmek yerine
+[ertelenmiştir](docs/WEB_TR.md#14-yerel-https--mevcut-sınır): kalıcı olarak
+ayrıcalıklı sistem durumu gerektirirdi.
 
 v0.14.1, `require(...)` için bir araç düzeltmesidir (dil sunucusu,
 biçimlendirici ve editör vurgulaması). Dil anlambilimi v0.14.0 ile aynıdır.
@@ -252,6 +275,7 @@ bakın.
 ## Dokümantasyon
 
 - [Türkçe Öğrenci Rehberi](docs/STUDENT_GUIDE_TR.md)
+- [Web — birinci taraf web çatısı](docs/WEB_TR.md)
 - [require(...) — yerel kaynak birleştirme](docs/REQUIRE_TR.md)
 - [Uygulamalı Modül Atölyeleri](docs/PRACTICAL_MODULES_TR.md) — CSV, Data,
   Plot, Excel, Word, Latex, HTTP(S) ve HTML'i uçtan uca projelerle öğrenin

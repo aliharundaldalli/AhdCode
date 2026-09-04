@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" width="96" height="96" role="img" aria-label="Ahd Akademi">
+  <rect width="96" height="96" rx="18" fill="#00aa55"/>
+  <path d="M28 68 48 28l20 40" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M36 56h24" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round"/>
+</svg>

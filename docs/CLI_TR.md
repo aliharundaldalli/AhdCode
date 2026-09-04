@@ -132,6 +132,40 @@ yeniden derlemeyi tetiklemez, çünkü statik dosyalar her istekte doğrudan
 diskten okunur. Bu grafiğin izlediği birleştirme kuralları için bkz.
 [`require(...)`](REQUIRE_TR.md).
 
+Gömülü birinci taraf modüller de izlenmez. `bring Web`, derleyiciye gömülü
+kaynaktan derlenir; diskte değişecek bir dosya yoktur.
+
+#### Dev ve Web uygulamaları
+
+Derlenen modül çizgesi birinci taraf [`Web`](WEB_TR.md) çatısını içerdiğinde
+`dev`, uygulamayı ve kanonik geliştirme adresini adlandıran bir başlık ekler:
+
+```
+AhdCode Web
+  Ahd Akademi (development)
+
+  http://ahdakademi.com.test
+```
+
+Adres, `APP_PROTOCOL` ile `APP_HOST`'a `.test` eklenmiş hâlidir; bu,
+uygulamanın genel konağının yerel kimliğidir. `dev`, `APP_*` değerlerini
+uygulamanın kendi önceliğiyle okur — önce süreç ortamı, sonra uygulama
+kökündeki `.env` — ve yalnızca ne yazacağına karar vermek için. Hiçbir
+değişkeni dışa aktarmaz ve alt sürece hiçbir şey geçirmez.
+
+Tek bir yapılandırmayı reddeder: `APP_ENV=production`. Bir production
+sözleşmesini geliştirme komutuyla çalıştırmak, ya onu development saymak ya da
+`APP_ENV`'i yeniden yazmak olurdu; bu yüzden `dev` uyuşmazlığı bildirir,
+hiçbir şey başlatmaz ve sıfırdan farklı bir kodla çıkar.
+
+`https` bir geliştirme adresi düşürülmez, açıklanır. v0.15 yerel bir sertifika
+otoritesi, `.test` çözücüsü veya geliştirme geçidi getirmez; `dev` eksik olanı
+söyler ve `APP_PROTOCOL`'ü olduğu gibi bırakır — bkz.
+[Web](WEB_TR.md#14-yerel-https--mevcut-sınır).
+
+Hiç `bring Web` yazmamış bir program, ortamında `APP_ENV` bulunsa bile
+bunların hiçbirinden etkilenmez.
+
 ### `stop`: nazik kapanış
 
 ```bash

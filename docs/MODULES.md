@@ -40,6 +40,23 @@ from Utilities bring all
 `all` brings only public, non-`Confidential` symbols. Import collisions and
 circular dependencies are compile-time errors.
 
+`Web` is different from both of these. It is a **bundled first-party module**:
+its source is AhdCode, embedded in the compiler, compiled in the same pass as
+your own files, and generated into the one self-contained executable. It
+resolves offline -- no registry, manifest, lockfile, or download -- and a
+local `Web.ahd` cannot shadow it, exactly as a local `HTTP.ahd` cannot shadow
+`HTTP`. See the [Web guide](WEB.md).
+
+```ahd
+bring Web
+from Web bring (Request, Response, HTMLNode)
+```
+
+`Web` re-exports the `HTTP` and `HTML` types it composes, and those are the
+same types, not copies: a `Request` reached through `Web` registers on a bare
+`HTTP.Server` unchanged. Only `Web` is public; the framework's internal
+modules are reachable from framework source alone.
+
 `Math`, `Time`, `Latex`, `Word`, `Excel`, `PDF`, `Archive`, `Path`, `File`, `Regex`, `CSV`, `Data`, `Statistics`, `Plot`, `Numeric`, `JSON`, `SQLite`, `HTTP`, `HTML`, `SMTP`, `XML`, `Env`, `Lists`, and `KeyValue` are compiler-registered and use
 these same import forms. A local file cannot shadow a standard module of the
 same name. `HTTP` is both the inbound server (`Server` / `Request` /

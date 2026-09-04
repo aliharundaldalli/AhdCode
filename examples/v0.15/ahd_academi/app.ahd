@@ -1,0 +1,32 @@
+// Ahd Akademi -- the AhdCode v0.15 Web foundations example.
+//
+//     cp .env.example .env
+//     ahdcode dev app.ahd
+//
+// One import, `bring Web`, covers routing, responses, and the UI tree. The
+// low-level HTTP and HTML modules stay available for anything this layer does
+// not cover; nothing here hides them.
+//
+// Structure, all composed with the released require(...) rule, which resolves
+// every path from this file's own directory:
+//
+//     Config/      the only place that reads the environment
+//     Layouts/     the shared document shell
+//     Pages/       one Function per page
+//     Components/  reusable fragments
+//     public/      static assets, served straight from disk
+require("Config/App.ahd")
+require("Pages/Home.ahd")
+require("Pages/About.ahd")
+bring Web
+from Web bring App
+
+academy: App := Web.app(application)
+
+academy.assets("/assets", "public")
+academy.get("/", homePage)
+academy.get("/hakkinda", aboutPage)
+academy.post("/selam", greetPage)
+
+write("{application.name} — {application.effectiveURL()}")
+academy.start()

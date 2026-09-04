@@ -1,0 +1,30 @@
+// The Config layer.
+//
+// This is the only file in the application that reads the environment.
+// Pages, layouts, and components never call Env: they receive the already
+// validated AppConfig, or a value derived from it, as an ordinary argument.
+//
+// Web.configure loads .env if the file exists and then validates the whole
+// contract -- APP_NAME, APP_ENV, APP_HOST, APP_PROTOCOL, SERVER_HOST, and
+// SERVER_PORT -- raising WebConfigError with the offending key's name if
+// anything is missing or malformed. Nothing here is compiled into the built
+// executable; every value is read from the process environment at start-up.
+bring Web
+from Web bring AppConfig
+bring Env
+
+application: AppConfig := Web.configure()
+// Pages call configuration() instead of touching the module binding
+// themselves. Reading a module binding inside a callable needs an explicit
+// Global declaration, and keeping that declaration in one accessor is exactly
+// the Config-layer convention: one place reads, everywhere else receives.
+configuration: Function := () -> AppConfig {
+    application: Global AppConfig
+    return application
+}
+// One application-specific setting, read here and nowhere else. Optional
+// values get their fallback in the Config layer too, so no page has to know
+// the key exists.
+tagline: Function := () -> String {
+    return Env.getOr("APP_TAGLINE", "AhdCode ile yazılmış küçük bir akademi")
+}

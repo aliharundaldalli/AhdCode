@@ -4332,3 +4332,188 @@ them.
 
 See [the MySQL module reference](MYSQL.md) and
 [`examples/v0.11`](../examples/v0.11/README.md).
+
+## 52. Web: building an application
+
+Section 36 showed `HTTP` and `HTML`, the two primitives underneath every
+AhdCode web page. v0.15 adds `Web`, a first-party framework that composes
+them, so an ordinary application needs one import instead of several.
+
+```ahd
+bring Web
+```
+
+`Web` does not replace `HTTP` and `HTML`. It re-exports their types unchanged
+-- a `Request` you reach through `Web` is the same `Request` from section 36
+-- and `bring HTTP` / `bring HTML` keep working exactly as before.
+
+### Building a page with Web.UI
+
+In section 36 you wrote a paragraph like this:
+
+```ahd
+HTML.element("p", {}, [HTML.text("Hoş geldiniz")])
+```
+
+That is explicit, and it is still correct. `Web.UI` says the same thing more
+directly:
+
+```ahd
+Web.UI.p("Hoş geldiniz")
+```
+
+Both build the identical page. The rule for the whole library is short:
+
+- an element that holds **text** takes a String: `h1`, `h2`, `p`, `span`,
+  `li`, `td`, `button`, `label`, `option`
+- an element that holds **other elements** takes a list: `section`,
+  `article`, `nav`, `header`, `footer`, `main`, `ul`, `ol`, `table`, `form`
+
+```ahd
+Web.UI.section(
+    [
+        Web.UI.h1("Ahd Akademi")
+        Web.UI.p("Hoş geldiniz")
+        Web.UI.a("/hakkinda", "Akademi hakkında")
+        Web.UI.img("/assets/logo.svg", "Ahd Akademi")
+    ]
+)
+```
+
+Attributes come last and are optional, so short calls stay short:
+
+```ahd
+Web.UI.p("Kayıt açıldı", {"class": "notice"})
+Web.UI.section([...], {"class": "hero", "id": "top"})
+```
+
+`img` always asks for its `alt` text. That is on purpose: a screen reader
+needs it, so the signature does not let you forget. A purely decorative image
+passes `""` deliberately.
+
+When a text element needs elements inside it -- a paragraph containing a bold
+word, a list item containing a link -- use the `Nodes` companion:
+
+```ahd
+Web.UI.pNodes([Web.UI.text("Merhaba "), Web.UI.strong("Ali")])
+Web.UI.liNodes([Web.UI.a("/hakkinda", "Hakkında")])
+```
+
+And for any tag `Web.UI` does not name, `HTML.element` is still there.
+
+### Text is always escaped
+
+This is the same protection section 36 explained, and it holds everywhere in
+`Web.UI`:
+
+```ahd
+Web.UI.p("<script>alert(1)</script>")
+```
+
+shows those characters on the page as text. It never becomes a running
+script. There is no way to opt out -- no `raw`, no `unsafeHTML` -- which is
+deliberate.
+
+### Pages, Layouts, Components
+
+Three words describe how an application is arranged:
+
+```
+Page       creates the content of one page
+Layout     wraps that content in the shared shell
+Component  creates a reusable fragment
+```
+
+None of these is special syntax. **Each one is an ordinary Function that
+returns an HTMLNode.** There is nothing to inherit and nothing to register.
+
+A Component:
+
+```ahd
+notice: Function := (title: String, message: String) -> HTMLNode {
+    return Web.UI.section([Web.UI.h2(title), Web.UI.p(message)], {"class": "notice"})
+}
+```
+
+A Layout:
+
+```ahd
+mainLayout: Function := (title: String, content: List<HTMLNode>) -> Response {
+    body: Local List<HTMLNode> := [Web.UI.main(content)]
+    return Web.page(title, body, [Web.UI.stylesheet("/assets/app.css")])
+}
+```
+
+A Page:
+
+```ahd
+homePage: Function := (request: Request) -> Response {
+    return mainLayout("Ana Sayfa", [Web.UI.h1("Ahd Akademi")])
+}
+```
+
+### Configuration
+
+An application reads its settings from the environment, in one place:
+
+```
+APP_NAME       Ahd Akademi
+APP_ENV        development, test, or production
+APP_HOST       ahdakademi.com        (a host -- no https://, no /path, no :port)
+APP_PROTOCOL   http or https
+SERVER_HOST    127.0.0.1
+SERVER_PORT    8080
+```
+
+```ahd
+bring Web
+from Web bring AppConfig
+
+application: AppConfig := Web.configure()
+```
+
+Nothing is guessed. If `APP_ENV` is missing or misspelled, the program stops
+at start-up and tells you which key is wrong, instead of running as something
+you did not intend.
+
+Put these in a file named `.env` while you work locally, and **never commit
+it**. Commit `.env.example` instead, with the names and placeholder values.
+Real passwords and keys stay out of version control -- and out of the built
+program, which reads them fresh every time it starts.
+
+Two pairs that look similar and are not:
+
+```
+APP_PROTOCOL + APP_HOST   what a person types:   https://ahdakademi.com
+SERVER_HOST  + SERVER_PORT what your program binds: 127.0.0.1:8080
+```
+
+On a real server these differ, because something in front (Cloudflare, nginx)
+handles the public address and forwards to your program.
+
+### Putting it together
+
+```ahd
+require("Config/App.ahd")
+require("Pages/Home.ahd")
+bring Web
+from Web bring App
+
+academy: App := Web.app(application)
+
+academy.assets("/assets", "public")
+academy.get("/", homePage)
+academy.start()
+```
+
+Run it while you work:
+
+```bash
+ahdcode dev app.ahd
+```
+
+Editing any `.ahd` file rebuilds and restarts. Editing `public/app.css` does
+not -- the browser just gets the new file on the next reload.
+
+A complete example is in `examples/v0.15/ahd_academi`, and the full reference
+is [docs/WEB.md](WEB.md).

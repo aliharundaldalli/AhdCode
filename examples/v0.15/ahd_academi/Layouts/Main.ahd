@@ -1,0 +1,25 @@
+// A Layout is an ordinary Function that wraps a page's content in the shared
+// document shell. It is not a template and not a special construct: it takes
+// the page's title and body, adds what every page shares, and returns a
+// Response.
+require("Components/Navbar.ahd")
+bring Web
+from Web bring (HTMLNode, Response, AppConfig)
+
+mainLayout: Function := (
+    config: AppConfig
+    title: String
+    current: String
+    content: List<HTMLNode>
+) -> Response {
+    body: Local List<HTMLNode> := [
+        navbar(config.name, current)
+        Web.UI.main(content)
+        Web.UI.footer([Web.UI.p("{config.name} — {config.effectiveURL()}")])
+    ]
+    return Web.page(
+        "{title} — {config.name}"
+        body
+        [Web.UI.stylesheet("/assets/app.css")]
+    )
+}

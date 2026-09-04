@@ -1,0 +1,32 @@
+// A Component is an ordinary Function that returns an HTMLNode.
+//
+// There is no base class to extend, no lifecycle to implement, and nothing to
+// register. This one takes the values it needs and returns a node -- that is
+// the whole contract.
+bring Web
+from Web bring HTMLNode
+
+navbar: Function := (siteName: String, current: String) -> HTMLNode {
+    return Web.UI.nav(
+        [
+            Web.UI.a("/", siteName, {"class": "brand"})
+            navLink("/", "Ana Sayfa", current)
+            navLink("/hakkinda", "Hakkında", current)
+        ]
+        {"class": "navbar"}
+    )
+}
+// Components compose other components. current marks the active link, so the
+// caller decides highlighting rather than the component guessing from a
+// global.
+navLink: Function := (
+    href: String
+    label: String
+    current: String
+) -> HTMLNode {
+    if href == current {
+        return Web.UI.a(href, label, {"class": "active"})
+    }
+
+    return Web.UI.a(href, label)
+}

@@ -1,0 +1,54 @@
+require("Config/App.ahd")
+require("Layouts/Main.ahd")
+bring Web
+from Web bring (Request, Response, HTMLNode)
+
+aboutPage: Function := (request: Request) -> Response {
+    content: Local List<HTMLNode> := [
+        Web.UI.section(
+            [
+                Web.UI.h1("Hakkında")
+                Web.UI.p("Bu uygulama AhdCode v0.15 Web temellerini gösterir.")
+                Web.UI.h2("Ortam")
+                Web.UI.table(
+                    [
+                        Web.UI.thead(
+                            [Web.UI.tr([Web.UI.th("Ayar"), Web.UI.th("Değer")])]
+                        )
+                        Web.UI.tbody(
+                            [
+                                Web.UI.tr(
+                                    [
+                                        Web.UI.td("Ortam")
+                                        Web.UI.td(configuration().environment)
+                                    ]
+                                )
+                                Web.UI.tr(
+                                    [
+                                        Web.UI.td("Genel adres")
+                                        Web.UI.td(configuration().url())
+                                    ]
+                                )
+                                Web.UI.tr(
+                                    [
+                                        Web.UI.td("Yerel adres")
+                                        Web.UI.td(
+                                            configuration().effectiveURL()
+                                        )
+                                    ]
+                                )
+                                Web.UI.tr(
+                                    [
+                                        Web.UI.td("Dinlenen adres")
+                                        Web.UI.td(configuration().address())
+                                    ]
+                                )
+                            ]
+                        )
+                    ]
+                )
+            ]
+        )
+    ]
+    return mainLayout(configuration(), "Hakkında", "/hakkinda", content)
+}

@@ -43,6 +43,23 @@ from Utilities bring all
 aktarım çakışmaları (import collisions) ve döngüsel bağımlılıklar (circular
 dependencies) derleme zamanı hatalarıdır.
 
+`Web` bunların ikisinden de farklıdır. O bir **gömülü birinci taraf
+modüldür**: kaynağı AhdCode'dur, derleyiciye gömülüdür, sizin dosyalarınızla
+aynı geçişte derlenir ve tek bir kendi kendine yeten çalıştırılabilir dosyaya
+üretilir. Çevrimdışı çözülür -- kayıt defteri, manifest, kilit dosyası veya
+indirme yoktur -- ve yerel bir `Web.ahd` onu gölgeleyemez; tıpkı yerel bir
+`HTTP.ahd`'nin `HTTP`'yi gölgeleyememesi gibi. Bkz. [Web rehberi](WEB_TR.md).
+
+```ahd
+bring Web
+from Web bring (Request, Response, HTMLNode)
+```
+
+`Web`, bileştirdiği `HTTP` ve `HTML` türlerini yeniden dışa aktarır; bunlar
+kopya değil, aynı türlerdir: `Web` üzerinden ulaşılan bir `Request` çıplak bir
+`HTTP.Server` üzerine değişmeden kaydolur. Yalnızca `Web` geneldir; çatının iç
+modüllerine yalnızca çatı kaynağından erişilebilir.
+
 `Math`, `Time`, `Latex`, `Word`, `Excel`, `PDF`, `Archive`, `Path`, `File`, `Regex`, `CSV`, `Data`, `Statistics`, `Plot`, `Numeric`, `JSON`, `SQLite`, `HTTP`, `HTML`, `SMTP`, `XML`, `Env`, `Lists` ve `KeyValue` derleyici tarafından
 kayıtlıdır (compiler-registered) ve aynı içe aktarım biçimlerini kullanır.
 Yerel bir dosya, aynı isimdeki standart bir modülün yerini alamaz (shadow

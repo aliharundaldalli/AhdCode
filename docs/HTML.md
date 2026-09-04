@@ -4,6 +4,14 @@
 
 [Back to README](../README.md) · [Modules](MODULES.md) · [HTTP](HTTP.md) · [Student Guide](STUDENT_GUIDE_EN.md#36-a-small-web-page)
 
+> **v0.15:** `HTML` is the low-level builder and stays exactly as documented
+> here. [`Web.UI`](WEB.md#9-webui) is an ergonomic layer written in AhdCode
+> *over* these primitives -- `Web.UI.p("x")` is `HTML.element("p", {},
+> [HTML.text("x")])` -- and produces identical markup with identical escaping.
+> `HTML.element` remains the escape hatch for any tag or attribute pattern
+> `Web.UI` does not name. Neither module has a raw-markup helper.
+
+
 If you are learning this module, start with the [HTML workshop](PRACTICAL_MODULES.md#8-html-build-safe-pages-and-parse-documents)
 for safe page building, selectors, null checks, and parsing an HTTPS response;
 use this page as the complete builder/parser reference.

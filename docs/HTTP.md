@@ -4,6 +4,15 @@
 
 [Back to README](../README.md) · [Modules](MODULES.md) · [HTML](HTML.md) · [Student Guide](STUDENT_GUIDE_EN.md#38-http-client)
 
+> **v0.15:** `HTTP` is the low-level module and stays exactly as documented
+> here. The first-party [`Web`](WEB.md) framework composes it -- `Web.app`
+> wraps `Server`, and `Web` re-exports `Request`, `Response`, `Session`,
+> `SessionStore`, `Cookie`, and `UploadedFile` as the *same* types. Using
+> `bring HTTP` directly is never a fallback or a legacy path; reach for it
+> whenever you want the server without the framework's configuration
+> contract.
+
+
 If you are learning this module, start with the [HTTP/HTTPS workshop](PRACTICAL_MODULES.md#7-http-and-https-requests-responses-and-failures)
 for URL structure, statuses, transport failures, JSON POST, and client safety;
 use this page as the complete Server and Client reference.

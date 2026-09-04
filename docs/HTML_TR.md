@@ -4,6 +4,14 @@
 
 [README'ye dön](../README_TR.md) · [Modüller](MODULES_TR.md) · [HTTP](HTTP_TR.md) · [Öğrenci Rehberi](STUDENT_GUIDE_TR.md#36-küçük-bir-web-sayfası)
 
+> **v0.15:** `HTML` düşük seviyeli kurucudur ve burada belgelendiği gibi
+> kalır. [`Web.UI`](WEB_TR.md#9-webui) bu ilkellerin *üzerine* AhdCode ile
+> yazılmış ergonomik bir katmandır -- `Web.UI.p("x")`, `HTML.element("p", {},
+> [HTML.text("x")])` demektir -- ve aynı kaçışlamayla aynı işaretlemeyi
+> üretir. `HTML.element`, `Web.UI`'nin adlandırmadığı her etiket ve öznitelik
+> kalıbı için kaçış yolu olmayı sürdürür. Hiçbir modülde ham işaretleme
+> yardımcısı yoktur.
+
 İlk kez öğreniyorsanız güvenli sayfa kurma, seçiciler, null kontrolü ve HTTPS
 ile alınan belgeyi ayrıştırmayı birlikte gösteren [HTML atölyesini](PRACTICAL_MODULES_TR.md#8-html-güvenli-sayfa-kurmak-ve-belge-ayrıştırmak)
 çalışın; bu sayfayı oluşturucu/ayrıştırıcı referansı olarak kullanın.

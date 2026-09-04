@@ -4363,3 +4363,192 @@ karışıklık olmaz.
 
 [MySQL modül referansına](MYSQL_TR.md) ve
 [`examples/v0.11`](../examples/v0.11/README_TR.md) klasörüne bakın.
+
+## 52. Web: bir uygulama kurmak
+
+36. bölüm, her AhdCode web sayfasının altındaki iki ilkeli -- `HTTP` ve
+`HTML` -- gösterdi. v0.15, bunları bileştiren birinci taraf bir çatı olan
+`Web`'i ekler; böylece sıradan bir uygulama birkaç yerine tek bir içe
+aktarmayla yetinir.
+
+```ahd
+bring Web
+```
+
+`Web`, `HTTP` ve `HTML`'in yerini almaz. Onların türlerini değiştirmeden
+yeniden dışa aktarır -- `Web` üzerinden ulaştığınız bir `Request`, 36.
+bölümdeki `Request`'in aynısıdır -- ve `bring HTTP` / `bring HTML` tam olarak
+eskisi gibi çalışmayı sürdürür.
+
+### Web.UI ile sayfa kurmak
+
+36. bölümde bir paragrafı şöyle yazdınız:
+
+```ahd
+HTML.element("p", {}, [HTML.text("Hoş geldiniz")])
+```
+
+Bu açıktır ve hâlâ doğrudur. `Web.UI` aynı şeyi daha doğrudan söyler:
+
+```ahd
+Web.UI.p("Hoş geldiniz")
+```
+
+İkisi de aynı sayfayı kurar. Tüm kütüphanenin kuralı kısadır:
+
+- **metin** tutan öğe bir String alır: `h1`, `h2`, `p`, `span`, `li`, `td`,
+  `button`, `label`, `option`
+- **başka öğeler** tutan öğe bir liste alır: `section`, `article`, `nav`,
+  `header`, `footer`, `main`, `ul`, `ol`, `table`, `form`
+
+```ahd
+Web.UI.section(
+    [
+        Web.UI.h1("Ahd Akademi")
+        Web.UI.p("Hoş geldiniz")
+        Web.UI.a("/hakkinda", "Akademi hakkında")
+        Web.UI.img("/assets/logo.svg", "Ahd Akademi")
+    ]
+)
+```
+
+Öznitelikler en sonda gelir ve isteğe bağlıdır; kısa çağrılar kısa kalır:
+
+```ahd
+Web.UI.p("Kayıt açıldı", {"class": "notice"})
+Web.UI.section([...], {"class": "hero", "id": "top"})
+```
+
+`img` her zaman `alt` metnini ister. Bu bilinçlidir: ekran okuyucunun ona
+ihtiyacı vardır, bu yüzden imza unutmanıza izin vermez. Yalnızca dekoratif
+bir görsel bilinçli olarak `""` geçer.
+
+Bir metin öğesinin içinde öğeler gerektiğinde -- kalın bir sözcük içeren
+paragraf, bağlantı içeren liste öğesi -- `Nodes` eşini kullanın:
+
+```ahd
+Web.UI.pNodes([Web.UI.text("Merhaba "), Web.UI.strong("Ali")])
+Web.UI.liNodes([Web.UI.a("/hakkinda", "Hakkında")])
+```
+
+`Web.UI`'nin adlandırmadığı her etiket için `HTML.element` hâlâ oradadır.
+
+### Metin her zaman kaçışlanır
+
+Bu, 36. bölümün anlattığı korumanın aynısıdır ve `Web.UI`'nin her yerinde
+geçerlidir:
+
+```ahd
+Web.UI.p("<script>alert(1)</script>")
+```
+
+bu karakterleri sayfada metin olarak gösterir. Asla çalışan bir betiğe
+dönüşmez. Bundan çıkış yolu yoktur -- `raw` yok, `unsafeHTML` yok -- ve bu
+bilinçlidir.
+
+### Sayfalar, Yerleşimler, Bileşenler
+
+Bir uygulamanın nasıl düzenlendiğini üç sözcük anlatır:
+
+```
+Page       bir sayfanın içeriğini üretir
+Layout     o içeriği ortak kabukla sarar
+Component  yeniden kullanılabilir bir parça üretir
+```
+
+Bunların hiçbiri özel sözdizimi değildir. **Her biri `HTMLNode` döndüren
+sıradan bir Function'dır.** Kalıtılacak bir şey yoktur, kaydedilecek bir şey
+yoktur.
+
+Bir Bileşen:
+
+```ahd
+notice: Function := (title: String, message: String) -> HTMLNode {
+    return Web.UI.section([Web.UI.h2(title), Web.UI.p(message)], {"class": "notice"})
+}
+```
+
+Bir Yerleşim:
+
+```ahd
+mainLayout: Function := (title: String, content: List<HTMLNode>) -> Response {
+    body: Local List<HTMLNode> := [Web.UI.main(content)]
+    return Web.page(title, body, [Web.UI.stylesheet("/assets/app.css")])
+}
+```
+
+Bir Sayfa:
+
+```ahd
+homePage: Function := (request: Request) -> Response {
+    return mainLayout("Ana Sayfa", [Web.UI.h1("Ahd Akademi")])
+}
+```
+
+### Yapılandırma
+
+Bir uygulama ayarlarını ortamdan, tek bir yerde okur:
+
+```
+APP_NAME       Ahd Akademi
+APP_ENV        development, test veya production
+APP_HOST       ahdakademi.com        (bir konak -- https:// yok, /yol yok, :port yok)
+APP_PROTOCOL   http veya https
+SERVER_HOST    127.0.0.1
+SERVER_PORT    8080
+```
+
+```ahd
+bring Web
+from Web bring AppConfig
+
+application: AppConfig := Web.configure()
+```
+
+Hiçbir şey tahmin edilmez. `APP_ENV` eksikse veya yanlış yazılmışsa program
+başlangıçta durur ve hangi anahtarın hatalı olduğunu söyler; amaçlamadığınız
+bir şey olarak çalışmaz.
+
+Yerel çalışırken bunları `.env` adlı bir dosyaya koyun ve **onu asla
+işlemeyin (commit etmeyin)**. Bunun yerine adları ve yer tutucu değerleri
+içeren `.env.example`'ı işleyin. Gerçek parolalar ve anahtarlar sürüm
+denetiminin dışında kalır -- ve her başlayışında onları yeniden okuyan
+üretilmiş programın da dışında.
+
+Birbirine benzeyen ama aynı olmayan iki çift:
+
+```
+APP_PROTOCOL + APP_HOST    bir insanın yazdığı:      https://ahdakademi.com
+SERVER_HOST  + SERVER_PORT programınızın bağlandığı: 127.0.0.1:8080
+```
+
+Gerçek bir sunucuda bunlar farklıdır, çünkü önde duran bir şey (Cloudflare,
+nginx) genel adresi karşılar ve programınıza iletir.
+
+### Hepsini bir araya getirmek
+
+```ahd
+require("Config/App.ahd")
+require("Pages/Home.ahd")
+bring Web
+from Web bring App
+
+academy: App := Web.app(application)
+
+academy.assets("/assets", "public")
+academy.get("/", homePage)
+academy.start()
+```
+
+Çalışırken şöyle çalıştırın:
+
+```bash
+ahdcode dev app.ahd
+```
+
+Herhangi bir `.ahd` dosyasını düzenlemek yeniden derler ve yeniden başlatır.
+`public/app.css`'i düzenlemek bunu yapmaz -- tarayıcı bir sonraki yenilemede
+yeni dosyayı alır.
+
+Eksiksiz bir örnek `examples/v0.15/ahd_academi` içindedir; tam referans
+[docs/WEB_TR.md](WEB_TR.md).

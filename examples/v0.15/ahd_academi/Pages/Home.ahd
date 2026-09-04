@@ -1,0 +1,77 @@
+// A Page produces the content of one page. It is an ordinary Function with
+// the handler signature the router expects, and it ends by handing its
+// content to a Layout.
+require("Config/App.ahd")
+require("Layouts/Main.ahd")
+require("Components/Notice.ahd")
+bring Web
+from Web bring (Request, Response, HTMLNode)
+
+homePage: Function := (request: Request) -> Response {
+    content: Local List<HTMLNode> := [
+        Web.UI.section(
+            [
+                Web.UI.h1(configuration().name)
+                Web.UI.p(tagline())
+                Web.UI.img(
+                    "/assets/logo.svg"
+                    "Ahd Akademi"
+                    {"class": "logo", "width": "96"}
+                )
+            ]
+            {"class": "hero"}
+        )
+        Web.UI.section(
+            [
+                Web.UI.h2("Dersler")
+                Web.UI.ul(
+                    [
+                        Web.UI.li("AhdCode ile ilk program")
+                        Web.UI.li("Fonksiyonlar ve sınıflar")
+                        Web.UI.liNodes(
+                            [Web.UI.a("/hakkinda", "Akademi hakkında")]
+                        )
+                    ]
+                )
+            ]
+        )
+        greetingSection(request)
+    ]
+    return mainLayout(configuration(), "Ana Sayfa", "/", content)
+}
+// The greeting form posts to /selam. Nothing here is a Forms framework:
+// the field is built with Web.UI and read back with the ordinary
+// Request.form primitive on the POST route below.
+greetingSection: Function := (request: Request) -> HTMLNode {
+    return Web.UI.section(
+        [
+            Web.UI.h2("Selam ver")
+            Web.UI.formTo(
+                "/selam"
+                "post"
+                [
+                    Web.UI.labelFor("isim", "Adınız")
+                    Web.UI.input("text", "isim", "", {"id": "isim"})
+                    Web.UI.button("Gönder", {"type": "submit"})
+                ]
+            )
+        ]
+        {"class": "form-card"}
+    )
+}
+// The POST handler. Request.form is the released low-level API and stays
+// exactly that; it returns a nullable String, so the missing-field case is
+// handled explicitly rather than assumed.
+greetPage: Function := (request: Request) -> Response {
+    submitted: Local String? := request.form("isim")
+    name: Local String := "ziyaretçi"
+    if submitted != null {
+        name = submitted
+    }
+
+    content: Local List<HTMLNode> := [
+        notice("Merhaba!", "Hoş geldin, {name}.")
+        Web.UI.pNodes([Web.UI.a("/", "Ana sayfaya dön")])
+    ]
+    return mainLayout(configuration(), "Selam", "/", content)
+}

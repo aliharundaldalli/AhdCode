@@ -1,0 +1,105 @@
+:root {
+    --ink: #1c1c1e;
+    --muted: #6b6b70;
+    --line: #e3e3e6;
+    --accent: #0a5;
+}
+
+body {
+    margin: 0;
+    font: 16px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif;
+    color: var(--ink);
+    background: #fbfbfc;
+}
+
+.navbar {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid var(--line);
+    background: #fff;
+}
+
+.navbar .brand {
+    font-weight: 600;
+    margin-right: auto;
+}
+
+.navbar a {
+    color: var(--ink);
+    text-decoration: none;
+}
+
+.navbar a.active {
+    color: var(--accent);
+    font-weight: 600;
+}
+
+main {
+    max-width: 46rem;
+    margin: 0 auto;
+    padding: 2rem 1.5rem;
+}
+
+section {
+    margin-bottom: 2.5rem;
+}
+
+h1 {
+    font-size: 2rem;
+    margin: 0 0 0.5rem;
+}
+
+h2 {
+    font-size: 1.25rem;
+    margin: 0 0 0.5rem;
+}
+
+.hero .logo {
+    margin-top: 1rem;
+}
+
+.notice {
+    border-left: 3px solid var(--accent);
+    padding-left: 1rem;
+}
+
+.form-card label {
+    display: block;
+    margin-bottom: 0.25rem;
+}
+
+.form-card input {
+    padding: 0.5rem;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    margin-right: 0.5rem;
+}
+
+.form-card button {
+    padding: 0.5rem 1rem;
+    border: 0;
+    border-radius: 6px;
+    background: var(--accent);
+    color: #fff;
+    cursor: pointer;
+}
+
+table {
+    border-collapse: collapse;
+    width: 100%;
+}
+
+th, td {
+    text-align: left;
+    padding: 0.5rem;
+    border-bottom: 1px solid var(--line);
+}
+
+footer {
+    border-top: 1px solid var(--line);
+    color: var(--muted);
+    padding: 1.5rem;
+    text-align: center;
+}

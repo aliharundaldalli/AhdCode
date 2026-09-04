@@ -124,6 +124,41 @@ never part of this graph: editing one never triggers a rebuild, since
 static files are read straight from disk on every request. See
 [`require(...)`](REQUIRE.md) for the composition rules this graph follows.
 
+Bundled first-party modules are never watched either. `bring Web` compiles
+from source embedded in the compiler, so there is no file on disk to change.
+
+#### Dev and Web applications
+
+When the compiled module graph contains the first-party [`Web`](WEB.md)
+framework, `dev` adds a banner naming the application and its canonical
+development URL:
+
+```
+AhdCode Web
+  Ahd Akademi (development)
+
+  http://ahdakademi.com.test
+```
+
+The URL is `APP_PROTOCOL` and `APP_HOST` with `.test` appended, which is the
+local identity of the application's public host. `dev` reads `APP_*` with the
+application's own precedence — process environment first, then the app-root
+`.env` — and only ever to decide what to print. It never exports a variable
+and never passes one to the child.
+
+It refuses one configuration: `APP_ENV=production`. Running a production
+contract through the development command would mean either treating it as
+development or rewriting `APP_ENV`, so `dev` reports the mismatch, starts
+nothing, and exits non-zero.
+
+An `https` development URL is explained rather than downgraded. v0.15 ships no
+local certificate authority, `.test` resolver, or development gateway, so
+`dev` says what is missing and leaves `APP_PROTOCOL` alone — see
+[Web](WEB.md#14-local-https--current-limitation).
+
+A program that never wrote `bring Web` is unaffected by all of this, even if
+`APP_ENV` happens to be set in its environment.
+
 ### `stop`: graceful shutdown
 
 ```bash

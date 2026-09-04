@@ -4,6 +4,14 @@
 
 [README'ye dön](../README_TR.md) · [Modüller](MODULES_TR.md) · [HTML](HTML_TR.md) · [Öğrenci Rehberi](STUDENT_GUIDE_TR.md#38-http-client)
 
+> **v0.15:** `HTTP` düşük seviyeli modüldür ve burada belgelendiği gibi
+> kalır. Birinci taraf [`Web`](WEB_TR.md) çatısı onu bileştirir -- `Web.app`
+> `Server`'ı sarar ve `Web`, `Request`, `Response`, `Session`,
+> `SessionStore`, `Cookie` ve `UploadedFile`'ı *aynı* türler olarak yeniden
+> dışa aktarır. Doğrudan `bring HTTP` kullanmak asla bir geri düşüş ya da
+> eski yol değildir; çatının yapılandırma sözleşmesi olmadan sunucuyu
+> istediğinizde ona uzanın.
+
 İlk kez öğreniyorsanız URL yapısı, durum kodları, taşıma hataları, JSON POST
 ve istemci güvenliğini birlikte gösteren [HTTP/HTTPS atölyesini](PRACTICAL_MODULES_TR.md#7-http-ve-https-istek-yanıt-ve-hata-sınırı)
 çalışın; bu sayfayı sunucu ve istemcinin eksiksiz referansı olarak kullanın.

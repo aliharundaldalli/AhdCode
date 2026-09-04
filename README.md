@@ -12,8 +12,30 @@ AhdCode is an experimental statically checked general-purpose programming
 language focused on readable syntax, explicit intent, predictable semantics,
 and native compilation.
 
-The current release is **v0.14.1**. The core language works end to end, but
-the project is not production-ready and breaking changes may occur before 1.0.
+The current release is **v0.14.1**; **v0.15.0** is in candidate. The core
+language works end to end, but the project is not production-ready and
+breaking changes may occur before 1.0.
+
+v0.15.0, **Web Foundations**, adds [`Web`](docs/WEB.md): a first-party web
+framework written mostly in AhdCode itself and bundled with the compiler, so
+`bring Web` resolves offline with no package manager, registry, manifest, or
+lockfile, and a built executable keeps no runtime dependency on framework
+source. It composes the existing HTTP and HTML primitives rather than
+replacing them and re-exports their types unchanged, so a `Request` reached
+through `Web` *is* HTTP's `Request`.
+[`Web.UI`](docs/WEB.md#9-webui) is a semantic HTML component layer — `section`,
+`h1`, `p`, `a`, `img`, `table`, `form` and the rest — where every text entry
+point escapes and there is no raw-markup helper anywhere.
+Pages, Layouts, and Components are ordinary Functions returning `HTMLNode`:
+no virtual DOM, no hydration, no template language, and no JavaScript runtime.
+A frozen environment contract (`APP_NAME`, `APP_ENV`, `APP_HOST`,
+`APP_PROTOCOL`, `SERVER_HOST`, `SERVER_PORT`) keeps the public URL and the
+bind address separate for reverse-proxy deployments, with no silent defaults
+and no `.env` values ever embedded in a binary. Still deliberately out of
+scope: ORM, forms/validation, middleware, auth, bundler, and browser live
+reload. Local trusted HTTPS for `<APP_HOST>.test` is
+[deferred](docs/WEB.md#14-local-https--current-limitation) rather than
+approximated: it would need permanently privileged system state.
 
 v0.14.1 is a tooling hotfix for `require(...)` (language server, formatter,
 and editor highlighting). Language semantics are unchanged from v0.14.0.
@@ -235,6 +257,7 @@ See the [CLI guide](docs/CLI.md), [formatter guide](docs/FORMATTER.md),
 
 - [Türkçe Öğrenci Rehberi](docs/STUDENT_GUIDE_TR.md)
 - [English Student Guide](docs/STUDENT_GUIDE_EN.md)
+- [Web — the first-party web framework](docs/WEB.md)
 - [require(...) — local source composition](docs/REQUIRE.md)
 - [Practical Module Workshops](docs/PRACTICAL_MODULES.md) — learn CSV, Data,
   Plot, Excel, Word, Latex, HTTP(S), and HTML through end-to-end projects
