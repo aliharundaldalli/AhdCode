@@ -1,0 +1,1261 @@
+// Local MySQL raffle demo.
+//
+//   cd examples/v0.12/raffle
+//   ahdcode run app.ahd
+//   open http://127.0.0.1:8082/
+//   ahdcode kill app.run
+//
+// Binds 127.0.0.1:8082 only. Admin password is hashed with Argon2id.
+bring Env
+bring File
+bring HTML
+bring HTTP
+bring MySQL
+bring Security
+from Env bring EnvError
+from File bring FileError
+from HTML bring HTMLNode
+from HTML bring HTMLError
+from HTTP bring Server
+from HTTP bring Request
+from HTTP bring Response
+from HTTP bring SessionStore
+from HTTP bring Session
+from HTTP bring HTTPError
+from MySQL bring MySQLDatabase
+from MySQL bring MySQLValue
+from MySQL bring MySQLError
+from Security bring SecurityError
+
+sessions: SessionStore := HTTP.sessions("ahd_raffle", 3600, false, "Lax")
+
+loadEnvFile: Function := () -> Nothing {
+    if File.exists(".env") {
+        Env.load(".env")
+    }
+}
+
+redact: Function := (message: String) -> String {
+    password: Local String := Env.getOr(
+        "MYSQL_PASSWORD"
+        Env.getOr("AHD_DATA_MYSQL_PASSWORD", "")
+    )
+    adminPassword: Local String := Env.getOr("RAFFLE_ADMIN_PASSWORD", "")
+    out: Local String := message
+    if password != "" {
+        out = out.replace(password, "[redacted]")
+    }
+    if adminPassword != "" {
+        out = out.replace(adminPassword, "[redacted]")
+    }
+    return out
+}
+
+connectMysql: Function := () -> MySQLDatabase {
+    host: Local String := Env.getOr(
+        "MYSQL_HOST"
+        Env.getOr("AHD_DATA_MYSQL_HOST", "127.0.0.1")
+    )
+    username: Local String := Env.getOr(
+        "MYSQL_USERNAME"
+        Env.getOr("AHD_DATA_MYSQL_USER", "root")
+    )
+    password: Local String := Env.getOr(
+        "MYSQL_PASSWORD"
+        Env.getOr("AHD_DATA_MYSQL_PASSWORD", "")
+    )
+    database: Local String := Env.getOr("MYSQL_DATABASE", "ahdcode_demo")
+    security: Local String := Env.getOr(
+        "MYSQL_SECURITY"
+        Env.getOr("AHD_DATA_MYSQL_SECURITY", "none")
+    )
+    port: Local Int := int(
+        Env.getOr("MYSQL_PORT", Env.getOr("AHD_DATA_MYSQL_PORT", "3306"))
+    )
+    return MySQL.connect(host, username, password, port, database, security)
+}
+
+cellString: Function := (row: Pair<String, MySQLValue>, key: String) -> String {
+    if not (key in row) {
+        return ""
+    }
+    value: Local MySQLValue := row[key]
+    if value.isNull() {
+        return ""
+    }
+    if value.kind() == "String" {
+        return value.string()
+    }
+    return ""
+}
+
+csrfToken: Function := (session: Session) -> String {
+    token: Local String? := session.get("csrf")
+    if token == null {
+        token = Security.token()
+        session.set("csrf", token)
+    }
+    return token
+}
+
+csrfOK: Function := (request: Request, session: Session) -> Bool {
+    stored: Local String? := session.get("csrf")
+    submitted: Local String? := request.form("csrf")
+    if stored == null {
+        return false
+    }
+    if submitted == null {
+        return false
+    }
+    return Security.secureEqual(stored, submitted)
+}
+
+rotateCsrf: Function := (session: Session) -> Nothing {
+    session.set("csrf", Security.token())
+}
+
+hiddenField: Function := (name: String, value: String) -> HTMLNode {
+    return HTML.element(
+        "input"
+        {"type": "hidden", "name": name, "value": value}
+        []
+    )
+}
+
+csrfField: Function := (token: String) -> HTMLNode {
+    return hiddenField("csrf", token)
+}
+
+isAdmin: Function := (session: Session) -> Bool {
+    flag: Local String? := session.get("admin")
+    if flag == null {
+        return false
+    }
+    return flag == "1"
+}
+
+pageCSS: Function := () -> String {
+    return r"""
+body { margin: 0; font-family: system-ui, sans-serif; background: #f6f7f9; color: #1a2744; }
+header { background: #fff; border-bottom: 1px solid #d5dbe3; padding: 12px 20px; display: flex; gap: 16px; align-items: center; }
+header a { color: #1a2744; text-decoration: none; }
+main { max-width: 720px; margin: 0 auto; padding: 24px; }
+.card { background: #fff; border: 1px solid #d5dbe3; border-radius: 8px; padding: 20px; margin-bottom: 16px; }
+.banner { background: #fff3cd; border: 1px solid #e6d08a; padding: 10px; margin: 12px 0; }
+.err { background: #fde8e4; border: 1px solid #e2a396; padding: 10px; margin: 12px 0; }
+.ok { background: #e7f6ec; border: 1px solid #b7e0c2; padding: 10px; margin: 12px 0; }
+.code { font-family: ui-monospace, monospace; font-size: 18px; word-break: break-all; background: #eef1f4; padding: 12px; }
+input, button { font: inherit; padding: 8px 10px; }
+button { cursor: pointer; background: #305d8c; color: #fff; border: 0; border-radius: 4px; }
+.muted { color: #5c6573; }
+"""
+}
+
+layout: Function := (title: String, body: List<HTMLNode>) -> String {
+    nodes: Local List<HTMLNode> := [
+        HTML.element("style", {}, [HTML.text(pageCSS())])
+        HTML.element(
+            "header"
+            {}
+            [
+                HTML.element("strong", {}, [HTML.text("AhdCode raffle")])
+                HTML.element("a", {"href": "/"}, [HTML.text("Çekiliş")])
+                HTML.element("a", {"href": "/admin"}, [HTML.text("Yönetici")])
+            ]
+        )
+        HTML.element("main", {}, body)
+    ]
+    return HTML.document("Raffle · " + title, nodes)
+}
+
+ensureSchema: Function := (db: MySQLDatabase) -> Nothing {
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS raffle_admin (
+            id INT PRIMARY KEY AUTO_INCREMENT,
+            username VARCHAR(64) NOT NULL UNIQUE,
+            password_hash VARCHAR(255) NOT NULL
+        )
+        """)
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS raffle (
+            id INT PRIMARY KEY,
+            status VARCHAR(16) NOT NULL,
+            winner_name VARCHAR(128) NULL,
+            winner_code VARCHAR(128) NULL
+        )
+        """)
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS raffle_entry (
+            id INT PRIMARY KEY AUTO_INCREMENT,
+            display_name VARCHAR(128) NOT NULL,
+            code VARCHAR(128) NOT NULL UNIQUE
+        )
+        """)
+    stateRows: Local List<Pair<String, MySQLValue>> := db.query(
+        "SELECT id FROM raffle WHERE id = 1"
+    )
+    if len(stateRows) == 0 {
+        db.execute("INSERT INTO raffle (id, status) VALUES (1, 'idle')")
+    }
+    adminRows: Local List<Pair<String, MySQLValue>> := db.query(
+        "SELECT id FROM raffle_admin"
+    )
+    if len(adminRows) == 0 {
+        username: Local String := Env.getOr("RAFFLE_ADMIN_USER", "admin")
+        password: Local String := Env.getOr(
+            "RAFFLE_ADMIN_PASSWORD"
+            "change-me-local-only"
+        )
+        hash: Local String := Security.passwordHash(password)
+        db.execute(
+            "INSERT INTO raffle_admin (username, password_hash) VALUES (?, ?)"
+            [MySQL.fromString(username), MySQL.fromString(hash)]
+        )
+    }
+}
+
+raffleStatus: Function := (db: MySQLDatabase) -> Pair<String, String> {
+    rows: Local List<Pair<String, MySQLValue>> := db.query(
+        "SELECT status, winner_name, winner_code FROM raffle WHERE id = 1"
+    )
+    if len(rows) == 0 {
+        return {"status": "idle", "winner_name": "", "winner_code": ""}
+    }
+    return {
+        "status": cellString(rows[0], "status")
+        "winner_name": cellString(rows[0], "winner_name")
+        "winner_code": cellString(rows[0], "winner_code")
+    }
+}
+
+entryCount: Function := (db: MySQLDatabase) -> Int {
+    rows: Local List<Pair<String, MySQLValue>> := db.query(
+        "SELECT COUNT(*) AS n FROM raffle_entry"
+    )
+    if len(rows) == 0 {
+        return 0
+    }
+    value: Local MySQLValue := rows[0]["n"]
+    if value.kind() == "Int" {
+        return value.int()
+    }
+    if value.kind() == "String" {
+        return int(value.string())
+    }
+    return 0
+}
+
+home: Function := (request: Request) -> Response {
+    sessions: Global SessionStore
+    session: Local Session := sessions.open(request)
+    token: Local String := csrfToken(session)
+    attempt {
+        db: Local MySQLDatabase := connectMysql()
+        attempt {
+            raffleInfo: Local Pair<String, String> := raffleStatus(db)
+            status: Local String := raffleInfo["status"]
+            count: Local Int := entryCount(db)
+            body: Local List<HTMLNode> := [
+                HTML.element("h1", {}, [HTML.text("Çekiliş")])
+            ]
+            if status == "idle" {
+                body.add(
+                    HTML.element(
+                        "p"
+                        {"class": "muted"}
+                        [
+                            HTML.text(
+                                "Henüz çekiliş başlatılmadı. Yönetici başlatınca buradan katılabilirsiniz."
+                            )
+                        ]
+                    )
+                )
+            }
+            if status == "open" {
+                body.add(
+                    HTML.element(
+                        "p"
+                        {}
+                        [HTML.text(str(count) + " kişi katıldı.")]
+                    )
+                )
+                body.add(
+                    HTML.element(
+                        "p"
+                        {"class": "muted"}
+                        [
+                            HTML.text(
+                                "Adınızı yazın; katıldığınıza dair bir kod alacaksınız."
+                            )
+                        ]
+                    )
+                )
+                body.add(
+                    HTML.element(
+                        "form"
+                        {"method": "post", "action": "/join", "class": "card"}
+                        [
+                            csrfField(token)
+                            HTML.element(
+                                "p"
+                                {}
+                                [
+                                    HTML.element(
+                                        "input"
+                                        {
+                                            "type": "text"
+                                            "name": "name"
+                                            "placeholder": "Adınız"
+                                        }
+                                        []
+                                    )
+                                ]
+                            )
+                            HTML.element(
+                                "button"
+                                {"type": "submit"}
+                                [HTML.text("Çekilişe katıl")]
+                            )
+                        ]
+                    )
+                )
+            }
+            if status == "drawn" {
+                body.add(
+                    HTML.element("h2", {}, [HTML.text("Kazanan ilan edildi")])
+                )
+                body.add(HTML.element("p", {}, [HTML.text("Kazanan: ")]))
+                body.add(
+                    HTML.element(
+                        "p"
+                        {}
+                        [
+                            HTML.element(
+                                "strong"
+                                {}
+                                [HTML.text(raffleInfo["winner_name"])]
+                            )
+                        ]
+                    )
+                )
+                body.add(
+                    HTML.element(
+                        "p"
+                        {"class": "muted"}
+                        [HTML.text("Katılım kodu:")]
+                    )
+                )
+                body.add(
+                    HTML.element(
+                        "div"
+                        {"class": "code"}
+                        [HTML.text(raffleInfo["winner_code"])]
+                    )
+                )
+            }
+            return sessions.commit(session, HTTP.html(layout("Çekiliş", body)))
+        }
+        except MySQLError as error {
+            return sessions.commit(
+                session
+                HTTP.html(
+                    layout(
+                        "Hata"
+                        [
+                            HTML.element(
+                                "div"
+                                {"class": "err"}
+                                [HTML.text(redact(error.message))]
+                            )
+                        ]
+                    )
+                )
+            )
+        }
+        ultimately {
+            db.close()
+        }
+    }
+    except MySQLError as error {
+        return sessions.commit(
+            session
+            HTTP.html(
+                layout(
+                    "Hata"
+                    [
+                        HTML.element(
+                            "div"
+                            {"class": "err"}
+                            [HTML.text(redact(error.message))]
+                        )
+                    ]
+                )
+            )
+        )
+    }
+    except DomainError as error {
+        return sessions.commit(
+            session
+            HTTP.html(
+                layout(
+                    "Hata"
+                    [
+                        HTML.element(
+                            "div"
+                            {"class": "err"}
+                            [HTML.text(redact(error.message))]
+                        )
+                    ]
+                )
+            )
+        )
+    }
+}
+
+joinRaffle: Function := (request: Request) -> Response {
+    sessions: Global SessionStore
+    session: Local Session := sessions.open(request)
+    if request.method() != "POST" {
+        return sessions.commit(
+            session
+            HTTP.html(
+                layout(
+                    "Hata"
+                    [
+                        HTML.element(
+                            "div"
+                            {"class": "err"}
+                            [HTML.text("POST gerekli")]
+                        )
+                    ]
+                )
+                405
+            )
+        )
+    }
+    if not csrfOK(request, session) {
+        return sessions.commit(
+            session
+            HTTP.html(
+                layout(
+                    "Hata"
+                    [
+                        HTML.element(
+                            "div"
+                            {"class": "err"}
+                            [HTML.text("CSRF reddedildi")]
+                        )
+                    ]
+                )
+                403
+            )
+        )
+    }
+    rawName: Local String? := request.form("name")
+    if rawName == null {
+        return sessions.commit(
+            session
+            HTTP.html(
+                layout(
+                    "Hata"
+                    [
+                        HTML.element(
+                            "div"
+                            {"class": "err"}
+                            [HTML.text("Ad gerekli")]
+                        )
+                    ]
+                )
+            )
+        )
+    }
+    name: Local String := rawName.trim()
+    if name == "" {
+        return sessions.commit(
+            session
+            HTTP.html(
+                layout(
+                    "Hata"
+                    [
+                        HTML.element(
+                            "div"
+                            {"class": "err"}
+                            [HTML.text("Ad gerekli")]
+                        )
+                    ]
+                )
+            )
+        )
+    }
+    if len(name) > 128 {
+        return sessions.commit(
+            session
+            HTTP.html(
+                layout(
+                    "Hata"
+                    [
+                        HTML.element(
+                            "div"
+                            {"class": "err"}
+                            [HTML.text("Ad en fazla 128 karakter olabilir")]
+                        )
+                    ]
+                )
+            )
+        )
+    }
+    rotateCsrf(session)
+    attempt {
+        db: Local MySQLDatabase := connectMysql()
+        attempt {
+            raffleInfo: Local Pair<String, String> := raffleStatus(db)
+            if raffleInfo["status"] != "open" {
+                return sessions.commit(
+                    session
+                    HTTP.html(
+                        layout(
+                            "Hata"
+                            [
+                                HTML.element(
+                                    "div"
+                                    {"class": "err"}
+                                    [HTML.text("Çekiliş şu anda açık değil.")]
+                                )
+                            ]
+                        )
+                    )
+                )
+            }
+            code: Local String := Security.token()
+            db.execute(
+                "INSERT INTO raffle_entry (display_name, code) VALUES (?, ?)"
+                [MySQL.fromString(name), MySQL.fromString(code)]
+            )
+            session.set("ticket_name", name)
+            session.set("ticket_code", code)
+            return sessions.commit(session, HTTP.redirect("/ticket"))
+        }
+        except MySQLError as error {
+            return sessions.commit(
+                session
+                HTTP.html(
+                    layout(
+                        "Hata"
+                        [
+                            HTML.element(
+                                "div"
+                                {"class": "err"}
+                                [HTML.text(redact(error.message))]
+                            )
+                        ]
+                    )
+                )
+            )
+        }
+        ultimately {
+            db.close()
+        }
+    }
+    except MySQLError as error {
+        return sessions.commit(
+            session
+            HTTP.html(
+                layout(
+                    "Hata"
+                    [
+                        HTML.element(
+                            "div"
+                            {"class": "err"}
+                            [HTML.text(redact(error.message))]
+                        )
+                    ]
+                )
+            )
+        )
+    }
+}
+
+ticketPage: Function := (request: Request) -> Response {
+    sessions: Global SessionStore
+    session: Local Session := sessions.open(request)
+    storedName: Local String? := session.get("ticket_name")
+    storedCode: Local String? := session.get("ticket_code")
+    if storedName == null or storedCode == null {
+        return sessions.commit(session, HTTP.redirect("/"))
+    }
+    name: Local String := storedName
+    code: Local String := storedCode
+    body: Local List<HTMLNode> := [
+        HTML.element("h1", {}, [HTML.text("Çekilişe katıldınız")])
+        HTML.element("p", {}, [HTML.text("Ad: ")])
+        HTML.element("p", {}, [HTML.element("strong", {}, [HTML.text(name)])])
+        HTML.element(
+            "p"
+            {"class": "muted"}
+            [HTML.text("Bu kod sizin katılım belgenizdir. Saklayın.")]
+        )
+        HTML.element("div", {"class": "code"}, [HTML.text(code)])
+        HTML.element(
+            "p"
+            {}
+            [
+                HTML.element(
+                    "a"
+                    {"href": "/"}
+                    [HTML.text("Çekiliş sayfasına dön")]
+                )
+            ]
+        )
+    ]
+    return sessions.commit(session, HTTP.html(layout("Kodunuz", body)))
+}
+
+adminPage: Function := (request: Request) -> Response {
+    sessions: Global SessionStore
+    session: Local Session := sessions.open(request)
+    token: Local String := csrfToken(session)
+    if not isAdmin(session) {
+        body: Local List<HTMLNode> := [
+            HTML.element("h1", {}, [HTML.text("Yönetici girişi")])
+            HTML.element(
+                "p"
+                {"class": "muted"}
+                [
+                    HTML.text(
+                        "Parola Argon2id ile doğrulanır; sayfada gösterilmez."
+                    )
+                ]
+            )
+            HTML.element(
+                "form"
+                {"method": "post", "action": "/admin/login", "class": "card"}
+                [
+                    csrfField(token)
+                    HTML.element(
+                        "p"
+                        {}
+                        [
+                            HTML.element(
+                                "input"
+                                {
+                                    "type": "text"
+                                    "name": "username"
+                                    "placeholder": "kullanıcı adı"
+                                }
+                                []
+                            )
+                        ]
+                    )
+                    HTML.element(
+                        "p"
+                        {}
+                        [
+                            HTML.element(
+                                "input"
+                                {
+                                    "type": "password"
+                                    "name": "password"
+                                    "placeholder": "parola"
+                                }
+                                []
+                            )
+                        ]
+                    )
+                    HTML.element(
+                        "button"
+                        {"type": "submit"}
+                        [HTML.text("Giriş")]
+                    )
+                ]
+            )
+        ]
+        return sessions.commit(session, HTTP.html(layout("Yönetici", body)))
+    }
+    attempt {
+        db: Local MySQLDatabase := connectMysql()
+        attempt {
+            raffleInfo: Local Pair<String, String> := raffleStatus(db)
+            count: Local Int := entryCount(db)
+            body: Local List<HTMLNode> := [
+                HTML.element("h1", {}, [HTML.text("Yönetici paneli")])
+                HTML.element(
+                    "p"
+                    {}
+                    [HTML.text("Durum: " + raffleInfo["status"])]
+                )
+                HTML.element("p", {}, [HTML.text("Katılımcı: " + str(count))])
+                HTML.element(
+                    "p"
+                    {"class": "banner"}
+                    [
+                        HTML.text(
+                            "Başlat yeni çekiliş açar ve önceki katılımcıları temizler. İlan et, açık çekilişten rastgele bir kazanan seçer."
+                        )
+                    ]
+                )
+                HTML.element(
+                    "form"
+                    {"method": "post", "action": "/admin/start"}
+                    [
+                        csrfField(token)
+                        HTML.element(
+                            "button"
+                            {"type": "submit"}
+                            [HTML.text("Çekilişi başlat")]
+                        )
+                    ]
+                )
+                HTML.element("p", {}, [])
+                HTML.element(
+                    "form"
+                    {"method": "post", "action": "/admin/draw"}
+                    [
+                        csrfField(token)
+                        HTML.element(
+                            "button"
+                            {"type": "submit"}
+                            [HTML.text("Kazananı ilan et")]
+                        )
+                    ]
+                )
+                HTML.element("p", {}, [])
+                HTML.element(
+                    "form"
+                    {"method": "post", "action": "/admin/logout"}
+                    [
+                        csrfField(token)
+                        HTML.element(
+                            "button"
+                            {"type": "submit"}
+                            [HTML.text("Çıkış")]
+                        )
+                    ]
+                )
+            ]
+            if raffleInfo["status"] == "drawn" {
+                body.add(
+                    HTML.element(
+                        "div"
+                        {"class": "ok"}
+                        [HTML.text("Kazanan: " + raffleInfo["winner_name"])]
+                    )
+                )
+            }
+            return sessions.commit(session, HTTP.html(layout("Yönetici", body)))
+        }
+        except MySQLError as error {
+            return sessions.commit(
+                session
+                HTTP.html(
+                    layout(
+                        "Hata"
+                        [
+                            HTML.element(
+                                "div"
+                                {"class": "err"}
+                                [HTML.text(redact(error.message))]
+                            )
+                        ]
+                    )
+                )
+            )
+        }
+        ultimately {
+            db.close()
+        }
+    }
+    except MySQLError as error {
+        return sessions.commit(
+            session
+            HTTP.html(
+                layout(
+                    "Hata"
+                    [
+                        HTML.element(
+                            "div"
+                            {"class": "err"}
+                            [HTML.text(redact(error.message))]
+                        )
+                    ]
+                )
+            )
+        )
+    }
+}
+
+adminLogin: Function := (request: Request) -> Response {
+    sessions: Global SessionStore
+    session: Local Session := sessions.open(request)
+    if request.method() != "POST" {
+        return sessions.commit(
+            session
+            HTTP.html(
+                layout(
+                    "Hata"
+                    [
+                        HTML.element(
+                            "div"
+                            {"class": "err"}
+                            [HTML.text("POST gerekli")]
+                        )
+                    ]
+                )
+                405
+            )
+        )
+    }
+    if not csrfOK(request, session) {
+        return sessions.commit(
+            session
+            HTTP.html(
+                layout(
+                    "Hata"
+                    [
+                        HTML.element(
+                            "div"
+                            {"class": "err"}
+                            [HTML.text("CSRF reddedildi")]
+                        )
+                    ]
+                )
+                403
+            )
+        )
+    }
+    username: Local String? := request.form("username")
+    password: Local String? := request.form("password")
+    if username == null or password == null {
+        return sessions.commit(
+            session
+            HTTP.html(
+                layout(
+                    "Hata"
+                    [
+                        HTML.element(
+                            "div"
+                            {"class": "err"}
+                            [HTML.text("Giriş başarısız")]
+                        )
+                    ]
+                )
+            )
+        )
+    }
+    rotateCsrf(session)
+    attempt {
+        db: Local MySQLDatabase := connectMysql()
+        attempt {
+            rows: Local List<Pair<String, MySQLValue>> := db.query(
+                "SELECT username, password_hash FROM raffle_admin WHERE username = ?"
+                [MySQL.fromString(username)]
+            )
+            if len(rows) == 0 {
+                return sessions.commit(
+                    session
+                    HTTP.html(
+                        layout(
+                            "Hata"
+                            [
+                                HTML.element(
+                                    "div"
+                                    {"class": "err"}
+                                    [HTML.text("Giriş başarısız")]
+                                )
+                            ]
+                        )
+                    )
+                )
+            }
+            hash: Local String := cellString(rows[0], "password_hash")
+            if not Security.passwordVerify(password, hash) {
+                return sessions.commit(
+                    session
+                    HTTP.html(
+                        layout(
+                            "Hata"
+                            [
+                                HTML.element(
+                                    "div"
+                                    {"class": "err"}
+                                    [HTML.text("Giriş başarısız")]
+                                )
+                            ]
+                        )
+                    )
+                )
+            }
+            session.rotate()
+            session.set("admin", "1")
+            rotateCsrf(session)
+            return sessions.commit(session, HTTP.redirect("/admin"))
+        }
+        except MySQLError as error {
+            return sessions.commit(
+                session
+                HTTP.html(
+                    layout(
+                        "Hata"
+                        [
+                            HTML.element(
+                                "div"
+                                {"class": "err"}
+                                [HTML.text(redact(error.message))]
+                            )
+                        ]
+                    )
+                )
+            )
+        }
+        except SecurityError as error {
+            return sessions.commit(
+                session
+                HTTP.html(
+                    layout(
+                        "Hata"
+                        [
+                            HTML.element(
+                                "div"
+                                {"class": "err"}
+                                [HTML.text("Giriş başarısız")]
+                            )
+                        ]
+                    )
+                )
+            )
+        }
+        ultimately {
+            db.close()
+        }
+    }
+    except MySQLError as error {
+        return sessions.commit(
+            session
+            HTTP.html(
+                layout(
+                    "Hata"
+                    [
+                        HTML.element(
+                            "div"
+                            {"class": "err"}
+                            [HTML.text(redact(error.message))]
+                        )
+                    ]
+                )
+            )
+        )
+    }
+}
+
+adminStart: Function := (request: Request) -> Response {
+    sessions: Global SessionStore
+    session: Local Session := sessions.open(request)
+    if request.method() != "POST" {
+        return sessions.commit(
+            session
+            HTTP.html(
+                layout(
+                    "Hata"
+                    [
+                        HTML.element(
+                            "div"
+                            {"class": "err"}
+                            [HTML.text("POST gerekli")]
+                        )
+                    ]
+                )
+                405
+            )
+        )
+    }
+    if not csrfOK(request, session) {
+        return sessions.commit(
+            session
+            HTTP.html(
+                layout(
+                    "Hata"
+                    [
+                        HTML.element(
+                            "div"
+                            {"class": "err"}
+                            [HTML.text("CSRF reddedildi")]
+                        )
+                    ]
+                )
+                403
+            )
+        )
+    }
+    if not isAdmin(session) {
+        return sessions.commit(session, HTTP.redirect("/admin"))
+    }
+    rotateCsrf(session)
+    attempt {
+        db: Local MySQLDatabase := connectMysql()
+        attempt {
+            db.execute("DELETE FROM raffle_entry")
+            db.execute(
+                "UPDATE raffle SET status = 'open', winner_name = NULL, winner_code = NULL WHERE id = 1"
+            )
+            return sessions.commit(session, HTTP.redirect("/admin"))
+        }
+        except MySQLError as error {
+            return sessions.commit(
+                session
+                HTTP.html(
+                    layout(
+                        "Hata"
+                        [
+                            HTML.element(
+                                "div"
+                                {"class": "err"}
+                                [HTML.text(redact(error.message))]
+                            )
+                        ]
+                    )
+                )
+            )
+        }
+        ultimately {
+            db.close()
+        }
+    }
+    except MySQLError as error {
+        return sessions.commit(
+            session
+            HTTP.html(
+                layout(
+                    "Hata"
+                    [
+                        HTML.element(
+                            "div"
+                            {"class": "err"}
+                            [HTML.text(redact(error.message))]
+                        )
+                    ]
+                )
+            )
+        )
+    }
+}
+
+adminDraw: Function := (request: Request) -> Response {
+    sessions: Global SessionStore
+    session: Local Session := sessions.open(request)
+    if request.method() != "POST" {
+        return sessions.commit(
+            session
+            HTTP.html(
+                layout(
+                    "Hata"
+                    [
+                        HTML.element(
+                            "div"
+                            {"class": "err"}
+                            [HTML.text("POST gerekli")]
+                        )
+                    ]
+                )
+                405
+            )
+        )
+    }
+    if not csrfOK(request, session) {
+        return sessions.commit(
+            session
+            HTTP.html(
+                layout(
+                    "Hata"
+                    [
+                        HTML.element(
+                            "div"
+                            {"class": "err"}
+                            [HTML.text("CSRF reddedildi")]
+                        )
+                    ]
+                )
+                403
+            )
+        )
+    }
+    if not isAdmin(session) {
+        return sessions.commit(session, HTTP.redirect("/admin"))
+    }
+    rotateCsrf(session)
+    attempt {
+        db: Local MySQLDatabase := connectMysql()
+        attempt {
+            raffleInfo: Local Pair<String, String> := raffleStatus(db)
+            if raffleInfo["status"] != "open" {
+                return sessions.commit(
+                    session
+                    HTTP.html(
+                        layout(
+                            "Hata"
+                            [
+                                HTML.element(
+                                    "div"
+                                    {"class": "err"}
+                                    [HTML.text("Açık bir çekiliş yok.")]
+                                )
+                            ]
+                        )
+                    )
+                )
+            }
+            rows: Local List<Pair<String, MySQLValue>> := db.query(
+                "SELECT display_name, code FROM raffle_entry ORDER BY RAND() LIMIT 1"
+            )
+            if len(rows) == 0 {
+                return sessions.commit(
+                    session
+                    HTTP.html(
+                        layout(
+                            "Hata"
+                            [
+                                HTML.element(
+                                    "div"
+                                    {"class": "err"}
+                                    [HTML.text("Katılımcı yok.")]
+                                )
+                            ]
+                        )
+                    )
+                )
+            }
+            winnerName: Local String := cellString(rows[0], "display_name")
+            winnerCode: Local String := cellString(rows[0], "code")
+            db.execute(
+                "UPDATE raffle SET status = 'drawn', winner_name = ?, winner_code = ? WHERE id = 1"
+                [MySQL.fromString(winnerName), MySQL.fromString(winnerCode)]
+            )
+            return sessions.commit(session, HTTP.redirect("/"))
+        }
+        except MySQLError as error {
+            return sessions.commit(
+                session
+                HTTP.html(
+                    layout(
+                        "Hata"
+                        [
+                            HTML.element(
+                                "div"
+                                {"class": "err"}
+                                [HTML.text(redact(error.message))]
+                            )
+                        ]
+                    )
+                )
+            )
+        }
+        ultimately {
+            db.close()
+        }
+    }
+    except MySQLError as error {
+        return sessions.commit(
+            session
+            HTTP.html(
+                layout(
+                    "Hata"
+                    [
+                        HTML.element(
+                            "div"
+                            {"class": "err"}
+                            [HTML.text(redact(error.message))]
+                        )
+                    ]
+                )
+            )
+        )
+    }
+}
+
+adminLogout: Function := (request: Request) -> Response {
+    sessions: Global SessionStore
+    session: Local Session := sessions.open(request)
+    if request.method() != "POST" {
+        return sessions.commit(
+            session
+            HTTP.html(
+                layout(
+                    "Hata"
+                    [
+                        HTML.element(
+                            "div"
+                            {"class": "err"}
+                            [HTML.text("POST gerekli")]
+                        )
+                    ]
+                )
+                405
+            )
+        )
+    }
+    if not csrfOK(request, session) {
+        return sessions.commit(
+            session
+            HTTP.html(
+                layout(
+                    "Hata"
+                    [
+                        HTML.element(
+                            "div"
+                            {"class": "err"}
+                            [HTML.text("CSRF reddedildi")]
+                        )
+                    ]
+                )
+                403
+            )
+        )
+    }
+    session.destroy()
+    return sessions.commit(session, HTTP.redirect("/admin"))
+}
+
+startRaffle: Function := () -> Nothing {
+    loadEnvFile()
+    db: Local MySQLDatabase := connectMysql()
+    attempt {
+        ensureSchema(db)
+    }
+    ultimately {
+        db.close()
+    }
+    app: Local Server := HTTP.server("127.0.0.1", 8082)
+    app.get("/", home)
+    app.post("/join", joinRaffle)
+    app.get("/ticket", ticketPage)
+    app.get("/admin", adminPage)
+    app.post("/admin/login", adminLogin)
+    app.post("/admin/start", adminStart)
+    app.post("/admin/draw", adminDraw)
+    app.post("/admin/logout", adminLogout)
+    write("Raffle listening on http://127.0.0.1:8082/")
+    app.start()
+}
+
+attempt {
+    startRaffle()
+}
+except HTTPError as error {
+    write("HTTP error: " + redact(error.message))
+}
+except MySQLError as error {
+    write("MySQL error: " + redact(error.message))
+}
+except EnvError as error {
+    write("Env error: " + redact(error.message))
+}
+except HTMLError as error {
+    write("HTML error: " + redact(error.message))
+}
+except SecurityError as error {
+    write("Security error: " + redact(error.message))
+}
+except DomainError as error {
+    write("Error: " + redact(error.message))
+}
+except FileError as error {
+    write("File error: " + redact(error.message))
+}

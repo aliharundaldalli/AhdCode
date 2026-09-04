@@ -273,6 +273,7 @@ bakın.
 - [v0.7 HTML ayrıştırma ve web kazıma](examples/v0.7/README_TR.md)
 - [v0.8 multipart formlar ve dosya yükleme](examples/v0.8/README_TR.md)
 - [v0.9 SMTP posta gönderimi](examples/v0.9/README_TR.md)
+- [v0.12 MySQL çekiliş](examples/v0.12/raffle/README_TR.md) — katılım kodu, hash’li yönetici girişi, kazanan ilanı
 - [AhdDataStudio](tools/AhdDataStudio/README_TR.md) — yerel MySQL + SQLite geliştirme arayüzü
 - [v0.4 Kütüphane Demosu](https://github.com/aliharundaldalli/ahdcode-library-demo) (ayrı başlangıç web uygulaması)
 - [v0.4 Seminer Demosu](https://github.com/aliharundaldalli/ahdcode-seminer-demo) (Hatay, çok sayfalı)
@@ -322,6 +323,7 @@ examples/v0.6/     giden HTTP Client ve JSON API'ler
 examples/v0.7/     HTML ayrıştırma, seçiciler ve web kazıma
 examples/v0.8/     multipart formlar, dosya yükleme ve yükleme meta verisi
 examples/v0.9/     Env yapılandırmalı SMTP metin/HTML postası
+examples/v0.12/    MySQL çekiliş örneği (katılım kodu ve kazanan ilanı)
 tools/AhdDataStudio/ birinci taraf yerel MySQL + SQLite geliştirme arayüzü
 AHDCODE_LANGUAGE_SPEC_v0.1.md
                    yetkili (authoritative) dil sözleşmesi
