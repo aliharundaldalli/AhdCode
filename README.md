@@ -12,9 +12,31 @@ AhdCode is an experimental statically checked general-purpose programming
 language focused on readable syntax, explicit intent, predictable semantics,
 and native compilation.
 
-The current release is **v0.12.0**. The core language works end to end, but
+The current release is **v0.13.0**. The core language works end to end, but
 the project is not production-ready and breaking changes may occur before 1.0.
 
+v0.14.0, **Application Foundations**, adds the remaining framework-independent
+groundwork for larger server-side AhdCode applications: compile-time local
+source composition with [`require(...)`](docs/REQUIRE.md), so a program can
+be split across files without a package manager; `ahdcode dev` (v0.13) now
+watches the entry file plus the whole resolved `require(...)` graph, not just
+the entry, so editing any required file rebuilds and restarts automatically;
+and [`server.static`](docs/HTTP.md#static-files) serves local static
+assets (CSS, JS, SVG, images, fonts) from one explicit filesystem root with
+path-traversal, symlink-escape, and dotfile protection built in, so every
+application does not reimplement that itself. This is deliberately not a Web
+framework release: no templating language, no forms/middleware/router
+framework, no package manager, and no browser live reload.
+[AhdDataStudio](tools/AhdDataStudio/README.md) is restructured onto these
+foundations as its own dogfood, split from one file into files grouped by
+responsibility, with no behavior change. v0.13.0 adds `ahdcode dev`: a
+MAMP/Vite-style foreground watch-rebuild-restart loop built as orchestration
+around the same build pipeline `ahdcode build`/`run` already use, plus
+`ahdcode stop`, the graceful counterpart to the existing (forced-by-default)
+`kill` — `stop` waits to confirm the process actually exited instead of
+just signaling it. A failed rebuild always leaves the previously working
+process running untouched, including the very first build; a runtime crash
+after a successful build is reported without retrying the same binary.
 v0.12.0 adds [AhdDataStudio](tools/AhdDataStudio/README.md): a first-party
 localhost MySQL + SQLite development application written in AhdCode, not a
 compiler builtin. Start it with `cd tools/AhdDataStudio && ahdcode run
@@ -210,6 +232,7 @@ See the [CLI guide](docs/CLI.md), [formatter guide](docs/FORMATTER.md),
 
 - [Türkçe Öğrenci Rehberi](docs/STUDENT_GUIDE_TR.md)
 - [English Student Guide](docs/STUDENT_GUIDE_EN.md)
+- [require(...) — local source composition](docs/REQUIRE.md)
 - [Practical Module Workshops](docs/PRACTICAL_MODULES.md) — learn CSV, Data,
   Plot, Excel, Word, Latex, HTTP(S), and HTML through end-to-end projects
 - [Getting started](docs/GETTING_STARTED.md)
@@ -260,6 +283,7 @@ See the [CLI guide](docs/CLI.md), [formatter guide](docs/FORMATTER.md),
 - [v0.8 multipart forms and file uploads](examples/v0.8/README.md)
 - [v0.9 SMTP mail sending](examples/v0.9/README.md)
 - [v0.12 MySQL raffle](examples/v0.12/raffle/README.md) — join codes, hashed admin login, announced winner
+- [v0.14 multi-file web example](examples/v0.14/multi_file_web/README.md) — require(...), dependency-aware dev, static assets
 - [AhdDataStudio](tools/AhdDataStudio/README.md) — local MySQL + SQLite development UI
 - [v0.4 Library Demo](https://github.com/aliharundaldalli/ahdcode-library-demo) (separate beginner web app)
 - [v0.4 Seminar Demo](https://github.com/aliharundaldalli/ahdcode-seminer-demo) (Hatay, multi-page)

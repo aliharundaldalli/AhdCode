@@ -12,10 +12,35 @@ AhdCode; okunabilir sözdizimi, açık niyet (explicit intent), öngörülebilir
 anlambilim (semantics) ve yerel (native) derlemeye odaklanan, deneysel,
 statik olarak denetlenen genel amaçlı bir programlama dilidir.
 
-Mevcut sürüm **v0.12.0**'dır. Çekirdek dil uçtan uca çalışır, ancak proje
+Mevcut sürüm **v0.13.0**'dır. Çekirdek dil uçtan uca çalışır, ancak proje
 üretime hazır değildir ve 1.0'dan önce kırıcı (breaking) değişiklikler
 olabilir.
 
+v0.14.0, **Uygulama Temelleri (Application Foundations)**, daha büyük
+sunucu taraflı AhdCode uygulamaları için kalan çerçeveden bağımsız
+temelleri ekler: paket yöneticisi olmadan bir programın dosyalara
+bölünebilmesi için derleme-zamanı yerel kaynak birleştirmesi
+([`require(...)`](docs/REQUIRE_TR.md)); `ahdcode dev` (v0.13) artık yalnızca
+giriş dosyasını değil, çözümlenmiş tüm `require(...)` grafiğini izler, bu
+yüzden require edilen herhangi bir dosyayı düzenlemek otomatik olarak
+yeniden derler ve yeniden başlatır; ve [`server.static`](docs/HTTP_TR.md#statik-dosyalar),
+yerel statik varlıkları (CSS, JS, SVG, görseller, fontlar) yol geçişi,
+sembolik bağ kaçışı ve gizli dosya korumasıyla tek bir açık dosya sistemi
+kökünden sunar, böylece her uygulama bunu kendisi yeniden uygulamak zorunda
+kalmaz. Bu kasıtlı olarak bir Web çerçevesi sürümü değildir: şablon dili,
+form/middleware/router çerçevesi, paket yöneticisi veya tarayıcı canlı
+yenileme yoktur. [AhdDataStudio](tools/AhdDataStudio/README_TR.md), kendi
+dogfood'u olarak bu temeller üzerine yeniden yapılandırılır; tek dosyadan
+sorumluluğa göre gruplanmış dosyalara bölünür, davranış değişikliği olmadan.
+v0.13.0, `ahdcode dev` ekler: `ahdcode build`/`run`'ın zaten kullandığı aynı
+derleme hattı etrafında bir orkestrasyon olarak kurulmuş, MAMP/Vite
+tarzı önplan izle-yeniden derle-yeniden başlat döngüsü; artı `ahdcode stop`,
+mevcut (varsayılan olarak zorlamalı) `kill`'in nazik karşılığı — `stop`,
+yalnızca sinyal göndermek yerine sürecin gerçekten çıktığını doğrulamak için
+bekler. Başarısız bir yeniden derleme, ilk derleme dahil, önceden çalışan
+süreci her zaman dokunulmadan çalışır bırakır; başarılı bir derlemeden
+sonraki bir çalışma zamanı çökmesi, aynı ikili dosyayı yeniden denemeden
+bildirilir.
 v0.12.0, [AhdDataStudio](tools/AhdDataStudio/README_TR.md) ekler: AhdCode ile
 yazılmış birinci taraf, yalnızca localhost MySQL + SQLite geliştirme
 uygulaması — derleyici yerleşik bir modülü değildir. `cd tools/AhdDataStudio
@@ -224,6 +249,7 @@ bakın.
 ## Dokümantasyon
 
 - [Türkçe Öğrenci Rehberi](docs/STUDENT_GUIDE_TR.md)
+- [require(...) — yerel kaynak birleştirme](docs/REQUIRE_TR.md)
 - [Uygulamalı Modül Atölyeleri](docs/PRACTICAL_MODULES_TR.md) — CSV, Data,
   Plot, Excel, Word, Latex, HTTP(S) ve HTML'i uçtan uca projelerle öğrenin
 - [English Student Guide](docs/STUDENT_GUIDE_EN.md)

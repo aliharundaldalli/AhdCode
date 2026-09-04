@@ -193,6 +193,50 @@ not part of the route: `GET /notes?q=x` still matches `/notes`. Duplicate
 Unknown paths return **404**. A path that exists for another method returns
 **405** with an `Allow` header listing the registered methods.
 
+## Static files
+
+`server.static(prefix, root)` (v0.14) maps every request whose path begins
+with `prefix` to a file under the local directory `root`:
+`server.static("/assets", "public")` serves a request for `/assets/app.css`
+from `public/app.css`. This is a first-party, low-level primitive for the
+application's own local files -- CSS, JavaScript, SVG, images, fonts -- not
+a general file browser and not a router: there is no directory listing, no
+`index.html` convention, and no wildcard/prefix mechanism beyond this one
+purpose-built method.
+
+An exact route always wins over a static prefix: `routes` is checked first
+on every request, and `static()` is only consulted on a miss, so
+`server.get("/assets/special.txt", handler)` can freely override one file
+under an otherwise-static directory with zero ambiguity. `static()` serves
+`GET`/`HEAD` only; other methods on a path under a static prefix fall
+through to the normal 404.
+
+Every request path segment is checked before it ever reaches the
+filesystem: empty, `.`, `..`, and any dotfile/dot-directory segment
+(`.env`, `.git/config`, `.DS_Store`, anywhere in the path, not only its
+last component) are refused outright, which also defeats percent-encoded
+traversal (`%2e%2e`), since the path is already decoded by the time this
+check runs. The resulting candidate is still canonicalized and checked for
+containment under `root`, and, if it turns out to be a symlink, checked
+again after resolving it -- a symlink whose target escapes `root` is never
+served, matching `require(...)`'s own containment model; one that resolves
+back inside `root` is served normally. A request that maps to a directory
+is refused (404), never listed.
+
+Files stream through the same binary-safe `http.ServeContent` machinery as
+`HTTP.file`/`HTTP.download`, so Range and conditional-request headers work,
+and nothing passes through an AhdCode `String`. `Content-Type` is set from
+the file's extension via Go's standard MIME registry; an unrecognized
+extension gets no explicit `Content-Type`.
+
+`static()` follows the same registration rules as routes: it cannot be
+called after `start()`, `prefix` must begin with `/`, `root` must already
+exist and be a directory, and two registered prefixes may not overlap.
+
+Editing a static file never triggers `ahdcode dev`'s rebuild -- static
+serving reads straight from disk on every request, so a manual browser
+refresh is always enough. See the [CLI guide](CLI.md#dev-watch-scope).
+
 ## Request snapshot
 
 Each handler receives an immutable snapshot, not a live Go request. `path()`
@@ -620,8 +664,10 @@ upload. The outbound client has no
 cookie jar, binary body, streaming API, SSE, WebSocket, multipart, file
 upload, automatic retries, OAuth, custom CA, client certificates, insecure TLS
 bypass, proxy API, or AI/OpenAI/Anthropic/Gemini module. There is no HTTP/2
-or HTTP/3 API, static-file server, database-backed sessions, authentication
-framework, CSRF, middleware, path parameters, wildcards, regex routes, reverse
-proxy, compression API, or caching. Bodies are bounded Strings, not a binary
-type. Session values are Strings; structured data is the application's
-conversion. JSON is never implied by HTTP.
+or HTTP/3 API, database-backed sessions, authentication framework, CSRF,
+middleware, path parameters, wildcards, regex routes, reverse proxy,
+compression API, or caching. `server.static` (v0.14) serves local files
+under one explicit root; it has no directory listing, `index.html`
+convention, asset hashing, bundling, minification, or CDN. Bodies are
+bounded Strings, not a binary type. Session values are Strings; structured
+data is the application's conversion. JSON is never implied by HTTP.

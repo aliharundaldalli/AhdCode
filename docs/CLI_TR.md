@@ -83,9 +83,8 @@ MAMP/Vite geliştirme sunucusu gibi — tamamen mevcut derleme hattının
 ahdcode dev app.ahd
 ```
 
-Giriş modülünü derler, sonucu başlatır ve ardından yalnızca o tek kaynak
-dosyasını izler (yalnızca giriş modülü — `dev`, `require(...)`'ı takip
-etmez ya da bir proje ağacını taramaz). Her kayıtta yeniden derler:
+Giriş modülünü derler, sonucu başlatır ve ardından onu izler. Her kayıtta
+yeniden derler:
 
 - yeniden derleme **başarılı** olursa, önceden çalışan süreç durdurulur ve
   yenisi onun yerini alır;
@@ -108,6 +107,30 @@ bitmeden önce bile) yayınlanır; böylece her zaman durdurulabilir ve aynı
 kaynağa karşı ikinci bir `dev`, sessizce yarışmak yerine her zaman
 saptanır. Temiz bir şekilde bitirmek için Ctrl+C'ye basın veya başka bir
 yerden `ahdcode stop app.dev` çalıştırın.
+
+#### Dev izleme kapsamı
+
+`dev`; giriş dosyasını, derleyicinin çözümlenmiş
+[`require(...)`](REQUIRE_TR.md) grafiğini ve en son derleme denemesinin
+adlandırdığı ama henüz bulamadığı herhangi bir `require(...)` hedefini
+izler — asla özyinelemeli, proje çapında bir tarama değil. İzlenen küme,
+başarılı ya da başarısız her derleme denemesinden sonra yeniden hesaplanır,
+bu yüzden:
+
+- require edilen herhangi bir dosyayı düzenlemek (ne kadar derinlemesine iç
+  içe olursa olsun) giriş dosyasını düzenlemekle aynı şekilde yeniden
+  derler ve yeniden başlatır;
+- önceden eksik olan require edilen bir dosyayı oluşturmak, onu require
+  eden dosyaya başka bir düzenleme gerekmeden otomatik olarak yeniden
+  derler;
+- `require(...)` grafiğinden düşen bir dosya (`require(...)` satırı
+  kaldırılan) izlenmeye devam etmez.
+
+[`server.static`](HTTP_TR.md#statik-dosyalar) üzerinden sunulan statik
+varlıklar hiçbir zaman bu grafiğin parçası değildir: birini düzenlemek asla
+yeniden derlemeyi tetiklemez, çünkü statik dosyalar her istekte doğrudan
+diskten okunur. Bu grafiğin izlediği birleştirme kuralları için bkz.
+[`require(...)`](REQUIRE_TR.md).
 
 ### `stop`: nazik kapanış
 

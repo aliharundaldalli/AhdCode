@@ -80,9 +80,8 @@ existing build pipeline — it is not a second compiler:
 ahdcode dev app.ahd
 ```
 
-It compiles the entry module, starts the result, and then watches that one
-source file (only the entry module — `dev` does not follow `require(...)` or
-scan a project tree). On every save it rebuilds:
+It compiles the entry module, starts the result, and then watches it. On
+every save it rebuilds:
 
 - if the rebuild **succeeds**, the previously running process is stopped and
   the new one takes its place;
@@ -104,6 +103,26 @@ first build finishes), so it is always stoppable and a second `dev` against
 the same source is always detected rather than silently racing the first.
 Press Ctrl+C, or run `ahdcode stop app.dev` from elsewhere, to end it
 cleanly.
+
+#### Dev watch scope
+
+`dev` watches the entry file plus the compiler's resolved
+[`require(...)`](REQUIRE.md) graph plus any `require(...)` target the
+latest build attempt named but could not find yet — never a recursive
+project-wide scan. The watch set is recomputed after every build attempt,
+success or failure, so:
+
+- editing any required file (however deeply nested) rebuilds and restarts,
+  the same as editing the entry;
+- creating a required file that was previously missing rebuilds
+  automatically, with no further edit to the file that requires it needed;
+- a file dropped from the `require(...)` graph (its `require(...)` line
+  removed) stops being watched.
+
+Static assets served through [`server.static`](HTTP.md#static-files) are
+never part of this graph: editing one never triggers a rebuild, since
+static files are read straight from disk on every request. See
+[`require(...)`](REQUIRE.md) for the composition rules this graph follows.
 
 ### `stop`: graceful shutdown
 

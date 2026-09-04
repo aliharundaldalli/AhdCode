@@ -186,6 +186,50 @@ değişmez.
 Bilinmeyen yollar **404** döner. Başka bir yöntem için var olan bir yol
 **405** ve `Allow` başlığı döner.
 
+## Statik dosyalar
+
+`server.static(prefix, root)` (v0.14), yolu `prefix` ile başlayan her isteği
+yerel `root` dizini altındaki bir dosyaya eşler:
+`server.static("/assets", "public")`, `/assets/app.css` isteğini
+`public/app.css`'ten sunar. Bu, uygulamanın kendi yerel dosyaları -- CSS,
+JavaScript, SVG, görseller, fontlar -- için birinci taraf, düşük seviyeli
+bir ilkeldir; genel bir dosya tarayıcısı ya da yönlendirici değildir: dizin
+listelemesi, `index.html` kuralı ya da bu tek amaç dışında joker/önek
+mekanizması yoktur.
+
+Tam bir rota her zaman statik bir önek karşısında kazanır: her istekte önce
+`routes` denetlenir, `static()` yalnızca eşleşme olmadığında devreye girer;
+böylece `server.get("/assets/special.txt", handler)`, aksi halde statik
+olan bir dizin altındaki tek bir dosyayı hiçbir belirsizlik olmadan
+serbestçe geçersiz kılabilir. `static()` yalnızca `GET`/`HEAD` sunar; statik
+bir önek altındaki bir yolda başka yöntemler normal 404'e düşer.
+
+Her istek yol parçası, dosya sistemine ulaşmadan önce denetlenir: boş, `.`,
+`..` ve herhangi bir gizli dosya/dizin parçası (`.env`, `.git/config`,
+`.DS_Store`, yalnızca son bileşende değil, yolun herhangi bir yerinde) doğrudan
+reddedilir -- bu, yüzde-kodlanmış geçiş denemelerini de (`%2e%2e`) etkisiz
+kılar, çünkü bu denetim çalıştığında yol zaten çözülmüştür. Ortaya çıkan aday
+yol yine de `root` altında kapsanma açısından kanonikleştirilip denetlenir
+ve bir sembolik bağ olduğu ortaya çıkarsa, çözüldükten sonra tekrar
+denetlenir -- hedefi `root`'un dışına kaçan bir sembolik bağ asla sunulmaz,
+tıpkı `require(...)`'in kendi kapsanma modeli gibi; `root`'un içine geri
+dönen biri normal şekilde sunulur. Bir dizine eşlenen bir istek reddedilir
+(404), asla listelenmez.
+
+Dosyalar, `HTTP.file`/`HTTP.download` ile aynı ikili-güvenli
+`http.ServeContent` altyapısından akar, böylece Range ve koşullu istek
+başlıkları çalışır ve hiçbir şey bir AhdCode `String`'inden geçmez.
+`Content-Type`, dosyanın uzantısından Go'nun standart MIME kayıt defteri
+üzerinden ayarlanır; tanınmayan bir uzantı açık bir `Content-Type` almaz.
+
+`static()`, rotalarla aynı kayıt kurallarını izler: `start()` sonrası
+çağrılamaz, `prefix` `/` ile başlamalıdır, `root` zaten var olmalı ve bir
+dizin olmalıdır, ve iki kayıtlı önek çakışamaz.
+
+Statik bir dosyayı düzenlemek `ahdcode dev`'in yeniden derlemesini asla
+tetiklemez -- statik sunum her istekte doğrudan diskten okur, bu yüzden
+elle bir tarayıcı yenilemesi her zaman yeterlidir.
+
 ## İstek kopyası
 
 Her işleyici, canlı bir Go isteği değil, değişmez bir kopya alır. `path()`
@@ -483,6 +527,9 @@ yükleme yoktur. Giden istemcinin çerez kavanozu,
 ikili gövde, akış API'si, SSE, WebSocket, multipart, dosya yükleme, otomatik
 yeniden deneme, OAuth, özel CA, istemci sertifikası, güvensiz TLS baypası,
 vekil API'si veya yapay zeka satıcı modülü yoktur. HTTP/2 veya HTTP/3 API'si,
-statik dosya sunucusu, veritabanı oturumu, kimlik doğrulama çerçevesi, CSRF,
-middleware, yol parametreleri, joker, regex yolları, ters vekil, sıkıştırma
-API'si veya önbellekleme yoktur. JSON, HTTP tarafından ima edilmez.
+veritabanı oturumu, kimlik doğrulama çerçevesi, CSRF, middleware, yol
+parametreleri, joker, regex yolları, ters vekil, sıkıştırma API'si veya
+önbellekleme yoktur. `server.static` (v0.14), tek bir açık kök altındaki
+yerel dosyaları sunar; dizin listelemesi, `index.html` kuralı, varlık
+hash'leme, paketleme, küçültme veya CDN yoktur. JSON, HTTP tarafından ima
+edilmez.
