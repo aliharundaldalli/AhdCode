@@ -1,0 +1,16 @@
+require("Components/Layout.ahd")
+require("Shared/HTMLHelpers.ahd")
+bring HTML
+from HTML bring HTMLNode
+bring HTTP
+from HTTP bring Request
+from HTTP bring Response
+
+aboutPage: Function := (request: Request) -> Response {
+    body: Local List<HTMLNode> := [
+        paragraph("A small AhdCode v0.14 example: local source composition")
+        paragraph("with require(...), dependency-aware ahdcode dev, and a")
+        paragraph("static asset (this page's stylesheet) served safely.")
+    ]
+    return HTTP.html(pageShell("About", body))
+}

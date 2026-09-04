@@ -1,0 +1,20 @@
+// A nested require: Layout is required by Pages/Home.ahd and
+// Pages/About.ahd, one level down from the entry, and its own require
+// targets still resolve relative to the application root -- never relative
+// to Components/ -- the frozen app-root-relative rule (section 11).
+require("Shared/HTMLHelpers.ahd")
+require("Components/Navigation.ahd")
+bring HTML
+from HTML bring HTMLNode
+
+pageShell: Function := (title: String, body: List<HTMLNode>) -> String {
+    nodes: Local List<HTMLNode> := [
+        HTML.element("link", {"rel": "stylesheet", "href": "/assets/app.css"}, [])
+        navBar()
+        pageTitle(title)
+    ]
+    for node in body {
+        nodes.add(node)
+    }
+    return HTML.document(title, nodes)
+}

@@ -1,0 +1,9 @@
+body {
+    font-family: -apple-system, sans-serif;
+    max-width: 40rem;
+    margin: 2rem auto;
+    color: #1f2937;
+}
+nav a {
+    margin-right: 0.5rem;
+}

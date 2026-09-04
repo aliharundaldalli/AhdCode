@@ -1,0 +1,18 @@
+bring HTML
+from HTML bring HTMLNode
+
+navLink: Function := (href: String, label: String) -> HTMLNode {
+    return HTML.element("a", {"href": href}, [HTML.text(label)])
+}
+
+navBar: Function := () -> HTMLNode {
+    return HTML.element(
+        "nav"
+        {}
+        [
+            navLink("/", "Home")
+            HTML.text(" · ")
+            navLink("/about", "About")
+        ]
+    )
+}

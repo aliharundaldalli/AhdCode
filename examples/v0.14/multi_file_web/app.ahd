@@ -1,0 +1,30 @@
+// AhdCode v0.14 — Application Foundations example.
+//
+// Demonstrates, in one small app:
+//   - require(...): compile-time local source composition
+//   - nested require(...): Pages/Home.ahd and Pages/About.ahd each require
+//     Components/Layout.ahd, which itself requires Shared/HTMLHelpers.ahd
+//     and Components/Navigation.ahd -- all resolved relative to this file's
+//     own directory, the application root, no matter how deep the require
+//     chain gets
+//   - file-local bring: every required file declares the standard modules
+//     it uses itself; nothing here is a silently inherited convenience
+//   - Server.static: public/app.css is served from disk through the new
+//     static primitive, not one HTTP.file route per asset
+//   - dependency-aware `ahdcode dev`: editing any required file above
+//     rebuilds and restarts this app; editing public/app.css does not
+//
+//   cd examples/v0.14/multi_file_web
+//   ahdcode dev app.ahd
+//   open http://127.0.0.1:8095/
+//   ahdcode stop app.dev
+require("Pages/Home.ahd")
+require("Pages/About.ahd")
+bring HTTP
+from HTTP bring Server
+
+app: Server := HTTP.server("127.0.0.1", 8095)
+app.static("/assets", "public")
+app.get("/", homePage)
+app.get("/about", aboutPage)
+app.start()

@@ -1,0 +1,13 @@
+// Small reusable HTML-building helpers, required by more than one page and
+// component below. Every file that uses HTML types declares its own bring
+// for HTML -- that stays true even for a Shared/ helper file like this one.
+bring HTML
+from HTML bring HTMLNode
+
+paragraph: Function := (text: String) -> HTMLNode {
+    return HTML.element("p", {}, [HTML.text(text)])
+}
+
+pageTitle: Function := (text: String) -> HTMLNode {
+    return HTML.element("h1", {}, [HTML.text(text)])
+}

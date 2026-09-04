@@ -1,0 +1,15 @@
+require("Components/Layout.ahd")
+require("Shared/HTMLHelpers.ahd")
+bring HTML
+from HTML bring HTMLNode
+bring HTTP
+from HTTP bring Request
+from HTTP bring Response
+
+homePage: Function := (request: Request) -> Response {
+    body: Local List<HTMLNode> := [
+        paragraph("This page, the About page, the navigation bar, and the")
+        paragraph("page shell are each their own required source file.")
+    ]
+    return HTTP.html(pageShell("Home", body))
+}
