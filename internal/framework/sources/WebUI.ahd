@@ -1,0 +1,716 @@
+// Web.UI -- AhdCode's semantic HTML component layer.
+//
+// Every helper here is an ordinary AhdCode Function that returns an HTMLNode
+// built by the existing HTML module. There is no virtual DOM, no hydration,
+// no reactive state, no component lifecycle, and no browser runtime: a page
+// is a value, composed once on the server and rendered to markup.
+//
+// Two shapes cover almost everything, so the whole surface is predictable:
+//
+//     text elements       tag(text, attributes := {})
+//     container elements  tag(children, attributes := {})
+//
+// Attributes are always the last parameter and always optional, so the
+// common call stays short. Every String that becomes page content goes
+// through HTML.text, which escapes it -- there is deliberately no raw-markup
+// helper anywhere in this file, so no ordinary UI call can turn a database
+// value into executable HTML.
+//
+// A text element that also needs markup children has a companion named with
+// the Nodes suffix: h1/h1Nodes, p/pNodes, a/aNodes, and so on. Anything this
+// layer does not cover is still reachable through element(...) below, or
+// through the HTML module directly.
+//
+// Helpers that set an attribute of their own build a new Pair with KeyValue
+// rather than writing into the one they were handed: a Pair is a reference,
+// and a component must never mutate its caller's attributes.
+bring HTML
+from HTML bring HTMLNode
+bring KeyValue
+
+UIKit: Class<> := {
+    // --- Core composition ---
+    // text escapes value and returns it as one text node. Every text-taking
+    // helper in this file routes through it.
+    text: Function := (value: String) -> HTMLNode {
+        return HTML.text(value)
+    }
+    // element is the escape hatch for any tag or attribute pattern this
+    // layer does not name. It is the same primitive the helpers below use.
+    element: Function := (
+        tag: String
+        attributes: Pair<String, String>
+        children: List<HTMLNode>
+    ) -> HTMLNode {
+        return HTML.element(tag, attributes, children)
+    }
+    // render turns a finished node tree into markup.
+    render: Function := (node: HTMLNode) -> String {
+        return HTML.render(node)
+    }
+    // stylesheet is the one head element common enough to name: the link a
+    // page needs to reach its own CSS. Pass it to Web.page's head list.
+    stylesheet: Function := (href: String) -> HTMLNode {
+        return HTML.element("link", {"rel": "stylesheet", "href": href}, [])
+    }
+    // --- Document structure ---
+    html: Function := (
+        children: List<HTMLNode>
+        attributes: Pair<String, String> := {}
+    ) -> HTMLNode {
+        return HTML.element("html", attributes, children)
+    }
+
+    head: Function := (
+        children: List<HTMLNode>
+        attributes: Pair<String, String> := {}
+    ) -> HTMLNode {
+        return HTML.element("head", attributes, children)
+    }
+
+    body: Function := (
+        children: List<HTMLNode>
+        attributes: Pair<String, String> := {}
+    ) -> HTMLNode {
+        return HTML.element("body", attributes, children)
+    }
+
+    title: Function := (
+        text: String
+        attributes: Pair<String, String> := {}
+    ) -> HTMLNode {
+        return HTML.element("title", attributes, [HTML.text(text)])
+    }
+    // --- Page structure ---
+    header: Function := (
+        children: List<HTMLNode>
+        attributes: Pair<String, String> := {}
+    ) -> HTMLNode {
+        return HTML.element("header", attributes, children)
+    }
+
+    footer: Function := (
+        children: List<HTMLNode>
+        attributes: Pair<String, String> := {}
+    ) -> HTMLNode {
+        return HTML.element("footer", attributes, children)
+    }
+
+    main: Function := (
+        children: List<HTMLNode>
+        attributes: Pair<String, String> := {}
+    ) -> HTMLNode {
+        return HTML.element("main", attributes, children)
+    }
+
+    section: Function := (
+        children: List<HTMLNode>
+        attributes: Pair<String, String> := {}
+    ) -> HTMLNode {
+        return HTML.element("section", attributes, children)
+    }
+
+    article: Function := (
+        children: List<HTMLNode>
+        attributes: Pair<String, String> := {}
+    ) -> HTMLNode {
+        return HTML.element("article", attributes, children)
+    }
+
+    aside: Function := (
+        children: List<HTMLNode>
+        attributes: Pair<String, String> := {}
+    ) -> HTMLNode {
+        return HTML.element("aside", attributes, children)
+    }
+
+    nav: Function := (
+        children: List<HTMLNode>
+        attributes: Pair<String, String> := {}
+    ) -> HTMLNode {
+        return HTML.element("nav", attributes, children)
+    }
+
+    div: Function := (
+        children: List<HTMLNode>
+        attributes: Pair<String, String> := {}
+    ) -> HTMLNode {
+        return HTML.element("div", attributes, children)
+    }
+
+    address: Function := (
+        children: List<HTMLNode>
+        attributes: Pair<String, String> := {}
+    ) -> HTMLNode {
+        return HTML.element("address", attributes, children)
+    }
+    // --- Headings ---
+    h1: Function := (
+        text: String
+        attributes: Pair<String, String> := {}
+    ) -> HTMLNode {
+        return HTML.element("h1", attributes, [HTML.text(text)])
+    }
+
+    h1Nodes: Function := (
+        children: List<HTMLNode>
+        attributes: Pair<String, String> := {}
+    ) -> HTMLNode {
+        return HTML.element("h1", attributes, children)
+    }
+
+    h2: Function := (
+        text: String
+        attributes: Pair<String, String> := {}
+    ) -> HTMLNode {
+        return HTML.element("h2", attributes, [HTML.text(text)])
+    }
+
+    h2Nodes: Function := (
+        children: List<HTMLNode>
+        attributes: Pair<String, String> := {}
+    ) -> HTMLNode {
+        return HTML.element("h2", attributes, children)
+    }
+
+    h3: Function := (
+        text: String
+        attributes: Pair<String, String> := {}
+    ) -> HTMLNode {
+        return HTML.element("h3", attributes, [HTML.text(text)])
+    }
+
+    h3Nodes: Function := (
+        children: List<HTMLNode>
+        attributes: Pair<String, String> := {}
+    ) -> HTMLNode {
+        return HTML.element("h3", attributes, children)
+    }
+
+    h4: Function := (
+        text: String
+        attributes: Pair<String, String> := {}
+    ) -> HTMLNode {
+        return HTML.element("h4", attributes, [HTML.text(text)])
+    }
+
+    h4Nodes: Function := (
+        children: List<HTMLNode>
+        attributes: Pair<String, String> := {}
+    ) -> HTMLNode {
+        return HTML.element("h4", attributes, children)
+    }
+
+    h5: Function := (
+        text: String
+        attributes: Pair<String, String> := {}
+    ) -> HTMLNode {
+        return HTML.element("h5", attributes, [HTML.text(text)])
+    }
+
+    h5Nodes: Function := (
+        children: List<HTMLNode>
+        attributes: Pair<String, String> := {}
+    ) -> HTMLNode {
+        return HTML.element("h5", attributes, children)
+    }
+
+    h6: Function := (
+        text: String
+        attributes: Pair<String, String> := {}
+    ) -> HTMLNode {
+        return HTML.element("h6", attributes, [HTML.text(text)])
+    }
+
+    h6Nodes: Function := (
+        children: List<HTMLNode>
+        attributes: Pair<String, String> := {}
+    ) -> HTMLNode {
+        return HTML.element("h6", attributes, children)
+    }
+    // --- Text content ---
+    p: Function := (
+        text: String
+        attributes: Pair<String, String> := {}
+    ) -> HTMLNode {
+        return HTML.element("p", attributes, [HTML.text(text)])
+    }
+
+    pNodes: Function := (
+        children: List<HTMLNode>
+        attributes: Pair<String, String> := {}
+    ) -> HTMLNode {
+        return HTML.element("p", attributes, children)
+    }
+
+    span: Function := (
+        text: String
+        attributes: Pair<String, String> := {}
+    ) -> HTMLNode {
+        return HTML.element("span", attributes, [HTML.text(text)])
+    }
+
+    spanNodes: Function := (
+        children: List<HTMLNode>
+        attributes: Pair<String, String> := {}
+    ) -> HTMLNode {
+        return HTML.element("span", attributes, children)
+    }
+
+    blockquote: Function := (
+        text: String
+        attributes: Pair<String, String> := {}
+    ) -> HTMLNode {
+        return HTML.element("blockquote", attributes, [HTML.text(text)])
+    }
+
+    blockquoteNodes: Function := (
+        children: List<HTMLNode>
+        attributes: Pair<String, String> := {}
+    ) -> HTMLNode {
+        return HTML.element("blockquote", attributes, children)
+    }
+
+    strong: Function := (
+        text: String
+        attributes: Pair<String, String> := {}
+    ) -> HTMLNode {
+        return HTML.element("strong", attributes, [HTML.text(text)])
+    }
+
+    em: Function := (
+        text: String
+        attributes: Pair<String, String> := {}
+    ) -> HTMLNode {
+        return HTML.element("em", attributes, [HTML.text(text)])
+    }
+
+    b: Function := (
+        text: String
+        attributes: Pair<String, String> := {}
+    ) -> HTMLNode {
+        return HTML.element("b", attributes, [HTML.text(text)])
+    }
+
+    i: Function := (
+        text: String
+        attributes: Pair<String, String> := {}
+    ) -> HTMLNode {
+        return HTML.element("i", attributes, [HTML.text(text)])
+    }
+
+    u: Function := (
+        text: String
+        attributes: Pair<String, String> := {}
+    ) -> HTMLNode {
+        return HTML.element("u", attributes, [HTML.text(text)])
+    }
+
+    small: Function := (
+        text: String
+        attributes: Pair<String, String> := {}
+    ) -> HTMLNode {
+        return HTML.element("small", attributes, [HTML.text(text)])
+    }
+
+    mark: Function := (
+        text: String
+        attributes: Pair<String, String> := {}
+    ) -> HTMLNode {
+        return HTML.element("mark", attributes, [HTML.text(text)])
+    }
+
+    code: Function := (
+        text: String
+        attributes: Pair<String, String> := {}
+    ) -> HTMLNode {
+        return HTML.element("code", attributes, [HTML.text(text)])
+    }
+
+    pre: Function := (
+        text: String
+        attributes: Pair<String, String> := {}
+    ) -> HTMLNode {
+        return HTML.element("pre", attributes, [HTML.text(text)])
+    }
+
+    time: Function := (
+        text: String
+        datetime: String
+        attributes: Pair<String, String> := {}
+    ) -> HTMLNode {
+        stamped: Local Pair<String, String> := KeyValue.with(
+            attributes
+            "datetime"
+            datetime
+        )
+        return HTML.element("time", stamped, [HTML.text(text)])
+    }
+
+    br: Function := (attributes: Pair<String, String> := {}) -> HTMLNode {
+        return HTML.element("br", attributes, [])
+    }
+
+    hr: Function := (attributes: Pair<String, String> := {}) -> HTMLNode {
+        return HTML.element("hr", attributes, [])
+    }
+    // --- Lists ---
+    ul: Function := (
+        children: List<HTMLNode>
+        attributes: Pair<String, String> := {}
+    ) -> HTMLNode {
+        return HTML.element("ul", attributes, children)
+    }
+
+    ol: Function := (
+        children: List<HTMLNode>
+        attributes: Pair<String, String> := {}
+    ) -> HTMLNode {
+        return HTML.element("ol", attributes, children)
+    }
+
+    dl: Function := (
+        children: List<HTMLNode>
+        attributes: Pair<String, String> := {}
+    ) -> HTMLNode {
+        return HTML.element("dl", attributes, children)
+    }
+
+    li: Function := (
+        text: String
+        attributes: Pair<String, String> := {}
+    ) -> HTMLNode {
+        return HTML.element("li", attributes, [HTML.text(text)])
+    }
+
+    liNodes: Function := (
+        children: List<HTMLNode>
+        attributes: Pair<String, String> := {}
+    ) -> HTMLNode {
+        return HTML.element("li", attributes, children)
+    }
+
+    dt: Function := (
+        text: String
+        attributes: Pair<String, String> := {}
+    ) -> HTMLNode {
+        return HTML.element("dt", attributes, [HTML.text(text)])
+    }
+
+    dd: Function := (
+        text: String
+        attributes: Pair<String, String> := {}
+    ) -> HTMLNode {
+        return HTML.element("dd", attributes, [HTML.text(text)])
+    }
+
+    ddNodes: Function := (
+        children: List<HTMLNode>
+        attributes: Pair<String, String> := {}
+    ) -> HTMLNode {
+        return HTML.element("dd", attributes, children)
+    }
+    // --- Links and media ---
+    // a takes its destination first, so a link reads in the order it is
+    // spoken: this href, showing this text.
+    a: Function := (
+        href: String
+        text: String
+        attributes: Pair<String, String> := {}
+    ) -> HTMLNode {
+        linked: Local Pair<String, String> := KeyValue.with(
+            attributes
+            "href"
+            href
+        )
+        return HTML.element("a", linked, [HTML.text(text)])
+    }
+
+    aNodes: Function := (
+        href: String
+        children: List<HTMLNode>
+        attributes: Pair<String, String> := {}
+    ) -> HTMLNode {
+        linked: Local Pair<String, String> := KeyValue.with(
+            attributes
+            "href"
+            href
+        )
+        return HTML.element("a", linked, children)
+    }
+    // img requires alt. A decorative image passes "" deliberately; there is
+    // no signature here that lets alt be forgotten by accident.
+    img: Function := (
+        src: String
+        alt: String
+        attributes: Pair<String, String> := {}
+    ) -> HTMLNode {
+        described: Local Pair<String, String> := KeyValue.overlay(
+            attributes
+            {"src": src, "alt": alt}
+        )
+        return HTML.element("img", described, [])
+    }
+
+    source: Function := (
+        src: String
+        type: String
+        attributes: Pair<String, String> := {}
+    ) -> HTMLNode {
+        typed: Local Pair<String, String> := KeyValue.overlay(
+            attributes
+            {"srcset": src, "type": type}
+        )
+        return HTML.element("source", typed, [])
+    }
+
+    picture: Function := (
+        children: List<HTMLNode>
+        attributes: Pair<String, String> := {}
+    ) -> HTMLNode {
+        return HTML.element("picture", attributes, children)
+    }
+
+    figure: Function := (
+        children: List<HTMLNode>
+        attributes: Pair<String, String> := {}
+    ) -> HTMLNode {
+        return HTML.element("figure", attributes, children)
+    }
+
+    figcaption: Function := (
+        text: String
+        attributes: Pair<String, String> := {}
+    ) -> HTMLNode {
+        return HTML.element("figcaption", attributes, [HTML.text(text)])
+    }
+
+    figcaptionNodes: Function := (
+        children: List<HTMLNode>
+        attributes: Pair<String, String> := {}
+    ) -> HTMLNode {
+        return HTML.element("figcaption", attributes, children)
+    }
+    // --- Tables ---
+    table: Function := (
+        children: List<HTMLNode>
+        attributes: Pair<String, String> := {}
+    ) -> HTMLNode {
+        return HTML.element("table", attributes, children)
+    }
+
+    thead: Function := (
+        children: List<HTMLNode>
+        attributes: Pair<String, String> := {}
+    ) -> HTMLNode {
+        return HTML.element("thead", attributes, children)
+    }
+
+    tbody: Function := (
+        children: List<HTMLNode>
+        attributes: Pair<String, String> := {}
+    ) -> HTMLNode {
+        return HTML.element("tbody", attributes, children)
+    }
+
+    tfoot: Function := (
+        children: List<HTMLNode>
+        attributes: Pair<String, String> := {}
+    ) -> HTMLNode {
+        return HTML.element("tfoot", attributes, children)
+    }
+
+    tr: Function := (
+        children: List<HTMLNode>
+        attributes: Pair<String, String> := {}
+    ) -> HTMLNode {
+        return HTML.element("tr", attributes, children)
+    }
+
+    caption: Function := (
+        text: String
+        attributes: Pair<String, String> := {}
+    ) -> HTMLNode {
+        return HTML.element("caption", attributes, [HTML.text(text)])
+    }
+
+    th: Function := (
+        text: String
+        attributes: Pair<String, String> := {}
+    ) -> HTMLNode {
+        return HTML.element("th", attributes, [HTML.text(text)])
+    }
+
+    thNodes: Function := (
+        children: List<HTMLNode>
+        attributes: Pair<String, String> := {}
+    ) -> HTMLNode {
+        return HTML.element("th", attributes, children)
+    }
+
+    td: Function := (
+        text: String
+        attributes: Pair<String, String> := {}
+    ) -> HTMLNode {
+        return HTML.element("td", attributes, [HTML.text(text)])
+    }
+
+    tdNodes: Function := (
+        children: List<HTMLNode>
+        attributes: Pair<String, String> := {}
+    ) -> HTMLNode {
+        return HTML.element("td", attributes, children)
+    }
+    // --- Forms ---
+    form: Function := (
+        children: List<HTMLNode>
+        attributes: Pair<String, String> := {}
+    ) -> HTMLNode {
+        return HTML.element("form", attributes, children)
+    }
+    // formTo is the ordinary case: a form that posts somewhere. v0.15 has no
+    // Forms framework -- this builds the element and nothing more. Validation,
+    // CSRF, old input, and error bags stay explicit application code built on
+    // the Security, Session, and HTTP primitives.
+    formTo: Function := (
+        action: String
+        method: String
+        children: List<HTMLNode>
+        attributes: Pair<String, String> := {}
+    ) -> HTMLNode {
+        targeted: Local Pair<String, String> := KeyValue.overlay(
+            attributes
+            {"action": action, "method": method}
+        )
+        return HTML.element("form", targeted, children)
+    }
+
+    fieldset: Function := (
+        children: List<HTMLNode>
+        attributes: Pair<String, String> := {}
+    ) -> HTMLNode {
+        return HTML.element("fieldset", attributes, children)
+    }
+
+    legend: Function := (
+        text: String
+        attributes: Pair<String, String> := {}
+    ) -> HTMLNode {
+        return HTML.element("legend", attributes, [HTML.text(text)])
+    }
+
+    label: Function := (
+        text: String
+        attributes: Pair<String, String> := {}
+    ) -> HTMLNode {
+        return HTML.element("label", attributes, [HTML.text(text)])
+    }
+
+    labelNodes: Function := (
+        children: List<HTMLNode>
+        attributes: Pair<String, String> := {}
+    ) -> HTMLNode {
+        return HTML.element("label", attributes, children)
+    }
+    // labelFor writes the for/id pairing an accessible field needs. The
+    // matching id is the caller's to set on the input.
+    labelFor: Function := (
+        target: String
+        text: String
+        attributes: Pair<String, String> := {}
+    ) -> HTMLNode {
+        bound: Local Pair<String, String> := KeyValue.with(
+            attributes
+            "for"
+            target
+        )
+        return HTML.element("label", bound, [HTML.text(text)])
+    }
+
+    input: Function := (
+        type: String
+        name: String
+        value: String := ""
+        attributes: Pair<String, String> := {}
+    ) -> HTMLNode {
+        field: Local Pair<String, String> := KeyValue.overlay(
+            attributes
+            {"type": type, "name": name, "value": value}
+        )
+        return HTML.element("input", field, [])
+    }
+
+    textarea: Function := (
+        name: String
+        value: String := ""
+        attributes: Pair<String, String> := {}
+    ) -> HTMLNode {
+        field: Local Pair<String, String> := KeyValue.with(
+            attributes
+            "name"
+            name
+        )
+        return HTML.element("textarea", field, [HTML.text(value)])
+    }
+
+    select: Function := (
+        name: String
+        children: List<HTMLNode>
+        attributes: Pair<String, String> := {}
+    ) -> HTMLNode {
+        field: Local Pair<String, String> := KeyValue.with(
+            attributes
+            "name"
+            name
+        )
+        return HTML.element("select", field, children)
+    }
+
+    option: Function := (
+        value: String
+        label: String
+        attributes: Pair<String, String> := {}
+    ) -> HTMLNode {
+        choice: Local Pair<String, String> := KeyValue.with(
+            attributes
+            "value"
+            value
+        )
+        return HTML.element("option", choice, [HTML.text(label)])
+    }
+
+    button: Function := (
+        text: String
+        attributes: Pair<String, String> := {}
+    ) -> HTMLNode {
+        return HTML.element("button", attributes, [HTML.text(text)])
+    }
+
+    buttonNodes: Function := (
+        children: List<HTMLNode>
+        attributes: Pair<String, String> := {}
+    ) -> HTMLNode {
+        return HTML.element("button", attributes, children)
+    }
+    // --- Disclosure ---
+    details: Function := (
+        children: List<HTMLNode>
+        attributes: Pair<String, String> := {}
+    ) -> HTMLNode {
+        return HTML.element("details", attributes, children)
+    }
+
+    summary: Function := (
+        text: String
+        attributes: Pair<String, String> := {}
+    ) -> HTMLNode {
+        return HTML.element("summary", attributes, [HTML.text(text)])
+    }
+
+    summaryNodes: Function := (
+        children: List<HTMLNode>
+        attributes: Pair<String, String> := {}
+    ) -> HTMLNode {
+        return HTML.element("summary", attributes, children)
+    }
+}

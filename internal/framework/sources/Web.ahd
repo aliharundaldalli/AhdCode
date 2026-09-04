@@ -43,9 +43,58 @@ bring HTML
 from HTML bring (HTMLNode, HTMLError)
 bring WebError
 from WebError bring WebConfigError
+bring WebUI
+from WebUI bring UIKit
+// UI is the semantic HTML component layer: Web.UI.section, Web.UI.h1,
+// Web.UI.p, Web.UI.img, and the rest. Every String it takes as content is
+// escaped, so a value out of a database or a form stays text.
+UI: UIKit := UIKit()
 // html renders a finished node tree as an HTML response.
 html: Function := (body: HTMLNode, status: Int := 200) -> Response {
     return HTTP.html(HTML.render(body), status)
+}
+// document renders a complete HTML document: the doctype, a UTF-8 head with
+// the escaped title and whatever head nodes the caller adds, and the body.
+//
+// This is the whole of Web's document handling. It is a shell, not a template
+// language: there are no slots, no inheritance, no directives, and no
+// expressions embedded in markup. A Layout is an ordinary Function that ends
+// by calling this.
+document: Function := (
+    title: String
+    body: List<HTMLNode>
+    head: List<HTMLNode> := []
+) -> String {
+    headNodes: Local List<HTMLNode> := [
+        HTML.element("meta", {"charset": "utf-8"}, [])
+        HTML.element(
+            "meta"
+            {
+                "name": "viewport"
+                "content": "width=device-width, initial-scale=1"
+            }
+            []
+        )
+        HTML.element("title", {}, [HTML.text(title)])
+    ]
+    for node in head {
+        headNodes.add(node)
+    }
+    shell: Local HTMLNode := HTML.element(
+        "html"
+        {}
+        [HTML.element("head", {}, headNodes), HTML.element("body", {}, body)]
+    )
+    return "<!doctype html>{HTML.render(shell)}"
+}
+// page is document as a response: the ordinary last line of a Layout.
+page: Function := (
+    title: String
+    body: List<HTMLNode>
+    head: List<HTMLNode> := []
+    status: Int := 200
+) -> Response {
+    return HTTP.html(document(title, body, head), status)
 }
 // text returns a plain-text response, mirroring HTTP.text.
 text: Function := (body: String, status: Int := 200) -> Response {
