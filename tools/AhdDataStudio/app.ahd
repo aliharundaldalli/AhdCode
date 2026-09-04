@@ -1,0 +1,2289 @@
+// AhdDataStudio — local database development UI.
+//
+// Written in AhdCode against the released HTTP, HTML, MySQL, SQLite, Env,
+// File, Path, and Security modules. There is no local source `require`, so
+// this first version lives in one file on purpose.
+//
+//   cd tools/AhdDataStudio
+//   ahdcode run app.ahd
+//   open http://127.0.0.1:8081/AhdDataStudio
+//
+// Binds 127.0.0.1 only. Do not change the host to 0.0.0.0.
+bring Env
+bring File
+bring HTML
+bring HTTP
+bring MySQL
+bring Path
+bring SQLite
+bring Security
+from Env bring EnvError
+from File bring FileError
+from HTML bring HTMLNode
+from HTML bring HTMLError
+from HTTP bring Server
+from HTTP bring Request
+from HTTP bring Response
+from HTTP bring SessionStore
+from HTTP bring Session
+from HTTP bring HTTPError
+from MySQL bring MySQLDatabase
+from MySQL bring MySQLResult
+from MySQL bring MySQLValue
+from MySQL bring MySQLError
+from SQLite bring Database
+from SQLite bring SQLiteValue
+from SQLite bring SQLiteError
+from Security bring SecurityError
+
+sessions: SessionStore := HTTP.sessions(
+    "ahd_datastudio"
+    3600
+    false
+    "Lax"
+)
+
+pageSize: Int := 50
+
+loadEnvFile: Function := () -> Nothing {
+    if File.exists(".env") {
+        Env.load(".env")
+    }
+}
+
+redact: Function := (message: String) -> String {
+    password: Local String := Env.getOr("AHD_DATA_MYSQL_PASSWORD", "")
+    if password != "" {
+        return message.replace(password, "[redacted]")
+    }
+    return message
+}
+
+quoteMysql: Function := (name: String) -> String {
+    return "`" + name.replace("`", "``") + "`"
+}
+
+quoteSqlite: Function := (name: String) -> String {
+    return "\"" + name.replace("\"", "\"\"") + "\""
+}
+
+mysqlBrowseURL: Function := (schema: String, table: String) -> String {
+    return "/AhdDataStudio/mysql/browse?database=" + schema + "&table=" + table
+}
+
+mysqlDatabaseURL: Function := (schema: String) -> String {
+    return "/AhdDataStudio/mysql/database?database=" + schema
+}
+
+sqliteBrowseURL: Function := (path: String, table: String) -> String {
+    return "/AhdDataStudio/sqlite/browse?db=" + path + "&table=" + table
+}
+
+sqliteDatabaseURL: Function := (path: String) -> String {
+    return "/AhdDataStudio/sqlite/database?db=" + path
+}
+
+isSafeComponent: Function := (name: String) -> Bool {
+    if name == "" or name == "." or name == ".." {
+        return false
+    }
+    if name.contains("/") or name.contains("\\") {
+        return false
+    }
+    return true
+}
+
+isSqliteExt: Function := (path: String) -> Bool {
+    ext: Local String := Path.ext(path).lower()
+    return ext == ".db" or ext == ".sqlite" or ext == ".sqlite3"
+}
+
+isDirectoryPath: Function := (path: String) -> Bool {
+    attempt {
+        File.list(path)
+        return true
+    } except FileError {
+        return false
+    }
+}
+
+allowedSqlitePaths: Function := () -> List<String> {
+    found: Local List<String> := []
+    explicit: Local String := Env.getOr("AHD_DATA_SQLITE_PATHS", "")
+    parts: Local List<String> := explicit.split(",")
+    for part in parts {
+        trimmed: Local String := part.trim()
+        if trimmed != "" {
+            if not (trimmed in found) {
+                found.add(trimmed)
+            }
+        }
+    }
+    root: Local String := Env.getOr("AHD_DATA_PROJECT_ROOT", "")
+    if root != "" {
+        attempt {
+            names: Local List<String> := File.list(root)
+            for name in names {
+                if isSafeComponent(name) {
+                    candidate: Local String := Path.join([root, name])
+                    if isSqliteExt(candidate) {
+                        if not isDirectoryPath(candidate) {
+                            if not (candidate in found) {
+                                found.add(candidate)
+                            }
+                        }
+                    }
+                }
+            }
+        } except FileError {
+        }
+    }
+    return found
+}
+
+sqlitePathAllowed: Function := (path: String) -> Bool {
+    allowed: Local List<String> := allowedSqlitePaths()
+    return path in allowed
+}
+
+connectMysql: Function := () -> MySQLDatabase {
+    host: Local String := Env.getOr("AHD_DATA_MYSQL_HOST", "127.0.0.1")
+    username: Local String := Env.getOr("AHD_DATA_MYSQL_USER", "root")
+    password: Local String := Env.getOr("AHD_DATA_MYSQL_PASSWORD", "")
+    portText: Local String := Env.getOr("AHD_DATA_MYSQL_PORT", "3306")
+    security: Local String := Env.getOr("AHD_DATA_MYSQL_SECURITY", "none")
+    port: Local Int := int(portText)
+    return MySQL.connect(host, username, password, port, null, security)
+}
+
+mysqlDatabases: Function := (db: MySQLDatabase) -> List<String> {
+    names: Local List<String> := []
+    rows: Local List<Pair<String, MySQLValue>> := db.query("SHOW DATABASES")
+    for row in rows {
+        if "Database" in row {
+            value: Local MySQLValue := row["Database"]
+            if not value.isNull() {
+                if value.kind() == "String" {
+                    names.add(value.string())
+                }
+            }
+        }
+    }
+    return names
+}
+
+mysqlTables: Function := (db: MySQLDatabase, schema: String) -> List<Pair<String, String>> {
+    rows: Local List<Pair<String, MySQLValue>> := db.query(
+        "SELECT TABLE_NAME, TABLE_TYPE, ENGINE, TABLE_ROWS FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = ? ORDER BY TABLE_NAME"
+        [MySQL.fromString(schema)]
+    )
+    tables: Local List<Pair<String, String>> := []
+    for row in rows {
+        name: Local String := ""
+        kind: Local String := ""
+        engine: Local String := ""
+        approx: Local String := ""
+        if "TABLE_NAME" in row {
+            if row["TABLE_NAME"].kind() == "String" {
+                name = row["TABLE_NAME"].string()
+            }
+        }
+        if "TABLE_TYPE" in row {
+            if row["TABLE_TYPE"].kind() == "String" {
+                kind = row["TABLE_TYPE"].string()
+            }
+        }
+        if "ENGINE" in row {
+            if not row["ENGINE"].isNull() {
+                if row["ENGINE"].kind() == "String" {
+                    engine = row["ENGINE"].string()
+                }
+            }
+        }
+        if "TABLE_ROWS" in row {
+            if not row["TABLE_ROWS"].isNull() {
+                if row["TABLE_ROWS"].kind() == "Int" {
+                    approx = str(row["TABLE_ROWS"].int())
+                }
+                else if row["TABLE_ROWS"].kind() == "String" {
+                    approx = row["TABLE_ROWS"].string()
+                }
+            }
+        }
+        tables.add({
+            "name": name
+            "type": kind
+            "engine": engine
+            "rows": approx
+        })
+    }
+    return tables
+}
+
+mysqlTableNames: Function := (db: MySQLDatabase, schema: String) -> List<String> {
+    names: Local List<String> := []
+    tables: Local List<Pair<String, String>> := mysqlTables(db, schema)
+    for table in tables {
+        names.add(table["name"])
+    }
+    return names
+}
+
+mysqlColumns: Function := (db: MySQLDatabase, schema: String, table: String) -> List<Pair<String, String>> {
+    rows: Local List<Pair<String, MySQLValue>> := db.query(
+        "SELECT COLUMN_NAME, COLUMN_TYPE, IS_NULLABLE, COLUMN_DEFAULT, COLUMN_KEY, EXTRA FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? ORDER BY ORDINAL_POSITION"
+        [MySQL.fromString(schema), MySQL.fromString(table)]
+    )
+    columns: Local List<Pair<String, String>> := []
+    for row in rows {
+        name: Local String := ""
+        sqlType: Local String := ""
+        nullable: Local String := ""
+        defaultValue: Local String := ""
+        key: Local String := ""
+        extra: Local String := ""
+        if "COLUMN_NAME" in row {
+            if row["COLUMN_NAME"].kind() == "String" {
+                name = row["COLUMN_NAME"].string()
+            }
+        }
+        if "COLUMN_TYPE" in row {
+            if row["COLUMN_TYPE"].kind() == "String" {
+                sqlType = row["COLUMN_TYPE"].string()
+            }
+        }
+        if "IS_NULLABLE" in row {
+            if row["IS_NULLABLE"].kind() == "String" {
+                nullable = row["IS_NULLABLE"].string()
+            }
+        }
+        if "COLUMN_DEFAULT" in row {
+            if row["COLUMN_DEFAULT"].isNull() {
+                defaultValue = ""
+            }
+            else if row["COLUMN_DEFAULT"].kind() == "String" {
+                defaultValue = row["COLUMN_DEFAULT"].string()
+            }
+        }
+        if "COLUMN_KEY" in row {
+            if row["COLUMN_KEY"].kind() == "String" {
+                key = row["COLUMN_KEY"].string()
+            }
+        }
+        if "EXTRA" in row {
+            if row["EXTRA"].kind() == "String" {
+                extra = row["EXTRA"].string()
+            }
+        }
+        columns.add({
+            "name": name
+            "type": sqlType
+            "nullable": nullable
+            "default": defaultValue
+            "key": key
+            "extra": extra
+        })
+    }
+    return columns
+}
+
+mysqlColumnNames: Function := (db: MySQLDatabase, schema: String, table: String) -> List<String> {
+    names: Local List<String> := []
+    columns: Local List<Pair<String, String>> := mysqlColumns(db, schema, table)
+    for column in columns {
+        names.add(column["name"])
+    }
+    return names
+}
+
+mysqlPrimaryColumns: Function := (columns: List<Pair<String, String>>) -> List<String> {
+    names: Local List<String> := []
+    for column in columns {
+        if column["key"] == "PRI" {
+            names.add(column["name"])
+        }
+    }
+    return names
+}
+
+formatMysqlValue: Function := (value: MySQLValue) -> String {
+    if value.isNull() {
+        return "NULL"
+    }
+    if value.isBinary() {
+        return "[Binary · " + str(value.binarySize()) + " bytes]"
+    }
+    kind: Local String := value.kind()
+    if kind == "Int" {
+        return str(value.int())
+    }
+    if kind == "Real" {
+        return str(value.real())
+    }
+    if kind == "String" {
+        return value.string()
+    }
+    return "[" + kind + "]"
+}
+
+formatSqliteValue: Function := (value: SQLiteValue) -> String {
+    if value.isNull() {
+        return "NULL"
+    }
+    kind: Local String := value.kind()
+    if kind == "Int" {
+        return str(value.int())
+    }
+    if kind == "Real" {
+        return str(value.real())
+    }
+    if kind == "String" {
+        return value.string()
+    }
+    return "[" + kind + "]"
+}
+
+looksLikeQuery: Function := (sql: String) -> Bool {
+    trimmed: Local String := sql.trim().lower()
+    if trimmed.startsWith("select") {
+        return true
+    }
+    if trimmed.startsWith("show") {
+        return true
+    }
+    if trimmed.startsWith("describe") or trimmed.startsWith("desc ") or trimmed == "desc" {
+        return true
+    }
+    if trimmed.startsWith("explain") {
+        return true
+    }
+    if trimmed.startsWith("with") {
+        return true
+    }
+    if trimmed.startsWith("pragma") {
+        return true
+    }
+    return false
+}
+
+csrfToken: Function := (session: Session) -> String {
+    token: Local String? := session.get("csrf")
+    if token == null {
+        token = Security.token()
+        session.set("csrf", token)
+    }
+    return token
+}
+
+csrfOK: Function := (request: Request, session: Session) -> Bool {
+    stored: Local String? := session.get("csrf")
+    submitted: Local String? := request.form("csrf")
+    if stored == null {
+        return false
+    }
+    if submitted == null {
+        return false
+    }
+    return Security.secureEqual(stored, submitted)
+}
+
+rotateCsrf: Function := (session: Session) -> Nothing {
+    session.set("csrf", Security.token())
+}
+
+hiddenField: Function := (name: String, value: String) -> HTMLNode {
+    return HTML.element(
+        "input"
+        {"type": "hidden", "name": name, "value": value}
+        []
+    )
+}
+
+csrfField: Function := (token: String) -> HTMLNode {
+    return hiddenField("csrf", token)
+}
+
+navLink: Function := (href: String, label: String) -> HTMLNode {
+    return HTML.element("a", {"href": href}, [HTML.text(label)])
+}
+
+queryForm: Function := (action: String, fields: Pair<String, String>, label: String) -> HTMLNode {
+    children: Local List<HTMLNode> := []
+    for name in fields {
+        children.add(hiddenField(name, fields[name]))
+    }
+    children.add(HTML.element("button", {"type": "submit"}, [HTML.text(label)]))
+    return HTML.element("form", {"method": "get", "action": action, "class": "inline"}, children)
+}
+
+studioCSS: Function := () -> String {
+    return r"""
+body { margin: 0; font-family: system-ui, sans-serif; background: #f6f3ee; color: #241f1b; }
+a { color: #8a1f12; }
+header { background: #8a1f12; color: #fff; padding: 12px 20px; display: flex; gap: 16px; align-items: center; }
+header a { color: #fff; text-decoration: none; }
+main { padding: 20px; max-width: 1100px; }
+table { border-collapse: collapse; width: 100%; background: #fff; }
+th, td { border: 1px solid #ddd; padding: 6px 8px; text-align: left; font-size: 14px; vertical-align: top; }
+th { background: #efe7dc; }
+h1, h2 { margin: 0 0 12px; }
+.banner { background: #fff3cd; border: 1px solid #e6d08a; padding: 10px; margin: 12px 0; }
+.err { background: #fde8e4; border: 1px solid #e2a396; padding: 10px; margin: 12px 0; }
+.ok { color: #1f6b3a; }
+.fail { color: #8a1f12; }
+.muted { color: #6b645e; }
+form.inline { display: inline; margin-right: 8px; }
+textarea { width: 100%; min-height: 160px; font-family: ui-monospace, monospace; }
+input[type=text], input[type=search] { padding: 4px 6px; }
+button, input[type=submit] { padding: 6px 10px; cursor: pointer; }
+.cards { display: flex; gap: 16px; flex-wrap: wrap; }
+.card { background: #fff; border: 1px solid #ddd; padding: 16px; min-width: 240px; }
+.brand { font-weight: 700; margin-right: 12px; }
+"""
+}
+
+layout: Function := (title: String, token: String, body: List<HTMLNode>) -> String {
+    nodes: Local List<HTMLNode> := [
+        HTML.element("style", {}, [HTML.text(studioCSS())])
+        HTML.element(
+            "header"
+            {}
+            [
+                HTML.element("span", {"class": "brand"}, [HTML.text("AhdDataStudio")])
+                navLink("/AhdDataStudio", "Home")
+                navLink("/AhdDataStudio/mysql", "MySQL")
+                navLink("/AhdDataStudio/sqlite", "SQLite")
+            ]
+        )
+        HTML.element("main", {}, body)
+    ]
+    return HTML.document("AhdDataStudio · " + title, nodes)
+}
+
+errorNodes: Function := (message: String) -> List<HTMLNode> {
+    return [
+        HTML.element("h1", {}, [HTML.text("Error")])
+        HTML.element("div", {"class": "err"}, [HTML.text(redact(message))])
+    ]
+}
+
+parsePage: Function := (text: String?) -> Int {
+    if text == null {
+        return 1
+    }
+    attempt {
+        value: Local Int := int(text)
+        if value < 1 {
+            return 1
+        }
+        return value
+    } except DomainError {
+        return 1
+    } except OverflowError {
+        return 1
+    }
+}
+
+sortDirection: Function := (text: String?) -> String {
+    if text == null {
+        return "ASC"
+    }
+    if text.upper() == "DESC" {
+        return "DESC"
+    }
+    return "ASC"
+}
+
+sqliteTables: Function := (db: Database) -> List<Pair<String, String>> {
+    rows: Local List<Pair<String, SQLiteValue>> := db.query(
+        "SELECT name, type FROM sqlite_master WHERE type IN ('table', 'view') AND name NOT LIKE 'sqlite_%' ORDER BY name"
+    )
+    tables: Local List<Pair<String, String>> := []
+    for row in rows {
+        name: Local String := ""
+        kind: Local String := ""
+        if "name" in row {
+            if row["name"].kind() == "String" {
+                name = row["name"].string()
+            }
+        }
+        if "type" in row {
+            if row["type"].kind() == "String" {
+                kind = row["type"].string()
+            }
+        }
+        tables.add({"name": name, "type": kind})
+    }
+    return tables
+}
+
+sqliteTableNames: Function := (db: Database) -> List<String> {
+    names: Local List<String> := []
+    tables: Local List<Pair<String, String>> := sqliteTables(db)
+    for table in tables {
+        names.add(table["name"])
+    }
+    return names
+}
+
+sqliteColumns: Function := (db: Database, table: String) -> List<Pair<String, String>> {
+    sql: Local String := "PRAGMA table_info(" + quoteSqlite(table) + ")"
+    rows: Local List<Pair<String, SQLiteValue>> := db.query(sql)
+    columns: Local List<Pair<String, String>> := []
+    for row in rows {
+        name: Local String := ""
+        sqlType: Local String := ""
+        nullable: Local String := "YES"
+        defaultValue: Local String := ""
+        key: Local String := ""
+        if "name" in row {
+            if row["name"].kind() == "String" {
+                name = row["name"].string()
+            }
+        }
+        if "type" in row {
+            if row["type"].kind() == "String" {
+                sqlType = row["type"].string()
+            }
+        }
+        if "notnull" in row {
+            if row["notnull"].kind() == "Int" {
+                if row["notnull"].int() != 0 {
+                    nullable = "NO"
+                }
+            }
+        }
+        if "dflt_value" in row {
+            if not row["dflt_value"].isNull() {
+                if row["dflt_value"].kind() == "String" {
+                    defaultValue = row["dflt_value"].string()
+                }
+                else if row["dflt_value"].kind() == "Int" {
+                    defaultValue = str(row["dflt_value"].int())
+                }
+                else if row["dflt_value"].kind() == "Real" {
+                    defaultValue = str(row["dflt_value"].real())
+                }
+            }
+        }
+        if "pk" in row {
+            if row["pk"].kind() == "Int" {
+                if row["pk"].int() != 0 {
+                    key = "PRI"
+                }
+            }
+        }
+        columns.add({
+            "name": name
+            "type": sqlType
+            "nullable": nullable
+            "default": defaultValue
+            "key": key
+            "extra": ""
+        })
+    }
+    return columns
+}
+
+sqliteBrowseColumns: Function := (columns: List<Pair<String, String>>) -> List<String> {
+    names: Local List<String> := []
+    for column in columns {
+        declared: Local String := column["type"].lower()
+        if declared.contains("blob") {
+            continue
+        }
+        names.add(column["name"])
+    }
+    return names
+}
+
+htmlTable: Function := (headers: List<String>, rows: List<List<String>>) -> HTMLNode {
+    headCells: Local List<HTMLNode> := []
+    for header in headers {
+        headCells.add(HTML.element("th", {}, [HTML.text(header)]))
+    }
+    bodyRows: Local List<HTMLNode> := []
+    for row in rows {
+        cells: Local List<HTMLNode> := []
+        for cell in row {
+            cells.add(HTML.element("td", {}, [HTML.text(cell)]))
+        }
+        bodyRows.add(HTML.element("tr", {}, cells))
+    }
+    return HTML.element(
+        "table"
+        {}
+        [
+            HTML.element("thead", {}, [HTML.element("tr", {}, headCells)])
+            HTML.element("tbody", {}, bodyRows)
+        ]
+    )
+}
+
+home: Function := (request: Request) -> Response {
+    sessions: Global SessionStore
+    session: Local Session := sessions.open(request)
+    token: Local String := csrfToken(session)
+    mysqlStatus: Local String := "Not configured"
+    mysqlDetail: Local String := ""
+    mysqlOk: Local Bool := false
+    attempt {
+        db: Local MySQLDatabase := connectMysql()
+        attempt {
+            names: Local List<String> := mysqlDatabases(db)
+            mysqlOk = true
+            mysqlStatus = "Connected"
+            mysqlDetail = str(len(names)) + " visible databases"
+        } except MySQLError as error {
+            mysqlStatus = "Connection failed"
+            mysqlDetail = redact(error.message)
+        } ultimately {
+            db.close()
+        }
+    } except MySQLError as error {
+        mysqlStatus = "Connection failed"
+        mysqlDetail = redact(error.message)
+    } except DomainError as error {
+        mysqlStatus = "Connection failed"
+        mysqlDetail = redact(error.message)
+    }
+
+    sqliteFiles: Local List<String> := []
+    sqliteStatus: Local String := "No project databases"
+    attempt {
+        sqliteFiles = allowedSqlitePaths()
+        sqliteStatus = str(len(sqliteFiles)) + " files"
+    } except FileError as error {
+        sqliteStatus = "Discovery failed"
+        sqliteDetail: Local String := redact(error.message)
+        sqliteStatus = sqliteStatus + " — " + sqliteDetail
+    }
+
+    mysqlClass: Local String := "fail"
+    if mysqlOk {
+        mysqlClass = "ok"
+    }
+    host: Local String := Env.getOr("AHD_DATA_MYSQL_HOST", "127.0.0.1")
+    port: Local String := Env.getOr("AHD_DATA_MYSQL_PORT", "3306")
+
+    body: Local List<HTMLNode> := [
+        HTML.element("h1", {}, [HTML.text("AhdDataStudio")])
+        HTML.element("p", {"class": "muted"}, [HTML.text("Local database development. Bound to 127.0.0.1 only.")])
+        HTML.element(
+            "div"
+            {"class": "cards"}
+            [
+                HTML.element(
+                    "div"
+                    {"class": "card"}
+                    [
+                        HTML.element("h2", {}, [HTML.text("MySQL")])
+                        HTML.element("p", {}, [HTML.text(host + ":" + port)])
+                        HTML.element("p", {"class": mysqlClass}, [HTML.text(mysqlStatus)])
+                        HTML.element("p", {}, [HTML.text(mysqlDetail)])
+                        navLink("/AhdDataStudio/mysql", "Open MySQL")
+                    ]
+                )
+                HTML.element(
+                    "div"
+                    {"class": "card"}
+                    [
+                        HTML.element("h2", {}, [HTML.text("SQLite")])
+                        HTML.element("p", {}, [HTML.text("Project databases")])
+                        HTML.element("p", {}, [HTML.text(sqliteStatus)])
+                        navLink("/AhdDataStudio/sqlite", "Open SQLite")
+                    ]
+                )
+            ]
+        )
+    ]
+    return sessions.commit(session, HTTP.html(layout("Home", token, body)))
+}
+
+mysqlHome: Function := (request: Request) -> Response {
+    sessions: Global SessionStore
+    session: Local Session := sessions.open(request)
+    token: Local String := csrfToken(session)
+    attempt {
+        db: Local MySQLDatabase := connectMysql()
+        attempt {
+            names: Local List<String> := mysqlDatabases(db)
+            items: Local List<HTMLNode> := []
+            for name in names {
+                items.add(
+                    HTML.element(
+                        "li"
+                        {}
+                        [
+                            queryForm(
+                                "/AhdDataStudio/mysql/database"
+                                {"database": name}
+                                name
+                            )
+                        ]
+                    )
+                )
+            }
+            body: Local List<HTMLNode> := [
+                HTML.element("h1", {}, [HTML.text("MySQL")])
+                HTML.element("p", {}, [HTML.text(str(len(names)) + " visible schemas for these credentials.")])
+                HTML.element("ul", {}, items)
+            ]
+            return sessions.commit(session, HTTP.html(layout("MySQL", token, body)))
+        } except MySQLError as error {
+            return sessions.commit(session, HTTP.html(layout("MySQL", token, errorNodes(error.message))))
+        } ultimately {
+            db.close()
+        }
+    } except MySQLError as error {
+        return sessions.commit(session, HTTP.html(layout("MySQL", token, errorNodes(error.message))))
+    }
+}
+
+mysqlDatabasePage: Function := (request: Request) -> Response {
+    sessions: Global SessionStore
+    session: Local Session := sessions.open(request)
+    token: Local String := csrfToken(session)
+    schema: Local String? := request.query("database")
+    if schema == null {
+        schema = request.form("database")
+    }
+    if schema == null {
+        return sessions.commit(session, HTTP.html(layout("MySQL", token, errorNodes("database is required"))))
+    }
+    attempt {
+        db: Local MySQLDatabase := connectMysql()
+        attempt {
+            allowed: Local List<String> := mysqlDatabases(db)
+            if not (schema in allowed) {
+                return sessions.commit(session, HTTP.html(layout("MySQL", token, errorNodes("unknown database"))))
+            }
+            tables: Local List<Pair<String, String>> := mysqlTables(db, schema)
+            rows: Local List<List<String>> := []
+            for table in tables {
+                rows.add([table["name"], table["type"], table["engine"], table["rows"]])
+            }
+            actions: Local List<HTMLNode> := []
+            for table in tables {
+                name: Local String := table["name"]
+                fields: Local Pair<String, String> := {"database": schema, "table": name}
+                actions.add(
+                    HTML.element(
+                        "li"
+                        {}
+                        [
+                            HTML.element("strong", {}, [HTML.text(name)])
+                            HTML.text(" ")
+                            queryForm("/AhdDataStudio/mysql/table", fields, "Structure")
+                            queryForm("/AhdDataStudio/mysql/indexes", fields, "Indexes")
+                            queryForm("/AhdDataStudio/mysql/browse", fields, "Browse")
+                            queryForm("/AhdDataStudio/mysql/sql", {"database": schema}, "SQL")
+                        ]
+                    )
+                )
+            }
+            body: Local List<HTMLNode> := [
+                HTML.element("h1", {}, [HTML.text("Schema " + schema)])
+                HTML.element("p", {"class": "muted"}, [HTML.text("TABLE_ROWS is an estimate when MySQL provides one, not an exact COUNT(*).")])
+                htmlTable(["Table", "Type", "Engine", "Approx. rows"], rows)
+                HTML.element("h2", {}, [HTML.text("Open")])
+                HTML.element("ul", {}, actions)
+                queryForm("/AhdDataStudio/mysql/sql", {"database": schema}, "SQL console")
+            ]
+            return sessions.commit(session, HTTP.html(layout(schema, token, body)))
+        } except MySQLError as error {
+            return sessions.commit(session, HTTP.html(layout("MySQL", token, errorNodes(error.message))))
+        } ultimately {
+            db.close()
+        }
+    } except MySQLError as error {
+        return sessions.commit(session, HTTP.html(layout("MySQL", token, errorNodes(error.message))))
+    }
+}
+
+mysqlTableNav: Function := (schema: String, table: String) -> HTMLNode {
+    fields: Local Pair<String, String> := {"database": schema, "table": table}
+    return HTML.element(
+        "p"
+        {}
+        [
+            queryForm("/AhdDataStudio/mysql/database", {"database": schema}, "Tables")
+            queryForm("/AhdDataStudio/mysql/table", fields, "Structure")
+            queryForm("/AhdDataStudio/mysql/indexes", fields, "Indexes")
+            queryForm("/AhdDataStudio/mysql/browse", fields, "Browse")
+            queryForm("/AhdDataStudio/mysql/sql", {"database": schema}, "SQL")
+        ]
+    )
+}
+
+mysqlStructurePage: Function := (request: Request) -> Response {
+    sessions: Global SessionStore
+    session: Local Session := sessions.open(request)
+    token: Local String := csrfToken(session)
+    schema: Local String? := request.query("database")
+    table: Local String? := request.query("table")
+    if schema == null or table == null {
+        return sessions.commit(session, HTTP.html(layout("MySQL", token, errorNodes("database and table are required"))))
+    }
+    attempt {
+        db: Local MySQLDatabase := connectMysql()
+        attempt {
+            if not (schema in mysqlDatabases(db)) {
+                return sessions.commit(session, HTTP.html(layout("MySQL", token, errorNodes("unknown database"))))
+            }
+            if not (table in mysqlTableNames(db, schema)) {
+                return sessions.commit(session, HTTP.html(layout("MySQL", token, errorNodes("unknown table"))))
+            }
+            columns: Local List<Pair<String, String>> := mysqlColumns(db, schema, table)
+            rows: Local List<List<String>> := []
+            insertFields: Local List<HTMLNode> := [csrfField(token), hiddenField("database", schema), hiddenField("table", table)]
+            for column in columns {
+                rows.add([
+                    column["name"]
+                    column["type"]
+                    column["nullable"]
+                    column["default"]
+                    column["key"]
+                    column["extra"]
+                ])
+                extra: Local String := column["extra"].lower()
+                if not extra.contains("auto_increment") {
+                    insertFields.add(HTML.element("label", {}, [HTML.text(column["name"] + " ")]))
+                    insertFields.add(HTML.element("input", {"type": "text", "name": "col_" + column["name"]}, []))
+                    insertFields.add(HTML.element("br", {}, []))
+                }
+            }
+            insertFields.add(HTML.element("button", {"type": "submit"}, [HTML.text("Insert row")]))
+            body: Local List<HTMLNode> := [
+                HTML.element("h1", {}, [HTML.text(schema + "." + table)])
+                mysqlTableNav(schema, table)
+                htmlTable(["Column", "Type", "Nullable", "Default", "Key", "Extra"], rows)
+                HTML.element("h2", {}, [HTML.text("Insert")])
+                HTML.element("form", {"method": "post", "action": "/AhdDataStudio/mysql/insert"}, insertFields)
+                HTML.element("h2", {}, [HTML.text("Destructive")])
+                HTML.element("p", {"class": "banner"}, [HTML.text("DROP and TRUNCATE require a confirmation POST.")])
+                queryForm("/AhdDataStudio/mysql/confirm", {"database": schema, "table": table, "action": "drop"}, "Drop table…")
+                queryForm("/AhdDataStudio/mysql/confirm", {"database": schema, "table": table, "action": "truncate"}, "Truncate table…")
+            ]
+            return sessions.commit(session, HTTP.html(layout(table, token, body)))
+        } except MySQLError as error {
+            return sessions.commit(session, HTTP.html(layout("MySQL", token, errorNodes(error.message))))
+        } ultimately {
+            db.close()
+        }
+    } except MySQLError as error {
+        return sessions.commit(session, HTTP.html(layout("MySQL", token, errorNodes(error.message))))
+    }
+}
+
+mysqlIndexesPage: Function := (request: Request) -> Response {
+    sessions: Global SessionStore
+    session: Local Session := sessions.open(request)
+    token: Local String := csrfToken(session)
+    schema: Local String? := request.query("database")
+    table: Local String? := request.query("table")
+    if schema == null or table == null {
+        return sessions.commit(session, HTTP.html(layout("MySQL", token, errorNodes("database and table are required"))))
+    }
+    attempt {
+        db: Local MySQLDatabase := connectMysql()
+        attempt {
+            if not (schema in mysqlDatabases(db)) {
+                return sessions.commit(session, HTTP.html(layout("MySQL", token, errorNodes("unknown database"))))
+            }
+            if not (table in mysqlTableNames(db, schema)) {
+                return sessions.commit(session, HTTP.html(layout("MySQL", token, errorNodes("unknown table"))))
+            }
+            infoRows: Local List<Pair<String, MySQLValue>> := db.query(
+                "SELECT INDEX_NAME, NON_UNIQUE, COLUMN_NAME, SEQ_IN_INDEX FROM INFORMATION_SCHEMA.STATISTICS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? ORDER BY INDEX_NAME, SEQ_IN_INDEX"
+                [MySQL.fromString(schema), MySQL.fromString(table)]
+            )
+            rows: Local List<List<String>> := []
+            for row in infoRows {
+                indexName: Local String := ""
+                unique: Local String := ""
+                column: Local String := ""
+                seq: Local String := ""
+                if "INDEX_NAME" in row {
+                    if row["INDEX_NAME"].kind() == "String" {
+                        indexName = row["INDEX_NAME"].string()
+                    }
+                }
+                if "NON_UNIQUE" in row {
+                    if row["NON_UNIQUE"].kind() == "Int" {
+                        if row["NON_UNIQUE"].int() == 0 {
+                            unique = "unique"
+                        }
+                        else {
+                            unique = "non-unique"
+                        }
+                    }
+                }
+                if "COLUMN_NAME" in row {
+                    if row["COLUMN_NAME"].kind() == "String" {
+                        column = row["COLUMN_NAME"].string()
+                    }
+                }
+                if "SEQ_IN_INDEX" in row {
+                    if row["SEQ_IN_INDEX"].kind() == "Int" {
+                        seq = str(row["SEQ_IN_INDEX"].int())
+                    }
+                }
+                rows.add([indexName, unique, column, seq])
+            }
+            body: Local List<HTMLNode> := [
+                HTML.element("h1", {}, [HTML.text("Indexes · " + table)])
+                mysqlTableNav(schema, table)
+                htmlTable(["Index", "Uniqueness", "Column", "Sequence"], rows)
+            ]
+            return sessions.commit(session, HTTP.html(layout("Indexes", token, body)))
+        } except MySQLError as error {
+            return sessions.commit(session, HTTP.html(layout("MySQL", token, errorNodes(error.message))))
+        } ultimately {
+            db.close()
+        }
+    } except MySQLError as error {
+        return sessions.commit(session, HTTP.html(layout("MySQL", token, errorNodes(error.message))))
+    }
+}
+
+mysqlBrowsePage: Function := (request: Request) -> Response {
+    sessions: Global SessionStore
+    pageSize: Global Int
+    session: Local Session := sessions.open(request)
+    token: Local String := csrfToken(session)
+    schema: Local String? := request.query("database")
+    table: Local String? := request.query("table")
+    if schema == null or table == null {
+        return sessions.commit(session, HTTP.html(layout("MySQL", token, errorNodes("database and table are required"))))
+    }
+    page: Local Int := parsePage(request.query("page"))
+    direction: Local String := sortDirection(request.query("dir"))
+    sortCol: Local String? := request.query("sort")
+    attempt {
+        db: Local MySQLDatabase := connectMysql()
+        attempt {
+            if not (schema in mysqlDatabases(db)) {
+                return sessions.commit(session, HTTP.html(layout("MySQL", token, errorNodes("unknown database"))))
+            }
+            if not (table in mysqlTableNames(db, schema)) {
+                return sessions.commit(session, HTTP.html(layout("MySQL", token, errorNodes("unknown table"))))
+            }
+            columns: Local List<Pair<String, String>> := mysqlColumns(db, schema, table)
+            columnNames: Local List<String> := mysqlColumnNames(db, schema, table)
+            orderColumn: Local String := columnNames[0]
+            if sortCol != null {
+                if sortCol in columnNames {
+                    orderColumn = sortCol
+                }
+            }
+            offset: Local Int := (page - 1) * pageSize
+            qualified: Local String := quoteMysql(schema) + "." + quoteMysql(table)
+            sql: Local String := "SELECT * FROM " + qualified + " ORDER BY " + quoteMysql(orderColumn) + " " + direction + " LIMIT ? OFFSET ?"
+            data: Local List<Pair<String, MySQLValue>> := db.query(sql, [MySQL.fromInt(pageSize), MySQL.fromInt(offset)])
+            headers: Local List<String> := []
+            if len(data) > 0 {
+                for key in data[0] {
+                    headers.add(key)
+                }
+            }
+            else {
+                headers = columnNames
+            }
+            pkCols: Local List<String> := mysqlPrimaryColumns(columns)
+            rows: Local List<List<String>> := []
+            actionNodes: Local List<HTMLNode> := []
+            for dataRow in data {
+                cells: Local List<String> := []
+                for header in headers {
+                    if header in dataRow {
+                        cells.add(formatMysqlValue(dataRow[header]))
+                    }
+                    else {
+                        cells.add("")
+                    }
+                }
+                rows.add(cells)
+                if len(pkCols) > 0 {
+                    deleteChildren: Local List<HTMLNode> := [
+                        csrfField(token)
+                        hiddenField("database", schema)
+                        hiddenField("table", table)
+                    ]
+                    updateChildren: Local List<HTMLNode> := [
+                        csrfField(token)
+                        hiddenField("database", schema)
+                        hiddenField("table", table)
+                    ]
+                    for pk in pkCols {
+                        pkValue: Local String := ""
+                        if pk in dataRow {
+                            pkValue = formatMysqlValue(dataRow[pk])
+                        }
+                        deleteChildren.add(hiddenField("pk_" + pk, pkValue))
+                        updateChildren.add(hiddenField("pk_" + pk, pkValue))
+                    }
+                    for header in headers {
+                        if not (header in pkCols) {
+                            current: Local String := ""
+                            if header in dataRow {
+                                current = formatMysqlValue(dataRow[header])
+                            }
+                            updateChildren.add(HTML.element("input", {"type": "text", "name": "col_" + header, "value": current}, []))
+                        }
+                    }
+                    deleteChildren.add(HTML.element("button", {"type": "submit"}, [HTML.text("Delete")]))
+                    updateChildren.add(HTML.element("button", {"type": "submit"}, [HTML.text("Update")]))
+                    actionNodes.add(
+                        HTML.element(
+                            "div"
+                            {}
+                            [
+                                HTML.element("form", {"method": "post", "action": "/AhdDataStudio/mysql/delete", "class": "inline"}, deleteChildren)
+                                HTML.element("form", {"method": "post", "action": "/AhdDataStudio/mysql/update", "class": "inline"}, updateChildren)
+                            ]
+                        )
+                    )
+                }
+            }
+            pager: Local List<HTMLNode> := []
+            if page > 1 {
+                pager.add(queryForm("/AhdDataStudio/mysql/browse", {"database": schema, "table": table, "page": str(page - 1), "sort": orderColumn, "dir": direction}, "Previous"))
+            }
+            if len(data) == pageSize {
+                pager.add(queryForm("/AhdDataStudio/mysql/browse", {"database": schema, "table": table, "page": str(page + 1), "sort": orderColumn, "dir": direction}, "Next"))
+            }
+            sortLinks: Local List<HTMLNode> := []
+            for name in columnNames {
+                sortLinks.add(queryForm("/AhdDataStudio/mysql/browse", {"database": schema, "table": table, "sort": name, "dir": "ASC"}, name + " ↑"))
+                sortLinks.add(queryForm("/AhdDataStudio/mysql/browse", {"database": schema, "table": table, "sort": name, "dir": "DESC"}, name + " ↓"))
+            }
+            body: Local List<HTMLNode> := [
+                HTML.element("h1", {}, [HTML.text("Browse · " + table)])
+                mysqlTableNav(schema, table)
+                HTML.element("p", {"class": "muted"}, [HTML.text("Page " + str(page) + " · " + str(pageSize) + " rows maximum. No unbounded SELECT.")])
+                HTML.element("div", {}, sortLinks)
+                htmlTable(headers, rows)
+                HTML.element("div", {}, pager)
+            ]
+            if len(actionNodes) > 0 {
+                body.add(HTML.element("h2", {}, [HTML.text("Row actions")]))
+                body.add(HTML.element("p", {"class": "muted"}, [HTML.text("Update and delete use parameter binding. Identifiers come from discovered metadata.")]))
+                for action in actionNodes {
+                    body.add(action)
+                }
+            }
+            return sessions.commit(session, HTTP.html(layout("Browse", token, body)))
+        } except MySQLError as error {
+            return sessions.commit(session, HTTP.html(layout("MySQL", token, errorNodes(error.message))))
+        } ultimately {
+            db.close()
+        }
+    } except MySQLError as error {
+        return sessions.commit(session, HTTP.html(layout("MySQL", token, errorNodes(error.message))))
+    }
+}
+
+mysqlSqlPage: Function := (request: Request) -> Response {
+    sessions: Global SessionStore
+    session: Local Session := sessions.open(request)
+    token: Local String := csrfToken(session)
+    schemaQuery: Local String? := request.query("database")
+    schema: Local String := ""
+    if schemaQuery != null {
+        schema = schemaQuery
+    }
+    body: Local List<HTMLNode> := [
+        HTML.element("h1", {}, [HTML.text("MySQL SQL console")])
+        HTML.element("div", {"class": "banner"}, [HTML.text("This console runs the SQL you type. Destructive statements are not extra-confirmed. Studio-generated forms use parameter binding; this console does not sanitize your SQL.")])
+        HTML.element(
+            "form"
+            {"method": "post", "action": "/AhdDataStudio/mysql/sql"}
+            [
+                csrfField(token)
+                hiddenField("database", schema)
+                HTML.element("textarea", {"name": "sql"}, [HTML.text("")])
+                HTML.element("br", {}, [])
+                HTML.element("button", {"type": "submit"}, [HTML.text("Run")])
+            ]
+        )
+    ]
+    if schema != "" {
+        body.add(queryForm("/AhdDataStudio/mysql/database", {"database": schema}, "Back to schema"))
+    }
+    return sessions.commit(session, HTTP.html(layout("SQL", token, body)))
+}
+
+mysqlSqlRun: Function := (request: Request) -> Response {
+    sessions: Global SessionStore
+    session: Local Session := sessions.open(request)
+    token: Local String := csrfToken(session)
+    if request.method() != "POST" {
+        return sessions.commit(session, HTTP.html(layout("SQL", token, errorNodes("SQL console requires POST")), 405))
+    }
+    if not csrfOK(request, session) {
+        return sessions.commit(session, HTTP.html(layout("SQL", token, errorNodes("rejected: CSRF token missing or invalid")), 403))
+    }
+    sqlText: Local String? := request.form("sql")
+    schemaForm: Local String? := request.form("database")
+    schema: Local String := ""
+    if schemaForm != null {
+        schema = schemaForm
+    }
+    if sqlText == null {
+        return sessions.commit(session, HTTP.html(layout("SQL", token, errorNodes("sql is required"))))
+    }
+    rotateCsrf(session)
+    token = csrfToken(session)
+    attempt {
+        db: Local MySQLDatabase := connectMysql()
+        attempt {
+            if schema != "" {
+                if not (schema in mysqlDatabases(db)) {
+                    return sessions.commit(session, HTTP.html(layout("SQL", token, errorNodes("unknown database"))))
+                }
+                db.execute("USE " + quoteMysql(schema))
+            }
+            body: Local List<HTMLNode> := [
+                HTML.element("h1", {}, [HTML.text("MySQL SQL console")])
+                HTML.element("div", {"class": "banner"}, [HTML.text("This console ran your SQL exactly as entered.")])
+            ]
+            if looksLikeQuery(sqlText) {
+                data: Local List<Pair<String, MySQLValue>> := db.query(sqlText)
+                headers: Local List<String> := []
+                rows: Local List<List<String>> := []
+                if len(data) > 0 {
+                    for key in data[0] {
+                        headers.add(key)
+                    }
+                    for dataRow in data {
+                        cells: Local List<String> := []
+                        for header in headers {
+                            cells.add(formatMysqlValue(dataRow[header]))
+                        }
+                        rows.add(cells)
+                    }
+                }
+                body.add(HTML.element("p", {}, [HTML.text(str(len(data)) + " row(s)")]))
+                if len(headers) > 0 {
+                    body.add(htmlTable(headers, rows))
+                }
+            }
+            else {
+                result: Local MySQLResult := db.execute(sqlText)
+                body.add(HTML.element("p", {}, [HTML.text("affected rows: " + str(result.affectedRows()))]))
+            }
+            body.add(
+                HTML.element(
+                    "form"
+                    {"method": "post", "action": "/AhdDataStudio/mysql/sql"}
+                    [
+                        csrfField(token)
+                        hiddenField("database", schema)
+                        HTML.element("textarea", {"name": "sql"}, [HTML.text(sqlText)])
+                        HTML.element("br", {}, [])
+                        HTML.element("button", {"type": "submit"}, [HTML.text("Run")])
+                    ]
+                )
+            )
+            return sessions.commit(session, HTTP.html(layout("SQL", token, body)))
+        } except MySQLError as error {
+            return sessions.commit(session, HTTP.html(layout("SQL", token, errorNodes(error.message))))
+        } ultimately {
+            db.close()
+        }
+    } except MySQLError as error {
+        return sessions.commit(session, HTTP.html(layout("SQL", token, errorNodes(error.message))))
+    }
+}
+
+rejectGetStateChange: Function := (request: Request, session: Session, token: String) -> Response? {
+    sessions: Global SessionStore
+    if request.method() != "POST" {
+        return sessions.commit(session, HTTP.html(layout("Rejected", token, errorNodes("this action requires POST")), 405))
+    }
+    if not csrfOK(request, session) {
+        return sessions.commit(session, HTTP.html(layout("Rejected", token, errorNodes("rejected: CSRF token missing or invalid")), 403))
+    }
+    return null
+}
+
+mysqlInsert: Function := (request: Request) -> Response {
+    sessions: Global SessionStore
+    session: Local Session := sessions.open(request)
+    token: Local String := csrfToken(session)
+    rejected: Local Response? := rejectGetStateChange(request, session, token)
+    if rejected != null {
+        return rejected
+    }
+    schema: Local String? := request.form("database")
+    table: Local String? := request.form("table")
+    if schema == null or table == null {
+        return sessions.commit(session, HTTP.html(layout("MySQL", token, errorNodes("database and table are required"))))
+    }
+    rotateCsrf(session)
+    attempt {
+        db: Local MySQLDatabase := connectMysql()
+        attempt {
+            if not (schema in mysqlDatabases(db)) {
+                return sessions.commit(session, HTTP.html(layout("MySQL", token, errorNodes("unknown database"))))
+            }
+            if not (table in mysqlTableNames(db, schema)) {
+                return sessions.commit(session, HTTP.html(layout("MySQL", token, errorNodes("unknown table"))))
+            }
+            columns: Local List<Pair<String, String>> := mysqlColumns(db, schema, table)
+            colNames: Local List<String> := []
+            values: Local List<MySQLValue> := []
+            for column in columns {
+                extra: Local String := column["extra"].lower()
+                if extra.contains("auto_increment") {
+                    continue
+                }
+                name: Local String := column["name"]
+                raw: Local String? := request.form("col_" + name)
+                if raw == null {
+                    continue
+                }
+                colNames.add(quoteMysql(name))
+                if raw == "" and column["nullable"] == "YES" {
+                    values.add(MySQL.nullValue())
+                }
+                else {
+                    values.add(MySQL.fromString(raw))
+                }
+            }
+            if len(colNames) == 0 {
+                return sessions.commit(session, HTTP.html(layout("MySQL", token, errorNodes("no insert columns"))))
+            }
+            placeholders: Local List<String> := []
+            for name in colNames {
+                placeholders.add("?")
+            }
+            sql: Local String := "INSERT INTO " + quoteMysql(schema) + "." + quoteMysql(table) + " (" + colNames[0]
+            index: Local Int := 1
+            while index < len(colNames) {
+                sql = sql + ", " + colNames[index]
+                index++
+            }
+            sql = sql + ") VALUES (?"
+            index = 1
+            while index < len(placeholders) {
+                sql = sql + ", ?"
+                index++
+            }
+            sql = sql + ")"
+            db.execute(sql, values)
+            return sessions.commit(session, HTTP.redirect(mysqlBrowseURL(schema, table)))
+        } except MySQLError as error {
+            return sessions.commit(session, HTTP.html(layout("MySQL", token, errorNodes(error.message))))
+        } ultimately {
+            db.close()
+        }
+    } except MySQLError as error {
+        return sessions.commit(session, HTTP.html(layout("MySQL", token, errorNodes(error.message))))
+    }
+}
+
+mysqlDelete: Function := (request: Request) -> Response {
+    sessions: Global SessionStore
+    session: Local Session := sessions.open(request)
+    token: Local String := csrfToken(session)
+    rejected: Local Response? := rejectGetStateChange(request, session, token)
+    if rejected != null {
+        return rejected
+    }
+    schema: Local String? := request.form("database")
+    table: Local String? := request.form("table")
+    if schema == null or table == null {
+        return sessions.commit(session, HTTP.html(layout("MySQL", token, errorNodes("database and table are required"))))
+    }
+    rotateCsrf(session)
+    attempt {
+        db: Local MySQLDatabase := connectMysql()
+        attempt {
+            if not (schema in mysqlDatabases(db)) {
+                return sessions.commit(session, HTTP.html(layout("MySQL", token, errorNodes("unknown database"))))
+            }
+            if not (table in mysqlTableNames(db, schema)) {
+                return sessions.commit(session, HTTP.html(layout("MySQL", token, errorNodes("unknown table"))))
+            }
+            columns: Local List<Pair<String, String>> := mysqlColumns(db, schema, table)
+            pkCols: Local List<String> := mysqlPrimaryColumns(columns)
+            if len(pkCols) == 0 {
+                return sessions.commit(session, HTTP.html(layout("MySQL", token, errorNodes("delete requires a primary key"))))
+            }
+            sql: Local String := "DELETE FROM " + quoteMysql(schema) + "." + quoteMysql(table) + " WHERE "
+            values: Local List<MySQLValue> := []
+            index: Local Int := 0
+            while index < len(pkCols) {
+                name: Local String := pkCols[index]
+                raw: Local String? := request.form("pk_" + name)
+                if raw == null {
+                    return sessions.commit(session, HTTP.html(layout("MySQL", token, errorNodes("missing primary key value"))))
+                }
+                if index > 0 {
+                    sql = sql + " AND "
+                }
+                sql = sql + quoteMysql(name) + " = ?"
+                values.add(MySQL.fromString(raw))
+                index++
+            }
+            db.execute(sql, values)
+            return sessions.commit(session, HTTP.redirect(mysqlBrowseURL(schema, table)))
+        } except MySQLError as error {
+            return sessions.commit(session, HTTP.html(layout("MySQL", token, errorNodes(error.message))))
+        } ultimately {
+            db.close()
+        }
+    } except MySQLError as error {
+        return sessions.commit(session, HTTP.html(layout("MySQL", token, errorNodes(error.message))))
+    }
+}
+
+mysqlUpdate: Function := (request: Request) -> Response {
+    sessions: Global SessionStore
+    session: Local Session := sessions.open(request)
+    token: Local String := csrfToken(session)
+    rejected: Local Response? := rejectGetStateChange(request, session, token)
+    if rejected != null {
+        return rejected
+    }
+    schema: Local String? := request.form("database")
+    table: Local String? := request.form("table")
+    if schema == null or table == null {
+        return sessions.commit(session, HTTP.html(layout("MySQL", token, errorNodes("database and table are required"))))
+    }
+    rotateCsrf(session)
+    attempt {
+        db: Local MySQLDatabase := connectMysql()
+        attempt {
+            if not (schema in mysqlDatabases(db)) {
+                return sessions.commit(session, HTTP.html(layout("MySQL", token, errorNodes("unknown database"))))
+            }
+            if not (table in mysqlTableNames(db, schema)) {
+                return sessions.commit(session, HTTP.html(layout("MySQL", token, errorNodes("unknown table"))))
+            }
+            columns: Local List<Pair<String, String>> := mysqlColumns(db, schema, table)
+            columnNames: Local List<String> := mysqlColumnNames(db, schema, table)
+            pkCols: Local List<String> := mysqlPrimaryColumns(columns)
+            if len(pkCols) == 0 {
+                return sessions.commit(session, HTTP.html(layout("MySQL", token, errorNodes("update requires a primary key"))))
+            }
+            setParts: Local List<String> := []
+            values: Local List<MySQLValue> := []
+            for name in columnNames {
+                if name in pkCols {
+                    continue
+                }
+                raw: Local String? := request.form("col_" + name)
+                if raw == null {
+                    continue
+                }
+                setParts.add(quoteMysql(name) + " = ?")
+                values.add(MySQL.fromString(raw))
+            }
+            if len(setParts) == 0 {
+                return sessions.commit(session, HTTP.html(layout("MySQL", token, errorNodes("no update columns"))))
+            }
+            sql: Local String := "UPDATE " + quoteMysql(schema) + "." + quoteMysql(table) + " SET " + setParts[0]
+            index: Local Int := 1
+            while index < len(setParts) {
+                sql = sql + ", " + setParts[index]
+                index++
+            }
+            sql = sql + " WHERE "
+            index = 0
+            while index < len(pkCols) {
+                name: Local String := pkCols[index]
+                raw: Local String? := request.form("pk_" + name)
+                if raw == null {
+                    return sessions.commit(session, HTTP.html(layout("MySQL", token, errorNodes("missing primary key value"))))
+                }
+                if index > 0 {
+                    sql = sql + " AND "
+                }
+                sql = sql + quoteMysql(name) + " = ?"
+                values.add(MySQL.fromString(raw))
+                index++
+            }
+            db.execute(sql, values)
+            return sessions.commit(session, HTTP.redirect(mysqlBrowseURL(schema, table)))
+        } except MySQLError as error {
+            return sessions.commit(session, HTTP.html(layout("MySQL", token, errorNodes(error.message))))
+        } ultimately {
+            db.close()
+        }
+    } except MySQLError as error {
+        return sessions.commit(session, HTTP.html(layout("MySQL", token, errorNodes(error.message))))
+    }
+}
+
+mysqlConfirmPage: Function := (request: Request) -> Response {
+    sessions: Global SessionStore
+    session: Local Session := sessions.open(request)
+    token: Local String := csrfToken(session)
+    schema: Local String? := request.query("database")
+    table: Local String? := request.query("table")
+    action: Local String? := request.query("action")
+    if schema == null or table == null or action == null {
+        return sessions.commit(session, HTTP.html(layout("Confirm", token, errorNodes("database, table, and action are required"))))
+    }
+    if action != "drop" and action != "truncate" {
+        return sessions.commit(session, HTTP.html(layout("Confirm", token, errorNodes("unknown action"))))
+    }
+    target: Local String := "/AhdDataStudio/mysql/drop"
+    label: Local String := "Confirm DROP TABLE"
+    if action == "truncate" {
+        target = "/AhdDataStudio/mysql/truncate"
+        label = "Confirm TRUNCATE TABLE"
+    }
+    body: Local List<HTMLNode> := [
+        HTML.element("h1", {}, [HTML.text("Confirm " + action)])
+        HTML.element("p", {}, [HTML.text("This will " + action + " " + schema + "." + table + ".")])
+        HTML.element(
+            "form"
+            {"method": "post", "action": target}
+            [
+                csrfField(token)
+                hiddenField("database", schema)
+                hiddenField("table", table)
+                HTML.element("button", {"type": "submit"}, [HTML.text(label)])
+            ]
+        )
+    ]
+    return sessions.commit(session, HTTP.html(layout("Confirm", token, body)))
+}
+
+mysqlDrop: Function := (request: Request) -> Response {
+    sessions: Global SessionStore
+    session: Local Session := sessions.open(request)
+    token: Local String := csrfToken(session)
+    rejected: Local Response? := rejectGetStateChange(request, session, token)
+    if rejected != null {
+        return rejected
+    }
+    schema: Local String? := request.form("database")
+    table: Local String? := request.form("table")
+    if schema == null or table == null {
+        return sessions.commit(session, HTTP.html(layout("MySQL", token, errorNodes("database and table are required"))))
+    }
+    rotateCsrf(session)
+    attempt {
+        db: Local MySQLDatabase := connectMysql()
+        attempt {
+            if not (schema in mysqlDatabases(db)) {
+                return sessions.commit(session, HTTP.html(layout("MySQL", token, errorNodes("unknown database"))))
+            }
+            if not (table in mysqlTableNames(db, schema)) {
+                return sessions.commit(session, HTTP.html(layout("MySQL", token, errorNodes("unknown table"))))
+            }
+            db.execute("DROP TABLE " + quoteMysql(schema) + "." + quoteMysql(table))
+            return sessions.commit(session, HTTP.redirect(mysqlDatabaseURL(schema)))
+        } except MySQLError as error {
+            return sessions.commit(session, HTTP.html(layout("MySQL", token, errorNodes(error.message))))
+        } ultimately {
+            db.close()
+        }
+    } except MySQLError as error {
+        return sessions.commit(session, HTTP.html(layout("MySQL", token, errorNodes(error.message))))
+    }
+}
+
+mysqlTruncate: Function := (request: Request) -> Response {
+    sessions: Global SessionStore
+    session: Local Session := sessions.open(request)
+    token: Local String := csrfToken(session)
+    rejected: Local Response? := rejectGetStateChange(request, session, token)
+    if rejected != null {
+        return rejected
+    }
+    schema: Local String? := request.form("database")
+    table: Local String? := request.form("table")
+    if schema == null or table == null {
+        return sessions.commit(session, HTTP.html(layout("MySQL", token, errorNodes("database and table are required"))))
+    }
+    rotateCsrf(session)
+    attempt {
+        db: Local MySQLDatabase := connectMysql()
+        attempt {
+            if not (schema in mysqlDatabases(db)) {
+                return sessions.commit(session, HTTP.html(layout("MySQL", token, errorNodes("unknown database"))))
+            }
+            if not (table in mysqlTableNames(db, schema)) {
+                return sessions.commit(session, HTTP.html(layout("MySQL", token, errorNodes("unknown table"))))
+            }
+            db.execute("TRUNCATE TABLE " + quoteMysql(schema) + "." + quoteMysql(table))
+            return sessions.commit(session, HTTP.redirect(mysqlBrowseURL(schema, table)))
+        } except MySQLError as error {
+            return sessions.commit(session, HTTP.html(layout("MySQL", token, errorNodes(error.message))))
+        } ultimately {
+            db.close()
+        }
+    } except MySQLError as error {
+        return sessions.commit(session, HTTP.html(layout("MySQL", token, errorNodes(error.message))))
+    }
+}
+
+sqliteNav: Function := (path: String, table: String) -> HTMLNode {
+    fields: Local Pair<String, String> := {"db": path, "table": table}
+    return HTML.element(
+        "p"
+        {}
+        [
+            queryForm("/AhdDataStudio/sqlite", {}, "Databases")
+            queryForm("/AhdDataStudio/sqlite/table", fields, "Structure")
+            queryForm("/AhdDataStudio/sqlite/indexes", fields, "Indexes")
+            queryForm("/AhdDataStudio/sqlite/browse", fields, "Browse")
+            queryForm("/AhdDataStudio/sqlite/sql", {"db": path}, "SQL")
+        ]
+    )
+}
+
+sqliteHome: Function := (request: Request) -> Response {
+    sessions: Global SessionStore
+    session: Local Session := sessions.open(request)
+    token: Local String := csrfToken(session)
+    files: Local List<String> := allowedSqlitePaths()
+    items: Local List<HTMLNode> := []
+    for path in files {
+        items.add(
+            HTML.element(
+                "li"
+                {}
+                [
+                    HTML.element("strong", {}, [HTML.text(Path.base(path))])
+                    HTML.text(" ")
+                    HTML.element("span", {"class": "muted"}, [HTML.text(path)])
+                    HTML.text(" ")
+                    queryForm("/AhdDataStudio/sqlite/database", {"db": path}, "Open")
+                ]
+            )
+        )
+    }
+    body: Local List<HTMLNode> := [
+        HTML.element("h1", {}, [HTML.text("SQLite")])
+        HTML.element("p", {}, [HTML.text("Only explicitly configured paths and files discovered as immediate children of AHD_DATA_PROJECT_ROOT are listed. There is no machine-wide scan.")])
+        HTML.element("ul", {}, items)
+    ]
+    if len(files) == 0 {
+        body.add(HTML.element("p", {"class": "muted"}, [HTML.text("No SQLite files registered. Set AHD_DATA_SQLITE_PATHS or AHD_DATA_PROJECT_ROOT.")]))
+    }
+    return sessions.commit(session, HTTP.html(layout("SQLite", token, body)))
+}
+
+openAllowedSqlite: Function := (path: String) -> Database? {
+    if not sqlitePathAllowed(path) {
+        return null
+    }
+    if isDirectoryPath(path) {
+        return null
+    }
+    return SQLite.open(path)
+}
+
+sqliteOpenPage: Function := (request: Request) -> Response {
+    sessions: Global SessionStore
+    session: Local Session := sessions.open(request)
+    token: Local String := csrfToken(session)
+    path: Local String? := request.query("db")
+    if path == null {
+        path = request.form("db")
+    }
+    if path == null {
+        return sessions.commit(session, HTTP.html(layout("SQLite", token, errorNodes("db is required"))))
+    }
+    attempt {
+        db: Local Database? := openAllowedSqlite(path)
+        if db == null {
+            return sessions.commit(session, HTTP.html(layout("SQLite", token, errorNodes("sqlite path is not in the allowed project set"))))
+        }
+        attempt {
+            tables: Local List<Pair<String, String>> := sqliteTables(db)
+            actions: Local List<HTMLNode> := []
+            rows: Local List<List<String>> := []
+            for table in tables {
+                rows.add([table["name"], table["type"]])
+                name: Local String := table["name"]
+                fields: Local Pair<String, String> := {"db": path, "table": name}
+                actions.add(
+                    HTML.element(
+                        "li"
+                        {}
+                        [
+                            HTML.element("strong", {}, [HTML.text(name)])
+                            HTML.text(" ")
+                            queryForm("/AhdDataStudio/sqlite/table", fields, "Structure")
+                            queryForm("/AhdDataStudio/sqlite/indexes", fields, "Indexes")
+                            queryForm("/AhdDataStudio/sqlite/browse", fields, "Browse")
+                        ]
+                    )
+                )
+            }
+            body: Local List<HTMLNode> := [
+                HTML.element("h1", {}, [HTML.text(Path.base(path))])
+                HTML.element("p", {"class": "muted"}, [HTML.text(path)])
+                htmlTable(["Table", "Type"], rows)
+                HTML.element("ul", {}, actions)
+                queryForm("/AhdDataStudio/sqlite/sql", {"db": path}, "SQL console")
+            ]
+            return sessions.commit(session, HTTP.html(layout("SQLite", token, body)))
+        } except SQLiteError as error {
+            return sessions.commit(session, HTTP.html(layout("SQLite", token, errorNodes(error.message))))
+        } ultimately {
+            db.close()
+        }
+    } except SQLiteError as error {
+        return sessions.commit(session, HTTP.html(layout("SQLite", token, errorNodes(error.message))))
+    }
+}
+
+sqliteStructurePage: Function := (request: Request) -> Response {
+    sessions: Global SessionStore
+    session: Local Session := sessions.open(request)
+    token: Local String := csrfToken(session)
+    path: Local String? := request.query("db")
+    table: Local String? := request.query("table")
+    if path == null or table == null {
+        return sessions.commit(session, HTTP.html(layout("SQLite", token, errorNodes("db and table are required"))))
+    }
+    attempt {
+        db: Local Database? := openAllowedSqlite(path)
+        if db == null {
+            return sessions.commit(session, HTTP.html(layout("SQLite", token, errorNodes("sqlite path is not in the allowed project set"))))
+        }
+        attempt {
+            if not (table in sqliteTableNames(db)) {
+                return sessions.commit(session, HTTP.html(layout("SQLite", token, errorNodes("unknown table"))))
+            }
+            columns: Local List<Pair<String, String>> := sqliteColumns(db, table)
+            rows: Local List<List<String>> := []
+            insertFields: Local List<HTMLNode> := [csrfField(token), hiddenField("db", path), hiddenField("table", table)]
+            for column in columns {
+                rows.add([column["name"], column["type"], column["nullable"], column["default"], column["key"]])
+                insertFields.add(HTML.element("label", {}, [HTML.text(column["name"] + " ")]))
+                insertFields.add(HTML.element("input", {"type": "text", "name": "col_" + column["name"]}, []))
+                insertFields.add(HTML.element("br", {}, []))
+            }
+            insertFields.add(HTML.element("button", {"type": "submit"}, [HTML.text("Insert row")]))
+            body: Local List<HTMLNode> := [
+                HTML.element("h1", {}, [HTML.text(table)])
+                sqliteNav(path, table)
+                htmlTable(["Column", "Type", "Nullable", "Default", "Key"], rows)
+                HTML.element("h2", {}, [HTML.text("Insert")])
+                HTML.element("form", {"method": "post", "action": "/AhdDataStudio/sqlite/insert"}, insertFields)
+                HTML.element("h2", {}, [HTML.text("Destructive")])
+                queryForm("/AhdDataStudio/sqlite/confirm", {"db": path, "table": table, "action": "drop"}, "Drop table…")
+            ]
+            return sessions.commit(session, HTTP.html(layout(table, token, body)))
+        } except SQLiteError as error {
+            return sessions.commit(session, HTTP.html(layout("SQLite", token, errorNodes(error.message))))
+        } ultimately {
+            db.close()
+        }
+    } except SQLiteError as error {
+        return sessions.commit(session, HTTP.html(layout("SQLite", token, errorNodes(error.message))))
+    }
+}
+
+sqliteIndexesPage: Function := (request: Request) -> Response {
+    sessions: Global SessionStore
+    session: Local Session := sessions.open(request)
+    token: Local String := csrfToken(session)
+    path: Local String? := request.query("db")
+    table: Local String? := request.query("table")
+    if path == null or table == null {
+        return sessions.commit(session, HTTP.html(layout("SQLite", token, errorNodes("db and table are required"))))
+    }
+    attempt {
+        db: Local Database? := openAllowedSqlite(path)
+        if db == null {
+            return sessions.commit(session, HTTP.html(layout("SQLite", token, errorNodes("sqlite path is not in the allowed project set"))))
+        }
+        attempt {
+            if not (table in sqliteTableNames(db)) {
+                return sessions.commit(session, HTTP.html(layout("SQLite", token, errorNodes("unknown table"))))
+            }
+            listRows: Local List<Pair<String, SQLiteValue>> := db.query("PRAGMA index_list(" + quoteSqlite(table) + ")")
+            rows: Local List<List<String>> := []
+            for indexRow in listRows {
+                indexName: Local String := ""
+                unique: Local String := "non-unique"
+                if "name" in indexRow {
+                    if indexRow["name"].kind() == "String" {
+                        indexName = indexRow["name"].string()
+                    }
+                }
+                if "unique" in indexRow {
+                    if indexRow["unique"].kind() == "Int" {
+                        if indexRow["unique"].int() != 0 {
+                            unique = "unique"
+                        }
+                    }
+                }
+                infoRows: Local List<Pair<String, SQLiteValue>> := db.query("PRAGMA index_info(" + quoteSqlite(indexName) + ")")
+                for info in infoRows {
+                    column: Local String := ""
+                    seq: Local String := ""
+                    if "name" in info {
+                        if info["name"].kind() == "String" {
+                            column = info["name"].string()
+                        }
+                    }
+                    if "seqno" in info {
+                        if info["seqno"].kind() == "Int" {
+                            seq = str(info["seqno"].int())
+                        }
+                    }
+                    rows.add([indexName, unique, column, seq])
+                }
+            }
+            body: Local List<HTMLNode> := [
+                HTML.element("h1", {}, [HTML.text("Indexes · " + table)])
+                sqliteNav(path, table)
+                htmlTable(["Index", "Uniqueness", "Column", "Sequence"], rows)
+            ]
+            return sessions.commit(session, HTTP.html(layout("Indexes", token, body)))
+        } except SQLiteError as error {
+            return sessions.commit(session, HTTP.html(layout("SQLite", token, errorNodes(error.message))))
+        } ultimately {
+            db.close()
+        }
+    } except SQLiteError as error {
+        return sessions.commit(session, HTTP.html(layout("SQLite", token, errorNodes(error.message))))
+    }
+}
+
+sqliteBrowsePage: Function := (request: Request) -> Response {
+    sessions: Global SessionStore
+    pageSize: Global Int
+    session: Local Session := sessions.open(request)
+    token: Local String := csrfToken(session)
+    path: Local String? := request.query("db")
+    table: Local String? := request.query("table")
+    if path == null or table == null {
+        return sessions.commit(session, HTTP.html(layout("SQLite", token, errorNodes("db and table are required"))))
+    }
+    page: Local Int := parsePage(request.query("page"))
+    direction: Local String := sortDirection(request.query("dir"))
+    sortCol: Local String? := request.query("sort")
+    attempt {
+        db: Local Database? := openAllowedSqlite(path)
+        if db == null {
+            return sessions.commit(session, HTTP.html(layout("SQLite", token, errorNodes("sqlite path is not in the allowed project set"))))
+        }
+        attempt {
+            if not (table in sqliteTableNames(db)) {
+                return sessions.commit(session, HTTP.html(layout("SQLite", token, errorNodes("unknown table"))))
+            }
+            columns: Local List<Pair<String, String>> := sqliteColumns(db, table)
+            browseCols: Local List<String> := sqliteBrowseColumns(columns)
+            if len(browseCols) == 0 {
+                return sessions.commit(session, HTTP.html(layout("SQLite", token, errorNodes("no non-BLOB columns to browse"))))
+            }
+            orderColumn: Local String := browseCols[0]
+            if sortCol != null {
+                if sortCol in browseCols {
+                    orderColumn = sortCol
+                }
+            }
+            selectList: Local String := quoteSqlite(browseCols[0])
+            index: Local Int := 1
+            while index < len(browseCols) {
+                selectList = selectList + ", " + quoteSqlite(browseCols[index])
+                index++
+            }
+            offset: Local Int := (page - 1) * pageSize
+            sql: Local String := "SELECT " + selectList + " FROM " + quoteSqlite(table) + " ORDER BY " + quoteSqlite(orderColumn) + " " + direction + " LIMIT ? OFFSET ?"
+            data: Local List<Pair<String, SQLiteValue>> := db.query(sql, [SQLite.fromInt(pageSize), SQLite.fromInt(offset)])
+            rows: Local List<List<String>> := []
+            for dataRow in data {
+                cells: Local List<String> := []
+                for header in browseCols {
+                    if header in dataRow {
+                        cells.add(formatSqliteValue(dataRow[header]))
+                    }
+                    else {
+                        cells.add("")
+                    }
+                }
+                rows.add(cells)
+            }
+            pkCols: Local List<String> := mysqlPrimaryColumns(columns)
+            actionNodes: Local List<HTMLNode> := []
+            for dataRow in data {
+                if len(pkCols) > 0 {
+                    deleteChildren: Local List<HTMLNode> := [csrfField(token), hiddenField("db", path), hiddenField("table", table)]
+                    updateChildren: Local List<HTMLNode> := [csrfField(token), hiddenField("db", path), hiddenField("table", table)]
+                    for pk in pkCols {
+                        pkValue: Local String := ""
+                        if pk in dataRow {
+                            pkValue = formatSqliteValue(dataRow[pk])
+                        }
+                        deleteChildren.add(hiddenField("pk_" + pk, pkValue))
+                        updateChildren.add(hiddenField("pk_" + pk, pkValue))
+                    }
+                    for header in browseCols {
+                        if not (header in pkCols) {
+                            current: Local String := ""
+                            if header in dataRow {
+                                current = formatSqliteValue(dataRow[header])
+                            }
+                            updateChildren.add(HTML.element("input", {"type": "text", "name": "col_" + header, "value": current}, []))
+                        }
+                    }
+                    deleteChildren.add(HTML.element("button", {"type": "submit"}, [HTML.text("Delete")]))
+                    updateChildren.add(HTML.element("button", {"type": "submit"}, [HTML.text("Update")]))
+                    actionNodes.add(
+                        HTML.element(
+                            "div"
+                            {}
+                            [
+                                HTML.element("form", {"method": "post", "action": "/AhdDataStudio/sqlite/delete", "class": "inline"}, deleteChildren)
+                                HTML.element("form", {"method": "post", "action": "/AhdDataStudio/sqlite/update", "class": "inline"}, updateChildren)
+                            ]
+                        )
+                    )
+                }
+            }
+            pager: Local List<HTMLNode> := []
+            if page > 1 {
+                pager.add(queryForm("/AhdDataStudio/sqlite/browse", {"db": path, "table": table, "page": str(page - 1), "sort": orderColumn, "dir": direction}, "Previous"))
+            }
+            if len(data) == pageSize {
+                pager.add(queryForm("/AhdDataStudio/sqlite/browse", {"db": path, "table": table, "page": str(page + 1), "sort": orderColumn, "dir": direction}, "Next"))
+            }
+            body: Local List<HTMLNode> := [
+                HTML.element("h1", {}, [HTML.text("Browse · " + table)])
+                sqliteNav(path, table)
+                HTML.element("p", {"class": "muted"}, [HTML.text("Page " + str(page) + " · " + str(pageSize) + " rows maximum. Declared BLOB columns are omitted from browse.")])
+                htmlTable(browseCols, rows)
+                HTML.element("div", {}, pager)
+            ]
+            for action in actionNodes {
+                body.add(action)
+            }
+            return sessions.commit(session, HTTP.html(layout("Browse", token, body)))
+        } except SQLiteError as error {
+            return sessions.commit(session, HTTP.html(layout("SQLite", token, errorNodes(error.message))))
+        } ultimately {
+            db.close()
+        }
+    } except SQLiteError as error {
+        return sessions.commit(session, HTTP.html(layout("SQLite", token, errorNodes(error.message))))
+    }
+}
+
+sqliteSqlPage: Function := (request: Request) -> Response {
+    sessions: Global SessionStore
+    session: Local Session := sessions.open(request)
+    token: Local String := csrfToken(session)
+    pathQuery: Local String? := request.query("db")
+    path: Local String := ""
+    if pathQuery != null {
+        path = pathQuery
+    }
+    body: Local List<HTMLNode> := [
+        HTML.element("h1", {}, [HTML.text("SQLite SQL console")])
+        HTML.element("div", {"class": "banner"}, [HTML.text("This console runs the SQL you type. Destructive statements are not extra-confirmed.")])
+        HTML.element(
+            "form"
+            {"method": "post", "action": "/AhdDataStudio/sqlite/sql"}
+            [
+                csrfField(token)
+                hiddenField("db", path)
+                HTML.element("textarea", {"name": "sql"}, [HTML.text("")])
+                HTML.element("br", {}, [])
+                HTML.element("button", {"type": "submit"}, [HTML.text("Run")])
+            ]
+        )
+    ]
+    return sessions.commit(session, HTTP.html(layout("SQL", token, body)))
+}
+
+sqliteSqlRun: Function := (request: Request) -> Response {
+    sessions: Global SessionStore
+    session: Local Session := sessions.open(request)
+    token: Local String := csrfToken(session)
+    if request.method() != "POST" {
+        return sessions.commit(session, HTTP.html(layout("SQL", token, errorNodes("SQL console requires POST")), 405))
+    }
+    if not csrfOK(request, session) {
+        return sessions.commit(session, HTTP.html(layout("SQL", token, errorNodes("rejected: CSRF token missing or invalid")), 403))
+    }
+    sqlText: Local String? := request.form("sql")
+    path: Local String? := request.form("db")
+    if sqlText == null or path == null {
+        return sessions.commit(session, HTTP.html(layout("SQL", token, errorNodes("db and sql are required"))))
+    }
+    rotateCsrf(session)
+    token = csrfToken(session)
+    attempt {
+        db: Local Database? := openAllowedSqlite(path)
+        if db == null {
+            return sessions.commit(session, HTTP.html(layout("SQLite", token, errorNodes("sqlite path is not in the allowed project set"))))
+        }
+        attempt {
+            body: Local List<HTMLNode> := [
+                HTML.element("h1", {}, [HTML.text("SQLite SQL console")])
+                HTML.element("div", {"class": "banner"}, [HTML.text("This console ran your SQL exactly as entered.")])
+            ]
+            if looksLikeQuery(sqlText) {
+                data: Local List<Pair<String, SQLiteValue>> := db.query(sqlText)
+                headers: Local List<String> := []
+                rows: Local List<List<String>> := []
+                if len(data) > 0 {
+                    for key in data[0] {
+                        headers.add(key)
+                    }
+                    for dataRow in data {
+                        cells: Local List<String> := []
+                        for header in headers {
+                            cells.add(formatSqliteValue(dataRow[header]))
+                        }
+                        rows.add(cells)
+                    }
+                }
+                body.add(HTML.element("p", {}, [HTML.text(str(len(data)) + " row(s)")]))
+                if len(headers) > 0 {
+                    body.add(htmlTable(headers, rows))
+                }
+            }
+            else {
+                changed: Local Int := db.execute(sqlText)
+                body.add(HTML.element("p", {}, [HTML.text("affected rows: " + str(changed))]))
+            }
+            body.add(
+                HTML.element(
+                    "form"
+                    {"method": "post", "action": "/AhdDataStudio/sqlite/sql"}
+                    [
+                        csrfField(token)
+                        hiddenField("db", path)
+                        HTML.element("textarea", {"name": "sql"}, [HTML.text(sqlText)])
+                        HTML.element("br", {}, [])
+                        HTML.element("button", {"type": "submit"}, [HTML.text("Run")])
+                    ]
+                )
+            )
+            return sessions.commit(session, HTTP.html(layout("SQL", token, body)))
+        } except SQLiteError as error {
+            return sessions.commit(session, HTTP.html(layout("SQLite", token, errorNodes(error.message))))
+        } ultimately {
+            db.close()
+        }
+    } except SQLiteError as error {
+        return sessions.commit(session, HTTP.html(layout("SQLite", token, errorNodes(error.message))))
+    }
+}
+
+sqliteInsert: Function := (request: Request) -> Response {
+    sessions: Global SessionStore
+    session: Local Session := sessions.open(request)
+    token: Local String := csrfToken(session)
+    rejected: Local Response? := rejectGetStateChange(request, session, token)
+    if rejected != null {
+        return rejected
+    }
+    path: Local String? := request.form("db")
+    table: Local String? := request.form("table")
+    if path == null or table == null {
+        return sessions.commit(session, HTTP.html(layout("SQLite", token, errorNodes("db and table are required"))))
+    }
+    rotateCsrf(session)
+    attempt {
+        db: Local Database? := openAllowedSqlite(path)
+        if db == null {
+            return sessions.commit(session, HTTP.html(layout("SQLite", token, errorNodes("sqlite path is not in the allowed project set"))))
+        }
+        attempt {
+            if not (table in sqliteTableNames(db)) {
+                return sessions.commit(session, HTTP.html(layout("SQLite", token, errorNodes("unknown table"))))
+            }
+            columns: Local List<Pair<String, String>> := sqliteColumns(db, table)
+            colNames: Local List<String> := []
+            values: Local List<SQLiteValue> := []
+            for column in columns {
+                name: Local String := column["name"]
+                raw: Local String? := request.form("col_" + name)
+                if raw == null {
+                    continue
+                }
+                colNames.add(quoteSqlite(name))
+                if raw == "" and column["nullable"] == "YES" {
+                    values.add(SQLite.nullValue())
+                }
+                else {
+                    values.add(SQLite.fromString(raw))
+                }
+            }
+            if len(colNames) == 0 {
+                return sessions.commit(session, HTTP.html(layout("SQLite", token, errorNodes("no insert columns"))))
+            }
+            sql: Local String := "INSERT INTO " + quoteSqlite(table) + " (" + colNames[0]
+            index: Local Int := 1
+            while index < len(colNames) {
+                sql = sql + ", " + colNames[index]
+                index++
+            }
+            sql = sql + ") VALUES (?"
+            index = 1
+            while index < len(colNames) {
+                sql = sql + ", ?"
+                index++
+            }
+            sql = sql + ")"
+            db.execute(sql, values)
+            return sessions.commit(session, HTTP.redirect(sqliteBrowseURL(path, table)))
+        } except SQLiteError as error {
+            return sessions.commit(session, HTTP.html(layout("SQLite", token, errorNodes(error.message))))
+        } ultimately {
+            db.close()
+        }
+    } except SQLiteError as error {
+        return sessions.commit(session, HTTP.html(layout("SQLite", token, errorNodes(error.message))))
+    }
+}
+
+sqliteDelete: Function := (request: Request) -> Response {
+    sessions: Global SessionStore
+    session: Local Session := sessions.open(request)
+    token: Local String := csrfToken(session)
+    rejected: Local Response? := rejectGetStateChange(request, session, token)
+    if rejected != null {
+        return rejected
+    }
+    path: Local String? := request.form("db")
+    table: Local String? := request.form("table")
+    if path == null or table == null {
+        return sessions.commit(session, HTTP.html(layout("SQLite", token, errorNodes("db and table are required"))))
+    }
+    rotateCsrf(session)
+    attempt {
+        db: Local Database? := openAllowedSqlite(path)
+        if db == null {
+            return sessions.commit(session, HTTP.html(layout("SQLite", token, errorNodes("sqlite path is not in the allowed project set"))))
+        }
+        attempt {
+            if not (table in sqliteTableNames(db)) {
+                return sessions.commit(session, HTTP.html(layout("SQLite", token, errorNodes("unknown table"))))
+            }
+            columns: Local List<Pair<String, String>> := sqliteColumns(db, table)
+            pkCols: Local List<String> := mysqlPrimaryColumns(columns)
+            if len(pkCols) == 0 {
+                return sessions.commit(session, HTTP.html(layout("SQLite", token, errorNodes("delete requires a primary key"))))
+            }
+            sql: Local String := "DELETE FROM " + quoteSqlite(table) + " WHERE "
+            values: Local List<SQLiteValue> := []
+            index: Local Int := 0
+            while index < len(pkCols) {
+                name: Local String := pkCols[index]
+                raw: Local String? := request.form("pk_" + name)
+                if raw == null {
+                    return sessions.commit(session, HTTP.html(layout("SQLite", token, errorNodes("missing primary key value"))))
+                }
+                if index > 0 {
+                    sql = sql + " AND "
+                }
+                sql = sql + quoteSqlite(name) + " = ?"
+                values.add(SQLite.fromString(raw))
+                index++
+            }
+            db.execute(sql, values)
+            return sessions.commit(session, HTTP.redirect(sqliteBrowseURL(path, table)))
+        } except SQLiteError as error {
+            return sessions.commit(session, HTTP.html(layout("SQLite", token, errorNodes(error.message))))
+        } ultimately {
+            db.close()
+        }
+    } except SQLiteError as error {
+        return sessions.commit(session, HTTP.html(layout("SQLite", token, errorNodes(error.message))))
+    }
+}
+
+sqliteUpdate: Function := (request: Request) -> Response {
+    sessions: Global SessionStore
+    session: Local Session := sessions.open(request)
+    token: Local String := csrfToken(session)
+    rejected: Local Response? := rejectGetStateChange(request, session, token)
+    if rejected != null {
+        return rejected
+    }
+    path: Local String? := request.form("db")
+    table: Local String? := request.form("table")
+    if path == null or table == null {
+        return sessions.commit(session, HTTP.html(layout("SQLite", token, errorNodes("db and table are required"))))
+    }
+    rotateCsrf(session)
+    attempt {
+        db: Local Database? := openAllowedSqlite(path)
+        if db == null {
+            return sessions.commit(session, HTTP.html(layout("SQLite", token, errorNodes("sqlite path is not in the allowed project set"))))
+        }
+        attempt {
+            if not (table in sqliteTableNames(db)) {
+                return sessions.commit(session, HTTP.html(layout("SQLite", token, errorNodes("unknown table"))))
+            }
+            columns: Local List<Pair<String, String>> := sqliteColumns(db, table)
+            columnNames: Local List<String> := sqliteBrowseColumns(columns)
+            pkCols: Local List<String> := mysqlPrimaryColumns(columns)
+            if len(pkCols) == 0 {
+                return sessions.commit(session, HTTP.html(layout("SQLite", token, errorNodes("update requires a primary key"))))
+            }
+            setParts: Local List<String> := []
+            values: Local List<SQLiteValue> := []
+            for name in columnNames {
+                if name in pkCols {
+                    continue
+                }
+                raw: Local String? := request.form("col_" + name)
+                if raw == null {
+                    continue
+                }
+                setParts.add(quoteSqlite(name) + " = ?")
+                values.add(SQLite.fromString(raw))
+            }
+            if len(setParts) == 0 {
+                return sessions.commit(session, HTTP.html(layout("SQLite", token, errorNodes("no update columns"))))
+            }
+            sql: Local String := "UPDATE " + quoteSqlite(table) + " SET " + setParts[0]
+            index: Local Int := 1
+            while index < len(setParts) {
+                sql = sql + ", " + setParts[index]
+                index++
+            }
+            sql = sql + " WHERE "
+            index = 0
+            while index < len(pkCols) {
+                name: Local String := pkCols[index]
+                raw: Local String? := request.form("pk_" + name)
+                if raw == null {
+                    return sessions.commit(session, HTTP.html(layout("SQLite", token, errorNodes("missing primary key value"))))
+                }
+                if index > 0 {
+                    sql = sql + " AND "
+                }
+                sql = sql + quoteSqlite(name) + " = ?"
+                values.add(SQLite.fromString(raw))
+                index++
+            }
+            db.execute(sql, values)
+            return sessions.commit(session, HTTP.redirect(sqliteBrowseURL(path, table)))
+        } except SQLiteError as error {
+            return sessions.commit(session, HTTP.html(layout("SQLite", token, errorNodes(error.message))))
+        } ultimately {
+            db.close()
+        }
+    } except SQLiteError as error {
+        return sessions.commit(session, HTTP.html(layout("SQLite", token, errorNodes(error.message))))
+    }
+}
+
+sqliteConfirmPage: Function := (request: Request) -> Response {
+    sessions: Global SessionStore
+    session: Local Session := sessions.open(request)
+    token: Local String := csrfToken(session)
+    path: Local String? := request.query("db")
+    table: Local String? := request.query("table")
+    action: Local String? := request.query("action")
+    if path == null or table == null or action == null {
+        return sessions.commit(session, HTTP.html(layout("Confirm", token, errorNodes("db, table, and action are required"))))
+    }
+    if action != "drop" {
+        return sessions.commit(session, HTTP.html(layout("Confirm", token, errorNodes("unknown action"))))
+    }
+    body: Local List<HTMLNode> := [
+        HTML.element("h1", {}, [HTML.text("Confirm DROP")])
+        HTML.element("p", {}, [HTML.text("This will drop " + table + ".")])
+        HTML.element(
+            "form"
+            {"method": "post", "action": "/AhdDataStudio/sqlite/drop"}
+            [
+                csrfField(token)
+                hiddenField("db", path)
+                hiddenField("table", table)
+                HTML.element("button", {"type": "submit"}, [HTML.text("Confirm DROP TABLE")])
+            ]
+        )
+    ]
+    return sessions.commit(session, HTTP.html(layout("Confirm", token, body)))
+}
+
+sqliteDrop: Function := (request: Request) -> Response {
+    sessions: Global SessionStore
+    session: Local Session := sessions.open(request)
+    token: Local String := csrfToken(session)
+    rejected: Local Response? := rejectGetStateChange(request, session, token)
+    if rejected != null {
+        return rejected
+    }
+    path: Local String? := request.form("db")
+    table: Local String? := request.form("table")
+    if path == null or table == null {
+        return sessions.commit(session, HTTP.html(layout("SQLite", token, errorNodes("db and table are required"))))
+    }
+    rotateCsrf(session)
+    attempt {
+        db: Local Database? := openAllowedSqlite(path)
+        if db == null {
+            return sessions.commit(session, HTTP.html(layout("SQLite", token, errorNodes("sqlite path is not in the allowed project set"))))
+        }
+        attempt {
+            if not (table in sqliteTableNames(db)) {
+                return sessions.commit(session, HTTP.html(layout("SQLite", token, errorNodes("unknown table"))))
+            }
+            db.execute("DROP TABLE " + quoteSqlite(table))
+            return sessions.commit(session, HTTP.redirect("/AhdDataStudio/sqlite"))
+        } except SQLiteError as error {
+            return sessions.commit(session, HTTP.html(layout("SQLite", token, errorNodes(error.message))))
+        } ultimately {
+            db.close()
+        }
+    } except SQLiteError as error {
+        return sessions.commit(session, HTTP.html(layout("SQLite", token, errorNodes(error.message))))
+    }
+}
+
+startStudio: Function := () -> Nothing {
+    loadEnvFile()
+    app: Local Server := HTTP.server("127.0.0.1", 8081)
+    app.get("/AhdDataStudio", home)
+    app.get("/AhdDataStudio/mysql", mysqlHome)
+    app.get("/AhdDataStudio/mysql/database", mysqlDatabasePage)
+    app.get("/AhdDataStudio/mysql/table", mysqlStructurePage)
+    app.get("/AhdDataStudio/mysql/indexes", mysqlIndexesPage)
+    app.get("/AhdDataStudio/mysql/browse", mysqlBrowsePage)
+    app.get("/AhdDataStudio/mysql/sql", mysqlSqlPage)
+    app.post("/AhdDataStudio/mysql/sql", mysqlSqlRun)
+    app.post("/AhdDataStudio/mysql/insert", mysqlInsert)
+    app.post("/AhdDataStudio/mysql/update", mysqlUpdate)
+    app.post("/AhdDataStudio/mysql/delete", mysqlDelete)
+    app.get("/AhdDataStudio/mysql/confirm", mysqlConfirmPage)
+    app.post("/AhdDataStudio/mysql/drop", mysqlDrop)
+    app.post("/AhdDataStudio/mysql/truncate", mysqlTruncate)
+    app.get("/AhdDataStudio/sqlite", sqliteHome)
+    app.get("/AhdDataStudio/sqlite/database", sqliteOpenPage)
+    app.get("/AhdDataStudio/sqlite/table", sqliteStructurePage)
+    app.get("/AhdDataStudio/sqlite/indexes", sqliteIndexesPage)
+    app.get("/AhdDataStudio/sqlite/browse", sqliteBrowsePage)
+    app.get("/AhdDataStudio/sqlite/sql", sqliteSqlPage)
+    app.post("/AhdDataStudio/sqlite/sql", sqliteSqlRun)
+    app.post("/AhdDataStudio/sqlite/insert", sqliteInsert)
+    app.post("/AhdDataStudio/sqlite/update", sqliteUpdate)
+    app.post("/AhdDataStudio/sqlite/delete", sqliteDelete)
+    app.get("/AhdDataStudio/sqlite/confirm", sqliteConfirmPage)
+    app.post("/AhdDataStudio/sqlite/drop", sqliteDrop)
+    write("AhdDataStudio listening on http://127.0.0.1:8081/AhdDataStudio")
+    app.start()
+}
+
+attempt {
+    startStudio()
+} except HTTPError as error {
+    write("HTTP error: " + redact(error.message))
+} except EnvError as error {
+    write("Env error: " + redact(error.message))
+} except HTMLError as error {
+    write("HTML error: " + redact(error.message))
+} except SecurityError as error {
+    write("Security error: " + redact(error.message))
+}
