@@ -24,9 +24,13 @@ func (store *Store) FoldingRanges(path string) []FoldingRange {
 	if entryModule == nil || entryModule.Parsed.Program == nil {
 		return nil
 	}
-	index := newLineIndexForFolding(cached.result.Text[entryModule.File.Path])
+	index := newLineIndexForFolding(cached.result.Text[canonical])
+	fileID := cached.fileIDFor(canonical)
 	var ranges []FoldingRange
 	for _, statement := range entryModule.Parsed.Program.Statements {
+		if !stmtInFile(statement, fileID) {
+			continue
+		}
 		collectFoldingStmt(statement, index, &ranges)
 	}
 	return ranges

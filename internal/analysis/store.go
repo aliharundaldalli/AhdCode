@@ -1,6 +1,9 @@
 package analysis
 
 import (
+	"os"
+	"path/filepath"
+	"strings"
 	"sync"
 
 	"ahdcode/internal/diagnostics"
@@ -161,21 +164,17 @@ func (store *Store) set(path, text string) Result {
 	store.mutex.Unlock()
 
 	compiler := module.NewCompiler(overlay{store: store}, overlay{store: store})
-	compiled := compiler.Compile(canonical)
+	compilePath := store.discoverRequireEntry(canonical)
+	compiled := compiler.Compile(compilePath)
+	if compilePath != canonical && !compilationContains(compiled, canonical) {
+		compiled = compiler.Compile(canonical)
+		compilePath = canonical
+	}
 
 	grouped := make(map[string][]diagnostics.Diagnostic)
 	texts := make(map[string]string)
 	fileToPath := make(map[source.FileID]string, len(compiled.Modules))
-	for _, item := range compiled.Modules {
-		if item == nil || item.File.ID == 0 {
-			continue
-		}
-		fileToPath[item.File.ID] = item.File.Path
-		if _, exists := grouped[item.File.Path]; !exists {
-			grouped[item.File.Path] = nil
-		}
-		texts[item.File.Path] = item.File.Text
-	}
+	indexCompiledFiles(compiled, grouped, texts, fileToPath)
 	for _, item := range compiled.Diagnostics {
 		owner, ok := fileToPath[item.Diagnostic.Span.FileID]
 		if !ok {
@@ -194,4 +193,109 @@ func (store *Store) set(path, text string) Result {
 	}
 	store.mutex.Unlock()
 	return result
+}
+
+func indexCompiledFiles(
+	compiled module.CompilationResult,
+	grouped map[string][]diagnostics.Diagnostic,
+	texts map[string]string,
+	fileToPath map[source.FileID]string,
+) {
+	for _, item := range compiled.Modules {
+		if item == nil {
+			continue
+		}
+		indexSourceFile(item.File, grouped, texts, fileToPath)
+		for _, required := range item.RequiredFiles {
+			indexSourceFile(required, grouped, texts, fileToPath)
+		}
+	}
+}
+
+func indexSourceFile(
+	file source.File,
+	grouped map[string][]diagnostics.Diagnostic,
+	texts map[string]string,
+	fileToPath map[source.FileID]string,
+) {
+	if file.ID == 0 || file.Path == "" {
+		return
+	}
+	fileToPath[file.ID] = file.Path
+	if _, exists := grouped[file.Path]; !exists {
+		grouped[file.Path] = nil
+	}
+	texts[file.Path] = file.Text
+}
+
+func compilationContains(compiled module.CompilationResult, path string) bool {
+	for _, item := range compiled.Modules {
+		if item == nil {
+			continue
+		}
+		if item.File.Path == path {
+			return true
+		}
+		for _, required := range item.RequiredFiles {
+			if required.Path == path {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// discoverRequireEntry finds the application entry that should own path's
+// require(...) graph. require paths are application-root relative -- the
+// directory of the entry file, never of the file that wrote require(...) --
+// so a nested Pages/Home.ahd must be compiled through the nearest ancestor
+// app.ahd that actually requires local source, not as its own entry.
+func (store *Store) discoverRequireEntry(path string) string {
+	dir := filepath.Dir(path)
+	for {
+		candidate := filepath.Join(dir, "app.ahd")
+		canon := canonicalPath(candidate)
+		if canon != path && store.sourceExists(candidate) && store.containsRequireCall(candidate) {
+			return canon
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			break
+		}
+		dir = parent
+	}
+	return path
+}
+
+func (store *Store) sourceExists(path string) bool {
+	if _, ok := store.text(canonicalPath(path)); ok {
+		return true
+	}
+	_, err := os.Stat(path)
+	return err == nil
+}
+
+func (store *Store) containsRequireCall(path string) bool {
+	text, ok := store.text(canonicalPath(path))
+	if !ok {
+		bytes, err := os.ReadFile(path)
+		if err != nil {
+			return false
+		}
+		text = string(bytes)
+	}
+	return strings.Contains(text, "require(")
+}
+
+func (e *entry) fileIDFor(path string) source.FileID {
+	if e == nil {
+		return 0
+	}
+	canonical := canonicalPath(path)
+	for id, candidate := range e.fileToPath {
+		if candidate == canonical {
+			return id
+		}
+	}
+	return 0
 }

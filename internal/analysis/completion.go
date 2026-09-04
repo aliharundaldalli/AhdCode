@@ -37,7 +37,7 @@ type ImportEdit struct {
 var statementKeywords = []string{
 	"if", "else", "while", "until", "for", "break", "continue",
 	"attempt", "except", "ultimately", "toss", "return", "state",
-	"true", "false", "null", "bring", "from",
+	"true", "false", "null", "bring", "from", "require",
 }
 
 // Completion answers a completion request at the given byte offset. It
@@ -62,7 +62,7 @@ func (store *Store) Completion(path string, offset int) []CompletionItem {
 	if entryModule == nil || entryModule.Parsed.Program == nil {
 		return nil
 	}
-	ancestors := ancestorsAtOffset(entryModule.Parsed.Program, offset)
+	ancestors := ancestorsAtOffset(entryModule.Parsed.Program, offset, cached.fileIDFor(canonical))
 	if len(ancestors) == 0 {
 		return nil
 	}

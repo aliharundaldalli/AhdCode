@@ -31,12 +31,16 @@ func (store *Store) CodeActions(path string, offset int) []CodeAction {
 	}
 	var actions []CodeAction
 	for ownerPath, items := range cached.result.Diagnostics {
+		if ownerPath != canonical {
+			continue
+		}
 		text := cached.result.Text[ownerPath]
+		fileID := cached.fileIDFor(canonical)
 		for _, item := range items {
 			if item.Severity != diagnostics.SeverityError {
 				continue
 			}
-			if !containsOffset(item.Span, offset) {
+			if !containsOffsetInFile(item.Span, offset, fileID) {
 				continue
 			}
 			if action, ok := quickFixForDiagnostic(ownerPath, text, item); ok {

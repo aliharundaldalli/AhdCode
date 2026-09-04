@@ -33,8 +33,12 @@ func (store *Store) DocumentSymbols(path string) []DocumentSymbol {
 		return nil
 	}
 	resolved := entryModule.Semantic.ResolvedSymbols
+	fileID := cached.fileIDFor(canonical)
 	var out []DocumentSymbol
 	for _, statement := range entryModule.Parsed.Program.Statements {
+		if !stmtInFile(statement, fileID) {
+			continue
+		}
 		symbol, ok := resolved[statement]
 		if !ok || symbol == nil {
 			continue

@@ -26,7 +26,7 @@ func (store *Store) References(path string, offset int, includeDeclaration bool)
 	if entryModule == nil || entryModule.Parsed.Program == nil {
 		return nil
 	}
-	node := findNodeAtOffset(entryModule.Parsed.Program, offset)
+	node := findNodeAtOffset(entryModule.Parsed.Program, offset, cached.fileIDFor(canonical))
 	if node == nil {
 		return nil
 	}

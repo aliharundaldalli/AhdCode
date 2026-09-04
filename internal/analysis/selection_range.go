@@ -21,7 +21,7 @@ func (store *Store) SelectionRanges(path string, offset int) *SelectionRange {
 	if entryModule == nil || entryModule.Parsed.Program == nil {
 		return nil
 	}
-	ancestors := ancestorsAtOffset(entryModule.Parsed.Program, offset)
+	ancestors := ancestorsAtOffset(entryModule.Parsed.Program, offset, cached.fileIDFor(canonical))
 	if len(ancestors) == 0 {
 		return nil
 	}

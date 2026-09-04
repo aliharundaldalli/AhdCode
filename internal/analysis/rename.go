@@ -130,7 +130,7 @@ func (store *Store) renameTarget(path string, offset int) (*semantic.Symbol, sou
 	if entryModule == nil || entryModule.Parsed.Program == nil {
 		return nil, source.Span{}, false
 	}
-	node := findNodeAtOffset(entryModule.Parsed.Program, offset)
+	node := findNodeAtOffset(entryModule.Parsed.Program, offset, cached.fileIDFor(canonical))
 	if node == nil {
 		return nil, source.Span{}, false
 	}

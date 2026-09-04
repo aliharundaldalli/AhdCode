@@ -61,6 +61,15 @@ yok).
 Sunucu **kaydedilmemiş editör metnini** analiz eder; açık belgeyi yalnızca
 derlemek için diske geri yazmaz.
 
+[`require(...)`](REQUIRE_TR.md) kullanan bir dosya, kendi dizinini uygulama
+kökü sanan ayrı bir mini program olarak değil, `require(...)` içeren en
+yakın ata `app.ahd` üzerinden analiz edilir. Bu, `ahdcode build`'in
+kullandığı aynı birleştirmedir; `Pages/Home.ahd` tamponu `Shared/`
+yardımcılarını görür ve kendi `require("Shared/...")` yollarında sahte
+"dosya bulunamadı" hatası göstermez. Tanılamalar span'in sahibi dosyada
+kalır — require edilen dosyadaki bir tür hatası giriş dosyasındaki
+`require("...")` dizesine boyanmaz.
+
 ## Otomatik import ve modül keşfi
 
 Kullanıcı modülleri `initialize`'dan gelen workspace kökleri ile giriş

@@ -25,6 +25,8 @@ korur; geri kalan her şey için tek bir kanonik (standart) düzeni işler:
   satıra toplanır.
 - Sığmayan bir tanesi, her öğe kendi satırında olacak şekilde bölünür ve
   **hiç virgül kullanılmaz** — sonda bile.
+- `require("Path/To/File.ahd")` asla satır kırılmaz. Yol derleme zamanı bir
+  dize değişmezidir; satırlara bölmek geçersiz kaynaktır.
 - Bir Function imzasının `(parametreler) -> DönüşTürü` şekli, her zaman
   gövdesini açan satırda bir arada tutulur.
 - Lambda aynı parametre-listesi düzenini ve kanonik boşluğu kullanır:

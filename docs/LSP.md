@@ -99,6 +99,15 @@ document's buffer back to its file on disk merely to compile it. An imported
 module that is also open in the editor is analyzed from its own unsaved
 buffer; anything not open is read from the filesystem.
 
+A file that uses [`require(...)`](REQUIRE.md) is analyzed as part of the
+nearest ancestor `app.ahd` that itself contains `require(...)`, not as a
+private mini-program whose directory is the application root. That is the
+same composition `ahdcode build` uses, so a `Pages/Home.ahd` buffer sees
+helpers from `Shared/` and does not report false "file not found" errors on
+its own `require("Shared/...")` paths. Diagnostics stay on the file that
+owns the span -- a type error in a required file is not painted onto the
+entry's `require("...")` string.
+
 ## Auto import and module discovery
 
 Auto import and workspace symbols discover user modules by scanning workspace

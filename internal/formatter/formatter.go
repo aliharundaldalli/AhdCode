@@ -602,6 +602,8 @@ func (b *builder) stmt(s ast.Stmt) doc {
 		return b.attemptStmt(v)
 	case *ast.BringStmt:
 		return b.bringStmt(v)
+	case *ast.RequireStmt:
+		return b.requireStmt(v)
 	case *ast.FunctionDecl:
 		return b.functionDecl(v)
 	case *ast.ClassDecl:
@@ -670,6 +672,22 @@ func (b *builder) attemptStmt(v *ast.AttemptStmt) doc {
 		parts = append(parts, withGapSeparator(gapDoc, false), ultimatelyKeyword, text(" "), b.block(v.Ultimately))
 	}
 	return concat(parts...)
+}
+
+func (b *builder) requireStmt(v *ast.RequireStmt) doc {
+	keyword := b.leaf()
+	open := b.leaf()
+	var path doc
+	if v.HasLiteralPath && !v.PathSpan.Empty() {
+		path = b.verbatimSpan(v.PathSpan)
+	} else {
+		path = b.gap()
+	}
+	closing := b.leaf()
+	// require("...") is a compile-time path literal, not a call. Breaking the
+	// string across lines is invalid source (LEX007), so this always stays
+	// on one line even when it is wider than 80 columns.
+	return concat(keyword, open, path, closing)
 }
 
 func (b *builder) bringStmt(v *ast.BringStmt) doc {

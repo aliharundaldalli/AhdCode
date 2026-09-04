@@ -304,3 +304,22 @@ func TestFormatterRendersModuleAliasCanonically(t *testing.T) {
 		t.Fatalf("module alias formatting is not idempotent: %q", second)
 	}
 }
+
+func TestFormatterKeepsRequirePathOnOneLine(t *testing.T) {
+	input := "require(  \"Pages/Home.ahd\"  )\nrequire(\"Shared/HTMLHelpers.ahd\")\nwrite(\"ok\")\n"
+	first := formatText(t, input)
+	if want := "require(\"Pages/Home.ahd\")\nrequire(\"Shared/HTMLHelpers.ahd\")\nwrite(\"ok\")\n"; first != want {
+		t.Fatalf("formatted require = %q, want %q", first, want)
+	}
+	if second := formatText(t, first); second != first {
+		t.Fatalf("require formatting is not idempotent:\nfirst:\n%s\nsecond:\n%s", first, second)
+	}
+	longPath := "Pages/" + strings.Repeat("Nested/", 12) + "Home.ahd"
+	long := formatText(t, "require(\""+longPath+"\")\n")
+	if strings.Contains(long, "\nrequire") || strings.Count(long, "\n") != 1 {
+		t.Fatalf("require path was wrapped:\n%s", long)
+	}
+	if !strings.Contains(long, "require(\""+longPath+"\")") {
+		t.Fatalf("require path was rewritten:\n%s", long)
+	}
+}

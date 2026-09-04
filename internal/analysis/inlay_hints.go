@@ -37,7 +37,11 @@ func (store *Store) InlayHints(path string) []InlayHint {
 	}
 	var hints []InlayHint
 	resolved := entryModule.Semantic.ResolvedSymbols
+	fileID := cached.fileIDFor(canonical)
 	for _, statement := range entryModule.Parsed.Program.Statements {
+		if !stmtInFile(statement, fileID) {
+			continue
+		}
 		collectInlayStmt(statement, entryModule, resolved, &hints)
 	}
 	return hints

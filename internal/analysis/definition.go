@@ -31,7 +31,7 @@ func (store *Store) Definition(path string, offset int) (Location, bool) {
 	if entryModule == nil || entryModule.Parsed.Program == nil {
 		return Location{}, false
 	}
-	node := findNodeAtOffset(entryModule.Parsed.Program, offset)
+	node := findNodeAtOffset(entryModule.Parsed.Program, offset, cached.fileIDFor(canonical))
 	if node == nil {
 		return Location{}, false
 	}

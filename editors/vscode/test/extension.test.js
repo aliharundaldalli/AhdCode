@@ -459,7 +459,7 @@ test("TextMate grammar follows the frozen v0.1 lexical surface", () => {
   assert.equal(escape.test("\\u{41}"), false);
 
   const grammarText = JSON.stringify(grammar);
-  for (const word of ["default", "same", "is", "has", "lambda", "structure", "attribute", "SuperClass"]) {
+  for (const word of ["default", "same", "is", "has", "lambda", "structure", "attribute", "SuperClass", "require"]) {
     assert.equal(grammarText.includes(word), true);
   }
 });

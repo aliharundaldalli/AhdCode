@@ -52,13 +52,14 @@ func (store *Store) SemanticTokens(path string) []SemanticToken {
 	if entryModule == nil || entryModule.Parsed.Program == nil {
 		return nil
 	}
-	text := cached.result.Text[entryModule.File.Path]
-	file := source.File{ID: entryModule.File.ID, Path: entryModule.File.Path, Text: text}
+	fileID := cached.fileIDFor(canonical)
+	text := cached.result.Text[canonical]
+	file := source.File{ID: fileID, Path: canonical, Text: text}
 	lexed := lexer.Lex(file)
 	collector := &semanticTokenCollector{
 		entryModule: entryModule,
 		text:        text,
-		fileID:      entryModule.File.ID,
+		fileID:      fileID,
 	}
 	collector.collectProgram(entryModule.Parsed.Program)
 	collector.collectComments(lexed.Tokens)
@@ -126,6 +127,8 @@ func (c *semanticTokenCollector) collectStmt(statement ast.Stmt, resolved map[as
 		c.collectStructureDecl(node, resolved)
 	case *ast.BringStmt:
 		c.addKeywordSpan(node.Span(), "bring", "from")
+	case *ast.RequireStmt:
+		c.addKeywordSpan(node.Span(), "require")
 	}
 }
 
@@ -331,6 +334,10 @@ func (c *semanticTokenCollector) addKeywordSpan(span source.Span, keywords ...st
 
 func (c *semanticTokenCollector) collectComments(tokens []token.Token) {
 	for _, item := range tokens {
+		switch item.Kind {
+		case token.KeywordRequire, token.KeywordBring, token.KeywordFrom:
+			c.addSpan(item.Span, SemTokenKeyword, 0)
+		}
 		for _, trivia := range item.LeadingTrivia {
 			if trivia.Kind == token.LineCommentTrivia || trivia.Kind == token.BlockCommentTrivia {
 				c.add(trivia.Span.Start.Offset, trivia.Span.End.Offset-trivia.Span.Start.Offset, SemTokenComment, 0)

@@ -27,7 +27,7 @@ func (store *Store) Hover(path string, offset int) (Hover, bool) {
 	if entryModule == nil || entryModule.Parsed.Program == nil {
 		return Hover{}, false
 	}
-	node := findNodeAtOffset(entryModule.Parsed.Program, offset)
+	node := findNodeAtOffset(entryModule.Parsed.Program, offset, cached.fileIDFor(canonical))
 	if node == nil {
 		return Hover{}, false
 	}

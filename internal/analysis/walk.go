@@ -6,66 +6,99 @@ import (
 )
 
 // findNodeAtOffset returns the innermost AST node whose source span covers
-// the given byte offset, or nil if the offset falls outside the program
-// entirely. This is a purely structural tree walk -- span containment only
-// -- with no type-checking or name-resolution knowledge of its own; it
-// exists only to turn a cursor position into a lookup key for the semantic
-// analyzer's own ResolvedSymbols/ExpressionTypes facts.
+// the given byte offset in fileID, or nil if the offset falls outside the
+// program entirely. This is a purely structural tree walk -- span
+// containment only -- with no type-checking or name-resolution knowledge of
+// its own; it exists only to turn a cursor position into a lookup key for
+// the semantic analyzer's own ResolvedSymbols/ExpressionTypes facts.
+//
+// fileID is required after require(...) composition: the merged program
+// contains statements from several files that reuse the same byte offsets
+// inside their own buffers. Matching offset alone would pick a node from
+// the wrong file.
 //
 // Containment is inclusive on both ends (unlike source.Span's own
 // half-open [Start, End) convention) because a hover request commonly lands
 // exactly on the boundary between two tokens -- right after the last
 // character of an identifier is a normal cursor position, and it should
 // still resolve to that identifier.
-func findNodeAtOffset(program *ast.Program, offset int) ast.Node {
+func findNodeAtOffset(program *ast.Program, offset int, fileID source.FileID) ast.Node {
 	if program == nil {
 		return nil
 	}
-	return descend(program, offset)
+	return descend(program, offset, fileID)
 }
 
-func descend(node ast.Node, offset int) ast.Node {
-	if node == nil || !containsOffset(node.Span(), offset) {
+func descend(node ast.Node, offset int, fileID source.FileID) ast.Node {
+	if node == nil {
 		return nil
 	}
+	if _, isProgram := node.(*ast.Program); !isProgram {
+		if !containsOffsetInFile(node.Span(), offset, fileID) {
+			return nil
+		}
+	}
 	for _, child := range children(node) {
-		if found := descend(child, offset); found != nil {
+		if found := descend(child, offset, fileID); found != nil {
 			return found
 		}
+	}
+	if _, isProgram := node.(*ast.Program); isProgram {
+		return nil
 	}
 	return node
 }
 
-// ancestorsAtOffset returns every node whose span covers offset, from the
-// program root down to the innermost match -- the same structural descent
-// findNodeAtOffset performs, except it keeps the whole path instead of only
-// its last element. Signature Help needs the path rather than just the
-// innermost node: the innermost node at a cursor sitting between two
+// ancestorsAtOffset returns every node whose span covers offset in fileID,
+// from the program root down to the innermost match -- the same structural
+// descent findNodeAtOffset performs, except it keeps the whole path instead
+// of only its last element. Signature Help needs the path rather than just
+// the innermost node: the innermost node at a cursor sitting between two
 // arguments of a call is often an argument expression itself, not the
 // enclosing *ast.CallExpr, so a caller must walk back out through ancestors
 // to find the nearest call.
-func ancestorsAtOffset(program *ast.Program, offset int) []ast.Node {
+func ancestorsAtOffset(program *ast.Program, offset int, fileID source.FileID) []ast.Node {
 	if program == nil {
 		return nil
 	}
-	var path []ast.Node
+	path := []ast.Node{program}
 	node := ast.Node(program)
-	for node != nil && containsOffset(node.Span(), offset) {
-		path = append(path, node)
+	for {
 		var next ast.Node
 		for _, child := range children(node) {
-			if containsOffset(child.Span(), offset) {
+			if _, isProgram := child.(*ast.Program); isProgram {
+				continue
+			}
+			if containsOffsetInFile(child.Span(), offset, fileID) {
 				next = child
 				break
 			}
 		}
+		if next == nil {
+			return path
+		}
+		path = append(path, next)
 		node = next
 	}
-	return path
 }
 
 func containsOffset(span source.Span, offset int) bool {
 	return offset >= span.Start.Offset && offset <= span.End.Offset
+}
+
+func containsOffsetInFile(span source.Span, offset int, fileID source.FileID) bool {
+	if fileID != 0 && span.FileID != 0 && span.FileID != fileID {
+		return false
+	}
+	return containsOffset(span, offset)
+}
+
+func stmtInFile(statement ast.Stmt, fileID source.FileID) bool {
+	if statement == nil {
+		return false
+	}
+	span := statement.Span()
+	return fileID == 0 || span.FileID == 0 || span.FileID == fileID
 }
 
 // children enumerates one node's immediate structural children, in source
@@ -125,6 +158,8 @@ func children(node ast.Node) []ast.Node {
 		}
 		return append(out, blockNodes(n.Ultimately)...)
 	case *ast.BringStmt:
+		return nil
+	case *ast.RequireStmt:
 		return nil
 	case *ast.FunctionDecl:
 		out := parameterNodes(n.Parameters)

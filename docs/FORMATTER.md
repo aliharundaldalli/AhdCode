@@ -25,6 +25,8 @@ canonical layout for everything else:
   columns.
 - One that does not fit breaks to one item per line, with **no comma at
   all** -- not even a trailing one.
+- `require("Path/To/File.ahd")` is never wrapped. The path is a compile-time
+  string literal; breaking it across lines is invalid source.
 - The `(parameters) -> ReturnType` shape of a Function signature is always
   kept together on the line that opens its body.
 - Lambda uses the same parameter-list layout and canonical spacing:

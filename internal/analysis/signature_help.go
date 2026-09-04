@@ -33,7 +33,7 @@ func (store *Store) SignatureHelp(path string, offset int) (SignatureHelp, bool)
 	if entryModule == nil || entryModule.Parsed.Program == nil {
 		return SignatureHelp{}, false
 	}
-	call := innermostCall(ancestorsAtOffset(entryModule.Parsed.Program, offset))
+	call := innermostCall(ancestorsAtOffset(entryModule.Parsed.Program, offset, cached.fileIDFor(canonical)))
 	if call == nil {
 		return SignatureHelp{}, false
 	}
