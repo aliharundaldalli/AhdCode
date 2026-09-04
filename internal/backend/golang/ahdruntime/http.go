@@ -54,6 +54,21 @@ type ahdHTTPServerState struct {
 	methods      map[string][]string
 	started      bool
 	httpServer   *http.Server
+	// staticRoutes are prefix-matched, checked only after routes misses
+	// entirely (see ahdHTTPDispatcher.ServeHTTP): a program that registers
+	// both an exact route and an overlapping static prefix always has the
+	// exact route win, with zero ambiguity, because it is looked up first.
+	staticRoutes []ahdHTTPStaticEntry
+}
+
+// ahdHTTPStaticEntry is one server.static(prefix, root) registration.
+// prefix always ends in "/"; root is the canonical (absolute, symlink-
+// resolved where the directory itself exists) filesystem directory it maps
+// to, computed once at registration time so every request only has to
+// canonicalize the much smaller path it is actually serving.
+type ahdHTTPStaticEntry struct {
+	prefix string
+	root   string
 }
 
 type ahdHTTPRequestData struct {
@@ -436,6 +451,150 @@ func ahdHTTPRegister(class *AhdClass, handle, method, path string, handler AhdHT
 	}
 }
 
+// AhdHTTPServerStatic registers a first-party static-file primitive:
+// requests under prefix are served from files under root, with no filesystem
+// discovery beyond that one explicit mapping and no directory listing. It
+// follows ahdHTTPRegister's exact conventions (same started-freeze, same
+// AhdRaiseClass validation style) but keeps its own staticRoutes list rather
+// than sharing the exact-match routes table, since a prefix is not a single
+// {method,path} key.
+func AhdHTTPServerStatic(class *AhdClass, handle, prefix, root string) {
+	if !strings.HasPrefix(prefix, "/") || strings.ContainsAny(prefix, "?#") {
+		AhdRaiseClass(class, "HTTP static prefix "+ahdHTMLQuote(prefix)+" must begin with / and must not contain ? or #")
+	}
+	normalizedPrefix := prefix
+	if !strings.HasSuffix(normalizedPrefix, "/") {
+		normalizedPrefix += "/"
+	}
+	info, err := os.Stat(root)
+	if err != nil || !info.IsDir() {
+		AhdRaiseClass(class, "HTTP static root "+ahdHTMLQuote(root)+" is not a directory")
+	}
+	canonicalRoot, err := filepath.Abs(root)
+	if err != nil {
+		AhdRaiseClass(class, "HTTP static root "+ahdHTMLQuote(root)+" could not be resolved")
+	}
+	if evaluated, evalErr := filepath.EvalSymlinks(canonicalRoot); evalErr == nil {
+		canonicalRoot = evaluated
+	}
+
+	server := ahdHTTPLookup(class, handle)
+	server.mutex.Lock()
+	defer server.mutex.Unlock()
+	if server.started {
+		AhdRaiseClass(class, "HTTP routes cannot be changed after start")
+	}
+	for _, existing := range server.staticRoutes {
+		if strings.HasPrefix(existing.prefix, normalizedPrefix) || strings.HasPrefix(normalizedPrefix, existing.prefix) {
+			AhdRaiseClass(class, "HTTP static prefix "+ahdHTMLQuote(prefix)+" overlaps the already-registered prefix "+ahdHTMLQuote(existing.prefix))
+		}
+	}
+	server.staticRoutes = append(server.staticRoutes, ahdHTTPStaticEntry{prefix: normalizedPrefix, root: canonicalRoot})
+}
+
+// ahdHTTPServeStatic attempts to serve request as a static file under one of
+// state's registered static roots. It writes and returns true on any match
+// -- including a rejected/missing/malformed one, always answered as a plain
+// 404 rather than leaking which reason applied -- and returns false without
+// writing anything when no static prefix matches path at all, so the
+// dispatcher's own 404 handles that case instead.
+//
+// Every request-supplied path segment is validated by allowlist before it
+// ever reaches the filesystem: empty, ".", "..", or dotfile/dot-directory
+// segments are refused outright (this also defeats encoded traversal, since
+// net/http has already percent-decoded request.URL.Path by the time this
+// function sees it). The joined candidate is then still checked for
+// canonical containment under root, and, if it turns out to be a symlink,
+// checked again after resolving it -- so a symlink whose target escapes
+// root can never be served, matching require(...)'s own containment model.
+func ahdHTTPServeStatic(state *ahdHTTPServerState, writer http.ResponseWriter, request *http.Request, method, path string) bool {
+	if method != http.MethodGet && method != http.MethodHead {
+		return false
+	}
+	state.mutex.Lock()
+	entries := append([]ahdHTTPStaticEntry(nil), state.staticRoutes...)
+	state.mutex.Unlock()
+
+	for _, entry := range entries {
+		if !strings.HasPrefix(path, entry.prefix) {
+			continue
+		}
+		relative := path[len(entry.prefix):]
+		if relative == "" || ahdHTTPStaticSegmentBlocked(relative) {
+			ahdHTTPWritePlain(writer, http.StatusNotFound, "Not Found")
+			return true
+		}
+		candidate := filepath.Join(entry.root, filepath.FromSlash(relative))
+		if !ahdHTTPWithinRoot(entry.root, candidate) {
+			ahdHTTPWritePlain(writer, http.StatusNotFound, "Not Found")
+			return true
+		}
+		info, err := os.Lstat(candidate)
+		if err != nil {
+			ahdHTTPWritePlain(writer, http.StatusNotFound, "Not Found")
+			return true
+		}
+		resolved := candidate
+		if info.Mode()&os.ModeSymlink != 0 {
+			evaluated, evalErr := filepath.EvalSymlinks(candidate)
+			if evalErr != nil || !ahdHTTPWithinRoot(entry.root, evaluated) {
+				ahdHTTPWritePlain(writer, http.StatusNotFound, "Not Found")
+				return true
+			}
+			resolved = evaluated
+			info, err = os.Stat(resolved)
+			if err != nil {
+				ahdHTTPWritePlain(writer, http.StatusNotFound, "Not Found")
+				return true
+			}
+		}
+		if info.IsDir() {
+			ahdHTTPWritePlain(writer, http.StatusNotFound, "Not Found")
+			return true
+		}
+		file, err := os.Open(resolved)
+		if err != nil {
+			ahdHTTPWritePlain(writer, http.StatusNotFound, "Not Found")
+			return true
+		}
+		defer func() { _ = file.Close() }()
+		if contentType := mime.TypeByExtension(filepath.Ext(resolved)); contentType != "" {
+			writer.Header().Set("Content-Type", contentType)
+		}
+		http.ServeContent(writer, request, filepath.Base(resolved), info.ModTime(), file)
+		return true
+	}
+	return false
+}
+
+// ahdHTTPStaticSegmentBlocked reports whether any "/"-separated segment of a
+// static request's relative path is empty, ".", "..", or begins with "."
+// (a dotfile or dot-directory anywhere in the path, not only its final
+// component) -- an allowlist check performed before any filesystem access.
+func ahdHTTPStaticSegmentBlocked(relative string) bool {
+	for _, segment := range strings.Split(relative, "/") {
+		if segment == "" || segment == "." || segment == ".." || strings.HasPrefix(segment, ".") {
+			return true
+		}
+	}
+	return false
+}
+
+// ahdHTTPWithinRoot reports whether candidate is root itself or a
+// descendant of it, judged lexically on already-cleaned paths.
+func ahdHTTPWithinRoot(root, candidate string) bool {
+	root = filepath.Clean(root)
+	candidate = filepath.Clean(candidate)
+	if candidate == root {
+		return true
+	}
+	relative, err := filepath.Rel(root, candidate)
+	if err != nil || filepath.IsAbs(relative) {
+		return false
+	}
+	return relative != ".." && !strings.HasPrefix(relative, ".."+string(filepath.Separator))
+}
+
 func ahdHTTPLookup(class *AhdClass, handle string) *ahdHTTPServerState {
 	ahdHTTPServersMu.Lock()
 	server := ahdHTTPServers[handle]
@@ -473,6 +632,9 @@ func (dispatcher ahdHTTPDispatcher) ServeHTTP(writer http.ResponseWriter, reques
 
 	if !found {
 		if len(allowed) == 0 {
+			if ahdHTTPServeStatic(dispatcher.state, writer, request, method, path) {
+				return
+			}
 			ahdHTTPWritePlain(writer, http.StatusNotFound, "Not Found")
 			return
 		}

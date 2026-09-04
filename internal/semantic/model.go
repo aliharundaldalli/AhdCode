@@ -452,6 +452,7 @@ const (
 	HTTPServerGet               TypeOperation = "Server.get"
 	HTTPServerPost              TypeOperation = "Server.post"
 	HTTPServerRoute             TypeOperation = "Server.route"
+	HTTPServerStatic            TypeOperation = "Server.static"
 	HTTPServerStart             TypeOperation = "Server.start"
 	HTTPRequestMethod           TypeOperation = "Request.method"
 	HTTPRequestPath             TypeOperation = "Request.path"

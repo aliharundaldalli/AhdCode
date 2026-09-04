@@ -115,6 +115,9 @@ func (generator *generator) httpOperation(name string, value *ir.CallExpr) strin
 	case "Server.route":
 		return "AhdHTTPServerRoute(" + errorClass + ", " + generator.httpDataOf(httpServerClass, httpServerHandleField, value.Callee) + ", " +
 			text(0) + ", " + text(1) + ", " + generator.httpHandler(value, 2) + ")"
+	case "Server.static":
+		return "AhdHTTPServerStatic(" + errorClass + ", " + generator.httpDataOf(httpServerClass, httpServerHandleField, value.Callee) + ", " +
+			text(0) + ", " + text(1) + ")"
 	case "Server.start":
 		return "AhdHTTPServerStart(" + errorClass + ", " + generator.httpDataOf(httpServerClass, httpServerHandleField, value.Callee) + ")"
 	case "Request.method":
