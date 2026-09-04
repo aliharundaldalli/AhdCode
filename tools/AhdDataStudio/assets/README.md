@@ -1,5 +1,9 @@
 # assets
 
-AhdDataStudio v0.12 has no Static Assets framework. Page CSS is a trusted
-raw String inside `app.ahd`. This directory is reserved for later asset
-work and is not served.
+Trusted files served with `HTTP.file` (explicit routes, not a static-root
+framework):
+
+- `/AhdDataStudio/assets/bootstrap.min.css` — Bootstrap 5.3.3 CSS
+- `/AhdDataStudio/assets/ahdcode-logo.png` — AhdCode logo
+
+License: [BOOTSTRAP_LICENSE](BOOTSTRAP_LICENSE) (MIT).

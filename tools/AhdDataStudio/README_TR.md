@@ -23,6 +23,19 @@ Sunucu yalnızca **127.0.0.1:8081** dinler. Bu bir yerel geliştirme aracıdır;
 
 Bu sürümde `ahdcode studio` komutu yoktur.
 
+## Durdurma
+
+`ahdcode run`, `app.ahd` yanına `app.run` yazar. Durdurmak için:
+
+```bash
+cd tools/AhdDataStudio
+ahdcode kill app.run
+```
+
+Bu komut uygulamayı durdurur ve `app.run` dosyasını siler. Derlenmiş
+ikiliyi kendiniz başlattıysanız o süreci durdurun (`lsof -nP -iTCP:8081
+-sTCP:LISTEN` PID'yi gösterir).
+
 ## MySQL
 
 Yapılandırma Env (veya bu dizindeki `.env`) iledir:

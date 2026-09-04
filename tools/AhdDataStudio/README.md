@@ -22,6 +22,19 @@ and must not be exposed on `0.0.0.0` or the public internet.
 
 There is no `ahdcode studio` command in this version.
 
+## Stop
+
+`ahdcode run` writes `app.run` next to `app.ahd`. Stop that process with:
+
+```bash
+cd tools/AhdDataStudio
+ahdcode kill app.run
+```
+
+That stops the application and removes `app.run`. If you started a compiled
+binary yourself, stop that process instead (`lsof -nP -iTCP:8081 -sTCP:LISTEN`
+shows the PID).
+
 ## MySQL
 
 Configure through Env (or `.env` in this directory):
