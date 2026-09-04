@@ -125,6 +125,13 @@ type devController struct {
 	output   io.Writer
 	errorOut io.Writer
 
+	// watcher's tracked path set is replaced after every completed build
+	// attempt (section 25), success or failure, with the entry plus the
+	// compiler's resolved require(...) graph plus any require(...) target
+	// that attempt named but could not find yet. Set once, right after
+	// construction, in runDev.
+	watcher *devWatcher
+
 	events chan devControllerEvent
 
 	building        bool
@@ -176,6 +183,29 @@ func (c *devController) startBuild() {
 	}()
 }
 
+// updateWatchSet replaces the watcher's tracked files with the entry plus
+// this build attempt's full dependency picture. The entry is always
+// included even if, in some degenerate failure, SourcePaths came back
+// empty -- dev must always be able to notice the entry itself being fixed.
+// Order does not matter to the watcher, so a plain dedup is enough to keep
+// the set deterministic without needing the compiler's own resolution
+// order.
+func (c *devController) updateWatchSet(result build.Result) {
+	if c.watcher == nil {
+		return
+	}
+	seen := map[string]bool{c.entry: true}
+	paths := []string{c.entry}
+	for _, path := range result.SourcePaths {
+		if seen[path] {
+			continue
+		}
+		seen[path] = true
+		paths = append(paths, path)
+	}
+	c.watcher.setPathsAsync(paths)
+}
+
 func (c *devController) reportDiagnostics(result build.Result) {
 	for _, item := range result.Diagnostics {
 		fmt.Fprintln(c.errorOut, format(item, result.Files))
@@ -204,7 +234,7 @@ func (c *devController) run() {
 				c.pendingRebuild = true
 				continue
 			}
-			c.printf("%s changed\n", filepath.Base(c.entry))
+			c.printf("Source changed\n")
 			c.startBuild()
 
 		case eventBuildFinished:
@@ -214,6 +244,7 @@ func (c *devController) run() {
 				c.finishShutdown()
 				return
 			}
+			c.updateWatchSet(event.buildResult)
 			if event.buildOK {
 				c.printf("✓ Build succeeded\n")
 				if c.child != nil {
@@ -246,7 +277,7 @@ func (c *devController) run() {
 			}
 			if c.pendingRebuild {
 				c.pendingRebuild = false
-				c.printf("%s changed\n", filepath.Base(c.entry))
+				c.printf("Source changed\n")
 				c.startBuild()
 			} else {
 				c.printf("Waiting for changes...\n")
@@ -398,7 +429,8 @@ func runDev(arguments []string, output, errorOutput io.Writer) int {
 		}
 	}()
 
-	watcher := newDevWatcher(absoluteEntry, controller.events)
+	watcher := newDevWatcher([]string{absoluteEntry}, controller.events)
+	controller.watcher = watcher
 	watcher.start()
 
 	fmt.Fprintln(output, "AhdCode Dev")
