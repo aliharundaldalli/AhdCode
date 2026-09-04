@@ -9,7 +9,7 @@ Bu örnekler yeni bir web çerçevesi olmadan yayınlanmış modülleri kullanı
 
 | Yol | Konu |
 |---|---|
-| [raffle/](raffle/README_TR.md) | MySQL çekiliş: katılım kodu, hash’li yönetici girişi, kazanan ilanı |
+| [raffle/](raffle/README_TR.md) | Tam yığın MySQL çekiliş: yaşam döngüsü, geçmiş, denetim, hash’li yönetici girişi |
 
 ```bash
 cd examples/v0.12/raffle

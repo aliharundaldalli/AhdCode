@@ -9,7 +9,7 @@ examples keep using the released modules without a new web framework.
 
 | Path | Topic |
 |---|---|
-| [raffle/](raffle/README.md) | MySQL raffle: join codes, hashed admin login, announced winner |
+| [raffle/](raffle/README.md) | Full-stack MySQL raffle: lifecycle, history, audit, hashed admin login |
 
 ```bash
 cd examples/v0.12/raffle
