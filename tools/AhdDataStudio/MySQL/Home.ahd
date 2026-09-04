@@ -1,0 +1,123 @@
+bring HTML
+from HTML bring HTMLNode
+bring HTTP
+from HTTP bring Request
+from HTTP bring Response
+from HTTP bring SessionStore
+from HTTP bring Session
+bring MySQL
+from MySQL bring MySQLDatabase
+from MySQL bring MySQLError
+bring SQLite
+from SQLite bring Database
+
+mysqlHome: Function := (request: Request) -> Response {
+    sessions: Global SessionStore
+    session: Local Session := sessions.open(request)
+    token: Local String := csrfToken(session)
+    attempt {
+        db: Local MySQLDatabase := connectMysql()
+        attempt {
+            names: Local List<String> := mysqlDatabases(db)
+            dbRows: Local List<HTMLNode> := []
+            for name in names {
+                dbRows.add(
+                    HTML.element(
+                        "tr"
+                        {}
+                        [
+                            HTML.element(
+                                "td"
+                                {}
+                                [HTML.element("strong", {}, [HTML.text(name)])]
+                            )
+                            HTML.element(
+                                "td"
+                                {"class": "text-end"}
+                                [
+                                    queryFormClass(
+                                        "/AhdDataStudio/mysql/database"
+                                        {"database": name}
+                                        "Open"
+                                        "btn btn-sm btn-primary"
+                                    )
+                                ]
+                            )
+                        ]
+                    )
+                )
+            }
+            body: Local List<HTMLNode> := [
+                HTML.element("h1", {"class": "h4 mb-2"}, [HTML.text("MySQL")])
+                HTML.element(
+                    "p"
+                    {"class": "text-muted"}
+                    [
+                        HTML.text(
+                            str(
+                                len(names)
+                            ) + " visible schemas for these credentials."
+                        )
+                    ]
+                )
+                HTML.element(
+                    "div"
+                    {"class": "table-responsive"}
+                    [
+                        HTML.element(
+                            "table"
+                            {
+                                "class": "table table-sm table-hover align-middle bg-white"
+                            }
+                            [
+                                HTML.element(
+                                    "thead"
+                                    {"class": "table-light"}
+                                    [
+                                        HTML.element(
+                                            "tr"
+                                            {}
+                                            [
+                                                HTML.element(
+                                                    "th"
+                                                    {}
+                                                    [HTML.text("Database")]
+                                                )
+                                                HTML.element(
+                                                    "th"
+                                                    {"class": "text-end"}
+                                                    [HTML.text("")]
+                                                )
+                                            ]
+                                        )
+                                    ]
+                                )
+                                HTML.element("tbody", {}, dbRows)
+                            ]
+                        )
+                    ]
+                )
+            ]
+            return sessions.commit(
+                session
+                HTTP.html(layout("MySQL", token, body))
+            )
+        }
+        except MySQLError as error {
+            return sessions.commit(
+                session
+                HTTP.html(layout("MySQL", token, errorNodes(error.message)))
+            )
+        }
+        ultimately {
+            db.close()
+        }
+    }
+    except MySQLError as error {
+        return sessions.commit(
+            session
+            HTTP.html(layout("MySQL", token, errorNodes(error.message)))
+        )
+    }
+}
+

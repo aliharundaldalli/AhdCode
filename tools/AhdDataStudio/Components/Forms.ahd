@@ -1,0 +1,128 @@
+bring HTML
+from HTML bring HTMLNode
+bring HTTP
+from HTTP bring Request
+from HTTP bring Response
+from HTTP bring SessionStore
+from HTTP bring Session
+
+hiddenField: Function := (name: String, value: String) -> HTMLNode {
+    return HTML.element(
+        "input"
+        {"type": "hidden", "name": name, "value": value}
+        []
+    )
+}
+
+csrfField: Function := (token: String) -> HTMLNode {
+    return hiddenField("csrf", token)
+}
+
+queryFormClass: Function := (
+    action: String
+    fields: Pair<String, String>
+    label: String
+    buttonClass: String
+) -> HTMLNode {
+    children: Local List<HTMLNode> := []
+    for name in fields {
+        children.add(hiddenField(name, fields[name]))
+    }
+    children.add(
+        HTML.element(
+            "button"
+            {"type": "submit", "class": buttonClass, "title": label}
+            [HTML.text(label)]
+        )
+    )
+    return HTML.element(
+        "form"
+        {"method": "get", "action": action, "class": "d-inline"}
+        children
+    )
+}
+
+queryForm: Function := (
+    action: String
+    fields: Pair<String, String>
+    label: String
+) -> HTMLNode {
+    return queryFormClass(
+        action
+        fields
+        label
+        "btn btn-sm btn-outline-secondary"
+    )
+}
+
+fieldNode: Function := (
+    name: String
+    sqlType: String
+    nullable: String
+) -> HTMLNode {
+    meta: Local String := sqlType
+    if nullable == "YES" {
+        meta = meta + " · nullable"
+    }
+    return HTML.element(
+        "div"
+        {"class": "col-md-6 col-xl-4"}
+        [
+            HTML.element(
+                "label"
+                {"class": "form-label small fw-semibold mb-1"}
+                [HTML.text(name)]
+            )
+            HTML.element(
+                "div"
+                {"class": "studio-field-meta"}
+                [HTML.text(meta)]
+            )
+            HTML.element(
+                "input"
+                {
+                    "type": "text"
+                    "name": "col_" + name
+                    "class": "form-control form-control-sm"
+                }
+                []
+            )
+        ]
+    )
+}
+
+rejectGetStateChange: Function := (
+    request: Request
+    session: Session
+    token: String
+) -> Response? {
+    sessions: Global SessionStore
+    if request.method() != "POST" {
+        return sessions.commit(
+            session
+            HTTP.html(
+                layout(
+                    "Rejected"
+                    token
+                    errorNodes("this action requires POST")
+                )
+                405
+            )
+        )
+    }
+    if not csrfOK(request, session) {
+        return sessions.commit(
+            session
+            HTTP.html(
+                layout(
+                    "Rejected"
+                    token
+                    errorNodes("rejected: CSRF token missing or invalid")
+                )
+                403
+            )
+        )
+    }
+    return null
+}
+

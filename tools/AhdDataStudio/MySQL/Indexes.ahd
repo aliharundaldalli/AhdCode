@@ -1,0 +1,118 @@
+bring HTML
+from HTML bring HTMLNode
+bring HTTP
+from HTTP bring Request
+from HTTP bring Response
+from HTTP bring SessionStore
+from HTTP bring Session
+bring MySQL
+from MySQL bring MySQLDatabase
+from MySQL bring MySQLValue
+from MySQL bring MySQLError
+
+mysqlIndexesPage: Function := (request: Request) -> Response {
+    sessions: Global SessionStore
+    session: Local Session := sessions.open(request)
+    token: Local String := csrfToken(session)
+    schema: Local String? := request.query("database")
+    table: Local String? := request.query("table")
+    if schema == null or table == null {
+        return sessions.commit(
+            session
+            HTTP.html(
+                layout(
+                    "MySQL"
+                    token
+                    errorNodes("database and table are required")
+                )
+            )
+        )
+    }
+    attempt {
+        db: Local MySQLDatabase := connectMysql()
+        attempt {
+            if not (schema in mysqlDatabases(db)) {
+                return sessions.commit(
+                    session
+                    HTTP.html(
+                        layout("MySQL", token, errorNodes("unknown database"))
+                    )
+                )
+            }
+            if not (table in mysqlTableNames(db, schema)) {
+                return sessions.commit(
+                    session
+                    HTTP.html(
+                        layout("MySQL", token, errorNodes("unknown table"))
+                    )
+                )
+            }
+            infoRows: Local List<Pair<String, MySQLValue>> := db.query(
+                "SELECT INDEX_NAME, NON_UNIQUE, COLUMN_NAME, SEQ_IN_INDEX FROM INFORMATION_SCHEMA.STATISTICS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? ORDER BY INDEX_NAME, SEQ_IN_INDEX"
+                [MySQL.fromString(schema), MySQL.fromString(table)]
+            )
+            rows: Local List<List<String>> := []
+            for row in infoRows {
+                indexName: Local String := ""
+                unique: Local String := ""
+                column: Local String := ""
+                seq: Local String := ""
+                if "INDEX_NAME" in row {
+                    if row["INDEX_NAME"].kind() == "String" {
+                        indexName = row["INDEX_NAME"].string()
+                    }
+                }
+                if "NON_UNIQUE" in row {
+                    if row["NON_UNIQUE"].kind() == "Int" {
+                        if row["NON_UNIQUE"].int() == 0 {
+                            unique = "unique"
+                        }
+                        else {
+                            unique = "non-unique"
+                        }
+                    }
+                }
+                if "COLUMN_NAME" in row {
+                    if row["COLUMN_NAME"].kind() == "String" {
+                        column = row["COLUMN_NAME"].string()
+                    }
+                }
+                if "SEQ_IN_INDEX" in row {
+                    if row["SEQ_IN_INDEX"].kind() == "Int" {
+                        seq = str(row["SEQ_IN_INDEX"].int())
+                    }
+                }
+                rows.add([indexName, unique, column, seq])
+            }
+            body: Local List<HTMLNode> := [
+                HTML.element(
+                    "h1"
+                    {"class": "h4"}
+                    [HTML.text("Indexes · " + table)]
+                )
+                mysqlTableNav(schema, table, "indexes")
+                htmlTable(["Index", "Uniqueness", "Column", "Sequence"], rows)
+            ]
+            return sessions.commit(
+                session
+                HTTP.html(layout("Indexes", token, body))
+            )
+        }
+        except MySQLError as error {
+            return sessions.commit(
+                session
+                HTTP.html(layout("MySQL", token, errorNodes(error.message)))
+            )
+        }
+        ultimately {
+            db.close()
+        }
+    }
+    except MySQLError as error {
+        return sessions.commit(
+            session
+            HTTP.html(layout("MySQL", token, errorNodes(error.message)))
+        )
+    }
+}
+

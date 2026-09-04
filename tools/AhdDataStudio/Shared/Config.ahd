@@ -1,0 +1,16 @@
+bring Env
+bring File
+bring HTTP
+from HTTP bring SessionStore
+
+loadEnvFile: Function := () -> Nothing {
+    if File.exists(".env") {
+        Env.load(".env")
+    }
+}
+
+sessions: SessionStore := HTTP.sessions("ahd_datastudio", 3600, false, "Lax")
+
+pageSize: Int := 50
+mysqlSchemaCache: List<String> := []
+mysqlActiveSchema: String := ""

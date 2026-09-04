@@ -1,0 +1,106 @@
+bring Env
+bring File
+from File bring FileError
+bring MySQL
+from MySQL bring MySQLDatabase
+bring Path
+
+connectMysql: Function := () -> MySQLDatabase {
+    host: Local String := Env.getOr("AHD_DATA_MYSQL_HOST", "127.0.0.1")
+    username: Local String := Env.getOr("AHD_DATA_MYSQL_USER", "root")
+    password: Local String := Env.getOr("AHD_DATA_MYSQL_PASSWORD", "")
+    portText: Local String := Env.getOr("AHD_DATA_MYSQL_PORT", "3306")
+    security: Local String := Env.getOr("AHD_DATA_MYSQL_SECURITY", "none")
+    port: Local Int := int(portText)
+    return MySQL.connect(host, username, password, port, null, security)
+}
+
+allowedSqlitePaths: Function := () -> List<String> {
+    found: Local List<String> := []
+    explicit: Local String := Env.getOr("AHD_DATA_SQLITE_PATHS", "")
+    parts: Local List<String> := explicit.split(",")
+    for part in parts {
+        trimmed: Local String := part.trim()
+        if trimmed != "" {
+            if not (trimmed in found) {
+                found.add(trimmed)
+            }
+        }
+    }
+    root: Local String := Env.getOr("AHD_DATA_PROJECT_ROOT", "")
+    if root != "" {
+        attempt {
+            names: Local List<String> := File.list(root)
+            for name in names {
+                if isSafeComponent(name) {
+                    candidate: Local String := Path.join([root, name])
+                    if isSqliteExt(candidate) {
+                        if not isDirectoryPath(candidate) {
+                            if not (candidate in found) {
+                                found.add(candidate)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        except FileError {}
+    }
+    return found
+}
+
+sqlitePathAllowed: Function := (path: String) -> Bool {
+    allowed: Local List<String> := allowedSqlitePaths()
+    return path in allowed
+}
+
+isSqliteExt: Function := (path: String) -> Bool {
+    ext: Local String := Path.ext(path).lower()
+    return ext == ".db" or ext == ".sqlite" or ext == ".sqlite3"
+}
+
+isDirectoryPath: Function := (path: String) -> Bool {
+    attempt {
+        File.list(path)
+        return true
+    }
+    except FileError {
+        return false
+    }
+}
+
+isSafeComponent: Function := (name: String) -> Bool {
+    if name == "" or name == "." or name == ".." {
+        return false
+    }
+    if name.contains("/") or name.contains("\\") {
+        return false
+    }
+    return true
+}
+
+looksLikeQuery: Function := (sql: String) -> Bool {
+    trimmed: Local String := sql.trim().lower()
+    if trimmed.startsWith("select") {
+        return true
+    }
+    if trimmed.startsWith("show") {
+        return true
+    }
+    if trimmed.startsWith(
+        "describe"
+    ) or trimmed.startsWith("desc ") or trimmed == "desc" {
+        return true
+    }
+    if trimmed.startsWith("explain") {
+        return true
+    }
+    if trimmed.startsWith("with") {
+        return true
+    }
+    if trimmed.startsWith("pragma") {
+        return true
+    }
+    return false
+}
+

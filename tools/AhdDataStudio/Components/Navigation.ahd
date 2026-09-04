@@ -1,0 +1,295 @@
+bring HTML
+from HTML bring HTMLNode
+
+navLink: Function := (href: String, label: String) -> HTMLNode {
+    return HTML.element(
+        "a"
+        {"href": href, "class": "nav-link"}
+        [HTML.text(label)]
+    )
+}
+
+mysqlActionGroup: Function := (schema: String, table: String) -> HTMLNode {
+    fields: Local Pair<String, String> := {"database": schema, "table": table}
+    return HTML.element(
+        "div"
+        {"class": "studio-actions"}
+        [
+            queryFormClass(
+                "/AhdDataStudio/mysql/browse"
+                fields
+                "Browse"
+                "btn btn-sm btn-primary"
+            )
+            queryFormClass(
+                "/AhdDataStudio/mysql/table"
+                fields
+                "Structure"
+                "btn btn-sm btn-outline-secondary"
+            )
+            queryFormClass(
+                "/AhdDataStudio/mysql/indexes"
+                fields
+                "Indexes"
+                "btn btn-sm btn-outline-secondary"
+            )
+        ]
+    )
+}
+
+sqliteActionGroup: Function := (path: String, table: String) -> HTMLNode {
+    fields: Local Pair<String, String> := {"db": path, "table": table}
+    return HTML.element(
+        "div"
+        {"class": "studio-actions"}
+        [
+            queryFormClass(
+                "/AhdDataStudio/sqlite/browse"
+                fields
+                "Browse"
+                "btn btn-sm btn-primary"
+            )
+            queryFormClass(
+                "/AhdDataStudio/sqlite/table"
+                fields
+                "Structure"
+                "btn btn-sm btn-outline-secondary"
+            )
+            queryFormClass(
+                "/AhdDataStudio/sqlite/indexes"
+                fields
+                "Indexes"
+                "btn btn-sm btn-outline-secondary"
+            )
+        ]
+    )
+}
+
+mysqlTableNav: Function := (
+    schema: String
+    table: String
+    current: String
+) -> HTMLNode {
+    fields: Local Pair<String, String> := {"database": schema, "table": table}
+    browseClass: Local String := "nav-link"
+    structureClass: Local String := "nav-link"
+    indexClass: Local String := "nav-link"
+    sqlClass: Local String := "nav-link"
+    if current == "browse" {
+        browseClass = "nav-link active"
+    }
+    if current == "structure" {
+        structureClass = "nav-link active"
+    }
+    if current == "indexes" {
+        indexClass = "nav-link active"
+    }
+    if current == "sql" {
+        sqlClass = "nav-link active"
+    }
+    return HTML.element(
+        "ul"
+        {"class": "nav nav-tabs studio-tabs mb-3"}
+        [
+            HTML.element(
+                "li"
+                {"class": "nav-item"}
+                [
+                    queryFormClass(
+                        "/AhdDataStudio/mysql/database"
+                        {"database": schema}
+                        "Tables"
+                        "nav-link"
+                    )
+                ]
+            )
+            HTML.element(
+                "li"
+                {"class": "nav-item"}
+                [
+                    queryFormClass(
+                        "/AhdDataStudio/mysql/browse"
+                        fields
+                        "Browse"
+                        browseClass
+                    )
+                ]
+            )
+            HTML.element(
+                "li"
+                {"class": "nav-item"}
+                [
+                    queryFormClass(
+                        "/AhdDataStudio/mysql/table"
+                        fields
+                        "Structure"
+                        structureClass
+                    )
+                ]
+            )
+            HTML.element(
+                "li"
+                {"class": "nav-item"}
+                [
+                    queryFormClass(
+                        "/AhdDataStudio/mysql/indexes"
+                        fields
+                        "Indexes"
+                        indexClass
+                    )
+                ]
+            )
+            HTML.element(
+                "li"
+                {"class": "nav-item"}
+                [
+                    queryFormClass(
+                        "/AhdDataStudio/mysql/sql"
+                        {"database": schema}
+                        "SQL"
+                        sqlClass
+                    )
+                ]
+            )
+        ]
+    )
+}
+
+sqliteNav: Function := (
+    path: String
+    table: String
+    current: String
+) -> HTMLNode {
+    fields: Local Pair<String, String> := {"db": path, "table": table}
+    browseClass: Local String := "nav-link"
+    structureClass: Local String := "nav-link"
+    indexClass: Local String := "nav-link"
+    sqlClass: Local String := "nav-link"
+    if current == "browse" {
+        browseClass = "nav-link active"
+    }
+    if current == "structure" {
+        structureClass = "nav-link active"
+    }
+    if current == "indexes" {
+        indexClass = "nav-link active"
+    }
+    if current == "sql" {
+        sqlClass = "nav-link active"
+    }
+    return HTML.element(
+        "ul"
+        {"class": "nav nav-tabs studio-tabs mb-3"}
+        [
+            HTML.element(
+                "li"
+                {"class": "nav-item"}
+                [
+                    queryFormClass(
+                        "/AhdDataStudio/sqlite"
+                        {}
+                        "Databases"
+                        "nav-link"
+                    )
+                ]
+            )
+            HTML.element(
+                "li"
+                {"class": "nav-item"}
+                [
+                    queryFormClass(
+                        "/AhdDataStudio/sqlite/browse"
+                        fields
+                        "Browse"
+                        browseClass
+                    )
+                ]
+            )
+            HTML.element(
+                "li"
+                {"class": "nav-item"}
+                [
+                    queryFormClass(
+                        "/AhdDataStudio/sqlite/table"
+                        fields
+                        "Structure"
+                        structureClass
+                    )
+                ]
+            )
+            HTML.element(
+                "li"
+                {"class": "nav-item"}
+                [
+                    queryFormClass(
+                        "/AhdDataStudio/sqlite/indexes"
+                        fields
+                        "Indexes"
+                        indexClass
+                    )
+                ]
+            )
+            HTML.element(
+                "li"
+                {"class": "nav-item"}
+                [
+                    queryFormClass(
+                        "/AhdDataStudio/sqlite/sql"
+                        {"db": path}
+                        "SQL"
+                        sqlClass
+                    )
+                ]
+            )
+        ]
+    )
+}
+
+kindTab: Function := (
+    schema: String
+    kind: String
+    current: String
+    label: String
+    count: Int
+) -> HTMLNode {
+    className: Local String := "nav-link"
+    if kind == current {
+        className = "nav-link active"
+    }
+    return HTML.element(
+        "li"
+        {"class": "nav-item"}
+        [
+            queryFormClass(
+                "/AhdDataStudio/mysql/database"
+                {"database": schema, "kind": kind}
+                label + " (" + str(count) + ")"
+                className
+            )
+        ]
+    )
+}
+
+schemaSideList: Function := (names: List<String>, current: String) -> HTMLNode {
+    items: Local List<HTMLNode> := []
+    for name in names {
+        buttonClass: Local String := "list-group-item list-group-item-action py-1 px-2 studio-side-item"
+        if name == current {
+            buttonClass = buttonClass + " active"
+        }
+        items.add(
+            queryFormClass(
+                "/AhdDataStudio/mysql/database"
+                {"database": name}
+                name
+                buttonClass
+            )
+        )
+    }
+    return HTML.element(
+        "div"
+        {"class": "list-group studio-side-list mb-3"}
+        items
+    )
+}
+

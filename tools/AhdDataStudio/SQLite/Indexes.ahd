@@ -1,0 +1,121 @@
+bring HTML
+from HTML bring HTMLNode
+bring HTTP
+from HTTP bring Request
+from HTTP bring Response
+from HTTP bring SessionStore
+from HTTP bring Session
+bring SQLite
+from SQLite bring Database
+from SQLite bring SQLiteValue
+from SQLite bring SQLiteError
+
+sqliteIndexesPage: Function := (request: Request) -> Response {
+    sessions: Global SessionStore
+    session: Local Session := sessions.open(request)
+    token: Local String := csrfToken(session)
+    path: Local String? := request.query("db")
+    table: Local String? := request.query("table")
+    if path == null or table == null {
+        return sessions.commit(
+            session
+            HTTP.html(
+                layout("SQLite", token, errorNodes("db and table are required"))
+            )
+        )
+    }
+    attempt {
+        db: Local Database? := openAllowedSqlite(path)
+        if db == null {
+            return sessions.commit(
+                session
+                HTTP.html(
+                    layout(
+                        "SQLite"
+                        token
+                        errorNodes(
+                            "sqlite path is not in the allowed project set"
+                        )
+                    )
+                )
+            )
+        }
+        attempt {
+            if not (table in sqliteTableNames(db)) {
+                return sessions.commit(
+                    session
+                    HTTP.html(
+                        layout("SQLite", token, errorNodes("unknown table"))
+                    )
+                )
+            }
+            listRows: Local List<Pair<String, SQLiteValue>> := db.query(
+                "PRAGMA index_list(" + quoteSqlite(table) + ")"
+            )
+            rows: Local List<List<String>> := []
+            for indexRow in listRows {
+                indexName: Local String := ""
+                unique: Local String := "non-unique"
+                if "name" in indexRow {
+                    if indexRow["name"].kind() == "String" {
+                        indexName = indexRow["name"].string()
+                    }
+                }
+                if "unique" in indexRow {
+                    if indexRow["unique"].kind() == "Int" {
+                        if indexRow["unique"].int() != 0 {
+                            unique = "unique"
+                        }
+                    }
+                }
+                infoRows: Local List<Pair<String, SQLiteValue>> := db.query(
+                    "PRAGMA index_info(" + quoteSqlite(indexName) + ")"
+                )
+                for info in infoRows {
+                    column: Local String := ""
+                    seq: Local String := ""
+                    if "name" in info {
+                        if info["name"].kind() == "String" {
+                            column = info["name"].string()
+                        }
+                    }
+                    if "seqno" in info {
+                        if info["seqno"].kind() == "Int" {
+                            seq = str(info["seqno"].int())
+                        }
+                    }
+                    rows.add([indexName, unique, column, seq])
+                }
+            }
+            body: Local List<HTMLNode> := [
+                HTML.element(
+                    "h1"
+                    {"class": "h4"}
+                    [HTML.text("Indexes · " + table)]
+                )
+                sqliteNav(path, table, "indexes")
+                htmlTable(["Index", "Uniqueness", "Column", "Sequence"], rows)
+            ]
+            return sessions.commit(
+                session
+                HTTP.html(layout("Indexes", token, body))
+            )
+        }
+        except SQLiteError as error {
+            return sessions.commit(
+                session
+                HTTP.html(layout("SQLite", token, errorNodes(error.message)))
+            )
+        }
+        ultimately {
+            db.close()
+        }
+    }
+    except SQLiteError as error {
+        return sessions.commit(
+            session
+            HTTP.html(layout("SQLite", token, errorNodes(error.message)))
+        )
+    }
+}
+

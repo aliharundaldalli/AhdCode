@@ -1,0 +1,30 @@
+bring HTTP
+from HTTP bring Request
+from HTTP bring Session
+bring Security
+
+csrfToken: Function := (session: Session) -> String {
+    token: Local String? := session.get("csrf")
+    if token == null {
+        token = Security.token()
+        session.set("csrf", token)
+    }
+    return token
+}
+
+csrfOK: Function := (request: Request, session: Session) -> Bool {
+    stored: Local String? := session.get("csrf")
+    submitted: Local String? := request.form("csrf")
+    if stored == null {
+        return false
+    }
+    if submitted == null {
+        return false
+    }
+    return Security.secureEqual(stored, submitted)
+}
+
+rotateCsrf: Function := (session: Session) -> Nothing {
+    session.set("csrf", Security.token())
+}
+

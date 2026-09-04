@@ -1,0 +1,269 @@
+bring HTML
+from HTML bring HTMLNode
+bring HTTP
+from HTTP bring Request
+from HTTP bring Response
+from HTTP bring SessionStore
+from HTTP bring Session
+bring MySQL
+from MySQL bring MySQLDatabase
+from MySQL bring MySQLError
+
+mysqlDatabasePage: Function := (request: Request) -> Response {
+    sessions: Global SessionStore
+    session: Local Session := sessions.open(request)
+    token: Local String := csrfToken(session)
+    schema: Local String? := request.query("database")
+    if schema == null {
+        schema = request.form("database")
+    }
+    if schema == null {
+        return sessions.commit(
+            session
+            HTTP.html(
+                layout("MySQL", token, errorNodes("database is required"))
+            )
+        )
+    }
+    attempt {
+        db: Local MySQLDatabase := connectMysql()
+        attempt {
+            allowed: Local List<String> := mysqlDatabases(db)
+            if not (schema in allowed) {
+                return sessions.commit(
+                    session
+                    HTTP.html(
+                        layout("MySQL", token, errorNodes("unknown database"))
+                    )
+                )
+            }
+            mysqlActiveSchema: Global String
+            mysqlActiveSchema = schema
+            kind: Local String := "all"
+            kindQuery: Local String? := request.query("kind")
+            if kindQuery != null {
+                kind = kindQuery
+            }
+            filter: Local String := ""
+            filterQuery: Local String? := request.query("q")
+            if filterQuery != null {
+                filter = filterQuery
+            }
+            tables: Local List<Pair<String, String>> := mysqlTables(db, schema)
+            countAll: Local Int := 0
+            countTable: Local Int := 0
+            countView: Local Int := 0
+            countSystem: Local Int := 0
+            tableRows: Local List<HTMLNode> := []
+            for table in tables {
+                tableType: Local String := table["type"]
+                countAll++
+                if tableType == "BASE TABLE" {
+                    countTable++
+                }
+                if tableType == "VIEW" {
+                    countView++
+                }
+                if tableType == "SYSTEM VIEW" {
+                    countSystem++
+                }
+                if not tableKindMatches(tableType, kind) {
+                    continue
+                }
+                if filter != "" {
+                    if not table["name"].lower().contains(filter.lower()) {
+                        continue
+                    }
+                }
+                name: Local String := table["name"]
+                tableRows.add(
+                    HTML.element(
+                        "tr"
+                        {}
+                        [
+                            HTML.element(
+                                "td"
+                                {}
+                                [
+                                    HTML.element(
+                                        "code"
+                                        {"class": "studio-name", "title": name}
+                                        [HTML.text(name)]
+                                    )
+                                ]
+                            )
+                            HTML.element(
+                                "td"
+                                {"class": "studio-actions-cell"}
+                                [mysqlActionGroup(schema, name)]
+                            )
+                            HTML.element("td", {}, [typeBadge(tableType)])
+                            HTML.element("td", {}, [HTML.text(table["engine"])])
+                            HTML.element(
+                                "td"
+                                {"class": "text-end"}
+                                [HTML.text(table["rows"])]
+                            )
+                        ]
+                    )
+                )
+            }
+            body: Local List<HTMLNode> := [
+                HTML.element("h1", {"class": "h4 mb-1"}, [HTML.text(schema)])
+                HTML.element(
+                    "p"
+                    {"class": "text-muted small"}
+                    [
+                        HTML.text(
+                            "TABLE_ROWS is an estimate when MySQL provides one, not an exact COUNT(*)."
+                        )
+                    ]
+                )
+                HTML.element(
+                    "ul"
+                    {"class": "nav nav-tabs studio-tabs mb-3"}
+                    [
+                        kindTab(schema, "all", kind, "All", countAll)
+                        kindTab(schema, "table", kind, "Tables", countTable)
+                        kindTab(schema, "view", kind, "Views", countView)
+                        kindTab(schema, "system", kind, "System", countSystem)
+                    ]
+                )
+                HTML.element(
+                    "form"
+                    {
+                        "method": "get"
+                        "action": "/AhdDataStudio/mysql/database"
+                        "class": "row g-2 mb-3"
+                    }
+                    [
+                        hiddenField("database", schema)
+                        hiddenField("kind", kind)
+                        HTML.element(
+                            "div"
+                            {"class": "col-auto"}
+                            [
+                                HTML.element(
+                                    "input"
+                                    {
+                                        "type": "search"
+                                        "name": "q"
+                                        "value": filter
+                                        "class": "form-control form-control-sm"
+                                        "placeholder": "Filter tables"
+                                    }
+                                    []
+                                )
+                            ]
+                        )
+                        HTML.element(
+                            "div"
+                            {"class": "col-auto"}
+                            [
+                                HTML.element(
+                                    "button"
+                                    {
+                                        "type": "submit"
+                                        "class": "btn btn-sm btn-outline-secondary"
+                                    }
+                                    [HTML.text("Filter")]
+                                )
+                            ]
+                        )
+                    ]
+                )
+                HTML.element(
+                    "div"
+                    {
+                        "class": "d-flex justify-content-between align-items-center mb-2"
+                    }
+                    [
+                        HTML.element(
+                            "span"
+                            {"class": "small text-muted"}
+                            [HTML.text(str(len(tableRows)) + " shown")]
+                        )
+                        queryFormClass(
+                            "/AhdDataStudio/mysql/sql"
+                            {"database": schema}
+                            "SQL console"
+                            "btn btn-sm btn-outline-primary"
+                        )
+                    ]
+                )
+                HTML.element(
+                    "div"
+                    {"class": "table-responsive"}
+                    [
+                        HTML.element(
+                            "table"
+                            {
+                                "class": "table table-sm table-striped table-hover align-middle bg-white studio-table"
+                            }
+                            [
+                                HTML.element(
+                                    "thead"
+                                    {"class": "table-light"}
+                                    [
+                                        HTML.element(
+                                            "tr"
+                                            {}
+                                            [
+                                                HTML.element(
+                                                    "th"
+                                                    {}
+                                                    [HTML.text("Table")]
+                                                )
+                                                HTML.element(
+                                                    "th"
+                                                    {}
+                                                    [HTML.text("Action")]
+                                                )
+                                                HTML.element(
+                                                    "th"
+                                                    {}
+                                                    [HTML.text("Type")]
+                                                )
+                                                HTML.element(
+                                                    "th"
+                                                    {}
+                                                    [HTML.text("Engine")]
+                                                )
+                                                HTML.element(
+                                                    "th"
+                                                    {"class": "text-end"}
+                                                    [HTML.text("Approx. rows")]
+                                                )
+                                            ]
+                                        )
+                                    ]
+                                )
+                                HTML.element("tbody", {}, tableRows)
+                            ]
+                        )
+                    ]
+                )
+            ]
+            return sessions.commit(
+                session
+                HTTP.html(layout(schema, token, body))
+            )
+        }
+        except MySQLError as error {
+            return sessions.commit(
+                session
+                HTTP.html(layout("MySQL", token, errorNodes(error.message)))
+            )
+        }
+        ultimately {
+            db.close()
+        }
+    }
+    except MySQLError as error {
+        return sessions.commit(
+            session
+            HTTP.html(layout("MySQL", token, errorNodes(error.message)))
+        )
+    }
+}
+

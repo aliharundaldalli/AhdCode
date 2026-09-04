@@ -1,0 +1,10 @@
+bring Env
+
+redact: Function := (message: String) -> String {
+    password: Local String := Env.getOr("AHD_DATA_MYSQL_PASSWORD", "")
+    if password != "" {
+        return message.replace(password, "[redacted]")
+    }
+    return message
+}
+

@@ -1,0 +1,271 @@
+bring HTML
+from HTML bring HTMLNode
+bring HTTP
+from HTTP bring Server
+from HTTP bring Request
+from HTTP bring Response
+from HTTP bring SessionStore
+from HTTP bring Session
+bring MySQL
+from MySQL bring MySQLDatabase
+from MySQL bring MySQLResult
+from MySQL bring MySQLValue
+from MySQL bring MySQLError
+bring SQLite
+from SQLite bring Database
+
+mysqlSqlPage: Function := (request: Request) -> Response {
+    sessions: Global SessionStore
+    session: Local Session := sessions.open(request)
+    token: Local String := csrfToken(session)
+    schemaQuery: Local String? := request.query("database")
+    schema: Local String := ""
+    if schemaQuery != null {
+        schema = schemaQuery
+    }
+    context: Local String := "Server-level console"
+    if schema != "" {
+        context = "Database: " + schema
+    }
+    body: Local List<HTMLNode> := [
+        HTML.element(
+            "h1"
+            {"class": "h4 mb-1"}
+            [HTML.text("MySQL SQL console")]
+        )
+        HTML.element(
+            "p"
+            {"class": "small text-muted studio-mono"}
+            [HTML.text(context)]
+        )
+        HTML.element(
+            "div"
+            {"class": "alert alert-warning py-2 small"}
+            [
+                HTML.text(
+                    "This console runs the SQL you type exactly as entered. Destructive statements are not extra-confirmed; generated Studio forms use parameter binding, this console does not sanitize SQL."
+                )
+            ]
+        )
+        HTML.element(
+            "div"
+            {"class": "studio-sql"}
+            [
+                HTML.element(
+                    "form"
+                    {"method": "post", "action": "/AhdDataStudio/mysql/sql"}
+                    [
+                        csrfField(token)
+                        hiddenField("database", schema)
+                        HTML.element(
+                            "label"
+                            {"class": "form-label small fw-semibold"}
+                            [HTML.text("SQL")]
+                        )
+                        HTML.element(
+                            "textarea"
+                            {
+                                "name": "sql"
+                                "class": "form-control mb-3"
+                                "placeholder": "SELECT ..."
+                            }
+                            [HTML.text("")]
+                        )
+                        HTML.element(
+                            "div"
+                            {
+                                "class": "d-flex justify-content-between align-items-center"
+                            }
+                            [
+                                HTML.element(
+                                    "span"
+                                    {"class": "small text-muted"}
+                                    [
+                                        HTML.text(
+                                            "Runs against the selected MySQL context."
+                                        )
+                                    ]
+                                )
+                                HTML.element(
+                                    "button"
+                                    {
+                                        "type": "submit"
+                                        "class": "btn btn-primary btn-sm px-3"
+                                    }
+                                    [HTML.text("Run query")]
+                                )
+                            ]
+                        )
+                    ]
+                )
+            ]
+        )
+    ]
+    if schema != "" {
+        body.add(
+            HTML.element(
+                "div"
+                {"class": "mt-2"}
+                [
+                    queryForm(
+                        "/AhdDataStudio/mysql/database"
+                        {"database": schema}
+                        "Back to schema"
+                    )
+                ]
+            )
+        )
+    }
+    return sessions.commit(session, HTTP.html(layout("SQL", token, body)))
+}
+
+mysqlSqlRun: Function := (request: Request) -> Response {
+    sessions: Global SessionStore
+    session: Local Session := sessions.open(request)
+    token: Local String := csrfToken(session)
+    if request.method() != "POST" {
+        return sessions.commit(
+            session
+            HTTP.html(
+                layout("SQL", token, errorNodes("SQL console requires POST"))
+                405
+            )
+        )
+    }
+    if not csrfOK(request, session) {
+        return sessions.commit(
+            session
+            HTTP.html(
+                layout(
+                    "SQL"
+                    token
+                    errorNodes("rejected: CSRF token missing or invalid")
+                )
+                403
+            )
+        )
+    }
+    sqlText: Local String? := request.form("sql")
+    schemaForm: Local String? := request.form("database")
+    schema: Local String := ""
+    if schemaForm != null {
+        schema = schemaForm
+    }
+    if sqlText == null {
+        return sessions.commit(
+            session
+            HTTP.html(layout("SQL", token, errorNodes("sql is required")))
+        )
+    }
+    rotateCsrf(session)
+    token = csrfToken(session)
+    attempt {
+        db: Local MySQLDatabase := connectMysql()
+        attempt {
+            if schema != "" {
+                if not (schema in mysqlDatabases(db)) {
+                    return sessions.commit(
+                        session
+                        HTTP.html(
+                            layout("SQL", token, errorNodes("unknown database"))
+                        )
+                    )
+                }
+                db.execute("USE " + quoteMysql(schema))
+            }
+            body: Local List<HTMLNode> := [
+                HTML.element(
+                    "h1"
+                    {"class": "h4"}
+                    [HTML.text("MySQL SQL console")]
+                )
+                HTML.element(
+                    "div"
+                    {"class": "alert alert-warning"}
+                    [HTML.text("This console ran your SQL exactly as entered.")]
+                )
+            ]
+            if looksLikeQuery(sqlText) {
+                data: Local List<Pair<String, MySQLValue>> := db.query(sqlText)
+                headers: Local List<String> := []
+                rows: Local List<List<String>> := []
+                if len(data) > 0 {
+                    for key in data[0] {
+                        headers.add(key)
+                    }
+                    for dataRow in data {
+                        cells: Local List<String> := []
+                        for header in headers {
+                            cells.add(formatMysqlValue(dataRow[header]))
+                        }
+                        rows.add(cells)
+                    }
+                }
+                body.add(
+                    HTML.element(
+                        "p"
+                        {}
+                        [HTML.text(str(len(data)) + " row(s)")]
+                    )
+                )
+                if len(headers) > 0 {
+                    body.add(htmlTable(headers, rows))
+                }
+            }
+            else {
+                result: Local MySQLResult := db.execute(sqlText)
+                body.add(
+                    HTML.element(
+                        "p"
+                        {}
+                        [
+                            HTML.text(
+                                "affected rows: " + str(result.affectedRows())
+                            )
+                        ]
+                    )
+                )
+            }
+            body.add(
+                HTML.element(
+                    "form"
+                    {"method": "post", "action": "/AhdDataStudio/mysql/sql"}
+                    [
+                        csrfField(token)
+                        hiddenField("database", schema)
+                        HTML.element(
+                            "textarea"
+                            {"name": "sql", "class": "form-control mb-2"}
+                            [HTML.text(sqlText)]
+                        )
+                        HTML.element(
+                            "button"
+                            {"type": "submit", "class": "btn btn-primary"}
+                            [HTML.text("Run")]
+                        )
+                    ]
+                )
+            )
+            return sessions.commit(
+                session
+                HTTP.html(layout("SQL", token, body))
+            )
+        }
+        except MySQLError as error {
+            return sessions.commit(
+                session
+                HTTP.html(layout("SQL", token, errorNodes(error.message)))
+            )
+        }
+        ultimately {
+            db.close()
+        }
+    }
+    except MySQLError as error {
+        return sessions.commit(
+            session
+            HTTP.html(layout("SQL", token, errorNodes(error.message)))
+        )
+    }
+}
+

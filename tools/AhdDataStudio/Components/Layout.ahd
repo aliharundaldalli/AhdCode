@@ -1,0 +1,511 @@
+bring File
+from File bring FileError
+bring HTML
+from HTML bring HTMLNode
+bring Path
+
+studioCSS: Function := () -> String {
+    return r"""
+:root {
+    --studio-bg: #f4f6f8;
+    --studio-panel: #ffffff;
+    --studio-border: #dfe3e8;
+    --studio-border-strong: #cbd2da;
+    --studio-text: #1f2937;
+    --studio-muted: #6b7280;
+    --studio-navy: #1f3155;
+    --studio-navy-2: #2e4774;
+    --studio-accent: #8a1f12;
+    --studio-sidebar: #edf1f5;
+}
+html, body { min-height: 100%; }
+body {
+    margin: 0;
+    background: var(--studio-bg);
+    color: var(--studio-text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+}
+.studio-navbar {
+    position: sticky;
+    top: 0;
+    z-index: 1030;
+    background: rgba(255,255,255,.97);
+    border-bottom: 1px solid var(--studio-border);
+    box-shadow: 0 1px 3px rgba(15,23,42,.04);
+}
+.studio-navbar .navbar-brand { color: var(--studio-navy); gap: .65rem; }
+.studio-navbar .navbar-nav .nav-link {
+    color: #445064;
+    padding: .45rem .75rem;
+    border-radius: .35rem;
+}
+.studio-navbar .navbar-nav .nav-link:hover {
+    color: var(--studio-accent);
+    background: #f7f2f1;
+}
+.studio-logo { height: 34px; width: auto; display: block; }
+.studio-local-badge {
+    color: #445064;
+    background: #f8fafc;
+    border: 1px solid var(--studio-border);
+    font-weight: 500;
+}
+.studio-sidebar {
+    background: var(--studio-sidebar);
+    min-height: calc(100vh - 58px);
+    border-right: 1px solid var(--studio-border);
+    font-size: 13px;
+    overflow-x: hidden;
+}
+.studio-sidebar-label {
+    letter-spacing: .08em;
+    font-size: 11px;
+    font-weight: 700;
+    color: #7a8494;
+}
+.studio-side-list form { display: block; margin: 0; max-width: 100%; }
+.studio-side-list button, .studio-side-item {
+    width: 100%;
+    max-width: 100%;
+    text-align: left;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.studio-side-list .list-group-item {
+    border-color: transparent;
+    background: transparent;
+    color: #445064;
+}
+.studio-side-list .list-group-item:hover { background: rgba(255,255,255,.7); }
+.studio-side-list .list-group-item.active {
+    background: #dce5f0;
+    border-color: #c8d4e2;
+    color: #183454;
+    font-weight: 600;
+}
+.studio-main { min-width: 0; }
+.studio-content { max-width: 1500px; }
+.studio-page-heading { margin-bottom: 1rem; }
+.studio-page-heading .eyebrow {
+    color: var(--studio-muted);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    font-weight: 700;
+}
+.studio-tabs { border-bottom: 1px solid var(--studio-border); flex-wrap: wrap; }
+.studio-tabs .nav-item { margin-bottom: -1px; }
+.studio-tabs .nav-item form { display: block; margin: 0; }
+.studio-tabs .nav-link {
+    border: 1px solid transparent;
+    border-top-left-radius: .375rem;
+    border-top-right-radius: .375rem;
+    background: transparent;
+    color: #305d8c;
+    font-size: 13px;
+    padding: .45rem .7rem;
+}
+.studio-tabs .nav-link:hover { background: #f8fafc; }
+.studio-tabs .nav-link.active {
+    background: #fff;
+    border-color: var(--studio-border) var(--studio-border) #fff;
+    color: #212529;
+    font-weight: 600;
+}
+.studio-name {
+    font-size: 12.5px;
+    color: #212529;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+    background: transparent;
+}
+.studio-actions {
+    display: inline-flex;
+    flex-wrap: nowrap;
+    gap: 4px;
+    align-items: center;
+}
+.studio-actions form { display: inline; margin: 0; }
+.studio-actions .btn {
+    padding: .18rem .5rem;
+    font-size: 12px;
+    line-height: 1.2;
+    border-radius: .25rem;
+}
+.studio-table-wrap {
+    border: 1px solid var(--studio-border);
+    border-radius: .45rem;
+    background: #fff;
+    overflow: auto;
+}
+.studio-table { width: 100%; margin-bottom: 0; }
+.studio-table td, .studio-table th { vertical-align: middle; border-color: #e8ebef; }
+.studio-table thead th {
+    color: #4b5563;
+    font-size: 12px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+.studio-table tbody tr:hover { background: #f8fafc; }
+.studio-actions-cell { width: 1%; white-space: nowrap; }
+.studio-card {
+    border: 1px solid var(--studio-border);
+    box-shadow: 0 1px 2px rgba(15,23,42,.04);
+}
+.studio-card .card-header {
+    background: #fafbfc;
+    border-bottom-color: var(--studio-border);
+}
+.studio-provider-icon {
+    width: 38px;
+    height: 38px;
+    border-radius: .5rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    color: #fff;
+    background: var(--studio-navy-2);
+}
+.studio-provider-icon.sqlite { background: #5f6f82; }
+.studio-status-badge { font-weight: 600; letter-spacing: .01em; }
+.studio-empty {
+    border: 1px dashed var(--studio-border-strong);
+    border-radius: .55rem;
+    background: #fff;
+    padding: 2.25rem 1.5rem;
+    text-align: center;
+    max-width: 760px;
+}
+.studio-empty-icon {
+    width: 38px;
+    height: 38px;
+    margin: 0 auto .75rem;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #eef2f6;
+    color: #637083;
+    font-size: 20px;
+}
+.studio-panel {
+    border: 1px solid var(--studio-border);
+    border-radius: .5rem;
+    background: #fff;
+    padding: 1rem;
+}
+.studio-field-meta {
+    color: var(--studio-muted);
+    font-size: 11px;
+    min-height: 17px;
+    margin-bottom: .3rem;
+}
+.studio-sortbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .35rem;
+    padding: .65rem;
+    margin-bottom: .75rem;
+    border: 1px solid var(--studio-border);
+    border-radius: .45rem;
+    background: #fff;
+}
+.studio-pagination {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .75rem;
+    margin-top: .75rem;
+}
+.studio-pagination .pager-actions {
+    display: flex;
+    gap: .4rem;
+}
+.studio-row-action {
+    border: 1px solid var(--studio-border);
+    border-radius: .45rem;
+    background: #fff;
+    padding: .85rem;
+    margin-bottom: .6rem;
+}
+.studio-row-action form { margin: 0; }
+.studio-row-action-fields {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: .45rem;
+}
+.studio-row-action .form-control { min-width: 0; }
+.studio-danger {
+    border: 1px solid #efc2c7;
+    border-left: 4px solid #b02a37;
+    background: #fff7f8;
+    border-radius: .45rem;
+    padding: 1rem;
+}
+.studio-sql {
+    border: 1px solid var(--studio-border);
+    border-radius: .5rem;
+    background: #fff;
+    padding: 1rem;
+}
+.studio-sql-context {
+    color: var(--studio-muted);
+    font-size: 12px;
+    margin-bottom: .65rem;
+}
+textarea.form-control {
+    min-height: 230px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 13px;
+    line-height: 1.5;
+    resize: vertical;
+}
+code, .studio-mono {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+h1.h4, h1.h3 { overflow-wrap: anywhere; }
+.ok { color: #146c43; font-weight: 600; }
+.fail { color: #b02a37; font-weight: 600; }
+@media (max-width: 767.98px) {
+    .studio-navbar .navbar-nav { display: none; }
+    .studio-sidebar {
+        min-height: auto;
+        border-right: 0;
+        border-bottom: 1px solid var(--studio-border);
+    }
+    .studio-content { padding-left: .25rem; padding-right: .25rem; }
+    .studio-actions { flex-wrap: wrap; }
+}
+"""
+}
+
+layout: Function := (
+    title: String
+    token: String
+    body: List<HTMLNode>
+) -> String {
+    sqliteLinks: Local List<HTMLNode> := []
+    attempt {
+        files: Local List<String> := allowedSqlitePaths()
+        for path in files {
+            sqliteLinks.add(
+                queryFormClass(
+                    "/AhdDataStudio/sqlite/database"
+                    {"db": path}
+                    Path.base(path)
+                    "btn btn-sm btn-outline-secondary w-100 text-start mb-1"
+                )
+            )
+        }
+    }
+    except FileError {}
+    mysqlSchemaCache: Global List<String>
+    mysqlActiveSchema: Global String
+    sideBody: Local List<HTMLNode> := [
+        HTML.element(
+            "div"
+            {"class": "studio-sidebar-label px-1 mb-2"}
+            [HTML.text("MYSQL")]
+        )
+        HTML.element(
+            "a"
+            {
+                "class": "btn btn-sm btn-light border w-100 text-start mb-2"
+                "href": "/AhdDataStudio/mysql"
+            }
+            [HTML.text("All databases")]
+        )
+    ]
+    if len(mysqlSchemaCache) > 0 {
+        sideBody.add(schemaSideList(mysqlSchemaCache, mysqlActiveSchema))
+    }
+    sideBody.add(
+        HTML.element(
+            "div"
+            {"class": "studio-sidebar-label px-1 mt-3 mb-2"}
+            [HTML.text("SQLITE")]
+        )
+    )
+    for link in sqliteLinks {
+        sideBody.add(link)
+    }
+    if len(sqliteLinks) == 0 {
+        sideBody.add(
+            HTML.element(
+                "div"
+                {"class": "small text-muted px-1 py-2"}
+                [
+                    HTML.text("No project databases")
+                    HTML.element(
+                        "div"
+                        {"class": "mt-1"}
+                        [
+                            HTML.text(
+                                "Configure a project root or explicit path."
+                            )
+                        ]
+                    )
+                ]
+            )
+        )
+    }
+    nodes: Local List<HTMLNode> := [
+        HTML.element(
+            "link"
+            {
+                "rel": "stylesheet"
+                "href": "/AhdDataStudio/assets/bootstrap.min.css"
+            }
+            []
+        )
+        HTML.element("style", {}, [HTML.text(studioCSS())])
+        HTML.element(
+            "nav"
+            {"class": "navbar navbar-expand navbar-light studio-navbar"}
+            [
+                HTML.element(
+                    "div"
+                    {"class": "container-fluid"}
+                    [
+                        HTML.element(
+                            "div"
+                            {"class": "d-flex align-items-center gap-2"}
+                            [
+                                HTML.element(
+                                    "a"
+                                    {
+                                        "class": "navbar-brand d-flex align-items-center mb-0"
+                                        "href": "/AhdDataStudio"
+                                    }
+                                    [
+                                        HTML.element(
+                                            "img"
+                                            {
+                                                "src": "/AhdDataStudio/assets/ahdcode-logo.png"
+                                                "alt": "AhdCode"
+                                                "class": "studio-logo"
+                                            }
+                                            []
+                                        )
+                                        HTML.element(
+                                            "span"
+                                            {"class": "fw-semibold"}
+                                            [HTML.text("AhdDataStudio")]
+                                        )
+                                    ]
+                                )
+                                HTML.element(
+                                    "span"
+                                    {"class": "badge studio-local-badge"}
+                                    [HTML.text("Local · 127.0.0.1")]
+                                )
+                            ]
+                        )
+                        HTML.element(
+                            "div"
+                            {"class": "navbar-nav"}
+                            [
+                                HTML.element(
+                                    "a"
+                                    {
+                                        "class": "nav-link"
+                                        "href": "/AhdDataStudio"
+                                    }
+                                    [HTML.text("Dashboard")]
+                                )
+                                HTML.element(
+                                    "a"
+                                    {
+                                        "class": "nav-link"
+                                        "href": "/AhdDataStudio/mysql"
+                                    }
+                                    [HTML.text("MySQL")]
+                                )
+                                HTML.element(
+                                    "a"
+                                    {
+                                        "class": "nav-link"
+                                        "href": "/AhdDataStudio/sqlite"
+                                    }
+                                    [HTML.text("SQLite")]
+                                )
+                            ]
+                        )
+                    ]
+                )
+            ]
+        )
+        HTML.element(
+            "div"
+            {"class": "container-fluid"}
+            [
+                HTML.element(
+                    "div"
+                    {"class": "row"}
+                    [
+                        HTML.element(
+                            "aside"
+                            {"class": "col-md-3 col-lg-2 studio-sidebar py-3"}
+                            sideBody
+                        )
+                        HTML.element(
+                            "main"
+                            {"class": "col-md-9 col-lg-10 studio-main py-4"}
+                            [
+                                HTML.element(
+                                    "div"
+                                    {"class": "studio-content"}
+                                    body
+                                )
+                            ]
+                        )
+                    ]
+                )
+            ]
+        )
+    ]
+    return HTML.document("AhdDataStudio · " + title, nodes)
+}
+
+errorNodes: Function := (message: String) -> List<HTMLNode> {
+    return [
+        HTML.element("h1", {"class": "h4"}, [HTML.text("Error")])
+        HTML.element(
+            "div"
+            {"class": "alert alert-danger"}
+            [HTML.text(redact(message))]
+        )
+    ]
+}
+
+parsePage: Function := (text: String?) -> Int {
+    if text == null {
+        return 1
+    }
+    attempt {
+        value: Local Int := int(text)
+        if value < 1 {
+            return 1
+        }
+        return value
+    }
+    except DomainError {
+        return 1
+    }
+    except OverflowError {
+        return 1
+    }
+}
+
+sortDirection: Function := (text: String?) -> String {
+    if text == null {
+        return "ASC"
+    }
+    if text.upper() == "DESC" {
+        return "DESC"
+    }
+    return "ASC"
+}
+

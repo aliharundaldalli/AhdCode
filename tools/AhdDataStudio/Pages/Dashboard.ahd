@@ -1,0 +1,319 @@
+bring Env
+bring File
+from File bring FileError
+bring HTML
+from HTML bring HTMLNode
+bring HTTP
+from HTTP bring Request
+from HTTP bring Response
+from HTTP bring SessionStore
+from HTTP bring Session
+bring MySQL
+from MySQL bring MySQLDatabase
+from MySQL bring MySQLError
+
+home: Function := (request: Request) -> Response {
+    sessions: Global SessionStore
+    session: Local Session := sessions.open(request)
+    token: Local String := csrfToken(session)
+    mysqlStatus: Local String := "Not configured"
+    mysqlDetail: Local String := ""
+    mysqlOk: Local Bool := false
+    attempt {
+        db: Local MySQLDatabase := connectMysql()
+        attempt {
+            names: Local List<String> := mysqlDatabases(db)
+            mysqlOk = true
+            mysqlStatus = "Connected"
+            mysqlDetail = str(len(names)) + " visible databases"
+        }
+        except MySQLError as error {
+            mysqlStatus = "Connection failed"
+            mysqlDetail = redact(error.message)
+        }
+        ultimately {
+            db.close()
+        }
+    }
+    except MySQLError as error {
+        mysqlStatus = "Connection failed"
+        mysqlDetail = redact(error.message)
+    }
+    except DomainError as error {
+        mysqlStatus = "Connection failed"
+        mysqlDetail = redact(error.message)
+    }
+
+    sqliteFiles: Local List<String> := []
+    sqliteStatus: Local String := "No project databases"
+    attempt {
+        sqliteFiles = allowedSqlitePaths()
+        sqliteStatus = str(len(sqliteFiles)) + " database file(s)"
+    }
+    except FileError as error {
+        sqliteStatus = "Discovery failed"
+        sqliteDetail: Local String := redact(error.message)
+        sqliteStatus = sqliteStatus + " — " + sqliteDetail
+    }
+
+    host: Local String := Env.getOr("AHD_DATA_MYSQL_HOST", "127.0.0.1")
+    port: Local String := Env.getOr("AHD_DATA_MYSQL_PORT", "3306")
+
+    sqliteDetailNodes: Local List<HTMLNode> := [
+        HTML.element(
+            "p"
+            {"class": "mb-2 text-muted"}
+            [HTML.text(sqliteStatus)]
+        )
+    ]
+    if len(sqliteFiles) == 0 {
+        sqliteDetailNodes.add(
+            HTML.element(
+                "p"
+                {"class": "small text-muted mb-3"}
+                [
+                    HTML.text(
+                        "Set AHD_DATA_SQLITE_PATHS or AHD_DATA_PROJECT_ROOT to add a project database."
+                    )
+                ]
+            )
+        )
+    }
+
+    body: Local List<HTMLNode> := [
+        HTML.element(
+            "div"
+            {"class": "studio-page-heading"}
+            [
+                HTML.element(
+                    "div"
+                    {"class": "eyebrow"}
+                    [HTML.text("Developer database workspace")]
+                )
+                HTML.element(
+                    "h1"
+                    {"class": "h3 mb-1"}
+                    [HTML.text("AhdDataStudio")]
+                )
+                HTML.element(
+                    "p"
+                    {"class": "text-muted mb-0"}
+                    [
+                        HTML.text(
+                            "Inspect and work with local MySQL and project-scoped SQLite databases from one AhdCode application."
+                        )
+                    ]
+                )
+            ]
+        )
+        HTML.element(
+            "div"
+            {"class": "row g-3"}
+            [
+                HTML.element(
+                    "div"
+                    {"class": "col-lg-6"}
+                    [
+                        HTML.element(
+                            "div"
+                            {"class": "card studio-card h-100"}
+                            [
+                                HTML.element(
+                                    "div"
+                                    {"class": "card-body"}
+                                    [
+                                        HTML.element(
+                                            "div"
+                                            {
+                                                "class": "d-flex justify-content-between align-items-start mb-3"
+                                            }
+                                            [
+                                                HTML.element(
+                                                    "div"
+                                                    {
+                                                        "class": "d-flex gap-3 align-items-center"
+                                                    }
+                                                    [
+                                                        HTML.element(
+                                                            "span"
+                                                            {
+                                                                "class": "studio-provider-icon"
+                                                            }
+                                                            [HTML.text("M")]
+                                                        )
+                                                        HTML.element(
+                                                            "div"
+                                                            {}
+                                                            [
+                                                                HTML.element(
+                                                                    "h2"
+                                                                    {
+                                                                        "class": "h5 mb-0"
+                                                                    }
+                                                                    [
+                                                                        HTML.text(
+                                                                            "MySQL"
+                                                                        )
+                                                                    ]
+                                                                )
+                                                                HTML.element(
+                                                                    "div"
+                                                                    {
+                                                                        "class": "small text-muted studio-mono"
+                                                                    }
+                                                                    [
+                                                                        HTML.text(
+                                                                            host + ":" + port
+                                                                        )
+                                                                    ]
+                                                                )
+                                                            ]
+                                                        )
+                                                    ]
+                                                )
+                                                statusBadge(
+                                                    mysqlStatus
+                                                    mysqlOk
+                                                )
+                                            ]
+                                        )
+                                        HTML.element(
+                                            "p"
+                                            {"class": "text-muted mb-3"}
+                                            [HTML.text(mysqlDetail)]
+                                        )
+                                        HTML.element(
+                                            "a"
+                                            {
+                                                "class": "btn btn-primary btn-sm"
+                                                "href": "/AhdDataStudio/mysql"
+                                            }
+                                            [HTML.text("Open MySQL")]
+                                        )
+                                    ]
+                                )
+                            ]
+                        )
+                    ]
+                )
+                HTML.element(
+                    "div"
+                    {"class": "col-lg-6"}
+                    [
+                        HTML.element(
+                            "div"
+                            {"class": "card studio-card h-100"}
+                            [
+                                HTML.element(
+                                    "div"
+                                    {"class": "card-body"}
+                                    [
+                                        HTML.element(
+                                            "div"
+                                            {
+                                                "class": "d-flex justify-content-between align-items-start mb-3"
+                                            }
+                                            [
+                                                HTML.element(
+                                                    "div"
+                                                    {
+                                                        "class": "d-flex gap-3 align-items-center"
+                                                    }
+                                                    [
+                                                        HTML.element(
+                                                            "span"
+                                                            {
+                                                                "class": "studio-provider-icon sqlite"
+                                                            }
+                                                            [HTML.text("S")]
+                                                        )
+                                                        HTML.element(
+                                                            "div"
+                                                            {}
+                                                            [
+                                                                HTML.element(
+                                                                    "h2"
+                                                                    {
+                                                                        "class": "h5 mb-0"
+                                                                    }
+                                                                    [
+                                                                        HTML.text(
+                                                                            "SQLite"
+                                                                        )
+                                                                    ]
+                                                                )
+                                                                HTML.element(
+                                                                    "div"
+                                                                    {
+                                                                        "class": "small text-muted"
+                                                                    }
+                                                                    [
+                                                                        HTML.text(
+                                                                            "Project databases only"
+                                                                        )
+                                                                    ]
+                                                                )
+                                                            ]
+                                                        )
+                                                    ]
+                                                )
+                                                HTML.element(
+                                                    "span"
+                                                    {
+                                                        "class": "badge rounded-pill text-bg-secondary studio-status-badge"
+                                                    }
+                                                    [
+                                                        HTML.text(
+                                                            str(
+                                                                len(sqliteFiles)
+                                                            ) + " found"
+                                                        )
+                                                    ]
+                                                )
+                                            ]
+                                        )
+                                        HTML.element(
+                                            "div"
+                                            {}
+                                            sqliteDetailNodes
+                                        )
+                                        HTML.element(
+                                            "a"
+                                            {
+                                                "class": "btn btn-primary btn-sm"
+                                                "href": "/AhdDataStudio/sqlite"
+                                            }
+                                            [HTML.text("Open SQLite")]
+                                        )
+                                    ]
+                                )
+                            ]
+                        )
+                    ]
+                )
+            ]
+        )
+        HTML.element(
+            "div"
+            {"class": "studio-panel mt-3"}
+            [
+                HTML.element(
+                    "div"
+                    {"class": "small fw-semibold mb-1"}
+                    [HTML.text("Safety boundary")]
+                )
+                HTML.element(
+                    "div"
+                    {"class": "small text-muted"}
+                    [
+                        HTML.text(
+                            "AhdDataStudio is bound to 127.0.0.1 and SQLite discovery remains limited to explicitly configured paths or immediate children of the configured project root."
+                        )
+                    ]
+                )
+            ]
+        )
+    ]
+    return sessions.commit(session, HTTP.html(layout("Home", token, body)))
+}
+

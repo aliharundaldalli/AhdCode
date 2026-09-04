@@ -1,0 +1,220 @@
+bring HTML
+from HTML bring HTMLNode
+bring HTTP
+from HTTP bring Request
+from HTTP bring Response
+from HTTP bring SessionStore
+from HTTP bring Session
+bring MySQL
+from MySQL bring MySQLDatabase
+from MySQL bring MySQLError
+
+mysqlStructurePage: Function := (request: Request) -> Response {
+    sessions: Global SessionStore
+    session: Local Session := sessions.open(request)
+    token: Local String := csrfToken(session)
+    schema: Local String? := request.query("database")
+    table: Local String? := request.query("table")
+    if schema == null or table == null {
+        return sessions.commit(
+            session
+            HTTP.html(
+                layout(
+                    "MySQL"
+                    token
+                    errorNodes("database and table are required")
+                )
+            )
+        )
+    }
+    attempt {
+        db: Local MySQLDatabase := connectMysql()
+        attempt {
+            if not (schema in mysqlDatabases(db)) {
+                return sessions.commit(
+                    session
+                    HTTP.html(
+                        layout("MySQL", token, errorNodes("unknown database"))
+                    )
+                )
+            }
+            if not (table in mysqlTableNames(db, schema)) {
+                return sessions.commit(
+                    session
+                    HTTP.html(
+                        layout("MySQL", token, errorNodes("unknown table"))
+                    )
+                )
+            }
+            columns: Local List<Pair<String, String>> := mysqlColumns(
+                db
+                schema
+                table
+            )
+            rows: Local List<List<String>> := []
+            insertFields: Local List<HTMLNode> := [
+                csrfField(token)
+                hiddenField("database", schema)
+                hiddenField("table", table)
+            ]
+            for column in columns {
+                rows.add(
+                    [
+                        column["name"]
+                        column["type"]
+                        column["nullable"]
+                        column["default"]
+                        column["key"]
+                        column["extra"]
+                    ]
+                )
+                extra: Local String := column["extra"].lower()
+                if not extra.contains("auto_increment") {
+                    insertFields.add(
+                        fieldNode(
+                            column["name"]
+                            column["type"]
+                            column["nullable"]
+                        )
+                    )
+                }
+            }
+            insertFields.add(
+                HTML.element(
+                    "div"
+                    {"class": "col-12"}
+                    [
+                        HTML.element(
+                            "button"
+                            {
+                                "type": "submit"
+                                "class": "btn btn-primary btn-sm"
+                            }
+                            [HTML.text("Insert row")]
+                        )
+                    ]
+                )
+            )
+            body: Local List<HTMLNode> := [
+                HTML.element(
+                    "h1"
+                    {"class": "h4 mb-1"}
+                    [HTML.text(schema + "." + table)]
+                )
+                HTML.element(
+                    "p"
+                    {"class": "small text-muted studio-mono"}
+                    [HTML.text("MySQL table structure")]
+                )
+                mysqlTableNav(schema, table, "structure")
+                htmlTable(
+                    ["Column", "Type", "Nullable", "Default", "Key", "Extra"]
+                    rows
+                )
+                HTML.element(
+                    "div"
+                    {"class": "studio-panel mt-3"}
+                    [
+                        HTML.element(
+                            "div"
+                            {
+                                "class": "d-flex justify-content-between align-items-center mb-3"
+                            }
+                            [
+                                HTML.element(
+                                    "h2"
+                                    {"class": "h6 mb-0"}
+                                    [HTML.text("Insert row")]
+                                )
+                                HTML.element(
+                                    "span"
+                                    {"class": "small text-muted"}
+                                    [
+                                        HTML.text(
+                                            "Values are submitted through parameter binding."
+                                        )
+                                    ]
+                                )
+                            ]
+                        )
+                        HTML.element(
+                            "form"
+                            {
+                                "method": "post"
+                                "action": "/AhdDataStudio/mysql/insert"
+                                "class": "row g-3"
+                            }
+                            insertFields
+                        )
+                    ]
+                )
+                HTML.element(
+                    "div"
+                    {"class": "studio-danger mt-3"}
+                    [
+                        HTML.element(
+                            "h2"
+                            {"class": "h6 text-danger mb-1"}
+                            [HTML.text("Danger zone")]
+                        )
+                        HTML.element(
+                            "p"
+                            {"class": "small text-muted mb-3"}
+                            [
+                                HTML.text(
+                                    "DROP and TRUNCATE require a separate confirmation POST."
+                                )
+                            ]
+                        )
+                        HTML.element(
+                            "div"
+                            {"class": "d-flex flex-wrap gap-2"}
+                            [
+                                queryFormClass(
+                                    "/AhdDataStudio/mysql/confirm"
+                                    {
+                                        "database": schema
+                                        "table": table
+                                        "action": "drop"
+                                    }
+                                    "Drop table…"
+                                    "btn btn-sm btn-outline-danger"
+                                )
+                                queryFormClass(
+                                    "/AhdDataStudio/mysql/confirm"
+                                    {
+                                        "database": schema
+                                        "table": table
+                                        "action": "truncate"
+                                    }
+                                    "Truncate table…"
+                                    "btn btn-sm btn-outline-danger"
+                                )
+                            ]
+                        )
+                    ]
+                )
+            ]
+            return sessions.commit(
+                session
+                HTTP.html(layout(table, token, body))
+            )
+        }
+        except MySQLError as error {
+            return sessions.commit(
+                session
+                HTTP.html(layout("MySQL", token, errorNodes(error.message)))
+            )
+        }
+        ultimately {
+            db.close()
+        }
+    }
+    except MySQLError as error {
+        return sessions.commit(
+            session
+            HTTP.html(layout("MySQL", token, errorNodes(error.message)))
+        )
+    }
+}
+

@@ -1,0 +1,1030 @@
+bring HTML
+from HTML bring HTMLNode
+bring HTTP
+from HTTP bring Request
+from HTTP bring Response
+from HTTP bring SessionStore
+from HTTP bring Session
+bring MySQL
+from MySQL bring MySQLDatabase
+from MySQL bring MySQLValue
+from MySQL bring MySQLError
+
+mysqlBrowsePage: Function := (request: Request) -> Response {
+    sessions: Global SessionStore
+    pageSize: Global Int
+    session: Local Session := sessions.open(request)
+    token: Local String := csrfToken(session)
+    schema: Local String? := request.query("database")
+    table: Local String? := request.query("table")
+    if schema == null or table == null {
+        return sessions.commit(
+            session
+            HTTP.html(
+                layout(
+                    "MySQL"
+                    token
+                    errorNodes("database and table are required")
+                )
+            )
+        )
+    }
+    page: Local Int := parsePage(request.query("page"))
+    direction: Local String := sortDirection(request.query("dir"))
+    sortCol: Local String? := request.query("sort")
+    attempt {
+        db: Local MySQLDatabase := connectMysql()
+        attempt {
+            if not (schema in mysqlDatabases(db)) {
+                return sessions.commit(
+                    session
+                    HTTP.html(
+                        layout("MySQL", token, errorNodes("unknown database"))
+                    )
+                )
+            }
+            if not (table in mysqlTableNames(db, schema)) {
+                return sessions.commit(
+                    session
+                    HTTP.html(
+                        layout("MySQL", token, errorNodes("unknown table"))
+                    )
+                )
+            }
+            columns: Local List<Pair<String, String>> := mysqlColumns(
+                db
+                schema
+                table
+            )
+            columnNames: Local List<String> := mysqlColumnNames(
+                db
+                schema
+                table
+            )
+            orderColumn: Local String := columnNames[0]
+            if sortCol != null {
+                if sortCol in columnNames {
+                    orderColumn = sortCol
+                }
+            }
+            offset: Local Int := (page - 1) * pageSize
+            qualified: Local String := quoteMysql(
+                schema
+            ) + "." + quoteMysql(table)
+            sql: Local String := "SELECT * FROM " + qualified + " ORDER BY " + quoteMysql(
+                orderColumn
+            ) + " " + direction + " LIMIT ? OFFSET ?"
+            data: Local List<Pair<String, MySQLValue>> := db.query(
+                sql
+                [MySQL.fromInt(pageSize), MySQL.fromInt(offset)]
+            )
+            headers: Local List<String> := []
+            if len(data) > 0 {
+                for key in data[0] {
+                    headers.add(key)
+                }
+            }
+            else {
+                headers = columnNames
+            }
+            pkCols: Local List<String> := mysqlPrimaryColumns(columns)
+            rows: Local List<List<String>> := []
+            actionNodes: Local List<HTMLNode> := []
+            rowNumber: Local Int := offset + 1
+            for dataRow in data {
+                cells: Local List<String> := []
+                for header in headers {
+                    if header in dataRow {
+                        cells.add(formatMysqlValue(dataRow[header]))
+                    }
+                    else {
+                        cells.add("")
+                    }
+                }
+                rows.add(cells)
+                if len(pkCols) > 0 {
+                    deleteChildren: Local List<HTMLNode> := [
+                        csrfField(token)
+                        hiddenField("database", schema)
+                        hiddenField("table", table)
+                    ]
+                    updateChildren: Local List<HTMLNode> := [
+                        csrfField(token)
+                        hiddenField("database", schema)
+                        hiddenField("table", table)
+                    ]
+                    pkSummary: Local String := ""
+                    for pk in pkCols {
+                        pkValue: Local String := ""
+                        if pk in dataRow {
+                            pkValue = formatMysqlValue(dataRow[pk])
+                        }
+                        deleteChildren.add(hiddenField("pk_" + pk, pkValue))
+                        updateChildren.add(hiddenField("pk_" + pk, pkValue))
+                        if pkSummary != "" {
+                            pkSummary = pkSummary + " · "
+                        }
+                        pkSummary = pkSummary + pk + "=" + pkValue
+                    }
+                    fieldNodes: Local List<HTMLNode> := []
+                    for header in headers {
+                        if not (header in pkCols) {
+                            current: Local String := ""
+                            if header in dataRow {
+                                current = formatMysqlValue(dataRow[header])
+                            }
+                            fieldNodes.add(
+                                HTML.element(
+                                    "div"
+                                    {}
+                                    [
+                                        HTML.element(
+                                            "label"
+                                            {"class": "small text-muted mb-1"}
+                                            [HTML.text(header)]
+                                        )
+                                        HTML.element(
+                                            "input"
+                                            {
+                                                "type": "text"
+                                                "name": "col_" + header
+                                                "value": current
+                                                "class": "form-control form-control-sm"
+                                            }
+                                            []
+                                        )
+                                    ]
+                                )
+                            )
+                        }
+                    }
+                    for field in fieldNodes {
+                        updateChildren.add(field)
+                    }
+                    updateChildren.add(
+                        HTML.element(
+                            "button"
+                            {
+                                "type": "submit"
+                                "class": "btn btn-sm btn-primary mt-2"
+                            }
+                            [HTML.text("Update row")]
+                        )
+                    )
+                    deleteChildren.add(
+                        HTML.element(
+                            "button"
+                            {
+                                "type": "submit"
+                                "class": "btn btn-sm btn-outline-danger"
+                            }
+                            [HTML.text("Delete row")]
+                        )
+                    )
+                    actionNodes.add(
+                        HTML.element(
+                            "div"
+                            {"class": "studio-row-action"}
+                            [
+                                HTML.element(
+                                    "div"
+                                    {
+                                        "class": "d-flex justify-content-between align-items-start gap-3 mb-2"
+                                    }
+                                    [
+                                        HTML.element(
+                                            "div"
+                                            {}
+                                            [
+                                                HTML.element(
+                                                    "div"
+                                                    {
+                                                        "class": "small fw-semibold"
+                                                    }
+                                                    [
+                                                        HTML.text(
+                                                            "Row " + str(
+                                                                rowNumber
+                                                            )
+                                                        )
+                                                    ]
+                                                )
+                                                HTML.element(
+                                                    "div"
+                                                    {
+                                                        "class": "small text-muted studio-mono"
+                                                    }
+                                                    [HTML.text(pkSummary)]
+                                                )
+                                            ]
+                                        )
+                                        HTML.element(
+                                            "form"
+                                            {
+                                                "method": "post"
+                                                "action": "/AhdDataStudio/mysql/delete"
+                                            }
+                                            deleteChildren
+                                        )
+                                    ]
+                                )
+                                HTML.element(
+                                    "form"
+                                    {
+                                        "method": "post"
+                                        "action": "/AhdDataStudio/mysql/update"
+                                    }
+                                    [
+                                        HTML.element(
+                                            "div"
+                                            {
+                                                "class": "studio-row-action-fields"
+                                            }
+                                            updateChildren
+                                        )
+                                    ]
+                                )
+                            ]
+                        )
+                    )
+                }
+                rowNumber++
+            }
+            pager: Local List<HTMLNode> := []
+            if page > 1 {
+                pager.add(
+                    queryFormClass(
+                        "/AhdDataStudio/mysql/browse"
+                        {
+                            "database": schema
+                            "table": table
+                            "page": str(page - 1)
+                            "sort": orderColumn
+                            "dir": direction
+                        }
+                        "← Previous"
+                        "btn btn-sm btn-outline-secondary"
+                    )
+                )
+            }
+            if len(data) == pageSize {
+                pager.add(
+                    queryFormClass(
+                        "/AhdDataStudio/mysql/browse"
+                        {
+                            "database": schema
+                            "table": table
+                            "page": str(page + 1)
+                            "sort": orderColumn
+                            "dir": direction
+                        }
+                        "Next →"
+                        "btn btn-sm btn-outline-secondary"
+                    )
+                )
+            }
+            sortLinks: Local List<HTMLNode> := []
+            for name in columnNames {
+                ascClass: Local String := "btn btn-sm btn-light border"
+                descClass: Local String := "btn btn-sm btn-light border"
+                if name == orderColumn and direction == "ASC" {
+                    ascClass = "btn btn-sm btn-primary"
+                }
+                if name == orderColumn and direction == "DESC" {
+                    descClass = "btn btn-sm btn-primary"
+                }
+                sortLinks.add(
+                    queryFormClass(
+                        "/AhdDataStudio/mysql/browse"
+                        {
+                            "database": schema
+                            "table": table
+                            "sort": name
+                            "dir": "ASC"
+                        }
+                        name + " ↑"
+                        ascClass
+                    )
+                )
+                sortLinks.add(
+                    queryFormClass(
+                        "/AhdDataStudio/mysql/browse"
+                        {
+                            "database": schema
+                            "table": table
+                            "sort": name
+                            "dir": "DESC"
+                        }
+                        name + " ↓"
+                        descClass
+                    )
+                )
+            }
+            body: Local List<HTMLNode> := [
+                HTML.element(
+                    "h1"
+                    {"class": "h4 mb-1"}
+                    [HTML.text("Browse · " + table)]
+                )
+                HTML.element(
+                    "p"
+                    {"class": "small text-muted studio-mono"}
+                    [HTML.text(schema + "." + table)]
+                )
+                mysqlTableNav(schema, table, "browse")
+                HTML.element(
+                    "div"
+                    {
+                        "class": "d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2"
+                    }
+                    [
+                        HTML.element(
+                            "span"
+                            {"class": "small text-muted"}
+                            [
+                                HTML.text(
+                                    "Page " + str(
+                                        page
+                                    ) + " · up to " + str(pageSize) + " rows"
+                                )
+                            ]
+                        )
+                        HTML.element(
+                            "span"
+                            {"class": "small text-muted"}
+                            [
+                                HTML.text(
+                                    "Sort: " + orderColumn + " " + direction
+                                )
+                            ]
+                        )
+                    ]
+                )
+                HTML.element("div", {"class": "studio-sortbar"}, sortLinks)
+            ]
+            if len(data) == 0 {
+                body.add(
+                    emptyState(
+                        "No rows on this page"
+                        "The table is empty at this offset, or there are no more rows to display."
+                    )
+                )
+            }
+            else {
+                body.add(htmlTable(headers, rows))
+            }
+            body.add(
+                HTML.element(
+                    "div"
+                    {"class": "studio-pagination"}
+                    [
+                        HTML.element(
+                            "span"
+                            {"class": "small text-muted"}
+                            [HTML.text("Page " + str(page))]
+                        )
+                        HTML.element("div", {"class": "pager-actions"}, pager)
+                    ]
+                )
+            )
+            if len(actionNodes) > 0 {
+                body.add(
+                    HTML.element(
+                        "h2"
+                        {"class": "h6 mt-4 mb-1"}
+                        [HTML.text("Row actions")]
+                    )
+                )
+                body.add(
+                    HTML.element(
+                        "p"
+                        {"class": "small text-muted"}
+                        [
+                            HTML.text(
+                                "Updates and deletes use parameter binding. Identifiers come from discovered metadata."
+                            )
+                        ]
+                    )
+                )
+                for action in actionNodes {
+                    body.add(action)
+                }
+            }
+            return sessions.commit(
+                session
+                HTTP.html(layout("Browse", token, body))
+            )
+        }
+        except MySQLError as error {
+            return sessions.commit(
+                session
+                HTTP.html(layout("MySQL", token, errorNodes(error.message)))
+            )
+        }
+        ultimately {
+            db.close()
+        }
+    }
+    except MySQLError as error {
+        return sessions.commit(
+            session
+            HTTP.html(layout("MySQL", token, errorNodes(error.message)))
+        )
+    }
+}
+
+mysqlInsert: Function := (request: Request) -> Response {
+    sessions: Global SessionStore
+    session: Local Session := sessions.open(request)
+    token: Local String := csrfToken(session)
+    rejected: Local Response? := rejectGetStateChange(request, session, token)
+    if rejected != null {
+        return rejected
+    }
+    schema: Local String? := request.form("database")
+    table: Local String? := request.form("table")
+    if schema == null or table == null {
+        return sessions.commit(
+            session
+            HTTP.html(
+                layout(
+                    "MySQL"
+                    token
+                    errorNodes("database and table are required")
+                )
+            )
+        )
+    }
+    rotateCsrf(session)
+    attempt {
+        db: Local MySQLDatabase := connectMysql()
+        attempt {
+            if not (schema in mysqlDatabases(db)) {
+                return sessions.commit(
+                    session
+                    HTTP.html(
+                        layout("MySQL", token, errorNodes("unknown database"))
+                    )
+                )
+            }
+            if not (table in mysqlTableNames(db, schema)) {
+                return sessions.commit(
+                    session
+                    HTTP.html(
+                        layout("MySQL", token, errorNodes("unknown table"))
+                    )
+                )
+            }
+            columns: Local List<Pair<String, String>> := mysqlColumns(
+                db
+                schema
+                table
+            )
+            colNames: Local List<String> := []
+            values: Local List<MySQLValue> := []
+            for column in columns {
+                extra: Local String := column["extra"].lower()
+                if extra.contains("auto_increment") {
+                    continue
+                }
+                name: Local String := column["name"]
+                raw: Local String? := request.form("col_" + name)
+                if raw == null {
+                    continue
+                }
+                colNames.add(quoteMysql(name))
+                if raw == "" and column["nullable"] == "YES" {
+                    values.add(MySQL.nullValue())
+                }
+                else {
+                    values.add(MySQL.fromString(raw))
+                }
+            }
+            if len(colNames) == 0 {
+                return sessions.commit(
+                    session
+                    HTTP.html(
+                        layout("MySQL", token, errorNodes("no insert columns"))
+                    )
+                )
+            }
+            placeholders: Local List<String> := []
+            for name in colNames {
+                placeholders.add("?")
+            }
+            sql: Local String := "INSERT INTO " + quoteMysql(
+                schema
+            ) + "." + quoteMysql(table) + " (" + colNames[0]
+            index: Local Int := 1
+            while index < len(colNames) {
+                sql = sql + ", " + colNames[index]
+                index++
+            }
+            sql = sql + ") VALUES (?"
+            index = 1
+            while index < len(placeholders) {
+                sql = sql + ", ?"
+                index++
+            }
+            sql = sql + ")"
+            db.execute(sql, values)
+            return sessions.commit(
+                session
+                HTTP.redirect(mysqlBrowseURL(schema, table))
+            )
+        }
+        except MySQLError as error {
+            return sessions.commit(
+                session
+                HTTP.html(layout("MySQL", token, errorNodes(error.message)))
+            )
+        }
+        ultimately {
+            db.close()
+        }
+    }
+    except MySQLError as error {
+        return sessions.commit(
+            session
+            HTTP.html(layout("MySQL", token, errorNodes(error.message)))
+        )
+    }
+}
+
+mysqlDelete: Function := (request: Request) -> Response {
+    sessions: Global SessionStore
+    session: Local Session := sessions.open(request)
+    token: Local String := csrfToken(session)
+    rejected: Local Response? := rejectGetStateChange(request, session, token)
+    if rejected != null {
+        return rejected
+    }
+    schema: Local String? := request.form("database")
+    table: Local String? := request.form("table")
+    if schema == null or table == null {
+        return sessions.commit(
+            session
+            HTTP.html(
+                layout(
+                    "MySQL"
+                    token
+                    errorNodes("database and table are required")
+                )
+            )
+        )
+    }
+    rotateCsrf(session)
+    attempt {
+        db: Local MySQLDatabase := connectMysql()
+        attempt {
+            if not (schema in mysqlDatabases(db)) {
+                return sessions.commit(
+                    session
+                    HTTP.html(
+                        layout("MySQL", token, errorNodes("unknown database"))
+                    )
+                )
+            }
+            if not (table in mysqlTableNames(db, schema)) {
+                return sessions.commit(
+                    session
+                    HTTP.html(
+                        layout("MySQL", token, errorNodes("unknown table"))
+                    )
+                )
+            }
+            columns: Local List<Pair<String, String>> := mysqlColumns(
+                db
+                schema
+                table
+            )
+            pkCols: Local List<String> := mysqlPrimaryColumns(columns)
+            if len(pkCols) == 0 {
+                return sessions.commit(
+                    session
+                    HTTP.html(
+                        layout(
+                            "MySQL"
+                            token
+                            errorNodes("delete requires a primary key")
+                        )
+                    )
+                )
+            }
+            sql: Local String := "DELETE FROM " + quoteMysql(
+                schema
+            ) + "." + quoteMysql(table) + " WHERE "
+            values: Local List<MySQLValue> := []
+            index: Local Int := 0
+            while index < len(pkCols) {
+                name: Local String := pkCols[index]
+                raw: Local String? := request.form("pk_" + name)
+                if raw == null {
+                    return sessions.commit(
+                        session
+                        HTTP.html(
+                            layout(
+                                "MySQL"
+                                token
+                                errorNodes("missing primary key value")
+                            )
+                        )
+                    )
+                }
+                if index > 0 {
+                    sql = sql + " AND "
+                }
+                sql = sql + quoteMysql(name) + " = ?"
+                values.add(MySQL.fromString(raw))
+                index++
+            }
+            db.execute(sql, values)
+            return sessions.commit(
+                session
+                HTTP.redirect(mysqlBrowseURL(schema, table))
+            )
+        }
+        except MySQLError as error {
+            return sessions.commit(
+                session
+                HTTP.html(layout("MySQL", token, errorNodes(error.message)))
+            )
+        }
+        ultimately {
+            db.close()
+        }
+    }
+    except MySQLError as error {
+        return sessions.commit(
+            session
+            HTTP.html(layout("MySQL", token, errorNodes(error.message)))
+        )
+    }
+}
+
+mysqlUpdate: Function := (request: Request) -> Response {
+    sessions: Global SessionStore
+    session: Local Session := sessions.open(request)
+    token: Local String := csrfToken(session)
+    rejected: Local Response? := rejectGetStateChange(request, session, token)
+    if rejected != null {
+        return rejected
+    }
+    schema: Local String? := request.form("database")
+    table: Local String? := request.form("table")
+    if schema == null or table == null {
+        return sessions.commit(
+            session
+            HTTP.html(
+                layout(
+                    "MySQL"
+                    token
+                    errorNodes("database and table are required")
+                )
+            )
+        )
+    }
+    rotateCsrf(session)
+    attempt {
+        db: Local MySQLDatabase := connectMysql()
+        attempt {
+            if not (schema in mysqlDatabases(db)) {
+                return sessions.commit(
+                    session
+                    HTTP.html(
+                        layout("MySQL", token, errorNodes("unknown database"))
+                    )
+                )
+            }
+            if not (table in mysqlTableNames(db, schema)) {
+                return sessions.commit(
+                    session
+                    HTTP.html(
+                        layout("MySQL", token, errorNodes("unknown table"))
+                    )
+                )
+            }
+            columns: Local List<Pair<String, String>> := mysqlColumns(
+                db
+                schema
+                table
+            )
+            columnNames: Local List<String> := mysqlColumnNames(
+                db
+                schema
+                table
+            )
+            pkCols: Local List<String> := mysqlPrimaryColumns(columns)
+            if len(pkCols) == 0 {
+                return sessions.commit(
+                    session
+                    HTTP.html(
+                        layout(
+                            "MySQL"
+                            token
+                            errorNodes("update requires a primary key")
+                        )
+                    )
+                )
+            }
+            setParts: Local List<String> := []
+            values: Local List<MySQLValue> := []
+            for name in columnNames {
+                if name in pkCols {
+                    continue
+                }
+                raw: Local String? := request.form("col_" + name)
+                if raw == null {
+                    continue
+                }
+                setParts.add(quoteMysql(name) + " = ?")
+                values.add(MySQL.fromString(raw))
+            }
+            if len(setParts) == 0 {
+                return sessions.commit(
+                    session
+                    HTTP.html(
+                        layout("MySQL", token, errorNodes("no update columns"))
+                    )
+                )
+            }
+            sql: Local String := "UPDATE " + quoteMysql(
+                schema
+            ) + "." + quoteMysql(table) + " SET " + setParts[0]
+            index: Local Int := 1
+            while index < len(setParts) {
+                sql = sql + ", " + setParts[index]
+                index++
+            }
+            sql = sql + " WHERE "
+            index = 0
+            while index < len(pkCols) {
+                name: Local String := pkCols[index]
+                raw: Local String? := request.form("pk_" + name)
+                if raw == null {
+                    return sessions.commit(
+                        session
+                        HTTP.html(
+                            layout(
+                                "MySQL"
+                                token
+                                errorNodes("missing primary key value")
+                            )
+                        )
+                    )
+                }
+                if index > 0 {
+                    sql = sql + " AND "
+                }
+                sql = sql + quoteMysql(name) + " = ?"
+                values.add(MySQL.fromString(raw))
+                index++
+            }
+            db.execute(sql, values)
+            return sessions.commit(
+                session
+                HTTP.redirect(mysqlBrowseURL(schema, table))
+            )
+        }
+        except MySQLError as error {
+            return sessions.commit(
+                session
+                HTTP.html(layout("MySQL", token, errorNodes(error.message)))
+            )
+        }
+        ultimately {
+            db.close()
+        }
+    }
+    except MySQLError as error {
+        return sessions.commit(
+            session
+            HTTP.html(layout("MySQL", token, errorNodes(error.message)))
+        )
+    }
+}
+
+mysqlConfirmPage: Function := (request: Request) -> Response {
+    sessions: Global SessionStore
+    session: Local Session := sessions.open(request)
+    token: Local String := csrfToken(session)
+    schema: Local String? := request.query("database")
+    table: Local String? := request.query("table")
+    action: Local String? := request.query("action")
+    if schema == null or table == null or action == null {
+        return sessions.commit(
+            session
+            HTTP.html(
+                layout(
+                    "Confirm"
+                    token
+                    errorNodes("database, table, and action are required")
+                )
+            )
+        )
+    }
+    if action != "drop" and action != "truncate" {
+        return sessions.commit(
+            session
+            HTTP.html(layout("Confirm", token, errorNodes("unknown action")))
+        )
+    }
+    target: Local String := "/AhdDataStudio/mysql/drop"
+    label: Local String := "Confirm DROP TABLE"
+    if action == "truncate" {
+        target = "/AhdDataStudio/mysql/truncate"
+        label = "Confirm TRUNCATE TABLE"
+    }
+    body: Local List<HTMLNode> := [
+        HTML.element(
+            "h1"
+            {"class": "h4 mb-3"}
+            [HTML.text("Confirm destructive action")]
+        )
+        HTML.element(
+            "div"
+            {"class": "studio-danger"}
+            [
+                HTML.element(
+                    "div"
+                    {"class": "small text-uppercase fw-bold text-danger mb-2"}
+                    [HTML.text("Danger zone")]
+                )
+                HTML.element(
+                    "h2"
+                    {"class": "h6"}
+                    [HTML.text(action.upper() + " " + schema + "." + table)]
+                )
+                HTML.element(
+                    "p"
+                    {"class": "text-muted small"}
+                    [
+                        HTML.text(
+                            "AhdDataStudio will execute this action only after this confirmation POST. Review the target before continuing."
+                        )
+                    ]
+                )
+                HTML.element(
+                    "form"
+                    {"method": "post", "action": target}
+                    [
+                        csrfField(token)
+                        hiddenField("database", schema)
+                        hiddenField("table", table)
+                        HTML.element(
+                            "a"
+                            {
+                                "href": mysqlBrowseURL(schema, table)
+                                "class": "btn btn-sm btn-light border me-2"
+                            }
+                            [HTML.text("Cancel")]
+                        )
+                        HTML.element(
+                            "button"
+                            {"type": "submit", "class": "btn btn-sm btn-danger"}
+                            [HTML.text(label)]
+                        )
+                    ]
+                )
+            ]
+        )
+    ]
+    return sessions.commit(session, HTTP.html(layout("Confirm", token, body)))
+}
+
+mysqlDrop: Function := (request: Request) -> Response {
+    sessions: Global SessionStore
+    session: Local Session := sessions.open(request)
+    token: Local String := csrfToken(session)
+    rejected: Local Response? := rejectGetStateChange(request, session, token)
+    if rejected != null {
+        return rejected
+    }
+    schema: Local String? := request.form("database")
+    table: Local String? := request.form("table")
+    if schema == null or table == null {
+        return sessions.commit(
+            session
+            HTTP.html(
+                layout(
+                    "MySQL"
+                    token
+                    errorNodes("database and table are required")
+                )
+            )
+        )
+    }
+    rotateCsrf(session)
+    attempt {
+        db: Local MySQLDatabase := connectMysql()
+        attempt {
+            if not (schema in mysqlDatabases(db)) {
+                return sessions.commit(
+                    session
+                    HTTP.html(
+                        layout("MySQL", token, errorNodes("unknown database"))
+                    )
+                )
+            }
+            if not (table in mysqlTableNames(db, schema)) {
+                return sessions.commit(
+                    session
+                    HTTP.html(
+                        layout("MySQL", token, errorNodes("unknown table"))
+                    )
+                )
+            }
+            db.execute(
+                "DROP TABLE " + quoteMysql(schema) + "." + quoteMysql(table)
+            )
+            return sessions.commit(
+                session
+                HTTP.redirect(mysqlDatabaseURL(schema))
+            )
+        }
+        except MySQLError as error {
+            return sessions.commit(
+                session
+                HTTP.html(layout("MySQL", token, errorNodes(error.message)))
+            )
+        }
+        ultimately {
+            db.close()
+        }
+    }
+    except MySQLError as error {
+        return sessions.commit(
+            session
+            HTTP.html(layout("MySQL", token, errorNodes(error.message)))
+        )
+    }
+}
+
+mysqlTruncate: Function := (request: Request) -> Response {
+    sessions: Global SessionStore
+    session: Local Session := sessions.open(request)
+    token: Local String := csrfToken(session)
+    rejected: Local Response? := rejectGetStateChange(request, session, token)
+    if rejected != null {
+        return rejected
+    }
+    schema: Local String? := request.form("database")
+    table: Local String? := request.form("table")
+    if schema == null or table == null {
+        return sessions.commit(
+            session
+            HTTP.html(
+                layout(
+                    "MySQL"
+                    token
+                    errorNodes("database and table are required")
+                )
+            )
+        )
+    }
+    rotateCsrf(session)
+    attempt {
+        db: Local MySQLDatabase := connectMysql()
+        attempt {
+            if not (schema in mysqlDatabases(db)) {
+                return sessions.commit(
+                    session
+                    HTTP.html(
+                        layout("MySQL", token, errorNodes("unknown database"))
+                    )
+                )
+            }
+            if not (table in mysqlTableNames(db, schema)) {
+                return sessions.commit(
+                    session
+                    HTTP.html(
+                        layout("MySQL", token, errorNodes("unknown table"))
+                    )
+                )
+            }
+            db.execute(
+                "TRUNCATE TABLE " + quoteMysql(schema) + "." + quoteMysql(table)
+            )
+            return sessions.commit(
+                session
+                HTTP.redirect(mysqlBrowseURL(schema, table))
+            )
+        }
+        except MySQLError as error {
+            return sessions.commit(
+                session
+                HTTP.html(layout("MySQL", token, errorNodes(error.message)))
+            )
+        }
+        ultimately {
+            db.close()
+        }
+    }
+    except MySQLError as error {
+        return sessions.commit(
+            session
+            HTTP.html(layout("MySQL", token, errorNodes(error.message)))
+        )
+    }
+}
+

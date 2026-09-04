@@ -1,0 +1,205 @@
+bring MySQL
+from MySQL bring MySQLDatabase
+from MySQL bring MySQLValue
+bring SQLite
+from SQLite bring Database
+
+quoteMysql: Function := (name: String) -> String {
+    return "`" + name.replace("`", "``") + "`"
+}
+
+mysqlBrowseURL: Function := (schema: String, table: String) -> String {
+    return "/AhdDataStudio/mysql/browse?database=" + schema + "&table=" + table
+}
+
+mysqlDatabaseURL: Function := (schema: String) -> String {
+    return "/AhdDataStudio/mysql/database?database=" + schema
+}
+
+mysqlDatabases: Function := (db: MySQLDatabase) -> List<String> {
+    names: Local List<String> := []
+    rows: Local List<Pair<String, MySQLValue>> := db.query("SHOW DATABASES")
+    for row in rows {
+        if "Database" in row {
+            value: Local MySQLValue := row["Database"]
+            if not value.isNull() {
+                if value.kind() == "String" {
+                    names.add(value.string())
+                }
+            }
+        }
+    }
+    mysqlSchemaCache: Global List<String>
+    mysqlSchemaCache = names
+    return names
+}
+
+mysqlTables: Function := (
+    db: MySQLDatabase
+    schema: String
+) -> List<Pair<String, String>> {
+    rows: Local List<Pair<String, MySQLValue>> := db.query(
+        "SELECT TABLE_NAME, TABLE_TYPE, ENGINE, TABLE_ROWS FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = ? ORDER BY TABLE_NAME"
+        [MySQL.fromString(schema)]
+    )
+    tables: Local List<Pair<String, String>> := []
+    for row in rows {
+        name: Local String := ""
+        kind: Local String := ""
+        engine: Local String := ""
+        approx: Local String := ""
+        if "TABLE_NAME" in row {
+            if row["TABLE_NAME"].kind() == "String" {
+                name = row["TABLE_NAME"].string()
+            }
+        }
+        if "TABLE_TYPE" in row {
+            if row["TABLE_TYPE"].kind() == "String" {
+                kind = row["TABLE_TYPE"].string()
+            }
+        }
+        if "ENGINE" in row {
+            if not row["ENGINE"].isNull() {
+                if row["ENGINE"].kind() == "String" {
+                    engine = row["ENGINE"].string()
+                }
+            }
+        }
+        if "TABLE_ROWS" in row {
+            if not row["TABLE_ROWS"].isNull() {
+                if row["TABLE_ROWS"].kind() == "Int" {
+                    approx = str(row["TABLE_ROWS"].int())
+                }
+                else if row["TABLE_ROWS"].kind() == "String" {
+                    approx = row["TABLE_ROWS"].string()
+                }
+            }
+        }
+        tables.add(
+            {"name": name, "type": kind, "engine": engine, "rows": approx}
+        )
+    }
+    return tables
+}
+
+mysqlTableNames: Function := (
+    db: MySQLDatabase
+    schema: String
+) -> List<String> {
+    names: Local List<String> := []
+    tables: Local List<Pair<String, String>> := mysqlTables(db, schema)
+    for table in tables {
+        names.add(table["name"])
+    }
+    return names
+}
+
+mysqlColumns: Function := (
+    db: MySQLDatabase
+    schema: String
+    table: String
+) -> List<Pair<String, String>> {
+    rows: Local List<Pair<String, MySQLValue>> := db.query(
+        "SELECT COLUMN_NAME, COLUMN_TYPE, IS_NULLABLE, COLUMN_DEFAULT, COLUMN_KEY, EXTRA FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? ORDER BY ORDINAL_POSITION"
+        [MySQL.fromString(schema), MySQL.fromString(table)]
+    )
+    columns: Local List<Pair<String, String>> := []
+    for row in rows {
+        name: Local String := ""
+        sqlType: Local String := ""
+        nullable: Local String := ""
+        defaultValue: Local String := ""
+        key: Local String := ""
+        extra: Local String := ""
+        if "COLUMN_NAME" in row {
+            if row["COLUMN_NAME"].kind() == "String" {
+                name = row["COLUMN_NAME"].string()
+            }
+        }
+        if "COLUMN_TYPE" in row {
+            if row["COLUMN_TYPE"].kind() == "String" {
+                sqlType = row["COLUMN_TYPE"].string()
+            }
+        }
+        if "IS_NULLABLE" in row {
+            if row["IS_NULLABLE"].kind() == "String" {
+                nullable = row["IS_NULLABLE"].string()
+            }
+        }
+        if "COLUMN_DEFAULT" in row {
+            if row["COLUMN_DEFAULT"].isNull() {
+                defaultValue = ""
+            }
+            else if row["COLUMN_DEFAULT"].kind() == "String" {
+                defaultValue = row["COLUMN_DEFAULT"].string()
+            }
+        }
+        if "COLUMN_KEY" in row {
+            if row["COLUMN_KEY"].kind() == "String" {
+                key = row["COLUMN_KEY"].string()
+            }
+        }
+        if "EXTRA" in row {
+            if row["EXTRA"].kind() == "String" {
+                extra = row["EXTRA"].string()
+            }
+        }
+        columns.add(
+            {
+                "name": name
+                "type": sqlType
+                "nullable": nullable
+                "default": defaultValue
+                "key": key
+                "extra": extra
+            }
+        )
+    }
+    return columns
+}
+
+mysqlColumnNames: Function := (
+    db: MySQLDatabase
+    schema: String
+    table: String
+) -> List<String> {
+    names: Local List<String> := []
+    columns: Local List<Pair<String, String>> := mysqlColumns(db, schema, table)
+    for column in columns {
+        names.add(column["name"])
+    }
+    return names
+}
+
+mysqlPrimaryColumns: Function := (
+    columns: List<Pair<String, String>>
+) -> List<String> {
+    names: Local List<String> := []
+    for column in columns {
+        if column["key"] == "PRI" {
+            names.add(column["name"])
+        }
+    }
+    return names
+}
+
+formatMysqlValue: Function := (value: MySQLValue) -> String {
+    if value.isNull() {
+        return "NULL"
+    }
+    if value.isBinary() {
+        return "[Binary · " + str(value.binarySize()) + " bytes]"
+    }
+    kind: Local String := value.kind()
+    if kind == "Int" {
+        return str(value.int())
+    }
+    if kind == "Real" {
+        return str(value.real())
+    }
+    if kind == "String" {
+        return value.string()
+    }
+    return "[" + kind + "]"
+}
+

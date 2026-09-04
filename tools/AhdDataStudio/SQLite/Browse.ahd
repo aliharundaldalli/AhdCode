@@ -1,0 +1,953 @@
+bring HTML
+from HTML bring HTMLNode
+bring HTTP
+from HTTP bring Request
+from HTTP bring Response
+from HTTP bring SessionStore
+from HTTP bring Session
+bring Path
+bring SQLite
+from SQLite bring Database
+from SQLite bring SQLiteValue
+from SQLite bring SQLiteError
+
+sqliteBrowsePage: Function := (request: Request) -> Response {
+    sessions: Global SessionStore
+    pageSize: Global Int
+    session: Local Session := sessions.open(request)
+    token: Local String := csrfToken(session)
+    path: Local String? := request.query("db")
+    table: Local String? := request.query("table")
+    if path == null or table == null {
+        return sessions.commit(
+            session
+            HTTP.html(
+                layout("SQLite", token, errorNodes("db and table are required"))
+            )
+        )
+    }
+    page: Local Int := parsePage(request.query("page"))
+    direction: Local String := sortDirection(request.query("dir"))
+    sortCol: Local String? := request.query("sort")
+    attempt {
+        db: Local Database? := openAllowedSqlite(path)
+        if db == null {
+            return sessions.commit(
+                session
+                HTTP.html(
+                    layout(
+                        "SQLite"
+                        token
+                        errorNodes(
+                            "sqlite path is not in the allowed project set"
+                        )
+                    )
+                )
+            )
+        }
+        attempt {
+            if not (table in sqliteTableNames(db)) {
+                return sessions.commit(
+                    session
+                    HTTP.html(
+                        layout("SQLite", token, errorNodes("unknown table"))
+                    )
+                )
+            }
+            columns: Local List<Pair<String, String>> := sqliteColumns(
+                db
+                table
+            )
+            browseCols: Local List<String> := sqliteBrowseColumns(columns)
+            if len(browseCols) == 0 {
+                return sessions.commit(
+                    session
+                    HTTP.html(
+                        layout(
+                            "SQLite"
+                            token
+                            errorNodes("no non-BLOB columns to browse")
+                        )
+                    )
+                )
+            }
+            orderColumn: Local String := browseCols[0]
+            if sortCol != null {
+                if sortCol in browseCols {
+                    orderColumn = sortCol
+                }
+            }
+            selectList: Local String := quoteSqlite(browseCols[0])
+            index: Local Int := 1
+            while index < len(browseCols) {
+                selectList = selectList + ", " + quoteSqlite(browseCols[index])
+                index++
+            }
+            offset: Local Int := (page - 1) * pageSize
+            sql: Local String := "SELECT " + selectList + " FROM " + quoteSqlite(
+                table
+            ) + " ORDER BY " + quoteSqlite(
+                orderColumn
+            ) + " " + direction + " LIMIT ? OFFSET ?"
+            data: Local List<Pair<String, SQLiteValue>> := db.query(
+                sql
+                [SQLite.fromInt(pageSize), SQLite.fromInt(offset)]
+            )
+            rows: Local List<List<String>> := []
+            for dataRow in data {
+                cells: Local List<String> := []
+                for header in browseCols {
+                    if header in dataRow {
+                        cells.add(formatSqliteValue(dataRow[header]))
+                    }
+                    else {
+                        cells.add("")
+                    }
+                }
+                rows.add(cells)
+            }
+            pkCols: Local List<String> := mysqlPrimaryColumns(columns)
+            actionNodes: Local List<HTMLNode> := []
+            rowNumber: Local Int := offset + 1
+            for dataRow in data {
+                if len(pkCols) > 0 {
+                    deleteChildren: Local List<HTMLNode> := [
+                        csrfField(token)
+                        hiddenField("db", path)
+                        hiddenField("table", table)
+                    ]
+                    updateChildren: Local List<HTMLNode> := [
+                        csrfField(token)
+                        hiddenField("db", path)
+                        hiddenField("table", table)
+                    ]
+                    pkSummary: Local String := ""
+                    for pk in pkCols {
+                        pkValue: Local String := ""
+                        if pk in dataRow {
+                            pkValue = formatSqliteValue(dataRow[pk])
+                        }
+                        deleteChildren.add(hiddenField("pk_" + pk, pkValue))
+                        updateChildren.add(hiddenField("pk_" + pk, pkValue))
+                        if pkSummary != "" {
+                            pkSummary = pkSummary + " · "
+                        }
+                        pkSummary = pkSummary + pk + "=" + pkValue
+                    }
+                    fieldNodes: Local List<HTMLNode> := []
+                    for header in browseCols {
+                        if not (header in pkCols) {
+                            current: Local String := ""
+                            if header in dataRow {
+                                current = formatSqliteValue(dataRow[header])
+                            }
+                            fieldNodes.add(
+                                HTML.element(
+                                    "div"
+                                    {}
+                                    [
+                                        HTML.element(
+                                            "label"
+                                            {"class": "small text-muted mb-1"}
+                                            [HTML.text(header)]
+                                        )
+                                        HTML.element(
+                                            "input"
+                                            {
+                                                "type": "text"
+                                                "name": "col_" + header
+                                                "value": current
+                                                "class": "form-control form-control-sm"
+                                            }
+                                            []
+                                        )
+                                    ]
+                                )
+                            )
+                        }
+                    }
+                    for field in fieldNodes {
+                        updateChildren.add(field)
+                    }
+                    updateChildren.add(
+                        HTML.element(
+                            "button"
+                            {
+                                "type": "submit"
+                                "class": "btn btn-sm btn-primary mt-2"
+                            }
+                            [HTML.text("Update row")]
+                        )
+                    )
+                    deleteChildren.add(
+                        HTML.element(
+                            "button"
+                            {
+                                "type": "submit"
+                                "class": "btn btn-sm btn-outline-danger"
+                            }
+                            [HTML.text("Delete row")]
+                        )
+                    )
+                    actionNodes.add(
+                        HTML.element(
+                            "div"
+                            {"class": "studio-row-action"}
+                            [
+                                HTML.element(
+                                    "div"
+                                    {
+                                        "class": "d-flex justify-content-between align-items-start gap-3 mb-2"
+                                    }
+                                    [
+                                        HTML.element(
+                                            "div"
+                                            {}
+                                            [
+                                                HTML.element(
+                                                    "div"
+                                                    {
+                                                        "class": "small fw-semibold"
+                                                    }
+                                                    [
+                                                        HTML.text(
+                                                            "Row " + str(
+                                                                rowNumber
+                                                            )
+                                                        )
+                                                    ]
+                                                )
+                                                HTML.element(
+                                                    "div"
+                                                    {
+                                                        "class": "small text-muted studio-mono"
+                                                    }
+                                                    [HTML.text(pkSummary)]
+                                                )
+                                            ]
+                                        )
+                                        HTML.element(
+                                            "form"
+                                            {
+                                                "method": "post"
+                                                "action": "/AhdDataStudio/sqlite/delete"
+                                            }
+                                            deleteChildren
+                                        )
+                                    ]
+                                )
+                                HTML.element(
+                                    "form"
+                                    {
+                                        "method": "post"
+                                        "action": "/AhdDataStudio/sqlite/update"
+                                    }
+                                    [
+                                        HTML.element(
+                                            "div"
+                                            {
+                                                "class": "studio-row-action-fields"
+                                            }
+                                            updateChildren
+                                        )
+                                    ]
+                                )
+                            ]
+                        )
+                    )
+                }
+                rowNumber++
+            }
+            pager: Local List<HTMLNode> := []
+            if page > 1 {
+                pager.add(
+                    queryFormClass(
+                        "/AhdDataStudio/sqlite/browse"
+                        {
+                            "db": path
+                            "table": table
+                            "page": str(page - 1)
+                            "sort": orderColumn
+                            "dir": direction
+                        }
+                        "← Previous"
+                        "btn btn-sm btn-outline-secondary"
+                    )
+                )
+            }
+            if len(data) == pageSize {
+                pager.add(
+                    queryFormClass(
+                        "/AhdDataStudio/sqlite/browse"
+                        {
+                            "db": path
+                            "table": table
+                            "page": str(page + 1)
+                            "sort": orderColumn
+                            "dir": direction
+                        }
+                        "Next →"
+                        "btn btn-sm btn-outline-secondary"
+                    )
+                )
+            }
+            sortLinks: Local List<HTMLNode> := []
+            for name in browseCols {
+                ascClass: Local String := "btn btn-sm btn-light border"
+                descClass: Local String := "btn btn-sm btn-light border"
+                if name == orderColumn and direction == "ASC" {
+                    ascClass = "btn btn-sm btn-primary"
+                }
+                if name == orderColumn and direction == "DESC" {
+                    descClass = "btn btn-sm btn-primary"
+                }
+                sortLinks.add(
+                    queryFormClass(
+                        "/AhdDataStudio/sqlite/browse"
+                        {"db": path, "table": table, "sort": name, "dir": "ASC"}
+                        name + " ↑"
+                        ascClass
+                    )
+                )
+                sortLinks.add(
+                    queryFormClass(
+                        "/AhdDataStudio/sqlite/browse"
+                        {
+                            "db": path
+                            "table": table
+                            "sort": name
+                            "dir": "DESC"
+                        }
+                        name + " ↓"
+                        descClass
+                    )
+                )
+            }
+            body: Local List<HTMLNode> := [
+                HTML.element(
+                    "h1"
+                    {"class": "h4 mb-1"}
+                    [HTML.text("Browse · " + table)]
+                )
+                HTML.element(
+                    "p"
+                    {"class": "small text-muted studio-mono"}
+                    [HTML.text(Path.base(path))]
+                )
+                sqliteNav(path, table, "browse")
+                HTML.element(
+                    "div"
+                    {
+                        "class": "d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2"
+                    }
+                    [
+                        HTML.element(
+                            "span"
+                            {"class": "small text-muted"}
+                            [
+                                HTML.text(
+                                    "Page " + str(
+                                        page
+                                    ) + " · up to " + str(pageSize) + " rows"
+                                )
+                            ]
+                        )
+                        HTML.element(
+                            "span"
+                            {"class": "small text-muted"}
+                            [
+                                HTML.text(
+                                    "Declared BLOB columns are omitted from browse."
+                                )
+                            ]
+                        )
+                    ]
+                )
+                HTML.element("div", {"class": "studio-sortbar"}, sortLinks)
+            ]
+            if len(data) == 0 {
+                body.add(
+                    emptyState(
+                        "No rows on this page"
+                        "The table is empty at this offset, or there are no more rows to display."
+                    )
+                )
+            }
+            else {
+                body.add(htmlTable(browseCols, rows))
+            }
+            body.add(
+                HTML.element(
+                    "div"
+                    {"class": "studio-pagination"}
+                    [
+                        HTML.element(
+                            "span"
+                            {"class": "small text-muted"}
+                            [HTML.text("Page " + str(page))]
+                        )
+                        HTML.element("div", {"class": "pager-actions"}, pager)
+                    ]
+                )
+            )
+            if len(actionNodes) > 0 {
+                body.add(
+                    HTML.element(
+                        "h2"
+                        {"class": "h6 mt-4 mb-1"}
+                        [HTML.text("Row actions")]
+                    )
+                )
+                body.add(
+                    HTML.element(
+                        "p"
+                        {"class": "small text-muted"}
+                        [
+                            HTML.text(
+                                "Updates and deletes require a primary key and keep the existing SQLite contract."
+                            )
+                        ]
+                    )
+                )
+                for action in actionNodes {
+                    body.add(action)
+                }
+            }
+            return sessions.commit(
+                session
+                HTTP.html(layout("Browse", token, body))
+            )
+        }
+        except SQLiteError as error {
+            return sessions.commit(
+                session
+                HTTP.html(layout("SQLite", token, errorNodes(error.message)))
+            )
+        }
+        ultimately {
+            db.close()
+        }
+    }
+    except SQLiteError as error {
+        return sessions.commit(
+            session
+            HTTP.html(layout("SQLite", token, errorNodes(error.message)))
+        )
+    }
+}
+
+sqliteInsert: Function := (request: Request) -> Response {
+    sessions: Global SessionStore
+    session: Local Session := sessions.open(request)
+    token: Local String := csrfToken(session)
+    rejected: Local Response? := rejectGetStateChange(request, session, token)
+    if rejected != null {
+        return rejected
+    }
+    path: Local String? := request.form("db")
+    table: Local String? := request.form("table")
+    if path == null or table == null {
+        return sessions.commit(
+            session
+            HTTP.html(
+                layout("SQLite", token, errorNodes("db and table are required"))
+            )
+        )
+    }
+    rotateCsrf(session)
+    attempt {
+        db: Local Database? := openAllowedSqlite(path)
+        if db == null {
+            return sessions.commit(
+                session
+                HTTP.html(
+                    layout(
+                        "SQLite"
+                        token
+                        errorNodes(
+                            "sqlite path is not in the allowed project set"
+                        )
+                    )
+                )
+            )
+        }
+        attempt {
+            if not (table in sqliteTableNames(db)) {
+                return sessions.commit(
+                    session
+                    HTTP.html(
+                        layout("SQLite", token, errorNodes("unknown table"))
+                    )
+                )
+            }
+            columns: Local List<Pair<String, String>> := sqliteColumns(
+                db
+                table
+            )
+            colNames: Local List<String> := []
+            values: Local List<SQLiteValue> := []
+            for column in columns {
+                name: Local String := column["name"]
+                raw: Local String? := request.form("col_" + name)
+                if raw == null {
+                    continue
+                }
+                colNames.add(quoteSqlite(name))
+                if raw == "" and column["nullable"] == "YES" {
+                    values.add(SQLite.nullValue())
+                }
+                else {
+                    values.add(SQLite.fromString(raw))
+                }
+            }
+            if len(colNames) == 0 {
+                return sessions.commit(
+                    session
+                    HTTP.html(
+                        layout("SQLite", token, errorNodes("no insert columns"))
+                    )
+                )
+            }
+            sql: Local String := "INSERT INTO " + quoteSqlite(
+                table
+            ) + " (" + colNames[0]
+            index: Local Int := 1
+            while index < len(colNames) {
+                sql = sql + ", " + colNames[index]
+                index++
+            }
+            sql = sql + ") VALUES (?"
+            index = 1
+            while index < len(colNames) {
+                sql = sql + ", ?"
+                index++
+            }
+            sql = sql + ")"
+            db.execute(sql, values)
+            return sessions.commit(
+                session
+                HTTP.redirect(sqliteBrowseURL(path, table))
+            )
+        }
+        except SQLiteError as error {
+            return sessions.commit(
+                session
+                HTTP.html(layout("SQLite", token, errorNodes(error.message)))
+            )
+        }
+        ultimately {
+            db.close()
+        }
+    }
+    except SQLiteError as error {
+        return sessions.commit(
+            session
+            HTTP.html(layout("SQLite", token, errorNodes(error.message)))
+        )
+    }
+}
+
+sqliteDelete: Function := (request: Request) -> Response {
+    sessions: Global SessionStore
+    session: Local Session := sessions.open(request)
+    token: Local String := csrfToken(session)
+    rejected: Local Response? := rejectGetStateChange(request, session, token)
+    if rejected != null {
+        return rejected
+    }
+    path: Local String? := request.form("db")
+    table: Local String? := request.form("table")
+    if path == null or table == null {
+        return sessions.commit(
+            session
+            HTTP.html(
+                layout("SQLite", token, errorNodes("db and table are required"))
+            )
+        )
+    }
+    rotateCsrf(session)
+    attempt {
+        db: Local Database? := openAllowedSqlite(path)
+        if db == null {
+            return sessions.commit(
+                session
+                HTTP.html(
+                    layout(
+                        "SQLite"
+                        token
+                        errorNodes(
+                            "sqlite path is not in the allowed project set"
+                        )
+                    )
+                )
+            )
+        }
+        attempt {
+            if not (table in sqliteTableNames(db)) {
+                return sessions.commit(
+                    session
+                    HTTP.html(
+                        layout("SQLite", token, errorNodes("unknown table"))
+                    )
+                )
+            }
+            columns: Local List<Pair<String, String>> := sqliteColumns(
+                db
+                table
+            )
+            pkCols: Local List<String> := mysqlPrimaryColumns(columns)
+            if len(pkCols) == 0 {
+                return sessions.commit(
+                    session
+                    HTTP.html(
+                        layout(
+                            "SQLite"
+                            token
+                            errorNodes("delete requires a primary key")
+                        )
+                    )
+                )
+            }
+            sql: Local String := "DELETE FROM " + quoteSqlite(table) + " WHERE "
+            values: Local List<SQLiteValue> := []
+            index: Local Int := 0
+            while index < len(pkCols) {
+                name: Local String := pkCols[index]
+                raw: Local String? := request.form("pk_" + name)
+                if raw == null {
+                    return sessions.commit(
+                        session
+                        HTTP.html(
+                            layout(
+                                "SQLite"
+                                token
+                                errorNodes("missing primary key value")
+                            )
+                        )
+                    )
+                }
+                if index > 0 {
+                    sql = sql + " AND "
+                }
+                sql = sql + quoteSqlite(name) + " = ?"
+                values.add(SQLite.fromString(raw))
+                index++
+            }
+            db.execute(sql, values)
+            return sessions.commit(
+                session
+                HTTP.redirect(sqliteBrowseURL(path, table))
+            )
+        }
+        except SQLiteError as error {
+            return sessions.commit(
+                session
+                HTTP.html(layout("SQLite", token, errorNodes(error.message)))
+            )
+        }
+        ultimately {
+            db.close()
+        }
+    }
+    except SQLiteError as error {
+        return sessions.commit(
+            session
+            HTTP.html(layout("SQLite", token, errorNodes(error.message)))
+        )
+    }
+}
+
+sqliteUpdate: Function := (request: Request) -> Response {
+    sessions: Global SessionStore
+    session: Local Session := sessions.open(request)
+    token: Local String := csrfToken(session)
+    rejected: Local Response? := rejectGetStateChange(request, session, token)
+    if rejected != null {
+        return rejected
+    }
+    path: Local String? := request.form("db")
+    table: Local String? := request.form("table")
+    if path == null or table == null {
+        return sessions.commit(
+            session
+            HTTP.html(
+                layout("SQLite", token, errorNodes("db and table are required"))
+            )
+        )
+    }
+    rotateCsrf(session)
+    attempt {
+        db: Local Database? := openAllowedSqlite(path)
+        if db == null {
+            return sessions.commit(
+                session
+                HTTP.html(
+                    layout(
+                        "SQLite"
+                        token
+                        errorNodes(
+                            "sqlite path is not in the allowed project set"
+                        )
+                    )
+                )
+            )
+        }
+        attempt {
+            if not (table in sqliteTableNames(db)) {
+                return sessions.commit(
+                    session
+                    HTTP.html(
+                        layout("SQLite", token, errorNodes("unknown table"))
+                    )
+                )
+            }
+            columns: Local List<Pair<String, String>> := sqliteColumns(
+                db
+                table
+            )
+            columnNames: Local List<String> := sqliteBrowseColumns(columns)
+            pkCols: Local List<String> := mysqlPrimaryColumns(columns)
+            if len(pkCols) == 0 {
+                return sessions.commit(
+                    session
+                    HTTP.html(
+                        layout(
+                            "SQLite"
+                            token
+                            errorNodes("update requires a primary key")
+                        )
+                    )
+                )
+            }
+            setParts: Local List<String> := []
+            values: Local List<SQLiteValue> := []
+            for name in columnNames {
+                if name in pkCols {
+                    continue
+                }
+                raw: Local String? := request.form("col_" + name)
+                if raw == null {
+                    continue
+                }
+                setParts.add(quoteSqlite(name) + " = ?")
+                values.add(SQLite.fromString(raw))
+            }
+            if len(setParts) == 0 {
+                return sessions.commit(
+                    session
+                    HTTP.html(
+                        layout("SQLite", token, errorNodes("no update columns"))
+                    )
+                )
+            }
+            sql: Local String := "UPDATE " + quoteSqlite(
+                table
+            ) + " SET " + setParts[0]
+            index: Local Int := 1
+            while index < len(setParts) {
+                sql = sql + ", " + setParts[index]
+                index++
+            }
+            sql = sql + " WHERE "
+            index = 0
+            while index < len(pkCols) {
+                name: Local String := pkCols[index]
+                raw: Local String? := request.form("pk_" + name)
+                if raw == null {
+                    return sessions.commit(
+                        session
+                        HTTP.html(
+                            layout(
+                                "SQLite"
+                                token
+                                errorNodes("missing primary key value")
+                            )
+                        )
+                    )
+                }
+                if index > 0 {
+                    sql = sql + " AND "
+                }
+                sql = sql + quoteSqlite(name) + " = ?"
+                values.add(SQLite.fromString(raw))
+                index++
+            }
+            db.execute(sql, values)
+            return sessions.commit(
+                session
+                HTTP.redirect(sqliteBrowseURL(path, table))
+            )
+        }
+        except SQLiteError as error {
+            return sessions.commit(
+                session
+                HTTP.html(layout("SQLite", token, errorNodes(error.message)))
+            )
+        }
+        ultimately {
+            db.close()
+        }
+    }
+    except SQLiteError as error {
+        return sessions.commit(
+            session
+            HTTP.html(layout("SQLite", token, errorNodes(error.message)))
+        )
+    }
+}
+
+sqliteConfirmPage: Function := (request: Request) -> Response {
+    sessions: Global SessionStore
+    session: Local Session := sessions.open(request)
+    token: Local String := csrfToken(session)
+    path: Local String? := request.query("db")
+    table: Local String? := request.query("table")
+    action: Local String? := request.query("action")
+    if path == null or table == null or action == null {
+        return sessions.commit(
+            session
+            HTTP.html(
+                layout(
+                    "Confirm"
+                    token
+                    errorNodes("db, table, and action are required")
+                )
+            )
+        )
+    }
+    if action != "drop" {
+        return sessions.commit(
+            session
+            HTTP.html(layout("Confirm", token, errorNodes("unknown action")))
+        )
+    }
+    body: Local List<HTMLNode> := [
+        HTML.element(
+            "h1"
+            {"class": "h4 mb-3"}
+            [HTML.text("Confirm destructive action")]
+        )
+        HTML.element(
+            "div"
+            {"class": "studio-danger"}
+            [
+                HTML.element(
+                    "div"
+                    {"class": "small text-uppercase fw-bold text-danger mb-2"}
+                    [HTML.text("Danger zone")]
+                )
+                HTML.element(
+                    "h2"
+                    {"class": "h6"}
+                    [HTML.text("DROP " + table)]
+                )
+                HTML.element(
+                    "p"
+                    {"class": "small text-muted studio-mono"}
+                    [HTML.text(Path.base(path))]
+                )
+                HTML.element(
+                    "p"
+                    {"class": "text-muted small"}
+                    [
+                        HTML.text(
+                            "AhdDataStudio will drop this SQLite table only after this confirmation POST."
+                        )
+                    ]
+                )
+                HTML.element(
+                    "form"
+                    {"method": "post", "action": "/AhdDataStudio/sqlite/drop"}
+                    [
+                        csrfField(token)
+                        hiddenField("db", path)
+                        hiddenField("table", table)
+                        HTML.element(
+                            "a"
+                            {
+                                "href": sqliteBrowseURL(path, table)
+                                "class": "btn btn-sm btn-light border me-2"
+                            }
+                            [HTML.text("Cancel")]
+                        )
+                        HTML.element(
+                            "button"
+                            {"type": "submit", "class": "btn btn-sm btn-danger"}
+                            [HTML.text("Confirm DROP TABLE")]
+                        )
+                    ]
+                )
+            ]
+        )
+    ]
+    return sessions.commit(session, HTTP.html(layout("Confirm", token, body)))
+}
+
+sqliteDrop: Function := (request: Request) -> Response {
+    sessions: Global SessionStore
+    session: Local Session := sessions.open(request)
+    token: Local String := csrfToken(session)
+    rejected: Local Response? := rejectGetStateChange(request, session, token)
+    if rejected != null {
+        return rejected
+    }
+    path: Local String? := request.form("db")
+    table: Local String? := request.form("table")
+    if path == null or table == null {
+        return sessions.commit(
+            session
+            HTTP.html(
+                layout("SQLite", token, errorNodes("db and table are required"))
+            )
+        )
+    }
+    rotateCsrf(session)
+    attempt {
+        db: Local Database? := openAllowedSqlite(path)
+        if db == null {
+            return sessions.commit(
+                session
+                HTTP.html(
+                    layout(
+                        "SQLite"
+                        token
+                        errorNodes(
+                            "sqlite path is not in the allowed project set"
+                        )
+                    )
+                )
+            )
+        }
+        attempt {
+            if not (table in sqliteTableNames(db)) {
+                return sessions.commit(
+                    session
+                    HTTP.html(
+                        layout("SQLite", token, errorNodes("unknown table"))
+                    )
+                )
+            }
+            db.execute("DROP TABLE " + quoteSqlite(table))
+            return sessions.commit(
+                session
+                HTTP.redirect("/AhdDataStudio/sqlite")
+            )
+        }
+        except SQLiteError as error {
+            return sessions.commit(
+                session
+                HTTP.html(layout("SQLite", token, errorNodes(error.message)))
+            )
+        }
+        ultimately {
+            db.close()
+        }
+    }
+    except SQLiteError as error {
+        return sessions.commit(
+            session
+            HTTP.html(layout("SQLite", token, errorNodes(error.message)))
+        )
+    }
+}
+

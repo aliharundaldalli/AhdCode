@@ -1,0 +1,107 @@
+bring HTML
+from HTML bring HTMLNode
+
+tableKindMatches: Function := (tableType: String, kind: String) -> Bool {
+    if kind == "all" or kind == "" {
+        return true
+    }
+    if kind == "table" {
+        return tableType == "BASE TABLE"
+    }
+    if kind == "view" {
+        return tableType == "VIEW"
+    }
+    if kind == "system" {
+        return tableType == "SYSTEM VIEW"
+    }
+    return true
+}
+
+typeBadge: Function := (tableType: String) -> HTMLNode {
+    className: Local String := "badge text-bg-secondary"
+    label: Local String := tableType
+    if tableType == "BASE TABLE" {
+        className = "badge text-bg-primary"
+        label = "Table"
+    }
+    if tableType == "VIEW" {
+        className = "badge text-bg-info"
+        label = "View"
+    }
+    if tableType == "SYSTEM VIEW" {
+        className = "badge text-bg-warning"
+        label = "System"
+    }
+    return HTML.element(
+        "span"
+        {"class": className, "title": tableType}
+        [HTML.text(label)]
+    )
+}
+
+statusBadge: Function := (label: String, ok: Bool) -> HTMLNode {
+    className: Local String := "badge rounded-pill text-bg-secondary studio-status-badge"
+    if ok {
+        className = "badge rounded-pill text-bg-success studio-status-badge"
+    }
+    return HTML.element("span", {"class": className}, [HTML.text(label)])
+}
+
+emptyState: Function := (title: String, message: String) -> HTMLNode {
+    return HTML.element(
+        "div"
+        {"class": "studio-empty"}
+        [
+            HTML.element(
+                "div"
+                {"class": "studio-empty-icon"}
+                [HTML.text("○")]
+            )
+            HTML.element("h2", {"class": "h6 mb-2"}, [HTML.text(title)])
+            HTML.element(
+                "p"
+                {"class": "text-muted mb-0"}
+                [HTML.text(message)]
+            )
+        ]
+    )
+}
+
+htmlTable: Function := (
+    headers: List<String>
+    rows: List<List<String>>
+) -> HTMLNode {
+    headCells: Local List<HTMLNode> := []
+    for header in headers {
+        headCells.add(HTML.element("th", {}, [HTML.text(header)]))
+    }
+    bodyRows: Local List<HTMLNode> := []
+    for row in rows {
+        cells: Local List<HTMLNode> := []
+        for cell in row {
+            cells.add(HTML.element("td", {}, [HTML.text(cell)]))
+        }
+        bodyRows.add(HTML.element("tr", {}, cells))
+    }
+    return HTML.element(
+        "div"
+        {"class": "studio-table-wrap"}
+        [
+            HTML.element(
+                "table"
+                {
+                    "class": "table table-sm table-striped table-hover align-middle bg-white studio-table"
+                }
+                [
+                    HTML.element(
+                        "thead"
+                        {"class": "table-light"}
+                        [HTML.element("tr", {}, headCells)]
+                    )
+                    HTML.element("tbody", {}, bodyRows)
+                ]
+            )
+        ]
+    )
+}
+

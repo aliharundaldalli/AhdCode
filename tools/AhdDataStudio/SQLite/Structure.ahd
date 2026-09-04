@@ -1,0 +1,177 @@
+bring HTML
+from HTML bring HTMLNode
+bring HTTP
+from HTTP bring Request
+from HTTP bring Response
+from HTTP bring SessionStore
+from HTTP bring Session
+bring Path
+bring SQLite
+from SQLite bring Database
+from SQLite bring SQLiteError
+
+sqliteStructurePage: Function := (request: Request) -> Response {
+    sessions: Global SessionStore
+    session: Local Session := sessions.open(request)
+    token: Local String := csrfToken(session)
+    path: Local String? := request.query("db")
+    table: Local String? := request.query("table")
+    if path == null or table == null {
+        return sessions.commit(
+            session
+            HTTP.html(
+                layout("SQLite", token, errorNodes("db and table are required"))
+            )
+        )
+    }
+    attempt {
+        db: Local Database? := openAllowedSqlite(path)
+        if db == null {
+            return sessions.commit(
+                session
+                HTTP.html(
+                    layout(
+                        "SQLite"
+                        token
+                        errorNodes(
+                            "sqlite path is not in the allowed project set"
+                        )
+                    )
+                )
+            )
+        }
+        attempt {
+            if not (table in sqliteTableNames(db)) {
+                return sessions.commit(
+                    session
+                    HTTP.html(
+                        layout("SQLite", token, errorNodes("unknown table"))
+                    )
+                )
+            }
+            columns: Local List<Pair<String, String>> := sqliteColumns(
+                db
+                table
+            )
+            rows: Local List<List<String>> := []
+            insertFields: Local List<HTMLNode> := [
+                csrfField(token)
+                hiddenField("db", path)
+                hiddenField("table", table)
+            ]
+            for column in columns {
+                rows.add(
+                    [
+                        column["name"]
+                        column["type"]
+                        column["nullable"]
+                        column["default"]
+                        column["key"]
+                    ]
+                )
+                insertFields.add(
+                    fieldNode(
+                        column["name"]
+                        column["type"]
+                        column["nullable"]
+                    )
+                )
+            }
+            insertFields.add(
+                HTML.element(
+                    "div"
+                    {"class": "col-12"}
+                    [
+                        HTML.element(
+                            "button"
+                            {
+                                "type": "submit"
+                                "class": "btn btn-primary btn-sm"
+                            }
+                            [HTML.text("Insert row")]
+                        )
+                    ]
+                )
+            )
+            body: Local List<HTMLNode> := [
+                HTML.element("h1", {"class": "h4 mb-1"}, [HTML.text(table)])
+                HTML.element(
+                    "p"
+                    {"class": "small text-muted studio-mono"}
+                    [HTML.text(Path.base(path))]
+                )
+                sqliteNav(path, table, "structure")
+                htmlTable(
+                    ["Column", "Type", "Nullable", "Default", "Key"]
+                    rows
+                )
+                HTML.element(
+                    "div"
+                    {"class": "studio-panel mt-3"}
+                    [
+                        HTML.element(
+                            "h2"
+                            {"class": "h6 mb-3"}
+                            [HTML.text("Insert row")]
+                        )
+                        HTML.element(
+                            "form"
+                            {
+                                "method": "post"
+                                "action": "/AhdDataStudio/sqlite/insert"
+                                "class": "row g-3"
+                            }
+                            insertFields
+                        )
+                    ]
+                )
+                HTML.element(
+                    "div"
+                    {"class": "studio-danger mt-3"}
+                    [
+                        HTML.element(
+                            "h2"
+                            {"class": "h6 text-danger mb-1"}
+                            [HTML.text("Danger zone")]
+                        )
+                        HTML.element(
+                            "p"
+                            {"class": "small text-muted mb-3"}
+                            [
+                                HTML.text(
+                                    "Dropping this table requires a separate confirmation POST."
+                                )
+                            ]
+                        )
+                        queryFormClass(
+                            "/AhdDataStudio/sqlite/confirm"
+                            {"db": path, "table": table, "action": "drop"}
+                            "Drop table…"
+                            "btn btn-sm btn-outline-danger"
+                        )
+                    ]
+                )
+            ]
+            return sessions.commit(
+                session
+                HTTP.html(layout(table, token, body))
+            )
+        }
+        except SQLiteError as error {
+            return sessions.commit(
+                session
+                HTTP.html(layout("SQLite", token, errorNodes(error.message)))
+            )
+        }
+        ultimately {
+            db.close()
+        }
+    }
+    except SQLiteError as error {
+        return sessions.commit(
+            session
+            HTTP.html(layout("SQLite", token, errorNodes(error.message)))
+        )
+    }
+}
+

@@ -1,0 +1,286 @@
+bring HTML
+from HTML bring HTMLNode
+bring HTTP
+from HTTP bring Request
+from HTTP bring Response
+from HTTP bring SessionStore
+from HTTP bring Session
+bring Path
+bring SQLite
+from SQLite bring Database
+from SQLite bring SQLiteError
+
+sqliteHome: Function := (request: Request) -> Response {
+    sessions: Global SessionStore
+    session: Local Session := sessions.open(request)
+    token: Local String := csrfToken(session)
+    files: Local List<String> := allowedSqlitePaths()
+    dbRows: Local List<HTMLNode> := []
+    for path in files {
+        dbRows.add(
+            HTML.element(
+                "tr"
+                {}
+                [
+                    HTML.element(
+                        "td"
+                        {}
+                        [
+                            HTML.element(
+                                "strong"
+                                {}
+                                [HTML.text(Path.base(path))]
+                            )
+                        ]
+                    )
+                    HTML.element(
+                        "td"
+                        {"class": "text-muted small studio-mono"}
+                        [HTML.text(path)]
+                    )
+                    HTML.element(
+                        "td"
+                        {"class": "text-end"}
+                        [
+                            queryFormClass(
+                                "/AhdDataStudio/sqlite/database"
+                                {"db": path}
+                                "Open"
+                                "btn btn-sm btn-primary"
+                            )
+                        ]
+                    )
+                ]
+            )
+        )
+    }
+    body: Local List<HTMLNode> := [
+        HTML.element(
+            "div"
+            {"class": "studio-page-heading"}
+            [
+                HTML.element(
+                    "div"
+                    {"class": "eyebrow"}
+                    [HTML.text("Project-scoped databases")]
+                )
+                HTML.element("h1", {"class": "h4 mb-1"}, [HTML.text("SQLite")])
+                HTML.element(
+                    "p"
+                    {"class": "text-muted mb-0"}
+                    [
+                        HTML.text(
+                            "Only explicitly configured database paths and SQLite files that are immediate children of AHD_DATA_PROJECT_ROOT are listed."
+                        )
+                    ]
+                )
+            ]
+        )
+    ]
+    if len(files) == 0 {
+        body.add(
+            emptyState(
+                "No project databases found"
+                "Set AHD_DATA_SQLITE_PATHS for explicit files, or AHD_DATA_PROJECT_ROOT to discover .db, .sqlite, and .sqlite3 files directly inside a project folder. AhdDataStudio never scans the whole machine."
+            )
+        )
+    }
+    else {
+        body.add(
+            HTML.element(
+                "div"
+                {"class": "studio-table-wrap"}
+                [
+                    HTML.element(
+                        "table"
+                        {
+                            "class": "table table-sm table-hover align-middle studio-table"
+                        }
+                        [
+                            HTML.element(
+                                "thead"
+                                {"class": "table-light"}
+                                [
+                                    HTML.element(
+                                        "tr"
+                                        {}
+                                        [
+                                            HTML.element(
+                                                "th"
+                                                {}
+                                                [HTML.text("Database")]
+                                            )
+                                            HTML.element(
+                                                "th"
+                                                {}
+                                                [HTML.text("Path")]
+                                            )
+                                            HTML.element(
+                                                "th"
+                                                {"class": "text-end"}
+                                                [HTML.text("Action")]
+                                            )
+                                        ]
+                                    )
+                                ]
+                            )
+                            HTML.element("tbody", {}, dbRows)
+                        ]
+                    )
+                ]
+            )
+        )
+    }
+    return sessions.commit(session, HTTP.html(layout("SQLite", token, body)))
+}
+
+sqliteOpenPage: Function := (request: Request) -> Response {
+    sessions: Global SessionStore
+    session: Local Session := sessions.open(request)
+    token: Local String := csrfToken(session)
+    path: Local String? := request.query("db")
+    if path == null {
+        path = request.form("db")
+    }
+    if path == null {
+        return sessions.commit(
+            session
+            HTTP.html(layout("SQLite", token, errorNodes("db is required")))
+        )
+    }
+    attempt {
+        db: Local Database? := openAllowedSqlite(path)
+        if db == null {
+            return sessions.commit(
+                session
+                HTTP.html(
+                    layout(
+                        "SQLite"
+                        token
+                        errorNodes(
+                            "sqlite path is not in the allowed project set"
+                        )
+                    )
+                )
+            )
+        }
+        attempt {
+            tables: Local List<Pair<String, String>> := sqliteTables(db)
+            tableRows: Local List<HTMLNode> := []
+            for table in tables {
+                name: Local String := table["name"]
+                tableRows.add(
+                    HTML.element(
+                        "tr"
+                        {}
+                        [
+                            HTML.element(
+                                "td"
+                                {}
+                                [
+                                    HTML.element(
+                                        "code"
+                                        {"class": "studio-name", "title": name}
+                                        [HTML.text(name)]
+                                    )
+                                ]
+                            )
+                            HTML.element(
+                                "td"
+                                {"class": "studio-actions-cell"}
+                                [sqliteActionGroup(path, name)]
+                            )
+                            HTML.element("td", {}, [typeBadge(table["type"])])
+                        ]
+                    )
+                )
+            }
+            body: Local List<HTMLNode> := [
+                HTML.element(
+                    "h1"
+                    {"class": "h4 mb-1"}
+                    [HTML.text(Path.base(path))]
+                )
+                HTML.element(
+                    "p"
+                    {"class": "text-muted small"}
+                    [HTML.text(path)]
+                )
+                HTML.element(
+                    "div"
+                    {"class": "d-flex justify-content-end mb-2"}
+                    [
+                        queryFormClass(
+                            "/AhdDataStudio/sqlite/sql"
+                            {"db": path}
+                            "SQL console"
+                            "btn btn-sm btn-outline-primary"
+                        )
+                    ]
+                )
+                HTML.element(
+                    "div"
+                    {"class": "table-responsive"}
+                    [
+                        HTML.element(
+                            "table"
+                            {
+                                "class": "table table-sm table-striped table-hover align-middle bg-white studio-table"
+                            }
+                            [
+                                HTML.element(
+                                    "thead"
+                                    {"class": "table-light"}
+                                    [
+                                        HTML.element(
+                                            "tr"
+                                            {}
+                                            [
+                                                HTML.element(
+                                                    "th"
+                                                    {}
+                                                    [HTML.text("Table")]
+                                                )
+                                                HTML.element(
+                                                    "th"
+                                                    {}
+                                                    [HTML.text("Action")]
+                                                )
+                                                HTML.element(
+                                                    "th"
+                                                    {}
+                                                    [HTML.text("Type")]
+                                                )
+                                            ]
+                                        )
+                                    ]
+                                )
+                                HTML.element("tbody", {}, tableRows)
+                            ]
+                        )
+                    ]
+                )
+            ]
+            return sessions.commit(
+                session
+                HTTP.html(layout("SQLite", token, body))
+            )
+        }
+        except SQLiteError as error {
+            return sessions.commit(
+                session
+                HTTP.html(layout("SQLite", token, errorNodes(error.message)))
+            )
+        }
+        ultimately {
+            db.close()
+        }
+    }
+    except SQLiteError as error {
+        return sessions.commit(
+            session
+            HTTP.html(layout("SQLite", token, errorNodes(error.message)))
+        )
+    }
+}
+

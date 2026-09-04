@@ -1,0 +1,153 @@
+bring SQLite
+from SQLite bring Database
+from SQLite bring SQLiteValue
+
+quoteSqlite: Function := (name: String) -> String {
+    return "\"" + name.replace("\"", "\"\"") + "\""
+}
+
+sqliteBrowseURL: Function := (path: String, table: String) -> String {
+    return "/AhdDataStudio/sqlite/browse?db=" + path + "&table=" + table
+}
+
+sqliteDatabaseURL: Function := (path: String) -> String {
+    return "/AhdDataStudio/sqlite/database?db=" + path
+}
+
+formatSqliteValue: Function := (value: SQLiteValue) -> String {
+    if value.isNull() {
+        return "NULL"
+    }
+    kind: Local String := value.kind()
+    if kind == "Int" {
+        return str(value.int())
+    }
+    if kind == "Real" {
+        return str(value.real())
+    }
+    if kind == "String" {
+        return value.string()
+    }
+    return "[" + kind + "]"
+}
+
+sqliteTables: Function := (db: Database) -> List<Pair<String, String>> {
+    rows: Local List<Pair<String, SQLiteValue>> := db.query(
+        "SELECT name, type FROM sqlite_master WHERE type IN ('table', 'view') AND name NOT LIKE 'sqlite_%' ORDER BY name"
+    )
+    tables: Local List<Pair<String, String>> := []
+    for row in rows {
+        name: Local String := ""
+        kind: Local String := ""
+        if "name" in row {
+            if row["name"].kind() == "String" {
+                name = row["name"].string()
+            }
+        }
+        if "type" in row {
+            if row["type"].kind() == "String" {
+                kind = row["type"].string()
+            }
+        }
+        tables.add({"name": name, "type": kind})
+    }
+    return tables
+}
+
+sqliteTableNames: Function := (db: Database) -> List<String> {
+    names: Local List<String> := []
+    tables: Local List<Pair<String, String>> := sqliteTables(db)
+    for table in tables {
+        names.add(table["name"])
+    }
+    return names
+}
+
+sqliteColumns: Function := (
+    db: Database
+    table: String
+) -> List<Pair<String, String>> {
+    sql: Local String := "PRAGMA table_info(" + quoteSqlite(table) + ")"
+    rows: Local List<Pair<String, SQLiteValue>> := db.query(sql)
+    columns: Local List<Pair<String, String>> := []
+    for row in rows {
+        name: Local String := ""
+        sqlType: Local String := ""
+        nullable: Local String := "YES"
+        defaultValue: Local String := ""
+        key: Local String := ""
+        if "name" in row {
+            if row["name"].kind() == "String" {
+                name = row["name"].string()
+            }
+        }
+        if "type" in row {
+            if row["type"].kind() == "String" {
+                sqlType = row["type"].string()
+            }
+        }
+        if "notnull" in row {
+            if row["notnull"].kind() == "Int" {
+                if row["notnull"].int() != 0 {
+                    nullable = "NO"
+                }
+            }
+        }
+        if "dflt_value" in row {
+            if not row["dflt_value"].isNull() {
+                if row["dflt_value"].kind() == "String" {
+                    defaultValue = row["dflt_value"].string()
+                }
+                else if row["dflt_value"].kind() == "Int" {
+                    defaultValue = str(row["dflt_value"].int())
+                }
+                else if row["dflt_value"].kind() == "Real" {
+                    defaultValue = str(row["dflt_value"].real())
+                }
+            }
+        }
+        if "pk" in row {
+            if row["pk"].kind() == "Int" {
+                if row["pk"].int() != 0 {
+                    key = "PRI"
+                }
+            }
+        }
+        columns.add(
+            {
+                "name": name
+                "type": sqlType
+                "nullable": nullable
+                "default": defaultValue
+                "key": key
+                "extra": ""
+            }
+        )
+    }
+    return columns
+}
+
+sqliteBrowseColumns: Function := (
+    columns: List<Pair<String, String>>
+) -> List<String> {
+    names: Local List<String> := []
+    for column in columns {
+        declared: Local String := column["type"].lower()
+        if declared.contains("blob") {
+            continue
+        }
+        names.add(column["name"])
+    }
+    return names
+}
+
+openAllowedSqlite: Function := (path: String) -> Database? {
+    if not sqlitePathAllowed(path) {
+        return null
+    }
+    if isDirectoryPath(path) {
+        return null
+    }
+    return SQLite.open(path)
+}
+

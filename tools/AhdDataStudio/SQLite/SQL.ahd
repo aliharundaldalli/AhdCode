@@ -1,0 +1,246 @@
+bring HTML
+from HTML bring HTMLNode
+bring HTTP
+from HTTP bring Request
+from HTTP bring Response
+from HTTP bring SessionStore
+from HTTP bring Session
+bring Path
+bring SQLite
+from SQLite bring Database
+from SQLite bring SQLiteValue
+from SQLite bring SQLiteError
+
+sqliteSqlPage: Function := (request: Request) -> Response {
+    sessions: Global SessionStore
+    session: Local Session := sessions.open(request)
+    token: Local String := csrfToken(session)
+    pathQuery: Local String? := request.query("db")
+    path: Local String := ""
+    if pathQuery != null {
+        path = pathQuery
+    }
+    context: Local String := "No database selected"
+    if path != "" {
+        context = Path.base(path)
+    }
+    body: Local List<HTMLNode> := [
+        HTML.element(
+            "h1"
+            {"class": "h4 mb-1"}
+            [HTML.text("SQLite SQL console")]
+        )
+        HTML.element(
+            "p"
+            {"class": "small text-muted studio-mono"}
+            [HTML.text(context)]
+        )
+        HTML.element(
+            "div"
+            {"class": "alert alert-warning py-2 small"}
+            [
+                HTML.text(
+                    "This console runs the SQL you type exactly as entered. Destructive statements are not extra-confirmed."
+                )
+            ]
+        )
+        HTML.element(
+            "div"
+            {"class": "studio-sql"}
+            [
+                HTML.element(
+                    "form"
+                    {"method": "post", "action": "/AhdDataStudio/sqlite/sql"}
+                    [
+                        csrfField(token)
+                        hiddenField("db", path)
+                        HTML.element(
+                            "label"
+                            {"class": "form-label small fw-semibold"}
+                            [HTML.text("SQL")]
+                        )
+                        HTML.element(
+                            "textarea"
+                            {
+                                "name": "sql"
+                                "class": "form-control mb-3"
+                                "placeholder": "SELECT ..."
+                            }
+                            [HTML.text("")]
+                        )
+                        HTML.element(
+                            "div"
+                            {
+                                "class": "d-flex justify-content-between align-items-center"
+                            }
+                            [
+                                HTML.element(
+                                    "span"
+                                    {"class": "small text-muted"}
+                                    [
+                                        HTML.text(
+                                            "Runs against the selected project database."
+                                        )
+                                    ]
+                                )
+                                HTML.element(
+                                    "button"
+                                    {
+                                        "type": "submit"
+                                        "class": "btn btn-primary btn-sm px-3"
+                                    }
+                                    [HTML.text("Run query")]
+                                )
+                            ]
+                        )
+                    ]
+                )
+            ]
+        )
+    ]
+    return sessions.commit(session, HTTP.html(layout("SQL", token, body)))
+}
+
+sqliteSqlRun: Function := (request: Request) -> Response {
+    sessions: Global SessionStore
+    session: Local Session := sessions.open(request)
+    token: Local String := csrfToken(session)
+    if request.method() != "POST" {
+        return sessions.commit(
+            session
+            HTTP.html(
+                layout("SQL", token, errorNodes("SQL console requires POST"))
+                405
+            )
+        )
+    }
+    if not csrfOK(request, session) {
+        return sessions.commit(
+            session
+            HTTP.html(
+                layout(
+                    "SQL"
+                    token
+                    errorNodes("rejected: CSRF token missing or invalid")
+                )
+                403
+            )
+        )
+    }
+    sqlText: Local String? := request.form("sql")
+    path: Local String? := request.form("db")
+    if sqlText == null or path == null {
+        return sessions.commit(
+            session
+            HTTP.html(
+                layout("SQL", token, errorNodes("db and sql are required"))
+            )
+        )
+    }
+    rotateCsrf(session)
+    token = csrfToken(session)
+    attempt {
+        db: Local Database? := openAllowedSqlite(path)
+        if db == null {
+            return sessions.commit(
+                session
+                HTTP.html(
+                    layout(
+                        "SQLite"
+                        token
+                        errorNodes(
+                            "sqlite path is not in the allowed project set"
+                        )
+                    )
+                )
+            )
+        }
+        attempt {
+            body: Local List<HTMLNode> := [
+                HTML.element("h1", {}, [HTML.text("SQLite SQL console")])
+                HTML.element(
+                    "div"
+                    {"class": "alert alert-warning"}
+                    [HTML.text("This console ran your SQL exactly as entered.")]
+                )
+            ]
+            if looksLikeQuery(sqlText) {
+                data: Local List<Pair<String, SQLiteValue>> := db.query(sqlText)
+                headers: Local List<String> := []
+                rows: Local List<List<String>> := []
+                if len(data) > 0 {
+                    for key in data[0] {
+                        headers.add(key)
+                    }
+                    for dataRow in data {
+                        cells: Local List<String> := []
+                        for header in headers {
+                            cells.add(formatSqliteValue(dataRow[header]))
+                        }
+                        rows.add(cells)
+                    }
+                }
+                body.add(
+                    HTML.element(
+                        "p"
+                        {}
+                        [HTML.text(str(len(data)) + " row(s)")]
+                    )
+                )
+                if len(headers) > 0 {
+                    body.add(htmlTable(headers, rows))
+                }
+            }
+            else {
+                changed: Local Int := db.execute(sqlText)
+                body.add(
+                    HTML.element(
+                        "p"
+                        {}
+                        [HTML.text("affected rows: " + str(changed))]
+                    )
+                )
+            }
+            body.add(
+                HTML.element(
+                    "form"
+                    {"method": "post", "action": "/AhdDataStudio/sqlite/sql"}
+                    [
+                        csrfField(token)
+                        hiddenField("db", path)
+                        HTML.element(
+                            "textarea"
+                            {"name": "sql", "class": "form-control mb-2"}
+                            [HTML.text(sqlText)]
+                        )
+                        HTML.element(
+                            "button"
+                            {"type": "submit", "class": "btn btn-primary"}
+                            [HTML.text("Run")]
+                        )
+                    ]
+                )
+            )
+            return sessions.commit(
+                session
+                HTTP.html(layout("SQL", token, body))
+            )
+        }
+        except SQLiteError as error {
+            return sessions.commit(
+                session
+                HTTP.html(layout("SQLite", token, errorNodes(error.message)))
+            )
+        }
+        ultimately {
+            db.close()
+        }
+    }
+    except SQLiteError as error {
+        return sessions.commit(
+            session
+            HTTP.html(layout("SQLite", token, errorNodes(error.message)))
+        )
+    }
+}
+
