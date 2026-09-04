@@ -23,20 +23,29 @@ import (
 	"ahdcode/internal/source"
 )
 
-const usage = `AhdCode v0.12.0 toolchain
+const usage = `AhdCode v0.13.0 toolchain
 
 usage:
   ahdcode                                  start the interactive REPL
   ahdcode build <entry.ahd> [-o <output>]   compile to a native executable
   ahdcode run   <entry.ahd> [-- <args>...]  compile and run
-  ahdcode kill  [--force] <app.run>          stop an application started by run
+  ahdcode dev   <entry.ahd>                  watch, rebuild, and restart on save
+  ahdcode stop  <app.dev|app.run>            gracefully stop a dev or run session
+  ahdcode kill  [--force] <app.dev|app.run>  forcibly stop a dev or run session
   ahdcode format [--check] <file.ahd>        canonicalize source in place
   ahdcode lsp                                start the language server (stdio)
   ahdcode --help                             show this help
   ahdcode --version                          print the compiler version
+
+stop vs kill:
+  stop  requests a graceful shutdown and waits (up to a few seconds) to
+        confirm the process actually exited.
+  kill  forces immediate termination. For app.dev this always stops both
+        the dev controller and its current child; for app.run, --force
+        escalates from the default graceful signal to an immediate one.
 `
 
-const version = "AhdCode v0.12.0"
+const version = "AhdCode v0.13.0"
 
 func main() {
 	os.Exit(run(os.Args[1:]))
@@ -55,6 +64,10 @@ func runWithIO(arguments []string, input io.Reader, output, errorOutput io.Write
 		return runBuild(arguments[1:], output, errorOutput)
 	case "run":
 		return runRun(arguments[1:], input, output, errorOutput)
+	case "dev":
+		return runDev(arguments[1:], output, errorOutput)
+	case "stop":
+		return runStop(arguments[1:], output, errorOutput)
 	case "kill":
 		return runKill(arguments[1:], output, errorOutput)
 	case "format":
@@ -203,6 +216,14 @@ func runKill(arguments []string, output, errorOutput io.Writer) int {
 	if target == "" {
 		fmt.Fprintln(errorOutput, "ahdcode kill: a run file is required, as in: ahdcode kill app.run")
 		return 2
+	}
+
+	// A .dev target owns two processes (the controller and its current
+	// child), not one, so it is handled by its own path -- see
+	// killDevSession in runstop.go. Everything below this point is
+	// unmodified existing .run handling.
+	if strings.HasSuffix(target, devDescriptorSuffix) {
+		return killDevSession(target, output, errorOutput)
 	}
 
 	descriptor, err := readRunDescriptor(target)
