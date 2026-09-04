@@ -12,11 +12,21 @@ AhdCode; okunabilir sözdizimi, açık niyet (explicit intent), öngörülebilir
 anlambilim (semantics) ve yerel (native) derlemeye odaklanan, deneysel,
 statik olarak denetlenen genel amaçlı bir programlama dilidir.
 
-Mevcut sürüm **v0.11.0**'dır. Çekirdek dil uçtan uca çalışır, ancak proje
+Mevcut sürüm **v0.12.0**'dır. Çekirdek dil uçtan uca çalışır, ancak proje
 üretime hazır değildir ve 1.0'dan önce kırıcı (breaking) değişiklikler
 olabilir.
 
-v0.11.0, [MySQL](docs/MYSQL_TR.md) ekler: `MySQL.connect` gerçek bir
+v0.12.0, [AhdDataStudio](tools/AhdDataStudio/README_TR.md) ekler: AhdCode ile
+yazılmış birinci taraf, yalnızca localhost MySQL + SQLite geliştirme
+uygulaması — derleyici yerleşik bir modülü değildir. `cd tools/AhdDataStudio
+&& ahdcode run app.ahd` ile başlatılır ve
+[http://127.0.0.1:8081/AhdDataStudio](http://127.0.0.1:8081/AhdDataStudio)
+adresinde açılır. Yalnızca `127.0.0.1` dinler, MySQL şemalarını
+`database: null` ile keşfeder, SQLite dosyalarını yapılandırılmış proje
+yollarıyla sınırlar ve üretilen CRUD için CSRF korumalı POST formları
+kullanır. Bu sürüm ayrıca iç içe hatalı String değişmezlerinde ayrıştırıcının
+takılı kalmasını düzeltir. v0.11 MySQL, gömülü vendor sürücü sayesinde
+çevrimdışı derlenebilir kalır. v0.11.0, [MySQL](docs/MYSQL_TR.md) ekler: `MySQL.connect` gerçek bir
 sunucuyu arar ve döndürmeden önce erişilebilir olduğunu doğrular; `database`
 `null` olabilir, böylece bir bağlantı herhangi biri seçilmeden önce kimlik
 bilgilerinin görebildiği her veritabanını `SHOW DATABASES` ile listeleyebilir;

@@ -12,10 +12,19 @@ AhdCode is an experimental statically checked general-purpose programming
 language focused on readable syntax, explicit intent, predictable semantics,
 and native compilation.
 
-The current release is **v0.11.0**. The core language works end to end, but
+The current release is **v0.12.0**. The core language works end to end, but
 the project is not production-ready and breaking changes may occur before 1.0.
 
-v0.11.0 adds [MySQL](docs/MYSQL.md): `MySQL.connect` dials a real server and
+v0.12.0 adds [AhdDataStudio](tools/AhdDataStudio/README.md): a first-party
+localhost MySQL + SQLite development application written in AhdCode, not a
+compiler builtin. Start it with `cd tools/AhdDataStudio && ahdcode run
+app.ahd` and open
+[http://127.0.0.1:8081/AhdDataStudio](http://127.0.0.1:8081/AhdDataStudio).
+It binds `127.0.0.1` only, discovers MySQL schemas with `database: null`,
+scopes SQLite files to configured project paths, and uses CSRF-protected
+POST forms for generated CRUD. This release also fixes a parser hang on
+malformed nested String literals. MySQL from v0.11 remains offline-buildable
+through the bundled vendored driver. v0.11.0 adds [MySQL](docs/MYSQL.md): `MySQL.connect` dials a real server and
 verifies it is reachable before returning, `database` may be `null` so a
 connection can list every database the credentials can see with `SHOW
 DATABASES` before selecting one, every query is server-side parameter-bound,
