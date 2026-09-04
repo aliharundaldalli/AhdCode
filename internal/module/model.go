@@ -26,6 +26,12 @@ type SourceIdentity struct {
 	Name    string
 	Path    string
 	Builtin bool
+	// Framework marks one of AhdCode's bundled first-party AhdCode source
+	// modules (see internal/framework). Such a module is compiled from bytes
+	// embedded in the compiler rather than loaded through SourceLoader, and
+	// its own imports resolve only against other bundled modules and the
+	// built-in modules -- never against the application's source tree.
+	Framework bool
 }
 
 type Module struct {

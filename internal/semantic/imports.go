@@ -64,8 +64,25 @@ func (a *analyzer) installImports(program *ast.Program) {
 				continue
 			}
 			a.installImportedName(bring, name, exported, localNames)
+			a.recordReExport(name, exported)
 		}
 	}
+}
+
+// recordReExport republishes one imported name through this module's own
+// interface. Only AhdCode's bundled first-party facade modules enable this;
+// for every application module the slice stays empty and `bring` remains
+// non-transitive exactly as before.
+func (a *analyzer) recordReExport(name string, symbol *Symbol) {
+	if !a.environment.ReExportImports || symbol == nil {
+		return
+	}
+	for _, existing := range a.result.ReExports {
+		if existing.Name == name {
+			return
+		}
+	}
+	a.result.ReExports = append(a.result.ReExports, ReExport{Name: name, Symbol: symbol})
 }
 
 func moduleDeclarationNames(program *ast.Program) map[string]bool {

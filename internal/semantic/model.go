@@ -677,6 +677,16 @@ type Environment struct {
 	ModuleName    string
 	Imports       map[string]*ModuleInterface
 	FailedImports map[string]bool
+	// ReExportImports makes this module a facade: every name it imports with
+	// `from Module bring name` also becomes one of its own exports. It is set
+	// only for AhdCode's bundled first-party facade modules, never for an
+	// application module, so ordinary `bring` stays strictly non-transitive.
+	//
+	// The re-exported binding is the imported Symbol itself, so a Class keeps
+	// the one identity it already had: a Request reached through the Web
+	// facade and a Request reached through HTTP are the same type, not two
+	// structurally similar ones.
+	ReExportImports bool
 }
 
 // Result is a side-table semantic model; Analyze never mutates the AST.
@@ -700,6 +710,10 @@ type Result struct {
 	// TypeOperations records the built-in String, List, and Pair operations,
 	// so lowering never has to rediscover them from member names.
 	TypeOperations map[*ast.CallExpr]TypeOperation
+	// ReExports lists the imported names a facade module publishes as its own
+	// exports, in first-encountered order. It is empty for every module that
+	// is not one of AhdCode's bundled first-party facades.
+	ReExports []ReExport
 	// ModuleOperations records the type-directed standard module calls, so a
 	// consumer can see which operation a call selected without re-deriving it
 	// from the resolved symbol. Lowering reads the specialized signature from
@@ -718,4 +732,11 @@ func (result Result) HasErrors() bool {
 		}
 	}
 	return false
+}
+
+// ReExport is one imported name a facade module republishes under its own
+// module interface, paired with the exact Symbol the import installed.
+type ReExport struct {
+	Name   string
+	Symbol *Symbol
 }

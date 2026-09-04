@@ -38,8 +38,32 @@ func BuildModuleInterface(result Result, moduleID, name string) *ModuleInterface
 			interfaceValue.ExportNames = append(interfaceValue.ExportNames, symbol.Name)
 		}
 	}
+	addReExports(interfaceValue, result, memo)
 	sort.Strings(interfaceValue.ExportNames)
 	return interfaceValue
+}
+
+// addReExports publishes a facade module's imported names as its own exports.
+// The symbol is cloned exactly like a locally declared one, which keeps every
+// consumer on the same code path -- but the clone deliberately keeps the
+// original Class pointer and OriginModuleID, so the re-exported name resolves
+// to the identical type the source module exports rather than to a duplicate.
+func addReExports(interfaceValue *ModuleInterface, result Result, memo map[*Symbol]*Symbol) {
+	for _, item := range result.ReExports {
+		if item.Symbol == nil || item.Symbol.Confidential {
+			continue
+		}
+		if _, exists := interfaceValue.Symbols[item.Name]; exists {
+			continue
+		}
+		cloned := cloneInterfaceSymbol(item.Symbol, memo)
+		interfaceValue.Symbols[item.Name] = cloned
+		interfaceValue.Exports[item.Name] = cloned
+		interfaceValue.ExportNames = append(interfaceValue.ExportNames, item.Name)
+		if cloned.Kind == ClassSymbol && cloned.Class != nil {
+			interfaceValue.Classes[classIdentityKey(cloned.Class)] = cloned
+		}
+	}
 }
 
 func classIdentityKey(class *types.ClassSymbol) string {

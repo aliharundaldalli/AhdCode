@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"ahdcode/internal/diagnostics"
+	"ahdcode/internal/framework"
 	"ahdcode/internal/lexer"
 	"ahdcode/internal/parser"
 	"ahdcode/internal/semantic"
@@ -81,7 +82,7 @@ func (compiler *Compiler) analyze(identity SourceIdentity, requester ModuleID, i
 		return module
 	}
 
-	text, err := compiler.Loader.Load(identity)
+	text, err := compiler.load(identity)
 	if err != nil {
 		module.State = Failed
 		compiler.addDiagnostic(semantic.CodeModuleNotFound, fmt.Sprintf("module %s was not found: %v", identity.Name, err), importSpan, "provide the sibling .ahd source file", requester, identity.ID, "", nil)
@@ -112,6 +113,7 @@ func (compiler *Compiler) analyze(identity SourceIdentity, requester ModuleID, i
 	environment := semantic.Environment{
 		ModuleID: string(identity.ID), ModuleName: identity.Name,
 		Imports: make(map[string]*semantic.ModuleInterface), FailedImports: make(map[string]bool),
+		ReExportImports: identity.Framework && framework.IsFacade(identity.Name),
 	}
 	dependencyFailed := false
 	seenDependencies := make(map[ModuleID]bool)
@@ -167,7 +169,29 @@ func (compiler *Compiler) resolveDependency(importer SourceIdentity, name string
 		}
 		return identity, nil
 	}
+	if identity, ok := frameworkIdentity(importer, name); ok {
+		return identity, nil
+	}
+	if importer.Framework {
+		return SourceIdentity{}, frameworkIsolationError(name)
+	}
 	return compiler.Resolver.Resolve(importer, name)
+}
+
+// load reads one module's source. A bundled first-party module comes from the
+// bytes embedded in the compiler, never from SourceLoader, so it compiles
+// identically whether the caller is the build pipeline, the language server's
+// overlay, or an in-memory test workspace -- and so no application-supplied
+// loader can substitute its own text for framework source.
+func (compiler *Compiler) load(identity SourceIdentity) (string, error) {
+	if identity.Framework {
+		text, ok := framework.Source(identity.Name)
+		if !ok {
+			return "", fmt.Errorf("bundled first-party module %s is missing from this build", identity.Name)
+		}
+		return text, nil
+	}
+	return compiler.Loader.Load(identity)
 }
 
 func (compiler *Compiler) cycleFrom(target ModuleID) []ModuleID {

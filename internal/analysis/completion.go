@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strings"
 
+	"ahdcode/internal/framework"
 	"ahdcode/internal/module"
 	"ahdcode/internal/semantic"
 	"ahdcode/internal/syntax/ast"
@@ -136,6 +137,16 @@ func lastWord(text string) string {
 func moduleNameCompletions(cached *entry, prefix string) []CompletionItem {
 	var items []CompletionItem
 	for name := range semantic.StandardModuleInterfaces() {
+		if strings.HasPrefix(name, prefix) {
+			items = append(items, CompletionItem{Label: name, Detail: "module " + name})
+		}
+	}
+	// The bundled first-party modules are offered by name for the same
+	// reason the standard modules are: they are importable and reserved.
+	// Only the *names* come from here -- every export, signature, and hover
+	// for them is read from the interface the compiler builds by actually
+	// compiling the module, exactly as for a module the user wrote.
+	for _, name := range framework.PublicModuleNames() {
 		if strings.HasPrefix(name, prefix) {
 			items = append(items, CompletionItem{Label: name, Detail: "module " + name})
 		}

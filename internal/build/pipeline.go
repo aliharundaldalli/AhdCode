@@ -13,6 +13,7 @@ import (
 	backend "ahdcode/internal/backend/golang"
 	"ahdcode/internal/backend/golang/ahdruntime/mysqlvendor"
 	"ahdcode/internal/diagnostics"
+	"ahdcode/internal/framework"
 	"ahdcode/internal/ir"
 	"ahdcode/internal/lowering"
 	"ahdcode/internal/module"
@@ -58,7 +59,14 @@ func Compile(entryPath string) Result {
 		}
 		if current.File.ID != 0 {
 			result.Files[current.File.ID] = current.File
-			result.SourcePaths = append(result.SourcePaths, current.File.Path)
+			// A bundled first-party module has no file on disk: its source is
+			// embedded in the compiler. It still needs a source.File so its
+			// diagnostics render, but `ahdcode dev` must never add its virtual
+			// path to the watch set -- there is nothing there to change, and a
+			// watcher pointed at it would report a permanently missing file.
+			if !framework.IsVirtualPath(current.File.Path) {
+				result.SourcePaths = append(result.SourcePaths, current.File.Path)
+			}
 		}
 		for _, required := range current.RequiredFiles {
 			result.Files[required.ID] = required

@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strings"
 
+	"ahdcode/internal/framework"
 	"ahdcode/internal/module"
 	"ahdcode/internal/semantic"
 )
@@ -69,7 +70,11 @@ func (store *Store) discoverUserModules(entryPath string) []discoveredModule {
 				continue
 			}
 			name := strings.TrimSuffix(entry.Name(), ".ahd")
-			if name == "" || standards[name] != nil {
+			// A file whose name matches a standard or bundled first-party
+			// module can never be the module a bring resolves to -- those
+			// names are reserved and win ahead of the filesystem -- so
+			// offering it here would only mislead.
+			if name == "" || standards[name] != nil || framework.IsPublic(name) {
 				continue
 			}
 			path := canonicalPath(filepath.Join(root, entry.Name()))

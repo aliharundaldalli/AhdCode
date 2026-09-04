@@ -41,6 +41,12 @@ func (compiler *Compiler) resolveRequires(identity SourceIdentity, entryModule *
 	if entryModule.Parsed.Program == nil {
 		return
 	}
+	// A bundled first-party module has no directory to be the app root, and
+	// must never read the application's source tree. Framework sources
+	// compose through `bring` alone, so there is nothing to expand here.
+	if identity.Framework {
+		return
+	}
 	entryCanonical := identity.Path
 	state := &requireState{
 		appRoot:  filepath.Dir(identity.Path),

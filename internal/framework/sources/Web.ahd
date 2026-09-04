@@ -1,0 +1,82 @@
+// AhdCode's first-party Web framework.
+//
+//     bring Web
+//
+// is the whole import an ordinary Web application needs. Web is a facade: it
+// composes the existing HTTP, HTML, Session, Security, and Env primitives
+// rather than replacing them, and it re-exports the types those primitives
+// already define, so a Request reached through Web is the same Request HTTP
+// hands a handler -- never a parallel copy of it.
+//
+// The low-level modules stay available and unchanged. An application that
+// wants them writes `bring HTTP` and `bring HTML` exactly as before; Web is
+// an addition, never a migration.
+//
+// What Web is not, in v0.15: it is not an ORM, not a Forms or validation
+// framework, not a middleware system, not a template language, and not a
+// JavaScript UI runtime. Pages are composed on the server and rendered to
+// markup. There is no virtual DOM and no hydration step.
+//
+// The shape of an application:
+//
+//     App      manages the application: configuration, routes, assets
+//     Page     produces the content of one page
+//     Layout   wraps that content in the shared document shell
+//     UI       builds the HTML tree
+//
+// Page, Layout, and Component are conventions, not language constructs.
+// Each one is an ordinary AhdCode Function that returns an HTMLNode -- there
+// is no base class to inherit, no lifecycle to implement, and no registry to
+// join.
+bring HTTP
+from HTTP bring (
+    Request
+    Response
+    Server
+    Session
+    SessionStore
+    Cookie
+    UploadedFile
+    HTTPError
+)
+bring HTML
+from HTML bring (HTMLNode, HTMLError)
+bring WebError
+from WebError bring WebConfigError
+// html renders a finished node tree as an HTML response.
+html: Function := (body: HTMLNode, status: Int := 200) -> Response {
+    return HTTP.html(HTML.render(body), status)
+}
+// text returns a plain-text response, mirroring HTTP.text.
+text: Function := (body: String, status: Int := 200) -> Response {
+    return HTTP.text(body, status)
+}
+// redirect sends the browser elsewhere. 303 is the default because the common
+// case is the redirect that follows a successful POST.
+redirect: Function := (location: String, status: Int := 303) -> Response {
+    return HTTP.redirect(location, status)
+}
+// response builds a response with an explicit status, body, and content type,
+// for anything the helpers above do not cover.
+response: Function := (
+    status: Int
+    body: String
+    contentType: String
+) -> Response {
+    return HTTP.response(status, body, contentType)
+}
+// render turns a node tree into markup.
+render: Function := (node: HTMLNode) -> String {
+    return HTML.render(node)
+}
+// sessions creates a session store. Sessions themselves are unchanged: the
+// existing SessionStore.open / SessionStore.commit pair still frames a
+// request, and this is only the constructor reached through Web.
+sessions: Function := (
+    cookieName: String := "ahdsession"
+    maxAgeSeconds: Int := 86400
+    secure: Bool := true
+    sameSite: String := "Lax"
+) -> SessionStore {
+    return HTTP.sessions(cookieName, maxAgeSeconds, secure, sameSite)
+}
