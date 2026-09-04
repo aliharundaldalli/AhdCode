@@ -10,7 +10,9 @@ Mevcut komut yüzeyi (command surface) şudur:
 ahdcode
 ahdcode build <entry.ahd> [-o <output>]
 ahdcode run <entry.ahd> [-- <args>...]
-ahdcode kill [--force] <app.run>
+ahdcode dev <entry.ahd>
+ahdcode stop <app.dev|app.run>
+ahdcode kill [--force] <app.dev|app.run>
 ahdcode format [--check] <file.ahd>
 ahdcode lsp
 ahdcode --help
@@ -64,13 +66,70 @@ bildirerek başarısız olur; süpervizörü gitmiş bir tanımlayıcı ise yeni
 çalıştırma sürebilsin diye temizlenir.
 
 Tanımlayıcı dahili CLI meta verisidir, dil düzeyinde bir biçim değildir:
-standart kütüphanede onu okuyan ya da yazan hiçbir şey yoktur; bir kontrol
-yetkisi taşıdığı için `0600` izinle yazılır; bir süreç yöneticisi, arka plan
-servis kaydı veya `dev`/izleme kipi değildir.
+standart kütüphanede onu okuyan ya da yazan hiçbir şey yoktur ve bir kontrol
+yetkisi taşıdığı için `0600` izinle yazılır.
 
 `build`, üretilen çalıştırılabilir dosyanın yolunu yazdırır. `-o` olmadan,
 derleyici geçerli çalışma dizininde giriş modülünün temel (base) adını
 kullanır.
+
+### `dev`: izle, yeniden derle, yeniden başlat
+
+`dev`, `build` ve `run`'ı önplanda bir izleme döngüsünde çalıştırır — bir
+MAMP/Vite geliştirme sunucusu gibi — tamamen mevcut derleme hattının
+üzerine kurulu bir orkestrasyon olarak; ikinci bir derleyici değildir:
+
+```bash
+ahdcode dev app.ahd
+```
+
+Giriş modülünü derler, sonucu başlatır ve ardından yalnızca o tek kaynak
+dosyasını izler (yalnızca giriş modülü — `dev`, `require(...)`'ı takip
+etmez ya da bir proje ağacını taramaz). Her kayıtta yeniden derler:
+
+- yeniden derleme **başarılı** olursa, önceden çalışan süreç durdurulur ve
+  yenisi onun yerini alır;
+- yeniden derleme **başarısız** olursa, tanılamalar olduğu yerde yazdırılır
+  ve önceden çalışan (son-iyi) süreç dokunulmadan çalışmaya devam eder —
+  bozuk bir kayıt, ilk derleme dahil, çalışan bir oturumu asla düşürmez;
+- çalışan süreç başarılı bir derlemeden sonra kendiliğinden çıkarsa
+  (örneğin bir çalışma zamanı çökmesi), `dev` bunu bildirir ve bir sonraki
+  kaydı beklemeye döner; aynı bozuk ikiliyi yeniden deneyerek döngüye
+  girmez.
+
+Kayıtlar debounce edilir (~150-300ms), böylece bir editörden gelen ardışık
+yazma patlaması tek bir yeniden derlemeye dönüşür, birkaçına değil; ve aynı
+anda yalnızca bir derleme çalışır.
+
+`run` gibi, canlı bir `dev` oturumu da giriş modülünün yanında küçük bir
+tanımlayıcı tutar — `app.ahd`, `app.dev` üretir — kendi doğrulanmış
+loopback kontrol kanalı üzerinden, oturum başlar başlamaz (ilk derleme
+bitmeden önce bile) yayınlanır; böylece her zaman durdurulabilir ve aynı
+kaynağa karşı ikinci bir `dev`, sessizce yarışmak yerine her zaman
+saptanır. Temiz bir şekilde bitirmek için Ctrl+C'ye basın veya başka bir
+yerden `ahdcode stop app.dev` çalıştırın.
+
+### `stop`: nazik kapanış
+
+```bash
+ahdcode stop app.dev
+ahdcode stop app.run
+```
+
+`stop`, `kill`'in nazik karşılığıdır: `kill`'in kullandığı aynı
+doğrulanmış kontrol kanalı üzerinden, sahibi olan oturumdan (bir `dev`
+denetleyicisi veya sade bir `run` süpervizörü) temiz bir şekilde
+kapanmasını ister ve — `kill`'in aksine — başarıyı bildirmeden önce sürecin
+gerçekten çıktığını doğrulamak için bekler. Nazik kapanış birkaç saniye
+içinde tamamlanmazsa, `stop` bunu sessizce zorla durdurmaya yükseltmek
+yerine açıkça bildirir; bunun için `ahdcode kill`'i kullanın. Çıplak bir
+kaynak adı verildiğinde (`app.dev`/`app.run` yerine `app.ahd`), hangi
+tanımlayıcı canlıysa ona göre çözümlenir; aynı ad için hem bir `dev` hem de
+bir `run` oturumu canlıysa, tahmin etmeyi reddeder ve açık dosyayı ister.
+
+`ahdcode kill app.dev`, hem dev denetleyicisini hem de o an sahibi olduğu
+çocuk süreci hiçbir başıboş süreç bırakmadan zorla durdurur;
+`ahdcode kill app.run` yukarıdaki açıklamadan değişmemiştir.
 
 Tanılamalar (diagnostics) sabit bir kod, kaynak konumu, bir alıntı (excerpt)
 ve varsa bir ipucu içerir. Derleyici çağrıları, kabuk (shell) komut

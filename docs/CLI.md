@@ -10,7 +10,9 @@ The current command surface is:
 ahdcode
 ahdcode build <entry.ahd> [-o <output>]
 ahdcode run <entry.ahd> [-- <args>...]
-ahdcode kill [--force] <app.run>
+ahdcode dev <entry.ahd>
+ahdcode stop <app.dev|app.run>
+ahdcode kill [--force] <app.dev|app.run>
 ahdcode format [--check] <file.ahd>
 ahdcode lsp
 ahdcode --help
@@ -62,12 +64,68 @@ command to use, instead of silently colliding on the port; a descriptor whose
 supervisor is gone is cleared so the new run can proceed.
 
 The descriptor is internal CLI metadata, not a language-level format: nothing
-in the standard library reads or writes it, it is written `0600` because it
-carries a control capability, and it is not a process manager, daemon
-registry, or `dev`/watch mode.
+in the standard library reads or writes it, and it is written `0600` because
+it carries a control capability.
 
 `build` prints the produced executable path. Without `-o`, the compiler uses
 the entry module's base name in the current working directory.
+
+### `dev`: watch, rebuild, restart
+
+`dev` runs `build` and `run` in a foreground watch loop, the same way a
+MAMP/Vite-style dev server works, entirely as orchestration around the
+existing build pipeline — it is not a second compiler:
+
+```bash
+ahdcode dev app.ahd
+```
+
+It compiles the entry module, starts the result, and then watches that one
+source file (only the entry module — `dev` does not follow `require(...)` or
+scan a project tree). On every save it rebuilds:
+
+- if the rebuild **succeeds**, the previously running process is stopped and
+  the new one takes its place;
+- if the rebuild **fails**, the diagnostics print in place and the
+  previously running (last-good) process is left running untouched — a
+  broken save never takes down a working session, including the very first
+  build;
+- if the running process exits on its own after a successful build (a
+  runtime crash, for instance), `dev` reports it and goes back to waiting
+  for the next save; it does not loop retrying the same broken binary.
+
+Saves are debounced (~150-300ms) so a burst of writes from an editor
+produces one rebuild, not several, and only one build ever runs at a time.
+
+Like `run`, a live `dev` session keeps a small descriptor beside the entry
+module — `app.ahd` produces `app.dev` — over its own authenticated loopback
+control channel, published as soon as the session starts (even before the
+first build finishes), so it is always stoppable and a second `dev` against
+the same source is always detected rather than silently racing the first.
+Press Ctrl+C, or run `ahdcode stop app.dev` from elsewhere, to end it
+cleanly.
+
+### `stop`: graceful shutdown
+
+```bash
+ahdcode stop app.dev
+ahdcode stop app.run
+```
+
+`stop` is the graceful counterpart to `kill`: it asks the owning session (a
+`dev` controller or a plain `run` supervisor) to shut down cleanly over the
+same authenticated control channel `kill` uses, and — unlike `kill` — waits
+to confirm the process has actually exited before reporting success. If
+graceful shutdown does not finish within a few seconds, `stop` reports that
+plainly rather than silently escalating to a forced kill; use
+`ahdcode kill` for that. Given a bare source name (`app.ahd` rather than
+`app.dev`/`app.run`) it resolves against whichever descriptor is live;
+if both a `dev` and a `run` session are active for the same name, it
+refuses to guess and asks for the explicit file.
+
+`ahdcode kill app.dev` forcibly stops both the dev controller and whatever
+child it currently owns, with no orphan left behind; `ahdcode kill app.run`
+is unchanged from the description above.
 
 Diagnostics include a stable code, source location, excerpt, and hint when
 available. Compiler invocations use argument arrays rather than shell command

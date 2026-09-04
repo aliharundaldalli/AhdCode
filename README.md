@@ -196,6 +196,7 @@ ahdcode --version
 
 ```bash
 ahdcode run examples/v0.1/01_hello.ahd
+ahdcode dev examples/v0.1/01_hello.ahd
 ahdcode build examples/v0.1/01_hello.ahd -o hello
 ahdcode format examples/v0.1/01_hello.ahd
 ahdcode format --check examples/v0.1/01_hello.ahd
