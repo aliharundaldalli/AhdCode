@@ -560,6 +560,32 @@ const (
 	SMTPMessageWithReplyTo  TypeOperation = "SMTPMessage.withReplyTo"
 	SMTPMessageWithText     TypeOperation = "SMTPMessage.withText"
 	SMTPMessageWithHtml     TypeOperation = "SMTPMessage.withHtml"
+
+	// MySQL (v0.11.0) is native network database connectivity. MySQLDatabase
+	// is one live connection pool; MySQLTransaction pins one underlying SQL
+	// transaction independently of the Database it came from; MySQLResult is
+	// immutable and belongs to the one execute call that produced it;
+	// MySQLValue is a closed, immutable value of exactly one MySQL storage
+	// kind (Null, Int, Real, String, or Binary).
+	MySQLDatabasePing        TypeOperation = "MySQLDatabase.ping"
+	MySQLDatabaseExecute     TypeOperation = "MySQLDatabase.execute"
+	MySQLDatabaseQuery       TypeOperation = "MySQLDatabase.query"
+	MySQLDatabaseBegin       TypeOperation = "MySQLDatabase.begin"
+	MySQLDatabaseClose       TypeOperation = "MySQLDatabase.close"
+	MySQLTransactionExecute  TypeOperation = "MySQLTransaction.execute"
+	MySQLTransactionQuery    TypeOperation = "MySQLTransaction.query"
+	MySQLTransactionCommit   TypeOperation = "MySQLTransaction.commit"
+	MySQLTransactionRollback TypeOperation = "MySQLTransaction.rollback"
+	MySQLResultAffectedRows  TypeOperation = "MySQLResult.affectedRows"
+	MySQLResultLastInsertID  TypeOperation = "MySQLResult.lastInsertId"
+	MySQLValueKind           TypeOperation = "MySQLValue.kind"
+	MySQLValueIsNull         TypeOperation = "MySQLValue.isNull"
+	MySQLValueInt            TypeOperation = "MySQLValue.int"
+	MySQLValueReal           TypeOperation = "MySQLValue.real"
+	MySQLValueString         TypeOperation = "MySQLValue.string"
+	MySQLValueIsBinary       TypeOperation = "MySQLValue.isBinary"
+	MySQLValueBinarySize     TypeOperation = "MySQLValue.binarySize"
+	MySQLValueBinaryBase64   TypeOperation = "MySQLValue.binaryBase64"
 )
 
 // ModuleOperation is one compiler-supplied standard module function whose

@@ -28,6 +28,7 @@ func StandardModuleInterfaces() map[string]*ModuleInterface {
 		"Latex":      latexModuleInterface(),
 		"Lists":      listsModuleInterface(),
 		"Math":       mathModuleInterface(),
+		"MySQL":      mysqlModuleInterface(),
 		"Numeric":    numericModuleInterface(),
 		"Path":       pathModuleInterface(),
 		"PDF":        pdfModuleInterface(),

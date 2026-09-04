@@ -3,6 +3,7 @@ package build
 import (
 	"errors"
 	"io"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -10,6 +11,7 @@ import (
 	"strings"
 
 	backend "ahdcode/internal/backend/golang"
+	"ahdcode/internal/backend/golang/ahdruntime/mysqlvendor"
 	"ahdcode/internal/diagnostics"
 	"ahdcode/internal/ir"
 	"ahdcode/internal/lowering"
@@ -74,11 +76,17 @@ func Compile(entryPath string) Result {
 type Workspace struct {
 	Directory string
 	toolchain string
+	vendored  bool
 }
 
 const workspaceModule = "module ahdcodeprogram\n\ngo 1.25\n"
 
-// NewWorkspace materializes a generated program in a private directory.
+// NewWorkspace materializes a generated program in a private directory. A
+// program that uses MySQL gets github.com/go-sql-driver/mysql's exact pinned
+// source written into vendor/ from the copy embedded in AhdCode itself (see
+// ahdruntime/mysqlvendor), so its build never touches the network or the
+// local Go module cache -- every other generated program keeps today's bare,
+// dependency-free go.mod untouched.
 func NewWorkspace(program *backend.GeneratedProgram) (*Workspace, []diagnostics.Diagnostic) {
 	toolchain, err := FindGoToolchain()
 	if err != nil {
@@ -89,9 +97,24 @@ func NewWorkspace(program *backend.GeneratedProgram) (*Workspace, []diagnostics.
 		return nil, []diagnostics.Diagnostic{workspaceFailure("could not create a temporary build workspace: " + err.Error())}
 	}
 	workspace := &Workspace{Directory: directory, toolchain: toolchain}
-	if err := os.WriteFile(filepath.Join(directory, "go.mod"), []byte(workspaceModule), 0o600); err != nil {
+	goMod := workspaceModule
+	if program != nil && program.RequiresMySQL {
+		goMod = mysqlvendor.GoMod
+		workspace.vendored = true
+	}
+	if err := os.WriteFile(filepath.Join(directory, "go.mod"), []byte(goMod), 0o600); err != nil {
 		workspace.Close()
 		return nil, []diagnostics.Diagnostic{workspaceFailure("could not write the generated go.mod: " + err.Error())}
+	}
+	if workspace.vendored {
+		if err := os.WriteFile(filepath.Join(directory, "go.sum"), []byte(mysqlvendor.GoSum), 0o600); err != nil {
+			workspace.Close()
+			return nil, []diagnostics.Diagnostic{workspaceFailure("could not write the generated go.sum: " + err.Error())}
+		}
+		if err := writeVendorTree(directory); err != nil {
+			workspace.Close()
+			return nil, []diagnostics.Diagnostic{workspaceFailure("could not stage the vendored MySQL driver: " + err.Error())}
+		}
 	}
 	for _, file := range program.Files {
 		if err := os.WriteFile(filepath.Join(directory, file.Name), []byte(file.Content), 0o600); err != nil {
@@ -125,16 +148,48 @@ func (workspace *Workspace) Close() {
 	_ = os.RemoveAll(workspace.Directory)
 }
 
+// writeVendorTree copies the embedded, pinned go-sql-driver/mysql (and its
+// own dependency, filippo.io/edwards25519) source into directory/vendor,
+// exactly as `go mod vendor` produced it at AhdCode development time. Nothing
+// here regenerates or refetches that tree: it is a plain file copy of
+// mysqlvendor.Vendor, which was embedded into the ahdcode binary itself.
+func writeVendorTree(directory string) error {
+	return fs.WalkDir(mysqlvendor.Vendor, "vendor", func(path string, entry fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		target := filepath.Join(directory, path)
+		if entry.IsDir() {
+			return os.MkdirAll(target, 0o755)
+		}
+		content, err := mysqlvendor.Vendor.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		return os.WriteFile(target, content, 0o600)
+	})
+}
+
 // BuildExecutable compiles the generated program to a native executable.
-// Process arguments are passed directly; no shell interpolation occurs.
+// Process arguments are passed directly; no shell interpolation occurs. A
+// vendored workspace builds with -mod=vendor, GOFLAGS=-mod=vendor,
+// GOPROXY=off, and GOSUMDB=off, so it can never reach the network or the
+// local module cache even if the environment would otherwise permit it.
 func (workspace *Workspace) BuildExecutable(outputPath string) []diagnostics.Diagnostic {
 	absolute, err := filepath.Abs(outputPath)
 	if err != nil {
 		return []diagnostics.Diagnostic{workspaceFailure("could not resolve the output path: " + err.Error())}
 	}
-	command := exec.Command(workspace.toolchain, "build", "-trimpath", "-o", absolute, ".")
+	args := []string{"build", "-trimpath"}
+	env := append(os.Environ(), "GOTOOLCHAIN=local")
+	if workspace.vendored {
+		args = append(args, "-mod=vendor")
+		env = append(env, "GOFLAGS=-mod=vendor", "GOPROXY=off", "GOSUMDB=off")
+	}
+	args = append(args, "-o", absolute, ".")
+	command := exec.Command(workspace.toolchain, args...)
 	command.Dir = workspace.Directory
-	command.Env = append(os.Environ(), "GOTOOLCHAIN=local")
+	command.Env = env
 	output, err := command.CombinedOutput()
 	if err == nil {
 		return nil

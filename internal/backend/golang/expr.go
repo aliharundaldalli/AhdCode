@@ -787,6 +787,9 @@ func (generator *generator) call(value *ir.CallExpr) string {
 	if strings.HasPrefix(string(value.Callable), sqliteModulePrefix) {
 		return generator.sqliteCall(value)
 	}
+	if strings.HasPrefix(string(value.Callable), mysqlModulePrefix) {
+		return generator.mysqlCall(value)
+	}
 	if strings.HasPrefix(string(value.Callable), httpModulePrefix) {
 		return generator.httpCall(value)
 	}
@@ -1056,6 +1059,10 @@ func (generator *generator) builtinCall(value *ir.CallExpr) string {
 		}
 		if strings.HasPrefix(name, "Database.") || strings.HasPrefix(name, "SQLiteValue.") {
 			return generator.sqliteOperation(name, value)
+		}
+		if strings.HasPrefix(name, "MySQLDatabase.") || strings.HasPrefix(name, "MySQLTransaction.") ||
+			strings.HasPrefix(name, "MySQLResult.") || strings.HasPrefix(name, "MySQLValue.") {
+			return generator.mysqlOperation(name, value)
 		}
 		if strings.HasPrefix(name, "Server.") || strings.HasPrefix(name, "Request.") || strings.HasPrefix(name, "Response.") ||
 			strings.HasPrefix(name, "Cookie.") || strings.HasPrefix(name, "SessionStore.") || strings.HasPrefix(name, "Session.") ||

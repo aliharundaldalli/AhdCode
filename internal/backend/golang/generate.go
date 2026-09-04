@@ -26,6 +26,7 @@ type GeneratedProgram struct {
 	RequiresPlot    bool
 	RequiresNumeric bool
 	RequiresSQLite  bool
+	RequiresMySQL   bool
 }
 
 const (
@@ -38,6 +39,7 @@ const (
 	httpRuntimeFileName     = "ahdcode_http_runtime.go"
 	htmlRuntimeFileName     = "ahdcode_html_runtime.go"
 	smtpRuntimeFileName     = "ahdcode_smtp_runtime.go"
+	mysqlRuntimeFileName    = "ahdcode_mysql_runtime.go"
 	securityRuntimeFileName = "ahdcode_security_runtime.go"
 )
 
@@ -66,6 +68,7 @@ type generator struct {
 	usesPlot    bool
 	usesNumeric bool
 	usesSQLite  bool
+	usesMySQL   bool
 	// frames tracks the enclosing loop and attempt structure so break,
 	// continue, and return transfer through error handling correctly.
 	frames []frame
@@ -140,7 +143,7 @@ func Generate(compilation *ir.Compilation) (*GeneratedProgram, []diagnostics.Dia
 	if err != nil {
 		return nil, append(generator.diagnostics, backendError(CodeFormatFailure, "embedded Security runtime source is not valid Go: "+err.Error(), source.Span{}, "the Security backend runtime must remain gofmt-clean"))
 	}
-	return &GeneratedProgram{Files: []GeneratedFile{
+	files := []GeneratedFile{
 		{Name: programFileName, Content: string(formatted)},
 		{Name: runtimeFileName, Content: string(runtime)},
 		{Name: excelRuntimeFileName, Content: string(excelRuntime)},
@@ -151,7 +154,22 @@ func Generate(compilation *ir.Compilation) (*GeneratedProgram, []diagnostics.Dia
 		{Name: htmlRuntimeFileName, Content: string(htmlRuntime)},
 		{Name: smtpRuntimeFileName, Content: string(smtpRuntime)},
 		{Name: securityRuntimeFileName, Content: string(securityRuntime)},
-	}, RequiresLatex: generator.usesLatex, RequiresPlot: generator.usesPlot, RequiresNumeric: generator.usesNumeric, RequiresSQLite: generator.usesSQLite}, generator.diagnostics
+	}
+	// Unlike every other runtime file above (standard library only, so always
+	// safe to include), ahdcode_mysql_runtime.go imports the vendored
+	// go-sql-driver/mysql. Adding it to a program that never uses MySQL would
+	// force that dependency (and NewWorkspace's vendor tree) onto every
+	// generated program, so it is included only when the program actually
+	// needs it.
+	if generator.usesMySQL {
+		mysqlRuntime, err := format.Source([]byte(mysqlRuntimeSource()))
+		if err != nil {
+			return nil, append(generator.diagnostics, backendError(CodeFormatFailure, "embedded MySQL runtime source is not valid Go: "+err.Error(), source.Span{}, "the MySQL backend runtime must remain gofmt-clean"))
+		}
+		files = append(files, GeneratedFile{Name: mysqlRuntimeFileName, Content: string(mysqlRuntime)})
+	}
+	return &GeneratedProgram{Files: files,
+		RequiresLatex: generator.usesLatex, RequiresPlot: generator.usesPlot, RequiresNumeric: generator.usesNumeric, RequiresSQLite: generator.usesSQLite, RequiresMySQL: generator.usesMySQL}, generator.diagnostics
 }
 
 // runtimeSource re-points the shared runtime package at the generated program.
@@ -189,6 +207,10 @@ func smtpRuntimeSource() string {
 
 func securityRuntimeSource() string {
 	return strings.Replace(ahdruntime.SecuritySource, "package ahdruntime", "package main", 1)
+}
+
+func mysqlRuntimeSource() string {
+	return strings.Replace(ahdruntime.MySQLSource, "package ahdruntime", "package main", 1)
 }
 
 func (generator *generator) hasErrors() bool {
@@ -433,6 +455,7 @@ func (generator *generator) emitProgram() string {
 	generator.emitJSONValueHelpers(writer)
 	generator.emitXMLHelpers(writer)
 	generator.emitSQLiteHelpers(writer)
+	generator.emitMySQLHelpers(writer)
 	generator.emitHTTPHelpers(writer)
 	generator.emitHTMLHelpers(writer)
 	generator.emitSMTPHelpers(writer)

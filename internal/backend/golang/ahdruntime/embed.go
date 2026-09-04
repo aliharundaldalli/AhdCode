@@ -46,6 +46,14 @@ var HTMLSource string
 //go:embed smtp.go
 var SMTPSource string
 
+// MySQLSource is emitted as a separate generated Go file, the same way
+// SMTPSource is. github.com/go-sql-driver/mysql is a pure-Go client of the
+// MySQL wire protocol, so unlike SQLiteSource this needs no bundled helper
+// executable: the generated program links the driver directly.
+//
+//go:embed mysql.go
+var MySQLSource string
+
 // SecuritySource is emitted as a separate generated Go file. It contains a
 // self-contained Argon2id implementation built only from the Go standard
 // library (crypto/rand, crypto/subtle, math/bits, encoding/base64), so the

@@ -196,6 +196,8 @@ func (session *Session) builtin(identity ir.CallableID, receiver any, arguments 
 		return session.keyValueBuiltin(strings.TrimPrefix(name, "builtin:KeyValue::"), values(arguments))
 	case strings.HasPrefix(name, "builtin:SQLite::"):
 		return session.sqliteBuiltin(strings.TrimPrefix(name, "builtin:SQLite::"), values(arguments))
+	case strings.HasPrefix(name, "builtin:MySQL::"):
+		return session.mysqlBuiltin(strings.TrimPrefix(name, "builtin:MySQL::"), values(arguments))
 	case strings.HasPrefix(name, "builtin:HTTP::"):
 		return session.httpBuiltin(strings.TrimPrefix(name, "builtin:HTTP::"), values(arguments))
 	case strings.HasPrefix(name, "builtin:HTML::"):
@@ -342,6 +344,10 @@ func (session *Session) core(name string, receiver any, arguments []any) any {
 	}
 	if strings.HasPrefix(name, "Database.") || strings.HasPrefix(name, "SQLiteValue.") {
 		return session.sqliteOperation(name, receiver, arguments)
+	}
+	if strings.HasPrefix(name, "MySQLDatabase.") || strings.HasPrefix(name, "MySQLTransaction.") ||
+		strings.HasPrefix(name, "MySQLResult.") || strings.HasPrefix(name, "MySQLValue.") {
+		return session.mysqlOperation(name, receiver, arguments)
 	}
 	if strings.HasPrefix(name, "Server.") || strings.HasPrefix(name, "Request.") || strings.HasPrefix(name, "Response.") ||
 		strings.HasPrefix(name, "Cookie.") || strings.HasPrefix(name, "SessionStore.") || strings.HasPrefix(name, "Session.") ||
