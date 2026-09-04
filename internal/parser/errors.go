@@ -14,4 +14,5 @@ const (
 	codeInvalidInferredTarget   = "PAR011"
 	codeInvalidLambdaSyntax     = "PAR012"
 	codeLeadingDotContinuation  = "PAR013"
+	codeInvalidRequireArgument  = "PAR014"
 )

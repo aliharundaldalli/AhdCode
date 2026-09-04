@@ -49,4 +49,16 @@ const (
 	codeMissingCapture = "SEM043"
 	codeUnknownCapture = "SEM044"
 	codeInvalidCapture = "SEM045"
+	// require(...) local source composition (v0.14). CodeRequireNotFound,
+	// CodeRequireCycle, and CodeRequireInvalidPath are raised by the
+	// require-resolution phase in package module, ahead of ordinary semantic
+	// analysis; they live here because module already depends on this package
+	// for its other cross-file diagnostic codes. CodeRequireNotDeclared is
+	// raised from inside the analyzer itself, when an identifier or type
+	// resolves to a symbol imported by a bring the current source file never
+	// wrote itself.
+	CodeRequireNotFound    = "SEM046"
+	CodeRequireCycle       = "SEM047"
+	CodeRequireInvalidPath = "SEM048"
+	CodeRequireNotDeclared = "SEM049"
 )

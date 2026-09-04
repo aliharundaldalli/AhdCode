@@ -284,6 +284,12 @@ func (a *analyzer) analyzeIdentifier(identifier *ast.IdentifierExpr, current *sc
 		a.error(codeUnknownName, fmt.Sprintf("unknown name %q", identifier.Name), identifier.Span(), "declare the binding in a visible lexical scope")
 		return expressionInfo{typeValue: types.Invalid, nullState: MaybeNull}
 	}
+	if !a.importVisible(symbol, identifier.Span()) {
+		module := a.importModuleOf[symbol]
+		a.error(CodeRequireNotDeclared, fmt.Sprintf("%q is not available here: this file must declare its own bring for module %s", identifier.Name, module),
+			identifier.Span(), fmt.Sprintf("add bring %s (or the matching from ... bring form) to this file", module))
+		return expressionInfo{typeValue: types.Invalid, nullState: MaybeNull}
+	}
 	// A lambda reads an enclosing binding only when it lists that name. The
 	// listed names already resolve inside the lambda's own scope, so reaching
 	// this with a lexical binding from an outer callable means the dependency

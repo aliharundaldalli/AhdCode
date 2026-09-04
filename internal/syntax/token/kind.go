@@ -43,6 +43,7 @@ const (
 	KeywordFrom
 	KeywordAll
 	KeywordAs
+	KeywordRequire
 	KeywordTrue
 	KeywordFalse
 	KeywordNull
@@ -116,7 +117,7 @@ var names = [...]string{
 	KeywordCondition: "condition", KeywordDefault: "default", KeywordAttempt: "attempt",
 	KeywordExcept: "except", KeywordUltimately: "ultimately", KeywordToss: "toss",
 	KeywordReturn: "return", KeywordBring: "bring", KeywordFrom: "from", KeywordAll: "all",
-	KeywordAs: "as", KeywordTrue: "true", KeywordFalse: "false", KeywordNull: "null",
+	KeywordAs: "as", KeywordRequire: "require", KeywordTrue: "true", KeywordFalse: "false", KeywordNull: "null",
 	KeywordInt: "Int", KeywordReal: "Real", KeywordComplex: "Complex", KeywordString: "String", KeywordBool: "Bool",
 	KeywordNothing: "Nothing", KeywordList: "List", KeywordPair: "Pair",
 	KeywordFunction: "Function", KeywordLambda: "lambda", KeywordOverload: "Overload", KeywordOverride: "Override",

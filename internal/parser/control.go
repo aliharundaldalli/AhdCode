@@ -209,6 +209,67 @@ func (p *parser) parseBring() ast.Stmt {
 	return statement
 }
 
+// parseRequire parses `require("Path/To/File.ahd")`: compiler-resolved local
+// source composition, not a runtime call. The argument must be a single
+// plain string literal with no interpolation -- anything else (a variable, a
+// concatenation, an interpolated string) is rejected here with a precise
+// diagnostic rather than silently accepted and failed later during path
+// resolution. require is valid only at module root; nested use is reported
+// but still parsed, so the rest of the file recovers normally.
+func (p *parser) parseRequire(scope scopeKind) ast.Stmt {
+	start := p.current().Span.Start
+	keyword := p.advance()
+	if scope != scopeModule {
+		p.errorSpan(codeInvalidDeclarationScope, "require is allowed only at module root", keyword.Span,
+			"move require to module root, outside any function, condition, loop, or block")
+	}
+	p.expect(token.LeftParen, "expected ( after require")
+
+	statement := &ast.RequireStmt{}
+	if p.check(token.StringStart) {
+		value := p.parseString()
+		if text, ok := literalStringText(value); ok {
+			statement.Path = text
+			statement.PathSpan = value.Span()
+			statement.HasLiteralPath = true
+		} else {
+			p.errorSpan(codeInvalidRequireArgument, "require path must be a plain string literal with no interpolation", value.Span(),
+				`write the path as a plain quoted string, e.g. require("Pages/Home.ahd")`)
+		}
+	} else {
+		p.errorCurrent(codeInvalidRequireArgument, "require expects a single string literal path",
+			`write the path as a quoted string, e.g. require("Pages/Home.ahd")`)
+	}
+	if !p.check(token.RightParen) && !p.check(token.Newline) && !p.atEnd() {
+		p.errorCurrent(codeInvalidRequireArgument, "require accepts exactly one string literal argument and nothing else",
+			"remove the extra content inside require(...)")
+		for !p.check(token.RightParen) && !p.check(token.Newline) && !p.atEnd() {
+			p.advance()
+		}
+	}
+	closing := p.expect(token.RightParen, "expected ) after require path")
+	statement.Base = p.base(start, closing.Span.End)
+	return statement
+}
+
+// literalStringText extracts the plain text of a string expression that
+// carries no interpolation, i.e. every part is a Text part. An empty string
+// ("") is a valid literal with zero parts.
+func literalStringText(expression ast.Expr) (string, bool) {
+	str, ok := expression.(*ast.StringExpr)
+	if !ok {
+		return "", false
+	}
+	text := ""
+	for _, part := range str.Parts {
+		if part.Expression != nil {
+			return "", false
+		}
+		text += part.Text
+	}
+	return text, true
+}
+
 // Clause keywords may appear immediately after a closing brace or after one or
 // more statement newlines. Newlines are restored when the requested clause is
 // absent so the outer statement list still owns statement termination.

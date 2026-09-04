@@ -59,6 +59,15 @@ func (a *analyzer) analyzeStatement(statement ast.Stmt, current *scope, flow flo
 	case *ast.BringStmt:
 		// Imports are installed before declaration/type predeclaration so later
 		// statements use the same ordinary scope and overload machinery.
+	case *ast.RequireStmt:
+		// require(...) is fully consumed by the module package's
+		// require-resolution phase before this program ever reaches semantic
+		// analysis: the statement is removed and the required file's own
+		// statements are spliced in its place. Reaching this case at all means
+		// analysis is running directly on an unresolved single file (for
+		// example a standalone LSP diagnostics pass); it is intentionally a
+		// no-op rather than an error; the file's own requires simply do not
+		// compose in that path.
 	case *ast.FunctionDecl:
 		a.analyzeFunction(value, current.callableClass())
 	case *ast.ClassDecl:

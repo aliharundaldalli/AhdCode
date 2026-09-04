@@ -52,6 +52,23 @@ type analyzer struct {
 	// else it would have to become an unspecialized Function value, which
 	// AhdCode has no representation for.
 	calleeExpressions map[ast.Expr]bool
+
+	// importVisibility and importModuleOf are require(...)-only bookkeeping,
+	// keyed by the installed *Symbol pointer rather than a field on Symbol
+	// itself: a bring-imported symbol installed by installImportedName is
+	// very often the exact object shared by the source module's own
+	// ModuleInterface.Symbols/Exports (a long-lived, process-wide value
+	// reused across every unrelated compile that ever brings it), so tagging
+	// visibility directly on Symbol would mean either mutating that shared
+	// object (leaking one compile's file identities into every other) or
+	// installing a private copy (breaking the pointer identity other code,
+	// including existing cross-module tests, expects between the installed
+	// binding and the module's own exported symbol). Both tables live only
+	// on this one analyzer run and are discarded with it. A symbol absent
+	// from importVisibility is visible everywhere, exactly as before
+	// require(...) existed.
+	importVisibility map[*Symbol]map[source.FileID]bool
+	importModuleOf   map[*Symbol]string
 }
 
 // Analyzer is the reusable parser.Result -> semantic.Result entry point.
@@ -581,7 +598,7 @@ func (a *analyzer) resolveType(reference *ast.TypeRef) types.Type {
 		}
 		return types.Pair{Key: a.checkedPairKey(key, reference.Arguments[0].Span()), Value: a.resolveType(reference.Arguments[1]), ValueNullable: reference.Arguments[1].Nullable}
 	default:
-		if class := a.classes[reference.Name]; class != nil {
+		if class := a.classes[reference.Name]; class != nil && a.importVisible(class, reference.Span()) {
 			if len(reference.Arguments) != 0 {
 				a.error(codeInvalidType, fmt.Sprintf("Class %s does not accept type arguments", reference.Name), reference.Span(), "remove generic arguments")
 			}
@@ -591,6 +608,19 @@ func (a *analyzer) resolveType(reference *ast.TypeRef) types.Type {
 		a.error(codeInvalidType, fmt.Sprintf("unknown type %q", reference.Name), reference.Span(), "declare the Class or use an AhdCode built-in type")
 		return types.Invalid
 	}
+}
+
+// importVisible reports whether a bring-imported symbol is visible from the
+// source file that use is written in. Every non-imported symbol (an ordinary
+// declaration, a builtin) has a nil ImportVisibility and is visible
+// everywhere in the merged program, exactly as before require(...) existed.
+// An imported symbol is visible only from the file(s) whose own bring
+// produced it (see installImportedName): a required file must declare the
+// standard modules it uses itself, rather than inheriting them from whatever
+// file happened to require it in.
+func (a *analyzer) importVisible(symbol *Symbol, span source.Span) bool {
+	visibility, tracked := a.importVisibility[symbol]
+	return !tracked || visibility[span.FileID]
 }
 
 // checkedPairKey enforces the v0.1 Pair key type rule. A rejected key degrades

@@ -1,5 +1,7 @@
 package ast
 
+import "ahdcode/internal/source"
+
 // Stmt is a typed statement/declaration node.
 type Stmt interface {
 	Node
@@ -160,6 +162,20 @@ type BringStmt struct {
 }
 
 func (*BringStmt) statementNode() {}
+
+// RequireStmt composes another local .ahd source file into this program at
+// compile time. Path is the literal string content (never re-parsed as an
+// expression); HasLiteralPath is false when the parser could not extract a
+// single unparameterized string literal, so later passes can skip resolution
+// entirely instead of chasing an empty path.
+type RequireStmt struct {
+	Base
+	Path           string
+	PathSpan       source.Span
+	HasLiteralPath bool
+}
+
+func (*RequireStmt) statementNode() {}
 
 type FunctionFlavor uint8
 

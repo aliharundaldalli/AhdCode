@@ -95,6 +95,20 @@ func (compiler *Compiler) analyze(identity SourceIdentity, requester ModuleID, i
 	compiler.appendFrontendDiagnostics(identity.ID, module.Parsed.Diagnostics)
 	frontendFailed := hasErrors(lexed.Diagnostics) || module.Parsed.HasErrors()
 
+	// require(...) is local source composition, resolved before the bring
+	// graph below: by the time brings are collected, every required file's
+	// own top-level statements (including its own bring statements) are
+	// already spliced into module.Parsed.Program, so the existing bring loop
+	// picks them up with no change of its own.
+	beforeRequire := len(compiler.diagnostics)
+	compiler.resolveRequires(identity, module)
+	for _, item := range compiler.diagnostics[beforeRequire:] {
+		if item.Diagnostic.Severity == diagnostics.SeverityError {
+			frontendFailed = true
+			break
+		}
+	}
+
 	environment := semantic.Environment{
 		ModuleID: string(identity.ID), ModuleName: identity.Name,
 		Imports: make(map[string]*semantic.ModuleInterface), FailedImports: make(map[string]bool),

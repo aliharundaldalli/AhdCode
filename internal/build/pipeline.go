@@ -26,6 +26,13 @@ type Result struct {
 	Program     *backend.GeneratedProgram
 	Diagnostics []diagnostics.Diagnostic
 	Files       map[source.FileID]source.File
+	// SourcePaths lists every local .ahd file this attempt depends on: the
+	// entry, every require(...)-resolved file (deterministic order), and
+	// every require(...) target this attempt named but could not load, so a
+	// caller such as `ahdcode dev` can watch a path that does not exist yet
+	// and rebuild automatically once it is created. Always includes at least
+	// the entry path when resolution reached that far.
+	SourcePaths []string
 }
 
 // HasErrors reports whether compilation failed.
@@ -46,9 +53,18 @@ func Compile(entryPath string) Result {
 	compilation := compiler.Compile(entryPath)
 	result := Result{Compilation: &compilation, Files: make(map[source.FileID]source.File)}
 	for _, current := range compilation.Modules {
-		if current != nil && current.File.ID != 0 {
-			result.Files[current.File.ID] = current.File
+		if current == nil {
+			continue
 		}
+		if current.File.ID != 0 {
+			result.Files[current.File.ID] = current.File
+			result.SourcePaths = append(result.SourcePaths, current.File.Path)
+		}
+		for _, required := range current.RequiredFiles {
+			result.Files[required.ID] = required
+			result.SourcePaths = append(result.SourcePaths, required.Path)
+		}
+		result.SourcePaths = append(result.SourcePaths, current.UnresolvedRequires...)
 	}
 	for _, item := range compilation.Diagnostics {
 		result.Diagnostics = append(result.Diagnostics, item.Diagnostic)

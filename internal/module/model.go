@@ -38,6 +38,18 @@ type Module struct {
 	Dependencies []ModuleID
 	State        AnalysisState
 	AnalyzeCount int
+	// RequiredFiles holds the parsed source.File for every distinct local
+	// file a require(...) statement merged into this module, in first-
+	// encountered (deterministic) order. Empty when the module uses no
+	// require(...). Populated before Parsed.Program's statements are
+	// analyzed, since the required files' statements are already spliced
+	// into Parsed.Program by then.
+	RequiredFiles []source.File
+	// UnresolvedRequires lists the canonical absolute paths this module's
+	// require(...) statements named but could not load on this attempt, so a
+	// caller such as `ahdcode dev` can watch for the file appearing later
+	// without needing another edit to the requesting file to notice it.
+	UnresolvedRequires []string
 }
 
 // ModuleDiagnostic adds graph/import context without changing the stable

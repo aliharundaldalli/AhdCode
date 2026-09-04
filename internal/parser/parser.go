@@ -130,6 +130,8 @@ func (p *parser) parseStatement(scope scopeKind) ast.Stmt {
 		return p.parseToss()
 	case token.KeywordBring, token.KeywordFrom:
 		return p.parseBring()
+	case token.KeywordRequire:
+		return p.parseRequire(scope)
 	case token.Increment, token.Decrement:
 		return p.parsePrefixUpdate()
 	case token.Dot:

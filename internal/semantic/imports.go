@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sort"
 
+	"ahdcode/internal/source"
 	"ahdcode/internal/syntax/ast"
 	"ahdcode/internal/types"
 )
@@ -89,10 +90,31 @@ func (a *analyzer) installImportedName(bring *ast.BringStmt, name string, symbol
 		a.error(CodeImportCollision, fmt.Sprintf("imported name %q collides with a module declaration", name), bring.Span(), "rename one declaration or use a namespace import")
 		return
 	}
+	fileID := bring.Span().FileID
 	if existing, exists := a.module.local(name); exists {
+		// A require(...)-composed program analyzes every required file's
+		// statements in one pass, so the same `bring Module` line, written
+		// independently by two different required files, is expected and
+		// reaches this path twice for the same name. That is not a
+		// collision: it is a second file legitimately declaring the
+		// dependency it itself uses, and it only extends which files may see
+		// the existing symbol -- and only the first time a given file does
+		// so; that same file writing the identical bring twice is still an
+		// ordinary duplicate. Anything else landing on the same name is a
+		// genuine collision, exactly as it already was for a single file.
+		visibility := a.importVisibility[existing]
+		if visibility != nil && a.importModuleOf[existing] == bring.Module && !visibility[fileID] {
+			visibility[fileID] = true
+			a.result.ResolvedSymbols[bring] = existing
+			return
+		}
 		a.error(CodeImportCollision, fmt.Sprintf("imported name %q collides with an existing symbol", name), bring.Span(), fmt.Sprintf("existing symbol has type %s", types.Display(existing.Type)))
 		return
 	}
+	// The installed binding is the exact symbol object passed in -- often the
+	// same *Symbol the source module's own ModuleInterface holds -- never a
+	// private copy: see the importVisibility/importModuleOf fields' comment
+	// on the analyzer struct for why a copy is unsafe here.
 	a.module.symbols[name] = symbol
 	a.result.Symbols = append(a.result.Symbols, symbol)
 	a.result.ResolvedSymbols[bring] = symbol
@@ -100,6 +122,12 @@ func (a *analyzer) installImportedName(bring *ast.BringStmt, name string, symbol
 		a.classes[name] = symbol
 		a.classByType[symbol.Class] = symbol
 	}
+	if a.importVisibility == nil {
+		a.importVisibility = make(map[*Symbol]map[source.FileID]bool)
+		a.importModuleOf = make(map[*Symbol]string)
+	}
+	a.importVisibility[symbol] = map[source.FileID]bool{fileID: true}
+	a.importModuleOf[symbol] = bring.Module
 }
 
 func (a *analyzer) registerInterfaceClasses(module *ModuleInterface) {
