@@ -503,10 +503,19 @@ func AhdHTTPServerStatic(class *AhdClass, handle, prefix, root string) {
 // ever reaches the filesystem: empty, ".", "..", or dotfile/dot-directory
 // segments are refused outright (this also defeats encoded traversal, since
 // net/http has already percent-decoded request.URL.Path by the time this
-// function sees it). The joined candidate is then still checked for
-// canonical containment under root, and, if it turns out to be a symlink,
-// checked again after resolving it -- so a symlink whose target escapes
-// root can never be served, matching require(...)'s own containment model.
+// function sees it). The joined candidate is then checked for lexical
+// containment under root as a fast first pass, and -- unconditionally,
+// never only when the leaf itself looks like a symlink -- fully resolved
+// with filepath.EvalSymlinks and checked for containment again on that
+// canonical path before anything is opened. A leaf-only symlink check is
+// not enough: an INTERMEDIATE path component can itself be a symlinked
+// directory (root/outside -> /elsewhere, with an entirely ordinary regular
+// file beneath it), and every filesystem lookup -- Lstat included --
+// transparently resolves intermediate symlinks regardless of the leaf's
+// own type, so a check gated on the leaf's mode alone never sees that
+// escape. Resolving unconditionally, on every request, closes that gap;
+// it also means a symlink whose canonical target stays inside root keeps
+// working normally, matching require(...)'s own containment model.
 func ahdHTTPServeStatic(state *ahdHTTPServerState, writer http.ResponseWriter, request *http.Request, method, path string) bool {
 	if method != http.MethodGet && method != http.MethodHead {
 		return false
@@ -529,24 +538,22 @@ func ahdHTTPServeStatic(state *ahdHTTPServerState, writer http.ResponseWriter, r
 			ahdHTTPWritePlain(writer, http.StatusNotFound, "Not Found")
 			return true
 		}
-		info, err := os.Lstat(candidate)
-		if err != nil {
+		// Resolved unconditionally -- never gated on whether the leaf
+		// itself looks like a symlink -- because an intermediate directory
+		// component can be the symlink instead, and Lstat/Stat/Open all
+		// resolve intermediate components transparently no matter what the
+		// leaf is. A candidate that does not exist at all (the ordinary
+		// missing-file case) also surfaces here as an error, since
+		// EvalSymlinks requires every component to resolve.
+		resolved, err := filepath.EvalSymlinks(candidate)
+		if err != nil || !ahdHTTPWithinRoot(entry.root, resolved) {
 			ahdHTTPWritePlain(writer, http.StatusNotFound, "Not Found")
 			return true
 		}
-		resolved := candidate
-		if info.Mode()&os.ModeSymlink != 0 {
-			evaluated, evalErr := filepath.EvalSymlinks(candidate)
-			if evalErr != nil || !ahdHTTPWithinRoot(entry.root, evaluated) {
-				ahdHTTPWritePlain(writer, http.StatusNotFound, "Not Found")
-				return true
-			}
-			resolved = evaluated
-			info, err = os.Stat(resolved)
-			if err != nil {
-				ahdHTTPWritePlain(writer, http.StatusNotFound, "Not Found")
-				return true
-			}
+		info, err := os.Stat(resolved)
+		if err != nil {
+			ahdHTTPWritePlain(writer, http.StatusNotFound, "Not Found")
+			return true
 		}
 		if info.IsDir() {
 			ahdHTTPWritePlain(writer, http.StatusNotFound, "Not Found")

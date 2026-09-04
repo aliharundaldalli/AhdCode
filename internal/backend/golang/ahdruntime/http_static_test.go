@@ -131,7 +131,10 @@ func TestHTTPStaticTraversalRejected(t *testing.T) {
 	}
 }
 
-func TestHTTPStaticSymlinkEscapeRejected(t *testing.T) {
+// TestHTTPStaticLeafSymlinkEscapeRejected: the static root directly contains
+// a symlink whose target is outside the root (public/escape.txt -> an
+// outside file). The leaf itself is the symlink.
+func TestHTTPStaticLeafSymlinkEscapeRejected(t *testing.T) {
 	root := t.TempDir()
 	staticRoot := filepath.Join(root, "public")
 	if err := os.MkdirAll(staticRoot, 0o755); err != nil {
@@ -155,8 +158,98 @@ func TestHTTPStaticSymlinkEscapeRejected(t *testing.T) {
 	}
 	defer response.Body.Close()
 	body, _ := io.ReadAll(response.Body)
-	if response.StatusCode == http.StatusOK && bytes.Contains(body, []byte("top secret")) {
-		t.Fatalf("symlink escape served the outside-root file (status %d, body %q)", response.StatusCode, body)
+	if response.StatusCode != http.StatusNotFound {
+		t.Fatalf("leaf symlink escape was not rejected: status %d, body %q", response.StatusCode, body)
+	}
+	if bytes.Contains(body, []byte("top secret")) {
+		t.Fatalf("leaf symlink escape leaked the outside-root file: body %q", body)
+	}
+}
+
+// TestHTTPStaticDirectorySymlinkEscapeRejected: an INTERMEDIATE path
+// component -- not the requested file itself -- is the symlink
+// (public/outside -> an outside directory, with an entirely ordinary
+// regular file underneath). This is the case a leaf-only symlink check
+// misses: os.Lstat on the full joined path resolves the intermediate
+// symlink transparently and reports the regular file's own (non-symlink)
+// mode, so a check gated on "is the leaf itself a symlink" never fires.
+func TestHTTPStaticDirectorySymlinkEscapeRejected(t *testing.T) {
+	root := t.TempDir()
+	staticRoot := filepath.Join(root, "public")
+	if err := os.MkdirAll(staticRoot, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	outsideDir := t.TempDir()
+	secret := filepath.Join(outsideDir, "secret.txt")
+	if err := os.WriteFile(secret, []byte("top secret"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	link := filepath.Join(staticRoot, "outside")
+	if err := os.Symlink(outsideDir, link); err != nil {
+		t.Skipf("symlinks unavailable in this environment: %v", err)
+	}
+	base, _ := startHTTP(t, ahdHTTPDefaultMaxBody, func(handle string) {
+		AhdHTTPServerStatic(AhdClassHTTPError, handle, "/assets", staticRoot)
+	})
+	response, err := http.Get(base + "/assets/outside/secret.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer response.Body.Close()
+	body, _ := io.ReadAll(response.Body)
+	if response.StatusCode != http.StatusNotFound {
+		t.Fatalf("intermediate directory symlink escape was not rejected: status %d, body %q", response.StatusCode, body)
+	}
+	if bytes.Contains(body, []byte("top secret")) {
+		t.Fatalf("intermediate directory symlink escape leaked the outside-root file: body %q", body)
+	}
+}
+
+// TestHTTPStaticSymlinkStayingInsideRootStillWorks: a symlink (leaf or
+// intermediate) whose canonical target remains inside the static root is
+// not an escape and must continue to be served normally -- the fix must
+// not degrade into banning every symlink outright.
+func TestHTTPStaticSymlinkStayingInsideRootStillWorks(t *testing.T) {
+	root := t.TempDir()
+	images := filepath.Join(root, "images")
+	if err := os.MkdirAll(images, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeStaticFixture(t, root, "images/photo.txt", []byte("a real photo, sort of"))
+	link := filepath.Join(root, "link")
+	if err := os.Symlink(images, link); err != nil {
+		t.Skipf("symlinks unavailable in this environment: %v", err)
+	}
+	base, _ := startHTTP(t, ahdHTTPDefaultMaxBody, func(handle string) {
+		AhdHTTPServerStatic(AhdClassHTTPError, handle, "/assets", root)
+	})
+	response, err := http.Get(base + "/assets/link/photo.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer response.Body.Close()
+	body, _ := io.ReadAll(response.Body)
+	if response.StatusCode != http.StatusOK || string(body) != "a real photo, sort of" {
+		t.Fatalf("an internal symlink that stays inside root should still be served: status %d, body %q", response.StatusCode, body)
+	}
+}
+
+// TestHTTPStaticNestedOrdinaryDirectoryFile: a file under a plain,
+// non-symlinked subdirectory must still serve normally after the fix.
+func TestHTTPStaticNestedOrdinaryDirectoryFile(t *testing.T) {
+	root := t.TempDir()
+	writeStaticFixture(t, root, "subdir/nested.txt", []byte("nested content"))
+	base, _ := startHTTP(t, ahdHTTPDefaultMaxBody, func(handle string) {
+		AhdHTTPServerStatic(AhdClassHTTPError, handle, "/assets", root)
+	})
+	response, err := http.Get(base + "/assets/subdir/nested.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer response.Body.Close()
+	body, _ := io.ReadAll(response.Body)
+	if response.StatusCode != http.StatusOK || string(body) != "nested content" {
+		t.Fatalf("ordinary nested file should serve: status %d, body %q", response.StatusCode, body)
 	}
 }
 
