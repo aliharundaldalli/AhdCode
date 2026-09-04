@@ -249,6 +249,7 @@ See the [CLI guide](docs/CLI.md), [formatter guide](docs/FORMATTER.md),
 - [v0.7 HTML parsing and web scraping](examples/v0.7/README.md)
 - [v0.8 multipart forms and file uploads](examples/v0.8/README.md)
 - [v0.9 SMTP mail sending](examples/v0.9/README.md)
+- [AhdDataStudio](tools/AhdDataStudio/README.md) — local MySQL + SQLite development UI
 - [v0.4 Library Demo](https://github.com/aliharundaldalli/ahdcode-library-demo) (separate beginner web app)
 - [v0.4 Seminar Demo](https://github.com/aliharundaldalli/ahdcode-seminer-demo) (Hatay, multi-page)
 - [Full v0.1 language specification](AHDCODE_LANGUAGE_SPEC_v0.1.md)
@@ -293,6 +294,7 @@ examples/v0.6/     outbound HTTP Client and JSON APIs
 examples/v0.7/     HTML parsing, selectors, and web scraping
 examples/v0.8/     multipart forms, file uploads, and upload metadata
 examples/v0.9/     SMTP text/HTML mail through Env-configured servers
+tools/AhdDataStudio/ first-party local MySQL + SQLite development UI
 AHDCODE_LANGUAGE_SPEC_v0.1.md
                    authoritative language contract
 ```
