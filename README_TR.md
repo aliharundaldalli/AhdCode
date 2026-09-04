@@ -12,9 +12,32 @@ AhdCode; okunabilir sözdizimi, açık niyet (explicit intent), öngörülebilir
 anlambilim (semantics) ve yerel (native) derlemeye odaklanan, deneysel,
 statik olarak denetlenen genel amaçlı bir programlama dilidir.
 
-Mevcut sürüm **v0.9.0**'dır. Çekirdek dil uçtan uca çalışır, ancak proje
+Mevcut sürüm **v0.11.0**'dır. Çekirdek dil uçtan uca çalışır, ancak proje
 üretime hazır değildir ve 1.0'dan önce kırıcı (breaking) değişiklikler
 olabilir.
+
+v0.11.0, [MySQL](docs/MYSQL_TR.md) ekler: `MySQL.connect` gerçek bir
+sunucuyu arar ve döndürmeden önce erişilebilir olduğunu doğrular; `database`
+`null` olabilir, böylece bir bağlantı herhangi biri seçilmeden önce kimlik
+bilgilerinin görebildiği her veritabanını `SHOW DATABASES` ile listeleyebilir;
+her sorgu sunucu taraflı parametre bağlıdır; bağımsız bir
+`MySQLTransaction` eşzamanlı isteklerle asla değişebilir durum paylaşmaz; ve
+`DECIMAL`/ikili değerler zorlanmak yerine kesin kalır. Gömülü
+`github.com/go-sql-driver/mysql` sürücüsü AhdCode'un kendisine yerleşiktir
+ve üretilen bir programın derlemesine `vendor/` olarak kopyalanır, böylece
+MySQL kullanan bir program yine de tamamen çevrimdışı derlenir — diğer her
+üretilmiş programın zaten sahip olduğu aynı garanti. v0.10.0,
+[Security](docs/SECURITY_TR.md) ekler: `Security.passwordHash` /
+`passwordVerify`, Argon2id parola hashlemeyi kendini tanımlayan tek bir
+saklanan dize arkasına sarar; `Security.token`, 256 bitlik URL-güvenli
+rastgele bir belirteç döndürür; ve `Security.secureEqual`, CSRF belirteçleri
+ve benzerleri için iki String'i sabit zamanda karşılaştırır — üç odaklı
+ilkel, bir kimlik doğrulama çerçevesi değil. v0.9.1, ikili-güvenli
+[HTTP](docs/HTTP_TR.md) dosya yanıtları ekler: `HTTP.file` ve
+`HTTP.download`, saklanan bir dosyanın tam baytlarını, hiçbir zaman bir
+AhdCode `String`'inden geçirmeden istemciye geri akıtır; açık bir
+`contentType` ve, `download` için, saklanan yoldan bağımsız ve ASCII
+olmayan isimler için bile güvenle kodlanmış bir sunum dosya adı ile.
 
 v0.9.0, yalnızca gönderim yapan [SMTP](docs/SMTP_TR.md) postası ekler:
 değiştirilemez bir `SMTPClient` host, port ve güvenliği (`starttls`, `tls`

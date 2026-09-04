@@ -12,9 +12,28 @@ AhdCode is an experimental statically checked general-purpose programming
 language focused on readable syntax, explicit intent, predictable semantics,
 and native compilation.
 
-The current release is **v0.9.0**. The core language works end to end, but
+The current release is **v0.11.0**. The core language works end to end, but
 the project is not production-ready and breaking changes may occur before 1.0.
 
+v0.11.0 adds [MySQL](docs/MYSQL.md): `MySQL.connect` dials a real server and
+verifies it is reachable before returning, `database` may be `null` so a
+connection can list every database the credentials can see with `SHOW
+DATABASES` before selecting one, every query is server-side parameter-bound,
+an independent `MySQLTransaction` never shares mutable state with concurrent
+requests, and `DECIMAL`/binary values stay exact rather than being coerced.
+The vendored `github.com/go-sql-driver/mysql` driver is embedded in AhdCode
+itself and copied into a generated program's build as `vendor/`, so a
+MySQL-using program still builds fully offline, the same guarantee every
+other generated program already has. v0.10.0 adds [Security](docs/SECURITY.md): `Security.passwordHash` /
+`passwordVerify` wrap Argon2id password hashing behind one self-describing
+stored string, `Security.token` returns a 256-bit URL-safe random token, and
+`Security.secureEqual` compares two Strings in constant time for CSRF tokens
+and the like — three focused primitives, not an authentication framework.
+v0.9.1 adds binary-safe [HTTP](docs/HTTP.md) file responses: `HTTP.file` and
+`HTTP.download` stream a stored file's exact bytes back to the client
+without ever passing them through an AhdCode `String`, with an explicit
+`contentType` and, for `download`, a presentation filename that is
+independent of the stored path and safely encoded even for non-ASCII names.
 v0.9.0 adds send-only [SMTP](docs/SMTP.md) mail: an immutable `SMTPClient`
 configures host, port, and security (`starttls`, `tls`, or explicit `none`),
 an immutable `SMTPMessage` carries To/Cc/Bcc, Reply-To, UTF-8 Subject, and

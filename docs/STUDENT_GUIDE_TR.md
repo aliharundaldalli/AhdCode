@@ -4152,6 +4152,7 @@ derinleştirebilirsiniz:
 - [Archive](ARCHIVE_TR.md)
 - [JSON](JSON_TR.md)
 - [SQLite](SQLITE_TR.md)
+- [MySQL](MYSQL_TR.md)
 - [HTTP](HTTP_TR.md)
 - [Security](SECURITY_TR.md)
 - [HTML](HTML_TR.md)
@@ -4179,8 +4180,9 @@ klasörüne, [v0.3 SQLite Not Defteri](../examples/v0.3/README_TR.md),
 [v0.7 HTML ayrıştırma ve web kazıma](../examples/v0.7/README_TR.md),
 [v0.8 dosya yükleme](../examples/v0.8/README_TR.md),
 [v0.9 SMTP e-posta](../examples/v0.9/README_TR.md),
-[v0.9.1 ikili-güvenli HTTP dosya yanıtları](../examples/v0.9.1/README_TR.md) ve
-[v0.10 Security örnekleri](../examples/v0.10/README.md) sayfalarına bakın.
+[v0.9.1 ikili-güvenli HTTP dosya yanıtları](../examples/v0.9.1/README_TR.md),
+[v0.10 Security örnekleri](../examples/v0.10/README.md) ve
+[v0.11 MySQL örnekleri](../examples/v0.11/README_TR.md) sayfalarına bakın.
 
 ## 50. Güvenlik: parola hashleme ve güvenli belirteçler
 
@@ -4257,3 +4259,107 @@ return HTTP.text("reddedildi", 403)
 
 Tam belge için [SECURITY_TR.md](SECURITY_TR.md) ve
 [v0.10 örnekleri](../examples/v0.10/README.md) sayfalarına bakın.
+
+## 51. MySQL: ağ veritabanı sunucusu
+
+Bölüm 35, kendi bilgisayarınızda tek bir dosyada yaşayan bir veritabanı olan
+SQLite'ı kullandı. **MySQL** önemli bir yönden farklıdır — o bir
+*sunucudur*. Bir dosya açmak yerine, ağ üzerinden kendi makinenizde veya
+tamamen başka bir yerdeki bir sunucuda çalışıyor olabilecek bir `mysqld`
+sürecine bağlanırsınız; bu sürece aynı anda birçok program konuşabilir.
+Yazdığınız SQL neredeyse aynıdır; değişen şey ona nasıl ulaştığınızdır.
+
+### 1. Bağlan
+
+```ahd
+bring Env
+bring MySQL
+from MySQL bring MySQLDatabase
+from MySQL bring MySQLError
+
+host := Env.getOr("MYSQL_HOST", "127.0.0.1")
+username := Env.getOr("MYSQL_USERNAME", "app")
+password := Env.getOr("MYSQL_PASSWORD", "")
+
+attempt {
+    db: Local MySQLDatabase := MySQL.connect(host, username, password, 3306, "okul")
+    write("bağlandı")
+    db.close()
+} except MySQLError as error {
+    write("bağlanılamadı: " + error.message)
+}
+```
+
+Gerçek bir parolayı asla doğrudan kaynak kodunuza yazmayın — bölüm 41'deki
+`SMTP` kimlik bilgileri gibi, `Env` ile okuyun. `MySQL.connect` yalnızca bu
+bilgileri hatırlamakla kalmaz: size bir `MySQLDatabase` vermeden önce
+gerçekten sunucuyu arar ve yanıt verdiğini kontrol eder, böylece yanlış bir
+ana bilgisayar veya yanlış bir parola tam orada `MySQLError` yükseltir, ilk
+sorgunuzda değil.
+
+### 2. Parametreli ekleme
+
+```ahd
+db.execute(
+    "INSERT INTO students (name, grade) VALUES (?, ?)"
+    [MySQL.fromString("Ada"), MySQL.fromString("95.5")]
+)
+```
+
+SQLite ile aynı kural: her `?`, gerçek bir bağlı parametredir, bu yüzden
+içinde başıboş bir tırnak veya noktalı virgül bulunan bir isim, asla SQL
+olarak çalıştırılmadan sıradan metin olarak saklanır. `MySQL.fromString`/
+`fromInt`/`fromReal`/`nullValue`, bağladığınız değerleri oluşturur —
+`SQLite.fromString` ve benzerlerinin kullandığı aynı şekiller.
+
+### 3. Sorgula
+
+```ahd
+rows := db.query("SELECT id, name, grade FROM students ORDER BY id")
+for row in rows {
+    write(row["name"].string() + ": " + row["grade"].string())
+}
+```
+
+Satırlar, tanıdık `Pair` şeklinde geri gelir. SQLite'tan farklı bir şey var:
+yukarıdaki `grade` gibi bir `DECIMAL` sütunu bir `String` olarak kalır
+(`"95.5"`), asla bir `Real` olmaz. İkili kayan nokta her ondalık kesri tam
+olarak temsil edemez, bu yüzden sessizce dönüştürmek bir notu veya fiyatı
+sessizce bozabilir. Üzerinde gerçekten aritmetiğe ihtiyacınız varsa
+`real(...)` ile açıkça dönüştürün.
+
+### 4. İşlem (Transaction)
+
+```ahd
+tx := db.begin()
+attempt {
+    tx.execute("UPDATE accounts SET balance = balance - ? WHERE id = ?", [...])
+    tx.execute("UPDATE accounts SET balance = balance + ? WHERE id = ?", [...])
+    tx.commit()
+} except MySQLError as error {
+    tx.rollback()
+    write(error.message)
+}
+```
+
+`db.begin()`, bağımsız bir işlem açar — açıkken aynı `MySQLDatabase`
+üzerindeki diğer sorguları engellemez. `commit()` ile ya iki güncelleme de
+gerçekleşir, ya da `rollback()` ile hiçbiri gerçekleşmez.
+
+### 5. Kapat
+
+```ahd
+db.close()
+```
+
+Bağlantıyı havuza geri bırakır. Sonrasında kapalı bir `MySQLDatabase`
+kullanmak, sessizce hiçbir şey yapmak yerine `MySQLError` yükseltir.
+
+**Teknik not.** `MySQL` ve `SQLite`, iki ayrı tip kümesine sahip iki ayrı
+modüldür (`MySQLDatabase` ile `Database`, `MySQLValue` ile `SQLiteValue`).
+Bir program ikisini de aynı anda `bring` edebilir — biri paylaşılan bir ağ
+veritabanı için, biri küçük yerel bir önbellek için — aralarında hiçbir
+karışıklık olmaz.
+
+[MySQL modül referansına](MYSQL_TR.md) ve
+[`examples/v0.11`](../examples/v0.11/README_TR.md) klasörüne bakın.

@@ -4121,6 +4121,7 @@ After finishing this guide, you can deepen your knowledge of the language detail
 - [Archive](ARCHIVE.md)
 - [JSON](JSON.md)
 - [SQLite](SQLITE.md)
+- [MySQL](MYSQL.md)
 - [HTTP](HTTP.md)
 - [Security](SECURITY.md)
 - [HTML](HTML.md)
@@ -4140,7 +4141,7 @@ After finishing this guide, you can deepen your knowledge of the language detail
 - [Practical Module Workshops](PRACTICAL_MODULES.md)
 - [Full v0.1 specification](../AHDCODE_LANGUAGE_SPEC_v0.1.md)
 
-Check the [curated v0.1 examples](../examples/v0.1/README.md) folder, the [v0.3 SQLite Notes App](../examples/v0.3/README.md), the [v0.4 Web Notes App](../examples/v0.4/README.md), the [v0.5 cookies and sessions](../examples/v0.5/README.md), the [v0.6 HTTP Client](../examples/v0.6/README.md), the [v0.7 HTML parsing and web scraping](../examples/v0.7/README.md), the [v0.8 file uploads](../examples/v0.8/README.md), the [v0.9 SMTP mail](../examples/v0.9/README.md), the [v0.9.1 binary HTTP file responses](../examples/v0.9.1/README.md), and the [v0.10 Security examples](../examples/v0.10/README.md) for more working programs.
+Check the [curated v0.1 examples](../examples/v0.1/README.md) folder, the [v0.3 SQLite Notes App](../examples/v0.3/README.md), the [v0.4 Web Notes App](../examples/v0.4/README.md), the [v0.5 cookies and sessions](../examples/v0.5/README.md), the [v0.6 HTTP Client](../examples/v0.6/README.md), the [v0.7 HTML parsing and web scraping](../examples/v0.7/README.md), the [v0.8 file uploads](../examples/v0.8/README.md), the [v0.9 SMTP mail](../examples/v0.9/README.md), the [v0.9.1 binary HTTP file responses](../examples/v0.9.1/README.md), the [v0.10 Security examples](../examples/v0.10/README.md), and the [v0.11 MySQL examples](../examples/v0.11/README.md) for more working programs.
 
 ## 50. Security: password hashing and secure tokens
 
@@ -4229,3 +4230,105 @@ return HTTP.text("rejected", 403)
 
 See [the full CSRF example](../examples/v0.10/03_csrf_session.ahd) and
 [SECURITY.md](SECURITY.md) for complete documentation.
+
+## 51. MySQL: a network database server
+
+Section 35 used SQLite: a database that lives in one file on your own
+computer. **MySQL** is different in one important way — it is a *server*.
+Instead of opening a file, you connect over the network to a `mysqld`
+process that might be running on your own machine, or on a server somewhere
+else entirely, and that many programs can talk to at the same time. The SQL
+you write is nearly identical; what changes is how you get to it.
+
+### 1. Connect
+
+```ahd
+bring Env
+bring MySQL
+from MySQL bring MySQLDatabase
+from MySQL bring MySQLError
+
+host := Env.getOr("MYSQL_HOST", "127.0.0.1")
+username := Env.getOr("MYSQL_USERNAME", "app")
+password := Env.getOr("MYSQL_PASSWORD", "")
+
+attempt {
+    db: Local MySQLDatabase := MySQL.connect(host, username, password, 3306, "school")
+    write("connected")
+    db.close()
+} except MySQLError as error {
+    write("could not connect: " + error.message)
+}
+```
+
+Never write a real password directly in your source — read it with `Env`,
+exactly like `SMTP` credentials in section 41. `MySQL.connect` does not just
+remember these details: it actually dials the server and checks it answers
+before giving you a `MySQLDatabase`, so a wrong host or a wrong password
+raises `MySQLError` right there, not on your first query.
+
+### 2. Parameterized insert
+
+```ahd
+db.execute(
+    "INSERT INTO students (name, grade) VALUES (?, ?)"
+    [MySQL.fromString("Ada"), MySQL.fromString("95.5")]
+)
+```
+
+Same rule as SQLite: every `?` is a real bound parameter, so a name
+containing a stray quote or a semicolon is stored as ordinary text, never
+executed as SQL. `MySQL.fromString`/`fromInt`/`fromReal`/`nullValue` build
+the values you bind, the same shapes `SQLite.fromString` and friends use.
+
+### 3. Query
+
+```ahd
+rows := db.query("SELECT id, name, grade FROM students ORDER BY id")
+for row in rows {
+    write(row["name"].string() + ": " + row["grade"].string())
+}
+```
+
+Rows come back as the familiar `Pair` shape. One thing is different from
+SQLite: a `DECIMAL` column like `grade` above stays a `String`
+(`"95.5"`), never a `Real`. Binary floating point cannot represent every
+decimal fraction exactly, so silently converting it could quietly corrupt a
+grade or a price. Convert explicitly with `real(...)` if you actually need
+arithmetic on it.
+
+### 4. Transaction
+
+```ahd
+tx := db.begin()
+attempt {
+    tx.execute("UPDATE accounts SET balance = balance - ? WHERE id = ?", [...])
+    tx.execute("UPDATE accounts SET balance = balance + ? WHERE id = ?", [...])
+    tx.commit()
+} except MySQLError as error {
+    tx.rollback()
+    write(error.message)
+}
+```
+
+`db.begin()` opens an independent transaction — it does not block other
+queries on the same `MySQLDatabase` while it is open. Either both updates
+happen, with `commit()`, or neither does, with `rollback()`.
+
+### 5. Close
+
+```ahd
+db.close()
+```
+
+Releases the connection back to the pool. Using a closed `MySQLDatabase`
+afterward raises `MySQLError` instead of quietly doing nothing.
+
+**Technical note.** `MySQL` and `SQLite` are two separate modules with two
+separate sets of types (`MySQLDatabase` vs. `Database`, `MySQLValue` vs.
+`SQLiteValue`). A program can `bring` both at once — one for a shared
+network database, one for a small local cache — with no confusion between
+them.
+
+See [the MySQL module reference](MYSQL.md) and
+[`examples/v0.11`](../examples/v0.11/README.md).

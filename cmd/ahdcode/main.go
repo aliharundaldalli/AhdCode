@@ -23,7 +23,7 @@ import (
 	"ahdcode/internal/source"
 )
 
-const usage = `AhdCode v0.10.0 toolchain
+const usage = `AhdCode v0.11.0 toolchain
 
 usage:
   ahdcode                                  start the interactive REPL
@@ -36,7 +36,7 @@ usage:
   ahdcode --version                          print the compiler version
 `
 
-const version = "AhdCode v0.10.0"
+const version = "AhdCode v0.11.0"
 
 func main() {
 	os.Exit(run(os.Args[1:]))
