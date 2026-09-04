@@ -27,7 +27,7 @@ func TestCommandDispatch(t *testing.T) {
 	if code := runWithIO(nil, bytes.NewBuffer(nil), &out, &errors); code != 0 {
 		t.Fatalf("expected REPL exit 0; received %d", code)
 	}
-	if !strings.Contains(out.String(), "AhdCode v0.14.1\nahd> ") {
+	if !strings.Contains(out.String(), "AhdCode v0.15.0\nahd> ") {
 		t.Fatalf("REPL banner/prompt = %q", out.String())
 	}
 	if code := run([]string{"nonsense"}); code != 2 {
@@ -116,7 +116,7 @@ func TestHelpVersionAndUnknownFlags(t *testing.T) {
 	}{
 		{[]string{"--help"}, 0, "ahdcode format"},
 		{[]string{"--help"}, 0, "ahdcode lsp"},
-		{[]string{"--version"}, 0, "AhdCode v0.14.1"},
+		{[]string{"--version"}, 0, "AhdCode v0.15.0"},
 		{[]string{"run", "--bad"}, 2, "unknown flag"},
 		{[]string{"format", "--bad", "x.ahd"}, 2, "unknown flag"},
 	} {

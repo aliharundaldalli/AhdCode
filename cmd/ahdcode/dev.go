@@ -153,6 +153,20 @@ type devController struct {
 	// the session is genuinely gone.
 	stopWaiters  []chan struct{}
 	shutdownDone chan struct{}
+
+	// webAnnounced records that the Web banner has already been printed for
+	// this session. The environment is inspected once, after the first
+	// successful build, so an ordinary rebuild stays as quiet as it is for
+	// any other program.
+	webAnnounced   bool
+	webBannerShown bool
+	webEnvironment webEnvironment
+
+	// exitStatus is the process exit code this session ends with. It stays 0
+	// for every ordinary run, including a failed build, which dev recovers
+	// from; a refused configuration is not recoverable and ends non-zero so
+	// a script or CI notices.
+	exitStatus int
 }
 
 func newDevController(entry, binDir, descriptorPath string, output, errorOut io.Writer) *devController {
@@ -247,6 +261,24 @@ func (c *devController) run() {
 			c.updateWatchSet(event.buildResult)
 			if event.buildOK {
 				c.printf("✓ Build succeeded\n")
+				if !c.webAnnounced && isWebApplication(event.buildResult) {
+					environment := readWebEnvironment(c.entry)
+					if err := checkWebEnvironment(environment); err != nil {
+						// A production configuration reached the development
+						// command. Refuse it rather than run it: this is a
+						// mismatch the user has to resolve, and starting the
+						// child anyway would run production configuration
+						// under a development session without saying so.
+						fmt.Fprintf(c.errorOut, "✗ %v\n", err)
+						c.discardCandidate(event.buildPath, false)
+						c.shuttingDown = true
+						c.exitStatus = 1
+						c.finishShutdown()
+						return
+					}
+					c.webAnnounced = true
+					c.webEnvironment = environment
+				}
 				if c.child != nil {
 					c.printf("→ Restarting...\n")
 					stopDevChild(c.child)
@@ -265,6 +297,10 @@ func (c *devController) run() {
 					c.currentBinary = event.buildPath
 					c.printf("✓ Running\n")
 					c.publishDescriptor()
+					if c.webAnnounced && !c.webBannerShown {
+						c.webBannerShown = true
+						announceWebApplication(c.output, c.webEnvironment)
+					}
 				}
 			} else {
 				c.printf("✗ Build failed\n\n")
@@ -440,5 +476,5 @@ func runDev(arguments []string, output, errorOutput io.Writer) int {
 
 	controller.run()
 	watcher.close()
-	return 0
+	return controller.exitStatus
 }
