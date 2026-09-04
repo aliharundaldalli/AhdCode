@@ -4,6 +4,11 @@
 
 [README'ye dön](../README_TR.md) · [Statistics](STATISTICS_TR.md) · [Modüller](MODULES_TR.md)
 
+İlk kez öğreniyorsanız Data'dan sayısal liste üretme, grafik türü seçme ve
+aynı grafiği Word/Latex raporuna gömme akışını gösteren
+[Plot atölyesini](PRACTICAL_MODULES_TR.md#3-plot-veriyi-okunabilir-bir-grafiğe-dönüştürmek)
+çalışın; bu sayfayı bütün grafik seçeneklerinin referansı olarak kullanın.
+
 Plot, tipli sayısal List'lerden grafik çizer. Math, Time, Regex, CSV, Data
 ve Statistics gibi açıktır (explicit):
 

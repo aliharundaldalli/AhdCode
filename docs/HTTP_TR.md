@@ -4,6 +4,10 @@
 
 [README'ye dön](../README_TR.md) · [Modüller](MODULES_TR.md) · [HTML](HTML_TR.md) · [Öğrenci Rehberi](STUDENT_GUIDE_TR.md#38-http-client)
 
+İlk kez öğreniyorsanız URL yapısı, durum kodları, taşıma hataları, JSON POST
+ve istemci güvenliğini birlikte gösteren [HTTP/HTTPS atölyesini](PRACTICAL_MODULES_TR.md#7-http-ve-https-istek-yanıt-ve-hata-sınırı)
+çalışın; bu sayfayı sunucu ve istemcinin eksiksiz referansı olarak kullanın.
+
 `HTTP`, AhdCode v0.4.0 ile gelen, derleyici tarafından kayıtlı
 `builtin:HTTP` modülüdür. Açıkça getirilir ve yanındaki bir `HTTP.ahd`
 onu gölgeleyemez:

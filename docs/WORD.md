@@ -4,6 +4,10 @@
 
 [Back to README](../README.md) · [Modules](MODULES.md) · [Plot](PLOT.md)
 
+If you are learning this module, start with the [Word workshop](PRACTICAL_MODULES.md#5-word-build-a-docx-report-with-tables-and-figures)
+to build a DOCX report from a Data table and Plot figure; use this page as the
+complete API and DOCX behavior reference.
+
 Word creates immutable documents, writes real `.docx` packages, and reads a
 small semantic subset of existing DOCX files. Import it explicitly:
 

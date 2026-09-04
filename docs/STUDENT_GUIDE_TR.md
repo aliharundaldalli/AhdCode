@@ -6,6 +6,14 @@ Kodların yanında zaman zaman İngilizce teknik terimler de göreceksiniz. Bunl
 
 En iyi öğrenme yolu, örnekleri yalnızca okumak değil çalıştırmaktır. Bir örneği kopyalayın, içindeki sayıyı veya metni değiştirin ve sonucun nasıl değiştiğine bakın.
 
+Bu rehber dilin temel öğrenme yoludur. Özellikle CSV, Data, Plot, Excel, Word,
+Latex, HTTP(S) ve HTML ile gerçek bir çıktı üretmek istiyorsanız, ilgili kısa
+tanıtımdan sonra [Uygulamalı Modül Atölyeleri](PRACTICAL_MODULES_TR.md)
+belgesine geçin. Orada modüller `CSV → Data → Statistics/Plot → Excel/Word/Latex` ve
+`HTTPS → HTML` iş akışları içinde, kontrol noktaları ve görevlerle anlatılır.
+Tek tek bütün imzalar ve sınır koşulları ise her modülün kendi referans
+belgesindedir.
+
 ## İçindekiler
 - [1. AhdCode nedir?](#1-ahdcode-nedir)
 - [2. Kurulum ve ilk programınız](#2-kurulum-ve-ilk-programınız)
@@ -26,6 +34,7 @@ En iyi öğrenme yolu, örnekleri yalnızca okumak değil çalıştırmaktır. B
 - [17. Sınıflar (Class) ve Özellikler (Attributes)](#17-sınıflar-class-ve-özellikler-attributes)
 - [18. Hata yönetimi (`attempt`, `except`, `ultimately` ve `toss`)](#18-hata-yönetimi-attempt-except-ultimately-ve-toss)
 - [19. Modüller ve bring](#19-modüller-ve-bring)
+  - [Uygulamalı modül çalışma rotası](#uygulamalı-modül-çalışma-rotası)
 - [20. Fundamentals modülü](#20-fundamentals-modülü)
 - [21. Math modülü](#21-math-modülü)
 - [22. Time modülü](#22-time-modülü)
@@ -1552,6 +1561,30 @@ except InvalidAgeError as error {
 
 Program büyüdükçe her şeyi tek bir dosyaya yazmak istemezsiniz. Bir işi ayrı bir `.ahd` dosyasına koyup başka bir dosyadan kullanabilirsiniz. Buna **modül** diyebiliriz.
 
+### Uygulamalı modül çalışma rotası
+
+Modül öğrenirken üç belge türünün görevi farklıdır:
+
+| Belge | Ne için kullanılır? |
+|---|---|
+| Bu öğrenci rehberi | Kavramı ilk kez öğrenmek ve küçük örneği görmek |
+| [Uygulamalı Modül Atölyeleri](PRACTICAL_MODULES_TR.md) | Baştan sona bir iş akışı kurmak ve alıştırma yapmak |
+| Modül referansı | Bütün fonksiyonları, parametreleri, hataları ve sınırları doğrulamak |
+
+Önerilen pratik sıra şöyledir:
+
+1. CSV ile dışarıdan gelen metin tablosunu okuyun.
+2. Data ile filtreleyin, sıralayın, dönüştürün ve gruplayın.
+3. Sayı gereken yerde açıkça `int(...)` / `real(...)` kullanın.
+4. Statistics ile özet hesaplayıp Plot ile grafiği görünür kılın.
+5. Excel ile tipli `.xlsx`, Word ile `.docx` veya Latex ile `.pdf` üretin.
+6. HTTP Client ile HTTPS içeriği alın; HTML ile güvenli sayfa kurun veya
+   alınmış işaretlemeyi ayrıştırın.
+
+Bu sırada hiçbir modül diğerinin görevini gizlice üstlenmez. CSV ve Data
+sayısal tür tahmin etmez; Excel formül hesaplamaz; HTML URL indirmez; HTTP
+aldığı HTML'i kendi başına ayrıştırmaz.
+
 ### Kendi modülünüzü oluşturmak
 
 Aynı klasörde iki dosyanız olduğunu düşünün:
@@ -1794,6 +1827,10 @@ Bozuk tırnaklama, kötü ayırıcı veya başlıkla uyuşmayan kayıt `CSVError
 
 [CSV modül referansına](CSV_TR.md) bakın.
 
+Dosya okuma, bozuk değer, özel ayraç ve kayıt yazma adımlarını birlikte
+çalışmak için [CSV atölyesine](PRACTICAL_MODULES_TR.md#1-csv-metin-tablosunu-güvenle-taşımak)
+geçin.
+
 ### İlk bakış: Data tabloları
 
 Metin girdikten sonra `Data` size bir `Table` verir: adlı sütunlar, süzüp şekil verebileceğiniz satırlar. Her hücre hâlâ `String`'dir. Her dönüşüm **yeni** bir tablo döndürür — elinizdeki tablo değişmez.
@@ -1873,6 +1910,10 @@ except DataError as error {
 **Siz deneyin:** Filtreyi `>= 90` yapıp `passed.rowCount()` ile kaç satır kaldığına bakın.
 
 Ayrıca `sort`, `rename`, `reverse`, `head`, `tail`, `transform`, `derive`, `unique`, `valueCounts` ve `groupBy` vardır. [Data modül referansına](DATA_TR.md) bakın.
+
+Temizleme, sayısal sıralama, gruplama, Statistics'e geçiş ve veri kalite
+kontrolü için [Data atölyesini](PRACTICAL_MODULES_TR.md#2-data-string-tablosunu-şekillendirmek)
+tamamlayın.
 
 ## 20. Fundamentals modülü
 
@@ -2283,6 +2324,11 @@ bars.save("ortalamalar.svg")
 
 Histogram, kutu ve alt grafikler için [Plot modül referansına](PLOT_TR.md) bakın.
 
+Data sütunundan sayısal liste üretme, doğru grafik türünü seçme ve aynı PNG
+grafiği Word ile Latex raporlarına gömme akışı için
+[Plot atölyesini](PRACTICAL_MODULES_TR.md#3-plot-veriyi-okunabilir-bir-grafiğe-dönüştürmek)
+tamamlayın.
+
 ## 25. Numeric modülü ve Complex
 
 `Numeric` doğrusal cebirdir: `Vector` uzunluğu olan sıralı sayılar, `Matrix` satır ve sütunlu bir ızgaradır. Elemanlar `Int` veya `Real`'dir. İşlemler yeni değer döndürür; elinizdeki Vector veya Matrix yeniden yazılmaz.
@@ -2367,6 +2413,11 @@ except LatexError as error {
 
 Teorem/tablo/kaynakça yardımcılarının tümünü ilk programa kopyalamayın. [Latex modül referansına](LATEX_TR.md) bakın.
 
+Article, Report ve Beamer üretimini; denklem, tablo, görsel, kaynakça ve
+`.tex` hata ayıklama çıktısıyla birlikte görmek için
+[Latex atölyesine](PRACTICAL_MODULES_TR.md#6-latex-akademik-pdf-ve-sunum-üretmek)
+geçin.
+
 ## 27. Word modülü
 
 Word **değiştirilemez** `.docx` belgeler üretir. Microsoft Office gerekmez. Her metot **yeni** bir `Document` döndürür; önceki değer olduğu gibi kalır. `save` dosyayı yazar ve `Nothing` döndürür; statement olarak çağırın.
@@ -2392,6 +2443,10 @@ document.save("lab-raporu.docx")
 **Siz deneyin:** `save` öncesi 2. düzey bir başlık ve kısa bir paragraf ekleyin.
 
 Birleştirme ve görsel boyutu için [Word modül referansına](WORD_TR.md) bakın.
+
+Data tablosu ve Plot grafiğinden doğrulanabilir bir DOCX raporu kurmak için
+[Word atölyesini](PRACTICAL_MODULES_TR.md#5-word-tablo-ve-görselli-docx-raporu)
+tamamlayın.
 
 ## 28. Excel modülü
 
@@ -2449,6 +2504,10 @@ Yanlış tür erişimi (`int()` bir String hücrede) `ExcelError` fırlatır. Bi
 **Siz deneyin:** Üçüncü bir öğrenci satırı ekleyip formülün yeni hücreyi kapsamasını sağlayın.
 
 Birleştirme ve stil ilk not defteri için gerekmez. [Excel modül referansına](EXCEL_TR.md) bakın.
+
+Tipli hücre, formül, Range, stil ve kaydedilen kitabı yeniden okuma akışı için
+[Excel atölyesine](PRACTICAL_MODULES_TR.md#4-excel-tipli-hücrelerle-gerçek-xlsx-üretmek)
+geçin.
 
 ## 29. PDF modülü
 
@@ -3297,6 +3356,11 @@ attempt {
 Ayrıntılar için [HTTP modül referansına](HTTP_TR.md) ve
 [`examples/v0.6`](../examples/v0.6/README_TR.md) bakın.
 
+URL parçaları, 4xx/5xx ile taşıma hatası farkı, JSON POST, Env jetonu ve
+istemci güvenlik kontrol listesi için
+[HTTP/HTTPS atölyesini](PRACTICAL_MODULES_TR.md#7-http-ve-https-istek-yanıt-ve-hata-sınırı)
+tamamlayın.
+
 ## 39. HTML ayrıştırma ve web kazıma (scraping)
 
 36. bölüm `HTML`'i sayfa *kurmak* için kullandı. v0.7.0 diğer yönü ekliyor:
@@ -3431,6 +3495,11 @@ for article in articles {
 
 Ayrıntılar için [HTML modül referansına](HTML_TR.md) ve
 [`examples/v0.7`](../examples/v0.7/README_TR.md) bakın.
+
+Güvenli dinamik sayfa, seçici kapsamı, null kontrolü ve HTTPS ile alınan
+sayfayı ayrıştırma akışı için
+[HTML atölyesine](PRACTICAL_MODULES_TR.md#8-html-güvenli-sayfa-kurmak-ve-belge-ayrıştırmak)
+geçin.
 
 ## 40. Dosya yüklemeleri
 
@@ -4099,6 +4168,7 @@ derinleştirebilirsiniz:
 - [Formatter](FORMATTER_TR.md)
 - [REPL](REPL_TR.md)
 - [Dil sunucusu](LSP_TR.md)
+- [Uygulamalı Modül Atölyeleri](PRACTICAL_MODULES_TR.md)
 - [Tam v0.1 spesifikasyonu](../AHDCODE_LANGUAGE_SPEC_v0.1_TR.md)
 
 Çalışan daha fazla örnek için [derlenmiş v0.1 örnekleri](../examples/v0.1/README_TR.md)

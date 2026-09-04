@@ -4,6 +4,10 @@
 
 [Back to README](../README.md) · [Modules](MODULES.md) · [Time module](TIME.md)
 
+If you are learning this module, start with the [Latex workshop](PRACTICAL_MODULES.md#6-latex-create-an-academic-pdf-or-slide-deck)
+for Article, Report, Beamer, equations, tables, Plot figures, and bibliography;
+use this page as the full helper and compilation reference.
+
 Latex turns AhdCode Strings into PDF documents. It is explicit, like Math and
 Time, and it works with the ordinary module forms including aliases:
 

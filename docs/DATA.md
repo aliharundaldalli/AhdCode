@@ -4,6 +4,10 @@
 
 [Back to README](../README.md) · [KeyValue](KEYVALUE.md) · [CSV](CSV.md) · [Modules](MODULES.md)
 
+If you are learning this module, start with the [Data workshop](PRACTICAL_MODULES.md#2-data-reshape-a-string-table)
+for filtering, numeric ordering, derivation, grouping, and the Statistics
+boundary; use this page as the complete behavior reference.
+
 Data is a small, strict, immutable table layer built on the existing String,
 List, Pair, Function, Lambda, and CSV machinery. It is explicit, like Math,
 Time, Regex, and CSV:

@@ -4,6 +4,10 @@
 
 [README'ye dön](../README_TR.md) · [Modüller](MODULES_TR.md) · [Plot](PLOT_TR.md)
 
+İlk kez öğreniyorsanız Data tablosu ve Plot görselinden DOCX raporu kuran
+[Word atölyesini](PRACTICAL_MODULES_TR.md#5-word-tablo-ve-görselli-docx-raporu)
+çalışın; bu sayfayı eksiksiz API ve DOCX davranış referansı olarak kullanın.
+
 Word, değiştirilemez belgeler oluşturur, gerçek `.docx` paketleri yazar ve
 mevcut DOCX dosyalarının küçük bir anlamsal alt kümesini okur:
 

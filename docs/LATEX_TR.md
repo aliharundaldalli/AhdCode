@@ -4,6 +4,10 @@
 
 [README'ye dön](../README_TR.md) · [Modüller](MODULES_TR.md) · [Time modülü](TIME_TR.md)
 
+İlk kez öğreniyorsanız Article, Report, Beamer, denklem, tablo, Plot görseli
+ve kaynakçayı tek akışta gösteren [Latex atölyesini](PRACTICAL_MODULES_TR.md#6-latex-akademik-pdf-ve-sunum-üretmek)
+çalışın; bu sayfayı tam yardımcı ve derleme referansı olarak kullanın.
+
 Latex, AhdCode String'lerini PDF belgelerine dönüştürür. Math ve Time gibi
 açıktır (explicit) ve alias'lar dahil sıradan modül biçimleriyle çalışır:
 

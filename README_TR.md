@@ -190,6 +190,8 @@ bakın.
 ## Dokümantasyon
 
 - [Türkçe Öğrenci Rehberi](docs/STUDENT_GUIDE_TR.md)
+- [Uygulamalı Modül Atölyeleri](docs/PRACTICAL_MODULES_TR.md) — CSV, Data,
+  Plot, Excel, Word, Latex, HTTP(S) ve HTML'i uçtan uca projelerle öğrenin
 - [English Student Guide](docs/STUDENT_GUIDE_EN.md)
 - [Başlangıç](docs/GETTING_STARTED_TR.md)
 - [Dil Turu](docs/LANGUAGE_TOUR_TR.md)

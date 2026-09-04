@@ -4,6 +4,11 @@
 
 [README'ye dön](../README_TR.md) · [Modüller](MODULES_TR.md) · [Lists](LISTS_TR.md) · [KeyValue](KEYVALUE_TR.md) · [Data](DATA_TR.md) · [JSON](JSON_TR.md)
 
+İlk kez öğreniyorsanız Workbook–Sheet–Cell döngüsünü, tipli hücreleri,
+formülleri, stilleri ve yeniden okuma kontrolünü birlikte gösteren
+[Excel atölyesini](PRACTICAL_MODULES_TR.md#4-excel-tipli-hücrelerle-gerçek-xlsx-üretmek)
+çalışın; bu sayfayı ayrıntılı API referansı olarak kullanın.
+
 `bring Excel`, güçlü tipli, değiştirilemez ve çevrimdışı bir XLSX katmanı
 sağlar. Yerel çalışma zamanı gerçek Excel-uyumlu `.xlsx` ZIP/XML paketleri
 oluşturur ve anlamsal olarak okur; Microsoft Excel, LibreOffice, Python,

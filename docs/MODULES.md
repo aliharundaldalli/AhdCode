@@ -55,6 +55,10 @@ F.writeText("note.txt", "hello")
 See [Time](TIME.md), [CSV](CSV.md), [Data](DATA.md), [Statistics](STATISTICS.md), [Plot](PLOT.md), [Numeric](NUMERIC.md), [Word](WORD.md), [Excel](EXCEL.md), [PDF](PDF.md), [Archive](ARCHIVE.md), [JSON](JSON.md), [SQLite](SQLITE.md), [HTTP](HTTP.md), [HTML](HTML.md), [SMTP](SMTP.md), [XML](XML.md), [Env](ENV.md), [Lists](LISTS.md), [KeyValue](KEYVALUE.md), and the other module-specific references
 for their typed surfaces and catchable domain errors.
 
+To learn CSV, Data, Plot, Excel, Word, Latex, HTTP(S), and HTML as connected
+student projects rather than isolated APIs, use the
+[Practical Module Workshops](PRACTICAL_MODULES.md).
+
 `Lists` and `KeyValue` are the structural transformation layer over the core
 `List` and `Pair` types. Their operations are *type-directed*: the compiler
 computes each call's exact result type from the argument types written at that

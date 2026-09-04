@@ -4,6 +4,10 @@
 
 [README'ye dön](../README_TR.md) · [Modüller](MODULES_TR.md) · [HTTP](HTTP_TR.md) · [Öğrenci Rehberi](STUDENT_GUIDE_TR.md#36-küçük-bir-web-sayfası)
 
+İlk kez öğreniyorsanız güvenli sayfa kurma, seçiciler, null kontrolü ve HTTPS
+ile alınan belgeyi ayrıştırmayı birlikte gösteren [HTML atölyesini](PRACTICAL_MODULES_TR.md#8-html-güvenli-sayfa-kurmak-ve-belge-ayrıştırmak)
+çalışın; bu sayfayı oluşturucu/ayrıştırıcı referansı olarak kullanın.
+
 `HTML`, derleyici tarafından kayıtlı `builtin:HTML` modülüdür. Oluşturucu
 yarısı (`HTMLNode`) AhdCode v0.4.0 ile geldi; ayrıştırma yarısı
 (`HTML.parse`, `HTMLDocument`, `HTMLElement`) v0.7.0'da eklendi. Açıkça

@@ -6,6 +6,14 @@ You will occasionally see English technical terms next to the code. You do not n
 
 The best way to learn is not just by reading the examples, but by running them. Copy an example, change a number or a text inside it, and observe how the result changes.
 
+This guide is the main path for learning the language. When you want to build
+something practical with CSV, Data, Plot, Excel, Word, Latex, HTTP(S), and
+HTML, continue from the short introduction into the
+[Practical Module Workshops](PRACTICAL_MODULES.md). They teach the connected
+`CSV → Data → Statistics/Plot → Excel/Word/Latex` and `HTTPS → HTML`
+workflows through checkpoints and exercises. Use each module's own reference
+page for its complete signatures, errors, and boundary conditions.
+
 ## Table of Contents
 - [1. What is AhdCode?](#1-what-is-ahdcode)
 - [2. Installation and your first program](#2-installation-and-your-first-program)
@@ -26,6 +34,7 @@ The best way to learn is not just by reading the examples, but by running them. 
 - [17. Classes (Class) and Attributes](#17-classes-class-and-attributes)
 - [18. Error handling (`attempt`, `except`, `ultimately`, and `toss`)](#18-error-handling-attempt-except-ultimately-and-toss)
 - [19. Modules and bring](#19-modules-and-bring)
+  - [Practical module learning path](#practical-module-learning-path)
 - [20. Fundamentals module](#20-fundamentals-module)
 - [21. Math module](#21-math-module)
 - [22. Time module](#22-time-module)
@@ -1533,6 +1542,29 @@ except InvalidAgeError as error {
 
 As a program grows, you won't want to write everything in a single file. You can put a task into a separate `.ahd` file and use it from another file. We can call this a **module**.
 
+### Practical module learning path
+
+The three kinds of documentation have different jobs:
+
+| Document | Use it for |
+|---|---|
+| This student guide | Learn a concept for the first time and run a small example |
+| [Practical Module Workshops](PRACTICAL_MODULES.md) | Build an end-to-end workflow and complete exercises |
+| Module reference | Verify every function, parameter, error, and limit |
+
+A useful practical order is:
+
+1. Read an external text table with CSV.
+2. Filter, sort, transform, and group it with Data.
+3. Convert explicitly with `int(...)` / `real(...)` wherever numbers begin.
+4. Summarize with Statistics and make the result visible with Plot.
+5. Produce typed `.xlsx` with Excel, `.docx` with Word, or `.pdf` with Latex.
+6. Fetch HTTPS content with HTTP Client; safely build or parse markup with HTML.
+
+No module silently takes over another module's job. CSV and Data do not infer
+numeric types, Excel does not calculate formulas, HTML does not fetch URLs,
+and HTTP does not parse the HTML body it receives.
+
 ### Creating your own module
 
 Imagine having two files in the same folder:
@@ -1775,6 +1807,10 @@ Malformed quoting, a bad delimiter, or a record that does not match the header r
 
 See [the CSV module reference](CSV.md) for delimiters, files, and error details.
 
+Use the [CSV workshop](PRACTICAL_MODULES.md#1-csv-transport-a-text-table-safely)
+for a complete path through files, malformed values, custom delimiters, and
+record writing.
+
 ### A first look at Data tables
 
 Once text is in, `Data` gives you a `Table`: named columns, rows you can filter and reshape. Every cell is still a `String`. Every transformation returns a **new** table — the one you already have does not change.
@@ -1854,6 +1890,10 @@ except DataError as error {
 **Try it yourself:** Change the filter to `>= 90` and print how many rows remain in `passed` with `rowCount()`.
 
 There is also `sort`, `rename`, `reverse`, `head`, `tail`, `transform`, `derive`, `unique`, `valueCounts`, and `groupBy`. See [the Data module reference](DATA.md).
+
+Complete the [Data workshop](PRACTICAL_MODULES.md#2-data-reshape-a-string-table)
+for cleaning, numeric ordering, grouping, Statistics conversion, and data
+quality checkpoints.
 
 ## 20. Fundamentals module
 
@@ -2265,6 +2305,10 @@ bars.save("averages.svg")
 
 See [the Plot module reference](PLOT.md) for histogram, box, error bars, and subplots.
 
+Complete the [Plot workshop](PRACTICAL_MODULES.md#3-plot-turn-data-into-a-readable-chart)
+to convert a Data column, choose a chart type, and embed the same PNG into Word
+and Latex reports.
+
 ## 25. Numeric module and Complex
 
 `Numeric` is linear algebra: a `Vector` is an ordered list of numbers with a length, a `Matrix` is a grid with rows and columns. Elements are `Int` or `Real`. Operations return new values; they do not rewrite the Vector or Matrix you already have.
@@ -2349,6 +2393,10 @@ Two different kinds of text:
 
 Do not copy every theorem/table/bibliography helper into a first program. See [the Latex module reference](LATEX.md).
 
+Use the [Latex workshop](PRACTICAL_MODULES.md#6-latex-create-an-academic-pdf-or-slide-deck)
+for Article, Report, and Beamer output with equations, tables, Plot figures,
+bibliography entries, and retained `.tex` source.
+
 ## 27. Word module
 
 Word builds **immutable** `.docx` documents. Microsoft Office is not required. Each method returns a **new** `Document`; the previous value stays as it was. `save` writes the file and returns `Nothing`, so you call it as a statement.
@@ -2374,6 +2422,9 @@ document.save("lab-report.docx")
 **Try it yourself:** Add a second heading at level `2` and a short paragraph under it before `save`.
 
 See [the Word module reference](WORD.md) for merges, image sizing, and `WordError`.
+
+Complete the [Word workshop](PRACTICAL_MODULES.md#5-word-build-a-docx-report-with-tables-and-figures)
+to build a verifiable DOCX report from a Data table and Plot figure.
 
 ## 28. Excel module
 
@@ -2431,6 +2482,9 @@ Wrong-kind access (`int()` on a String cell) raises `ExcelError`. Unknown sheet 
 **Try it yourself:** Add a third student row, keep the formula covering the new cell, and save again.
 
 Merge and style exist for later; they are not required for a first grade sheet. See [the Excel module reference](EXCEL.md).
+
+Use the [Excel workshop](PRACTICAL_MODULES.md#4-excel-create-a-real-xlsx-with-typed-cells)
+for typed cells, formulas, Range, styles, and read-back verification.
 
 ## 29. PDF module
 
@@ -3273,6 +3327,10 @@ attempt {
 See [the HTTP module reference](HTTP.md) and
 [`examples/v0.6`](../examples/v0.6/README.md).
 
+Complete the [HTTP/HTTPS workshop](PRACTICAL_MODULES.md#7-http-and-https-requests-responses-and-failures)
+for URL structure, HTTP status versus transport failure, JSON POST, Env
+tokens, and the client security checklist.
+
 ## 39. HTML parsing and web scraping
 
 Section 36 used `HTML` to *build* pages. v0.7.0 adds the other direction:
@@ -3407,6 +3465,10 @@ for article in articles {
 
 See [the HTML module reference](HTML.md) and
 [`examples/v0.7`](../examples/v0.7/README.md).
+
+Use the [HTML workshop](PRACTICAL_MODULES.md#8-html-build-safe-pages-and-parse-documents)
+for safe dynamic pages, selector scope, null checks, and parsing a document
+fetched over HTTPS.
 
 ## 40. File uploads
 
@@ -4075,6 +4137,7 @@ After finishing this guide, you can deepen your knowledge of the language detail
 - [Formatter](FORMATTER.md)
 - [REPL](REPL.md)
 - [Language server](LSP.md)
+- [Practical Module Workshops](PRACTICAL_MODULES.md)
 - [Full v0.1 specification](../AHDCODE_LANGUAGE_SPEC_v0.1.md)
 
 Check the [curated v0.1 examples](../examples/v0.1/README.md) folder, the [v0.3 SQLite Notes App](../examples/v0.3/README.md), the [v0.4 Web Notes App](../examples/v0.4/README.md), the [v0.5 cookies and sessions](../examples/v0.5/README.md), the [v0.6 HTTP Client](../examples/v0.6/README.md), the [v0.7 HTML parsing and web scraping](../examples/v0.7/README.md), the [v0.8 file uploads](../examples/v0.8/README.md), the [v0.9 SMTP mail](../examples/v0.9/README.md), the [v0.9.1 binary HTTP file responses](../examples/v0.9.1/README.md), and the [v0.10 Security examples](../examples/v0.10/README.md) for more working programs.

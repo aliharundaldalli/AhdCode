@@ -4,6 +4,10 @@
 
 [README'ye dön](../README_TR.md) · [Modüller](MODULES_TR.md) · [File ve Path](FILESYSTEM_TR.md)
 
+İlk kez öğreniyorsanız önce kayıt/satır seçimi, tırnaklama, tür dönüşümü ve
+hata yakalamayı birlikte ele alan [CSV atölyesini](PRACTICAL_MODULES_TR.md#1-csv-metin-tablosunu-güvenle-taşımak)
+çalışın; bu sayfayı eksiksiz API referansı olarak kullanın.
+
 `CSV`, derleyiciye kayıtlı `builtin:CSV` modülüdür. Açıkça içe aktarılır ve
 kardeş bir `CSV.ahd` onun yerini alamaz:
 

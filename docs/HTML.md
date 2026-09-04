@@ -4,6 +4,10 @@
 
 [Back to README](../README.md) · [Modules](MODULES.md) · [HTTP](HTTP.md) · [Student Guide](STUDENT_GUIDE_EN.md#36-a-small-web-page)
 
+If you are learning this module, start with the [HTML workshop](PRACTICAL_MODULES.md#8-html-build-safe-pages-and-parse-documents)
+for safe page building, selectors, null checks, and parsing an HTTPS response;
+use this page as the complete builder/parser reference.
+
 `HTML` is the compiler-registered `builtin:HTML` module. The builder half
 (`HTMLNode`) was introduced in AhdCode v0.4.0; the parsing half
 (`HTML.parse`, `HTMLDocument`, `HTMLElement`) was added in v0.7.0. It is

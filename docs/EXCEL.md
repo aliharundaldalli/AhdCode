@@ -4,6 +4,10 @@
 
 [Back to README](../README.md) · [Modules](MODULES.md) · [Lists](LISTS.md) · [KeyValue](KEYVALUE.md) · [Data](DATA.md) · [JSON](JSON.md)
 
+If you are learning this module, start with the [Excel workshop](PRACTICAL_MODULES.md#4-excel-create-a-real-xlsx-with-typed-cells)
+for the Workbook–Sheet–Cell cycle, typed cells, formulas, styles, and read-back
+verification; use this page as the detailed API reference.
+
 `bring Excel` provides a strongly typed, immutable, offline XLSX layer. It
 creates and semantically reads real Excel-compatible `.xlsx` ZIP/XML packages
 using the native runtime; Microsoft Excel, LibreOffice, Python, helper

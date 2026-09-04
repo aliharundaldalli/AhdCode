@@ -4,6 +4,10 @@
 
 [README'ye dön](../README_TR.md) · [KeyValue](KEYVALUE_TR.md) · [CSV](CSV_TR.md) · [Modüller](MODULES_TR.md)
 
+İlk kez öğreniyorsanız filtreleme, sayısal sıralama, türetme, gruplama ve
+Statistics'e geçişi tek akışta gösteren [Data atölyesini](PRACTICAL_MODULES_TR.md#2-data-string-tablosunu-şekillendirmek)
+çalışın; bu sayfayı eksiksiz davranış referansı olarak kullanın.
+
 Data; mevcut String, List, Pair, Function, Lambda ve CSV altyapısı üzerine
 kurulmuş küçük, katı (strict) ve değiştirilemez (immutable) bir tablo
 katmanıdır. Math, Time, Regex ve CSV gibi açıktır (explicit):

@@ -4,6 +4,10 @@
 
 [Back to README](../README.md) · [Modules](MODULES.md) · [HTML](HTML.md) · [Student Guide](STUDENT_GUIDE_EN.md#38-http-client)
 
+If you are learning this module, start with the [HTTP/HTTPS workshop](PRACTICAL_MODULES.md#7-http-and-https-requests-responses-and-failures)
+for URL structure, statuses, transport failures, JSON POST, and client safety;
+use this page as the complete Server and Client reference.
+
 `HTTP` is the compiler-registered `builtin:HTTP` module, introduced in
 AhdCode v0.4.0. It is explicit and a sibling `HTTP.ahd` cannot shadow it:
 

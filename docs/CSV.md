@@ -4,6 +4,10 @@
 
 [Back to README](../README.md) · [Modules](MODULES.md) · [File and Path](FILESYSTEM.md)
 
+If you are learning this module, start with the [CSV workshop](PRACTICAL_MODULES.md#1-csv-transport-a-text-table-safely)
+for rows versus records, quoting, conversion, and error handling; use this page
+as the complete API reference.
+
 `CSV` is the compiler-registered `builtin:CSV` module. It is explicit and a
 sibling `CSV.ahd` cannot shadow it:
 

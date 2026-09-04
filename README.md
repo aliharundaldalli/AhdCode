@@ -181,6 +181,8 @@ See the [CLI guide](docs/CLI.md), [formatter guide](docs/FORMATTER.md),
 
 - [Türkçe Öğrenci Rehberi](docs/STUDENT_GUIDE_TR.md)
 - [English Student Guide](docs/STUDENT_GUIDE_EN.md)
+- [Practical Module Workshops](docs/PRACTICAL_MODULES.md) — learn CSV, Data,
+  Plot, Excel, Word, Latex, HTTP(S), and HTML through end-to-end projects
 - [Getting started](docs/GETTING_STARTED.md)
 - [Language tour](docs/LANGUAGE_TOUR.md)
 - [Types and null safety](docs/TYPES_AND_NULL.md)

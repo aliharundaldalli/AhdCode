@@ -4,6 +4,10 @@
 
 [Back to README](../README.md) · [Statistics](STATISTICS.md) · [Modules](MODULES.md)
 
+If you are learning this module, start with the [Plot workshop](PRACTICAL_MODULES.md#3-plot-turn-data-into-a-readable-chart)
+for Data conversion, chart choice, quality checks, and embedding one figure in
+Word and Latex; use this page as the full chart reference.
+
 Plot renders charts from typed numeric Lists. It is explicit, like Math,
 Time, Regex, CSV, Data, and Statistics:
 
