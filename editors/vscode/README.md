@@ -67,20 +67,20 @@ This runs `@vscode/vsce package` and creates a local `.vsix`; it does not publis
 Install in VS Code from the Command Palette with **Extensions: Install from VSIX...**, or with:
 
 ```bash
-code --install-extension ahdcode-0.2.2.vsix
+code --install-extension ahdcode-0.2.3.vsix
 ```
 
 Google Antigravity IDE 1.107 exposes the same local VSIX CLI operation:
 
 ```bash
-antigravity-ide --install-extension ahdcode-0.2.2.vsix
+antigravity-ide --install-extension ahdcode-0.2.3.vsix
 ```
 
 On macOS, if those launchers are not on PATH, use the application-bundled launchers:
 
 ```bash
-/Applications/Visual\ Studio\ Code.app/Contents/Resources/app/bin/code --install-extension ahdcode-0.2.2.vsix
-/Applications/Antigravity\ IDE.app/Contents/Resources/app/bin/antigravity-ide --install-extension ahdcode-0.2.2.vsix
+/Applications/Visual\ Studio\ Code.app/Contents/Resources/app/bin/code --install-extension ahdcode-0.2.3.vsix
+/Applications/Antigravity\ IDE.app/Contents/Resources/app/bin/antigravity-ide --install-extension ahdcode-0.2.3.vsix
 ```
 
 The same package is used by both editors. The extension API baseline is VS Code 1.107, matching the tested Antigravity standalone extension host.
