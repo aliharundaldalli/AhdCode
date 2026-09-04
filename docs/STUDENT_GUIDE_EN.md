@@ -1,4 +1,4 @@
-# AhdCode v0.9.0 English Student Guide
+# AhdCode v0.10.0 English Student Guide
 
 This guide is designed so that **even someone who has never programmed before** can follow along. You can read it in order from beginning to end; in each section, you will first see what we want to achieve, then write a working example, and finally learn the necessary rules.
 
@@ -56,6 +56,7 @@ The best way to learn is not just by reading the examples, but by running them. 
 - [47. Exercises](#47-exercises)
 - [48. Solution Hints](#48-solution-hints)
 - [49. Next steps and technical docs](#49-next-steps-and-technical-docs)
+- [50. Security: password hashing and secure tokens](#50-security-password-hashing-and-secure-tokens)
 
 ## 1. What is AhdCode?
 
@@ -75,7 +76,7 @@ Hello!
 
 AhdCode checks the code you wrote before running the program. For example, if you try to use text like a number, or if you use a value that could be `null` without checking it, it will tell you the error before the program even starts, whenever possible. But you don't need to think about these details at the beginning; we'll see examples in later sections.
 
-AhdCode v0.6.0 is the current release. You can run small command-line programs or compile them into local executables, keep data in a local SQLite database, serve a page from this machine over HTTP, remember per-browser values with an in-memory session, call an external HTTP or HTTPS API, and use the language server (`ahdcode lsp`) from an editor such as VS Code. Some standard modules, such as SQLite, may use companion runtime helpers supplied with AhdCode. HTTP, HTML, cookies, sessions, and the HTTP Client use the Go standard library inside the runtime; they do not add an HTTP helper. v0.2.2 completed the everyday language server; v0.3.0 added SQLite; v0.4.0 is the first browser-facing AhdCode application phase; v0.5.0 adds cookies and server-side sessions; v0.6.0 adds the outbound HTTP Client.
+AhdCode v0.10.0 is the current release. You can run small command-line programs or compile them into local executables, keep data in a local SQLite database, serve a page from this machine over HTTP -- including a binary-safe file response with `HTTP.file`/`HTTP.download` -- remember per-browser values with an in-memory session, call an external HTTP or HTTPS API, parse HTML and scrape a page, accept file uploads, send mail through SMTP, hash passwords and generate secure tokens with the `Security` module, and use the language server (`ahdcode lsp`) from an editor such as VS Code. Some standard modules, such as SQLite, may use companion runtime helpers supplied with AhdCode. HTTP, HTML, cookies, sessions, and the HTTP Client use the Go standard library inside the runtime; they do not add an HTTP helper. v0.2.2 completed the everyday language server; v0.3.0 added SQLite; v0.4.0 is the first browser-facing AhdCode application phase; v0.5.0 adds cookies and server-side sessions; v0.6.0 adds the outbound HTTP Client; v0.7.0 adds HTML parsing and web scraping; v0.8.0 adds multipart file uploads; v0.9.0 adds SMTP mail; v0.9.1 adds binary-safe HTTP file responses; v0.10.0 adds the `Security` module.
 
 > **Technical note:** Checking types before the program runs is called *static checking*.
 
@@ -2730,6 +2731,31 @@ See [Lists](LISTS.md) and [KeyValue](KEYVALUE.md) for every signature.
 
 Until now, the values in a program disappeared when the program ended. A **database** is a file that keeps rows of data after the program closes. **SQLite** is a small database engine that lives in a single file on your computer (or in memory while you practice). You write ordinary SQL; AhdCode is a safe typed bridge: it binds parameters and converts values. It is not an ORM, not a query builder, and not a migration tool.
 
+### Tables, rows, and columns
+
+Picture a table the way you'd picture one page of a spreadsheet. It has a
+name (`notes`), a fixed set of **columns** -- the *kind* of information every
+row will hold, such as `id`, `title`, `body` -- and any number of **rows**,
+one per note you save. Every row in the table has the same columns, in the
+same order; only the values differ from row to row.
+
+**SQL** (Structured Query Language) is the language you use to talk to a
+table: create it, put rows in, read rows back out, change them, remove them.
+You do not need to learn all of SQL -- a handful of words cover almost
+everything in this section, and you will meet each one in a real AhdCode
+example below:
+
+| SQL word | Means, in plain language |
+|---|---|
+| `CREATE TABLE` | make a new table with these columns |
+| `INSERT INTO ... VALUES (...)` | add one new row |
+| `SELECT ... FROM ...` | read rows back |
+| `WHERE` | only the rows matching this condition |
+| `ORDER BY` | in this order |
+| `UPDATE ... SET ...` | change existing rows |
+| `DELETE FROM ...` | remove rows |
+| `PRIMARY KEY` | the column that uniquely identifies a row, the way a student number identifies one student |
+
 ```ahd
 bring SQLite
 from SQLite bring Database
@@ -2880,6 +2906,35 @@ v0.3.0 taught a database that remembers after the program closes. v0.4.0 adds a
 way to open that data in a browser on this machine: `HTTP` for a local server,
 and `HTML` so user text cannot become tags.
 
+### What happens when a browser opens a page?
+
+When you type an address into a browser and press Enter, the browser sends a
+small message called a **request** to a program somewhere and waits. That
+program is a **server**: it reads the request, decides what to do, and sends
+back a **response** -- usually a page of HTML the browser draws on screen.
+In this section, your own AhdCode program becomes that server, running on
+your own computer.
+
+Two parts of the request matter most for a beginner:
+
+- The **method** says what kind of request it is. `GET` means "just give me
+  something to look at" -- opening a page, following a link. `POST` means
+  "here is some data, do something with it" -- submitting a form.
+- The **path** is the part of the address after the host, such as `/` or
+  `/notes`. Your program decides what each path does; nothing happens just
+  because a file with that name exists somewhere.
+
+A **port** is a number (like `8080`) that says *which* running program on the
+computer should receive the request -- several programs can listen on the
+same computer at once, each on its own port, the same way several apartments
+can share one street address as long as each has its own door number.
+
+**HTML** is the markup language a web page is written in. A **tag** like
+`<h1>...</h1>` labels a piece of content as a big heading; `<form>` labels a
+group of inputs the browser will collect and send back to the server. You do
+not need to already know HTML -- every tag this section uses is shown in the
+examples below.
+
 `127.0.0.1` means **this computer only**. The address you open is
 `http://127.0.0.1:8080/`. Do not casually bind `0.0.0.0`. `Server.start()`
 occupies the terminal until you stop the program.
@@ -3022,9 +3077,22 @@ See [the HTTP module reference](HTTP.md) and [the HTML module reference](HTML.md
 ## 37. Cookies and sessions
 
 v0.4.0 served a page. v0.5.0 lets **this browser** keep a value that **that
-browser** does not share. The cookie holds only a random id. The values live
-on the server, in memory. This is not a login framework. You can store a name
-yourself after you check a form.
+browser** does not share.
+
+### What is a cookie?
+
+A **cookie** is a small piece of text a server asks the browser to remember.
+Once set, the browser automatically attaches that same text to every later
+request it sends to the same site -- that is the only special thing a cookie
+does: the browser resends it for you, with no extra code in your page or
+your AhdCode program. A cookie is why a site can "recognize" the same browser
+across several page loads, even though each HTTP request on its own has no
+memory of the one before it.
+
+The cookie AhdCode sets holds only a random id -- not a name, not a
+password. The actual values live on the server, in memory, looked up by that
+id. This is not a login framework. You can store a name yourself after you
+check a form.
 
 A module-level `SessionStore` is declared `Global` inside each handler, like
 any other module binding.
@@ -3435,6 +3503,55 @@ The PDF itself stays in `uploads/papers/`; the database keeps only where it
 is and what it is. If you never save an upload, it is deleted automatically
 when the request ends.
 
+### Serving the file back
+
+Saving is only half the story -- the seminar student also needs to open the
+PDF again later. Storage and presentation are two different concerns: the
+stored path deliberately has no extension (`save` never invents one), but
+the browser still needs a `Content-Type` to know how to show the file.
+
+```ahd
+paper: Function := (request: Request) -> Response {
+    id: Local String? := request.query("id")
+    if id == null {
+        return HTTP.text("id is required", 400)
+    }
+    row: Local Pair<String, SQLiteValue>? := lookupPaper(int(id))
+    if row == null {
+        return HTTP.text("not found", 404)
+    }
+    found: Local Pair<String, SQLiteValue> := row
+    return HTTP.file(found["stored_path"].string(), "application/pdf")
+}
+```
+
+`HTTP.file` streams the exact bytes straight from disk to the browser; it
+never turns them into an AhdCode `String`, so a PDF's binary content survives
+untouched. `contentType` is always your decision -- AhdCode never guesses it
+from the path or from the file's own bytes.
+
+To make the browser download the file instead of showing it, and to hand it
+back a friendlier name than the opaque stored one, use `HTTP.download`:
+
+```ahd
+return HTTP.download(
+    found["stored_path"].string()
+    "application/pdf"
+    found["original_name"].string()
+)
+```
+
+The presentation name is completely independent of the stored path: it can
+be anything, including the exact name the uploader originally used, and it
+never touches the filesystem. AhdCode encodes it safely for the response
+header, even for a name with spaces or Turkish characters, such as
+`Özet Çalışması.pdf`.
+
+**Technical note.** Never pass a path built from request input straight into
+`HTTP.file`/`HTTP.download`. Look it up from your own database first, the
+way `lookupPaper` does above, so a request can only ever name a file your
+application already knows about -- never an arbitrary path on disk.
+
 ### Stopping your server
 
 While `ahdcode run app.ahd` is running it keeps an `app.run` file beside your
@@ -3446,7 +3563,9 @@ ahdcode kill app.run
 ```
 
 See [the HTTP module reference](HTTP.md) and
-[`examples/v0.8`](../examples/v0.8/README.md).
+[`examples/v0.8`](../examples/v0.8/README.md) for the upload walkthrough, and
+[`examples/v0.9.1`](../examples/v0.9.1/README.md) for uploading and then
+serving the same file back with `HTTP.file`/`HTTP.download`.
 
 ## 41. Sending email (SMTP)
 
@@ -3911,6 +4030,55 @@ Instead of immediately looking for full solutions, build each program in small s
 22. `HTTP.server("127.0.0.1", 8080)`, `app.get("/ok", handler)`, `HTTP.text("ok")`, then `app.start()`.
 23. `HTTP.client()`, `client.get("https://example.com/")`, `response.status()`. A 404 is still `ClientResponse`; a TLS or timeout failure is `HTTPError`.
 
+## 49. Next steps and technical docs
+
+After finishing this guide, you can deepen your knowledge of the language details from these documents:
+
+- [Getting Started](GETTING_STARTED.md)
+- [Language Tour](LANGUAGE_TOUR.md)
+- [Types and Null](TYPES_AND_NULL.md)
+- [Control Flow](CONTROL_FLOW.md)
+- [Functions](FUNCTIONS.md)
+- [Classes](CLASSES.md)
+- [Collections](COLLECTIONS.md)
+- [Modules](MODULES.md)
+- [Errors](ERRORS.md)
+- [Fundamentals](FUNDAMENTALS.md)
+- [Class Protocol Methods](PROTOCOLS.md)
+- [String API](STRING_API.md)
+- [List API](LIST_API.md)
+- [Math](MATH.md)
+- [Time](TIME.md)
+- [Statistics](STATISTICS.md)
+- [Plot](PLOT.md)
+- [Numeric](NUMERIC.md)
+- [Latex](LATEX.md)
+- [Word](WORD.md)
+- [Excel](EXCEL.md)
+- [PDF](PDF.md)
+- [Archive](ARCHIVE.md)
+- [JSON](JSON.md)
+- [SQLite](SQLITE.md)
+- [HTTP](HTTP.md)
+- [Security](SECURITY.md)
+- [HTML](HTML.md)
+- [XML](XML.md)
+- [Env](ENV.md)
+- [Lists](LISTS.md)
+- [KeyValue](KEYVALUE.md)
+- [File and Path](FILESYSTEM.md)
+- [Regex](REGEX.md)
+- [CSV](CSV.md)
+- [Data](DATA.md)
+- [Diagnostics](DIAGNOSTICS.md)
+- [CLI](CLI.md)
+- [Formatter](FORMATTER.md)
+- [REPL](REPL.md)
+- [Language server](LSP.md)
+- [Full v0.1 specification](../AHDCODE_LANGUAGE_SPEC_v0.1.md)
+
+Check the [curated v0.1 examples](../examples/v0.1/README.md) folder, the [v0.3 SQLite Notes App](../examples/v0.3/README.md), the [v0.4 Web Notes App](../examples/v0.4/README.md), the [v0.5 cookies and sessions](../examples/v0.5/README.md), the [v0.6 HTTP Client](../examples/v0.6/README.md), the [v0.7 HTML parsing and web scraping](../examples/v0.7/README.md), the [v0.8 file uploads](../examples/v0.8/README.md), the [v0.9 SMTP mail](../examples/v0.9/README.md), the [v0.9.1 binary HTTP file responses](../examples/v0.9.1/README.md), and the [v0.10 Security examples](../examples/v0.10/README.md) for more working programs.
+
 ## 50. Security: password hashing and secure tokens
 
 The `Security` module (v0.10.0) provides three focused tools: Argon2id
@@ -3998,52 +4166,3 @@ return HTTP.text("rejected", 403)
 
 See [the full CSRF example](../examples/v0.10/03_csrf_session.ahd) and
 [SECURITY.md](SECURITY.md) for complete documentation.
-
-## 49. Next steps and technical docs
-
-After finishing this guide, you can deepen your knowledge of the language details from these documents:
-
-- [Getting Started](GETTING_STARTED.md)
-- [Language Tour](LANGUAGE_TOUR.md)
-- [Types and Null](TYPES_AND_NULL.md)
-- [Control Flow](CONTROL_FLOW.md)
-- [Functions](FUNCTIONS.md)
-- [Classes](CLASSES.md)
-- [Collections](COLLECTIONS.md)
-- [Modules](MODULES.md)
-- [Errors](ERRORS.md)
-- [Fundamentals](FUNDAMENTALS.md)
-- [Class Protocol Methods](PROTOCOLS.md)
-- [String API](STRING_API.md)
-- [List API](LIST_API.md)
-- [Math](MATH.md)
-- [Time](TIME.md)
-- [Statistics](STATISTICS.md)
-- [Plot](PLOT.md)
-- [Numeric](NUMERIC.md)
-- [Latex](LATEX.md)
-- [Word](WORD.md)
-- [Excel](EXCEL.md)
-- [PDF](PDF.md)
-- [Archive](ARCHIVE.md)
-- [JSON](JSON.md)
-- [SQLite](SQLITE.md)
-- [HTTP](HTTP.md)
-- [Security](SECURITY.md)
-- [HTML](HTML.md)
-- [XML](XML.md)
-- [Env](ENV.md)
-- [Lists](LISTS.md)
-- [KeyValue](KEYVALUE.md)
-- [File and Path](FILESYSTEM.md)
-- [Regex](REGEX.md)
-- [CSV](CSV.md)
-- [Data](DATA.md)
-- [Diagnostics](DIAGNOSTICS.md)
-- [CLI](CLI.md)
-- [Formatter](FORMATTER.md)
-- [REPL](REPL.md)
-- [Language server](LSP.md)
-- [Full v0.1 specification](../AHDCODE_LANGUAGE_SPEC_v0.1.md)
-
-Check the [curated v0.1 examples](../examples/v0.1/README.md) folder, the [v0.3 SQLite Notes App](../examples/v0.3/README.md), the [v0.4 Web Notes App](../examples/v0.4/README.md), the [v0.5 cookies and sessions](../examples/v0.5/README.md), the [v0.6 HTTP Client](../examples/v0.6/README.md), the [v0.7 HTML parsing and web scraping](../examples/v0.7/README.md), the [v0.8 file uploads](../examples/v0.8/README.md), and the [v0.10 Security examples](../examples/v0.10/README.md) for more working programs.

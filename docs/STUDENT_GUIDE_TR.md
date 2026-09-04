@@ -1,4 +1,4 @@
-# AhdCode v0.9.0 Türkçe Öğrenci Rehberi
+# AhdCode v0.10.0 Türkçe Öğrenci Rehberi
 
 Bu rehber, **daha önce hiç programlama yapmamış birinin de takip edebilmesi** için hazırlanmıştır. Baştan sona sırayla okuyabilirsiniz; her bölümde önce ne yapmak istediğimizi görecek, sonra çalışan bir örnek yazacak, en son gerekli kuralları öğreneceksiniz.
 
@@ -56,6 +56,7 @@ En iyi öğrenme yolu, örnekleri yalnızca okumak değil çalıştırmaktır. B
 - [47. Egzersizler](#47-egzersizler)
 - [48. Çözüm İpuçları](#48-çözüm-i̇puçları)
 - [49. Sonraki adımlar ve teknik belgeler](#49-sonraki-adımlar-ve-teknik-belgeler)
+- [50. Güvenlik: parola hashleme ve güvenli belirteçler](#50-güvenlik-parola-hashleme-ve-güvenli-belirteçler)
 
 ## 1. AhdCode nedir?
 
@@ -75,7 +76,7 @@ Merhaba!
 
 AhdCode, programı çalıştırmadan önce yazdığınız kodu kontrol eder. Örneğin bir metni sayı gibi kullanmaya çalışırsanız veya `null` olabilecek bir değeri kontrol etmeden kullanırsanız, mümkün olduğunda hatayı daha program başlamadan söyler. Ama başlangıçta bunun ayrıntılarını düşünmeniz gerekmiyor; ilerleyen bölümlerde örneklerle göreceğiz.
 
-AhdCode v0.6.0 güncel sürümdür. Küçük komut satırı programlarını çalıştırabilir veya yerel executable uygulamalara derleyebilirsiniz; veriyi yerel bir SQLite veritabanında tutabilir, bu makineden HTTP ile bir sayfa sunabilir, tarayıcı başına bellek içi oturum değerleri tutabilir, dış bir HTTP veya HTTPS API çağırabilir ve dil sunucusunu (`ahdcode lsp`) VS Code gibi bir editörden kullanabilirsiniz. Bazı standart modüller, örneğin SQLite, derlenmiş uygulamanın yanında AhdCode'un sağladığı yardımcı çalışma zamanı bileşenlerini kullanabilir. HTTP, HTML, çerez, oturum ve HTTP Client, çalışma zamanının içindeki Go standart kütüphanesini kullanır; ayrı bir HTTP yardımcısı eklemezler. v0.2.2 pratik günlük dil sunucusunu tamamladı; v0.3.0 SQLite ekledi; v0.4.0 tarayıcıdan kullanılan ilk AhdCode uygulama fazıdır; v0.5.0 çerez ve sunucu taraflı oturum ekler; v0.6.0 giden HTTP Client ekler.
+AhdCode v0.10.0 güncel sürümdür. Küçük komut satırı programlarını çalıştırabilir veya yerel executable uygulamalara derleyebilirsiniz; veriyi yerel bir SQLite veritabanında tutabilir, bu makineden HTTP ile bir sayfa sunabilir -- `HTTP.file`/`HTTP.download` ile ikili-güvenli bir dosya yanıtı dahil -- tarayıcı başına bellek içi oturum değerleri tutabilir, dış bir HTTP veya HTTPS API çağırabilir, HTML ayrıştırıp bir sayfadan veri kazıyabilir, dosya yüklemesi kabul edebilir, SMTP ile e-posta gönderebilir, `Security` modülüyle parola hashleyip güvenli belirteç üretebilir ve dil sunucusunu (`ahdcode lsp`) VS Code gibi bir editörden kullanabilirsiniz. Bazı standart modüller, örneğin SQLite, derlenmiş uygulamanın yanında AhdCode'un sağladığı yardımcı çalışma zamanı bileşenlerini kullanabilir. HTTP, HTML, çerez, oturum ve HTTP Client, çalışma zamanının içindeki Go standart kütüphanesini kullanır; ayrı bir HTTP yardımcısı eklemezler. v0.2.2 pratik günlük dil sunucusunu tamamladı; v0.3.0 SQLite ekledi; v0.4.0 tarayıcıdan kullanılan ilk AhdCode uygulama fazıdır; v0.5.0 çerez ve sunucu taraflı oturum ekler; v0.6.0 giden HTTP Client ekler; v0.7.0 HTML ayrıştırma ve web kazıma ekler; v0.8.0 çok parçalı dosya yüklemesi ekler; v0.9.0 SMTP e-posta ekler; v0.9.1 ikili-güvenli HTTP dosya yanıtları ekler; v0.10.0 `Security` modülünü ekler.
 
 > **Teknik not:** Program çalışmadan önce türlerin kontrol edilmesine *static checking* denir.
 
@@ -2751,6 +2752,31 @@ Her imza için [Lists](LISTS_TR.md) ve [KeyValue](KEYVALUE_TR.md) referansların
 
 Şimdiye kadar programdaki değerler, program bitince kayboluyordu. Bir **veritabanı**, program kapandıktan sonra da satırları duran bir dosyadır. **SQLite**, bilgisayarınızda tek bir dosyada (veya denemek için bellekte) yaşayan küçük bir veritabanı motorudur. Siz sıradan SQL yazarsınız; AhdCode güvenli ve tipli bir köprüdür: parametreleri bağlar ve değerleri dönüştürür. ORM değildir, sorgu oluşturucu değildir, migration aracı değildir.
 
+### Tablolar, satırlar ve sütunlar
+
+Bir tabloyu, bir Excel sayfasının tek bir sayfası gibi düşünün. Bir adı
+(`notes`), her satırın taşıyacağı bilginin *türünü* belirten sabit bir
+**sütun** kümesi vardır -- `id`, `title`, `body` gibi -- ve kaydettiğiniz her
+not için bir **satır** eklenir. Tablodaki her satır aynı sütunlara, aynı
+sırada sahiptir; satırdan satıra yalnızca değerler değişir.
+
+**SQL** (Structured Query Language / Yapılandırılmış Sorgu Dili), bir
+tabloyla konuşmak için kullandığınız dildir: oluşturmak, satır eklemek,
+satırları geri okumak, değiştirmek, silmek. SQL'in tamamını öğrenmenize
+gerek yok -- bu bölümde ihtiyacınız olan birkaç kelime aşağıda, gerçek bir
+AhdCode örneğinde karşınıza çıkacak:
+
+| SQL kelimesi | Sade dille anlamı |
+|---|---|
+| `CREATE TABLE` | bu sütunlarla yeni bir tablo oluştur |
+| `INSERT INTO ... VALUES (...)` | yeni bir satır ekle |
+| `SELECT ... FROM ...` | satırları geri oku |
+| `WHERE` | yalnızca bu koşula uyan satırlar |
+| `ORDER BY` | bu sırayla |
+| `UPDATE ... SET ...` | var olan satırları değiştir |
+| `DELETE FROM ...` | satırları sil |
+| `PRIMARY KEY` | bir satırı benzersiz şekilde tanımlayan sütun, bir öğrenci numarasının tek bir öğrenciyi tanımlaması gibi |
+
 ```ahd
 bring SQLite
 from SQLite bring Database
@@ -2901,6 +2927,36 @@ v0.3.0, program kapansa da hatırlayan bir veritabanı öğretti. v0.4.0, bu
 veriyi bu makinenin tarayıcısında açmanın yolunu ekler: yerel sunucu için
 `HTTP`, kullanıcı metninin etiket olmaması için `HTML`.
 
+### Bir tarayıcı sayfa açtığında ne olur?
+
+Bir adresi tarayıcıya yazıp Enter'a bastığınızda, tarayıcı bir yere
+**istek** (request) adında küçük bir mesaj gönderir ve bekler. O yerdeki
+program bir **sunucudur** (server): isteği okur, ne yapacağına karar verir
+ve geri bir **yanıt** (response) gönderir -- genellikle tarayıcının ekrana
+çizdiği bir HTML sayfası. Bu bölümde, kendi AhdCode programınız kendi
+bilgisayarınızda çalışan o sunucu olacak.
+
+İsteğin iki parçası bir yeni başlayan için en önemlisi:
+
+- **Yöntem** (method), isteğin ne tür olduğunu söyler. `GET`, "bana
+  bakacağım bir şey ver" demektir -- bir sayfa açmak, bir bağlantıya
+  tıklamak. `POST`, "işte veri, bununla bir şey yap" demektir -- bir form
+  göndermek.
+- **Yol** (path), adresteki host'tan sonraki kısımdır, örneğin `/` veya
+  `/notes`. Her yolun ne yapacağına programınız karar verir; o isimde bir
+  dosya var diye kendiliğinden bir şey olmaz.
+
+**Port**, bilgisayardaki *hangi* çalışan programın isteği alacağını söyleyen
+bir sayıdır (`8080` gibi) -- aynı bilgisayarda birçok program aynı anda
+dinleyebilir, her biri kendi portunda, birden fazla dairenin aynı cadde
+adresini paylaşıp her birinin kendi kapı numarasına sahip olması gibi.
+
+**HTML**, bir web sayfasının yazıldığı biçimlendirme dilidir. `<h1>...</h1>`
+gibi bir **etiket** (tag), bir içerik parçasını büyük başlık olarak
+işaretler; `<form>` ise tarayıcının toplayıp sunucuya geri göndereceği bir
+girdi grubunu işaretler. HTML'i önceden bilmenize gerek yok -- bu bölümün
+kullandığı her etiket aşağıdaki örneklerde gösteriliyor.
+
 `127.0.0.1` **yalnızca bu bilgisayar** demektir. Açacağınız adres
 `http://127.0.0.1:8080/` şeklindedir. `0.0.0.0` bağlamayı gelişigüzel
 yapmayın. `Server.start()` programı durdurana kadar terminali meşgul tutar.
@@ -3045,8 +3101,21 @@ bakın.
 ## 37. Çerezler ve oturumlar
 
 v0.4.0 bir sayfa sundu. v0.5.0, **bu tarayıcının** değerini **o tarayıcıyla**
-paylaşmadan tutmayı ekler. Çerez yalnızca rastgele bir kimlik taşır. Değerler
-sunucuda, bellektedir. Bu bir giriş çerçevesi değildir. Bir formdan sonra adı
+paylaşmadan tutmayı ekler.
+
+### Çerez nedir?
+
+**Çerez** (cookie), sunucunun tarayıcıdan hatırlamasını istediği küçük bir
+metin parçasıdır. Bir kez ayarlandıktan sonra, tarayıcı aynı metni aynı
+siteye gönderdiği her sonraki isteğe kendiliğinden ekler -- çerezin tek özel
+yaptığı budur: tarayıcı onu sizin yerinize tekrar gönderir, sayfanızda veya
+AhdCode programınızda fazladan bir kod olmadan. Bir sitenin, HTTP'nin kendisi
+bir istekten diğerine hiçbir hafızaya sahip olmamasına rağmen, aynı
+tarayıcıyı birkaç sayfa yüklemesi boyunca "tanıyabilmesinin" sebebi çerezdir.
+
+AhdCode'un ayarladığı çerez yalnızca rastgele bir kimlik taşır -- bir isim
+değil, bir parola değil. Gerçek değerler sunucuda, bellekte, o kimlikle
+aranarak durur. Bu bir giriş çerçevesi değildir. Bir formdan sonra adı
 kendiniz saklayabilirsiniz.
 
 Modül düzeyindeki `SessionStore`, her işleyicide diğer modül bağlamaları gibi
@@ -3458,6 +3527,55 @@ PDF'in kendisi `uploads/papers/` içinde kalır; veritabanı yalnızca nerede
 olduğunu ve ne olduğunu tutar. Bir yüklemeyi hiç kaydetmezseniz, istek
 bittiğinde otomatik olarak silinir.
 
+### Dosyayı geri sunmak
+
+Kaydetmek hikayenin yalnızca yarısı -- seminer öğrencisinin PDF'i daha sonra
+tekrar açması da gerekir. Depolama ve sunum iki ayrı meseledir: saklanan
+yolun kasıtlı olarak uzantısı yoktur (`save` asla bir uzantı uydurmaz), ama
+tarayıcının dosyayı nasıl göstereceğini bilmesi için yine de bir
+`Content-Type` gerekir.
+
+```ahd
+paper: Function := (request: Request) -> Response {
+    id: Local String? := request.query("id")
+    if id == null {
+        return HTTP.text("id gerekli", 400)
+    }
+    row: Local Pair<String, SQLiteValue>? := lookupPaper(int(id))
+    if row == null {
+        return HTTP.text("bulunamadı", 404)
+    }
+    found: Local Pair<String, SQLiteValue> := row
+    return HTTP.file(found["stored_path"].string(), "application/pdf")
+}
+```
+
+`HTTP.file`, baytları doğrudan diskten tarayıcıya akıtır; onları hiçbir
+zaman bir AhdCode `String`'ine dönüştürmez, bu yüzden bir PDF'in ikili
+içeriği bozulmadan kalır. `contentType` her zaman sizin kararınızdır --
+AhdCode bunu asla yoldan veya dosyanın kendi baytlarından tahmin etmez.
+
+Tarayıcının dosyayı göstermek yerine indirmesini sağlamak, ve ona saklanan
+opak addan daha dostane bir ad vermek için `HTTP.download` kullanın:
+
+```ahd
+return HTTP.download(
+    found["stored_path"].string()
+    "application/pdf"
+    found["original_name"].string()
+)
+```
+
+Sunum adı, saklanan yoldan tamamen bağımsızdır: yükleyenin kullandığı
+orijinal ad dahil herhangi bir şey olabilir ve dosya sistemine asla
+dokunmaz. AhdCode bunu yanıt başlığı için güvenle kodlar; boşluk içeren
+veya `Özet Çalışması.pdf` gibi Türkçe karakterli bir ad için bile.
+
+**Teknik not.** İstekten gelen bir yolu doğrudan `HTTP.file`/`HTTP.download`'a
+asla geçirmeyin. Yukarıdaki `lookupPaper` gibi önce kendi veritabanınızdan
+arayın; böylece bir istek yalnızca uygulamanızın zaten bildiği bir dosyayı
+adlandırabilir -- diskteki rastgele bir yolu değil.
+
 ### Sunucunuzu durdurmak
 
 `ahdcode run app.ahd` çalışırken kaynağınızın yanında bir `app.run` dosyası
@@ -3467,8 +3585,10 @@ tutar. Uygulamayı durdurmak için portu veya süreç kimliğini bulmanız gerek
 ahdcode kill app.run
 ```
 
-Ayrıntılar için [HTTP modül referansına](HTTP_TR.md) ve
-[`examples/v0.8`](../examples/v0.8/README_TR.md) bakın.
+Ayrıntılar için [HTTP modül referansına](HTTP_TR.md) ve yükleme rehberi
+için [`examples/v0.8`](../examples/v0.8/README_TR.md) bakın; dosyayı
+yükledikten sonra `HTTP.file`/`HTTP.download` ile geri sunmak için
+[`examples/v0.9.1`](../examples/v0.9.1/README_TR.md) bakın.
 
 ## 41. E-posta gönderme (SMTP)
 
@@ -3933,6 +4053,65 @@ Tam çözümleri hemen aramak yerine her programı küçük adımlarla kurun.
 22. `HTTP.server("127.0.0.1", 8080)`, `app.get("/ok", handler)`, `HTTP.text("ok")`, sonra `app.start()`.
 23. `HTTP.client()`, `client.get("https://example.com/")`, `response.status()`. 404 hâlâ `ClientResponse`; TLS veya zaman aşımı `HTTPError`.
 
+## 49. Sonraki adımlar ve teknik belgeler
+
+Bu rehberi tamamladıktan sonra dilin ayrıntılarını şu belgelerden
+derinleştirebilirsiniz:
+
+- [Başlangıç](GETTING_STARTED_TR.md)
+- [Dil turu](LANGUAGE_TOUR_TR.md)
+- [Türler ve null](TYPES_AND_NULL_TR.md)
+- [Kontrol Akışı](CONTROL_FLOW_TR.md)
+- [Fonksiyonlar](FUNCTIONS_TR.md)
+- [Sınıflar](CLASSES_TR.md)
+- [Class Protocol Methods](PROTOCOLS_TR.md)
+- [Koleksiyonlar](COLLECTIONS_TR.md)
+- [Modüller](MODULES_TR.md)
+- [Hatalar](ERRORS_TR.md)
+- [Temel İşlevler](FUNDAMENTALS_TR.md)
+- [String API](STRING_API_TR.md)
+- [List API](LIST_API_TR.md)
+- [Math](MATH_TR.md)
+- [Time](TIME_TR.md)
+- [Statistics](STATISTICS_TR.md)
+- [Plot](PLOT_TR.md)
+- [Numeric](NUMERIC_TR.md)
+- [Latex](LATEX_TR.md)
+- [Word](WORD_TR.md)
+- [Excel](EXCEL_TR.md)
+- [PDF](PDF_TR.md)
+- [Archive](ARCHIVE_TR.md)
+- [JSON](JSON_TR.md)
+- [SQLite](SQLITE_TR.md)
+- [HTTP](HTTP_TR.md)
+- [Security](SECURITY_TR.md)
+- [HTML](HTML_TR.md)
+- [XML](XML_TR.md)
+- [Env](ENV_TR.md)
+- [Lists](LISTS_TR.md)
+- [KeyValue](KEYVALUE_TR.md)
+- [File ve Path](FILESYSTEM_TR.md)
+- [Regex](REGEX_TR.md)
+- [CSV](CSV_TR.md)
+- [Data](DATA_TR.md)
+- [Tanılamalar](DIAGNOSTICS_TR.md)
+- [CLI](CLI_TR.md)
+- [Formatter](FORMATTER_TR.md)
+- [REPL](REPL_TR.md)
+- [Dil sunucusu](LSP_TR.md)
+- [Tam v0.1 spesifikasyonu](../AHDCODE_LANGUAGE_SPEC_v0.1_TR.md)
+
+Çalışan daha fazla örnek için [derlenmiş v0.1 örnekleri](../examples/v0.1/README_TR.md)
+klasörüne, [v0.3 SQLite Not Defteri](../examples/v0.3/README_TR.md),
+[v0.4 Web Not Defteri](../examples/v0.4/README_TR.md),
+[v0.5 çerezler ve oturumlar](../examples/v0.5/README_TR.md),
+[v0.6 HTTP Client](../examples/v0.6/README_TR.md),
+[v0.7 HTML ayrıştırma ve web kazıma](../examples/v0.7/README_TR.md),
+[v0.8 dosya yükleme](../examples/v0.8/README_TR.md),
+[v0.9 SMTP e-posta](../examples/v0.9/README_TR.md),
+[v0.9.1 ikili-güvenli HTTP dosya yanıtları](../examples/v0.9.1/README_TR.md) ve
+[v0.10 Security örnekleri](../examples/v0.10/README.md) sayfalarına bakın.
+
 ## 50. Güvenlik: parola hashleme ve güvenli belirteçler
 
 `Security` modülü (v0.10.0) üç odaklı araç sunar: Argon2id parola hashleme,
@@ -4008,58 +4187,3 @@ return HTTP.text("reddedildi", 403)
 
 Tam belge için [SECURITY_TR.md](SECURITY_TR.md) ve
 [v0.10 örnekleri](../examples/v0.10/README.md) sayfalarına bakın.
-
-## 49. Sonraki adımlar ve teknik belgeler
-
-Bu rehberi tamamladıktan sonra dilin ayrıntılarını şu belgelerden
-derinleştirebilirsiniz:
-
-- [Başlangıç](GETTING_STARTED_TR.md)
-- [Dil turu](LANGUAGE_TOUR_TR.md)
-- [Türler ve null](TYPES_AND_NULL_TR.md)
-- [Kontrol Akışı](CONTROL_FLOW_TR.md)
-- [Fonksiyonlar](FUNCTIONS_TR.md)
-- [Sınıflar](CLASSES_TR.md)
-- [Class Protocol Methods](PROTOCOLS_TR.md)
-- [Koleksiyonlar](COLLECTIONS_TR.md)
-- [Modüller](MODULES_TR.md)
-- [Hatalar](ERRORS_TR.md)
-- [Temel İşlevler](FUNDAMENTALS_TR.md)
-- [String API](STRING_API_TR.md)
-- [List API](LIST_API_TR.md)
-- [Math](MATH_TR.md)
-- [Time](TIME_TR.md)
-- [Statistics](STATISTICS_TR.md)
-- [Plot](PLOT_TR.md)
-- [Numeric](NUMERIC_TR.md)
-- [Latex](LATEX_TR.md)
-- [Word](WORD_TR.md)
-- [Excel](EXCEL_TR.md)
-- [PDF](PDF_TR.md)
-- [Archive](ARCHIVE_TR.md)
-- [JSON](JSON_TR.md)
-- [SQLite](SQLITE_TR.md)
-- [HTTP](HTTP_TR.md)
-- [HTML](HTML_TR.md)
-- [XML](XML_TR.md)
-- [Env](ENV_TR.md)
-- [Lists](LISTS_TR.md)
-- [KeyValue](KEYVALUE_TR.md)
-- [File ve Path](FILESYSTEM_TR.md)
-- [Regex](REGEX_TR.md)
-- [CSV](CSV_TR.md)
-- [Data](DATA_TR.md)
-- [Tanılamalar](DIAGNOSTICS_TR.md)
-- [CLI](CLI_TR.md)
-- [Formatter](FORMATTER_TR.md)
-- [REPL](REPL_TR.md)
-- [Dil sunucusu](LSP_TR.md)
-- [Tam v0.1 spesifikasyonu](../AHDCODE_LANGUAGE_SPEC_v0.1_TR.md)
-
-Çalışan daha fazla örnek için [derlenmiş v0.1 örnekleri](../examples/v0.1/README_TR.md)
-klasörüne, [v0.3 SQLite Not Defteri](../examples/v0.3/README_TR.md),
-[v0.4 Web Not Defteri](../examples/v0.4/README_TR.md),
-[v0.5 çerezler ve oturumlar](../examples/v0.5/README_TR.md),
-[v0.6 HTTP Client](../examples/v0.6/README_TR.md) ve
-[v0.7 HTML ayrıştırma ve web kazıma](../examples/v0.7/README_TR.md) ve
-[v0.8 dosya yükleme](../examples/v0.8/README_TR.md) örneklerine bakın.
