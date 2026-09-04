@@ -39,3 +39,4 @@ These examples need a real, reachable MySQL server; none of them start one.
 
 - [MySQL module documentation](../../docs/MYSQL.md)
 - [Student Guide — MySQL section](../../docs/STUDENT_GUIDE_EN.md#51-mysql-a-network-database-server)
+- [v0.12 MySQL raffle](../v0.12/raffle/README.md)

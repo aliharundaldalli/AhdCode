@@ -40,3 +40,4 @@ kendisi bir sunucu başlatmaz.
 
 - [MySQL modül belgeleri](../../docs/MYSQL.md)
 - [Öğrenci Rehberi — MySQL bölümü](../../docs/STUDENT_GUIDE_TR.md#51-mysql-a%C4%9F-veritaban%C4%B1-sunucusu)
+- [v0.12 MySQL çekiliş](../v0.12/raffle/README_TR.md)
