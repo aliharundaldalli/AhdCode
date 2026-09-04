@@ -187,16 +187,14 @@ func (p *parser) parseBring() ast.Stmt {
 	}
 	if p.match(token.LeftParen) {
 		p.skipNewlines()
-		for !p.check(token.RightParen) && !p.atEnd() {
+		for !p.atListTerminator(token.RightParen) {
+			before := p.index
 			name := p.expect(token.Identifier, "expected imported symbol name")
 			if name.Value != "" {
 				statement.Names = append(statement.Names, name.Value)
 			}
-			if p.consumeItemSeparator(token.RightParen) {
-				continue
-			}
-			if !p.check(token.RightParen) {
-				p.errorCurrent(codeExpectedSeparator, "expected comma or newline between imported names", "separate same-line names with commas")
+			if !p.finishListItem(before, token.RightParen, "expected comma or newline between imported names", "separate same-line names with commas") {
+				break
 			}
 		}
 		closing := p.expect(token.RightParen, "expected ) after imported names")

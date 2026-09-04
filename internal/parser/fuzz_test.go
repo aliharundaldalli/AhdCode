@@ -12,6 +12,8 @@ func FuzzParserNeverPanics(f *testing.F) {
 		"", "2^3^2", "swap(a b)", "Student(name: \"Ali\")",
 		"if true {\nreturn\n}", "state x { condition default {} }",
 		"name: Pair<String, Int> := null", "\xff\xfe", `"x={call(1)}"`,
+		`write("{foo(}")`, `write("{\"a\": 1}")`,
+		"f: Function := () -> String {\n    return write(\"{\\\"a\\\": 1}\")\n}\n",
 	}
 	for _, seed := range seeds {
 		f.Add(seed)

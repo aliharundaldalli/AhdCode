@@ -616,6 +616,8 @@ func TestMalformedInputsDoNotPanic(t *testing.T) {
 	inputs := []string{
 		"(", "[1 2", "{a:}", "if {", "state x { condition", "attempt {}", "from bring",
 		"name: Pair<String Int :=", `"unterminated {`, "Student(name:)", "x[::]", "else {}",
+		`write("{foo(}")`, "write(\"{\\\"a\\\": 1}\")",
+		"f: Function := () -> String {\n    return write(\"{\\\"a\\\": 1}\")\n}\n",
 	}
 	for _, input := range inputs {
 		t.Run(input, func(t *testing.T) {

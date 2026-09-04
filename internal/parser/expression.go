@@ -175,18 +175,16 @@ func (p *parser) parseCaptureList() ([]ast.CaptureRef, bool) {
 	p.skipNewlines()
 	var captures []ast.CaptureRef
 	malformed := false
-	for !p.check(token.RightBracket) && !p.atEnd() {
+	for !p.atListTerminator(token.RightBracket) {
+		before := p.index
 		capture, ok := p.parseLambdaDependency()
 		if !ok {
 			malformed = true
 			break
 		}
 		captures = append(captures, capture)
-		if p.consumeItemSeparator(token.RightBracket) {
-			continue
-		}
-		if !p.check(token.RightBracket) {
-			p.errorCurrent(codeExpectedSeparator, "expected comma or newline between lambda dependencies", "separate same-line dependencies with commas")
+		if !p.finishListItem(before, token.RightBracket, "expected comma or newline between lambda dependencies", "separate same-line dependencies with commas") {
+			break
 		}
 	}
 	p.skipNewlines()
@@ -276,7 +274,8 @@ func (p *parser) parseCall(callee ast.Expr) ast.Expr {
 	p.skipNewlines()
 	var arguments []ast.CallArgument
 	argumentStyle := -1 // 0 positional, 1 named
-	for !p.check(token.RightParen) && !p.atEnd() {
+	for !p.atListTerminator(token.RightParen) {
+		before := p.index
 		argumentStart := p.current().Span.Start
 		name := ""
 		style := 0
@@ -295,11 +294,8 @@ func (p *parser) parseCall(callee ast.Expr) ast.Expr {
 		arguments = append(arguments, ast.CallArgument{
 			Base: p.base(argumentStart, spanEnd(value)), Name: name, Value: value,
 		})
-		if p.consumeItemSeparator(token.RightParen) {
-			continue
-		}
-		if !p.check(token.RightParen) {
-			p.errorCurrent(codeExpectedSeparator, "expected comma or newline between call arguments", "add a comma on the same line or place the next argument on a new line")
+		if !p.finishListItem(before, token.RightParen, "expected comma or newline between call arguments", "add a comma on the same line or place the next argument on a new line") {
+			break
 		}
 	}
 	closing := p.expect(token.RightParen, "expected ) to close the call argument list")
@@ -353,13 +349,11 @@ func (p *parser) parseList() ast.Expr {
 	start := p.advance().Span.Start
 	p.skipNewlines()
 	var elements []ast.Expr
-	for !p.check(token.RightBracket) && !p.atEnd() {
+	for !p.atListTerminator(token.RightBracket) {
+		before := p.index
 		elements = append(elements, p.parseExpression(0))
-		if p.consumeItemSeparator(token.RightBracket) {
-			continue
-		}
-		if !p.check(token.RightBracket) {
-			p.errorCurrent(codeExpectedSeparator, "expected comma or newline between List elements", "separate same-line elements with commas")
+		if !p.finishListItem(before, token.RightBracket, "expected comma or newline between List elements", "separate same-line elements with commas") {
+			break
 		}
 	}
 	closing := p.expect(token.RightBracket, "expected ] to close the List literal")
@@ -370,18 +364,16 @@ func (p *parser) parsePair() ast.Expr {
 	start := p.advance().Span.Start
 	p.skipNewlines()
 	var entries []ast.PairEntry
-	for !p.check(token.RightBrace) && !p.atEnd() {
+	for !p.atListTerminator(token.RightBrace) {
+		before := p.index
 		entryStart := p.current().Span.Start
 		key := p.parseExpression(0)
 		p.expect(token.Colon, "expected : between Pair key and value")
 		p.skipNewlines()
 		value := p.parseExpression(0)
 		entries = append(entries, ast.PairEntry{Base: p.base(entryStart, spanEnd(value)), Key: key, Value: value})
-		if p.consumeItemSeparator(token.RightBrace) {
-			continue
-		}
-		if !p.check(token.RightBrace) {
-			p.errorCurrent(codeExpectedSeparator, "expected comma or newline between Pair entries", "separate same-line entries with commas")
+		if !p.finishListItem(before, token.RightBrace, "expected comma or newline between Pair entries", "separate same-line entries with commas") {
+			break
 		}
 	}
 	closing := p.expect(token.RightBrace, "expected } to close the Pair literal")
@@ -398,6 +390,42 @@ func (p *parser) consumeItemSeparator(closing token.Kind) bool {
 		return true
 	}
 	return p.check(closing)
+}
+
+// atListTerminator is true when a delimited list must stop. EOF and the
+// list's own closer are the normal ends. A closer that belongs to an outer
+// construct also ends the list so recovery cannot inspect that token forever.
+func (p *parser) atListTerminator(closing token.Kind) bool {
+	return p.check(closing) || p.atEnd() || p.closesOuterConstruct(closing)
+}
+
+func (p *parser) closesOuterConstruct(closing token.Kind) bool {
+	switch p.current().Kind {
+	case token.RightParen, token.RightBracket, token.RightBrace, token.InterpolationEnd:
+		return p.current().Kind != closing
+	default:
+		return false
+	}
+}
+
+// finishListItem handles the separator after one list item. It returns whether
+// the caller should read another item. On a malformed path the parser either
+// consumes input or stops, so it never spins on the same token.
+func (p *parser) finishListItem(before int, closing token.Kind, message, hint string) bool {
+	if p.consumeItemSeparator(closing) {
+		return true
+	}
+	if p.check(closing) || p.atEnd() {
+		return true
+	}
+	if p.closesOuterConstruct(closing) {
+		return false
+	}
+	p.errorCurrent(codeExpectedSeparator, message, hint)
+	if p.index == before && !p.atEnd() {
+		p.advance()
+	}
+	return true
 }
 
 func (p *parser) parseString() ast.Expr {

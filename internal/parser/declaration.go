@@ -358,7 +358,8 @@ func (p *parser) parseParameterList(allowInherited bool) []ast.Parameter {
 	p.skipNewlines()
 	var parameters []ast.Parameter
 	seenDefault := false
-	for !p.check(token.RightParen) && !p.atEnd() {
+	for !p.atListTerminator(token.RightParen) {
+		before := p.index
 		start := p.current().Span.Start
 		if allowInherited && p.check(token.Identifier) && p.current().Value == "SuperClass" && p.peek(1).Kind == token.Dot && p.peek(2).Kind == token.Identifier && p.peek(2).Value == "attributes" {
 			p.advance()
@@ -395,11 +396,8 @@ func (p *parser) parseParameterList(allowInherited bool) []ast.Parameter {
 				Type: typeRef, Default: defaultValue,
 			})
 		}
-		if p.consumeItemSeparator(token.RightParen) {
-			continue
-		}
-		if !p.check(token.RightParen) {
-			p.errorCurrent(codeExpectedSeparator, "expected comma or newline between parameters", "separate same-line parameters with commas")
+		if !p.finishListItem(before, token.RightParen, "expected comma or newline between parameters", "separate same-line parameters with commas") {
+			break
 		}
 	}
 	p.expect(token.RightParen, "expected ) to close the parameter list")
