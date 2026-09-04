@@ -1,0 +1,60 @@
+// Parameterized create/read/update/delete against one MySQL table, and the
+// affectedRows/lastInsertId a MySQLResult carries. Never hardcode a real
+// password.
+//
+//   export MYSQL_HOST=127.0.0.1
+//   export MYSQL_USERNAME=app
+//   export MYSQL_PASSWORD=change-me
+//   export MYSQL_DATABASE=ahdcode_demo
+//   ahdcode run 02_mysql_crud.ahd
+bring Env
+bring MySQL
+from MySQL bring MySQLDatabase
+from MySQL bring MySQLResult
+from MySQL bring MySQLError
+
+host := Env.getOr("MYSQL_HOST", "127.0.0.1")
+username := Env.getOr("MYSQL_USERNAME", "app")
+password := Env.getOr("MYSQL_PASSWORD", "")
+database := Env.getOr("MYSQL_DATABASE", "ahdcode_demo")
+security := Env.getOr("MYSQL_SECURITY", "tls")
+
+attempt {
+    db: Local MySQLDatabase := MySQL.connect(host, username, password, 3306, database, security)
+
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS students (
+            id INT PRIMARY KEY AUTO_INCREMENT,
+            name VARCHAR(100) NOT NULL,
+            grade DECIMAL(4,1) NOT NULL
+        )
+        """)
+
+    created: Local MySQLResult := db.execute(
+        "INSERT INTO students (name, grade) VALUES (?, ?)"
+        [MySQL.fromString("Ada"), MySQL.fromString("95.5")]
+    )
+    id: Local Int? := created.lastInsertId()
+    write("inserted id: " + str(id))
+
+    rows: Local := db.query("SELECT id, name, grade FROM students ORDER BY id")
+    for row in rows {
+        // DECIMAL stays an exact String -- it is never coerced into Real.
+        write(str(row["id"].int()) + ": " + row["name"].string() + " (" + row["grade"].string() + ")")
+    }
+
+    if id != null {
+        updated: Local MySQLResult := db.execute(
+            "UPDATE students SET grade = ? WHERE id = ?"
+            [MySQL.fromString("97.0"), MySQL.fromInt(id)]
+        )
+        write("rows updated: " + str(updated.affectedRows()))
+
+        deleted: Local MySQLResult := db.execute("DELETE FROM students WHERE id = ?", [MySQL.fromInt(id)])
+        write("rows deleted: " + str(deleted.affectedRows()))
+    }
+
+    db.close()
+} except MySQLError as error {
+    write("MySQL error: " + error.message)
+}

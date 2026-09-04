@@ -1,0 +1,51 @@
+// A transfer between two rows, committed only if both updates succeed, and
+// rolled back if either fails. Never hardcode a real password.
+//
+//   export MYSQL_HOST=127.0.0.1
+//   export MYSQL_USERNAME=app
+//   export MYSQL_PASSWORD=change-me
+//   export MYSQL_DATABASE=ahdcode_demo
+//   ahdcode run 03_mysql_transaction.ahd
+bring Env
+bring MySQL
+from MySQL bring MySQLDatabase
+from MySQL bring MySQLTransaction
+from MySQL bring MySQLError
+
+host := Env.getOr("MYSQL_HOST", "127.0.0.1")
+username := Env.getOr("MYSQL_USERNAME", "app")
+password := Env.getOr("MYSQL_PASSWORD", "")
+database := Env.getOr("MYSQL_DATABASE", "ahdcode_demo")
+security := Env.getOr("MYSQL_SECURITY", "tls")
+
+attempt {
+    db: Local MySQLDatabase := MySQL.connect(host, username, password, 3306, database, security)
+
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS accounts (
+            id INT PRIMARY KEY,
+            balance DECIMAL(10,2) NOT NULL
+        )
+        """)
+    db.execute("INSERT IGNORE INTO accounts (id, balance) VALUES (1, '100.00'), (2, '0.00')")
+
+    tx: Local MySQLTransaction := db.begin()
+    attempt {
+        tx.execute("UPDATE accounts SET balance = balance - ? WHERE id = ?", [MySQL.fromString("25.00"), MySQL.fromInt(1)])
+        tx.execute("UPDATE accounts SET balance = balance + ? WHERE id = ?", [MySQL.fromString("25.00"), MySQL.fromInt(2)])
+        tx.commit()
+        write("transfer committed")
+    } except MySQLError as error {
+        tx.rollback()
+        write("transfer rolled back: " + error.message)
+    }
+
+    rows: Local := db.query("SELECT id, balance FROM accounts ORDER BY id")
+    for row in rows {
+        write(str(row["id"].int()) + ": " + row["balance"].string())
+    }
+
+    db.close()
+} except MySQLError as error {
+    write("MySQL error: " + error.message)
+}
