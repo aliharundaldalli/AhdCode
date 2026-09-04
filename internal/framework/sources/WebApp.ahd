@@ -1,0 +1,51 @@
+// The Web application object.
+//
+// App owns two things and nothing more: the validated configuration and the
+// HTTP server it binds. Routing, static assets, and start are thin passes
+// through to the existing HTTP primitives, so an application never loses
+// access to what those primitives already do -- and a handler is still an
+// ordinary Function(Request) -> Response, checked exactly as HTTP checks it.
+//
+// There is no middleware chain, no route group, and no router of Web's own in
+// v0.15. Those are deliberately later work; this release is the foundation
+// they will sit on.
+bring HTTP
+from HTTP bring Server
+bring WebConfig
+from WebConfig bring AppConfig
+
+App: Class<> := {
+    structure: Attributes := (config: AppConfig, server: Server)
+    // get registers a handler for GET on one exact path.
+    get: Function := (path: String, handler: Function) -> Nothing {
+        attribute.server.get(path, handler)
+    }
+    // post registers a handler for POST on one exact path.
+    post: Function := (path: String, handler: Function) -> Nothing {
+        attribute.server.post(path, handler)
+    }
+    // route registers a handler for any method the server supports.
+    route: Function := (
+        method: String
+        path: String
+        handler: Function
+    ) -> Nothing {
+        attribute.server.route(method, path, handler)
+    }
+    // assets serves a directory of static files under a URL prefix. Editing a
+    // file under root changes what the browser gets on the next request; it
+    // never rebuilds AhdCode source, because none of it is AhdCode source.
+    assets: Function := (prefix: String, root: String) -> Nothing {
+        attribute.server.static(prefix, root)
+    }
+    // start binds the socket and serves. It does not return.
+    start: Function := () -> Nothing {
+        attribute.server.start()
+    }
+    // configuration hands back the validated AppConfig, so a page or layout
+    // can read the application name or canonical URL without reaching for the
+    // environment itself.
+    configuration: Function := () -> AppConfig {
+        return attribute.config
+    }
+}

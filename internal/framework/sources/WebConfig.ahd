@@ -1,0 +1,186 @@
+// Web configuration -- the environment contract every AhdCode Web
+// application shares.
+//
+// The rule this file enforces is one-directional:
+//
+//     .env / process environment  ->  Config  ->  app / pages / components
+//
+// Environment lookups belong here. Pages and components receive already
+// validated values and never reach for Env themselves.
+//
+// Nothing in this file is baked into a built executable. `ahdcode build`
+// produces an ordinary environment-independent binary; every value below is
+// read at start-up, from the process environment of the machine that runs it.
+bring Env
+bring WebError
+from WebError bring WebConfigError
+// AppConfig is one application's validated configuration. It is produced by
+// load() below, which either returns a complete value or raises -- there is
+// no partially valid AppConfig and no silent default for a required key.
+AppConfig: Class<> := {
+    structure: Attributes := (
+        name: String
+        environment: String
+        host: String
+        protocol: String
+        serverHost: String
+        serverPort: Int
+    )
+    // url is the application's canonical public address: what a person types,
+    // what belongs in a link, what a reverse proxy terminates TLS for. It is
+    // deliberately independent of serverHost/serverPort, which describe the
+    // socket this process actually listens on.
+    url: Function := () -> String {
+        return "{attribute.protocol}://{attribute.host}"
+    }
+    // developmentURL is the same identity as seen from this machine during
+    // development: APP_HOST with .test appended, so ahdakademi.com is
+    // reachable locally as ahdakademi.com.test without ever colliding with
+    // the real name or resolving to the real server.
+    developmentURL: Function := () -> String {
+        return "{attribute.protocol}://{attribute.host}.test"
+    }
+    // developmentHost is the bare .test hostname, without scheme.
+    developmentHost: Function := () -> String {
+        return "{attribute.host}.test"
+    }
+    // effectiveURL is the address to show and to link in this environment:
+    // the .test name in development, the real public name everywhere else.
+    // Production never gains a .test suffix.
+    effectiveURL: Function := () -> String {
+        if attribute.environment == "development" {
+            return "{attribute.protocol}://{attribute.host}.test"
+        }
+
+        return "{attribute.protocol}://{attribute.host}"
+    }
+    // address is the host:port this process binds. Never derive a public URL
+    // from it: behind Cloudflare, Caddy, or nginx the two have no relation.
+    address: Function := () -> String {
+        return "{attribute.serverHost}:{attribute.serverPort}"
+    }
+
+    isDevelopment: Function := () -> Bool {
+        return attribute.environment == "development"
+    }
+
+    isTest: Function := () -> Bool {
+        return attribute.environment == "test"
+    }
+
+    isProduction: Function := () -> Bool {
+        return attribute.environment == "production"
+    }
+
+    isSecure: Function := () -> Bool {
+        return attribute.protocol == "https"
+    }
+}
+// required reads one environment variable that must be present and non-empty.
+// The message names the key and never echoes the value, so a missing
+// DB_PASSWORD cannot leak a real one into a log through the error path.
+required: Function := (key: String) -> String {
+    value: Local String := Env.getOr(key, "")
+    if value == "" {
+        toss WebConfigError(
+            message: "{key} is required. Set it in .env or in the process environment."
+        )
+    }
+
+    return value
+}
+// requiredEnvironment validates APP_ENV against the three environments
+// AhdCode recognizes. There is no default: a Web application that does not
+// say which environment it is running in is misconfigured, not "probably
+// development".
+requiredEnvironment: Function := () -> String {
+    value: Local String := required("APP_ENV")
+    if value == "development" or value == "test" or value == "production" {
+        return value
+    }
+
+    toss WebConfigError(
+        message: "APP_ENV must be one of: development, test, production. Lowercase."
+    )
+}
+// requiredProtocol validates APP_PROTOCOL. http and https only, lowercase,
+// and never silently defaulted -- the scheme decides whether links, cookies,
+// and redirects are secure.
+requiredProtocol: Function := () -> String {
+    value: Local String := required("APP_PROTOCOL")
+    if value == "http" or value == "https" {
+        return value
+    }
+
+    toss WebConfigError(
+        message: "APP_PROTOCOL must be http or https. Lowercase."
+    )
+}
+// requiredHost validates APP_HOST as a host, not a URL. Scheme, path, and
+// port are separate concerns, and a malformed value is rejected rather than
+// quietly trimmed into something that only looks right.
+requiredHost: Function := () -> String {
+    value: Local String := required("APP_HOST")
+    if value.contains("://") {
+        toss WebConfigError(
+            message: "APP_HOST must be a host only, not a URL. Write ahdakademi.com, not https://ahdakademi.com."
+        )
+    }
+
+    if value.contains("/") {
+        toss WebConfigError(
+            message: "APP_HOST must be a host only, without a path. Write ahdakademi.com, not ahdakademi.com/path."
+        )
+    }
+
+    if value.contains(":") {
+        toss WebConfigError(
+            message: "APP_HOST must be a host only, without a port. Set SERVER_PORT separately."
+        )
+    }
+
+    if value.contains(" ") {
+        toss WebConfigError(message: "APP_HOST must not contain spaces.")
+    }
+
+    return value
+}
+// requiredPort converts SERVER_PORT explicitly and checks it names a usable
+// TCP port. String.toInt raises on anything that is not an integer, so a
+// typo fails at start-up instead of at bind time.
+requiredPort: Function := () -> Int {
+    raw: Local String := required("SERVER_PORT")
+    port: Local Int := 0
+    attempt {
+        port = int(raw)
+    }
+    except DomainError {
+        toss WebConfigError(
+            message: "SERVER_PORT must be a whole number between 1 and 65535."
+        )
+    }
+    except OverflowError {
+        toss WebConfigError(
+            message: "SERVER_PORT must be a whole number between 1 and 65535."
+        )
+    }
+
+    if port < 1 or port > 65535 {
+        toss WebConfigError(message: "SERVER_PORT must be between 1 and 65535.")
+    }
+
+    return port
+}
+// load reads and validates the whole application contract from the current
+// process environment. Call Web.loadEnvironment(".env") first if this
+// application uses a local .env file.
+load: Function := () -> AppConfig {
+    return AppConfig(
+        name: required("APP_NAME")
+        environment: requiredEnvironment()
+        host: requiredHost()
+        protocol: requiredProtocol()
+        serverHost: required("SERVER_HOST")
+        serverPort: requiredPort()
+    )
+}

@@ -41,14 +41,58 @@ from HTTP bring (
 )
 bring HTML
 from HTML bring (HTMLNode, HTMLError)
+bring Env
+bring File
 bring WebError
 from WebError bring WebConfigError
+bring WebConfig
+from WebConfig bring AppConfig
+bring WebApp
+from WebApp bring App
 bring WebUI
 from WebUI bring UIKit
 // UI is the semantic HTML component layer: Web.UI.section, Web.UI.h1,
 // Web.UI.p, Web.UI.img, and the rest. Every String it takes as content is
 // escaped, so a value out of a database or a form stays text.
 UI: UIKit := UIKit()
+// loadEnvironment reads a local .env file into the process environment.
+//
+// Precedence is fixed and deliberate: a variable already exported by the
+// process, a container, or CI wins over the file. That makes `.env` a local
+// development convenience and never something that quietly overrides a real
+// deployment's configuration. Values are read at run time and are never
+// compiled into the executable.
+loadEnvironment: Function := (path: String := ".env") -> Nothing {
+    if File.exists(path) {
+        Env.load(path, false)
+    }
+}
+// configure loads the local .env file if there is one, then reads and
+// validates the application's environment contract. It raises WebConfigError,
+// naming the key at fault, if anything required is missing or malformed.
+//
+// This is the one place an application reads its environment. Pages, layouts,
+// and components receive the validated AppConfig instead of calling Env
+// themselves.
+configure: Function := (envPath: String := ".env") -> AppConfig {
+    loadEnvironment(envPath)
+    return WebConfig.load()
+}
+// app builds the application from a validated configuration, binding the
+// server to SERVER_HOST and SERVER_PORT. Those describe the socket this
+// process listens on, which is not the same thing as the application's public
+// URL: behind a reverse proxy the two differ by design.
+app: Function := (config: AppConfig) -> App {
+    return App(
+        config: config
+        server: HTTP.server(config.serverHost, config.serverPort)
+    )
+}
+// start is the ordinary entry point: load .env if present, validate the
+// environment, and build the application.
+start: Function := (envPath: String := ".env") -> App {
+    return app(configure(envPath))
+}
 // html renders a finished node tree as an HTML response.
 html: Function := (body: HTMLNode, status: Int := 200) -> Response {
     return HTTP.html(HTML.render(body), status)
@@ -96,7 +140,8 @@ page: Function := (
 ) -> Response {
     return HTTP.html(document(title, body, head), status)
 }
-// text returns a plain-text response, mirroring HTTP.text.
+// text returns a plain-text response, mirroring HTTP.text. To build an
+// escaped text *node* for a page, use Web.UI.text.
 text: Function := (body: String, status: Int := 200) -> Response {
     return HTTP.text(body, status)
 }

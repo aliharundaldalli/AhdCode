@@ -214,6 +214,89 @@ write(layout("A <b>title</b>", [card("Card")]))
 	}
 }
 
+// G. The environment contract: the canonical URL is APP_PROTOCOL://APP_HOST,
+// development derives the same identity with .test appended, and production
+// never gains that suffix.
+func TestWebConfigDerivesEnvironmentURLs(t *testing.T) {
+	directory := writeSources(t, map[string]string{"main.ahd": `bring Web
+from Web bring AppConfig
+
+config: AppConfig := Web.configure()
+write(config.url())
+write(config.developmentURL())
+write(config.effectiveURL())
+write(config.address())
+`})
+	for _, testCase := range []struct{ environment, expected string }{
+		{"development", "https://example.com.test"},
+		{"test", "https://example.com"},
+		{"production", "https://example.com"},
+	} {
+		out := runWebEnvProgram(t, directory, map[string]string{
+			"APP_NAME": "Example", "APP_ENV": testCase.environment,
+			"APP_HOST": "example.com", "APP_PROTOCOL": "https",
+			"SERVER_HOST": "127.0.0.1", "SERVER_PORT": "8080",
+		})
+		lines := strings.Split(strings.TrimSpace(out), "\n")
+		if lines[0] != "https://example.com" {
+			t.Errorf("%s: canonical URL was %q", testCase.environment, lines[0])
+		}
+		if lines[1] != "https://example.com.test" {
+			t.Errorf("%s: development URL was %q", testCase.environment, lines[1])
+		}
+		if lines[2] != testCase.expected {
+			t.Errorf("%s: effective URL was %q, expected %q", testCase.environment, lines[2], testCase.expected)
+		}
+		if lines[3] != "127.0.0.1:8080" {
+			t.Errorf("%s: bind address was %q", testCase.environment, lines[3])
+		}
+	}
+}
+
+// H. Invalid configuration fails with a message that names the key, and the
+// error path never repeats a secret's value.
+func TestWebConfigRejectsInvalidValues(t *testing.T) {
+	directory := writeSources(t, map[string]string{"main.ahd": `bring Web
+from Web bring AppConfig
+
+config: AppConfig := Web.configure()
+write(config.url())
+`})
+	valid := map[string]string{
+		"APP_NAME": "Example", "APP_ENV": "development",
+		"APP_HOST": "example.com", "APP_PROTOCOL": "https",
+		"SERVER_HOST": "127.0.0.1", "SERVER_PORT": "8080",
+		"DB_PASSWORD": "s3cret-canary-value",
+	}
+	for _, testCase := range []struct{ key, value, expected string }{
+		{"APP_ENV", "dev", "APP_ENV must be one of"},
+		{"APP_ENV", "DEVELOPMENT", "APP_ENV must be one of"},
+		{"APP_ENV", "", "APP_ENV is required"},
+		{"APP_PROTOCOL", "HTTP", "APP_PROTOCOL must be http or https"},
+		{"APP_PROTOCOL", "ftp", "APP_PROTOCOL must be http or https"},
+		{"APP_PROTOCOL", "", "APP_PROTOCOL is required"},
+		{"APP_HOST", "https://example.com", "not a URL"},
+		{"APP_HOST", "example.com/path", "without a path"},
+		{"APP_HOST", "example.com:8080", "without a port"},
+		{"SERVER_PORT", "eight", "whole number"},
+		{"SERVER_PORT", "70000", "between 1 and 65535"},
+	} {
+		environment := make(map[string]string, len(valid))
+		for key, value := range valid {
+			environment[key] = value
+		}
+		environment[testCase.key] = testCase.value
+		_, errorOutput := runWebEnvProgramExpectingFailure(t, directory, environment)
+		if !strings.Contains(errorOutput, testCase.expected) {
+			t.Errorf("%s=%q: expected a message containing %q; received %q",
+				testCase.key, testCase.value, testCase.expected, strings.TrimSpace(errorOutput))
+		}
+		if strings.Contains(errorOutput, "s3cret-canary-value") {
+			t.Errorf("%s=%q: a secret's value appeared in a configuration error", testCase.key, testCase.value)
+		}
+	}
+}
+
 // I. The low-level modules remain usable on their own after Web exists: an
 // application is never forced through the facade.
 func TestLowLevelHTTPAndHTMLStillWorkWithoutWeb(t *testing.T) {
