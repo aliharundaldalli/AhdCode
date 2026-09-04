@@ -437,17 +437,32 @@ Watching: /path/to/app.ahd
 AhdCode Web
   Ahd Akademi (development)
 
+  Open:
+  http://127.0.0.1:8080
+
+  Development identity:
   http://ahdakademi.com.test
+  (.test is not locally routed in v0.15)
 
 Waiting for changes...
 ```
 
+**`Open:` altındaki adresi açın.** Bu, uygulamanın gerçekten bağlandığı soket
+olan `SERVER_HOST` ve `SERVER_PORT`'tur ve bu makinede çalışan tek adrestir.
+
+`Development identity:` altındaki satır, uygulamanın *yapılandırıldığı*
+addır. v0.15 bu adı türetir ama çözmez — gömülü bir `.test` çözücüsü yoktur —
+bu yüzden yalnızca bilgi olarak gösterilir ve öyle işaretlenir; asla
+tıklanacak bir yer olarak değil.
+
 v0.13/v0.14'ün bağımlılık farkında geliştirme denetleyicisi değişmemiştir ve
 kaynak çizgesi, izleyici, son iyi yapı, yeniden derleme, yeniden başlatma ve
-durdurma hâlâ ona aittir. Web bir başlık ve bir güvenlik denetimi ekler.
+durdurma hâlâ ona aittir. Web bir başlık ve iki güvenlik denetimi ekler.
 
 `require(...)` çizgesindeki herhangi bir kaynak dosyayı düzenlemek yeniden
 derler ve yeniden başlatır. `public/app.css`'i düzenlemek bunu yapmaz.
+
+### Reddedilen yapılandırmalar
 
 `ahdcode dev`, `APP_ENV=production`'ı **reddeder**:
 
@@ -459,8 +474,34 @@ derler ve yeniden başlatır. `public/app.css`'i düzenlemek bunu yapmaz.
   Nothing was started and APP_ENV was not changed.
 ```
 
-Hiçbir şey başlatılmaz, `APP_ENV` yeniden yazılmaz ve komut sıfırdan farklı
-bir kodla çıkar.
+`APP_PROTOCOL=https`'i de **reddeder**:
+
+```
+✗ Local HTTPS is not available in AhdCode v0.15.
+  ahdcode dev serves plaintext HTTP, so it cannot honour
+  APP_PROTOCOL=https.
+
+  Configured identity:
+  https://ahdakademi.com.test
+
+  Set APP_PROTOCOL=http for local development, or terminate
+  HTTPS with an external local proxy in front of 127.0.0.1:8080.
+  Nothing was started and APP_PROTOCOL was not changed.
+```
+
+`ahdcode dev` uygulamayı başlatır ve uygulama düz metin bir HTTP soketine
+bağlanır. v0.15'te `APP_PROTOCOL=https`'in burada TLS'e dönüştüğü bir yol
+yoktur; alt süreci başlatmak, yapılandırma `https` derken `http` sunmak
+olurdu. Düşürmek yerine reddeder: sessiz bir düşüş, güvenli çerez veya karışık
+içerik sorununu production'a kadar gizlerdi.
+
+Her iki rette de hiçbir şey başlatılmaz, hiçbir dinleyici açılmaz, geride
+`.dev` tanımlayıcısı kalmaz, `APP_ENV` ve `APP_PROTOCOL` değişmez ve komut
+sıfırdan farklı bir kodla çıkar.
+
+`APP_ENV=test` normal çalışır. `APP_HOST`'u değiştirmeden kullanır; bu yüzden
+başlık yalnızca bağlanma adresini bildirir ve hiçbir `.test` kimliği
+göstermez.
 
 ## 13. `.test`
 
@@ -470,12 +511,17 @@ bir kodla çıkar.
 APP_HOST=ahdakademi.com   →   ahdakademi.com.test
 ```
 
-Böylece `APP_PROTOCOL=https`, mantıksal geliştirme adresi olarak
-`https://ahdakademi.com.test`'i verir. `.test` ayrılmış özel amaçlı bir üst
-düzey alan adıdır (RFC 6761); bunu kullanmak, geliştirme trafiğinin kazara
-gerçek konağa çözülememesi demektir.
+`.test` ayrılmış özel amaçlı bir üst düzey alan adıdır (RFC 6761); bunu
+kullanmak, geliştirme trafiğinin kazara gerçek konağa çözülememesi demektir.
 
-Production `APP_HOST`'u aynen kullanır ve bu son eki asla almaz.
+**v0.15'te `.test` mantıksal bir kimliktir, yönlendirilebilir bir adres
+değil.** AhdCode bunun için DNS, çözücü kaydı veya `/etc/hosts` girdisi
+kurmaz; bu yüzden ad, olağan macOS çözümlemesiyle çözülmez ve tarayıcıda
+açılamaz. Doğrudan kullanılabilir yerel adres `SERVER_HOST:SERVER_PORT`'tur ve
+`ahdcode dev` önce onu yazar.
+
+Production `APP_HOST`'u aynen kullanır — gerçek kanonik alan adını — ve bu son
+eki asla almaz. `APP_ENV=test` de `APP_HOST`'u değiştirmeden kullanır.
 
 `AppConfig` türetimleri sunar:
 
@@ -506,21 +552,12 @@ Bu, uzun ömürlü ve ayrıcalıklı bir yerel ağ artalan sürecidir. Yaklaşı
 çözüm üretmek yerine ertelenmiştir: v0.15 hiçbir sistem durumu kurmaz, hiçbir
 ayrıcalık istemez ve yerel güven artefaktı eklemez.
 
-`APP_PROTOCOL=https` olduğunda `ahdcode dev`, ilk çalıştırmayı gizemli
-bırakmak yerine durumu açıkça söyler:
-
-```
-  APP_PROTOCOL is https, which is the application's public identity.
-  This machine has no local certificate authority or .test resolver,
-  so https://ahdakademi.com.test does not open on its own yet.
-
-  Until it does, either serve development over http by setting
-  APP_PROTOCOL=http, or put a TLS-terminating proxy in front of
-  127.0.0.1:8080. APP_PROTOCOL was not changed.
-```
-
-`https`'i asla sessizce `http`'ye düşürmez. Sessiz bir düşüş, güvenli çerez
-veya karışık içerik sorununu production'a kadar gizlerdi.
+Bu nedenle `APP_PROTOCOL=https`, `ahdcode dev`'in uygulamayı düz metin http
+üzerinden sunup ona https demesi yerine
+[başlatmayı reddetmesine](#reddedilen-yapılandırmalar) yol açar. `https`'i
+asla sessizce `http`'ye düşürmez ve asla güvenilmeyen bir sertifika üretmez.
+Sessiz bir düşüş, güvenli çerez veya karışık içerik sorununu production'a
+kadar gizlerdi.
 
 Bugün yerel çalışma için `APP_PROTOCOL=http` kullanın ve
 `http://127.0.0.1:SERVER_PORT` adresine gidin ya da hâlihazırda

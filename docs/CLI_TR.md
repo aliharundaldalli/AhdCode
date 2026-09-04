@@ -144,24 +144,43 @@ Derlenen modül çizgesi birinci taraf [`Web`](WEB_TR.md) çatısını içerdiğ
 AhdCode Web
   Ahd Akademi (development)
 
+  Open:
+  http://127.0.0.1:8080
+
+  Development identity:
   http://ahdakademi.com.test
+  (.test is not locally routed in v0.15)
 ```
 
-Adres, `APP_PROTOCOL` ile `APP_HOST`'a `.test` eklenmiş hâlidir; bu,
-uygulamanın genel konağının yerel kimliğidir. `dev`, `APP_*` değerlerini
-uygulamanın kendi önceliğiyle okur — önce süreç ortamı, sonra uygulama
-kökündeki `.env` — ve yalnızca ne yazacağına karar vermek için. Hiçbir
-değişkeni dışa aktarmaz ve alt sürece hiçbir şey geçirmez.
+`Open:` altındaki adres `SERVER_HOST` ve `SERVER_PORT`'tan kurulur —
+uygulamanın gerçekten bağlandığı soket — ve açılacak olan adrestir. Geri
+döngüyü varsaymaz, yapılandırılmış konağı izler; joker bir bağlanma adresi
+(`0.0.0.0`), gerçekten erişilebilir olduğu geri döngü adresi olarak gösterilir.
 
-Tek bir yapılandırmayı reddeder: `APP_ENV=production`. Bir production
-sözleşmesini geliştirme komutuyla çalıştırmak, ya onu development saymak ya da
-`APP_ENV`'i yeniden yazmak olurdu; bu yüzden `dev` uyuşmazlığı bildirir,
-hiçbir şey başlatmaz ve sıfırdan farklı bir kodla çıkar.
+`Development identity:` altındaki satır, `APP_PROTOCOL` ile `APP_HOST`'a
+`.test` eklenmiş hâlidir. v0.15 bu adı türetir ama onun için bir çözücü
+kurmaz; bu yüzden yerel olarak yönlendirilmediği belirtilir ve asla birincil
+adres olarak sunulmaz. `APP_ENV=test`, `APP_HOST`'u değiştirmeden kullanır; bu
+yüzden hiç kimlik satırı almaz.
 
-`https` bir geliştirme adresi düşürülmez, açıklanır. v0.15 yerel bir sertifika
-otoritesi, `.test` çözücüsü veya geliştirme geçidi getirmez; `dev` eksik olanı
-söyler ve `APP_PROTOCOL`'ü olduğu gibi bırakır — bkz.
-[Web](WEB_TR.md#14-yerel-https--mevcut-sınır).
+`dev`, `APP_*` değerlerini uygulamanın kendi önceliğiyle okur — önce süreç
+ortamı, sonra uygulama kökündeki `.env` — ve yalnızca ne yazacağına karar
+vermek için. Hiçbir değişkeni dışa aktarmaz ve alt sürece hiçbir şey geçirmez.
+
+Bir şey başlatmadan önce iki yapılandırmayı reddeder:
+
+- `APP_ENV=production`. Bir production sözleşmesini geliştirme komutuyla
+  çalıştırmak, ya onu development saymak ya da `APP_ENV`'i yeniden yazmak
+  olurdu.
+- `APP_PROTOCOL=https`. `dev` düz metin HTTP sunar; alt süreci başlatmak,
+  yapılandırma `https` derken `http` sunmak olurdu. v0.15 yerel bir sertifika
+  otoritesi, `.test` çözücüsü veya geliştirme geçidi getirmez ve `dev` ne
+  protokolü düşürür ne de güvenilmeyen bir sertifika üretir — bkz.
+  [Web](WEB_TR.md#14-yerel-https--mevcut-sınır).
+
+Her iki durumda da `dev` uyuşmazlığı bildirir, alt süreç başlatmaz, dinleyici
+açmaz, geride `.dev` tanımlayıcısı bırakmaz, iki değişkeni de değiştirmez ve
+sıfırdan farklı bir kodla çıkar.
 
 Hiç `bring Web` yazmamış bir program, ortamında `APP_ENV` bulunsa bile
 bunların hiçbirinden etkilenmez.

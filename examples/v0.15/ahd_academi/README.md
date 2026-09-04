@@ -12,12 +12,19 @@ cp .env.example .env
 ahdcode dev app.ahd
 ```
 
-Then open `http://127.0.0.1:8080/`.
+Then open the address `ahdcode dev` prints under `Open:` — with the supplied
+`.env` that is `http://127.0.0.1:8080/`. It is built from `SERVER_HOST` and
+`SERVER_PORT`, so it follows whatever you configure.
 
-`ahdcode dev` prints the canonical development URL
-(`http://ahdakademi.com.test`). `.test` names the local identity of
-`APP_HOST`; v0.15 does not ship the resolver that makes it open by itself, so
-use the loopback address and port for now. See
+`dev` also prints a `Development identity:` line (`http://ahdakademi.com.test`).
+That is the name the application is *configured* with. v0.15 derives it but
+installs no `.test` resolver, so it does not resolve on this machine and is
+labelled accordingly — open the `Open:` address instead. See
+[docs/WEB.md](../../../docs/WEB.md#13-test).
+
+Keep `APP_PROTOCOL=http` for local work. `ahdcode dev` refuses
+`APP_PROTOCOL=https` rather than serve plaintext http while calling it https;
+v0.15 ships no local certificate authority. See
 [docs/WEB.md](../../../docs/WEB.md#14-local-https--current-limitation).
 
 Stop it with `ahdcode stop app.dev`.
@@ -64,7 +71,11 @@ APP_ENV=production  APP_HOST=ahdakademi.com   →  ahdakademi.com
 ```
 
 `ahdcode dev` refuses `APP_ENV=production` rather than run a production
-configuration under development semantics.
+configuration under development semantics, and refuses `APP_PROTOCOL=https`
+rather than downgrade it. Both refusals happen before anything starts.
+
+`APP_ENV=test` runs normally and uses `APP_HOST` unchanged, so it gets no
+`.test` identity line.
 
 The public URL and the bind address are separate: `APP_PROTOCOL`/`APP_HOST`
 say what a person types, `SERVER_HOST`/`SERVER_PORT` say what this process

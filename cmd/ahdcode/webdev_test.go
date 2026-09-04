@@ -76,7 +76,7 @@ func TestDevelopmentURLAppendsTest(t *testing.T) {
 // E. A production configuration is refused by the development command rather
 // than run under development semantics or silently rewritten.
 func TestProductionConfigurationIsRefusedByDev(t *testing.T) {
-	err := checkWebEnvironment(webEnvironment{environment: "production", host: "example.com", protocol: "https"})
+	err := checkWebEnvironment(webEnvironment{environment: "production", host: "example.com", protocol: "http"})
 	if err == nil {
 		t.Fatal("ahdcode dev accepted a production configuration")
 	}
@@ -87,56 +87,118 @@ func TestProductionConfigurationIsRefusedByDev(t *testing.T) {
 		}
 	}
 	for _, environment := range []string{"development", "test", ""} {
-		if checkWebEnvironment(webEnvironment{environment: environment}) != nil {
-			t.Errorf("ahdcode dev refused APP_ENV=%q", environment)
+		if checkWebEnvironment(webEnvironment{environment: environment, protocol: "http"}) != nil {
+			t.Errorf("ahdcode dev refused APP_ENV=%q over http", environment)
 		}
 	}
 }
 
-// F. The banner leads with the canonical development URL, which is the line
-// the user actually needs.
-func TestWebBannerShowsTheDevelopmentURL(t *testing.T) {
+// F. APP_PROTOCOL=https is refused outright. dev serves plaintext HTTP, so
+// starting the child would mean running http while every URL derived from the
+// configuration says https.
+func TestHTTPSConfigurationIsRefusedByDev(t *testing.T) {
+	err := checkWebEnvironment(webEnvironment{
+		environment: "development", host: "ahdakademi.com", protocol: "https",
+		serverHost: "127.0.0.1", serverPort: "8080",
+	})
+	if err == nil {
+		t.Fatal("ahdcode dev accepted APP_PROTOCOL=https and would have served plaintext http")
+	}
+	message := err.Error()
+	for _, expected := range []string{
+		"Local HTTPS is not available",
+		"https://ahdakademi.com.test",
+		"APP_PROTOCOL=http",
+		"127.0.0.1:8080",
+		"Nothing was started and APP_PROTOCOL was not changed",
+	} {
+		if !strings.Contains(message, expected) {
+			t.Errorf("the refusal did not mention %q: %s", expected, message)
+		}
+	}
+	// The command it points at must exist. v0.15 ships no trust tooling.
+	if strings.Contains(message, "ahdcode trust") {
+		t.Errorf("the refusal pointed at a command that does not exist: %s", message)
+	}
+}
+
+// G. https is refused in every environment dev can run, not just development:
+// the child binds plaintext in all of them.
+func TestHTTPSIsRefusedInEveryDevEnvironment(t *testing.T) {
+	for _, environment := range []string{"development", "test"} {
+		err := checkWebEnvironment(webEnvironment{
+			environment: environment, host: "example.com", protocol: "https",
+			serverHost: "127.0.0.1", serverPort: "8080",
+		})
+		if err == nil {
+			t.Errorf("APP_ENV=%s with https was accepted", environment)
+		}
+	}
+}
+
+// H. The banner leads with the address that actually works, built from the
+// configured socket rather than a hardcoded loopback.
+func TestWebBannerLeadsWithTheWorkingAddress(t *testing.T) {
 	var out bytes.Buffer
 	announceWebApplication(&out, webEnvironment{
 		name: "Ahd Akademi", environment: "development",
 		host: "ahdakademi.com", protocol: "http",
+		serverHost: "127.0.0.1", serverPort: "8137",
 	})
 	printed := out.String()
-	if !strings.Contains(printed, "http://ahdakademi.com.test") {
-		t.Errorf("the banner did not show the development URL:\n%s", printed)
+	if !strings.Contains(printed, "Open:") || !strings.Contains(printed, "http://127.0.0.1:8137") {
+		t.Errorf("the banner did not lead with the working address:\n%s", printed)
 	}
-	if !strings.Contains(printed, "Ahd Akademi (development)") {
-		t.Errorf("the banner did not name the application and environment:\n%s", printed)
+	openIndex := strings.Index(printed, "http://127.0.0.1:8137")
+	identityIndex := strings.Index(printed, "ahdakademi.com.test")
+	if identityIndex < 0 {
+		t.Fatalf("the development identity was dropped entirely:\n%s", printed)
+	}
+	if openIndex > identityIndex {
+		t.Errorf("the unresolvable .test name was printed before the working address:\n%s", printed)
+	}
+	if !strings.Contains(printed, "not locally routed") {
+		t.Errorf("the .test identity was not marked as unresolved:\n%s", printed)
 	}
 }
 
-// G. An https development URL is explained, never downgraded. The banner must
-// not offer http as though it were what was configured.
-func TestHTTPSNoticeExplainsWithoutDowngrading(t *testing.T) {
+// I. The working address follows SERVER_HOST, and a wildcard bind is shown as
+// the loopback a browser can actually open.
+func TestWorkingAddressFollowsServerHost(t *testing.T) {
+	for _, testCase := range []struct{ host, port, expected string }{
+		{"127.0.0.1", "8080", "http://127.0.0.1:8080"},
+		{"192.168.1.20", "3000", "http://192.168.1.20:3000"},
+		{"0.0.0.0", "8080", "http://127.0.0.1:8080"},
+		{"::1", "8080", "http://[::1]:8080"},
+	} {
+		environment := webEnvironment{
+			environment: "development", host: "example.com", protocol: "http",
+			serverHost: testCase.host, serverPort: testCase.port,
+		}
+		if got := environment.openURL(); got != testCase.expected {
+			t.Errorf("SERVER_HOST=%s SERVER_PORT=%s produced %q, expected %q",
+				testCase.host, testCase.port, got, testCase.expected)
+		}
+	}
+}
+
+// J. APP_ENV=test uses APP_HOST unchanged, exactly as AppConfig does, so the
+// banner must not advertise a .test development identity for it.
+func TestTestEnvironmentPrintsNoDevelopmentIdentity(t *testing.T) {
 	var out bytes.Buffer
 	announceWebApplication(&out, webEnvironment{
-		name: "Ahd Akademi", environment: "development",
-		host: "ahdakademi.com", protocol: "https",
-		serverHost: "127.0.0.1", serverPort: "8080",
+		name: "Ahd Akademi", environment: "test",
+		host: "ahdakademi.com", protocol: "http",
+		serverHost: "127.0.0.1", serverPort: "8137",
 	})
 	printed := out.String()
-	if !strings.Contains(printed, "https://ahdakademi.com.test") {
-		t.Errorf("the https development URL was not shown:\n%s", printed)
+	if strings.Contains(printed, "ahdakademi.com.test") {
+		t.Errorf("APP_ENV=test advertised a .test development identity:\n%s", printed)
 	}
-	if !strings.Contains(printed, "APP_PROTOCOL was not changed") {
-		t.Errorf("the notice did not state that APP_PROTOCOL is untouched:\n%s", printed)
+	if strings.Contains(printed, "Development identity") {
+		t.Errorf("APP_ENV=test printed a development identity block:\n%s", printed)
 	}
-	if !strings.Contains(printed, "127.0.0.1:8080") {
-		t.Errorf("the notice did not name the address a proxy would forward to:\n%s", printed)
-	}
-	if strings.Contains(printed, "http://ahdakademi.com.test") {
-		t.Errorf("the notice offered a silent http downgrade:\n%s", printed)
-	}
-}
-
-// H. An http development URL needs no notice at all.
-func TestHTTPDevelopmentPrintsNoTLSNotice(t *testing.T) {
-	if lines := localHTTPSNotice(webEnvironment{protocol: "http", host: "example.com"}); lines != nil {
-		t.Errorf("expected no TLS notice for http, received %#v", lines)
+	if !strings.Contains(printed, "http://127.0.0.1:8137") {
+		t.Errorf("APP_ENV=test did not report the bind address:\n%s", printed)
 	}
 }

@@ -137,24 +137,41 @@ development URL:
 AhdCode Web
   Ahd Akademi (development)
 
+  Open:
+  http://127.0.0.1:8080
+
+  Development identity:
   http://ahdakademi.com.test
+  (.test is not locally routed in v0.15)
 ```
 
-The URL is `APP_PROTOCOL` and `APP_HOST` with `.test` appended, which is the
-local identity of the application's public host. `dev` reads `APP_*` with the
-application's own precedence — process environment first, then the app-root
-`.env` — and only ever to decide what to print. It never exports a variable
-and never passes one to the child.
+The address under `Open:` is built from `SERVER_HOST` and `SERVER_PORT` — the
+socket the application actually binds — and is the one to open. It follows the
+configured host rather than assuming loopback; a wildcard bind (`0.0.0.0`) is
+displayed as the loopback address it is genuinely reachable on.
 
-It refuses one configuration: `APP_ENV=production`. Running a production
-contract through the development command would mean either treating it as
-development or rewriting `APP_ENV`, so `dev` reports the mismatch, starts
-nothing, and exits non-zero.
+The line under `Development identity:` is `APP_PROTOCOL` and `APP_HOST` with
+`.test` appended. v0.15 derives that name but installs no resolver for it, so
+it is labelled as not locally routed and never presented as the primary URL.
+`APP_ENV=test` uses `APP_HOST` unchanged, so it gets no identity line at all.
 
-An `https` development URL is explained rather than downgraded. v0.15 ships no
-local certificate authority, `.test` resolver, or development gateway, so
-`dev` says what is missing and leaves `APP_PROTOCOL` alone — see
-[Web](WEB.md#14-local-https--current-limitation).
+`dev` reads `APP_*` with the application's own precedence — process
+environment first, then the app-root `.env` — and only ever to decide what to
+print. It never exports a variable and never passes one to the child.
+
+It refuses two configurations, before starting anything:
+
+- `APP_ENV=production`. Running a production contract through the development
+  command would mean either treating it as development or rewriting
+  `APP_ENV`.
+- `APP_PROTOCOL=https`. `dev` serves plaintext HTTP, so starting the child
+  would mean serving `http` while the configuration says `https`. v0.15 ships
+  no local certificate authority, `.test` resolver, or development gateway,
+  and `dev` neither downgrades the protocol nor generates an untrusted
+  certificate — see [Web](WEB.md#14-local-https--current-limitation).
+
+In both cases `dev` reports the mismatch, starts no child, opens no listener,
+leaves no `.dev` descriptor, changes neither variable, and exits non-zero.
 
 A program that never wrote `bring Web` is unaffected by all of this, even if
 `APP_ENV` happens to be set in its environment.

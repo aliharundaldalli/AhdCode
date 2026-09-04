@@ -435,17 +435,33 @@ Watching: /path/to/app.ahd
 AhdCode Web
   Ahd Akademi (development)
 
+  Open:
+  http://127.0.0.1:8080
+
+  Development identity:
   http://ahdakademi.com.test
+  (.test is not locally routed in v0.15)
 
 Waiting for changes...
 ```
 
+**Open the address under `Open:`.** That is `SERVER_HOST` and `SERVER_PORT`,
+the socket the application actually binds, and it is the only address that
+works on this machine.
+
+The line under `Development identity:` is the name the application is
+*configured* with. v0.15 derives it but does not resolve it — there is no
+bundled `.test` resolver — so it is shown for reference and marked as such,
+never as somewhere to click.
+
 The v0.13/v0.14 dependency-aware dev controller is unchanged and still owns
 the source graph, the watcher, last-good, rebuild, restart, and stop. Web adds
-a banner and one safety check.
+a banner and two safety checks.
 
 Editing any source file in the `require(...)` graph rebuilds and restarts.
 Editing `public/app.css` does not.
+
+### Refusals
 
 `ahdcode dev` **refuses** `APP_ENV=production`:
 
@@ -457,8 +473,34 @@ Editing `public/app.css` does not.
   Nothing was started and APP_ENV was not changed.
 ```
 
-Nothing is started, `APP_ENV` is not rewritten, and the command exits
-non-zero.
+It also **refuses** `APP_PROTOCOL=https`:
+
+```
+✗ Local HTTPS is not available in AhdCode v0.15.
+  ahdcode dev serves plaintext HTTP, so it cannot honour
+  APP_PROTOCOL=https.
+
+  Configured identity:
+  https://ahdakademi.com.test
+
+  Set APP_PROTOCOL=http for local development, or terminate
+  HTTPS with an external local proxy in front of 127.0.0.1:8080.
+  Nothing was started and APP_PROTOCOL was not changed.
+```
+
+`ahdcode dev` starts the application, and the application binds a plaintext
+HTTP socket. There is no path in v0.15 by which `APP_PROTOCOL=https` results
+in TLS here, so starting the child would mean serving `http` while the
+configuration says `https`. It refuses instead of downgrading: a silent
+downgrade would hide a secure-cookie or mixed-content problem until
+production.
+
+In both refusals nothing is started, no listener is opened, no `.dev`
+descriptor is left behind, `APP_ENV` and `APP_PROTOCOL` are unchanged, and the
+command exits non-zero.
+
+`APP_ENV=test` runs normally. It uses `APP_HOST` unchanged, so the banner
+reports the bind address alone and shows no `.test` identity.
 
 ## 13. `.test`
 
@@ -469,12 +511,17 @@ appended:
 APP_HOST=ahdakademi.com   →   ahdakademi.com.test
 ```
 
-`APP_PROTOCOL=https` therefore yields the logical development URL
-`https://ahdakademi.com.test`. `.test` is a reserved special-use TLD (RFC
-6761); using it means development traffic can never resolve to the real host
-by accident.
+`.test` is a reserved special-use TLD (RFC 6761); using it means development
+traffic can never resolve to the real host by accident.
 
-Production uses `APP_HOST` exactly and never gains the suffix.
+**`.test` is a logical identity in v0.15, not a routable address.** AhdCode
+installs no DNS, no resolver entry, and no `/etc/hosts` record for it, so the
+name does not resolve through ordinary macOS resolution and cannot be opened
+in a browser. The directly usable local address is `SERVER_HOST:SERVER_PORT`,
+which is what `ahdcode dev` prints first.
+
+Production uses `APP_HOST` exactly — the real canonical domain — and never
+gains the suffix. `APP_ENV=test` uses `APP_HOST` unchanged too.
 
 `AppConfig` exposes the derivations:
 
@@ -504,20 +551,10 @@ That is a long-lived, privileged local network daemon. It is deferred rather
 than approximated: v0.15 installs no system state, requests no privilege, and
 adds no local trust artifacts.
 
-When `APP_PROTOCOL=https`, `ahdcode dev` says so plainly instead of leaving
-the first run mysterious:
-
-```
-  APP_PROTOCOL is https, which is the application's public identity.
-  This machine has no local certificate authority or .test resolver,
-  so https://ahdakademi.com.test does not open on its own yet.
-
-  Until it does, either serve development over http by setting
-  APP_PROTOCOL=http, or put a TLS-terminating proxy in front of
-  127.0.0.1:8080. APP_PROTOCOL was not changed.
-```
-
-It never silently downgrades `https` to `http`. A silent downgrade would hide
+Because of that, `APP_PROTOCOL=https` makes `ahdcode dev`
+[refuse to start](#refusals) rather than serve the application over plaintext
+http while calling it https. It never silently downgrades `https` to `http`,
+and it never generates an untrusted certificate. A silent downgrade would hide
 a secure-cookie or mixed-content problem until production.
 
 For local work today, set `APP_PROTOCOL=http` and use

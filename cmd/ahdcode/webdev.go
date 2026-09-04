@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"io"
+	"net"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -127,6 +128,11 @@ func unquoteDevEnvValue(rest string) string {
 // developmentHost is APP_HOST with .test appended -- the local name, never
 // the real one, so development traffic cannot reach the production host by
 // accident.
+//
+// v0.15 derives this identity but does not resolve it: there is no bundled
+// .test resolver, so the name does not open in a browser on its own. Every
+// caller below therefore has to say which of the two it is showing -- the
+// address that works, or the identity the application is configured with.
 func (environment webEnvironment) developmentHost() string {
 	return environment.host + ".test"
 }
@@ -135,14 +141,64 @@ func (environment webEnvironment) developmentURL() string {
 	return environment.protocol + "://" + environment.developmentHost()
 }
 
-// checkWebEnvironment refuses exactly one thing: running a configuration that
-// declares itself production through the development command. Everything else
-// is left to the application's own Web.configure, which validates the full
-// contract and reports the offending key.
+// hasDevelopmentIdentity reports whether this environment is the one that
+// derives a .test name. Only development does, which is exactly what
+// AppConfig.effectiveURL already decides -- test and production use APP_HOST
+// unchanged, so advertising a .test name for them would contradict the
+// application's own configuration.
+func (environment webEnvironment) hasDevelopmentIdentity() bool {
+	return environment.environment == "development" && environment.host != "" && environment.protocol != ""
+}
+
+// hasBindAddress reports whether the socket keys are both present. They are
+// required configuration, so a missing one means the child has already failed
+// its own validation and there is no address worth printing.
+func (environment webEnvironment) hasBindAddress() bool {
+	return environment.serverHost != "" && environment.serverPort != ""
+}
+
+// bindAddress is SERVER_HOST:SERVER_PORT, the socket the application actually
+// binds -- the same pair AppConfig.address reports. An IPv6 literal is
+// bracketed so the result stays a valid authority.
+func (environment webEnvironment) bindAddress() string {
+	if !environment.hasBindAddress() {
+		return "SERVER_HOST:SERVER_PORT"
+	}
+	return net.JoinHostPort(environment.serverHost, environment.serverPort)
+}
+
+// openURL is the address a person can actually open right now. It is built
+// from the real SERVER_HOST and SERVER_PORT rather than a hardcoded loopback,
+// with one display substitution: a wildcard bind address is not something a
+// browser can navigate to, so it is shown as the loopback the server is in
+// fact reachable on. Nothing is invented -- an application bound to 0.0.0.0
+// is genuinely served at 127.0.0.1.
+func (environment webEnvironment) openURL() string {
+	host := environment.serverHost
+	switch host {
+	case "0.0.0.0":
+		host = "127.0.0.1"
+	case "::", "[::]":
+		host = "::1"
+	}
+	scheme := environment.protocol
+	if scheme == "" {
+		scheme = "http"
+	}
+	return scheme + "://" + net.JoinHostPort(host, environment.serverPort)
+}
+
+// checkWebEnvironment decides whether this configuration may run under the
+// development command at all. It runs before the child is started, so a
+// refusal means no process, no listener, and no descriptor.
 //
-// The alternative -- quietly treating production as development, or quietly
-// rewriting APP_ENV -- would make `ahdcode dev` a way to run production code
-// under development semantics without saying so. It fails instead.
+// Two configurations are refused, both for the same underlying reason: dev
+// would otherwise run something other than what the environment describes.
+//
+// The alternative in each case -- quietly treating production as development,
+// or quietly serving an https application over plaintext http -- would make
+// `ahdcode dev` lie about what it is running. It fails instead, and never
+// rewrites APP_ENV or APP_PROTOCOL.
 func checkWebEnvironment(environment webEnvironment) error {
 	if environment.environment == "production" {
 		return fmt.Errorf(
@@ -152,69 +208,60 @@ func checkWebEnvironment(environment webEnvironment) error {
 				"  executable directly for a production configuration.\n" +
 				"  Nothing was started and APP_ENV was not changed.")
 	}
+	if environment.protocol == "https" {
+		// `ahdcode dev` starts the application, and the application binds a
+		// plaintext HTTP socket. There is no path in v0.15 by which
+		// APP_PROTOCOL=https results in TLS here, so starting the child would
+		// mean serving http while the configuration -- and any URL printed
+		// from it -- says https. Refusing is the honest outcome; downgrading
+		// silently would hide a secure-cookie or mixed-content problem until
+		// production.
+		identity := "https://" + environment.host
+		if environment.environment == "development" && environment.host != "" {
+			identity = environment.developmentURL()
+		}
+		message := "Local HTTPS is not available in AhdCode v0.15.\n" +
+			"  ahdcode dev serves plaintext HTTP, so it cannot honour\n" +
+			"  APP_PROTOCOL=https.\n"
+		if environment.host != "" {
+			message += "\n  Configured identity:\n  " + identity + "\n"
+		}
+		message += "\n  Set APP_PROTOCOL=http for local development, or terminate\n" +
+			"  HTTPS with an external local proxy in front of " + environment.bindAddress() + ".\n" +
+			"  Nothing was started and APP_PROTOCOL was not changed."
+		return fmt.Errorf("%s", message)
+	}
 	return nil
 }
 
 // announceWebApplication prints the Web banner once the application is
-// running. The canonical development URL is the line the user actually needs,
-// so it gets its own line with nothing else on it.
+// running.
+//
+// The address that actually works comes first and is labelled as the one to
+// open. The .test identity is shown after it, labelled as the configured
+// identity and marked as not locally routed, because v0.15 ships no resolver
+// for it -- presenting it as the primary URL would send a reader to a name
+// their machine cannot resolve.
+//
+// Only development has a .test identity. For test the configuration uses
+// APP_HOST unchanged, and printing a .test name there would contradict
+// AppConfig, so the banner shows the bind address alone.
 func announceWebApplication(output io.Writer, environment webEnvironment) {
 	fmt.Fprintln(output)
 	fmt.Fprintln(output, "AhdCode Web")
 	if environment.name != "" {
 		fmt.Fprintf(output, "  %s (%s)\n", environment.name, environment.environment)
 	}
-	if environment.host != "" && environment.protocol != "" {
+	if environment.hasBindAddress() {
 		fmt.Fprintln(output)
+		fmt.Fprintln(output, "  Open:")
+		fmt.Fprintf(output, "  %s\n", environment.openURL())
+	}
+	if environment.hasDevelopmentIdentity() {
+		fmt.Fprintln(output)
+		fmt.Fprintln(output, "  Development identity:")
 		fmt.Fprintf(output, "  %s\n", environment.developmentURL())
+		fmt.Fprintln(output, "  (.test is not locally routed in v0.15)")
 	}
 	fmt.Fprintln(output)
-	for _, line := range localHTTPSNotice(environment) {
-		fmt.Fprintln(output, line)
-	}
-}
-
-// localHTTPSNotice explains what an https development URL still needs on this
-// machine. A first Web run must never be mysterious: if the name does not
-// resolve, the reason and the way forward are printed here.
-//
-// It deliberately does not fall back to http, and never rewrites APP_PROTOCOL.
-// An application that says APP_PROTOCOL=https is served over https or not at
-// all: a silent downgrade would mean testing something other than what is
-// configured, and would hide a secure-cookie or mixed-content problem until
-// production.
-//
-// v0.15 does not ship the local certificate authority, the .test resolver, or
-// the development gateway that would make this URL open by itself. Reaching
-// https://<APP_HOST>.test with no port needs three permanently privileged
-// pieces of system state at once -- a root-installed resolver for the .test
-// domain, a listener on privileged port 443, and a certificate authority in
-// the system trust store -- and that is a larger, security-sensitive change
-// than this release should make quietly. It is deferred rather than
-// approximated: nothing here installs, or asks for, any privilege.
-func localHTTPSNotice(environment webEnvironment) []string {
-	if environment.protocol != "https" {
-		return nil
-	}
-	return []string{
-		"  APP_PROTOCOL is https, which is the application's public identity.",
-		"  This machine has no local certificate authority or .test resolver,",
-		"  so " + environment.developmentURL() + " does not open on its own yet.",
-		"",
-		"  Until it does, either serve development over http by setting",
-		"  APP_PROTOCOL=http, or put a TLS-terminating proxy in front of",
-		"  " + environment.bindHint() + ". APP_PROTOCOL was not changed.",
-		"",
-	}
-}
-
-// bindHint names the socket the application binds, which is what a proxy in
-// front of it forwards to. It is read from the same environment the
-// application reads, and falls back to the shape of the keys rather than
-// inventing a port.
-func (environment webEnvironment) bindHint() string {
-	if environment.serverHost != "" && environment.serverPort != "" {
-		return environment.serverHost + ":" + environment.serverPort
-	}
-	return "SERVER_HOST:SERVER_PORT"
 }

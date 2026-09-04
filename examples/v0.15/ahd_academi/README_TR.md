@@ -12,12 +12,19 @@ cp .env.example .env
 ahdcode dev app.ahd
 ```
 
-Ardından `http://127.0.0.1:8080/` adresini açın.
+Ardından `ahdcode dev`'in `Open:` altında yazdığı adresi açın — verilen `.env`
+ile bu `http://127.0.0.1:8080/`'dir. Adres `SERVER_HOST` ve `SERVER_PORT`'tan
+kurulur, yani ne yapılandırırsanız onu izler.
 
-`ahdcode dev` kanonik geliştirme adresini yazar
-(`http://ahdakademi.com.test`). `.test`, `APP_HOST`'un yerel kimliğini
-adlandırır; v0.15 bu adresi kendiliğinden açan çözücüyü getirmediği için
-şimdilik geri döngü adresini ve portunu kullanın. Bkz.
+`dev` ayrıca bir `Development identity:` satırı yazar
+(`http://ahdakademi.com.test`). Bu, uygulamanın *yapılandırıldığı* addır.
+v0.15 onu türetir ama bir `.test` çözücüsü kurmaz; bu yüzden bu makinede
+çözülmez ve öyle işaretlenir — onun yerine `Open:` adresini açın. Bkz.
+[docs/WEB_TR.md](../../../docs/WEB_TR.md#13-test).
+
+Yerel çalışma için `APP_PROTOCOL=http` kullanın. `ahdcode dev`,
+`APP_PROTOCOL=https`'i düz metin http sunup ona https demek yerine reddeder;
+v0.15 yerel bir sertifika otoritesi getirmez. Bkz.
 [docs/WEB_TR.md](../../../docs/WEB_TR.md#14-yerel-https--mevcut-sınır).
 
 Durdurmak için `ahdcode stop app.dev`.
@@ -65,7 +72,11 @@ APP_ENV=production  APP_HOST=ahdakademi.com   →  ahdakademi.com
 ```
 
 `ahdcode dev`, bir production yapılandırmasını development anlambilimiyle
-çalıştırmak yerine `APP_ENV=production`'ı reddeder.
+çalıştırmak yerine `APP_ENV=production`'ı reddeder; `APP_PROTOCOL=https`'i de
+düşürmek yerine reddeder. Her iki ret de hiçbir şey başlamadan önce olur.
+
+`APP_ENV=test` normal çalışır ve `APP_HOST`'u değiştirmeden kullanır; bu
+yüzden hiç `.test` kimlik satırı almaz.
 
 Genel URL ile bağlanma adresi ayrıdır: `APP_PROTOCOL`/`APP_HOST` bir insanın
 yazdığını, `SERVER_HOST`/`SERVER_PORT` bu sürecin bağlandığını söyler. Ters
