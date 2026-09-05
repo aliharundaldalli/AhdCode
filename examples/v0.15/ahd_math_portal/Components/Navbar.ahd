@@ -30,26 +30,6 @@ navbar: Function := (
             {"class": "nav-item"}
         )
     ]
-    if user != null {
-        links.add(
-            Web.UI.liNodes(
-                [
-                    Web.UI.aNodes(
-                        "/profile"
-                        [
-                            Web.UI.i(
-                                ""
-                                {"class": "fa-solid fa-user-graduate me-1"}
-                            )
-                            Web.UI.text("Profilim")
-                        ]
-                        {"class": "nav-link"}
-                    )
-                ]
-                {"class": "nav-item"}
-            )
-        )
-    }
     if isAdmin {
         links.add(
             Web.UI.liNodes(
