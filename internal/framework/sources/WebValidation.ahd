@@ -1,0 +1,157 @@
+// Ordered, concrete field errors. Rules run only when explicitly called.
+FieldError: Class<> := {
+    structure: Attributes := (field: String, message: String)
+}
+
+ValidationErrors: Class<> := {
+    structure: Attributes := (entries: List<FieldError>)
+    add: Function := (field: String, message: String) -> Nothing {
+        attribute.entries.add(FieldError(field: field, message: message))
+    }
+    any: Function := () -> Bool {
+        return len(attribute.entries) > 0
+    }
+    hasField: Function := (field: String) -> Bool {
+        for item in attribute.entries {
+            if item.field == field {
+                return true
+            }
+        }
+        return false
+    }
+    first: Function := (field: String) -> String? {
+        for item in attribute.entries {
+            if item.field == field {
+                return item.message
+            }
+        }
+        return null
+    }
+    forField: Function := (field: String) -> List<String> {
+        result: Local List<String> := []
+        for item in attribute.entries {
+            if item.field == field {
+                result.add(item.message)
+            }
+        }
+        return result
+    }
+    messages: Function := () -> List<String> {
+        result: Local List<String> := []
+        for item in attribute.entries {
+            result.add(item.message)
+        }
+        return result
+    }
+    required: Function := (
+        field: String
+        value: String
+        message: String
+    ) -> Nothing {
+        if value.trim() == "" {
+            attribute.entries.add(FieldError(field: field, message: message))
+        }
+    }
+    minLength: Function := (
+        field: String
+        value: String
+        minimum: Int
+        message: String
+    ) -> Nothing {
+        if len(value) < minimum {
+            attribute.entries.add(FieldError(field: field, message: message))
+        }
+    }
+    maxLength: Function := (
+        field: String
+        value: String
+        maximum: Int
+        message: String
+    ) -> Nothing {
+        if len(value) > maximum {
+            attribute.entries.add(FieldError(field: field, message: message))
+        }
+    }
+    matches: Function := (
+        field: String
+        value: String
+        expected: String
+        message: String
+    ) -> Nothing {
+        if value != expected {
+            attribute.entries.add(FieldError(field: field, message: message))
+        }
+    }
+    email: Function := (
+        field: String
+        value: String
+        message: String
+    ) -> Nothing {
+        if emailShaped(value) == false {
+            attribute.entries.add(FieldError(field: field, message: message))
+        }
+    }
+    oneOf: Function := (
+        field: String
+        value: String
+        allowed: List<String>
+        message: String
+    ) -> Nothing {
+        for candidate in allowed {
+            if candidate == value {
+                return
+            }
+        }
+        attribute.entries.add(FieldError(field: field, message: message))
+    }
+    hexColor: Function := (
+        field: String
+        value: String
+        message: String
+    ) -> Nothing {
+        if hexColorShaped(value) == false {
+            attribute.entries.add(FieldError(field: field, message: message))
+        }
+    }
+}
+// Shape only, not deliverability or full RFC address validation.
+emailShaped: Function := (value: String) -> Bool {
+    if value.contains(
+        " "
+    ) or value.contains("\t") or value.contains("\n") or value.contains("\r") {
+        return false
+    }
+    parts: Local List<String> := value.split("@")
+    if len(parts) != 2 {
+        return false
+    }
+    if parts[0] == "" or parts[1] == "" {
+        return false
+    }
+    labels: Local List<String> := parts[1].split(".")
+    if len(labels) < 2 {
+        return false
+    }
+    for label in labels {
+        if label == "" {
+            return false
+        }
+    }
+    return true
+}
+
+hexColorShaped: Function := (value: String) -> Bool {
+    if len(value) != 7 or value.startsWith("#") == false {
+        return false
+    }
+    digits: Local String := value.lower()
+    allowed: Local String := "0123456789abcdef"
+    index: Local Int := 1
+    while index < 7 {
+        if allowed.contains(digits[index]) == false {
+            return false
+        }
+        index++
+    }
+    return true
+}

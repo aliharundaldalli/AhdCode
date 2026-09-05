@@ -1,0 +1,84 @@
+// Form reads the HTTP parser's existing request snapshot. It neither parses
+// raw bodies again nor puts submitted fields into a session.
+bring HTTP
+from HTTP bring Request
+bring WebError
+from WebError bring FormValueError
+
+FormField: Class<> := {
+    structure: Attributes := (name: String, value: String)
+}
+
+OldInput: Class<> := {
+    structure: Attributes := (fields: List<FormField>)
+    value: Function := (name: String, fallback: String := "") -> String {
+        for field in attribute.fields {
+            if field.name == name {
+                return field.value
+            }
+        }
+        return fallback
+    }
+}
+
+Form: Class<> := {
+    structure: Attributes := (request: Request)
+    optional: Function := (name: String) -> String? {
+        return attribute.request.form(name)
+    }
+    value: Function := (name: String, fallback: String := "") -> String {
+        result: Local String? := attribute.request.form(name)
+        if result == null {
+            return fallback
+        }
+        return result
+    }
+    hasField: Function := (name: String) -> Bool {
+        return attribute.request.form(name) != null
+    }
+    // Missing is null. Empty, malformed, or overflowing integers raise a
+    // catchable error whose message contains no submitted value.
+    integer: Function := (name: String) -> Int? {
+        raw: Local String? := attribute.request.form(name)
+        if raw == null {
+            return null
+        }
+        attempt {
+            return int(raw)
+        }
+        except DomainError {
+            toss FormValueError(message: "Form field is not an integer.")
+        }
+        except OverflowError {
+            toss FormValueError(message: "Form integer is out of range.")
+        }
+    }
+    // Unchecked/missing is false. Explicit on/true/1 and off/false/0 are
+    // accepted; other submitted strings are errors, not silently truthy.
+    checkbox: Function := (name: String) -> Bool {
+        raw: Local String? := attribute.request.form(name)
+        if raw == null {
+            return false
+        }
+        if raw == "on" or raw == "true" or raw == "1" {
+            return true
+        }
+        if raw == "off" or raw == "false" or raw == "0" {
+            return false
+        }
+        toss FormValueError(message: "Form field is not a checkbox value.")
+    }
+    // Deliberate allowlist, no implicit password/confirmation/token copying.
+    // The caller is responsible for selecting only non-sensitive fields.
+    // Values are ordinary strings: render with Web.UI, never raw markup.
+    old: Function := (safeFields: List<String>) -> OldInput {
+        fields: Local List<FormField> := []
+        for name in safeFields {
+            raw: Local String? := attribute.request.form(name)
+            if raw != null {
+                fields.add(FormField(name: name, value: raw))
+            }
+        }
+        return OldInput(fields: fields)
+    }
+}

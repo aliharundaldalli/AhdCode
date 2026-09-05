@@ -1,15 +1,16 @@
 // Web's own error identity.
 //
-// There is deliberately one small error type here, not a catch-all WebError
-// that rebrands failures the existing modules already report well. HTTP
-// failures stay HTTPError, HTML failures stay HTMLError, session and security
-// failures keep their own identities, and application code catches them by
-// the name that actually describes what went wrong.
-//
-// WebConfigError covers the one thing genuinely new in v0.15: an application
-// whose environment contract is missing or malformed. Its message names the
-// key at fault and never repeats the value, so a bad secret cannot reach a
-// log through an error string.
+// Configuration, lifecycle, and typed-form errors are distinct. Existing
+// HTTP, HTML, Session, and Security failures retain their original identities.
+// Error messages never include submitted values, session data, or tokens.
 WebConfigError: Class<Error> := {
+    structure: Attributes := (SuperClass.attributes)
+}
+// Explicit lifecycle misuse; never includes request/session contents.
+WebContextError: Class<Error> := {
+    structure: Attributes := (SuperClass.attributes)
+}
+// Invalid submitted typed value; absence is represented separately.
+FormValueError: Class<Error> := {
     structure: Attributes := (SuperClass.attributes)
 }
