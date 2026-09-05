@@ -125,12 +125,16 @@ navbarAccount: Function := (user: UserRecord?, token: String) -> HTMLNode {
         "post"
         [
             Web.UI.input("hidden", "_csrf", token)
-            Web.UI.spanNodes(
+            Web.UI.aNodes(
+                "/profile"
                 [
                     Web.UI.i("", {"class": "fa-regular fa-circle-user me-1"})
                     Web.UI.text(user.name)
                 ]
-                {"class": "text-white me-3 align-self-center"}
+                {
+                    "class": "btn btn-sm btn-outline-light me-2"
+                    "title": "Profilim"
+                }
             )
             Web.UI.buttonNodes(
                 [

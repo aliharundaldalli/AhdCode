@@ -141,3 +141,18 @@ solutionsCount: Function := () -> Int {
 
     return rowInt(rows[0], "total")
 }
+
+solutionsForUser: Function := (userId: Int) -> List<SolutionRecord> {
+    rows: Local List<Pair<String, MySQLValue>> := connection(
+        
+    ).query(
+        "{solutionsSelect()} WHERE s.user_id = ? ORDER BY s.id DESC"
+        [MySQL.fromInt(userId)]
+    )
+    records: Local List<SolutionRecord> := []
+    for row in rows {
+        records.add(solutionsFromRow(row))
+    }
+
+    return records
+}

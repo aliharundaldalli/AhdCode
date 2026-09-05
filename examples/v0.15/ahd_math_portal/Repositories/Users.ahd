@@ -136,3 +136,12 @@ usersCount: Function := () -> Int {
 
     return rowInt(rows[0], "total")
 }
+
+usersUpdateName: Function := (id: Int, name: String) -> Nothing {
+    connection(
+        
+    ).execute(
+        "UPDATE users SET name = ? WHERE id = ?"
+        [MySQL.fromString(name), MySQL.fromInt(id)]
+    )
+}

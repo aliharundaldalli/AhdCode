@@ -1,0 +1,493 @@
+// User profile page: account details, name update, password change, and personal solutions.
+require("Layouts/Main.ahd")
+require("Components/FormField.ahd")
+require("Components/SolutionModal.ahd")
+require("Services/Context.ahd")
+require("Services/Session.ahd")
+require("Services/Guard.ahd")
+require("Services/CSRF.ahd")
+require("Services/Auth.ahd")
+require("Repositories/Users.ahd")
+require("Repositories/Solutions.ahd")
+require("Support/Validation.ahd")
+bring Web
+from Web bring (Request, Response, HTMLNode, Session)
+bring Security
+
+profilePage: Function := (request: Request) -> Response {
+    session: Local Session := sessionOpen(request)
+    context: Local PageContext := contextFor(session)
+    guard: Local GuardResult := signedInGuard(context)
+    if guard.allowed == false {
+        return sessionCommit(session, guard.refusal)
+    }
+
+    user: Local UserRecord? := context.user
+    if user == null {
+        return sessionCommit(session, Web.redirect("/login"))
+    }
+
+    solutions: Local List<SolutionRecord> := solutionsForUser(user.id)
+
+    roleBadge: Local HTMLNode := Web.UI.span(
+        "Öğrenci"
+        {"class": "badge text-bg-secondary"}
+    )
+    if user.role == "admin" {
+        roleBadge = Web.UI.span("Yönetici", {"class": "badge text-bg-primary"})
+    }
+    // Hero Overview Card
+    heroCard: Local HTMLNode := Web.UI.div(
+        [
+            Web.UI.div(
+                [
+                    Web.UI.div(
+                        [
+                            Web.UI.div(
+                                [Web.UI.i("", {"class": "fa-solid fa-user"})]
+                                {"class": "profile-avatar me-3 me-sm-4"}
+                            )
+                            Web.UI.div(
+                                [
+                                    Web.UI.div(
+                                        [
+                                            Web.UI.h1(
+                                                user.name
+                                                {
+                                                    "class": "h4 fw-bold mb-1 text-dark"
+                                                }
+                                            )
+                                            Web.UI.spanNodes(
+                                                [roleBadge]
+                                                {"class": "ms-2"}
+                                            )
+                                            Web.UI.span(
+                                                "Aktif Hesap"
+                                                {
+                                                    "class": "badge text-bg-success-subtle text-success-emphasis border border-success-subtle ms-2"
+                                                }
+                                            )
+                                        ]
+                                        {
+                                            "class": "d-flex align-items-center flex-wrap mb-1"
+                                        }
+                                    )
+                                    Web.UI.p(
+                                        user.email
+                                        {
+                                            "class": "text-body-secondary mb-0 small"
+                                        }
+                                    )
+                                ]
+                            )
+                        ]
+                        {"class": "d-flex align-items-center"}
+                    )
+                    Web.UI.div(
+                        [
+                            Web.UI.div(
+                                [
+                                    Web.UI.p(
+                                        "Çözümlerim"
+                                        {
+                                            "class": "text-body-secondary small mb-0"
+                                        }
+                                    )
+                                    Web.UI.p(
+                                        str(len(solutions))
+                                        {
+                                            "class": "fs-4 fw-bold mb-0 text-primary text-end"
+                                        }
+                                    )
+                                ]
+                                {
+                                    "class": "px-3 py-2 bg-light rounded-3 border text-center text-sm-end"
+                                }
+                            )
+                        ]
+                        {"class": "mt-3 mt-sm-0"}
+                    )
+                ]
+                {
+                    "class": "card-body d-flex flex-wrap align-items-center justify-content-between p-4"
+                }
+            )
+        ]
+        {"class": "card border-0 shadow-sm mb-4"}
+    )
+    // Left Column: Edit Name & Change Password
+    nameFormCard: Local HTMLNode := Web.UI.div(
+        [
+            Web.UI.h2(
+                "Profil Bilgileri"
+                {"class": "h5 fw-bold mb-3 text-dark pb-2 border-bottom"}
+            )
+            Web.UI.formTo(
+                "/profile/name"
+                "post"
+                [
+                    csrfInput(session)
+                    formFieldWithIcon(
+                        "profile-name"
+                        "name"
+                        "Ad soyad"
+                        "text"
+                        "fa-solid fa-user"
+                        user.name
+                        ""
+                        "Adınız Soyadınız"
+                    )
+                    Web.UI.div(
+                        [
+                            Web.UI.label(
+                                "E-posta adresi"
+                                {"class": "form-label text-body-secondary"}
+                            )
+                            Web.UI.input(
+                                "email"
+                                "email"
+                                user.email
+                                {
+                                    "class": "form-control bg-light"
+                                    "readonly": "true"
+                                }
+                            )
+                            Web.UI.p(
+                                "E-posta adresi hesap güvenliği için sabittir."
+                                {"class": "form-text"}
+                            )
+                        ]
+                        {"class": "mb-3"}
+                    )
+                    Web.UI.buttonNodes(
+                        [
+                            Web.UI.i(
+                                ""
+                                {"class": "fa-solid fa-floppy-disk me-1"}
+                            )
+                            Web.UI.text("Bilgileri Kaydet")
+                        ]
+                        {"type": "submit", "class": "btn btn-primary"}
+                    )
+                ]
+            )
+        ]
+        {"class": "admin-card"}
+    )
+
+    passwordFormCard: Local HTMLNode := Web.UI.div(
+        [
+            Web.UI.h2(
+                "Parola Değiştir"
+                {"class": "h5 fw-bold mb-3 text-dark pb-2 border-bottom"}
+            )
+            Web.UI.formTo(
+                "/profile/password"
+                "post"
+                [
+                    csrfInput(session)
+                    formPasswordFieldWithIcon(
+                        "profile-current-password"
+                        "current_password"
+                        "Mevcut Parola"
+                        "fa-solid fa-lock"
+                        ""
+                        ""
+                        "Mevcut parolanız"
+                    )
+                    formPasswordFieldWithIcon(
+                        "profile-new-password"
+                        "new_password"
+                        "Yeni Parola"
+                        "fa-solid fa-key"
+                        ""
+                        "En az {str(validationMinimumPassword())} karakter."
+                        "Yeni parolanız"
+                    )
+                    formPasswordFieldWithIcon(
+                        "profile-confirm-password"
+                        "password_confirmation"
+                        "Yeni Parola (Tekrar)"
+                        "fa-solid fa-shield-halved"
+                        ""
+                        ""
+                        "Yeni parolanız (tekrar)"
+                    )
+                    Web.UI.buttonNodes(
+                        [
+                            Web.UI.i("", {"class": "fa-solid fa-key me-1"})
+                            Web.UI.text("Parolayı Değiştir")
+                        ]
+                        {"type": "submit", "class": "btn btn-outline-primary"}
+                    )
+                ]
+            )
+        ]
+        {"class": "admin-card"}
+    )
+
+    leftCol: Local HTMLNode := Web.UI.div(
+        [nameFormCard, passwordFormCard]
+        {"class": "col-12 col-lg-5 mb-4"}
+    )
+    // Right Column: Solutions List
+    solutionItems: Local List<HTMLNode> := []
+    if len(solutions) == 0 {
+        solutionItems.add(
+            Web.UI.div(
+                [
+                    Web.UI.div(
+                        [
+                            Web.UI.i(
+                                ""
+                                {
+                                    "class": "fa-solid fa-file-circle-question fa-3x text-body-tertiary mb-3"
+                                }
+                            )
+                            Web.UI.h3(
+                                "Henüz Çözüm Göndermediniz"
+                                {"class": "h5 fw-bold text-dark"}
+                            )
+                            Web.UI.p(
+                                "Soru detay sayfalarından çözüm dosyalarınızı yükleyerek burada takip edebilirsiniz."
+                                {"class": "text-body-secondary small mb-3"}
+                            )
+                            Web.UI.aNodes(
+                                "/"
+                                [
+                                    Web.UI.i(
+                                        ""
+                                        {"class": "fa-solid fa-list-check me-1"}
+                                    )
+                                    Web.UI.text("Soruları Keşfet")
+                                ]
+                                {"class": "btn btn-sm btn-primary"}
+                            )
+                        ]
+                        {"class": "text-center py-5"}
+                    )
+                ]
+                {"class": "card-body"}
+            )
+        )
+    }
+    else {
+        tableRows: Local List<HTMLNode> := []
+        for s in solutions {
+            tableRows.add(
+                Web.UI.tr(
+                    [
+                        Web.UI.tdNodes(
+                            [
+                                Web.UI.a(
+                                    "/question?id={str(s.questionId)}"
+                                    s.questionTitle
+                                    {
+                                        "class": "fw-semibold text-decoration-none"
+                                    }
+                                )
+                            ]
+                        )
+                        Web.UI.td(s.originalFilename)
+                        Web.UI.td(s.createdAt)
+                        Web.UI.tdNodes(
+                            [
+                                Web.UI.buttonNodes(
+                                    [
+                                        Web.UI.i(
+                                            ""
+                                            {"class": "fa-solid fa-eye me-1"}
+                                        )
+                                        Web.UI.text("Görüntüle")
+                                    ]
+                                    {
+                                        "type": "button"
+                                        "class": "btn btn-sm btn-primary me-2"
+                                        "onclick": "openSolutionModal({str(s.id)}, '{user.name} - {s.questionTitle}', '{s.mimeType}', '{s.originalFilename}')"
+                                    }
+                                )
+                                Web.UI.aNodes(
+                                    "/solution/file?id={str(s.id)}"
+                                    [
+                                        Web.UI.i(
+                                            ""
+                                            {
+                                                "class": "fa-solid fa-download me-1"
+                                            }
+                                        )
+                                        Web.UI.text("İndir")
+                                    ]
+                                    {"class": "btn btn-sm btn-outline-primary"}
+                                )
+                            ]
+                            {"class": "d-flex"}
+                        )
+                    ]
+                )
+            )
+        }
+
+        solutionItems.add(
+            Web.UI.div(
+                [
+                    Web.UI.table(
+                        [
+                            Web.UI.thead(
+                                [
+                                    Web.UI.tr(
+                                        [
+                                            Web.UI.th("Soru")
+                                            Web.UI.th("Dosya")
+                                            Web.UI.th("Tarih")
+                                            Web.UI.th("İşlem")
+                                        ]
+                                    )
+                                ]
+                            )
+                            Web.UI.tbody(tableRows)
+                        ]
+                        {"class": "table align-middle"}
+                    )
+                ]
+                {"class": "table-responsive"}
+            )
+        )
+    }
+
+    rightCol: Local HTMLNode := Web.UI.div(
+        [
+            Web.UI.div(
+                [
+                    Web.UI.div(
+                        [
+                            Web.UI.h2(
+                                "Gönderdiğim Çözümler"
+                                {"class": "h5 fw-bold mb-0 text-dark"}
+                            )
+                            Web.UI.span(
+                                "{str(len(solutions))} Çözüm"
+                                {
+                                    "class": "badge text-bg-primary-subtle text-primary-emphasis border border-primary-subtle"
+                                }
+                            )
+                        ]
+                        {
+                            "class": "d-flex align-items-center justify-content-between mb-3 pb-2 border-bottom"
+                        }
+                    )
+                    Web.UI.div(solutionItems, {})
+                ]
+                {"class": "admin-card"}
+            )
+        ]
+        {"class": "col-12 col-lg-7"}
+    )
+
+    pageContent: Local List<HTMLNode> := [
+        heroCard
+        Web.UI.div([leftCol, rightCol], {"class": "row"})
+        solutionModalNode()
+    ]
+
+    return sessionCommit(
+        session
+        mainLayout(
+            session
+            "Profilim"
+            context.siteName
+            context.headerColor
+            user
+            context.isAdmin
+            context.flash
+            context.flashKind
+            pageContent
+        )
+    )
+}
+
+profileNameSubmit: Function := (request: Request) -> Response {
+    session: Local Session := sessionOpen(request)
+    context: Local PageContext := contextFor(session)
+    guard: Local GuardResult := signedInGuard(context)
+    if guard.allowed == false {
+        return sessionCommit(session, guard.refusal)
+    }
+
+    if csrfValid(session, request) == false {
+        return sessionCommit(session, Web.text("Geçersiz form belirteci.", 403))
+    }
+
+    user: Local UserRecord? := context.user
+    if user == null {
+        return sessionCommit(session, Web.redirect("/login"))
+    }
+
+    name: Local String := validationField(request.form("name"))
+    if name == "" {
+        flashSet(session, "error", "Ad soyad alanı boş bırakılamaz.")
+        return sessionCommit(session, Web.redirect("/profile"))
+    }
+
+    if len(name) > 80 {
+        flashSet(session, "error", "Ad soyad en fazla 80 karakter olabilir.")
+        return sessionCommit(session, Web.redirect("/profile"))
+    }
+
+    usersUpdateName(user.id, name)
+    flashSet(session, "success", "Profil bilgileriniz başarıyla güncellendi.")
+    return sessionCommit(session, Web.redirect("/profile"))
+}
+
+profilePasswordSubmit: Function := (request: Request) -> Response {
+    session: Local Session := sessionOpen(request)
+    context: Local PageContext := contextFor(session)
+    guard: Local GuardResult := signedInGuard(context)
+    if guard.allowed == false {
+        return sessionCommit(session, guard.refusal)
+    }
+
+    if csrfValid(session, request) == false {
+        return sessionCommit(session, Web.text("Geçersiz form belirteci.", 403))
+    }
+
+    user: Local UserRecord? := context.user
+    if user == null {
+        return sessionCommit(session, Web.redirect("/login"))
+    }
+
+    currentPassword: Local String := validationField(
+        request.form("current_password")
+    )
+    newPassword: Local String := validationField(request.form("new_password"))
+    confirmation: Local String := validationField(
+        request.form("password_confirmation")
+    )
+
+    if Security.passwordVerify(currentPassword, user.passwordHash) == false {
+        flashSet(session, "error", "Mevcut parolanızı yanlış girdiniz.")
+        return sessionCommit(session, Web.redirect("/profile"))
+    }
+
+    if validationPasswordLongEnough(newPassword) == false {
+        flashSet(
+            session
+            "error"
+            "Yeni parola en az {str(validationMinimumPassword())} karakter olmalıdır."
+        )
+        return sessionCommit(session, Web.redirect("/profile"))
+    }
+
+    if newPassword != confirmation {
+        flashSet(session, "error", "Yeni parolalar eşleşmiyor.")
+        return sessionCommit(session, Web.redirect("/profile"))
+    }
+
+    usersSetPassword(user.id, Security.passwordHash(newPassword))
+    // Re-authenticate session with fresh user record so auth_version change doesn't log the user out
+    freshUser: Local UserRecord? := usersFindById(user.id)
+    if freshUser != null {
+        authLogin(session, freshUser)
+    }
+    flashSet(session, "success", "Parolanız başarıyla güncellendi.")
+    return sessionCommit(session, Web.redirect("/profile"))
+}
