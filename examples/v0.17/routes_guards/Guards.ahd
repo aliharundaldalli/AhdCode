@@ -1,0 +1,21 @@
+bring Web
+from Web bring (RequestContext, Response)
+
+signedIn: Function := (context: RequestContext) -> Response? {
+    if context.session.has("user") == false {
+        return context.respond(Web.text("sign in first", 401))
+    }
+
+    return null
+}
+
+adminOnly: Function := (context: RequestContext) -> Response? {
+    role: Local String? := context.session.get("role")
+    if role != null {
+        if role == "admin" {
+            return null
+        }
+    }
+
+    return context.respond(Web.text("forbidden", 403))
+}

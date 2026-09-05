@@ -1,0 +1,26 @@
+bring Web
+from Web bring (RequestContext, Response)
+
+home: Function := (context: RequestContext) -> Response {
+    return context.respond(Web.text("home", 200))
+}
+
+login: Function := (context: RequestContext) -> Response {
+    name: Local String? := context.request.form("user")
+    role: Local String? := context.request.form("role")
+    if name == null or role == null {
+        return context.respond(Web.text("user and role required", 400))
+    }
+    if name == "" or role == "" {
+        return context.respond(Web.text("user and role required", 400))
+    }
+
+    context.session.set("user", name)
+    context.session.set("role", role)
+    return context.respond(Web.text("signed in", 200))
+}
+
+logout: Function := (context: RequestContext) -> Response {
+    context.session.clear()
+    return context.respond(Web.text("signed out", 200))
+}

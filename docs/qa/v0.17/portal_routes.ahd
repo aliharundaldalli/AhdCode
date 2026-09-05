@@ -1,0 +1,99 @@
+// Scratch v0.17 portal route table. Not the live Math Portal.
+// Compiles without MySQL, SMTP, or uploads.
+bring Web
+from Web bring (App, RequestContext, Response, SessionStore)
+
+application: App := Web.start()
+sessions: SessionStore := Web.sessions("portal", 3600, false, "Lax")
+
+signedIn: Function := (context: RequestContext) -> Response? {
+    if context.session.has("user_id") == false {
+        return context.respond(Web.redirect("/login"))
+    }
+
+    return null
+}
+
+adminOnly: Function := (context: RequestContext) -> Response? {
+    if context.session.has("admin") == false {
+        return context.respond(Web.text("Forbidden", 403))
+    }
+
+    return null
+}
+
+page: Function := (context: RequestContext, label: String) -> Response {
+    return context.respond(Web.text(label, 200))
+}
+
+home: Function := (context: RequestContext) -> Response {
+    return page(context, "home")
+}
+
+questions: Function := (context: RequestContext) -> Response {
+    return page(context, "questions")
+}
+
+question: Function := (context: RequestContext) -> Response {
+    return page(context, "question")
+}
+
+login: Function := (context: RequestContext) -> Response {
+    return page(context, "login")
+}
+
+register: Function := (context: RequestContext) -> Response {
+    return page(context, "register")
+}
+
+profile: Function := (context: RequestContext) -> Response {
+    return page(context, "profile")
+}
+
+logout: Function := (context: RequestContext) -> Response {
+    context.session.clear()
+    return context.respond(Web.redirect("/"))
+}
+
+upload: Function := (context: RequestContext) -> Response {
+    return page(context, "upload")
+}
+
+adminUsers: Function := (context: RequestContext) -> Response {
+    return page(context, "admin users")
+}
+
+adminQuestions: Function := (context: RequestContext) -> Response {
+    return page(context, "admin questions")
+}
+
+adminSettings: Function := (context: RequestContext) -> Response {
+    return page(context, "admin settings")
+}
+
+routes := Web.routes(application, sessions)
+routes.get("/", home)
+routes.get("/questions", questions)
+routes.get("/question/*", question)
+routes.get("/login", login)
+routes.post("/login", login)
+routes.get("/register", register)
+routes.post("/register", register)
+routes.post("/logout", logout)
+
+member := routes.group("/profile")
+member.get("/", profile, signedIn)
+member.post("/name", profile, signedIn)
+
+uploads := routes.group("/solution")
+uploads.post("/", upload, signedIn)
+
+admin := routes.group("/admin")
+admin.get("/", adminUsers, signedIn, adminOnly)
+admin.get("/users", adminUsers, signedIn, adminOnly)
+admin.get("/questions", adminQuestions, signedIn, adminOnly)
+admin.post("/questions/save", adminQuestions, signedIn, adminOnly)
+admin.get("/settings", adminSettings, signedIn, adminOnly)
+admin.post("/settings", adminSettings, signedIn, adminOnly)
+
+write("portal routes registered")

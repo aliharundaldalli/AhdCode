@@ -1,0 +1,10 @@
+bring Web
+from Web bring (RequestContext, Response)
+
+dashboard: Function := (context: RequestContext) -> Response {
+    return context.respond(Web.text("admin dashboard", 200))
+}
+
+secret: Function := (context: RequestContext) -> Response {
+    return context.respond(Web.text("admin secret", 200))
+}

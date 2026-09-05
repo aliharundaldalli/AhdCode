@@ -1,0 +1,27 @@
+// v0.17: context-aware routes, one group, two ordered guards.
+//
+//     ahdcode dev app.ahd
+//
+// No database and no package manager. Session values are the whole policy.
+require("Pages/Home.ahd")
+require("Pages/Admin.ahd")
+require("Guards.ahd")
+bring Web
+from Web bring (App, RequestContext, SessionStore)
+
+application: App := Web.start()
+sessions: SessionStore := Web.sessions("v017demo", 3600, false, "Lax")
+routes := Web.routes(application, sessions)
+
+routes.get("/", home)
+routes.post("/login", login)
+routes.post("/logout", logout)
+
+admin := routes.group("/admin")
+admin.get("/", dashboard, signedIn, adminOnly)
+admin.get("/secret", secret, signedIn, adminOnly)
+
+write(
+    "{application.configuration().name} — http://{application.configuration().address()}"
+)
+application.start()
