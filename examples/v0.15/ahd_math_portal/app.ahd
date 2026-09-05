@@ -26,6 +26,7 @@
 // parameter (/question?id=1) rather than a path segment.
 require("Config/App.ahd")
 require("Pages/Home.ahd")
+require("Pages/Questions.ahd")
 require("Pages/Question.ahd")
 require("Pages/SolutionUpload.ahd")
 require("Pages/Login.ahd")
@@ -57,6 +58,7 @@ portal: Server := HTTP.server(
 portal.static("/assets", "public")
 
 portal.get("/", homePage)
+portal.get("/questions", questionsPage)
 portal.get("/question", questionPage)
 portal.post("/solution", solutionSubmit)
 portal.get("/solution/file", solutionFileDownload)

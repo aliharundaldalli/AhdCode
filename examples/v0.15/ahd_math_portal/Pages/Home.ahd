@@ -194,18 +194,25 @@ heroSection: Function := (siteName: String) -> HTMLNode {
 mathFeedSection: Function := (feed: MathScrapeOutcome) -> HTMLNode {
     statusBadge: Local HTMLNode := Web.UI.spanNodes(
         [
-            Web.UI.i("", {"class": "fa-solid fa-circle-check me-1"})
-            Web.UI.text("HTTP {str(feed.statusCode)} Canlı")
+            Web.UI.i(
+                ""
+                {"class": "fa-solid fa-circle-check me-1 text-success"}
+            )
+            Web.UI.text("Güncel Akış")
         ]
-        {"class": "badge text-bg-success me-2"}
+        {
+            "class": "badge text-bg-success-subtle text-success-emphasis border border-success-subtle me-2"
+        }
     )
     if feed.success == false {
         statusBadge = Web.UI.spanNodes(
             [
-                Web.UI.i("", {"class": "fa-solid fa-database me-1"})
-                Web.UI.text("Yerel Önbellek")
+                Web.UI.i("", {"class": "fa-solid fa-clock-rotate-left me-1"})
+                Web.UI.text("Önbellek")
             ]
-            {"class": "badge text-bg-secondary me-2"}
+            {
+                "class": "badge text-bg-secondary-subtle text-secondary-emphasis border border-secondary-subtle me-2"
+            }
         )
     }
 
@@ -287,11 +294,11 @@ mathFeedSection: Function := (feed: MathScrapeOutcome) -> HTMLNode {
                                     Web.UI.i(
                                         ""
                                         {
-                                            "class": "fa-solid fa-globe text-primary fs-4 me-2"
+                                            "class": "fa-solid fa-newspaper text-primary fs-4 me-2"
                                         }
                                     )
                                     Web.UI.h2(
-                                        "Canlı Web Kazıma: Matematik Bülteni"
+                                        "Matematik Dünyasından Güncel Başlıklar"
                                         {"class": "h4 mb-0 fw-bold"}
                                     )
                                 ]
@@ -305,15 +312,13 @@ mathFeedSection: Function := (feed: MathScrapeOutcome) -> HTMLNode {
                                             Web.UI.i(
                                                 ""
                                                 {
-                                                    "class": "fa-solid fa-network-wired me-1"
+                                                    "class": "fa-brands fa-wikipedia-w me-1"
                                                 }
                                             )
-                                            Web.UI.text(
-                                                "HTTP.client + HTML.parse"
-                                            )
+                                            Web.UI.text("Vikipedi Akışı")
                                         ]
                                         {
-                                            "class": "badge text-bg-info-subtle text-info-emphasis border border-info-subtle"
+                                            "class": "badge text-bg-primary-subtle text-primary border border-primary-subtle"
                                         }
                                     )
                                 ]

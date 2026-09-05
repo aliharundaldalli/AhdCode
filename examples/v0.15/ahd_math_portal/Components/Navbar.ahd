@@ -19,7 +19,7 @@ navbar: Function := (
         Web.UI.liNodes(
             [
                 Web.UI.aNodes(
-                    "/"
+                    "/questions"
                     [
                         Web.UI.i("", {"class": "fa-solid fa-list-check me-1"})
                         Web.UI.text("Sorular")

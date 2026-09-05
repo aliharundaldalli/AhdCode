@@ -1,0 +1,293 @@
+// Public Questions catalog with keyword search and topic filters.
+require("Layouts/Main.ahd")
+require("Components/QuestionCard.ahd")
+require("Services/Context.ahd")
+require("Services/Session.ahd")
+require("Repositories/Questions.ahd")
+require("Support/Validation.ahd")
+bring Web
+from Web bring (Request, Response, HTMLNode, Session)
+
+questionsPage: Function := (request: Request) -> Response {
+    session: Local Session := sessionOpen(request)
+    context: Local PageContext := contextFor(session)
+
+    searchQuery: Local String := validationField(request.query("q"))
+    selectedTopic: Local String := validationField(request.query("topic"))
+
+    questions: Local List<QuestionRecord> := questionsFilter(
+        searchQuery
+        selectedTopic
+    )
+    topics: Local List<String> := questionsTopics()
+
+    content: Local List<HTMLNode> := [
+        questionsHeaderSection(searchQuery, selectedTopic, len(questions))
+        questionsFilterBar(searchQuery, selectedTopic, topics)
+        questionsGridSection(questions, searchQuery, selectedTopic)
+    ]
+
+    return sessionCommit(
+        session
+        mainLayout(
+            session
+            "Sorular"
+            context.siteName
+            context.headerColor
+            context.user
+            context.isAdmin
+            context.flash
+            context.flashKind
+            content
+        )
+    )
+}
+
+questionsHeaderSection: Function := (
+    search: String
+    topic: String
+    totalCount: Int
+) -> HTMLNode {
+    countBadge: Local HTMLNode := Web.UI.span(
+        "{str(totalCount)} soru listeleniyor"
+        {
+            "class": "badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill px-3 py-2"
+        }
+    )
+
+    return Web.UI.div(
+        [
+            Web.UI.div(
+                [
+                    Web.UI.div(
+                        [
+                            Web.UI.i(
+                                ""
+                                {
+                                    "class": "fa-solid fa-square-root-variable text-primary fs-3 me-2"
+                                }
+                            )
+                            Web.UI.h1(
+                                "Matematik Soruları"
+                                {"class": "h3 fw-bold text-dark mb-0"}
+                            )
+                        ]
+                        {"class": "d-flex align-items-center mb-1"}
+                    )
+                    Web.UI.p(
+                        "Yayımlanmış tüm problemleri inceleyin, konuya göre filtreleyin veya anahtar kelimeyle arayın."
+                        {"class": "text-muted small mb-0"}
+                    )
+                ]
+            )
+            countBadge
+        ]
+        {
+            "class": "d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4 border-bottom pb-3"
+        }
+    )
+}
+
+questionsFilterBar: Function := (
+    search: String
+    selectedTopic: String
+    topics: List<String>
+) -> HTMLNode {
+    topicOptions: Local List<HTMLNode> := [
+        Web.UI.element("option", {"value": ""}, [Web.UI.text("Tüm Konular")])
+    ]
+
+    for t in topics {
+        attrs: Local Pair<String, String> := {"value": t}
+        if t == selectedTopic {
+            attrs = {"value": t, "selected": "selected"}
+        }
+        topicOptions.add(Web.UI.element("option", attrs, [Web.UI.text(t)]))
+    }
+
+    clearBtn: Local HTMLNode := Web.UI.text("")
+    if search != "" or selectedTopic != "" {
+        clearBtn = Web.UI.aNodes(
+            "/questions"
+            [
+                Web.UI.i("", {"class": "fa-solid fa-xmark me-1"})
+                Web.UI.text("Temizle")
+            ]
+            {"class": "btn btn-outline-secondary"}
+        )
+    }
+
+    topicPills: Local List<HTMLNode> := []
+    allPillClass: Local String := "btn btn-sm btn-outline-primary rounded-pill px-3"
+    if selectedTopic == "" {
+        allPillClass = "btn btn-sm btn-primary rounded-pill px-3 shadow-xs"
+    }
+    topicPills.add(
+        Web.UI.aNodes(
+            "/questions"
+            [Web.UI.text("Tümü")]
+            {"class": allPillClass}
+        )
+    )
+
+    for t in topics {
+        pillClass: Local String := "btn btn-sm btn-outline-secondary rounded-pill px-3"
+        if t == selectedTopic {
+            pillClass = "btn btn-sm btn-primary rounded-pill px-3 shadow-xs"
+        }
+        topicPills.add(
+            Web.UI.aNodes(
+                "/questions?topic={t}"
+                [Web.UI.text(t)]
+                {"class": pillClass}
+            )
+        )
+    }
+
+    return Web.UI.div(
+        [
+            Web.UI.formTo(
+                "/questions"
+                "get"
+                [
+                    Web.UI.div(
+                        [
+                            Web.UI.div(
+                                [
+                                    Web.UI.div(
+                                        [
+                                            Web.UI.span(
+                                                ""
+                                                {
+                                                    "class": "input-group-text bg-white border-end-0 text-muted"
+                                                }
+                                            )
+                                            Web.UI.input(
+                                                "text"
+                                                "q"
+                                                search
+                                                {
+                                                    "class": "form-control border-start-0 ps-0"
+                                                    "placeholder": "Soru başlığı, konu veya metinde ara..."
+                                                }
+                                            )
+                                        ]
+                                        {"class": "input-group"}
+                                    )
+                                ]
+                                {"class": "col-12 col-md-5"}
+                            )
+                            Web.UI.div(
+                                [
+                                    Web.UI.element(
+                                        "select"
+                                        {
+                                            "name": "topic"
+                                            "class": "form-select"
+                                        }
+                                        topicOptions
+                                    )
+                                ]
+                                {"class": "col-12 col-md-4"}
+                            )
+                            Web.UI.div(
+                                [
+                                    Web.UI.buttonNodes(
+                                        [
+                                            Web.UI.i(
+                                                ""
+                                                {
+                                                    "class": "fa-solid fa-magnifying-glass me-1"
+                                                }
+                                            )
+                                            Web.UI.text("Ara")
+                                        ]
+                                        {
+                                            "type": "submit"
+                                            "class": "btn btn-primary"
+                                        }
+                                    )
+                                    clearBtn
+                                ]
+                                {"class": "col-12 col-md-3 d-flex gap-2"}
+                            )
+                        ]
+                        {"class": "row g-2"}
+                    )
+                ]
+            )
+            Web.UI.div(
+                [
+                    Web.UI.span(
+                        "Hızlı Konular:"
+                        {"class": "small fw-semibold text-muted me-2"}
+                    )
+                    Web.UI.div(
+                        topicPills
+                        {"class": "d-flex flex-wrap gap-2 align-items-center"}
+                    )
+                ]
+                {
+                    "class": "d-flex flex-wrap align-items-center gap-2 mt-3 pt-3 border-top"
+                }
+            )
+        ]
+        {"class": "card border-0 shadow-sm rounded-4 p-3 mb-4 bg-white"}
+    )
+}
+
+questionsGridSection: Function := (
+    questions: List<QuestionRecord>
+    search: String
+    topic: String
+) -> HTMLNode {
+    if len(questions) == 0 {
+        return Web.UI.div(
+            [
+                Web.UI.div(
+                    [
+                        Web.UI.i(
+                            ""
+                            {
+                                "class": "fa-solid fa-filter-circle-xmark text-muted fs-1 mb-3 d-block"
+                            }
+                        )
+                        Web.UI.h3(
+                            "Aradığınız kriterlere uygun soru bulunamadı"
+                            {"class": "h5 fw-bold text-dark mb-2"}
+                        )
+                        Web.UI.p(
+                            "Farklı bir arama terimi deneyebilir veya konu filtresini sıfırlayabilirsiniz."
+                            {"class": "text-muted small mb-3"}
+                        )
+                        Web.UI.aNodes(
+                            "/questions"
+                            [
+                                Web.UI.i(
+                                    ""
+                                    {"class": "fa-solid fa-rotate-left me-1"}
+                                )
+                                Web.UI.text("Tüm Soruları Göster")
+                            ]
+                            {"class": "btn btn-primary btn-sm"}
+                        )
+                    ]
+                    {"class": "text-center py-5"}
+                )
+            ]
+            {"class": "card border-0 shadow-sm rounded-4 mb-4"}
+        )
+    }
+
+    cards: Local List<HTMLNode> := []
+    for question in questions {
+        cards.add(
+            Web.UI.div(
+                [questionCard(question)]
+                {"class": "col-12 col-md-6 col-lg-4 mb-4"}
+            )
+        )
+    }
+
+    return Web.UI.div(cards, {"class": "row"})
+}

@@ -52,7 +52,7 @@ siteFooter: Function := (siteName: String) -> HTMLNode {
                                             Web.UI.liNodes(
                                                 [
                                                     Web.UI.a(
-                                                        "/"
+                                                        "/questions"
                                                         "Sorular"
                                                         {
                                                             "class": "text-decoration-none text-body-secondary small"

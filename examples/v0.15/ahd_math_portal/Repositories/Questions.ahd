@@ -161,3 +161,47 @@ questionsCountByStatus: Function := (status: String) -> Int {
 
     return rowInt(rows[0], "total")
 }
+
+questionsTopics: Function := () -> List<String> {
+    rows: Local List<Pair<String, MySQLValue>> := connection(
+        
+    ).query(
+        "SELECT DISTINCT topic FROM questions WHERE status = 'published' AND topic != '' ORDER BY topic ASC"
+    )
+    topics: Local List<String> := []
+    for row in rows {
+        topics.add(rowString(row, "topic"))
+    }
+    return topics
+}
+
+questionsFilter: Function := (
+    search: String
+    topic: String
+) -> List<QuestionRecord> {
+    sql: Local String := "{questionsSelect()} WHERE status = 'published'"
+    params: Local List<MySQLValue> := []
+
+    if topic != "" {
+        sql = "{sql} AND topic = ?"
+        params.add(MySQL.fromString(topic))
+    }
+
+    if search != "" {
+        likePattern: Local String := "%{search}%"
+        sql = "{sql} AND (title LIKE ? OR body LIKE ? OR topic LIKE ?)"
+        params.add(MySQL.fromString(likePattern))
+        params.add(MySQL.fromString(likePattern))
+        params.add(MySQL.fromString(likePattern))
+    }
+
+    sql = "{sql} ORDER BY published_at DESC, id DESC"
+    rows: Local List<Pair<String, MySQLValue>> := connection(
+        
+    ).query(sql, params)
+    records: Local List<QuestionRecord> := []
+    for row in rows {
+        records.add(questionsFromRow(row))
+    }
+    return records
+}
