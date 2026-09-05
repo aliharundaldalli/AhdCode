@@ -1,0 +1,9 @@
+bring Web
+from Web bring HTMLNode
+
+footer: Function := (siteName: String) -> HTMLNode {
+    return Web.UI.footer(
+        [Web.UI.p(siteName)]
+        {"class": "footer"}
+    )
+}

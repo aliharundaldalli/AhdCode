@@ -760,10 +760,12 @@ ahdcode dev app.ahd
 
 `init web` initializes the current directory. It writes `.env` (loopback
 development defaults, gitignored) and `.env.example` (safe to commit), plus
-one Page, Layout, Component, Config file, `public/app.css`, and empty
-`public/css/style.css` / `public/js/main.js` starters. Templates are embedded
-in the CLI: no network, no package manager, no overwrite. Open
-`http://127.0.0.1:8080`. The starter does not load JavaScript.
+one Page, Layout, Navbar, Footer, Config file, and empty `public/style.css`
+and `public/main.js`. The layout links both assets with the released Web HTML
+API (`Web.UI.stylesheet`, `Web.UI.element("script", ...)`). Templates are
+embedded in the CLI: no network, no package manager, no overwrite. Open
+`http://127.0.0.1:8080`. `main.js` is optional static JavaScript, not a
+frontend runtime.
 
 ## Example
 

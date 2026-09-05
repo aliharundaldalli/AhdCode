@@ -327,8 +327,8 @@ ahdcode dev app.ahd
 ```
 
 `ahdcode init web` **bulunulan dizini** çevrimdışı, küçük bir Web uygulaması
-olarak kurar: `app.ahd`, Config / Pages / Layouts / Components, `public/`
-(boş `css/` ve `js/` başlangıç dosyaları dahil), `.env` ve `.env.example`.
+olarak kurar: `app.ahd`, Config / Pages / Layouts / Components (Navbar ve
+Footer), boş `public/style.css` ve `public/main.js`, `.env` ve `.env.example`.
 `.env` gitignore’dadır; `.env.example` güvenle commitlenir. Var olan dosyaların
 üzerine yazılmaz. Paket yöneticisi ve ağ indirmesi yoktur.
 

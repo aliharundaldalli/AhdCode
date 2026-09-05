@@ -31,11 +31,11 @@ var managedFiles = []fileSpec{
 	{embedPath: "templates/gitignore", relPath: ".gitignore", perm: 0o644, mergeGI: true},
 	{embedPath: "templates/Config/App.ahd", relPath: "Config/App.ahd", perm: 0o644},
 	{embedPath: "templates/Components/Navbar.ahd", relPath: "Components/Navbar.ahd", perm: 0o644},
+	{embedPath: "templates/Components/Footer.ahd", relPath: "Components/Footer.ahd", perm: 0o644},
 	{embedPath: "templates/Layouts/Main.ahd", relPath: "Layouts/Main.ahd", perm: 0o644},
 	{embedPath: "templates/Pages/Home.ahd", relPath: "Pages/Home.ahd", perm: 0o644},
-	{embedPath: "templates/public/app.css", relPath: "public/app.css", perm: 0o644},
-	{embedPath: "templates/public/css/style.css", relPath: "public/css/style.css", perm: 0o644},
-	{embedPath: "templates/public/js/main.js", relPath: "public/js/main.js", perm: 0o644},
+	{embedPath: "templates/public/style.css", relPath: "public/style.css", perm: 0o644},
+	{embedPath: "templates/public/main.js", relPath: "public/main.js", perm: 0o644},
 }
 
 var requiredDirs = []string{
@@ -44,8 +44,6 @@ var requiredDirs = []string{
 	"Layouts",
 	"Pages",
 	"public",
-	"public/css",
-	"public/js",
 }
 
 // Web initializes root as a minimal AhdCode Web application.

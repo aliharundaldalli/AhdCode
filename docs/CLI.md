@@ -23,9 +23,10 @@ ahdcode --version
 `ahdcode init web` writes a minimal Web application into the **current
 directory**. It creates `.env` (safe development defaults, gitignored) and
 `.env.example` (safe to commit), plus `app.ahd`, Config / Pages / Layouts /
-Components, `public/app.css`, and empty `public/css/style.css` and
-`public/js/main.js` starters. Templates are embedded in the CLI: offline, no
-package manager, no overwrite. Next: `ahdcode dev app.ahd`.
+Navbar and Footer, and empty `public/style.css` and `public/main.js`. The
+layout already links both assets through the released Web HTML API. Templates
+are embedded in the CLI: offline, no package manager, no overwrite. Next:
+`ahdcode dev app.ahd`.
 
 `run` compiles through the normal frontend and Go backend, then executes the
 native result. Arguments after the entry (optionally after `--`) are forwarded

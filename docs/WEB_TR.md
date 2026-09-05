@@ -764,10 +764,12 @@ ahdcode dev app.ahd
 
 `init web` bulunulan dizini kurar. `.env` (loopback geliştirme varsayılanları,
 gitignore) ve `.env.example` (güvenle commitlenir) ile bir Page, Layout,
-Component, Config, `public/app.css` ve boş `public/css/style.css` /
-`public/js/main.js` yazar. Şablonlar CLI içine gömülüdür: ağ yok, paket
-yöneticisi yok, üzerine yazma yok. `http://127.0.0.1:8080` adresini açın.
-Başlangıç sayfası JavaScript yüklemez.
+Navbar, Footer, Config, boş `public/style.css` ve `public/main.js` yazar.
+Yerleşim her iki varlığı da yayınlanmış Web HTML API’siyle bağlar
+(`Web.UI.stylesheet`, `Web.UI.element("script", ...)`). Şablonlar CLI içine
+gömülüdür: ağ yok, paket yöneticisi yok, üzerine yazma yok.
+`http://127.0.0.1:8080` adresini açın. `main.js` isteğe bağlı statik
+JavaScript’tir; ön yüz çalışma zamanı değildir.
 
 ## Örnek
 

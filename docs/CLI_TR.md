@@ -22,10 +22,11 @@ ahdcode --version
 
 `ahdcode init web` **bulunulan dizine** küçük bir Web uygulaması yazar.
 `.env` (güvenli geliştirme varsayılanları, gitignore) ve `.env.example`
-(güvenle commitlenir) ile `app.ahd`, Config / Pages / Layouts / Components,
-`public/app.css` ve boş `public/css/style.css` / `public/js/main.js`
-oluşturulur. Şablonlar CLI içine gömülüdür: çevrimdışı, paket yöneticisi yok,
-üzerine yazma yok. Sonraki adım: `ahdcode dev app.ahd`.
+(güvenle commitlenir) ile `app.ahd`, Config / Pages / Layouts / Navbar ve
+Footer, boş `public/style.css` ve `public/main.js` oluşturulur. Yerleşim her
+iki varlığı da yayınlanmış Web HTML API’siyle sayfaya bağlar. Şablonlar CLI
+içine gömülüdür: çevrimdışı, paket yöneticisi yok, üzerine yazma yok. Sonraki
+adım: `ahdcode dev app.ahd`.
 
 `run`, normal önyüz (frontend) ve Go arkayüzünden (backend) derler, ardından
 yerel (native) sonucu çalıştırır. Giriş dosyasından sonraki argümanlar

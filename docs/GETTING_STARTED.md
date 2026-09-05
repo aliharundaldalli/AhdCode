@@ -89,14 +89,16 @@ ahdcode dev app.ahd
 ```
 
 This writes `app.ahd`, `.env`, `.env.example`, `.gitignore`, one Config /
-Page / Layout / Component, `public/app.css`, and empty starter files
-`public/css/style.css` and `public/js/main.js`. `.env` holds only safe
-development defaults (`APP_HOST=localhost`, loopback HTTP) and is gitignored.
-`.env.example` is safe to commit. Process environment values still win over
-`.env`. Existing files are never overwritten; there is no `--force`.
+Page / Layout, Navbar and Footer, and empty `public/style.css` and
+`public/main.js`. The layout already references `/assets/style.css` and
+`/assets/main.js`. `.env` holds only safe development defaults
+(`APP_HOST=localhost`, loopback HTTP) and is gitignored. `.env.example` is
+safe to commit. Process environment values still win over `.env`. Existing
+files are never overwritten; there is no `--force`.
 
-Open `http://127.0.0.1:8080`. The starter page does not load JavaScript or
-CDN assets. Forms, CSRF, and sessions are not included here; see the
+Open `http://127.0.0.1:8080`. `main.js` is an ordinary static file, not a
+frontend runtime. There is no npm, bundler, or CDN. Forms, CSRF, and sessions
+are not included here; see the
 [v0.16 forms example](../examples/v0.16/forms_validation/README.md).
 
 ## Input

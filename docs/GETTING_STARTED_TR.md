@@ -87,15 +87,17 @@ ahdcode init web
 ahdcode dev app.ahd
 ```
 
-`app.ahd`, `.env`, `.env.example`, `.gitignore`, bir Config / Page / Layout /
-Component, `public/app.css` ve boş başlangıç dosyaları `public/css/style.css`
-ile `public/js/main.js` yazılır. `.env` yalnızca güvenli geliştirme
-varsayılanlarını tutar (`APP_HOST=localhost`, loopback HTTP) ve gitignore’dadır.
-`.env.example` güvenle commitlenir. Süreç ortamı hâlâ `.env`’den üstündür.
-Var olan dosyaların üzerine yazılmaz; `--force` yoktur.
+`app.ahd`, `.env`, `.env.example`, `.gitignore`, bir Config / Page / Layout,
+Navbar ve Footer, boş `public/style.css` ve `public/main.js` yazılır. Yerleşim
+`/assets/style.css` ve `/assets/main.js` dosyalarını zaten bağlar. `.env`
+yalnızca güvenli geliştirme varsayılanlarını tutar (`APP_HOST=localhost`,
+loopback HTTP) ve gitignore’dadır. `.env.example` güvenle commitlenir. Süreç
+ortamı hâlâ `.env`’den üstündür. Var olan dosyaların üzerine yazılmaz;
+`--force` yoktur.
 
-`http://127.0.0.1:8080` adresini açın. Başlangıç sayfası JavaScript veya CDN
-yüklemez. Form, CSRF ve oturum burada yoktur; bkz.
+`http://127.0.0.1:8080` adresini açın. `main.js` sıradan bir statik dosyadır;
+ön yüz çalışma zamanı değildir. npm, paketleyici veya CDN yoktur. Form, CSRF
+ve oturum burada yoktur; bkz.
 [v0.16 form örneği](../examples/v0.16/forms_validation/README_TR.md).
 
 ## Girdi

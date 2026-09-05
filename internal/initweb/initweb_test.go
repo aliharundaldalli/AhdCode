@@ -21,11 +21,11 @@ func TestWebFreshDirectory(t *testing.T) {
 		".gitignore",
 		"Config/App.ahd",
 		"Components/Navbar.ahd",
+		"Components/Footer.ahd",
 		"Layouts/Main.ahd",
 		"Pages/Home.ahd",
-		"public/app.css",
-		"public/css/style.css",
-		"public/js/main.js",
+		"public/style.css",
+		"public/main.js",
 	}
 	for _, rel := range want {
 		info, err := os.Lstat(filepath.Join(root, rel))
@@ -85,12 +85,45 @@ func TestWebFreshDirectory(t *testing.T) {
 	if strings.Contains(string(home), "http") && strings.Contains(string(home), "cdn") {
 		t.Fatalf("home loaded a CDN")
 	}
-	css, err := os.ReadFile(filepath.Join(root, "public/app.css"))
+	layout, err := os.ReadFile(filepath.Join(root, "Layouts/Main.ahd"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(bytes.TrimSpace(css)) == 0 {
-		t.Fatal("public/app.css is empty")
+	for _, needle := range []string{
+		"navbar(config.name)",
+		"footer(config.name)",
+		`Web.UI.stylesheet("/assets/style.css")`,
+		`Web.UI.element("script", {"src": "/assets/main.js"}, [])`,
+	} {
+		if !strings.Contains(string(layout), needle) {
+			t.Fatalf("layout missing %s:\n%s", needle, layout)
+		}
+	}
+	if strings.Contains(string(layout), "app.css") {
+		t.Fatal("layout still references app.css")
+	}
+	css, err := os.ReadFile(filepath.Join(root, "public/style.css"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(css) != 0 {
+		t.Fatalf("public/style.css should be empty, got %q", css)
+	}
+	script, err := os.ReadFile(filepath.Join(root, "public/main.js"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(script) != 0 {
+		t.Fatalf("public/main.js should be empty, got %q", script)
+	}
+	if _, err := os.Stat(filepath.Join(root, "public/app.css")); !os.IsNotExist(err) {
+		t.Fatal("public/app.css should not be generated")
+	}
+	if _, err := os.Stat(filepath.Join(root, "public/css")); !os.IsNotExist(err) {
+		t.Fatal("public/css/ should not be generated")
+	}
+	if _, err := os.Stat(filepath.Join(root, "public/js")); !os.IsNotExist(err) {
+		t.Fatal("public/js/ should not be generated")
 	}
 	if !strings.Contains(out.String(), "ahdcode dev app.ahd") {
 		t.Fatalf("success output missing next step:\n%s", out.String())
