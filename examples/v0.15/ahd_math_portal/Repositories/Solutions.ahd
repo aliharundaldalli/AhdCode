@@ -84,6 +84,21 @@ solutionsRecent: Function := () -> List<SolutionRecord> {
 
     return records
 }
+
+solutionsForQuestion: Function := (questionId: Int) -> List<SolutionRecord> {
+    rows: Local List<Pair<String, MySQLValue>> := connection(
+        
+    ).query(
+        "{solutionsSelect()} WHERE s.question_id = ? ORDER BY s.id DESC"
+        [MySQL.fromInt(questionId)]
+    )
+    records: Local List<SolutionRecord> := []
+    for row in rows {
+        records.add(solutionsFromRow(row))
+    }
+
+    return records
+}
 // solutionsCreate returns false when the UNIQUE constraint rejects the insert.
 // That is the authoritative answer to "does this user already have a solution
 // for this question", and it is correct even when two uploads arrive at once.

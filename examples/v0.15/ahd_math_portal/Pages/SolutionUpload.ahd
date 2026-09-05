@@ -8,6 +8,8 @@ require("Repositories/Users.ahd")
 require("Support/Validation.ahd")
 bring Web
 from Web bring (Request, Response, Session, UploadedFile)
+bring HTTP
+bring File
 
 solutionSubmit: Function := (request: Request) -> Response {
     session: Local Session := sessionOpen(request)
@@ -49,4 +51,27 @@ solutionSubmit: Function := (request: Request) -> Response {
         session
         Web.redirect("/question?id={str(questionId)}")
     )
+}
+
+solutionFileDownload: Function := (request: Request) -> Response {
+    session: Local Session := sessionOpen(request)
+    context: Local PageContext := contextFor(session)
+
+    viewer: Local UserRecord? := context.user
+    if viewer == null {
+        return sessionCommit(session, Web.redirect("/login"))
+    }
+
+    id: Local Int := validationPositiveInt(request.query("id"))
+    solution: Local SolutionRecord? := solutionsFindById(id)
+    if solution == null {
+        return sessionCommit(session, Web.text("Çözüm bulunamadı.", 404))
+    }
+
+    path: Local String := solutionPath(solution.storedFilename)
+    if File.exists(path) == false {
+        return sessionCommit(session, Web.text("Dosya bulunamadı.", 404))
+    }
+
+    return sessionCommit(session, HTTP.file(path, solution.mimeType))
 }

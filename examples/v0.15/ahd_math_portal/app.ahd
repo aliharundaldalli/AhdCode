@@ -56,6 +56,7 @@ portal.static("/assets", "public")
 portal.get("/", homePage)
 portal.get("/question", questionPage)
 portal.post("/solution", solutionSubmit)
+portal.get("/solution/file", solutionFileDownload)
 
 portal.get("/login", loginPage)
 portal.post("/login", loginSubmit)

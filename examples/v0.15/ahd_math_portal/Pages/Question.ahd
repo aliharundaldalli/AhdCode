@@ -64,7 +64,13 @@ questionPage: Function := (request: Request) -> Response {
                     [Web.UI.text(question.body)]
                     {"class": "bg-body-tertiary p-3 rounded math-content"}
                 )
-            ], {"class": "mb-4"}), solutionSection(session, context, question)]
+            ], {
+                "class": "mb-4"
+            }), solutionSection(
+            session
+            context
+            question
+        ), communitySolutionsSection(context, question)]
 
     return sessionCommit(
         session
@@ -117,7 +123,20 @@ solutionSection: Function := (
                 Web.UI.h2("Çözümünüz", {"class": "h5"})
                 Web.UI.p(
                     "Çözümünüz {existing.createdAt} tarihinde alındı: {existing.originalFilename}"
-                    {"class": "alert alert-success"}
+                    {"class": "alert alert-success mb-2"}
+                )
+                Web.UI.div(
+                    [
+                        Web.UI.a(
+                            "/solution/file?id={str(existing.id)}"
+                            "Yüklediğim Çözümü Görüntüle / İndir"
+                            {
+                                "class": "btn btn-sm btn-outline-success"
+                                "target": "_blank"
+                            }
+                        )
+                    ]
+                    {"class": "mb-2"}
                 )
                 Web.UI.p(
                     "Her soru için tek bir çözüm gönderilebilir."
@@ -166,5 +185,110 @@ solutionSection: Function := (
             )
         ]
         {"class": "border-top pt-4"}
+    )
+}
+
+communitySolutionsSection: Function := (
+    context: PageContext
+    question: QuestionRecord
+) -> HTMLNode {
+    viewer: Local UserRecord? := context.user
+    solutions: Local List<SolutionRecord> := solutionsForQuestion(question.id)
+
+    titleNode: Local HTMLNode := Web.UI.div(
+        [
+            Web.UI.h2("Gönderilen Çözümler", {"class": "h5 mb-0"})
+            Web.UI.span(
+                "{str(len(solutions))} çözüm"
+                {"class": "badge text-bg-primary rounded-pill ms-2"}
+            )
+        ]
+        {"class": "d-flex align-items-center mb-3"}
+    )
+
+    if len(solutions) == 0 {
+        return Web.UI.section(
+            [
+                titleNode
+                Web.UI.p(
+                    "Bu soru için henüz bir çözüm paylaşılmadı. İlk çözümü siz yükleyin!"
+                    {"class": "alert alert-info small mb-0"}
+                )
+            ]
+            {"class": "border-top pt-4 mt-4"}
+        )
+    }
+
+    cards: Local List<HTMLNode> := []
+    for sol in solutions {
+        badgeKind: Local String := "text-bg-secondary"
+        typeLabel: Local String := "Dosya"
+        if sol.mimeType == "application/pdf" {
+            badgeKind = "text-bg-danger"
+            typeLabel = "PDF"
+        }
+        else if sol.mimeType == "image/png" or sol.mimeType == "image/jpeg" {
+            badgeKind = "text-bg-info"
+            typeLabel = "Görsel"
+        }
+
+        viewBtn: Local HTMLNode := Web.UI.span("")
+        if viewer != null {
+            viewBtn = Web.UI.a(
+                "/solution/file?id={str(sol.id)}"
+                "Çözümü Gör / İndir"
+                {"class": "btn btn-sm btn-outline-primary", "target": "_blank"}
+            )
+        }
+        else {
+            viewBtn = Web.UI.a(
+                "/login"
+                "Görmek için Giriş Yapın"
+                {"class": "btn btn-sm btn-outline-secondary"}
+            )
+        }
+
+        kbSize: Local Int := int(sol.fileSize / 1024)
+        if kbSize == 0 {
+            kbSize = 1
+        }
+
+        cards.add(
+            Web.UI.div(
+                [
+                    Web.UI.div(
+                        [
+                            Web.UI.div(
+                                [
+                                    Web.UI.strong(
+                                        sol.userName
+                                        {"class": "d-block text-dark"}
+                                    )
+                                    Web.UI.span(
+                                        "{sol.createdAt} • {sol.originalFilename} ({str(kbSize)} KB)"
+                                        {"class": "text-body-secondary small"}
+                                    )
+                                ]
+                                {"class": "me-auto"}
+                            )
+                            Web.UI.span(
+                                typeLabel
+                                {"class": "badge {badgeKind} me-3"}
+                            )
+                            viewBtn
+                        ]
+                        {
+                            "class": "d-flex align-items-center justify-content-between p-3 border rounded bg-light-subtle"
+                        }
+                    )
+                ]
+                {"class": "mb-2"}
+            )
+        )
+    }
+
+    return Web.UI.section(
+        [titleNode, Web.UI.div(cards, {"class": "solutions-list"})]
+        {"class": "border-top pt-4 mt-4"}
     )
 }

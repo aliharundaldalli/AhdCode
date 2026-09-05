@@ -6,14 +6,180 @@ siteFooter: Function := (siteName: String) -> HTMLNode {
         [
             Web.UI.div(
                 [
-                    Web.UI.p(
-                        "{siteName} — AhdCode v0.15 Web referans uygulaması"
-                        {"class": "text-body-secondary mb-0 small"}
+                    Web.UI.div(
+                        [
+                            Web.UI.div(
+                                [
+                                    Web.UI.div(
+                                        [
+                                            Web.UI.img(
+                                                "/assets/images/logo.png"
+                                                "AhdCode"
+                                                {
+                                                    "width": "28"
+                                                    "height": "28"
+                                                    "class": "me-2 rounded shadow-sm"
+                                                }
+                                            )
+                                            Web.UI.span(
+                                                siteName
+                                                {
+                                                    "class": "fs-5 fw-bold text-body-emphasis"
+                                                }
+                                            )
+                                        ]
+                                        {
+                                            "class": "d-flex align-items-center mb-2"
+                                        }
+                                    )
+                                    Web.UI.p(
+                                        "AhdCode v0.15 ile inşa edilmiş matematik portalı ve problem çözme referans uygulaması."
+                                        {
+                                            "class": "text-body-secondary small pe-md-4 mb-0"
+                                        }
+                                    )
+                                ]
+                                {"class": "col-12 col-md-5 mb-4 mb-md-0"}
+                            )
+                            Web.UI.div(
+                                [
+                                    Web.UI.h3(
+                                        "Hızlı Bağlantılar"
+                                        {"class": "h6 fw-semibold mb-3"}
+                                    )
+                                    Web.UI.ul(
+                                        [
+                                            Web.UI.liNodes(
+                                                [
+                                                    Web.UI.a(
+                                                        "/"
+                                                        "Sorular"
+                                                        {
+                                                            "class": "text-decoration-none text-body-secondary small"
+                                                        }
+                                                    )
+                                                ]
+                                                {"class": "mb-2"}
+                                            )
+                                            Web.UI.liNodes(
+                                                [
+                                                    Web.UI.a(
+                                                        "/login"
+                                                        "Giriş Yap"
+                                                        {
+                                                            "class": "text-decoration-none text-body-secondary small"
+                                                        }
+                                                    )
+                                                ]
+                                                {"class": "mb-2"}
+                                            )
+                                            Web.UI.liNodes(
+                                                [
+                                                    Web.UI.a(
+                                                        "/register"
+                                                        "Kayıt Ol"
+                                                        {
+                                                            "class": "text-decoration-none text-body-secondary small"
+                                                        }
+                                                    )
+                                                ]
+                                                {"class": "mb-0"}
+                                            )
+                                        ]
+                                        {"class": "list-unstyled mb-0"}
+                                    )
+                                ]
+                                {"class": "col-6 col-md-3 mb-4 mb-md-0"}
+                            )
+                            Web.UI.div(
+                                [
+                                    Web.UI.h3(
+                                        "Teknoloji"
+                                        {"class": "h6 fw-semibold mb-3"}
+                                    )
+                                    Web.UI.ul(
+                                        [
+                                            Web.UI.liNodes(
+                                                [
+                                                    Web.UI.span(
+                                                        "• AhdCode Native Web Mimarisi"
+                                                        {
+                                                            "class": "text-body-secondary small"
+                                                        }
+                                                    )
+                                                ]
+                                                {"class": "mb-2"}
+                                            )
+                                            Web.UI.liNodes(
+                                                [
+                                                    Web.UI.span(
+                                                        "• MathJax LaTeX Vektörel Dizgi"
+                                                        {
+                                                            "class": "text-body-secondary small"
+                                                        }
+                                                    )
+                                                ]
+                                                {"class": "mb-2"}
+                                            )
+                                            Web.UI.liNodes(
+                                                [
+                                                    Web.UI.span(
+                                                        "• Güvenli Çözüm Depolama"
+                                                        {
+                                                            "class": "text-body-secondary small"
+                                                        }
+                                                    )
+                                                ]
+                                                {"class": "mb-0"}
+                                            )
+                                        ]
+                                        {"class": "list-unstyled mb-0"}
+                                    )
+                                ]
+                                {"class": "col-6 col-md-4"}
+                            )
+                        ]
+                        {"class": "row"}
+                    )
+                    Web.UI.element(
+                        "hr"
+                        {"class": "my-4 border-secondary-subtle"}
+                        []
+                    )
+                    Web.UI.div(
+                        [
+                            Web.UI.p(
+                                "© 2026 {siteName}. Tüm hakları saklıdır."
+                                {
+                                    "class": "text-body-secondary small mb-2 mb-md-0"
+                                }
+                            )
+                            Web.UI.div(
+                                [
+                                    Web.UI.span(
+                                        "AhdCode v0.15 Web"
+                                        {
+                                            "class": "badge text-bg-primary-subtle text-primary-emphasis border border-primary-subtle me-2"
+                                        }
+                                    )
+                                    Web.UI.span(
+                                        "MathJax 3.x"
+                                        {
+                                            "class": "badge text-bg-secondary-subtle text-secondary-emphasis border border-secondary-subtle"
+                                        }
+                                    )
+                                ]
+                                {"class": "d-flex align-items-center"}
+                            )
+                        ]
+                        {
+                            "class": "d-flex flex-wrap justify-content-between align-items-center"
+                        }
                     )
                 ]
                 {"class": "container py-4"}
             )
         ]
-        {"class": "border-top mt-5"}
+        {"class": "bg-body-tertiary border-top mt-5"}
     )
 }

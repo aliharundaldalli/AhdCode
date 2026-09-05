@@ -45,7 +45,15 @@ navbar: Function := (
                             Web.UI.aNodes(
                                 "/"
                                 [
-                                    Web.UI.span("∑", {"class": "fs-3 me-2"})
+                                    Web.UI.img(
+                                        "/assets/images/logo.png"
+                                        "AhdCode"
+                                        {
+                                            "width": "34"
+                                            "height": "34"
+                                            "class": "me-2 rounded shadow-sm"
+                                        }
+                                    )
                                     Web.UI.span(
                                         siteName
                                         {"class": "fs-5 fw-semibold"}
