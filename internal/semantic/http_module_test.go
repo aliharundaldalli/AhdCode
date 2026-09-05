@@ -163,18 +163,18 @@ func TestHTTPModuleInterfaceExportsExactSurface(t *testing.T) {
 		t.Fatalf("HTTP exports %v; want %v", module.ExportNames, wantExports)
 	}
 	signatures := map[string]string{
-		"server":        "(host: String, port: Int, maxBodyBytes: Int := default) -> Server",
-		"text":          "(body: String, status: Int := default) -> Response",
-		"html":          "(body: String, status: Int := default) -> Response",
-		"response":      "(status: Int, body: String, contentType: String) -> Response",
-		"redirect":      "(location: String, status: Int := default) -> Response",
-		"file":          "(path: String, contentType: String) -> Response",
-		"download":      "(path: String, contentType: String, fileName: String) -> Response",
-		"cookie":        "(name: String, value: String) -> Cookie",
-		"deleteCookie":  "(name: String, path: String := default) -> Cookie",
-		"sessions":      "(cookieName: String := default, maxAgeSeconds: Int := default, secure: Bool := default, sameSite: String := default) -> SessionStore",
-		"client":        "(timeoutSeconds: Int := default, maxResponseBytes: Int := default, followRedirects: Bool := default) -> Client",
-		"clientRequest":   "(method: String, url: String) -> ClientRequest",
+		"server":         "(host: String, port: Int, maxBodyBytes: Int := default) -> Server",
+		"text":           "(body: String, status: Int := default) -> Response",
+		"html":           "(body: String, status: Int := default) -> Response",
+		"response":       "(status: Int, body: String, contentType: String) -> Response",
+		"redirect":       "(location: String, status: Int := default) -> Response",
+		"file":           "(path: String, contentType: String) -> Response",
+		"download":       "(path: String, contentType: String, fileName: String) -> Response",
+		"cookie":         "(name: String, value: String) -> Cookie",
+		"deleteCookie":   "(name: String, path: String := default) -> Cookie",
+		"sessions":       "(cookieName: String := default, maxAgeSeconds: Int := default, secure: Bool := default, sameSite: String := default) -> SessionStore",
+		"client":         "(timeoutSeconds: Int := default, maxResponseBytes: Int := default, followRedirects: Bool := default) -> Client",
+		"clientRequest":  "(method: String, url: String) -> ClientRequest",
 		"contextHandler": "(store: SessionStore, opener: Function(Request, SessionStore) -> RequestContext, handler: Function(RequestContext) -> Response, first: Function(RequestContext) -> Response, second: Function(RequestContext) -> Response) -> Function(Request) -> Response",
 	}
 	for name, want := range signatures {
