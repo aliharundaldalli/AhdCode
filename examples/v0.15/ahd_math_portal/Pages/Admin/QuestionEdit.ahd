@@ -81,26 +81,63 @@ adminQuestionForm: Function := (
     }
 
     content.add(
-        Web.UI.formTo(
-            "/admin/questions/save"
-            "post"
+        Web.UI.div(
             [
-                csrfInput(session)
-                Web.UI.input("hidden", "question_id", str(id))
-                formField("question-title", "title", "Başlık", "text", title)
-                formField("question-topic", "topic", "Konu", "text", topic)
-                formTextArea("question-body", "body", "Soru metni", body)
-                Web.UI.button(
-                    "Kaydet"
-                    {"type": "submit", "class": "btn btn-primary"}
+                Web.UI.formTo(
+                    "/admin/questions/save"
+                    "post"
+                    [
+                        csrfInput(session)
+                        Web.UI.input("hidden", "question_id", str(id))
+                        formField(
+                            "question-title"
+                            "title"
+                            "Başlık"
+                            "text"
+                            title
+                        )
+                        formField(
+                            "question-topic"
+                            "topic"
+                            "Konu"
+                            "text"
+                            topic
+                        )
+                        formTextArea(
+                            "question-body"
+                            "body"
+                            "Soru metni"
+                            body
+                        )
+                        Web.UI.buttonNodes(
+                            [
+                                Web.UI.i(
+                                    ""
+                                    {"class": "fa-solid fa-floppy-disk me-1"}
+                                )
+                                Web.UI.text("Kaydet")
+                            ]
+                            {"type": "submit", "class": "btn btn-primary"}
+                        )
+                    ]
                 )
             ]
+            {"class": "admin-card"}
         )
     )
     content.add(adminGeminiPanel(session, id, title, topic, body))
     content.add(
         Web.UI.pNodes(
-            [Web.UI.a("/admin/questions", "Listeye dön")]
+            [
+                Web.UI.aNodes(
+                    "/admin/questions"
+                    [
+                        Web.UI.i("", {"class": "fa-solid fa-arrow-left me-1"})
+                        Web.UI.text("Listeye dön")
+                    ]
+                    {"class": "text-decoration-none"}
+                )
+            ]
             {"class": "mt-3 mb-0 small"}
         )
     )
@@ -132,24 +169,46 @@ adminGeminiPanel: Function := (
     body: String
 ) -> HTMLNode {
     if geminiConfigured() == false {
-        return Web.UI.section(
+        return Web.UI.div(
             [
-                Web.UI.h2("Gemini ile üret", {"class": "h5"})
+                Web.UI.h2Nodes(
+                    [
+                        Web.UI.i(
+                            ""
+                            {
+                                "class": "fa-solid fa-wand-magic-sparkles text-primary me-2"
+                            }
+                        )
+                        Web.UI.text("Gemini ile üret")
+                    ]
+                    {"class": "h5 mb-3"}
+                )
                 Web.UI.p(
                     "Gemini yapılandırılmamış. GEMINI_API_KEY ve GEMINI_MODEL ortam değişkenlerini ayarlayın."
                     {"class": "alert alert-secondary mb-0"}
                 )
             ]
-            {"class": "border-top mt-4 pt-4"}
+            {"class": "admin-card"}
         )
     }
 
-    return Web.UI.section(
+    return Web.UI.div(
         [
-            Web.UI.h2("Gemini ile üret", {"class": "h5"})
+            Web.UI.h2Nodes(
+                [
+                    Web.UI.i(
+                        ""
+                        {
+                            "class": "fa-solid fa-wand-magic-sparkles text-primary me-2"
+                        }
+                    )
+                    Web.UI.text("Gemini ile üret")
+                ]
+                {"class": "h5 mb-1"}
+            )
             Web.UI.p(
                 "Üretilen metin taslak olarak forma yazılır. Yayımlamak ayrı ve açık bir adımdır."
-                {"class": "text-body-secondary small"}
+                {"class": "text-body-secondary small mb-3"}
             )
             Web.UI.formTo(
                 "/admin/questions/generate"
@@ -188,14 +247,22 @@ adminGeminiPanel: Function := (
                         "Ek yönerge"
                         "text"
                     )
-                    Web.UI.button(
-                        "Taslak üret"
+                    Web.UI.buttonNodes(
+                        [
+                            Web.UI.i(
+                                ""
+                                {
+                                    "class": "fa-solid fa-wand-magic-sparkles me-1"
+                                }
+                            )
+                            Web.UI.text("Taslak üret")
+                        ]
                         {"type": "submit", "class": "btn btn-outline-primary"}
                     )
                 ]
             )
         ]
-        {"class": "border-top mt-4 pt-4"}
+        {"class": "admin-card"}
     )
 }
 

@@ -31,9 +31,12 @@ adminQuestionsPage: Function := (request: Request) -> Response {
     content: Local List<HTMLNode> := [
         Web.UI.pNodes(
             [
-                Web.UI.a(
+                Web.UI.aNodes(
                     "/admin/questions/new"
-                    "Yeni soru"
+                    [
+                        Web.UI.i("", {"class": "fa-solid fa-plus me-1"})
+                        Web.UI.text("Yeni soru")
+                    ]
                     {"class": "btn btn-primary"}
                 )
             ]
@@ -90,10 +93,12 @@ adminQuestionRow: Function := (
     )
     actionLabel: Local String := "Yayımla"
     actionValue: Local String := "publish"
+    actionIcon: Local String := "fa-solid fa-globe me-1"
     if question.status == "published" {
         badge = Web.UI.span("Yayımlandı", {"class": "badge text-bg-success"})
         actionLabel = "Taslağa al"
         actionValue = "unpublish"
+        actionIcon = "fa-solid fa-box-archive me-1"
     }
 
     return Web.UI.tr(
@@ -103,9 +108,15 @@ adminQuestionRow: Function := (
             Web.UI.tdNodes([badge])
             Web.UI.tdNodes(
                 [
-                    Web.UI.a(
+                    Web.UI.aNodes(
                         "/admin/questions/edit?id={str(question.id)}"
-                        "Düzenle"
+                        [
+                            Web.UI.i(
+                                ""
+                                {"class": "fa-solid fa-pen-to-square me-1"}
+                            )
+                            Web.UI.text("Düzenle")
+                        ]
                         {"class": "btn btn-sm btn-outline-primary me-2"}
                     )
                     Web.UI.formTo(
@@ -119,8 +130,11 @@ adminQuestionRow: Function := (
                                 str(question.id)
                             )
                             Web.UI.input("hidden", "action", actionValue)
-                            Web.UI.button(
-                                actionLabel
+                            Web.UI.buttonNodes(
+                                [
+                                    Web.UI.i("", {"class": actionIcon})
+                                    Web.UI.text(actionLabel)
+                                ]
                                 {
                                     "type": "submit"
                                     "class": "btn btn-sm btn-outline-secondary"

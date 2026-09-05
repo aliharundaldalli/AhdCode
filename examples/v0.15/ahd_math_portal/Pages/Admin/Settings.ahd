@@ -137,29 +137,40 @@ adminSettingsView: Function := (
     }
 
     content.add(
-        Web.UI.formTo(
-            "/admin/settings"
-            "post"
+        Web.UI.div(
             [
-                csrfInput(session)
-                formField(
-                    "settings-name"
-                    "site_name"
-                    "Site adı"
-                    "text"
-                    siteName
-                )
-                colorPaletteField(
-                    "settings-color"
-                    "header_color"
-                    "Başlık rengi"
-                    headerColor
-                )
-                Web.UI.button(
-                    "Kaydet"
-                    {"type": "submit", "class": "btn btn-primary"}
+                Web.UI.formTo(
+                    "/admin/settings"
+                    "post"
+                    [
+                        csrfInput(session)
+                        formField(
+                            "settings-name"
+                            "site_name"
+                            "Site adı"
+                            "text"
+                            siteName
+                        )
+                        colorPaletteField(
+                            "settings-color"
+                            "header_color"
+                            "Başlık rengi"
+                            headerColor
+                        )
+                        Web.UI.buttonNodes(
+                            [
+                                Web.UI.i(
+                                    ""
+                                    {"class": "fa-solid fa-floppy-disk me-1"}
+                                )
+                                Web.UI.text("Ayarları Kaydet")
+                            ]
+                            {"type": "submit", "class": "btn btn-primary"}
+                        )
+                    ]
                 )
             ]
+            {"class": "admin-card"}
         )
     )
 

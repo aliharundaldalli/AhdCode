@@ -62,17 +62,29 @@ adminSolutionsPage: Function := (request: Request) -> Response {
                     Web.UI.td(solution.createdAt)
                     Web.UI.tdNodes(
                         [
-                            Web.UI.button(
-                                "Çözümü Gör"
+                            Web.UI.buttonNodes(
+                                [
+                                    Web.UI.i(
+                                        ""
+                                        {"class": "fa-solid fa-eye me-1"}
+                                    )
+                                    Web.UI.text("Çözümü Gör")
+                                ]
                                 {
                                     "type": "button"
                                     "class": "btn btn-sm btn-primary me-2"
                                     "onclick": "openSolutionModal({str(solution.id)}, '{solution.userName} - {solution.questionTitle}', '{solution.mimeType}', '{solution.originalFilename}')"
                                 }
                             )
-                            Web.UI.a(
+                            Web.UI.aNodes(
                                 "/admin/solutions/file?id={str(solution.id)}"
-                                "İndir"
+                                [
+                                    Web.UI.i(
+                                        ""
+                                        {"class": "fa-solid fa-download me-1"}
+                                    )
+                                    Web.UI.text("İndir")
+                                ]
                                 {"class": "btn btn-sm btn-outline-primary"}
                             )
                         ]

@@ -17,13 +17,30 @@ adminDashboardPage: Function := (request: Request) -> Response {
     }
 
     cards: Local List<HTMLNode> := [
-        adminStatCard("Kullanıcı", str(usersCount()))
+        adminStatCard(
+            "Kullanıcı"
+            str(usersCount())
+            "fa-solid fa-users fa-xl"
+            "stat-primary"
+        )
         adminStatCard(
             "Yayımlanan soru"
             str(questionsCountByStatus("published"))
+            "fa-solid fa-circle-check fa-xl"
+            "stat-success"
         )
-        adminStatCard("Taslak soru", str(questionsCountByStatus("draft")))
-        adminStatCard("Çözüm", str(solutionsCount()))
+        adminStatCard(
+            "Taslak soru"
+            str(questionsCountByStatus("draft"))
+            "fa-solid fa-file-pen fa-xl"
+            "stat-warning"
+        )
+        adminStatCard(
+            "Çözüm"
+            str(solutionsCount())
+            "fa-solid fa-lightbulb fa-xl"
+            "stat-info"
+        )
     ]
 
     return sessionCommit(
@@ -42,23 +59,43 @@ adminDashboardPage: Function := (request: Request) -> Response {
     )
 }
 
-adminStatCard: Function := (label: String, value: String) -> HTMLNode {
+adminStatCard: Function := (
+    label: String
+    value: String
+    iconClass: String
+    colorClass: String
+) -> HTMLNode {
     return Web.UI.div(
         [
             Web.UI.div(
                 [
                     Web.UI.div(
                         [
-                            Web.UI.p(
-                                label
-                                {"class": "text-body-secondary small mb-1"}
+                            Web.UI.div(
+                                [
+                                    Web.UI.p(
+                                        label
+                                        {
+                                            "class": "text-body-secondary small fw-medium mb-1"
+                                        }
+                                    )
+                                    Web.UI.p(
+                                        value
+                                        {"class": "fs-2 fw-bold mb-0 text-dark"}
+                                    )
+                                ]
                             )
-                            Web.UI.p(value, {"class": "fs-3 fw-semibold mb-0"})
+                            Web.UI.div(
+                                [Web.UI.i("", {"class": iconClass})]
+                                {"class": "stat-icon-badge {colorClass}"}
+                            )
                         ]
-                        {"class": "card-body"}
+                        {
+                            "class": "card-body d-flex align-items-center justify-content-between p-4"
+                        }
                     )
                 ]
-                {"class": "card h-100"}
+                {"class": "card admin-stat-card h-100 border-0"}
             )
         ]
         {"class": "col-6 col-lg-3"}

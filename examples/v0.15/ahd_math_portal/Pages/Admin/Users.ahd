@@ -102,6 +102,10 @@ adminUserRow: Function := (
         )
     }
     else {
+        actionIcon: Local String := "fa-solid fa-user-check me-1"
+        if actionValue == "deactivate" {
+            actionIcon = "fa-solid fa-user-xmark me-1"
+        }
         actionNodes.add(
             Web.UI.formTo(
                 "/admin/users/state"
@@ -110,8 +114,11 @@ adminUserRow: Function := (
                     csrfInput(session)
                     Web.UI.input("hidden", "user_id", str(user.id))
                     Web.UI.input("hidden", "action", actionValue)
-                    Web.UI.button(
-                        actionLabel
+                    Web.UI.buttonNodes(
+                        [
+                            Web.UI.i("", {"class": actionIcon})
+                            Web.UI.text(actionLabel)
+                        ]
                         {
                             "type": "submit"
                             "class": "btn btn-sm btn-outline-secondary me-2"
@@ -124,9 +131,12 @@ adminUserRow: Function := (
     }
 
     actionNodes.add(
-        Web.UI.a(
+        Web.UI.aNodes(
             "/admin/users/edit?id={str(user.id)}"
-            "Parola ata"
+            [
+                Web.UI.i("", {"class": "fa-solid fa-key me-1"})
+                Web.UI.text("Parola ata")
+            ]
             {"class": "btn btn-sm btn-outline-primary"}
         )
     )
@@ -206,40 +216,57 @@ adminUserEditView: Function := (
     }
 
     content.add(
-        Web.UI.p("{user.name} — {user.email}", {"class": "text-body-secondary"})
-    )
-    content.add(
-        Web.UI.p(
-            "Mevcut parola görüntülenemez. Buradan yalnızca yeni bir parola atanır ve eski oturumlar geçersiz olur."
-            {"class": "alert alert-info"}
-        )
-    )
-    content.add(
-        Web.UI.formTo(
-            "/admin/users/password"
-            "post"
+        Web.UI.div(
             [
-                csrfInput(session)
-                Web.UI.input("hidden", "user_id", str(user.id))
-                formField(
-                    "admin-new-password"
-                    "password"
-                    "Yeni parola"
-                    "password"
-                    ""
-                    "En az {str(validationMinimumPassword())} karakter."
+                Web.UI.p(
+                    "{user.name} — {user.email}"
+                    {"class": "fw-semibold mb-2"}
                 )
-                Web.UI.button(
-                    "Parolayı ata"
-                    {"type": "submit", "class": "btn btn-primary"}
+                Web.UI.p(
+                    "Mevcut parola görüntülenemez. Buradan yalnızca yeni bir parola atanır ve eski oturumlar geçersiz olur."
+                    {"class": "alert alert-info py-2 small mb-4"}
+                )
+                Web.UI.formTo(
+                    "/admin/users/password"
+                    "post"
+                    [
+                        csrfInput(session)
+                        Web.UI.input("hidden", "user_id", str(user.id))
+                        formField(
+                            "admin-new-password"
+                            "password"
+                            "Yeni parola"
+                            "password"
+                            ""
+                            "En az {str(validationMinimumPassword())} karakter."
+                        )
+                        Web.UI.buttonNodes(
+                            [
+                                Web.UI.i("", {"class": "fa-solid fa-key me-1"})
+                                Web.UI.text("Parolayı ata")
+                            ]
+                            {"type": "submit", "class": "btn btn-primary"}
+                        )
+                    ]
+                )
+                Web.UI.pNodes(
+                    [
+                        Web.UI.aNodes(
+                            "/admin/users"
+                            [
+                                Web.UI.i(
+                                    ""
+                                    {"class": "fa-solid fa-arrow-left me-1"}
+                                )
+                                Web.UI.text("Listeye dön")
+                            ]
+                            {"class": "text-decoration-none"}
+                        )
+                    ]
+                    {"class": "mt-4 mb-0 small"}
                 )
             ]
-        )
-    )
-    content.add(
-        Web.UI.pNodes(
-            [Web.UI.a("/admin/users", "Listeye dön")]
-            {"class": "mt-3 mb-0 small"}
+            {"class": "admin-card"}
         )
     )
 
