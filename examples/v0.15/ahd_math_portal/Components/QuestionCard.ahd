@@ -18,12 +18,26 @@ questionCard: Function := (question: QuestionRecord) -> HTMLNode {
                 [
                     Web.UI.div(
                         [
-                            Web.UI.span(
-                                question.topic
-                                {"class": "badge text-bg-secondary"}
+                            Web.UI.spanNodes(
+                                [
+                                    Web.UI.i(
+                                        ""
+                                        {"class": "fa-solid fa-tag me-1"}
+                                    )
+                                    Web.UI.text(question.topic)
+                                ]
+                                {"class": "badge text-bg-primary"}
                             )
-                            Web.UI.span(
-                                published
+                            Web.UI.spanNodes(
+                                [
+                                    Web.UI.i(
+                                        ""
+                                        {
+                                            "class": "fa-regular fa-calendar-days me-1"
+                                        }
+                                    )
+                                    Web.UI.text(published)
+                                ]
                                 {"class": "text-body-secondary small ms-2"}
                             )
                         ]
@@ -34,9 +48,15 @@ questionCard: Function := (question: QuestionRecord) -> HTMLNode {
                         questionExcerpt(question.body)
                         {"class": "card-text"}
                     )
-                    Web.UI.a(
+                    Web.UI.aNodes(
                         "/question?id={question.id}"
-                        "Soruyu aç"
+                        [
+                            Web.UI.text("Soruyu İncele ")
+                            Web.UI.i(
+                                ""
+                                {"class": "fa-solid fa-arrow-right ms-1"}
+                            )
+                        ]
                         {"class": "btn btn-sm btn-outline-primary"}
                     )
                 ]

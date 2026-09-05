@@ -128,17 +128,26 @@ solutionSection: Function := (
                 )
                 Web.UI.div(
                     [
-                        Web.UI.button(
-                            "Çözümümü Görüntüle"
+                        Web.UI.buttonNodes(
+                            [
+                                Web.UI.i("", {"class": "fa-solid fa-eye me-1"})
+                                Web.UI.text("Çözümümü Görüntüle")
+                            ]
                             {
                                 "type": "button"
                                 "class": "btn btn-sm btn-outline-success me-2"
                                 "onclick": "openSolutionModal({str(existing.id)}, 'Benim Çözümüm', '{existing.mimeType}', '{existing.originalFilename}')"
                             }
                         )
-                        Web.UI.a(
+                        Web.UI.aNodes(
                             "/solution/file?id={str(existing.id)}"
-                            "İndir"
+                            [
+                                Web.UI.i(
+                                    ""
+                                    {"class": "fa-solid fa-download me-1"}
+                                )
+                                Web.UI.text("İndir")
+                            ]
                             {
                                 "class": "btn btn-sm btn-outline-secondary"
                                 "target": "_blank"
@@ -185,8 +194,14 @@ solutionSection: Function := (
                         ]
                         {"class": "mb-3"}
                     )
-                    Web.UI.button(
-                        "Gönder"
+                    Web.UI.buttonNodes(
+                        [
+                            Web.UI.i(
+                                ""
+                                {"class": "fa-solid fa-cloud-arrow-up me-1"}
+                            )
+                            Web.UI.text("Çözümü Gönder")
+                        ]
                         {"type": "submit", "class": "btn btn-primary"}
                     )
                 ]
@@ -206,6 +221,10 @@ communitySolutionsSection: Function := (
 
     titleNode: Local HTMLNode := Web.UI.div(
         [
+            Web.UI.i(
+                ""
+                {"class": "fa-solid fa-comments text-primary me-2 fs-5"}
+            )
             Web.UI.h2("Gönderilen Çözümler", {"class": "h5 mb-0"})
             Web.UI.span(
                 "{str(len(solutions))} çözüm"
@@ -241,8 +260,11 @@ communitySolutionsSection: Function := (
             typeLabel = "Görsel"
         }
 
-        viewBtn: Local HTMLNode := Web.UI.button(
-            "Çözümü Gör"
+        viewBtn: Local HTMLNode := Web.UI.buttonNodes(
+            [
+                Web.UI.i("", {"class": "fa-solid fa-eye me-1"})
+                Web.UI.text("Çözümü Gör")
+            ]
             {
                 "type": "button"
                 "class": "btn btn-sm btn-primary"

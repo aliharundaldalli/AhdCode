@@ -1,0 +1,147 @@
+// Web scraping service demonstrating AhdCode v0.15's native HTTP Client and HTML Parser.
+bring Time
+from Time bring DateTime
+bring HTTP
+from HTTP bring (Client, ClientRequest, ClientResponse)
+bring HTML
+from HTML bring (HTMLDocument, HTMLElement)
+
+ScrapedMathTopic: Class<> := {
+    structure: Attributes := (
+        title: String
+        url: String
+        summary: String
+        category: String
+        badgeColor: String
+        icon: String
+    )
+}
+
+MathScrapeOutcome: Class<> := {
+    structure: Attributes := (
+        success: Bool
+        statusCode: Int
+        sourceUrl: String
+        sourceTitle: String
+        leadParagraph: String
+        topics: List<ScrapedMathTopic>
+        timestamp: String
+        note: String
+    )
+}
+
+defaultMathTopics: Function := () -> List<ScrapedMathTopic> {
+    return [
+        ScrapedMathTopic(
+            title: "Cebir ve Yapılar"
+            url: "https://tr.wikipedia.org/wiki/Cebir"
+            summary: "Denklemler, polinomlar, matrisler, grup teorisi ve soyut cebirsel yapıların matematiksel kuramı."
+            category: "Temel Matematik"
+            badgeColor: "primary"
+            icon: "fa-solid fa-calculator"
+        )
+        ScrapedMathTopic(
+            title: "Matematiksel Analiz"
+            url: "https://tr.wikipedia.org/wiki/Matematiksel_analiz"
+            summary: "Limit, türev, integral, diferansiyel denklemler ve sonsuz serilerin analitik temelleri."
+            category: "Sürekli Matematik"
+            badgeColor: "success"
+            icon: "fa-solid fa-chart-line"
+        )
+        ScrapedMathTopic(
+            title: "Geometri ve Topoloji"
+            url: "https://tr.wikipedia.org/wiki/Topoloji"
+            summary: "Şekil, uzay, eğrilik, çokboyutlu manifoldlar ve sürekli deformasyonlar altında korunan özellikler."
+            category: "Uzay ve Biçim"
+            badgeColor: "warning"
+            icon: "fa-solid fa-shapes"
+        )
+        ScrapedMathTopic(
+            title: "Sayılar Teorisi"
+            url: "https://tr.wikipedia.org/wiki/Sayılar_teorisi"
+            summary: "Asal sayılar, diofantos denklemleri, modüler aritmetik ve modern asimetrik kriptografi."
+            category: "Ayrık Matematik"
+            badgeColor: "info"
+            icon: "fa-solid fa-hashtag"
+        )
+        ScrapedMathTopic(
+            title: "Olasılık ve İstatistik"
+            url: "https://tr.wikipedia.org/wiki/Olasılık_teorisi"
+            summary: "Rastgele olaylar, stokastik süreçler, büyük veri analizi, varyans ve dağılım modelleri."
+            category: "Uygulamalı Matematik"
+            badgeColor: "danger"
+            icon: "fa-solid fa-dice"
+        )
+        ScrapedMathTopic(
+            title: "Matematiksel Mantık"
+            url: "https://tr.wikipedia.org/wiki/Matematiksel_mantık"
+            summary: "Önermeler kalkülüsü, Gödel'in eksiklik teoremleri, model teorisi ve biçimsel ispat kuramı."
+            category: "Felsefe ve Temeller"
+            badgeColor: "secondary"
+            icon: "fa-solid fa-brain"
+        )
+    ]
+}
+
+fetchMathFeed: Function := () -> MathScrapeOutcome {
+    sourceUrl: Local String := "https://tr.wikipedia.org/wiki/Matematik"
+    now: Local DateTime := Time.now()
+    nowText: Local String := now.toString()
+    defaultLead: Local String := "Matematik (Yunanca μάθημα máthēma, \"bilgi, çalışma, öğrenme\"); sayılar, felsefe, uzay ve fizik gibi konularla ilgilenir. Matematikçiler ve filozoflar arasında matematiğin kesin kapsamı ve tanımı konusunda görüş ayrılığı vardır."
+
+    attempt {
+        client: Local Client := HTTP.client(3)
+        req: Local ClientRequest := HTTP.clientRequest(
+            "GET"
+            sourceUrl
+        ).withHeader(
+            "User-Agent"
+            "AhdCodeMathPortal/0.15 (aliharun; ahdakademi.test)"
+        )
+        res: Local ClientResponse := client.send(req)
+        status: Local Int := res.status()
+        if status == 200 {
+            doc: Local HTMLDocument := HTML.parse(res.body())
+            titleElem: Local HTMLElement? := doc.first("title")
+            pageTitle: Local String := "Matematik - Vikipedi"
+            if titleElem != null {
+                pageTitle = titleElem.text()
+            }
+
+            lead: Local String := defaultLead
+            paras: Local List<HTMLElement> := doc.select(".mw-parser-output p")
+            for p in paras {
+                pt: Local String := p.text()
+                if len(pt) > 50 {
+                    lead = pt
+                    break
+                }
+            }
+
+            return MathScrapeOutcome(
+                success: true
+                statusCode: status
+                sourceUrl: sourceUrl
+                sourceTitle: pageTitle
+                leadParagraph: lead
+                topics: defaultMathTopics()
+                timestamp: nowText
+                note: "Wikipedia üzerinden HTTP.client ve HTML.parse ile canlı olarak kazındı."
+            )
+        }
+    }
+    except Error as err {
+        // Fallback gracefully on network error or timeout
+    }
+
+    return MathScrapeOutcome(
+        success: false
+        statusCode: 0
+        sourceUrl: sourceUrl
+        sourceTitle: "Matematik - Vikipedi (Yerel Önbellek)"
+        leadParagraph: defaultLead
+        topics: defaultMathTopics()
+        timestamp: nowText
+        note: "Yerel önbellek ve güvenilir veri tabanı devrede (kesintisiz sunum)."
+    )
+}

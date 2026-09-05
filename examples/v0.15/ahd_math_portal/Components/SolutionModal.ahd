@@ -50,25 +50,49 @@ solutionModalNode: Function := () -> HTMLNode {
                             )
                             Web.UI.div(
                                 [
-                                    Web.UI.a(
+                                    Web.UI.aNodes(
                                         "#"
-                                        "Yeni Sekmede Aç"
+                                        [
+                                            Web.UI.i(
+                                                ""
+                                                {
+                                                    "class": "fa-solid fa-arrow-up-right-from-square me-1"
+                                                }
+                                            )
+                                            Web.UI.text("Yeni Sekmede Aç")
+                                        ]
                                         {
                                             "class": "btn btn-sm btn-outline-secondary me-2"
                                             "id": "solutionModalDirectLink"
                                             "target": "_blank"
                                         }
                                     )
-                                    Web.UI.a(
+                                    Web.UI.aNodes(
                                         "#"
-                                        "İndir"
+                                        [
+                                            Web.UI.i(
+                                                ""
+                                                {
+                                                    "class": "fa-solid fa-download me-1"
+                                                }
+                                            )
+                                            Web.UI.text("İndir")
+                                        ]
                                         {
                                             "class": "btn btn-sm btn-primary me-2"
                                             "id": "solutionModalDownloadLink"
                                         }
                                     )
-                                    Web.UI.button(
-                                        "Kapat"
+                                    Web.UI.buttonNodes(
+                                        [
+                                            Web.UI.i(
+                                                ""
+                                                {
+                                                    "class": "fa-solid fa-xmark me-1"
+                                                }
+                                            )
+                                            Web.UI.text("Kapat")
+                                        ]
                                         {
                                             "type": "button"
                                             "class": "btn btn-sm btn-secondary"

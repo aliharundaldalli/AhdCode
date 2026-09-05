@@ -101,8 +101,14 @@ siteFooter: Function := (siteName: String) -> HTMLNode {
                                         [
                                             Web.UI.liNodes(
                                                 [
+                                                    Web.UI.i(
+                                                        ""
+                                                        {
+                                                            "class": "fa-solid fa-code text-primary me-2"
+                                                        }
+                                                    )
                                                     Web.UI.span(
-                                                        "• AhdCode Native Web Mimarisi"
+                                                        "AhdCode v0.15 Web Mimarisi"
                                                         {
                                                             "class": "text-body-secondary small"
                                                         }
@@ -112,8 +118,14 @@ siteFooter: Function := (siteName: String) -> HTMLNode {
                                             )
                                             Web.UI.liNodes(
                                                 [
+                                                    Web.UI.i(
+                                                        ""
+                                                        {
+                                                            "class": "fa-solid fa-square-root-variable text-success me-2"
+                                                        }
+                                                    )
                                                     Web.UI.span(
-                                                        "• MathJax LaTeX Vektörel Dizgi"
+                                                        "MathJax LaTeX Dizgi"
                                                         {
                                                             "class": "text-body-secondary small"
                                                         }
@@ -123,8 +135,31 @@ siteFooter: Function := (siteName: String) -> HTMLNode {
                                             )
                                             Web.UI.liNodes(
                                                 [
+                                                    Web.UI.i(
+                                                        ""
+                                                        {
+                                                            "class": "fa-solid fa-globe text-info me-2"
+                                                        }
+                                                    )
                                                     Web.UI.span(
-                                                        "• Güvenli Çözüm Depolama"
+                                                        "Web Kazıma (HTTP & HTML)"
+                                                        {
+                                                            "class": "text-body-secondary small"
+                                                        }
+                                                    )
+                                                ]
+                                                {"class": "mb-2"}
+                                            )
+                                            Web.UI.liNodes(
+                                                [
+                                                    Web.UI.i(
+                                                        ""
+                                                        {
+                                                            "class": "fa-solid fa-shield-halved text-warning me-2"
+                                                        }
+                                                    )
+                                                    Web.UI.span(
+                                                        "Güvenli Çözüm Depolama"
                                                         {
                                                             "class": "text-body-secondary small"
                                                         }

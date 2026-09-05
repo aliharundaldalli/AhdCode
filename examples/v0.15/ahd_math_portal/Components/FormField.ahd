@@ -63,8 +63,8 @@ formPasswordField: Function := (
                     value
                     {"id": id, "class": "form-control"}
                 )
-                Web.UI.button(
-                    "👁"
+                Web.UI.buttonNodes(
+                    [Web.UI.i("", {"class": "fa-regular fa-eye"})]
                     {
                         "type": "button"
                         "class": "btn btn-outline-secondary"

@@ -17,7 +17,16 @@ navbar: Function := (
 ) -> HTMLNode {
     links: Local List<HTMLNode> := [
         Web.UI.liNodes(
-            [Web.UI.a("/", "Sorular", {"class": "nav-link px-2 text-white"})]
+            [
+                Web.UI.aNodes(
+                    "/"
+                    [
+                        Web.UI.i("", {"class": "fa-solid fa-list-check me-1"})
+                        Web.UI.text("Sorular")
+                    ]
+                    {"class": "nav-link px-2 text-white"}
+                )
+            ]
             {"class": "nav-item"}
         )
     ]
@@ -25,9 +34,15 @@ navbar: Function := (
         links.add(
             Web.UI.liNodes(
                 [
-                    Web.UI.a(
+                    Web.UI.aNodes(
                         "/admin"
-                        "Yönetim"
+                        [
+                            Web.UI.i(
+                                ""
+                                {"class": "fa-solid fa-shield-halved me-1"}
+                            )
+                            Web.UI.text("Yönetim")
+                        ]
                         {"class": "nav-link px-2 text-white"}
                     )
                 ]
@@ -81,14 +96,23 @@ navbarAccount: Function := (user: UserRecord?, token: String) -> HTMLNode {
     if user == null {
         return Web.UI.div(
             [
-                Web.UI.a(
+                Web.UI.aNodes(
                     "/login"
-                    "Giriş"
+                    [
+                        Web.UI.i(
+                            ""
+                            {"class": "fa-solid fa-right-to-bracket me-1"}
+                        )
+                        Web.UI.text("Giriş")
+                    ]
                     {"class": "btn btn-sm btn-light me-2"}
                 )
-                Web.UI.a(
+                Web.UI.aNodes(
                     "/register"
-                    "Kayıt ol"
+                    [
+                        Web.UI.i("", {"class": "fa-solid fa-user-plus me-1"})
+                        Web.UI.text("Kayıt ol")
+                    ]
                     {"class": "btn btn-sm btn-outline-light"}
                 )
             ]
@@ -101,12 +125,21 @@ navbarAccount: Function := (user: UserRecord?, token: String) -> HTMLNode {
         "post"
         [
             Web.UI.input("hidden", "_csrf", token)
-            Web.UI.span(
-                user.name
+            Web.UI.spanNodes(
+                [
+                    Web.UI.i("", {"class": "fa-regular fa-circle-user me-1"})
+                    Web.UI.text(user.name)
+                ]
                 {"class": "text-white me-3 align-self-center"}
             )
-            Web.UI.button(
-                "Çıkış"
+            Web.UI.buttonNodes(
+                [
+                    Web.UI.i(
+                        ""
+                        {"class": "fa-solid fa-arrow-right-from-bracket me-1"}
+                    )
+                    Web.UI.text("Çıkış")
+                ]
                 {"type": "submit", "class": "btn btn-sm btn-light"}
             )
         ]

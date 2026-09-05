@@ -6,11 +6,36 @@ adminSidebar: Function := (current: String) -> HTMLNode {
         [
             Web.UI.ul(
                 [
-                    adminSidebarLink("/admin", "Panel", current)
-                    adminSidebarLink("/admin/users", "Kullanıcılar", current)
-                    adminSidebarLink("/admin/questions", "Sorular", current)
-                    adminSidebarLink("/admin/solutions", "Çözümler", current)
-                    adminSidebarLink("/admin/settings", "Ayarlar", current)
+                    adminSidebarLink(
+                        "/admin"
+                        "fa-solid fa-gauge-high me-2"
+                        "Panel"
+                        current
+                    )
+                    adminSidebarLink(
+                        "/admin/users"
+                        "fa-solid fa-users me-2"
+                        "Kullanıcılar"
+                        current
+                    )
+                    adminSidebarLink(
+                        "/admin/questions"
+                        "fa-solid fa-circle-question me-2"
+                        "Sorular"
+                        current
+                    )
+                    adminSidebarLink(
+                        "/admin/solutions"
+                        "fa-solid fa-file-lines me-2"
+                        "Çözümler"
+                        current
+                    )
+                    adminSidebarLink(
+                        "/admin/settings"
+                        "fa-solid fa-sliders me-2"
+                        "Ayarlar"
+                        current
+                    )
                 ]
                 {"class": "list-group"}
             )
@@ -21,6 +46,7 @@ adminSidebar: Function := (current: String) -> HTMLNode {
 
 adminSidebarLink: Function := (
     href: String
+    iconClass: String
     label: String
     current: String
 ) -> HTMLNode {
@@ -29,5 +55,9 @@ adminSidebarLink: Function := (
         style = "list-group-item list-group-item-action active"
     }
 
-    return Web.UI.a(href, label, {"class": style})
+    return Web.UI.aNodes(
+        href
+        [Web.UI.i("", {"class": iconClass}), Web.UI.text(label)]
+        {"class": style}
+    )
 }

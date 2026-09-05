@@ -1,8 +1,9 @@
-// The public question list.
+// The public question list with live math web-scraping showcase.
 require("Layouts/Main.ahd")
 require("Components/QuestionCard.ahd")
 require("Services/Context.ahd")
 require("Services/Session.ahd")
+require("Services/Scraper.ahd")
 require("Repositories/Questions.ahd")
 bring Web
 from Web bring (Request, Response, HTMLNode, Session)
@@ -11,46 +12,19 @@ homePage: Function := (request: Request) -> Response {
     session: Local Session := sessionOpen(request)
     context: Local PageContext := contextFor(session)
     questions: Local List<QuestionRecord> := questionsPublished()
+    feed: Local MathScrapeOutcome := fetchMathFeed()
 
     content: Local List<HTMLNode> := [
-        Web.UI.section(
-            [
-                Web.UI.h1("Matematik soruları", {"class": "h2 mb-1"})
-                Web.UI.p(
-                    "Yayımlanmış sorular. Çözümünüzü yüklemek için giriş yapın."
-                    {"class": "text-body-secondary"}
-                )
-            ]
-            {"class": "mb-4"}
-        )
+        heroSection(context.siteName)
+        mathFeedSection(feed)
+        questionsSection(questions)
     ]
-    if len(questions) == 0 {
-        content.add(
-            Web.UI.p(
-                "Henüz yayımlanmış soru yok."
-                {"class": "alert alert-info"}
-            )
-        )
-    }
-    else {
-        cards: Local List<HTMLNode> := []
-        for question in questions {
-            cards.add(
-                Web.UI.div(
-                    [questionCard(question)]
-                    {"class": "col-12 col-md-6 col-lg-4 mb-4"}
-                )
-            )
-        }
-
-        content.add(Web.UI.div(cards, {"class": "row"}))
-    }
 
     return sessionCommit(
         session
         mainLayout(
             session
-            "Sorular"
+            "Sorular ve Matematik Bülteni"
             context.siteName
             context.headerColor
             context.user
@@ -60,4 +34,274 @@ homePage: Function := (request: Request) -> Response {
             content
         )
     )
+}
+
+heroSection: Function := (siteName: String) -> HTMLNode {
+    return Web.UI.section(
+        [
+            Web.UI.div(
+                [
+                    Web.UI.div(
+                        [
+                            Web.UI.i(
+                                ""
+                                {
+                                    "class": "fa-solid fa-square-root-variable text-primary fs-2 me-3"
+                                }
+                            )
+                            Web.UI.h1(
+                                "Matematik Portalı & Problem Platformu"
+                                {
+                                    "class": "display-6 fw-bold text-body-emphasis mb-0"
+                                }
+                            )
+                        ]
+                        {"class": "d-flex align-items-center mb-2"}
+                    )
+                    Web.UI.p(
+                        "AhdCode v0.15 native web mimarisi, MathJax LaTeX vektörel dizgisi ve canlı web kazıma (HTTP & HTML) motoruyla güçlendirilmiş referans platform."
+                        {"class": "lead text-body-secondary mb-0"}
+                    )
+                ]
+                {"class": "p-4 p-md-5 mb-4 rounded-3 bg-body-tertiary border"}
+            )
+        ]
+        {"class": "mb-4"}
+    )
+}
+
+mathFeedSection: Function := (feed: MathScrapeOutcome) -> HTMLNode {
+    statusBadge: Local HTMLNode := Web.UI.spanNodes(
+        [
+            Web.UI.i("", {"class": "fa-solid fa-circle-check me-1"})
+            Web.UI.text("HTTP {str(feed.statusCode)} Canlı")
+        ]
+        {"class": "badge text-bg-success me-2"}
+    )
+    if feed.success == false {
+        statusBadge = Web.UI.spanNodes(
+            [
+                Web.UI.i("", {"class": "fa-solid fa-database me-1"})
+                Web.UI.text("Yerel Önbellek")
+            ]
+            {"class": "badge text-bg-secondary me-2"}
+        )
+    }
+
+    topicCards: Local List<HTMLNode> := []
+    for topic in feed.topics {
+        topicCards.add(
+            Web.UI.div(
+                [
+                    Web.UI.div(
+                        [
+                            Web.UI.div(
+                                [
+                                    Web.UI.div(
+                                        [
+                                            Web.UI.i(
+                                                ""
+                                                {
+                                                    "class": "{topic.icon} text-{topic.badgeColor} fs-4 me-2"
+                                                }
+                                            )
+                                            Web.UI.span(
+                                                topic.category
+                                                {
+                                                    "class": "badge text-bg-{topic.badgeColor}"
+                                                }
+                                            )
+                                        ]
+                                        {
+                                            "class": "d-flex align-items-center justify-content-between mb-2"
+                                        }
+                                    )
+                                    Web.UI.h3(
+                                        topic.title
+                                        {"class": "h6 card-title fw-bold mb-2"}
+                                    )
+                                    Web.UI.p(
+                                        topic.summary
+                                        {
+                                            "class": "card-text small text-body-secondary mb-3"
+                                        }
+                                    )
+                                    Web.UI.aNodes(
+                                        topic.url
+                                        [
+                                            Web.UI.text("Vikipedi'de İncele ")
+                                            Web.UI.i(
+                                                ""
+                                                {
+                                                    "class": "fa-solid fa-arrow-up-right-from-square small"
+                                                }
+                                            )
+                                        ]
+                                        {
+                                            "class": "btn btn-sm btn-outline-secondary mt-auto w-100"
+                                            "target": "_blank"
+                                            "rel": "noopener noreferrer"
+                                        }
+                                    )
+                                ]
+                                {"class": "card-body d-flex flex-column"}
+                            )
+                        ]
+                        {"class": "card h-100 shadow-sm border"}
+                    )
+                ]
+                {"class": "col-12 col-md-6 col-lg-4 mb-3"}
+            )
+        )
+    }
+
+    return Web.UI.section(
+        [
+            Web.UI.div(
+                [
+                    Web.UI.div(
+                        [
+                            Web.UI.div(
+                                [
+                                    Web.UI.i(
+                                        ""
+                                        {
+                                            "class": "fa-solid fa-globe text-primary fs-4 me-2"
+                                        }
+                                    )
+                                    Web.UI.h2(
+                                        "Canlı Web Kazıma: Matematik Bülteni"
+                                        {"class": "h4 mb-0 fw-bold"}
+                                    )
+                                ]
+                                {"class": "d-flex align-items-center"}
+                            )
+                            Web.UI.div(
+                                [
+                                    statusBadge
+                                    Web.UI.spanNodes(
+                                        [
+                                            Web.UI.i(
+                                                ""
+                                                {
+                                                    "class": "fa-solid fa-network-wired me-1"
+                                                }
+                                            )
+                                            Web.UI.text(
+                                                "HTTP.client + HTML.parse"
+                                            )
+                                        ]
+                                        {
+                                            "class": "badge text-bg-info-subtle text-info-emphasis border border-info-subtle"
+                                        }
+                                    )
+                                ]
+                                {
+                                    "class": "d-flex align-items-center mt-2 mt-md-0"
+                                }
+                            )
+                        ]
+                        {
+                            "class": "d-flex flex-wrap align-items-center justify-content-between mb-3 border-bottom pb-3"
+                        }
+                    )
+                    Web.UI.div(
+                        [
+                            Web.UI.p(
+                                feed.leadParagraph
+                                {"class": "mb-2 text-body-secondary"}
+                            )
+                            Web.UI.pNodes(
+                                [
+                                    Web.UI.span("Kaynak: ")
+                                    Web.UI.aNodes(
+                                        feed.sourceUrl
+                                        [
+                                            Web.UI.text(feed.sourceTitle)
+                                            Web.UI.i(
+                                                ""
+                                                {
+                                                    "class": "fa-solid fa-arrow-up-right-from-square ms-1"
+                                                }
+                                            )
+                                        ]
+                                        {
+                                            "target": "_blank"
+                                            "rel": "noopener noreferrer"
+                                            "class": "text-primary text-decoration-none fw-semibold"
+                                        }
+                                    )
+                                    Web.UI.span(" • ")
+                                    Web.UI.i(
+                                        ""
+                                        {"class": "fa-regular fa-clock me-1"}
+                                    )
+                                    Web.UI.span(feed.timestamp)
+                                ]
+                                {"class": "small text-body-tertiary mb-0"}
+                            )
+                        ]
+                        {"class": "p-3 bg-light rounded border mb-4"}
+                    )
+                    Web.UI.div(topicCards, {"class": "row"})
+                ]
+                {"class": "p-4 border rounded-3 bg-white shadow-sm mb-5"}
+            )
+        ]
+    )
+}
+
+questionsSection: Function := (questions: List<QuestionRecord>) -> HTMLNode {
+    headerNode: Local HTMLNode := Web.UI.div(
+        [
+            Web.UI.div(
+                [
+                    Web.UI.i(
+                        ""
+                        {
+                            "class": "fa-solid fa-book-open text-primary fs-4 me-2"
+                        }
+                    )
+                    Web.UI.h2(
+                        "Matematik Soruları"
+                        {"class": "h4 mb-0 fw-bold"}
+                    )
+                    Web.UI.span(
+                        "{str(len(questions))} soru"
+                        {"class": "badge text-bg-primary rounded-pill ms-2"}
+                    )
+                ]
+                {"class": "d-flex align-items-center"}
+            )
+            Web.UI.p(
+                "Yayımlanmış sorular. Çözümünüzü göndermek için giriş yapın."
+                {"class": "text-body-secondary small mb-0 mt-1"}
+            )
+        ]
+        {"class": "mb-4"}
+    )
+
+    if len(questions) == 0 {
+        return Web.UI.section(
+            [
+                headerNode
+                Web.UI.p(
+                    "Henüz yayımlanmış soru yok."
+                    {"class": "alert alert-info"}
+                )
+            ]
+        )
+    }
+
+    cards: Local List<HTMLNode> := []
+    for question in questions {
+        cards.add(
+            Web.UI.div(
+                [questionCard(question)]
+                {"class": "col-12 col-md-6 col-lg-4 mb-4"}
+            )
+        )
+    }
+
+    return Web.UI.section([headerNode, Web.UI.div(cards, {"class": "row"})])
 }
