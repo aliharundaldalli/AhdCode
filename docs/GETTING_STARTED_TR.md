@@ -120,7 +120,7 @@ Sırada: [dil turunu](LANGUAGE_TOUR_TR.md) ve
 [Data tablolarını](DATA_TR.md), [PDF](PDF_TR.md) üretimini ve
 [Archive](ARCHIVE_TR.md) paketlemesini çalıştırın.
 
-## v0.16 adayı: tam form iş akışı
+## v0.16: tam form iş akışı
 
 [Form örneği](../examples/v0.16/forms_validation/README_TR.md),
 `ahdcode run examples/v0.16/forms_validation/app.ahd` ile veritabanı olmadan

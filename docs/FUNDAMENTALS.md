@@ -83,8 +83,8 @@ write(type(x))          // "Int"
 ```
 
 `type(null)` always reports `"Null"`. This is an intrinsic case in the
-Fundamental itself, not a new source-level `Null` declaration type -- `x :=
-null` is still rejected exactly as in v0.1.7.
+Fundamental itself, not a new source-level `Null` declaration type -- bare `x :=
+null` is rejected because `null` cannot determine an underlying type; write `x: User? := null`.
 
 ## `id(reference)`
 
@@ -92,8 +92,7 @@ null` is still rejected exactly as in v0.1.7.
 debugging, logging, and introspection. It is **not** a memory address and
 carries no guarantee beyond the current process or REPL session.
 
-Only reference values with meaningful AhdCode identity are accepted in
-v0.1.8: a Class instance, a List, or a Pair. A primitive (`Int`, `Real`,
+Only reference values with meaningful AhdCode identity are accepted: a Class instance, a List, or a Pair. A primitive (`Int`, `Real`,
 `Bool`, `String`) has no identity to report and is a compile-time error:
 
 ```ahd

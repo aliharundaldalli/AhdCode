@@ -94,7 +94,7 @@ A nullable collection receiver must be narrowed before member/index access.
 For `List<T?>`, each element is independently nullable and must likewise be
 checked. `Constant` deep-freeze behavior is unchanged by nullability.
 AhdCode has no truthiness, optional chaining, null-coalescing, or force-unwrap
-syntax in v0.1.
+syntax.
 
 ## `Nothing` is different
 

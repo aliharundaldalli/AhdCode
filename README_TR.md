@@ -12,9 +12,22 @@ AhdCode; okunabilir sözdizimi, açık niyet (explicit intent), öngörülebilir
 anlambilim (semantics) ve yerel (native) derlemeye odaklanan, deneysel,
 statik olarak denetlenen genel amaçlı bir programlama dilidir.
 
-Mevcut sürüm **v0.15.1**'dir. Çekirdek dil
+Mevcut sürüm **v0.16.0**'dır. Çekirdek dil
 uçtan uca çalışır, ancak proje üretime hazır değildir ve 1.0'dan önce kırıcı
 (breaking) değişiklikler olabilir.
+
+v0.16.0, **İstek Bağlamı, Formlar, Doğrulama, CSRF ve Flash**, açık istek/oturum
+bağlamı (`RequestContext`), tek seferlik yanıt ve oturum sonlandırma
+(`context.respond`), türlenmiş form okuma (`Forms`), sıralı doğrulama hataları
+(`ValidationErrors`), seçilmiş güvenli eski girdi (`OldInput`), oturuma bağlı
+CSRF (`Web.UI.csrfField`) ve tüketilen flash mesajları (`context.flashSet`,
+`context.flashTake`) ekler. Uygulama gömülü AhdCode'dur; mevcut
+HTTP/Session/Web.UI API'leri ve v0.15.1 temiz yolları uyumludur.
+[İş akışı ve kesin API](docs/WEB_TR.md#16-v016-istek-bağlamı-formlar-doğrulama-csrf-ve-flash)
+ile [çalıştırılabilir örneğe](examples/v0.16/forms_validation/README_TR.md) bakın.
+
+v0.15.1, URL sorgu parametreleri yerine kaynak rotaları için temiz yol
+parametreleri sağlayan tek-segmentli HTTP yol sonu joker karakterini (`/*`) ekler.
 
 v0.15.0, **Web Temelleri (Web Foundations)**, [`Web`](docs/WEB_TR.md)'i
 ekler: çoğunlukla AhdCode'un kendisiyle yazılmış ve derleyiciye gömülü
@@ -33,8 +46,8 @@ Function'lardır: sanal DOM yok, hydration yok, şablon dili yok, JavaScript
 `APP_HOST`, `APP_PROTOCOL`, `SERVER_HOST`, `SERVER_PORT`) ters vekil
 dağıtımları için genel URL ile bağlanma adresini ayrı tutar; sessiz
 varsayılan yoktur ve hiçbir `.env` değeri bir ikiliye gömülmez. Bilinçli
-olarak kapsam dışı kalanlar: ORM, form/doğrulama, ara katman, yetkilendirme,
-paketleyici ve tarayıcı canlı yenilemesi. `<APP_HOST>.test` için yerel
+olarak kapsam dışı kalanlar: ORM, ara katman, yetkilendirme, paketleyici ve
+tarayıcı canlı yenilemesi. `<APP_HOST>.test` için yerel
 güvenilir HTTPS, yaklaşık bir çözüm üretmek yerine
 [ertelenmiştir](docs/WEB_TR.md#14-yerel-https--mevcut-sınır): kalıcı olarak
 ayrıcalıklı sistem durumu gerektirirdi.
@@ -226,6 +239,54 @@ for name in names {
   sembol kataloğu yok ve bir belge editörde açık ve kaydedilmemişken
   dosyasına asla yazılmaz.
 
+## Tasarım İlkeleri: Sabit İlkeler, Gelişen 1.0 Öncesi Yüzey
+
+AhdCode kalıcı tasarım ilkelerine dayanır:
+
+- **Minimum satır sayısı yerine okunabilirlik:** Sözdizimi yapay kısalık yerine netliği ve yapıyı tercih eder.
+- **Açık niyet (explicit intent):** Sade İngilizce anahtar sözcükler; bildirim (`:=`) ve değişiklik (`=`) görsel olarak ayırt edilir.
+- **Katı statik tipleme:** `Any`/dinamik geri çekilme (fallback) yoktur; ilgisiz sessiz tür zorlaması (coercion) yoktur; truthiness yoktur.
+- **Yalnızca güvenli ve tekil çıkarım:** Atlanan tür belirtimleri yalnızca belirsizlik olmadığında çıkarılır; derleyici asla tahmin yürütmez.
+- **Belirlenirci (deterministic) davranış:** Gizli değişken çalışma zamanı durumu yoktur, sihirli küresel yan etkiler yoktur.
+- **Pratik olan her yerde yeni sözdizimi yerine sıradan Function'lar ve kütüphaneler.**
+- **Kanonik biçimlendirme:** `ahdcode format` tarafından uygulanan tek bir yetkili sunum stili.
+- **Ürün davranışı olarak tanılama:** Eyleme geçirilebilir ipuçlarıyla yapıya duyarlı net hatalar.
+
+### 1.0 Öncesi Dil Evrimi
+
+AhdCode, 1.0 öncesini kalıcı olarak dondurulmuş bir durum olarak görmez; sözdizimini gelişigüzel de değiştirmez. Yukarıdaki temel ilkeler sabittir. Gerçek uygulama, dogfooding ve pratik uygulama ihtiyaçları somut eksikleri gösterdiğinde, 1.0 öncesi dil kararları bilinçli olarak revize edilir. Bildirim tür çıkarımı, açık null olabilen türler (`T?`), açık leksikal/küresel bağımlılık listelerine sahip yalnızca-ifade lambda'lar (`#isim`, `@isim`) ve kapalı Class Protocol Methods kümesi gibi yetenekler; statik tiplemeyi, belirlenirciliği, açıklığı ve gizli sihrin reddedilmesini kesin olarak koruyan bilinçli evrimleri yansıtır.
+
+## Mimari Taksonomi
+
+Kavramsal netliği korumak için AhdCode'un yetenekleri dört belirgin mimari katmanda düzenlenmiştir:
+
+1. **Çekirdek Dil (Core Language):**
+   - Açık bildirimler (`:=`) ve değişiklik (`=`), açık iç içe kapsam (`Local`, `Global`)
+   - Statik tür sistemi ve null güvenliği: null olamayan `T`, açık null olabilen `T?`, `Nothing` ve akış-duyarlı null daraltması
+   - İsimli Function'lar ve açık yakalamalara (`#isim`, `@isim`) sahip yalnızca-ifade lambda'lar (`lambda (...) -> ifade`)
+   - Class'lar, tekli kalıtım ve on sabit [Class Protocol Method](docs/PROTOCOLS_TR.md) (`CEqual`, `CCompare`, `CAdd`, `CSubtract`, `CMultiply`, `CDivide`, `CRemainder`, `CPower`, `CNegate`, `CStr`)
+   - Belirlenirci kontrol akışı (`if`/`else`, `for`/`between`, `attempt`/`except`/`ultimately`/`toss`)
+   - Önceden tanımlanmış temel işlevler (`write`, `take`, `str`, `int`, `real`, `len`, `clear`, `abs`, `sum`, `min`, `max`, `type`, `id`) ve yapılandırılmış hata taksonomisi
+   - Modül çözümleme (`bring`, `from ... bring`) ve derleme zamanı yerel kaynak birleştirme ([`require(...)`](docs/REQUIRE_TR.md))
+
+2. **Standart Kütüphane (Birinci Taraf Gömülü Modüller):**
+   - **Matematik ve Hesaplama:** [`Math`](docs/MATH_TR.md), [`Regex`](docs/REGEX_TR.md), [`Statistics`](docs/STATISTICS_TR.md), [`Numeric`](docs/NUMERIC_TR.md), [`Plot`](docs/PLOT_TR.md)
+   - **Veri ve Koleksiyonlar:** [`Lists`](docs/LISTS_TR.md), [`KeyValue`](docs/KEYVALUE_TR.md), [`CSV`](docs/CSV_TR.md), [`Data`](docs/DATA_TR.md), [`JSON`](docs/JSON_TR.md), [`XML`](docs/XML_TR.md)
+   - **Belge Üretimi:** [`Word`](docs/WORD_TR.md), [`Excel`](docs/EXCEL_TR.md), [`PDF`](docs/PDF_TR.md), [`Latex`](docs/LATEX_TR.md), [`Archive`](docs/ARCHIVE_TR.md)
+   - **Sistem ve Ortam:** [`Time`](docs/TIME_TR.md), [`Path`](docs/FILESYSTEM_TR.md), [`File`](docs/FILESYSTEM_TR.md), [`Env`](docs/ENV_TR.md)
+
+3. **Birinci Taraf Çalışma Zamanı / Çatı Modülleri:**
+   - **Ağ, Sunucu ve Depolama İlkelleri:** [`HTTP`](docs/HTTP_TR.md) (bellek içi sunucu, istek/yanıt, çerezler, oturumlar, statik dosya sunucusu, client), [`HTML`](docs/HTML_TR.md) (anlamsal kurucu, ayrıştırıcı, seçici motoru), [`Security`](docs/SECURITY_TR.md) (Argon2id özetleme, güvenli token'lar, sabit zamanlı karşılaştırma), [`SQLite`](docs/SQLITE_TR.md) (yerel tipli veritabanı köprüsü), [`MySQL`](docs/MYSQL_TR.md) (bağlantı havuzu ve işlemlerle ağ veritabanı), [`SMTP`](docs/SMTP_TR.md) (yalnızca gönderim yapan posta istemcisi)
+   - **Web Uygulama Çatısı:** [`Web`](docs/WEB_TR.md) (birinci taraf gömülü web çatısı, [`Web.UI`](docs/WEB_TR.md#9-webui) anlamsal bileşenleri, `RequestContext`, tipli `Forms`, sıralı `ValidationErrors`, seçilmiş `OldInput`, oturuma bağlı CSRF ve flash yaşam döngüsü)
+
+4. **Geliştirici Araçları:**
+   - **Derleyici ve Araç Zinciri:** `ahdcode build`, `ahdcode run`, `ahdcode dev` (izleme-yeniden derleme döngüsü), `ahdcode stop`
+   - **Kanonik Biçimlendirici:** `ahdcode format` (sözdizim ağacı güdümlü, yorum koruyan)
+   - **Etkileşimli REPL:** `ahdcode repl` (kalıcı çok satırlı ortam)
+   - **Editör ve Dil Sunucusu:** `ahdcode lsp`, resmi VS Code / Antigravity eklentisi (`editors/vscode`)
+   - **Tanılama Motoru:** Net hata kodları ve ipuçlarıyla yapıya duyarlı derleyici tanılamaları
+   - **Yerel Geliştirici Arayüzü:** [AhdDataStudio](tools/AhdDataStudio/README_TR.md) (localhost MySQL ve SQLite yönetim aracı)
+
 ## Kaynak koddan derleme
 
 AhdCode şu anda Go 1.25 veya daha yeni bir sürüm gerektirir.
@@ -331,7 +392,7 @@ bakın.
 - [AhdDataStudio](tools/AhdDataStudio/README_TR.md) — yerel MySQL + SQLite geliştirme arayüzü
 - [v0.4 Kütüphane Demosu](https://github.com/aliharundaldalli/ahdcode-library-demo) (ayrı başlangıç web uygulaması)
 - [v0.4 Seminer Demosu](https://github.com/aliharundaldalli/ahdcode-seminer-demo) (Hatay, çok sayfalı)
-- [v0.15 Matematik Portalı](https://github.com/aliharundaldalli/ahdcode-math-portal) (Web.UI, MySQL, oturum, CSRF)
+- [v0.16 Matematik Portalı](https://github.com/aliharundaldalli/ahdcode-math-portal) (RequestContext, form, doğrulama, CSRF, flash)
 - [Tam v0.1 dil spesifikasyonu](AHDCODE_LANGUAGE_SPEC_v0.1_TR.md)
 
 ## Editör eklentisi
@@ -346,42 +407,36 @@ VS Code hem de Antigravity'i hedefler.
 
 ## Mevcut sınırlamalar
 
-v0.1, kasıtlı olarak blok/deyim (statement) lambda'ları, örtük/genel değişken (mutable) closure hücreleri,
-tuple dönüş değerleri, reflection, interface, çoklu kalıtım (multiple
-inheritance), hata ayıklayıcı (debugger), paket arama yolları (package
-search paths) veya web çalışma zamanına sahip değildir.
-[Dil sunucusunda](docs/LSP_TR.md) henüz yeniden adlandırma (rename) veya
-semantic token yoktur, ve referans bulma workspace genelinde bir indeks
-yerine bir belgenin kendi derleme grafiğiyle sınırlıdır. Operatör
-davranışı yalnızca on sabit
-[Class Protocol Methods](docs/PROTOCOLS_TR.md) aracılığıyla
-kullanıcı-tanımlıdır (user-definable), genel bir aşırı yükleme (overloading)
-mekanizması değildir. Modüller kardeş (sibling) `.ahd` dosyalarıdır ve
-editör eklentisi hafif bir çalıştır-ve-vurgula entegrasyonudur. Bkz.
-[spesifikasyonun desteklenmeyen özellik listesi](AHDCODE_LANGUAGE_SPEC_v0.1_TR.md#40-desteklenmeyen-v01-özellikleri).
+AhdCode aktif 1.0 öncesi geliştirme aşamasındadır ve henüz üretime hazır değildir; 1.0'dan önce kırıcı değişiklikler olabilir.
+
+Dil içinde AhdCode; kasıtlı olarak blok/deyim lambda'larını, keyfi/örtük değişken closure'ları, genel kullanıcı-tanımlı operatör aşırı yüklemesini (on sabit Class Protocol Method dışında), çoklu dönüş değerlerini/tuple'ları, reflection'ı, trait/interface'leri ve çoklu kalıtımı hariç tutar. Araçlarda ise AhdCode harici bir paket yöneticisi veya uzak kayıt defteri yerine derleme zamanı yerel kaynak birleştirmesi ([`require(...)`](docs/REQUIRE_TR.md)) ve paketli çevrimdışı modülleri kullanır. Dil sunucusu referans bulma ve yeniden adlandırma işlemleri arka plan çalışma alanı indeksi yerine derleme grafiği içinde çalışır. Bkz. [spesifikasyonun desteklenmeyen özellik listesi](AHDCODE_LANGUAGE_SPEC_v0.1_TR.md#40-desteklenmeyen-v01-özellikleri).
 
 ## Depo haritası
 
 ```text
-cmd/ahdcode/       CLI giriş noktası
-cmd/ahdnumeric/    paketli ileri doğrusal-cebir yardımcısı
-cmd/ahdplot/       paketli grafik render yardımcısı
-cmd/ahdsqlite/     paketli CGO'suz SQLite yardımcısı
-internal/          derleyici, çalışma zamanı, formatter ve REPL
-editors/vscode/    VS Code / Antigravity eklentisi
-docs/              son kullanıcı rehberleri
-examples/v0.1/     derlenmiş çalışan programlar
-examples/v0.3/     SQLite Not Defteri
-examples/v0.4/     Web Not Defteri
-examples/v0.5/     çerezler ve bellek içi oturumlar
-examples/v0.6/     giden HTTP Client ve JSON API'ler
-examples/v0.7/     HTML ayrıştırma, seçiciler ve web kazıma
-examples/v0.8/     multipart formlar, dosya yükleme ve yükleme meta verisi
-examples/v0.9/     Env yapılandırmalı SMTP metin/HTML postası
-examples/v0.12/    MySQL çekiliş örneği (katılım kodu ve kazanan ilanı)
+cmd/ahdcode/         CLI giriş noktası ve komut yönlendirici
+cmd/ahdnumeric/      paketli ileri doğrusal-cebir yardımcısı
+cmd/ahdplot/         paketli grafik render yardımcısı
+cmd/ahdsqlite/       paketli CGO'suz SQLite yardımcısı
+internal/            derleyici ön yüzü, arka yüzü, çalışma zamanı, biçimlendirici, LSP ve REPL
+internal/framework/  paketli birinci taraf Web çatısı kaynağı
+editors/vscode/      VS Code / Antigravity editör eklentisi
+docs/                yetkili referans rehberleri ve eğitimler
+examples/v0.1/       derlenmiş çekirdek dil programları
+examples/v0.3/       SQLite Not Defteri
+examples/v0.4/       Web Not Defteri
+examples/v0.5/       çerezler ve bellek içi oturumlar
+examples/v0.6/       giden HTTP Client ve JSON API'ler
+examples/v0.7/       HTML ayrıştırma, seçiciler ve web kazıma
+examples/v0.8/       multipart formlar, dosya yükleme ve yükleme meta verisi
+examples/v0.9/       Env yapılandırmalı SMTP metin/HTML postası
+examples/v0.12/      MySQL çekiliş örneği (katılım kodu ve kazanan ilanı)
+examples/v0.14/      require(...) ve statik varlıklarla çok dosyalı web uygulaması
+examples/v0.15/      Matematik Portalı dogfood uygulaması
+examples/v0.16/      formlar, doğrulama, CSRF ve flash iş akışı
 tools/AhdDataStudio/ birinci taraf yerel MySQL + SQLite geliştirme arayüzü
 AHDCODE_LANGUAGE_SPEC_v0.1.md
-                   yetkili (authoritative) dil sözleşmesi
+                     yetkili çekirdek dil sözleşmesi
 ```
 
 ## Geliştirme ve katkılar
@@ -395,13 +450,3 @@ dil tasarımı ve nihai teknik kararlar proje yazarına aittir.
 ## Lisans
 
 AhdCode, [MIT Lisansı](LICENSE) altında kullanılabilir.
-
-
-**v0.16.0 adayı — İstek Bağlamı, Formlar, Doğrulama, CSRF ve Flash.**
-Aday; açık istek/oturum bağlamı, tek seferlik yanıt sonlandırma, türlenmiş form
-okuma, sıralı doğrulama hataları, seçilmiş güvenli eski girdi, oturuma bağlı CSRF
-ve tüketilen flash mesajları ekler. Uygulama gömülü AhdCode'dur; mevcut
-HTTP/Session/Web.UI API'leri ve v0.15.1 temiz yolları uyumludur. Bu bağımsız QA
-bekleyen aday çalışmadır, yeni yayımlanmış sürüm değildir.
-[İş akışı ve kesin API](docs/WEB_TR.md) ile
-[çalıştırılabilir örneğe](examples/v0.16/forms_validation/README_TR.md) bakın.

@@ -4553,7 +4553,7 @@ yeni dosyayı alır.
 Eksiksiz bir örnek `examples/v0.15/ahd_academi` içindedir; tam referans
 [docs/WEB_TR.md](WEB_TR.md).
 
-## v0.16 adayı: tam form iş akışı
+## v0.16: tam form iş akışı
 
 [Form örneği](../examples/v0.16/forms_validation/README_TR.md),
 `ahdcode run examples/v0.16/forms_validation/app.ahd` ile veritabanı olmadan

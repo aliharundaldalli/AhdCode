@@ -32,7 +32,7 @@ v0.15 bilinçli olarak şunları **içermez**:
 | İçermez | Durumu |
 | --- | --- |
 | ORM, sorgu kurucu, göç (migration) | `SQLite` / `MySQL` açıkça kullanılır |
-| Form, doğrulama, eski girdi, hata torbaları | v0.16 için planlı |
+| Form, doğrulama, eski girdi, hata torbaları | v0.16'da yayımlandı (bkz. bölüm 16) |
 | Ara katman zincirleri, rota grupları, yetki bekçileri | v0.17 için planlı |
 | Şablon dili | `Web.document` bir kabuktur, şablon değil |
 | Sanal DOM, hydration, tepkisel durum, hooks | Planlı değil; sayfalar sunucuda kurulur |
@@ -766,9 +766,9 @@ cp .env.example .env
 ahdcode dev app.ahd
 ```
 
-## 16. v0.16 adayı: istek bağlamı, formlar, doğrulama, CSRF ve flash
+## 16. v0.16: istek bağlamı, formlar, doğrulama, CSRF ve flash
 
-v0.16 adayı, Matematik Portalında ölçülen oturum, doğrulama ve form tekrarlarını
+v0.16, Matematik Portalında ölçülen oturum, doğrulama ve form tekrarlarını
 azaltır. Olağan `Function -> HTMLNode` bileşimini ve açık veri akışını korur.
 Yeni kolaylıkların tamamı derleyiciye gömülü AhdCode kaynaklarıdır; yerel HTTP
 ayrıştırıcısı, SessionStore ve Security uygulaması değişmez. Yeni bağımlılık
@@ -911,10 +911,10 @@ bekler. Eski uygulama yardımcılarıyla birlikte kullanımda da `__web_csrf` ve
 
 Depo yayımlanmış bellek içi, süreç yerel ömrünü ve çerez politikasını korur.
 Bağlam kalıcı oturum veya süreçler arası eşzamanlama eklemez. Kullanıcı/site
-bağlamı, korumalar ve DB/JSON dönüşümleri açık kalır. Bu adayda middleware, auth
+bağlamı, korumalar ve DB/JSON dönüşümleri açık kalır. Bu sürümde middleware, auth
 çerçevesi, ORM, JSON/yönlendirme yeniden tasarımı veya varlık sistemi yoktur.
 
-### Kesin aday API'si
+### Kesin v0.16 API'si
 
 ```text
 Web.context(request: Request, store: SessionStore) -> RequestContext

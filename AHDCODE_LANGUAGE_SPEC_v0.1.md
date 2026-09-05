@@ -1,27 +1,33 @@
 # AhdCode Language Specification v0.1
 
-**Status:** Draft frozen core specification for first implementation  
-**Clarification revision:** 2026-08-28; clarified rules are normative for v0.1  
-**Primary implementation target:** Go  
-**File extension:** `.ahd`  
-**Initial scope:** CLI-first language. Explicit standard-library operations may invoke bundled runtime helpers or platform viewers when that is their declared purpose; this does not make AhdCode a GUI language. Web, HTTP, MySQL, SMTP, HTML layouts, JSON-specific web conveniences, and AhdWeb remain deferred.
+**Status:** Living pre-1.0 language specification<br>
+**Historical note:** Historical filename retained for compatibility<br>
+**Clarification revision:** 2026-09-05; normative pre-1.0 core specification<br>
+**Primary implementation target:** Go<br>
+**File extension:** `.ahd`<br>
+**Scope:** Core language grammar, static type system, and execution semantics. The specification originated as the v0.1 bootstrap core design and has received normative revisions as the pre-1.0 language evolved (e.g. declaration inference, explicit `T?`, expression-only lambdas, and Class Protocol Methods). Standard library modules (`Math`, `Regex`, `Data`, `Time`, etc.), first-party runtime services (`HTTP`, `SQLite`, `MySQL`, `SMTP`), and higher-level application frameworks (`Web`) build on top of these core semantics without altering core grammar, and are documented in their dedicated guides in `docs/`.
 
 ---
 
 ## 1. Design Philosophy
 
-AhdCode is designed around a few strong rules:
+AhdCode is designed around stable design principles with an evolving pre-1.0 surface:
 
 1. **Readability over minimum line count.**
 2. **Use plain English words when a short technical abbreviation adds no value.**
 3. **Do not silently coerce unrelated types.**
-4. **Make declaration and mutation visibly different.**
+4. **Make declaration and mutation visibly different** (`:=` vs `=`).
 5. **Allow concise syntax when it is unambiguous, but provide one canonical formatter style.**
 6. **Do not add a special language feature when an ordinary function can solve the problem cleanly.**
 7. **Do not add features only because C, Python, Java, JavaScript, or another language has them.**
 8. **The compiler may infer omitted type details only when it can do so safely and uniquely. It must never fall back to `Any`/dynamic behavior merely to make code compile.**
 9. **The parser may accept several harmless presentation forms; the formatter decides what canonical AhdCode looks like.**
-10. **Core language first. Web comes later as a runtime/library layer, not as the foundation of the grammar.**
+10. **Core language first. Web and network services exist as runtime/framework layers, not as the foundation of the grammar.**
+11. **Diagnostics as product behavior:** precise, construct-aware errors with actionable hints.
+
+### Stable Principles, Evolving Pre-1.0 Surface
+
+AhdCode does not treat pre-1.0 as permanently feature-frozen, nor does it casually churn syntax. The core principles above remain constant. As real implementation, dogfooding, and practical application needs demonstrate concrete gaps, pre-1.0 language decisions are revised deliberately. Capabilities such as declaration type inference, explicit nullable types (`T?`), expression-only lambdas with explicit dependency lists (`#name`, `@name`), and the closed set of Class Protocol Methods reflect deliberate evolutions that strictly preserve static typing, determinism, explicitness, and the rejection of hidden magic.
 
 AhdCode should feel approachable like Python, visually structured like C-family languages, and statically controlled without excessive ceremony.
 
@@ -3484,18 +3490,13 @@ Complex mathematics belongs to a Complex facility later.
 
 ---
 
-## 40. Unsupported v0.1 Features
+## 40. Unsupported Pre-1.0 Core Language Features <a id="40-unsupported-v01-features"></a>
 
-Intentionally excluded:
+Intentionally excluded from the core language contract (server-side services such as HTTP, HTML, MySQL, SMTP, and Web are implemented as first-party runtime/framework modules, not as core grammar extensions):
 
-- web runtime / AhdWeb
-- HTTP routing
-- MySQL
-- SMTP
-- HTML layouts
 - static class members
 - Getter/Setter syntax
-- block/statement lambdas and lexical closures
+- block/statement lambdas and lexical closures (lambdas are expression-only with explicit captures, §50, §54)
 - general/unrestricted user-defined operator overloading (only the ten fixed
   Class Protocol Methods of §47 exist; there is no arbitrary operator
   definition, no reverse operators, and no in-place protocols)

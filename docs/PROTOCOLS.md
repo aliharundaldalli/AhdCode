@@ -12,7 +12,7 @@ double-underscore naming convention, no `__eq__`/`__repr__`/`__radd__`-style
 family, and no attempt to give every language mechanism (construction,
 iteration, indexing, attribute access, calling) its own protocol name.
 
-There are exactly ten Class Protocol Methods in v0.1.8:
+There are exactly ten Class Protocol Methods:
 
 ```text
 CEqual CCompare
@@ -212,11 +212,11 @@ arithmetic protocol -- conceptually `a += b` behaves like `a = a + b`,
 subject to the normal assignment-compatibility rules. The target's receiver
 is evaluated exactly once, exactly like every other compound assignment;
 there is no separate in-place protocol (no `CIAdd`-style method). `++` and
-`--` are unrelated and are not extended to Class values in v0.1.8.
+`--` are unrelated and are not extended to Class values.
 
 ## Nullability
 
-Protocol dispatch never weakens v0.1.7 null safety. If the left operand is
+Protocol dispatch never weakens null safety. If the left operand is
 nullable, it must be narrowed to `NonNull` by ordinary flow analysis before a
 protocol method can be invoked on it -- exactly the same requirement as any
 other method call:

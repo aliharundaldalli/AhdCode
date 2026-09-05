@@ -32,7 +32,7 @@ v0.15 deliberately does **not** include:
 | Not included | Where it stands |
 | --- | --- |
 | ORM, query builder, migrations | Use `SQLite` / `MySQL` explicitly |
-| Forms, validation, old input, error bags | Planned for v0.16 |
+| Forms, validation, old input, error bags | Released in v0.16 (see section 16) |
 | Middleware chains, route groups, auth guards | Planned for v0.17 |
 | Template language | `Web.document` is a shell, not a template |
 | Virtual DOM, hydration, reactive state, hooks | Not planned; pages are composed on the server |
@@ -762,9 +762,9 @@ cp .env.example .env
 ahdcode dev app.ahd
 ```
 
-## 16. v0.16 candidate: request context, forms, validation, CSRF and flash
+## 16. v0.16: request context, forms, validation, CSRF and flash
 
-The v0.16 candidate reduces the repeated session, validation, and form plumbing
+v0.16 reduces the repeated session, validation, and form plumbing
 found in the Math Portal. It preserves ordinary `Function -> HTMLNode`
 composition and explicit data flow. All new conveniences are bundled AhdCode
 source; the native HTTP parser, SessionStore, and Security implementation stay
@@ -909,9 +909,9 @@ The store retains its released in-memory, process-local lifetime and cookie
 policy. Context adds neither durable sessions nor cross-process synchronization.
 Application user/site context, guards, and DB/JSON conversion stay explicit.
 No middleware, auth framework, ORM, JSON redesign, routing redesign, or asset
-system is included in this candidate.
+system is included in this release.
 
-### Exact candidate API
+### Exact v0.16 API
 
 ```text
 Web.context(request: Request, store: SessionStore) -> RequestContext

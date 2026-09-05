@@ -12,19 +12,22 @@ AhdCode is an experimental statically checked general-purpose programming
 language focused on readable syntax, explicit intent, predictable semantics,
 and native compilation.
 
-The current release is **v0.15.1**. The core
+The current release is **v0.16.0**. The core
 language works end to end, but the project is not production-ready and
-breaking changes may occur before 1.0.
+breaking changes may still occur before 1.0.
 
-
-**v0.16.0 candidate — Request Context, Forms, Validation, CSRF & Flash.**
-The candidate adds an explicit request/session context, one-time response
-finalization, typed form access, ordered validation errors, selected safe old
-input, session-bound CSRF, and consumed flash messages. The implementation is
-bundled AhdCode; existing HTTP/Session/Web.UI APIs and v0.15.1 clean routes remain
-compatible. This is candidate work pending independent QA, not a new release.
-See the [workflow and exact API](docs/WEB.md#16-v016-candidate-request-context-forms-validation-csrf-and-flash)
+v0.16.0, **Request Context, Forms, Validation, CSRF & Flash**, adds an explicit
+request/session context (`RequestContext`), one-time response and session
+finalization (`context.respond`), typed form access (`Forms`), ordered
+validation errors (`ValidationErrors`), selected safe old input (`OldInput`),
+session-bound CSRF (`Web.UI.csrfField`), and consumed flash messages
+(`context.flashSet`, `context.flashTake`). The implementation is bundled AhdCode;
+existing HTTP/Session/Web.UI APIs and v0.15.1 clean routes remain compatible.
+See the [workflow and exact API](docs/WEB.md#16-v016-request-context-forms-validation-csrf-and-flash)
 and the [runnable example](examples/v0.16/forms_validation/README.md).
+
+v0.15.1 adds one-segment HTTP trailing path wildcards (`/*`), enabling clean
+path parameter routing without URL query strings.
 
 v0.15.0, **Web Foundations**, adds [`Web`](docs/WEB.md): a first-party web
 framework written mostly in AhdCode itself and bundled with the compiler, so
@@ -42,8 +45,8 @@ A frozen environment contract (`APP_NAME`, `APP_ENV`, `APP_HOST`,
 `APP_PROTOCOL`, `SERVER_HOST`, `SERVER_PORT`) keeps the public URL and the
 bind address separate for reverse-proxy deployments, with no silent defaults
 and no `.env` values ever embedded in a binary. Still deliberately out of
-scope: ORM, forms/validation, middleware, auth, bundler, and browser live
-reload. Local trusted HTTPS for `<APP_HOST>.test` is
+scope: ORM, middleware, auth, bundler, and browser live reload. Local trusted
+HTTPS for `<APP_HOST>.test` is
 [deferred](docs/WEB.md#14-local-https--current-limitation) rather than
 approximated: it would need permanently privileged system state.
 
@@ -219,6 +222,54 @@ for name in names {
   second parser, no hand-maintained symbol catalog, and no writes to a
   document's file while it's open and unsaved in an editor.
 
+## Design Principles: Stable Principles, Evolving Pre-1.0 Surface
+
+AhdCode is grounded in enduring design principles:
+
+- **Readability over minimum line count:** syntax favors clarity and structure over clever compactness.
+- **Explicit intent:** plain English keywords; declaration (`:=`) and mutation (`=`) are visibly distinct.
+- **Strict static typing:** no `Any`/dynamic fallback; no unrelated silent coercion; no truthiness.
+- **Safe and unique inference only:** omitted type annotations are inferred only when unambiguous; the compiler never guesses.
+- **Deterministic behavior:** no hidden mutable runtime state, no magical global side effects.
+- **Ordinary Functions and libraries before new syntax where practical.**
+- **Canonical formatting:** one single authoritative presentation style enforced by `ahdcode format`.
+- **Diagnostics as product behavior:** precise, construct-aware errors with actionable hints.
+
+### Pre-1.0 Language Evolution
+
+AhdCode does not treat pre-1.0 as permanently feature-frozen, nor does it casually churn syntax. The core principles above remain constant. As real implementation, dogfooding, and practical application needs demonstrate concrete gaps, pre-1.0 language decisions are revised deliberately. Capabilities such as declaration type inference, explicit nullable types (`T?`), expression-only lambdas with explicit lexical/global dependency lists (`#name`, `@name`), and the closed set of Class Protocol Methods reflect deliberate evolutions that strictly preserve static typing, determinism, explicitness, and the rejection of hidden magic.
+
+## Architecture Taxonomy
+
+To maintain conceptual clarity, AhdCode's capabilities are organized into four distinct architectural layers:
+
+1. **Core Language:**
+   - Explicit declarations (`:=`) and mutation (`=`), explicit nested scope (`Local`, `Global`)
+   - Static type system and nullability: non-nullable `T`, explicit nullable `T?`, `Nothing`, and flow-sensitive null narrowing
+   - Named Functions and expression-only lambdas (`lambda (...) -> expr`) with explicit captures (`#name`, `@name`)
+   - Classes, single inheritance, and the fixed set of ten [Class Protocol Methods](docs/PROTOCOLS.md) (`CEqual`, `CCompare`, `CAdd`, `CSubtract`, `CMultiply`, `CDivide`, `CRemainder`, `CPower`, `CNegate`, `CStr`)
+   - Deterministic control flow (`if`/`else`, `for`/`between`, `attempt`/`except`/`ultimately`/`toss`)
+   - Predeclared fundamentals (`write`, `take`, `str`, `int`, `real`, `len`, `clear`, `abs`, `sum`, `min`, `max`, `type`, `id`) and structured error taxonomy
+   - Module resolution (`bring`, `from ... bring`) and compile-time local source composition ([`require(...)`](docs/REQUIRE.md))
+
+2. **Standard Library (First-party Bundled Modules):**
+   - **Mathematics & Computation:** [`Math`](docs/MATH.md), [`Regex`](docs/REGEX.md), [`Statistics`](docs/STATISTICS.md), [`Numeric`](docs/NUMERIC.md), [`Plot`](docs/PLOT.md)
+   - **Data & Collections:** [`Lists`](docs/LISTS.md), [`KeyValue`](docs/KEYVALUE.md), [`CSV`](docs/CSV.md), [`Data`](docs/DATA.md), [`JSON`](docs/JSON.md), [`XML`](docs/XML.md)
+   - **Document Generation:** [`Word`](docs/WORD.md), [`Excel`](docs/EXCEL.md), [`PDF`](docs/PDF.md), [`Latex`](docs/LATEX.md), [`Archive`](docs/ARCHIVE.md)
+   - **System & Environment:** [`Time`](docs/TIME.md), [`Path`](docs/FILESYSTEM.md), [`File`](docs/FILESYSTEM.md), [`Env`](docs/ENV.md)
+
+3. **First-Party Runtime / Framework Modules:**
+   - **Network, Server & Storage Primitives:** [`HTTP`](docs/HTTP.md) (in-memory server, request/response, cookies, sessions, static file server, client), [`HTML`](docs/HTML.md) (semantic builder, parser, selector engine), [`Security`](docs/SECURITY.md) (Argon2id hashing, secure tokens, constant-time comparison), [`SQLite`](docs/SQLITE.md) (local typed database bridge), [`MySQL`](docs/MYSQL.md) (network database with connection pool and transactions), [`SMTP`](docs/SMTP.md) (send-only mail client)
+   - **Web Application Framework:** [`Web`](docs/WEB.md) (first-party bundled web framework, [`Web.UI`](docs/WEB.md#9-webui) semantic components, `RequestContext`, typed `Forms`, ordered `ValidationErrors`, selected `OldInput`, session-bound CSRF, and flash lifecycle)
+
+4. **Developer Tools:**
+   - **Compiler & Toolchain:** `ahdcode build`, `ahdcode run`, `ahdcode dev` (watch-rebuild loop), `ahdcode stop`
+   - **Canonical Formatter:** `ahdcode format` (syntax tree-driven, comment-preserving)
+   - **Interactive REPL:** `ahdcode repl` (persistent multi-line environment)
+   - **Editor & Language Server:** `ahdcode lsp`, official VS Code / Antigravity extension (`editors/vscode`)
+   - **Diagnostics Engine:** construct-aware compiler diagnostics with clear error codes and hints
+   - **Local Developer UI:** [AhdDataStudio](tools/AhdDataStudio/README.md) (localhost MySQL and SQLite management tool)
+
 ## Build from source
 
 AhdCode currently requires Go 1.25 or newer.
@@ -323,7 +374,7 @@ See the [CLI guide](docs/CLI.md), [formatter guide](docs/FORMATTER.md),
 - [AhdDataStudio](tools/AhdDataStudio/README.md) — local MySQL + SQLite development UI
 - [v0.4 Library Demo](https://github.com/aliharundaldalli/ahdcode-library-demo) (separate beginner web app)
 - [v0.4 Seminar Demo](https://github.com/aliharundaldalli/ahdcode-seminer-demo) (Hatay, multi-page)
-- [v0.15 Math Portal](https://github.com/aliharundaldalli/ahdcode-math-portal) (Web.UI, MySQL, sessions, CSRF)
+- [v0.16 Math Portal](https://github.com/aliharundaldalli/ahdcode-math-portal) (RequestContext, forms, validation, CSRF, flash)
 - [Full v0.1 language specification](AHDCODE_LANGUAGE_SPEC_v0.1.md)
 
 ## Editor extension
@@ -337,39 +388,36 @@ diagnostics and hover. The same VSIX targets VS Code and Antigravity. See its
 
 ## Current limitations
 
-v0.1 intentionally has no block/statement lambdas, implicit/general mutable closure cells, tuple
-returns, reflection, interfaces, multiple inheritance, debugger, package
-search paths, or web runtime. The [language server](docs/LSP.md) has no
-rename or semantic tokens yet, and find references is scoped to one
-document's own compile graph rather than a full workspace-wide index.
-Operator behavior is user-definable only through the ten fixed
-[Class Protocol Methods](docs/PROTOCOLS.md), not a general overloading
-mechanism. Modules are sibling `.ahd` files, and the editor extension is a
-lightweight run-and-highlight integration. See the
-[specification's unsupported-feature list](AHDCODE_LANGUAGE_SPEC_v0.1.md#40-unsupported-v01-features).
+AhdCode is in active pre-1.0 development and is not yet production-ready; breaking changes may still occur before 1.0.
+
+Within the language, AhdCode intentionally excludes block/statement lambdas, arbitrary/implicit mutable closures, general user-defined operator overloading (outside the ten fixed Class Protocol Methods), multiple return values/tuples, reflection, traits/interfaces, and multiple inheritance. In tooling, AhdCode uses compile-time local source composition ([`require(...)`](docs/REQUIRE.md)) and bundled offline modules rather than an external package manager or remote registry. Language server references and rename operate within the compile graph rather than an asynchronous background workspace index. See the [specification's unsupported-feature list](AHDCODE_LANGUAGE_SPEC_v0.1.md#40-unsupported-v01-features).
 
 ## Repository map
 
 ```text
-cmd/ahdcode/       CLI entry point
-cmd/ahdnumeric/    bundled advanced linear-algebra helper
-cmd/ahdplot/       bundled chart-rendering helper
-cmd/ahdsqlite/     bundled CGO-free SQLite helper
-internal/          compiler, runtime, formatter, and REPL
-editors/vscode/    VS Code / Antigravity extension
-docs/              end-user guides
-examples/v0.1/     curated working programs
-examples/v0.3/     SQLite Notes App
-examples/v0.4/     Web Notes App
-examples/v0.5/     cookies and in-memory sessions
-examples/v0.6/     outbound HTTP Client and JSON APIs
-examples/v0.7/     HTML parsing, selectors, and web scraping
-examples/v0.8/     multipart forms, file uploads, and upload metadata
-examples/v0.9/     SMTP text/HTML mail through Env-configured servers
-examples/v0.12/    MySQL raffle demo (join codes and announced winner)
+cmd/ahdcode/         CLI entry point and command router
+cmd/ahdnumeric/      bundled advanced linear-algebra helper
+cmd/ahdplot/         bundled chart-rendering helper
+cmd/ahdsqlite/       bundled CGO-free SQLite helper
+internal/            compiler frontend, backend, runtime, formatter, LSP, and REPL
+internal/framework/  bundled first-party Web framework source
+editors/vscode/      VS Code / Antigravity editor extension
+docs/                authoritative reference guides and tutorials
+examples/v0.1/       curated core language programs
+examples/v0.3/       SQLite Notes App
+examples/v0.4/       Web Notes App
+examples/v0.5/       cookies and in-memory sessions
+examples/v0.6/       outbound HTTP Client and JSON APIs
+examples/v0.7/       HTML parsing, selectors, and web scraping
+examples/v0.8/       multipart forms, file uploads, and upload metadata
+examples/v0.9/       SMTP text/HTML mail through Env-configured servers
+examples/v0.12/      MySQL raffle demo (join codes and announced winner)
+examples/v0.14/      multi-file web app with require(...) and static assets
+examples/v0.15/      Math Portal dogfood application
+examples/v0.16/      forms, validation, CSRF, and flash workflow
 tools/AhdDataStudio/ first-party local MySQL + SQLite development UI
 AHDCODE_LANGUAGE_SPEC_v0.1.md
-                   authoritative language contract
+                     authoritative core language specification
 ```
 
 ## Development and credits

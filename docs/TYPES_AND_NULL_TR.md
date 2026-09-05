@@ -98,7 +98,7 @@ kuralları kullanır: `(Int)` ve `(Int?)` farklı imzalardır ve çözülmemiş 
 Null olabilen bir koleksiyon alıcısı (receiver), üye/indeks erişiminden önce
 daraltılmalıdır. `List<T?>` için her eleman bağımsız olarak null olabilir ve
 aynı şekilde kontrol edilmelidir. `Constant` derin dondurma davranışı, null
-olabilirlikten etkilenmez. AhdCode'da v0.1'de truthiness, optional chaining,
+olabilirlikten etkilenmez. AhdCode'da truthiness, optional chaining,
 null-coalescing veya force-unwrap sözdizimi yoktur.
 
 ## `Nothing` farklıdır

@@ -53,7 +53,7 @@ a `Function` value is accepted, including `map`, `filter`, and the existing
 `sort` key callback. No implicit coercion is added.
 
 Lambda parameters are required; default-valued parameters remain available on
-named Function declarations, not expression lambdas, in v0.1.11.
+named Function declarations, not expression lambdas.
 
 A lambda cannot contain a block or statements. Use the unchanged named
 Function syntax when control flow, declarations, loops, error handling, or
@@ -126,7 +126,7 @@ Reference values follow the language's ordinary rules: capturing a `List`,
 parameter does, so the referenced object stays shared.
 
 A captured name is read-only inside the lambda. `#`/`Local` gives the lambda
-the enclosing value, not ownership of the enclosing variable, and v0.1.13 adds
+the enclosing value, not ownership of the enclosing variable, and AhdCode has
 no mutable closure cell or reference box.
 
 **An `@`/`Global` dependency is not a capture.** It does not snapshot the

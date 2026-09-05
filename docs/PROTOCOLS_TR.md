@@ -13,7 +13,7 @@ adlandırma kuralı, `__eq__`/`__repr__`/`__radd__` tarzı bir aile yoktur ve
 her dil mekanizmasına (oluşturma, yineleme, indeksleme, öznitelik erişimi,
 çağırma) kendi protokol ismini verme girişimi yoktur.
 
-v0.1.8'de tam olarak on tane Class Protocol Method vardır:
+Tam olarak on tane Class Protocol Method vardır:
 
 ```text
 CEqual CCompare
@@ -215,7 +215,7 @@ genişletilmez.
 
 ## Null olabilirlik
 
-Protokol dağıtımı, v0.1.7 null güvenliğini asla zayıflatmaz. Sol işlenen
+Protokol dağıtımı, null güvenliğini asla zayıflatmaz. Sol işlenen
 null olabiliyorsa, bir protokol metodu onun üzerinde çağrılmadan önce
 sıradan akış analizi (flow analysis) ile `NonNull`'a daraltılmalıdır --
 diğer herhangi bir metot çağrısıyla aynı gereklilik:

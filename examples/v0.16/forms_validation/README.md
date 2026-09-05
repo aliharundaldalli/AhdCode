@@ -1,4 +1,4 @@
-# Forms and validation — v0.16 candidate
+# Forms and validation — v0.16
 
 ```bash
 ahdcode run examples/v0.16/forms_validation/app.ahd

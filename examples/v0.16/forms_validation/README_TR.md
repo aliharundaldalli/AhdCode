@@ -1,4 +1,4 @@
-# Formlar ve doğrulama — v0.16 adayı
+# Formlar ve doğrulama — v0.16
 
 ```bash
 ahdcode run examples/v0.16/forms_validation/app.ahd

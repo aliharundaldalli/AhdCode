@@ -6,44 +6,36 @@
 > Uygulama açısından iki belge aynı kuralları açıklar; metinsel bir çeviri
 > uyuşmazlığı oluşursa İngilizce ana spesifikasyon esas alınır.
 
-**Durum:** İlk uygulama için dondurulmuş (frozen) taslak çekirdek spesifikasyon
-**Açıklama revizyonu:** 2026-08-28; açıklanan kurallar v0.1 için normatiftir
-**Birincil uygulama hedefi:** Go
-**Dosya uzantısı:** `.ahd`
-**Başlangıç kapsamı:** CLI öncelikli dil. Açık standart-kütüphane işlemleri,
-ilan edilmiş amaçları bu olduğunda paketlenmiş çalışma zamanı yardımcılarını
-veya platform görüntüleyicilerini çağırabilir; bu, AhdCode'u bir GUI dili
-yapmaz. Web, HTTP, MySQL, SMTP, HTML düzenleri, JSON'a özgü web kolaylıkları
-ve AhdWeb ertelenmiş olarak kalır.
+**Durum:** Yaşayan (living) 1.0 öncesi dil spesifikasyonu<br>
+**Tarihsel not:** Uyumluluk için tarihsel dosya adı korunmuştur<br>
+**Açıklama revizyonu:** 2026-09-05; normatif 1.0 öncesi çekirdek spesifikasyon<br>
+**Birincil uygulama hedefi:** Go<br>
+**Dosya uzantısı:** `.ahd`<br>
+**Kapsam:** Çekirdek dil dilbilgisi (grammar), statik tür sistemi ve yürütme anlambilimi (semantics). Bu spesifikasyon, v0.1 önyükleme (bootstrap) çekirdek tasarımı olarak başlamış ve 1.0 öncesi dil yüzeyi geliştikçe (ör. bildirim çıkarımı, açık `T?`, yalnızca-ifade lambda'lar ve Class Protocol Methods) normatif revizyonlar almıştır. Standart kütüphane modülleri (`Math`, `Regex`, `Data`, `Time`, vb.), birinci taraf çalışma zamanı servisleri (`HTTP`, `SQLite`, `MySQL`, `SMTP`) ve üst düzey uygulama çatıları (`Web`), çekirdek dilbilgisini değiştirmeden bu temel anlambilim üzerine kurulur ve `docs/` altındaki özel belgelerinde belgelenir.
 
 ---
 
 ## 1. Tasarım Felsefesi
 
-AhdCode, birkaç güçlü kural etrafında tasarlanmıştır:
+AhdCode, sabit tasarım ilkeleri ve gelişen 1.0 öncesi yüzey anlayışıyla tasarlanmıştır:
 
 1. **Minimum satır sayısı yerine okunabilirlik.**
-2. **Kısa teknik bir kısaltmanın hiçbir değer katmadığı yerde sade İngilizce
-   kelimeler kullanın.**
+2. **Kısa teknik bir kısaltmanın hiçbir değer katmadığı yerde sade İngilizce kelimeler kullanın.**
 3. **İlgisiz türleri sessizce zorlama (coerce) yapmayın.**
-4. **Bildirimi ve değişikliği (mutation) görsel olarak farklı yapın.**
-5. **Belirsiz olmadığında özlü (concise) sözdizimine izin verin, ancak tek
-   bir kanonik formatter stili sağlayın.**
-6. **Sıradan bir fonksiyon sorunu temiz bir şekilde çözebiliyorsa özel bir
-   dil özelliği eklemeyin.**
-7. **Yalnızca C, Python, Java, JavaScript veya başka bir dilde olduğu için
-   özellik eklemeyin.**
-8. **Derleyici, yalnızca güvenli ve benzersiz bir şekilde yapabildiğinde
-   eksik tür ayrıntılarını çıkarabilir (infer edebilir). Kodun derlenmesini
-   sağlamak için asla `Any`/dinamik davranışa geri dönmemelidir.**
-9. **Ayrıştırıcı (parser) birkaç zararsız sunum biçimini kabul edebilir;
-   kanonik AhdCode'un neye benzediğine formatter karar verir.**
-10. **Önce çekirdek dil. Web, dilbilgisinin temeli olarak değil, daha sonra
-    bir çalışma zamanı/kütüphane katmanı olarak gelir.**
+4. **Bildirimi ve değişikliği (mutation) görsel olarak farklı yapın** (`:=` ve `=`).
+5. **Belirsiz olmadığında özlü (concise) sözdizimine izin verin, ancak tek bir kanonik formatter stili sağlayın.**
+6. **Sıradan bir fonksiyon sorunu temiz bir şekilde çözebiliyorsa özel bir dil özelliği eklemeyin.**
+7. **Yalnızca C, Python, Java, JavaScript veya başka bir dilde olduğu için özellik eklemeyin.**
+8. **Derleyici, yalnızca güvenli ve benzersiz bir şekilde yapabildiğinde eksik tür ayrıntılarını çıkarabilir (infer edebilir). Kodun derlenmesini sağlamak için asla `Any`/dinamik davranışa geri dönmemelidir.**
+9. **Ayrıştırıcı (parser) birkaç zararsız sunum biçimini kabul edebilir; kanonik AhdCode'un neye benzediğine formatter karar verir.**
+10. **Önce çekirdek dil. Web ve ağ servisleri, dilbilgisinin temeli olarak değil, çalışma zamanı/çatı katmanları olarak yer alır.**
+11. **Ürün davranışı olarak tanılama (diagnostics):** Eyleme geçirilebilir ipuçlarıyla yapıya duyarlı net hatalar.
 
-AhdCode, Python gibi yaklaşılabilir, C ailesi diller gibi görsel olarak
-yapılandırılmış ve aşırı törensellik olmadan statik olarak kontrollü
-hissettirmelidir.
+### Sabit İlkeler, Gelişen 1.0 Öncesi Yüzey
+
+AhdCode, 1.0 öncesini kalıcı olarak dondurulmuş bir durum olarak görmez; sözdizimini gelişigüzel de değiştirmez. Yukarıdaki temel ilkeler sabittir. Gerçek uygulama, dogfooding ve pratik uygulama ihtiyaçları somut eksikleri gösterdiğinde, 1.0 öncesi dil kararları bilinçli olarak revize edilir. Bildirim tür çıkarımı, açık null olabilen türler (`T?`), açık leksikal/küresel bağımlılık listelerine sahip yalnızca-ifade lambda'lar (`#isim`, `@isim`) ve kapalı Class Protocol Methods kümesi gibi yetenekler; statik tiplemeyi, belirlenirciliği, açıklığı ve gizli sihrin reddedilmesini kesin olarak koruyan bilinçli evrimleri yansıtır.
+
+AhdCode, Python gibi yaklaşılabilir, C ailesi diller gibi görsel olarak yapılandırılmış ve aşırı törensellik olmadan statik olarak kontrollü hissettirmelidir.
 
 ---
 
@@ -3896,18 +3888,13 @@ Karmaşık matematik, daha sonraki bir Complex olanağına aittir.
 
 ---
 
-## 40. Desteklenmeyen v0.1 Özellikleri
+## 40. Desteklenmeyen 1.0 Öncesi Çekirdek Dil Özellikleri <a id="40-desteklenmeyen-v01-özellikleri"></a>
 
-Kasıtlı olarak hariç tutulanlar:
+Çekirdek dil sözleşmesinden kasıtlı olarak hariç tutulanlar (HTTP, HTML, MySQL, SMTP ve Web gibi sunucu taraflı servisler çekirdek dilbilgisi uzantıları olarak değil, birinci taraf çalışma zamanı/çatı modülleri olarak uygulanmıştır):
 
-- web çalışma zamanı / AhdWeb
-- HTTP yönlendirme
-- MySQL
-- SMTP
-- HTML düzenleri
 - statik Class üyeleri
 - Getter/Setter sözdizimi
-- blok/deyim lambda'ları ve lexical closure'lar
+- blok/deyim lambda'ları ve lexical closure'lar (lambda'lar açık yakalamalara sahip yalnızca-ifade biçimindedir, §50, §54)
 - genel/sınırsız kullanıcı-tanımlı operatör aşırı yüklemesi (yalnızca
   §47'nin on sabit Class Protocol Methods'ı vardır; keyfi operatör
   tanımı, ters operatörler veya yerinde (in-place) protokoller yoktur)

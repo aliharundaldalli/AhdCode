@@ -54,7 +54,7 @@ olan her parametre türü desteklenir. Uyumlu bir lambda; `map`, `filter` ve
 mevcut `sort` anahtar callback'i dahil, `Function` değeri kabul edilen her
 yerde çalışır. Örtük zorlama (implicit coercion) eklenmez.
 
-Lambda parametreleri zorunludur; varsayılan değerli parametreler v0.1.11'de
+Lambda parametreleri zorunludur; varsayılan değerli parametreler
 ifade lambda'larında değil, isimli Function bildirimlerinde kullanılabilir.
 
 Bir lambda blok veya deyim (statement) içeremez. Kontrol akışı, bildirimler,
@@ -130,7 +130,7 @@ Class örneğini yakalamak, tam olarak onu bir parametre olarak geçirmek gibi
 referansı kopyalar; bu yüzden referans verilen nesne paylaşılmaya devam eder.
 
 Yakalanan bir isim lambda içinde salt okunurdur. `#`/`Local`, lambda'ya
-çevreleyen değeri verir, çevreleyen değişkenin sahipliğini değil; v0.1.13
+çevreleyen değeri verir, çevreleyen değişkenin sahipliğini değil; AhdCode
 değiştirilebilir bir closure hücresi veya referans kutusu eklemez.
 
 **Bir `@`/`Global` bağımlılığı bir yakalama değildir.** Modül bağlamasını

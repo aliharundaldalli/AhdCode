@@ -1,16 +1,18 @@
 # Codex Bootstrap Prompt — Implement AhdCode v0.1
 
-> **Historical note:** This document is the bootstrap implementation prompt
-> used during early AhdCode v0.1 development. Some language decisions
-> described here were intentionally revised in later v0.1.x releases (for
-> example, declaration type inference in v0.1.7, and the Class Protocol
-> Methods introduced in v0.1.8 -- neither of which existed when this prompt
-> was written). The current language specification and current docs are
-> authoritative for present behavior; this document is kept as a record of
-> the initial design and how the language has evolved since. See
-> [`AHDCODE_LANGUAGE_SPEC_v0.1.md`](AHDCODE_LANGUAGE_SPEC_v0.1.md),
-> [`docs/PROTOCOLS.md`](docs/PROTOCOLS.md), and
-> [`docs/TYPES_AND_NULL.md`](docs/TYPES_AND_NULL.md) for the current rules.
+> [!WARNING]
+> **HISTORICAL DOCUMENT — NOT THE CURRENT LANGUAGE CONTRACT**
+>
+> This document is the bootstrap implementation prompt used during early AhdCode v0.1 development. It is preserved strictly as valuable project history.
+>
+> AhdCode's pre-1.0 language surface and ecosystem have evolved through deliberate revisions driven by real implementation, dogfooding, and practical application needs. Representative later deliberate revisions that are absent from this historical prompt include:
+> - declaration type inference (`name := "value"`, `Local`, `Global`)
+> - explicit nullable type syntax (`T?`) and flow-sensitive null narrowing
+> - expression-only lambda with explicit dependencies (`#name`, `@name`)
+> - the fixed closed set of ten Class Protocol Methods (`CAdd`, `CEqual`, `CCompare`, etc.)
+> - subsequent first-party runtime, toolchain, and application framework layers (`HTTP`, `SQLite`, `MySQL`, `SMTP`, `require(...)`, `ahdcode dev`, and `Web` v0.16)
+>
+> **Do not use this prompt as a specification for current AhdCode.** The current authoritative language contract is defined in [`AHDCODE_LANGUAGE_SPEC_v0.1.md`](AHDCODE_LANGUAGE_SPEC_v0.1.md), and current user-facing behavior is documented in [`docs/`](docs/).
 
 You are the primary implementation agent for a new programming language named **AhdCode**.
 

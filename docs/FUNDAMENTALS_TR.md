@@ -87,7 +87,7 @@ write(type(x))          // "Int"
 
 `type(null)` her zaman `"Null"` bildirir. Bu, Fundamental'ın kendi içindeki
 içkin (intrinsic) bir durumdur, yeni bir kaynak seviyesi `Null` bildirim
-türü değildir -- `x := null`, v0.1.7'deki gibi hâlâ reddedilir.
+türü değildir -- yalın `x := null`, `null` temel bir tür belirleyemediği için reddedilir; `x: User? := null` yazın.
 
 ## `id(reference)`
 
@@ -96,7 +96,7 @@ içgözlem için çalışma zamanı tarafından yönetilen bir kimlik numarası
 döndürür. Bir bellek adresi **değildir** ve mevcut süreç veya REPL
 oturumunun ötesinde hiçbir garanti taşımaz.
 
-v0.1.8'de yalnızca anlamlı bir AhdCode kimliğine sahip referans değerleri
+Yalnızca anlamlı bir AhdCode kimliğine sahip referans değerleri
 kabul edilir: bir Class örneği, bir List veya bir Pair. Bir ilkel (primitive)
 değerin (`Int`, `Real`, `Bool`, `String`) bildirecek bir kimliği yoktur ve
 bu bir derleme zamanı hatasıdır:

@@ -119,7 +119,7 @@ Next: read the [language tour](LANGUAGE_TOUR.md), learn how to act on
 [Data tables](DATA.md), [PDF](PDF.md) generation, and
 [Archive](ARCHIVE.md) packaging.
 
-## v0.16 candidate: a complete form workflow
+## v0.16: a complete form workflow
 
 The [forms example](../examples/v0.16/forms_validation/README.md) runs with
 `ahdcode run examples/v0.16/forms_validation/app.ahd` and needs no database.

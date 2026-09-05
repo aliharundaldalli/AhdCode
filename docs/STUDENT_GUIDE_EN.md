@@ -4518,7 +4518,7 @@ not -- the browser just gets the new file on the next reload.
 A complete example is in `examples/v0.15/ahd_academi`, and the full reference
 is [docs/WEB.md](WEB.md).
 
-## v0.16 candidate: a complete form workflow
+## v0.16: a complete form workflow
 
 The [forms example](../examples/v0.16/forms_validation/README.md) runs with
 `ahdcode run examples/v0.16/forms_validation/app.ahd` and needs no database.
