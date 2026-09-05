@@ -4580,8 +4580,10 @@ API'yi öğretir; v0.15 API'leri kaynak uyumluluğunu korur.
 
 ## v0.17: gruplar ve bekçiler
 
-`ahdcode init web` tek rotalı bir başlangıç yazar. Bağlam duyarlı rotalar,
-gruplar ve sıralı bekçiler ayrı katmandır:
+`ahdcode init web` artık Empty, Basic veya Admin sorar. Empty bir karşılama
+sayfasıdır. Basic posta yapılandırması ekler. Admin giriş, pano ve
+veritabanı ekler. Bağlam duyarlı rotalar, gruplar ve sıralı bekçiler ayrı,
+açık katman olarak kalır:
 [`examples/v0.17/routes_guards`](../examples/v0.17/routes_guards).
 `Function(Request) -> Response` ile `App.get` çalışmayı sürdürür. Bekçi
 devam için `null`, durmak için sonlandırılmış `Response` döner. Web bir

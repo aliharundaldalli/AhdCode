@@ -748,24 +748,96 @@ configuration contract.
 | --- | --- |
 | v0.16 | Forms, validation, CSRF conveniences, flash, old input, form errors |
 | v0.17 | `ahdcode init web`, context-aware routes, route groups, ordered guards |
+| v0.18 | Web starters: Empty, Basic, Admin; local Bootstrap; Admin DB bootstrap |
 
 ## Starting a project
 
 ```bash
-mkdir MyPortal
-cd MyPortal
+mkdir my-app
+cd my-app
 ahdcode init web
 ahdcode dev app.ahd
 ```
 
-`init web` initializes the current directory. It writes `.env` (loopback
-development defaults, gitignored) and `.env.example` (safe to commit), plus
-one Page, Layout, Navbar, Footer, Config file, and empty `public/style.css`
-and `public/main.js`. The layout links both assets with the released Web HTML
-API (`Web.UI.stylesheet`, `Web.UI.element("script", ...)`). Templates are
-embedded in the CLI: no network, no package manager, no overwrite. Open
-`http://127.0.0.1:8080`. `main.js` is optional static JavaScript, not a
-frontend runtime.
+On a terminal, `init web` asks Empty, Basic, or Admin. You can also run
+`ahdcode init web empty|basic|admin`. This is a pre-1.0 change from the
+v0.17 immediate scaffold.
+
+Templates and [Bootstrap 5.3.3](https://getbootstrap.com/) (MIT) ship inside
+the CLI. Generated pages load only local files:
+
+- `/assets/vendor/bootstrap/bootstrap.min.css`
+- `/assets/vendor/bootstrap/bootstrap.bundle.min.js`
+- `/assets/style.css`
+- `/assets/main.js`
+- `/assets/ahdcode-logo.png`
+
+There is no CDN, npm, or network fetch during `init web`.
+
+## 18. v0.18: Web starters and application bootstrap
+
+v0.18 does not change RequestContext, RouteSet, guards, Forms, CSRF, Flash,
+Security, SQLite, MySQL, HTTP, or SMTP. It changes the **startup experience**.
+
+### Empty
+
+A polished welcome application. No database, login, dashboard, repositories,
+or mail keys. `.env` stays the six application keys.
+
+### Basic
+
+The same shell plus `Config/Mail.ahd` and `MAIL_*` keys that those functions
+actually read. `MAIL_SECURITY` defaults to `starttls` (SMTP on port 587).
+Empty `MAIL_HOST` still lets the app start. No database and no authentication.
+
+### Admin
+
+Public Home, Login, Dashboard, and POST `/logout` (CSRF, then redirect to
+`/`). `signedIn` is ordinary generated application code:
+
+```ahd
+routes.get("/dashboard", dashboard, signedIn)
+```
+
+Login uses Form, ValidationErrors, CSRF, session rotation, Flash, and email
+old input only. Failures do not say whether the email exists.
+
+#### SQLite
+
+Creates `database/<name>.db` and `database/schema.sql`, applies the schema,
+and inserts the administrator with `Security.passwordHash`. An existing
+`.db` file stops init. Generated `database/*.db` files are gitignored;
+`schema.sql` is not.
+
+#### MySQL
+
+Asks host, port, database name, username, and password (hidden). Uses the
+released MySQL contract (`tls` or `none`; default `tls`). After local
+conflict checks:
+
+1. connect without selecting a database
+2. refuse if the database already exists (no `--force`, no DROP, no ALTER)
+3. `CREATE DATABASE` with a validated identifier `[A-Za-z][A-Za-z0-9_]*`
+4. apply schema and insert the administrator
+5. write application files
+
+Init does not create MySQL users or change GRANT permissions. If the
+supplied account cannot `CREATE DATABASE`, init reports that and stops.
+If this invocation created a new database and a later step fails, the
+database is **not** dropped.
+
+Environment key names:
+
+Empty: `APP_NAME`, `APP_ENV`, `APP_HOST`, `APP_PROTOCOL`, `SERVER_HOST`,
+`SERVER_PORT`
+
+Basic also: `MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD`,
+`MAIL_FROM_ADDRESS`, `MAIL_FROM_NAME`, `MAIL_SECURITY`
+
+Admin SQLite also: `DB_DRIVER`, `DB_DATABASE`
+
+Admin MySQL also: `DB_HOST`, `DB_PORT`, `DB_USERNAME`, `DB_PASSWORD`,
+`DB_SECURITY`
 
 ## 17. v0.17: context routes, groups, and guards
 

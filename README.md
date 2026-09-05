@@ -12,9 +12,16 @@ AhdCode is an experimental statically checked general-purpose programming
 language focused on readable syntax, explicit intent, predictable semantics,
 and native compilation.
 
-The current candidate is **v0.17.0**. The core
+The current candidate is **v0.18.0**. The core
 language works end to end, but the project is not production-ready and
 breaking changes may still occur before 1.0.
+
+v0.18.0, **Web Starter & Application Bootstrap**, turns `ahdcode init web`
+into a starter wizard: Empty, Basic, or Admin. Empty is a polished welcome
+application. Basic adds common application and mail configuration. Admin
+adds login, a dashboard, and SQLite or MySQL bootstrap with one
+administrator. v0.17 route, guard, form, CSRF, and flash APIs are unchanged.
+See [Web](docs/WEB.md#18-v018-web-starters-and-application-bootstrap).
 
 v0.17.0, **Web Init, Context Routes, Groups & Guards**, keeps `ahdcode init web`
 and adds explicit context-aware route registration, route groups, and
@@ -310,17 +317,22 @@ ahdcode --version
 ## CLI quick start
 
 ```bash
-mkdir MyPortal && cd MyPortal
+mkdir my-app
+cd my-app
 ahdcode init web
 ahdcode dev app.ahd
 ```
 
-`ahdcode init web` initializes the **current directory** as a minimal offline
-Web application: `app.ahd`, Config / Pages / Layouts / Components (Navbar and
-Footer), empty `public/style.css` and `public/main.js`, `.env`, and
-`.env.example`. `.env` is gitignored; `.env.example` is safe to commit.
-Existing files are never overwritten. There is no package manager and no
-network fetch.
+On a terminal, `ahdcode init web` asks which starter to write:
+
+- **Empty** — welcome application, no database, no login
+- **Basic** — the same shell plus common `.env` / mail configuration
+- **Admin** — Home, Login, Dashboard, and one administrator on SQLite or MySQL
+
+You can also pass the starter: `ahdcode init web empty`, `basic`, or `admin`.
+Templates and Bootstrap 5.3.3 ship inside the CLI (MIT, local files, no CDN).
+`.env` is gitignored; Admin SQLite `database/*.db` files are ignored too.
+Existing files and existing databases are never overwritten.
 
 ```bash
 ahdcode run examples/v0.1/01_hello.ahd

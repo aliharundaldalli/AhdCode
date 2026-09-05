@@ -12,9 +12,16 @@ AhdCode; okunabilir sözdizimi, açık niyet (explicit intent), öngörülebilir
 anlambilim (semantics) ve yerel (native) derlemeye odaklanan, deneysel,
 statik olarak denetlenen genel amaçlı bir programlama dilidir.
 
-Mevcut aday **v0.17.0**'dır. Çekirdek dil
+Mevcut aday **v0.18.0**'dır. Çekirdek dil
 uçtan uca çalışır, ancak proje üretime hazır değildir ve 1.0'dan önce kırıcı
 (breaking) değişiklikler olabilir.
+
+v0.18.0, **Web Starter ve Uygulama Başlangıcı**, `ahdcode init web` komutunu
+Empty, Basic veya Admin seçen bir sihirbaza çevirir. Empty cilalı bir
+karşılama uygulamasıdır. Basic ortak uygulama ve posta yapılandırmasını
+ekler. Admin giriş, pano ve SQLite veya MySQL üzerinde bir yönetici hesabı
+ekler. v0.17 rota, bekçi, form, CSRF ve flash API'leri değişmez.
+[Web](docs/WEB_TR.md#18-v018-web-starterlar-ve-uygulama-başlangıcı) bölümüne bakın.
 
 v0.17.0, **Web Init, Bağlam Rotaları, Gruplar ve Bekçiler**, `ahdcode init web`
 ile bağlam duyarlı rota kaydı, rota grupları ve sıralı, politikasız bekçiler
@@ -328,16 +335,23 @@ ahdcode --version
 ## CLI hızlı başlangıç
 
 ```bash
-mkdir MyPortal && cd MyPortal
+mkdir my-app
+cd my-app
 ahdcode init web
 ahdcode dev app.ahd
 ```
 
-`ahdcode init web` **bulunulan dizini** çevrimdışı, küçük bir Web uygulaması
-olarak kurar: `app.ahd`, Config / Pages / Layouts / Components (Navbar ve
-Footer), boş `public/style.css` ve `public/main.js`, `.env` ve `.env.example`.
-`.env` gitignore’dadır; `.env.example` güvenle commitlenir. Var olan dosyaların
-üzerine yazılmaz. Paket yöneticisi ve ağ indirmesi yoktur.
+Bir terminalde `ahdcode init web` hangi starter'ın yazılacağını sorar:
+
+- **Empty** — karşılama uygulaması; veritabanı ve giriş yok
+- **Basic** — aynı kabuk artı ortak `.env` / posta yapılandırması
+- **Admin** — Home, Login, Dashboard ve SQLite veya MySQL üzerinde bir yönetici
+
+Starter'ı doğrudan da verebilirsiniz: `ahdcode init web empty`, `basic` veya
+`admin`. Şablonlar ve Bootstrap 5.3.3 CLI içindedir (MIT, yerel dosyalar,
+CDN yok). `.env` gitignore'dadır; Admin SQLite `database/*.db` dosyaları da
+yok sayılır. Var olan dosyaların ve var olan veritabanlarının üzerine
+yazılmaz.
 
 ```bash
 ahdcode run examples/v0.1/01_hello.ahd

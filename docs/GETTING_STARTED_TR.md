@@ -81,29 +81,30 @@ ahdcode build hello.ahd -o hello
 Bulunulan dizini kurar. Proje adı, paket yöneticisi veya ağ indirmesi yoktur:
 
 ```bash
-mkdir MyPortal
-cd MyPortal
+mkdir my-app
+cd my-app
 ahdcode init web
 ahdcode dev app.ahd
 ```
 
-`app.ahd`, `.env`, `.env.example`, `.gitignore`, bir Config / Page / Layout,
-Navbar ve Footer, boş `public/style.css` ve `public/main.js` yazılır. Yerleşim
-`/assets/style.css` ve `/assets/main.js` dosyalarını zaten bağlar. `.env`
-yalnızca güvenli geliştirme varsayılanlarını tutar (`APP_HOST=localhost`,
-loopback HTTP) ve gitignore’dadır. `.env.example` güvenle commitlenir. Süreç
-ortamı hâlâ `.env`’den üstündür. Var olan dosyaların üzerine yazılmaz;
+Bir TTY'de komut Empty, Basic veya Admin, ardından uygulama adını sorar.
+`ahdcode init web empty` ve `ahdcode init web basic` ilk soruyu atlar.
+Admin SQLite veya MySQL ve yönetici hesabı ile devam eder.
+
+Empty ve Basic veritabanı sormaz; giriş veya `database/` üretmez. Admin
+şemayı ve yöneticiyi hemen kurar: `ahdcode dev app.ahd` sonrası uygulama
+hazırdır. Çıkış POST `/logout` ile yapılır ve `/` adresine döner.
+
+`.env` gitignore'dadır. Admin SQLite `database/*.db` dosyalarını yok sayar;
+`database/schema.sql` izlenebilir kalır. `.env.example` girilen parolaları
+içermez. Var olan dosyaların ve var olan veritabanlarının üzerine yazılmaz;
 `--force` yoktur.
 
-`http://127.0.0.1:8080` adresini açın. `main.js` sıradan bir statik dosyadır;
-ön yüz çalışma zamanı değildir. npm, paketleyici veya CDN yoktur. Form, CSRF
-ve oturum burada yoktur; bkz.
-[v0.16 form örneği](../examples/v0.16/forms_validation/README_TR.md).
-
-Rota grupları ve sıralı bekçiler sonraki, açık bir katmandır — bkz.
-[Web §17](WEB_TR.md#17-v017-bağlam-rotaları-gruplar-ve-bekçiler) ve
-[`examples/v0.17/routes_guards`](../examples/v0.17/routes_guards). Başlangıç
-iskeleti bunları eklemez.
+`http://127.0.0.1:8080` adresini açın. Bootstrap 5.3.3 yereldır. `main.js`
+sıradan bir statik dosyadır; ön yüz çalışma zamanı değildir. npm veya CDN
+yoktur. v0.17 rota, bekçi, form, CSRF ve flash API'leri değişmez. Bu, 1.0
+öncesi bir davranış değişikliğidir: yalın `ahdcode init web` artık hemen
+üretmek yerine sihirbaz açar.
 
 ## Girdi
 

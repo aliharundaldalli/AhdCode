@@ -8,7 +8,7 @@ Mevcut komut yüzeyi (command surface) şudur:
 
 ```text
 ahdcode
-ahdcode init web
+ahdcode init web [empty|basic|admin]
 ahdcode build <entry.ahd> [-o <output>]
 ahdcode run <entry.ahd> [-- <args>...]
 ahdcode dev <entry.ahd>
@@ -20,13 +20,11 @@ ahdcode --help
 ahdcode --version
 ```
 
-`ahdcode init web` **bulunulan dizine** küçük bir Web uygulaması yazar.
-`.env` (güvenli geliştirme varsayılanları, gitignore) ve `.env.example`
-(güvenle commitlenir) ile `app.ahd`, Config / Pages / Layouts / Navbar ve
-Footer, boş `public/style.css` ve `public/main.js` oluşturulur. Yerleşim her
-iki varlığı da yayınlanmış Web HTML API’siyle sayfaya bağlar. Şablonlar CLI
-içine gömülüdür: çevrimdışı, paket yöneticisi yok, üzerine yazma yok. Sonraki
-adım: `ahdcode dev app.ahd`.
+`ahdcode init web` **bulunulan dizine** bir Web starter yazar. Bir TTY'de
+Empty, Basic veya Admin sorar. Etkileşimsiz kullanım `empty`, `basic` veya
+`admin` geçmelidir. Şablonlar, Bootstrap 5.3.3 ve AhdCode logosu gömülüdür:
+çevrimdışı, paket yöneticisi yok, üzerine yazma yok. Sonraki adım:
+`ahdcode dev app.ahd`.
 
 `run`, normal önyüz (frontend) ve Go arkayüzünden (backend) derler, ardından
 yerel (native) sonucu çalıştırır. Giriş dosyasından sonraki argümanlar

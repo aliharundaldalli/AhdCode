@@ -4538,8 +4538,10 @@ available without a session. `Form.integer` separates missing null from invalid
 
 ## v0.17: groups and guards
 
-`ahdcode init web` writes a one-route starter. Context-aware routes, groups,
-and ordered guards are a separate layer:
+`ahdcode init web` now asks Empty, Basic, or Admin. Empty is a welcome
+page. Basic adds mail configuration. Admin adds login, a dashboard, and a
+database. Context-aware routes, groups, and ordered guards remain a
+separate, explicit layer:
 [`examples/v0.17/routes_guards`](../examples/v0.17/routes_guards).
 `App.get` with `Function(Request) -> Response` still works. A guard returns
 `null` to continue or a finalized `Response` to stop. Web does not decide

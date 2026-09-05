@@ -752,24 +752,63 @@ düşük seviyeli modüllere uzanın.
 | --- | --- |
 | v0.16 | Formlar, doğrulama, CSRF kolaylıkları, flash, eski girdi, form hataları |
 | v0.17 | `ahdcode init web`, bağlam duyarlı rotalar, rota grupları, sıralı bekçiler |
+| v0.18 | Web starter'lar: Empty, Basic, Admin; yerel Bootstrap; Admin DB kurulumu |
 
 ## Bir proje başlatmak
 
 ```bash
-mkdir MyPortal
-cd MyPortal
+mkdir my-app
+cd my-app
 ahdcode init web
 ahdcode dev app.ahd
 ```
 
-`init web` bulunulan dizini kurar. `.env` (loopback geliştirme varsayılanları,
-gitignore) ve `.env.example` (güvenle commitlenir) ile bir Page, Layout,
-Navbar, Footer, Config, boş `public/style.css` ve `public/main.js` yazar.
-Yerleşim her iki varlığı da yayınlanmış Web HTML API’siyle bağlar
-(`Web.UI.stylesheet`, `Web.UI.element("script", ...)`). Şablonlar CLI içine
-gömülüdür: ağ yok, paket yöneticisi yok, üzerine yazma yok.
-`http://127.0.0.1:8080` adresini açın. `main.js` isteğe bağlı statik
-JavaScript’tir; ön yüz çalışma zamanı değildir.
+Bir terminalde `init web` Empty, Basic veya Admin sorar. Ayrıca
+`ahdcode init web empty|basic|admin` çalıştırılabilir. Bu, v0.17'nin hemen
+iskelet yazmasından 1.0 öncesi bir değişikliktir.
+
+Şablonlar ve [Bootstrap 5.3.3](https://getbootstrap.com/) (MIT) CLI içindedir.
+Üretilen sayfalar yalnızca yerel dosyaları yükler. `init web` sırasında CDN,
+npm veya ağ indirmesi yoktur.
+
+## 18. v0.18: Web starter'lar ve uygulama başlangıcı
+
+v0.18 RequestContext, RouteSet, bekçiler, Forms, CSRF, Flash, Security,
+SQLite, MySQL, HTTP veya SMTP'yi değiştirmez. Değişen **başlangıç deneyimidir**.
+
+### Empty
+
+Cilalı bir karşılama uygulaması. Veritabanı, giriş, pano, repository veya
+posta anahtarı yoktur. `.env` altı uygulama anahtarında kalır.
+
+### Basic
+
+Aynı kabuk artı `Config/Mail.ahd` ve bu fonksiyonların gerçekten okuduğu
+`MAIL_*` anahtarları. `MAIL_SECURITY` varsayılanı `starttls` (587). Boş
+`MAIL_HOST` uygulamayı yine başlatır. Veritabanı ve kimlik doğrulama yoktur.
+
+### Admin
+
+Herkese açık Home, Login, Dashboard ve POST `/logout` (CSRF, sonra `/`).
+`signedIn` üretilmiş sıradan uygulama kodudur.
+
+Giriş Form, ValidationErrors, CSRF, oturum döndürme, Flash ve yalnızca e-posta
+eski girdisini kullanır. Hatalar e-postanın var olup olmadığını söylemez.
+
+#### SQLite
+
+`database/<ad>.db` ve `database/schema.sql` oluşturur, şemayı uygular,
+yöneticiyi `Security.passwordHash` ile ekler. Var olan bir `.db` dosyası
+init'i durdurur. Üretilen `database/*.db` gitignore'dadır; `schema.sql` değil.
+
+#### MySQL
+
+Ana bilgisayar, port, veritabanı adı, kullanıcı adı ve parola (gizli) sorar.
+Yayınlanmış MySQL sözleşmesini kullanır (`tls` veya `none`; varsayılan `tls`).
+Yerel çakışma denetimlerinden sonra var olan bir veritabanını reddeder,
+doğrulanmış bir tanıtıcı ile `CREATE DATABASE` yapar, şemayı ve yöneticiyi
+kurar. MySQL kullanıcısı oluşturmaz, GRANT değiştirmez. Bu çağrı yeni bir
+veritabanı oluşturup sonraki adım başarısız olursa veritabanı **silinmez**.
 
 ## 17. v0.17: bağlam rotaları, gruplar ve bekçiler
 

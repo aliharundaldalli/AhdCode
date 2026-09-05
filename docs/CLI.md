@@ -8,7 +8,7 @@ The current command surface is:
 
 ```text
 ahdcode
-ahdcode init web
+ahdcode init web [empty|basic|admin]
 ahdcode build <entry.ahd> [-o <output>]
 ahdcode run <entry.ahd> [-- <args>...]
 ahdcode dev <entry.ahd>
@@ -20,12 +20,10 @@ ahdcode --help
 ahdcode --version
 ```
 
-`ahdcode init web` writes a minimal Web application into the **current
-directory**. It creates `.env` (safe development defaults, gitignored) and
-`.env.example` (safe to commit), plus `app.ahd`, Config / Pages / Layouts /
-Navbar and Footer, and empty `public/style.css` and `public/main.js`. The
-layout already links both assets through the released Web HTML API. Templates
-are embedded in the CLI: offline, no package manager, no overwrite. Next:
+`ahdcode init web` writes a Web starter into the **current directory**. On a
+TTY it asks Empty, Basic, or Admin. Non-interactive use must pass
+`empty`, `basic`, or `admin`. Templates, Bootstrap 5.3.3, and the AhdCode
+logo are embedded: offline, no package manager, no overwrite. Next:
 `ahdcode dev app.ahd`.
 
 `run` compiles through the normal frontend and Go backend, then executes the

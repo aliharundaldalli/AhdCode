@@ -82,29 +82,31 @@ Initialize the current directory. No project name, package manager, or
 network fetch:
 
 ```bash
-mkdir MyPortal
-cd MyPortal
+mkdir my-app
+cd my-app
 ahdcode init web
 ahdcode dev app.ahd
 ```
 
-This writes `app.ahd`, `.env`, `.env.example`, `.gitignore`, one Config /
-Page / Layout, Navbar and Footer, and empty `public/style.css` and
-`public/main.js`. The layout already references `/assets/style.css` and
-`/assets/main.js`. `.env` holds only safe development defaults
-(`APP_HOST=localhost`, loopback HTTP) and is gitignored. `.env.example` is
-safe to commit. Process environment values still win over `.env`. Existing
-files are never overwritten; there is no `--force`.
+On a TTY the command asks Empty, Basic, or Admin, then the application name.
+`ahdcode init web empty` and `ahdcode init web basic` skip the first question.
+Admin continues with SQLite or MySQL and the administrator account.
 
-Open `http://127.0.0.1:8080`. `main.js` is an ordinary static file, not a
-frontend runtime. There is no npm, bundler, or CDN. Forms, CSRF, and sessions
-are not included here; see the
-[v0.16 forms example](../examples/v0.16/forms_validation/README.md).
+Empty and Basic do not ask for a database and do not generate login or
+`database/`. Admin initializes the schema and administrator immediately:
+after `ahdcode dev app.ahd` the app is ready. Logout is POST `/logout` and
+redirects to `/`.
 
-Route groups and ordered guards are a later, explicit layer — see
-[Web §17](WEB.md#17-v017-context-routes-groups-and-guards) and
-[`examples/v0.17/routes_guards`](../examples/v0.17/routes_guards). The
-starter does not add them.
+`.env` is gitignored. Admin SQLite ignores `database/*.db` and keeps
+`database/schema.sql` trackable. `.env.example` never contains entered
+passwords. Existing files and existing databases are never overwritten;
+there is no `--force`.
+
+Open `http://127.0.0.1:8080`. Bootstrap 5.3.3 is local. `main.js` is an
+ordinary static file, not a frontend runtime. There is no npm or CDN.
+v0.17 route, guard, form, CSRF, and flash APIs are unchanged. This is a
+pre-1.0 behavior change: bare `ahdcode init web` is now a wizard instead of
+immediate generation.
 
 ## Input
 
