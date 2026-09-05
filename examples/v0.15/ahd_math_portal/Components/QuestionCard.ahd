@@ -49,7 +49,7 @@ questionCard: Function := (question: QuestionRecord) -> HTMLNode {
                         {"class": "card-text"}
                     )
                     Web.UI.aNodes(
-                        "/question?id={question.id}"
+                        "/question/{str(question.id)}"
                         [
                             Web.UI.text("Soruyu İncele ")
                             Web.UI.i(

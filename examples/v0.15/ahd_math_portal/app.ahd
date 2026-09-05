@@ -22,8 +22,8 @@
 //   public/        Bootstrap and application CSS, served from disk
 //   storage/       uploaded solutions, never served statically
 //
-// v0.15 routes match exact paths, so records are addressed with a query
-// parameter (/question?id=1) rather than a path segment.
+// Published questions use a one-segment wildcard: /question/2. The
+// exact /question route still accepts the older ?id= query and redirects.
 require("Config/App.ahd")
 require("Pages/Home.ahd")
 require("Pages/Questions.ahd")
@@ -59,7 +59,8 @@ portal.static("/assets", "public")
 
 portal.get("/", homePage)
 portal.get("/questions", questionsPage)
-portal.get("/question", questionPage)
+portal.get("/question", questionLegacyPage)
+portal.get("/question/*", questionPage)
 portal.post("/solution", solutionSubmit)
 portal.get("/solution/file", solutionFileDownload)
 

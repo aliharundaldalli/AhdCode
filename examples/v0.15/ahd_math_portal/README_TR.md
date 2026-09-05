@@ -5,11 +5,11 @@
 <h1 align="center">Ahd Akademi Matematik</h1>
 
 <p align="center">
-  <strong><a href="https://github.com/aliharundaldalli/AhdCode">AhdCode</a> v0.15.0 ile yazıldı — <a href="https://github.com/aliharundaldalli/AhdCode/releases/tag/v0.15.0">Web Foundations</a></strong>
+  <strong><a href="https://github.com/aliharundaldalli/AhdCode">AhdCode</a> v0.15.1 ile yazıldı — <a href="https://github.com/aliharundaldalli/AhdCode/releases/tag/v0.15.0">Web Foundations</a></strong>
 </p>
 
 <p align="center">
-  <a href="https://github.com/aliharundaldalli/AhdCode"><img src="https://img.shields.io/badge/AhdCode-v0.15.0-0d6efd?style=flat-square" alt="AhdCode v0.15.0"></a>
+  <a href="https://github.com/aliharundaldalli/AhdCode"><img src="https://img.shields.io/badge/AhdCode-v0.15.1-0d6efd?style=flat-square" alt="AhdCode v0.15.1"></a>
   <a href="https://github.com/aliharundaldalli/AhdCode/blob/main/docs/WEB.md"><img src="https://img.shields.io/badge/bring-Web-198754?style=flat-square" alt="bring Web"></a>
   <a href="https://github.com/aliharundaldalli/AhdCode/blob/main/docs/REQUIRE.md"><img src="https://img.shields.io/badge/require(...)-v0.14-6f42c1?style=flat-square" alt="require"></a>
   <a href="README.md"><img src="https://img.shields.io/badge/Language-English-0d6efd?style=flat-square" alt="English"></a>
@@ -27,7 +27,7 @@ kaynağına bağımlı değildir.
 [English](README.md) · [AhdCode](https://github.com/aliharundaldalli/AhdCode) · [v0.15.0 sürümü](https://github.com/aliharundaldalli/AhdCode/releases/tag/v0.15.0)
 
 <p align="center">
-  <img src="docs/screenshots/home.png" alt="Ahd Akademi Matematik ana sayfası" width="920">
+  <img src="docs/screenshots/home-hero.png" alt="Ahd Akademi Matematik ana sayfası" width="920">
 </p>
 
 ## v0.15 gerçek bir uygulamada
@@ -47,19 +47,27 @@ kaynağına bağımlı değildir.
 Arayüz Türkçe. Sorulardaki matematik yerel MathJax ile dizilir.
 
 <p align="center">
-  <img src="docs/screenshots/question.png" alt="MathJax ile yayımlanmış soru" width="720">
+  <img src="docs/screenshots/questions.png" alt="Arama ve konu süzgeçli soru kataloğu" width="920">
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/login.png" alt="Giriş" width="640">
+  <img src="docs/screenshots/question-detail.png" alt="MathJax ile yayımlanmış soru" width="920">
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/admin.png" alt="Yönetici paneli" width="720">
+  <img src="docs/screenshots/login-form.png" alt="Giriş" width="920">
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/admin-users.png" alt="Yönetici kullanıcı listesi; ad ve e-posta bulanık" width="720">
+  <img src="docs/screenshots/admin-panel.png" alt="Yönetici paneli" width="920">
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/admin-sliders.png" alt="Yönetici slayt yönetimi" width="920">
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/admin-users-blurred.png" alt="Yönetici kullanıcı listesi; ad ve e-posta bulanık" width="920">
 </p>
 
 ## Düzen
@@ -83,7 +91,7 @@ köküne) görelidir. Her dosya kullandığı modülleri kendi getirir.
 
 ## Gereksinimler
 
-- Kurulu **AhdCode v0.15.0** (`ahdcode --version`)
+- Kurulu **AhdCode v0.15.1** (`ahdcode --version`)
 - Erişilebilir bir MySQL sunucusu
 - Yazılabilir özel yükleme dizini
 

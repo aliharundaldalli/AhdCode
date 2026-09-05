@@ -5,11 +5,11 @@
 <h1 align="center">Ahd Akademi Matematik</h1>
 
 <p align="center">
-  <strong>Built with <a href="https://github.com/aliharundaldalli/AhdCode">AhdCode</a> v0.15.0 — <a href="https://github.com/aliharundaldalli/AhdCode/releases/tag/v0.15.0">Web Foundations</a></strong>
+  <strong>Built with <a href="https://github.com/aliharundaldalli/AhdCode">AhdCode</a> v0.15.1 — <a href="https://github.com/aliharundaldalli/AhdCode/releases/tag/v0.15.0">Web Foundations</a></strong>
 </p>
 
 <p align="center">
-  <a href="https://github.com/aliharundaldalli/AhdCode"><img src="https://img.shields.io/badge/AhdCode-v0.15.0-0d6efd?style=flat-square" alt="AhdCode v0.15.0"></a>
+  <a href="https://github.com/aliharundaldalli/AhdCode"><img src="https://img.shields.io/badge/AhdCode-v0.15.1-0d6efd?style=flat-square" alt="AhdCode v0.15.1"></a>
   <a href="https://github.com/aliharundaldalli/AhdCode/blob/main/docs/WEB.md"><img src="https://img.shields.io/badge/bring-Web-198754?style=flat-square" alt="bring Web"></a>
   <a href="https://github.com/aliharundaldalli/AhdCode/blob/main/docs/REQUIRE.md"><img src="https://img.shields.io/badge/require(...)-v0.14-6f42c1?style=flat-square" alt="require"></a>
   <a href="README_TR.md"><img src="https://img.shields.io/badge/Dil-Türkçe-e35d6a?style=flat-square" alt="Türkçe"></a>
@@ -27,7 +27,7 @@ framework source.
 [Türkçe](README_TR.md) · [AhdCode](https://github.com/aliharundaldalli/AhdCode) · [v0.15.0 release](https://github.com/aliharundaldalli/AhdCode/releases/tag/v0.15.0)
 
 <p align="center">
-  <img src="docs/screenshots/home.png" alt="Ahd Akademi Matematik home page" width="920">
+  <img src="docs/screenshots/home-hero.png" alt="Ahd Akademi Matematik home page" width="920">
 </p>
 
 ## What v0.15 looks like in a real app
@@ -47,19 +47,27 @@ framework source.
 The public UI is Turkish. Math in questions is typeset with local MathJax.
 
 <p align="center">
-  <img src="docs/screenshots/question.png" alt="Published question with MathJax" width="720">
+  <img src="docs/screenshots/questions.png" alt="Questions catalog with search and topic filters" width="920">
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/login.png" alt="Login" width="640">
+  <img src="docs/screenshots/question-detail.png" alt="Published question with MathJax" width="920">
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/admin.png" alt="Admin dashboard" width="720">
+  <img src="docs/screenshots/login-form.png" alt="Login" width="920">
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/admin-users.png" alt="Admin users list with names and emails blurred" width="720">
+  <img src="docs/screenshots/admin-panel.png" alt="Admin dashboard" width="920">
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/admin-sliders.png" alt="Admin slider management" width="920">
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/admin-users-blurred.png" alt="Admin users list with names and emails blurred" width="920">
 </p>
 
 ## Layout
@@ -83,7 +91,7 @@ root), not to the file that wrote it. Each file brings the modules it uses.
 
 ## Requirements
 
-- Installed **AhdCode v0.15.0** (`ahdcode --version`)
+- Installed **AhdCode v0.15.1** (`ahdcode --version`)
 - A reachable MySQL server
 - A writable private upload directory
 

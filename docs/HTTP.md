@@ -196,7 +196,9 @@ Idle 60s. There are no access logs.
 
 Routes are exact path matches. The path must begin with `/` and must not
 contain `?` or `#`. `/notes` and `/notes/` are different. Query strings are
-not part of the route: `GET /notes?q=x` still matches `/notes`. Duplicate
+not part of the route: `GET /notes?q=x` still matches `/notes`. A path may
+end with `/*` to match exactly one extra segment (`/question/*` matches
+`/question/2`, not `/question` or `/question/2/extra`). Duplicate
 `method + path` pairs raise `HTTPError`. Routes cannot change after `start()`.
 
 Unknown paths return **404**. A path that exists for another method returns

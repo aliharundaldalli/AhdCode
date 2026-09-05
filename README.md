@@ -12,7 +12,7 @@ AhdCode is an experimental statically checked general-purpose programming
 language focused on readable syntax, explicit intent, predictable semantics,
 and native compilation.
 
-The current release is **v0.14.1**; **v0.15.0** is in candidate. The core
+The current release is **v0.15.1**. The core
 language works end to end, but the project is not production-ready and
 breaking changes may occur before 1.0.
 

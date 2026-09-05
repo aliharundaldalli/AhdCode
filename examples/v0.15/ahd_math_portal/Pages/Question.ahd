@@ -1,8 +1,6 @@
 // One published question, plus the signed-in user's solution upload.
 //
-// v0.15 routing matches exact paths, so the question is identified by a query
-// parameter rather than a path segment. That is the released routing model,
-// not a workaround.
+// /question/2 is a one-segment wildcard. /question?id=2 still redirects.
 require("Layouts/Main.ahd")
 require("Components/FormField.ahd")
 require("Components/SolutionModal.ahd")
@@ -17,32 +15,24 @@ require("Support/Validation.ahd")
 bring Web
 from Web bring (Request, Response, HTMLNode, Session)
 
+questionLegacyPage: Function := (request: Request) -> Response {
+    session: Local Session := sessionOpen(request)
+    id: Local Int := validationPositiveInt(request.query("id"))
+    if id > 0 {
+        return sessionCommit(session, Web.redirect("/question/{str(id)}"))
+    }
+
+    return questionMissing(session, contextFor(session))
+}
+
 questionPage: Function := (request: Request) -> Response {
     session: Local Session := sessionOpen(request)
     context: Local PageContext := contextFor(session)
-    id: Local Int := validationPositiveInt(request.query("id"))
+    id: Local Int := questionIDFromRequest(request)
     question: Local QuestionRecord? := questionsFindPublished(id)
 
     if question == null {
-        return sessionCommit(
-            session
-            mainLayout(
-                session
-                "Soru bulunamadı"
-                context.siteName
-                context.headerColor
-                context.user
-                context.isAdmin
-                context.flash
-                context.flashKind
-                [
-                    Web.UI.p(
-                        "Böyle bir yayımlanmış soru yok."
-                        {"class": "alert alert-warning"}
-                    )
-                ]
-            )
-        )
+        return questionMissing(session, context)
     }
 
     content: Local List<HTMLNode> := [Web.UI.article([
@@ -314,5 +304,42 @@ communitySolutionsSection: Function := (
     return Web.UI.section(
         [titleNode, Web.UI.div(cards, {"class": "solutions-list"})]
         {"class": "border-top pt-4 mt-4"}
+    )
+}
+
+questionIDFromRequest: Function := (request: Request) -> Int {
+    path: Local String := request.path()
+    prefix: Local String := "/question/"
+    if path.startsWith(prefix) {
+        rest: Local String := path[len(prefix):len(path)]
+        if rest.contains("/") == false {
+            return validationPositiveInt(rest)
+        }
+
+        return 0
+    }
+
+    return validationPositiveInt(request.query("id"))
+}
+
+questionMissing: Function := (session: Session, context: PageContext) -> Response {
+    return sessionCommit(
+        session
+        mainLayout(
+            session
+            "Soru bulunamadı"
+            context.siteName
+            context.headerColor
+            context.user
+            context.isAdmin
+            context.flash
+            context.flashKind
+            [
+                Web.UI.p(
+                    "Böyle bir yayımlanmış soru yok."
+                    {"class": "alert alert-warning"}
+                )
+            ]
+        )
     )
 }

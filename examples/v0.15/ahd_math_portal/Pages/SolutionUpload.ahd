@@ -35,7 +35,7 @@ solutionSubmit: Function := (request: Request) -> Response {
         flashSet(session, "error", "Bir dosya seçin.")
         return sessionCommit(
             session
-            Web.redirect("/question?id={str(questionId)}")
+            Web.redirect("/question/{str(questionId)}")
         )
     }
 
@@ -49,7 +49,7 @@ solutionSubmit: Function := (request: Request) -> Response {
 
     return sessionCommit(
         session
-        Web.redirect("/question?id={str(questionId)}")
+        Web.redirect("/question/{str(questionId)}")
     )
 }
 

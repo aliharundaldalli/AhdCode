@@ -459,6 +459,59 @@ func TestHTTPDuplicateRouteAndInvalidPath(t *testing.T) {
 	expectRaise(t, AhdClassHTTPError, func() {
 		AhdHTTPServerRoute(AhdClassHTTPError, handle, "GET GET", "/x", func(string) string { return AhdHTTPText(AhdClassHTTPError, "x", 200) })
 	})
+	expectRaise(t, AhdClassHTTPError, func() {
+		AhdHTTPServerGet(AhdClassHTTPError, handle, "/*", func(string) string { return AhdHTTPText(AhdClassHTTPError, "x", 200) })
+	})
+	expectRaise(t, AhdClassHTTPError, func() {
+		AhdHTTPServerGet(AhdClassHTTPError, handle, "/notes/*/edit", func(string) string { return AhdHTTPText(AhdClassHTTPError, "x", 200) })
+	})
+}
+
+func TestHTTPWildcardOneSegment(t *testing.T) {
+	base, _ := startHTTP(t, ahdHTTPDefaultMaxBody, func(handle string) {
+		AhdHTTPServerGet(AhdClassHTTPError, handle, "/question/*", func(data string) string {
+			return AhdHTTPText(AhdClassHTTPError, AhdHTTPRequestPath(data), 200)
+		})
+		AhdHTTPServerGet(AhdClassHTTPError, handle, "/questions", func(string) string {
+			return AhdHTTPText(AhdClassHTTPError, "list", 200)
+		})
+	})
+	client := &http.Client{Timeout: 2 * time.Second}
+	get := func(path string) (int, string) {
+		t.Helper()
+		response, err := client.Get(base + path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer response.Body.Close()
+		body, _ := io.ReadAll(response.Body)
+		return response.StatusCode, string(body)
+	}
+	status, body := get("/question/2")
+	if status != 200 || body != "/question/2" {
+		t.Fatalf("GET /question/2 = %d %q", status, body)
+	}
+	status, body = get("/questions")
+	if status != 200 || body != "list" {
+		t.Fatalf("GET /questions = %d %q", status, body)
+	}
+	status, _ = get("/question")
+	if status != 404 {
+		t.Fatalf("GET /question = %d, want 404", status)
+	}
+	status, _ = get("/question/2/extra")
+	if status != 404 {
+		t.Fatalf("GET /question/2/extra = %d, want 404", status)
+	}
+	request, _ := http.NewRequest(http.MethodPost, base+"/question/2", nil)
+	response, err := http.DefaultClient.Do(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = response.Body.Close()
+	if response.StatusCode != 405 {
+		t.Fatalf("POST /question/2 = %d, want 405", response.StatusCode)
+	}
 }
 
 func TestHTTPHandlersAreSerialized(t *testing.T) {

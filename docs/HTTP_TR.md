@@ -188,6 +188,8 @@ Idle 60s. Erişim günlüğü yoktur.
 
 Yollar tam eşleşmedir. Yol `/` ile başlamalı, `?` veya `#` içermemelidir.
 `/notes` ile `/notes/` farklıdır. Sorgu dizesi yolun parçası değildir.
+Yol `/*` ile bitiyorsa tam olarak bir ek segment eşleşir (`/question/*`,
+`/question/2` ile eşleşir; `/question` veya `/question/2/extra` ile değil).
 Aynı `method + path` tekrarı `HTTPError` fırlatır. `start()` sonrası yollar
 değişmez.
 

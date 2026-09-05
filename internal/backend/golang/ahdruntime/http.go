@@ -435,6 +435,9 @@ func ahdHTTPRegister(class *AhdClass, handle, method, path string, handler AhdHT
 	if !strings.HasPrefix(path, "/") || strings.ContainsAny(path, "?#") {
 		AhdRaiseClass(class, "HTTP route path "+ahdHTMLQuote(path)+" must begin with / and must not contain ? or #")
 	}
+	if strings.Contains(path, "*") && ahdHTTPWildcardPrefix(path) == "" {
+		AhdRaiseClass(class, "HTTP route path "+ahdHTMLQuote(path)+" may use a trailing /* for one path segment")
+	}
 	server := ahdHTTPLookup(class, handle)
 	server.mutex.Lock()
 	defer server.mutex.Unlock()
@@ -449,6 +452,52 @@ func ahdHTTPRegister(class *AhdClass, handle, method, path string, handler AhdHT
 	if !ahdHTTPContains(server.methods[path], method) {
 		server.methods[path] = append(server.methods[path], method)
 	}
+}
+
+// ahdHTTPWildcardPrefix returns the exact prefix of a trailing one-segment
+// pattern such as /question/*. Empty means the path is not that pattern.
+func ahdHTTPWildcardPrefix(path string) string {
+	if !strings.HasSuffix(path, "/*") || strings.Count(path, "*") != 1 {
+		return ""
+	}
+	prefix := strings.TrimSuffix(path, "/*")
+	if prefix == "" || !strings.HasPrefix(prefix, "/") || strings.ContainsAny(prefix, "*?#") {
+		return ""
+	}
+	return prefix
+}
+
+// ahdHTTPLookupRoute prefers an exact method+path match, then a registered
+// trailing /* that consumes exactly one extra segment. Caller holds the lock.
+func ahdHTTPLookupRoute(state *ahdHTTPServerState, method, path string) (AhdHTTPHandler, bool, []string) {
+	if handler, found := state.routes[ahdHTTPRouteKey{method: method, path: path}]; found {
+		return handler, true, append([]string(nil), state.methods[path]...)
+	}
+	allowed := append([]string(nil), state.methods[path]...)
+	var matched AhdHTTPHandler
+	found := false
+	for key, handler := range state.routes {
+		prefix := ahdHTTPWildcardPrefix(key.path)
+		if prefix == "" || !ahdHTTPWildcardMatch(prefix, path) {
+			continue
+		}
+		if !ahdHTTPContains(allowed, key.method) {
+			allowed = append(allowed, key.method)
+		}
+		if key.method == method {
+			matched = handler
+			found = true
+		}
+	}
+	return matched, found, allowed
+}
+
+func ahdHTTPWildcardMatch(prefix, path string) bool {
+	if !strings.HasPrefix(path, prefix+"/") {
+		return false
+	}
+	segment := path[len(prefix)+1:]
+	return segment != "" && !strings.Contains(segment, "/")
 }
 
 // AhdHTTPServerStatic registers a first-party static-file primitive:
@@ -632,8 +681,7 @@ func (dispatcher ahdHTTPDispatcher) ServeHTTP(writer http.ResponseWriter, reques
 	path := request.URL.Path
 	method := request.Method
 	dispatcher.state.mutex.Lock()
-	handler, found := dispatcher.state.routes[ahdHTTPRouteKey{method: method, path: path}]
-	allowed := append([]string(nil), dispatcher.state.methods[path]...)
+	handler, found, allowed := ahdHTTPLookupRoute(dispatcher.state, method, path)
 	maxBody := dispatcher.state.maxBodyBytes
 	dispatcher.state.mutex.Unlock()
 

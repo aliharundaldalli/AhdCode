@@ -280,7 +280,7 @@ profilePage: Function := (request: Request) -> Response {
                         Web.UI.tdNodes(
                             [
                                 Web.UI.a(
-                                    "/question?id={str(s.questionId)}"
+                                    "/question/{str(s.questionId)}"
                                     s.questionTitle
                                     {
                                         "class": "fw-semibold text-decoration-none"
