@@ -134,3 +134,46 @@ attempt {
     write(error.message)
 }
 ```
+
+## AhdCode araç zincirinin kendi okuduğu değişkenler
+
+Bunlar `Env` modülü tarafından değil, `ahdcode` komut satırı tarafından
+okunur. Burada listelenmelerinin nedeni, insanların onlara burada bakmasıdır.
+
+### Uygulama yapılandırması
+
+`ahdcode dev`; `APP_NAME`, `APP_ENV`, `APP_HOST`, `APP_PROTOCOL`,
+`SERVER_HOST` ve `SERVER_PORT` değerlerini uygulamanın kendi önceliğiyle
+okur — önce süreç ortamı, sonra uygulama kökündeki `.env` — ve yalnızca ne
+yazacağına ve oturumun çalışıp çalışamayacağına karar vermek için. Hiçbirini
+dışa aktarmaz ve alt sürece geçirmez. Her birinin anlamı için bkz.
+[Web](WEB_TR.md).
+
+`APP_HOST` ayrıca bir geliştirme oturumunun yönlendirileceği yerel `.test`
+adını belirler: `ahdakademi.com`, `ahdakademi.test` olarak geliştirilir. Bkz.
+[CLI](CLI_TR.md#yerel-geliştirme-test-adları-ve-yönlendirici).
+
+### Yerel geliştirme
+
+| Değişken | Okuyan | Anlamı |
+| --- | --- | --- |
+| `AHDCODE_LOCAL_HOME` | CLI | Rota ve veritabanı kayıt defterlerini tutan kullanıcıya özel dizini değiştirir. Mutlak olmalıdır. Olağan kullanımda ayarlanmaz. |
+| `AHDCODE_LOCAL_ROUTER_PORT` | CLI | 80 portuna bağlanılamadığında yerel yönlendiricinin yedek portu. Varsayılan `7357`. 1–65535 dışındaki bir değer ölümcül değildir, yok sayılır. |
+| `AHDCODE_ROOT` | CLI | AhdCode kaynak deponuz; `tools/AhdDataStudio` dizinini başka yerden bulmak için kullanılır. |
+| `AHDCODE_SQLITE_RUNTIME` | çalışma zamanı | `ahdcode` ile birlikte kurulu değilse paketlenmiş `ahdsqlite` yardımcısının yolu. |
+
+### AhdDataStudio
+
+| Değişken | Anlamı |
+| --- | --- |
+| `AHD_DATA_REGISTRY` | AhdCode veritabanı kayıt defterinin yolu. `ahdcode databases` tarafından otomatik ayarlanır; Studio kayıtlı SQLite veritabanlarını buradan okur. |
+| `AHD_DATA_SQLITE_PATHS` | Virgülle ayrılmış açık SQLite dosyaları. Desteklenmeye devam eder ve artık elle düzenlenmesi gereken bir şey değildir — bkz. `ahdcode databases add`. |
+| `AHD_DATA_PROJECT_ROOT` | **Hemen** altındaki `.db`/`.sqlite`/`.sqlite3` dosyaları listelenen klasör. Özyinelemeli değildir ve bu kökün dışına asla çıkılmaz. |
+| `AHD_DATA_MYSQL_HOST` | Yalnızca MySQL sunucu adresi (`127.0.0.1`); asla `host:port` değil. |
+| `AHD_DATA_MYSQL_PORT` | MySQL portu. |
+| `AHD_DATA_MYSQL_USER`, `AHD_DATA_MYSQL_PASSWORD` | MySQL kimlik bilgileri. Bunlar Studio'nun `.env` dosyasında yaşar ve bilinçli olarak **hiçbir** AhdCode kayıt defterinde bulunmaz. |
+| `AHD_DATA_MYSQL_SECURITY` | `tls` veya `none`. |
+
+Studio üç SQLite kaynağını — kayıt defteri, `AHD_DATA_SQLITE_PATHS`,
+`AHD_DATA_PROJECT_ROOT` — bu sabit sırayla birleştirip yinelenenleri ayıklar.
+Özyinelemeli veya makine geneli hiçbir tarama yapılmaz.

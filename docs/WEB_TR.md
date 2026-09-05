@@ -509,20 +509,28 @@ AhdCode Web
   Open:
   http://127.0.0.1:8080
 
-  Development identity:
-  http://ahdakademi.com.test
-  (.test is not locally routed in v0.15)
+  Local identity:
+  http://ahdakademi.test/
+  Bind: 127.0.0.1:8080
 
 Waiting for changes...
 ```
 
-**`Open:` altındaki adresi açın.** Bu, uygulamanın gerçekten bağlandığı soket
-olan `SERVER_HOST` ve `SERVER_PORT`'tur ve bu makinede çalışan tek adrestir.
+`Open:` altındaki adres, uygulamanın gerçekten bağlandığı soket olan
+`SERVER_HOST` ve `SERVER_PORT`'tur. Her zaman çalışır.
 
-`Development identity:` altındaki satır, uygulamanın *yapılandırıldığı*
-addır. v0.15 bu adı türetir ama çözmez — gömülü bir `.test` çözücüsü yoktur —
-bu yüzden yalnızca bilgi olarak gösterilir ve öyle işaretlenir; asla
-tıklanacak bir yer olarak değil.
+`Local identity:` altındaki satır, `APP_HOST`'tan türetilen `.test` adıdır ve
+v0.19 bu adı hem türetir **hem de yönlendirir**: `ahdcode dev` onu AhdCode
+rota kayıt defterinde alır ve oturum sürdüğü sürece çalışan, yalnızca geri
+döngüyü dinleyen yerel bir yönlendiriciden sunar. Yönlendirici, bağlandığı
+port ve `ahdcode local hosts` için bkz.
+[CLI](CLI_TR.md#yerel-geliştirme-test-adları-ve-yönlendirici).
+
+İkisi bilinçli olarak ayrı bildirilir. Bağlanma adresi soketin nerede
+olduğunu, yerel adres ise bu makinenin ona hangi adı yönlendirdiğini söyler.
+Yönlendirme kurulamazsa başlık bunu tek satırda söyler ve uygulama yine
+çalışır — bir kolaylığın başarısız olması, düzgün başlamış bir oturumu asla
+başarısız kılmaz.
 
 v0.13/v0.14'ün bağımlılık farkında geliştirme denetleyicisi değişmemiştir ve
 kaynak çizgesi, izleyici, son iyi yapı, yeniden derleme, yeniden başlatma ve
@@ -546,12 +554,12 @@ derler ve yeniden başlatır. `public/app.css`'i düzenlemek bunu yapmaz.
 `APP_PROTOCOL=https`'i de **reddeder**:
 
 ```
-✗ Local HTTPS is not available in AhdCode v0.15.
+✗ Local HTTPS is not available in AhdCode v0.19.
   ahdcode dev serves plaintext HTTP, so it cannot honour
   APP_PROTOCOL=https.
 
   Configured identity:
-  https://ahdakademi.com.test
+  https://ahdakademi.test
 
   Set APP_PROTOCOL=http for local development, or terminate
   HTTPS with an external local proxy in front of 127.0.0.1:8080.
@@ -559,7 +567,7 @@ derler ve yeniden başlatır. `public/app.css`'i düzenlemek bunu yapmaz.
 ```
 
 `ahdcode dev` uygulamayı başlatır ve uygulama düz metin bir HTTP soketine
-bağlanır. v0.15'te `APP_PROTOCOL=https`'in burada TLS'e dönüştüğü bir yol
+bağlanır. v0.19'da `APP_PROTOCOL=https`'in burada TLS'e dönüştüğü bir yol
 yoktur; alt süreci başlatmak, yapılandırma `https` derken `http` sunmak
 olurdu. Düşürmek yerine reddeder: sessiz bir düşüş, güvenli çerez veya karışık
 içerik sorununu production'a kadar gizlerdi.
@@ -574,63 +582,85 @@ göstermez.
 
 ## 13. `.test`
 
-`APP_ENV=development` için yerel kimlik, `APP_HOST`'a `.test` eklenmiş hâlidir:
+`APP_ENV=development` için yerel kimlik, `APP_HOST`'un kaydedilebilir sonekini
+`.test` ile değiştirir:
 
 ```
-APP_HOST=ahdakademi.com   →   ahdakademi.com.test
+APP_HOST=ahdakademi.com     →   ahdakademi.test
+APP_HOST=ahdakademi.com.tr  →   ahdakademi.com.test
+APP_HOST=localhost          →   localhost.test
 ```
 
-`.test` ayrılmış özel amaçlı bir üst düzey alan adıdır (RFC 6761); bunu
-kullanmak, geliştirme trafiğinin kazara gerçek konağa çözülememesi demektir.
+Sonek eklenmez, değiştirilir; böylece yerel ad, production adının üzerine bir
+şey iliştirilmiş hâli gibi değil, aynı proje gibi okunur.
 
-**v0.15'te `.test` mantıksal bir kimliktir, yönlendirilebilir bir adres
-değil.** AhdCode bunun için DNS, çözücü kaydı veya `/etc/hosts` girdisi
-kurmaz; bu yüzden ad, olağan macOS çözümlemesiyle çözülmez ve tarayıcıda
-açılamaz. Doğrudan kullanılabilir yerel adres `SERVER_HOST:SERVER_PORT`'tur ve
-`ahdcode dev` önce onu yazar.
+`.test`, ayrılmış özel amaçlı bir TLD'dir (RFC 6761) ve asla devredilmeyecek;
+bu yüzden geliştirme trafiği kazara gerçek konağa çözülemez. `.local`
+bilinçli olarak **kullanılmaz**: macOS'ta ve çoğu Linux masaüstünde
+mDNS/Bonjour tarafından sahiplenilir.
 
-Production `APP_HOST`'u aynen kullanır — gerçek kanonik alan adını — ve bu son
-eki asla almaz. `APP_ENV=test` de `APP_HOST`'u değiştirmeden kullanır.
+Production `APP_HOST`'u tam olarak kullanır — gerçek kanonik alan adı — ve
+soneki asla almaz. `APP_ENV=test` de `APP_HOST`'u değiştirmeden kullanır.
 
-`AppConfig` türetimleri sunar:
+`AppConfig` türetimleri açar:
 
 | Çağrı | `development` | `production` |
 | --- | --- | --- |
 | `url()` | `https://ahdakademi.com` | `https://ahdakademi.com` |
-| `developmentURL()` | `https://ahdakademi.com.test` | `https://ahdakademi.com.test` |
-| `developmentHost()` | `ahdakademi.com.test` | `ahdakademi.com.test` |
-| `effectiveURL()` | `https://ahdakademi.com.test` | `https://ahdakademi.com` |
+| `developmentURL()` | `https://ahdakademi.test` | `https://ahdakademi.test` |
+| `developmentHost()` | `ahdakademi.test` | `ahdakademi.test` |
+| `effectiveURL()` | `https://ahdakademi.test` | `https://ahdakademi.com` |
 | `address()` | `127.0.0.1:8080` | `127.0.0.1:8080` |
+
+Bu, `ahdcode dev`'in bir rota alırken kullandığı türetimin aynısıdır; böylece
+bir uygulamanın `effectiveURL()`'den kurduğu bağlantı ile bir insanın
+açabileceği ad her zaman aynı dizedir.
+
+### Ad yönlendiriliyor mu?
+
+v0.19'da evet — HTTP üzerinden ve yalnızca bu makinede. `ahdcode dev` adı
+AhdCode'un kullanıcıya özel rota kayıt defterine yazar ve kayıtlı bütün
+rotaları sunan, yalnızca geri döngüyü dinleyen küçük bir yönlendirici
+barındırır. Temiz adresin bir tarayıcıda açılması için iki şeyin daha doğru
+olması gerekir:
+
+1. **adın çözülmesi.** `ahdcode local hosts apply`, sistem hosts dosyasına
+   sorduktan sonra tek bir sınırlanmış `127.0.0.1` eşlemeleri bloğu ekler.
+   İşaretlerin dışındaki her şey olduğu gibi bırakılır, etkileşimsiz bir
+   oturum asla sormaz ve yetki yükseltmez, reddetmek de hiçbir şeyi bozmaz —
+   geri döngü adresi her zaman çalışır.
+2. **yönlendiricinin 80 portunu tutması.** Dener; platform izin vermezse
+   belirlenimci yedek `7357`'yi alır ve bunun yerine
+   `http://ahdakademi.test:7357/` yazar. 80 portu için hiçbir yetki
+   yükseltilmez.
+
+Türetilen ada canlı bir AhdCode oturumu zaten sahipse ilk boş sonek kullanılır
+(`ahdakademi1.test`). Sahiplik hosts dosyasıyla değil rota kayıt defteriyle
+belirlenir; bu yüzden artık çalışmayan bir projeden kalan bir eşleme yeni
+oturumu asla sonekli bir ada itmez.
 
 ## 14. Yerel HTTPS — mevcut sınır
 
-`.test` kendiliğinden çözülmez ve v0.15 yerel bir sertifika otoritesi, bir
-`.test` çözücüsü veya bir geliştirme geçidi **getirmez**. Bu sürümde
+v0.19, `.test` adlarını **düz metin HTTP** üzerinden yönlendirir. Hâlâ yerel
+bir sertifika otoritesi, sertifika yöneticisi veya ACME **getirmez** ve
 `ahdcode trust` komutu yoktur.
 
-`https://<APP_HOST>.test` adresine görünür bir port olmadan ulaşmak, aynı anda
-kalıcı olarak ayrıcalıklı üç sistem bileşeni gerektirir:
-
-1. `.test` alanı için root ile kurulan bir çözücü (`/etc/resolver/test` artı
-   bir çözücü süreci ya da root yönetimindeki `/etc/hosts` kayıtları),
-2. ayrıcalıklı 443 portunda bir dinleyici veya root ile kurulan bir paket
-   yönlendirmesi,
-3. sistem güven deposunda bir sertifika otoritesi.
-
-Bu, uzun ömürlü ve ayrıcalıklı bir yerel ağ artalan sürecidir. Yaklaşık bir
-çözüm üretmek yerine ertelenmiştir: v0.15 hiçbir sistem durumu kurmaz, hiçbir
-ayrıcalık istemez ve yerel güven artefaktı eklemez.
+Görünür bir port olmadan `https://<ad>.test` sunmak, sistem güven deposunda
+bir sertifika otoritesi gerektirir; bu, bu bilgisayarın neye güvendiğine dair
+kalıcı ve makine geneli bir değişikliktir. Bu, bir geri döngü konak adını
+yönlendirmekten çok daha büyük bir karardır ve yaklaşık olarak taklit
+edilmek yerine ertelenmiştir: AhdCode hiçbir güven bileşeni kurmaz ve
+sertifika üretmez.
 
 Bu nedenle `APP_PROTOCOL=https`, `ahdcode dev`'in uygulamayı düz metin http
 üzerinden sunup ona https demesi yerine
-[başlatmayı reddetmesine](#reddedilen-yapılandırmalar) yol açar. `https`'i
-asla sessizce `http`'ye düşürmez ve asla güvenilmeyen bir sertifika üretmez.
-Sessiz bir düşüş, güvenli çerez veya karışık içerik sorununu production'a
-kadar gizlerdi.
+[başlamayı reddetmesine](#reddedilen-yapılandırmalar) yol açar. `https`'i asla sessizce `http`'ye
+düşürmez ve asla güvenilmeyen bir sertifika üretmez. Sessiz bir düşüş,
+güvenli çerez veya karışık içerik sorununu production'a kadar gizlerdi.
 
-Bugün yerel çalışma için `APP_PROTOCOL=http` kullanın ve
-`http://127.0.0.1:SERVER_PORT` adresine gidin ya da hâlihazırda
-çalıştırdığınız bir vekille TLS'i sonlandırın.
+Bugün yerel çalışma için `APP_PROTOCOL=http` ayarlayın ve `.test` adını ya da
+`http://127.0.0.1:SERVER_PORT` adresini kullanın; veya zaten çalıştırdığınız
+bir vekil ile TLS'i sonlandırın.
 
 ## 15. Production
 
@@ -800,9 +830,27 @@ eski girdisini kullanır. Hatalar e-postanın var olup olmadığını söylemez.
 `database/<ad>.db` ve `database/schema.sql` oluşturur, şemayı uygular,
 yöneticiyi `Security.passwordHash` ile ekler. Var olan bir `.db` dosyası
 init'i durdurur. Üretilen `database/*.db` gitignore'dadır; `schema.sql` değil.
-Başarı çıktısı AhdDataStudio'ya yönlendirir
-(`http://ahddatabasestudio.test:8081/AhdDataStudio`); Studio `.env` bulunursa yeni dosya
-`AHD_DATA_SQLITE_PATHS` listesine eklenir.
+
+Yeni veritabanı AhdCode veritabanı kayıt defterine **otomatik olarak**
+kaydedilir; böylece AhdDataStudio'da hiçbir ayar yapmadan görünür:
+
+```bash
+ahdcode init web admin
+ahdcode databases      # yeni veritabanı zaten listelidir
+```
+
+Yalnızca o tek dosya kaydedilir — proje taranmaz — ve kayıt, veritabanı
+güvenle yerine konduktan sonra yapılır. Kayıt defteri yazılamazsa hata
+bildirilir ve hiçbir şey geri alınmaz: veritabanı da üretilen uygulama da
+gerçek ve doğrudur, mesaj da `ahdcode databases add` ile elle nasıl
+kaydedileceğini söyler. Bulunabilir bir Studio `.env` varsa dosya
+`AHD_DATA_SQLITE_PATHS` listesine de eklenir; böylece v0.18 düzeni değişmeden
+çalışır.
+
+Başarı çıktısı AhdDataStudio'nun kanonik adresine yönlendirir
+(`http://ahddatabasestudio.test/`); doğrudan adres
+`http://127.0.0.1:8081/AhdDataStudio` desteklenmeye devam eder. Bkz.
+[CLI](CLI_TR.md#ahdcode-databases).
 
 #### MySQL
 

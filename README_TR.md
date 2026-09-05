@@ -12,9 +12,30 @@ AhdCode; okunabilir sözdizimi, açık niyet (explicit intent), öngörülebilir
 anlambilim (semantics) ve yerel (native) derlemeye odaklanan, deneysel,
 statik olarak denetlenen genel amaçlı bir programlama dilidir.
 
-Mevcut aday **v0.18.5**'dır. Çekirdek dil
+Mevcut aday **v0.19.0**'dır. Çekirdek dil
 uçtan uca çalışır, ancak proje üretime hazır değildir ve 1.0'dan önce kırıcı
 (breaking) değişiklikler olabilir.
+
+v0.19.0, **Yerel Geliştirme ve Veritabanı Keşfi**, yerel AhdCode
+geliştirmesini bütünleşik hâle getirir. `ahdcode dev`, bir HTTP Web
+uygulamasına `APP_HOST`'tan türetilen bir `.test` adı verir —
+`ahdakademi.com`, `http://ahdakademi.test/` olarak geliştirilir — ve onu Go
+standart kütüphanesinden kurulu, yalnızca geri döngüyü dinleyen küçük bir
+yönlendiriciden sunar: Caddy yok, nginx yok, artalan süreci yok, kurulan bir
+şey yok. Aynı adı isteyen ikinci proje `ahdakademi1.test` alır.
+`ahdcode local status` bütün yerel rotaları bildirir; `ahdcode local hosts
+apply` ise sistem hosts dosyasındaki tek bir sınırlanmış bloğu, sorduktan
+sonra ve dışındaki hiçbir satıra dokunmadan yönetir.
+
+`ahdcode init web admin` artık oluşturduğu SQLite veritabanını kaydeder;
+böylece AhdDataStudio'da düzenlenecek hiçbir ortam değişkeni olmadan görünür.
+`ahdcode databases list|add|remove` bu kayıt defterini elle yönetir; `remove`
+bir kaydı unutur ve dosyaya asla dokunmaz. Studio'nun kanonik adresi
+`http://ahddatabasestudio.test/` olur; `http://127.0.0.1:8081/AhdDataStudio`
+tam olarak desteklenmeye devam eder. Yerel geliştirme HTTP'dir: hâlâ yerel
+TLS, sertifika otoritesi veya ACME yoktur. Bu sürümde hiçbir dil sözdizimi
+veya tür anlamı değişmemiştir. Bkz.
+[CLI](docs/CLI_TR.md#yerel-geliştirme-test-adları-ve-yönlendirici).
 
 v0.18.5, **Web Starter ve Uygulama Başlangıcı**, `ahdcode init web` komutunu
 Empty, Basic veya Admin seçen bir sihirbaza çevirir. Empty cilalı bir
@@ -98,7 +119,8 @@ v0.12.0, [AhdDataStudio](tools/AhdDataStudio/README_TR.md) ekler: AhdCode ile
 yazılmış birinci taraf, yalnızca localhost MySQL + SQLite geliştirme
 uygulaması — derleyici yerleşik bir modülü değildir. `ahdcode databases` ile
 başlatılır ve
-[http://ahddatabasestudio.test:8081/AhdDataStudio](http://ahddatabasestudio.test:8081/AhdDataStudio)
+[http://ahddatabasestudio.test/](http://ahddatabasestudio.test/) (ya da
+[http://127.0.0.1:8081/AhdDataStudio](http://127.0.0.1:8081/AhdDataStudio))
 adresinde açılır. Yalnızca `127.0.0.1` dinler, MySQL şemalarını
 `database: null` ile keşfeder, SQLite dosyalarını yapılandırılmış proje
 yollarıyla sınırlar ve üretilen CRUD için CSRF korumalı POST formları
@@ -294,16 +316,16 @@ Kavramsal netliği korumak için AhdCode'un yetenekleri dört belirgin mimari ka
    - **Web Uygulama Çatısı:** [`Web`](docs/WEB_TR.md) (birinci taraf gömülü web çatısı, [`Web.UI`](docs/WEB_TR.md#9-webui) anlamsal bileşenleri, `RequestContext`, tipli `Forms`, sıralı `ValidationErrors`, seçilmiş `OldInput`, oturuma bağlı CSRF ve flash yaşam döngüsü)
 
 4. **Geliştirici Araçları:**
-   - **Derleyici ve Araç Zinciri:** `ahdcode build`, `ahdcode run`, `ahdcode dev` (izleme-yeniden derleme döngüsü), `ahdcode stop`
+   - **Derleyici ve Araç Zinciri:** `ahdcode build`, `ahdcode run`, `ahdcode dev` (otomatik `.test` kimlikleriyle izleme-yeniden derleme döngüsü), `ahdcode stop`, `ahdcode local` (yerel rotalar ve yönetilen konak adları)
    - **Kanonik Biçimlendirici:** `ahdcode format` (sözdizim ağacı güdümlü, yorum koruyan)
    - **Etkileşimli REPL:** `ahdcode repl` (kalıcı çok satırlı ortam)
    - **Editör ve Dil Sunucusu:** `ahdcode lsp`, resmi VS Code / Antigravity eklentisi (`editors/vscode`)
    - **Tanılama Motoru:** Net hata kodları ve ipuçlarıyla yapıya duyarlı derleyici tanılamaları
-   - **Yerel Geliştirici Arayüzü:** [AhdDataStudio](tools/AhdDataStudio/README_TR.md) (localhost MySQL ve SQLite yönetim aracı)
+   - **Yerel Geliştirici Arayüzü:** [AhdDataStudio](tools/AhdDataStudio/README_TR.md) (localhost MySQL ve SQLite yönetim aracı), `ahdcode databases list|add|remove` (kullanıcıya özel SQLite kayıt defteri)
 
 ## Kaynak koddan derleme
 
-AhdCode şu anda Go 1.25 veya daha yeni bir sürüm gerektirir.
+AhdCode şu anda Go 1.26 veya daha yeni bir sürüm gerektirir.
 
 ```bash
 cd AhdCode
@@ -339,6 +361,17 @@ mkdir my-app
 cd my-app
 ahdcode init web
 ahdcode dev app.ahd
+```
+
+`dev`, hem bağlandığı soketi hem de artık yönlendirdiği yerel adı yazar:
+
+```text
+  Open:
+  http://127.0.0.1:8080
+
+  Local identity:
+  http://ahdakademi.test/
+  Bind: 127.0.0.1:8080
 ```
 
 Bir terminalde `ahdcode init web` hangi starter'ın yazılacağını sorar:

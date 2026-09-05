@@ -16,11 +16,12 @@ Then open the address `ahdcode dev` prints under `Open:` — with the supplied
 `.env` that is `http://127.0.0.1:8080/`. It is built from `SERVER_HOST` and
 `SERVER_PORT`, so it follows whatever you configure.
 
-`dev` also prints a `Development identity:` line (`http://ahdakademi.com.test`).
-That is the name the application is *configured* with. v0.15 derives it but
-installs no `.test` resolver, so it does not resolve on this machine and is
-labelled accordingly — open the `Open:` address instead. See
-[docs/WEB.md](../../../docs/WEB.md#13-test).
+`dev` also prints a `Local identity:` line (`http://ahdakademi.test/`) and the
+bind address beneath it. Since v0.19 that name is routed by AhdCode's
+loopback-only local router, so it opens in a browser once
+`ahdcode local hosts apply` has mapped it to `127.0.0.1`. The `Open:` address
+works either way. See [docs/WEB.md](../../../docs/WEB.md#13-test) and
+[docs/CLI.md](../../../docs/CLI.md#local-development-test-names-and-the-router).
 
 Keep `APP_PROTOCOL=http` for local work. `ahdcode dev` refuses
 `APP_PROTOCOL=https` rather than serve plaintext http while calling it https;
@@ -63,8 +64,8 @@ public/            app.css and logo.svg, served from disk
 ## Environments
 
 ```bash
-# development: the local identity gains .test
-APP_ENV=development APP_HOST=ahdakademi.com   →  ahdakademi.com.test
+# development: the registrable suffix is replaced with .test
+APP_ENV=development APP_HOST=ahdakademi.com   →  ahdakademi.test
 
 # production: APP_HOST exactly, never .test
 APP_ENV=production  APP_HOST=ahdakademi.com   →  ahdakademi.com

@@ -133,3 +133,45 @@ attempt {
     write(error.message)
 }
 ```
+
+## Variables the AhdCode toolchain itself reads
+
+These are read by the `ahdcode` command line, not by the `Env` module. They
+are listed here because this is where people look for them.
+
+### Application configuration
+
+`ahdcode dev` reads `APP_NAME`, `APP_ENV`, `APP_HOST`, `APP_PROTOCOL`,
+`SERVER_HOST`, and `SERVER_PORT` with the application's own precedence — the
+process environment first, then the app-root `.env` — and only ever to decide
+what to print and whether the session may run. It never exports one and never
+passes one to the child. See [Web](WEB.md) for what each means.
+
+`APP_HOST` additionally determines the local `.test` name a development
+session is routed at: `ahdakademi.com` develops as `ahdakademi.test`. See
+[CLI](CLI.md#local-development-test-names-and-the-router).
+
+### Local development
+
+| Variable | Read by | Meaning |
+| --- | --- | --- |
+| `AHDCODE_LOCAL_HOME` | CLI | Overrides the per-user directory holding the route and database registries. Must be absolute. Ordinary use never sets it. |
+| `AHDCODE_LOCAL_ROUTER_PORT` | CLI | The local router's fallback port when port 80 cannot be bound. Defaults to `7357`. A value outside 1–65535 is ignored rather than fatal. |
+| `AHDCODE_ROOT` | CLI | Your AhdCode source checkout, used to find `tools/AhdDataStudio` from elsewhere. |
+| `AHDCODE_SQLITE_RUNTIME` | runtime | Path to the bundled `ahdsqlite` helper, when it is not installed alongside `ahdcode`. |
+
+### AhdDataStudio
+
+| Variable | Meaning |
+| --- | --- |
+| `AHD_DATA_REGISTRY` | Path to the AhdCode database registry. Set automatically by `ahdcode databases`; Studio reads registered SQLite databases from it. |
+| `AHD_DATA_SQLITE_PATHS` | Comma-separated explicit SQLite files. Still supported, and no longer something you have to edit by hand — see `ahdcode databases add`. |
+| `AHD_DATA_PROJECT_ROOT` | A folder whose **immediate** `.db`/`.sqlite`/`.sqlite3` children are listed. Not recursive, and never walked outside that root. |
+| `AHD_DATA_MYSQL_HOST` | MySQL server address only (`127.0.0.1`), never `host:port`. |
+| `AHD_DATA_MYSQL_PORT` | MySQL port. |
+| `AHD_DATA_MYSQL_USER`, `AHD_DATA_MYSQL_PASSWORD` | MySQL credentials. These live in Studio's `.env` and are deliberately **not** in any AhdCode registry. |
+| `AHD_DATA_MYSQL_SECURITY` | `tls` or `none`. |
+
+Studio combines the three SQLite sources — registry, `AHD_DATA_SQLITE_PATHS`,
+`AHD_DATA_PROJECT_ROOT` — deduplicated in that fixed order. Nothing recursive
+and nothing machine-wide is ever scanned.

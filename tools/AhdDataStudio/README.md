@@ -13,16 +13,32 @@ ahdcode databases
 
 Open:
 
-[http://ahddatabasestudio.test:8081/AhdDataStudio](http://ahddatabasestudio.test:8081/AhdDataStudio)
+[http://ahddatabasestudio.test/](http://ahddatabasestudio.test/)
 
-The process still binds **127.0.0.1:8081** only. The public name is
-`AhdDatabaseStudio.test`. Add this once if the name does not resolve:
+That name is served by AhdCode's loopback-only [local
+router](../../docs/CLI.md#local-development-test-names-and-the-router), which
+runs for as long as `ahdcode databases` does. The direct address is always
+supported and is what the CLI opens when the clean name does not resolve here:
+
+[http://127.0.0.1:8081/AhdDataStudio](http://127.0.0.1:8081/AhdDataStudio)
+
+`GET /` redirects to `/AhdDataStudio`, so both forms land somewhere useful.
+
+The process still binds **127.0.0.1:8081** only. It must not be exposed on
+`0.0.0.0` or the public internet.
+
+For the clean name to resolve, `ahddatabasestudio.test` has to map to
+loopback. `ahdcode local hosts apply` adds it — after asking, in one delimited
+block, leaving everything else in the file untouched — or you can add the line
+yourself:
 
 ```text
 127.0.0.1 ahddatabasestudio.test
 ```
 
-It must not be exposed on `0.0.0.0` or the public internet.
+If the router cannot bind port 80 it uses the fallback port and the URL
+carries it (`http://ahddatabasestudio.test:7357/`). `ahdcode local status`
+reports which.
 
 ## Stop
 
@@ -65,13 +81,36 @@ untrusted form text and concatenated as raw SQL.
 
 SQLite files appear only when:
 
+- they are in the **AhdCode database registry** (`AHD_DATA_REGISTRY`, set
+  automatically by `ahdcode databases`), and/or
 - listed in `AHD_DATA_SQLITE_PATHS` (comma-separated), and/or
 - they are immediate children of `AHD_DATA_PROJECT_ROOT` with extension
   `.db`, `.sqlite`, or `.sqlite3`
 
-There is **no machine-wide scan**, no recursive walk, and no password
-file search. A query/form path is accepted only if it matches that
-allowlist. `..` components and directory targets are rejected.
+The three sources are combined and deduplicated in that fixed order, so the
+list is the same on every request. There is **no machine-wide scan**, no
+recursive walk, and no password file search. A query/form path is accepted
+only if it matches that allowlist. `..` components and directory targets are
+rejected.
+
+The registry is the source that means you no longer edit an environment
+variable by hand:
+
+```bash
+ahdcode databases add ./database/app.db     # register
+ahdcode databases list                      # see what is registered
+ahdcode databases remove ./database/app.db  # forget it; the file is kept
+```
+
+`ahdcode init web admin` registers the SQLite database it creates
+automatically, so a freshly generated project is already visible here.
+
+The registry holds metadata only — a driver, a path, a display name. It never
+holds a password, a token, or any database content, and **MySQL credentials
+stay in this directory's `.env`**, deliberately outside it. Removing an entry
+never touches the SQLite file. A registered file that is not present right now
+is shown as unavailable rather than dropped, because an unmounted volume is
+not a withdrawal.
 
 SQLite in generated AhdCode programs uses the bundled `ahdsqlite` helper.
 If the helper is missing, the first `SQLite.open` raises `SQLiteError`

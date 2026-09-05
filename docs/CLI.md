@@ -10,11 +10,16 @@ The current command surface is:
 ahdcode
 ahdcode init web [empty|basic|admin]
 ahdcode databases
+ahdcode databases list
+ahdcode databases add <file.db>
+ahdcode databases remove <file.db>
 ahdcode build <entry.ahd> [-o <output>]
 ahdcode run <entry.ahd> [-- <args>...]
 ahdcode dev <entry.ahd>
 ahdcode stop <app.dev|app.run>
 ahdcode kill [--force] <app.dev|app.run>
+ahdcode local status
+ahdcode local hosts [apply|remove]
 ahdcode format [--check] <file.ahd>
 ahdcode lsp
 ahdcode --help
@@ -138,8 +143,8 @@ from source embedded in the compiler, so there is no file on disk to change.
 #### Dev and Web applications
 
 When the compiled module graph contains the first-party [`Web`](WEB.md)
-framework, `dev` adds a banner naming the application and its canonical
-development URL:
+framework, `dev` adds a banner naming the application, the socket it bound,
+and the local name this machine now routes to it:
 
 ```
 AhdCode Web
@@ -148,20 +153,51 @@ AhdCode Web
   Open:
   http://127.0.0.1:8080
 
-  Development identity:
-  http://ahdakademi.com.test
-  (.test is not locally routed in v0.15)
+  Local identity:
+  http://ahdakademi.test/
+  Bind: 127.0.0.1:8080
 ```
 
 The address under `Open:` is built from `SERVER_HOST` and `SERVER_PORT` — the
-socket the application actually binds — and is the one to open. It follows the
+socket the application actually binds — and always works. It follows the
 configured host rather than assuming loopback; a wildcard bind (`0.0.0.0`) is
 displayed as the loopback address it is genuinely reachable on.
 
-The line under `Development identity:` is `APP_PROTOCOL` and `APP_HOST` with
-`.test` appended. v0.15 derives that name but installs no resolver for it, so
-it is labelled as not locally routed and never presented as the primary URL.
-`APP_ENV=test` uses `APP_HOST` unchanged, so it gets no identity line at all.
+The line under `Local identity:` is the `.test` name derived from `APP_HOST`,
+served by the [local router](#local-development-test-names-and-the-router).
+The two are reported separately on purpose: the bind address says where the
+socket is, the local URL says what name this machine routes to it, and
+merging them into one "URL" would quietly become wrong the moment the port
+changed. `APP_ENV=test` uses `APP_HOST` unchanged, so it gets no identity
+line at all.
+
+#### How the local name is derived
+
+The registrable suffix is replaced, not appended to:
+
+| `APP_HOST`         | local name             |
+| ------------------ | ---------------------- |
+| `ahdakademi.com`   | `ahdakademi.test`      |
+| `ahdakademi.com.tr`| `ahdakademi.com.test`  |
+| `localhost`        | `localhost.test`       |
+| `ahdakademi.test`  | `ahdakademi.test`      |
+
+If a **live** AhdCode session already owns that name, the next free suffix is
+used — `ahdakademi1.test`, then `ahdakademi2.test`, and so on, always the
+smallest free index. Ownership is decided by AhdCode's own route registry,
+never by the hosts file: a leftover `127.0.0.1 ahdakademi.test` line from a
+project that is no longer running is a harmless stale mapping and does not
+push a new session onto a suffixed name.
+
+A route is claimed only once the application is actually listening, and it is
+released when the session stops — through Ctrl+C, `ahdcode stop`, or
+`ahdcode kill` alike. A session that crashes leaves an entry behind; the next
+`ahdcode dev` reclaims it after finding its owner unreachable, so no name is
+held forever by a process that died.
+
+If routing cannot be arranged at all, the session still runs and the banner
+says so in one line. A convenience failing is never allowed to fail an
+application that started correctly.
 
 `dev` reads `APP_*` with the application's own precedence — process
 environment first, then the app-root `.env` — and only ever to decide what to
@@ -173,10 +209,11 @@ It refuses two configurations, before starting anything:
   command would mean either treating it as development or rewriting
   `APP_ENV`.
 - `APP_PROTOCOL=https`. `dev` serves plaintext HTTP, so starting the child
-  would mean serving `http` while the configuration says `https`. v0.15 ships
-  no local certificate authority, `.test` resolver, or development gateway,
-  and `dev` neither downgrades the protocol nor generates an untrusted
-  certificate — see [Web](WEB.md#14-local-https--current-limitation).
+  would mean serving `http` while the configuration says `https`. v0.19
+  routes `.test` names over plaintext HTTP and still ships no local
+  certificate authority and no certificate management, and `dev` neither
+  downgrades the protocol nor generates an untrusted certificate — see
+  [Web](WEB.md#14-local-https--current-limitation).
 
 In both cases `dev` reports the mismatch, starts no child, opens no listener,
 leaves no `.dev` descriptor, changes neither variable, and exits non-zero.
@@ -229,6 +266,122 @@ when they launch a server over stdio transport; `ahdcode lsp` never supports
 any other transport, so the flag is a no-op) and never writes anything but
 protocol frames to stdout.
 
+## Local development: `.test` names and the router
+
+`ahdcode dev` and `ahdcode databases` each host a small first-party reverse
+router while they run. It is built from the Go standard library — there is no
+Caddy, no nginx, no external service, and nothing installed on the machine —
+and it disappears with the session that hosted it.
+
+What it does is narrow by design:
+
+- it listens on **loopback only**, never `0.0.0.0` and never an external
+  interface, so nothing off this machine can reach it;
+- it forwards only to destinations recorded in AhdCode's route registry, and
+  the registry only ever accepts a loopback destination — checked when the
+  entry is written and again when it is read;
+- a `Host` header that is not in that allowlist is refused with `404`. A
+  request has no way to name its own destination, so this is not an open
+  proxy and cannot be turned into one;
+- method, path, query, headers, and body are forwarded unchanged, and the
+  application sees the name that was typed rather than the loopback port.
+
+Local development is **plaintext HTTP** in v0.19. There is no local TLS, no
+certificate authority, and no ACME.
+
+### Which port
+
+Port 80 gives the clean URL and is attempted first. On most Unix machines an
+unprivileged process cannot bind it, and that is platform policy rather than
+something to work around: AhdCode does not elevate, does not retry
+indefinitely, and does not wait for anyone. It takes the deterministic
+fallback port `7357` immediately and prints the URL that actually works:
+
+```text
+http://ahdakademi.test:7357/
+```
+
+`AHDCODE_LOCAL_ROUTER_PORT` overrides that fallback when `7357` is already
+spoken for on your machine.
+
+Only one process can hold the port, but every AhdCode session serves every
+registered route, so which one holds it does not matter. A session that
+starts second keeps trying quietly in the background and takes over the
+moment the first stops.
+
+### `ahdcode local status`
+
+Reports what is running and where it points, and changes nothing:
+
+```text
+AhdCode Local
+
+Router: running
+Bind: 127.0.0.1:7357
+  Port 80 was not available, so local URLs carry :7357.
+
+System hosts: /etc/hosts
+  managed block: absent
+  ahdakademi.test: mapped to 127.0.0.1
+  ahddatabasestudio.test: not mapped
+  (`ahdcode local hosts` shows how to add the missing ones)
+
+Routes:
+  ahdakademi.test
+    url: http://ahdakademi.test:7357/
+    -> 127.0.0.1:18437
+    source: /home/ada/projects/ahd/app.ahd
+
+Route registry: ~/.config/ahdcode/routes.json
+Database registry: ~/.config/ahdcode/databases.json
+```
+
+A route whose owner is no longer running is listed separately as stale. Only
+a session that answers its own authenticated control channel counts as live —
+a recorded process id is never trusted, because operating systems reuse them.
+
+### `ahdcode local hosts`
+
+A `.test` name still has to resolve. AhdCode manages exactly one delimited
+block in the system hosts file:
+
+```text
+# BEGIN AHDCODE LOCAL
+127.0.0.1 ahdakademi.test
+127.0.0.1 ahddatabasestudio.test
+# END AHDCODE LOCAL
+```
+
+`ahdcode local hosts` prints the block and whether it is in place.
+`ahdcode local hosts apply` writes it; `ahdcode local hosts remove` takes it
+back out. In all three cases:
+
+- **everything outside the two markers is left byte for byte as it was.** The
+  file is never regenerated and never reordered, and an entry you or another
+  tool put there survives, including through removal of AhdCode's own block;
+- only `127.0.0.1` mappings are ever written, and only for names AhdCode
+  actually routes;
+- when the file is already writable, the change is applied directly and no
+  elevation is involved at all;
+- otherwise the exact change is shown and **an explicit yes at an
+  interactive prompt** is required before administrator access is requested.
+  `sudo` is never invoked silently and never invoked without that answer;
+- a **non-interactive** session never prompts and never elevates. It prints
+  what would be needed and exits, rather than blocking on a password nobody
+  is there to type.
+
+`.test` is used rather than `.local` deliberately: `.test` is reserved by
+RFC 6761 and will never be delegated, while `.local` is claimed by
+mDNS/Bonjour on macOS and most Linux desktops.
+
+Names accumulate in the block rather than being pruned each run: a loopback
+mapping with nothing behind it is harmless, and removing it would mean asking
+for administrator access again the next time the same project runs.
+
+If you decline, or the platform does not support it, nothing breaks — the
+application stays reachable at its own loopback address, which the banner
+always prints.
+
 ## `ahdcode databases`
 
 Launches the bundled AhdDataStudio database workspace. Source discovery checks
@@ -239,16 +392,84 @@ Only these locations are checked; no machine or home-directory scan is performed
 
 On launch, a missing `.env` is copied from `.env.example` with mode `0600`;
 an existing `.env` is preserved. The server binds only to `127.0.0.1:8081`.
-Its public convenience URL is `http://ahddatabasestudio.test:8081/AhdDataStudio`.
-You may optionally add this local hosts entry:
+
+Its canonical URL is:
 
 ```text
-127.0.0.1 ahddatabasestudio.test
+http://ahddatabasestudio.test/
 ```
 
+served through the local router described above. The direct address remains
+fully supported and is what the CLI opens whenever the clean name is not
+resolvable on this machine:
+
+```text
+http://127.0.0.1:8081/AhdDataStudio
+```
+
+Studio also answers `GET /` with a redirect to `/AhdDataStudio`, so both the
+clean name and the bare loopback root land somewhere useful.
+
 The CLI reads the local hosts file without DNS lookups. Unless it finds an
-unambiguous IPv4 mapping, it immediately selects
-`http://127.0.0.1:8081/AhdDataStudio` for the browser. It never modifies hosts
-files automatically. Admin SQLite initialization can append the generated
-path to an **existing** Studio `.env`, preferring `AHDCODE_ROOT` over cwd
-lookup; `init web` does not create the Studio `.env`.
+unambiguous IPv4 mapping for `ahddatabasestudio.test`, it opens the direct
+loopback URL. It never modifies hosts files automatically — that is what
+`ahdcode local hosts apply` is for, and it asks first.
+
+### `ahdcode databases list | add | remove`
+
+Bare `ahdcode databases` still means "open AhdDataStudio". Beneath it are
+three small commands over the per-user **database registry**, so a database
+can become visible in Studio without editing any environment variable:
+
+```bash
+ahdcode databases add ./database/app.db
+ahdcode databases list
+ahdcode databases remove ./database/app.db
+```
+
+- **SQLite only** in v0.19. MySQL configuration stays exactly where it is —
+  explicit AhdDataStudio settings — because a MySQL source is inseparable
+  from credentials, and credentials have no place in a registry.
+- `add` requires the file to exist; the registry describes databases, it does
+  not create them. The path is canonicalized (absolute, cleaned, symlinks
+  resolved), so the same file named two different ways stays one entry.
+- `remove` forgets **exactly** that registry entry. **The SQLite file itself
+  is never opened, moved, or deleted.**
+- Nothing is ever scanned. An entry exists because a starter created that
+  file or because you named it here.
+- A registered file that is not present right now is listed as `unavailable`
+  rather than dropped: a database on an unmounted volume has not been
+  withdrawn, and only you should be able to remove it.
+
+`list` prints one tab-separated row per entry (`driver`, path, state), which
+is enough to grep or cut in a script.
+
+### Automatic registration from `init web admin`
+
+When [`ahdcode init web admin`](WEB.md) creates a SQLite database, it
+registers that one file automatically. Nothing has to be added to
+`AHD_DATA_SQLITE_PATHS` or `AHD_DATA_PROJECT_ROOT` first:
+
+```bash
+ahdcode init web admin
+ahdcode databases      # the new database is already listed
+```
+
+Only the database the command itself created is registered — the project is
+never scanned for others. Registration happens after the database is safely
+in place, and if the registry cannot be written the failure is reported and
+nothing is undone: the database and the generated application are both real
+and correct, and the message says how to register it by hand.
+
+The Studio `.env` list is still updated as well when one is discoverable, so
+a v0.18 setup that already depends on `AHD_DATA_SQLITE_PATHS` keeps working
+unchanged. `init web` does not create the Studio `.env`.
+
+### Where the registries live
+
+Both registries are per-user files under the OS configuration directory
+(`~/.config/ahdcode/` on Linux, `~/Library/Application Support/ahdcode/` on
+macOS), created `0700`, with each file written atomically at `0600`.
+`AHDCODE_LOCAL_HOME` overrides the location. They hold local development
+metadata only — hostnames, loopback ports, file paths — and never a password,
+a token, or any database content. See [Env](ENV.md).

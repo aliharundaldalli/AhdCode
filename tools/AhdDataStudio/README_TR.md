@@ -14,16 +14,34 @@ ahdcode databases
 
 Adres:
 
-[http://ahddatabasestudio.test:8081/AhdDataStudio](http://ahddatabasestudio.test:8081/AhdDataStudio)
+[http://ahddatabasestudio.test/](http://ahddatabasestudio.test/)
 
-Süreç hâlâ yalnızca **127.0.0.1:8081** dinler. Görünen ad
-`AhdDatabaseStudio.test`. Ad çözülmezse `/etc/hosts` dosyasına bir kez ekleyin:
+Bu ad, `ahdcode databases` çalıştığı sürece çalışan, yalnızca geri döngüyü
+dinleyen AhdCode [yerel
+yönlendiricisi](../../docs/CLI_TR.md#yerel-geliştirme-test-adları-ve-yönlendirici)
+tarafından sunulur. Doğrudan adres her zaman desteklenir ve temiz ad burada
+çözülmediğinde CLI zaten onu açar:
+
+[http://127.0.0.1:8081/AhdDataStudio](http://127.0.0.1:8081/AhdDataStudio)
+
+`GET /`, `/AhdDataStudio` adresine yönlendirir; böylece iki biçim de işe yarar
+bir yere düşer.
+
+Süreç hâlâ yalnızca **127.0.0.1:8081** dinler. `0.0.0.0` veya internete
+açılmamalıdır.
+
+Temiz adın çözülmesi için `ahddatabasestudio.test` geri döngüye eşlenmelidir.
+`ahdcode local hosts apply` bunu ekler — sorduktan sonra, tek bir sınırlanmış
+blok hâlinde, dosyadaki diğer her şeye dokunmadan — ya da satırı kendiniz
+ekleyebilirsiniz:
 
 ```text
 127.0.0.1 ahddatabasestudio.test
 ```
 
-`0.0.0.0` veya internete açılmamalıdır.
+Yönlendirici 80 portuna bağlanamazsa yedek portu kullanır ve adres onu taşır
+(`http://ahddatabasestudio.test:7357/`). Hangisi olduğunu
+`ahdcode local status` bildirir.
 
 ## Durdurma
 
@@ -66,13 +84,35 @@ form metninden ham SQL'e eklenmezler.
 
 SQLite dosyaları yalnızca şu durumlarda görünür:
 
+- **AhdCode veritabanı kayıt defterinde** iseler (`AHD_DATA_REGISTRY`;
+  `ahdcode databases` tarafından otomatik ayarlanır), ve/veya
 - `AHD_DATA_SQLITE_PATHS` içinde (virgülle ayrılmış), ve/veya
 - `AHD_DATA_PROJECT_ROOT` altındaki **hemen** `.db` / `.sqlite` /
   `.sqlite3` çocukları
 
-Makine geneli tarama yoktur, özyinelemeli dolaşma yoktur, parola dosyası
-araması yoktur. Sorgu/form yolu yalnızca bu izin listesiyle eşleşirse
-kabul edilir. `..` bileşenleri ve dizin hedefleri reddedilir.
+Üç kaynak bu sabit sırayla birleştirilip yinelenenler ayıklanır; böylece liste
+her istekte aynıdır. Makine geneli tarama yoktur, özyinelemeli dolaşma yoktur,
+parola dosyası araması yoktur. Sorgu/form yolu yalnızca bu izin listesiyle
+eşleşirse kabul edilir. `..` bileşenleri ve dizin hedefleri reddedilir.
+
+Bir ortam değişkenini artık elle düzenlememenizi sağlayan kaynak kayıt
+defteridir:
+
+```bash
+ahdcode databases add ./database/app.db     # kaydet
+ahdcode databases list                      # kayıtlıları gör
+ahdcode databases remove ./database/app.db  # unut; dosya korunur
+```
+
+`ahdcode init web admin`, oluşturduğu SQLite veritabanını otomatik kaydeder;
+böylece yeni üretilmiş bir proje burada zaten görünür.
+
+Kayıt defteri yalnızca meta veri tutar — bir sürücü, bir yol, bir görünen ad.
+Asla parola, belirteç veya veritabanı içeriği tutmaz ve **MySQL kimlik
+bilgileri bilinçli olarak onun dışında**, bu dizindeki `.env` dosyasında
+kalır. Bir kaydı silmek SQLite dosyasına asla dokunmaz. Şu anda mevcut olmayan
+kayıtlı bir dosya, düşürülmek yerine "unavailable" olarak gösterilir; çünkü
+bağlanmamış bir birim geri çekilme değildir.
 
 Üretilen AhdCode programlarında SQLite, paketlenmiş `ahdsqlite`
 yardımcısını kullanır. Yardımcı yoksa ilk `SQLite.open` `SQLiteError`

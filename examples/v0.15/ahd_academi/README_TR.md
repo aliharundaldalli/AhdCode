@@ -16,11 +16,13 @@ Ardından `ahdcode dev`'in `Open:` altında yazdığı adresi açın — verilen
 ile bu `http://127.0.0.1:8080/`'dir. Adres `SERVER_HOST` ve `SERVER_PORT`'tan
 kurulur, yani ne yapılandırırsanız onu izler.
 
-`dev` ayrıca bir `Development identity:` satırı yazar
-(`http://ahdakademi.com.test`). Bu, uygulamanın *yapılandırıldığı* addır.
-v0.15 onu türetir ama bir `.test` çözücüsü kurmaz; bu yüzden bu makinede
-çözülmez ve öyle işaretlenir — onun yerine `Open:` adresini açın. Bkz.
-[docs/WEB_TR.md](../../../docs/WEB_TR.md#13-test).
+`dev` ayrıca bir `Local identity:` satırı (`http://ahdakademi.test/`) ve onun
+altına bağlanma adresini yazar. v0.19'dan beri bu ad, AhdCode'un yalnızca geri
+döngüyü dinleyen yerel yönlendiricisi tarafından sunulur; `ahdcode local hosts
+apply` onu `127.0.0.1`'e eşledikten sonra tarayıcıda açılır. `Open:` adresi her
+iki durumda da çalışır. Bkz.
+[docs/WEB_TR.md](../../../docs/WEB_TR.md#13-test) ve
+[docs/CLI_TR.md](../../../docs/CLI_TR.md#yerel-geliştirme-test-adları-ve-yönlendirici).
 
 Yerel çalışma için `APP_PROTOCOL=http` kullanın. `ahdcode dev`,
 `APP_PROTOCOL=https`'i düz metin http sunup ona https demek yerine reddeder;
@@ -64,8 +66,8 @@ public/            app.css ve logo.svg, diskten sunulur
 ## Ortamlar
 
 ```bash
-# development: yerel kimlik .test kazanır
-APP_ENV=development APP_HOST=ahdakademi.com   →  ahdakademi.com.test
+# development: kaydedilebilir sonek .test ile değiştirilir
+APP_ENV=development APP_HOST=ahdakademi.com   →  ahdakademi.test
 
 # production: APP_HOST aynen, asla .test değil
 APP_ENV=production  APP_HOST=ahdakademi.com   →  ahdakademi.com

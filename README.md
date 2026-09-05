@@ -12,9 +12,28 @@ AhdCode is an experimental statically checked general-purpose programming
 language focused on readable syntax, explicit intent, predictable semantics,
 and native compilation.
 
-The current candidate is **v0.18.5**. The core
+The current candidate is **v0.19.0**. The core
 language works end to end, but the project is not production-ready and
 breaking changes may still occur before 1.0.
+
+v0.19.0, **Local Development & Database Discovery**, makes local AhdCode
+development feel integrated. `ahdcode dev` gives an HTTP Web application a
+`.test` name derived from `APP_HOST` — `ahdakademi.com` develops as
+`http://ahdakademi.test/` — and serves it through a small loopback-only
+router built from the Go standard library: no Caddy, no nginx, no daemon, and
+nothing installed. A second project wanting the same name gets
+`ahdakademi1.test`. `ahdcode local status` reports every local route, and
+`ahdcode local hosts apply` manages one delimited block in the system hosts
+file, after asking, without touching a line outside it.
+
+`ahdcode init web admin` now registers the SQLite database it creates, so it
+appears in AhdDataStudio with no environment variable to edit, and
+`ahdcode databases list|add|remove` manages that registry by hand — `remove`
+forgets an entry and never touches the file. Studio's canonical URL becomes
+`http://ahddatabasestudio.test/`, with `http://127.0.0.1:8081/AhdDataStudio`
+still fully supported. Local development is HTTP: there is still no local
+TLS, certificate authority, or ACME. No language syntax or type semantics
+changed in this release. See [CLI](docs/CLI.md#local-development-test-names-and-the-router).
 
 v0.18.5, **Web Starter & Application Bootstrap**, turns `ahdcode init web`
 into a starter wizard: Empty, Basic, or Admin. Empty is a polished welcome
@@ -92,7 +111,8 @@ after a successful build is reported without retrying the same binary.
 v0.12.0 adds [AhdDataStudio](tools/AhdDataStudio/README.md): a first-party
 localhost MySQL + SQLite development application written in AhdCode, not a
 compiler builtin. Start it with `ahdcode databases` and open
-[http://ahddatabasestudio.test:8081/AhdDataStudio](http://ahddatabasestudio.test:8081/AhdDataStudio).
+[http://ahddatabasestudio.test/](http://ahddatabasestudio.test/) (or
+[http://127.0.0.1:8081/AhdDataStudio](http://127.0.0.1:8081/AhdDataStudio)).
 It binds `127.0.0.1` only, discovers MySQL schemas with `database: null`,
 scopes SQLite files to configured project paths, and uses CSRF-protected
 POST forms for generated CRUD. This release also fixes a parser hang on
@@ -276,16 +296,16 @@ To maintain conceptual clarity, AhdCode's capabilities are organized into four d
    - **Web Application Framework:** [`Web`](docs/WEB.md) (first-party bundled web framework, [`Web.UI`](docs/WEB.md#9-webui) semantic components, `RequestContext`, typed `Forms`, ordered `ValidationErrors`, selected `OldInput`, session-bound CSRF, and flash lifecycle)
 
 4. **Developer Tools:**
-   - **Compiler & Toolchain:** `ahdcode build`, `ahdcode run`, `ahdcode dev` (watch-rebuild loop), `ahdcode stop`
+   - **Compiler & Toolchain:** `ahdcode build`, `ahdcode run`, `ahdcode dev` (watch-rebuild loop with automatic `.test` identities), `ahdcode stop`, `ahdcode local` (local routes and managed hostnames)
    - **Canonical Formatter:** `ahdcode format` (syntax tree-driven, comment-preserving)
    - **Interactive REPL:** `ahdcode repl` (persistent multi-line environment)
    - **Editor & Language Server:** `ahdcode lsp`, official VS Code / Antigravity extension (`editors/vscode`)
    - **Diagnostics Engine:** construct-aware compiler diagnostics with clear error codes and hints
-   - **Local Developer UI:** [AhdDataStudio](tools/AhdDataStudio/README.md) (localhost MySQL and SQLite management tool)
+   - **Local Developer UI:** [AhdDataStudio](tools/AhdDataStudio/README.md) (localhost MySQL and SQLite management tool), `ahdcode databases list|add|remove` (per-user SQLite registry)
 
 ## Build from source
 
-AhdCode currently requires Go 1.25 or newer.
+AhdCode currently requires Go 1.26 or newer.
 
 ```bash
 cd AhdCode
@@ -320,6 +340,17 @@ mkdir my-app
 cd my-app
 ahdcode init web
 ahdcode dev app.ahd
+```
+
+`dev` prints both the socket it bound and the local name it now routes:
+
+```text
+  Open:
+  http://127.0.0.1:8080
+
+  Local identity:
+  http://ahdakademi.test/
+  Bind: 127.0.0.1:8080
 ```
 
 On a terminal, `ahdcode init web` asks which starter to write:

@@ -1,4 +1,4 @@
-# AhdCode v0.10.0 English Student Guide
+# AhdCode v0.19.0 English Student Guide
 
 This guide is designed so that **even someone who has never programmed before** can follow along. You can read it in order from beginning to end; in each section, you will first see what we want to achieve, then write a working example, and finally learn the necessary rules.
 
@@ -13,6 +13,10 @@ HTML, continue from the short introduction into the
 `CSV → Data → Statistics/Plot → Excel/Word/Latex` and `HTTPS → HTML`
 workflows through checkpoints and exercises. Use each module's own reference
 page for its complete signatures, errors, and boundary conditions.
+
+This guide teaches; it is not a reference manual and not a changelog. Where a
+module has more to it than a beginner needs on the first pass, the section
+says so and links to the reference page that lists every signature.
 
 ## Table of Contents
 - [1. What is AhdCode?](#1-what-is-ahdcode)
@@ -66,6 +70,12 @@ page for its complete signatures, errors, and boundary conditions.
 - [48. Solution Hints](#48-solution-hints)
 - [49. Next steps and technical docs](#49-next-steps-and-technical-docs)
 - [50. Security: password hashing and secure tokens](#50-security-password-hashing-and-secure-tokens)
+- [51. MySQL: a network database server](#51-mysql-a-network-database-server)
+- [52. Web: building an application](#52-web-building-an-application)
+- [53. A complete form workflow](#53-a-complete-form-workflow)
+- [54. Groups, guards, and the starters](#54-groups-guards-and-the-starters)
+- [55. Databases you can see: `ahdcode databases`](#55-databases-you-can-see-ahdcode-databases)
+- [56. Your application's local address](#56-your-applications-local-address)
 
 ## 1. What is AhdCode?
 
@@ -85,13 +95,21 @@ Hello!
 
 AhdCode checks the code you wrote before running the program. For example, if you try to use text like a number, or if you use a value that could be `null` without checking it, it will tell you the error before the program even starts, whenever possible. But you don't need to think about these details at the beginning; we'll see examples in later sections.
 
-AhdCode v0.10.0 is the current release. You can run small command-line programs or compile them into local executables, keep data in a local SQLite database, serve a page from this machine over HTTP -- including a binary-safe file response with `HTTP.file`/`HTTP.download` -- remember per-browser values with an in-memory session, call an external HTTP or HTTPS API, parse HTML and scrape a page, accept file uploads, send mail through SMTP, hash passwords and generate secure tokens with the `Security` module, and use the language server (`ahdcode lsp`) from an editor such as VS Code. Some standard modules, such as SQLite, may use companion runtime helpers supplied with AhdCode. HTTP, HTML, cookies, sessions, and the HTTP Client use the Go standard library inside the runtime; they do not add an HTTP helper. v0.2.2 completed the everyday language server; v0.3.0 added SQLite; v0.4.0 is the first browser-facing AhdCode application phase; v0.5.0 adds cookies and server-side sessions; v0.6.0 adds the outbound HTTP Client; v0.7.0 adds HTML parsing and web scraping; v0.8.0 adds multipart file uploads; v0.9.0 adds SMTP mail; v0.9.1 adds binary-safe HTTP file responses; v0.10.0 adds the `Security` module.
+AhdCode v0.19.0 is the current release. It is still pre-1.0: the language works end to end, but things may still change before 1.0.
+
+With it you can write small command-line programs or compile them into native executables; keep data in a local SQLite database or a MySQL server; build a complete web application with the first-party `Web` framework -- pages, layouts, forms, validation, CSRF, flash messages, sessions, and file uploads; call external HTTP and HTTPS APIs; parse HTML; send mail through SMTP; hash passwords and generate secure tokens with `Security`; and use the language server (`ahdcode lsp`) from an editor such as VS Code.
+
+The toolchain grew alongside the language. `ahdcode dev` watches your files, rebuilds, and restarts as you save. `ahdcode init web` writes a working starter project. `ahdcode databases` opens AhdDataStudio, a local database workspace. And since v0.19, a web application you run locally gets a readable address of its own -- `http://ahdakademi.test/` rather than a port number -- which section 56 explains.
+
+Some standard modules, such as SQLite, use companion runtime helpers supplied with AhdCode. HTTP, HTML, cookies, sessions, and the HTTP Client use the Go standard library inside the runtime; they add no third-party HTTP dependency.
+
+You do not need to know which version added what to use the language. If you are curious, the [README](../README.md) keeps that history.
 
 > **Technical note:** Checking types before the program runs is called *static checking*.
 
 ## 2. Installation and your first program
 
-To build AhdCode from source, you must have Go 1.25 or newer installed on your computer. Run the following commands in the project folder:
+To build AhdCode from source, you must have Go 1.26 or newer installed on your computer. Run the following commands in the project folder:
 
 ```bash
 cd AhdCode
@@ -107,7 +125,7 @@ If you want to use the `Latex` module, you must also stage the offline Latex run
 go run ./tooling/latex/cmd/package-latex --output "$(go env GOPATH)"
 ```
 
-If the last command shows the AhdCode version, you are ready.
+If the last command prints `AhdCode v0.19.0`, you are ready.
 
 Now create a file named `hello.ahd` and write this inside:
 
@@ -1628,6 +1646,44 @@ from Greeting bring all
 ```
 
 Imports that lead to the collision of identical names and circular module dependencies are compile-time errors.
+
+### Splitting one application across files: `require(...)`
+
+`bring` imports a *module* -- something with its own namespace, like `Time` or
+your own `Greeting.ahd`. When you are building one application, you usually
+want the opposite: several files that together make up a single program,
+sharing one set of names.
+
+That is what `require(...)` is for:
+
+```ahd
+require("Config/App.ahd")
+require("Pages/Home.ahd")
+
+bring Web
+from Web bring App
+
+academy: App := Web.app(application)
+academy.get("/", homePage)
+academy.start()
+```
+
+Each `require(...)` line names a file, relative to the file doing the
+requiring. The compiler reads that file as part of *this* program, so
+`homePage` -- defined in `Pages/Home.ahd` -- is an ordinary name here, with no
+prefix.
+
+Three rules are worth remembering:
+
+- the path is a **literal String**, not a variable. The compiler has to know
+  the whole program before it runs any of it;
+- requiring the same file twice is fine. It is read once;
+- a cycle is a compile-time error, the same as with `bring`.
+
+This is how every non-trivial application in this guide is organized, and it
+is what `ahdcode init web` generates for you. `ahdcode dev` watches every file
+in the `require(...)` graph, so editing a page rebuilds and restarts just like
+editing the entry file. The full rules are in [`require(...)`](REQUIRE.md).
 
 ### Giving a short name to a module
 
@@ -3807,40 +3863,101 @@ The formatter is idempotent; running it again on the same file produces no new c
 
 ## 43. Command line (CLI)
 
-You can use AhdCode from the terminal with a few basic commands:
+You can use AhdCode from the terminal with a few basic commands. If you are a
+beginner, the two you will use most are `ahdcode run` and, once you are
+building something bigger, `ahdcode dev`.
 
-```text
+### Running and building
+
+```bash
 ahdcode run file.ahd
 ```
 
-Runs the program.
+Compiles and runs the program.
 
-```text
+```bash
 ahdcode build file.ahd
 ```
 
-Compiles the program into a standalone local executable.
+Compiles the program into a standalone native executable and prints its path.
+Add `-o name` to choose the name.
 
-```text
+```bash
 ahdcode format file.ahd
 ```
 
-Formats the file according to the common style.
+Formats the file according to the common style (section 42).
 
-```text
+### Working on a program that keeps running
+
+A web application does not finish -- it waits for requests. Restarting it by
+hand after every edit gets old fast, so:
+
+```bash
+ahdcode dev app.ahd
+```
+
+`dev` compiles the program, starts it, and then watches every file in its
+`require(...)` graph. On each save it rebuilds:
+
+- if the build **succeeds**, the running program is replaced by the new one;
+- if the build **fails**, the errors print and *the last working version keeps
+  running*. A broken save never takes your site down;
+- if the program crashes on its own, `dev` says so and waits for your next
+  save rather than looping on a binary it already knows is broken.
+
+Press Ctrl+C to stop it.
+
+### Stopping something you started elsewhere
+
+While `run` or `dev` is going, AhdCode keeps a small file next to your program
+-- `app.run` or `app.dev` -- that says how to reach it. From another terminal:
+
+```bash
+ahdcode stop app.dev     # ask it to shut down cleanly, and wait for it to
+ahdcode kill app.run     # stop it immediately
+```
+
+`stop` is the polite one: it asks, then waits to confirm the process really
+exited. `kill` does not wait. Neither of them hunts for a process id — that is
+deliberate, and [the CLI guide](CLI.md) explains why it matters.
+
+You can also give the source name and let AhdCode work out which session is
+running:
+
+```bash
+ahdcode stop app.ahd
+```
+
+### Starting a project, and looking at your data
+
+```bash
+ahdcode init web        # write a working web starter into this folder
+ahdcode databases       # open AhdDataStudio, the local database workspace
+ahdcode local status    # what local addresses this machine is serving
+```
+
+Sections 54, 55, and 56 use these.
+
+### Editor support and help
+
+```bash
 ahdcode lsp
 ```
 
-Starts the language server used by editors. The v0.2.2 editor support includes diagnostics, hover, completion with auto import, definition navigation and references, rename, signature help, semantic highlighting, inlay hints, quick fixes, and formatting. See the [language server guide](LSP.md) for details.
+Starts the language server used by editors: diagnostics, hover, completion
+with auto import, definition navigation and references, rename, signature
+help, semantic highlighting, inlay hints, quick fixes, and formatting. You
+normally never type this yourself -- your editor launches it. See the
+[language server guide](LSP.md).
 
-```text
+```bash
 ahdcode --help
 ahdcode --version
 ```
 
-Shows help and version information.
-
-If you are a beginner, the command you will use most of the time will be `ahdcode run ...`.
+Shows help and version information. `--help` lists the full command surface;
+[the CLI guide](CLI.md) explains each one properly.
 
 ## 44. Interactive shell (REPL)
 
@@ -4133,15 +4250,25 @@ After finishing this guide, you can deepen your knowledge of the language detail
 - [Regex](REGEX.md)
 - [CSV](CSV.md)
 - [Data](DATA.md)
+- [Web](WEB.md)
+- [require(...)](REQUIRE.md)
 - [Diagnostics](DIAGNOSTICS.md)
 - [CLI](CLI.md)
+- [Env](ENV.md)
+- [AhdDataStudio](../tools/AhdDataStudio/README.md)
 - [Formatter](FORMATTER.md)
 - [REPL](REPL.md)
 - [Language server](LSP.md)
 - [Practical Module Workshops](PRACTICAL_MODULES.md)
 - [Full v0.1 specification](../AHDCODE_LANGUAGE_SPEC_v0.1.md)
 
-Check the [curated v0.1 examples](../examples/v0.1/README.md) folder, the [v0.3 SQLite Notes App](../examples/v0.3/README.md), the [v0.4 Web Notes App](../examples/v0.4/README.md), the [v0.5 cookies and sessions](../examples/v0.5/README.md), the [v0.6 HTTP Client](../examples/v0.6/README.md), the [v0.7 HTML parsing and web scraping](../examples/v0.7/README.md), the [v0.8 file uploads](../examples/v0.8/README.md), the [v0.9 SMTP mail](../examples/v0.9/README.md), the [v0.9.1 binary HTTP file responses](../examples/v0.9.1/README.md), the [v0.10 Security examples](../examples/v0.10/README.md), and the [v0.11 MySQL examples](../examples/v0.11/README.md) for more working programs.
+Check the [curated v0.1 examples](../examples/v0.1/README.md) folder, the [v0.3 SQLite Notes App](../examples/v0.3/README.md), the [v0.4 Web Notes App](../examples/v0.4/README.md), the [v0.5 cookies and sessions](../examples/v0.5/README.md), the [v0.6 HTTP Client](../examples/v0.6/README.md), the [v0.7 HTML parsing and web scraping](../examples/v0.7/README.md), the [v0.8 file uploads](../examples/v0.8/README.md), the [v0.9 SMTP mail](../examples/v0.9/README.md), the [v0.9.1 binary HTTP file responses](../examples/v0.9.1/README.md), the [v0.10 Security examples](../examples/v0.10/README.md), the [v0.11 MySQL examples](../examples/v0.11/README.md), the
+[v0.12 raffle application](../examples/v0.12/README.md), the
+[v0.14 multi-file Web application](../examples/v0.14/multi_file_web), the
+[v0.15 Web applications](../examples/v0.15/ahd_academi), the
+[v0.16 forms and validation example](../examples/v0.16/forms_validation/README.md),
+the [v0.17 routes and guards example](../examples/v0.17/routes_guards), and the
+[v0.18 Web starters](../examples/v0.18/README.md) for more working programs.
 
 ## 50. Security: password hashing and secure tokens
 
@@ -4336,8 +4463,8 @@ See [the MySQL module reference](MYSQL.md) and
 ## 52. Web: building an application
 
 Section 36 showed `HTTP` and `HTML`, the two primitives underneath every
-AhdCode web page. v0.15 adds `Web`, a first-party framework that composes
-them, so an ordinary application needs one import instead of several.
+AhdCode web page. `Web` is the first-party framework that composes them, so an
+ordinary application needs one import instead of several.
 
 ```ahd
 bring Web
@@ -4518,7 +4645,7 @@ not -- the browser just gets the new file on the next reload.
 A complete example is in `examples/v0.15/ahd_academi`, and the full reference
 is [docs/WEB.md](WEB.md).
 
-## v0.16: a complete form workflow
+## 53. A complete form workflow
 
 The [forms example](../examples/v0.16/forms_validation/README.md) runs with
 `ahdcode run examples/v0.16/forms_validation/app.ahd` and needs no database.
@@ -4536,11 +4663,32 @@ so application login and guards remain explicit. `Web.form(request)` is also
 available without a session. `Form.integer` separates missing null from invalid
 `FormValueError`; `Form.optional` separates missing from empty input.
 
-## v0.17: groups and guards
+## 54. Groups, guards, and the starters
 
-`ahdcode init web` now asks Empty, Basic, or Admin. Empty is a welcome
-page. Basic adds mail configuration. Admin adds login, a dashboard, and a
-database. Context-aware routes, groups, and ordered guards remain a
+### The starters
+
+`ahdcode init web` asks which starter to write, or you can name it directly
+(`ahdcode init web empty`, `basic`, `admin`):
+
+- **Empty** -- a welcome page. No database, no login.
+- **Basic** -- the same shell plus common application and mail configuration
+  in `.env`.
+- **Admin** -- Home, Login, and a Dashboard, with one administrator account in
+  either SQLite or MySQL.
+
+Everything it writes is ordinary AhdCode you can read and change: pages,
+layouts, components, and a `Config/` folder, wired together with
+`require(...)` exactly as section 19 described. Templates and Bootstrap ship
+inside the CLI, so `init` needs no network and installs no package manager.
+It never overwrites a file or a database that is already there.
+
+The Admin starter asks for a database name and one administrator, creates the
+database, and hashes the password with `Security.passwordHash` (section 50).
+If you chose SQLite, section 55 picks up from there.
+
+### Routes, groups, and guards
+
+Context-aware routes, groups, and ordered guards remain a
 separate, explicit layer:
 [`examples/v0.17/routes_guards`](../examples/v0.17/routes_guards).
 `App.get` with `Function(Request) -> Response` still works. A guard returns
@@ -4559,3 +4707,173 @@ language constructs, and handler names are ordinary identifiers: the example
 routes to `register`, `registerSubmit` and `profile` with no `Page` suffix,
 while applications that already use `registerPage` keep working unchanged. See
 [10.1 Naming](WEB.md#101-naming).
+
+## 55. Databases you can see: `ahdcode databases`
+
+Section 35 opened a SQLite database from code. Sooner or later you also want
+to *look* at one: what tables are in there, what is actually stored, did that
+INSERT really work.
+
+```bash
+ahdcode databases
+```
+
+That starts **AhdDataStudio**, a small database workspace that runs on your
+own machine. It is itself an AhdCode program -- you can read its source under
+`tools/AhdDataStudio/` -- and it is not part of the language. It opens at:
+
+```text
+http://ahddatabasestudio.test/
+```
+
+and, whether or not that name resolves on your machine, always at:
+
+```text
+http://127.0.0.1:8081/AhdDataStudio
+```
+
+It listens on `127.0.0.1` only. It is a local development tool and must never
+be put on a public address.
+
+### Which databases show up
+
+Studio does **not** search your computer for database files. That is
+deliberate: a tool that goes looking through your disk for things that look
+like databases is a tool you cannot reason about.
+
+Instead, a SQLite database appears when it has been *registered*:
+
+```bash
+ahdcode databases add ./notes.db      # register this file
+ahdcode databases list                # what is registered
+ahdcode databases remove ./notes.db   # forget it
+```
+
+Two things about `remove` are worth saying plainly. It removes the *entry*,
+not the file -- your database is untouched. And it only removes the exact
+entry you named.
+
+If a registered file is missing right now -- an external drive that is not
+plugged in, a project folder you moved -- `list` shows it as `unavailable`
+rather than quietly forgetting it. Only you remove things from your registry.
+
+### You usually will not have to do this by hand
+
+When you create a project with the Admin starter and choose SQLite:
+
+```bash
+ahdcode init web admin
+ahdcode databases
+```
+
+the database that `init` just created is already there. It registers itself,
+so there is nothing to configure and nothing to type.
+
+MySQL works differently, and on purpose: a MySQL connection needs a username
+and a password, and those live in AhdDataStudio's own `.env` file rather than
+in any registry. AhdCode does not keep your database passwords in a list.
+
+See the [AhdDataStudio guide](../tools/AhdDataStudio/README.md) and
+[CLI](CLI.md#ahdcode-databases).
+
+## 56. Your application's local address
+
+When you ran a web page in section 36, you opened something like
+`http://127.0.0.1:8080`. That works, but it does not look like a website, and
+if you have two projects open you have to remember which port is which.
+
+Your application already knows its real name. In its `.env`:
+
+```text
+APP_NAME=Ahd Akademi
+APP_ENV=development
+APP_HOST=ahdakademi.com
+APP_PROTOCOL=http
+SERVER_HOST=127.0.0.1
+SERVER_PORT=8080
+```
+
+`APP_HOST` is the address people will eventually type. So when you run:
+
+```bash
+ahdcode dev app.ahd
+```
+
+AhdCode derives a *local* name from it and serves your application there:
+
+```text
+AhdCode Web
+  Ahd Akademi (development)
+
+  Open:
+  http://127.0.0.1:8080
+
+  Local identity:
+  http://ahdakademi.test/
+  Bind: 127.0.0.1:8080
+```
+
+`ahdakademi.com` becomes `ahdakademi.test`. The ending is replaced, not added
+to, so the local name reads like the same project. `.test` is an address
+ending that is reserved forever for exactly this -- it can never belong to a
+real website -- so local work can never accidentally reach the real server.
+
+Notice that two things are printed, not one:
+
+- **Open** is the socket your program actually bound: `SERVER_HOST` and
+  `SERVER_PORT`. This always works.
+- **Local identity** is the name this machine now routes to it.
+
+They are different facts, which is why they are shown separately. The bind
+address is where the socket is; the local name is what this computer points at
+it.
+
+### Two projects, same name
+
+Start a second project that is also configured for `ahdakademi.com` and it
+gets `ahdakademi1.test`, then `ahdakademi2.test`, and so on. Stop the first
+one and its name is free again for whoever asks next.
+
+### Making the name resolve
+
+A `.test` name still has to mean something to your computer. Ask AhdCode to
+set that up:
+
+```bash
+ahdcode local hosts apply
+```
+
+It shows you exactly what it will add -- a few `127.0.0.1` lines between two
+marker comments -- and asks before doing anything, because changing the system
+hosts file needs administrator access. Everything else in that file is left
+alone. You can undo it with `ahdcode local hosts remove`.
+
+If you would rather not, nothing breaks: the `Open:` address keeps working
+exactly as before.
+
+### Seeing what is running
+
+```bash
+ahdcode local status
+```
+
+lists every local address this machine is currently serving, and what each one
+points at. If you ever wonder "which project is `ahdakademi1.test`?", this
+answers it.
+
+### What this is not
+
+Two honest limits:
+
+- **It is HTTP, not HTTPS.** `https://` locally would mean installing a
+  certificate authority into your computer's trust store, which is a much
+  bigger decision than routing a name. AhdCode does not do it, and it refuses
+  to start with `APP_PROTOCOL=https` rather than serve plain HTTP while
+  calling it secure.
+- **It is only your machine.** The router listens on loopback and forwards
+  only to loopback. Nothing outside your computer can reach it, and it is not
+  a way to publish anything.
+
+For deployment, `APP_HOST` and `APP_PROTOCOL` describe the *public* address
+and a real server in front of your application terminates HTTPS. The
+[Web guide](WEB.md#15-production) explains that split.

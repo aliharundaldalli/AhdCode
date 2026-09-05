@@ -163,7 +163,7 @@ A malformed value is rejected with a message that says which rule it broke,
 rather than trimmed into something that merely looks right.
 
 `APP_ENV=test` is a recognized, isolated environment for automated tests. It
-does not enable production behaviour and does not append `.test`. v0.15 adds
+does not enable production behaviour and derives no `.test` name. v0.19 adds
 no testing DSL.
 
 Configuration errors name the offending key and never echo its value, so a
@@ -507,21 +507,27 @@ AhdCode Web
   Open:
   http://127.0.0.1:8080
 
-  Development identity:
-  http://ahdakademi.com.test
-  (.test is not locally routed in v0.15)
+  Local identity:
+  http://ahdakademi.test/
+  Bind: 127.0.0.1:8080
 
 Waiting for changes...
 ```
 
-**Open the address under `Open:`.** That is `SERVER_HOST` and `SERVER_PORT`,
-the socket the application actually binds, and it is the only address that
-works on this machine.
+The address under `Open:` is `SERVER_HOST` and `SERVER_PORT`, the socket the
+application actually binds. It always works.
 
-The line under `Development identity:` is the name the application is
-*configured* with. v0.15 derives it but does not resolve it — there is no
-bundled `.test` resolver — so it is shown for reference and marked as such,
-never as somewhere to click.
+The line under `Local identity:` is the `.test` name derived from `APP_HOST`,
+which v0.19 both derives **and routes**: `ahdcode dev` claims it in the
+AhdCode route registry and serves it from a loopback-only local router that
+runs for as long as the session does. See
+[CLI](CLI.md#local-development-test-names-and-the-router) for the router, the
+port it binds, and `ahdcode local hosts`.
+
+The two are reported separately on purpose. The bind address says where the
+socket is; the local URL says what name this machine routes to it. If routing
+cannot be arranged, the banner says so in one line and the application still
+runs — a convenience failing never fails a session that started correctly.
 
 The v0.13/v0.14 dependency-aware dev controller is unchanged and still owns
 the source graph, the watcher, last-good, rebuild, restart, and stop. Web adds
@@ -545,12 +551,12 @@ Editing `public/app.css` does not.
 It also **refuses** `APP_PROTOCOL=https`:
 
 ```
-✗ Local HTTPS is not available in AhdCode v0.15.
+✗ Local HTTPS is not available in AhdCode v0.19.
   ahdcode dev serves plaintext HTTP, so it cannot honour
   APP_PROTOCOL=https.
 
   Configured identity:
-  https://ahdakademi.com.test
+  https://ahdakademi.test
 
   Set APP_PROTOCOL=http for local development, or terminate
   HTTPS with an external local proxy in front of 127.0.0.1:8080.
@@ -558,7 +564,7 @@ It also **refuses** `APP_PROTOCOL=https`:
 ```
 
 `ahdcode dev` starts the application, and the application binds a plaintext
-HTTP socket. There is no path in v0.15 by which `APP_PROTOCOL=https` results
+HTTP socket. There is no path in v0.19 by which `APP_PROTOCOL=https` results
 in TLS here, so starting the child would mean serving `http` while the
 configuration says `https`. It refuses instead of downgrading: a silent
 downgrade would hide a secure-cookie or mixed-content problem until
@@ -573,21 +579,22 @@ reports the bind address alone and shows no `.test` identity.
 
 ## 13. `.test`
 
-For `APP_ENV=development`, the local identity is `APP_HOST` with `.test`
-appended:
+For `APP_ENV=development`, the local identity replaces `APP_HOST`'s
+registrable suffix with `.test`:
 
 ```
-APP_HOST=ahdakademi.com   →   ahdakademi.com.test
+APP_HOST=ahdakademi.com     →   ahdakademi.test
+APP_HOST=ahdakademi.com.tr  →   ahdakademi.com.test
+APP_HOST=localhost          →   localhost.test
 ```
 
-`.test` is a reserved special-use TLD (RFC 6761); using it means development
-traffic can never resolve to the real host by accident.
+The suffix is replaced rather than appended to, so the local name reads as
+the same project instead of as the production name with something bolted on.
 
-**`.test` is a logical identity in v0.15, not a routable address.** AhdCode
-installs no DNS, no resolver entry, and no `/etc/hosts` record for it, so the
-name does not resolve through ordinary macOS resolution and cannot be opened
-in a browser. The directly usable local address is `SERVER_HOST:SERVER_PORT`,
-which is what `ahdcode dev` prints first.
+`.test` is a reserved special-use TLD (RFC 6761) and will never be delegated,
+so development traffic can never resolve to the real host by accident.
+`.local` is deliberately **not** used: it is claimed by mDNS/Bonjour on macOS
+and most Linux desktops.
 
 Production uses `APP_HOST` exactly — the real canonical domain — and never
 gains the suffix. `APP_ENV=test` uses `APP_HOST` unchanged too.
@@ -597,28 +604,47 @@ gains the suffix. `APP_ENV=test` uses `APP_HOST` unchanged too.
 | Call | `development` | `production` |
 | --- | --- | --- |
 | `url()` | `https://ahdakademi.com` | `https://ahdakademi.com` |
-| `developmentURL()` | `https://ahdakademi.com.test` | `https://ahdakademi.com.test` |
-| `developmentHost()` | `ahdakademi.com.test` | `ahdakademi.com.test` |
-| `effectiveURL()` | `https://ahdakademi.com.test` | `https://ahdakademi.com` |
+| `developmentURL()` | `https://ahdakademi.test` | `https://ahdakademi.test` |
+| `developmentHost()` | `ahdakademi.test` | `ahdakademi.test` |
+| `effectiveURL()` | `https://ahdakademi.test` | `https://ahdakademi.com` |
 | `address()` | `127.0.0.1:8080` | `127.0.0.1:8080` |
+
+This is the same derivation `ahdcode dev` uses to claim a route, so a link an
+application builds from `effectiveURL()` and the name a person can open are
+the same string.
+
+### Is the name routed?
+
+In v0.19, yes — over HTTP, on this machine only. `ahdcode dev` registers the
+name in AhdCode's per-user route registry and hosts a small loopback-only
+router that serves every registered route. Two things still have to be true
+for the clean URL to open in a browser:
+
+1. **the name resolves.** `ahdcode local hosts apply` adds one delimited block
+   of `127.0.0.1` mappings to the system hosts file, after asking. Everything
+   outside its markers is left exactly as it is, a non-interactive session
+   never prompts and never elevates, and declining breaks nothing — the
+   loopback address always works.
+2. **the router holds port 80.** It tries, and takes the deterministic
+   fallback `7357` when the platform will not allow it, printing
+   `http://ahdakademi.test:7357/` instead. Nothing elevates to get port 80.
+
+If a live AhdCode session already owns the derived name, the next free suffix
+is used (`ahdakademi1.test`). Ownership is decided by the route registry, not
+by the hosts file, so a leftover mapping from a project that is no longer
+running never pushes a new session onto a suffixed name.
 
 ## 14. Local HTTPS — current limitation
 
-`.test` does not resolve on its own, and v0.15 **does not ship** a local
-certificate authority, a `.test` resolver, or a development gateway. There is
-no `ahdcode trust` command in this release.
+v0.19 routes `.test` names over **plaintext HTTP**. It still **does not ship**
+a local certificate authority, a certificate manager, or ACME, and there is no
+`ahdcode trust` command.
 
-Reaching `https://<APP_HOST>.test` with no visible port needs three
-permanently privileged pieces of system state at once:
-
-1. a root-installed resolver for the `.test` domain (`/etc/resolver/test` plus
-   a resolver process, or root-managed `/etc/hosts` entries),
-2. a listener on privileged port 443, or a root-installed packet redirect,
-3. a certificate authority in the system trust store.
-
-That is a long-lived, privileged local network daemon. It is deferred rather
-than approximated: v0.15 installs no system state, requests no privilege, and
-adds no local trust artifacts.
+Serving `https://<name>.test` with no visible port needs a certificate
+authority in the system trust store, which is a permanent, machine-wide change
+to what this computer trusts. That is a much larger decision than routing a
+loopback hostname, and it is deferred rather than approximated: AhdCode
+installs no trust artifacts and generates no certificates.
 
 Because of that, `APP_PROTOCOL=https` makes `ahdcode dev`
 [refuse to start](#refusals) rather than serve the application over plaintext
@@ -626,7 +652,7 @@ http while calling it https. It never silently downgrades `https` to `http`,
 and it never generates an untrusted certificate. A silent downgrade would hide
 a secure-cookie or mixed-content problem until production.
 
-For local work today, set `APP_PROTOCOL=http` and use
+For local work today, set `APP_PROTOCOL=http` and use the `.test` name or
 `http://127.0.0.1:SERVER_PORT`, or terminate TLS with a proxy you already run.
 
 ## 15. Production
@@ -664,8 +690,10 @@ SERVER_PORT=8080            →   127.0.0.1:8080
 
 Never derive a public URL from `SERVER_PORT`.
 
-v0.15 is not a production certificate manager: no ACME, no Let's Encrypt
-automation, no DNS challenges, no renewal service. If your `HTTP` primitives
+v0.19 is not a production certificate manager: no ACME, no Let's Encrypt
+automation, no DNS challenges, no renewal service. The local router is
+strictly a development convenience -- loopback only, never a deployment
+target. If your `HTTP` primitives
 already support direct TLS, that remains available and unchanged.
 
 ## 16. `.env`
@@ -807,9 +835,28 @@ old input only. Failures do not say whether the email exists.
 Creates `database/<name>.db` and `database/schema.sql`, applies the schema,
 and inserts the administrator with `Security.passwordHash`. An existing
 `.db` file stops init. Generated `database/*.db` files are gitignored;
-`schema.sql` is not. Success output points at AhdDataStudio
-(`http://ahddatabasestudio.test:8081/AhdDataStudio`) and, when that `.env` is found,
-adds the new file to `AHD_DATA_SQLITE_PATHS`.
+`schema.sql` is not.
+
+The new database is **registered automatically** in the AhdCode database
+registry, so it appears in AhdDataStudio with nothing to configure:
+
+```bash
+ahdcode init web admin
+ahdcode databases      # the new database is already listed
+```
+
+Only that one file is registered — the project is never scanned — and
+registration happens after the database is safely in place. If the registry
+cannot be written, the failure is reported and nothing is undone: the database
+and the generated application are both real and correct, and the message says
+how to register it by hand with `ahdcode databases add`. When a Studio `.env`
+is discoverable the file is also added to `AHD_DATA_SQLITE_PATHS`, so a v0.18
+setup keeps working unchanged.
+
+Success output points at AhdDataStudio's canonical URL
+(`http://ahddatabasestudio.test/`); the direct address
+`http://127.0.0.1:8081/AhdDataStudio` remains supported. See
+[CLI](CLI.md#ahdcode-databases).
 
 #### MySQL
 

@@ -1,4 +1,4 @@
-# AhdCode v0.10.0 Türkçe Öğrenci Rehberi
+# AhdCode v0.19.0 Türkçe Öğrenci Rehberi
 
 Bu rehber, **daha önce hiç programlama yapmamış birinin de takip edebilmesi** için hazırlanmıştır. Baştan sona sırayla okuyabilirsiniz; her bölümde önce ne yapmak istediğimizi görecek, sonra çalışan bir örnek yazacak, en son gerekli kuralları öğreneceksiniz.
 
@@ -13,6 +13,11 @@ belgesine geçin. Orada modüller `CSV → Data → Statistics/Plot → Excel/Wo
 `HTTPS → HTML` iş akışları içinde, kontrol noktaları ve görevlerle anlatılır.
 Tek tek bütün imzalar ve sınır koşulları ise her modülün kendi referans
 belgesindedir.
+
+Bu rehber öğretir; bir referans kılavuzu ya da değişiklik günlüğü değildir. Bir
+modülün, yeni başlayan birinin ilk okumada ihtiyaç duyduğundan fazlası varsa,
+ilgili bölüm bunu söyler ve bütün imzaları listeleyen referans sayfasına bağlantı
+verir.
 
 ## İçindekiler
 - [1. AhdCode nedir?](#1-ahdcode-nedir)
@@ -66,6 +71,12 @@ belgesindedir.
 - [48. Çözüm İpuçları](#48-çözüm-i̇puçları)
 - [49. Sonraki adımlar ve teknik belgeler](#49-sonraki-adımlar-ve-teknik-belgeler)
 - [50. Güvenlik: parola hashleme ve güvenli belirteçler](#50-güvenlik-parola-hashleme-ve-güvenli-belirteçler)
+- [51. MySQL: ağ veritabanı sunucusu](#51-mysql-ağ-veritabanı-sunucusu)
+- [52. Web: bir uygulama kurmak](#52-web-bir-uygulama-kurmak)
+- [53. Tam bir form iş akışı](#53-tam-bir-form-iş-akışı)
+- [54. Gruplar, bekçiler ve starter'lar](#54-gruplar-bekçiler-ve-starterlar)
+- [55. Görebildiğiniz veritabanları: `ahdcode databases`](#55-görebildiğiniz-veritabanları-ahdcode-databases)
+- [56. Uygulamanızın yerel adresi](#56-uygulamanızın-yerel-adresi)
 
 ## 1. AhdCode nedir?
 
@@ -85,13 +96,21 @@ Merhaba!
 
 AhdCode, programı çalıştırmadan önce yazdığınız kodu kontrol eder. Örneğin bir metni sayı gibi kullanmaya çalışırsanız veya `null` olabilecek bir değeri kontrol etmeden kullanırsanız, mümkün olduğunda hatayı daha program başlamadan söyler. Ama başlangıçta bunun ayrıntılarını düşünmeniz gerekmiyor; ilerleyen bölümlerde örneklerle göreceğiz.
 
-AhdCode v0.10.0 güncel sürümdür. Küçük komut satırı programlarını çalıştırabilir veya yerel executable uygulamalara derleyebilirsiniz; veriyi yerel bir SQLite veritabanında tutabilir, bu makineden HTTP ile bir sayfa sunabilir -- `HTTP.file`/`HTTP.download` ile ikili-güvenli bir dosya yanıtı dahil -- tarayıcı başına bellek içi oturum değerleri tutabilir, dış bir HTTP veya HTTPS API çağırabilir, HTML ayrıştırıp bir sayfadan veri kazıyabilir, dosya yüklemesi kabul edebilir, SMTP ile e-posta gönderebilir, `Security` modülüyle parola hashleyip güvenli belirteç üretebilir ve dil sunucusunu (`ahdcode lsp`) VS Code gibi bir editörden kullanabilirsiniz. Bazı standart modüller, örneğin SQLite, derlenmiş uygulamanın yanında AhdCode'un sağladığı yardımcı çalışma zamanı bileşenlerini kullanabilir. HTTP, HTML, çerez, oturum ve HTTP Client, çalışma zamanının içindeki Go standart kütüphanesini kullanır; ayrı bir HTTP yardımcısı eklemezler. v0.2.2 pratik günlük dil sunucusunu tamamladı; v0.3.0 SQLite ekledi; v0.4.0 tarayıcıdan kullanılan ilk AhdCode uygulama fazıdır; v0.5.0 çerez ve sunucu taraflı oturum ekler; v0.6.0 giden HTTP Client ekler; v0.7.0 HTML ayrıştırma ve web kazıma ekler; v0.8.0 çok parçalı dosya yüklemesi ekler; v0.9.0 SMTP e-posta ekler; v0.9.1 ikili-güvenli HTTP dosya yanıtları ekler; v0.10.0 `Security` modülünü ekler.
+AhdCode v0.19.0 güncel sürümdür. Hâlâ 1.0 öncesidir: dil uçtan uca çalışır, ama 1.0'dan önce bazı şeyler değişebilir.
+
+Onunla küçük komut satırı programları yazabilir veya bunları yerel executable uygulamalara derleyebilirsiniz; veriyi yerel bir SQLite veritabanında ya da bir MySQL sunucusunda tutabilirsiniz; birinci taraf `Web` çatısıyla eksiksiz bir web uygulaması kurabilirsiniz — sayfalar, yerleşimler, formlar, doğrulama, CSRF, flash mesajları, oturumlar ve dosya yüklemeleri; dış HTTP ve HTTPS API'leri çağırabilir, HTML ayrıştırabilir, SMTP ile e-posta gönderebilir, `Security` ile parola hashleyip güvenli belirteç üretebilir ve dil sunucusunu (`ahdcode lsp`) VS Code gibi bir editörden kullanabilirsiniz.
+
+Araç zinciri de dille birlikte büyüdü. `ahdcode dev` siz kaydettikçe dosyalarınızı izler, yeniden derler ve yeniden başlatır. `ahdcode init web` çalışan bir starter proje yazar. `ahdcode databases` yerel veritabanı çalışma alanı AhdDataStudio'yu açar. Ve v0.19'dan beri yerel çalıştırdığınız bir web uygulaması kendine ait okunabilir bir adres alır — bir port numarası yerine `http://ahdakademi.test/` — bunu 56. bölüm anlatır.
+
+Bazı standart modüller, örneğin SQLite, AhdCode'un sağladığı yardımcı çalışma zamanı bileşenlerini kullanır. HTTP, HTML, çerez, oturum ve HTTP Client, çalışma zamanının içindeki Go standart kütüphanesini kullanır; üçüncü taraf bir HTTP bağımlılığı eklemezler.
+
+Dili kullanmak için hangi sürümün neyi eklediğini bilmeniz gerekmez. Merak ediyorsanız bu geçmişi [README](../README_TR.md) tutar.
 
 > **Teknik not:** Program çalışmadan önce türlerin kontrol edilmesine *static checking* denir.
 
 ## 2. Kurulum ve ilk programınız
 
-AhdCode'u kaynak kodundan kurmak için bilgisayarınızda Go 1.25 veya daha yeni bir sürüm bulunmalıdır. Proje klasöründe şu komutları çalıştırın:
+AhdCode'u kaynak kodundan kurmak için bilgisayarınızda Go 1.26 veya daha yeni bir sürüm bulunmalıdır. Proje klasöründe şu komutları çalıştırın:
 
 ```bash
 cd AhdCode
@@ -107,7 +126,7 @@ Eğer `Latex` modülünü kullanmayı planlıyorsanız, çevrimdışı (offline)
 go run ./tooling/latex/cmd/package-latex --output "$(go env GOPATH)"
 ```
 
-Son komut AhdCode sürümünü gösteriyorsa hazırsınız.
+Son komut `AhdCode v0.19.0` yazıyorsa hazırsınız.
 
 Şimdi `hello.ahd` adında bir dosya oluşturun ve içine şunu yazın:
 
@@ -1648,6 +1667,45 @@ from Greeting bring all
 ```
 
 Aynı ismin çakışmasına yol açan içe aktarımlar ve döngüsel modül bağımlılıkları derleme zamanı hatasıdır.
+
+### Bir uygulamayı dosyalara bölmek: `require(...)`
+
+`bring` bir *modül* içe aktarır — `Time` gibi ya da kendi `Greeting.ahd`
+dosyanız gibi, kendi ad alanı olan bir şey. Bir uygulama kurarken genellikle
+bunun tersini istersiniz: birlikte tek bir program oluşturan, tek bir ad
+kümesini paylaşan birkaç dosya.
+
+`require(...)` tam olarak bunun içindir:
+
+```ahd
+require("Config/App.ahd")
+require("Pages/Home.ahd")
+
+bring Web
+from Web bring App
+
+akademi: App := Web.app(application)
+akademi.get("/", homePage)
+akademi.start()
+```
+
+Her `require(...)` satırı, kendisini yazan dosyaya göreli bir dosya adı verir.
+Derleyici o dosyayı *bu* programın parçası olarak okur; böylece
+`Pages/Home.ahd` içinde tanımlanan `homePage` burada hiçbir önek olmadan
+sıradan bir isimdir.
+
+Aklınızda tutmaya değer üç kural:
+
+- yol bir **String sabitidir**, değişken değil. Derleyicinin, herhangi bir
+  şeyi çalıştırmadan önce programın tamamını bilmesi gerekir;
+- aynı dosyayı iki kez `require` etmek sorun değildir. Bir kez okunur;
+- döngü, `bring`'de olduğu gibi derleme zamanı hatasıdır.
+
+Bu rehberdeki her ciddi uygulama böyle düzenlenmiştir ve `ahdcode init web`
+sizin için bunu üretir. `ahdcode dev`, `require(...)` çizgesindeki her dosyayı
+izler; bu yüzden bir sayfayı düzenlemek de tıpkı giriş dosyasını düzenlemek
+gibi yeniden derleyip yeniden başlatır. Kuralların tamamı:
+[`require(...)`](REQUIRE_TR.md).
 
 ### Bir modüle kısa isim vermek
 
@@ -3836,40 +3894,103 @@ Formatter idempotent'tir; aynı dosyada tekrar çalıştırmak yeni değişiklik
 
 ## 43. Komut satırı (CLI)
 
-AhdCode'u terminalden birkaç temel komutla kullanabilirsiniz:
+AhdCode'u terminalden birkaç temel komutla kullanabilirsiniz. Yeni
+başlıyorsanız en çok kullanacağınız ikisi `ahdcode run` ve — daha büyük bir şey
+kurmaya başladığınızda — `ahdcode dev` olacaktır.
 
-```text
+### Çalıştırmak ve derlemek
+
+```bash
 ahdcode run file.ahd
 ```
 
-Programı çalıştırır.
+Programı derleyip çalıştırır.
 
-```text
+```bash
 ahdcode build file.ahd
 ```
 
-Programı kendi başına çalışan yerel bir executable'a dönüştürür.
+Programı kendi başına çalışan yerel bir executable'a dönüştürür ve yolunu
+yazar. Adı seçmek için `-o ad` ekleyin.
 
-```text
+```bash
 ahdcode format file.ahd
 ```
 
-Dosyayı ortak stile göre biçimlendirir.
+Dosyayı ortak stile göre biçimlendirir (42. bölüm).
 
-```text
+### Sürekli çalışan bir program üzerinde çalışmak
+
+Bir web uygulaması bitmez — istek bekler. Her düzenlemeden sonra elle yeniden
+başlatmak çabuk sıkıcı olur; bu yüzden:
+
+```bash
+ahdcode dev app.ahd
+```
+
+`dev` programı derler, başlatır ve `require(...)` çizgesindeki her dosyayı
+izler. Her kayıtta yeniden derler:
+
+- derleme **başarılıysa**, çalışan program yenisiyle değiştirilir;
+- derleme **başarısızsa**, hatalar yazılır ve *son çalışan sürüm çalışmaya
+  devam eder*. Bozuk bir kayıt sitenizi asla düşürmez;
+- program kendiliğinden çökerse `dev` bunu söyler ve zaten bozuk olduğunu
+  bildiği bir ikili dosyayı yeniden denemek yerine bir sonraki kaydınızı
+  bekler.
+
+Durdurmak için Ctrl+C.
+
+### Başka yerde başlattığınız bir şeyi durdurmak
+
+`run` veya `dev` çalışırken AhdCode, programınızın yanına ona nasıl
+ulaşılacağını söyleyen küçük bir dosya bırakır: `app.run` veya `app.dev`. Başka
+bir terminalden:
+
+```bash
+ahdcode stop app.dev     # düzgün kapanmasını iste ve bunu bekle
+ahdcode kill app.run     # hemen durdur
+```
+
+`stop` kibar olanıdır: ister, sonra sürecin gerçekten çıktığını doğrulamak için
+bekler. `kill` beklemez. İkisi de bir süreç kimliği aramaz — bu bilinçlidir ve
+nedenini [CLI rehberi](CLI_TR.md) anlatır.
+
+Kaynak adını verip hangi oturumun çalıştığını AhdCode'un bulmasını da
+sağlayabilirsiniz:
+
+```bash
+ahdcode stop app.ahd
+```
+
+### Proje başlatmak ve verinize bakmak
+
+```bash
+ahdcode init web        # bu klasöre çalışan bir web starter yaz
+ahdcode databases       # yerel veritabanı çalışma alanı AhdDataStudio'yu aç
+ahdcode local status    # bu makinenin sunduğu yerel adresler
+```
+
+54, 55 ve 56. bölümler bunları kullanır.
+
+### Editör desteği ve yardım
+
+```bash
 ahdcode lsp
 ```
 
-Editörlerin kullandığı dil sunucusunu başlatır. v0.2.2 editör desteği; tanılamalar, hover, completion ve otomatik import, tanıma gitme ve referans bulma, rename, signature help, semantik renklendirme, inlay hints, quick fix'ler ve biçimlendirme içerir. Ayrıntılar için [dil sunucusu rehberine](LSP_TR.md) bakın.
+Editörlerin kullandığı dil sunucusunu başlatır: tanılamalar, hover, otomatik
+import'lu completion, tanıma gitme ve referans bulma, rename, signature help,
+semantik renklendirme, inlay hints, quick fix'ler ve biçimlendirme. Normalde
+bunu kendiniz yazmazsınız — editörünüz başlatır. Bkz.
+[dil sunucusu rehberi](LSP_TR.md).
 
-```text
+```bash
 ahdcode --help
 ahdcode --version
 ```
 
-Yardım ve sürüm bilgisini gösterir.
-
-Yeni başlıyorsanız çoğu zaman kullanacağınız komut `ahdcode run ...` olacaktır.
+Yardım ve sürüm bilgisini gösterir. `--help` komut yüzeyinin tamamını listeler;
+[CLI rehberi](CLI_TR.md) her birini ayrıntılı anlatır.
 
 ## 44. Etkileşimli kabuk (REPL)
 
@@ -4164,8 +4285,12 @@ derinleştirebilirsiniz:
 - [Regex](REGEX_TR.md)
 - [CSV](CSV_TR.md)
 - [Data](DATA_TR.md)
+- [Web](WEB_TR.md)
+- [require(...)](REQUIRE_TR.md)
 - [Tanılamalar](DIAGNOSTICS_TR.md)
 - [CLI](CLI_TR.md)
+- [Env](ENV_TR.md)
+- [AhdDataStudio](../tools/AhdDataStudio/README_TR.md)
 - [Formatter](FORMATTER_TR.md)
 - [REPL](REPL_TR.md)
 - [Dil sunucusu](LSP_TR.md)
@@ -4181,8 +4306,14 @@ klasörüne, [v0.3 SQLite Not Defteri](../examples/v0.3/README_TR.md),
 [v0.8 dosya yükleme](../examples/v0.8/README_TR.md),
 [v0.9 SMTP e-posta](../examples/v0.9/README_TR.md),
 [v0.9.1 ikili-güvenli HTTP dosya yanıtları](../examples/v0.9.1/README_TR.md),
-[v0.10 Security örnekleri](../examples/v0.10/README.md) ve
-[v0.11 MySQL örnekleri](../examples/v0.11/README_TR.md) sayfalarına bakın.
+[v0.10 Security örnekleri](../examples/v0.10/README.md),
+[v0.11 MySQL örnekleri](../examples/v0.11/README_TR.md),
+[v0.12 çekiliş uygulaması](../examples/v0.12/README_TR.md),
+[v0.14 çok dosyalı Web uygulaması](../examples/v0.14/multi_file_web),
+[v0.15 Web uygulamaları](../examples/v0.15/ahd_academi),
+[v0.16 form ve doğrulama örneği](../examples/v0.16/forms_validation/README_TR.md),
+[v0.17 rota ve bekçi örneği](../examples/v0.17/routes_guards) ve
+[v0.18 Web starter'ları](../examples/v0.18/README_TR.md) sayfalarına bakın.
 
 ## 50. Güvenlik: parola hashleme ve güvenli belirteçler
 
@@ -4367,9 +4498,8 @@ karışıklık olmaz.
 ## 52. Web: bir uygulama kurmak
 
 36. bölüm, her AhdCode web sayfasının altındaki iki ilkeli -- `HTTP` ve
-`HTML` -- gösterdi. v0.15, bunları bileştiren birinci taraf bir çatı olan
-`Web`'i ekler; böylece sıradan bir uygulama birkaç yerine tek bir içe
-aktarmayla yetinir.
+`HTML` -- gösterdi. `Web`, bunları bileştiren birinci taraf çatıdır; böylece
+sıradan bir uygulama birkaç yerine tek bir içe aktarmayla yetinir.
 
 ```ahd
 bring Web
@@ -4553,7 +4683,7 @@ yeni dosyayı alır.
 Eksiksiz bir örnek `examples/v0.15/ahd_academi` içindedir; tam referans
 [docs/WEB_TR.md](WEB_TR.md).
 
-## v0.16: tam form iş akışı
+## 53. Tam bir form iş akışı
 
 [Form örneği](../examples/v0.16/forms_validation/README_TR.md),
 `ahdcode run examples/v0.16/forms_validation/app.ahd` ile veritabanı olmadan
@@ -4578,11 +4708,32 @@ ve diğer sırları seçmeyin. Otomatik eski girdi saklama, flash gösterimi,
 middleware veya auth çerçevesi yoktur. [Web rehberi](WEB_TR.md) tam akışı ve kesin
 API'yi öğretir; v0.15 API'leri kaynak uyumluluğunu korur.
 
-## v0.17: gruplar ve bekçiler
+## 54. Gruplar, bekçiler ve starter'lar
 
-`ahdcode init web` artık Empty, Basic veya Admin sorar. Empty bir karşılama
-sayfasıdır. Basic posta yapılandırması ekler. Admin giriş, pano ve
-veritabanı ekler. Bağlam duyarlı rotalar, gruplar ve sıralı bekçiler ayrı,
+### Starter'lar
+
+`ahdcode init web` hangi starter'ın yazılacağını sorar; ya da doğrudan
+adlandırabilirsiniz (`ahdcode init web empty`, `basic`, `admin`):
+
+- **Empty** — bir karşılama sayfası. Veritabanı yok, giriş yok.
+- **Basic** — aynı kabuk artı `.env` içinde ortak uygulama ve posta
+  yapılandırması.
+- **Admin** — Home, Login ve bir Dashboard; SQLite ya da MySQL üzerinde tek bir
+  yönetici hesabıyla.
+
+Yazdığı her şey okuyup değiştirebileceğiniz sıradan AhdCode'dur: sayfalar,
+yerleşimler, bileşenler ve bir `Config/` klasörü; hepsi 19. bölümdeki gibi
+`require(...)` ile birbirine bağlanmıştır. Şablonlar ve Bootstrap CLI'ın
+içindedir; bu yüzden `init` ağ gerektirmez ve hiçbir paket yöneticisi kurmaz.
+Var olan bir dosyanın ya da veritabanının üzerine asla yazmaz.
+
+Admin starter'ı bir veritabanı adı ve bir yönetici sorar, veritabanını
+oluşturur ve parolayı `Security.passwordHash` ile hashler (50. bölüm). SQLite
+seçtiyseniz 55. bölüm oradan devam eder.
+
+### Rotalar, gruplar ve bekçiler
+
+Bağlam duyarlı rotalar, gruplar ve sıralı bekçiler ayrı,
 açık katman olarak kalır:
 [`examples/v0.17/routes_guards`](../examples/v0.17/routes_guards).
 `Function(Request) -> Response` ile `App.get` çalışmayı sürdürür. Bekçi
@@ -4594,3 +4745,173 @@ yapısı değil; işleyici adları da sıradan tanımlayıcılardır: örnek `Pa
 olmadan `register`, `registerSubmit` ve `profile` işleyicilerine yönlendirir,
 `registerPage` kullanan uygulamalar ise değişmeden çalışmayı sürdürür. Bkz.
 [10.1 Adlandırma](WEB_TR.md#101-adlandırma).
+
+## 55. Görebildiğiniz veritabanları: `ahdcode databases`
+
+35. bölüm koddan bir SQLite veritabanı açtı. Er ya da geç bir veritabanına
+*bakmak* da istersiniz: içinde hangi tablolar var, gerçekten ne saklanıyor, o
+INSERT çalıştı mı.
+
+```bash
+ahdcode databases
+```
+
+Bu, kendi makinenizde çalışan küçük bir veritabanı çalışma alanı olan
+**AhdDataStudio**'yu başlatır. Kendisi de bir AhdCode programıdır —
+kaynağını `tools/AhdDataStudio/` altında okuyabilirsiniz — ve dilin parçası
+değildir. Şu adreste açılır:
+
+```text
+http://ahddatabasestudio.test/
+```
+
+ve bu ad makinenizde çözülsün ya da çözülmesin, her zaman şurada:
+
+```text
+http://127.0.0.1:8081/AhdDataStudio
+```
+
+Yalnızca `127.0.0.1` dinler. Yerel bir geliştirme aracıdır ve asla açık bir
+adrese konmamalıdır.
+
+### Hangi veritabanları görünür
+
+Studio bilgisayarınızda veritabanı dosyası **aramaz**. Bu bilinçlidir:
+diskinizde veritabanına benzeyen şeyleri dolaşan bir araç, hakkında akıl
+yürütemeyeceğiniz bir araçtır.
+
+Bunun yerine bir SQLite veritabanı *kaydedilmişse* görünür:
+
+```bash
+ahdcode databases add ./notes.db      # bu dosyayı kaydet
+ahdcode databases list                # neler kayıtlı
+ahdcode databases remove ./notes.db   # unut
+```
+
+`remove` hakkında iki şeyi açıkça söylemek gerekir. *Kaydı* siler, dosyayı
+değil — veritabanınıza dokunulmaz. Ve yalnızca adını verdiğiniz kaydı siler.
+
+Kayıtlı bir dosya şu anda yoksa — takılı olmayan bir harici disk, taşıdığınız
+bir proje klasörü — `list` onu sessizce unutmak yerine `unavailable` olarak
+gösterir. Kayıt defterinizden bir şeyi yalnızca siz silersiniz.
+
+### Genellikle bunu elle yapmanız gerekmez
+
+Admin starter'ıyla bir proje oluşturup SQLite seçtiğinizde:
+
+```bash
+ahdcode init web admin
+ahdcode databases
+```
+
+`init`'in az önce oluşturduğu veritabanı zaten oradadır. Kendini kaydeder;
+yapılandırılacak bir şey ve yazılacak bir şey yoktur.
+
+MySQL farklı çalışır ve bu bilinçlidir: bir MySQL bağlantısı kullanıcı adı ve
+parola ister; bunlar da herhangi bir kayıt defterinde değil, AhdDataStudio'nun
+kendi `.env` dosyasında yaşar. AhdCode veritabanı parolalarınızı bir listede
+tutmaz.
+
+Bkz. [AhdDataStudio rehberi](../tools/AhdDataStudio/README_TR.md) ve
+[CLI](CLI_TR.md#ahdcode-databases).
+
+## 56. Uygulamanızın yerel adresi
+
+36. bölümde bir web sayfası çalıştırdığınızda `http://127.0.0.1:8080` gibi bir
+şey açtınız. Bu çalışır ama bir web sitesine benzemez; ayrıca iki projeniz
+açıksa hangi portun hangisi olduğunu hatırlamanız gerekir.
+
+Uygulamanız gerçek adını zaten biliyor. `.env` dosyasında:
+
+```text
+APP_NAME=Ahd Akademi
+APP_ENV=development
+APP_HOST=ahdakademi.com
+APP_PROTOCOL=http
+SERVER_HOST=127.0.0.1
+SERVER_PORT=8080
+```
+
+`APP_HOST`, insanların bir gün yazacağı adrestir. Bu yüzden şunu
+çalıştırdığınızda:
+
+```bash
+ahdcode dev app.ahd
+```
+
+AhdCode ondan *yerel* bir ad türetir ve uygulamanızı orada sunar:
+
+```text
+AhdCode Web
+  Ahd Akademi (development)
+
+  Open:
+  http://127.0.0.1:8080
+
+  Local identity:
+  http://ahdakademi.test/
+  Bind: 127.0.0.1:8080
+```
+
+`ahdakademi.com`, `ahdakademi.test` olur. Sonek eklenmez, değiştirilir; böylece
+yerel ad aynı proje gibi okunur. `.test`, tam olarak bunun için sonsuza dek
+ayrılmış bir adres sonudur — gerçek bir web sitesine asla ait olamaz — bu
+yüzden yerel çalışma kazara gerçek sunucuya ulaşamaz.
+
+Bir değil iki şeyin yazıldığına dikkat edin:
+
+- **Open**, programınızın gerçekten bağlandığı sokettir: `SERVER_HOST` ve
+  `SERVER_PORT`. Bu her zaman çalışır.
+- **Local identity**, bu makinenin ona yönlendirdiği addır.
+
+Bunlar farklı olgulardır; bu yüzden ayrı gösterilirler. Bağlanma adresi soketin
+nerede olduğunu, yerel ad ise bu bilgisayarın ona neyi işaret ettiğini söyler.
+
+### İki proje, aynı ad
+
+Yine `ahdakademi.com` için yapılandırılmış ikinci bir projeyi başlatın;
+`ahdakademi1.test`, sonra `ahdakademi2.test` alır. İlkini durdurun ve adı
+sıradaki için yeniden serbest kalsın.
+
+### Adın çözülmesini sağlamak
+
+Bir `.test` adının bilgisayarınız için bir anlam ifade etmesi gerekir. Bunu
+AhdCode'un ayarlamasını isteyin:
+
+```bash
+ahdcode local hosts apply
+```
+
+Ne ekleyeceğini tam olarak gösterir — iki işaret yorumu arasında birkaç
+`127.0.0.1` satırı — ve bir şey yapmadan önce sorar; çünkü sistem hosts
+dosyasını değiştirmek yönetici erişimi ister. O dosyadaki başka her şeye
+dokunulmaz. `ahdcode local hosts remove` ile geri alabilirsiniz.
+
+İstemezseniz hiçbir şey bozulmaz: `Open:` adresi tam olarak eskisi gibi
+çalışmaya devam eder.
+
+### Neyin çalıştığını görmek
+
+```bash
+ahdcode local status
+```
+
+bu makinenin şu anda sunduğu her yerel adresi ve her birinin neyi işaret
+ettiğini listeler. "`ahdakademi1.test` hangi projeydi?" diye merak ederseniz,
+yanıtı budur.
+
+### Bunun ne olmadığı
+
+İki dürüst sınır:
+
+- **HTTPS değil, HTTP'dir.** Yerelde `https://`, bilgisayarınızın güven
+  deposuna bir sertifika otoritesi kurmak demektir; bu, bir adı yönlendirmekten
+  çok daha büyük bir karardır. AhdCode bunu yapmaz ve düz HTTP sunup ona
+  güvenli demektense `APP_PROTOCOL=https` ile başlamayı reddeder.
+- **Yalnızca sizin makineniz.** Yönlendirici geri döngüyü dinler ve yalnızca
+  geri döngüye iletir. Bilgisayarınızın dışından hiçbir şey ona erişemez ve bu,
+  bir şey yayınlamanın yolu değildir.
+
+Dağıtım için `APP_HOST` ve `APP_PROTOCOL` *herkese açık* adresi tanımlar ve
+uygulamanızın önündeki gerçek bir sunucu HTTPS'i sonlandırır. Bu ayrımı
+[Web rehberi](WEB_TR.md#15-production) anlatır.
