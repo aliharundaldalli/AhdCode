@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"ahdcode/internal/localdev"
 )
 
 // A. The .env reader dev uses accepts the same KEY=value grammar the Env
@@ -61,14 +63,15 @@ func TestReadWebEnvironmentPrefersTheProcessEnvironment(t *testing.T) {
 	}
 }
 
-// D. Development derives the local identity by appending .test; nothing else
-// about the host is rewritten.
-func TestDevelopmentURLAppendsTest(t *testing.T) {
+// D. Development derives the local identity from APP_HOST by replacing the
+// registrable suffix with .test, so the local name reads as the same project
+// rather than as the production name with something appended.
+func TestDevelopmentURLDerivesTestName(t *testing.T) {
 	environment := webEnvironment{host: "ahdakademi.com", protocol: "https"}
-	if environment.developmentHost() != "ahdakademi.com.test" {
+	if environment.developmentHost() != "ahdakademi.test" {
 		t.Errorf("development host was %q", environment.developmentHost())
 	}
-	if environment.developmentURL() != "https://ahdakademi.com.test" {
+	if environment.developmentURL() != "https://ahdakademi.test" {
 		t.Errorf("development URL was %q", environment.developmentURL())
 	}
 }
@@ -107,7 +110,7 @@ func TestHTTPSConfigurationIsRefusedByDev(t *testing.T) {
 	message := err.Error()
 	for _, expected := range []string{
 		"Local HTTPS is not available",
-		"https://ahdakademi.com.test",
+		"https://ahdakademi.test",
 		"APP_PROTOCOL=http",
 		"127.0.0.1:8080",
 		"Nothing was started and APP_PROTOCOL was not changed",
@@ -144,21 +147,42 @@ func TestWebBannerLeadsWithTheWorkingAddress(t *testing.T) {
 		name: "Ahd Akademi", environment: "development",
 		host: "ahdakademi.com", protocol: "http",
 		serverHost: "127.0.0.1", serverPort: "8137",
+	}, devLocalRoute{
+		route:      localdev.Route{Hostname: "ahdakademi.test", BindHost: "127.0.0.1", BindPort: 8137},
+		routerPort: 80,
 	})
 	printed := out.String()
 	if !strings.Contains(printed, "Open:") || !strings.Contains(printed, "http://127.0.0.1:8137") {
 		t.Errorf("the banner did not lead with the working address:\n%s", printed)
 	}
 	openIndex := strings.Index(printed, "http://127.0.0.1:8137")
-	identityIndex := strings.Index(printed, "ahdakademi.com.test")
+	identityIndex := strings.Index(printed, "http://ahdakademi.test/")
 	if identityIndex < 0 {
-		t.Fatalf("the development identity was dropped entirely:\n%s", printed)
+		t.Fatalf("the local identity was dropped entirely:\n%s", printed)
 	}
 	if openIndex > identityIndex {
-		t.Errorf("the unresolvable .test name was printed before the working address:\n%s", printed)
+		t.Errorf("the logical URL was printed before the working address:\n%s", printed)
 	}
-	if !strings.Contains(printed, "not locally routed") {
-		t.Errorf("the .test identity was not marked as unresolved:\n%s", printed)
+	if !strings.Contains(printed, "Bind: 127.0.0.1:8137") {
+		t.Errorf("the bind address was not reported alongside the logical URL:\n%s", printed)
+	}
+}
+
+// H2. A session that could not obtain a route still reports the application
+// as running, and says plainly that the name is not routed.
+func TestWebBannerReportsAnUnroutedIdentity(t *testing.T) {
+	var out bytes.Buffer
+	announceWebApplication(&out, webEnvironment{
+		name: "Ahd Akademi", environment: "development",
+		host: "ahdakademi.com", protocol: "http",
+		serverHost: "127.0.0.1", serverPort: "8137",
+	}, devLocalRoute{note: "no local router port was available on this machine"})
+	printed := out.String()
+	if !strings.Contains(printed, "http://127.0.0.1:8137") {
+		t.Errorf("the working address was dropped when routing failed:\n%s", printed)
+	}
+	if !strings.Contains(printed, "not routed") {
+		t.Errorf("an unrouted identity was not marked as such:\n%s", printed)
 	}
 }
 
@@ -190,13 +214,13 @@ func TestTestEnvironmentPrintsNoDevelopmentIdentity(t *testing.T) {
 		name: "Ahd Akademi", environment: "test",
 		host: "ahdakademi.com", protocol: "http",
 		serverHost: "127.0.0.1", serverPort: "8137",
-	})
+	}, devLocalRoute{})
 	printed := out.String()
-	if strings.Contains(printed, "ahdakademi.com.test") {
+	if strings.Contains(printed, "ahdakademi.test") {
 		t.Errorf("APP_ENV=test advertised a .test development identity:\n%s", printed)
 	}
-	if strings.Contains(printed, "Development identity") {
-		t.Errorf("APP_ENV=test printed a development identity block:\n%s", printed)
+	if strings.Contains(printed, "Local identity") {
+		t.Errorf("APP_ENV=test printed a local identity block:\n%s", printed)
 	}
 	if !strings.Contains(printed, "http://127.0.0.1:8137") {
 		t.Errorf("APP_ENV=test did not report the bind address:\n%s", printed)

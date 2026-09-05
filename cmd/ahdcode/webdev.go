@@ -11,6 +11,7 @@ import (
 
 	"ahdcode/internal/build"
 	"ahdcode/internal/framework"
+	"ahdcode/internal/localdev"
 	"ahdcode/internal/module"
 )
 
@@ -125,16 +126,20 @@ func unquoteDevEnvValue(rest string) string {
 	return strings.TrimSpace(rest)
 }
 
-// developmentHost is APP_HOST with .test appended -- the local name, never
-// the real one, so development traffic cannot reach the production host by
-// accident.
+// developmentHost is the local name derived from APP_HOST -- never the real
+// one, so development traffic cannot reach the production host by accident.
 //
-// v0.15 derives this identity but does not resolve it: there is no bundled
-// .test resolver, so the name does not open in a browser on its own. Every
-// caller below therefore has to say which of the two it is showing -- the
-// address that works, or the identity the application is configured with.
+// v0.15 derived this identity but could not resolve it. v0.19 both derives it
+// and routes it: the registrable suffix is dropped rather than kept (see
+// localdev.DeriveHostname), so ahdakademi.com develops as ahdakademi.test,
+// and the local router serves that name from the AhdCode route registry.
+// Callers still distinguish the two facts they are reporting -- the address
+// the socket is bound to, and the name this machine routes to it.
 func (environment webEnvironment) developmentHost() string {
-	return environment.host + ".test"
+	if derived := localdev.DeriveHostname(environment.host); derived != "" {
+		return derived
+	}
+	return environment.host
 }
 
 func (environment webEnvironment) developmentURL() string {
@@ -215,12 +220,13 @@ func checkWebEnvironment(environment webEnvironment) error {
 		// mean serving http while the configuration -- and any URL printed
 		// from it -- says https. Refusing is the honest outcome; downgrading
 		// silently would hide a secure-cookie or mixed-content problem until
-		// production.
+		// production. v0.19 routes .test names over plaintext HTTP and adds
+		// no certificate authority, so this is unchanged.
 		identity := "https://" + environment.host
 		if environment.environment == "development" && environment.host != "" {
 			identity = environment.developmentURL()
 		}
-		message := "Local HTTPS is not available in AhdCode v0.15.\n" +
+		message := "Local HTTPS is not available in AhdCode v0.19.\n" +
 			"  ahdcode dev serves plaintext HTTP, so it cannot honour\n" +
 			"  APP_PROTOCOL=https.\n"
 		if environment.host != "" {
@@ -238,15 +244,15 @@ func checkWebEnvironment(environment webEnvironment) error {
 // running.
 //
 // The address that actually works comes first and is labelled as the one to
-// open. The .test identity is shown after it, labelled as the configured
-// identity and marked as not locally routed, because v0.15 ships no resolver
-// for it -- presenting it as the primary URL would send a reader to a name
-// their machine cannot resolve.
+// open, because it is true regardless of whether local routing came up. The
+// local identity follows it, reported by writeLocalIdentity together with
+// whatever is currently standing between it and working -- an unmapped
+// hostname, a router on a fallback port, or no router at all.
 //
-// Only development has a .test identity. For test the configuration uses
+// Only development has a local identity. For test the configuration uses
 // APP_HOST unchanged, and printing a .test name there would contradict
 // AppConfig, so the banner shows the bind address alone.
-func announceWebApplication(output io.Writer, environment webEnvironment) {
+func announceWebApplication(output io.Writer, environment webEnvironment, local devLocalRoute) {
 	fmt.Fprintln(output)
 	fmt.Fprintln(output, "AhdCode Web")
 	if environment.name != "" {
@@ -257,11 +263,6 @@ func announceWebApplication(output io.Writer, environment webEnvironment) {
 		fmt.Fprintln(output, "  Open:")
 		fmt.Fprintf(output, "  %s\n", environment.openURL())
 	}
-	if environment.hasDevelopmentIdentity() {
-		fmt.Fprintln(output)
-		fmt.Fprintln(output, "  Development identity:")
-		fmt.Fprintf(output, "  %s\n", environment.developmentURL())
-		fmt.Fprintln(output, "  (.test is not locally routed in v0.15)")
-	}
+	writeLocalIdentity(output, environment, local)
 	fmt.Fprintln(output)
 }

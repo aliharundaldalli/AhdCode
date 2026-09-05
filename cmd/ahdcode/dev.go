@@ -162,6 +162,13 @@ type devController struct {
 	webBannerShown bool
 	webEnvironment webEnvironment
 
+	// localRoute and routerHolder are this session's v0.19 local identity:
+	// the .test hostname the registry granted it and the loopback router
+	// serving it. Both are owned by the event loop like everything else
+	// here, and both are released in finishShutdown.
+	localRoute   devLocalRoute
+	routerHolder *localRouterHolder
+
 	// exitStatus is the process exit code this session ends with. It stays 0
 	// for every ordinary run, including a failed build, which dev recovers
 	// from; a refused configuration is not recoverable and ends non-zero so
@@ -298,8 +305,12 @@ func (c *devController) run() {
 					c.printf("✓ Running\n")
 					c.publishDescriptor()
 					if c.webAnnounced && !c.webBannerShown {
+						// The route is claimed only now, with a child
+						// actually listening: a local name must never
+						// exist for an application that is not there.
+						c.establishLocalRoute(c.webEnvironment)
 						c.webBannerShown = true
-						announceWebApplication(c.output, c.webEnvironment)
+						announceWebApplication(c.output, c.webEnvironment, c.localRoute)
 					}
 				}
 			} else {
@@ -390,6 +401,7 @@ func (c *devController) publishDescriptor() {
 // goroutine) that is blocked on the stop actually being complete.
 func (c *devController) finishShutdown() {
 	c.removeCandidate(c.currentBinary)
+	c.releaseLocalRoute()
 	removeOwnDevDescriptor(c.descriptorPath, c.controlPort)
 	_ = os.RemoveAll(c.binDir)
 	for _, waiter := range c.stopWaiters {
