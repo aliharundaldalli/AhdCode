@@ -24,11 +24,11 @@ import (
 	"ahdcode/internal/source"
 )
 
-const usage = `AhdCode v0.17.0 toolchain
+const usage = `AhdCode v0.18.0 toolchain
 
 usage:
   ahdcode                                  start the interactive REPL
-  ahdcode init  web                          initialize this directory as a Web app
+  ahdcode init  web [empty|basic|admin]      initialize this directory as a Web app
   ahdcode build <entry.ahd> [-o <output>]   compile to a native executable
   ahdcode run   <entry.ahd> [-- <args>...]  compile and run
   ahdcode dev   <entry.ahd>                  watch, rebuild, and restart on save
@@ -47,7 +47,7 @@ stop vs kill:
         escalates from the default graceful signal to an immediate one.
 `
 
-const version = "AhdCode v0.17.0"
+const version = "AhdCode v0.18.0"
 
 func main() {
 	os.Exit(run(os.Args[1:]))
@@ -63,7 +63,7 @@ func runWithIO(arguments []string, input io.Reader, output, errorOutput io.Write
 	}
 	switch arguments[0] {
 	case "init":
-		return runInit(arguments[1:], output, errorOutput)
+		return runInit(arguments[1:], input, output, errorOutput)
 	case "build":
 		return runBuild(arguments[1:], output, errorOutput)
 	case "run":
@@ -98,17 +98,17 @@ func runWithIO(arguments []string, input io.Reader, output, errorOutput io.Write
 	}
 }
 
-func runInit(arguments []string, output, errorOutput io.Writer) int {
+func runInit(arguments []string, input io.Reader, output, errorOutput io.Writer) int {
 	if len(arguments) == 0 {
 		fmt.Fprintln(errorOutput, "ahdcode init: a template name is required, as in: ahdcode init web")
 		return 2
 	}
-	if len(arguments) > 1 {
-		fmt.Fprintln(errorOutput, "ahdcode init: no additional arguments are accepted")
-		return 2
-	}
 	if arguments[0] != "web" {
 		fmt.Fprintf(errorOutput, "ahdcode init: unsupported template %q\n", arguments[0])
+		return 2
+	}
+	if len(arguments) > 2 {
+		fmt.Fprintln(errorOutput, "ahdcode init web: only empty, basic, or admin may follow")
 		return 2
 	}
 	root, err := os.Getwd()
@@ -116,11 +116,31 @@ func runInit(arguments []string, output, errorOutput io.Writer) int {
 		fmt.Fprintf(errorOutput, "ahdcode init: %v\n", err)
 		return 1
 	}
-	if err := initweb.Web(root, output, errorOutput); err != nil {
+	options := initweb.Options{
+		Input:  input,
+		Output: output,
+		IsTTY:  isInteractive(input),
+	}
+	if len(arguments) == 2 {
+		options.Starter = arguments[1]
+	}
+	if err := initweb.Web(root, output, errorOutput, options); err != nil {
 		fmt.Fprintln(errorOutput, err.Error())
 		return 1
 	}
 	return 0
+}
+
+func isInteractive(input io.Reader) bool {
+	file, ok := input.(*os.File)
+	if !ok {
+		return false
+	}
+	info, err := file.Stat()
+	if err != nil {
+		return false
+	}
+	return info.Mode()&os.ModeCharDevice != 0
 }
 
 func runBuild(arguments []string, outputWriter, errorOutput io.Writer) int {

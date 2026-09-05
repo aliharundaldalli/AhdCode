@@ -1,0 +1,130 @@
+require("Config/App.ahd")
+require("Layouts/Guest.ahd")
+require("Services/Auth.ahd")
+bring Web
+from Web bring (
+    RequestContext
+    Response
+    Form
+    OldInput
+    ValidationErrors
+    HTMLNode
+)
+
+login: Function := (context: RequestContext) -> Response {
+    return context.respond(
+        loginView(context, context.form().old([]), Web.errors(), "")
+    )
+}
+
+loginSubmit: Function := (context: RequestContext) -> Response {
+    form: Local Form := context.form()
+    if context.csrfValid() == false {
+        return context.respond(Web.text("Forbidden", 403))
+    }
+    errors: Local ValidationErrors := Web.errors()
+    errors.required("email", form.value("email"), "Email is required.")
+    errors.email("email", form.value("email"), "Enter an email address.")
+    errors.required("password", form.value("password"), "Password is required.")
+    if errors.any() {
+        return context.respond(
+            loginView(context, form.old(["email"]), errors, "", 422)
+        )
+    }
+    if authenticate(context, form.value("email"), form.value("password")) {
+        context.flashSet("notice", "Signed in.")
+        return context.respond(Web.redirect("/dashboard"))
+    }
+
+    return context.respond(
+        loginView(
+            context
+            form.old(["email"])
+            errors
+            "Those credentials are not correct."
+            422
+        )
+    )
+}
+
+loginView: Function := (
+    context: RequestContext
+    old: OldInput
+    errors: ValidationErrors
+    message: String
+    status: Int := 200
+) -> Response {
+    return guestLayout(
+        configuration()
+        "Log in"
+        [
+            Web.UI.div(
+                [
+                    loginAlerts(context, errors, message)
+                    Web.UI.h1("Log in", {"class": "h3 mb-3"})
+                    Web.UI.formTo(
+                        "/login"
+                        "post"
+                        [
+                            Web.UI.csrfField(context)
+                            Web.UI.labelFor("email", "Email")
+                            Web.UI.input(
+                                "email"
+                                "email"
+                                old.value("email")
+                                {
+                                    "id": "email"
+                                    "class": "form-control"
+                                    "autocomplete": "username"
+                                }
+                            )
+                            Web.UI.labelFor("password", "Password")
+                            Web.UI.input(
+                                "password"
+                                "password"
+                                ""
+                                {
+                                    "id": "password"
+                                    "class": "form-control"
+                                    "autocomplete": "current-password"
+                                }
+                            )
+                            Web.UI.button(
+                                "Log in"
+                                {
+                                    "type": "submit"
+                                    "class": "app-button w-100 mt-3"
+                                }
+                            )
+                        ]
+                    )
+                    Web.UI.pNodes(
+                        [Web.UI.a("/", "Back to home")]
+                        {"class": "mt-3 mb-0"}
+                    )
+                ]
+                {"class": "app-login-card"}
+            )
+        ]
+        status
+    )
+}
+
+loginAlerts: Function := (
+    context: RequestContext
+    errors: ValidationErrors
+    message: String
+) -> HTMLNode {
+    items: Local List<HTMLNode> := []
+    notice: Local String? := context.flashTake("notice")
+    if notice != null {
+        items.add(Web.UI.p(notice, {"class": "app-flash"}))
+    }
+    if message != "" {
+        items.add(Web.UI.p(message, {"class": "app-flash", "role": "alert"}))
+    }
+    for item in errors.messages() {
+        items.add(Web.UI.p(item, {"class": "app-flash", "role": "alert"}))
+    }
+    return Web.UI.div(items)
+}

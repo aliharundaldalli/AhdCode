@@ -1,0 +1,36 @@
+require("Components/Navbar.ahd")
+require("Components/Footer.ahd")
+bring Web
+from Web bring (HTMLNode, Response, AppConfig)
+
+guestLayout: Function := (
+    config: AppConfig
+    title: String
+    content: List<HTMLNode>
+    status: Int := 200
+) -> Response {
+    return Web.page(
+        "{title} — {config.name}"
+        [
+            Web.UI.div(
+                [
+                    navbar(config.name)
+                    Web.UI.main(content, {"class": "app-main app-login"})
+                    footer(config.name)
+                ]
+                {"class": "app-shell"}
+            )
+        ]
+        [
+            Web.UI.stylesheet("/assets/vendor/bootstrap/bootstrap.min.css")
+            Web.UI.stylesheet("/assets/style.css")
+            Web.UI.element(
+                "script"
+                {"src": "/assets/vendor/bootstrap/bootstrap.bundle.min.js"}
+                []
+            )
+            Web.UI.element("script", {"src": "/assets/main.js"}, [])
+        ]
+        status
+    )
+}

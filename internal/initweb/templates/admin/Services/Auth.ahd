@@ -1,0 +1,38 @@
+require("Repositories/Users.ahd")
+bring Security
+bring Web
+from Web bring (RequestContext, Response)
+
+signedIn: Function := (context: RequestContext) -> Response? {
+    if context.session.has("user_id") == false {
+        return context.respond(Web.redirect("/login"))
+    }
+
+    return null
+}
+
+authenticate: Function := (
+    context: RequestContext
+    email: String
+    password: String
+) -> Bool {
+    user: Local UserRecord? := usersFindByEmail(email)
+    if user == null {
+        return false
+    }
+    if Security.passwordVerify(password, user.passwordHash) == false {
+        return false
+    }
+    context.session.rotate()
+    context.session.set("user_id", str(user.id))
+    context.session.set("user_name", user.name)
+    return true
+}
+
+logout: Function := (context: RequestContext) -> Response {
+    if context.csrfValid() == false {
+        return context.respond(Web.text("Forbidden", 403))
+    }
+    context.session.destroy()
+    return context.respond(Web.redirect("/"))
+}

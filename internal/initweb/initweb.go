@@ -1,5 +1,5 @@
-// Package initweb writes a minimal offline AhdCode Web application into
-// the current directory. Templates ship inside the CLI; nothing is fetched.
+// Package initweb writes an offline AhdCode Web starter into the current
+// directory. Templates ship inside the CLI; nothing is fetched at init time.
 package initweb
 
 import (
@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -22,67 +21,109 @@ type fileSpec struct {
 	relPath   string
 	perm      os.FileMode
 	mergeGI   bool
+	content   []byte
 }
 
-var managedFiles = []fileSpec{
-	{embedPath: "templates/app.ahd", relPath: "app.ahd", perm: 0o644},
-	{embedPath: "templates/env", relPath: ".env", perm: 0o600},
-	{embedPath: "templates/env.example", relPath: ".env.example", perm: 0o644},
-	{embedPath: "templates/gitignore", relPath: ".gitignore", perm: 0o644, mergeGI: true},
-	{embedPath: "templates/Config/App.ahd", relPath: "Config/App.ahd", perm: 0o644},
-	{embedPath: "templates/Components/Navbar.ahd", relPath: "Components/Navbar.ahd", perm: 0o644},
-	{embedPath: "templates/Components/Footer.ahd", relPath: "Components/Footer.ahd", perm: 0o644},
-	{embedPath: "templates/Layouts/Main.ahd", relPath: "Layouts/Main.ahd", perm: 0o644},
-	{embedPath: "templates/Pages/Home.ahd", relPath: "Pages/Home.ahd", perm: 0o644},
-	{embedPath: "templates/public/style.css", relPath: "public/style.css", perm: 0o644},
-	{embedPath: "templates/public/main.js", relPath: "public/main.js", perm: 0o644},
-}
-
-var requiredDirs = []string{
-	"Config",
-	"Components",
-	"Layouts",
-	"Pages",
-	"public",
-}
-
-// Web initializes root as a minimal AhdCode Web application.
-func Web(root string, output, errorOutput io.Writer) error {
+// Web initializes root as an AhdCode Web application.
+func Web(root string, output, errorOutput io.Writer, options Options) error {
+	_ = errorOutput
 	root, err := filepath.Abs(root)
 	if err != nil {
 		return fmt.Errorf("cannot initialize Web project:\n%v", err)
 	}
 	root = filepath.Clean(root)
+	if options.Output == nil {
+		options.Output = output
+	}
 
-	planned, err := preflight(root)
+	options, err = resolveOptions(root, options)
 	if err != nil {
 		return err
 	}
 
-	for _, dir := range requiredDirs {
+	planned, err := preflight(root, options)
+	if err != nil {
+		return err
+	}
+
+	var createdMySQL bool
+	if options.isMySQL() {
+		createdMySQL, err = bootstrapMySQL(options, nil)
+		if err != nil {
+			if createdMySQL {
+				return fmt.Errorf("%v\n\n%s", err, leftoverMySQLMessage(options.DatabaseName))
+			}
+			return err
+		}
+	}
+
+	var stagedSQLite string
+	if options.isSQLite() {
+		stagedSQLite, err = sqliteStage(options)
+		if err != nil {
+			if createdMySQL {
+				return fmt.Errorf("%v\n\n%s", err, leftoverMySQLMessage(options.DatabaseName))
+			}
+			return err
+		}
+		defer func() {
+			if stagedSQLite != "" {
+				_ = os.Remove(stagedSQLite)
+			}
+		}()
+	}
+
+	for _, dir := range requiredDirsFor(options) {
 		path, resolveErr := resolveManaged(root, dir)
 		if resolveErr != nil {
-			return fmt.Errorf("cannot initialize Web project:\n%v\n\nNo files were written.", resolveErr)
+			return finishFailure(fmt.Errorf("cannot initialize Web project:\n%v\n\nNo files were written.", resolveErr), createdMySQL, options)
 		}
 		if mkErr := os.MkdirAll(path, 0o755); mkErr != nil {
-			return fmt.Errorf("cannot initialize Web project:\n%v", mkErr)
+			return finishFailure(fmt.Errorf("cannot initialize Web project:\n%v", mkErr), createdMySQL, options)
 		}
 	}
 
-	created := make([]string, 0, len(planned))
-	for _, item := range planned {
-		if wrErr := os.WriteFile(item.abs, item.content, item.perm); wrErr != nil {
-			return fmt.Errorf("cannot initialize Web project:\n%v", wrErr)
-		}
-		created = append(created, item.relPath)
+	if err := writePlanned(planned); err != nil {
+		return finishFailure(fmt.Errorf("cannot initialize Web project:\n%v", err), createdMySQL, options)
 	}
 
-	fmt.Fprintf(output, "Initialized AhdCode Web project in %s\n\nCreated:\n", root)
-	for _, rel := range created {
-		fmt.Fprintf(output, "  %s\n", rel)
+	if stagedSQLite != "" {
+		if err := installSQLiteFile(root, options, stagedSQLite); err != nil {
+			return finishFailure(err, createdMySQL, options)
+		}
+		stagedSQLite = ""
 	}
-	fmt.Fprint(output, "\nNext:\n  ahdcode dev app.ahd\n")
+
+	writeSuccess(output, options)
 	return nil
+}
+
+func finishFailure(err error, createdMySQL bool, options Options) error {
+	if createdMySQL {
+		return fmt.Errorf("%v\n\n%s", err, leftoverMySQLMessage(options.DatabaseName))
+	}
+	return err
+}
+
+func writeSuccess(output io.Writer, options Options) {
+	fmt.Fprint(output, "AhdCode Web application initialized.\n\n")
+	switch options.Starter {
+	case StarterBasic:
+		fmt.Fprintf(output, "Starter: Basic\nApplication: %s\n\n", options.AppName)
+		fmt.Fprint(output, "Application configuration ready.\nMail configuration is available in .env.\n\n")
+	case StarterAdmin:
+		fmt.Fprintf(output, "Starter: Admin\nApplication: %s\n", options.AppName)
+		if options.isSQLite() {
+			fmt.Fprint(output, "Database: SQLite\n")
+		} else {
+			fmt.Fprint(output, "Database: MySQL\n")
+		}
+		fmt.Fprintf(output, "Database name: %s\nAdmin: %s\n\n", options.DatabaseName, options.AdminEmail)
+		fmt.Fprint(output, "Database initialized.\nAdministrator created.\n\n")
+	default:
+		fmt.Fprintf(output, "Starter: Empty\nApplication: %s\n\n", options.AppName)
+	}
+	fmt.Fprint(output, "Next:\n  ahdcode dev app.ahd\n")
 }
 
 type plannedFile struct {
@@ -92,11 +133,13 @@ type plannedFile struct {
 	perm    os.FileMode
 }
 
-func preflight(root string) ([]plannedFile, error) {
+func preflight(root string, options Options) ([]plannedFile, error) {
 	var conflicts []string
-	planned := make([]plannedFile, 0, len(managedFiles))
+	dirs := requiredDirsFor(options)
+	specs := managedFor(options)
+	planned := make([]plannedFile, 0, len(specs))
 
-	for _, dir := range requiredDirs {
+	for _, dir := range dirs {
 		path, err := resolveManaged(root, dir)
 		if err != nil {
 			return nil, fmt.Errorf("cannot initialize Web project:\n%v\n\nNo files were written.", err)
@@ -117,16 +160,33 @@ func preflight(root string) ([]plannedFile, error) {
 		}
 	}
 
-	for _, spec := range managedFiles {
+	if options.isSQLite() {
+		rel := sqliteRelPath(options)
+		abs, err := resolveManaged(root, rel)
+		if err != nil {
+			return nil, fmt.Errorf("cannot initialize Web project:\n%v\n\nNo files were written.", err)
+		}
+		info, err := os.Lstat(abs)
+		if err == nil {
+			if info.Mode()&os.ModeSymlink != 0 {
+				conflicts = append(conflicts, rel+" is a symlink")
+			} else {
+				conflicts = append(conflicts, rel+" already exists")
+			}
+		} else if err != nil && !os.IsNotExist(err) && !isNotDir(err) {
+			return nil, fmt.Errorf("cannot initialize Web project:\n%v\n\nNo files were written.", err)
+		}
+	}
+
+	for _, spec := range specs {
 		abs, err := resolveManaged(root, spec.relPath)
 		if err != nil {
 			return nil, fmt.Errorf("cannot initialize Web project:\n%v\n\nNo files were written.", err)
 		}
-		content, err := fs.ReadFile(templates, spec.embedPath)
+		content, err := loadSpecContent(spec)
 		if err != nil {
 			return nil, fmt.Errorf("cannot initialize Web project:\n%v\n\nNo files were written.", err)
 		}
-		content = normalizeNewlines(content)
 
 		info, err := os.Lstat(abs)
 		if err != nil {

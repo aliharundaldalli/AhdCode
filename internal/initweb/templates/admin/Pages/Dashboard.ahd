@@ -1,0 +1,64 @@
+require("Config/App.ahd")
+require("Config/Database.ahd")
+require("Layouts/Main.ahd")
+bring Web
+from Web bring (RequestContext, Response, HTMLNode, AppConfig)
+
+dashboard: Function := (context: RequestContext) -> Response {
+    config: Local AppConfig := configuration()
+    userName: Local String := "Administrator"
+    stored: Local String? := context.session.get("user_name")
+    if stored != null {
+        if stored != "" {
+            userName = stored
+        }
+    }
+    notice: Local String := ""
+    flash: Local String? := context.flashTake("notice")
+    if flash != null {
+        notice = flash
+    }
+    return context.respond(
+        appLayout(
+            context
+            config
+            "Dashboard"
+            userName
+            [
+                dashboardNotice(notice)
+                Web.UI.h1("Dashboard")
+                Web.UI.p("Welcome, {userName}")
+                Web.UI.section(
+                    [
+                        Web.UI.h2("Application")
+                        Web.UI.p("Environment: {config.environment}")
+                        Web.UI.p("Database: {databaseDriver()}")
+                    ]
+                    {"class": "app-card"}
+                )
+                Web.UI.section(
+                    [
+                        Web.UI.h2("Quick Start")
+                        Web.UI.ul(
+                            [
+                                Web.UI.li("Edit Pages/Dashboard.ahd")
+                                Web.UI.li("Edit public/style.css")
+                                Web.UI.li("Add a route in app.ahd")
+                            ]
+                            {"class": "app-files"}
+                        )
+                    ]
+                    {"class": "app-card"}
+                )
+            ]
+        )
+    )
+}
+
+dashboardNotice: Function := (notice: String) -> HTMLNode {
+    if notice == "" {
+        return Web.UI.div([])
+    }
+
+    return Web.UI.p(notice, {"class": "app-flash", "role": "status"})
+}

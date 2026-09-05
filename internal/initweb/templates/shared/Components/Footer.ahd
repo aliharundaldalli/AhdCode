@@ -1,0 +1,22 @@
+bring Web
+from Web bring HTMLNode
+
+footer: Function := (siteName: String) -> HTMLNode {
+    return Web.UI.footer(
+        [
+            Web.UI.div(
+                [
+                    Web.UI.img(
+                        "/assets/ahdcode-logo.png"
+                        "AhdCode"
+                        {"class": "app-footer-logo"}
+                    )
+                    Web.UI.p(siteName, {"class": "app-footer-name"})
+                    Web.UI.p("Built with AhdCode", {"class": "app-footer-meta"})
+                ]
+                {"class": "app-footer-inner"}
+            )
+        ]
+        {"class": "app-footer"}
+    )
+}

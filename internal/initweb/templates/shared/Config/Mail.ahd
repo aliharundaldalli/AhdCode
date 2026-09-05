@@ -1,0 +1,69 @@
+// SMTP configuration read from MAIL_* environment keys.
+//
+// Mail is optional. An empty MAIL_HOST means the application still starts;
+// nothing is sent until those keys are filled in.
+bring Env
+bring SMTP
+from SMTP bring SMTPClient
+
+mailConfigured: Function := () -> Bool {
+    return Env.getOr("MAIL_HOST", "") != ""
+}
+
+mailHost: Function := () -> String {
+    return Env.getOr("MAIL_HOST", "")
+}
+
+mailPort: Function := () -> Int {
+    raw: Local String := Env.getOr("MAIL_PORT", "587")
+    value: Local Int := 587
+    attempt {
+        value = int(raw)
+    }
+    except DomainError {
+        return 587
+    }
+    except OverflowError {
+        return 587
+    }
+
+    return value
+}
+
+mailUsername: Function := () -> String {
+    return Env.getOr("MAIL_USERNAME", "")
+}
+
+mailPassword: Function := () -> String {
+    return Env.getOr("MAIL_PASSWORD", "")
+}
+
+mailFromAddress: Function := () -> String {
+    return Env.getOr("MAIL_FROM_ADDRESS", "")
+}
+
+mailFromName: Function := () -> String {
+    return Env.getOr("MAIL_FROM_NAME", "")
+}
+// SMTP.client accepts none, starttls, or tls. Port 587 uses starttls.
+mailSecurity: Function := () -> String {
+    value: Local String := Env.getOr("MAIL_SECURITY", "starttls")
+    if value == "none" or value == "starttls" or value == "tls" {
+        return value
+    }
+
+    return "starttls"
+}
+
+mailClient: Function := () -> SMTPClient {
+    client: Local SMTPClient := SMTP.client(
+        mailHost()
+        mailPort()
+        mailSecurity()
+    )
+    if mailUsername() != "" {
+        return client.withPlainAuth(mailUsername(), mailPassword())
+    }
+
+    return client
+}

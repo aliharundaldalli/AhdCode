@@ -27,7 +27,7 @@ func TestCommandDispatch(t *testing.T) {
 	if code := runWithIO(nil, bytes.NewBuffer(nil), &out, &errors); code != 0 {
 		t.Fatalf("expected REPL exit 0; received %d", code)
 	}
-	if !strings.Contains(out.String(), "AhdCode v0.17.0\nahd> ") {
+	if !strings.Contains(out.String(), "AhdCode v0.18.0\nahd> ") {
 		t.Fatalf("REPL banner/prompt = %q", out.String())
 	}
 	if code := run([]string{"nonsense"}); code != 2 {
@@ -116,7 +116,7 @@ func TestHelpVersionAndUnknownFlags(t *testing.T) {
 	}{
 		{[]string{"--help"}, 0, "ahdcode format"},
 		{[]string{"--help"}, 0, "ahdcode lsp"},
-		{[]string{"--version"}, 0, "AhdCode v0.17.0"},
+		{[]string{"--version"}, 0, "AhdCode v0.18.0"},
 		{[]string{"run", "--bad"}, 2, "unknown flag"},
 		{[]string{"format", "--bad", "x.ahd"}, 2, "unknown flag"},
 	} {
@@ -258,10 +258,10 @@ func TestInitUsage(t *testing.T) {
 		t.Fatalf("unsupported = %q", errors.String())
 	}
 	errors.Reset()
-	if code := runWithIO([]string{"init", "web", "extra"}, bytes.NewBuffer(nil), &out, &errors); code != 2 {
-		t.Fatalf("init extra: exit %d", code)
+	if code := runWithIO([]string{"init", "web", "extra"}, bytes.NewBuffer(nil), &out, &errors); code != 1 {
+		t.Fatalf("init extra: exit %d stderr=%q", code, errors.String())
 	}
-	if !strings.Contains(errors.String(), "no additional arguments") {
+	if !strings.Contains(errors.String(), "unknown starter") {
 		t.Fatalf("extra = %q", errors.String())
 	}
 	var helpOut, helpErr bytes.Buffer
@@ -285,13 +285,21 @@ func TestInitWebWritesCurrentDirectory(t *testing.T) {
 	t.Cleanup(func() { _ = os.Chdir(wd) })
 
 	var out, errors bytes.Buffer
-	if code := runWithIO([]string{"init", "web"}, bytes.NewBuffer(nil), &out, &errors); code != 0 {
-		t.Fatalf("init web: exit %d stderr=%q", code, errors.String())
+	if code := runWithIO([]string{"init", "web"}, bytes.NewBuffer(nil), &out, &errors); code != 1 {
+		t.Fatalf("bare init web on non-tty: exit %d stderr=%q", code, errors.String())
+	}
+	if !strings.Contains(errors.String(), "empty|basic|admin") {
+		t.Fatalf("non-tty hint = %q", errors.String())
+	}
+	errors.Reset()
+	out.Reset()
+	if code := runWithIO([]string{"init", "web", "empty"}, bytes.NewBuffer(nil), &out, &errors); code != 0 {
+		t.Fatalf("init web empty: exit %d stderr=%q", code, errors.String())
 	}
 	if _, err := os.Stat(filepath.Join(root, "app.ahd")); err != nil {
 		t.Fatalf("app.ahd: %v", err)
 	}
-	if !strings.Contains(out.String(), "Initialized AhdCode Web project") {
+	if !strings.Contains(out.String(), "Starter: Empty") {
 		t.Fatalf("stdout=%q", out.String())
 	}
 }

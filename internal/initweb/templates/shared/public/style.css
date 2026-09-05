@@ -1,0 +1,293 @@
+:root {
+  --app-bg: #fdfdfc;
+  --app-ink: #1b1b18;
+  --app-muted: #706f6c;
+  --app-line: #e3e3e0;
+  --app-card: #ffffff;
+  --app-accent: #1b1b18;
+}
+
+html,
+body {
+  background: var(--app-bg);
+  color: var(--app-ink);
+}
+
+.app-shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--app-bg);
+}
+
+.app-navbar {
+  padding: 1.25rem 0 0;
+}
+
+.app-topbar {
+  width: min(72rem, calc(100% - 2rem));
+  margin: 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.app-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  text-decoration: none;
+  color: var(--app-ink);
+}
+
+.app-brand:hover {
+  color: var(--app-ink);
+}
+
+.app-logo {
+  height: 36px;
+  width: auto;
+  display: block;
+}
+
+.app-brand-name {
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.app-nav-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1.25rem;
+}
+
+.app-nav-link,
+.app-nav-button {
+  color: var(--app-muted);
+  text-decoration: none;
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+}
+
+.app-nav-link:hover,
+.app-nav-button:hover {
+  color: var(--app-ink);
+}
+
+.app-nav-user {
+  color: var(--app-ink);
+}
+
+.app-logout {
+  margin: 0;
+}
+
+.app-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 2rem 0 3rem;
+}
+
+.app-stage {
+  text-align: center;
+  padding: 3rem 1.5rem 1.5rem;
+}
+
+.app-hero-logo {
+  height: 88px;
+  width: auto;
+  margin: 0 auto 1.75rem;
+  display: block;
+}
+
+.app-stage h1 {
+  font-size: clamp(1.8rem, 4vw, 2.4rem);
+  font-weight: 550;
+  letter-spacing: -0.03em;
+  margin-bottom: 0.75rem;
+}
+
+.app-lead {
+  color: var(--app-ink);
+  font-size: 1.05rem;
+  margin-bottom: 0.35rem;
+}
+
+.app-sub {
+  color: var(--app-muted);
+  margin-bottom: 0;
+}
+
+.app-actions {
+  display: flex;
+  justify-content: center;
+  gap: 0.75rem;
+  margin-top: 1.75rem;
+}
+
+.app-button,
+.app-button-ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 8.5rem;
+  padding: 0.55rem 1rem;
+  border-radius: 0.4rem;
+  text-decoration: none;
+  font-weight: 550;
+}
+
+.app-button {
+  background: var(--app-accent);
+  color: #fff;
+  border: 1px solid var(--app-accent);
+}
+
+.app-button:hover {
+  color: #fff;
+  opacity: 0.92;
+}
+
+.app-button-ghost {
+  background: transparent;
+  color: var(--app-ink);
+  border: 1px solid var(--app-line);
+}
+
+.app-button-ghost:hover {
+  color: var(--app-ink);
+  background: #f5f5f3;
+}
+
+.app-notes {
+  width: min(42rem, calc(100% - 2rem));
+  margin: 0.5rem auto 0;
+  color: var(--app-muted);
+}
+
+.app-notes h2 {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--app-ink);
+  margin-bottom: 0.75rem;
+}
+
+.app-files {
+  margin: 0;
+  padding-left: 1.1rem;
+}
+
+.app-cards {
+  width: min(64rem, calc(100% - 2rem));
+  margin: 1.5rem auto 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  gap: 1rem;
+}
+
+.app-card {
+  background: var(--app-card);
+  border: 1px solid var(--app-line);
+  border-radius: 0.6rem;
+  padding: 1.25rem 1.3rem;
+}
+
+.app-card h2 {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: 0.65rem;
+}
+
+.app-card p,
+.app-card .app-files {
+  color: var(--app-muted);
+  margin-bottom: 0.35rem;
+}
+
+.app-footer {
+  padding: 1.5rem 1rem 2rem;
+  color: var(--app-muted);
+}
+
+.app-footer-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.app-footer-logo {
+  height: 28px;
+  width: auto;
+  opacity: 0.9;
+}
+
+.app-footer-name {
+  margin: 0;
+  color: var(--app-ink);
+  font-weight: 550;
+}
+
+.app-footer-meta {
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.app-login {
+  justify-content: center;
+}
+
+.app-login-card {
+  width: min(26rem, calc(100% - 2rem));
+  margin: 2rem auto;
+  background: var(--app-card);
+  border: 1px solid var(--app-line);
+  border-radius: 0.7rem;
+  padding: 1.75rem 1.5rem;
+}
+
+.app-dashboard {
+  justify-content: flex-start;
+  width: min(52rem, calc(100% - 2rem));
+  margin: 0 auto;
+}
+
+.app-dashboard .app-card {
+  margin: 1rem 0;
+}
+
+.app-dashboard h1 {
+  font-size: 1.7rem;
+  letter-spacing: -0.03em;
+}
+
+.app-flash {
+  margin-bottom: 1rem;
+}
+
+.app-login-card .form-control,
+.app-login-card label {
+  text-align: left;
+}
+
+.app-login-card label {
+  margin-top: 0.75rem;
+  margin-bottom: 0.3rem;
+}
+
+@media (max-width: 640px) {
+  .app-brand-name {
+    display: none;
+  }
+
+  .app-hero-logo {
+    height: 72px;
+  }
+}

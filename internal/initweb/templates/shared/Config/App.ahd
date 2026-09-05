@@ -1,0 +1,14 @@
+// The only file that reads the core application environment.
+//
+// Web.configure loads .env when the file exists and then validates the
+// released contract: APP_NAME, APP_ENV, APP_HOST, APP_PROTOCOL,
+// SERVER_HOST, SERVER_PORT. Process environment values win over .env.
+bring Web
+from Web bring AppConfig
+
+application: AppConfig := Web.configure()
+
+configuration: Function := () -> AppConfig {
+    application: Global AppConfig
+    return application
+}
