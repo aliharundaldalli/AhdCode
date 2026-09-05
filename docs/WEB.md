@@ -816,7 +816,8 @@ adds the new file to `AHD_DATA_SQLITE_PATHS`.
 Asks database name, username, and password (hidden). Host, port, and
 security are not prompted: they come from AhdDataStudio
 (`AHD_DATA_MYSQL_HOST`, `AHD_DATA_MYSQL_PORT`, `AHD_DATA_MYSQL_SECURITY`
-in that `.env` or the process environment). Host is the server address
+in that `.env` or the process environment) when present, otherwise
+`127.0.0.1:3306` and loopback `none`. Host is the server address
 only (`127.0.0.1`), never `host:port`. Uses the released MySQL contract
 (`tls` or `none`). After local
 conflict checks:
