@@ -70,7 +70,7 @@ questionPage: Function := (request: Request) -> Response {
             session
             context
             question
-        ), communitySolutionsSection(context, question)]
+        ), communitySolutionsSection(context, question), solutionModalNode()]
 
     return sessionCommit(
         session
@@ -127,11 +127,19 @@ solutionSection: Function := (
                 )
                 Web.UI.div(
                     [
+                        Web.UI.button(
+                            "Çözümümü Görüntüle"
+                            {
+                                "type": "button"
+                                "class": "btn btn-sm btn-outline-success me-2"
+                                "onclick": "openSolutionModal({str(existing.id)}, 'Benim Çözümüm', '{existing.mimeType}', '{existing.originalFilename}')"
+                            }
+                        )
                         Web.UI.a(
                             "/solution/file?id={str(existing.id)}"
-                            "Yüklediğim Çözümü Görüntüle / İndir"
+                            "İndir"
                             {
-                                "class": "btn btn-sm btn-outline-success"
+                                "class": "btn btn-sm btn-outline-secondary"
                                 "target": "_blank"
                             }
                         )
@@ -232,10 +240,13 @@ communitySolutionsSection: Function := (
             typeLabel = "Görsel"
         }
 
-        viewBtn: Local HTMLNode := Web.UI.a(
-            "/solution/file?id={str(sol.id)}"
-            "Çözümü Gör / İndir"
-            {"class": "btn btn-sm btn-outline-primary", "target": "_blank"}
+        viewBtn: Local HTMLNode := Web.UI.button(
+            "Çözümü Gör"
+            {
+                "type": "button"
+                "class": "btn btn-sm btn-primary"
+                "onclick": "openSolutionModal({str(sol.id)}, '{sol.userName} - Çözüm', '{sol.mimeType}', '{sol.originalFilename}')"
+            }
         )
 
         kbSize: Local Int := int(sol.fileSize / 1024)
@@ -280,5 +291,96 @@ communitySolutionsSection: Function := (
     return Web.UI.section(
         [titleNode, Web.UI.div(cards, {"class": "solutions-list"})]
         {"class": "border-top pt-4 mt-4"}
+    )
+}
+
+solutionModalNode: Function := () -> HTMLNode {
+    return Web.UI.div(
+        [
+            Web.UI.div(
+                [
+                    Web.UI.div(
+                        [
+                            Web.UI.div(
+                                [
+                                    Web.UI.div(
+                                        [
+                                            Web.UI.h3(
+                                                "Çözüm Görüntüleyici"
+                                                {
+                                                    "class": "h5 mb-0"
+                                                    "id": "solutionModalTitle"
+                                                }
+                                            )
+                                            Web.UI.span(
+                                                ""
+                                                {
+                                                    "class": "text-body-secondary small"
+                                                    "id": "solutionModalSubtitle"
+                                                }
+                                            )
+                                        ]
+                                    )
+                                    Web.UI.button(
+                                        "✕"
+                                        {
+                                            "type": "button"
+                                            "class": "btn-close"
+                                            "onclick": "closeSolutionModal()"
+                                            "aria-label": "Kapat"
+                                        }
+                                    )
+                                ]
+                                {"class": "solution-modal-header"}
+                            )
+                            Web.UI.div(
+                                []
+                                {
+                                    "class": "solution-modal-body"
+                                    "id": "solutionModalBody"
+                                }
+                            )
+                            Web.UI.div(
+                                [
+                                    Web.UI.a(
+                                        "#"
+                                        "Yeni Sekmede Aç"
+                                        {
+                                            "class": "btn btn-sm btn-outline-secondary me-2"
+                                            "id": "solutionModalDirectLink"
+                                            "target": "_blank"
+                                        }
+                                    )
+                                    Web.UI.a(
+                                        "#"
+                                        "İndir"
+                                        {
+                                            "class": "btn btn-sm btn-primary me-2"
+                                            "id": "solutionModalDownloadLink"
+                                        }
+                                    )
+                                    Web.UI.button(
+                                        "Kapat"
+                                        {
+                                            "type": "button"
+                                            "class": "btn btn-sm btn-secondary"
+                                            "onclick": "closeSolutionModal()"
+                                        }
+                                    )
+                                ]
+                                {"class": "solution-modal-footer"}
+                            )
+                        ]
+                        {"class": "solution-modal-content"}
+                    )
+                ]
+                {"class": "solution-modal-dialog"}
+            )
+        ]
+        {
+            "class": "solution-modal-backdrop d-none"
+            "id": "solutionModal"
+            "onclick": "if (event.target === this) closeSolutionModal();"
+        }
     )
 }

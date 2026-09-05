@@ -55,5 +55,6 @@ layoutHead: Function := () -> List<HTMLNode> {
             }
             []
         )
+        Web.UI.element("script", {"src": "/assets/js/solution-modal.js"}, [])
     ]
 }
