@@ -14,15 +14,20 @@ const (
 	ahdDataMySQLPortKey     = "AHD_DATA_MYSQL_PORT"
 	ahdDataMySQLSecurityKey = "AHD_DATA_MYSQL_SECURITY"
 	ahdDataSQLitePathsKey   = "AHD_DATA_SQLITE_PATHS"
-	AhdDataStudioHost       = "ahddatabasestudio.test"
-	ahdDataStudioURL        = "http://ahddatabasestudio.test:8081/AhdDataStudio"
-	ahdDataStudioBindURL    = "http://127.0.0.1:8081/AhdDataStudio"
+	AhdDataStudioHost = "ahddatabasestudio.test"
+	// v0.19 routes ahddatabasestudio.test through the local router, so the
+	// canonical URL no longer carries Studio's port or its mount path. The
+	// loopback URL below keeps working unchanged and is what `ahdcode
+	// databases` falls back to when local routing is not available.
+	ahdDataStudioURL     = "http://ahddatabasestudio.test/"
+	ahdDataStudioBindURL = "http://127.0.0.1:8081/AhdDataStudio"
 )
 
 // AhdDataStudioPublicURL is the .test identity the CLI prints and opens.
 func AhdDataStudioPublicURL() string { return ahdDataStudioURL }
 
-// AhdDataStudioLoopbackURL is the bind address, used when .test is not in hosts.
+// AhdDataStudioLoopbackURL is the direct bind address. It stays supported and
+// is used whenever the clean name is not resolvable on this machine.
 func AhdDataStudioLoopbackURL() string { return ahdDataStudioBindURL }
 
 // LocateAhdDataStudio finds tools/AhdDataStudio/app.ahd from AHDCODE_ROOT

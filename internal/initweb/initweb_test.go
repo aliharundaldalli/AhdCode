@@ -259,8 +259,17 @@ func TestAdminSQLiteBootstrap(t *testing.T) {
 	if !strings.Contains(out.String(), "Starter: Admin") || !strings.Contains(out.String(), "ada@example.com") {
 		t.Fatalf("stdout=%s", out.String())
 	}
-	if !strings.Contains(out.String(), ahdDataStudioURL) || !strings.Contains(out.String(), ahdDataSQLitePathsKey) {
+	// v0.19: the success output points at AhdDataStudio and says the
+	// database is already registered. It no longer tells the user to edit
+	// AHD_DATA_SQLITE_PATHS, because nothing has to be edited any more.
+	if !strings.Contains(out.String(), ahdDataStudioURL) {
 		t.Fatalf("stdout missing AhdDataStudio pointer:\n%s", out.String())
+	}
+	if !strings.Contains(out.String(), "Registered for AhdDataStudio") {
+		t.Fatalf("stdout did not report automatic registration:\n%s", out.String())
+	}
+	if strings.Contains(out.String(), ahdDataSQLitePathsKey) {
+		t.Fatalf("stdout still asked for manual environment configuration:\n%s", out.String())
 	}
 	if strings.Contains(out.String(), password) {
 		t.Fatal("success output echoed the password")

@@ -11,6 +11,8 @@ import (
 	"path/filepath"
 	"strings"
 	"syscall"
+
+	"ahdcode/internal/localdev"
 )
 
 //go:embed templates
@@ -88,18 +90,39 @@ func Web(root string, output, errorOutput io.Writer, options Options) error {
 	}
 
 	var sqliteAbs string
+	var registrationErr error
 	if stagedSQLite != "" {
 		if err := installSQLiteFile(root, options, stagedSQLite); err != nil {
 			return finishFailure(err, createdMySQL, options)
 		}
 		if dest, resolveErr := resolveManaged(root, sqliteRelPath(options)); resolveErr == nil {
 			sqliteAbs = dest
-			_ = registerSQLiteWithStudio(dest)
+			registrationErr = registerCreatedSQLite(dest, root)
 		}
 		stagedSQLite = ""
 	}
 
-	writeSuccess(output, options, sqliteAbs)
+	writeSuccess(output, options, sqliteAbs, registrationErr)
+	return nil
+}
+
+// registerCreatedSQLite makes the database this command just created visible
+// to AhdDataStudio without the user editing any environment variable.
+//
+// It runs only after the file is safely in place, and only for that one file:
+// the project is never scanned, and a database init did not create is never
+// registered. A failure here is reported and nothing else -- the database is
+// real, the application is generated and correct, and deleting either of them
+// because a convenience registry could not be written would destroy work over
+// a bookkeeping problem.
+//
+// The Studio .env list is still updated as well, so a v0.18 setup that
+// already depends on AHD_DATA_SQLITE_PATHS keeps working unchanged.
+func registerCreatedSQLite(databasePath, projectRoot string) error {
+	_ = registerSQLiteWithStudio(databasePath)
+	if _, _, err := localdev.AddSQLite(databasePath, projectRoot); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -110,7 +133,7 @@ func finishFailure(err error, createdMySQL bool, options Options) error {
 	return err
 }
 
-func writeSuccess(output io.Writer, options Options, sqliteAbs string) {
+func writeSuccess(output io.Writer, options Options, sqliteAbs string, registrationErr error) {
 	fmt.Fprint(output, "AhdCode Web application initialized.\n\n")
 	switch options.Starter {
 	case StarterBasic:
@@ -133,7 +156,13 @@ func writeSuccess(output io.Writer, options Options, sqliteAbs string) {
 		fmt.Fprintf(output, "  AhdDataStudio: %s\n", ahdDataStudioURL)
 		if options.isSQLite() && sqliteAbs != "" {
 			fmt.Fprintf(output, "  SQLite file: %s\n", sqliteAbs)
-			fmt.Fprintf(output, "  Add it to AhdDataStudio as %s\n", ahdDataSQLitePathsKey)
+			if registrationErr != nil {
+				fmt.Fprint(output, "\nThe database was created, but it could not be registered for AhdDataStudio:\n")
+				fmt.Fprintf(output, "  %v\n", registrationErr)
+				fmt.Fprintf(output, "Nothing was removed. Register it yourself with:\n  ahdcode databases add %s\n", sqliteAbs)
+			} else {
+				fmt.Fprint(output, "  Registered for AhdDataStudio; run: ahdcode databases\n")
+			}
 		}
 	}
 }
