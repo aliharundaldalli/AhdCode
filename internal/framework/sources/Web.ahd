@@ -12,8 +12,8 @@
 // wants them writes `bring HTTP` and `bring HTML` exactly as before; Web is
 // an addition, never a migration.
 //
-// What Web is not, in v0.15: it is not an ORM, not a Forms or validation
-// framework, not a middleware system, not a template language, and not a
+// Web provides explicit context, forms, validation, CSRF, and flash in v0.16.
+// It is not an ORM, not a middleware system, not a template language, and not a
 // JavaScript UI runtime. Pages are composed on the server and rendered to
 // markup. There is no virtual DOM and no hydration step.
 //
@@ -44,11 +44,17 @@ from HTML bring (HTMLNode, HTMLError)
 bring Env
 bring File
 bring WebError
-from WebError bring WebConfigError
+from WebError bring (WebConfigError, WebContextError, FormValueError)
 bring WebConfig
 from WebConfig bring AppConfig
 bring WebApp
 from WebApp bring App
+bring WebContext
+from WebContext bring RequestContext
+bring WebForm
+from WebForm bring (Form, FormField, OldInput)
+bring WebValidation
+from WebValidation bring (FieldError, ValidationErrors)
 bring WebUI
 from WebUI bring UIKit
 // UI is the semantic HTML component layer: Web.UI.section, Web.UI.h1,
@@ -173,4 +179,20 @@ sessions: Function := (
     sameSite: String := "Lax"
 ) -> SessionStore {
     return HTTP.sessions(cookieName, maxAgeSeconds, secure, sameSite)
+}
+// The caller chooses the store and visibly finalizes every response path.
+context: Function := (request: Request, store: SessionStore) -> RequestContext {
+    return RequestContext(
+        request: request
+        session: store.open(request)
+        store: store
+    )
+}
+// Additive form access; CSRF is opt-in and separate from reading form fields.
+form: Function := (request: Request) -> Form {
+    return Form(request: request)
+}
+// Every call creates an independent ordered error collection.
+errors: Function := () -> ValidationErrors {
+    return ValidationErrors(entries: [])
 }

@@ -1,0 +1,84 @@
+// Explicit, per-request session ownership. Construct with Web.context.
+bring HTTP
+from HTTP bring (Request, Response, Session, SessionStore)
+bring Security
+bring WebError
+from WebError bring WebContextError
+bring WebForm
+from WebForm bring Form
+
+RequestContext: Class<> := {
+    structure: Attributes := (
+        request: Request
+        session: Session
+        store: SessionStore
+        finalized: Bool := false
+    )
+    // Call once at the visible end of each response path. Aliases share this
+    // guard because ordinary Class instances have reference semantics.
+    respond: Function := (response: Response) -> Response {
+        if attribute.finalized {
+            toss WebContextError(
+                message: "RequestContext has already been finalized."
+            )
+        }
+        result: Local Response := attribute.store.commit(
+            attribute.session
+            response
+        )
+        attribute.finalized = true
+        return result
+    }
+    form: Function := () -> Form {
+        return Form(request: attribute.request)
+    }
+    csrfToken: Function := () -> String {
+        if attribute.finalized {
+            toss WebContextError(
+                message: "RequestContext has already been finalized."
+            )
+        }
+        existing: Local String? := attribute.session.get("__web_csrf")
+        if existing != null {
+            if existing != "" {
+                return existing
+            }
+        }
+        minted: Local String := Security.token()
+        attribute.session.set("__web_csrf", minted)
+        return minted
+    }
+    // Verification never creates a token and leaves the 403 decision to code.
+    csrfValid: Function := () -> Bool {
+        expected: Local String? := attribute.session.get("__web_csrf")
+        submitted: Local String? := attribute.request.form("_csrf")
+        if expected == null or submitted == null {
+            return false
+        }
+        if expected == "" or submitted == "" {
+            return false
+        }
+        return Security.secureEqual(expected, submitted)
+    }
+    flashSet: Function := (key: String, value: String) -> Nothing {
+        if attribute.finalized {
+            toss WebContextError(
+                message: "RequestContext has already been finalized."
+            )
+        }
+        attribute.session.set("__web_flash:{key}", value)
+    }
+    // A flash stays pending until explicitly taken; no request hooks expire it.
+    flashTake: Function := (key: String) -> String? {
+        if attribute.finalized {
+            toss WebContextError(
+                message: "RequestContext has already been finalized."
+            )
+        }
+        value: Local String? := attribute.session.get("__web_flash:{key}")
+        if value != null {
+            attribute.session.remove("__web_flash:{key}")
+        }
+        return value
+    }
+}

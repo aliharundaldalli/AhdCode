@@ -27,8 +27,18 @@
 bring HTML
 from HTML bring HTMLNode
 bring KeyValue
+bring WebContext
+from WebContext bring RequestContext
 
 UIKit: Class<> := {
+    // Escaped hidden input only; verification remains an explicit handler call.
+    csrfField: Function := (context: RequestContext) -> HTMLNode {
+        return HTML.element(
+            "input"
+            {"type": "hidden", "name": "_csrf", "value": context.csrfToken()}
+            []
+        )
+    }
     // --- Core composition ---
     // text escapes value and returns it as one text node. Every text-taking
     // helper in this file routes through it.

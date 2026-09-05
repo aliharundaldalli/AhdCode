@@ -66,3 +66,50 @@ func TestHoverDescribesWebExport(t *testing.T) {
 		t.Errorf("hover did not mention Response: %q", hover.Text)
 	}
 }
+
+func TestWebV016CompletionHoverAndSignatures(t *testing.T) {
+	for _, tc := range []struct {
+		text, marker string
+		labels       []string
+	}{
+		{"bring Web\nWeb.\n", "Web.", []string{"context", "form", "errors", "RequestContext", "ValidationErrors", "OldInput"}},
+		{"bring Web\nfrom Web bring \n", "from Web bring ", []string{"RequestContext", "Form", "FormValueError", "WebContextError"}},
+		{"bring Web\nWeb.UI.\n", "Web.UI.", []string{"csrfField", "input", "form", "label", "select", "option", "button"}},
+	} {
+		path := filepath.Join(t.TempDir(), "main.ahd")
+		store := NewStore()
+		store.Open(path, tc.text)
+		items := store.Completion(path, strings.Index(tc.text, tc.marker)+len(tc.marker))
+		for _, label := range tc.labels {
+			if !hasLabel(items, label) {
+				t.Errorf("%s: missing %s in %#v", tc.marker, label, items)
+			}
+		}
+	}
+	text := `bring Web
+from Web bring (Request, Response, RequestContext, SessionStore)
+handle: Function := (request: Request, sessions: SessionStore) -> Response {
+    context: Local RequestContext := Web.context(request, sessions)
+    Web.UI.csrfField(context)
+    return context.respond(Web.text("ok"))
+}
+`
+	path := filepath.Join(t.TempDir(), "main.ahd")
+	store := NewStore()
+	store.Open(path, text)
+	for _, tc := range []struct{ call, result string }{
+		{"Web.context(", "RequestContext"},
+		{"Web.UI.csrfField(", "HTMLNode"},
+		{"context.respond(", "Response"},
+	} {
+		at := strings.Index(text, tc.call)
+		help, ok := store.SignatureHelp(path, at+len(tc.call))
+		if !ok || !strings.Contains(help.Label, tc.result) {
+			t.Errorf("signature %s: %#v, %v", tc.call, help, ok)
+		}
+		hover, ok := store.Hover(path, at+len(tc.call)-2)
+		if !ok || !strings.Contains(hover.Text, tc.result) {
+			t.Errorf("hover %s: %#v, %v", tc.call, hover, ok)
+		}
+	}
+}
