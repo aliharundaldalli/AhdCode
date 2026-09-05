@@ -95,18 +95,24 @@ navbar: Function := (
                                     )
                                 ]
                                 {
-                                    "class": "navbar-brand d-flex align-items-center text-white text-decoration-none me-auto py-0"
+                                    "class": "navbar-brand d-flex align-items-center text-white text-decoration-none me-4 py-0"
                                 }
                             )
-                            Web.UI.ul(links, {"class": "nav me-3 mb-0"})
+                            Web.UI.ul(
+                                links
+                                {
+                                    "class": "navbar-nav me-auto mb-0 d-flex flex-row align-items-center gap-1"
+                                }
+                            )
                             navbarAccount(user, token)
                         ]
-                        {
-                            "class": "container d-flex flex-wrap align-items-center py-2"
-                        }
+                        {"class": "container d-flex align-items-center py-2"}
                     )
                 ]
-                {"class": "navbar", "style": "background-color: {headerColor};"}
+                {
+                    "class": "navbar navbar-expand"
+                    "style": "background: linear-gradient(135deg, {headerColor} 0%, rgba(15, 23, 42, 0.95) 100%); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);"
+                }
             )
         ]
         {"class": "site-header"}
@@ -126,7 +132,7 @@ navbarAccount: Function := (user: UserRecord?, token: String) -> HTMLNode {
                         )
                         Web.UI.text("Giriş")
                     ]
-                    {"class": "btn btn-sm btn-nav-login me-2"}
+                    {"class": "btn btn-sm btn-light btn-nav-login me-2"}
                 )
                 Web.UI.aNodes(
                     "/register"
@@ -134,7 +140,7 @@ navbarAccount: Function := (user: UserRecord?, token: String) -> HTMLNode {
                         Web.UI.i("", {"class": "fa-solid fa-user-plus me-1"})
                         Web.UI.text("Kayıt ol")
                     ]
-                    {"class": "btn btn-sm btn-nav-register"}
+                    {"class": "btn btn-sm btn-outline-light btn-nav-register"}
                 )
             ]
             {"class": "d-flex align-items-center"}
@@ -156,7 +162,7 @@ navbarAccount: Function := (user: UserRecord?, token: String) -> HTMLNode {
                     Web.UI.span(user.name, {"class": "fw-semibold"})
                 ]
                 {
-                    "class": "btn btn-sm btn-nav-profile me-2"
+                    "class": "btn btn-sm btn-outline-light btn-nav-profile me-2"
                     "title": "Profilimi Görüntüle"
                 }
             )
@@ -168,7 +174,11 @@ navbarAccount: Function := (user: UserRecord?, token: String) -> HTMLNode {
                     )
                     Web.UI.text("Çıkış")
                 ]
-                {"type": "submit", "class": "btn btn-sm btn-nav-logout"}
+                {
+                    "type": "submit"
+                    "class": "btn btn-sm btn-light btn-nav-logout"
+                    "title": "Oturumu Kapat"
+                }
             )
         ]
         {"class": "d-flex align-items-center", "id": "logout-form"}
