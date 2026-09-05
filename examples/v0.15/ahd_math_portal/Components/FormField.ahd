@@ -83,3 +83,100 @@ formPasswordField: Function := (
 
     return Web.UI.div(children, {"class": "mb-3"})
 }
+
+formFieldWithIcon: Function := (
+    id: String
+    name: String
+    label: String
+    type: String
+    iconClass: String
+    value: String := ""
+    help: String := ""
+    placeholder: String := ""
+) -> HTMLNode {
+    labelNode: Local HTMLNode := Web.UI.labelNodes(
+        [
+            Web.UI.i("", {"class": "{iconClass} me-2 text-primary"})
+            Web.UI.text(label)
+        ]
+        {"for": id, "class": "form-label"}
+    )
+    inputNode: Local HTMLNode := Web.UI.input(
+        type
+        name
+        value
+        {"id": id, "class": "form-control"}
+    )
+    if placeholder != "" {
+        inputNode = Web.UI.input(
+            type
+            name
+            value
+            {"id": id, "class": "form-control", "placeholder": placeholder}
+        )
+    }
+
+    children: Local List<HTMLNode> := [labelNode, inputNode]
+    if help != "" {
+        children.add(Web.UI.p(help, {"class": "form-text"}))
+    }
+
+    return Web.UI.div(children, {"class": "mb-3"})
+}
+
+formPasswordFieldWithIcon: Function := (
+    id: String
+    name: String
+    label: String
+    iconClass: String
+    value: String := ""
+    help: String := ""
+    placeholder: String := ""
+) -> HTMLNode {
+    labelNode: Local HTMLNode := Web.UI.labelNodes(
+        [
+            Web.UI.i("", {"class": "{iconClass} me-2 text-primary"})
+            Web.UI.text(label)
+        ]
+        {"for": id, "class": "form-label"}
+    )
+    inputNode: Local HTMLNode := Web.UI.input(
+        "password"
+        name
+        value
+        {"id": id, "class": "form-control"}
+    )
+    if placeholder != "" {
+        inputNode = Web.UI.input(
+            "password"
+            name
+            value
+            {"id": id, "class": "form-control", "placeholder": placeholder}
+        )
+    }
+
+    children: Local List<HTMLNode> := [
+        labelNode
+        Web.UI.div(
+            [
+                inputNode
+                Web.UI.buttonNodes(
+                    [Web.UI.i("", {"class": "fa-regular fa-eye"})]
+                    {
+                        "type": "button"
+                        "class": "btn btn-outline-secondary"
+                        "onclick": "togglePasswordVisibility('{id}', this)"
+                        "title": "Şifreyi Göster / Gizle"
+                        "aria-label": "Şifreyi Göster / Gizle"
+                    }
+                )
+            ]
+            {"class": "input-group"}
+        )
+    ]
+    if help != "" {
+        children.add(Web.UI.p(help, {"class": "form-text"}))
+    }
+
+    return Web.UI.div(children, {"class": "mb-3"})
+}

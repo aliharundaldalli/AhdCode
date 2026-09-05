@@ -16,7 +16,30 @@ authLayout: Function := (
         card.add(alertBox(flashKind, flash))
     }
 
-    card.add(Web.UI.h1(title, {"class": "h3 mb-4"}))
+    headerNode: Local HTMLNode := Web.UI.div(
+        [
+            Web.UI.aNodes(
+                "/"
+                [
+                    Web.UI.img(
+                        "/assets/images/logo.png"
+                        siteName
+                        {
+                            "width": "54"
+                            "height": "54"
+                            "class": "rounded-3 shadow-sm mb-2 auth-logo"
+                        }
+                    )
+                ]
+                {"class": "d-inline-block text-decoration-none"}
+            )
+            Web.UI.h1(title, {"class": "h3 fw-bold mb-1 text-dark"})
+            Web.UI.p(siteName, {"class": "text-body-secondary small mb-0"})
+        ]
+        {"class": "text-center mb-4 pb-2 border-bottom"}
+    )
+    card.add(headerNode)
+
     for node in content {
         card.add(node)
     }
@@ -28,13 +51,19 @@ authLayout: Function := (
                 Web.UI.div(
                     [
                         Web.UI.div(
-                            [Web.UI.div(card, {"class": "card-body p-4"})]
-                            {"class": "card shadow-sm"}
+                            [
+                                Web.UI.div(
+                                    card
+                                    {"class": "card-body p-4 p-sm-5"}
+                                )
+                            ]
+                            {"class": "card auth-card border-0 shadow-sm"}
                         )
                     ]
-                    {"class": "container py-5", "style": "max-width: 32rem;"}
+                    {"class": "container py-5", "style": "max-width: 30rem;"}
                 )
             ]
+            {"class": "auth-main"}
         )
         siteFooter(siteName)
     ]

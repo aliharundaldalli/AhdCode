@@ -39,34 +39,74 @@ registerView: Function := (
             "post"
             [
                 csrfInput(session)
-                formField("register-name", "name", "Ad soyad", "text", name)
-                formField("register-email", "email", "E-posta", "email", email)
-                formPasswordField(
+                formFieldWithIcon(
+                    "register-name"
+                    "name"
+                    "Ad soyad"
+                    "text"
+                    "fa-solid fa-user"
+                    name
+                    ""
+                    "Adınız Soyadınız"
+                )
+                formFieldWithIcon(
+                    "register-email"
+                    "email"
+                    "E-posta"
+                    "email"
+                    "fa-solid fa-envelope"
+                    email
+                    ""
+                    "ornek@eposta.com"
+                )
+                formPasswordFieldWithIcon(
                     "register-password"
                     "password"
                     "Parola"
+                    "fa-solid fa-lock"
                     ""
                     "En az {str(validationMinimumPassword())} karakter."
+                    "••••••••"
                 )
-                formPasswordField(
+                formPasswordFieldWithIcon(
                     "register-confirm"
                     "password_confirmation"
                     "Parola (tekrar)"
+                    "fa-solid fa-shield-halved"
+                    ""
+                    ""
+                    "••••••••"
                 )
-                Web.UI.button(
-                    "Kayıt ol"
-                    {"type": "submit", "class": "btn btn-primary w-100"}
+                Web.UI.buttonNodes(
+                    [
+                        Web.UI.i("", {"class": "fa-solid fa-user-plus me-2"})
+                        Web.UI.text("Kayıt ol")
+                    ]
+                    {"type": "submit", "class": "btn btn-primary w-100 py-2"}
                 )
             ]
         )
     )
     fields.add(
-        Web.UI.pNodes(
+        Web.UI.div(
             [
-                Web.UI.text("Zaten hesabınız var mı? ")
-                Web.UI.a("/login", "Giriş yapın")
+                Web.UI.span(
+                    "Zaten hesabınız var mı? "
+                    {"class": "text-body-secondary"}
+                )
+                Web.UI.aNodes(
+                    "/login"
+                    [
+                        Web.UI.i(
+                            ""
+                            {"class": "fa-solid fa-right-to-bracket me-1"}
+                        )
+                        Web.UI.text("Giriş yapın")
+                    ]
+                    {"class": "fw-semibold text-decoration-none"}
+                )
             ]
-            {"class": "mt-3 mb-0 small"}
+            {"class": "mt-4 pt-3 border-top text-center small"}
         )
     )
 

@@ -68,7 +68,7 @@ adminSolutionsPage: Function := (request: Request) -> Response {
                                         ""
                                         {"class": "fa-solid fa-eye me-1"}
                                     )
-                                    Web.UI.text("Çözümü Gör")
+                                    Web.UI.text("Görüntüle")
                                 ]
                                 {
                                     "type": "button"
