@@ -157,7 +157,7 @@ func TestHTTPModuleInterfaceExportsExactSurface(t *testing.T) {
 	wantExports := []string{
 		"Client", "ClientRequest", "ClientResponse", "Cookie", "HTTPError", "Request", "Response",
 		"Server", "Session", "SessionStore", "UploadedFile",
-		"client", "clientRequest", "cookie", "deleteCookie", "download", "file", "html", "redirect", "response", "server", "sessions", "text",
+		"client", "clientRequest", "contextHandler", "cookie", "deleteCookie", "download", "file", "html", "redirect", "response", "server", "sessions", "text",
 	}
 	if strings.Join(module.ExportNames, ",") != strings.Join(wantExports, ",") {
 		t.Fatalf("HTTP exports %v; want %v", module.ExportNames, wantExports)
@@ -174,7 +174,8 @@ func TestHTTPModuleInterfaceExportsExactSurface(t *testing.T) {
 		"deleteCookie":  "(name: String, path: String := default) -> Cookie",
 		"sessions":      "(cookieName: String := default, maxAgeSeconds: Int := default, secure: Bool := default, sameSite: String := default) -> SessionStore",
 		"client":        "(timeoutSeconds: Int := default, maxResponseBytes: Int := default, followRedirects: Bool := default) -> Client",
-		"clientRequest": "(method: String, url: String) -> ClientRequest",
+		"clientRequest":   "(method: String, url: String) -> ClientRequest",
+		"contextHandler": "(store: SessionStore, opener: Function(Request, SessionStore) -> RequestContext, handler: Function(RequestContext) -> Response, first: Function(RequestContext) -> Response, second: Function(RequestContext) -> Response) -> Function(Request) -> Response",
 	}
 	for name, want := range signatures {
 		symbol := module.Exports[name]

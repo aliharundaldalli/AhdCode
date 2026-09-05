@@ -24,6 +24,9 @@ var (
 	httpClientRequestClass  = &types.ClassSymbol{ModuleID: httpModuleID, Name: "ClientRequest"}
 	httpClientResponseClass = &types.ClassSymbol{ModuleID: httpModuleID, Name: "ClientResponse"}
 	httpUploadedFileClass   = &types.ClassSymbol{ModuleID: httpModuleID, Name: "UploadedFile"}
+	// RequestContext is the bundled Web class. HTTP.contextHandler only
+	// adapts already-checked Functions; it does not own Web policy.
+	webRequestContextClass = &types.ClassSymbol{ModuleID: "framework:WebContext", Name: "RequestContext"}
 )
 
 // HTTPErrorIdentity, HTTPServerIdentity, HTTPRequestIdentity, and
@@ -95,6 +98,25 @@ func httpHandlerType() types.Type {
 	}}
 }
 
+func webRequestContextType() types.Type { return types.Class{Symbol: webRequestContextClass} }
+
+func httpContextOpenerType() types.Type {
+	return types.Function{Signature: &types.Signature{
+		Parameters: []types.Parameter{
+			{Name: "request", Type: httpRequestType()},
+			{Name: "store", Type: httpSessionStoreType()},
+		},
+		Return: webRequestContextType(),
+	}}
+}
+
+func httpContextRouteHandlerType() types.Type {
+	return types.Function{Signature: &types.Signature{
+		Parameters: []types.Parameter{{Name: "context", Type: webRequestContextType()}},
+		Return:     httpResponseType(),
+	}}
+}
+
 func httpModuleInterface() *ModuleInterface {
 	module := standardInterface(httpModuleID, "HTTP")
 	classes := []struct {
@@ -156,6 +178,15 @@ func httpModuleInterface() *ModuleInterface {
 	addStandardExport(module, standardFunction(httpModuleID, "clientRequest", httpClientRequestType(),
 		types.Parameter{Name: "method", Type: types.String},
 		types.Parameter{Name: "url", Type: types.String}))
+	// contextHandler is the v0.17 registration adapter used by Web.routes.
+	// It creates no session finalization; the handler or a refusing guard
+	// still returns context.respond(...).
+	addStandardExport(module, standardFunction(httpModuleID, "contextHandler", httpHandlerType(),
+		types.Parameter{Name: "store", Type: httpSessionStoreType()},
+		types.Parameter{Name: "opener", Type: httpContextOpenerType()},
+		types.Parameter{Name: "handler", Type: httpContextRouteHandlerType()},
+		types.Parameter{Name: "first", Type: httpContextRouteHandlerType()},
+		types.Parameter{Name: "second", Type: httpContextRouteHandlerType()}))
 	sort.Strings(module.ExportNames)
 	return module
 }

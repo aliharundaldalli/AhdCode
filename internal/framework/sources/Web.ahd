@@ -12,8 +12,9 @@
 // wants them writes `bring HTTP` and `bring HTML` exactly as before; Web is
 // an addition, never a migration.
 //
-// Web provides explicit context, forms, validation, CSRF, and flash in v0.16.
-// It is not an ORM, not a middleware system, not a template language, and not a
+// Web provides explicit context, forms, validation, CSRF, and flash in v0.16,
+// and additive context-aware route groups and guards in v0.17. It is not an
+// ORM, not a general middleware system, not a template language, and not a
 // JavaScript UI runtime. Pages are composed on the server and rendered to
 // markup. There is no virtual DOM and no hydration step.
 //
@@ -44,13 +45,15 @@ from HTML bring (HTMLNode, HTMLError)
 bring Env
 bring File
 bring WebError
-from WebError bring (WebConfigError, WebContextError, FormValueError)
+from WebError bring (WebConfigError, WebContextError, FormValueError, WebRouteError)
 bring WebConfig
 from WebConfig bring AppConfig
 bring WebApp
 from WebApp bring App
 bring WebContext
 from WebContext bring RequestContext
+bring WebRoutes
+from WebRoutes bring (RouteSet, RouteGroup)
 bring WebForm
 from WebForm bring (Form, FormField, OldInput)
 bring WebValidation
@@ -179,6 +182,12 @@ sessions: Function := (
     sameSite: String := "Lax"
 ) -> SessionStore {
     return HTTP.sessions(cookieName, maxAgeSeconds, secure, sameSite)
+}
+// Context-aware registration over an existing App. Handlers receive
+// RequestContext; they still finalize with context.respond. Request-based
+// App.get / App.post remain valid.
+routes: Function := (app: App, store: SessionStore) -> RouteSet {
+    return RouteSet(app: app, store: store)
 }
 // The caller chooses the store and visibly finalizes every response path.
 context: Function := (request: Request, store: SessionStore) -> RequestContext {

@@ -14,3 +14,8 @@ WebContextError: Class<Error> := {
 FormValueError: Class<Error> := {
     structure: Attributes := (SuperClass.attributes)
 }
+// Invalid route-group prefix or child fragment. Messages name the rule,
+// never a guessed repair of the string.
+WebRouteError: Class<Error> := {
+    structure: Attributes := (SuperClass.attributes)
+}

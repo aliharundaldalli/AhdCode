@@ -70,6 +70,9 @@ func (session *Session) invoke(value *FunctionValue, arguments []argumentValue) 
 			identity = table[identity]
 		}
 	}
+	if identity == "builtin:HTTP::contextDispatch" {
+		return session.httpContextDispatch(value.Captured, arguments)
+	}
 	if strings.HasPrefix(string(identity), "builtin:") {
 		return session.builtin(identity, value.Receiver, arguments)
 	}

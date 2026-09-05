@@ -1,0 +1,256 @@
+// Context-aware route registration, groups, and ordered guards.
+//
+// This is registration convenience over HTTP. It does not replace App.get,
+// does not match paths itself, and does not finalize RequestContext.
+//
+// List<Function> and Function-typed Class attributes have no inferable
+// signature, and an AhdCode lambda cannot wrap an unspecialized Function
+// parameter. Guards are therefore ordinary parameters of get/post/route.
+// HTTP.contextHandler is the narrow native adapter that binds those
+// already-checked Functions to one Request -> Response registration.
+// Compose extra checks in application code if more than two are needed.
+bring HTTP
+from HTTP bring (Request, Response, SessionStore)
+bring WebApp
+from WebApp bring App
+bring WebContext
+from WebContext bring RequestContext
+bring WebError
+from WebError bring WebRouteError
+
+RouteSet: Class<> := {
+    structure: Attributes := (app: App, store: SessionStore)
+    group: Function := (prefix: String) -> RouteGroup {
+        return RouteGroup(
+            app: attribute.app
+            store: attribute.store
+            prefix: requireGroupPrefix(prefix)
+        )
+    }
+    get: Function := (
+        path: String
+        handler: Function
+        first: Function := allowAllGuard
+        second: Function := allowAllGuard
+    ) -> Nothing {
+        attribute.app.route(
+            "GET"
+            joinRoutePath("/", path)
+            HTTP.contextHandler(
+                attribute.store
+                openContext
+                handler
+                first
+                second
+            )
+        )
+    }
+    post: Function := (
+        path: String
+        handler: Function
+        first: Function := allowAllGuard
+        second: Function := allowAllGuard
+    ) -> Nothing {
+        attribute.app.route(
+            "POST"
+            joinRoutePath("/", path)
+            HTTP.contextHandler(
+                attribute.store
+                openContext
+                handler
+                first
+                second
+            )
+        )
+    }
+    route: Function := (
+        method: String
+        path: String
+        handler: Function
+        first: Function := allowAllGuard
+        second: Function := allowAllGuard
+    ) -> Nothing {
+        attribute.app.route(
+            method
+            joinRoutePath("/", path)
+            HTTP.contextHandler(
+                attribute.store
+                openContext
+                handler
+                first
+                second
+            )
+        )
+    }
+}
+
+RouteGroup: Class<> := {
+    structure: Attributes := (app: App, store: SessionStore, prefix: String)
+    get: Function := (
+        path: String
+        handler: Function
+        first: Function := allowAllGuard
+        second: Function := allowAllGuard
+    ) -> Nothing {
+        attribute.app.route(
+            "GET"
+            joinRoutePath(attribute.prefix, path)
+            HTTP.contextHandler(
+                attribute.store
+                openContext
+                handler
+                first
+                second
+            )
+        )
+    }
+    post: Function := (
+        path: String
+        handler: Function
+        first: Function := allowAllGuard
+        second: Function := allowAllGuard
+    ) -> Nothing {
+        attribute.app.route(
+            "POST"
+            joinRoutePath(attribute.prefix, path)
+            HTTP.contextHandler(
+                attribute.store
+                openContext
+                handler
+                first
+                second
+            )
+        )
+    }
+    route: Function := (
+        method: String
+        path: String
+        handler: Function
+        first: Function := allowAllGuard
+        second: Function := allowAllGuard
+    ) -> Nothing {
+        attribute.app.route(
+            method
+            joinRoutePath(attribute.prefix, path)
+            HTTP.contextHandler(
+                attribute.store
+                openContext
+                handler
+                first
+                second
+            )
+        )
+    }
+}
+
+allowAllGuard: Function := (context: RequestContext) -> Response? {
+    return null
+}
+
+openContext: Function := (
+    request: Request
+    store: SessionStore
+) -> RequestContext {
+    return RequestContext(
+        request: request
+        session: store.open(request)
+        store: store
+    )
+}
+
+requireGroupPrefix: Function := (prefix: String) -> String {
+    if prefix == "/" {
+        toss WebRouteError(
+            message: "route group prefix must be a non-root canonical path"
+        )
+    }
+    if isCanonicalPrefix(prefix) == false {
+        toss WebRouteError(
+            message: "route group prefix must be a canonical path fragment"
+        )
+    }
+
+    return prefix
+}
+
+joinRoutePath: Function := (prefix: String, child: String) -> String {
+    if prefix == "/" {
+        if isCanonicalChild(child) == false {
+            toss WebRouteError(
+                message: "route path must be a canonical path fragment"
+            )
+        }
+        return requireFinalRoutePath(child)
+    }
+    if isCanonicalPrefix(prefix) == false {
+        toss WebRouteError(
+            message: "route group prefix must be a canonical path fragment"
+        )
+    }
+    if isCanonicalChild(child) == false {
+        toss WebRouteError(
+            message: "route path must be a canonical path fragment"
+        )
+    }
+    if child == "/" {
+        return requireFinalRoutePath(prefix)
+    }
+
+    return requireFinalRoutePath("{prefix}{child}")
+}
+
+requireFinalRoutePath: Function := (path: String) -> String {
+    if path == "/*" {
+        toss WebRouteError(
+            message: "route path must be a canonical path fragment"
+        )
+    }
+
+    return path
+}
+
+isCanonicalPrefix: Function := (path: String) -> Bool {
+    if path == "/" {
+        return true
+    }
+    if path.startsWith("/") == false {
+        return false
+    }
+    if path.contains(
+        "?"
+    ) or path.contains("#") or path.contains("//") or path.contains("*") {
+        return false
+    }
+    if path.endsWith("/") {
+        return false
+    }
+
+    return true
+}
+
+isCanonicalChild: Function := (path: String) -> Bool {
+    if path == "/" {
+        return true
+    }
+    if path.startsWith("/") == false {
+        return false
+    }
+    if path.contains("?") or path.contains("#") or path.contains("//") {
+        return false
+    }
+    if path.contains("*") {
+        if path.endsWith("/*") == false {
+            return false
+        }
+        if path.contains("*/*") {
+            return false
+        }
+
+        return true
+    }
+    if path.endsWith("/") {
+        return false
+    }
+
+    return true
+}

@@ -131,6 +131,15 @@ func TestApplicationModulesDoNotReExportImports(t *testing.T) {
 	}
 }
 
+func TestWebFacadeExportsV017RouteTypes(t *testing.T) {
+	result := compileWorkspace(map[string]string{
+		"/app.ahd": "bring Web\nfrom Web bring (RouteSet, RouteGroup, WebRouteError)\n",
+	}, "/app.ahd")
+	if result.HasErrors() {
+		t.Fatalf("v0.17 Web exports did not resolve:\n%s", diagnosticsText(result))
+	}
+}
+
 // G. A bundled module's own path is virtual, so `ahdcode dev` never adds it to
 // a watch set: there is no such file to change.
 func TestBundledModulePathsAreVirtual(t *testing.T) {

@@ -72,8 +72,8 @@ func TestWebV016CompletionHoverAndSignatures(t *testing.T) {
 		text, marker string
 		labels       []string
 	}{
-		{"bring Web\nWeb.\n", "Web.", []string{"context", "form", "errors", "RequestContext", "ValidationErrors", "OldInput"}},
-		{"bring Web\nfrom Web bring \n", "from Web bring ", []string{"RequestContext", "Form", "FormValueError", "WebContextError"}},
+		{"bring Web\nWeb.\n", "Web.", []string{"context", "form", "errors", "RequestContext", "ValidationErrors", "OldInput", "routes", "RouteSet", "RouteGroup"}},
+		{"bring Web\nfrom Web bring \n", "from Web bring ", []string{"RequestContext", "Form", "FormValueError", "WebContextError", "RouteSet", "RouteGroup", "WebRouteError"}},
 		{"bring Web\nWeb.UI.\n", "Web.UI.", []string{"csrfField", "input", "form", "label", "select", "option", "button"}},
 	} {
 		path := filepath.Join(t.TempDir(), "main.ahd")

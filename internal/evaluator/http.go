@@ -192,9 +192,53 @@ func (session *Session) httpBuiltin(name string, args []any) any {
 			session.httpBoolArg(args, 2, true)))
 	case "clientRequest":
 		return session.httpClientRequest(ahdruntime.AhdHTTPClientRequest(class, args[0].(string), args[1].(string)))
+	case "contextHandler":
+		return session.httpContextHandler(args)
 	}
 	session.raise("Error", "unsupported HTTP function "+name)
 	return nil
+}
+
+func (session *Session) httpFunctionArg(args []any, index int, name string) *FunctionValue {
+	function, ok := args[index].(*FunctionValue)
+	if !ok || function == nil {
+		session.raise("HTTPError", "HTTP.contextHandler "+name+" is missing")
+	}
+	return function
+}
+
+func (session *Session) httpContextHandler(args []any) any {
+	if len(args) != 5 {
+		session.raise("HTTPError", "HTTP.contextHandler expects five arguments")
+	}
+	return &FunctionValue{
+		Callable: "builtin:HTTP::contextDispatch",
+		Captured: []any{
+			args[0],
+			session.httpFunctionArg(args, 1, "opener"),
+			session.httpFunctionArg(args, 2, "handler"),
+			session.httpFunctionArg(args, 3, "first"),
+			session.httpFunctionArg(args, 4, "second"),
+		},
+	}
+}
+
+func (session *Session) httpContextDispatch(captured []any, arguments []argumentValue) any {
+	if len(captured) != 5 || len(arguments) == 0 {
+		session.raise("HTTPError", "HTTP context dispatch is missing its bound Functions")
+	}
+	opener := captured[1].(*FunctionValue)
+	handler := captured[2].(*FunctionValue)
+	first := captured[3].(*FunctionValue)
+	second := captured[4].(*FunctionValue)
+	context := session.invoke(opener, []argumentValue{{value: arguments[0].value}, {value: captured[0]}})
+	if refused := session.invoke(first, []argumentValue{{value: context}}); refused != nil {
+		return refused
+	}
+	if refused := session.invoke(second, []argumentValue{{value: context}}); refused != nil {
+		return refused
+	}
+	return session.invoke(handler, []argumentValue{{value: context}})
 }
 
 func (session *Session) httpOperation(name string, receiver any, args []any) any {

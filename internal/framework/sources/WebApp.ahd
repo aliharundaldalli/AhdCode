@@ -6,9 +6,9 @@
 // access to what those primitives already do -- and a handler is still an
 // ordinary Function(Request) -> Response, checked exactly as HTTP checks it.
 //
-// There is no middleware chain, no route group, and no router of Web's own in
-// v0.15. Those are deliberately later work; this release is the foundation
-// they will sit on.
+// Request-based get/post/route stay the HTTP handler contract. v0.17 adds
+// Web.routes for RequestContext handlers, groups, and guards. There is still
+// no general middleware chain and no second router.
 bring HTTP
 from HTTP bring Server
 bring WebConfig

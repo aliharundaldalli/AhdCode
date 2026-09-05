@@ -30,6 +30,7 @@ var (
 	httpClientResponseDataField = ir.FieldID("builtin:HTTP::class::ClientResponse::field::data")
 	httpUploadedFileClass       = ir.ClassID("builtin:HTTP::class::UploadedFile")
 	httpUploadedFileDataField   = ir.FieldID("builtin:HTTP::class::UploadedFile::field::data")
+	webRequestContextClass      = ir.ClassID("framework:WebContext::class::RequestContext")
 )
 
 func (generator *generator) httpCall(value *ir.CallExpr) string {
@@ -88,6 +89,8 @@ func (generator *generator) httpCall(value *ir.CallExpr) string {
 	case "clientRequest":
 		return generator.httpValueFrom(httpClientRequestClass, "AhdHTTPClientRequest("+errorClass+", "+
 			text(0, `""`)+", "+text(1, `""`)+")", meta)
+	case "contextHandler":
+		return generator.httpContextHandler(value, meta)
 	default:
 		return generator.unsupported("HTTP function "+name, meta.Span)
 	}
@@ -240,6 +243,37 @@ func (generator *generator) httpOperation(name string, value *ir.CallExpr) strin
 	default:
 		return generator.unsupported("HTTP operation "+name, meta.Span)
 	}
+}
+
+// httpContextHandler lowers the v0.17 registration adapter. It opens one
+// RequestContext through the supplied opener, runs first then second, then
+// the handler. It never commits the session.
+func (generator *generator) httpContextHandler(value *ir.CallExpr, meta ir.ExprBase) string {
+	if generator.layouts[webRequestContextClass] == nil {
+		return generator.unsupported("HTTP.contextHandler without RequestContext", meta.Span)
+	}
+	if len(value.Arguments) != 5 {
+		return generator.unsupported("HTTP.contextHandler with a malformed argument list", meta.Span)
+	}
+	storeType := generator.interfaceName(httpSessionStoreClass)
+	reqType := generator.interfaceName(httpRequestClass)
+	resType := generator.interfaceName(httpResponseClass)
+	ctxType := generator.interfaceName(webRequestContextClass)
+	openerType := "func(" + reqType + ", " + storeType + ") " + ctxType
+	routeType := "func(" + ctxType + ") " + resType
+	handlerType := "func(" + reqType + ") " + resType
+	return "func(store " + storeType + ", opener " + openerType + ", handler " + routeType +
+		", first " + routeType + ", second " + routeType + ") " + handlerType + " { " +
+		"return func(request " + reqType + ") " + resType + " { " +
+		"context := opener(request, store); " +
+		"if refused := first(context); refused != nil { return refused }; " +
+		"if refused := second(context); refused != nil { return refused }; " +
+		"return handler(context) } }(" +
+		generator.expr(value.Arguments[0].Value) + ", " +
+		generator.expr(value.Arguments[1].Value) + ", " +
+		generator.expr(value.Arguments[2].Value) + ", " +
+		generator.expr(value.Arguments[3].Value) + ", " +
+		generator.expr(value.Arguments[4].Value) + ")"
 }
 
 func (generator *generator) httpHandler(value *ir.CallExpr, index int) string {
