@@ -1,0 +1,94 @@
+// The shared solution viewer modal component.
+bring Web
+from Web bring HTMLNode
+
+solutionModalNode: Function := () -> HTMLNode {
+    return Web.UI.div(
+        [
+            Web.UI.div(
+                [
+                    Web.UI.div(
+                        [
+                            Web.UI.div(
+                                [
+                                    Web.UI.div(
+                                        [
+                                            Web.UI.h3(
+                                                "Çözüm Görüntüleyici"
+                                                {
+                                                    "class": "h5 mb-0"
+                                                    "id": "solutionModalTitle"
+                                                }
+                                            )
+                                            Web.UI.span(
+                                                ""
+                                                {
+                                                    "class": "text-body-secondary small"
+                                                    "id": "solutionModalSubtitle"
+                                                }
+                                            )
+                                        ]
+                                    )
+                                    Web.UI.button(
+                                        ""
+                                        {
+                                            "type": "button"
+                                            "class": "btn-close"
+                                            "onclick": "closeSolutionModal()"
+                                            "aria-label": "Kapat"
+                                        }
+                                    )
+                                ]
+                                {"class": "solution-modal-header"}
+                            )
+                            Web.UI.div(
+                                []
+                                {
+                                    "class": "solution-modal-body"
+                                    "id": "solutionModalBody"
+                                }
+                            )
+                            Web.UI.div(
+                                [
+                                    Web.UI.a(
+                                        "#"
+                                        "Yeni Sekmede Aç"
+                                        {
+                                            "class": "btn btn-sm btn-outline-secondary me-2"
+                                            "id": "solutionModalDirectLink"
+                                            "target": "_blank"
+                                        }
+                                    )
+                                    Web.UI.a(
+                                        "#"
+                                        "İndir"
+                                        {
+                                            "class": "btn btn-sm btn-primary me-2"
+                                            "id": "solutionModalDownloadLink"
+                                        }
+                                    )
+                                    Web.UI.button(
+                                        "Kapat"
+                                        {
+                                            "type": "button"
+                                            "class": "btn btn-sm btn-secondary"
+                                            "onclick": "closeSolutionModal()"
+                                        }
+                                    )
+                                ]
+                                {"class": "solution-modal-footer"}
+                            )
+                        ]
+                        {"class": "solution-modal-content"}
+                    )
+                ]
+                {"class": "solution-modal-dialog"}
+            )
+        ]
+        {
+            "class": "solution-modal-backdrop d-none"
+            "id": "solutionModal"
+            "onclick": "if (event.target === this) closeSolutionModal();"
+        }
+    )
+}

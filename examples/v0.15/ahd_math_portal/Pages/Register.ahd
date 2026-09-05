@@ -41,19 +41,17 @@ registerView: Function := (
                 csrfInput(session)
                 formField("register-name", "name", "Ad soyad", "text", name)
                 formField("register-email", "email", "E-posta", "email", email)
-                formField(
+                formPasswordField(
                     "register-password"
                     "password"
                     "Parola"
-                    "password"
                     ""
                     "En az {str(validationMinimumPassword())} karakter."
                 )
-                formField(
+                formPasswordField(
                     "register-confirm"
                     "password_confirmation"
                     "Parola (tekrar)"
-                    "password"
                 )
                 Web.UI.button(
                     "Kayıt ol"

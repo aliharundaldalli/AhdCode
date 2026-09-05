@@ -37,7 +37,7 @@ loginView: Function := (
             [
                 csrfInput(session)
                 formField("login-email", "email", "E-posta", "email", email)
-                formField("login-password", "password", "Parola", "password")
+                formPasswordField("login-password", "password", "Parola")
                 Web.UI.button(
                     "Giriş yap"
                     {"type": "submit", "class": "btn btn-primary w-100"}

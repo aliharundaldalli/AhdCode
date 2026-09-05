@@ -26,7 +26,7 @@ adminUsersPage: Function := (request: Request) -> Response {
 
     rows: Local List<HTMLNode> := []
     for user in usersAll() {
-        rows.add(adminUserRow(session, user))
+        rows.add(adminUserRow(session, user, context.user))
     }
 
     table: Local HTMLNode := Web.UI.table(
@@ -65,7 +65,11 @@ adminUsersPage: Function := (request: Request) -> Response {
     )
 }
 
-adminUserRow: Function := (session: Session, user: UserRecord) -> HTMLNode {
+adminUserRow: Function := (
+    session: Session
+    user: UserRecord
+    viewer: UserRecord?
+) -> HTMLNode {
     stateBadge: Local HTMLNode := Web.UI.span(
         "Pasif"
         {"class": "badge text-bg-secondary"}
@@ -78,39 +82,62 @@ adminUserRow: Function := (session: Session, user: UserRecord) -> HTMLNode {
         actionValue = "deactivate"
     }
 
+    isSelf: Local Bool := false
+    if viewer != null {
+        if viewer.id == user.id {
+            isSelf = true
+        }
+    }
+
+    actionNodes: Local List<HTMLNode> := []
+    if isSelf {
+        actionNodes.add(
+            Web.UI.span(
+                "Mevcut oturum"
+                {
+                    "class": "badge text-bg-light border me-2 py-2 text-muted"
+                    "title": "Kendi hesabınızı pasifleştiremezsiniz"
+                }
+            )
+        )
+    }
+    else {
+        actionNodes.add(
+            Web.UI.formTo(
+                "/admin/users/state"
+                "post"
+                [
+                    csrfInput(session)
+                    Web.UI.input("hidden", "user_id", str(user.id))
+                    Web.UI.input("hidden", "action", actionValue)
+                    Web.UI.button(
+                        actionLabel
+                        {
+                            "type": "submit"
+                            "class": "btn btn-sm btn-outline-secondary me-2"
+                        }
+                    )
+                ]
+                {"class": "d-inline"}
+            )
+        )
+    }
+
+    actionNodes.add(
+        Web.UI.a(
+            "/admin/users/edit?id={str(user.id)}"
+            "Parola ata"
+            {"class": "btn btn-sm btn-outline-primary"}
+        )
+    )
+
     return Web.UI.tr(
         [
             Web.UI.td(user.name)
             Web.UI.td(user.email)
             Web.UI.td(user.role)
             Web.UI.tdNodes([stateBadge])
-            Web.UI.tdNodes(
-                [
-                    Web.UI.formTo(
-                        "/admin/users/state"
-                        "post"
-                        [
-                            csrfInput(session)
-                            Web.UI.input("hidden", "user_id", str(user.id))
-                            Web.UI.input("hidden", "action", actionValue)
-                            Web.UI.button(
-                                actionLabel
-                                {
-                                    "type": "submit"
-                                    "class": "btn btn-sm btn-outline-secondary me-2"
-                                }
-                            )
-                        ]
-                        {"class": "d-inline"}
-                    )
-                    Web.UI.a(
-                        "/admin/users/edit?id={str(user.id)}"
-                        "Parola ata"
-                        {"class": "btn btn-sm btn-outline-primary"}
-                    )
-                ]
-                {"class": "d-flex"}
-            )
+            Web.UI.tdNodes(actionNodes)
         ]
     )
 }
@@ -131,6 +158,18 @@ adminUserStateSubmit: Function := (request: Request) -> Response {
     action: Local String := validationField(request.form("action"))
     if id == 0 {
         return sessionCommit(session, Web.text("Kullanıcı bulunamadı.", 404))
+    }
+
+    viewer: Local UserRecord? := context.user
+    if viewer != null {
+        if viewer.id == id and action == "deactivate" {
+            flashSet(
+                session
+                "error"
+                "Kendi yönetici hesabınızı pasifleştiremezsiniz."
+            )
+            return sessionCommit(session, Web.redirect("/admin/users"))
+        }
     }
 
     usersSetActive(id, action == "activate")

@@ -35,6 +35,95 @@ adminSettingsPage: Function := (request: Request) -> Response {
     )
 }
 
+colorPaletteField: Function := (
+    id: String
+    name: String
+    label: String
+    value: String
+) -> HTMLNode {
+    colors: Local List<String> := [
+        "#0d6efd"
+        "#4f46e5"
+        "#059669"
+        "#7c3aed"
+        "#dc2626"
+        "#0891b2"
+        "#d97706"
+        "#1e293b"
+    ]
+    swatches: Local List<HTMLNode> := []
+    for c in colors {
+        swatches.add(
+            Web.UI.button(
+                ""
+                {
+                    "type": "button"
+                    "class": "btn p-0 border rounded shadow-sm me-2 mb-2"
+                    "style": "width: 32px; height: 32px; background-color: {c}; cursor: pointer;"
+                    "title": c
+                    "aria-label": c
+                    "onclick": "setColorPreset('{c}')"
+                }
+            )
+        )
+    }
+
+    return Web.UI.div(
+        [
+            Web.UI.labelFor(id, label, {"class": "form-label fw-semibold"})
+            Web.UI.div(
+                [
+                    Web.UI.input(
+                        "color"
+                        "header_color_picker"
+                        value
+                        {
+                            "id": "header_color_picker"
+                            "class": "form-control form-control-color me-2"
+                            "style": "width: 48px; height: 38px; padding: 2px; cursor: pointer;"
+                            "title": "Renk seçin"
+                            "oninput": "setColorPreset(this.value)"
+                            "onchange": "setColorPreset(this.value)"
+                        }
+                    )
+                    Web.UI.input(
+                        "text"
+                        name
+                        value
+                        {
+                            "id": id
+                            "class": "form-control font-monospace"
+                            "style": "max-width: 140px;"
+                            "maxlength": "7"
+                            "placeholder": "#0d6efd"
+                            "oninput": "updateColorFromInput(this.value)"
+                        }
+                    )
+                ]
+                {"class": "d-flex align-items-center mb-2"}
+            )
+            Web.UI.div(
+                [
+                    Web.UI.span(
+                        "Hızlı Palet Seçenekleri:"
+                        {"class": "small text-body-secondary d-block mb-2"}
+                    )
+                    Web.UI.div(
+                        swatches
+                        {"class": "d-flex flex-wrap align-items-center"}
+                    )
+                ]
+                {"class": "p-3 bg-light rounded border mb-2"}
+            )
+            Web.UI.p(
+                "Yalnızca #RRGGBB biçimi kabul edilir. Renk seçiciden veya hazır paletten bir renk seçebilirsiniz."
+                {"class": "form-text"}
+            )
+        ]
+        {"class": "mb-3"}
+    )
+}
+
 adminSettingsView: Function := (
     session: Session
     context: PageContext
@@ -60,13 +149,11 @@ adminSettingsView: Function := (
                     "text"
                     siteName
                 )
-                formField(
+                colorPaletteField(
                     "settings-color"
                     "header_color"
                     "Başlık rengi"
-                    "text"
                     headerColor
-                    "Yalnızca #RRGGBB biçimi kabul edilir."
                 )
                 Web.UI.button(
                     "Kaydet"

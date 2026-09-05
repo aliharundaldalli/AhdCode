@@ -45,3 +45,41 @@ formTextArea: Function := (
         {"class": "mb-3"}
     )
 }
+
+formPasswordField: Function := (
+    id: String
+    name: String
+    label: String
+    value: String := ""
+    help: String := ""
+) -> HTMLNode {
+    children: Local List<HTMLNode> := [
+        Web.UI.labelFor(id, label, {"class": "form-label"})
+        Web.UI.div(
+            [
+                Web.UI.input(
+                    "password"
+                    name
+                    value
+                    {"id": id, "class": "form-control"}
+                )
+                Web.UI.button(
+                    "👁"
+                    {
+                        "type": "button"
+                        "class": "btn btn-outline-secondary"
+                        "onclick": "togglePasswordVisibility('{id}', this)"
+                        "title": "Şifreyi Göster / Gizle"
+                        "aria-label": "Şifreyi Göster / Gizle"
+                    }
+                )
+            ]
+            {"class": "input-group"}
+        )
+    ]
+    if help != "" {
+        children.add(Web.UI.p(help, {"class": "form-text"}))
+    }
+
+    return Web.UI.div(children, {"class": "mb-3"})
+}
