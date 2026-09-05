@@ -32,7 +32,6 @@ func noneLive(Route) bool { return false }
 func TestDeriveHostname(t *testing.T) {
 	for _, testCase := range []struct{ appHost, expected string }{
 		{"ahdakademi.com", "ahdakademi.test"},
-		{"ahdakademi.com.tr", "ahdakademi.com.test"},
 		{"AhdAkademi.COM", "ahdakademi.test"},
 		{"ahdakademi.com:8443", "ahdakademi.test"},
 		{"ahdakademi.test", "ahdakademi.test"},
@@ -46,6 +45,68 @@ func TestDeriveHostname(t *testing.T) {
 	} {
 		if got := DeriveHostname(testCase.appHost); got != testCase.expected {
 			t.Errorf("APP_HOST=%q derived %q, expected %q", testCase.appHost, got, testCase.expected)
+		}
+	}
+}
+
+// A2. A multi-label suffix is dropped whole, so the same project derives the
+// same local name whichever registry its production domain sits under. The
+// second label goes only beneath a two-letter country code, so an ordinary
+// subdomain is never mistaken for a registry label.
+func TestDeriveHostnameDropsMultiLabelSuffixes(t *testing.T) {
+	for _, testCase := range []struct{ appHost, expected string }{
+		// The case this exists for: .com.tr reads as the same project as .com.
+		{"ahdakademi.com.tr", "ahdakademi.test"},
+		{"AhdAkademi.COM.TR", "ahdakademi.test"},
+		{"ahdakademi.com.tr:8443", "ahdakademi.test"},
+		{"ahdakademi.org.tr", "ahdakademi.test"},
+		{"ahdakademi.edu.tr", "ahdakademi.test"},
+		{"ahdakademi.gov.tr", "ahdakademi.test"},
+		{"example.co.uk", "example.test"},
+		{"example.com.au", "example.test"},
+		{"example.ac.uk", "example.test"},
+
+		// A subdomain under a two-label suffix keeps the subdomain.
+		{"admin.ahdakademi.com.tr", "admin.ahdakademi.test"},
+
+		// Not a two-letter country code: nothing extra is dropped.
+		{"www.example.com", "www.example.test"},
+		{"api.example.info", "api.example.test"},
+
+		// A two-letter country code whose second label is an ordinary name,
+		// not a registry label: only the country code goes.
+		{"admin.checkmate.tr", "admin.checkmate.test"},
+		{"checkmate.tr", "checkmate.test"},
+
+		// Nothing left after dropping both is not a name; the caller falls
+		// back rather than being handed ".test".
+		{"com.tr", "com.test"},
+	} {
+		if got := DeriveHostname(testCase.appHost); got != testCase.expected {
+			t.Errorf("APP_HOST=%q derived %q, expected %q", testCase.appHost, got, testCase.expected)
+		}
+	}
+}
+
+// A3. Every derived name is one the router is actually willing to serve.
+// Derivation and validation must not be able to disagree.
+func TestDerivedHostnamesAreAlwaysRoutable(t *testing.T) {
+	for _, appHost := range []string{
+		"ahdakademi.com", "ahdakademi.com.tr", "example.co.uk",
+		"admin.ahdakademi.com.tr", "www.example.com", "localhost",
+		"ahd_akademi.com.tr", "-lead.com.tr", "checkmate.tr",
+	} {
+		derived := DeriveHostname(appHost)
+		if derived == "" {
+			continue
+		}
+		if !ValidHostname(derived) {
+			t.Errorf("APP_HOST=%q derived %q, which the router would refuse", appHost, derived)
+		}
+		// A derived name is also stable: deriving from it again is a no-op,
+		// so a restart never walks the name somewhere new.
+		if again := DeriveHostname(derived); again != derived {
+			t.Errorf("%q re-derived as %q; derivation is not stable", derived, again)
 		}
 	}
 }

@@ -183,12 +183,22 @@ değiştirmeden kullanır; bu yüzden hiç kimlik satırı almaz.
 
 Kaydedilebilir sonek eklenmez, değiştirilir:
 
-| `APP_HOST`          | yerel ad               |
-| ------------------- | ---------------------- |
-| `ahdakademi.com`    | `ahdakademi.test`      |
-| `ahdakademi.com.tr` | `ahdakademi.com.test`  |
-| `localhost`         | `localhost.test`       |
-| `ahdakademi.test`   | `ahdakademi.test`      |
+| `APP_HOST`                | yerel ad                |
+| ------------------------- | ----------------------- |
+| `ahdakademi.com`          | `ahdakademi.test`       |
+| `ahdakademi.com.tr`       | `ahdakademi.test`       |
+| `example.co.uk`           | `example.test`          |
+| `www.example.com`         | `www.example.test`      |
+| `admin.ahdakademi.com.tr` | `admin.ahdakademi.test` |
+| `localhost`               | `localhost.test`        |
+| `ahdakademi.test`         | `ahdakademi.test`       |
+
+Çok etiketli sonek bütün olarak düşürülür: `ahdakademi.com.tr`,
+`ahdakademi.com` ile aynı projedir; bu yüzden ikisi de `ahdakademi.test`
+adresinde geliştirilir. İkinci etiket yalnızca iki harfli bir ülke kodunun
+altında ve yalnızca bir kayıt etiketiyse (`com`, `co`, `org`, `edu`, `gov` ve
+benzerleri) düşürülür; bu yüzden `www.example.com` `www` etiketini,
+`admin.checkmate.tr` de `admin` etiketini korur.
 
 O ada **canlı** bir AhdCode oturumu zaten sahipse, ilk boş sonek kullanılır:
 `ahdakademi1.test`, sonra `ahdakademi2.test` — her zaman en küçük boş indis.

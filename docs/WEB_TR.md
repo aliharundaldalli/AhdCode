@@ -586,13 +586,22 @@ göstermez.
 `.test` ile değiştirir:
 
 ```
-APP_HOST=ahdakademi.com     →   ahdakademi.test
-APP_HOST=ahdakademi.com.tr  →   ahdakademi.com.test
-APP_HOST=localhost          →   localhost.test
+APP_HOST=ahdakademi.com           →   ahdakademi.test
+APP_HOST=ahdakademi.com.tr        →   ahdakademi.test
+APP_HOST=example.co.uk            →   example.test
+APP_HOST=www.example.com          →   www.example.test
+APP_HOST=admin.ahdakademi.com.tr  →   admin.ahdakademi.test
+APP_HOST=localhost                →   localhost.test
 ```
 
 Sonek eklenmez, değiştirilir; böylece yerel ad, production adının üzerine bir
 şey iliştirilmiş hâli gibi değil, aynı proje gibi okunur.
+
+Çok etiketli sonek bütün olarak düşürülür; böylece bir proje `.com` yerine
+`.com.tr` altında olduğu için farklı bir yerel ad almaz. İkinci etiket
+yalnızca iki harfli bir ülke kodunun altında ve yalnızca bir kayıt etiketiyse
+(`com`, `co`, `org`, `edu`, `gov` ve benzerleri) düşürülür; bu yüzden sıradan
+bir alt alan adı asla kayıt etiketi sanılmaz.
 
 `.test`, ayrılmış özel amaçlı bir TLD'dir (RFC 6761) ve asla devredilmeyecek;
 bu yüzden geliştirme trafiği kazara gerçek konağa çözülemez. `.local`

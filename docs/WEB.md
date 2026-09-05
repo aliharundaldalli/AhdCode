@@ -583,13 +583,22 @@ For `APP_ENV=development`, the local identity replaces `APP_HOST`'s
 registrable suffix with `.test`:
 
 ```
-APP_HOST=ahdakademi.com     →   ahdakademi.test
-APP_HOST=ahdakademi.com.tr  →   ahdakademi.com.test
-APP_HOST=localhost          →   localhost.test
+APP_HOST=ahdakademi.com           →   ahdakademi.test
+APP_HOST=ahdakademi.com.tr        →   ahdakademi.test
+APP_HOST=example.co.uk            →   example.test
+APP_HOST=www.example.com          →   www.example.test
+APP_HOST=admin.ahdakademi.com.tr  →   admin.ahdakademi.test
+APP_HOST=localhost                →   localhost.test
 ```
 
 The suffix is replaced rather than appended to, so the local name reads as
 the same project instead of as the production name with something bolted on.
+
+A multi-label suffix is dropped whole, so a project does not get a different
+local name for sitting under `.com.tr` rather than `.com`. The second label
+goes only beneath a two-letter country code and only when it is a registry
+label (`com`, `co`, `org`, `edu`, `gov`, and similar), so an ordinary
+subdomain is never mistaken for one.
 
 `.test` is a reserved special-use TLD (RFC 6761) and will never be delegated,
 so development traffic can never resolve to the real host by accident.

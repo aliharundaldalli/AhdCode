@@ -175,12 +175,21 @@ line at all.
 
 The registrable suffix is replaced, not appended to:
 
-| `APP_HOST`         | local name             |
-| ------------------ | ---------------------- |
-| `ahdakademi.com`   | `ahdakademi.test`      |
-| `ahdakademi.com.tr`| `ahdakademi.com.test`  |
-| `localhost`        | `localhost.test`       |
-| `ahdakademi.test`  | `ahdakademi.test`      |
+| `APP_HOST`               | local name                 |
+| ------------------------ | -------------------------- |
+| `ahdakademi.com`         | `ahdakademi.test`          |
+| `ahdakademi.com.tr`      | `ahdakademi.test`          |
+| `example.co.uk`          | `example.test`             |
+| `www.example.com`        | `www.example.test`         |
+| `admin.ahdakademi.com.tr`| `admin.ahdakademi.test`    |
+| `localhost`              | `localhost.test`           |
+| `ahdakademi.test`        | `ahdakademi.test`          |
+
+A multi-label suffix is dropped whole: `ahdakademi.com.tr` is the same project
+as `ahdakademi.com`, so both develop at `ahdakademi.test`. The second label is
+only dropped beneath a two-letter country code and only when it is a registry
+label (`com`, `co`, `org`, `edu`, `gov`, and similar), so `www.example.com`
+keeps its `www` and `admin.checkmate.tr` keeps its `admin`.
 
 If a **live** AhdCode session already owns that name, the next free suffix is
 used — `ahdakademi1.test`, then `ahdakademi2.test`, and so on, always the

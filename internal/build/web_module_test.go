@@ -218,6 +218,42 @@ write(layout("A <b>title</b>", [card("Card")]))
 // development derives the local name by replacing the registrable suffix
 // with .test (example.com becomes example.test, the same derivation
 // `ahdcode dev` routes), and production never gains that suffix.
+// G2. A multi-label registrable suffix is dropped whole, so a project on
+// ahdakademi.com.tr develops at the same local name as one on
+// ahdakademi.com. The framework and `ahdcode dev` share this derivation, so
+// a link an application builds and the name the toolchain routes must agree.
+func TestWebConfigDropsMultiLabelSuffixes(t *testing.T) {
+	directory := writeSources(t, map[string]string{"main.ahd": `bring Web
+from Web bring AppConfig
+
+config: AppConfig := Web.configure()
+write(config.developmentHost())
+write(config.effectiveURL())
+`})
+	for _, testCase := range []struct{ appHost, expectedHost string }{
+		{"ahdakademi.com.tr", "ahdakademi.test"},
+		{"ahdakademi.com", "ahdakademi.test"},
+		{"example.co.uk", "example.test"},
+		{"admin.ahdakademi.com.tr", "admin.ahdakademi.test"},
+		{"www.example.com", "www.example.test"},
+		{"admin.checkmate.tr", "admin.checkmate.test"},
+	} {
+		out := runWebEnvProgram(t, directory, map[string]string{
+			"APP_NAME": "Example", "APP_ENV": "development",
+			"APP_HOST": testCase.appHost, "APP_PROTOCOL": "http",
+			"SERVER_HOST": "127.0.0.1", "SERVER_PORT": "8080",
+		})
+		lines := strings.Split(strings.TrimSpace(out), "\n")
+		if lines[0] != testCase.expectedHost {
+			t.Errorf("APP_HOST=%s: developmentHost was %q, expected %q",
+				testCase.appHost, lines[0], testCase.expectedHost)
+		}
+		if lines[1] != "http://"+testCase.expectedHost {
+			t.Errorf("APP_HOST=%s: effectiveURL was %q", testCase.appHost, lines[1])
+		}
+	}
+}
+
 func TestWebConfigDerivesEnvironmentURLs(t *testing.T) {
 	directory := writeSources(t, map[string]string{"main.ahd": `bring Web
 from Web bring AppConfig

@@ -14,6 +14,44 @@
 bring Env
 bring WebError
 from WebError bring WebConfigError
+// webCountryCodeSecondLevelLabels are the labels that act as a registry's own
+// second level directly under a two-letter country code: the "com" in
+// ahdakademi.com.tr, the "co" in example.co.uk. It is a fixed list rather
+// than the Public Suffix List, and it matches the one the toolchain uses.
+webCountryCodeSecondLevelLabels: Function := () -> List<String> {
+    return [
+        "com"
+        "co"
+        "net"
+        "org"
+        "edu"
+        "gov"
+        "mil"
+        "ac"
+        "gen"
+        "biz"
+        "info"
+        "name"
+        "web"
+        "tv"
+        "k12"
+        "sch"
+        "ltd"
+        "nom"
+        "or"
+        "ne"
+        "go"
+        "int"
+        "av"
+        "bel"
+        "pol"
+        "tsk"
+        "dr"
+        "kep"
+        "res"
+        "in"
+    ]
+}
 // webLocalHostname derives the local development name from a public host.
 //
 // The registrable suffix is replaced rather than appended to, so
@@ -23,13 +61,26 @@ from WebError bring WebConfigError
 // delegated, so it never collides with a real domain or resolves to the real
 // server.
 //
+// A multi-label suffix is dropped whole: ahdakademi.com.tr is the same
+// project as ahdakademi.com, so both derive ahdakademi.test. The second label
+// is only dropped beneath a two-letter country code, so www.example.com keeps
+// its www and admin.checkmate.tr keeps its admin.
+//
 // This is the same derivation `ahdcode dev` uses when it claims a local
 // route, so a link built from AppConfig and the name the toolchain actually
 // serves are always the one address.
 webLocalHostname: Function := (host: String) -> String {
     labels: Local List<String> := host.lower().split(".")
     if len(labels) > 1 {
+        topLevel: Local String := labels[len(labels) - 1]
         labels.eject(-1)
+        if len(labels) > 1 {
+            if len(topLevel) == 2 {
+                if labels[len(labels) - 1] in webCountryCodeSecondLevelLabels() {
+                    labels.eject(-1)
+                }
+            }
+        }
     }
 
     name: Local String := ""

@@ -22,6 +22,27 @@ const LocalTLD = "test"
 // rather than a name to work around.
 const StudioHost = "ahddatabasestudio.test"
 
+// countryCodeSecondLevelLabels are the labels that act as a registry's own
+// second level directly under a two-letter country-code domain: the "com" in
+// ahdakademi.com.tr, the "co" in example.co.uk.
+//
+// This is a fixed list rather than the Public Suffix List. The PSL is a large
+// file that changes on its own schedule, and AhdCode ships no dependency and
+// fetches nothing; more importantly, the only thing being decided here is
+// what a *local development name* looks like on one machine. Being wrong
+// costs a slightly different .test name, never a wrong destination -- the
+// route registry, not this function, decides where anything is actually
+// served. A short list that covers the registries people really configure is
+// the right size for that.
+var countryCodeSecondLevelLabels = map[string]bool{
+	"com": true, "co": true, "net": true, "org": true, "edu": true,
+	"gov": true, "mil": true, "ac": true, "gen": true, "biz": true,
+	"info": true, "name": true, "web": true, "tv": true, "k12": true,
+	"sch": true, "ltd": true, "nom": true, "or": true, "ne": true,
+	"go": true, "int": true, "av": true, "bel": true, "pol": true,
+	"tsk": true, "dr": true, "kep": true, "res": true, "in": true,
+}
+
 // DeriveHostname turns an application's configured APP_HOST into the local
 // development name AhdCode will route.
 //
@@ -30,6 +51,14 @@ const StudioHost = "ahddatabasestudio.test"
 // ahdakademi.com.test: the local name should read as the same project, not
 // as the production name with something bolted on. A single-label host has
 // no suffix to drop and is used whole.
+//
+// A multi-label suffix is dropped whole. ahdakademi.com.tr is the same
+// project as ahdakademi.com, so both derive ahdakademi.test; leaving
+// ahdakademi.com.test behind for the first would make the local name depend
+// on which registry the production domain happens to sit under. The second
+// label is only ever dropped beneath a two-letter country code, so
+// www.example.com keeps its www (www.example.test) and admin.checkmate.tr
+// keeps its admin (admin.checkmate.test).
 //
 // The result is always a syntactically valid host: labels are lowercased and
 // reduced to letters, digits, and interior hyphens. An APP_HOST that reduces
@@ -56,7 +85,11 @@ func DeriveHostname(appHost string) string {
 	// APP_HOST=ahdakademi.test derives ahdakademi.test unchanged.
 	labels := strings.Split(host, ".")
 	if len(labels) > 1 {
+		topLevel := labels[len(labels)-1]
 		labels = labels[:len(labels)-1]
+		if len(labels) > 1 && len(topLevel) == 2 && countryCodeSecondLevelLabels[labels[len(labels)-1]] {
+			labels = labels[:len(labels)-1]
+		}
 	}
 	var kept []string
 	for _, label := range labels {
