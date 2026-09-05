@@ -425,6 +425,7 @@ questionsSection: Function := (questions: List<QuestionRecord>) -> HTMLNode {
                     {"class": "alert alert-info"}
                 )
             ]
+            {"id": "questions"}
         )
     }
 
@@ -438,5 +439,8 @@ questionsSection: Function := (questions: List<QuestionRecord>) -> HTMLNode {
         )
     }
 
-    return Web.UI.section([headerNode, Web.UI.div(cards, {"class": "row"})])
+    return Web.UI.section(
+        [headerNode, Web.UI.div(cards, {"class": "row"})]
+        {"id": "questions"}
+    )
 }

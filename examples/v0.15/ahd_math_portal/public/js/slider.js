@@ -154,6 +154,28 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }, { passive: true });
 
+  // Smooth scroll for anchor buttons inside slider
+  const sliderAnchorButtons = slider.querySelectorAll('a[href*="#"]');
+  sliderAnchorButtons.forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const href = btn.getAttribute('href');
+      const hashIndex = href.indexOf('#');
+      if (hashIndex !== -1) {
+        const targetId = href.substring(hashIndex + 1);
+        const targetEl = document.getElementById(targetId);
+        if (targetEl) {
+          e.preventDefault();
+          targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          if (history.pushState) {
+            history.pushState(null, null, '#' + targetId);
+          } else {
+            window.location.hash = targetId;
+          }
+        }
+      }
+    });
+  });
+
   // Initial activation
   showSlide(0);
   startAutoplay();

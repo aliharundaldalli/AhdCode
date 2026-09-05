@@ -1,6 +1,14 @@
 /* A small amount of application styling on top of Bootstrap.
    Bootstrap itself is vendored unmodified in bootstrap.min.css. */
 
+html {
+    scroll-behavior: smooth;
+}
+
+#questions {
+    scroll-margin-top: 90px;
+}
+
 /* Premium Sticky Navbar */
 .site-header {
     position: sticky;
