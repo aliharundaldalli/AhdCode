@@ -14,3 +14,4 @@ sessions: SessionStore := HTTP.sessions("ahd_datastudio", 3600, false, "Lax")
 pageSize: Int := 50
 mysqlSchemaCache: List<String> := []
 mysqlActiveSchema: String := ""
+studioLang: String := "en"

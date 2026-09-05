@@ -11,12 +11,13 @@ require("Services/Auth.ahd")
 require("Services/CSRF.ahd")
 require("Support/Validation.ahd")
 bring Web
-from Web bring (Request, Response, HTMLNode, Session)
+from Web bring (Request, Response, HTMLNode, Session, RequestContext, Form)
 
 loginPage: Function := (request: Request) -> Response {
-    session: Local Session := sessionOpen(request)
+    web: Local RequestContext := Web.context(request, sessionStore())
+    session: Local Session := web.session
     context: Local PageContext := contextFor(session)
-    return sessionCommit(session, loginView(session, context, "", ""))
+    return web.respond(loginView(session, context, "", ""))
 }
 
 loginView: Function := (
@@ -121,33 +122,35 @@ loginView: Function := (
 }
 
 loginSubmit: Function := (request: Request) -> Response {
-    session: Local Session := sessionOpen(request)
+    web: Local RequestContext := Web.context(request, sessionStore())
+    session: Local Session := web.session
     context: Local PageContext := contextFor(session)
-    if csrfValid(session, request) == false {
-        return sessionCommit(session, Web.text("Geçersiz form belirteci.", 403))
+    form: Local Form := web.form()
+    if web.csrfValid() == false {
+        return web.respond(Web.text("Geçersiz form belirteci.", 403))
     }
 
-    email: Local String := validationEmail(request.form("email"))
-    password: Local String := validationField(request.form("password"))
+    email: Local String := form.value("email").trim().lower()
+    password: Local String := form.value("password")
     user: Local UserRecord? := authAttempt(email, password)
     if user == null {
-        return sessionCommit(
-            session
+        return web.respond(
             loginView(session, context, email, "E-posta veya parola hatalı.")
         )
     }
 
     authLogin(session, user)
-    flashSet(session, "success", "Hoş geldiniz, {user.name}.")
-    return sessionCommit(session, Web.redirect("/"))
+    portalFlash(web, "success", "Hoş geldiniz, {user.name}.")
+    return web.respond(Web.redirect("/"))
 }
 
 logoutSubmit: Function := (request: Request) -> Response {
-    session: Local Session := sessionOpen(request)
-    if csrfValid(session, request) == false {
-        return sessionCommit(session, Web.text("Geçersiz form belirteci.", 403))
+    web: Local RequestContext := Web.context(request, sessionStore())
+    session: Local Session := web.session
+    if web.csrfValid() == false {
+        return web.respond(Web.text("Geçersiz form belirteci.", 403))
     }
 
     authLogout(session)
-    return sessionCommit(session, Web.redirect("/"))
+    return web.respond(Web.redirect("/"))
 }

@@ -800,11 +800,17 @@ eski girdisini kullanır. Hatalar e-postanın var olup olmadığını söylemez.
 `database/<ad>.db` ve `database/schema.sql` oluşturur, şemayı uygular,
 yöneticiyi `Security.passwordHash` ile ekler. Var olan bir `.db` dosyası
 init'i durdurur. Üretilen `database/*.db` gitignore'dadır; `schema.sql` değil.
+Başarı çıktısı AhdDataStudio'ya yönlendirir
+(`http://ahddatabasestudio.test:8081/AhdDataStudio`); Studio `.env` bulunursa yeni dosya
+`AHD_DATA_SQLITE_PATHS` listesine eklenir.
 
 #### MySQL
 
-Ana bilgisayar, port, veritabanı adı, kullanıcı adı ve parola (gizli) sorar.
-Yayınlanmış MySQL sözleşmesini kullanır (`tls` veya `none`; varsayılan `tls`).
+Veritabanı adı, kullanıcı adı ve parola (gizli) sorar. Host, port ve
+güvenlik sorulmaz: AhdDataStudio ayarından gelir (`AHD_DATA_MYSQL_HOST`,
+`AHD_DATA_MYSQL_PORT`, `AHD_DATA_MYSQL_SECURITY`). Host yalnızca sunucu
+adresidir (`127.0.0.1`); `host:port` değildir.
+Yayınlanmış MySQL sözleşmesini kullanır (`tls` veya `none`).
 Yerel çakışma denetimlerinden sonra var olan bir veritabanını reddeder,
 doğrulanmış bir tanıtıcı ile `CREATE DATABASE` yapar, şemayı ve yöneticiyi
 kurar. MySQL kullanıcısı oluşturmaz, GRANT değiştirmez. Bu çağrı yeni bir

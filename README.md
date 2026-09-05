@@ -12,11 +12,11 @@ AhdCode is an experimental statically checked general-purpose programming
 language focused on readable syntax, explicit intent, predictable semantics,
 and native compilation.
 
-The current candidate is **v0.18.0**. The core
+The current candidate is **v0.18.5**. The core
 language works end to end, but the project is not production-ready and
 breaking changes may still occur before 1.0.
 
-v0.18.0, **Web Starter & Application Bootstrap**, turns `ahdcode init web`
+v0.18.5, **Web Starter & Application Bootstrap**, turns `ahdcode init web`
 into a starter wizard: Empty, Basic, or Admin. Empty is a polished welcome
 application. Basic adds common application and mail configuration. Admin
 adds login, a dashboard, and SQLite or MySQL bootstrap with one
@@ -91,9 +91,8 @@ process running untouched, including the very first build; a runtime crash
 after a successful build is reported without retrying the same binary.
 v0.12.0 adds [AhdDataStudio](tools/AhdDataStudio/README.md): a first-party
 localhost MySQL + SQLite development application written in AhdCode, not a
-compiler builtin. Start it with `cd tools/AhdDataStudio && ahdcode run
-app.ahd` and open
-[http://127.0.0.1:8081/AhdDataStudio](http://127.0.0.1:8081/AhdDataStudio).
+compiler builtin. Start it with `ahdcode databases` and open
+[http://ahddatabasestudio.test:8081/AhdDataStudio](http://ahddatabasestudio.test:8081/AhdDataStudio).
 It binds `127.0.0.1` only, discovers MySQL schemas with `database: null`,
 scopes SQLite files to configured project paths, and uses CSRF-protected
 POST forms for generated CRUD. This release also fixes a parser hang on

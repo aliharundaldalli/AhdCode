@@ -1,4 +1,4 @@
-// Ahd Akademi Matematik -- an AhdCode v0.15 Web reference application.
+// Ahd Akademi Matematik -- an AhdCode v0.16 Web reference application.
 //
 //   cp .env.example .env          and fill in the database settings
 //   mysql -u <user> -p <db> < database/schema.sql

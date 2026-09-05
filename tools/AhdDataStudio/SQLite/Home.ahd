@@ -45,7 +45,7 @@ sqliteHome: Function := (request: Request) -> Response {
                             queryFormClass(
                                 "/AhdDataStudio/sqlite/database"
                                 {"db": path}
-                                "Open"
+                                t("open")
                                 "btn btn-sm btn-primary"
                             )
                         ]
@@ -62,7 +62,7 @@ sqliteHome: Function := (request: Request) -> Response {
                 HTML.element(
                     "div"
                     {"class": "eyebrow"}
-                    [HTML.text("Project-scoped databases")]
+                    [HTML.text(t("sqlite_eyebrow"))]
                 )
                 HTML.element("h1", {"class": "h4 mb-1"}, [HTML.text("SQLite")])
                 HTML.element(
@@ -70,7 +70,7 @@ sqliteHome: Function := (request: Request) -> Response {
                     {"class": "text-muted mb-0"}
                     [
                         HTML.text(
-                            "Only explicitly configured database paths and SQLite files that are immediate children of AHD_DATA_PROJECT_ROOT are listed."
+                            t("sqlite_lead")
                         )
                     ]
                 )
@@ -80,8 +80,8 @@ sqliteHome: Function := (request: Request) -> Response {
     if len(files) == 0 {
         body.add(
             emptyState(
-                "No project databases found"
-                "Set AHD_DATA_SQLITE_PATHS for explicit files, or AHD_DATA_PROJECT_ROOT to discover .db, .sqlite, and .sqlite3 files directly inside a project folder. AhdDataStudio never scans the whole machine."
+                t("sqlite_empty_title")
+                t("sqlite_empty_body")
             )
         )
     }
@@ -201,11 +201,7 @@ sqliteOpenPage: Function := (request: Request) -> Response {
                     {"class": "h4 mb-1"}
                     [HTML.text(Path.base(path))]
                 )
-                HTML.element(
-                    "p"
-                    {"class": "text-muted small"}
-                    [HTML.text(path)]
-                )
+                databaseContext("SQLite", path)
                 HTML.element(
                     "div"
                     {"class": "d-flex justify-content-end mb-2"}
@@ -261,6 +257,9 @@ sqliteOpenPage: Function := (request: Request) -> Response {
                     ]
                 )
             ]
+            if len(tables) == 0 {
+                body.add(emptyState(t("no_rows"), t("no_rows_detail")))
+            }
             return sessions.commit(
                 session
                 HTTP.html(layout("SQLite", token, body))

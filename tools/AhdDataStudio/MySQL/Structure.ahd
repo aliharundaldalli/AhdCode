@@ -101,11 +101,7 @@ mysqlStructurePage: Function := (request: Request) -> Response {
                     {"class": "h4 mb-1"}
                     [HTML.text(schema + "." + table)]
                 )
-                HTML.element(
-                    "p"
-                    {"class": "small text-muted studio-mono"}
-                    [HTML.text("MySQL table structure")]
-                )
+                databaseContext("MySQL", schema)
                 mysqlTableNav(schema, table, "structure")
                 htmlTable(
                     ["Column", "Type", "Nullable", "Default", "Key", "Extra"]

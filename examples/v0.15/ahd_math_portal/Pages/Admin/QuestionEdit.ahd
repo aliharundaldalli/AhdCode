@@ -16,28 +16,38 @@ require("Repositories/Users.ahd")
 require("Support/Validation.ahd")
 require("Config/Gemini.ahd")
 bring Web
-from Web bring (Request, Response, HTMLNode, Session)
+from Web bring (
+    Request
+    Response
+    HTMLNode
+    Session
+    RequestContext
+    Form
+    OldInput
+    ValidationErrors
+)
 
 adminQuestionNewPage: Function := (request: Request) -> Response {
-    session: Local Session := sessionOpen(request)
+    web: Local RequestContext := Web.context(request, sessionStore())
+    session: Local Session := web.session
     context: Local PageContext := contextFor(session)
     guard: Local GuardResult := adminGuard(session, context)
     if guard.allowed == false {
-        return sessionCommit(session, guard.refusal)
+        return web.respond(guard.refusal)
     }
 
-    return sessionCommit(
-        session
+    return web.respond(
         adminQuestionForm(session, context, 0, "", "", "", [], "")
     )
 }
 
 adminQuestionEditPage: Function := (request: Request) -> Response {
-    session: Local Session := sessionOpen(request)
+    web: Local RequestContext := Web.context(request, sessionStore())
+    session: Local Session := web.session
     context: Local PageContext := contextFor(session)
     guard: Local GuardResult := adminGuard(session, context)
     if guard.allowed == false {
-        return sessionCommit(session, guard.refusal)
+        return web.respond(guard.refusal)
     }
 
     id: Local Int := validationPathID(
@@ -47,11 +57,10 @@ adminQuestionEditPage: Function := (request: Request) -> Response {
     )
     question: Local QuestionRecord? := questionsFindAny(id)
     if question == null {
-        return sessionCommit(session, Web.text("Soru bulunamadı.", 404))
+        return web.respond(Web.text("Soru bulunamadı.", 404))
     }
 
-    return sessionCommit(
-        session
+    return web.respond(
         adminQuestionForm(
             session
             context
@@ -271,23 +280,25 @@ adminGeminiPanel: Function := (
 }
 
 adminQuestionGenerateSubmit: Function := (request: Request) -> Response {
-    session: Local Session := sessionOpen(request)
+    web: Local RequestContext := Web.context(request, sessionStore())
+    session: Local Session := web.session
     context: Local PageContext := contextFor(session)
     guard: Local GuardResult := adminGuard(session, context)
     if guard.allowed == false {
-        return sessionCommit(session, guard.refusal)
+        return web.respond(guard.refusal)
     }
 
-    if csrfValid(session, request) == false {
-        return sessionCommit(session, Web.text("Geçersiz form belirteci.", 403))
+    form: Local Form := web.form()
+    if web.csrfValid() == false {
+        return web.respond(Web.text("Geçersiz form belirteci.", 403))
     }
 
-    id: Local Int := validationPositiveInt(request.form("question_id"))
-    topic: Local String := validationField(request.form("topic"))
-    difficulty: Local String := validationField(request.form("difficulty"))
-    instruction: Local String := validationField(request.form("instruction"))
-    existingTitle: Local String := validationField(request.form("title"))
-    existingBody: Local String := validationField(request.form("body"))
+    id: Local Int := validationPositiveInt(form.optional("question_id"))
+    topic: Local String := form.value("topic").trim()
+    difficulty: Local String := form.value("difficulty").trim()
+    instruction: Local String := form.value("instruction").trim()
+    existingTitle: Local String := form.value("title").trim()
+    existingBody: Local String := form.value("body").trim()
 
     generated: Local GeneratedQuestion := geminiGenerate(
         topic
@@ -295,8 +306,7 @@ adminQuestionGenerateSubmit: Function := (request: Request) -> Response {
         instruction
     )
     if generated.ok == false {
-        return sessionCommit(
-            session
+        return web.respond(
             adminQuestionForm(
                 session
                 context
@@ -316,8 +326,7 @@ adminQuestionGenerateSubmit: Function := (request: Request) -> Response {
         newTitle = existingTitle
     }
 
-    return sessionCommit(
-        session
+    return web.respond(
         adminQuestionForm(
             session
             context
@@ -332,46 +341,38 @@ adminQuestionGenerateSubmit: Function := (request: Request) -> Response {
 }
 
 adminQuestionSaveSubmit: Function := (request: Request) -> Response {
-    session: Local Session := sessionOpen(request)
+    web: Local RequestContext := Web.context(request, sessionStore())
+    session: Local Session := web.session
     context: Local PageContext := contextFor(session)
     guard: Local GuardResult := adminGuard(session, context)
     if guard.allowed == false {
-        return sessionCommit(session, guard.refusal)
+        return web.respond(guard.refusal)
     }
 
-    if csrfValid(session, request) == false {
-        return sessionCommit(session, Web.text("Geçersiz form belirteci.", 403))
+    form: Local Form := web.form()
+    if web.csrfValid() == false {
+        return web.respond(Web.text("Geçersiz form belirteci.", 403))
     }
 
-    id: Local Int := validationPositiveInt(request.form("question_id"))
-    title: Local String := validationField(request.form("title"))
-    topic: Local String := validationField(request.form("topic"))
-    body: Local String := validationField(request.form("body"))
-
-    errors: Local List<String> := []
-    if title == "" {
-        errors.add("Başlık gerekli.")
-    }
-
-    if topic == "" {
-        errors.add("Konu gerekli.")
-    }
-
-    if body == "" {
-        errors.add("Soru metni gerekli.")
-    }
-
-    if len(errors) > 0 {
-        return sessionCommit(
-            session
+    id: Local Int := validationPositiveInt(form.optional("question_id"))
+    title: Local String := form.value("title").trim()
+    topic: Local String := form.value("topic").trim()
+    body: Local String := form.value("body").trim()
+    old: Local OldInput := form.old(["title", "topic", "body"])
+    errors: Local ValidationErrors := Web.errors()
+    errors.required("title", title, "Başlık gerekli.")
+    errors.required("topic", topic, "Konu gerekli.")
+    errors.required("body", body, "Soru metni gerekli.")
+    if errors.any() {
+        return web.respond(
             adminQuestionForm(
                 session
                 context
                 id
-                title
-                topic
-                body
-                errors
+                old.value("title")
+                old.value("topic")
+                old.value("body")
+                errors.messages()
                 ""
             )
         )
@@ -385,12 +386,12 @@ adminQuestionSaveSubmit: Function := (request: Request) -> Response {
 
     if id == 0 {
         questionsCreate(title, topic, body, authorId)
-        flashSet(session, "success", "Soru taslak olarak kaydedildi.")
+        portalFlash(web, "success", "Soru taslak olarak kaydedildi.")
     }
     else {
         questionsUpdate(id, title, topic, body)
-        flashSet(session, "success", "Soru güncellendi.")
+        portalFlash(web, "success", "Soru güncellendi.")
     }
 
-    return sessionCommit(session, Web.redirect("/admin/questions"))
+    return web.respond(Web.redirect("/admin/questions"))
 }

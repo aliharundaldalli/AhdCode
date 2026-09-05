@@ -9,6 +9,7 @@ Mevcut komut yüzeyi (command surface) şudur:
 ```text
 ahdcode
 ahdcode init web [empty|basic|admin]
+ahdcode databases
 ahdcode build <entry.ahd> [-o <output>]
 ahdcode run <entry.ahd> [-- <args>...]
 ahdcode dev <entry.ahd>
@@ -235,3 +236,26 @@ edilir ve yok sayılır — gerçek LSP istemci kütüphaneleri, sunucuyu stdio
 transport üzerinden başlatırken bunu otomatik olarak ekler; `ahdcode lsp`
 zaten başka hiçbir transport'u desteklemediği için bu bayrak bir no-op'tur)
 ve stdout'a protokol çerçeveleri dışında hiçbir şey yazmaz.
+
+## `ahdcode databases`
+
+Paketle gelen AhdDataStudio veritabanı çalışma alanını başlatır. Kaynak keşfi
+önce `$AHDCODE_ROOT/tools/AhdDataStudio/app.ahd` dosyasına, sonra geçerli
+dizinden yukarı doğru `tools/AhdDataStudio` dizinine (veya Studio dizininin
+kendisine) bakar. Başka bir projede çalışırken `AHDCODE_ROOT` değerini AhdCode
+kaynak deposuna ayarlayın. Makine veya ev dizini taraması yapılmaz.
+
+Başlatılırken `.env` yoksa `.env.example` dosyasından `0600` izinleriyle
+kopyalanır; mevcut `.env` korunur. Sunucu yalnızca `127.0.0.1:8081` adresine
+bağlanır. Kolaylık adresi `http://ahddatabasestudio.test:8081/AhdDataStudio`
+olup isteğe bağlı hosts kaydı şöyledir:
+
+```text
+127.0.0.1 ahddatabasestudio.test
+```
+
+CLI, DNS sorgulamadan yerel hosts dosyasını okur. Çelişkisiz IPv4 eşlemesi
+yoksa tarayıcı için hemen `http://127.0.0.1:8081/AhdDataStudio` adresini seçer.
+Hosts dosyalarını otomatik değiştirmez. Admin SQLite kurulumu, üretilen yolu
+**mevcut** Studio `.env` dosyasına ekleyebilir; `AHDCODE_ROOT`, geçerli dizin
+aramasından önceliklidir. `init web`, Studio `.env` dosyasını oluşturmaz.

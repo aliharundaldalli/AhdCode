@@ -87,14 +87,19 @@ func Web(root string, output, errorOutput io.Writer, options Options) error {
 		return finishFailure(fmt.Errorf("cannot initialize Web project:\n%v", err), createdMySQL, options)
 	}
 
+	var sqliteAbs string
 	if stagedSQLite != "" {
 		if err := installSQLiteFile(root, options, stagedSQLite); err != nil {
 			return finishFailure(err, createdMySQL, options)
 		}
+		if dest, resolveErr := resolveManaged(root, sqliteRelPath(options)); resolveErr == nil {
+			sqliteAbs = dest
+			_ = registerSQLiteWithStudio(dest)
+		}
 		stagedSQLite = ""
 	}
 
-	writeSuccess(output, options)
+	writeSuccess(output, options, sqliteAbs)
 	return nil
 }
 
@@ -105,7 +110,7 @@ func finishFailure(err error, createdMySQL bool, options Options) error {
 	return err
 }
 
-func writeSuccess(output io.Writer, options Options) {
+func writeSuccess(output io.Writer, options Options, sqliteAbs string) {
 	fmt.Fprint(output, "AhdCode Web application initialized.\n\n")
 	switch options.Starter {
 	case StarterBasic:
@@ -124,6 +129,13 @@ func writeSuccess(output io.Writer, options Options) {
 		fmt.Fprintf(output, "Starter: Empty\nApplication: %s\n\n", options.AppName)
 	}
 	fmt.Fprint(output, "Next:\n  ahdcode dev app.ahd\n")
+	if options.isAdmin() {
+		fmt.Fprintf(output, "  AhdDataStudio: %s\n", ahdDataStudioURL)
+		if options.isSQLite() && sqliteAbs != "" {
+			fmt.Fprintf(output, "  SQLite file: %s\n", sqliteAbs)
+			fmt.Fprintf(output, "  Add it to AhdDataStudio as %s\n", ahdDataSQLitePathsKey)
+		}
+	}
 }
 
 type plannedFile struct {

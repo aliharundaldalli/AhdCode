@@ -24,11 +24,12 @@ import (
 	"ahdcode/internal/source"
 )
 
-const usage = `AhdCode v0.18.0 toolchain
+const usage = `AhdCode v0.18.5 toolchain
 
 usage:
   ahdcode                                  start the interactive REPL
   ahdcode init  web [empty|basic|admin]      initialize this directory as a Web app
+  ahdcode databases                          start AhdDataStudio at AhdDatabaseStudio.test
   ahdcode build <entry.ahd> [-o <output>]   compile to a native executable
   ahdcode run   <entry.ahd> [-- <args>...]  compile and run
   ahdcode dev   <entry.ahd>                  watch, rebuild, and restart on save
@@ -47,7 +48,7 @@ stop vs kill:
         escalates from the default graceful signal to an immediate one.
 `
 
-const version = "AhdCode v0.18.0"
+const version = "AhdCode v0.18.5"
 
 func main() {
 	os.Exit(run(os.Args[1:]))
@@ -64,6 +65,8 @@ func runWithIO(arguments []string, input io.Reader, output, errorOutput io.Write
 	switch arguments[0] {
 	case "init":
 		return runInit(arguments[1:], input, output, errorOutput)
+	case "databases":
+		return runDatabases(arguments[1:], input, output, errorOutput)
 	case "build":
 		return runBuild(arguments[1:], output, errorOutput)
 	case "run":

@@ -12,11 +12,11 @@ AhdCode; okunabilir sözdizimi, açık niyet (explicit intent), öngörülebilir
 anlambilim (semantics) ve yerel (native) derlemeye odaklanan, deneysel,
 statik olarak denetlenen genel amaçlı bir programlama dilidir.
 
-Mevcut aday **v0.18.0**'dır. Çekirdek dil
+Mevcut aday **v0.18.5**'dır. Çekirdek dil
 uçtan uca çalışır, ancak proje üretime hazır değildir ve 1.0'dan önce kırıcı
 (breaking) değişiklikler olabilir.
 
-v0.18.0, **Web Starter ve Uygulama Başlangıcı**, `ahdcode init web` komutunu
+v0.18.5, **Web Starter ve Uygulama Başlangıcı**, `ahdcode init web` komutunu
 Empty, Basic veya Admin seçen bir sihirbaza çevirir. Empty cilalı bir
 karşılama uygulamasıdır. Basic ortak uygulama ve posta yapılandırmasını
 ekler. Admin giriş, pano ve SQLite veya MySQL üzerinde bir yönetici hesabı
@@ -96,9 +96,9 @@ sonraki bir çalışma zamanı çökmesi, aynı ikili dosyayı yeniden denemeden
 bildirilir.
 v0.12.0, [AhdDataStudio](tools/AhdDataStudio/README_TR.md) ekler: AhdCode ile
 yazılmış birinci taraf, yalnızca localhost MySQL + SQLite geliştirme
-uygulaması — derleyici yerleşik bir modülü değildir. `cd tools/AhdDataStudio
-&& ahdcode run app.ahd` ile başlatılır ve
-[http://127.0.0.1:8081/AhdDataStudio](http://127.0.0.1:8081/AhdDataStudio)
+uygulaması — derleyici yerleşik bir modülü değildir. `ahdcode databases` ile
+başlatılır ve
+[http://ahddatabasestudio.test:8081/AhdDataStudio](http://ahddatabasestudio.test:8081/AhdDataStudio)
 adresinde açılır. Yalnızca `127.0.0.1` dinler, MySQL şemalarını
 `database: null` ile keşfeder, SQLite dosyalarını yapılandırılmış proje
 yollarıyla sınırlar ve üretilen CRUD için CSRF korumalı POST formları

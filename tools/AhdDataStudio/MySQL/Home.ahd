@@ -1,3 +1,4 @@
+bring Env
 bring HTML
 from HTML bring HTMLNode
 bring HTTP
@@ -38,7 +39,7 @@ mysqlHome: Function := (request: Request) -> Response {
                                     queryFormClass(
                                         "/AhdDataStudio/mysql/database"
                                         {"database": name}
-                                        "Open"
+                                        t("open")
                                         "btn btn-sm btn-primary"
                                     )
                                 ]
@@ -49,6 +50,7 @@ mysqlHome: Function := (request: Request) -> Response {
             }
             body: Local List<HTMLNode> := [
                 HTML.element("h1", {"class": "h4 mb-2"}, [HTML.text("MySQL")])
+                databaseContext("MySQL", Env.getOr("AHD_DATA_MYSQL_HOST", "127.0.0.1") + ":" + Env.getOr("AHD_DATA_MYSQL_PORT", "3306"))
                 HTML.element(
                     "p"
                     {"class": "text-muted"}
@@ -98,6 +100,9 @@ mysqlHome: Function := (request: Request) -> Response {
                     ]
                 )
             ]
+            if len(names) == 0 {
+                body.add(emptyState(t("no_rows"), t("no_rows_detail")))
+            }
             return sessions.commit(
                 session
                 HTTP.html(layout("MySQL", token, body))

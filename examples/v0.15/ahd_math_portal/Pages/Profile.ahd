@@ -11,20 +11,29 @@ require("Repositories/Users.ahd")
 require("Repositories/Solutions.ahd")
 require("Support/Validation.ahd")
 bring Web
-from Web bring (Request, Response, HTMLNode, Session)
+from Web bring (
+    Request
+    Response
+    HTMLNode
+    Session
+    RequestContext
+    Form
+    ValidationErrors
+)
 bring Security
 
 profilePage: Function := (request: Request) -> Response {
-    session: Local Session := sessionOpen(request)
+    web: Local RequestContext := Web.context(request, sessionStore())
+    session: Local Session := web.session
     context: Local PageContext := contextFor(session)
     guard: Local GuardResult := signedInGuard(context)
     if guard.allowed == false {
-        return sessionCommit(session, guard.refusal)
+        return web.respond(guard.refusal)
     }
 
     user: Local UserRecord? := context.user
     if user == null {
-        return sessionCommit(session, Web.redirect("/login"))
+        return web.respond(Web.redirect("/login"))
     }
 
     solutions: Local List<SolutionRecord> := solutionsForUser(user.id)
@@ -385,8 +394,7 @@ profilePage: Function := (request: Request) -> Response {
         solutionModalNode()
     ]
 
-    return sessionCommit(
-        session
+    return web.respond(
         mainLayout(
             session
             "Profilim"
@@ -402,80 +410,86 @@ profilePage: Function := (request: Request) -> Response {
 }
 
 profileNameSubmit: Function := (request: Request) -> Response {
-    session: Local Session := sessionOpen(request)
+    web: Local RequestContext := Web.context(request, sessionStore())
+    session: Local Session := web.session
     context: Local PageContext := contextFor(session)
     guard: Local GuardResult := signedInGuard(context)
     if guard.allowed == false {
-        return sessionCommit(session, guard.refusal)
+        return web.respond(guard.refusal)
     }
 
-    if csrfValid(session, request) == false {
-        return sessionCommit(session, Web.text("Geçersiz form belirteci.", 403))
+    form: Local Form := web.form()
+    if web.csrfValid() == false {
+        return web.respond(Web.text("Geçersiz form belirteci.", 403))
     }
 
     user: Local UserRecord? := context.user
     if user == null {
-        return sessionCommit(session, Web.redirect("/login"))
+        return web.respond(Web.redirect("/login"))
     }
 
-    name: Local String := validationField(request.form("name"))
-    if name == "" {
-        flashSet(session, "error", "Ad soyad alanı boş bırakılamaz.")
-        return sessionCommit(session, Web.redirect("/profile"))
-    }
-
-    if len(name) > 80 {
-        flashSet(session, "error", "Ad soyad en fazla 80 karakter olabilir.")
-        return sessionCommit(session, Web.redirect("/profile"))
+    name: Local String := form.value("name").trim()
+    errors: Local ValidationErrors := Web.errors()
+    errors.required("name", name, "Ad soyad alanı boş bırakılamaz.")
+    errors.maxLength(
+        "name"
+        name
+        80
+        "Ad soyad en fazla 80 karakter olabilir."
+    )
+    if errors.any() {
+        portalFlash(web, "error", errors.messages()[0])
+        return web.respond(Web.redirect("/profile"))
     }
 
     usersUpdateName(user.id, name)
-    flashSet(session, "success", "Profil bilgileriniz başarıyla güncellendi.")
-    return sessionCommit(session, Web.redirect("/profile"))
+    portalFlash(web, "success", "Profil bilgileriniz başarıyla güncellendi.")
+    return web.respond(Web.redirect("/profile"))
 }
 
 profilePasswordSubmit: Function := (request: Request) -> Response {
-    session: Local Session := sessionOpen(request)
+    web: Local RequestContext := Web.context(request, sessionStore())
+    session: Local Session := web.session
     context: Local PageContext := contextFor(session)
     guard: Local GuardResult := signedInGuard(context)
     if guard.allowed == false {
-        return sessionCommit(session, guard.refusal)
+        return web.respond(guard.refusal)
     }
 
-    if csrfValid(session, request) == false {
-        return sessionCommit(session, Web.text("Geçersiz form belirteci.", 403))
+    form: Local Form := web.form()
+    if web.csrfValid() == false {
+        return web.respond(Web.text("Geçersiz form belirteci.", 403))
     }
 
     user: Local UserRecord? := context.user
     if user == null {
-        return sessionCommit(session, Web.redirect("/login"))
+        return web.respond(Web.redirect("/login"))
     }
 
-    currentPassword: Local String := validationField(
-        request.form("current_password")
+    currentPassword: Local String := form.value("current_password")
+    newPassword: Local String := form.value("new_password")
+    confirmation: Local String := form.value("password_confirmation")
+    errors: Local ValidationErrors := Web.errors()
+    errors.minLength(
+        "new_password"
+        newPassword
+        validationMinimumPassword()
+        "Yeni parola en az {str(validationMinimumPassword())} karakter olmalıdır."
     )
-    newPassword: Local String := validationField(request.form("new_password"))
-    confirmation: Local String := validationField(
-        request.form("password_confirmation")
+    errors.matches(
+        "password_confirmation"
+        confirmation
+        newPassword
+        "Yeni parolalar eşleşmiyor."
     )
-
     if Security.passwordVerify(currentPassword, user.passwordHash) == false {
-        flashSet(session, "error", "Mevcut parolanızı yanlış girdiniz.")
-        return sessionCommit(session, Web.redirect("/profile"))
+        portalFlash(web, "error", "Mevcut parolanızı yanlış girdiniz.")
+        return web.respond(Web.redirect("/profile"))
     }
 
-    if validationPasswordLongEnough(newPassword) == false {
-        flashSet(
-            session
-            "error"
-            "Yeni parola en az {str(validationMinimumPassword())} karakter olmalıdır."
-        )
-        return sessionCommit(session, Web.redirect("/profile"))
-    }
-
-    if newPassword != confirmation {
-        flashSet(session, "error", "Yeni parolalar eşleşmiyor.")
-        return sessionCommit(session, Web.redirect("/profile"))
+    if errors.any() {
+        portalFlash(web, "error", errors.messages()[0])
+        return web.respond(Web.redirect("/profile"))
     }
 
     usersSetPassword(user.id, Security.passwordHash(newPassword))
@@ -484,6 +498,6 @@ profilePasswordSubmit: Function := (request: Request) -> Response {
     if freshUser != null {
         authLogin(session, freshUser)
     }
-    flashSet(session, "success", "Parolanız başarıyla güncellendi.")
-    return sessionCommit(session, Web.redirect("/profile"))
+    portalFlash(web, "success", "Parolanız başarıyla güncellendi.")
+    return web.respond(Web.redirect("/profile"))
 }

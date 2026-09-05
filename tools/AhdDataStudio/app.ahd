@@ -7,13 +7,13 @@
 // Pages/, MySQL/, and SQLite/, and serves its local UI assets through
 // Server.static rather than one HTTP.file route per file.
 //
-//   cd tools/AhdDataStudio
-//   ahdcode run app.ahd
-//   open http://127.0.0.1:8081/AhdDataStudio
+//   ahdcode databases
+//   open http://ahddatabasestudio.test:8081/AhdDataStudio
 //   ahdcode kill app.run
 //
 // Binds 127.0.0.1 only. Do not change the host to 0.0.0.0.
 require("Shared/Config.ahd")
+require("Shared/Locale.ahd")
 require("Shared/Redaction.ahd")
 require("Shared/Database.ahd")
 require("Shared/CSRF.ahd")
@@ -65,6 +65,7 @@ startStudio: Function := () -> Nothing {
     app: Local Server := HTTP.server("127.0.0.1", 8081)
     app.static("/AhdDataStudio/assets", staticAssetsRoot())
     app.get("/AhdDataStudio", home)
+    app.get("/AhdDataStudio/lang", setStudioLang)
     app.get("/AhdDataStudio/mysql", mysqlHome)
     app.get("/AhdDataStudio/mysql/database", mysqlDatabasePage)
     app.get("/AhdDataStudio/mysql/table", mysqlStructurePage)
@@ -90,7 +91,7 @@ startStudio: Function := () -> Nothing {
     app.post("/AhdDataStudio/sqlite/delete", sqliteDelete)
     app.get("/AhdDataStudio/sqlite/confirm", sqliteConfirmPage)
     app.post("/AhdDataStudio/sqlite/drop", sqliteDrop)
-    write("AhdDataStudio listening on http://127.0.0.1:8081/AhdDataStudio")
+    write("AhdDataStudio listening on http://ahddatabasestudio.test:8081/AhdDataStudio")
     app.start()
 }
 

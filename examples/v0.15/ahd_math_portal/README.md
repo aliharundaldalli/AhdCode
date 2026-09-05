@@ -5,40 +5,45 @@
 <h1 align="center">Ahd Akademi Matematik</h1>
 
 <p align="center">
-  <strong>Built with <a href="https://github.com/aliharundaldalli/AhdCode">AhdCode</a> v0.15.1 — <a href="https://github.com/aliharundaldalli/AhdCode/releases/tag/v0.15.0">Web Foundations</a></strong>
+  <strong>Built with <a href="https://github.com/aliharundaldalli/AhdCode">AhdCode</a> v0.16.0 — <a href="https://github.com/aliharundaldalli/AhdCode/releases/tag/v0.16.0">Request Context, Forms &amp; Validation</a></strong>
 </p>
 
 <p align="center">
-  <a href="https://github.com/aliharundaldalli/AhdCode"><img src="https://img.shields.io/badge/AhdCode-v0.15.1-0d6efd?style=flat-square" alt="AhdCode v0.15.1"></a>
+  <a href="https://github.com/aliharundaldalli/AhdCode"><img src="https://img.shields.io/badge/AhdCode-v0.16.0-0d6efd?style=flat-square" alt="AhdCode v0.16.0"></a>
   <a href="https://github.com/aliharundaldalli/AhdCode/blob/main/docs/WEB.md"><img src="https://img.shields.io/badge/bring-Web-198754?style=flat-square" alt="bring Web"></a>
   <a href="https://github.com/aliharundaldalli/AhdCode/blob/main/docs/REQUIRE.md"><img src="https://img.shields.io/badge/require(...)-v0.14-6f42c1?style=flat-square" alt="require"></a>
   <a href="README_TR.md"><img src="https://img.shields.io/badge/Dil-Türkçe-e35d6a?style=flat-square" alt="Türkçe"></a>
 </p>
 
 A full-stack, server-rendered mathematics portal written entirely in AhdCode.
-It is the reference dogfood application for **v0.15 Web Foundations**: `bring Web`,
-`Web.UI`, Pages / Layouts / Components, `.env` + Config, and the same
-`require(...)` composition introduced in v0.14.
+It is the reference dogfood application for **v0.16 Request Context, Forms &
+Validation** on top of **v0.15 Web Foundations**: `Web.context`, `Web.form`,
+`Web.errors`, session-bound CSRF, consumed flash, `bring Web` / `Web.UI`,
+Pages / Layouts / Components, `.env` + Config, and `require(...)`.
 
 There is no npm, Node, React, VDOM, ORM, or package registry. The compiler
 bundles the Web framework. A built executable keeps no runtime dependency on
 framework source.
 
-[Türkçe](README_TR.md) · [AhdCode](https://github.com/aliharundaldalli/AhdCode) · [v0.15.0 release](https://github.com/aliharundaldalli/AhdCode/releases/tag/v0.15.0)
+[Türkçe](README_TR.md) · [AhdCode](https://github.com/aliharundaldalli/AhdCode) · [v0.16.0 release](https://github.com/aliharundaldalli/AhdCode/releases/tag/v0.16.0)
 
 <p align="center">
   <img src="docs/screenshots/home-hero.png" alt="Ahd Akademi Matematik home page" width="920">
 </p>
 
-## What v0.15 looks like in a real app
+## What v0.16 looks like in a real app
 
 | AhdCode surface | How this portal uses it |
 |---|---|
+| `Web.context` / `respond` | One request context per handler; session commit exactly once on the return path |
+| `Web.form` / `Form.old` | Typed field reads; old input is an allowlist (name/email, never passwords) |
+| `Web.errors` | Ordered `required`, `email`, `minLength`, `matches`, `hexColor`; business uniqueness via `add` |
+| CSRF & flash | `csrfValid()` / `Web.UI.csrfField` share `__web_csrf`; flash lives under `__web_flash:` and is taken once |
 | `bring Web` / `Web.UI` | Semantic server-side HTML: forms, nav, tables, cards. Every text entry point escapes. |
 | `require("...")` | One program split into Config, Repositories, Services, Layouts, Components, Pages |
 | `ahdcode dev` | Watches the whole require graph and rebuilds on save |
 | MySQL | Parameter-bound queries, InnoDB schema, UNIQUE constraints |
-| Security | Argon2id passwords, CSRF with `secureEqual`, `session.rotate()` on login |
+| Security | Argon2id passwords, `session.rotate()` on login |
 | HTTP + HTML | Live Wikipedia math bulletin (outbound client + scrape) |
 | SMTP | Optional password-reset mail; generic response if mail is off |
 | HTTP client + JSON | Optional Gemini draft helper; key never goes in a URL |
@@ -91,7 +96,7 @@ root), not to the file that wrote it. Each file brings the modules it uses.
 
 ## Requirements
 
-- Installed **AhdCode v0.15.1** (`ahdcode --version`)
+- Installed **AhdCode v0.16.0** (`ahdcode --version`)
 - A reachable MySQL server
 - A writable private upload directory
 
@@ -138,7 +143,7 @@ unset ADMIN_PASSWORD ADMIN_EMAIL ADMIN_NAME
 
 ## Features
 
-- Register / login / logout with CSRF on every state change
+- Register / login / logout with v0.16 CSRF, validation, and flash on every state change
 - Published questions on the home page; drafts stay private until publish
 - PDF / PNG / JPEG solution uploads (content sniffing, 5 MiB, private storage)
 - Admin users, questions, settings, and authorized solution download
@@ -169,7 +174,9 @@ Start the binary from that directory.
 ## Same family
 
 - [AhdCode](https://github.com/aliharundaldalli/AhdCode) — language and compiler
+- [v0.16.0 — Request Context, Forms & Validation](https://github.com/aliharundaldalli/AhdCode/releases/tag/v0.16.0)
 - [v0.15.0 — Web Foundations](https://github.com/aliharundaldalli/AhdCode/releases/tag/v0.15.0)
+- [v0.15.1 — HTTP Path Wildcards](https://github.com/aliharundaldalli/AhdCode/releases/tag/v0.15.1)
 - [Ahd Akademi Matematik](https://github.com/aliharundaldalli/ahdcode-math-portal) — this public showcase
 - [v0.4 Library Demo](https://github.com/aliharundaldalli/ahdcode-library-demo)
 - [v0.4 Seminar Demo](https://github.com/aliharundaldalli/ahdcode-seminer-demo)

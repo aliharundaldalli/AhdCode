@@ -1,13 +1,22 @@
 // One-shot session messages.
 //
-// v0.15 has no flash framework. This is the smallest thing that works: write a
-// message into the session, read it once, and remove it. It is application
-// code, not a Web addition.
+// v0.16 stores flash under the reserved __web_flash: prefix. Application
+// helpers and RequestContext.flashSet/flashTake share those keys so a
+// context.respond after portalFlash is visible on the next GET, then gone.
 bring Web
-from Web bring Session
+from Web bring (Session, RequestContext)
 
-flashKey: String := "flash_message"
-flashKindKey: String := "flash_kind"
+flashKey: String := "__web_flash:message"
+flashKindKey: String := "__web_flash:kind"
+
+portalFlash: Function := (
+    web: RequestContext
+    kind: String
+    message: String
+) -> Nothing {
+    web.flashSet("kind", kind)
+    web.flashSet("message", message)
+}
 
 flashSet: Function := (
     session: Session

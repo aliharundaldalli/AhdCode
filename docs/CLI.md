@@ -9,6 +9,7 @@ The current command surface is:
 ```text
 ahdcode
 ahdcode init web [empty|basic|admin]
+ahdcode databases
 ahdcode build <entry.ahd> [-o <output>]
 ahdcode run <entry.ahd> [-- <args>...]
 ahdcode dev <entry.ahd>
@@ -227,3 +228,27 @@ optional `--stdio`
 when they launch a server over stdio transport; `ahdcode lsp` never supports
 any other transport, so the flag is a no-op) and never writes anything but
 protocol frames to stdout.
+
+## `ahdcode databases`
+
+Launches the bundled AhdDataStudio database workspace. Source discovery checks
+`$AHDCODE_ROOT/tools/AhdDataStudio/app.ahd` first, then walks upward from the
+current directory for `tools/AhdDataStudio` (or the Studio directory itself).
+Set `AHDCODE_ROOT` to your AhdCode source checkout when working elsewhere.
+Only these locations are checked; no machine or home-directory scan is performed.
+
+On launch, a missing `.env` is copied from `.env.example` with mode `0600`;
+an existing `.env` is preserved. The server binds only to `127.0.0.1:8081`.
+Its public convenience URL is `http://ahddatabasestudio.test:8081/AhdDataStudio`.
+You may optionally add this local hosts entry:
+
+```text
+127.0.0.1 ahddatabasestudio.test
+```
+
+The CLI reads the local hosts file without DNS lookups. Unless it finds an
+unambiguous IPv4 mapping, it immediately selects
+`http://127.0.0.1:8081/AhdDataStudio` for the browser. It never modifies hosts
+files automatically. Admin SQLite initialization can append the generated
+path to an **existing** Studio `.env`, preferring `AHDCODE_ROOT` over cwd
+lookup; `init web` does not create the Studio `.env`.

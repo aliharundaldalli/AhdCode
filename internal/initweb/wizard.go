@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"fmt"
 	"io"
-	"strconv"
 	"strings"
 )
 
@@ -161,52 +160,41 @@ func resolveAdminOptions(options Options) (Options, error) {
 }
 
 func resolveMySQLOptions(options Options) (Options, error) {
-	if options.MySQLSecurity == "" {
-		options.MySQLSecurity = "tls"
-	}
-	if err := validateMySQLSecurity(options.MySQLSecurity); err != nil {
-		return options, err
-	}
-
 	if strings.TrimSpace(options.MySQLHost) == "" {
-		if options.IsTTY {
-			host, err := promptLine(options, "Host [127.0.0.1]:")
-			if err != nil {
-				return options, err
-			}
-			if strings.TrimSpace(host) == "" {
-				options.MySQLHost = "127.0.0.1"
-			} else {
-				options.MySQLHost = host
-			}
-		} else {
-			options.MySQLHost = "127.0.0.1"
+		host, err := resolveStudioMySQLHost()
+		if err != nil {
+			return options, err
 		}
+		options.MySQLHost = host
 	}
 	if err := validateMySQLHost(options.MySQLHost); err != nil {
 		return options, err
 	}
 
 	if options.MySQLPort == 0 {
-		if options.IsTTY {
-			raw, err := promptLine(options, "Port [3306]:")
-			if err != nil {
-				return options, err
-			}
-			if strings.TrimSpace(raw) == "" {
-				options.MySQLPort = 3306
-			} else {
-				port, convErr := strconv.Atoi(strings.TrimSpace(raw))
-				if convErr != nil {
-					return options, fmt.Errorf("MySQL port must be a whole number between 1 and 65535")
-				}
-				options.MySQLPort = port
-			}
-		} else {
-			options.MySQLPort = 3306
+		port, err := resolveStudioMySQLPort()
+		if err != nil {
+			return options, err
 		}
+		options.MySQLPort = port
 	}
 	if err := validateMySQLPort(options.MySQLPort); err != nil {
+		return options, err
+	}
+
+	if options.MySQLSecurity == "" {
+		if raw, err := lookupStudioSetting(ahdDataMySQLSecurityKey); err == nil && raw != "" {
+			options.MySQLSecurity = raw
+		} else {
+			options.MySQLSecurity = defaultMySQLSecurity(options.MySQLHost)
+		}
+	}
+	normalized, err := normalizeMySQLSecurity(options.MySQLSecurity)
+	if err != nil {
+		return options, err
+	}
+	options.MySQLSecurity = normalized
+	if err := validateMySQLSecurity(options.MySQLSecurity); err != nil {
 		return options, err
 	}
 
@@ -308,12 +296,67 @@ func validateMySQLHost(host string) error {
 	if strings.TrimSpace(host) != host {
 		return fmt.Errorf("MySQL host is not valid")
 	}
+	if looksLikeHostPort(host) {
+		return fmt.Errorf("MySQL host is the server address only (127.0.0.1), not host:port")
+	}
+	if looksLikePort(host) {
+		return fmt.Errorf("MySQL host %q looks like a port. Use 127.0.0.1 for this machine.", host)
+	}
 	for _, r := range host {
 		if r < 32 || r == 127 || r == '/' || r == ' ' || r == '\t' {
 			return fmt.Errorf("MySQL host is not valid")
 		}
 	}
 	return nil
+}
+
+func looksLikeHostPort(host string) bool {
+	if strings.HasPrefix(host, "[") && strings.Contains(host, "]:") {
+		return true
+	}
+	if strings.HasPrefix(host, "[") {
+		return false
+	}
+	return strings.Count(host, ":") == 1
+}
+
+func looksLikePort(host string) bool {
+	if host == "" {
+		return false
+	}
+	for _, r := range host {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+	return true
+}
+
+func isLoopbackMySQLHost(host string) bool {
+	switch strings.ToLower(strings.TrimSpace(host)) {
+	case "127.0.0.1", "localhost", "::1", "[::1]":
+		return true
+	default:
+		return false
+	}
+}
+
+func defaultMySQLSecurity(host string) string {
+	if isLoopbackMySQLHost(host) {
+		return "none"
+	}
+	return "tls"
+}
+
+func normalizeMySQLSecurity(value string) (string, error) {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "tls", "1":
+		return "tls", nil
+	case "none", "2":
+		return "none", nil
+	default:
+		return "", fmt.Errorf("MySQL security must be tls or none")
+	}
 }
 
 func validateMySQLPort(port int) error {

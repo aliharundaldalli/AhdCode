@@ -31,7 +31,7 @@ queryFormClass: Function := (
     children.add(
         HTML.element(
             "button"
-            {"type": "submit", "class": buttonClass, "title": label}
+            {"type": "submit", "class": buttonClass, "title": label, "aria-current": str(buttonClass.contains("active"))}
             [HTML.text(label)]
         )
     )
@@ -70,7 +70,7 @@ fieldNode: Function := (
         [
             HTML.element(
                 "label"
-                {"class": "form-label small fw-semibold mb-1"}
+                {"class": "form-label small fw-semibold mb-1", "for": "insert-" + name}
                 [HTML.text(name)]
             )
             HTML.element(
@@ -83,6 +83,7 @@ fieldNode: Function := (
                 {
                     "type": "text"
                     "name": "col_" + name
+                    "id": "insert-" + name
                     "class": "form-control form-control-sm"
                 }
                 []

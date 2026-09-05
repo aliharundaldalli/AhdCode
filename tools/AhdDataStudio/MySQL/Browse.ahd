@@ -88,17 +88,17 @@ mysqlBrowsePage: Function := (request: Request) -> Response {
                 headers = columnNames
             }
             pkCols: Local List<String> := mysqlPrimaryColumns(columns)
-            rows: Local List<List<String>> := []
+            rows: Local List<List<HTMLNode>> := []
             actionNodes: Local List<HTMLNode> := []
             rowNumber: Local Int := offset + 1
             for dataRow in data {
-                cells: Local List<String> := []
+                cells: Local List<HTMLNode> := []
                 for header in headers {
                     if header in dataRow {
-                        cells.add(formatMysqlValue(dataRow[header]))
+                        cells.add(databaseValue(formatMysqlValue(dataRow[header]), dataRow[header].isNull()))
                     }
                     else {
-                        cells.add("")
+                        cells.add(HTML.text(""))
                     }
                 }
                 rows.add(cells)
@@ -148,6 +148,7 @@ mysqlBrowsePage: Function := (request: Request) -> Response {
                                             {
                                                 "type": "text"
                                                 "name": "col_" + header
+                                                "aria-label": header
                                                 "value": current
                                                 "class": "form-control form-control-sm"
                                             }
@@ -326,11 +327,7 @@ mysqlBrowsePage: Function := (request: Request) -> Response {
                     {"class": "h4 mb-1"}
                     [HTML.text("Browse · " + table)]
                 )
-                HTML.element(
-                    "p"
-                    {"class": "small text-muted studio-mono"}
-                    [HTML.text(schema + "." + table)]
-                )
+                databaseContext("MySQL", schema)
                 mysqlTableNav(schema, table, "browse")
                 HTML.element(
                     "div"
@@ -371,7 +368,7 @@ mysqlBrowsePage: Function := (request: Request) -> Response {
                 )
             }
             else {
-                body.add(htmlTable(headers, rows))
+                body.add(htmlValueTable(headers, rows))
             }
             body.add(
                 HTML.element(

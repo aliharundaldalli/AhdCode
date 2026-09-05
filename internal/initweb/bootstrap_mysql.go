@@ -50,7 +50,7 @@ func (session *mysqlSession) connect(database *string) error {
 	session.Close()
 	handle, err := ahdruntime.MySQLConnect(session.host, session.username, session.password, int64(session.port), database, session.security, 10)
 	if err != nil {
-		return fmt.Errorf("cannot connect:\n%v", sanitizeSecret(err.Error(), session.password))
+		return mysqlDialError(session.host, session.port, session.security, session.password, err)
 	}
 	session.handle = handle
 	return nil
@@ -63,7 +63,7 @@ func (session *mysqlSession) DatabaseExists(name string) (bool, error) {
 		[]string{ahdruntime.MySQLFromString(name)},
 	)
 	if err != nil {
-		return false, fmt.Errorf("cannot connect:\n%v", sanitizeSecret(err.Error(), session.password))
+		return false, mysqlDialError(session.host, session.port, session.security, session.password, err)
 	}
 	return len(rows) > 0, nil
 }
@@ -145,6 +145,15 @@ func sanitizeSecret(message, secret string) string {
 		return message
 	}
 	return strings.ReplaceAll(message, secret, "")
+}
+
+func mysqlDialError(host string, port int, security, password string, err error) error {
+	detail := sanitizeSecret(err.Error(), password)
+	message := fmt.Sprintf("cannot connect to MySQL at %s:%d:\n%s", host, port, detail)
+	if isLoopbackMySQLHost(host) && security == "tls" {
+		return fmt.Errorf("%s\n\nA local MySQL server usually needs Security none, not tls.", message)
+	}
+	return fmt.Errorf("%s\n\nHost is the server address (127.0.0.1 for this machine), not the port.", message)
 }
 
 func leftoverMySQLMessage(name string) string {

@@ -15,39 +15,41 @@ require("Support/Validation.ahd")
 require("Layouts/Admin.ahd")
 require("Components/SolutionModal.ahd")
 bring Web
-from Web bring (Request, Response, Session, HTMLNode)
+from Web bring (Request, Response, Session, HTMLNode, RequestContext)
 bring HTTP
 bring File
 
 adminSolutionDownload: Function := (request: Request) -> Response {
-    session: Local Session := sessionOpen(request)
+    web: Local RequestContext := Web.context(request, sessionStore())
+    session: Local Session := web.session
     context: Local PageContext := contextFor(session)
     guard: Local GuardResult := adminGuard(session, context)
     if guard.allowed == false {
-        return sessionCommit(session, guard.refusal)
+        return web.respond(guard.refusal)
     }
 
     id: Local Int := validationPositiveInt(request.query("id"))
     solution: Local SolutionRecord? := solutionsFindById(id)
     if solution == null {
-        return sessionCommit(session, Web.text("Çözüm bulunamadı.", 404))
+        return web.respond(Web.text("Çözüm bulunamadı.", 404))
     }
 
     path: Local String := solutionPath(solution.storedFilename)
     if File.exists(path) == false {
-        return sessionCommit(session, Web.text("Dosya bulunamadı.", 404))
+        return web.respond(Web.text("Dosya bulunamadı.", 404))
     }
     // The content type is the one detected at upload time and stored, not
     // anything the client asked for now.
-    return sessionCommit(session, HTTP.file(path, solution.mimeType))
+    return web.respond(HTTP.file(path, solution.mimeType))
 }
 
 adminSolutionsPage: Function := (request: Request) -> Response {
-    session: Local Session := sessionOpen(request)
+    web: Local RequestContext := Web.context(request, sessionStore())
+    session: Local Session := web.session
     context: Local PageContext := contextFor(session)
     guard: Local GuardResult := adminGuard(session, context)
     if guard.allowed == false {
-        return sessionCommit(session, guard.refusal)
+        return web.respond(guard.refusal)
     }
 
     rows: Local List<HTMLNode> := []
@@ -112,8 +114,7 @@ adminSolutionsPage: Function := (request: Request) -> Response {
         {"class": "table align-middle"}
     )
 
-    return sessionCommit(
-        session
+    return web.respond(
         adminLayout(
             session
             "Çözümler"

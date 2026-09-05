@@ -13,18 +13,27 @@ require("Services/CSRF.ahd")
 require("Repositories/SiteSettings.ahd")
 require("Support/Validation.ahd")
 bring Web
-from Web bring (Request, Response, HTMLNode, Session)
+from Web bring (
+    Request
+    Response
+    HTMLNode
+    Session
+    RequestContext
+    Form
+    OldInput
+    ValidationErrors
+)
 
 adminSettingsPage: Function := (request: Request) -> Response {
-    session: Local Session := sessionOpen(request)
+    web: Local RequestContext := Web.context(request, sessionStore())
+    session: Local Session := web.session
     context: Local PageContext := contextFor(session)
     guard: Local GuardResult := adminGuard(session, context)
     if guard.allowed == false {
-        return sessionCommit(session, guard.refusal)
+        return web.respond(guard.refusal)
     }
 
-    return sessionCommit(
-        session
+    return web.respond(
         adminSettingsView(
             session
             context
@@ -188,42 +197,49 @@ adminSettingsView: Function := (
 }
 
 adminSettingsSubmit: Function := (request: Request) -> Response {
-    session: Local Session := sessionOpen(request)
+    web: Local RequestContext := Web.context(request, sessionStore())
+    session: Local Session := web.session
     context: Local PageContext := contextFor(session)
     guard: Local GuardResult := adminGuard(session, context)
     if guard.allowed == false {
-        return sessionCommit(session, guard.refusal)
+        return web.respond(guard.refusal)
     }
 
-    if csrfValid(session, request) == false {
-        return sessionCommit(session, Web.text("Geçersiz form belirteci.", 403))
+    form: Local Form := web.form()
+    if web.csrfValid() == false {
+        return web.respond(Web.text("Geçersiz form belirteci.", 403))
     }
 
-    siteName: Local String := validationField(request.form("site_name"))
-    headerColor: Local String := validationField(request.form("header_color"))
-
-    errors: Local List<String> := []
-    if siteName == "" {
-        errors.add("Site adı boş olamaz.")
-    }
-
-    if len(siteName) > 80 {
-        errors.add("Site adı en fazla 80 karakter olabilir.")
-    }
-
-    if validationHexColor(headerColor) == false {
-        errors.add("Başlık rengi #RRGGBB biçiminde olmalı (örnek: #0d6efd).")
-    }
-
-    if len(errors) > 0 {
-        return sessionCommit(
-            session
-            adminSettingsView(session, context, siteName, headerColor, errors)
+    siteName: Local String := form.value("site_name").trim()
+    headerColor: Local String := form.value("header_color").trim()
+    old: Local OldInput := form.old(["site_name", "header_color"])
+    errors: Local ValidationErrors := Web.errors()
+    errors.required("site_name", siteName, "Site adı boş olamaz.")
+    errors.maxLength(
+        "site_name"
+        siteName
+        80
+        "Site adı en fazla 80 karakter olabilir."
+    )
+    errors.hexColor(
+        "header_color"
+        headerColor
+        "Başlık rengi #RRGGBB biçiminde olmalı (örnek: #0d6efd)."
+    )
+    if errors.any() {
+        return web.respond(
+            adminSettingsView(
+                session
+                context
+                old.value("site_name")
+                old.value("header_color")
+                errors.messages()
+            )
         )
     }
 
     settingsSet("site_name", siteName)
     settingsSet("header_color", headerColor)
-    flashSet(session, "success", "Ayarlar kaydedildi.")
-    return sessionCommit(session, Web.redirect("/admin/settings"))
+    portalFlash(web, "success", "Ayarlar kaydedildi.")
+    return web.respond(Web.redirect("/admin/settings"))
 }

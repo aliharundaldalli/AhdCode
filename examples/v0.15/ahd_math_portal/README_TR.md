@@ -5,40 +5,45 @@
 <h1 align="center">Ahd Akademi Matematik</h1>
 
 <p align="center">
-  <strong><a href="https://github.com/aliharundaldalli/AhdCode">AhdCode</a> v0.15.1 ile yazıldı — <a href="https://github.com/aliharundaldalli/AhdCode/releases/tag/v0.15.0">Web Foundations</a></strong>
+  <strong><a href="https://github.com/aliharundaldalli/AhdCode">AhdCode</a> v0.16.0 ile yazıldı — <a href="https://github.com/aliharundaldalli/AhdCode/releases/tag/v0.16.0">İstek Bağlamı, Formlar ve Doğrulama</a></strong>
 </p>
 
 <p align="center">
-  <a href="https://github.com/aliharundaldalli/AhdCode"><img src="https://img.shields.io/badge/AhdCode-v0.15.1-0d6efd?style=flat-square" alt="AhdCode v0.15.1"></a>
+  <a href="https://github.com/aliharundaldalli/AhdCode"><img src="https://img.shields.io/badge/AhdCode-v0.16.0-0d6efd?style=flat-square" alt="AhdCode v0.16.0"></a>
   <a href="https://github.com/aliharundaldalli/AhdCode/blob/main/docs/WEB.md"><img src="https://img.shields.io/badge/bring-Web-198754?style=flat-square" alt="bring Web"></a>
   <a href="https://github.com/aliharundaldalli/AhdCode/blob/main/docs/REQUIRE.md"><img src="https://img.shields.io/badge/require(...)-v0.14-6f42c1?style=flat-square" alt="require"></a>
   <a href="README.md"><img src="https://img.shields.io/badge/Language-English-0d6efd?style=flat-square" alt="English"></a>
 </p>
 
 Tamamı AhdCode ile yazılmış, sunucuda üretilen bir matematik portalı.
-**v0.15 Web Foundations** için referans uygulama: `bring Web`, `Web.UI`,
-Pages / Layouts / Components, `.env` + Config ve v0.14’te gelen
-`require(...)` birleşimi.
+**v0.16 İstek Bağlamı, Formlar ve Doğrulama** için referans uygulama;
+temeli **v0.15 Web Foundations**: `Web.context`, `Web.form`, `Web.errors`,
+oturuma bağlı CSRF, bir kez okunan flash, `bring Web` / `Web.UI`,
+Pages / Layouts / Components, `.env` + Config ve `require(...)`.
 
 npm, Node, React, VDOM, ORM veya paket kaydı yok. Derleyici Web
 çerçevesini pakete gömer. Derlenen çalıştırılabilir dosya çerçeve
 kaynağına bağımlı değildir.
 
-[English](README.md) · [AhdCode](https://github.com/aliharundaldalli/AhdCode) · [v0.15.0 sürümü](https://github.com/aliharundaldalli/AhdCode/releases/tag/v0.15.0)
+[English](README.md) · [AhdCode](https://github.com/aliharundaldalli/AhdCode) · [v0.16.0 sürümü](https://github.com/aliharundaldalli/AhdCode/releases/tag/v0.16.0)
 
 <p align="center">
   <img src="docs/screenshots/home-hero.png" alt="Ahd Akademi Matematik ana sayfası" width="920">
 </p>
 
-## v0.15 gerçek bir uygulamada
+## v0.16 gerçek bir uygulamada
 
 | AhdCode yüzeyi | Bu portalda kullanımı |
 |---|---|
+| `Web.context` / `respond` | Her işleyicide bir istek bağlamı; oturum yalnızca dönüş yolunda bir kez işlenir |
+| `Web.form` / `Form.old` | Tipli alan okuma; eski girdi izin listesi (ad/e-posta, asla parola değil) |
+| `Web.errors` | Sıralı `required`, `email`, `minLength`, `matches`, `hexColor`; tekillik `add` ile |
+| CSRF ve flash | `csrfValid()` / `Web.UI.csrfField` `__web_csrf` paylaşır; flash `__web_flash:` altında bir kez alınır |
 | `bring Web` / `Web.UI` | Anlamlı sunucu HTML’i: form, nav, tablo, kart. Metin girişleri kaçışlanır. |
 | `require("...")` | Config, Repositories, Services, Layouts, Components, Pages olarak bölünmüş tek program |
 | `ahdcode dev` | Tüm require grafını izler, kayıtta yeniden derler |
 | MySQL | Parametreli sorgular, InnoDB şema, UNIQUE kısıtları |
-| Güvenlik | Argon2id parolalar, `secureEqual` ile CSRF, girişte `session.rotate()` |
+| Güvenlik | Argon2id parolalar, girişte `session.rotate()` |
 | HTTP + HTML | Canlı Vikipedi matematik bülteni (dış istemci + kazıma) |
 | SMTP | İsteğe bağlı parola sıfırlama; posta kapalıysa yanıt aynı kalır |
 | HTTP istemcisi + JSON | İsteğe bağlı Gemini taslak yardımcısı; anahtar URL’ye yazılmaz |
@@ -91,7 +96,7 @@ köküne) görelidir. Her dosya kullandığı modülleri kendi getirir.
 
 ## Gereksinimler
 
-- Kurulu **AhdCode v0.15.1** (`ahdcode --version`)
+- Kurulu **AhdCode v0.16.0** (`ahdcode --version`)
 - Erişilebilir bir MySQL sunucusu
 - Yazılabilir özel yükleme dizini
 
@@ -138,7 +143,7 @@ unset ADMIN_PASSWORD ADMIN_EMAIL ADMIN_NAME
 
 ## Özellikler
 
-- Her durum değişikliğinde CSRF ile kayıt / giriş / çıkış
+- Her durum değişikliğinde v0.16 CSRF, doğrulama ve flash ile kayıt / giriş / çıkış
 - Ana sayfada yayımlanmış sorular; taslaklar yayımlanana kadar gizli
 - PDF / PNG / JPEG çözüm yükleme (içerik koklama, 5 MiB, özel depolama)
 - Yönetici kullanıcı, soru, ayar ve yetkili çözüm indirme
@@ -170,7 +175,9 @@ ortamı) gerekir. İkiliyi o dizinden başlatın.
 ## Aynı aile
 
 - [AhdCode](https://github.com/aliharundaldalli/AhdCode) — dil ve derleyici
+- [v0.16.0 — İstek Bağlamı, Formlar ve Doğrulama](https://github.com/aliharundaldalli/AhdCode/releases/tag/v0.16.0)
 - [v0.15.0 — Web Foundations](https://github.com/aliharundaldalli/AhdCode/releases/tag/v0.15.0)
+- [v0.15.1 — HTTP yol jokerleri](https://github.com/aliharundaldalli/AhdCode/releases/tag/v0.15.1)
 - [Ahd Akademi Matematik](https://github.com/aliharundaldalli/ahdcode-math-portal) — bu genel tanıtım
 - [v0.4 Kütüphane Demosu](https://github.com/aliharundaldalli/ahdcode-library-demo)
 - [v0.4 Seminer Demosu](https://github.com/aliharundaldalli/ahdcode-seminer-demo)

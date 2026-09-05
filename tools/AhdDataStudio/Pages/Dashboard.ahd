@@ -1,3 +1,4 @@
+bring Path
 bring Env
 bring File
 from File bring FileError
@@ -16,7 +17,7 @@ home: Function := (request: Request) -> Response {
     sessions: Global SessionStore
     session: Local Session := sessions.open(request)
     token: Local String := csrfToken(session)
-    mysqlStatus: Local String := "Not configured"
+    mysqlStatus: Local String := t("not_configured")
     mysqlDetail: Local String := ""
     mysqlOk: Local Bool := false
     attempt {
@@ -24,11 +25,11 @@ home: Function := (request: Request) -> Response {
         attempt {
             names: Local List<String> := mysqlDatabases(db)
             mysqlOk = true
-            mysqlStatus = "Connected"
-            mysqlDetail = str(len(names)) + " visible databases"
+            mysqlStatus = t("connected")
+            mysqlDetail = str(len(names)) + " " + t("visible_databases")
         }
         except MySQLError as error {
-            mysqlStatus = "Connection failed"
+            mysqlStatus = t("connection_failed")
             mysqlDetail = redact(error.message)
         }
         ultimately {
@@ -36,22 +37,22 @@ home: Function := (request: Request) -> Response {
         }
     }
     except MySQLError as error {
-        mysqlStatus = "Connection failed"
+        mysqlStatus = t("connection_failed")
         mysqlDetail = redact(error.message)
     }
     except DomainError as error {
-        mysqlStatus = "Connection failed"
+        mysqlStatus = t("connection_failed")
         mysqlDetail = redact(error.message)
     }
 
     sqliteFiles: Local List<String> := []
-    sqliteStatus: Local String := "No project databases"
+    sqliteStatus: Local String := t("no_project_db")
     attempt {
         sqliteFiles = allowedSqlitePaths()
-        sqliteStatus = str(len(sqliteFiles)) + " database file(s)"
+        sqliteStatus = str(len(sqliteFiles)) + " " + t("db_files")
     }
     except FileError as error {
-        sqliteStatus = "Discovery failed"
+        sqliteStatus = t("discovery_failed")
         sqliteDetail: Local String := redact(error.message)
         sqliteStatus = sqliteStatus + " — " + sqliteDetail
     }
@@ -73,10 +74,22 @@ home: Function := (request: Request) -> Response {
                 {"class": "small text-muted mb-3"}
                 [
                     HTML.text(
-                        "Set AHD_DATA_SQLITE_PATHS or AHD_DATA_PROJECT_ROOT to add a project database."
+                        t("sqlite_hint")
                     )
                 ]
             )
+        )
+    }
+
+    for path in sqliteFiles {
+        sqliteDetailNodes.add(
+            HTML.element("div", {"class": "studio-database-entry"}, [
+                HTML.element("div", {}, [
+                    HTML.element("strong", {}, [HTML.text(Path.base(path))])
+                    HTML.element("span", {"class": "studio-path"}, [HTML.text(path)])
+                ])
+                queryFormClass("/AhdDataStudio/sqlite/database", {"db": path}, t("open"), "btn btn-sm btn-outline-primary")
+            ])
         )
     }
 
@@ -88,7 +101,7 @@ home: Function := (request: Request) -> Response {
                 HTML.element(
                     "div"
                     {"class": "eyebrow"}
-                    [HTML.text("Developer database workspace")]
+                    [HTML.text(t("home_eyebrow"))]
                 )
                 HTML.element(
                     "h1"
@@ -100,7 +113,7 @@ home: Function := (request: Request) -> Response {
                     {"class": "text-muted mb-0"}
                     [
                         HTML.text(
-                            "Inspect and work with local MySQL and project-scoped SQLite databases from one AhdCode application."
+                            t("home_lead")
                         )
                     ]
                 )
@@ -188,7 +201,7 @@ home: Function := (request: Request) -> Response {
                                                 "class": "btn btn-primary btn-sm"
                                                 "href": "/AhdDataStudio/mysql"
                                             }
-                                            [HTML.text("Open MySQL")]
+                                            [HTML.text(t("open_mysql"))]
                                         )
                                     ]
                                 )
@@ -249,7 +262,7 @@ home: Function := (request: Request) -> Response {
                                                                     }
                                                                     [
                                                                         HTML.text(
-                                                                            "Project databases only"
+                                                                            t("project_only")
                                                                         )
                                                                     ]
                                                                 )
@@ -266,7 +279,7 @@ home: Function := (request: Request) -> Response {
                                                         HTML.text(
                                                             str(
                                                                 len(sqliteFiles)
-                                                            ) + " found"
+                                                            ) + " " + t("found")
                                                         )
                                                     ]
                                                 )
@@ -283,7 +296,7 @@ home: Function := (request: Request) -> Response {
                                                 "class": "btn btn-primary btn-sm"
                                                 "href": "/AhdDataStudio/sqlite"
                                             }
-                                            [HTML.text("Open SQLite")]
+                                            [HTML.text(t("open_sqlite"))]
                                         )
                                     ]
                                 )
@@ -300,14 +313,14 @@ home: Function := (request: Request) -> Response {
                 HTML.element(
                     "div"
                     {"class": "small fw-semibold mb-1"}
-                    [HTML.text("Safety boundary")]
+                    [HTML.text(t("safety_title"))]
                 )
                 HTML.element(
                     "div"
                     {"class": "small text-muted"}
                     [
                         HTML.text(
-                            "AhdDataStudio is bound to 127.0.0.1 and SQLite discovery remains limited to explicitly configured paths or immediate children of the configured project root."
+                            t("safety_body")
                         )
                     ]
                 )

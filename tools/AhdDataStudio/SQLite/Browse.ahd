@@ -93,15 +93,15 @@ sqliteBrowsePage: Function := (request: Request) -> Response {
                 sql
                 [SQLite.fromInt(pageSize), SQLite.fromInt(offset)]
             )
-            rows: Local List<List<String>> := []
+            rows: Local List<List<HTMLNode>> := []
             for dataRow in data {
-                cells: Local List<String> := []
+                cells: Local List<HTMLNode> := []
                 for header in browseCols {
                     if header in dataRow {
-                        cells.add(formatSqliteValue(dataRow[header]))
+                        cells.add(databaseValue(formatSqliteValue(dataRow[header]), dataRow[header].isNull()))
                     }
                     else {
-                        cells.add("")
+                        cells.add(HTML.text(""))
                     }
                 }
                 rows.add(cells)
@@ -156,6 +156,7 @@ sqliteBrowsePage: Function := (request: Request) -> Response {
                                             {
                                                 "type": "text"
                                                 "name": "col_" + header
+                                                "aria-label": header
                                                 "value": current
                                                 "class": "form-control form-control-sm"
                                             }
@@ -329,11 +330,7 @@ sqliteBrowsePage: Function := (request: Request) -> Response {
                     {"class": "h4 mb-1"}
                     [HTML.text("Browse · " + table)]
                 )
-                HTML.element(
-                    "p"
-                    {"class": "small text-muted studio-mono"}
-                    [HTML.text(Path.base(path))]
-                )
+                databaseContext("SQLite", path)
                 sqliteNav(path, table, "browse")
                 HTML.element(
                     "div"
@@ -374,7 +371,7 @@ sqliteBrowsePage: Function := (request: Request) -> Response {
                 )
             }
             else {
-                body.add(htmlTable(browseCols, rows))
+                body.add(htmlValueTable(browseCols, rows))
             }
             body.add(
                 HTML.element(

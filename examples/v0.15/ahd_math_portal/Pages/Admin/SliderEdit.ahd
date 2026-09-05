@@ -9,29 +9,40 @@ require("Services/CSRF.ahd")
 require("Repositories/Sliders.ahd")
 require("Support/Validation.ahd")
 bring Web
-from Web bring (Request, Response, HTMLNode, Session, UploadedFile)
+from Web bring (
+    Request
+    Response
+    HTMLNode
+    Session
+    UploadedFile
+    RequestContext
+    Form
+    OldInput
+    ValidationErrors
+)
 bring Path
 
 adminSliderNewPage: Function := (request: Request) -> Response {
-    session: Local Session := sessionOpen(request)
+    web: Local RequestContext := Web.context(request, sessionStore())
+    session: Local Session := web.session
     context: Local PageContext := contextFor(session)
     guard: Local GuardResult := adminGuard(session, context)
     if guard.allowed == false {
-        return sessionCommit(session, guard.refusal)
+        return web.respond(guard.refusal)
     }
 
-    return sessionCommit(
-        session
+    return web.respond(
         adminSliderForm(session, context, 0, "", "", "", "", "", 0, true, [])
     )
 }
 
 adminSliderEditPage: Function := (request: Request) -> Response {
-    session: Local Session := sessionOpen(request)
+    web: Local RequestContext := Web.context(request, sessionStore())
+    session: Local Session := web.session
     context: Local PageContext := contextFor(session)
     guard: Local GuardResult := adminGuard(session, context)
     if guard.allowed == false {
-        return sessionCommit(session, guard.refusal)
+        return web.respond(guard.refusal)
     }
 
     id: Local Int := validationPathID(
@@ -41,11 +52,10 @@ adminSliderEditPage: Function := (request: Request) -> Response {
     )
     slider: Local SliderRecord? := slidersFindById(id)
     if slider == null {
-        return sessionCommit(session, Web.text("Slayt bulunamadı.", 404))
+        return web.respond(Web.text("Slayt bulunamadı.", 404))
     }
 
-    return sessionCommit(
-        session
+    return web.respond(
         adminSliderForm(
             session
             context
@@ -345,44 +355,41 @@ adminSliderForm: Function := (
 }
 
 adminSliderSaveSubmit: Function := (request: Request) -> Response {
-    session: Local Session := sessionOpen(request)
+    web: Local RequestContext := Web.context(request, sessionStore())
+    session: Local Session := web.session
     context: Local PageContext := contextFor(session)
     guard: Local GuardResult := adminGuard(session, context)
     if guard.allowed == false {
-        return sessionCommit(session, guard.refusal)
+        return web.respond(guard.refusal)
     }
 
-    if csrfValid(session, request) == false {
-        return sessionCommit(session, Web.text("Geçersiz form belirteci.", 403))
+    form: Local Form := web.form()
+    if web.csrfValid() == false {
+        return web.respond(Web.text("Geçersiz form belirteci.", 403))
     }
 
-    id: Local Int := validationPositiveInt(request.form("slider_id"))
-    title: Local String := validationField(request.form("title"))
-    subtitle: Local String := validationField(request.form("subtitle"))
-    imageUrl: Local String := validationField(request.form("image_url"))
-    buttonText: Local String := validationField(request.form("button_text"))
-    buttonUrl: Local String := validationField(request.form("button_url"))
+    id: Local Int := validationPositiveInt(form.optional("slider_id"))
+    title: Local String := form.value("title").trim()
+    subtitle: Local String := form.value("subtitle").trim()
+    imageUrl: Local String := form.value("image_url").trim()
+    buttonText: Local String := form.value("button_text").trim()
+    buttonUrl: Local String := form.value("button_url").trim()
     displayOrder: Local Int := validationPositiveInt(
-        request.form("display_order")
+        form.optional("display_order")
     )
-    isActive: Local Bool := request.form("is_active") == "1"
+    isActive: Local Bool := form.checkbox("is_active")
 
     existingSlider: Local SliderRecord? := null
     if id > 0 {
         existingSlider = slidersFindById(id)
         if existingSlider == null {
-            return sessionCommit(session, Web.text("Slayt bulunamadı.", 404))
+            return web.respond(Web.text("Slayt bulunamadı.", 404))
         }
     }
 
-    errors: Local List<String> := []
-    if title == "" {
-        errors.add("Slayt başlığı zorunludur.")
-    }
-
-    if subtitle == "" {
-        errors.add("Açıklama / metin zorunludur.")
-    }
+    errors: Local ValidationErrors := Web.errors()
+    errors.required("title", title, "Slayt başlığı zorunludur.")
+    errors.required("subtitle", subtitle, "Açıklama / metin zorunludur.")
     // Check if an image file is uploaded
     upload: Local UploadedFile? := request.file("image_file")
     if upload != null {
@@ -394,7 +401,7 @@ adminSliderSaveSubmit: Function := (request: Request) -> Response {
                 imageUrl = "/assets/images/sliders/{storedName}"
             }
             else {
-                errors.add("Görsel yalnızca PNG, JPEG veya WebP olabilir.")
+                errors.add("image_file", "Görsel yalnızca PNG, JPEG veya WebP olabilir.")
             }
         }
     }
@@ -406,24 +413,29 @@ adminSliderSaveSubmit: Function := (request: Request) -> Response {
     }
 
     if imageUrl == "" {
-        errors.add("Bir görsel URL'si girin veya cihazınızdan dosya yükleyin.")
+        errors.add(
+            "image_url"
+            "Bir görsel URL'si girin veya cihazınızdan dosya yükleyin."
+        )
     }
 
-    if len(errors) > 0 {
-        return sessionCommit(
-            session
+    if errors.any() {
+        old: Local OldInput := form.old(
+            ["title", "subtitle", "image_url", "button_text", "button_url"]
+        )
+        return web.respond(
             adminSliderForm(
                 session
                 context
                 id
-                title
-                subtitle
+                old.value("title")
+                old.value("subtitle")
                 imageUrl
-                buttonText
-                buttonUrl
+                old.value("button_text")
+                old.value("button_url")
                 displayOrder
                 isActive
-                errors
+                errors.messages()
             )
         )
     }
@@ -438,7 +450,7 @@ adminSliderSaveSubmit: Function := (request: Request) -> Response {
             displayOrder
             isActive
         )
-        flashSet(session, "success", "Yeni slayt başarıyla eklendi.")
+        portalFlash(web, "success", "Yeni slayt başarıyla eklendi.")
     }
     else {
         slidersUpdate(
@@ -451,8 +463,8 @@ adminSliderSaveSubmit: Function := (request: Request) -> Response {
             displayOrder
             isActive
         )
-        flashSet(session, "success", "Slayt başarıyla güncellendi.")
+        portalFlash(web, "success", "Slayt başarıyla güncellendi.")
     }
 
-    return sessionCommit(session, Web.redirect("/admin/sliders"))
+    return web.respond(Web.redirect("/admin/sliders"))
 }

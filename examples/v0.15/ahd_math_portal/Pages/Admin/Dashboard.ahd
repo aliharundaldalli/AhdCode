@@ -6,14 +6,15 @@ require("Repositories/Users.ahd")
 require("Repositories/Questions.ahd")
 require("Repositories/Solutions.ahd")
 bring Web
-from Web bring (Request, Response, HTMLNode, Session)
+from Web bring (Request, Response, HTMLNode, Session, RequestContext)
 
 adminDashboardPage: Function := (request: Request) -> Response {
-    session: Local Session := sessionOpen(request)
+    web: Local RequestContext := Web.context(request, sessionStore())
+    session: Local Session := web.session
     context: Local PageContext := contextFor(session)
     guard: Local GuardResult := adminGuard(session, context)
     if guard.allowed == false {
-        return sessionCommit(session, guard.refusal)
+        return web.respond(guard.refusal)
     }
 
     cards: Local List<HTMLNode> := [
@@ -43,8 +44,7 @@ adminDashboardPage: Function := (request: Request) -> Response {
         )
     ]
 
-    return sessionCommit(
-        session
+    return web.respond(
         adminLayout(
             session
             "Panel"

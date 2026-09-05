@@ -13,14 +13,15 @@ require("Services/Gemini.ahd")
 require("Repositories/Questions.ahd")
 require("Support/Validation.ahd")
 bring Web
-from Web bring (Request, Response, HTMLNode, Session)
+from Web bring (Request, Response, HTMLNode, Session, RequestContext, Form)
 
 adminQuestionsPage: Function := (request: Request) -> Response {
-    session: Local Session := sessionOpen(request)
+    web: Local RequestContext := Web.context(request, sessionStore())
+    session: Local Session := web.session
     context: Local PageContext := contextFor(session)
     guard: Local GuardResult := adminGuard(session, context)
     if guard.allowed == false {
-        return sessionCommit(session, guard.refusal)
+        return web.respond(guard.refusal)
     }
 
     rows: Local List<HTMLNode> := []
@@ -67,8 +68,7 @@ adminQuestionsPage: Function := (request: Request) -> Response {
         )
     ]
 
-    return sessionCommit(
-        session
+    return web.respond(
         adminLayout(
             session
             "Sorular"
@@ -151,31 +151,33 @@ adminQuestionRow: Function := (
 }
 
 adminQuestionStatusSubmit: Function := (request: Request) -> Response {
-    session: Local Session := sessionOpen(request)
+    web: Local RequestContext := Web.context(request, sessionStore())
+    session: Local Session := web.session
     context: Local PageContext := contextFor(session)
     guard: Local GuardResult := adminGuard(session, context)
     if guard.allowed == false {
-        return sessionCommit(session, guard.refusal)
+        return web.respond(guard.refusal)
     }
 
-    if csrfValid(session, request) == false {
-        return sessionCommit(session, Web.text("Geçersiz form belirteci.", 403))
+    form: Local Form := web.form()
+    if web.csrfValid() == false {
+        return web.respond(Web.text("Geçersiz form belirteci.", 403))
     }
 
-    id: Local Int := validationPositiveInt(request.form("question_id"))
-    action: Local String := validationField(request.form("action"))
+    id: Local Int := validationPositiveInt(form.optional("question_id"))
+    action: Local String := form.value("action").trim()
     if questionsFindAny(id) == null {
-        return sessionCommit(session, Web.text("Soru bulunamadı.", 404))
+        return web.respond(Web.text("Soru bulunamadı.", 404))
     }
 
     if action == "publish" {
         questionsPublish(id)
-        flashSet(session, "success", "Soru yayımlandı.")
+        portalFlash(web, "success", "Soru yayımlandı.")
     }
     else {
         questionsUnpublish(id)
-        flashSet(session, "success", "Soru taslağa alındı.")
+        portalFlash(web, "success", "Soru taslağa alındı.")
     }
 
-    return sessionCommit(session, Web.redirect("/admin/questions"))
+    return web.respond(Web.redirect("/admin/questions"))
 }

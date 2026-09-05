@@ -111,7 +111,7 @@ func renderEnv(options Options, example bool) string {
 			b.WriteString(envLine("DB_USERNAME", options.MySQLUser) + "\n")
 			b.WriteString(envLine("DB_PASSWORD", options.MySQLPassword) + "\n")
 		}
-		b.WriteString("DB_SECURITY=tls\n")
+		b.WriteString(envLine("DB_SECURITY", options.MySQLSecurity) + "\n")
 	}
 	return b.String()
 }

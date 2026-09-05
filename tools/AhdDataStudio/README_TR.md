@@ -9,19 +9,21 @@ AhdCode programıdır.
 ## Başlatma
 
 ```bash
-cd tools/AhdDataStudio
-cp .env.example .env   # ardından yer tutucuları düzenleyin
-ahdcode run app.ahd
+ahdcode databases
 ```
 
 Adres:
 
-[http://127.0.0.1:8081/AhdDataStudio](http://127.0.0.1:8081/AhdDataStudio)
+[http://ahddatabasestudio.test:8081/AhdDataStudio](http://ahddatabasestudio.test:8081/AhdDataStudio)
 
-Sunucu yalnızca **127.0.0.1:8081** dinler. Bu bir yerel geliştirme aracıdır;
+Süreç hâlâ yalnızca **127.0.0.1:8081** dinler. Görünen ad
+`AhdDatabaseStudio.test`. Ad çözülmezse `/etc/hosts` dosyasına bir kez ekleyin:
+
+```text
+127.0.0.1 ahddatabasestudio.test
+```
+
 `0.0.0.0` veya internete açılmamalıdır.
-
-Bu sürümde `ahdcode studio` komutu yoktur.
 
 ## Durdurma
 

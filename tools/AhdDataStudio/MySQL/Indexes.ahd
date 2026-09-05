@@ -90,6 +90,7 @@ mysqlIndexesPage: Function := (request: Request) -> Response {
                     {"class": "h4"}
                     [HTML.text("Indexes · " + table)]
                 )
+                databaseContext("MySQL", schema)
                 mysqlTableNav(schema, table, "indexes")
                 htmlTable(["Index", "Uniqueness", "Column", "Sequence"], rows)
             ]

@@ -33,11 +33,8 @@ mysqlSqlPage: Function := (request: Request) -> Response {
             {"class": "h4 mb-1"}
             [HTML.text("MySQL SQL console")]
         )
-        HTML.element(
-            "p"
-            {"class": "small text-muted studio-mono"}
-            [HTML.text(context)]
-        )
+        databaseContext("MySQL", context)
+        sqlWorkspaceNav("MySQL", schema)
         HTML.element(
             "div"
             {"class": "alert alert-warning py-2 small"}
@@ -59,13 +56,13 @@ mysqlSqlPage: Function := (request: Request) -> Response {
                         hiddenField("database", schema)
                         HTML.element(
                             "label"
-                            {"class": "form-label small fw-semibold"}
+                            {"class": "form-label small fw-semibold", "for": "studio-query"}
                             [HTML.text("SQL")]
                         )
                         HTML.element(
                             "textarea"
                             {
-                                "name": "sql"
+                                "id": "studio-query", "aria-label": "SQL", "spellcheck": "false", "name": "sql"
                                 "class": "form-control mb-3"
                                 "placeholder": "SELECT ..."
                             }
@@ -179,24 +176,26 @@ mysqlSqlRun: Function := (request: Request) -> Response {
                     {"class": "h4"}
                     [HTML.text("MySQL SQL console")]
                 )
+                databaseContext("MySQL", schema)
+                sqlWorkspaceNav("MySQL", schema)
                 HTML.element(
                     "div"
-                    {"class": "alert alert-warning"}
+                    {"class": "alert alert-success", "role": "status"}
                     [HTML.text("This console ran your SQL exactly as entered.")]
                 )
             ]
             if looksLikeQuery(sqlText) {
                 data: Local List<Pair<String, MySQLValue>> := db.query(sqlText)
                 headers: Local List<String> := []
-                rows: Local List<List<String>> := []
+                rows: Local List<List<HTMLNode>> := []
                 if len(data) > 0 {
                     for key in data[0] {
                         headers.add(key)
                     }
                     for dataRow in data {
-                        cells: Local List<String> := []
+                        cells: Local List<HTMLNode> := []
                         for header in headers {
-                            cells.add(formatMysqlValue(dataRow[header]))
+                            cells.add(databaseValue(formatMysqlValue(dataRow[header]), dataRow[header].isNull()))
                         }
                         rows.add(cells)
                     }
@@ -209,7 +208,10 @@ mysqlSqlRun: Function := (request: Request) -> Response {
                     )
                 )
                 if len(headers) > 0 {
-                    body.add(htmlTable(headers, rows))
+                    body.add(htmlValueTable(headers, rows))
+                }
+                else {
+                    body.add(emptyState(t("no_rows"), t("no_rows_detail")))
                 }
             }
             else {
@@ -229,13 +231,13 @@ mysqlSqlRun: Function := (request: Request) -> Response {
             body.add(
                 HTML.element(
                     "form"
-                    {"method": "post", "action": "/AhdDataStudio/mysql/sql"}
+                    {"method": "post", "action": "/AhdDataStudio/mysql/sql", "class": "studio-sql mt-3"}
                     [
                         csrfField(token)
                         hiddenField("database", schema)
                         HTML.element(
                             "textarea"
-                            {"name": "sql", "class": "form-control mb-2"}
+                            {"id": "studio-query", "aria-label": "SQL", "spellcheck": "false", "name": "sql", "class": "form-control mb-2"}
                             [HTML.text(sqlText)]
                         )
                         HTML.element(

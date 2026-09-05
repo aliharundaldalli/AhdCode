@@ -1,3 +1,4 @@
+bring Path
 bring HTML
 from HTML bring HTMLNode
 
@@ -18,19 +19,19 @@ mysqlActionGroup: Function := (schema: String, table: String) -> HTMLNode {
             queryFormClass(
                 "/AhdDataStudio/mysql/browse"
                 fields
-                "Browse"
+                t("browse")
                 "btn btn-sm btn-primary"
             )
             queryFormClass(
                 "/AhdDataStudio/mysql/table"
                 fields
-                "Structure"
+                t("structure")
                 "btn btn-sm btn-outline-secondary"
             )
             queryFormClass(
                 "/AhdDataStudio/mysql/indexes"
                 fields
-                "Indexes"
+                t("indexes")
                 "btn btn-sm btn-outline-secondary"
             )
         ]
@@ -46,19 +47,19 @@ sqliteActionGroup: Function := (path: String, table: String) -> HTMLNode {
             queryFormClass(
                 "/AhdDataStudio/sqlite/browse"
                 fields
-                "Browse"
+                t("browse")
                 "btn btn-sm btn-primary"
             )
             queryFormClass(
                 "/AhdDataStudio/sqlite/table"
                 fields
-                "Structure"
+                t("structure")
                 "btn btn-sm btn-outline-secondary"
             )
             queryFormClass(
                 "/AhdDataStudio/sqlite/indexes"
                 fields
-                "Indexes"
+                t("indexes")
                 "btn btn-sm btn-outline-secondary"
             )
         ]
@@ -98,7 +99,7 @@ mysqlTableNav: Function := (
                     queryFormClass(
                         "/AhdDataStudio/mysql/database"
                         {"database": schema}
-                        "Tables"
+                        t("tables")
                         "nav-link"
                     )
                 ]
@@ -110,7 +111,7 @@ mysqlTableNav: Function := (
                     queryFormClass(
                         "/AhdDataStudio/mysql/browse"
                         fields
-                        "Browse"
+                        t("browse")
                         browseClass
                     )
                 ]
@@ -122,7 +123,7 @@ mysqlTableNav: Function := (
                     queryFormClass(
                         "/AhdDataStudio/mysql/table"
                         fields
-                        "Structure"
+                        t("structure")
                         structureClass
                     )
                 ]
@@ -134,7 +135,7 @@ mysqlTableNav: Function := (
                     queryFormClass(
                         "/AhdDataStudio/mysql/indexes"
                         fields
-                        "Indexes"
+                        t("indexes")
                         indexClass
                     )
                 ]
@@ -200,7 +201,7 @@ sqliteNav: Function := (
                     queryFormClass(
                         "/AhdDataStudio/sqlite/browse"
                         fields
-                        "Browse"
+                        t("browse")
                         browseClass
                     )
                 ]
@@ -212,7 +213,7 @@ sqliteNav: Function := (
                     queryFormClass(
                         "/AhdDataStudio/sqlite/table"
                         fields
-                        "Structure"
+                        t("structure")
                         structureClass
                     )
                 ]
@@ -224,7 +225,7 @@ sqliteNav: Function := (
                     queryFormClass(
                         "/AhdDataStudio/sqlite/indexes"
                         fields
-                        "Indexes"
+                        t("indexes")
                         indexClass
                     )
                 ]
@@ -293,3 +294,24 @@ schemaSideList: Function := (names: List<String>, current: String) -> HTMLNode {
     )
 }
 
+
+// Context uses already selected identifiers; it does not imply connection health.
+databaseContext: Function := (engine: String, detail: String) -> HTMLNode {
+    return HTML.element("div", {"class": "studio-context"}, [
+        HTML.element("span", {"class": "studio-engine"}, [HTML.text(engine)])
+        HTML.element("span", {"class": "studio-mono"}, [HTML.text(detail)])
+    ])
+}
+
+sqlWorkspaceNav: Function := (engine: String, value: String) -> HTMLNode {
+    action: Local String := "/AhdDataStudio/sqlite/database"
+    fields: Local Pair<String, String> := {"db": value}
+    if engine == "MySQL" {
+        action = "/AhdDataStudio/mysql/database"
+        fields = {"database": value}
+    }
+    return HTML.element("ul", {"class": "nav studio-tabs mb-3"}, [
+        HTML.element("li", {"class": "nav-item"}, [queryFormClass(action, fields, t("tables"), "nav-link")])
+        HTML.element("li", {"class": "nav-item"}, [HTML.element("span", {"class": "nav-link active", "aria-current": "page"}, [HTML.text("SQL")])])
+    ])
+}

@@ -71,15 +71,39 @@ htmlTable: Function := (
     headers: List<String>
     rows: List<List<String>>
 ) -> HTMLNode {
+    nodeRows: Local List<List<HTMLNode>> := []
+    for row in rows {
+        cells: Local List<HTMLNode> := []
+        for cell in row { cells.add(HTML.text(cell)) }
+        nodeRows.add(cells)
+    }
+    return htmlValueTable(headers, nodeRows)
+}
+
+// Values arrive as escaped text nodes; NULL styling is based on the typed value.
+databaseValue: Function := (text: String, isNull: Bool) -> HTMLNode {
+    if isNull {
+        return HTML.element("span", {"class": "studio-null", "title": "SQL NULL"}, [HTML.text(text)])
+    }
+    return HTML.text(text)
+}
+
+htmlValueTable: Function := (
+    headers: List<String>
+    rows: List<List<HTMLNode>>
+) -> HTMLNode {
+    if len(rows) == 0 {
+        return emptyState(t("no_rows"), t("no_rows_detail"))
+    }
     headCells: Local List<HTMLNode> := []
     for header in headers {
-        headCells.add(HTML.element("th", {}, [HTML.text(header)]))
+        headCells.add(HTML.element("th", {"scope": "col"}, [HTML.text(header)]))
     }
     bodyRows: Local List<HTMLNode> := []
     for row in rows {
         cells: Local List<HTMLNode> := []
         for cell in row {
-            cells.add(HTML.element("td", {}, [HTML.text(cell)]))
+            cells.add(HTML.element("td", {}, [cell]))
         }
         bodyRows.add(HTML.element("tr", {}, cells))
     }
@@ -90,7 +114,7 @@ htmlTable: Function := (
             HTML.element(
                 "table"
                 {
-                    "class": "table table-sm table-striped table-hover align-middle bg-white studio-table"
+                    "class": "table table-sm table-striped table-hover align-middle bg-white studio-table studio-data"
                 }
                 [
                     HTML.element(

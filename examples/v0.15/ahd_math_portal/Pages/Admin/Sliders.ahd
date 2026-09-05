@@ -7,14 +7,15 @@ require("Services/CSRF.ahd")
 require("Repositories/Sliders.ahd")
 require("Support/Validation.ahd")
 bring Web
-from Web bring (Request, Response, HTMLNode, Session)
+from Web bring (Request, Response, HTMLNode, Session, RequestContext, Form)
 
 adminSlidersPage: Function := (request: Request) -> Response {
-    session: Local Session := sessionOpen(request)
+    web: Local RequestContext := Web.context(request, sessionStore())
+    session: Local Session := web.session
     context: Local PageContext := contextFor(session)
     guard: Local GuardResult := adminGuard(session, context)
     if guard.allowed == false {
-        return sessionCommit(session, guard.refusal)
+        return web.respond(guard.refusal)
     }
 
     sliders: Local List<SliderRecord> := slidersAll()
@@ -116,8 +117,7 @@ adminSlidersPage: Function := (request: Request) -> Response {
         mainSection
     ]
 
-    return sessionCommit(
-        session
+    return web.respond(
         adminLayout(
             session
             "Slayt Yönetimi"
@@ -306,47 +306,51 @@ adminSliderRow: Function := (
 }
 
 adminSliderStatusSubmit: Function := (request: Request) -> Response {
-    session: Local Session := sessionOpen(request)
+    web: Local RequestContext := Web.context(request, sessionStore())
+    session: Local Session := web.session
     context: Local PageContext := contextFor(session)
     guard: Local GuardResult := adminGuard(session, context)
     if guard.allowed == false {
-        return sessionCommit(session, guard.refusal)
+        return web.respond(guard.refusal)
     }
 
-    if csrfValid(session, request) == false {
-        return sessionCommit(session, Web.text("Geçersiz form belirteci.", 403))
+    form: Local Form := web.form()
+    if web.csrfValid() == false {
+        return web.respond(Web.text("Geçersiz form belirteci.", 403))
     }
 
-    id: Local Int := validationPositiveInt(request.form("slider_id"))
+    id: Local Int := validationPositiveInt(form.optional("slider_id"))
     slider: Local SliderRecord? := slidersFindById(id)
     if slider == null {
-        return sessionCommit(session, Web.text("Slayt bulunamadı.", 404))
+        return web.respond(Web.text("Slayt bulunamadı.", 404))
     }
 
     slidersSetActive(id, slider.isActive == false)
-    flashSet(session, "success", "Slayt durumu güncellendi.")
-    return sessionCommit(session, Web.redirect("/admin/sliders"))
+    portalFlash(web, "success", "Slayt durumu güncellendi.")
+    return web.respond(Web.redirect("/admin/sliders"))
 }
 
 adminSliderDeleteSubmit: Function := (request: Request) -> Response {
-    session: Local Session := sessionOpen(request)
+    web: Local RequestContext := Web.context(request, sessionStore())
+    session: Local Session := web.session
     context: Local PageContext := contextFor(session)
     guard: Local GuardResult := adminGuard(session, context)
     if guard.allowed == false {
-        return sessionCommit(session, guard.refusal)
+        return web.respond(guard.refusal)
     }
 
-    if csrfValid(session, request) == false {
-        return sessionCommit(session, Web.text("Geçersiz form belirteci.", 403))
+    form: Local Form := web.form()
+    if web.csrfValid() == false {
+        return web.respond(Web.text("Geçersiz form belirteci.", 403))
     }
 
-    id: Local Int := validationPositiveInt(request.form("slider_id"))
+    id: Local Int := validationPositiveInt(form.optional("slider_id"))
     slider: Local SliderRecord? := slidersFindById(id)
     if slider == null {
-        return sessionCommit(session, Web.text("Slayt bulunamadı.", 404))
+        return web.respond(Web.text("Slayt bulunamadı.", 404))
     }
 
     slidersDelete(id)
-    flashSet(session, "success", "Slayt başarıyla silindi.")
-    return sessionCommit(session, Web.redirect("/admin/sliders"))
+    portalFlash(web, "success", "Slayt başarıyla silindi.")
+    return web.respond(Web.redirect("/admin/sliders"))
 }

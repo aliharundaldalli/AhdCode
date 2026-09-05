@@ -8,19 +8,21 @@ It is a first-party AhdCode program that uses the released `HTTP`, `HTML`,
 ## Start
 
 ```bash
-cd tools/AhdDataStudio
-cp .env.example .env   # then edit placeholders
-ahdcode run app.ahd
+ahdcode databases
 ```
 
 Open:
 
-[http://127.0.0.1:8081/AhdDataStudio](http://127.0.0.1:8081/AhdDataStudio)
+[http://ahddatabasestudio.test:8081/AhdDataStudio](http://ahddatabasestudio.test:8081/AhdDataStudio)
 
-The server binds **127.0.0.1:8081** only. It is a local development tool
-and must not be exposed on `0.0.0.0` or the public internet.
+The process still binds **127.0.0.1:8081** only. The public name is
+`AhdDatabaseStudio.test`. Add this once if the name does not resolve:
 
-There is no `ahdcode studio` command in this version.
+```text
+127.0.0.1 ahddatabasestudio.test
+```
+
+It must not be exposed on `0.0.0.0` or the public internet.
 
 ## Stop
 

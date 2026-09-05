@@ -12,13 +12,23 @@ require("Services/CSRF.ahd")
 require("Repositories/Users.ahd")
 require("Support/Validation.ahd")
 bring Web
-from Web bring (Request, Response, HTMLNode, Session)
+from Web bring (
+    Request
+    Response
+    HTMLNode
+    Session
+    RequestContext
+    Form
+    OldInput
+    ValidationErrors
+)
 bring Security
 
 registerPage: Function := (request: Request) -> Response {
-    session: Local Session := sessionOpen(request)
+    web: Local RequestContext := Web.context(request, sessionStore())
+    session: Local Session := web.session
     context: Local PageContext := contextFor(session)
-    return sessionCommit(session, registerView(session, context, "", "", []))
+    return web.respond(registerView(session, context, "", "", []))
 }
 
 registerView: Function := (
@@ -121,42 +131,43 @@ registerView: Function := (
 }
 
 registerSubmit: Function := (request: Request) -> Response {
-    session: Local Session := sessionOpen(request)
+    web: Local RequestContext := Web.context(request, sessionStore())
+    session: Local Session := web.session
     context: Local PageContext := contextFor(session)
-    if csrfValid(session, request) == false {
-        return sessionCommit(session, Web.text("Geçersiz form belirteci.", 403))
+    form: Local Form := web.form()
+    if web.csrfValid() == false {
+        return web.respond(Web.text("Geçersiz form belirteci.", 403))
     }
 
-    name: Local String := validationField(request.form("name"))
-    email: Local String := validationEmail(request.form("email"))
-    password: Local String := validationField(request.form("password"))
-    confirmation: Local String := validationField(
-        request.form("password_confirmation")
+    name: Local String := form.value("name").trim()
+    email: Local String := form.value("email").trim().lower()
+    password: Local String := form.value("password")
+    confirmation: Local String := form.value("password_confirmation")
+    old: Local OldInput := form.old(["name", "email"])
+    errors: Local ValidationErrors := Web.errors()
+    errors.required("name", name, "Ad soyad gerekli.")
+    errors.email("email", email, "Geçerli bir e-posta adresi girin.")
+    errors.minLength(
+        "password"
+        password
+        validationMinimumPassword()
+        "Parola en az {str(validationMinimumPassword())} karakter olmalı."
     )
-
-    errors: Local List<String> := []
-    if name == "" {
-        errors.add("Ad soyad gerekli.")
-    }
-
-    if validationEmailShaped(email) == false {
-        errors.add("Geçerli bir e-posta adresi girin.")
-    }
-
-    if validationPasswordLongEnough(password) == false {
-        errors.add(
-            "Parola en az {str(validationMinimumPassword())} karakter olmalı."
-        )
-    }
-
-    if password != confirmation {
-        errors.add("Parolalar eşleşmiyor.")
-    }
-
-    if len(errors) > 0 {
-        return sessionCommit(
-            session
-            registerView(session, context, name, email, errors)
+    errors.matches(
+        "password_confirmation"
+        confirmation
+        password
+        "Parolalar eşleşmiyor."
+    )
+    if errors.any() {
+        return web.respond(
+            registerView(
+                session
+                context
+                old.value("name")
+                old.value("email")
+                errors.messages()
+            )
         )
     }
 
@@ -167,18 +178,18 @@ registerSubmit: Function := (request: Request) -> Response {
         "user"
     )
     if created == null {
-        return sessionCommit(
-            session
+        errors.add("email", "Bu e-posta adresi zaten kayıtlı.")
+        return web.respond(
             registerView(
                 session
                 context
-                name
-                email
-                ["Bu e-posta adresi zaten kayıtlı."]
+                old.value("name")
+                old.value("email")
+                errors.messages()
             )
         )
     }
 
-    flashSet(session, "success", "Kaydınız tamamlandı. Giriş yapabilirsiniz.")
-    return sessionCommit(session, Web.redirect("/login"))
+    portalFlash(web, "success", "Kaydınız tamamlandı. Giriş yapabilirsiniz.")
+    return web.respond(Web.redirect("/login"))
 }

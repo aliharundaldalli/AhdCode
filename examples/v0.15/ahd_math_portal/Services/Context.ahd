@@ -22,8 +22,9 @@ PageContext: Class<> := {
         flashKind: String
     )
 }
-// contextFor reads and clears the flash, so calling it twice in one request
-// would consume the message. Each handler calls it once, at the top.
+// contextFor reads and clears the flash through the v0.16 reserved
+// __web_flash: keys, so calling it twice in one request would consume the
+// message. Each handler calls it once, at the top.
 contextFor: Function := (session: Session) -> PageContext {
     user: Local UserRecord? := authCurrentUser(session)
     color: Local String := settingsGet("header_color", "#0d6efd")

@@ -13,26 +13,28 @@ require("Repositories/Users.ahd")
 require("Repositories/Solutions.ahd")
 require("Support/Validation.ahd")
 bring Web
-from Web bring (Request, Response, HTMLNode, Session)
+from Web bring (Request, Response, HTMLNode, Session, RequestContext)
 
 questionLegacyPage: Function := (request: Request) -> Response {
-    session: Local Session := sessionOpen(request)
+    web: Local RequestContext := Web.context(request, sessionStore())
+    session: Local Session := web.session
     id: Local Int := validationPositiveInt(request.query("id"))
     if id > 0 {
-        return sessionCommit(session, Web.redirect("/question/{str(id)}"))
+        return web.respond(Web.redirect("/question/{str(id)}"))
     }
 
-    return questionMissing(session, contextFor(session))
+    return web.respond(questionMissing(session, contextFor(session)))
 }
 
 questionPage: Function := (request: Request) -> Response {
-    session: Local Session := sessionOpen(request)
+    web: Local RequestContext := Web.context(request, sessionStore())
+    session: Local Session := web.session
     context: Local PageContext := contextFor(session)
     id: Local Int := questionIDFromRequest(request)
     question: Local QuestionRecord? := questionsFindPublished(id)
 
     if question == null {
-        return questionMissing(session, context)
+        return web.respond(questionMissing(session, context))
     }
 
     content: Local List<HTMLNode> := [Web.UI.article([
@@ -63,8 +65,7 @@ questionPage: Function := (request: Request) -> Response {
             question
         ), communitySolutionsSection(context, question), solutionModalNode()]
 
-    return sessionCommit(
-        session
+    return web.respond(
         mainLayout(
             session
             question.title
@@ -315,23 +316,20 @@ questionMissing: Function := (
     session: Session
     context: PageContext
 ) -> Response {
-    return sessionCommit(
+    return mainLayout(
         session
-        mainLayout(
-            session
-            "Soru bulunamadı"
-            context.siteName
-            context.headerColor
-            context.user
-            context.isAdmin
-            context.flash
-            context.flashKind
-            [
-                Web.UI.p(
-                    "Böyle bir yayımlanmış soru yok."
-                    {"class": "alert alert-warning"}
-                )
-            ]
-        )
+        "Soru bulunamadı"
+        context.siteName
+        context.headerColor
+        context.user
+        context.isAdmin
+        context.flash
+        context.flashKind
+        [
+            Web.UI.p(
+                "Böyle bir yayımlanmış soru yok."
+                {"class": "alert alert-warning"}
+            )
+        ]
     )
 }

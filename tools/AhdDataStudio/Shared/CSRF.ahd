@@ -4,6 +4,7 @@ from HTTP bring Session
 bring Security
 
 csrfToken: Function := (session: Session) -> String {
+    rememberLang(session)
     token: Local String? := session.get("csrf")
     if token == null {
         token = Security.token()

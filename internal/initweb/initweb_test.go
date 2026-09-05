@@ -259,6 +259,9 @@ func TestAdminSQLiteBootstrap(t *testing.T) {
 	if !strings.Contains(out.String(), "Starter: Admin") || !strings.Contains(out.String(), "ada@example.com") {
 		t.Fatalf("stdout=%s", out.String())
 	}
+	if !strings.Contains(out.String(), ahdDataStudioURL) || !strings.Contains(out.String(), ahdDataSQLitePathsKey) {
+		t.Fatalf("stdout missing AhdDataStudio pointer:\n%s", out.String())
+	}
 	if strings.Contains(out.String(), password) {
 		t.Fatal("success output echoed the password")
 	}
@@ -479,6 +482,106 @@ func TestNamesAndIdentifiers(t *testing.T) {
 	}
 	if err := validateAdminPassword("long-enough", "different"); err == nil || !strings.Contains(err.Error(), "do not match") {
 		t.Fatalf("mismatch = %v", err)
+	}
+	if err := validateMySQLHost("1234"); err == nil || !strings.Contains(err.Error(), "port") {
+		t.Fatalf("numeric host = %v", err)
+	}
+	if err := validateMySQLHost("127.0.0.1:1234"); err == nil || !strings.Contains(err.Error(), "host:port") {
+		t.Fatalf("host:port = %v", err)
+	}
+	if err := validateMySQLHost("127.0.0.1"); err != nil {
+		t.Fatal(err)
+	}
+	if got := defaultMySQLSecurity("127.0.0.1"); got != "none" {
+		t.Fatalf("loopback security = %q", got)
+	}
+	if got := defaultMySQLSecurity("db.example.com"); got != "tls" {
+		t.Fatalf("remote security = %q", got)
+	}
+}
+
+func TestRegisterSQLiteWithStudioEnv(t *testing.T) {
+	t.Setenv("AHDCODE_ROOT", "")
+	root := t.TempDir()
+	studio := filepath.Join(root, "tools", "AhdDataStudio")
+	if err := os.MkdirAll(studio, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	envPath := filepath.Join(studio, ".env")
+	if err := os.WriteFile(envPath, []byte("AHD_DATA_MYSQL_HOST=127.0.0.1\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(root)
+	dbPath := filepath.Join(root, "database", "app.db")
+	if !registerSQLiteWithStudio(dbPath) {
+		t.Fatal("expected Studio registration")
+	}
+	got, err := os.ReadFile(envPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(got)
+	if !strings.Contains(text, "AHD_DATA_MYSQL_HOST=127.0.0.1") {
+		t.Fatalf("unrelated Studio key rewritten:\n%s", text)
+	}
+	if !strings.Contains(text, ahdDataSQLitePathsKey+"="+dbPath) {
+		t.Fatalf("sqlite path missing:\n%s", text)
+	}
+	if !registerSQLiteWithStudio(dbPath) {
+		t.Fatal("second registration failed")
+	}
+	again, err := os.ReadFile(envPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Count(string(again), dbPath) != 1 {
+		t.Fatalf("path duplicated:\n%s", again)
+	}
+}
+
+func TestAhdDataStudioPublicURLUsesTestHost(t *testing.T) {
+	if !strings.Contains(AhdDataStudioPublicURL(), "ahddatabasestudio.test") {
+		t.Fatalf("public URL = %s", AhdDataStudioPublicURL())
+	}
+	if !strings.Contains(AhdDataStudioLoopbackURL(), "127.0.0.1") {
+		t.Fatalf("bind URL = %s", AhdDataStudioLoopbackURL())
+	}
+}
+
+func TestMySQLPortComesFromAhdDataStudio(t *testing.T) {
+	t.Setenv(ahdDataMySQLPortKey, "3307")
+	port, err := resolveStudioMySQLPort()
+	if err != nil || port != 3307 {
+		t.Fatalf("port=%d err=%v", port, err)
+	}
+}
+
+func TestMySQLHostComesFromAhdDataStudio(t *testing.T) {
+	t.Setenv(ahdDataMySQLHostKey, "127.0.0.1")
+	host, err := resolveStudioMySQLHost()
+	if err != nil || host != "127.0.0.1" {
+		t.Fatalf("host=%q err=%v", host, err)
+	}
+}
+
+func TestMySQLPortRequiredFromAhdDataStudio(t *testing.T) {
+	t.Setenv(ahdDataMySQLPortKey, "")
+	_ = os.Unsetenv(ahdDataMySQLPortKey)
+	_, err := resolveStudioMySQLPort()
+	if err == nil || !strings.Contains(err.Error(), ahdDataMySQLPortKey) {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestWizardRejectsNumericMySQLHost(t *testing.T) {
+	t.Setenv(ahdDataMySQLHostKey, "1234")
+	t.Setenv(ahdDataMySQLPortKey, "3306")
+	err := Web(t.TempDir(), ioDiscard{}, ioDiscard{}, Options{
+		Input: strings.NewReader("3\nDemo\n2\nmy_db\n"),
+		IsTTY: true,
+	})
+	if err == nil || !strings.Contains(err.Error(), "looks like a port") {
+		t.Fatalf("error = %v", err)
 	}
 }
 

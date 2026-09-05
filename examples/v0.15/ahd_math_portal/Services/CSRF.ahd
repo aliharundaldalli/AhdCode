@@ -1,16 +1,15 @@
 // Cross-site request forgery protection.
 //
-// v0.15 has no Forms or CSRF convenience framework, so this is ordinary
-// application code over the released Session and Security primitives. It is
-// deliberately small: one token per session, rendered as a hidden field,
-// compared in constant time.
+// v0.16 Web.UI.csrfField / RequestContext.csrfValid use the reserved
+// __web_csrf session key. These helpers keep the same key so the navbar
+// logout token and form fields stay compatible with context.csrfValid().
 require("Services/Session.ahd")
 bring Web
 from Web bring (Session, Request, Response, HTMLNode)
 bring Security
 
 csrfField: String := "_csrf"
-csrfSessionKey: String := "csrf_token"
+csrfSessionKey: String := "__web_csrf"
 // csrfToken returns this session's token, minting one on first use. The token
 // lives in the session, so it is unpredictable to a third-party site and
 // changes whenever the session does.

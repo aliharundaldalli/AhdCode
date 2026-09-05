@@ -1,0 +1,286 @@
+bring Env
+bring HTML
+from HTML bring HTMLNode
+bring HTTP
+from HTTP bring Request
+from HTTP bring Response
+from HTTP bring SessionStore
+from HTTP bring Session
+
+rememberLang: Function := (session: Session) -> Nothing {
+    studioLang: Global String
+    stored: Local String? := session.get("lang")
+    if stored != null {
+        if stored == "tr" or stored == "en" {
+            studioLang = stored
+            return
+        }
+    }
+    fromEnv: Local String := Env.getOr("AHD_DATA_LANG", "en")
+    if fromEnv == "tr" {
+        studioLang = "tr"
+        return
+    }
+    studioLang = "en"
+}
+
+setStudioLang: Function := (request: Request) -> Response {
+    sessions: Global SessionStore
+    session: Local Session := sessions.open(request)
+    rememberLang(session)
+    lang: Local String? := request.query("lang")
+    if lang != null {
+        if lang == "tr" or lang == "en" {
+            session.set("lang", lang)
+            studioLang: Global String
+            studioLang = lang
+        }
+    }
+    return sessions.commit(session, HTTP.redirect("/AhdDataStudio"))
+}
+
+t: Function := (key: String) -> String {
+    studioLang: Global String
+    if studioLang == "tr" {
+        return tTR(key)
+    }
+    return tEN(key)
+}
+
+tEN: Function := (key: String) -> String {
+    if key == "no_rows" { return "No rows to display" }
+    if key == "no_rows_detail" { return "There are no entries in this result." }
+    if key == "tables" { return "Tables" }
+    if key == "nav_dashboard" {
+        return "Dashboard"
+    }
+    if key == "nav_mysql" {
+        return "MySQL"
+    }
+    if key == "nav_sqlite" {
+        return "SQLite"
+    }
+    if key == "local_badge" {
+        return "Local · 127.0.0.1"
+    }
+    if key == "all_databases" {
+        return "All databases"
+    }
+    if key == "no_project_db" {
+        return "No project databases"
+    }
+    if key == "configure_paths" {
+        return "Configure a project root or explicit path."
+    }
+    if key == "error" {
+        return "Error"
+    }
+    if key == "browse" {
+        return "Browse"
+    }
+    if key == "structure" {
+        return "Structure"
+    }
+    if key == "indexes" {
+        return "Indexes"
+    }
+    if key == "open" {
+        return "Open"
+    }
+    if key == "home_eyebrow" {
+        return "Developer database workspace"
+    }
+    if key == "home_lead" {
+        return "Inspect and work with local MySQL and project-scoped SQLite databases from one AhdCode application."
+    }
+    if key == "not_configured" {
+        return "Not configured"
+    }
+    if key == "connected" {
+        return "Connected"
+    }
+    if key == "connection_failed" {
+        return "Connection failed"
+    }
+    if key == "visible_databases" {
+        return "visible databases"
+    }
+    if key == "db_files" {
+        return "database file(s)"
+    }
+    if key == "discovery_failed" {
+        return "Discovery failed"
+    }
+    if key == "sqlite_hint" {
+        return "Set AHD_DATA_SQLITE_PATHS or AHD_DATA_PROJECT_ROOT to add a project database."
+    }
+    if key == "project_only" {
+        return "Project databases only"
+    }
+    if key == "found" {
+        return "found"
+    }
+    if key == "open_mysql" {
+        return "Open MySQL"
+    }
+    if key == "open_sqlite" {
+        return "Open SQLite"
+    }
+    if key == "safety_title" {
+        return "Safety boundary"
+    }
+    if key == "safety_body" {
+        return "AhdDataStudio is bound to 127.0.0.1 and SQLite discovery remains limited to explicitly configured paths or immediate children of the configured project root."
+    }
+    if key == "sqlite_eyebrow" {
+        return "Project-scoped databases"
+    }
+    if key == "sqlite_lead" {
+        return "Only explicitly configured database paths and SQLite files that are immediate children of AHD_DATA_PROJECT_ROOT are listed."
+    }
+    if key == "sqlite_empty_title" {
+        return "No project databases found"
+    }
+    if key == "sqlite_empty_body" {
+        return "Set AHD_DATA_SQLITE_PATHS for explicit files, or AHD_DATA_PROJECT_ROOT to discover .db, .sqlite, and .sqlite3 files directly inside a project folder. AhdDataStudio never scans the whole machine."
+    }
+    return key
+}
+
+tTR: Function := (key: String) -> String {
+    if key == "no_rows" { return "Gösterilecek satır yok" }
+    if key == "no_rows_detail" { return "Bu sonuçta kayıt bulunmuyor." }
+    if key == "tables" { return "Tablolar" }
+    if key == "nav_dashboard" {
+        return "Pano"
+    }
+    if key == "nav_mysql" {
+        return "MySQL"
+    }
+    if key == "nav_sqlite" {
+        return "SQLite"
+    }
+    if key == "local_badge" {
+        return "Yerel · 127.0.0.1"
+    }
+    if key == "all_databases" {
+        return "Tüm veritabanları"
+    }
+    if key == "no_project_db" {
+        return "Proje veritabanı yok"
+    }
+    if key == "configure_paths" {
+        return "Bir proje kökü veya açık dosya yolu ayarlayın."
+    }
+    if key == "error" {
+        return "Hata"
+    }
+    if key == "browse" {
+        return "Göz at"
+    }
+    if key == "structure" {
+        return "Yapı"
+    }
+    if key == "indexes" {
+        return "Dizinler"
+    }
+    if key == "open" {
+        return "Aç"
+    }
+    if key == "home_eyebrow" {
+        return "Geliştirici veritabanı çalışma alanı"
+    }
+    if key == "home_lead" {
+        return "Yerel MySQL ve projeye bağlı SQLite veritabanlarını tek bir AhdCode uygulamasından inceleyin."
+    }
+    if key == "not_configured" {
+        return "Yapılandırılmadı"
+    }
+    if key == "connected" {
+        return "Bağlandı"
+    }
+    if key == "connection_failed" {
+        return "Bağlantı başarısız"
+    }
+    if key == "visible_databases" {
+        return "görünen veritabanı"
+    }
+    if key == "db_files" {
+        return "veritabanı dosyası"
+    }
+    if key == "discovery_failed" {
+        return "Keşif başarısız"
+    }
+    if key == "sqlite_hint" {
+        return "Proje veritabanı eklemek için AHD_DATA_SQLITE_PATHS veya AHD_DATA_PROJECT_ROOT ayarlayın."
+    }
+    if key == "project_only" {
+        return "Yalnızca proje veritabanları"
+    }
+    if key == "found" {
+        return "bulundu"
+    }
+    if key == "open_mysql" {
+        return "MySQL'i aç"
+    }
+    if key == "open_sqlite" {
+        return "SQLite'ı aç"
+    }
+    if key == "safety_title" {
+        return "Güvenlik sınırı"
+    }
+    if key == "safety_body" {
+        return "AhdDataStudio yalnızca 127.0.0.1'e bağlıdır. SQLite keşfi yalnızca açık yollar veya ayarlı proje kökünün doğrudan çocuklarıyla sınırlıdır."
+    }
+    if key == "sqlite_eyebrow" {
+        return "Projeye bağlı veritabanları"
+    }
+    if key == "sqlite_lead" {
+        return "Yalnızca açıkça ayarlanmış yollar ve AHD_DATA_PROJECT_ROOT içindeki doğrudan .db / .sqlite / .sqlite3 dosyaları listelenir."
+    }
+    if key == "sqlite_empty_title" {
+        return "Proje veritabanı bulunamadı"
+    }
+    if key == "sqlite_empty_body" {
+        return "Açık dosyalar için AHD_DATA_SQLITE_PATHS, klasör içi keşif için AHD_DATA_PROJECT_ROOT ayarlayın. AhdDataStudio tüm makineyi tarmaz."
+    }
+    return tEN(key)
+}
+
+langSwitch: Function := () -> HTMLNode {
+    studioLang: Global String
+    enClass: Local String := "btn btn-sm btn-outline-secondary"
+    trClass: Local String := "btn btn-sm btn-outline-secondary"
+    if studioLang == "en" {
+        enClass = "btn btn-sm btn-dark"
+    }
+    if studioLang == "tr" {
+        trClass = "btn btn-sm btn-dark"
+    }
+    return HTML.element(
+        "div"
+        {"class": "studio-lang btn-group"}
+        [
+            HTML.element(
+                "a"
+                {
+                    "class": enClass
+                    "href": "/AhdDataStudio/lang?lang=en"
+                    "title": "English"
+                    "aria-current": str(studioLang == "en")
+                }
+                [HTML.text("EN")]
+            )
+            HTML.element(
+                "a"
+                {
+                    "class": trClass
+                    "href": "/AhdDataStudio/lang?lang=tr"
+                    "title": "Türkçe"
+                    "aria-current": str(studioLang == "tr")
+                }
+                [HTML.text("TR")]
+            )
+        ]
+    )
+}

@@ -807,12 +807,18 @@ old input only. Failures do not say whether the email exists.
 Creates `database/<name>.db` and `database/schema.sql`, applies the schema,
 and inserts the administrator with `Security.passwordHash`. An existing
 `.db` file stops init. Generated `database/*.db` files are gitignored;
-`schema.sql` is not.
+`schema.sql` is not. Success output points at AhdDataStudio
+(`http://ahddatabasestudio.test:8081/AhdDataStudio`) and, when that `.env` is found,
+adds the new file to `AHD_DATA_SQLITE_PATHS`.
 
 #### MySQL
 
-Asks host, port, database name, username, and password (hidden). Uses the
-released MySQL contract (`tls` or `none`; default `tls`). After local
+Asks database name, username, and password (hidden). Host, port, and
+security are not prompted: they come from AhdDataStudio
+(`AHD_DATA_MYSQL_HOST`, `AHD_DATA_MYSQL_PORT`, `AHD_DATA_MYSQL_SECURITY`
+in that `.env` or the process environment). Host is the server address
+only (`127.0.0.1`), never `host:port`. Uses the released MySQL contract
+(`tls` or `none`). After local
 conflict checks:
 
 1. connect without selecting a database

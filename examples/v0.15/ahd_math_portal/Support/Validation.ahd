@@ -1,8 +1,8 @@
 // Validation helpers.
 //
-// v0.15 has no Forms/validation framework, and this application deliberately
-// does not grow one. These are a few small, explicit checks used by the
-// handlers; every rule that matters is still written out where it applies.
+// Form shape rules use Web.errors() in the handlers. These helpers remain
+// for path/query IDs, password policy, and normalizing values that are not
+// posted form fields.
 // validationField reads a form field as a trimmed String, treating a missing
 // field exactly like an empty one.
 validationField: Function := (value: String?) -> String {

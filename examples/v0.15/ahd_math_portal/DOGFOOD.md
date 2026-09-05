@@ -1,5 +1,9 @@
 # v0.16 dogfood findings
 
+The portal now uses the released v0.16 request context, form, validation,
+CSRF, and flash APIs. The table below is the original measurement that
+shaped that work; it is kept as history, not as a current gap list.
+
 Measured against the completed v0.15 reference application on 2026-09-05. Counts are literal call sites in application source, excluding comments, helpers' definitions, temporary probes, and framework sources unless stated. These are scoped usability findings, not a proposal to change v0.15 during this task.
 
 | Severity | Concrete evidence | Consequence and focused next step |
