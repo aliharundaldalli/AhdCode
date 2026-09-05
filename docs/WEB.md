@@ -180,9 +180,9 @@ from Web bring App
 academy: App := Web.app(application)
 
 academy.assets("/assets", "public")
-academy.get("/", homePage)
-academy.get("/hakkinda", aboutPage)
-academy.post("/selam", greetPage)
+academy.get("/", home)
+academy.get("/hakkinda", about)
+academy.post("/selam", greet)
 academy.start()
 ```
 
@@ -200,6 +200,9 @@ academy.start()
 A handler is an ordinary `Function(Request) -> Response`, type-checked exactly
 as `HTTP` checks it — passing the wrong shape is a compile error naming the
 expected signature.
+
+Its *name* is irrelevant to routing; see
+[10.1 Naming](#101-naming) for the recommended convention.
 
 ## 8. Responses
 
@@ -391,7 +394,7 @@ mainLayout: Function := (config: AppConfig, title: String, current: String, cont
 A **Page**:
 
 ```ahd
-homePage: Function := (request: Request) -> Response {
+home: Function := (request: Request) -> Response {
     content: Local List<HTMLNode> := [
         Web.UI.section([Web.UI.h1(configuration().name), Web.UI.p(tagline())])
     ]
@@ -401,6 +404,72 @@ homePage: Function := (request: Request) -> Response {
 
 `Web.UI` holds the primitive HTML components; your `Components/` directory
 holds application-specific ones. They are intentionally separate.
+
+### 10.1 Naming
+
+`Page`, `Layout` and `Component` are **application organization conventions,
+not special language constructs.** Nothing in the compiler, the router or the
+runtime looks at a name.
+
+**Handler names are ordinary AhdCode identifiers. `Page` is not a required
+suffix.** A route is given a `Function` **value**:
+
+```ahd
+portal.get("/admin/users/edit/*", adminUserEdit)
+```
+
+Whatever that function is called — `adminUserEdit`, `adminUserEditPage`,
+`admin_user_edit` — the router receives the same value and behaves
+identically. Applications written against earlier releases that use
+`registerPage` or `profilePage` stay source-compatible; nothing is deprecated.
+
+New examples in this documentation drop the redundant suffix, and name the
+action explicitly when one screen needs more than one handler:
+
+```
+register            // GET  /register
+registerSubmit      // POST /register
+
+adminQuestionEdit   // GET  the edit form
+adminQuestionSave   // POST the edit form
+```
+
+**Recommended file names use PascalCase**, so the word boundaries in the
+handler name are the word boundaries in the file name:
+
+```
+Pages/Admin/UserEdit.ahd        ->  adminUserEdit    (camelCase, preferred)
+                                ->  admin_user_edit  (snake_case, also valid)
+Pages/Admin/QuestionEdit.ahd    ->  adminQuestionEdit
+Pages/Admin/Users.ahd           ->  adminUsers
+```
+
+The style terms, used precisely:
+
+```
+adminUserEdit      camelCase
+AdminUserEdit      PascalCase
+admin_user_edit    snake_case
+```
+
+Mixed spellings such as `admin_UserEdit` combine two conventions without
+adding meaning; the examples avoid them. `adminUserEdit` is preferred simply
+because the existing AhdCode examples are predominantly camelCase — the
+identifier grammar accepts underscores, so `admin_user_edit` is ordinary valid
+code, and the choice belongs to the application.
+
+Identifiers are **case-sensitive**, and this is a naming convention rather than
+a lookup rule, so collapsed or case-folded spellings are not alternate
+spellings of the same name:
+
+```
+adminuseredit   adminUSEREDIT   adminUseredit   admin_UserEdit
+```
+
+None of those is `adminUserEdit`. There is no automatic route discovery, no
+filename reflection, no filename-to-function lookup, no case-insensitive or
+fuzzy handler matching, no `Page` annotation and no `page` keyword. The
+require chain is explicit and the route argument is a plain value.
 
 ## 11. Static assets
 
@@ -692,3 +761,206 @@ cd examples/v0.15/ahd_academi
 cp .env.example .env
 ahdcode dev app.ahd
 ```
+
+## 16. v0.16 candidate: request context, forms, validation, CSRF and flash
+
+The v0.16 candidate reduces the repeated session, validation, and form plumbing
+found in the Math Portal. It preserves ordinary `Function -> HTMLNode`
+composition and explicit data flow. All new conveniences are bundled AhdCode
+source; the native HTTP parser, SessionStore, and Security implementation stay
+unchanged. There is no new dependency or language syntax.
+
+### Run the complete example
+
+```bash
+cd examples/v0.16/forms_validation
+ahdcode run app.ahd
+```
+
+Open `http://127.0.0.1:8160/register`. Submit invalid input, then valid input;
+follow the redirect to `/profile` and refresh to see the message disappear.
+No database, account provisioning, `.env` file, or downloaded assets are needed.
+The example binds loopback and explicitly uses a non-Secure cookie for local
+HTTP. For HTTPS applications create the store with `secure: true` (or use the
+existing `AppConfig.isSecure()` policy). An optional shell `SERVER_PORT` changes
+the example port; `.env.example` is documentation, not automatically loaded.
+
+### One context, one explicit outgoing response
+
+Create one context per incoming request with `Web.context(request, store)`.
+The store is chosen by the application, normally once at startup. The context
+holds the original `request`, the opened `session`, the commit `store`, and a
+`finalized` flag. It is an ordinary reference value passed to Functions; there
+is no request singleton, service container, implicit authorization, or hook.
+
+Build a response and call `context.respond(response)` exactly once on the
+executed return path, including 200, 403, 404, 422, and redirect responses. It
+commits through the selected SessionStore, then marks the context finalized.
+A second call, including through an alias, raises `WebContextError` before
+committing again. If commit raises, finalization has not succeeded. There are
+no automatic retries. A handler must return the finalized response.
+
+Finish session mutations **before** responding. Use `context.session` with
+existing login, rotate, or destroy functions. The context's mutating CSRF/flash
+methods reject use after finalization. Its fields are ordinary AhdCode class
+attributes, not an access-control boundary: do not replace its session/store,
+reset its flag, or mix low-level commit with context finalization for the same
+response. Low-level `HTTP`, `Request.form`, `SessionStore.open/commit`, and every
+v0.15 `Web.UI` helper remain available without migration. Both exact routes and
+the v0.15.1 trailing one-segment `/*` routes accept the same handlers; exact
+routes still take precedence.
+
+### GET, POST, validate, redirect
+
+On GET, create a context, render `Web.UI.csrfField(context)` inside the form,
+and finalize the page. On POST, get `context.form()`, explicitly verify CSRF,
+validate, then either render errors and selected old input or perform the
+application mutation and redirect. This handler uses the view and store accessor
+from the [complete runnable example](../examples/v0.16/forms_validation/app.ahd):
+
+```ahd
+registerSubmit: Function := (request: Request) -> Response {
+    context: Local RequestContext := Web.context(request, exampleSessions())
+    form: Local Form := context.form()
+    if context.csrfValid() == false {
+        return context.respond(Web.text("Forbidden", 403))
+    }
+    errors: Local ValidationErrors := Web.errors()
+    errors.required("name", form.value("name"), "Name is required.")
+    errors.email("email", form.value("email"), "Enter an email address.")
+    errors.minLength("password", form.value("password"), 10, "Use at least 10 characters.")
+    errors.matches("password_confirmation", form.value("password_confirmation"), form.value("password"), "Passwords must match.")
+    if errors.any() {
+        return context.respond(registerView(context, form.old(["name", "email"]), errors, 422))
+    }
+    context.flashSet("notice", "Form accepted. No account was created.")
+    return context.respond(Web.redirect("/profile"))
+}
+```
+
+`Web.form(request)` also works without a session or context, for forms that do
+not need CSRF. It wraps the parser's existing snapshot; it never parses a second
+body or invents dynamic values. `value` returns the first submitted string,
+unchanged, with a fallback only when missing. `optional` distinguishes null
+from an empty string; `hasField` tests presence, including empty values.
+Normalize deliberately with `.trim()` or `.lower()` where appropriate. Do not
+trim passwords unless that is an explicit application policy. Query strings
+remain separate: use `Request.query` for a search form using the URL query.
+
+`integer` returns null for absence and raises `FormValueError` for empty,
+malformed, or overflowing input, following the existing `int(String)` grammar.
+`checkbox` returns false for absence, true for `on`/`true`/`1`, and false for
+`off`/`false`/`0`; other strings raise `FormValueError`. Values are case-sensitive.
+Use `hasField` first if missing and explicit false must differ. Errors never
+include submitted values. Multipart files still use `Request.file/files`.
+
+### Validation is explicit and ordered
+
+`Web.errors()` creates a fresh collection. Rule methods append errors when the
+supplied value fails. They neither read requests nor transform submitted values.
+`required` rejects empty or whitespace-only values. Length rules use AhdCode
+`len(String)` semantics and inclusive bounds; choose non-negative bounds.
+`matches` is ordinary value equality for confirmation fields, not secret-token
+verification. `email` checks a single `@`, nonempty local/domain parts, no space,
+tab, CR or LF, and at least two nonempty domain labels. It is a shape check, not
+RFC validation or proof of deliverability. `hexColor` accepts exactly `#RRGGBB`.
+`oneOf` uses exact string membership, including case.
+
+Errors remain in rule/add call order. `first` returns null if none;
+`forField` and `messages` return independent lists of strings. Multiple errors
+for one field are retained. `errors.add("email", "Already registered.")`
+keeps database uniqueness and other business policy in application code. Render
+messages through `Web.UI` text nodes, as the example's FormErrors component does.
+
+### Old input is a deliberate allowlist
+
+`form.old(["name", "email"])` creates a new `OldInput` value containing only
+those present fields. The field list is required; there is no automatic copy-all
+operation or session persistence. Passwords, confirmations, reset verifiers,
+CSRF tokens, and other secrets are excluded by leaving them off the allowlist.
+**The framework does not guess sensitive field names or override an explicit
+selection. The application must select only safe fields.** Use an empty list
+for an empty form. Pass `OldInput` to a view explicitly; it is not a request global.
+
+`old.value` returns an ordinary string. `Web.UI.input` escapes it in the value
+attribute: `<script>alert(1)</script>` remains data. Password controls should
+receive `""`, as in the example. Old input is not automatically available after
+a redirect; this first version demonstrates immediate validation re-rendering.
+
+### CSRF and flash state
+
+`csrfToken()` uses `Security.token()` once per session and keeps it under the
+reserved `__web_csrf` session key. It remains stable through expected requests
+and rotation that preserves session values. Clearing/destroying the session
+requires new tokens. `Web.UI.csrfField(context)` renders an escaped hidden
+`_csrf` input; it does not submit or validate anything. `csrfValid()` rejects
+missing/empty expected or submitted tokens and uses `Security.secureEqual`.
+Verification does not mint tokens. Never log token or password values.
+
+`flashSet(key, value)` stores a string under `__web_flash:{key}`. `flashTake(key)`
+returns a nullable string and removes it; a second take returns null. Choose your
+own keys and visual categories. The next rendering handler should take the
+message and finalize its response so the removal persists. Refresh then sees no
+message. There is no automatic rendering or request-age expiration: a message
+stays pending until explicitly consumed. Reserve `__web_csrf` and the
+`__web_flash:` prefix for Web, including when mixing older application helpers.
+
+The store retains its released in-memory, process-local lifetime and cookie
+policy. Context adds neither durable sessions nor cross-process synchronization.
+Application user/site context, guards, and DB/JSON conversion stay explicit.
+No middleware, auth framework, ORM, JSON redesign, routing redesign, or asset
+system is included in this candidate.
+
+### Exact candidate API
+
+```text
+Web.context(request: Request, store: SessionStore) -> RequestContext
+Web.form(request: Request) -> Form
+Web.errors() -> ValidationErrors
+Web.UI.csrfField(context: RequestContext) -> HTMLNode
+
+RequestContext.respond(response: Response) -> Response
+RequestContext.form() -> Form
+RequestContext.csrfToken() -> String
+RequestContext.csrfValid() -> Bool
+RequestContext.flashSet(key: String, value: String) -> Nothing
+RequestContext.flashTake(key: String) -> String?
+
+Form.optional(name: String) -> String?
+Form.value(name: String, fallback: String := "") -> String
+Form.hasField(name: String) -> Bool
+Form.integer(name: String) -> Int?
+Form.checkbox(name: String) -> Bool
+Form.old(safeFields: List<String>) -> OldInput
+OldInput.value(name: String, fallback: String := "") -> String
+
+ValidationErrors.add(field: String, message: String) -> Nothing
+ValidationErrors.any() -> Bool
+ValidationErrors.hasField(field: String) -> Bool
+ValidationErrors.first(field: String) -> String?
+ValidationErrors.forField(field: String) -> List<String>
+ValidationErrors.messages() -> List<String>
+ValidationErrors.required(field: String, value: String, message: String) -> Nothing
+ValidationErrors.minLength(field: String, value: String, minimum: Int, message: String) -> Nothing
+ValidationErrors.maxLength(field: String, value: String, maximum: Int, message: String) -> Nothing
+ValidationErrors.matches(field: String, value: String, expected: String, message: String) -> Nothing
+ValidationErrors.email(field: String, value: String, message: String) -> Nothing
+ValidationErrors.oneOf(field: String, value: String, allowed: List<String>, message: String) -> Nothing
+ValidationErrors.hexColor(field: String, value: String, message: String) -> Nothing
+```
+
+New concrete types and constructor attributes:
+
+| Type | Attributes |
+| --- | --- |
+| `RequestContext` | `request: Request`, `session: Session`, `store: SessionStore`, `finalized: Bool := false` |
+| `Form` | `request: Request` |
+| `FormField` | `name: String`, `value: String` |
+| `OldInput` | `fields: List<FormField>` |
+| `FieldError` | `field: String`, `message: String` |
+| `ValidationErrors` | `entries: List<FieldError>` |
+
+Use `Web.context`, `Web.form`, `Web.errors`, and `Form.old` as the normal
+constructors. `WebContextError` and `FormValueError` inherit `Error` and its
+attributes; existing error identities are unchanged. New APIs appear through
+the compiled ModuleInterface in completion, hover, and signature help.

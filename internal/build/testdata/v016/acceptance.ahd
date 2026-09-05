@@ -1,0 +1,370 @@
+bring Web
+bring HTTP
+bring Env
+from Web bring (
+    Request
+    Response
+    RequestContext
+    Form
+    FormValueError
+    WebContextError
+    Session
+    SessionStore
+    Server
+    ValidationErrors
+    OldInput
+    HTMLNode
+)
+// One native application for the v0.16 black-box checks. No database needed.
+ensure: Function := (passed: Bool, message: String) -> Nothing {
+    if passed == false {
+        toss Error(message: message)
+    }
+}
+
+validationChecks: Function := () -> Nothing {
+    errors: Local ValidationErrors := Web.errors()
+    errors.required("name", "  ", "required")
+    errors.minLength("name", "x", 2, "minimum")
+    errors.maxLength("name", "xxx", 2, "maximum")
+    errors.matches("confirmation", "a", "b", "mismatch")
+    errors.email("email", "bad@domain", "email")
+    errors.oneOf("role", "owner", ["user", "admin"], "allowed")
+    errors.hexColor("color", "#12345g", "color")
+    errors.add("custom", "manual")
+    ensure(errors.any(), "errors.any")
+    ensure(errors.hasField("name"), "errors.hasField")
+    ensure(errors.first("name") == "required", "first error ordering")
+    ensure(errors.first("absent") == null, "absent first")
+    ensure(len(errors.forField("name")) == 3, "multiple field errors")
+    ensure(len(errors.forField("absent")) == 0, "absent field errors")
+    messages: Local List<String> := errors.messages()
+    ensure(messages[7] == "manual", "insertion order")
+    messages.add("external")
+    ensure(len(errors.messages()) == 8, "messages are copied")
+    valid: Local ValidationErrors := Web.errors()
+    valid.required("name", "Ali", "required")
+    valid.minLength("name", "Ali", 3, "min")
+    valid.maxLength("name", "Ali", 3, "max")
+    valid.matches("password", "same", "same", "matches")
+    valid.email("email", "ali@example.com", "email")
+    valid.oneOf("role", "user", ["user", "admin"], "role")
+    valid.hexColor("color", "#aB01fF", "color")
+    ensure(valid.any() == false, "valid input or error isolation")
+    for bad in [
+        ""
+        "x"
+        "@a.com"
+        "a@.com"
+        "a@b."
+        "a@@b.com"
+        "a@b..com"
+        "a b@c.com"
+        "a\tb@c.com"
+    ] {
+        item: Local ValidationErrors := Web.errors()
+        item.email("email", bad, "bad")
+        ensure(item.any(), "email edge case")
+    }
+    for bad in ["red", "#123", "#1234567", "#12;456", "#12345 "] {
+        item: Local ValidationErrors := Web.errors()
+        item.hexColor("color", bad, "bad")
+        ensure(item.any(), "hex edge case")
+    }
+    write("validation checks passed")
+}
+
+sessions: SessionStore := Web.sessions("v016qa", 3600, false, "Lax")
+exampleSessions: Function := () -> SessionStore {
+    sessions: Global SessionStore
+    return sessions
+}
+
+ok: Function := (request: Request) -> Response {
+    return Web.text("ok")
+}
+
+readState: Function := (request: Request) -> Response {
+    context: Local RequestContext := Web.context(request, exampleSessions())
+    user: Local String? := context.session.get("user")
+    if user == null {
+        return context.respond(Web.text("anonymous"))
+    }
+    return context.respond(Web.text(user))
+}
+
+loginMutation: Function := (session: Session) -> Nothing {
+    session.rotate()
+    session.set("user", "Ali")
+}
+
+login: Function := (request: Request) -> Response {
+    context: Local RequestContext := Web.context(request, exampleSessions())
+    if context.csrfValid() == false {
+        return context.respond(Web.text("Forbidden", 403))
+    }
+    loginMutation(context.session)
+    context.flashSet("notice", "signed in")
+    return context.respond(Web.redirect("/profile"))
+}
+
+logout: Function := (request: Request) -> Response {
+    context: Local RequestContext := Web.context(request, exampleSessions())
+    if context.csrfValid() == false {
+        return context.respond(Web.text("Forbidden", 403))
+    }
+    context.session.destroy()
+    return context.respond(Web.redirect("/register"))
+}
+
+formChecks: Function := (request: Request) -> Response {
+    context: Local RequestContext := Web.context(request, exampleSessions())
+    form: Local Form := Web.form(request)
+    ensure(form.optional("absent") == null, "missing optional")
+    ensure(form.value("absent") == "", "missing value")
+    ensure(form.value("absent", "fallback") == "fallback", "fallback")
+    ensure(form.hasField("absent") == false, "missing presence")
+    ensure(form.hasField("empty"), "empty presence")
+    ensure(form.optional("empty") == "", "empty optional")
+    ensure(
+        form.value("email") == request.form("email")
+        "Request.form compatibility"
+    )
+    ensure(form.integer("absent") == null, "missing integer")
+    ensure(form.integer("number") == 42, "integer")
+    ensure(form.checkbox("absent") == false, "missing checkbox")
+    ensure(form.checkbox("checked"), "checkbox")
+    ensure(form.checkbox("unchecked") == false, "unchecked")
+    for name in ["empty", "badnumber", "overflow"] {
+        caught: Local Bool := false
+        attempt {
+            form.integer(name)
+        }
+        except FormValueError {
+            caught = true
+        }
+        ensure(caught, "invalid typed value must differ from missing")
+    }
+    caught: Local Bool := false
+    attempt {
+        form.checkbox("badnumber")
+    }
+    except FormValueError {
+        caught = true
+    }
+    ensure(caught, "invalid checkbox")
+    old: Local OldInput := form.old(["email"])
+    ensure(old.value("password") == "", "password excluded")
+    ensure(old.value("password_confirmation") == "", "confirmation excluded")
+    ensure(old.value("reset_token") == "", "reset token excluded")
+    ensure(old.value("_csrf") == "", "csrf excluded")
+    ensure(old.value("absent", "fallback") == "fallback", "old fallback")
+    return context.respond(
+        Web.html(Web.UI.input("text", "email", old.value("email")))
+    )
+}
+
+doubleFinalize: Function := (request: Request) -> Response {
+    context: Local RequestContext := Web.context(request, exampleSessions())
+    alias: Local RequestContext := context
+    context.session.set("once", "yes")
+    response: Local Response := context.respond(Web.text("once"))
+    caught: Local Bool := false
+    attempt {
+        alias.respond(response)
+    }
+    except WebContextError {
+        caught = true
+    }
+    ensure(caught, "double finalization through alias")
+    caught = false
+    attempt {
+        context.flashSet("late", "must not persist")
+    }
+    except WebContextError {
+        caught = true
+    }
+    ensure(caught, "late mutation")
+    return response
+}
+
+flashTwice: Function := (request: Request) -> Response {
+    context: Local RequestContext := Web.context(request, exampleSessions())
+    context.flashSet("probe", "once")
+    ensure(context.flashTake("probe") == "once", "flash first take")
+    ensure(context.flashTake("probe") == null, "flash second take")
+    return context.respond(Web.text("taken"))
+}
+
+lowLevel: Function := (request: Request) -> Response {
+    session: Local Session := exampleSessions().open(request)
+    session.set("legacy", "yes")
+    return exampleSessions().commit(session, HTTP.text("legacy"))
+}
+
+legacyRead: Function := (request: Request) -> Response {
+    context: Local RequestContext := Web.context(request, exampleSessions())
+    ensure(
+        context.session.get("legacy") == "yes"
+        "low-level session compatibility"
+    )
+    return context.respond(Web.text("legacy yes"))
+}
+
+early: Function := (request: Request) -> Response {
+    context: Local RequestContext := Web.context(request, exampleSessions())
+    return context.respond(Web.text("missing", 404))
+}
+
+validationChecks()
+server: Server := HTTP.server(
+    "127.0.0.1"
+    int(Env.getOr("SERVER_PORT", "8161"))
+)
+server.get("/ok", ok)
+server.get("/register", register)
+server.post("/register", registerSubmit)
+server.post("/protected/*", login)
+server.post("/protected/exact", ok)
+server.post("/logout", logout)
+server.get("/profile", profile)
+server.get("/state", readState)
+server.post("/form-checks", formChecks)
+server.get("/double", doubleFinalize)
+server.get("/flash-twice", flashTwice)
+server.get("/legacy", lowLevel)
+server.get("/legacy-read", legacyRead)
+server.get("/early", early)
+server.start()
+
+formErrors: Function := (errors: ValidationErrors) -> HTMLNode {
+    items: Local List<HTMLNode> := []
+    for message in errors.messages() {
+        items.add(Web.UI.li(message))
+    }
+    return Web.UI.ul(items, {"role": "alert"})
+}
+
+mainLayout: Function := (
+    title: String
+    content: List<HTMLNode>
+    status: Int := 200
+) -> Response {
+    return Web.page(title, [Web.UI.main(content)], [], status)
+}
+
+registerView: Function := (
+    context: RequestContext
+    old: OldInput
+    errors: ValidationErrors
+    status: Int := 200
+) -> Response {
+    return mainLayout(
+        "Register"
+        [
+            Web.UI.h1("Forms, validation and flash")
+            Web.UI.p(
+                "This example validates a form; it does not create an account."
+            )
+            formErrors(errors)
+            Web.UI.formTo(
+                "/register"
+                "post"
+                [
+                    Web.UI.csrfField(context)
+                    Web.UI.labelFor("name", "Name")
+                    Web.UI.input(
+                        "text"
+                        "name"
+                        old.value("name")
+                        {"id": "name"}
+                    )
+                    Web.UI.labelFor("email", "Email")
+                    Web.UI.input(
+                        "email"
+                        "email"
+                        old.value("email")
+                        {"id": "email"}
+                    )
+                    Web.UI.labelFor(
+                        "password"
+                        "Password (at least 10 characters)"
+                    )
+                    Web.UI.input("password", "password", "", {"id": "password"})
+                    Web.UI.labelFor("confirmation", "Confirm password")
+                    Web.UI.input(
+                        "password"
+                        "password_confirmation"
+                        ""
+                        {"id": "confirmation"}
+                    )
+                    Web.UI.button("Submit", {"type": "submit"})
+                ]
+            )
+        ]
+        status
+    )
+}
+
+register: Function := (request: Request) -> Response {
+    context: Local RequestContext := Web.context(request, exampleSessions())
+    return context.respond(
+        registerView(context, context.form().old([]), Web.errors())
+    )
+}
+
+registerSubmit: Function := (request: Request) -> Response {
+    context: Local RequestContext := Web.context(request, exampleSessions())
+    form: Local Form := context.form()
+    if context.csrfValid() == false {
+        return context.respond(Web.text("Forbidden", 403))
+    }
+    errors: Local ValidationErrors := Web.errors()
+    errors.required("name", form.value("name"), "Name is required.")
+    errors.maxLength(
+        "name"
+        form.value("name")
+        80
+        "Name must be at most 80 characters."
+    )
+    errors.email("email", form.value("email"), "Enter an email address.")
+    errors.minLength(
+        "password"
+        form.value("password")
+        10
+        "Password must have at least 10 characters."
+    )
+    errors.matches(
+        "password_confirmation"
+        form.value("password_confirmation")
+        form.value("password")
+        "Passwords must match."
+    )
+    if errors.any() {
+        // This is the entire old-input policy. No password or token is copied.
+        return context.respond(
+            registerView(context, form.old(["name", "email"]), errors, 422)
+        )
+    }
+    context.flashSet("notice", "Form accepted. No account was created.")
+    return context.respond(Web.redirect("/profile"))
+}
+
+profile: Function := (request: Request) -> Response {
+    context: Local RequestContext := Web.context(request, exampleSessions())
+    notice: Local String? := context.flashTake("notice")
+    message: Local String := "No pending message."
+    if notice != null {
+        message = notice
+    }
+    return context.respond(
+        mainLayout(
+            "Profile"
+            [
+                Web.UI.h1("Profile")
+                Web.UI.p(message, {"role": "status"})
+                Web.UI.a("/register", "Return to the form")
+            ]
+        )
+    )
+}

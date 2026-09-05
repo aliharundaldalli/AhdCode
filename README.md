@@ -16,6 +16,16 @@ The current release is **v0.15.1**. The core
 language works end to end, but the project is not production-ready and
 breaking changes may occur before 1.0.
 
+
+**v0.16.0 candidate — Request Context, Forms, Validation, CSRF & Flash.**
+The candidate adds an explicit request/session context, one-time response
+finalization, typed form access, ordered validation errors, selected safe old
+input, session-bound CSRF, and consumed flash messages. The implementation is
+bundled AhdCode; existing HTTP/Session/Web.UI APIs and v0.15.1 clean routes remain
+compatible. This is candidate work pending independent QA, not a new release.
+See the [workflow and exact API](docs/WEB.md#16-v016-candidate-request-context-forms-validation-csrf-and-flash)
+and the [runnable example](examples/v0.16/forms_validation/README.md).
+
 v0.15.0, **Web Foundations**, adds [`Web`](docs/WEB.md): a first-party web
 framework written mostly in AhdCode itself and bundled with the compiler, so
 `bring Web` resolves offline with no package manager, registry, manifest, or

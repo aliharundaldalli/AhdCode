@@ -23,7 +23,7 @@ import (
 	"ahdcode/internal/source"
 )
 
-const usage = `AhdCode v0.15.1 toolchain
+const usage = `AhdCode v0.16.0 toolchain
 
 usage:
   ahdcode                                  start the interactive REPL
@@ -45,7 +45,7 @@ stop vs kill:
         escalates from the default graceful signal to an immediate one.
 `
 
-const version = "AhdCode v0.15.1"
+const version = "AhdCode v0.16.0"
 
 func main() {
 	os.Exit(run(os.Args[1:]))

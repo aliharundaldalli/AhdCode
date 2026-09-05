@@ -1,0 +1,22 @@
+require("Layouts/Main.ahd")
+bring Web
+from Web bring (Request, Response, RequestContext)
+
+profile: Function := (request: Request) -> Response {
+    context: Local RequestContext := Web.context(request, exampleSessions())
+    notice: Local String? := context.flashTake("notice")
+    message: Local String := "No pending message."
+    if notice != null {
+        message = notice
+    }
+    return context.respond(
+        mainLayout(
+            "Profile"
+            [
+                Web.UI.h1("Profile")
+                Web.UI.p(message, {"role": "status"})
+                Web.UI.a("/register", "Return to the form")
+            ]
+        )
+    )
+}

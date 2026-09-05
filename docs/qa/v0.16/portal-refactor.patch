@@ -1,0 +1,802 @@
+diff --git a/Pages/Admin/QuestionEdit.ahd b/Pages/Admin/QuestionEdit.ahd
+index 681a3d7..209ae3e 100644
+--- a/Pages/Admin/QuestionEdit.ahd
++++ b/Pages/Admin/QuestionEdit.ahd
+@@ -16,28 +16,34 @@ require("Repositories/Users.ahd")
+ require("Support/Validation.ahd")
+ require("Config/Gemini.ahd")
+ bring Web
+-from Web bring (Request, Response, HTMLNode, Session)
++from Web bring (
++    RequestContext
++    Form
++    OldInput
++    ValidationErrors
++    Request
++    Response
++    HTMLNode
++    Session
++)
+ 
+ adminQuestionNewPage: Function := (request: Request) -> Response {
+-    session: Local Session := sessionOpen(request)
+-    context: Local PageContext := contextFor(session)
+-    guard: Local GuardResult := adminGuard(session, context)
++    web: Local RequestContext := Web.context(request, sessionStore())
++    context: Local PageContext := contextFor(web.session)
++    guard: Local GuardResult := adminGuard(web.session, context)
+     if guard.allowed == false {
+-        return sessionCommit(session, guard.refusal)
++        return web.respond(guard.refusal)
+     }
+ 
+-    return sessionCommit(
+-        session
+-        adminQuestionForm(session, context, 0, "", "", "", [], "")
+-    )
++    return web.respond(adminQuestionForm(web, context, 0, "", "", "", [], ""))
+ }
+ 
+ adminQuestionEditPage: Function := (request: Request) -> Response {
+-    session: Local Session := sessionOpen(request)
+-    context: Local PageContext := contextFor(session)
+-    guard: Local GuardResult := adminGuard(session, context)
++    web: Local RequestContext := Web.context(request, sessionStore())
++    context: Local PageContext := contextFor(web.session)
++    guard: Local GuardResult := adminGuard(web.session, context)
+     if guard.allowed == false {
+-        return sessionCommit(session, guard.refusal)
++        return web.respond(guard.refusal)
+     }
+ 
+     id: Local Int := validationPathID(
+@@ -47,13 +53,12 @@ adminQuestionEditPage: Function := (request: Request) -> Response {
+     )
+     question: Local QuestionRecord? := questionsFindAny(id)
+     if question == null {
+-        return sessionCommit(session, Web.text("Soru bulunamadı.", 404))
++        return web.respond(Web.text("Soru bulunamadı.", 404))
+     }
+ 
+-    return sessionCommit(
+-        session
++    return web.respond(
+         adminQuestionForm(
+-            session
++            web
+             context
+             question.id
+             question.title
+@@ -66,7 +71,7 @@ adminQuestionEditPage: Function := (request: Request) -> Response {
+ }
+ 
+ adminQuestionForm: Function := (
+-    session: Session
++    web: RequestContext
+     context: PageContext
+     id: Int
+     title: String
+@@ -75,6 +80,7 @@ adminQuestionForm: Function := (
+     errors: List<String>
+     notice: String
+ ) -> Response {
++    session: Local Session := web.session
+     content: Local List<HTMLNode> := []
+     if len(errors) > 0 {
+         content.add(errorList(errors))
+@@ -91,7 +97,7 @@ adminQuestionForm: Function := (
+                     "/admin/questions/save"
+                     "post"
+                     [
+-                        csrfInput(session)
++                        Web.UI.csrfField(web)
+                         Web.UI.input("hidden", "question_id", str(id))
+                         formField(
+                             "question-title"
+@@ -129,7 +135,7 @@ adminQuestionForm: Function := (
+             {"class": "admin-card"}
+         )
+     )
+-    content.add(adminGeminiPanel(session, id, title, topic, body))
++    content.add(adminGeminiPanel(web, id, title, topic, body))
+     content.add(
+         Web.UI.pNodes(
+             [
+@@ -166,12 +172,13 @@ adminQuestionForm: Function := (
+ // adminGeminiPanel is the AI drafting form. When Gemini is not configured the
+ // panel says so plainly instead of offering a button that cannot work.
+ adminGeminiPanel: Function := (
+-    session: Session
++    web: RequestContext
+     id: Int
+     title: String
+     topic: String
+     body: String
+ ) -> HTMLNode {
++    session: Local Session := web.session
+     if geminiConfigured() == false {
+         return Web.UI.div(
+             [
+@@ -218,7 +225,7 @@ adminGeminiPanel: Function := (
+                 "/admin/questions/generate"
+                 "post"
+                 [
+-                    csrfInput(session)
++                    Web.UI.csrfField(web)
+                     Web.UI.input("hidden", "question_id", str(id))
+                     Web.UI.input("hidden", "title", title)
+                     Web.UI.input("hidden", "body", body)
+@@ -271,23 +278,24 @@ adminGeminiPanel: Function := (
+ }
+ 
+ adminQuestionGenerateSubmit: Function := (request: Request) -> Response {
+-    session: Local Session := sessionOpen(request)
+-    context: Local PageContext := contextFor(session)
+-    guard: Local GuardResult := adminGuard(session, context)
++    web: Local RequestContext := Web.context(request, sessionStore())
++    form: Local Form := web.form()
++    context: Local PageContext := contextFor(web.session)
++    guard: Local GuardResult := adminGuard(web.session, context)
+     if guard.allowed == false {
+-        return sessionCommit(session, guard.refusal)
++        return web.respond(guard.refusal)
+     }
+ 
+-    if csrfValid(session, request) == false {
+-        return sessionCommit(session, Web.text("Geçersiz form belirteci.", 403))
++    if web.csrfValid() == false {
++        return web.respond(Web.text("Geçersiz form belirteci.", 403))
+     }
+ 
+-    id: Local Int := validationPositiveInt(request.form("question_id"))
+-    topic: Local String := validationField(request.form("topic"))
+-    difficulty: Local String := validationField(request.form("difficulty"))
+-    instruction: Local String := validationField(request.form("instruction"))
+-    existingTitle: Local String := validationField(request.form("title"))
+-    existingBody: Local String := validationField(request.form("body"))
++    id: Local Int := validationPositiveInt(form.optional("question_id"))
++    topic: Local String := form.value("topic").trim()
++    difficulty: Local String := form.value("difficulty").trim()
++    instruction: Local String := form.value("instruction").trim()
++    existingTitle: Local String := form.value("title").trim()
++    existingBody: Local String := form.value("body").trim()
+ 
+     generated: Local GeneratedQuestion := geminiGenerate(
+         topic
+@@ -295,10 +303,9 @@ adminQuestionGenerateSubmit: Function := (request: Request) -> Response {
+         instruction
+     )
+     if generated.ok == false {
+-        return sessionCommit(
+-            session
++        return web.respond(
+             adminQuestionForm(
+-                session
++                web
+                 context
+                 id
+                 existingTitle
+@@ -316,10 +323,9 @@ adminQuestionGenerateSubmit: Function := (request: Request) -> Response {
+         newTitle = existingTitle
+     }
+ 
+-    return sessionCommit(
+-        session
++    return web.respond(
+         adminQuestionForm(
+-            session
++            web
+             context
+             id
+             newTitle
+@@ -332,46 +338,38 @@ adminQuestionGenerateSubmit: Function := (request: Request) -> Response {
+ }
+ 
+ adminQuestionSaveSubmit: Function := (request: Request) -> Response {
+-    session: Local Session := sessionOpen(request)
+-    context: Local PageContext := contextFor(session)
+-    guard: Local GuardResult := adminGuard(session, context)
++    web: Local RequestContext := Web.context(request, sessionStore())
++    form: Local Form := web.form()
++    context: Local PageContext := contextFor(web.session)
++    guard: Local GuardResult := adminGuard(web.session, context)
+     if guard.allowed == false {
+-        return sessionCommit(session, guard.refusal)
+-    }
+-
+-    if csrfValid(session, request) == false {
+-        return sessionCommit(session, Web.text("Geçersiz form belirteci.", 403))
++        return web.respond(guard.refusal)
+     }
+ 
+-    id: Local Int := validationPositiveInt(request.form("question_id"))
+-    title: Local String := validationField(request.form("title"))
+-    topic: Local String := validationField(request.form("topic"))
+-    body: Local String := validationField(request.form("body"))
+-
+-    errors: Local List<String> := []
+-    if title == "" {
+-        errors.add("Başlık gerekli.")
+-    }
+-
+-    if topic == "" {
+-        errors.add("Konu gerekli.")
++    if web.csrfValid() == false {
++        return web.respond(Web.text("Geçersiz form belirteci.", 403))
+     }
+ 
+-    if body == "" {
+-        errors.add("Soru metni gerekli.")
+-    }
++    id: Local Int := validationPositiveInt(form.optional("question_id"))
++    title: Local String := form.value("title").trim()
++    topic: Local String := form.value("topic").trim()
++    body: Local String := form.value("body").trim()
+ 
+-    if len(errors) > 0 {
+-        return sessionCommit(
+-            session
++    old: Local OldInput := form.old(["title", "topic", "body"])
++    errors: Local ValidationErrors := Web.errors()
++    errors.required("title", title, "Başlık gerekli.")
++    errors.required("topic", topic, "Konu gerekli.")
++    errors.required("body", body, "Soru metni gerekli.")
++    if errors.any() {
++        return web.respond(
+             adminQuestionForm(
+-                session
++                web
+                 context
+                 id
+-                title
+-                topic
+-                body
+-                errors
++                old.value("title")
++                old.value("topic")
++                old.value("body")
++                errors.messages()
+                 ""
+             )
+         )
+@@ -385,12 +383,14 @@ adminQuestionSaveSubmit: Function := (request: Request) -> Response {
+ 
+     if id == 0 {
+         questionsCreate(title, topic, body, authorId)
+-        flashSet(session, "success", "Soru taslak olarak kaydedildi.")
++        web.flashSet("kind", "success")
++        web.flashSet("message", "Soru taslak olarak kaydedildi.")
+     }
+     else {
+         questionsUpdate(id, title, topic, body)
+-        flashSet(session, "success", "Soru güncellendi.")
++        web.flashSet("kind", "success")
++        web.flashSet("message", "Soru güncellendi.")
+     }
+ 
+-    return sessionCommit(session, Web.redirect("/admin/questions"))
++    return web.respond(Web.redirect("/admin/questions"))
+ }
+diff --git a/Pages/Admin/Settings.ahd b/Pages/Admin/Settings.ahd
+index c7b5cb8..815f096 100644
+--- a/Pages/Admin/Settings.ahd
++++ b/Pages/Admin/Settings.ahd
+@@ -13,20 +13,28 @@ require("Services/CSRF.ahd")
+ require("Repositories/SiteSettings.ahd")
+ require("Support/Validation.ahd")
+ bring Web
+-from Web bring (Request, Response, HTMLNode, Session)
++from Web bring (
++    RequestContext
++    Form
++    OldInput
++    ValidationErrors
++    Request
++    Response
++    HTMLNode
++    Session
++)
+ 
+ adminSettingsPage: Function := (request: Request) -> Response {
+-    session: Local Session := sessionOpen(request)
+-    context: Local PageContext := contextFor(session)
+-    guard: Local GuardResult := adminGuard(session, context)
++    web: Local RequestContext := Web.context(request, sessionStore())
++    context: Local PageContext := contextFor(web.session)
++    guard: Local GuardResult := adminGuard(web.session, context)
+     if guard.allowed == false {
+-        return sessionCommit(session, guard.refusal)
++        return web.respond(guard.refusal)
+     }
+ 
+-    return sessionCommit(
+-        session
++    return web.respond(
+         adminSettingsView(
+-            session
++            web
+             context
+             settingsGet("site_name", "Ahd Akademi Matematik")
+             settingsGet("header_color", "#0d6efd")
+@@ -125,12 +133,13 @@ colorPaletteField: Function := (
+ }
+ 
+ adminSettingsView: Function := (
+-    session: Session
++    web: RequestContext
+     context: PageContext
+     siteName: String
+     headerColor: String
+     errors: List<String>
+ ) -> Response {
++    session: Local Session := web.session
+     content: Local List<HTMLNode> := []
+     if len(errors) > 0 {
+         content.add(errorList(errors))
+@@ -143,7 +152,7 @@ adminSettingsView: Function := (
+                     "/admin/settings"
+                     "post"
+                     [
+-                        csrfInput(session)
++                        Web.UI.csrfField(web)
+                         formField(
+                             "settings-name"
+                             "site_name"
+@@ -188,42 +197,50 @@ adminSettingsView: Function := (
+ }
+ 
+ adminSettingsSubmit: Function := (request: Request) -> Response {
+-    session: Local Session := sessionOpen(request)
+-    context: Local PageContext := contextFor(session)
+-    guard: Local GuardResult := adminGuard(session, context)
++    web: Local RequestContext := Web.context(request, sessionStore())
++    form: Local Form := web.form()
++    context: Local PageContext := contextFor(web.session)
++    guard: Local GuardResult := adminGuard(web.session, context)
+     if guard.allowed == false {
+-        return sessionCommit(session, guard.refusal)
+-    }
+-
+-    if csrfValid(session, request) == false {
+-        return sessionCommit(session, Web.text("Geçersiz form belirteci.", 403))
++        return web.respond(guard.refusal)
+     }
+ 
+-    siteName: Local String := validationField(request.form("site_name"))
+-    headerColor: Local String := validationField(request.form("header_color"))
+-
+-    errors: Local List<String> := []
+-    if siteName == "" {
+-        errors.add("Site adı boş olamaz.")
++    if web.csrfValid() == false {
++        return web.respond(Web.text("Geçersiz form belirteci.", 403))
+     }
+ 
+-    if len(siteName) > 80 {
+-        errors.add("Site adı en fazla 80 karakter olabilir.")
+-    }
++    siteName: Local String := form.value("site_name").trim()
++    headerColor: Local String := form.value("header_color").trim()
+ 
+-    if validationHexColor(headerColor) == false {
+-        errors.add("Başlık rengi #RRGGBB biçiminde olmalı (örnek: #0d6efd).")
+-    }
+-
+-    if len(errors) > 0 {
+-        return sessionCommit(
+-            session
+-            adminSettingsView(session, context, siteName, headerColor, errors)
++    old: Local OldInput := form.old(["site_name", "header_color"])
++    errors: Local ValidationErrors := Web.errors()
++    errors.required("site_name", siteName, "Site adı boş olamaz.")
++    errors.maxLength(
++        "site_name"
++        siteName
++        80
++        "Site adı en fazla 80 karakter olabilir."
++    )
++    errors.hexColor(
++        "header_color"
++        headerColor
++        "Başlık rengi #RRGGBB biçiminde olmalı (örnek: #0d6efd)."
++    )
++    if errors.any() {
++        return web.respond(
++            adminSettingsView(
++                web
++                context
++                old.value("site_name")
++                old.value("header_color")
++                errors.messages()
++            )
+         )
+     }
+ 
+     settingsSet("site_name", siteName)
+     settingsSet("header_color", headerColor)
+-    flashSet(session, "success", "Ayarlar kaydedildi.")
+-    return sessionCommit(session, Web.redirect("/admin/settings"))
++    web.flashSet("kind", "success")
++    web.flashSet("message", "Ayarlar kaydedildi.")
++    return web.respond(Web.redirect("/admin/settings"))
+ }
+diff --git a/Pages/Login.ahd b/Pages/Login.ahd
+index 312a951..5fc6bf8 100644
+--- a/Pages/Login.ahd
++++ b/Pages/Login.ahd
+@@ -11,20 +11,30 @@ require("Services/Auth.ahd")
+ require("Services/CSRF.ahd")
+ require("Support/Validation.ahd")
+ bring Web
+-from Web bring (Request, Response, HTMLNode, Session)
++from Web bring (
++    RequestContext
++    Form
++    OldInput
++    ValidationErrors
++    Request
++    Response
++    HTMLNode
++    Session
++)
+ 
+ loginPage: Function := (request: Request) -> Response {
+-    session: Local Session := sessionOpen(request)
+-    context: Local PageContext := contextFor(session)
+-    return sessionCommit(session, loginView(session, context, "", ""))
++    web: Local RequestContext := Web.context(request, sessionStore())
++    context: Local PageContext := contextFor(web.session)
++    return web.respond(loginView(web, context, "", ""))
+ }
+ 
+ loginView: Function := (
+-    session: Session
++    web: RequestContext
+     context: PageContext
+     email: String
+     error: String
+ ) -> Response {
++    session: Local Session := web.session
+     fields: Local List<HTMLNode> := []
+     if error != "" {
+         fields.add(alertBox("error", error))
+@@ -35,7 +45,7 @@ loginView: Function := (
+             "/login"
+             "post"
+             [
+-                csrfInput(session)
++                Web.UI.csrfField(web)
+                 formFieldWithIcon(
+                     "login-email"
+                     "email"
+@@ -121,33 +131,34 @@ loginView: Function := (
+ }
+ 
+ loginSubmit: Function := (request: Request) -> Response {
+-    session: Local Session := sessionOpen(request)
+-    context: Local PageContext := contextFor(session)
+-    if csrfValid(session, request) == false {
+-        return sessionCommit(session, Web.text("Geçersiz form belirteci.", 403))
++    web: Local RequestContext := Web.context(request, sessionStore())
++    form: Local Form := web.form()
++    context: Local PageContext := contextFor(web.session)
++    if web.csrfValid() == false {
++        return web.respond(Web.text("Geçersiz form belirteci.", 403))
+     }
+ 
+-    email: Local String := validationEmail(request.form("email"))
+-    password: Local String := validationField(request.form("password"))
++    email: Local String := form.value("email").trim().lower()
++    password: Local String := form.value("password").trim()
+     user: Local UserRecord? := authAttempt(email, password)
+     if user == null {
+-        return sessionCommit(
+-            session
+-            loginView(session, context, email, "E-posta veya parola hatalı.")
++        return web.respond(
++            loginView(web, context, email, "E-posta veya parola hatalı.")
+         )
+     }
+ 
+-    authLogin(session, user)
+-    flashSet(session, "success", "Hoş geldiniz, {user.name}.")
+-    return sessionCommit(session, Web.redirect("/"))
++    authLogin(web.session, user)
++    web.flashSet("kind", "success")
++    web.flashSet("message", "Hoş geldiniz, {user.name}.")
++    return web.respond(Web.redirect("/"))
+ }
+ 
+ logoutSubmit: Function := (request: Request) -> Response {
+-    session: Local Session := sessionOpen(request)
+-    if csrfValid(session, request) == false {
+-        return sessionCommit(session, Web.text("Geçersiz form belirteci.", 403))
++    web: Local RequestContext := Web.context(request, sessionStore())
++    if web.csrfValid() == false {
++        return web.respond(Web.text("Geçersiz form belirteci.", 403))
+     }
+ 
+-    authLogout(session)
+-    return sessionCommit(session, Web.redirect("/"))
++    authLogout(web.session)
++    return web.respond(Web.redirect("/"))
+ }
+diff --git a/Pages/Register.ahd b/Pages/Register.ahd
+index 980ac04..82a480a 100644
+--- a/Pages/Register.ahd
++++ b/Pages/Register.ahd
+@@ -12,22 +12,32 @@ require("Services/CSRF.ahd")
+ require("Repositories/Users.ahd")
+ require("Support/Validation.ahd")
+ bring Web
+-from Web bring (Request, Response, HTMLNode, Session)
++from Web bring (
++    RequestContext
++    Form
++    OldInput
++    ValidationErrors
++    Request
++    Response
++    HTMLNode
++    Session
++)
+ bring Security
+ 
+ registerPage: Function := (request: Request) -> Response {
+-    session: Local Session := sessionOpen(request)
+-    context: Local PageContext := contextFor(session)
+-    return sessionCommit(session, registerView(session, context, "", "", []))
++    web: Local RequestContext := Web.context(request, sessionStore())
++    context: Local PageContext := contextFor(web.session)
++    return web.respond(registerView(web, context, "", "", []))
+ }
+ 
+ registerView: Function := (
+-    session: Session
++    web: RequestContext
+     context: PageContext
+     name: String
+     email: String
+     errors: List<String>
+ ) -> Response {
++    session: Local Session := web.session
+     fields: Local List<HTMLNode> := []
+     if len(errors) > 0 {
+         fields.add(errorList(errors))
+@@ -38,7 +48,7 @@ registerView: Function := (
+             "/register"
+             "post"
+             [
+-                csrfInput(session)
++                Web.UI.csrfField(web)
+                 formFieldWithIcon(
+                     "register-name"
+                     "name"
+@@ -121,42 +131,43 @@ registerView: Function := (
+ }
+ 
+ registerSubmit: Function := (request: Request) -> Response {
+-    session: Local Session := sessionOpen(request)
+-    context: Local PageContext := contextFor(session)
+-    if csrfValid(session, request) == false {
+-        return sessionCommit(session, Web.text("Geçersiz form belirteci.", 403))
++    web: Local RequestContext := Web.context(request, sessionStore())
++    form: Local Form := web.form()
++    context: Local PageContext := contextFor(web.session)
++    if web.csrfValid() == false {
++        return web.respond(Web.text("Geçersiz form belirteci.", 403))
+     }
+ 
+-    name: Local String := validationField(request.form("name"))
+-    email: Local String := validationEmail(request.form("email"))
+-    password: Local String := validationField(request.form("password"))
+-    confirmation: Local String := validationField(
+-        request.form("password_confirmation")
+-    )
+-
+-    errors: Local List<String> := []
+-    if name == "" {
+-        errors.add("Ad soyad gerekli.")
+-    }
+-
+-    if validationEmailShaped(email) == false {
+-        errors.add("Geçerli bir e-posta adresi girin.")
+-    }
+-
+-    if validationPasswordLongEnough(password) == false {
+-        errors.add(
+-            "Parola en az {str(validationMinimumPassword())} karakter olmalı."
+-        )
+-    }
++    name: Local String := form.value("name").trim()
++    email: Local String := form.value("email").trim().lower()
++    password: Local String := form.value("password").trim()
++    confirmation: Local String := form.value("password_confirmation").trim()
+ 
+-    if password != confirmation {
+-        errors.add("Parolalar eşleşmiyor.")
+-    }
+-
+-    if len(errors) > 0 {
+-        return sessionCommit(
+-            session
+-            registerView(session, context, name, email, errors)
++    old: Local OldInput := form.old(["name", "email"])
++    errors: Local ValidationErrors := Web.errors()
++    errors.required("name", name, "Ad soyad gerekli.")
++    errors.email("email", email, "Geçerli bir e-posta adresi girin.")
++    errors.minLength(
++        "password"
++        password
++        validationMinimumPassword()
++        "Parola en az {str(validationMinimumPassword())} karakter olmalı."
++    )
++    errors.matches(
++        "password_confirmation"
++        confirmation
++        password
++        "Parolalar eşleşmiyor."
++    )
++    if errors.any() {
++        return web.respond(
++            registerView(
++                web
++                context
++                old.value("name")
++                old.value("email")
++                errors.messages()
++            )
+         )
+     }
+ 
+@@ -167,10 +178,9 @@ registerSubmit: Function := (request: Request) -> Response {
+         "user"
+     )
+     if created == null {
+-        return sessionCommit(
+-            session
++        return web.respond(
+             registerView(
+-                session
++                web
+                 context
+                 name
+                 email
+@@ -179,6 +189,7 @@ registerSubmit: Function := (request: Request) -> Response {
+         )
+     }
+ 
+-    flashSet(session, "success", "Kaydınız tamamlandı. Giriş yapabilirsiniz.")
+-    return sessionCommit(session, Web.redirect("/login"))
++    web.flashSet("kind", "success")
++    web.flashSet("message", "Kaydınız tamamlandı. Giriş yapabilirsiniz.")
++    return web.respond(Web.redirect("/login"))
+ }
+diff --git a/Pages/SolutionUpload.ahd b/Pages/SolutionUpload.ahd
+index f32c082..946cd72 100644
+--- a/Pages/SolutionUpload.ahd
++++ b/Pages/SolutionUpload.ahd
+@@ -7,65 +7,72 @@ require("Repositories/Questions.ahd")
+ require("Repositories/Users.ahd")
+ require("Support/Validation.ahd")
+ bring Web
+-from Web bring (Request, Response, Session, UploadedFile)
++from Web bring (
++    RequestContext
++    Form
++    OldInput
++    ValidationErrors
++    Request
++    Response
++    Session
++    UploadedFile
++)
+ bring HTTP
+ bring File
+ 
+ solutionSubmit: Function := (request: Request) -> Response {
+-    session: Local Session := sessionOpen(request)
+-    context: Local PageContext := contextFor(session)
++    web: Local RequestContext := Web.context(request, sessionStore())
++    form: Local Form := web.form()
++    context: Local PageContext := contextFor(web.session)
+ 
+     viewer: Local UserRecord? := context.user
+     if viewer == null {
+-        return sessionCommit(session, Web.redirect("/login"))
++        return web.respond(Web.redirect("/login"))
+     }
+ 
+-    if csrfValid(session, request) == false {
+-        return sessionCommit(session, Web.text("Geçersiz form belirteci.", 403))
++    if web.csrfValid() == false {
++        return web.respond(Web.text("Geçersiz form belirteci.", 403))
+     }
+ 
+-    questionId: Local Int := validationPositiveInt(request.form("question_id"))
++    questionId: Local Int := validationPositiveInt(form.optional("question_id"))
+     question: Local QuestionRecord? := questionsFindPublished(questionId)
+     if question == null {
+-        return sessionCommit(session, Web.text("Soru bulunamadı.", 404))
++        return web.respond(Web.text("Soru bulunamadı.", 404))
+     }
+ 
+     upload: Local UploadedFile? := request.file("solution")
+     if upload == null {
+-        flashSet(session, "error", "Bir dosya seçin.")
+-        return sessionCommit(
+-            session
+-            Web.redirect("/question/{str(questionId)}")
+-        )
++        web.flashSet("kind", "error")
++        web.flashSet("message", "Bir dosya seçin.")
++        return web.respond(Web.redirect("/question/{str(questionId)}"))
+     }
+ 
+     outcome: Local UploadOutcome := solutionStore(viewer.id, questionId, upload)
+     if outcome.accepted {
+-        flashSet(session, "success", outcome.message)
++        web.flashSet("kind", "success")
++        web.flashSet("message", outcome.message)
+     }
+     else {
+-        flashSet(session, "error", outcome.message)
++        web.flashSet("kind", "error")
++        web.flashSet("message", outcome.message)
+     }
+ 
+-    return sessionCommit(
+-        session
+-        Web.redirect("/question/{str(questionId)}")
+-    )
++    return web.respond(Web.redirect("/question/{str(questionId)}"))
+ }
+ 
+ solutionFileDownload: Function := (request: Request) -> Response {
+-    session: Local Session := sessionOpen(request)
++    web: Local RequestContext := Web.context(request, sessionStore())
+ 
+     id: Local Int := validationPositiveInt(request.query("id"))
+     solution: Local SolutionRecord? := solutionsFindById(id)
+     if solution == null {
+-        return sessionCommit(session, Web.text("Çözüm bulunamadı.", 404))
++        return web.respond(Web.text("Çözüm bulunamadı.", 404))
+     }
+ 
+     path: Local String := solutionPath(solution.storedFilename)
+     if File.exists(path) == false {
+-        return sessionCommit(session, Web.text("Dosya bulunamadı.", 404))
++        return web.respond(Web.text("Dosya bulunamadı.", 404))
+     }
+ 
+-    return sessionCommit(session, HTTP.file(path, solution.mimeType))
++    return web.respond(HTTP.file(path, solution.mimeType))
+ }
+diff --git a/Services/CSRF.ahd b/Services/CSRF.ahd
+index ba832a2..9b9b5c5 100644
+--- a/Services/CSRF.ahd
++++ b/Services/CSRF.ahd
+@@ -10,7 +10,7 @@ from Web bring (Session, Request, Response, HTMLNode)
+ bring Security
+ 
+ csrfField: String := "_csrf"
+-csrfSessionKey: String := "csrf_token"
++csrfSessionKey: String := "__web_csrf"
+ // csrfToken returns this session's token, minting one on first use. The token
+ // lives in the session, so it is unpredictable to a third-party site and
+ // changes whenever the session does.
+diff --git a/Services/Flash.ahd b/Services/Flash.ahd
+index adfb65e..33ce9b7 100644
+--- a/Services/Flash.ahd
++++ b/Services/Flash.ahd
+@@ -6,8 +6,8 @@
+ bring Web
+ from Web bring Session
+ 
+-flashKey: String := "flash_message"
+-flashKindKey: String := "flash_kind"
++flashKey: String := "__web_flash:message"
++flashKindKey: String := "__web_flash:kind"
+ 
+ flashSet: Function := (
+     session: Session

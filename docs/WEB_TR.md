@@ -183,9 +183,9 @@ from Web bring App
 academy: App := Web.app(application)
 
 academy.assets("/assets", "public")
-academy.get("/", homePage)
-academy.get("/hakkinda", aboutPage)
-academy.post("/selam", greetPage)
+academy.get("/", home)
+academy.get("/hakkinda", about)
+academy.post("/selam", greet)
 academy.start()
 ```
 
@@ -203,6 +203,9 @@ academy.start()
 Bir işleyici sıradan bir `Function(Request) -> Response`'tur ve `HTTP`'nin
 denetlediği gibi tür denetiminden geçer — yanlış şekilli bir işleyici,
 beklenen imzayı söyleyen bir derleme hatasıdır.
+
+*Adı* yönlendirme açısından önemsizdir; önerilen sözleşme için bkz.
+[10.1 Adlandırma](#101-adlandırma).
 
 ## 8. Yanıtlar
 
@@ -393,7 +396,7 @@ mainLayout: Function := (config: AppConfig, title: String, current: String, cont
 Bir **Sayfa**:
 
 ```ahd
-homePage: Function := (request: Request) -> Response {
+home: Function := (request: Request) -> Response {
     content: Local List<HTMLNode> := [
         Web.UI.section([Web.UI.h1(configuration().name), Web.UI.p(tagline())])
     ]
@@ -403,6 +406,72 @@ homePage: Function := (request: Request) -> Response {
 
 `Web.UI` ilkel HTML bileşenlerini tutar; sizin `Components/` dizininiz
 uygulamaya özgü olanları. Bunlar bilinçli olarak ayrıdır.
+
+### 10.1 Adlandırma
+
+`Page`, `Layout` ve `Component` **uygulama düzenleme sözleşmeleridir, özel dil
+yapıları değil.** Derleyicide, yönlendiricide veya çalışma zamanında hiçbir şey
+bir ada bakmaz.
+
+**İşleyici adları sıradan AhdCode tanımlayıcılarıdır. `Page` zorunlu bir sonek
+değildir.** Bir rotaya bir `Function` **değeri** verilir:
+
+```ahd
+portal.get("/admin/users/edit/*", adminUserEdit)
+```
+
+O fonksiyonun adı ne olursa olsun — `adminUserEdit`, `adminUserEditPage`,
+`admin_user_edit` — yönlendirici aynı değeri alır ve aynı şekilde davranır.
+Önceki sürümlere göre yazılmış, `registerPage` veya `profilePage` kullanan
+uygulamalar kaynak uyumlu kalır; hiçbir şey kullanımdan kaldırılmadı.
+
+Bu belgelerdeki yeni örnekler gereksiz soneki bırakır ve bir ekran birden çok
+işleyici gerektirdiğinde eylemi açıkça adlandırır:
+
+```
+register            // GET  /register
+registerSubmit      // POST /register
+
+adminQuestionEdit   // GET  düzenleme formu
+adminQuestionSave   // POST düzenleme formu
+```
+
+**Önerilen dosya adları PascalCase'dir**; böylece işleyici adındaki sözcük
+sınırları dosya adındaki sözcük sınırlarıyla aynı olur:
+
+```
+Pages/Admin/UserEdit.ahd        ->  adminUserEdit    (camelCase, tercih edilen)
+                                ->  admin_user_edit  (snake_case, o da geçerli)
+Pages/Admin/QuestionEdit.ahd    ->  adminQuestionEdit
+Pages/Admin/Users.ahd           ->  adminUsers
+```
+
+Biçem terimleri, tam karşılıklarıyla:
+
+```
+adminUserEdit      camelCase
+AdminUserEdit      PascalCase
+admin_user_edit    snake_case
+```
+
+`admin_UserEdit` gibi karışık yazımlar iki sözleşmeyi anlam katmadan
+birleştirir; örnekler bunlardan kaçınır. `adminUserEdit` yalnızca mevcut
+AhdCode örnekleri ağırlıklı olarak camelCase olduğu için tercih edilir —
+tanımlayıcı dil bilgisi alt çizgi kabul eder, dolayısıyla `admin_user_edit`
+sıradan geçerli koddur ve seçim uygulamaya aittir.
+
+Tanımlayıcılar **büyük/küçük harfe duyarlıdır** ve bu bir arama kuralı değil bir
+adlandırma sözleşmesi olduğundan, birleştirilmiş veya harf katlanmış yazımlar
+aynı adın alternatif yazımları değildir:
+
+```
+adminuseredit   adminUSEREDIT   adminUseredit   admin_UserEdit
+```
+
+Bunların hiçbiri `adminUserEdit` değildir. Otomatik rota keşfi, dosya adı
+yansıması, dosya adından fonksiyona arama, büyük/küçük harf duyarsız veya
+bulanık işleyici eşleştirmesi, `Page` açıklaması ya da `page` anahtar sözcüğü
+yoktur. `require` zinciri açıktır ve rota argümanı düz bir değerdir.
 
 ## 11. Statik varlıklar
 
@@ -696,3 +765,205 @@ cd examples/v0.15/ahd_academi
 cp .env.example .env
 ahdcode dev app.ahd
 ```
+
+## 16. v0.16 adayı: istek bağlamı, formlar, doğrulama, CSRF ve flash
+
+v0.16 adayı, Matematik Portalında ölçülen oturum, doğrulama ve form tekrarlarını
+azaltır. Olağan `Function -> HTMLNode` bileşimini ve açık veri akışını korur.
+Yeni kolaylıkların tamamı derleyiciye gömülü AhdCode kaynaklarıdır; yerel HTTP
+ayrıştırıcısı, SessionStore ve Security uygulaması değişmez. Yeni bağımlılık
+veya dil sözdizimi eklenmez.
+
+### Tam örneği çalıştırın
+
+```bash
+cd examples/v0.16/forms_validation
+ahdcode run app.ahd
+```
+
+`http://127.0.0.1:8160/register` adresini açın. Önce geçersiz, sonra geçerli
+veri gönderin; `/profile` yönlendirmesinden sonra sayfayı yenileyince mesajın
+kaybolduğunu görün. Veritabanı, hesap oluşturma, `.env` dosyası veya indirilecek
+kaynak gerekmez. Örnek loopback üzerinde yerel HTTP için açıkça Secure olmayan
+çerez kullanır. HTTPS uygulamasında depoyu `secure: true` ile oluşturun veya
+mevcut `AppConfig.isSecure()` politikasını kullanın. Kabuktaki isteğe bağlı
+`SERVER_PORT` portu değiştirir; `.env.example` açıklamadır, otomatik yüklenmez.
+
+### Bir bağlam, açıkça sonlandırılmış bir yanıt
+
+Her gelen istek için `Web.context(request, store)` ile bir bağlam oluşturun.
+Depoyu uygulama seçer; genellikle başlangıçta bir kez oluşturur. Bağlam özgün
+`request`, açılan `session`, kaydetme yetkisine sahip `store` ve `finalized`
+bayrağını taşır. Fonksiyonlara aktarılan sıradan bir referans değeridir; gizli
+istek tekili, servis kapsayıcısı, örtük yetkilendirme veya kanca yoktur.
+
+Yanıtı oluşturun ve yürütülen dönüş yolunda `context.respond(response)` çağrısını
+tam bir kez yapın: 200, 403, 404, 422 ve yönlendirmeler dahil. Seçilen SessionStore
+ile kaydeder, sonra bağlamı sonlandırılmış işaretler. Aynı değerin başka bir
+referansı üzerinden de olsa ikinci çağrı, tekrar kaydetmeden `WebContextError`
+fırlatır. Kaydetme hata verirse sonlandırma başarılı olmamıştır; otomatik yeniden
+deneme yoktur. İşleyici sonlandırılmış yanıtı döndürmelidir.
+
+Oturum değişikliklerini yanıttan **önce** bitirin. Mevcut giriş, rotate veya destroy
+fonksiyonlarına `context.session` aktarabilirsiniz. Bağlamın CSRF/flash değiştiren
+metotları sonlandırmadan sonraki kullanımı reddeder. Alanlar sıradan AhdCode sınıf
+öznitelikleridir, erişim güvenliği sınırı değildir: session/store değerlerini
+değiştirmeyin, bayrağı sıfırlamayın ve aynı yanıtta alt düzey commit ile bağlam
+sonlandırmasını karıştırmayın. Alt düzey `HTTP`, `Request.form`,
+`SessionStore.open/commit` ve bütün v0.15 `Web.UI` yardımcıları geçerlidir.
+Tam yollar ve v0.15.1 son tek segment `/*` yolları aynı işleyicileri kabul eder;
+tam yol eşleşmesi önceliklidir.
+
+### GET, POST, doğrulama, yönlendirme
+
+GET'te bağlam oluşturun, form içinde `Web.UI.csrfField(context)` üretin ve sayfayı
+sonlandırın. POST'ta `context.form()` alın, CSRF'yi açıkça denetleyin ve doğrulayın.
+Hatalarda mesajlarla seçilmiş eski girdiyi gösterin; başarıda uygulama değişikliğini
+yapıp yönlendirin. Aşağıdaki işleyici [çalıştırılabilir tam örnekteki](../examples/v0.16/forms_validation/app.ahd)
+görünümü ve depo erişim fonksiyonunu kullanır:
+
+```ahd
+registerSubmit: Function := (request: Request) -> Response {
+    context: Local RequestContext := Web.context(request, exampleSessions())
+    form: Local Form := context.form()
+    if context.csrfValid() == false {
+        return context.respond(Web.text("Forbidden", 403))
+    }
+    errors: Local ValidationErrors := Web.errors()
+    errors.required("name", form.value("name"), "Name is required.")
+    errors.email("email", form.value("email"), "Enter an email address.")
+    errors.minLength("password", form.value("password"), 10, "Use at least 10 characters.")
+    errors.matches("password_confirmation", form.value("password_confirmation"), form.value("password"), "Passwords must match.")
+    if errors.any() {
+        return context.respond(registerView(context, form.old(["name", "email"]), errors, 422))
+    }
+    context.flashSet("notice", "Form accepted. No account was created.")
+    return context.respond(Web.redirect("/profile"))
+}
+```
+
+`Web.form(request)` oturumsuz ve bağlamsız da çalışır; her form CSRF gerektirmez.
+Mevcut ayrıştırıcının istek görüntüsünü sarar; gövdeyi tekrar ayrıştırmaz veya
+dinamik değerler üretmez. `value` ilk gönderilen metni değiştirmeden döndürür;
+yalnızca eksik alanda varsayılanı kullanır. `optional`, null ile boş metni ayırır;
+`hasField` boş değer dahil alanın varlığını sınar. Gerektiğinde `.trim()` veya
+`.lower()` ile açıkça normalleştirin. Uygulamanızın açık politikası değilse
+parolaları kırpmayın. Sorgu dizesi ayrıdır: URL sorgusuyla çalışan arama formu için
+`Request.query` kullanın.
+
+`integer` eksik alanda null; boş, hatalı veya taşan girdide `FormValueError`
+üretir ve mevcut `int(String)` dilbilgisini izler. `checkbox` eksik alanda false,
+`on`/`true`/`1` için true, `off`/`false`/`0` için false döndürür; diğer metinler
+`FormValueError` üretir. Büyük/küçük harf duyarlıdır. Eksik ile açık false ayrımı
+gerekiyorsa önce `hasField` kullanın. Hatalar gönderilen değeri içermez.
+Multipart dosyaları mevcut `Request.file/files` üzerinden alınır.
+
+### Doğrulama açık ve sıralıdır
+
+`Web.errors()` bağımsız bir koleksiyon oluşturur. Kural metotları verilen değer
+başarısızsa hata ekler; istek okumaz ve gönderilen değerleri dönüştürmez.
+`required` boş veya yalnızca boşluk içeren değerleri reddeder. Uzunluk kuralları
+AhdCode `len(String)` anlamını ve dahil sınırları kullanır; negatif olmayan
+sınırlar seçin. `matches` onay alanları için olağan eşitliktir, gizli belirteç
+karşılaştırması değildir. `email` tek `@`, boş olmayan yerel/alan adı bölümleri,
+boşluk/tab/CR/LF bulunmaması ve en az iki boş olmayan alan adı etiketi arar.
+RFC doğrulaması veya teslim edilebilirlik kanıtı değildir. `hexColor` yalnızca
+`#RRGGBB` kabul eder. `oneOf` büyük/küçük harf dahil tam metin üyeliğini sınar.
+
+Hatalar kural/add çağrı sırasını korur. `first` yoksa null döndürür;
+`forField` ve `messages` bağımsız metin listeleri döndürür. Aynı alanın birden
+çok hatası korunur. `errors.add("email", "Zaten kayıtlı.")` ile veritabanı
+benzersizliği ve iş kuralları uygulamada kalır. Mesajları örnekteki FormErrors
+bileşeni gibi `Web.UI` metin düğümleriyle gösterin.
+
+### Eski girdi açık bir izin listesidir
+
+`form.old(["name", "email"])` yalnızca listede bulunan ve gönderilmiş alanlarla
+yeni bir `OldInput` üretir. Alan listesi zorunludur; otomatik tümünü kopyalama
+veya oturuma kaydetme yoktur. Parolaları, onaylarını, sıfırlama doğrulayıcılarını,
+CSRF belirteçlerini ve diğer sırları listeye eklemeyerek dışarıda bırakın.
+**Çerçeve hassas alan adlarını tahmin etmez ve açık seçiminizi değiştirmez.
+Yalnızca güvenli alanları seçmek uygulamanın sorumluluğudur.** Boş form için boş
+liste kullanın. OldInput görünümün açık parametresidir; gizli istek durumu değildir.
+
+`old.value` sıradan metin döndürür. `Web.UI.input` bunu value özniteliğinde
+kaçırır: `<script>alert(1)</script>` veri olarak kalır. Parola kontrollerine
+örnekteki gibi `""` verin. Eski girdi yönlendirme sonrasında otomatik taşınmaz;
+bu sürüm doğrulama hatasında aynı yanıtta yeniden göstermeyi öğretir.
+
+### CSRF ve flash durumu
+
+`csrfToken()` oturum başına `Security.token()` kullanır ve değeri ayrılmış
+`__web_csrf` anahtarında tutar. Beklenen isteklerde ve oturum değerlerini koruyan
+rotation sırasında sabittir. Oturumu temizlemek/yok etmek yeni belirteç gerektirir.
+`Web.UI.csrfField(context)` kaçırılmış gizli `_csrf` alanı üretir; göndermez veya
+doğrulamaz. `csrfValid()` beklenen/gönderilen değerin eksik veya boş olmasını
+reddeder ve `Security.secureEqual` kullanır. Doğrulama belirteç üretmez.
+Belirteç veya parola değerlerini günlüğe yazmayın.
+
+`flashSet(key, value)` metni `__web_flash:{key}` altında saklar. `flashTake(key)`
+nullable metni döndürüp kaldırır; ikinci alım null döndürür. Anahtarları ve görsel
+kategorileri siz seçersiniz. Sonraki sayfa işleyicisi mesajı alıp yanıtını
+sonlandırmalıdır; silme böyle kaydedilir ve yenilemede mesaj görünmez. Otomatik
+gösterim veya istek yaşına göre süre sonu yoktur; mesaj açıkça tüketilene kadar
+bekler. Eski uygulama yardımcılarıyla birlikte kullanımda da `__web_csrf` ve
+`__web_flash:` önekini Web için ayırın.
+
+Depo yayımlanmış bellek içi, süreç yerel ömrünü ve çerez politikasını korur.
+Bağlam kalıcı oturum veya süreçler arası eşzamanlama eklemez. Kullanıcı/site
+bağlamı, korumalar ve DB/JSON dönüşümleri açık kalır. Bu adayda middleware, auth
+çerçevesi, ORM, JSON/yönlendirme yeniden tasarımı veya varlık sistemi yoktur.
+
+### Kesin aday API'si
+
+```text
+Web.context(request: Request, store: SessionStore) -> RequestContext
+Web.form(request: Request) -> Form
+Web.errors() -> ValidationErrors
+Web.UI.csrfField(context: RequestContext) -> HTMLNode
+
+RequestContext.respond(response: Response) -> Response
+RequestContext.form() -> Form
+RequestContext.csrfToken() -> String
+RequestContext.csrfValid() -> Bool
+RequestContext.flashSet(key: String, value: String) -> Nothing
+RequestContext.flashTake(key: String) -> String?
+
+Form.optional(name: String) -> String?
+Form.value(name: String, fallback: String := "") -> String
+Form.hasField(name: String) -> Bool
+Form.integer(name: String) -> Int?
+Form.checkbox(name: String) -> Bool
+Form.old(safeFields: List<String>) -> OldInput
+OldInput.value(name: String, fallback: String := "") -> String
+
+ValidationErrors.add(field: String, message: String) -> Nothing
+ValidationErrors.any() -> Bool
+ValidationErrors.hasField(field: String) -> Bool
+ValidationErrors.first(field: String) -> String?
+ValidationErrors.forField(field: String) -> List<String>
+ValidationErrors.messages() -> List<String>
+ValidationErrors.required(field: String, value: String, message: String) -> Nothing
+ValidationErrors.minLength(field: String, value: String, minimum: Int, message: String) -> Nothing
+ValidationErrors.maxLength(field: String, value: String, maximum: Int, message: String) -> Nothing
+ValidationErrors.matches(field: String, value: String, expected: String, message: String) -> Nothing
+ValidationErrors.email(field: String, value: String, message: String) -> Nothing
+ValidationErrors.oneOf(field: String, value: String, allowed: List<String>, message: String) -> Nothing
+ValidationErrors.hexColor(field: String, value: String, message: String) -> Nothing
+```
+
+Yeni somut türler ve kurucu öznitelikleri:
+
+| Tür | Öznitelikler |
+| --- | --- |
+| `RequestContext` | `request: Request`, `session: Session`, `store: SessionStore`, `finalized: Bool := false` |
+| `Form` | `request: Request` |
+| `FormField` | `name: String`, `value: String` |
+| `OldInput` | `fields: List<FormField>` |
+| `FieldError` | `field: String`, `message: String` |
+| `ValidationErrors` | `entries: List<FieldError>` |
+
+Olağan kurucular `Web.context`, `Web.form`, `Web.errors` ve `Form.old` olmalıdır.
+`WebContextError` ve `FormValueError`, `Error` ve özniteliklerini miras alır;
+mevcut hata kimlikleri değişmez. Tamamlama, hover ve imza yardımı yeni API'leri
+derlenmiş ModuleInterface üzerinden öğrenir.

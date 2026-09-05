@@ -1,0 +1,90 @@
+{
+  "baseline_commit": "2f9f9cd675623f076e218b6eca5790fcc84dd439",
+  "files": [
+    "Pages/Login.ahd",
+    "Pages/Register.ahd",
+    "Pages/Admin/Settings.ahd",
+    "Pages/Admin/QuestionEdit.ahd",
+    "Pages/SolutionUpload.ahd"
+  ],
+  "handlers": [
+    "loginSubmit",
+    "registerSubmit",
+    "adminSettingsSubmit",
+    "adminQuestionSaveSubmit",
+    "logoutSubmit",
+    "solutionSubmit"
+  ],
+  "portal_baseline": {
+    "sessionOpen": 39,
+    "sessionCommit": 118,
+    "contextFor": 37,
+    "request.form": 45,
+    "csrfValid (application helper)": 17,
+    "manual `_csrf`": 2,
+    "errors.add": 16,
+    "flashSet (application helper)": 25
+  },
+  "before": {
+    "sessionOpen": 6,
+    "sessionCommit": 22,
+    "contextFor": 5,
+    "request.form": 13,
+    "csrfValid (application helper)": 6,
+    "manual `_csrf`": 0,
+    "errors.add": 10,
+    "flashSet (application helper)": 8
+  },
+  "after": {
+    "sessionOpen": 0,
+    "sessionCommit": 0,
+    "contextFor": 5,
+    "request.form": 0,
+    "csrfValid (application helper)": 0,
+    "manual `_csrf`": 0,
+    "errors.add": 0,
+    "flashSet (application helper)": 0
+  },
+  "handler_lines": {
+    "loginSubmit": {
+      "before": 21,
+      "after": 22
+    },
+    "registerSubmit": {
+      "before": 62,
+      "after": 63
+    },
+    "adminSettingsSubmit": {
+      "before": 40,
+      "after": 48
+    },
+    "adminQuestionSaveSubmit": {
+      "before": 63,
+      "after": 57
+    },
+    "logoutSubmit": {
+      "before": 9,
+      "after": 9
+    },
+    "solutionSubmit": {
+      "before": 41,
+      "after": 39
+    }
+  },
+  "before_handlers": {
+    "loginSubmit": "loginSubmit: Function := (request: Request) -> Response {\n    session: Local Session := sessionOpen(request)\n    context: Local PageContext := contextFor(session)\n    if csrfValid(session, request) == false {\n        return sessionCommit(session, Web.text(\"Geçersiz form belirteci.\", 403))\n    }\n\n    email: Local String := validationEmail(request.form(\"email\"))\n    password: Local String := validationField(request.form(\"password\"))\n    user: Local UserRecord? := authAttempt(email, password)\n    if user == null {\n        return sessionCommit(\n            session\n            loginView(session, context, email, \"E-posta veya parola hatalı.\")\n        )\n    }\n\n    authLogin(session, user)\n    flashSet(session, \"success\", \"Hoş geldiniz, {user.name}.\")\n    return sessionCommit(session, Web.redirect(\"/\"))\n}",
+    "logoutSubmit": "logoutSubmit: Function := (request: Request) -> Response {\n    session: Local Session := sessionOpen(request)\n    if csrfValid(session, request) == false {\n        return sessionCommit(session, Web.text(\"Geçersiz form belirteci.\", 403))\n    }\n\n    authLogout(session)\n    return sessionCommit(session, Web.redirect(\"/\"))\n}",
+    "registerSubmit": "registerSubmit: Function := (request: Request) -> Response {\n    session: Local Session := sessionOpen(request)\n    context: Local PageContext := contextFor(session)\n    if csrfValid(session, request) == false {\n        return sessionCommit(session, Web.text(\"Geçersiz form belirteci.\", 403))\n    }\n\n    name: Local String := validationField(request.form(\"name\"))\n    email: Local String := validationEmail(request.form(\"email\"))\n    password: Local String := validationField(request.form(\"password\"))\n    confirmation: Local String := validationField(\n        request.form(\"password_confirmation\")\n    )\n\n    errors: Local List<String> := []\n    if name == \"\" {\n        errors.add(\"Ad soyad gerekli.\")\n    }\n\n    if validationEmailShaped(email) == false {\n        errors.add(\"Geçerli bir e-posta adresi girin.\")\n    }\n\n    if validationPasswordLongEnough(password) == false {\n        errors.add(\n            \"Parola en az {str(validationMinimumPassword())} karakter olmalı.\"\n        )\n    }\n\n    if password != confirmation {\n        errors.add(\"Parolalar eşleşmiyor.\")\n    }\n\n    if len(errors) > 0 {\n        return sessionCommit(\n            session\n            registerView(session, context, name, email, errors)\n        )\n    }\n\n    created: Local Int? := usersCreate(\n        name\n        email\n        Security.passwordHash(password)\n        \"user\"\n    )\n    if created == null {\n        return sessionCommit(\n            session\n            registerView(\n                session\n                context\n                name\n                email\n                [\"Bu e-posta adresi zaten kayıtlı.\"]\n            )\n        )\n    }\n\n    flashSet(session, \"success\", \"Kaydınız tamamlandı. Giriş yapabilirsiniz.\")\n    return sessionCommit(session, Web.redirect(\"/login\"))\n}",
+    "adminSettingsSubmit": "adminSettingsSubmit: Function := (request: Request) -> Response {\n    session: Local Session := sessionOpen(request)\n    context: Local PageContext := contextFor(session)\n    guard: Local GuardResult := adminGuard(session, context)\n    if guard.allowed == false {\n        return sessionCommit(session, guard.refusal)\n    }\n\n    if csrfValid(session, request) == false {\n        return sessionCommit(session, Web.text(\"Geçersiz form belirteci.\", 403))\n    }\n\n    siteName: Local String := validationField(request.form(\"site_name\"))\n    headerColor: Local String := validationField(request.form(\"header_color\"))\n\n    errors: Local List<String> := []\n    if siteName == \"\" {\n        errors.add(\"Site adı boş olamaz.\")\n    }\n\n    if len(siteName) > 80 {\n        errors.add(\"Site adı en fazla 80 karakter olabilir.\")\n    }\n\n    if validationHexColor(headerColor) == false {\n        errors.add(\"Başlık rengi #RRGGBB biçiminde olmalı (örnek: #0d6efd).\")\n    }\n\n    if len(errors) > 0 {\n        return sessionCommit(\n            session\n            adminSettingsView(session, context, siteName, headerColor, errors)\n        )\n    }\n\n    settingsSet(\"site_name\", siteName)\n    settingsSet(\"header_color\", headerColor)\n    flashSet(session, \"success\", \"Ayarlar kaydedildi.\")\n    return sessionCommit(session, Web.redirect(\"/admin/settings\"))\n}",
+    "adminQuestionSaveSubmit": "adminQuestionSaveSubmit: Function := (request: Request) -> Response {\n    session: Local Session := sessionOpen(request)\n    context: Local PageContext := contextFor(session)\n    guard: Local GuardResult := adminGuard(session, context)\n    if guard.allowed == false {\n        return sessionCommit(session, guard.refusal)\n    }\n\n    if csrfValid(session, request) == false {\n        return sessionCommit(session, Web.text(\"Geçersiz form belirteci.\", 403))\n    }\n\n    id: Local Int := validationPositiveInt(request.form(\"question_id\"))\n    title: Local String := validationField(request.form(\"title\"))\n    topic: Local String := validationField(request.form(\"topic\"))\n    body: Local String := validationField(request.form(\"body\"))\n\n    errors: Local List<String> := []\n    if title == \"\" {\n        errors.add(\"Başlık gerekli.\")\n    }\n\n    if topic == \"\" {\n        errors.add(\"Konu gerekli.\")\n    }\n\n    if body == \"\" {\n        errors.add(\"Soru metni gerekli.\")\n    }\n\n    if len(errors) > 0 {\n        return sessionCommit(\n            session\n            adminQuestionForm(\n                session\n                context\n                id\n                title\n                topic\n                body\n                errors\n                \"\"\n            )\n        )\n    }\n\n    author: Local UserRecord? := context.user\n    authorId: Local Int := 0\n    if author != null {\n        authorId = author.id\n    }\n\n    if id == 0 {\n        questionsCreate(title, topic, body, authorId)\n        flashSet(session, \"success\", \"Soru taslak olarak kaydedildi.\")\n    }\n    else {\n        questionsUpdate(id, title, topic, body)\n        flashSet(session, \"success\", \"Soru güncellendi.\")\n    }\n\n    return sessionCommit(session, Web.redirect(\"/admin/questions\"))\n}",
+    "solutionSubmit": "solutionSubmit: Function := (request: Request) -> Response {\n    session: Local Session := sessionOpen(request)\n    context: Local PageContext := contextFor(session)\n\n    viewer: Local UserRecord? := context.user\n    if viewer == null {\n        return sessionCommit(session, Web.redirect(\"/login\"))\n    }\n\n    if csrfValid(session, request) == false {\n        return sessionCommit(session, Web.text(\"Geçersiz form belirteci.\", 403))\n    }\n\n    questionId: Local Int := validationPositiveInt(request.form(\"question_id\"))\n    question: Local QuestionRecord? := questionsFindPublished(questionId)\n    if question == null {\n        return sessionCommit(session, Web.text(\"Soru bulunamadı.\", 404))\n    }\n\n    upload: Local UploadedFile? := request.file(\"solution\")\n    if upload == null {\n        flashSet(session, \"error\", \"Bir dosya seçin.\")\n        return sessionCommit(\n            session\n            Web.redirect(\"/question/{str(questionId)}\")\n        )\n    }\n\n    outcome: Local UploadOutcome := solutionStore(viewer.id, questionId, upload)\n    if outcome.accepted {\n        flashSet(session, \"success\", outcome.message)\n    }\n    else {\n        flashSet(session, \"error\", outcome.message)\n    }\n\n    return sessionCommit(\n        session\n        Web.redirect(\"/question/{str(questionId)}\")\n    )\n}"
+  },
+  "after_handlers": {
+    "loginSubmit": "loginSubmit: Function := (request: Request) -> Response {\n    web: Local RequestContext := Web.context(request, sessionStore())\n    form: Local Form := web.form()\n    context: Local PageContext := contextFor(web.session)\n    if web.csrfValid() == false {\n        return web.respond(Web.text(\"Geçersiz form belirteci.\", 403))\n    }\n\n    email: Local String := form.value(\"email\").trim().lower()\n    password: Local String := form.value(\"password\").trim()\n    user: Local UserRecord? := authAttempt(email, password)\n    if user == null {\n        return web.respond(\n            loginView(web, context, email, \"E-posta veya parola hatalı.\")\n        )\n    }\n\n    authLogin(web.session, user)\n    web.flashSet(\"kind\", \"success\")\n    web.flashSet(\"message\", \"Hoş geldiniz, {user.name}.\")\n    return web.respond(Web.redirect(\"/\"))\n}",
+    "logoutSubmit": "logoutSubmit: Function := (request: Request) -> Response {\n    web: Local RequestContext := Web.context(request, sessionStore())\n    if web.csrfValid() == false {\n        return web.respond(Web.text(\"Geçersiz form belirteci.\", 403))\n    }\n\n    authLogout(web.session)\n    return web.respond(Web.redirect(\"/\"))\n}",
+    "registerSubmit": "registerSubmit: Function := (request: Request) -> Response {\n    web: Local RequestContext := Web.context(request, sessionStore())\n    form: Local Form := web.form()\n    context: Local PageContext := contextFor(web.session)\n    if web.csrfValid() == false {\n        return web.respond(Web.text(\"Geçersiz form belirteci.\", 403))\n    }\n\n    name: Local String := form.value(\"name\").trim()\n    email: Local String := form.value(\"email\").trim().lower()\n    password: Local String := form.value(\"password\").trim()\n    confirmation: Local String := form.value(\"password_confirmation\").trim()\n\n    old: Local OldInput := form.old([\"name\", \"email\"])\n    errors: Local ValidationErrors := Web.errors()\n    errors.required(\"name\", name, \"Ad soyad gerekli.\")\n    errors.email(\"email\", email, \"Geçerli bir e-posta adresi girin.\")\n    errors.minLength(\n        \"password\"\n        password\n        validationMinimumPassword()\n        \"Parola en az {str(validationMinimumPassword())} karakter olmalı.\"\n    )\n    errors.matches(\n        \"password_confirmation\"\n        confirmation\n        password\n        \"Parolalar eşleşmiyor.\"\n    )\n    if errors.any() {\n        return web.respond(\n            registerView(\n                web\n                context\n                old.value(\"name\")\n                old.value(\"email\")\n                errors.messages()\n            )\n        )\n    }\n\n    created: Local Int? := usersCreate(\n        name\n        email\n        Security.passwordHash(password)\n        \"user\"\n    )\n    if created == null {\n        return web.respond(\n            registerView(\n                web\n                context\n                name\n                email\n                [\"Bu e-posta adresi zaten kayıtlı.\"]\n            )\n        )\n    }\n\n    web.flashSet(\"kind\", \"success\")\n    web.flashSet(\"message\", \"Kaydınız tamamlandı. Giriş yapabilirsiniz.\")\n    return web.respond(Web.redirect(\"/login\"))\n}",
+    "adminSettingsSubmit": "adminSettingsSubmit: Function := (request: Request) -> Response {\n    web: Local RequestContext := Web.context(request, sessionStore())\n    form: Local Form := web.form()\n    context: Local PageContext := contextFor(web.session)\n    guard: Local GuardResult := adminGuard(web.session, context)\n    if guard.allowed == false {\n        return web.respond(guard.refusal)\n    }\n\n    if web.csrfValid() == false {\n        return web.respond(Web.text(\"Geçersiz form belirteci.\", 403))\n    }\n\n    siteName: Local String := form.value(\"site_name\").trim()\n    headerColor: Local String := form.value(\"header_color\").trim()\n\n    old: Local OldInput := form.old([\"site_name\", \"header_color\"])\n    errors: Local ValidationErrors := Web.errors()\n    errors.required(\"site_name\", siteName, \"Site adı boş olamaz.\")\n    errors.maxLength(\n        \"site_name\"\n        siteName\n        80\n        \"Site adı en fazla 80 karakter olabilir.\"\n    )\n    errors.hexColor(\n        \"header_color\"\n        headerColor\n        \"Başlık rengi #RRGGBB biçiminde olmalı (örnek: #0d6efd).\"\n    )\n    if errors.any() {\n        return web.respond(\n            adminSettingsView(\n                web\n                context\n                old.value(\"site_name\")\n                old.value(\"header_color\")\n                errors.messages()\n            )\n        )\n    }\n\n    settingsSet(\"site_name\", siteName)\n    settingsSet(\"header_color\", headerColor)\n    web.flashSet(\"kind\", \"success\")\n    web.flashSet(\"message\", \"Ayarlar kaydedildi.\")\n    return web.respond(Web.redirect(\"/admin/settings\"))\n}",
+    "adminQuestionSaveSubmit": "adminQuestionSaveSubmit: Function := (request: Request) -> Response {\n    web: Local RequestContext := Web.context(request, sessionStore())\n    form: Local Form := web.form()\n    context: Local PageContext := contextFor(web.session)\n    guard: Local GuardResult := adminGuard(web.session, context)\n    if guard.allowed == false {\n        return web.respond(guard.refusal)\n    }\n\n    if web.csrfValid() == false {\n        return web.respond(Web.text(\"Geçersiz form belirteci.\", 403))\n    }\n\n    id: Local Int := validationPositiveInt(form.optional(\"question_id\"))\n    title: Local String := form.value(\"title\").trim()\n    topic: Local String := form.value(\"topic\").trim()\n    body: Local String := form.value(\"body\").trim()\n\n    old: Local OldInput := form.old([\"title\", \"topic\", \"body\"])\n    errors: Local ValidationErrors := Web.errors()\n    errors.required(\"title\", title, \"Başlık gerekli.\")\n    errors.required(\"topic\", topic, \"Konu gerekli.\")\n    errors.required(\"body\", body, \"Soru metni gerekli.\")\n    if errors.any() {\n        return web.respond(\n            adminQuestionForm(\n                web\n                context\n                id\n                old.value(\"title\")\n                old.value(\"topic\")\n                old.value(\"body\")\n                errors.messages()\n                \"\"\n            )\n        )\n    }\n\n    author: Local UserRecord? := context.user\n    authorId: Local Int := 0\n    if author != null {\n        authorId = author.id\n    }\n\n    if id == 0 {\n        questionsCreate(title, topic, body, authorId)\n        web.flashSet(\"kind\", \"success\")\n        web.flashSet(\"message\", \"Soru taslak olarak kaydedildi.\")\n    }\n    else {\n        questionsUpdate(id, title, topic, body)\n        web.flashSet(\"kind\", \"success\")\n        web.flashSet(\"message\", \"Soru güncellendi.\")\n    }\n\n    return web.respond(Web.redirect(\"/admin/questions\"))\n}",
+    "solutionSubmit": "solutionSubmit: Function := (request: Request) -> Response {\n    web: Local RequestContext := Web.context(request, sessionStore())\n    form: Local Form := web.form()\n    context: Local PageContext := contextFor(web.session)\n\n    viewer: Local UserRecord? := context.user\n    if viewer == null {\n        return web.respond(Web.redirect(\"/login\"))\n    }\n\n    if web.csrfValid() == false {\n        return web.respond(Web.text(\"Geçersiz form belirteci.\", 403))\n    }\n\n    questionId: Local Int := validationPositiveInt(form.optional(\"question_id\"))\n    question: Local QuestionRecord? := questionsFindPublished(questionId)\n    if question == null {\n        return web.respond(Web.text(\"Soru bulunamadı.\", 404))\n    }\n\n    upload: Local UploadedFile? := request.file(\"solution\")\n    if upload == null {\n        web.flashSet(\"kind\", \"error\")\n        web.flashSet(\"message\", \"Bir dosya seçin.\")\n        return web.respond(Web.redirect(\"/question/{str(questionId)}\"))\n    }\n\n    outcome: Local UploadOutcome := solutionStore(viewer.id, questionId, upload)\n    if outcome.accepted {\n        web.flashSet(\"kind\", \"success\")\n        web.flashSet(\"message\", outcome.message)\n    }\n    else {\n        web.flashSet(\"kind\", \"error\")\n        web.flashSet(\"message\", outcome.message)\n    }\n\n    return web.respond(Web.redirect(\"/question/{str(questionId)}\"))\n}"
+  }
+}

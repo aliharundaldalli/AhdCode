@@ -1,0 +1,21 @@
+require("Pages/Register.ahd")
+require("Pages/Profile.ahd")
+bring Web
+
+bring HTTP
+bring Env
+from Web bring (SessionStore, Server)
+
+sessions: SessionStore := Web.sessions("forms_example", 3600, false, "Lax")
+exampleSessions: Function := () -> SessionStore {
+    sessions: Global SessionStore
+    return sessions
+}
+server: Server := HTTP.server(
+    "127.0.0.1"
+    int(Env.getOr("SERVER_PORT", "8160"))
+)
+server.get("/register", register)
+server.post("/register", registerSubmit)
+server.get("/profile", profile)
+server.start()

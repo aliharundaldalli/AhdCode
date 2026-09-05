@@ -1,0 +1,108 @@
+require("Components/FormErrors.ahd")
+require("Layouts/Main.ahd")
+bring Web
+from Web bring (
+    Request
+    Response
+    RequestContext
+    Form
+    OldInput
+    ValidationErrors
+)
+
+registerView: Function := (
+    context: RequestContext
+    old: OldInput
+    errors: ValidationErrors
+    status: Int := 200
+) -> Response {
+    return mainLayout(
+        "Register"
+        [
+            Web.UI.h1("Forms, validation and flash")
+            Web.UI.p(
+                "This example validates a form; it does not create an account."
+            )
+            formErrors(errors)
+            Web.UI.formTo(
+                "/register"
+                "post"
+                [
+                    Web.UI.csrfField(context)
+                    Web.UI.labelFor("name", "Name")
+                    Web.UI.input(
+                        "text"
+                        "name"
+                        old.value("name")
+                        {"id": "name"}
+                    )
+                    Web.UI.labelFor("email", "Email")
+                    Web.UI.input(
+                        "email"
+                        "email"
+                        old.value("email")
+                        {"id": "email"}
+                    )
+                    Web.UI.labelFor(
+                        "password"
+                        "Password (at least 10 characters)"
+                    )
+                    Web.UI.input("password", "password", "", {"id": "password"})
+                    Web.UI.labelFor("confirmation", "Confirm password")
+                    Web.UI.input(
+                        "password"
+                        "password_confirmation"
+                        ""
+                        {"id": "confirmation"}
+                    )
+                    Web.UI.button("Submit", {"type": "submit"})
+                ]
+            )
+        ]
+        status
+    )
+}
+
+register: Function := (request: Request) -> Response {
+    context: Local RequestContext := Web.context(request, exampleSessions())
+    return context.respond(
+        registerView(context, context.form().old([]), Web.errors())
+    )
+}
+
+registerSubmit: Function := (request: Request) -> Response {
+    context: Local RequestContext := Web.context(request, exampleSessions())
+    form: Local Form := context.form()
+    if context.csrfValid() == false {
+        return context.respond(Web.text("Forbidden", 403))
+    }
+    errors: Local ValidationErrors := Web.errors()
+    errors.required("name", form.value("name"), "Name is required.")
+    errors.maxLength(
+        "name"
+        form.value("name")
+        80
+        "Name must be at most 80 characters."
+    )
+    errors.email("email", form.value("email"), "Enter an email address.")
+    errors.minLength(
+        "password"
+        form.value("password")
+        10
+        "Password must have at least 10 characters."
+    )
+    errors.matches(
+        "password_confirmation"
+        form.value("password_confirmation")
+        form.value("password")
+        "Passwords must match."
+    )
+    if errors.any() {
+        // This is the entire old-input policy. No password or token is copied.
+        return context.respond(
+            registerView(context, form.old(["name", "email"]), errors, 422)
+        )
+    }
+    context.flashSet("notice", "Form accepted. No account was created.")
+    return context.respond(Web.redirect("/profile"))
+}

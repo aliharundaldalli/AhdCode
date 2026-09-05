@@ -1,0 +1,10 @@
+bring Web
+from Web bring (ValidationErrors, HTMLNode)
+
+formErrors: Function := (errors: ValidationErrors) -> HTMLNode {
+    items: Local List<HTMLNode> := []
+    for message in errors.messages() {
+        items.add(Web.UI.li(message))
+    }
+    return Web.UI.ul(items, {"role": "alert"})
+}

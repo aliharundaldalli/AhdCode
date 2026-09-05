@@ -395,3 +395,13 @@ dil tasarımı ve nihai teknik kararlar proje yazarına aittir.
 ## Lisans
 
 AhdCode, [MIT Lisansı](LICENSE) altında kullanılabilir.
+
+
+**v0.16.0 adayı — İstek Bağlamı, Formlar, Doğrulama, CSRF ve Flash.**
+Aday; açık istek/oturum bağlamı, tek seferlik yanıt sonlandırma, türlenmiş form
+okuma, sıralı doğrulama hataları, seçilmiş güvenli eski girdi, oturuma bağlı CSRF
+ve tüketilen flash mesajları ekler. Uygulama gömülü AhdCode'dur; mevcut
+HTTP/Session/Web.UI API'leri ve v0.15.1 temiz yolları uyumludur. Bu bağımsız QA
+bekleyen aday çalışmadır, yeni yayımlanmış sürüm değildir.
+[İş akışı ve kesin API](docs/WEB_TR.md) ile
+[çalıştırılabilir örneğe](examples/v0.16/forms_validation/README_TR.md) bakın.

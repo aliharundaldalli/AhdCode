@@ -4517,3 +4517,34 @@ not -- the browser just gets the new file on the next reload.
 
 A complete example is in `examples/v0.15/ahd_academi`, and the full reference
 is [docs/WEB.md](WEB.md).
+
+## v0.16 candidate: a complete form workflow
+
+The [forms example](../examples/v0.16/forms_validation/README.md) runs with
+`ahdcode run examples/v0.16/forms_validation/app.ahd` and needs no database.
+Visit `http://127.0.0.1:8160/register`. GET creates a request context and renders
+a hidden CSRF field. POST explicitly verifies CSRF and collects validation
+errors. Invalid input re-renders only the selected name/email values through
+Web.UI escaping; password and confirmation stay empty. Valid input sets a flash
+message and redirects to `/profile`; its handler takes the message and commits
+the removal, so refreshing shows no message.
+
+Use one `Web.context(request, store)` per request and return
+`context.respond(response)` on every response path. A duplicate finalization
+raises `WebContextError`. `context.session` remains the ordinary Session value,
+so application login and guards remain explicit. `Web.form(request)` is also
+available without a session. `Form.integer` separates missing null from invalid
+`FormValueError`; `Form.optional` separates missing from empty input.
+`Web.errors()` supports required, length, matches, email shape, allowed values,
+strict hex color, and custom field errors in deterministic order.
+
+Choose `form.old(["name", "email"])` deliberately; never select passwords,
+reset verifiers, or other secrets. There is no automatic old-input persistence,
+flash rendering, middleware, or auth framework. The [Web guide](WEB.md) teaches
+the complete flow and exact API; the v0.15 APIs remain source-compatible.
+
+`Page`, `Layout` and `Component` are ways to organize an application, not
+language constructs, and handler names are ordinary identifiers: the example
+routes to `register`, `registerSubmit` and `profile` with no `Page` suffix,
+while applications that already use `registerPage` keep working unchanged. See
+[10.1 Naming](WEB.md#101-naming).

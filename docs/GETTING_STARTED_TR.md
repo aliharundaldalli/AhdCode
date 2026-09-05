@@ -119,3 +119,34 @@ Sırada: [dil turunu](LANGUAGE_TOUR_TR.md) ve
 [derlenmiş örnekleri](../examples/v0.1/README_TR.md),
 [Data tablolarını](DATA_TR.md), [PDF](PDF_TR.md) üretimini ve
 [Archive](ARCHIVE_TR.md) paketlemesini çalıştırın.
+
+## v0.16 adayı: tam form iş akışı
+
+[Form örneği](../examples/v0.16/forms_validation/README_TR.md),
+`ahdcode run examples/v0.16/forms_validation/app.ahd` ile veritabanı olmadan
+çalışır. `http://127.0.0.1:8160/register` adresini açın. GET bir istek bağlamı
+oluşturup gizli CSRF alanını gösterir. POST açıkça CSRF doğrular ve doğrulama
+hatalarını toplar. Geçersiz girdide yalnızca seçilmiş ad/e-posta değerleri Web.UI
+kaçırmasıyla yeniden gösterilir; parola ve onayı boş kalır. Geçerli girdide flash
+mesajı yazılıp `/profile` adresine yönlendirilir; bu işleyici mesajı tüketip silmeyi
+kaydeder, böylece yenilemede mesaj görünmez.
+
+İstek başına bir `Web.context(request, store)` kullanın ve her yanıt yolunda
+`context.respond(response)` döndürün. İkinci sonlandırma `WebContextError`
+üretir. `context.session` olağan Session değeridir; uygulamanın giriş ve koruma
+kodları açık kalır. `Web.form(request)` oturumsuz da kullanılabilir.
+`Form.integer` eksik null ile geçersiz `FormValueError` durumlarını;
+`Form.optional` eksik ile boş girdiyi ayırır. `Web.errors()` zorunlu alan,
+uzunluk, eşleşme, e-posta biçimi, izin verilen değerler, kesin hex renk ve özel
+alan hatalarını belirli sırayla destekler.
+
+`form.old(["name", "email"])` seçimini açık yapın; parola, sıfırlama doğrulayıcısı
+ve diğer sırları seçmeyin. Otomatik eski girdi saklama, flash gösterimi,
+middleware veya auth çerçevesi yoktur. [Web rehberi](WEB_TR.md) tam akışı ve kesin
+API'yi öğretir; v0.15 API'leri kaynak uyumluluğunu korur.
+
+`Page`, `Layout` ve `Component` bir uygulamayı düzenleme biçimleridir, dil
+yapısı değil; işleyici adları da sıradan tanımlayıcılardır: örnek `Page` soneki
+olmadan `register`, `registerSubmit` ve `profile` işleyicilerine yönlendirir,
+`registerPage` kullanan uygulamalar ise değişmeden çalışmayı sürdürür. Bkz.
+[10.1 Adlandırma](WEB_TR.md#101-adlandırma).
