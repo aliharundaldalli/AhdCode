@@ -232,21 +232,11 @@ communitySolutionsSection: Function := (
             typeLabel = "Görsel"
         }
 
-        viewBtn: Local HTMLNode := Web.UI.span("")
-        if viewer != null {
-            viewBtn = Web.UI.a(
-                "/solution/file?id={str(sol.id)}"
-                "Çözümü Gör / İndir"
-                {"class": "btn btn-sm btn-outline-primary", "target": "_blank"}
-            )
-        }
-        else {
-            viewBtn = Web.UI.a(
-                "/login"
-                "Görmek için Giriş Yapın"
-                {"class": "btn btn-sm btn-outline-secondary"}
-            )
-        }
+        viewBtn: Local HTMLNode := Web.UI.a(
+            "/solution/file?id={str(sol.id)}"
+            "Çözümü Gör / İndir"
+            {"class": "btn btn-sm btn-outline-primary", "target": "_blank"}
+        )
 
         kbSize: Local Int := int(sol.fileSize / 1024)
         if kbSize == 0 {
