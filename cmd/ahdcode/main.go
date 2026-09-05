@@ -24,17 +24,22 @@ import (
 	"ahdcode/internal/source"
 )
 
-const usage = `AhdCode v0.18.5 toolchain
+const usage = `AhdCode v0.19.0 toolchain
 
 usage:
-  ahdcode                                  start the interactive REPL
+  ahdcode                                    start the interactive REPL
   ahdcode init  web [empty|basic|admin]      initialize this directory as a Web app
-  ahdcode databases                          start AhdDataStudio at AhdDatabaseStudio.test
-  ahdcode build <entry.ahd> [-o <output>]   compile to a native executable
-  ahdcode run   <entry.ahd> [-- <args>...]  compile and run
+  ahdcode databases                          start AhdDataStudio at ahddatabasestudio.test
+  ahdcode databases list                     list registered local databases
+  ahdcode databases add <file.db>            register a SQLite file with AhdDataStudio
+  ahdcode databases remove <file.db>         forget a SQLite file (the file is kept)
+  ahdcode build <entry.ahd> [-o <output>]    compile to a native executable
+  ahdcode run   <entry.ahd> [-- <args>...]   compile and run
   ahdcode dev   <entry.ahd>                  watch, rebuild, and restart on save
   ahdcode stop  <app.dev|app.run>            gracefully stop a dev or run session
   ahdcode kill  [--force] <app.dev|app.run>  forcibly stop a dev or run session
+  ahdcode local status                       show local routes and the local router
+  ahdcode local hosts [apply|remove]         manage AhdCode's block in the hosts file
   ahdcode format [--check] <file.ahd>        canonicalize source in place
   ahdcode lsp                                start the language server (stdio)
   ahdcode --help                             show this help
@@ -46,9 +51,16 @@ stop vs kill:
   kill  forces immediate termination. For app.dev this always stops both
         the dev controller and its current child; for app.run, --force
         escalates from the default graceful signal to an immediate one.
+
+local development:
+  ahdcode dev gives an HTTP Web application a .test name derived from
+  APP_HOST and serves it through a loopback-only router, so a project
+  configured for ahdakademi.com opens at http://ahdakademi.test/ while
+  still binding its own SERVER_HOST:SERVER_PORT. The logical URL and the
+  bind address are reported separately and neither replaces the other.
 `
 
-const version = "AhdCode v0.18.5"
+const version = "AhdCode v0.19.0"
 
 func main() {
 	os.Exit(run(os.Args[1:]))
@@ -73,6 +85,8 @@ func runWithIO(arguments []string, input io.Reader, output, errorOutput io.Write
 		return runRun(arguments[1:], input, output, errorOutput)
 	case "dev":
 		return runDev(arguments[1:], output, errorOutput)
+	case "local":
+		return runLocal(arguments[1:], input, output, errorOutput)
 	case "stop":
 		return runStop(arguments[1:], output, errorOutput)
 	case "kill":
