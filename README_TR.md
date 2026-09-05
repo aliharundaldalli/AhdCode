@@ -321,6 +321,18 @@ ahdcode --version
 ## CLI hızlı başlangıç
 
 ```bash
+mkdir MyPortal && cd MyPortal
+ahdcode init web
+ahdcode dev app.ahd
+```
+
+`ahdcode init web` **bulunulan dizini** çevrimdışı, küçük bir Web uygulaması
+olarak kurar: `app.ahd`, Config / Pages / Layouts / Components, `public/`
+(boş `css/` ve `js/` başlangıç dosyaları dahil), `.env` ve `.env.example`.
+`.env` gitignore’dadır; `.env.example` güvenle commitlenir. Var olan dosyaların
+üzerine yazılmaz. Paket yöneticisi ve ağ indirmesi yoktur.
+
+```bash
 ahdcode run examples/v0.1/01_hello.ahd
 ahdcode dev examples/v0.1/01_hello.ahd
 ahdcode build examples/v0.1/01_hello.ahd -o hello

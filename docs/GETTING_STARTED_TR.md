@@ -76,6 +76,28 @@ ahdcode build hello.ahd -o hello
 ./hello
 ```
 
+## Bir Web uygulaması başlatın
+
+Bulunulan dizini kurar. Proje adı, paket yöneticisi veya ağ indirmesi yoktur:
+
+```bash
+mkdir MyPortal
+cd MyPortal
+ahdcode init web
+ahdcode dev app.ahd
+```
+
+`app.ahd`, `.env`, `.env.example`, `.gitignore`, bir Config / Page / Layout /
+Component, `public/app.css` ve boş başlangıç dosyaları `public/css/style.css`
+ile `public/js/main.js` yazılır. `.env` yalnızca güvenli geliştirme
+varsayılanlarını tutar (`APP_HOST=localhost`, loopback HTTP) ve gitignore’dadır.
+`.env.example` güvenle commitlenir. Süreç ortamı hâlâ `.env`’den üstündür.
+Var olan dosyaların üzerine yazılmaz; `--force` yoktur.
+
+`http://127.0.0.1:8080` adresini açın. Başlangıç sayfası JavaScript veya CDN
+yüklemez. Form, CSRF ve oturum burada yoktur; bkz.
+[v0.16 form örneği](../examples/v0.16/forms_validation/README_TR.md).
+
 ## Girdi
 
 `take` bir satır okur. Metin döndürür, bu yüzden sayısal girdi için açık bir

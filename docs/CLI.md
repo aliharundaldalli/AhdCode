@@ -8,6 +8,7 @@ The current command surface is:
 
 ```text
 ahdcode
+ahdcode init web
 ahdcode build <entry.ahd> [-o <output>]
 ahdcode run <entry.ahd> [-- <args>...]
 ahdcode dev <entry.ahd>
@@ -18,6 +19,13 @@ ahdcode lsp
 ahdcode --help
 ahdcode --version
 ```
+
+`ahdcode init web` writes a minimal Web application into the **current
+directory**. It creates `.env` (safe development defaults, gitignored) and
+`.env.example` (safe to commit), plus `app.ahd`, Config / Pages / Layouts /
+Components, `public/app.css`, and empty `public/css/style.css` and
+`public/js/main.js` starters. Templates are embedded in the CLI: offline, no
+package manager, no overwrite. Next: `ahdcode dev app.ahd`.
 
 `run` compiles through the normal frontend and Go backend, then executes the
 native result. Arguments after the entry (optionally after `--`) are forwarded

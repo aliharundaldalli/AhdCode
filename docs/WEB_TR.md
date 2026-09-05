@@ -753,6 +753,22 @@ düşük seviyeli modüllere uzanın.
 | v0.16 | Formlar, doğrulama, CSRF kolaylıkları, flash, eski girdi, form hataları |
 | v0.17 | Zengin yönlendirme, rota grupları, ara katman bileşimi, yetki bekçileri |
 
+## Bir proje başlatmak
+
+```bash
+mkdir MyPortal
+cd MyPortal
+ahdcode init web
+ahdcode dev app.ahd
+```
+
+`init web` bulunulan dizini kurar. `.env` (loopback geliştirme varsayılanları,
+gitignore) ve `.env.example` (güvenle commitlenir) ile bir Page, Layout,
+Component, Config, `public/app.css` ve boş `public/css/style.css` /
+`public/js/main.js` yazar. Şablonlar CLI içine gömülüdür: ağ yok, paket
+yöneticisi yok, üzerine yazma yok. `http://127.0.0.1:8080` adresini açın.
+Başlangıç sayfası JavaScript yüklemez.
+
 ## Örnek
 
 Tam bir uygulama

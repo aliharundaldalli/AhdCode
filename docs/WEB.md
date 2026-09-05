@@ -749,6 +749,22 @@ configuration contract.
 | v0.16 | Forms, validation, CSRF conveniences, flash, old input, form errors |
 | v0.17 | Richer routing, route groups, middleware composition, auth guards |
 
+## Starting a project
+
+```bash
+mkdir MyPortal
+cd MyPortal
+ahdcode init web
+ahdcode dev app.ahd
+```
+
+`init web` initializes the current directory. It writes `.env` (loopback
+development defaults, gitignored) and `.env.example` (safe to commit), plus
+one Page, Layout, Component, Config file, `public/app.css`, and empty
+`public/css/style.css` / `public/js/main.js` starters. Templates are embedded
+in the CLI: no network, no package manager, no overwrite. Open
+`http://127.0.0.1:8080`. The starter does not load JavaScript.
+
 ## Example
 
 A complete application lives in

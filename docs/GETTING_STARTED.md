@@ -76,6 +76,29 @@ ahdcode build hello.ahd -o hello
 ./hello
 ```
 
+## Start a Web application
+
+Initialize the current directory. No project name, package manager, or
+network fetch:
+
+```bash
+mkdir MyPortal
+cd MyPortal
+ahdcode init web
+ahdcode dev app.ahd
+```
+
+This writes `app.ahd`, `.env`, `.env.example`, `.gitignore`, one Config /
+Page / Layout / Component, `public/app.css`, and empty starter files
+`public/css/style.css` and `public/js/main.js`. `.env` holds only safe
+development defaults (`APP_HOST=localhost`, loopback HTTP) and is gitignored.
+`.env.example` is safe to commit. Process environment values still win over
+`.env`. Existing files are never overwritten; there is no `--force`.
+
+Open `http://127.0.0.1:8080`. The starter page does not load JavaScript or
+CDN assets. Forms, CSRF, and sessions are not included here; see the
+[v0.16 forms example](../examples/v0.16/forms_validation/README.md).
+
 ## Input
 
 `take` reads one line. It returns text, so numeric input uses an explicit

@@ -303,6 +303,18 @@ ahdcode --version
 ## CLI quick start
 
 ```bash
+mkdir MyPortal && cd MyPortal
+ahdcode init web
+ahdcode dev app.ahd
+```
+
+`ahdcode init web` initializes the **current directory** as a minimal offline
+Web application: `app.ahd`, Config / Pages / Layouts / Components, `public/`
+assets including empty `css/` and `js/` starters, `.env`, and `.env.example`.
+`.env` is gitignored; `.env.example` is safe to commit. Existing files are
+never overwritten. There is no package manager and no network fetch.
+
+```bash
 ahdcode run examples/v0.1/01_hello.ahd
 ahdcode dev examples/v0.1/01_hello.ahd
 ahdcode build examples/v0.1/01_hello.ahd -o hello
