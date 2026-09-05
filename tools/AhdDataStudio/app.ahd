@@ -8,7 +8,8 @@
 // Server.static rather than one HTTP.file route per file.
 //
 //   ahdcode databases
-//   open http://ahddatabasestudio.test:8081/AhdDataStudio
+//   open http://ahddatabasestudio.test/          (through the local router)
+//   open http://127.0.0.1:8081/AhdDataStudio     (always available)
 //   ahdcode kill app.run
 //
 // Binds 127.0.0.1 only. Do not change the host to 0.0.0.0.
@@ -44,6 +45,8 @@ bring Security
 from Env bring EnvError
 from HTML bring HTMLError
 from HTTP bring Server
+from HTTP bring Request
+from HTTP bring Response
 from HTTP bring HTTPError
 from Security bring SecurityError
 
@@ -53,6 +56,17 @@ from Security bring SecurityError
 // when present and the path relative to the repository root is the
 // fallback. Both files this app ships (bootstrap.min.css, the logo) live
 // together under the same directory, so one static root covers both.
+// studioRoot answers the bare root.
+//
+// Studio mounts everything under /AhdDataStudio, so a person opening
+// http://127.0.0.1:8081/ or http://ahddatabasestudio.test/ would otherwise
+// land on nothing. The redirect is relative, so it keeps whichever host the
+// caller used and the local router needs no path rewriting of its own --
+// which is what keeps the router a plain host-based proxy.
+studioRoot: Function := (request: Request) -> Response {
+    return HTTP.redirect("/AhdDataStudio")
+}
+
 staticAssetsRoot: Function := () -> String {
     if File.exists("assets/bootstrap.min.css") {
         return "assets"
@@ -64,6 +78,7 @@ startStudio: Function := () -> Nothing {
     loadEnvFile()
     app: Local Server := HTTP.server("127.0.0.1", 8081)
     app.static("/AhdDataStudio/assets", staticAssetsRoot())
+    app.get("/", studioRoot)
     app.get("/AhdDataStudio", home)
     app.get("/AhdDataStudio/lang", setStudioLang)
     app.get("/AhdDataStudio/mysql", mysqlHome)
@@ -91,7 +106,7 @@ startStudio: Function := () -> Nothing {
     app.post("/AhdDataStudio/sqlite/delete", sqliteDelete)
     app.get("/AhdDataStudio/sqlite/confirm", sqliteConfirmPage)
     app.post("/AhdDataStudio/sqlite/drop", sqliteDrop)
-    write("AhdDataStudio listening on http://ahddatabasestudio.test:8081/AhdDataStudio")
+    write("AhdDataStudio listening on http://127.0.0.1:8081/AhdDataStudio")
     app.start()
 }
 

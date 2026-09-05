@@ -1,6 +1,9 @@
 bring Env
 bring File
 from File bring FileError
+bring JSON
+from JSON bring JSONValue
+from JSON bring JSONError
 bring MySQL
 from MySQL bring MySQLDatabase
 bring Path
@@ -15,8 +18,64 @@ connectMysql: Function := () -> MySQLDatabase {
     return MySQL.connect(host, username, password, port, null, security)
 }
 
+// registeredSqlitePaths reads the AhdCode database registry.
+//
+// The registry is written by the CLI (`ahdcode init web admin` registers the
+// database it created; `ahdcode databases add` registers one by hand), and
+// AHD_DATA_REGISTRY names its location. It holds only metadata -- a driver,
+// a path, a display name -- and never a credential, so reading it here adds
+// no secret to this process.
+//
+// A registry that is missing, unreadable, or malformed yields no paths
+// rather than an error: the environment-variable sources below are a
+// complete configuration on their own, and Studio must still open.
+registeredSqlitePaths: Function := () -> List<String> {
+    found: Local List<String> := []
+    registry: Local String := Env.getOr("AHD_DATA_REGISTRY", "")
+    if registry == "" {
+        return found
+    }
+    attempt {
+        document: Local JSONValue := JSON.read(registry)
+        entries: Local JSONValue? := document.get("databases")
+        if entries != null {
+            for entry in entries.array() {
+                driver: Local JSONValue? := entry.get("driver")
+                file: Local JSONValue? := entry.get("path")
+                if driver != null {
+                    if file != null {
+                        if driver.string() == "sqlite" {
+                            value: Local String := file.string()
+                            if value != "" {
+                                if not (value in found) {
+                                    found.add(value)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    except JSONError {}
+    return found
+}
+
+// allowedSqlitePaths is the one allowlist every SQLite page in Studio checks
+// a requested path against. v0.19 adds the registry as a third source, ahead
+// of the two environment sources it already had, and deduplicates across all
+// three in a fixed order so the list is the same on every request.
+//
+// The discovery rules themselves are unchanged: explicit paths, plus the
+// immediate children of AHD_DATA_PROJECT_ROOT. Nothing recursive, nothing
+// machine-wide.
 allowedSqlitePaths: Function := () -> List<String> {
     found: Local List<String> := []
+    for registered in registeredSqlitePaths() {
+        if not (registered in found) {
+            found.add(registered)
+        }
+    }
     explicit: Local String := Env.getOr("AHD_DATA_SQLITE_PATHS", "")
     parts: Local List<String> := explicit.split(",")
     for part in parts {
