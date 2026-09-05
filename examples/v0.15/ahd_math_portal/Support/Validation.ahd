@@ -102,3 +102,22 @@ validationPositiveInt: Function := (value: String?) -> Int {
 
     return parsed
 }
+// validationPathID extracts a trailing integer segment from a request path given
+// a prefix (e.g. "/admin/questions/edit/"). If the path does not start with the
+// prefix, it falls back to fallbackQueryId for backward compatibility.
+validationPathID: Function := (
+    path: String
+    prefix: String
+    fallbackQueryId: String?
+) -> Int {
+    if path.startsWith(prefix) {
+        rest: Local String := path[len(prefix):len(path)]
+        if rest.contains("/") == false {
+            return validationPositiveInt(rest)
+        }
+
+        return 0
+    }
+
+    return validationPositiveInt(fallbackQueryId)
+}

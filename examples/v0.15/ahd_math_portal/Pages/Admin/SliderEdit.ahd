@@ -34,7 +34,11 @@ adminSliderEditPage: Function := (request: Request) -> Response {
         return sessionCommit(session, guard.refusal)
     }
 
-    id: Local Int := validationPositiveInt(request.query("id"))
+    id: Local Int := validationPathID(
+        request.path()
+        "/admin/sliders/edit/"
+        request.query("id")
+    )
     slider: Local SliderRecord? := slidersFindById(id)
     if slider == null {
         return sessionCommit(session, Web.text("Slayt bulunamadı.", 404))

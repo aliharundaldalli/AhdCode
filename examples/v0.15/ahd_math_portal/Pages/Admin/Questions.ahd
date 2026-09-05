@@ -109,7 +109,7 @@ adminQuestionRow: Function := (
             Web.UI.tdNodes(
                 [
                     Web.UI.aNodes(
-                        "/admin/questions/edit?id={str(question.id)}"
+                        "/admin/questions/edit/{str(question.id)}"
                         [
                             Web.UI.i(
                                 ""

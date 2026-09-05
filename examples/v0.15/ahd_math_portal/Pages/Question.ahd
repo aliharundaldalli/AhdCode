@@ -308,21 +308,13 @@ communitySolutionsSection: Function := (
 }
 
 questionIDFromRequest: Function := (request: Request) -> Int {
-    path: Local String := request.path()
-    prefix: Local String := "/question/"
-    if path.startsWith(prefix) {
-        rest: Local String := path[len(prefix):len(path)]
-        if rest.contains("/") == false {
-            return validationPositiveInt(rest)
-        }
-
-        return 0
-    }
-
-    return validationPositiveInt(request.query("id"))
+    return validationPathID(request.path(), "/question/", request.query("id"))
 }
 
-questionMissing: Function := (session: Session, context: PageContext) -> Response {
+questionMissing: Function := (
+    session: Session
+    context: PageContext
+) -> Response {
     return sessionCommit(
         session
         mainLayout(

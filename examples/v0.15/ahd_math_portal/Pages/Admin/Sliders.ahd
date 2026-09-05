@@ -227,7 +227,7 @@ adminSliderRow: Function := (
                     Web.UI.div(
                         [
                             Web.UI.aNodes(
-                                "/admin/sliders/edit?id={str(slider.id)}"
+                                "/admin/sliders/edit/{str(slider.id)}"
                                 [
                                     Web.UI.i(
                                         ""

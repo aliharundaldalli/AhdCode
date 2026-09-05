@@ -132,7 +132,7 @@ adminUserRow: Function := (
 
     actionNodes.add(
         Web.UI.aNodes(
-            "/admin/users/edit?id={str(user.id)}"
+            "/admin/users/edit/{str(user.id)}"
             [
                 Web.UI.i("", {"class": "fa-solid fa-key me-1"})
                 Web.UI.text("Parola ata")
@@ -195,7 +195,11 @@ adminUserEditPage: Function := (request: Request) -> Response {
         return sessionCommit(session, guard.refusal)
     }
 
-    id: Local Int := validationPositiveInt(request.query("id"))
+    id: Local Int := validationPathID(
+        request.path()
+        "/admin/users/edit/"
+        request.query("id")
+    )
     user: Local UserRecord? := usersFindById(id)
     if user == null {
         return sessionCommit(session, Web.text("Kullanıcı bulunamadı.", 404))

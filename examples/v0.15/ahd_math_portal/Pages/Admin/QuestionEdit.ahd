@@ -40,7 +40,11 @@ adminQuestionEditPage: Function := (request: Request) -> Response {
         return sessionCommit(session, guard.refusal)
     }
 
-    id: Local Int := validationPositiveInt(request.query("id"))
+    id: Local Int := validationPathID(
+        request.path()
+        "/admin/questions/edit/"
+        request.query("id")
+    )
     question: Local QuestionRecord? := questionsFindAny(id)
     if question == null {
         return sessionCommit(session, Web.text("Soru bulunamadı.", 404))
