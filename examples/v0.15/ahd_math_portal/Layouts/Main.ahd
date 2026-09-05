@@ -1,0 +1,49 @@
+// The public layout.
+//
+// A Layout is an ordinary Function: it takes the page's title and content,
+// adds what every page shares, and returns a Response. Site name and header
+// colour come from site_settings, read once per request and passed down.
+require("Services/CSRF.ahd")
+require("Components/Navbar.ahd")
+require("Components/Footer.ahd")
+require("Components/Alert.ahd")
+require("Repositories/Users.ahd")
+bring Web
+from Web bring (HTMLNode, Response, Session)
+
+mainLayout: Function := (
+    session: Session
+    title: String
+    siteName: String
+    headerColor: String
+    user: UserRecord?
+    isAdmin: Bool
+    flash: String
+    flashKind: String
+    content: List<HTMLNode>
+) -> Response {
+    main: Local List<HTMLNode> := []
+    if flash != "" {
+        main.add(alertBox(flashKind, flash))
+    }
+
+    for node in content {
+        main.add(node)
+    }
+
+    body: Local List<HTMLNode> := [
+        navbar(csrfToken(session), siteName, headerColor, user, isAdmin)
+        Web.UI.main([Web.UI.div(main, {"class": "container py-4"})])
+        siteFooter(siteName)
+    ]
+    return Web.page("{title} — {siteName}", body, layoutHead())
+}
+// layoutHead is the shared document head: the vendored Bootstrap stylesheet
+// and this application's own small stylesheet, both served from public/ by the
+// application's own static route. Nothing is fetched from a CDN at runtime.
+layoutHead: Function := () -> List<HTMLNode> {
+    return [
+        Web.UI.stylesheet("/assets/css/bootstrap.min.css")
+        Web.UI.stylesheet("/assets/css/app.css")
+    ]
+}

@@ -1,0 +1,19 @@
+bring Web
+from Web bring HTMLNode
+
+siteFooter: Function := (siteName: String) -> HTMLNode {
+    return Web.UI.footer(
+        [
+            Web.UI.div(
+                [
+                    Web.UI.p(
+                        "{siteName} — AhdCode v0.15 Web referans uygulaması"
+                        {"class": "text-body-secondary mb-0 small"}
+                    )
+                ]
+                {"class": "container py-4"}
+            )
+        ]
+        {"class": "border-top mt-5"}
+    )
+}

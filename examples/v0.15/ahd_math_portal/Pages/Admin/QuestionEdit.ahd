@@ -1,0 +1,325 @@
+// The question editor, including Gemini drafting.
+//
+// The generate button posts the editor's own fields to /admin/questions/generate,
+// which calls Gemini and re-renders this same editor with the generated text
+// filled in. Nothing is saved by that round trip: the administrator still has
+// to press save, and then publish, as two further explicit actions.
+require("Layouts/Admin.ahd")
+require("Components/FormField.ahd")
+require("Services/Context.ahd")
+require("Services/Session.ahd")
+require("Services/Guard.ahd")
+require("Services/CSRF.ahd")
+require("Services/Gemini.ahd")
+require("Repositories/Questions.ahd")
+require("Repositories/Users.ahd")
+require("Support/Validation.ahd")
+require("Config/Gemini.ahd")
+bring Web
+from Web bring (Request, Response, HTMLNode, Session)
+
+adminQuestionNewPage: Function := (request: Request) -> Response {
+    session: Local Session := sessionOpen(request)
+    context: Local PageContext := contextFor(session)
+    guard: Local GuardResult := adminGuard(session, context)
+    if guard.allowed == false {
+        return sessionCommit(session, guard.refusal)
+    }
+
+    return sessionCommit(
+        session
+        adminQuestionForm(session, context, 0, "", "", "", [], "")
+    )
+}
+
+adminQuestionEditPage: Function := (request: Request) -> Response {
+    session: Local Session := sessionOpen(request)
+    context: Local PageContext := contextFor(session)
+    guard: Local GuardResult := adminGuard(session, context)
+    if guard.allowed == false {
+        return sessionCommit(session, guard.refusal)
+    }
+
+    id: Local Int := validationPositiveInt(request.query("id"))
+    question: Local QuestionRecord? := questionsFindAny(id)
+    if question == null {
+        return sessionCommit(session, Web.text("Soru bulunamadı.", 404))
+    }
+
+    return sessionCommit(
+        session
+        adminQuestionForm(
+            session
+            context
+            question.id
+            question.title
+            question.topic
+            question.body
+            []
+            ""
+        )
+    )
+}
+
+adminQuestionForm: Function := (
+    session: Session
+    context: PageContext
+    id: Int
+    title: String
+    topic: String
+    body: String
+    errors: List<String>
+    notice: String
+) -> Response {
+    content: Local List<HTMLNode> := []
+    if len(errors) > 0 {
+        content.add(errorList(errors))
+    }
+
+    if notice != "" {
+        content.add(alertBox("info", notice))
+    }
+
+    content.add(
+        Web.UI.formTo(
+            "/admin/questions/save"
+            "post"
+            [
+                csrfInput(session)
+                Web.UI.input("hidden", "question_id", str(id))
+                formField("question-title", "title", "Başlık", "text", title)
+                formField("question-topic", "topic", "Konu", "text", topic)
+                formTextArea("question-body", "body", "Soru metni", body)
+                Web.UI.button(
+                    "Kaydet"
+                    {"type": "submit", "class": "btn btn-primary"}
+                )
+            ]
+        )
+    )
+    content.add(adminGeminiPanel(session, id, title, topic, body))
+    content.add(
+        Web.UI.pNodes(
+            [Web.UI.a("/admin/questions", "Listeye dön")]
+            {"class": "mt-3 mb-0 small"}
+        )
+    )
+
+    heading: Local String := "Yeni soru"
+    if id != 0 {
+        heading = "Soruyu düzenle"
+    }
+
+    return adminLayout(
+        session
+        heading
+        context.siteName
+        context.headerColor
+        context.user
+        "/admin/questions"
+        context.flash
+        context.flashKind
+        content
+    )
+}
+// adminGeminiPanel is the AI drafting form. When Gemini is not configured the
+// panel says so plainly instead of offering a button that cannot work.
+adminGeminiPanel: Function := (
+    session: Session
+    id: Int
+    title: String
+    topic: String
+    body: String
+) -> HTMLNode {
+    if geminiConfigured() == false {
+        return Web.UI.section(
+            [
+                Web.UI.h2("Gemini ile üret", {"class": "h5"})
+                Web.UI.p(
+                    "Gemini yapılandırılmamış. GEMINI_API_KEY ve GEMINI_MODEL ortam değişkenlerini ayarlayın."
+                    {"class": "alert alert-secondary mb-0"}
+                )
+            ]
+            {"class": "border-top mt-4 pt-4"}
+        )
+    }
+
+    return Web.UI.section(
+        [
+            Web.UI.h2("Gemini ile üret", {"class": "h5"})
+            Web.UI.p(
+                "Üretilen metin taslak olarak forma yazılır. Yayımlamak ayrı ve açık bir adımdır."
+                {"class": "text-body-secondary small"}
+            )
+            Web.UI.formTo(
+                "/admin/questions/generate"
+                "post"
+                [
+                    csrfInput(session)
+                    Web.UI.input("hidden", "question_id", str(id))
+                    Web.UI.input("hidden", "title", title)
+                    Web.UI.input("hidden", "body", body)
+                    formField("gemini-topic", "topic", "Konu", "text", topic)
+                    Web.UI.div(
+                        [
+                            Web.UI.labelFor(
+                                "gemini-difficulty"
+                                "Zorluk"
+                                {"class": "form-label"}
+                            )
+                            Web.UI.select(
+                                "difficulty"
+                                [
+                                    Web.UI.option("kolay", "Kolay")
+                                    Web.UI.option("orta", "Orta")
+                                    Web.UI.option("zor", "Zor")
+                                ]
+                                {
+                                    "id": "gemini-difficulty"
+                                    "class": "form-select"
+                                }
+                            )
+                        ]
+                        {"class": "mb-3"}
+                    )
+                    formField(
+                        "gemini-instruction"
+                        "instruction"
+                        "Ek yönerge"
+                        "text"
+                    )
+                    Web.UI.button(
+                        "Taslak üret"
+                        {"type": "submit", "class": "btn btn-outline-primary"}
+                    )
+                ]
+            )
+        ]
+        {"class": "border-top mt-4 pt-4"}
+    )
+}
+
+adminQuestionGenerateSubmit: Function := (request: Request) -> Response {
+    session: Local Session := sessionOpen(request)
+    context: Local PageContext := contextFor(session)
+    guard: Local GuardResult := adminGuard(session, context)
+    if guard.allowed == false {
+        return sessionCommit(session, guard.refusal)
+    }
+
+    if csrfValid(session, request) == false {
+        return sessionCommit(session, Web.text("Geçersiz form belirteci.", 403))
+    }
+
+    id: Local Int := validationPositiveInt(request.form("question_id"))
+    topic: Local String := validationField(request.form("topic"))
+    difficulty: Local String := validationField(request.form("difficulty"))
+    instruction: Local String := validationField(request.form("instruction"))
+    existingTitle: Local String := validationField(request.form("title"))
+    existingBody: Local String := validationField(request.form("body"))
+
+    generated: Local GeneratedQuestion := geminiGenerate(
+        topic
+        difficulty
+        instruction
+    )
+    if generated.ok == false {
+        return sessionCommit(
+            session
+            adminQuestionForm(
+                session
+                context
+                id
+                existingTitle
+                topic
+                existingBody
+                [generated.error]
+                ""
+            )
+        )
+    }
+    // The generated text is untrusted text. It reaches the page through the
+    // ordinary escaping form fields, exactly like anything a person typed.
+    newTitle: Local String := generated.title
+    if newTitle == "" {
+        newTitle = existingTitle
+    }
+
+    return sessionCommit(
+        session
+        adminQuestionForm(
+            session
+            context
+            id
+            newTitle
+            topic
+            generated.body
+            []
+            "Taslak üretildi. Gözden geçirip kaydedin."
+        )
+    )
+}
+
+adminQuestionSaveSubmit: Function := (request: Request) -> Response {
+    session: Local Session := sessionOpen(request)
+    context: Local PageContext := contextFor(session)
+    guard: Local GuardResult := adminGuard(session, context)
+    if guard.allowed == false {
+        return sessionCommit(session, guard.refusal)
+    }
+
+    if csrfValid(session, request) == false {
+        return sessionCommit(session, Web.text("Geçersiz form belirteci.", 403))
+    }
+
+    id: Local Int := validationPositiveInt(request.form("question_id"))
+    title: Local String := validationField(request.form("title"))
+    topic: Local String := validationField(request.form("topic"))
+    body: Local String := validationField(request.form("body"))
+
+    errors: Local List<String> := []
+    if title == "" {
+        errors.add("Başlık gerekli.")
+    }
+
+    if topic == "" {
+        errors.add("Konu gerekli.")
+    }
+
+    if body == "" {
+        errors.add("Soru metni gerekli.")
+    }
+
+    if len(errors) > 0 {
+        return sessionCommit(
+            session
+            adminQuestionForm(
+                session
+                context
+                id
+                title
+                topic
+                body
+                errors
+                ""
+            )
+        )
+    }
+
+    author: Local UserRecord? := context.user
+    authorId: Local Int := 0
+    if author != null {
+        authorId = author.id
+    }
+
+    if id == 0 {
+        questionsCreate(title, topic, body, authorId)
+        flashSet(session, "success", "Soru taslak olarak kaydedildi.")
+    }
+    else {
+        questionsUpdate(id, title, topic, body)
+        flashSet(session, "success", "Soru güncellendi.")
+    }
+
+    return sessionCommit(session, Web.redirect("/admin/questions"))
+}

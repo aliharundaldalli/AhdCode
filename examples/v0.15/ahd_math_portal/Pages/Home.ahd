@@ -1,0 +1,63 @@
+// The public question list.
+require("Layouts/Main.ahd")
+require("Components/QuestionCard.ahd")
+require("Services/Context.ahd")
+require("Services/Session.ahd")
+require("Repositories/Questions.ahd")
+bring Web
+from Web bring (Request, Response, HTMLNode, Session)
+
+homePage: Function := (request: Request) -> Response {
+    session: Local Session := sessionOpen(request)
+    context: Local PageContext := contextFor(session)
+    questions: Local List<QuestionRecord> := questionsPublished()
+
+    content: Local List<HTMLNode> := [
+        Web.UI.section(
+            [
+                Web.UI.h1("Matematik soruları", {"class": "h2 mb-1"})
+                Web.UI.p(
+                    "Yayımlanmış sorular. Çözümünüzü yüklemek için giriş yapın."
+                    {"class": "text-body-secondary"}
+                )
+            ]
+            {"class": "mb-4"}
+        )
+    ]
+    if len(questions) == 0 {
+        content.add(
+            Web.UI.p(
+                "Henüz yayımlanmış soru yok."
+                {"class": "alert alert-info"}
+            )
+        )
+    }
+    else {
+        cards: Local List<HTMLNode> := []
+        for question in questions {
+            cards.add(
+                Web.UI.div(
+                    [questionCard(question)]
+                    {"class": "col-12 col-md-6 col-lg-4 mb-4"}
+                )
+            )
+        }
+
+        content.add(Web.UI.div(cards, {"class": "row"}))
+    }
+
+    return sessionCommit(
+        session
+        mainLayout(
+            session
+            "Sorular"
+            context.siteName
+            context.headerColor
+            context.user
+            context.isAdmin
+            context.flash
+            context.flashKind
+            content
+        )
+    )
+}

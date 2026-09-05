@@ -1,0 +1,171 @@
+// One published question, plus the signed-in user's solution upload.
+//
+// v0.15 routing matches exact paths, so the question is identified by a query
+// parameter rather than a path segment. That is the released routing model,
+// not a workaround.
+require("Layouts/Main.ahd")
+require("Components/FormField.ahd")
+require("Services/Context.ahd")
+require("Services/Session.ahd")
+require("Services/Solutions.ahd")
+require("Services/CSRF.ahd")
+require("Repositories/Questions.ahd")
+require("Repositories/Users.ahd")
+require("Repositories/Solutions.ahd")
+require("Support/Validation.ahd")
+bring Web
+from Web bring (Request, Response, HTMLNode, Session)
+
+questionPage: Function := (request: Request) -> Response {
+    session: Local Session := sessionOpen(request)
+    context: Local PageContext := contextFor(session)
+    id: Local Int := validationPositiveInt(request.query("id"))
+    question: Local QuestionRecord? := questionsFindPublished(id)
+
+    if question == null {
+        return sessionCommit(
+            session
+            mainLayout(
+                session
+                "Soru bulunamadı"
+                context.siteName
+                context.headerColor
+                context.user
+                context.isAdmin
+                context.flash
+                context.flashKind
+                [
+                    Web.UI.p(
+                        "Böyle bir yayımlanmış soru yok."
+                        {"class": "alert alert-warning"}
+                    )
+                ]
+            )
+        )
+    }
+
+    content: Local List<HTMLNode> := [Web.UI.article([
+                Web.UI.div(
+                    [
+                        Web.UI.span(
+                            question.topic
+                            {"class": "badge text-bg-secondary"}
+                        )
+                    ]
+                    {"class": "mb-2"}
+                )
+                Web.UI.h1(question.title, {"class": "h3"})
+                Web.UI.p(
+                    question.publishedAt
+                    {"class": "text-body-secondary small"}
+                )
+                // The body is data. If it contains LaTeX source it is shown as
+                // written: see the README on why v0.15 renders no formulas.
+                Web.UI.pre(
+                    question.body
+                    {"class": "bg-body-tertiary p-3 rounded"}
+                )
+            ], {"class": "mb-4"}), solutionSection(session, context, question)]
+
+    return sessionCommit(
+        session
+        mainLayout(
+            session
+            question.title
+            context.siteName
+            context.headerColor
+            context.user
+            context.isAdmin
+            context.flash
+            context.flashKind
+            content
+        )
+    )
+}
+// solutionSection shows one of three states: sign in, already submitted, or
+// the upload form. The submitted state is what a user sees after their single
+// allowed upload -- there is no edit, delete, or resubmit.
+solutionSection: Function := (
+    session: Session
+    context: PageContext
+    question: QuestionRecord
+) -> HTMLNode {
+    // Narrowing applies to bindings, not to attribute access, so the nullable
+    // attribute is copied into a local before it is guarded.
+    viewer: Local UserRecord? := context.user
+    if viewer == null {
+        return Web.UI.section(
+            [
+                Web.UI.h2("Çözümünüz", {"class": "h5"})
+                Web.UI.pNodes(
+                    [
+                        Web.UI.a("/login", "Giriş yapın")
+                        Web.UI.text(" ve çözümünüzü yükleyin.")
+                    ]
+                )
+            ]
+            {"class": "border-top pt-4"}
+        )
+    }
+
+    existing: Local SolutionRecord? := solutionsFindForUser(
+        viewer.id
+        question.id
+    )
+    if existing != null {
+        return Web.UI.section(
+            [
+                Web.UI.h2("Çözümünüz", {"class": "h5"})
+                Web.UI.p(
+                    "Çözümünüz {existing.createdAt} tarihinde alındı: {existing.originalFilename}"
+                    {"class": "alert alert-success"}
+                )
+                Web.UI.p(
+                    "Her soru için tek bir çözüm gönderilebilir."
+                    {"class": "text-body-secondary small mb-0"}
+                )
+            ]
+            {"class": "border-top pt-4"}
+        )
+    }
+
+    return Web.UI.section(
+        [
+            Web.UI.h2("Çözümünüzü yükleyin", {"class": "h5"})
+            Web.UI.formTo(
+                "/solution"
+                "post"
+                [
+                    csrfInput(session)
+                    Web.UI.input("hidden", "question_id", str(question.id))
+                    Web.UI.div(
+                        [
+                            Web.UI.labelFor(
+                                "solution-file"
+                                "Dosya (PDF, PNG veya JPEG)"
+                                {"class": "form-label"}
+                            )
+                            Web.UI.input(
+                                "file"
+                                "solution"
+                                ""
+                                {"id": "solution-file", "class": "form-control"}
+                            )
+                            Web.UI.p(
+                                "En fazla {str(uploadMaxBytes() / 1048576)} MiB. Her soru için tek gönderim."
+                                {"class": "form-text"}
+                            )
+                        ]
+                        {"class": "mb-3"}
+                    )
+                    Web.UI.button(
+                        "Gönder"
+                        {"type": "submit", "class": "btn btn-primary"}
+                    )
+                ]
+                {"enctype": "multipart/form-data"}
+            )
+        ]
+        {"class": "border-top pt-4"}
+    )
+}

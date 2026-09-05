@@ -1,0 +1,50 @@
+// Cross-site request forgery protection.
+//
+// v0.15 has no Forms or CSRF convenience framework, so this is ordinary
+// application code over the released Session and Security primitives. It is
+// deliberately small: one token per session, rendered as a hidden field,
+// compared in constant time.
+require("Services/Session.ahd")
+bring Web
+from Web bring (Session, Request, Response, HTMLNode)
+bring Security
+
+csrfField: String := "_csrf"
+csrfSessionKey: String := "csrf_token"
+// csrfToken returns this session's token, minting one on first use. The token
+// lives in the session, so it is unpredictable to a third-party site and
+// changes whenever the session does.
+csrfToken: Function := (session: Session) -> String {
+    csrfSessionKey: Global String
+    existing: Local String? := session.get(csrfSessionKey)
+    if existing != null {
+        return existing
+    }
+
+    minted: Local String := Security.token()
+    session.set(csrfSessionKey, minted)
+    return minted
+}
+// csrfInput is the hidden field every mutating form carries.
+csrfInput: Function := (session: Session) -> HTMLNode {
+    csrfField: Global String
+    return Web.UI.input("hidden", csrfField, csrfToken(session))
+}
+// csrfValid compares the submitted field with the session's token using a
+// constant-time comparison, so a wrong token leaks nothing through timing.
+// A missing session token or a missing field is a failure, never a pass.
+csrfValid: Function := (session: Session, request: Request) -> Bool {
+    csrfField: Global String
+    csrfSessionKey: Global String
+    expected: Local String? := session.get(csrfSessionKey)
+    if expected == null {
+        return false
+    }
+
+    submitted: Local String? := request.form(csrfField)
+    if submitted == null {
+        return false
+    }
+
+    return Security.secureEqual(expected, submitted)
+}

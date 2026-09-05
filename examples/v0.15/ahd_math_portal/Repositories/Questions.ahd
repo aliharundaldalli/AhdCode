@@ -1,0 +1,163 @@
+// Question persistence.
+//
+// Public listings select on status = 'published' in SQL rather than filtering
+// after the fact, so an unpublished draft never leaves the database on a
+// public path.
+require("Config/Database.ahd")
+require("Support/Rows.ahd")
+bring MySQL
+from MySQL bring (MySQLDatabase, MySQLValue)
+
+QuestionRecord: Class<> := {
+    structure: Attributes := (
+        id: Int
+        title: String
+        topic: String
+        body: String
+        status: String
+        publishedAt: String
+        createdAt: String
+    )
+}
+
+questionsFromRow: Function := (
+    row: Pair<String, MySQLValue>
+) -> QuestionRecord {
+    return QuestionRecord(
+        id: rowInt(row, "id")
+        title: rowString(row, "title")
+        topic: rowString(row, "topic")
+        body: rowString(row, "body")
+        status: rowString(row, "status")
+        publishedAt: rowString(row, "published_at")
+        createdAt: rowString(row, "created_at")
+    )
+}
+
+questionsSelect: Function := () -> String {
+    return "SELECT id, title, topic, body, status, DATE_FORMAT(published_at, '%Y-%m-%d') AS published_at, DATE_FORMAT(created_at, '%Y-%m-%d') AS created_at FROM questions"
+}
+
+questionsPublished: Function := () -> List<QuestionRecord> {
+    rows: Local List<Pair<String, MySQLValue>> := connection(
+        
+    ).query(
+        "{questionsSelect()} WHERE status = 'published' ORDER BY published_at DESC, id DESC"
+    )
+    records: Local List<QuestionRecord> := []
+    for row in rows {
+        records.add(questionsFromRow(row))
+    }
+
+    return records
+}
+
+questionsAll: Function := () -> List<QuestionRecord> {
+    rows: Local List<Pair<String, MySQLValue>> := connection(
+        
+    ).query("{questionsSelect()} ORDER BY id DESC")
+    records: Local List<QuestionRecord> := []
+    for row in rows {
+        records.add(questionsFromRow(row))
+    }
+
+    return records
+}
+// questionsFindPublished is the public lookup: a draft id returns null here
+// even when the id is guessed correctly.
+questionsFindPublished: Function := (id: Int) -> QuestionRecord? {
+    rows: Local List<Pair<String, MySQLValue>> := connection(
+        
+    ).query(
+        "{questionsSelect()} WHERE id = ? AND status = 'published' LIMIT 1"
+        [MySQL.fromInt(id)]
+    )
+    if len(rows) == 0 {
+        return null
+    }
+
+    return questionsFromRow(rows[0])
+}
+
+questionsFindAny: Function := (id: Int) -> QuestionRecord? {
+    rows: Local List<Pair<String, MySQLValue>> := connection(
+        
+    ).query("{questionsSelect()} WHERE id = ? LIMIT 1", [MySQL.fromInt(id)])
+    if len(rows) == 0 {
+        return null
+    }
+
+    return questionsFromRow(rows[0])
+}
+
+questionsCreate: Function := (
+    title: String
+    topic: String
+    body: String
+    createdBy: Int
+) -> Int? {
+    result: Local := connection(
+        
+    ).execute(
+        "INSERT INTO questions (title, topic, body, status, created_by) VALUES (?, ?, ?, 'draft', ?)"
+        [
+            MySQL.fromString(title)
+            MySQL.fromString(topic)
+            MySQL.fromString(body)
+            MySQL.fromInt(createdBy)
+        ]
+    )
+    return result.lastInsertId()
+}
+
+questionsUpdate: Function := (
+    id: Int
+    title: String
+    topic: String
+    body: String
+) -> Nothing {
+    connection(
+        
+    ).execute(
+        "UPDATE questions SET title = ?, topic = ?, body = ? WHERE id = ?"
+        [
+            MySQL.fromString(title)
+            MySQL.fromString(topic)
+            MySQL.fromString(body)
+            MySQL.fromInt(id)
+        ]
+    )
+}
+// Publishing is an explicit admin action, and it is the only place
+// published_at is set.
+questionsPublish: Function := (id: Int) -> Nothing {
+    connection(
+        
+    ).execute(
+        "UPDATE questions SET status = 'published', published_at = COALESCE(published_at, NOW()) WHERE id = ?"
+        [MySQL.fromInt(id)]
+    )
+}
+
+questionsUnpublish: Function := (id: Int) -> Nothing {
+    connection(
+        
+    ).execute(
+        "UPDATE questions SET status = 'draft' WHERE id = ?"
+        [MySQL.fromInt(id)]
+    )
+}
+
+questionsCountByStatus: Function := (status: String) -> Int {
+    rows: Local List<Pair<String, MySQLValue>> := connection(
+        
+    ).query(
+        "SELECT COUNT(*) AS total FROM questions WHERE status = ?"
+        [MySQL.fromString(status)]
+    )
+    if len(rows) == 0 {
+        return 0
+    }
+
+    return rowInt(rows[0], "total")
+}

@@ -1,0 +1,100 @@
+// Sign in.
+//
+// A failed attempt always reports the same thing, whether the address is
+// unknown, the password is wrong, or the account is deactivated. Saying which
+// would turn the login form into an account-existence oracle.
+require("Layouts/Auth.ahd")
+require("Components/FormField.ahd")
+require("Services/Context.ahd")
+require("Services/Session.ahd")
+require("Services/Auth.ahd")
+require("Services/CSRF.ahd")
+require("Support/Validation.ahd")
+bring Web
+from Web bring (Request, Response, HTMLNode, Session)
+
+loginPage: Function := (request: Request) -> Response {
+    session: Local Session := sessionOpen(request)
+    context: Local PageContext := contextFor(session)
+    return sessionCommit(session, loginView(session, context, "", ""))
+}
+
+loginView: Function := (
+    session: Session
+    context: PageContext
+    email: String
+    error: String
+) -> Response {
+    fields: Local List<HTMLNode> := []
+    if error != "" {
+        fields.add(alertBox("error", error))
+    }
+
+    fields.add(
+        Web.UI.formTo(
+            "/login"
+            "post"
+            [
+                csrfInput(session)
+                formField("login-email", "email", "E-posta", "email", email)
+                formField("login-password", "password", "Parola", "password")
+                Web.UI.button(
+                    "Giriş yap"
+                    {"type": "submit", "class": "btn btn-primary w-100"}
+                )
+            ]
+        )
+    )
+    fields.add(
+        Web.UI.pNodes(
+            [
+                Web.UI.text("Hesabınız yok mu? ")
+                Web.UI.a("/register", "Kayıt olun")
+                Web.UI.text(" · ")
+                Web.UI.a("/forgot-password", "Parolamı unuttum")
+            ]
+            {"class": "mt-3 mb-0 small"}
+        )
+    )
+
+    return authLayout(
+        "Giriş"
+        context.siteName
+        context.headerColor
+        context.flash
+        context.flashKind
+        fields
+    )
+}
+
+loginSubmit: Function := (request: Request) -> Response {
+    session: Local Session := sessionOpen(request)
+    context: Local PageContext := contextFor(session)
+    if csrfValid(session, request) == false {
+        return sessionCommit(session, Web.text("Geçersiz form belirteci.", 403))
+    }
+
+    email: Local String := validationEmail(request.form("email"))
+    password: Local String := validationField(request.form("password"))
+    user: Local UserRecord? := authAttempt(email, password)
+    if user == null {
+        return sessionCommit(
+            session
+            loginView(session, context, email, "E-posta veya parola hatalı.")
+        )
+    }
+
+    authLogin(session, user)
+    flashSet(session, "success", "Hoş geldiniz, {user.name}.")
+    return sessionCommit(session, Web.redirect("/"))
+}
+
+logoutSubmit: Function := (request: Request) -> Response {
+    session: Local Session := sessionOpen(request)
+    if csrfValid(session, request) == false {
+        return sessionCommit(session, Web.text("Geçersiz form belirteci.", 403))
+    }
+
+    authLogout(session)
+    return sessionCommit(session, Web.redirect("/"))
+}

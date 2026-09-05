@@ -1,0 +1,33 @@
+// The application's session store.
+//
+// One SessionStore is created at start-up and framed around each request with
+// the released open/commit pair. Cookie flags follow the environment: Secure
+// is set only when the public protocol is https, because a Secure cookie on a
+// plain-http development origin is one the browser would simply never send.
+require("Config/App.ahd")
+bring Web
+from Web bring (SessionStore, Session, Request, Response, AppConfig)
+
+store: SessionStore := Web.sessions(
+    "ahdmath_session"
+    86400
+    sessionSecure()
+    "Lax"
+)
+
+sessionStore: Function := () -> SessionStore {
+    store: Global SessionStore
+    return store
+}
+
+sessionSecure: Function := () -> Bool {
+    return configuration().isSecure()
+}
+
+sessionOpen: Function := (request: Request) -> Session {
+    return sessionStore().open(request)
+}
+
+sessionCommit: Function := (session: Session, response: Response) -> Response {
+    return sessionStore().commit(session, response)
+}

@@ -1,0 +1,33 @@
+// Gemini configuration.
+//
+// The API key is runtime configuration. It is never written into HTML, never
+// logged, never placed in a URL shown to a user, and never committed: the
+// checked-in .env.example carries an empty placeholder.
+//
+// The model is configuration too. Model names change, so the application does
+// not hardcode one and pretend it is permanent -- an unset GEMINI_MODEL simply
+// means the AI feature reports itself unavailable.
+bring Env
+
+geminiConfigured: Function := () -> Bool {
+    return Env.getOr(
+        "GEMINI_API_KEY"
+        ""
+    ) != "" and Env.getOr("GEMINI_MODEL", "") != ""
+}
+
+geminiKey: Function := () -> String {
+    return Env.getOr("GEMINI_API_KEY", "")
+}
+
+geminiModel: Function := () -> String {
+    return Env.getOr("GEMINI_MODEL", "")
+}
+// A configurable base keeps the adapter testable against a local mock without
+// the adapter knowing anything about tests.
+geminiBaseURL: Function := () -> String {
+    return Env.getOr(
+        "GEMINI_BASE_URL"
+        "https://generativelanguage.googleapis.com"
+    )
+}

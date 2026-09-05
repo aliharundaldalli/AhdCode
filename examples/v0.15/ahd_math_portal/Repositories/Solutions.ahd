@@ -1,0 +1,128 @@
+// Solution persistence.
+//
+// The one-solution-per-user-per-question rule lives in the database as
+// UNIQUE(user_id, question_id). solutionsCreate reports failure rather than
+// raising, so the caller can treat "someone else won the race" as an ordinary
+// outcome and clean up the file it just wrote.
+require("Config/Database.ahd")
+require("Support/Rows.ahd")
+bring MySQL
+from MySQL bring (MySQLDatabase, MySQLValue, MySQLError)
+
+SolutionRecord: Class<> := {
+    structure: Attributes := (
+        id: Int
+        userId: Int
+        questionId: Int
+        originalFilename: String
+        storedFilename: String
+        mimeType: String
+        fileSize: Int
+        createdAt: String
+        userName: String
+        questionTitle: String
+    )
+}
+
+solutionsFromRow: Function := (
+    row: Pair<String, MySQLValue>
+) -> SolutionRecord {
+    return SolutionRecord(
+        id: rowInt(row, "id")
+        userId: rowInt(row, "user_id")
+        questionId: rowInt(row, "question_id")
+        originalFilename: rowString(row, "original_filename")
+        storedFilename: rowString(row, "stored_filename")
+        mimeType: rowString(row, "mime_type")
+        fileSize: rowInt(row, "file_size")
+        createdAt: rowString(row, "created_at")
+        userName: rowString(row, "user_name")
+        questionTitle: rowString(row, "question_title")
+    )
+}
+
+solutionsSelect: Function := () -> String {
+    return "SELECT s.id, s.user_id, s.question_id, s.original_filename, s.stored_filename, s.mime_type, s.file_size, DATE_FORMAT(s.created_at, '%Y-%m-%d %H:%i') AS created_at, u.name AS user_name, q.title AS question_title FROM solutions s JOIN users u ON u.id = s.user_id JOIN questions q ON q.id = s.question_id"
+}
+
+solutionsFindForUser: Function := (
+    userId: Int
+    questionId: Int
+) -> SolutionRecord? {
+    rows: Local List<Pair<String, MySQLValue>> := connection(
+        
+    ).query(
+        "{solutionsSelect()} WHERE s.user_id = ? AND s.question_id = ? LIMIT 1"
+        [MySQL.fromInt(userId), MySQL.fromInt(questionId)]
+    )
+    if len(rows) == 0 {
+        return null
+    }
+
+    return solutionsFromRow(rows[0])
+}
+
+solutionsFindById: Function := (id: Int) -> SolutionRecord? {
+    rows: Local List<Pair<String, MySQLValue>> := connection(
+        
+    ).query("{solutionsSelect()} WHERE s.id = ? LIMIT 1", [MySQL.fromInt(id)])
+    if len(rows) == 0 {
+        return null
+    }
+
+    return solutionsFromRow(rows[0])
+}
+
+solutionsRecent: Function := () -> List<SolutionRecord> {
+    rows: Local List<Pair<String, MySQLValue>> := connection(
+        
+    ).query("{solutionsSelect()} ORDER BY s.id DESC LIMIT 50")
+    records: Local List<SolutionRecord> := []
+    for row in rows {
+        records.add(solutionsFromRow(row))
+    }
+
+    return records
+}
+// solutionsCreate returns false when the UNIQUE constraint rejects the insert.
+// That is the authoritative answer to "does this user already have a solution
+// for this question", and it is correct even when two uploads arrive at once.
+solutionsCreate: Function := (
+    userId: Int
+    questionId: Int
+    originalFilename: String
+    storedFilename: String
+    mimeType: String
+    fileSize: Int
+) -> Bool {
+    attempt {
+        connection(
+            
+        ).execute(
+            "INSERT INTO solutions (user_id, question_id, original_filename, stored_filename, mime_type, file_size) VALUES (?, ?, ?, ?, ?, ?)"
+            [
+                MySQL.fromInt(userId)
+                MySQL.fromInt(questionId)
+                MySQL.fromString(originalFilename)
+                MySQL.fromString(storedFilename)
+                MySQL.fromString(mimeType)
+                MySQL.fromInt(fileSize)
+            ]
+        )
+        return true
+    }
+    except MySQLError {
+        return false
+    }
+}
+
+solutionsCount: Function := () -> Int {
+    rows: Local List<Pair<String, MySQLValue>> := connection(
+        
+    ).query("SELECT COUNT(*) AS total FROM solutions")
+    if len(rows) == 0 {
+        return 0
+    }
+
+    return rowInt(rows[0], "total")
+}

@@ -1,0 +1,260 @@
+// User administration.
+//
+// An administrator can activate or deactivate an account and set a new
+// password. There is deliberately no way to read an existing password: the
+// database stores an Argon2id hash, the hash is never rendered, and "edit
+// password" means replacing it.
+require("Layouts/Admin.ahd")
+require("Components/FormField.ahd")
+require("Services/Context.ahd")
+require("Services/Session.ahd")
+require("Services/Guard.ahd")
+require("Services/CSRF.ahd")
+require("Repositories/Users.ahd")
+require("Support/Validation.ahd")
+bring Web
+from Web bring (Request, Response, HTMLNode, Session)
+bring Security
+
+adminUsersPage: Function := (request: Request) -> Response {
+    session: Local Session := sessionOpen(request)
+    context: Local PageContext := contextFor(session)
+    guard: Local GuardResult := adminGuard(session, context)
+    if guard.allowed == false {
+        return sessionCommit(session, guard.refusal)
+    }
+
+    rows: Local List<HTMLNode> := []
+    for user in usersAll() {
+        rows.add(adminUserRow(session, user))
+    }
+
+    table: Local HTMLNode := Web.UI.table(
+        [
+            Web.UI.thead(
+                [
+                    Web.UI.tr(
+                        [
+                            Web.UI.th("Ad")
+                            Web.UI.th("E-posta")
+                            Web.UI.th("Rol")
+                            Web.UI.th("Durum")
+                            Web.UI.th("İşlem")
+                        ]
+                    )
+                ]
+            )
+            Web.UI.tbody(rows)
+        ]
+        {"class": "table align-middle"}
+    )
+
+    return sessionCommit(
+        session
+        adminLayout(
+            session
+            "Kullanıcılar"
+            context.siteName
+            context.headerColor
+            context.user
+            "/admin/users"
+            context.flash
+            context.flashKind
+            [Web.UI.div([table], {"class": "table-responsive"})]
+        )
+    )
+}
+
+adminUserRow: Function := (session: Session, user: UserRecord) -> HTMLNode {
+    stateBadge: Local HTMLNode := Web.UI.span(
+        "Pasif"
+        {"class": "badge text-bg-secondary"}
+    )
+    actionLabel: Local String := "Etkinleştir"
+    actionValue: Local String := "activate"
+    if user.isActive {
+        stateBadge = Web.UI.span("Aktif", {"class": "badge text-bg-success"})
+        actionLabel = "Pasifleştir"
+        actionValue = "deactivate"
+    }
+
+    return Web.UI.tr(
+        [
+            Web.UI.td(user.name)
+            Web.UI.td(user.email)
+            Web.UI.td(user.role)
+            Web.UI.tdNodes([stateBadge])
+            Web.UI.tdNodes(
+                [
+                    Web.UI.formTo(
+                        "/admin/users/state"
+                        "post"
+                        [
+                            csrfInput(session)
+                            Web.UI.input("hidden", "user_id", str(user.id))
+                            Web.UI.input("hidden", "action", actionValue)
+                            Web.UI.button(
+                                actionLabel
+                                {
+                                    "type": "submit"
+                                    "class": "btn btn-sm btn-outline-secondary me-2"
+                                }
+                            )
+                        ]
+                        {"class": "d-inline"}
+                    )
+                    Web.UI.a(
+                        "/admin/users/edit?id={str(user.id)}"
+                        "Parola ata"
+                        {"class": "btn btn-sm btn-outline-primary"}
+                    )
+                ]
+                {"class": "d-flex"}
+            )
+        ]
+    )
+}
+
+adminUserStateSubmit: Function := (request: Request) -> Response {
+    session: Local Session := sessionOpen(request)
+    context: Local PageContext := contextFor(session)
+    guard: Local GuardResult := adminGuard(session, context)
+    if guard.allowed == false {
+        return sessionCommit(session, guard.refusal)
+    }
+
+    if csrfValid(session, request) == false {
+        return sessionCommit(session, Web.text("Geçersiz form belirteci.", 403))
+    }
+
+    id: Local Int := validationPositiveInt(request.form("user_id"))
+    action: Local String := validationField(request.form("action"))
+    if id == 0 {
+        return sessionCommit(session, Web.text("Kullanıcı bulunamadı.", 404))
+    }
+
+    usersSetActive(id, action == "activate")
+    flashSet(session, "success", "Kullanıcı durumu güncellendi.")
+    return sessionCommit(session, Web.redirect("/admin/users"))
+}
+
+adminUserEditPage: Function := (request: Request) -> Response {
+    session: Local Session := sessionOpen(request)
+    context: Local PageContext := contextFor(session)
+    guard: Local GuardResult := adminGuard(session, context)
+    if guard.allowed == false {
+        return sessionCommit(session, guard.refusal)
+    }
+
+    id: Local Int := validationPositiveInt(request.query("id"))
+    user: Local UserRecord? := usersFindById(id)
+    if user == null {
+        return sessionCommit(session, Web.text("Kullanıcı bulunamadı.", 404))
+    }
+
+    return sessionCommit(session, adminUserEditView(session, context, user, []))
+}
+
+adminUserEditView: Function := (
+    session: Session
+    context: PageContext
+    user: UserRecord
+    errors: List<String>
+) -> Response {
+    content: Local List<HTMLNode> := []
+    if len(errors) > 0 {
+        content.add(errorList(errors))
+    }
+
+    content.add(
+        Web.UI.p("{user.name} — {user.email}", {"class": "text-body-secondary"})
+    )
+    content.add(
+        Web.UI.p(
+            "Mevcut parola görüntülenemez. Buradan yalnızca yeni bir parola atanır ve eski oturumlar geçersiz olur."
+            {"class": "alert alert-info"}
+        )
+    )
+    content.add(
+        Web.UI.formTo(
+            "/admin/users/password"
+            "post"
+            [
+                csrfInput(session)
+                Web.UI.input("hidden", "user_id", str(user.id))
+                formField(
+                    "admin-new-password"
+                    "password"
+                    "Yeni parola"
+                    "password"
+                    ""
+                    "En az {str(validationMinimumPassword())} karakter."
+                )
+                Web.UI.button(
+                    "Parolayı ata"
+                    {"type": "submit", "class": "btn btn-primary"}
+                )
+            ]
+        )
+    )
+    content.add(
+        Web.UI.pNodes(
+            [Web.UI.a("/admin/users", "Listeye dön")]
+            {"class": "mt-3 mb-0 small"}
+        )
+    )
+
+    return adminLayout(
+        session
+        "Parola ata"
+        context.siteName
+        context.headerColor
+        context.user
+        "/admin/users"
+        context.flash
+        context.flashKind
+        content
+    )
+}
+
+adminUserPasswordSubmit: Function := (request: Request) -> Response {
+    session: Local Session := sessionOpen(request)
+    context: Local PageContext := contextFor(session)
+    guard: Local GuardResult := adminGuard(session, context)
+    if guard.allowed == false {
+        return sessionCommit(session, guard.refusal)
+    }
+
+    if csrfValid(session, request) == false {
+        return sessionCommit(session, Web.text("Geçersiz form belirteci.", 403))
+    }
+
+    id: Local Int := validationPositiveInt(request.form("user_id"))
+    user: Local UserRecord? := usersFindById(id)
+    if user == null {
+        return sessionCommit(session, Web.text("Kullanıcı bulunamadı.", 404))
+    }
+
+    password: Local String := validationField(request.form("password"))
+    if validationPasswordLongEnough(password) == false {
+        return sessionCommit(
+            session
+            adminUserEditView(
+                session
+                context
+                user
+                [
+                    "Parola en az {str(validationMinimumPassword())} karakter olmalı."
+                ]
+            )
+        )
+    }
+
+    usersSetPassword(user.id, Security.passwordHash(password))
+    flashSet(
+        session
+        "success"
+        "Parola güncellendi ve önceki oturumlar sonlandırıldı."
+    )
+    return sessionCommit(session, Web.redirect("/admin/users"))
+}

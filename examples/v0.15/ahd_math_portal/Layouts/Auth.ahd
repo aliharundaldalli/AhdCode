@@ -1,0 +1,42 @@
+// A narrow, centred layout for the sign-in and registration pages.
+require("Layouts/Main.ahd")
+bring Web
+from Web bring (HTMLNode, Response)
+
+authLayout: Function := (
+    title: String
+    siteName: String
+    headerColor: String
+    flash: String
+    flashKind: String
+    content: List<HTMLNode>
+) -> Response {
+    card: Local List<HTMLNode> := []
+    if flash != "" {
+        card.add(alertBox(flashKind, flash))
+    }
+
+    card.add(Web.UI.h1(title, {"class": "h3 mb-4"}))
+    for node in content {
+        card.add(node)
+    }
+
+    body: Local List<HTMLNode> := [
+        navbar("", siteName, headerColor, null, false)
+        Web.UI.main(
+            [
+                Web.UI.div(
+                    [
+                        Web.UI.div(
+                            [Web.UI.div(card, {"class": "card-body p-4"})]
+                            {"class": "card shadow-sm"}
+                        )
+                    ]
+                    {"class": "container py-5", "style": "max-width: 32rem;"}
+                )
+            ]
+        )
+        siteFooter(siteName)
+    ]
+    return Web.page("{title} — {siteName}", body, layoutHead())
+}

@@ -1,0 +1,45 @@
+// Per-request context.
+//
+// Every page needs the same handful of facts: who is signed in, whether they
+// administer the site, the site name and header colour, and any pending flash
+// message. Gathering them once per request keeps that plumbing out of the
+// pages -- and keeps the site settings read to one place.
+require("Services/Auth.ahd")
+require("Services/Flash.ahd")
+require("Repositories/SiteSettings.ahd")
+require("Repositories/Users.ahd")
+require("Support/Validation.ahd")
+bring Web
+from Web bring Session
+
+PageContext: Class<> := {
+    structure: Attributes := (
+        siteName: String
+        headerColor: String
+        user: UserRecord?
+        isAdmin: Bool
+        flash: String
+        flashKind: String
+    )
+}
+// contextFor reads and clears the flash, so calling it twice in one request
+// would consume the message. Each handler calls it once, at the top.
+contextFor: Function := (session: Session) -> PageContext {
+    user: Local UserRecord? := authCurrentUser(session)
+    color: Local String := settingsGet("header_color", "#0d6efd")
+    // Validated on the way out as well as on the way in: a value written
+    // directly into the database by some other means still cannot reach the
+    // style attribute unless it is a strict #RRGGBB colour.
+    if validationHexColor(color) == false {
+        color = "#0d6efd"
+    }
+
+    return PageContext(
+        siteName: settingsGet("site_name", "Ahd Akademi Matematik")
+        headerColor: color
+        user: user
+        isAdmin: authIsAdmin(user)
+        flash: flashTake(session)
+        flashKind: flashTakeKind(session)
+    )
+}

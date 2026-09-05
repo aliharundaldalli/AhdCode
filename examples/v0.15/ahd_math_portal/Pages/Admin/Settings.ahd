@@ -1,0 +1,131 @@
+// Site settings.
+//
+// header_color is validated as a strict #RRGGBB value before it is stored and
+// again before it is used, because it is the one setting that reaches a style
+// attribute. Anything else -- a colour name, a url(), a javascript: string, a
+// longer or shorter hex -- is rejected.
+require("Layouts/Admin.ahd")
+require("Components/FormField.ahd")
+require("Services/Context.ahd")
+require("Services/Session.ahd")
+require("Services/Guard.ahd")
+require("Services/CSRF.ahd")
+require("Repositories/SiteSettings.ahd")
+require("Support/Validation.ahd")
+bring Web
+from Web bring (Request, Response, HTMLNode, Session)
+
+adminSettingsPage: Function := (request: Request) -> Response {
+    session: Local Session := sessionOpen(request)
+    context: Local PageContext := contextFor(session)
+    guard: Local GuardResult := adminGuard(session, context)
+    if guard.allowed == false {
+        return sessionCommit(session, guard.refusal)
+    }
+
+    return sessionCommit(
+        session
+        adminSettingsView(
+            session
+            context
+            settingsGet("site_name", "Ahd Akademi Matematik")
+            settingsGet("header_color", "#0d6efd")
+            []
+        )
+    )
+}
+
+adminSettingsView: Function := (
+    session: Session
+    context: PageContext
+    siteName: String
+    headerColor: String
+    errors: List<String>
+) -> Response {
+    content: Local List<HTMLNode> := []
+    if len(errors) > 0 {
+        content.add(errorList(errors))
+    }
+
+    content.add(
+        Web.UI.formTo(
+            "/admin/settings"
+            "post"
+            [
+                csrfInput(session)
+                formField(
+                    "settings-name"
+                    "site_name"
+                    "Site adı"
+                    "text"
+                    siteName
+                )
+                formField(
+                    "settings-color"
+                    "header_color"
+                    "Başlık rengi"
+                    "text"
+                    headerColor
+                    "Yalnızca #RRGGBB biçimi kabul edilir."
+                )
+                Web.UI.button(
+                    "Kaydet"
+                    {"type": "submit", "class": "btn btn-primary"}
+                )
+            ]
+        )
+    )
+
+    return adminLayout(
+        session
+        "Ayarlar"
+        context.siteName
+        context.headerColor
+        context.user
+        "/admin/settings"
+        context.flash
+        context.flashKind
+        content
+    )
+}
+
+adminSettingsSubmit: Function := (request: Request) -> Response {
+    session: Local Session := sessionOpen(request)
+    context: Local PageContext := contextFor(session)
+    guard: Local GuardResult := adminGuard(session, context)
+    if guard.allowed == false {
+        return sessionCommit(session, guard.refusal)
+    }
+
+    if csrfValid(session, request) == false {
+        return sessionCommit(session, Web.text("Geçersiz form belirteci.", 403))
+    }
+
+    siteName: Local String := validationField(request.form("site_name"))
+    headerColor: Local String := validationField(request.form("header_color"))
+
+    errors: Local List<String> := []
+    if siteName == "" {
+        errors.add("Site adı boş olamaz.")
+    }
+
+    if len(siteName) > 80 {
+        errors.add("Site adı en fazla 80 karakter olabilir.")
+    }
+
+    if validationHexColor(headerColor) == false {
+        errors.add("Başlık rengi #RRGGBB biçiminde olmalı (örnek: #0d6efd).")
+    }
+
+    if len(errors) > 0 {
+        return sessionCommit(
+            session
+            adminSettingsView(session, context, siteName, headerColor, errors)
+        )
+    }
+
+    settingsSet("site_name", siteName)
+    settingsSet("header_color", headerColor)
+    flashSet(session, "success", "Ayarlar kaydedildi.")
+    return sessionCommit(session, Web.redirect("/admin/settings"))
+}

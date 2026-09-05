@@ -1,0 +1,47 @@
+// A labelled form control.
+//
+// labelFor writes the for attribute and the caller supplies the matching id,
+// which is the accessibility pairing Web.UI documents. This component exists
+// because the application repeats the pattern often -- it is not a Forms
+// framework, and it does no validation.
+bring Web
+from Web bring HTMLNode
+
+formField: Function := (
+    id: String
+    name: String
+    label: String
+    type: String
+    value: String := ""
+    help: String := ""
+) -> HTMLNode {
+    children: Local List<HTMLNode> := [
+        Web.UI.labelFor(id, label, {"class": "form-label"})
+        Web.UI.input(type, name, value, {"id": id, "class": "form-control"})
+    ]
+    if help != "" {
+        children.add(Web.UI.p(help, {"class": "form-text"}))
+    }
+
+    return Web.UI.div(children, {"class": "mb-3"})
+}
+
+formTextArea: Function := (
+    id: String
+    name: String
+    label: String
+    value: String := ""
+    rows: String := "8"
+) -> HTMLNode {
+    return Web.UI.div(
+        [
+            Web.UI.labelFor(id, label, {"class": "form-label"})
+            Web.UI.textarea(
+                name
+                value
+                {"id": id, "class": "form-control", "rows": rows}
+            )
+        ]
+        {"class": "mb-3"}
+    )
+}

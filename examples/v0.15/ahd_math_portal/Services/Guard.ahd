@@ -1,0 +1,45 @@
+// Server-side authorization.
+//
+// Hiding a link is not authorization. Every admin handler calls adminGuard
+// first and acts on the result before doing anything else: an unauthenticated
+// request is redirected to sign in, and an authenticated non-admin gets 403
+// whether or not they were ever shown a link.
+require("Services/Auth.ahd")
+require("Services/Context.ahd")
+require("Repositories/Users.ahd")
+bring Web
+from Web bring (Response, Session)
+
+GuardResult: Class<> := {
+    structure: Attributes := (
+        allowed: Bool
+        // refusal is meaningful only when allowed is false.
+        refusal: Response
+    )
+}
+
+adminGuard: Function := (
+    session: Session
+    context: PageContext
+) -> GuardResult {
+    if context.user == null {
+        return GuardResult(allowed: false, refusal: Web.redirect("/login"))
+    }
+
+    if context.isAdmin == false {
+        return GuardResult(
+            allowed: false
+            refusal: Web.text("Bu sayfaya erişim yetkiniz yok.", 403)
+        )
+    }
+
+    return GuardResult(allowed: true, refusal: Web.text("", 200))
+}
+// signedInGuard is the same idea for pages that need any signed-in user.
+signedInGuard: Function := (context: PageContext) -> GuardResult {
+    if context.user == null {
+        return GuardResult(allowed: false, refusal: Web.redirect("/login"))
+    }
+
+    return GuardResult(allowed: true, refusal: Web.text("", 200))
+}

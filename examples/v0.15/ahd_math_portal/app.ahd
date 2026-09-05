@@ -1,0 +1,87 @@
+// Ahd Akademi Matematik -- an AhdCode v0.15 Web reference application.
+//
+//   cp .env.example .env          and fill in the database settings
+//   mysql -u <user> -p <db> < database/schema.sql
+//   ahdcode dev app.ahd
+//
+// One import, `bring Web`, covers routing, responses, and the UI tree. The
+// low-level modules are reached directly where the facade does not carry what
+// this application needs: HTTP for the outbound client and binary responses,
+// MySQL, SMTP, JSON, Security, File, and Path.
+//
+// Structure, all composed with the released require(...) rule, which resolves
+// every path from this file's own directory:
+//
+//   Config/        the donly place that reads the environment
+//   Support/       small shared helpers (row access, validation)
+//   Repositories/  every SQL statement, all with bound parameters
+//   Services/      auth, sessions, CSRF, uploads, mail, Gemini
+//   Layouts/       the three document shells
+//   Components/    reusable fragments
+//   Pages/         one Function per route
+//   public/        Bootstrap and application CSS, served from disk
+//   storage/       uploaded solutions, never served statically
+//
+// v0.15 routes match exact paths, so records are addressed with a query
+// parameter (/question?id=1) rather than a path segment.
+require("Config/App.ahd")
+require("Pages/Home.ahd")
+require("Pages/Question.ahd")
+require("Pages/SolutionUpload.ahd")
+require("Pages/Login.ahd")
+require("Pages/Register.ahd")
+require("Pages/ForgotPassword.ahd")
+require("Pages/ResetPassword.ahd")
+require("Pages/Admin/Dashboard.ahd")
+require("Pages/Admin/Users.ahd")
+require("Pages/Admin/Questions.ahd")
+require("Pages/Admin/QuestionEdit.ahd")
+require("Pages/Admin/Settings.ahd")
+require("Pages/Admin/SolutionDownload.ahd")
+bring Web
+from Web bring (App, AppConfig)
+bring HTTP
+from HTTP bring Server
+// The server's own body limit is the upload limit plus a small allowance for
+// the rest of the multipart envelope, so an oversized upload is refused by the
+// transport before the handler ever sees it.
+portal: Server := HTTP.server(
+    configuration().serverHost
+    configuration().serverPort
+    uploadMaxBytes() + 65536
+)
+
+portal.static("/assets", "public")
+
+portal.get("/", homePage)
+portal.get("/question", questionPage)
+portal.post("/solution", solutionSubmit)
+
+portal.get("/login", loginPage)
+portal.post("/login", loginSubmit)
+portal.post("/logout", logoutSubmit)
+portal.get("/register", registerPage)
+portal.post("/register", registerSubmit)
+portal.get("/forgot-password", forgotPasswordPage)
+portal.post("/forgot-password", forgotPasswordSubmit)
+portal.get("/reset-password", resetPasswordPage)
+portal.post("/reset-password", resetPasswordSubmit)
+
+portal.get("/admin", adminDashboardPage)
+portal.get("/admin/users", adminUsersPage)
+portal.post("/admin/users/state", adminUserStateSubmit)
+portal.get("/admin/users/edit", adminUserEditPage)
+portal.post("/admin/users/password", adminUserPasswordSubmit)
+portal.get("/admin/questions", adminQuestionsPage)
+portal.get("/admin/questions/new", adminQuestionNewPage)
+portal.get("/admin/questions/edit", adminQuestionEditPage)
+portal.post("/admin/questions/save", adminQuestionSaveSubmit)
+portal.post("/admin/questions/status", adminQuestionStatusSubmit)
+portal.post("/admin/questions/generate", adminQuestionGenerateSubmit)
+portal.get("/admin/solutions", adminSolutionsPage)
+portal.get("/admin/solutions/file", adminSolutionDownload)
+portal.get("/admin/settings", adminSettingsPage)
+portal.post("/admin/settings", adminSettingsSubmit)
+
+write("{configuration().name} — {configuration().address()}")
+portal.start()

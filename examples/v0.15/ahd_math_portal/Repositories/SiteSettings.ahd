@@ -1,0 +1,37 @@
+// Site settings persistence.
+//
+// These are application settings a site administrator edits -- never
+// deployment secrets. Database, SMTP, and API credentials stay in the
+// environment and never appear in this table.
+require("Config/Database.ahd")
+require("Support/Rows.ahd")
+bring MySQL
+from MySQL bring (MySQLDatabase, MySQLValue)
+
+settingsGet: Function := (key: String, fallback: String) -> String {
+    rows: Local List<Pair<String, MySQLValue>> := connection(
+        
+    ).query(
+        "SELECT setting_value FROM site_settings WHERE setting_key = ? LIMIT 1"
+        [MySQL.fromString(key)]
+    )
+    if len(rows) == 0 {
+        return fallback
+    }
+
+    value: Local String := rowString(rows[0], "setting_value")
+    if value == "" {
+        return fallback
+    }
+
+    return value
+}
+
+settingsSet: Function := (key: String, value: String) -> Nothing {
+    connection(
+        
+    ).execute(
+        "INSERT INTO site_settings (setting_key, setting_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)"
+        [MySQL.fromString(key), MySQL.fromString(value)]
+    )
+}

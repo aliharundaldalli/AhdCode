@@ -1,0 +1,55 @@
+// Row helpers.
+//
+// MySQLDatabase.query returns List<Pair<String, MySQLValue>>: one Pair per
+// row, keyed by column name. Reading a column therefore means indexing the
+// Pair and then converting the MySQLValue, and a NULL column must be handled
+// before conversion or the conversion raises.
+//
+// These four helpers are the whole of that boilerplate, written once. They are
+// deliberately small and non-generic -- this is a reference application, not a
+// row-mapping framework.
+//
+// `key in pair` tests Pair keys; `has` is for Class members only.
+bring MySQL
+from MySQL bring MySQLValue
+
+rowString: Function := (
+    row: Pair<String, MySQLValue>
+    column: String
+) -> String {
+    if column not in row {
+        return ""
+    }
+
+    value: Local MySQLValue := row[column]
+    if value.isNull() {
+        return ""
+    }
+
+    return value.string()
+}
+
+rowInt: Function := (row: Pair<String, MySQLValue>, column: String) -> Int {
+    if column not in row {
+        return 0
+    }
+
+    value: Local MySQLValue := row[column]
+    if value.isNull() {
+        return 0
+    }
+
+    return value.int()
+}
+
+rowBool: Function := (row: Pair<String, MySQLValue>, column: String) -> Bool {
+    return rowInt(row, column) != 0
+}
+
+rowIsNull: Function := (row: Pair<String, MySQLValue>, column: String) -> Bool {
+    if column not in row {
+        return true
+    }
+
+    return row[column].isNull()
+}

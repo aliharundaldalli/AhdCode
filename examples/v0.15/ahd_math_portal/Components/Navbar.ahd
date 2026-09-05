@@ -1,0 +1,107 @@
+// The site navigation bar.
+//
+// A Component is an ordinary Function returning an HTMLNode. The header colour
+// is a validated #RRGGBB value from site_settings -- validated before it is
+// stored and again before it reaches the style attribute, so a stored setting
+// can never carry arbitrary CSS.
+require("Repositories/Users.ahd")
+bring Web
+from Web bring HTMLNode
+
+navbar: Function := (
+    token: String
+    siteName: String
+    headerColor: String
+    user: UserRecord?
+    isAdmin: Bool
+) -> HTMLNode {
+    links: Local List<HTMLNode> := [
+        Web.UI.liNodes(
+            [Web.UI.a("/", "Sorular", {"class": "nav-link px-2 text-white"})]
+            {"class": "nav-item"}
+        )
+    ]
+    if isAdmin {
+        links.add(
+            Web.UI.liNodes(
+                [
+                    Web.UI.a(
+                        "/admin"
+                        "Yönetim"
+                        {"class": "nav-link px-2 text-white"}
+                    )
+                ]
+                {"class": "nav-item"}
+            )
+        )
+    }
+
+    return Web.UI.header(
+        [
+            Web.UI.nav(
+                [
+                    Web.UI.div(
+                        [
+                            Web.UI.aNodes(
+                                "/"
+                                [
+                                    Web.UI.span("∑", {"class": "fs-3 me-2"})
+                                    Web.UI.span(
+                                        siteName
+                                        {"class": "fs-5 fw-semibold"}
+                                    )
+                                ]
+                                {
+                                    "class": "d-flex align-items-center text-white text-decoration-none me-auto"
+                                }
+                            )
+                            Web.UI.ul(links, {"class": "nav me-3 mb-0"})
+                            navbarAccount(user, token)
+                        ]
+                        {
+                            "class": "container d-flex flex-wrap align-items-center py-2"
+                        }
+                    )
+                ]
+                {"class": "navbar", "style": "background-color: {headerColor};"}
+            )
+        ]
+    )
+}
+
+navbarAccount: Function := (user: UserRecord?, token: String) -> HTMLNode {
+    if user == null {
+        return Web.UI.div(
+            [
+                Web.UI.a(
+                    "/login"
+                    "Giriş"
+                    {"class": "btn btn-sm btn-light me-2"}
+                )
+                Web.UI.a(
+                    "/register"
+                    "Kayıt ol"
+                    {"class": "btn btn-sm btn-outline-light"}
+                )
+            ]
+            {"class": "d-flex"}
+        )
+    }
+
+    return Web.UI.formTo(
+        "/logout"
+        "post"
+        [
+            Web.UI.input("hidden", "_csrf", token)
+            Web.UI.span(
+                user.name
+                {"class": "text-white me-3 align-self-center"}
+            )
+            Web.UI.button(
+                "Çıkış"
+                {"type": "submit", "class": "btn btn-sm btn-light"}
+            )
+        ]
+        {"class": "d-flex", "id": "logout-form"}
+    )
+}

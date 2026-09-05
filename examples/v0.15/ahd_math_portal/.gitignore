@@ -1,0 +1,14 @@
+# Never commit real configuration.
+.env
+
+# Uploaded solutions are runtime data, not source.
+storage/solutions/*
+!storage/solutions/.gitkeep
+
+# Optional local HTTPS preview: executable, private CA keys, logs and PID state.
+.local/
+
+# Runtime session files
+*.dev
+*.run
+

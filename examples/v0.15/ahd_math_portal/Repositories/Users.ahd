@@ -1,0 +1,138 @@
+// User persistence.
+//
+// Every statement below binds its values as ? parameters. No SQL string in
+// this file is built by concatenating an email, a name, or anything else that
+// came from a request.
+require("Config/Database.ahd")
+require("Support/Rows.ahd")
+bring MySQL
+from MySQL bring (MySQLDatabase, MySQLValue, MySQLError)
+// UserRecord is the application's own view of a row. Repositories return these
+// rather than raw MySQLValue collections, so pages never touch database types.
+UserRecord: Class<> := {
+    structure: Attributes := (
+        id: Int
+        name: String
+        email: String
+        passwordHash: String
+        role: String
+        isActive: Bool
+        authVersion: Int
+    )
+}
+
+usersFromRow: Function := (row: Pair<String, MySQLValue>) -> UserRecord {
+    return UserRecord(
+        id: rowInt(row, "id")
+        name: rowString(row, "name")
+        email: rowString(row, "email")
+        passwordHash: rowString(row, "password_hash")
+        role: rowString(row, "role")
+        isActive: rowBool(row, "is_active")
+        authVersion: rowInt(row, "auth_version")
+    )
+}
+
+usersSelect: Function := () -> String {
+    return "SELECT id, name, email, password_hash, role, is_active, auth_version FROM users"
+}
+
+usersFindByEmail: Function := (email: String) -> UserRecord? {
+    rows: Local List<Pair<String, MySQLValue>> := connection(
+        
+    ).query(
+        "{usersSelect()} WHERE email = ? LIMIT 1"
+        [MySQL.fromString(email)]
+    )
+    if len(rows) == 0 {
+        return null
+    }
+
+    return usersFromRow(rows[0])
+}
+
+usersFindById: Function := (id: Int) -> UserRecord? {
+    rows: Local List<Pair<String, MySQLValue>> := connection(
+        
+    ).query("{usersSelect()} WHERE id = ? LIMIT 1", [MySQL.fromInt(id)])
+    if len(rows) == 0 {
+        return null
+    }
+
+    return usersFromRow(rows[0])
+}
+
+usersAll: Function := () -> List<UserRecord> {
+    rows: Local List<Pair<String, MySQLValue>> := connection(
+        
+    ).query("{usersSelect()} ORDER BY id")
+    records: Local List<UserRecord> := []
+    for row in rows {
+        records.add(usersFromRow(row))
+    }
+
+    return records
+}
+// usersCreate returns null when the unique index on email rejects the insert,
+// which is how a duplicate registration is detected: the constraint decides,
+// not a prior SELECT that another request could invalidate.
+usersCreate: Function := (
+    name: String
+    email: String
+    passwordHash: String
+    role: String
+) -> Int? {
+    attempt {
+        result: Local := connection(
+            
+        ).execute(
+            "INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, ?)"
+            [
+                MySQL.fromString(name)
+                MySQL.fromString(email)
+                MySQL.fromString(passwordHash)
+                MySQL.fromString(role)
+            ]
+        )
+        return result.lastInsertId()
+    }
+    except MySQLError {
+        return null
+    }
+}
+
+usersSetActive: Function := (id: Int, active: Bool) -> Nothing {
+    flag: Local Int := 0
+    if active {
+        flag = 1
+    }
+
+    connection(
+        
+    ).execute(
+        "UPDATE users SET is_active = ? WHERE id = ?"
+        [MySQL.fromInt(flag), MySQL.fromInt(id)]
+    )
+}
+// usersSetPassword stores a new hash and advances auth_version in the same
+// statement, so every session authenticated with the old password stops being
+// accepted on its next request.
+usersSetPassword: Function := (id: Int, passwordHash: String) -> Nothing {
+    connection(
+        
+    ).execute(
+        "UPDATE users SET password_hash = ?, auth_version = auth_version + 1 WHERE id = ?"
+        [MySQL.fromString(passwordHash), MySQL.fromInt(id)]
+    )
+}
+
+usersCount: Function := () -> Int {
+    rows: Local List<Pair<String, MySQLValue>> := connection(
+        
+    ).query("SELECT COUNT(*) AS total FROM users")
+    if len(rows) == 0 {
+        return 0
+    }
+
+    return rowInt(rows[0], "total")
+}

@@ -1,0 +1,108 @@
+// Authenticated solution download.
+//
+// storage/solutions is never served as a static directory. This route is the
+// only way an uploaded file leaves the machine, and it checks administrator
+// authorization before touching the filesystem.
+//
+// The path is rebuilt from the stored name held in the database -- the name
+// UploadedFile.save generated -- so no part of the request reaches the path.
+require("Services/Context.ahd")
+require("Services/Session.ahd")
+require("Services/Guard.ahd")
+require("Services/Solutions.ahd")
+require("Repositories/Solutions.ahd")
+require("Support/Validation.ahd")
+require("Layouts/Admin.ahd")
+bring Web
+from Web bring (Request, Response, Session, HTMLNode)
+bring HTTP
+bring File
+
+adminSolutionDownload: Function := (request: Request) -> Response {
+    session: Local Session := sessionOpen(request)
+    context: Local PageContext := contextFor(session)
+    guard: Local GuardResult := adminGuard(session, context)
+    if guard.allowed == false {
+        return sessionCommit(session, guard.refusal)
+    }
+
+    id: Local Int := validationPositiveInt(request.query("id"))
+    solution: Local SolutionRecord? := solutionsFindById(id)
+    if solution == null {
+        return sessionCommit(session, Web.text("Çözüm bulunamadı.", 404))
+    }
+
+    path: Local String := solutionPath(solution.storedFilename)
+    if File.exists(path) == false {
+        return sessionCommit(session, Web.text("Dosya bulunamadı.", 404))
+    }
+    // The content type is the one detected at upload time and stored, not
+    // anything the client asked for now.
+    return sessionCommit(session, HTTP.file(path, solution.mimeType))
+}
+
+adminSolutionsPage: Function := (request: Request) -> Response {
+    session: Local Session := sessionOpen(request)
+    context: Local PageContext := contextFor(session)
+    guard: Local GuardResult := adminGuard(session, context)
+    if guard.allowed == false {
+        return sessionCommit(session, guard.refusal)
+    }
+
+    rows: Local List<HTMLNode> := []
+    for solution in solutionsRecent() {
+        rows.add(Web.UI.tr([
+                    Web.UI.td(solution.userName)
+                    Web.UI.td(solution.questionTitle)
+                    // The uploader chose this name. It is display metadata and is
+                    // escaped like any other text; the stored file has a different,
+                    // generated name.
+                    Web.UI.td(solution.originalFilename)
+                    Web.UI.td(solution.createdAt)
+                    Web.UI.tdNodes(
+                        [
+                            Web.UI.a(
+                                "/admin/solutions/file?id={str(solution.id)}"
+                                "İndir"
+                                {"class": "btn btn-sm btn-outline-primary"}
+                            )
+                        ]
+                    )
+                ]))
+    }
+
+    table: Local HTMLNode := Web.UI.table(
+        [
+            Web.UI.thead(
+                [
+                    Web.UI.tr(
+                        [
+                            Web.UI.th("Kullanıcı")
+                            Web.UI.th("Soru")
+                            Web.UI.th("Dosya")
+                            Web.UI.th("Tarih")
+                            Web.UI.th("İşlem")
+                        ]
+                    )
+                ]
+            )
+            Web.UI.tbody(rows)
+        ]
+        {"class": "table align-middle"}
+    )
+
+    return sessionCommit(
+        session
+        adminLayout(
+            session
+            "Çözümler"
+            context.siteName
+            context.headerColor
+            context.user
+            "/admin/solutions"
+            context.flash
+            context.flashKind
+            [Web.UI.div([table], {"class": "table-responsive"})]
+        )
+    )
+}

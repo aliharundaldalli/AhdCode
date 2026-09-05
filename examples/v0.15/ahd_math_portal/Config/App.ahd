@@ -1,0 +1,95 @@
+// The application configuration layer.
+//
+// This directory is the only place that reads the environment. Pages,
+// components, services, and repositories receive validated values as ordinary
+// arguments or through the accessors below.
+//
+// Web.configure loads .env when the file exists and then validates the frozen
+// v0.15 contract -- APP_NAME, APP_ENV, APP_HOST, APP_PROTOCOL, SERVER_HOST,
+// SERVER_PORT -- raising WebConfigError naming the offending key. Nothing here
+// is compiled into the executable: every value is read at start-up.
+bring Web
+from Web bring AppConfig
+bring Env
+
+application: AppConfig := Web.configure()
+// configuration is how everything else reads the validated contract. Reading a
+// module binding inside a callable needs an explicit Global declaration, so
+// that declaration lives here once rather than in every page.
+configuration: Function := () -> AppConfig {
+    application: Global AppConfig
+    return application
+}
+// linkBaseURL is the base address for links that must actually work when the
+// recipient clicks them -- password reset mail above all.
+//
+// This deliberately does not use AppConfig.effectiveURL in development. v0.15
+// derives <APP_HOST>.test as a logical identity but installs no resolver for
+// it, so a mailed .test link would be unusable. Development and test therefore
+// link to the real bind address; production links to the canonical public URL.
+linkBaseURL: Function := () -> String {
+    config: Local AppConfig := configuration()
+    if config.isProduction() {
+        // Application-level override for a proxy on a nonstandard public port,
+        // such as the optional local HTTPS preview. SERVER_PORT remains the
+        // internal HTTP socket; the released Web configuration is unchanged.
+        port: Local Int := publicPort()
+        if port > 0 {
+            return "{config.url()}:{str(port)}"
+        }
+
+        return config.url()
+    }
+
+    return "http://{config.address()}"
+}
+
+publicPort: Function := () -> Int {
+    raw: Local String := Env.getOr("APP_PUBLIC_PORT", "")
+    if raw == "" {
+        return 0
+    }
+
+    value: Local Int := 0
+    attempt {
+        value = int(raw)
+    }
+    except DomainError {
+        return 0
+    }
+    except OverflowError {
+        return 0
+    }
+
+    if value < 1 or value > 65535 {
+        return 0
+    }
+
+    return value
+}
+// uploadRoot is the directory solution uploads are written to. It is outside
+// public/, so nothing here is ever served as a static asset.
+uploadRoot: Function := () -> String {
+    return Env.getOr("UPLOAD_ROOT", "storage/solutions")
+}
+// uploadMaxBytes caps one uploaded solution. The server enforces its own
+// request-body limit from the same value.
+uploadMaxBytes: Function := () -> Int {
+    raw: Local String := Env.getOr("UPLOAD_MAX_BYTES", "5242880")
+    value: Local Int := 5242880
+    attempt {
+        value = int(raw)
+    }
+    except DomainError {
+        return 5242880
+    }
+    except OverflowError {
+        return 5242880
+    }
+
+    if value < 1024 {
+        return 5242880
+    }
+
+    return value
+}

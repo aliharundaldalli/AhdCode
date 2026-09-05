@@ -1,0 +1,104 @@
+// Validation helpers.
+//
+// v0.15 has no Forms/validation framework, and this application deliberately
+// does not grow one. These are a few small, explicit checks used by the
+// handlers; every rule that matters is still written out where it applies.
+// validationField reads a form field as a trimmed String, treating a missing
+// field exactly like an empty one.
+validationField: Function := (value: String?) -> String {
+    if value == null {
+        return ""
+    }
+
+    return value.trim()
+}
+// validationEmail normalizes an address for storage and comparison: trimmed
+// and lowercased, so Ali@Example.COM and ali@example.com are one account.
+// This is normalization, not RFC validation.
+validationEmail: Function := (value: String?) -> String {
+    return validationField(value).lower()
+}
+
+validationEmailShaped: Function := (value: String) -> Bool {
+    if value.contains("@") == false {
+        return false
+    }
+
+    if value.contains(" ") {
+        return false
+    }
+
+    parts: Local List<String> := value.split("@")
+    if len(parts) != 2 {
+        return false
+    }
+
+    if parts[0] == "" or parts[1] == "" {
+        return false
+    }
+
+    return parts[1].contains(".")
+}
+// The documented minimum. Short enough to be usable in a reference app,
+// long enough that the rule is real.
+validationMinimumPasswordLength: Int := 10
+// Reading a module binding inside a callable needs an explicit Global
+// declaration, so the constant is exposed through one accessor rather than
+// repeating that declaration in every page that mentions the rule.
+validationMinimumPassword: Function := () -> Int {
+    validationMinimumPasswordLength: Global Int
+    return validationMinimumPasswordLength
+}
+
+validationPasswordLongEnough: Function := (value: String) -> Bool {
+    return len(value) >= validationMinimumPassword()
+}
+// validationHexColor accepts #RRGGBB and nothing else. The value reaches a
+// style attribute, so anything looser would let a stored setting inject CSS.
+validationHexColor: Function := (value: String) -> Bool {
+    if len(value) != 7 {
+        return false
+    }
+
+    if value.startsWith("#") == false {
+        return false
+    }
+
+    digits: Local String := value.lower()
+    allowed: Local String := "0123456789abcdef"
+    index: Local Int := 1
+    while index < 7 {
+        if allowed.contains(digits[index]) == false {
+            return false
+        }
+
+        index++
+    }
+
+    return true
+}
+// validationPositiveInt parses an id from a query string. Anything that is not
+// a positive whole number is rejected rather than coerced.
+validationPositiveInt: Function := (value: String?) -> Int {
+    raw: Local String := validationField(value)
+    if raw == "" {
+        return 0
+    }
+
+    parsed: Local Int := 0
+    attempt {
+        parsed = int(raw)
+    }
+    except DomainError {
+        return 0
+    }
+    except OverflowError {
+        return 0
+    }
+
+    if parsed < 1 {
+        return 0
+    }
+
+    return parsed
+}

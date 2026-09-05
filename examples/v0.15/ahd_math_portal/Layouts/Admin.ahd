@@ -1,0 +1,53 @@
+// The admin layout. Being able to see this page is not authorization: every
+// admin route checks the signed-in user's database role before rendering.
+require("Layouts/Main.ahd")
+require("Components/AdminSidebar.ahd")
+bring Web
+from Web bring (HTMLNode, Response, Session)
+
+adminLayout: Function := (
+    session: Session
+    title: String
+    siteName: String
+    headerColor: String
+    user: UserRecord?
+    current: String
+    flash: String
+    flashKind: String
+    content: List<HTMLNode>
+) -> Response {
+    column: Local List<HTMLNode> := []
+    if flash != "" {
+        column.add(alertBox(flashKind, flash))
+    }
+
+    column.add(Web.UI.h1(title, {"class": "h3 mb-4"}))
+    for node in content {
+        column.add(node)
+    }
+
+    body: Local List<HTMLNode> := [
+        navbar(csrfToken(session), siteName, headerColor, user, true)
+        Web.UI.main(
+            [
+                Web.UI.div(
+                    [
+                        Web.UI.div(
+                            [
+                                Web.UI.div(
+                                    [adminSidebar(current)]
+                                    {"class": "col-12 col-md-3"}
+                                )
+                                Web.UI.div(column, {"class": "col-12 col-md-9"})
+                            ]
+                            {"class": "row"}
+                        )
+                    ]
+                    {"class": "container py-4"}
+                )
+            ]
+        )
+        siteFooter(siteName)
+    ]
+    return Web.page("{title} — {siteName}", body, layoutHead())
+}

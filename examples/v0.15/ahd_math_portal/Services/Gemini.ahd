@@ -1,0 +1,196 @@
+// The Gemini REST adapter.
+//
+// This is the only file that knows Gemini's wire format. It uses the released
+// HTTP client and JSON module directly -- no shelling out to curl, and no
+// dependency beyond what AhdCode ships.
+//
+// The API key is sent as a header, never as a query parameter, so it does not
+// end up in a URL that could be logged or shown. Nothing here writes the key
+// into a returned value, an error message, or a page.
+//
+// Generation produces a draft and nothing more. The administrator reviews and
+// publishes explicitly; there is no path from this file to a published
+// question.
+require("Config/Gemini.ahd")
+bring Web
+// Web re-exports the inbound server types (Request, Response, Session and so
+// on). The outbound client types are not part of that set, so this file
+// reaches for the low-level HTTP module directly -- the documented escape
+// hatch, not a workaround.
+bring HTTP
+from HTTP bring (Client, ClientRequest, ClientResponse, HTTPError)
+bring JSON
+from JSON bring (JSONValue, JSONError)
+
+GeneratedQuestion: Class<> := {
+    structure: Attributes := (
+        ok: Bool
+        title: String
+        topic: String
+        body: String
+        error: String
+    )
+}
+
+geminiUnavailable: Function := (message: String) -> GeneratedQuestion {
+    return GeneratedQuestion(
+        ok: false
+        title: ""
+        topic: ""
+        body: ""
+        error: message
+    )
+}
+// geminiPrompt asks for a plain-text answer in a fixed two-line shape. Parsing
+// stays trivial and no model-authored string is ever treated as markup.
+geminiPrompt: Function := (
+    topic: String
+    difficulty: String
+    instruction: String
+) -> String {
+    return "Bir matematik sorusu yaz. Konu: {topic}. Zorluk: {difficulty}. Ek yönerge: {instruction}.\n\nYanıtı tam olarak şu biçimde ver:\nBASLIK: <tek satır başlık>\nSORU: <sorunun tam metni>\n\nBaşka hiçbir şey yazma."
+}
+
+geminiGenerate: Function := (
+    topic: String
+    difficulty: String
+    instruction: String
+) -> GeneratedQuestion {
+    if geminiConfigured() == false {
+        return geminiUnavailable(
+            "Gemini yapılandırılmamış. GEMINI_API_KEY ve GEMINI_MODEL ayarlayın."
+        )
+    }
+
+    url: Local String := "{geminiBaseURL()}/v1beta/models/{geminiModel()}:generateContent"
+    payload: Local String := geminiRequestBody(
+        geminiPrompt(topic, difficulty, instruction)
+    )
+
+    attempt {
+        client: Local Client := HTTP.client(20)
+        request: Local ClientRequest := HTTP.clientRequest("POST", url)
+        request = request.withHeader("Content-Type", "application/json")
+        request = request.withHeader("x-goog-api-key", geminiKey())
+        response: Local ClientResponse := client.send(request.withBody(payload))
+
+        if response.status() != 200 {
+            // The status is reported; the response body is not, because it can
+            // echo request material.
+            return geminiUnavailable(
+                "Gemini {str(response.status())} yanıtı döndürdü."
+            )
+        }
+
+        return geminiParse(response.body())
+    }
+    except HTTPError {
+        return geminiUnavailable("Gemini isteği tamamlanamadı.")
+    }
+}
+
+geminiRequestBody: Function := (prompt: String) -> String {
+    part: Local JSONValue := JSON.object({"text": JSON.fromString(prompt)})
+    content: Local JSONValue := JSON.object({"parts": JSON.array([part])})
+    return JSON.stringify(JSON.object({"contents": JSON.array([content])}))
+}
+// geminiParse walks the documented response shape defensively. JSONValue.get
+// returns a nullable, so every level is guarded: a malformed or unexpected
+// body becomes a clean message rather than a raised error. The nesting here is
+// the honest cost of navigating an untyped document safely.
+geminiParse: Function := (body: String) -> GeneratedQuestion {
+    malformed: Local String := "Gemini yanıtı beklenen biçimde değil."
+    attempt {
+        root: Local JSONValue := JSON.parse(body)
+        if root.kind() != "Object" {
+            return geminiUnavailable(malformed)
+        }
+
+        candidates: Local JSONValue? := root.get("candidates")
+        if candidates == null {
+            return geminiUnavailable(malformed)
+        }
+
+        if candidates.kind() != "Array" {
+            return geminiUnavailable(malformed)
+        }
+
+        if len(candidates.array()) == 0 {
+            return geminiUnavailable("Gemini bir aday yanıt döndürmedi.")
+        }
+
+        content: Local JSONValue? := candidates.at(0).get("content")
+        if content == null {
+            return geminiUnavailable(malformed)
+        }
+
+        parts: Local JSONValue? := content.get("parts")
+        if parts == null {
+            return geminiUnavailable(malformed)
+        }
+
+        if parts.kind() != "Array" {
+            return geminiUnavailable(malformed)
+        }
+
+        if len(parts.array()) == 0 {
+            return geminiUnavailable("Gemini boş bir yanıt döndürdü.")
+        }
+
+        text: Local JSONValue? := parts.at(0).get("text")
+        if text == null {
+            return geminiUnavailable(malformed)
+        }
+
+        if text.kind() != "String" {
+            return geminiUnavailable(malformed)
+        }
+
+        return geminiSplit(text.string())
+    }
+    except JSONError {
+        return geminiUnavailable("Gemini yanıtı çözümlenemedi.")
+    }
+}
+// geminiSplit reads the two labelled lines. Whatever the model actually wrote
+// is carried through as ordinary text and escaped wherever it is displayed.
+geminiSplit: Function := (text: String) -> GeneratedQuestion {
+    title: Local String := ""
+    body: Local String := ""
+    collecting: Local Bool := false
+
+    for line in text.split("\n") {
+        trimmed: Local String := line.trim()
+        if trimmed.startsWith("BASLIK:") {
+            title = trimmed.replace("BASLIK:", "").trim()
+            collecting = false
+        }
+        else if trimmed.startsWith("SORU:") {
+            body = trimmed.replace("SORU:", "").trim()
+            collecting = true
+        }
+        else if collecting and trimmed != "" {
+            body = "{body}\n{trimmed}"
+        }
+    }
+
+    if title == "" and body == "" {
+        // The model ignored the requested shape. Hand the whole answer back as
+        // the body so the administrator can still edit it into a question.
+        return GeneratedQuestion(
+            ok: true
+            title: ""
+            topic: ""
+            body: text.trim()
+            error: ""
+        )
+    }
+
+    return GeneratedQuestion(
+        ok: true
+        title: title
+        topic: ""
+        body: body
+        error: ""
+    )
+}

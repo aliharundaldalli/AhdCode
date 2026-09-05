@@ -1,0 +1,38 @@
+// Database configuration.
+//
+// The connection is opened once at start-up and shared by every repository.
+// Credentials are read here and nowhere else, and never appear in an error
+// message: a failure reports the host and database, never the password.
+bring Env
+bring MySQL
+from MySQL bring MySQLDatabase
+
+database: MySQLDatabase := MySQL.connect(
+    Env.getOr("DB_HOST", "127.0.0.1")
+    Env.getOr("DB_USERNAME", "")
+    Env.getOr("DB_PASSWORD", "")
+    databasePort()
+    Env.getOr("DB_NAME", "")
+    Env.getOr("DB_SECURITY", "none")
+)
+// connection hands the shared MySQLDatabase to repositories.
+connection: Function := () -> MySQLDatabase {
+    database: Global MySQLDatabase
+    return database
+}
+
+databasePort: Function := () -> Int {
+    raw: Local String := Env.getOr("DB_PORT", "3306")
+    value: Local Int := 3306
+    attempt {
+        value = int(raw)
+    }
+    except DomainError {
+        return 3306
+    }
+    except OverflowError {
+        return 3306
+    }
+
+    return value
+}

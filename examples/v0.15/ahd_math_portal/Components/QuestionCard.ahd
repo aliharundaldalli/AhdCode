@@ -1,0 +1,57 @@
+// One question, as a Bootstrap card.
+//
+// Every value here is escaped by Web.UI: a question body is data, and it stays
+// data even when it contains markup or LaTeX source.
+require("Repositories/Questions.ahd")
+bring Web
+from Web bring HTMLNode
+
+questionCard: Function := (question: QuestionRecord) -> HTMLNode {
+    published: Local String := question.publishedAt
+    if published == "" {
+        published = "—"
+    }
+
+    return Web.UI.article(
+        [
+            Web.UI.div(
+                [
+                    Web.UI.div(
+                        [
+                            Web.UI.span(
+                                question.topic
+                                {"class": "badge text-bg-secondary"}
+                            )
+                            Web.UI.span(
+                                published
+                                {"class": "text-body-secondary small ms-2"}
+                            )
+                        ]
+                        {"class": "mb-2"}
+                    )
+                    Web.UI.h2(question.title, {"class": "h5 card-title"})
+                    Web.UI.p(
+                        questionExcerpt(question.body)
+                        {"class": "card-text"}
+                    )
+                    Web.UI.a(
+                        "/question?id={question.id}"
+                        "Soruyu aç"
+                        {"class": "btn btn-sm btn-outline-primary"}
+                    )
+                ]
+                {"class": "card-body"}
+            )
+        ]
+        {"class": "card h-100"}
+    )
+}
+// questionExcerpt shortens a body for the listing. It cuts on characters, not
+// markup, because the body is never markup.
+questionExcerpt: Function := (body: String) -> String {
+    if len(body) <= 160 {
+        return body
+    }
+
+    return "{body[0:160]}…"
+}

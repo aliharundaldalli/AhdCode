@@ -1,0 +1,167 @@
+// Question administration: list, create, edit, draft, publish.
+//
+// Publication is always an explicit administrator action. Nothing else in the
+// application -- including Gemini generation -- can move a question out of
+// draft.
+require("Layouts/Admin.ahd")
+require("Components/FormField.ahd")
+require("Services/Context.ahd")
+require("Services/Session.ahd")
+require("Services/Guard.ahd")
+require("Services/CSRF.ahd")
+require("Services/Gemini.ahd")
+require("Repositories/Questions.ahd")
+require("Support/Validation.ahd")
+bring Web
+from Web bring (Request, Response, HTMLNode, Session)
+
+adminQuestionsPage: Function := (request: Request) -> Response {
+    session: Local Session := sessionOpen(request)
+    context: Local PageContext := contextFor(session)
+    guard: Local GuardResult := adminGuard(session, context)
+    if guard.allowed == false {
+        return sessionCommit(session, guard.refusal)
+    }
+
+    rows: Local List<HTMLNode> := []
+    for question in questionsAll() {
+        rows.add(adminQuestionRow(session, question))
+    }
+
+    content: Local List<HTMLNode> := [
+        Web.UI.pNodes(
+            [
+                Web.UI.a(
+                    "/admin/questions/new"
+                    "Yeni soru"
+                    {"class": "btn btn-primary"}
+                )
+            ]
+            {"class": "mb-3"}
+        )
+        Web.UI.div(
+            [
+                Web.UI.table(
+                    [
+                        Web.UI.thead(
+                            [
+                                Web.UI.tr(
+                                    [
+                                        Web.UI.th("Başlık")
+                                        Web.UI.th("Konu")
+                                        Web.UI.th("Durum")
+                                        Web.UI.th("İşlem")
+                                    ]
+                                )
+                            ]
+                        )
+                        Web.UI.tbody(rows)
+                    ]
+                    {"class": "table align-middle"}
+                )
+            ]
+            {"class": "table-responsive"}
+        )
+    ]
+
+    return sessionCommit(
+        session
+        adminLayout(
+            session
+            "Sorular"
+            context.siteName
+            context.headerColor
+            context.user
+            "/admin/questions"
+            context.flash
+            context.flashKind
+            content
+        )
+    )
+}
+
+adminQuestionRow: Function := (
+    session: Session
+    question: QuestionRecord
+) -> HTMLNode {
+    badge: Local HTMLNode := Web.UI.span(
+        "Taslak"
+        {"class": "badge text-bg-warning"}
+    )
+    actionLabel: Local String := "Yayımla"
+    actionValue: Local String := "publish"
+    if question.status == "published" {
+        badge = Web.UI.span("Yayımlandı", {"class": "badge text-bg-success"})
+        actionLabel = "Taslağa al"
+        actionValue = "unpublish"
+    }
+
+    return Web.UI.tr(
+        [
+            Web.UI.td(question.title)
+            Web.UI.td(question.topic)
+            Web.UI.tdNodes([badge])
+            Web.UI.tdNodes(
+                [
+                    Web.UI.a(
+                        "/admin/questions/edit?id={str(question.id)}"
+                        "Düzenle"
+                        {"class": "btn btn-sm btn-outline-primary me-2"}
+                    )
+                    Web.UI.formTo(
+                        "/admin/questions/status"
+                        "post"
+                        [
+                            csrfInput(session)
+                            Web.UI.input(
+                                "hidden"
+                                "question_id"
+                                str(question.id)
+                            )
+                            Web.UI.input("hidden", "action", actionValue)
+                            Web.UI.button(
+                                actionLabel
+                                {
+                                    "type": "submit"
+                                    "class": "btn btn-sm btn-outline-secondary"
+                                }
+                            )
+                        ]
+                        {"class": "d-inline"}
+                    )
+                ]
+                {"class": "d-flex"}
+            )
+        ]
+    )
+}
+
+adminQuestionStatusSubmit: Function := (request: Request) -> Response {
+    session: Local Session := sessionOpen(request)
+    context: Local PageContext := contextFor(session)
+    guard: Local GuardResult := adminGuard(session, context)
+    if guard.allowed == false {
+        return sessionCommit(session, guard.refusal)
+    }
+
+    if csrfValid(session, request) == false {
+        return sessionCommit(session, Web.text("Geçersiz form belirteci.", 403))
+    }
+
+    id: Local Int := validationPositiveInt(request.form("question_id"))
+    action: Local String := validationField(request.form("action"))
+    if questionsFindAny(id) == null {
+        return sessionCommit(session, Web.text("Soru bulunamadı.", 404))
+    }
+
+    if action == "publish" {
+        questionsPublish(id)
+        flashSet(session, "success", "Soru yayımlandı.")
+    }
+    else {
+        questionsUnpublish(id)
+        flashSet(session, "success", "Soru taslağa alındı.")
+    }
+
+    return sessionCommit(session, Web.redirect("/admin/questions"))
+}

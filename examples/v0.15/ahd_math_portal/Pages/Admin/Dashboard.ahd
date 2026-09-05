@@ -1,0 +1,66 @@
+require("Layouts/Admin.ahd")
+require("Services/Context.ahd")
+require("Services/Session.ahd")
+require("Services/Guard.ahd")
+require("Repositories/Users.ahd")
+require("Repositories/Questions.ahd")
+require("Repositories/Solutions.ahd")
+bring Web
+from Web bring (Request, Response, HTMLNode, Session)
+
+adminDashboardPage: Function := (request: Request) -> Response {
+    session: Local Session := sessionOpen(request)
+    context: Local PageContext := contextFor(session)
+    guard: Local GuardResult := adminGuard(session, context)
+    if guard.allowed == false {
+        return sessionCommit(session, guard.refusal)
+    }
+
+    cards: Local List<HTMLNode> := [
+        adminStatCard("Kullanıcı", str(usersCount()))
+        adminStatCard(
+            "Yayımlanan soru"
+            str(questionsCountByStatus("published"))
+        )
+        adminStatCard("Taslak soru", str(questionsCountByStatus("draft")))
+        adminStatCard("Çözüm", str(solutionsCount()))
+    ]
+
+    return sessionCommit(
+        session
+        adminLayout(
+            session
+            "Panel"
+            context.siteName
+            context.headerColor
+            context.user
+            "/admin"
+            context.flash
+            context.flashKind
+            [Web.UI.div(cards, {"class": "row g-3"})]
+        )
+    )
+}
+
+adminStatCard: Function := (label: String, value: String) -> HTMLNode {
+    return Web.UI.div(
+        [
+            Web.UI.div(
+                [
+                    Web.UI.div(
+                        [
+                            Web.UI.p(
+                                label
+                                {"class": "text-body-secondary small mb-1"}
+                            )
+                            Web.UI.p(value, {"class": "fs-3 fw-semibold mb-0"})
+                        ]
+                        {"class": "card-body"}
+                    )
+                ]
+                {"class": "card h-100"}
+            )
+        ]
+        {"class": "col-6 col-lg-3"}
+    )
+}

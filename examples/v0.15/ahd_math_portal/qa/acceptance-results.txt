@@ -1,0 +1,216 @@
+AhdCode v0.15.0 portal acceptance — 2026-09-05
+Synthetic accounts/key; disposable loopback fixtures only. No real credentials recorded.
+
+=== test_auth.py ===
+PASS  register page 200
+PASS  register form carries a CSRF token
+PASS  registration succeeds
+PASS  duplicate email rejected
+PASS  short password rejected
+PASS  password confirmation mismatch rejected
+PASS  register without CSRF token -> 403
+PASS  wrong password rejected
+PASS  unknown account gives the same generic message
+PASS  login succeeds
+PASS  login without CSRF token -> 403
+PASS  normal user denied /admin
+PASS  normal user denied /admin/users
+PASS  normal user denied /admin/questions
+PASS  normal user denied /admin/settings
+PASS  normal user denied /admin/solutions
+PASS  anonymous redirected from /admin
+PASS  admin login succeeds
+PASS  admin can reach /admin
+
+19/19 passed
+
+=== test_content.py ===
+PASS  question editor 200
+PASS  draft created
+PASS  draft listed for admin
+PASS  question title escaped in admin list
+PASS  draft not on public home
+PASS  draft not reachable publicly by id
+PASS  publish succeeds
+PASS  published question appears publicly
+PASS  public listing escapes the title
+PASS  question detail 200
+PASS  question body escaped
+PASS  bold tag shown as text
+PASS  publish without CSRF -> 403
+PASS  publish with wrong CSRF -> 403
+PASS  normal user cannot save a question
+PASS  settings page 200
+PASS  valid settings saved
+PASS  site name applied
+PASS  header color applied
+PASS  header color rejected: 'red'
+PASS  header color rejected: 'javascript:alert(1)'
+PASS  header color rejected: '#12345'
+PASS  header color rejected: '#12345678'
+PASS  header color rejected: 'url(x)'
+PASS  header color rejected: '#0d6efd; background:url(x)'
+PASS  site name escaped
+PASS  settings without CSRF -> 403
+QID=1
+
+27/27 passed
+
+=== test_upload.py ===
+PASS  anonymous sees no upload form
+PASS  anonymous upload redirected to login
+PASS  rejected .exe
+PASS  .exe not accepted (no solution recorded)
+PASS  rejected .html
+PASS  .html not accepted (no solution recorded)
+PASS  rejected .svg
+PASS  .svg not accepted (no solution recorded)
+PASS  rejected text claiming application/pdf
+PASS  text claiming application/pdf not accepted (no solution recorded)
+PASS  oversize upload refused
+PASS  oversize left no solution
+PASS  traversal filename accepted as a plain upload
+PASS  upload recorded after traversal name
+PASS  displayed filename has no path separators
+PASS  exactly one stored file
+PASS  stored name is not the attacker basename
+PASS  stored name looks random
+PASS  nothing escaped the storage directory
+PASS  second upload not offered / refused
+PASS  submitted state shown, no upload form
+PASS  storage still has one file
+PASS  upload without CSRF -> 403
+PASS  PNG accepted for a different user
+PASS  second user's solution recorded
+PASS  storage now has two files
+
+26/26 passed
+
+=== test_onetime.py ===
+PASS  submitted state is shown
+PASS  upload form is no longer offered
+PASS  no resubmit/edit/delete control
+PASS  duplicate POST rejected with valid CSRF
+PASS  direct re-POST does not create a second solution
+
+5/5 passed
+
+=== test_download.py ===
+PASS  admin solutions list 200
+PASS  uploader filename escaped in list
+PASS  admin can download a solution
+PASS  correct content type
+PASS  body is the stored PDF
+PASS  normal user cannot download
+PASS  anonymous cannot download
+PASS  not served statically: /assets/../storage/solutions/de1f3a23ac47ccd9150dd3ee82a9f5c7
+PASS  not served statically: /storage/solutions/de1f3a23ac47ccd9150dd3ee82a9f5c7
+PASS  not served statically: /assets/../../etc/passwd
+PASS  bad id refused: '../../etc/passwd'
+PASS  bad id refused: 'abc'
+PASS  bad id refused: '-1'
+PASS  bad id refused: '0'
+PASS  bad id refused: '99999'
+
+15/15 passed
+
+=== test_extra.py ===
+PASS  logout missing token -> 403
+PASS  logout wrong token -> 403
+PASS  logout valid token -> 303
+PASS  logout ends authentication
+PASS  inactive account login rejected
+PASS  settings wrong CSRF -> 403
+PASS  upload wrong CSRF -> 403
+PASS  DB composite UNIQUE exists
+PASS  duplicate HTTP attempt left exactly one row
+PASS  stored file exists only under private root
+PASS  actual stored file inaccessible: /storage/solutions/
+PASS  actual stored file inaccessible: /assets/../storage/solutions/
+PASS  actual stored file inaccessible: /assets/%2e%2e/storage/solutions/
+
+13/13 passed
+
+=== test_reset.py ===
+PASS  forgot-password returns generic response
+PASS  one message delivered for a known account
+PASS  mail contains a reset link
+PASS  link uses the working bind address, not .test
+PASS  unknown account returns the same response
+PASS  no mail sent for an unknown account
+PASS  verifier is stored hashed
+PASS  raw verifier is not in the database
+PASS  wrong verifier rejected
+PASS  unknown selector rejected
+PASS  valid link opens the form
+PASS  password reset succeeds
+PASS  token is one-time (reuse rejected)
+PASS  old password rejected after reset
+PASS  new password accepted
+PASS  expired token rejected
+PASS  session works before password change
+PASS  old session invalidated after admin password change
+
+18/18 passed
+
+=== test_gemini.py ===
+PASS  Gemini panel offered when configured
+PASS  generation returns the editor
+PASS  generated title appears as an editable draft
+PASS  generated body appears in the textarea
+PASS  model output is escaped
+PASS  nothing was saved by generating
+PASS  nothing was published by generating
+PASS  a request reached the API
+PASS  model name is in the path
+PASS  API key sent as a header
+PASS  API key NOT in the URL
+PASS  prompt carried in the JSON body
+PASS  API key not echoed into the page
+PASS  HTTP error handled without a crash
+PASS  HTTP error shows a message, not a stack trace
+PASS  HTTP error leaks no API key
+PASS  malformed JSON handled without a crash
+PASS  malformed JSON shows a message, not a stack trace
+PASS  malformed JSON leaks no API key
+PASS  unexpected shape handled without a crash
+PASS  unexpected shape shows a message, not a stack trace
+PASS  unexpected shape leaks no API key
+PASS  empty candidates handled without a crash
+PASS  empty candidates shows a message, not a stack trace
+PASS  empty candidates leaks no API key
+PASS  generate without CSRF -> 403
+PASS  normal user cannot generate
+
+27/27 passed
+
+=== test_layouts.py ===
+PASS  layout renders /
+PASS  logout form includes token /
+PASS  layout renders /question?id=1
+PASS  logout form includes token /question?id=1
+PASS  layout renders /question?id=99999
+PASS  logout form includes token /question?id=99999
+PASS  layout renders /admin
+PASS  logout form includes token /admin
+PASS  layout renders /admin/users
+PASS  logout form includes token /admin/users
+PASS  layout renders /admin/users/edit?id=1
+PASS  logout form includes token /admin/users/edit?id=1
+PASS  layout renders /admin/questions
+PASS  logout form includes token /admin/questions
+PASS  layout renders /admin/questions/new
+PASS  logout form includes token /admin/questions/new
+PASS  layout renders /admin/questions/edit?id=1
+PASS  logout form includes token /admin/questions/edit?id=1
+PASS  layout renders /admin/solutions
+PASS  logout form includes token /admin/solutions
+PASS  layout renders /admin/settings
+PASS  logout form includes token /admin/settings
+PASS  admin navbar token logs out
+PASS  anonymous auth layout /login
+PASS  anonymous auth layout /register
+PASS  anonymous auth layout /forgot-password
+
+26/26 passed
+

@@ -1,0 +1,27 @@
+/* A small amount of application styling on top of Bootstrap.
+   Bootstrap itself is vendored unmodified in bootstrap.min.css. */
+
+.navbar {
+    /* The inline background-color comes from the validated header_color
+       setting; this only supplies the fallback and the text colour. */
+    background-color: #0d6efd;
+}
+
+.navbar a.nav-link:hover {
+    text-decoration: underline;
+}
+
+main {
+    min-height: 60vh;
+}
+
+.card-title {
+    margin-bottom: 0.5rem;
+}
+
+pre {
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    margin-bottom: 0;
+    font-size: 0.95rem;
+}

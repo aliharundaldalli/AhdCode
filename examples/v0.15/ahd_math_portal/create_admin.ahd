@@ -1,0 +1,68 @@
+// First administrator setup.
+//
+//   ADMIN_NAME="Ali Harun" ADMIN_EMAIL=admin@example.test ADMIN_PASSWORD='...' \
+//     ahdcode run create_admin.ahd
+//
+// There is no shipped default administrator and no hardcoded password. The
+// values come from the environment, are used once, and are never printed --
+// the script reports the email it acted on and nothing else.
+//
+// Unset ADMIN_PASSWORD afterwards so it does not linger in your shell history
+// or environment.
+//
+// This script lives at the application root rather than under scripts/ on
+// purpose: require(...) resolves from the entry file's own directory, and
+// ../ traversal is rejected, so a second entry point in a subdirectory cannot
+// reuse the application's Config and Repositories.
+// Load local .env before opening the database, just as app.ahd does.
+require("Config/App.ahd")
+require("Config/Database.ahd")
+require("Repositories/Users.ahd")
+require("Support/Validation.ahd")
+bring Env
+bring MySQL
+from MySQL bring MySQLValue
+bring Security
+
+adminName: String := Env.getOr("ADMIN_NAME", "")
+adminEmail: String := validationEmail(Env.getOr("ADMIN_EMAIL", ""))
+adminPassword: String := Env.getOr("ADMIN_PASSWORD", "")
+
+if adminName == "" or adminEmail == "" or adminPassword == "" {
+    write("ADMIN_NAME, ADMIN_EMAIL, and ADMIN_PASSWORD must all be set.")
+}
+else if validationEmailShaped(adminEmail) == false {
+    write("ADMIN_EMAIL is not a valid address.")
+}
+else if validationPasswordLongEnough(adminPassword) == false {
+    write(
+        "ADMIN_PASSWORD must be at least {str(validationMinimumPassword())} characters."
+    )
+}
+else {
+    hash: Local String := Security.passwordHash(adminPassword)
+    existing: Local UserRecord? := usersFindByEmail(adminEmail)
+    if existing == null {
+        created: Local Int? := usersCreate(adminName, adminEmail, hash, "admin")
+        if created == null {
+            write("Could not create the administrator.")
+        }
+        else {
+            write("Administrator created: {adminEmail}")
+        }
+    }
+    else {
+        // Only the named account is touched, and only its password and role.
+        connection(
+            
+        ).execute(
+            "UPDATE users SET name = ?, password_hash = ?, role = 'admin', is_active = 1, auth_version = auth_version + 1 WHERE id = ?"
+            [
+                MySQL.fromString(adminName)
+                MySQL.fromString(hash)
+                MySQL.fromInt(existing.id)
+            ]
+        )
+        write("Administrator updated: {adminEmail}")
+    }
+}

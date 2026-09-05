@@ -1,0 +1,54 @@
+AhdCode Dev
+
+Watching: /Users/ahd/Developer/AhdCode/examples/v0.15/ahd_math_portal/app.ahd
+
+→ Building...
+✓ Build succeeded
+→ Starting...
+✓ Running
+
+AhdCode Web
+  Ahd Akademi Matematik (development)
+
+  Open:
+  http://127.0.0.1:8160
+
+  Development identity:
+  http://ahdakademi.com.test
+  (.test is not locally routed in v0.15)
+
+Waiting for changes...
+Source changed
+→ Building...
+✓ Build succeeded
+→ Restarting...
+✓ Running
+Waiting for changes...
+Source changed
+→ Building...
+✓ Build succeeded
+→ Restarting...
+✓ Running
+Waiting for changes...
+Source changed
+→ Building...
+✗ Build failed
+
+error [SEM004] /Users/ahd/Developer/AhdCode/examples/v0.15/ahd_math_portal/Pages/Home.ahd:64:31
+initializer of qaContinuationInvalid expects Int; received String
+  64 | qaContinuationInvalid: Int := "type-error"
+     |                               ^^^^^^^^^^^^
+  hint: use a value assignable to the declared type
+
+✓ Previous successful build is still running
+Waiting for changes...
+Source changed
+→ Building...
+✓ Build succeeded
+→ Restarting...
+✓ Running
+Waiting for changes...
+^C
+Stopping...
+✓ Server stopped
+✓ Dev watcher stopped

@@ -1,0 +1,101 @@
+// Solution uploads.
+//
+// Three rules decide whether an upload is accepted, in this order:
+//
+//   1. the bytes must look like a PDF, PNG, or JPEG -- decided by
+//      detectedContentType, never by the declared type or the filename;
+//   2. the file must be within the configured size limit;
+//   3. the user must not already have a solution for this question, which the
+//      database decides through UNIQUE(user_id, question_id).
+//
+// The file is written before the row is inserted, because save() is what
+// produces the stored name. If the insert then loses the race, the file this
+// request just created is removed -- and only that file, identified by the
+// path save() returned, never by anything a client supplied.
+require("Config/App.ahd")
+require("Repositories/Solutions.ahd")
+bring Web
+from Web bring UploadedFile
+bring File
+from File bring FileError
+bring Path
+
+UploadOutcome: Class<> := {
+    structure: Attributes := (accepted: Bool, message: String)
+}
+// solutionAllowedType maps sniffed content types to the formats this
+// application accepts. The extension the uploader chose is irrelevant.
+solutionAllowedType: Function := (detected: String) -> Bool {
+    return detected == "application/pdf" or detected == "image/png" or detected == "image/jpeg"
+}
+
+solutionStore: Function := (
+    userId: Int
+    questionId: Int
+    upload: UploadedFile
+) -> UploadOutcome {
+    detected: Local String := upload.detectedContentType()
+    if solutionAllowedType(detected) == false {
+        return UploadOutcome(
+            accepted: false
+            message: "Yalnızca PDF, PNG veya JPEG yükleyebilirsiniz."
+        )
+    }
+
+    if upload.size() > uploadMaxBytes() {
+        return UploadOutcome(
+            accepted: false
+            message: "Dosya çok büyük. En fazla {str(uploadMaxBytes() / 1048576)} MiB."
+        )
+    }
+
+    if upload.size() == 0 {
+        return UploadOutcome(accepted: false, message: "Boş dosya yüklenemez.")
+    }
+    // A fast pre-check so the common duplicate never writes a file at all.
+    // It is not the authority -- the constraint below is.
+    if solutionsFindForUser(userId, questionId) != null {
+        return UploadOutcome(
+            accepted: false
+            message: "Bu soru için zaten bir çözüm gönderdiniz."
+        )
+    }
+    // save() creates the directory, writes under a cryptographically random
+    // basename, and returns the real stored path. The uploader's filename
+    // never touches the filesystem.
+    storedPath: Local String := upload.save(uploadRoot())
+    storedName: Local String := Path.base(storedPath)
+
+    inserted: Local Bool := solutionsCreate(
+        userId
+        questionId
+        upload.originalName()
+        storedName
+        detected
+        upload.size()
+    )
+    if inserted == false {
+        // Another request won the race for this user and question. Remove the
+        // orphan this request created -- the exact path save() returned, so no
+        // other user's file can be reached from here.
+        attempt {
+            File.delete(storedPath)
+        }
+        except FileError {
+            // The row is what matters and it does not exist; a file that could
+            // not be removed is unreferenced, not a correctness problem.
+        }
+
+        return UploadOutcome(
+            accepted: false
+            message: "Bu soru için zaten bir çözüm gönderdiniz."
+        )
+    }
+
+    return UploadOutcome(accepted: true, message: "Çözümünüz alındı.")
+}
+// solutionPath rebuilds the on-disk path from the stored name held in the
+// database. The name came from save(); nothing from a request reaches it.
+solutionPath: Function := (storedFilename: String) -> String {
+    return Path.join([uploadRoot(), storedFilename])
+}

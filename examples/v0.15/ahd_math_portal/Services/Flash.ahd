@@ -1,0 +1,44 @@
+// One-shot session messages.
+//
+// v0.15 has no flash framework. This is the smallest thing that works: write a
+// message into the session, read it once, and remove it. It is application
+// code, not a Web addition.
+bring Web
+from Web bring Session
+
+flashKey: String := "flash_message"
+flashKindKey: String := "flash_kind"
+
+flashSet: Function := (
+    session: Session
+    kind: String
+    message: String
+) -> Nothing {
+    flashKey: Global String
+    flashKindKey: Global String
+    session.set(flashKey, message)
+    session.set(flashKindKey, kind)
+}
+// flashTake returns the pending message and clears it, so a refresh does not
+// show it again.
+flashTake: Function := (session: Session) -> String {
+    flashKey: Global String
+    message: Local String? := session.get(flashKey)
+    if message == null {
+        return ""
+    }
+
+    session.remove(flashKey)
+    return message
+}
+
+flashTakeKind: Function := (session: Session) -> String {
+    flashKindKey: Global String
+    kind: Local String? := session.get(flashKindKey)
+    if kind == null {
+        return "info"
+    }
+
+    session.remove(flashKindKey)
+    return kind
+}

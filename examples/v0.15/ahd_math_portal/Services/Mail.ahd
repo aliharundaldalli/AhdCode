@@ -1,0 +1,37 @@
+// Outbound mail.
+//
+// Sending is best-effort by design: password reset shows the same generic
+// response whether or not mail could be delivered, so a broken or unconfigured
+// SMTP server never turns into an account-existence oracle. Failures are
+// swallowed here and reported nowhere the requester can see.
+require("Config/Mail.ahd")
+bring SMTP
+from SMTP bring (SMTPClient, SMTPMessage, SMTPError)
+
+mailSend: Function := (to: String, subject: String, body: String) -> Bool {
+    if mailConfigured() == false {
+        return false
+    }
+
+    attempt {
+        client: Local SMTPClient := SMTP.client(
+            mailHost()
+            mailPort()
+            mailSecurity()
+        )
+        if mailUsername() != "" {
+            client = client.withPlainAuth(mailUsername(), mailPassword())
+        }
+
+        message: Local SMTPMessage := SMTP.message(
+            mailFromAddress()
+            [to]
+            subject
+        )
+        client.send(message.withText(body))
+        return true
+    }
+    except SMTPError {
+        return false
+    }
+}

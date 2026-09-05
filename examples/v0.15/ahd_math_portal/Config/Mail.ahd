@@ -1,0 +1,58 @@
+// SMTP configuration.
+//
+// Mail is optional: with no SMTP_HOST configured the application still runs
+// and password reset still behaves identically from the outside -- the same
+// generic response is shown either way, so a missing mail server never
+// discloses whether an address is registered.
+bring Env
+
+mailConfigured: Function := () -> Bool {
+    return Env.getOr("SMTP_HOST", "") != ""
+}
+
+mailHost: Function := () -> String {
+    return Env.getOr("SMTP_HOST", "")
+}
+
+mailPort: Function := () -> Int {
+    raw: Local String := Env.getOr("SMTP_PORT", "587")
+    value: Local Int := 587
+    attempt {
+        value = int(raw)
+    }
+    except DomainError {
+        return 587
+    }
+    except OverflowError {
+        return 587
+    }
+
+    return value
+}
+
+mailUsername: Function := () -> String {
+    return Env.getOr("SMTP_USERNAME", "")
+}
+
+mailPassword: Function := () -> String {
+    return Env.getOr("SMTP_PASSWORD", "")
+}
+
+mailFromAddress: Function := () -> String {
+    return Env.getOr("SMTP_FROM_ADDRESS", "no-reply@localhost")
+}
+
+mailFromName: Function := () -> String {
+    return Env.getOr("SMTP_FROM_NAME", "Ahd Akademi Matematik")
+}
+// SMTP.client takes "none", "starttls", or "tls". Local test sinks speak
+// plaintext, so the default here is none rather than a value that would fail
+// against a disposable listener.
+mailSecurity: Function := () -> String {
+    value: Local String := Env.getOr("SMTP_SECURITY", "none")
+    if value == "none" or value == "starttls" or value == "tls" {
+        return value
+    }
+
+    return "none"
+}

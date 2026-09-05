@@ -1,0 +1,101 @@
+// Authentication and authorization.
+//
+// The session carries an id and the auth_version it authenticated with;
+// everything else about the current user -- role, active state -- is read from
+// the database on each request. A submitted form or a cookie never decides
+// whether someone is an administrator.
+require("Services/Session.ahd")
+require("Repositories/Users.ahd")
+bring Web
+from Web bring (Session, Request, Response)
+bring Security
+
+authUserKey: String := "auth_user_id"
+authVersionKey: String := "auth_version"
+// authLogin binds a session to an account. rotate() gives the session a new
+// identifier at the privilege boundary, so a session id observed before login
+// is not the one that ends up authenticated.
+authLogin: Function := (session: Session, user: UserRecord) -> Nothing {
+    authUserKey: Global String
+    authVersionKey: Global String
+    session.rotate()
+    session.set(authUserKey, str(user.id))
+    session.set(authVersionKey, str(user.authVersion))
+}
+
+authLogout: Function := (session: Session) -> Nothing {
+    session.destroy()
+}
+// authCurrentUser resolves the signed-in account, or null. It re-reads the
+// user every request on purpose: a deactivated account or a password change
+// takes effect immediately rather than at the next login.
+authCurrentUser: Function := (session: Session) -> UserRecord? {
+    authUserKey: Global String
+    authVersionKey: Global String
+    rawId: Local String? := session.get(authUserKey)
+    if rawId == null {
+        return null
+    }
+
+    id: Local Int := 0
+    attempt {
+        id = int(rawId)
+    }
+    except DomainError {
+        return null
+    }
+    except OverflowError {
+        return null
+    }
+
+    user: Local UserRecord? := usersFindById(id)
+    if user == null {
+        return null
+    }
+
+    if user.isActive == false {
+        return null
+    }
+    // auth_version mismatch means the password changed after this session was
+    // established. The session stops being accepted.
+    rawVersion: Local String? := session.get(authVersionKey)
+    if rawVersion == null {
+        return null
+    }
+
+    if rawVersion != str(user.authVersion) {
+        return null
+    }
+
+    return user
+}
+
+authIsAdmin: Function := (user: UserRecord?) -> Bool {
+    if user == null {
+        return false
+    }
+
+    return user.role == "admin"
+}
+// authAttempt verifies credentials. It reports one generic outcome for an
+// unknown address, a wrong password, and a deactivated account, so the
+// response never says which of the three happened.
+authAttempt: Function := (email: String, password: String) -> UserRecord? {
+    user: Local UserRecord? := usersFindByEmail(email)
+    if user == null {
+        // Hash anyway so a missing account does not answer measurably faster
+        // than a wrong password.
+        Security.passwordHash(password)
+        return null
+    }
+
+    if Security.passwordVerify(password, user.passwordHash) == false {
+        return null
+    }
+
+    if user.isActive == false {
+        return null
+    }
+
+    return user
+}

@@ -1,0 +1,146 @@
+// Registration.
+//
+// Uniqueness is decided by the database: the insert is attempted and a
+// constraint violation becomes the duplicate-email message. A prior SELECT
+// would be a race, and this way there is only one source of truth.
+require("Layouts/Auth.ahd")
+require("Components/FormField.ahd")
+require("Services/Context.ahd")
+require("Services/Session.ahd")
+require("Services/Auth.ahd")
+require("Services/CSRF.ahd")
+require("Repositories/Users.ahd")
+require("Support/Validation.ahd")
+bring Web
+from Web bring (Request, Response, HTMLNode, Session)
+bring Security
+
+registerPage: Function := (request: Request) -> Response {
+    session: Local Session := sessionOpen(request)
+    context: Local PageContext := contextFor(session)
+    return sessionCommit(session, registerView(session, context, "", "", []))
+}
+
+registerView: Function := (
+    session: Session
+    context: PageContext
+    name: String
+    email: String
+    errors: List<String>
+) -> Response {
+    fields: Local List<HTMLNode> := []
+    if len(errors) > 0 {
+        fields.add(errorList(errors))
+    }
+
+    fields.add(
+        Web.UI.formTo(
+            "/register"
+            "post"
+            [
+                csrfInput(session)
+                formField("register-name", "name", "Ad soyad", "text", name)
+                formField("register-email", "email", "E-posta", "email", email)
+                formField(
+                    "register-password"
+                    "password"
+                    "Parola"
+                    "password"
+                    ""
+                    "En az {str(validationMinimumPassword())} karakter."
+                )
+                formField(
+                    "register-confirm"
+                    "password_confirmation"
+                    "Parola (tekrar)"
+                    "password"
+                )
+                Web.UI.button(
+                    "Kayıt ol"
+                    {"type": "submit", "class": "btn btn-primary w-100"}
+                )
+            ]
+        )
+    )
+    fields.add(
+        Web.UI.pNodes(
+            [
+                Web.UI.text("Zaten hesabınız var mı? ")
+                Web.UI.a("/login", "Giriş yapın")
+            ]
+            {"class": "mt-3 mb-0 small"}
+        )
+    )
+
+    return authLayout(
+        "Kayıt ol"
+        context.siteName
+        context.headerColor
+        context.flash
+        context.flashKind
+        fields
+    )
+}
+
+registerSubmit: Function := (request: Request) -> Response {
+    session: Local Session := sessionOpen(request)
+    context: Local PageContext := contextFor(session)
+    if csrfValid(session, request) == false {
+        return sessionCommit(session, Web.text("Geçersiz form belirteci.", 403))
+    }
+
+    name: Local String := validationField(request.form("name"))
+    email: Local String := validationEmail(request.form("email"))
+    password: Local String := validationField(request.form("password"))
+    confirmation: Local String := validationField(
+        request.form("password_confirmation")
+    )
+
+    errors: Local List<String> := []
+    if name == "" {
+        errors.add("Ad soyad gerekli.")
+    }
+
+    if validationEmailShaped(email) == false {
+        errors.add("Geçerli bir e-posta adresi girin.")
+    }
+
+    if validationPasswordLongEnough(password) == false {
+        errors.add(
+            "Parola en az {str(validationMinimumPassword())} karakter olmalı."
+        )
+    }
+
+    if password != confirmation {
+        errors.add("Parolalar eşleşmiyor.")
+    }
+
+    if len(errors) > 0 {
+        return sessionCommit(
+            session
+            registerView(session, context, name, email, errors)
+        )
+    }
+
+    created: Local Int? := usersCreate(
+        name
+        email
+        Security.passwordHash(password)
+        "user"
+    )
+    if created == null {
+        return sessionCommit(
+            session
+            registerView(
+                session
+                context
+                name
+                email
+                ["Bu e-posta adresi zaten kayıtlı."]
+            )
+        )
+    }
+
+    flashSet(session, "success", "Kaydınız tamamlandı. Giriş yapabilirsiniz.")
+    return sessionCommit(session, Web.redirect("/login"))
+}
