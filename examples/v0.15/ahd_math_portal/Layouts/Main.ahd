@@ -47,7 +47,7 @@ layoutHead: Function := () -> List<HTMLNode> {
         Web.UI.stylesheet(
             "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
         )
-        Web.UI.stylesheet("/assets/css/app.css?v=1.7")
+        Web.UI.stylesheet("/assets/css/app.css?v=1.8")
         Web.UI.element("script", {"src": "/assets/js/mathjax-config.js"}, [])
         Web.UI.element(
             "script"

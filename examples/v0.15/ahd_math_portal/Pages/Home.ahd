@@ -80,20 +80,6 @@ homeSliderSection: Function := (sliders: List<SliderRecord>) -> HTMLNode {
                     [
                         Web.UI.div(
                             [
-                                Web.UI.spanNodes(
-                                    [
-                                        Web.UI.i(
-                                            ""
-                                            {
-                                                "class": "fa-solid fa-square-root-variable me-1"
-                                            }
-                                        )
-                                        Web.UI.text("Ahd Akademi")
-                                    ]
-                                    {
-                                        "class": "badge bg-primary text-white px-2 py-1 rounded-pill mb-2 hero-slide-badge"
-                                    }
-                                )
                                 Web.UI.h2(
                                     slider.title
                                     {
