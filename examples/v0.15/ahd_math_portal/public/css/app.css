@@ -25,3 +25,17 @@ pre {
     margin-bottom: 0;
     font-size: 0.95rem;
 }
+
+.math-content {
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    font-size: 1.05rem;
+    line-height: 1.7;
+}
+
+mjx-container {
+    overflow-x: auto;
+    overflow-y: hidden;
+    max-width: 100%;
+}
+

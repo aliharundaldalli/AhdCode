@@ -45,5 +45,15 @@ layoutHead: Function := () -> List<HTMLNode> {
     return [
         Web.UI.stylesheet("/assets/css/bootstrap.min.css")
         Web.UI.stylesheet("/assets/css/app.css")
+        Web.UI.element("script", {"src": "/assets/js/mathjax-config.js"}, [])
+        Web.UI.element(
+            "script"
+            {
+                "id": "MathJax-script"
+                "async": "true"
+                "src": "/assets/js/mathjax.js"
+            }
+            []
+        )
     ]
 }

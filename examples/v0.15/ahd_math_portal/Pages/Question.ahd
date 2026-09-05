@@ -59,11 +59,10 @@ questionPage: Function := (request: Request) -> Response {
                     question.publishedAt
                     {"class": "text-body-secondary small"}
                 )
-                // The body is data. If it contains LaTeX source it is shown as
-                // written: see the README on why v0.15 renders no formulas.
-                Web.UI.pre(
-                    question.body
-                    {"class": "bg-body-tertiary p-3 rounded"}
+                // The body is data. MathJax processes LaTeX delimiters ($...$ and $$...$$) client-side.
+                Web.UI.div(
+                    [Web.UI.text(question.body)]
+                    {"class": "bg-body-tertiary p-3 rounded math-content"}
                 )
             ], {"class": "mb-4"}), solutionSection(session, context, question)]
 
