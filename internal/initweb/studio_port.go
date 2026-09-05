@@ -21,6 +21,13 @@ const (
 	// databases` falls back to when local routing is not available.
 	ahdDataStudioURL     = "http://ahddatabasestudio.test/"
 	ahdDataStudioBindURL = "http://127.0.0.1:8081/AhdDataStudio"
+
+	// Init runs from a project directory, which has no AhdDataStudio .env in
+	// scope. Falling back to the ordinary local MySQL socket is better than
+	// failing the wizard over configuration the user has no reason to have
+	// set yet; an explicit setting still wins.
+	defaultStudioMySQLHost = "127.0.0.1"
+	defaultStudioMySQLPort = 3306
 )
 
 // AhdDataStudioPublicURL is the .test identity the CLI prints and opens.
@@ -69,7 +76,7 @@ func studioAppExists(dir string) bool {
 func resolveStudioMySQLHost() (string, error) {
 	host, err := lookupStudioSetting(ahdDataMySQLHostKey)
 	if err != nil {
-		return "", fmt.Errorf("MySQL host is required.\nSet %s in AhdDataStudio (.env) or export it in this shell.", ahdDataMySQLHostKey)
+		return defaultStudioMySQLHost, nil
 	}
 	return host, nil
 }
@@ -91,7 +98,7 @@ func lookupStudioSetting(key string) (string, error) {
 func resolveStudioMySQLPort() (int, error) {
 	raw, err := lookupStudioSetting(ahdDataMySQLPortKey)
 	if err != nil {
-		return 0, fmt.Errorf("MySQL port is required.\nSet %s in AhdDataStudio (.env) or export it in this shell.", ahdDataMySQLPortKey)
+		return defaultStudioMySQLPort, nil
 	}
 	return parseRequiredMySQLPort(raw)
 }
@@ -191,6 +198,9 @@ func ahdDataStudioEnvFiles() []string {
 	// Explicit source root takes precedence over nearest cwd/upward discovery.
 	if root := strings.TrimSpace(os.Getenv("AHDCODE_ROOT")); root != "" {
 		add(filepath.Join(root, "tools", "AhdDataStudio", ".env"))
+	}
+	if dir, err := LocateAhdDataStudio(); err == nil {
+		add(filepath.Join(dir, ".env"))
 	}
 	if cwd, err := os.Getwd(); err == nil {
 		dir := cwd

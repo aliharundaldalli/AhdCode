@@ -855,8 +855,9 @@ Başarı çıktısı AhdDataStudio'nun kanonik adresine yönlendirir
 #### MySQL
 
 Veritabanı adı, kullanıcı adı ve parola (gizli) sorar. Host, port ve
-güvenlik sorulmaz: AhdDataStudio ayarından gelir (`AHD_DATA_MYSQL_HOST`,
-`AHD_DATA_MYSQL_PORT`, `AHD_DATA_MYSQL_SECURITY`). Host yalnızca sunucu
+güvenlik sorulmaz: AhdDataStudio ayarı varsa oradan gelir
+(`AHD_DATA_MYSQL_HOST`, `AHD_DATA_MYSQL_PORT`, `AHD_DATA_MYSQL_SECURITY`);
+yoksa `127.0.0.1:3306` ve yerel `none`. Host yalnızca sunucu
 adresidir (`127.0.0.1`); `host:port` değildir.
 Yayınlanmış MySQL sözleşmesini kullanır (`tls` veya `none`).
 Yerel çakışma denetimlerinden sonra var olan bir veritabanını reddeder,

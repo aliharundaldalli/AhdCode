@@ -573,12 +573,33 @@ func TestMySQLHostComesFromAhdDataStudio(t *testing.T) {
 	}
 }
 
-func TestMySQLPortRequiredFromAhdDataStudio(t *testing.T) {
+func TestMySQLDefaultsWhenStudioUnset(t *testing.T) {
+	t.Setenv("AHDCODE_ROOT", "")
+	t.Setenv(ahdDataMySQLHostKey, "")
 	t.Setenv(ahdDataMySQLPortKey, "")
+	t.Setenv(ahdDataMySQLSecurityKey, "")
+	_ = os.Unsetenv(ahdDataMySQLHostKey)
 	_ = os.Unsetenv(ahdDataMySQLPortKey)
-	_, err := resolveStudioMySQLPort()
-	if err == nil || !strings.Contains(err.Error(), ahdDataMySQLPortKey) {
+	_ = os.Unsetenv(ahdDataMySQLSecurityKey)
+	t.Chdir(t.TempDir())
+
+	host, err := resolveStudioMySQLHost()
+	if err != nil || host != defaultStudioMySQLHost {
+		t.Fatalf("host=%q err=%v", host, err)
+	}
+	port, err := resolveStudioMySQLPort()
+	if err != nil || port != defaultStudioMySQLPort {
+		t.Fatalf("port=%d err=%v", port, err)
+	}
+	options, err := resolveMySQLOptions(Options{IsTTY: false})
+	if err == nil || !strings.Contains(err.Error(), "interactive terminal") {
 		t.Fatalf("error = %v", err)
+	}
+	if options.MySQLHost != defaultStudioMySQLHost || options.MySQLPort != defaultStudioMySQLPort {
+		t.Fatalf("options host=%q port=%d", options.MySQLHost, options.MySQLPort)
+	}
+	if options.MySQLSecurity != "none" {
+		t.Fatalf("security = %q", options.MySQLSecurity)
 	}
 }
 
