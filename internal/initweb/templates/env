@@ -1,0 +1,6 @@
+APP_NAME=AhdCode Web
+APP_ENV=development
+APP_HOST=localhost
+APP_PROTOCOL=http
+SERVER_HOST=127.0.0.1
+SERVER_PORT=8080

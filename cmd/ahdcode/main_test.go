@@ -241,3 +241,57 @@ func TestLSPSubcommandRejectsUnexpectedArguments(t *testing.T) {
 		t.Fatalf("expected no stdout output when rejecting arguments, got %q", out.String())
 	}
 }
+
+func TestInitUsage(t *testing.T) {
+	var out, errors bytes.Buffer
+	if code := runWithIO([]string{"init"}, bytes.NewBuffer(nil), &out, &errors); code != 2 {
+		t.Fatalf("init without template: exit %d stderr=%q", code, errors.String())
+	}
+	if !strings.Contains(errors.String(), "ahdcode init web") {
+		t.Fatalf("init usage = %q", errors.String())
+	}
+	errors.Reset()
+	if code := runWithIO([]string{"init", "foo"}, bytes.NewBuffer(nil), &out, &errors); code != 2 {
+		t.Fatalf("init foo: exit %d", code)
+	}
+	if !strings.Contains(errors.String(), `unsupported template "foo"`) {
+		t.Fatalf("unsupported = %q", errors.String())
+	}
+	errors.Reset()
+	if code := runWithIO([]string{"init", "web", "extra"}, bytes.NewBuffer(nil), &out, &errors); code != 2 {
+		t.Fatalf("init extra: exit %d", code)
+	}
+	if !strings.Contains(errors.String(), "no additional arguments") {
+		t.Fatalf("extra = %q", errors.String())
+	}
+	var helpOut, helpErr bytes.Buffer
+	if code := runWithIO([]string{"help"}, bytes.NewBuffer(nil), &helpOut, &helpErr); code != 0 {
+		t.Fatalf("help exit %d", code)
+	}
+	if !strings.Contains(helpOut.String(), "ahdcode init  web") {
+		t.Fatalf("help missing init web:\n%s", helpOut.String())
+	}
+}
+
+func TestInitWebWritesCurrentDirectory(t *testing.T) {
+	root := t.TempDir()
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(root); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(wd) })
+
+	var out, errors bytes.Buffer
+	if code := runWithIO([]string{"init", "web"}, bytes.NewBuffer(nil), &out, &errors); code != 0 {
+		t.Fatalf("init web: exit %d stderr=%q", code, errors.String())
+	}
+	if _, err := os.Stat(filepath.Join(root, "app.ahd")); err != nil {
+		t.Fatalf("app.ahd: %v", err)
+	}
+	if !strings.Contains(out.String(), "Initialized AhdCode Web project") {
+		t.Fatalf("stdout=%q", out.String())
+	}
+}

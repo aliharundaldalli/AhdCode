@@ -1,0 +1,18 @@
+require("Components/Navbar.ahd")
+bring Web
+from Web bring (HTMLNode, Response, AppConfig)
+
+mainLayout: Function := (
+    config: AppConfig
+    title: String
+    content: List<HTMLNode>
+) -> Response {
+    return Web.page(
+        "{title} — {config.name}"
+        [
+            navbar(config.name)
+            Web.UI.main(content)
+        ]
+        [Web.UI.stylesheet("/assets/app.css")]
+    )
+}

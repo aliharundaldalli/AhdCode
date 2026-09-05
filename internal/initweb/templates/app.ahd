@@ -1,0 +1,10 @@
+require("Config/App.ahd")
+require("Pages/Home.ahd")
+bring Web
+from Web bring App
+
+site: App := Web.app(application)
+site.assets("/assets", "public")
+site.get("/", home)
+write("{application.name} — http://{application.address()}")
+site.start()

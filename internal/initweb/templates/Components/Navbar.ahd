@@ -1,0 +1,9 @@
+bring Web
+from Web bring HTMLNode
+
+navbar: Function := (siteName: String) -> HTMLNode {
+    return Web.UI.nav(
+        [Web.UI.a("/", siteName)]
+        {"class": "navbar"}
+    )
+}

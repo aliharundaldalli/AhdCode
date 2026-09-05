@@ -1,0 +1,16 @@
+require("Config/App.ahd")
+require("Layouts/Main.ahd")
+bring Web
+from Web bring (Request, Response)
+
+home: Function := (request: Request) -> Response {
+    return mainLayout(
+        configuration()
+        "Home"
+        [
+            Web.UI.h1("AhdCode Web")
+            Web.UI.p("Your application is running.")
+            Web.UI.p("Edit Pages/Home.ahd to get started.")
+        ]
+    )
+}

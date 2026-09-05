@@ -18,6 +18,7 @@ import (
 	"ahdcode/internal/build"
 	"ahdcode/internal/diagnostics"
 	"ahdcode/internal/formatter"
+	"ahdcode/internal/initweb"
 	"ahdcode/internal/lsp"
 	"ahdcode/internal/repl"
 	"ahdcode/internal/source"
@@ -27,6 +28,7 @@ const usage = `AhdCode v0.16.0 toolchain
 
 usage:
   ahdcode                                  start the interactive REPL
+  ahdcode init  web                          initialize this directory as a Web app
   ahdcode build <entry.ahd> [-o <output>]   compile to a native executable
   ahdcode run   <entry.ahd> [-- <args>...]  compile and run
   ahdcode dev   <entry.ahd>                  watch, rebuild, and restart on save
@@ -60,6 +62,8 @@ func runWithIO(arguments []string, input io.Reader, output, errorOutput io.Write
 		return repl.Run(input, output, errorOutput, version)
 	}
 	switch arguments[0] {
+	case "init":
+		return runInit(arguments[1:], output, errorOutput)
 	case "build":
 		return runBuild(arguments[1:], output, errorOutput)
 	case "run":
@@ -92,6 +96,31 @@ func runWithIO(arguments []string, input io.Reader, output, errorOutput io.Write
 		fmt.Fprintf(errorOutput, "unknown command %q\n\n%s", arguments[0], usage)
 		return 2
 	}
+}
+
+func runInit(arguments []string, output, errorOutput io.Writer) int {
+	if len(arguments) == 0 {
+		fmt.Fprintln(errorOutput, "ahdcode init: a template name is required, as in: ahdcode init web")
+		return 2
+	}
+	if len(arguments) > 1 {
+		fmt.Fprintln(errorOutput, "ahdcode init: no additional arguments are accepted")
+		return 2
+	}
+	if arguments[0] != "web" {
+		fmt.Fprintf(errorOutput, "ahdcode init: unsupported template %q\n", arguments[0])
+		return 2
+	}
+	root, err := os.Getwd()
+	if err != nil {
+		fmt.Fprintf(errorOutput, "ahdcode init: %v\n", err)
+		return 1
+	}
+	if err := initweb.Web(root, output, errorOutput); err != nil {
+		fmt.Fprintln(errorOutput, err.Error())
+		return 1
+	}
+	return 0
 }
 
 func runBuild(arguments []string, outputWriter, errorOutput io.Writer) int {
