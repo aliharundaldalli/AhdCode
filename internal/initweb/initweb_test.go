@@ -125,6 +125,21 @@ func TestWebFreshDirectory(t *testing.T) {
 	if !strings.Contains(out.String(), "Starter: Empty") || !strings.Contains(out.String(), "ahdcode dev app.ahd") {
 		t.Fatalf("success output missing:\n%s", out.String())
 	}
+	wantLogo, err := templates.ReadFile("templates/shared/public/ahdcode-logo.png")
+	if err != nil {
+		t.Fatal(err)
+	}
+	gotLogo, err := os.ReadFile(filepath.Join(root, "public/ahdcode-logo.png"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(gotLogo, wantLogo) {
+		t.Fatalf("public/ahdcode-logo.png was rewritten; got %d bytes, want %d", len(gotLogo), len(wantLogo))
+	}
+	pngSig := []byte{0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a}
+	if !bytes.HasPrefix(gotLogo, pngSig) {
+		t.Fatalf("public/ahdcode-logo.png lost its PNG signature: %x", gotLogo[:min(8, len(gotLogo))])
+	}
 }
 
 func TestWizardEmptySkipsDatabase(t *testing.T) {

@@ -133,14 +133,30 @@ func quoteEnvValue(value string) string {
 }
 
 func loadSpecContent(spec fileSpec) ([]byte, error) {
-	if len(spec.content) > 0 {
-		return normalizeNewlines(spec.content), nil
-	}
-	content, err := fs.ReadFile(templates, spec.embedPath)
+	content, err := specBytes(spec)
 	if err != nil {
 		return nil, err
 	}
+	if isBinaryAsset(spec.relPath) {
+		return content, nil
+	}
 	return normalizeNewlines(content), nil
+}
+
+func specBytes(spec fileSpec) ([]byte, error) {
+	if len(spec.content) > 0 {
+		return spec.content, nil
+	}
+	return fs.ReadFile(templates, spec.embedPath)
+}
+
+func isBinaryAsset(relPath string) bool {
+	switch strings.ToLower(filepath.Ext(relPath)) {
+	case ".png", ".jpg", ".jpeg", ".gif", ".webp", ".ico", ".woff", ".woff2":
+		return true
+	default:
+		return false
+	}
 }
 
 func writePlanned(planned []plannedFile) error {
