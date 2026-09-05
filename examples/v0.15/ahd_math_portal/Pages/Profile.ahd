@@ -293,16 +293,12 @@ profilePage: Function := (request: Request) -> Response {
                         Web.UI.tdNodes(
                             [
                                 Web.UI.buttonNodes(
-                                    [
-                                        Web.UI.i(
-                                            ""
-                                            {"class": "fa-solid fa-eye me-1"}
-                                        )
-                                        Web.UI.text("Görüntüle")
-                                    ]
+                                    [Web.UI.i("", {"class": "fa-solid fa-eye"})]
                                     {
                                         "type": "button"
                                         "class": "btn btn-sm btn-primary me-2"
+                                        "title": "Görüntüle"
+                                        "aria-label": "Görüntüle"
                                         "onclick": "openSolutionModal({str(s.id)}, '{user.name} - {s.questionTitle}', '{s.mimeType}', '{s.originalFilename}')"
                                     }
                                 )

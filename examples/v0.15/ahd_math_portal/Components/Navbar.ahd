@@ -24,12 +24,32 @@ navbar: Function := (
                         Web.UI.i("", {"class": "fa-solid fa-list-check me-1"})
                         Web.UI.text("Sorular")
                     ]
-                    {"class": "nav-link px-2 text-white"}
+                    {"class": "nav-link"}
                 )
             ]
             {"class": "nav-item"}
         )
     ]
+    if user != null {
+        links.add(
+            Web.UI.liNodes(
+                [
+                    Web.UI.aNodes(
+                        "/profile"
+                        [
+                            Web.UI.i(
+                                ""
+                                {"class": "fa-solid fa-user-graduate me-1"}
+                            )
+                            Web.UI.text("Profilim")
+                        ]
+                        {"class": "nav-link"}
+                    )
+                ]
+                {"class": "nav-item"}
+            )
+        )
+    }
     if isAdmin {
         links.add(
             Web.UI.liNodes(
@@ -43,7 +63,7 @@ navbar: Function := (
                             )
                             Web.UI.text("Yönetim")
                         ]
-                        {"class": "nav-link px-2 text-white"}
+                        {"class": "nav-link"}
                     )
                 ]
                 {"class": "nav-item"}
@@ -66,16 +86,16 @@ navbar: Function := (
                                         {
                                             "width": "34"
                                             "height": "34"
-                                            "class": "me-2 rounded shadow-sm"
+                                            "class": "me-2 rounded shadow-sm navbar-brand-logo"
                                         }
                                     )
                                     Web.UI.span(
                                         siteName
-                                        {"class": "fs-5 fw-semibold"}
+                                        {"class": "fs-5 fw-bold text-white"}
                                     )
                                 ]
                                 {
-                                    "class": "d-flex align-items-center text-white text-decoration-none me-auto"
+                                    "class": "navbar-brand d-flex align-items-center text-white text-decoration-none me-auto py-0"
                                 }
                             )
                             Web.UI.ul(links, {"class": "nav me-3 mb-0"})
@@ -89,6 +109,7 @@ navbar: Function := (
                 {"class": "navbar", "style": "background-color: {headerColor};"}
             )
         ]
+        {"class": "site-header"}
     )
 }
 
@@ -105,7 +126,7 @@ navbarAccount: Function := (user: UserRecord?, token: String) -> HTMLNode {
                         )
                         Web.UI.text("Giriş")
                     ]
-                    {"class": "btn btn-sm btn-light me-2"}
+                    {"class": "btn btn-sm btn-nav-login me-2"}
                 )
                 Web.UI.aNodes(
                     "/register"
@@ -113,10 +134,10 @@ navbarAccount: Function := (user: UserRecord?, token: String) -> HTMLNode {
                         Web.UI.i("", {"class": "fa-solid fa-user-plus me-1"})
                         Web.UI.text("Kayıt ol")
                     ]
-                    {"class": "btn btn-sm btn-outline-light"}
+                    {"class": "btn btn-sm btn-nav-register"}
                 )
             ]
-            {"class": "d-flex"}
+            {"class": "d-flex align-items-center"}
         )
     }
 
@@ -128,12 +149,15 @@ navbarAccount: Function := (user: UserRecord?, token: String) -> HTMLNode {
             Web.UI.aNodes(
                 "/profile"
                 [
-                    Web.UI.i("", {"class": "fa-regular fa-circle-user me-1"})
-                    Web.UI.text(user.name)
+                    Web.UI.i(
+                        ""
+                        {"class": "fa-solid fa-circle-user me-1 text-white-50"}
+                    )
+                    Web.UI.span(user.name, {"class": "fw-semibold"})
                 ]
                 {
-                    "class": "btn btn-sm btn-outline-light me-2"
-                    "title": "Profilim"
+                    "class": "btn btn-sm btn-nav-profile me-2"
+                    "title": "Profilimi Görüntüle"
                 }
             )
             Web.UI.buttonNodes(
@@ -144,9 +168,9 @@ navbarAccount: Function := (user: UserRecord?, token: String) -> HTMLNode {
                     )
                     Web.UI.text("Çıkış")
                 ]
-                {"type": "submit", "class": "btn btn-sm btn-light"}
+                {"type": "submit", "class": "btn btn-sm btn-nav-logout"}
             )
         ]
-        {"class": "d-flex", "id": "logout-form"}
+        {"class": "d-flex align-items-center", "id": "logout-form"}
     )
 }
