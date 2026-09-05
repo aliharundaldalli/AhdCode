@@ -5,6 +5,7 @@ require("Services/Context.ahd")
 require("Services/Session.ahd")
 require("Services/Scraper.ahd")
 require("Repositories/Questions.ahd")
+require("Repositories/Sliders.ahd")
 bring Web
 from Web bring (Request, Response, HTMLNode, Session)
 
@@ -13,9 +14,15 @@ homePage: Function := (request: Request) -> Response {
     context: Local PageContext := contextFor(session)
     questions: Local List<QuestionRecord> := questionsPublished()
     feed: Local MathScrapeOutcome := fetchMathFeed()
+    sliders: Local List<SliderRecord> := slidersActive()
+
+    heroNode: Local HTMLNode := heroSection(context.siteName)
+    if len(sliders) > 0 {
+        heroNode = homeSliderSection(sliders)
+    }
 
     content: Local List<HTMLNode> := [
-        heroSection(context.siteName)
+        heroNode
         mathFeedSection(feed)
         questionsSection(questions)
     ]
@@ -33,6 +40,134 @@ homePage: Function := (request: Request) -> Response {
             context.flashKind
             content
         )
+    )
+}
+
+homeSliderSection: Function := (sliders: List<SliderRecord>) -> HTMLNode {
+    slideNodes: Local List<HTMLNode> := []
+    indicatorNodes: Local List<HTMLNode> := []
+    index: Local Int := 0
+
+    for slider in sliders {
+        activeClass: Local String := ""
+        if index == 0 {
+            activeClass = " active"
+        }
+
+        buttonNode: Local HTMLNode := Web.UI.div([], {})
+        if slider.buttonText != "" {
+            buttonNode = Web.UI.aNodes(
+                slider.buttonUrl
+                [
+                    Web.UI.text(slider.buttonText)
+                    Web.UI.i("", {"class": "fa-solid fa-arrow-right-long ms-2"})
+                ]
+                {
+                    "class": "btn btn-primary btn-lg rounded-pill px-4 py-2 shadow-lg hero-action-btn"
+                }
+            )
+        }
+
+        slideNode: Local HTMLNode := Web.UI.div(
+            [
+                Web.UI.img(
+                    slider.imageUrl
+                    slider.title
+                    {"class": "hero-slide-bg", "loading": "eager"}
+                )
+                Web.UI.div([], {"class": "hero-slide-overlay"})
+                Web.UI.div(
+                    [
+                        Web.UI.div(
+                            [
+                                Web.UI.spanNodes(
+                                    [
+                                        Web.UI.i(
+                                            ""
+                                            {
+                                                "class": "fa-solid fa-square-root-variable me-2"
+                                            }
+                                        )
+                                        Web.UI.text("Ahd Akademi")
+                                    ]
+                                    {
+                                        "class": "badge bg-primary-subtle text-primary border border-primary-subtle px-3 py-2 rounded-pill mb-3"
+                                    }
+                                )
+                                Web.UI.h2(
+                                    slider.title
+                                    {
+                                        "class": "display-6 fw-bold text-white mb-3 hero-slide-title"
+                                    }
+                                )
+                                Web.UI.p(
+                                    slider.subtitle
+                                    {
+                                        "class": "lead text-light text-opacity-90 mb-4 hero-slide-desc"
+                                    }
+                                )
+                                buttonNode
+                            ]
+                            {"class": "hero-slide-content"}
+                        )
+                    ]
+                    {"class": "container hero-slide-container"}
+                )
+            ]
+            {"class": "hero-slide{activeClass}"}
+        )
+        slideNodes.add(slideNode)
+
+        indicatorClass: Local String := "hero-indicator"
+        if index == 0 {
+            indicatorClass = "hero-indicator active"
+        }
+        indicatorNode: Local HTMLNode := Web.UI.button(
+            ""
+            {
+                "type": "button"
+                "class": indicatorClass
+                "aria-label": "Slayt {str(index + 1)}"
+            }
+        )
+        indicatorNodes.add(indicatorNode)
+        index = index + 1
+    }
+
+    return Web.UI.section(
+        [
+            Web.UI.div(
+                [
+                    Web.UI.div(
+                        [Web.UI.div([], {"class": "hero-slider-progress-bar"})]
+                        {"class": "hero-slider-progress"}
+                    )
+                    Web.UI.div(slideNodes, {"class": "hero-slider-track"})
+                    Web.UI.buttonNodes(
+                        [Web.UI.i("", {"class": "fa-solid fa-chevron-left"})]
+                        {
+                            "type": "button"
+                            "class": "hero-slider-btn hero-slider-btn-prev"
+                            "aria-label": "Önceki Slayt"
+                        }
+                    )
+                    Web.UI.buttonNodes(
+                        [Web.UI.i("", {"class": "fa-solid fa-chevron-right"})]
+                        {
+                            "type": "button"
+                            "class": "hero-slider-btn hero-slider-btn-next"
+                            "aria-label": "Sonraki Slayt"
+                        }
+                    )
+                    Web.UI.div(
+                        indicatorNodes
+                        {"class": "hero-slider-indicators"}
+                    )
+                ]
+                {"class": "hero-slider-container shadow-sm mb-4"}
+            )
+        ]
+        {"class": "mb-4"}
     )
 }
 

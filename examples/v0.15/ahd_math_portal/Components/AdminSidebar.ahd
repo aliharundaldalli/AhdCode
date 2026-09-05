@@ -31,6 +31,12 @@ adminSidebar: Function := (current: String) -> HTMLNode {
                         current
                     )
                     adminSidebarLink(
+                        "/admin/sliders"
+                        "fa-solid fa-images me-2"
+                        "Slaytlar"
+                        current
+                    )
+                    adminSidebarLink(
                         "/admin/settings"
                         "fa-solid fa-sliders me-2"
                         "Ayarlar"

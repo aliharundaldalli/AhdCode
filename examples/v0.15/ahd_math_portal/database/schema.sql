@@ -94,3 +94,23 @@ INSERT INTO site_settings (setting_key, setting_value) VALUES
     ('site_name', 'Ahd Akademi Matematik'),
     ('header_color', '#0d6efd')
 ON DUPLICATE KEY UPDATE setting_value = setting_value;
+
+CREATE TABLE IF NOT EXISTS sliders (
+    id            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    title         VARCHAR(200)    NOT NULL,
+    subtitle      TEXT            NOT NULL,
+    image_url     VARCHAR(500)    NOT NULL,
+    button_text   VARCHAR(100)    NOT NULL DEFAULT '',
+    button_url    VARCHAR(500)    NOT NULL DEFAULT '',
+    display_order INT             NOT NULL DEFAULT 0,
+    is_active     TINYINT(1)      NOT NULL DEFAULT 1,
+    created_at    DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at    DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+INSERT INTO sliders (title, subtitle, image_url, button_text, button_url, display_order, is_active) VALUES
+    ('Matematiksel Düşünce ve Problem Çözme', 'Analiz, geometri, cebir ve sayı teorisinde derinleşin. Topluluğun çözümlerini inceleyin ve kendi yaklaşımınızı paylaşın.', 'https://images.unsplash.com/photo-1635070041078-e363dbe005cb?auto=format&fit=crop&w=1600&q=80', 'Soruları Keşfet', '/#questions', 1, 1),
+    ('Haftanın Seçkin Matematik Problemleri', 'Her hafta yenilenen zorlu problemlerle analitik yeteneklerinizi sınayın. LaTeX destekli çözümlerinizi sisteme yükleyin.', 'https://images.unsplash.com/photo-1509228468518-180dd4864904?auto=format&fit=crop&w=1600&q=80', 'Çözüm Gönder', '/#questions', 2, 1),
+    ('Ahd Akademi Topluluğuna Katılın', 'Matematik tutkunları, akademisyenler ve öğrenciler için açık, şeffaf ve yüksek standartlı referans platformu.', 'https://images.unsplash.com/photo-1596495578065-6e0763fa1178?auto=format&fit=crop&w=1600&q=80', 'Aramıza Katıl', '/register', 3, 1);
+

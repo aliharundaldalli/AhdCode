@@ -26,8 +26,10 @@ geminiModel: Function := () -> String {
 // A configurable base keeps the adapter testable against a local mock without
 // the adapter knowing anything about tests.
 geminiBaseURL: Function := () -> String {
-    return Env.getOr(
-        "GEMINI_BASE_URL"
-        "https://generativelanguage.googleapis.com"
-    )
+    value: Local String := Env.getOr("GEMINI_BASE_URL", "")
+    if value == "" {
+        return "https://generativelanguage.googleapis.com"
+    }
+
+    return value
 }

@@ -1,0 +1,454 @@
+// Slider editor: create and edit slider records.
+require("Layouts/Admin.ahd")
+require("Components/FormField.ahd")
+require("Components/Alert.ahd")
+require("Services/Context.ahd")
+require("Services/Session.ahd")
+require("Services/Guard.ahd")
+require("Services/CSRF.ahd")
+require("Repositories/Sliders.ahd")
+require("Support/Validation.ahd")
+bring Web
+from Web bring (Request, Response, HTMLNode, Session, UploadedFile)
+bring Path
+
+adminSliderNewPage: Function := (request: Request) -> Response {
+    session: Local Session := sessionOpen(request)
+    context: Local PageContext := contextFor(session)
+    guard: Local GuardResult := adminGuard(session, context)
+    if guard.allowed == false {
+        return sessionCommit(session, guard.refusal)
+    }
+
+    return sessionCommit(
+        session
+        adminSliderForm(session, context, 0, "", "", "", "", "", 0, true, [])
+    )
+}
+
+adminSliderEditPage: Function := (request: Request) -> Response {
+    session: Local Session := sessionOpen(request)
+    context: Local PageContext := contextFor(session)
+    guard: Local GuardResult := adminGuard(session, context)
+    if guard.allowed == false {
+        return sessionCommit(session, guard.refusal)
+    }
+
+    id: Local Int := validationPositiveInt(request.query("id"))
+    slider: Local SliderRecord? := slidersFindById(id)
+    if slider == null {
+        return sessionCommit(session, Web.text("Slayt bulunamadı.", 404))
+    }
+
+    return sessionCommit(
+        session
+        adminSliderForm(
+            session
+            context
+            slider.id
+            slider.title
+            slider.subtitle
+            slider.imageUrl
+            slider.buttonText
+            slider.buttonUrl
+            slider.displayOrder
+            slider.isActive
+            []
+        )
+    )
+}
+
+adminSliderForm: Function := (
+    session: Session
+    context: PageContext
+    id: Int
+    title: String
+    subtitle: String
+    imageUrl: String
+    buttonText: String
+    buttonUrl: String
+    displayOrder: Int
+    isActive: Bool
+    errors: List<String>
+) -> Response {
+    content: Local List<HTMLNode> := []
+    if len(errors) > 0 {
+        content.add(errorList(errors))
+    }
+
+    heading: Local String := "Yeni Slayt Ekle"
+    if id != 0 {
+        heading = "Slaytı Düzenle"
+    }
+
+    activeCheckboxAttrs: Local Pair<String, String> := {
+        "type": "checkbox"
+        "id": "slider-is-active"
+        "name": "is_active"
+        "class": "form-check-input"
+        "value": "1"
+    }
+    if isActive {
+        activeCheckboxAttrs = {
+            "type": "checkbox"
+            "id": "slider-is-active"
+            "name": "is_active"
+            "class": "form-check-input"
+            "value": "1"
+            "checked": "checked"
+        }
+    }
+
+    imagePreviewNode: Local HTMLNode := Web.UI.div([], {})
+    if imageUrl != "" {
+        imagePreviewNode = Web.UI.div(
+            [
+                Web.UI.label("Mevcut Görsel", {"class": "form-label d-block"})
+                Web.UI.img(
+                    imageUrl
+                    title
+                    {
+                        "class": "rounded-3 border shadow-sm mb-2"
+                        "style": "max-height: 180px; max-width: 100%; object-fit: cover;"
+                    }
+                )
+                Web.UI.div(
+                    [
+                        Web.UI.small(
+                            "Bağlantı: {imageUrl}"
+                            {"class": "text-muted font-monospace"}
+                        )
+                    ]
+                )
+            ]
+            {"class": "mb-3 p-3 bg-light rounded border"}
+        )
+    }
+
+    formCard: Local HTMLNode := Web.UI.div(
+        [
+            Web.UI.div(
+                [
+                    Web.UI.h2(heading, {"class": "h4 fw-bold text-dark mb-1"})
+                    Web.UI.p(
+                        "Anasayfada yer alan hero slayt alanında görüntülenecek bilgileri belirleyin."
+                        {"class": "text-muted small mb-0"}
+                    )
+                ]
+                {"class": "border-bottom pb-3 mb-4"}
+            )
+            Web.UI.formTo(
+                "/admin/sliders/save"
+                "post"
+                [
+                    csrfInput(session)
+                    Web.UI.input("hidden", "slider_id", str(id))
+                    formFieldWithIcon(
+                        "slider-title"
+                        "title"
+                        "Slayt Başlığı *"
+                        "text"
+                        "fa-solid fa-heading"
+                        title
+                        "Örn: Matematiksel Düşünce ve Problem Çözme"
+                        "Başlık girin"
+                    )
+                    formTextArea(
+                        "slider-subtitle"
+                        "subtitle"
+                        "Açıklama / Metin *"
+                        subtitle
+                        "3"
+                    )
+                    imagePreviewNode
+                    Web.UI.div(
+                        [
+                            Web.UI.div(
+                                [
+                                    formFieldWithIcon(
+                                        "slider-image-url"
+                                        "image_url"
+                                        "Görsel URL'si"
+                                        "text"
+                                        "fa-solid fa-image"
+                                        imageUrl
+                                        "Görselin doğrudan web adresi (https://... veya /assets/...)"
+                                        "https://images.unsplash.com/..."
+                                    )
+                                ]
+                                {"class": "col-12 col-md-6"}
+                            )
+                            Web.UI.div(
+                                [
+                                    Web.UI.div(
+                                        [
+                                            Web.UI.labelFor(
+                                                "slider-image-file"
+                                                "Veya Cihazdan Görsel Yükle"
+                                                {"class": "form-label"}
+                                            )
+                                            Web.UI.input(
+                                                "file"
+                                                "image_file"
+                                                ""
+                                                {
+                                                    "id": "slider-image-file"
+                                                    "class": "form-control"
+                                                    "accept": "image/png, image/jpeg, image/webp"
+                                                }
+                                            )
+                                            Web.UI.p(
+                                                "PNG, JPEG veya WebP formatında görsel seçebilirsiniz."
+                                                {"class": "form-text"}
+                                            )
+                                        ]
+                                        {"class": "mb-3"}
+                                    )
+                                ]
+                                {"class": "col-12 col-md-6"}
+                            )
+                        ]
+                        {"class": "row"}
+                    )
+                    Web.UI.div(
+                        [
+                            Web.UI.div(
+                                [
+                                    formFieldWithIcon(
+                                        "slider-button-text"
+                                        "button_text"
+                                        "Buton İsmi (İsteğe Bağlı)"
+                                        "text"
+                                        "fa-solid fa-font"
+                                        buttonText
+                                        "Örn: Soruları Keşfet, Aramıza Katıl"
+                                        "Buton metni"
+                                    )
+                                ]
+                                {"class": "col-12 col-md-6"}
+                            )
+                            Web.UI.div(
+                                [
+                                    formFieldWithIcon(
+                                        "slider-button-url"
+                                        "button_url"
+                                        "Buton Linki (Hedef URL)"
+                                        "text"
+                                        "fa-solid fa-link"
+                                        buttonUrl
+                                        "Örn: /#questions, /register veya https://..."
+                                        "Hedef adres"
+                                    )
+                                ]
+                                {"class": "col-12 col-md-6"}
+                            )
+                        ]
+                        {"class": "row"}
+                    )
+                    Web.UI.div(
+                        [
+                            Web.UI.div(
+                                [
+                                    formFieldWithIcon(
+                                        "slider-display-order"
+                                        "display_order"
+                                        "Sıralama (Küçükten Büyüğe)"
+                                        "number"
+                                        "fa-solid fa-arrow-down-1-9"
+                                        str(displayOrder)
+                                        "Örn: 1, 2, 3"
+                                        "0"
+                                    )
+                                ]
+                                {"class": "col-12 col-md-6"}
+                            )
+                            Web.UI.div(
+                                [
+                                    Web.UI.div(
+                                        [
+                                            Web.UI.div(
+                                                [
+                                                    Web.UI.element(
+                                                        "input"
+                                                        activeCheckboxAttrs
+                                                        []
+                                                    )
+                                                    Web.UI.labelFor(
+                                                        "slider-is-active"
+                                                        "Slayt Aktif (Anasayfada Göster)"
+                                                        {
+                                                            "class": "form-check-label fw-semibold"
+                                                        }
+                                                    )
+                                                ]
+                                                {
+                                                    "class": "form-check form-switch pt-4 mt-2"
+                                                }
+                                            )
+                                        ]
+                                        {"class": "mb-3"}
+                                    )
+                                ]
+                                {"class": "col-12 col-md-6"}
+                            )
+                        ]
+                        {"class": "row"}
+                    )
+                    Web.UI.div(
+                        [
+                            Web.UI.buttonNodes(
+                                [
+                                    Web.UI.i(
+                                        ""
+                                        {
+                                            "class": "fa-solid fa-floppy-disk me-2"
+                                        }
+                                    )
+                                    Web.UI.text("Kaydet")
+                                ]
+                                {
+                                    "type": "submit"
+                                    "class": "btn btn-primary px-4 shadow-sm"
+                                }
+                            )
+                            Web.UI.aNodes(
+                                "/admin/sliders"
+                                [Web.UI.text("İptal")]
+                                {"class": "btn btn-outline-secondary ms-2"}
+                            )
+                        ]
+                        {"class": "border-top pt-3 mt-3"}
+                    )
+                ]
+                {"enctype": "multipart/form-data"}
+            )
+        ]
+        {"class": "card border-0 shadow-sm rounded-4 p-4 mb-4"}
+    )
+    content.add(formCard)
+
+    return adminLayout(
+        session
+        heading
+        context.siteName
+        context.headerColor
+        context.user
+        "/admin/sliders"
+        context.flash
+        context.flashKind
+        content
+    )
+}
+
+adminSliderSaveSubmit: Function := (request: Request) -> Response {
+    session: Local Session := sessionOpen(request)
+    context: Local PageContext := contextFor(session)
+    guard: Local GuardResult := adminGuard(session, context)
+    if guard.allowed == false {
+        return sessionCommit(session, guard.refusal)
+    }
+
+    if csrfValid(session, request) == false {
+        return sessionCommit(session, Web.text("Geçersiz form belirteci.", 403))
+    }
+
+    id: Local Int := validationPositiveInt(request.form("slider_id"))
+    title: Local String := validationField(request.form("title"))
+    subtitle: Local String := validationField(request.form("subtitle"))
+    imageUrl: Local String := validationField(request.form("image_url"))
+    buttonText: Local String := validationField(request.form("button_text"))
+    buttonUrl: Local String := validationField(request.form("button_url"))
+    displayOrder: Local Int := validationPositiveInt(
+        request.form("display_order")
+    )
+    isActive: Local Bool := request.form("is_active") == "1"
+
+    existingSlider: Local SliderRecord? := null
+    if id > 0 {
+        existingSlider = slidersFindById(id)
+        if existingSlider == null {
+            return sessionCommit(session, Web.text("Slayt bulunamadı.", 404))
+        }
+    }
+
+    errors: Local List<String> := []
+    if title == "" {
+        errors.add("Slayt başlığı zorunludur.")
+    }
+
+    if subtitle == "" {
+        errors.add("Açıklama / metin zorunludur.")
+    }
+    // Check if an image file is uploaded
+    upload: Local UploadedFile? := request.file("image_file")
+    if upload != null {
+        if upload.size() > 0 {
+            detected: Local String := upload.detectedContentType()
+            if detected == "image/png" or detected == "image/jpeg" or detected == "image/webp" {
+                storedPath: Local String := upload.save("public/images/sliders")
+                storedName: Local String := Path.base(storedPath)
+                imageUrl = "/assets/images/sliders/{storedName}"
+            }
+            else {
+                errors.add("Görsel yalnızca PNG, JPEG veya WebP olabilir.")
+            }
+        }
+    }
+    // If still empty and existing slider exists, preserve existing image
+    if imageUrl == "" {
+        if existingSlider != null {
+            imageUrl = existingSlider.imageUrl
+        }
+    }
+
+    if imageUrl == "" {
+        errors.add("Bir görsel URL'si girin veya cihazınızdan dosya yükleyin.")
+    }
+
+    if len(errors) > 0 {
+        return sessionCommit(
+            session
+            adminSliderForm(
+                session
+                context
+                id
+                title
+                subtitle
+                imageUrl
+                buttonText
+                buttonUrl
+                displayOrder
+                isActive
+                errors
+            )
+        )
+    }
+
+    if id == 0 {
+        slidersCreate(
+            title
+            subtitle
+            imageUrl
+            buttonText
+            buttonUrl
+            displayOrder
+            isActive
+        )
+        flashSet(session, "success", "Yeni slayt başarıyla eklendi.")
+    }
+    else {
+        slidersUpdate(
+            id
+            title
+            subtitle
+            imageUrl
+            buttonText
+            buttonUrl
+            displayOrder
+            isActive
+        )
+        flashSet(session, "success", "Slayt başarıyla güncellendi.")
+    }
+
+    return sessionCommit(session, Web.redirect("/admin/sliders"))
+}

@@ -1,129 +1,172 @@
-# Ahd Akademi Matematik
+<p align="center">
+  <img src="public/images/logo.png" alt="AhdCode" width="180">
+</p>
 
-**Yayımlanmış AhdCode v0.15.0** ile hazırlanmış tam yığın matematik portalı. Web/UI, MySQL, oturum, Security, dosya yükleme, SMTP ve HTTP/JSON modüllerini gerçek bir uygulamada sınar; derleyici/framework değiştirilmez. [English](README.md) · [Kabul sonuçları](QA.md) · [v0.16 bulguları](DOGFOOD.md).
+<h1 align="center">Ahd Akademi Matematik</h1>
 
-## Yerel kurulum ve `.env`
+<p align="center">
+  <strong><a href="https://github.com/aliharundaldalli/AhdCode">AhdCode</a> v0.15.0 ile yazıldı — <a href="https://github.com/aliharundaldalli/AhdCode/releases/tag/v0.15.0">Web Foundations</a></strong>
+</p>
 
-AhdCode v0.15.0, erişilebilir MySQL ve yazılabilir özel yükleme dizini gerekir. Uygulama npm, Node, CDN, uzak JavaScript veya Bootstrap JS kullanmaz.
+<p align="center">
+  <a href="https://github.com/aliharundaldalli/AhdCode"><img src="https://img.shields.io/badge/AhdCode-v0.15.0-0d6efd?style=flat-square" alt="AhdCode v0.15.0"></a>
+  <a href="https://github.com/aliharundaldalli/AhdCode/blob/main/docs/WEB.md"><img src="https://img.shields.io/badge/bring-Web-198754?style=flat-square" alt="bring Web"></a>
+  <a href="https://github.com/aliharundaldalli/AhdCode/blob/main/docs/REQUIRE.md"><img src="https://img.shields.io/badge/require(...)-v0.14-6f42c1?style=flat-square" alt="require"></a>
+  <a href="README.md"><img src="https://img.shields.io/badge/Language-English-0d6efd?style=flat-square" alt="English"></a>
+</p>
 
-Proje dizininde, mevcut `.env` dosyasının üzerine yazmadan:
+Tamamı AhdCode ile yazılmış, sunucuda üretilen bir matematik portalı.
+**v0.15 Web Foundations** için referans uygulama: `bring Web`, `Web.UI`,
+Pages / Layouts / Components, `.env` + Config ve v0.14’te gelen
+`require(...)` birleşimi.
+
+npm, Node, React, VDOM, ORM veya paket kaydı yok. Derleyici Web
+çerçevesini pakete gömer. Derlenen çalıştırılabilir dosya çerçeve
+kaynağına bağımlı değildir.
+
+[English](README.md) · [AhdCode](https://github.com/aliharundaldalli/AhdCode) · [v0.15.0 sürümü](https://github.com/aliharundaldalli/AhdCode/releases/tag/v0.15.0)
+
+<p align="center">
+  <img src="docs/screenshots/home.png" alt="Ahd Akademi Matematik ana sayfası" width="920">
+</p>
+
+## v0.15 gerçek bir uygulamada
+
+| AhdCode yüzeyi | Bu portalda kullanımı |
+|---|---|
+| `bring Web` / `Web.UI` | Anlamlı sunucu HTML’i: form, nav, tablo, kart. Metin girişleri kaçışlanır. |
+| `require("...")` | Config, Repositories, Services, Layouts, Components, Pages olarak bölünmüş tek program |
+| `ahdcode dev` | Tüm require grafını izler, kayıtta yeniden derler |
+| MySQL | Parametreli sorgular, InnoDB şema, UNIQUE kısıtları |
+| Güvenlik | Argon2id parolalar, `secureEqual` ile CSRF, girişte `session.rotate()` |
+| HTTP + HTML | Canlı Vikipedi matematik bülteni (dış istemci + kazıma) |
+| SMTP | İsteğe bağlı parola sıfırlama; posta kapalıysa yanıt aynı kalır |
+| HTTP istemcisi + JSON | İsteğe bağlı Gemini taslak yardımcısı; anahtar URL’ye yazılmaz |
+| `Server.static` | Yalnızca `public/` altındaki yerel CSS/JS/görseller |
+
+Arayüz Türkçe. Sorulardaki matematik yerel MathJax ile dizilir.
+
+<p align="center">
+  <img src="docs/screenshots/question.png" alt="MathJax ile yayımlanmış soru" width="720">
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/login.png" alt="Giriş" width="640">
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/admin.png" alt="Yönetici paneli" width="720">
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/admin-users.png" alt="Yönetici kullanıcı listesi; ad ve e-posta bulanık" width="720">
+</p>
+
+## Düzen
+
+```
+app.ahd                 giriş: require(...) grafı, rotalar, Server.static
+Config/                 ortamı okuyan tek yer
+Support/                satır yardımcıları ve doğrulama
+Repositories/           her SQL ifadesi, bağlı parametreler
+Services/               kimlik, oturum, CSRF, yükleme, posta, Gemini, kazıma
+Layouts/                Main, Auth, Admin kabukları
+Components/             navbar, kartlar, formlar, çözüm penceresi
+Pages/                  rota başına bir Function
+public/                 Bootstrap CSS, app.css, logo, yerel betikler
+storage/solutions/      özel yüklemeler — statik dosya olarak eşlenmez
+database/schema.sql     beş InnoDB tablo, IF NOT EXISTS
+```
+
+Her `require("...")` yolu, yazıldığı dosyaya değil, bu dizine (uygulama
+köküne) görelidir. Her dosya kullandığı modülleri kendi getirir.
+
+## Gereksinimler
+
+- Kurulu **AhdCode v0.15.0** (`ahdcode --version`)
+- Erişilebilir bir MySQL sunucusu
+- Yazılabilir özel yükleme dizini
+
+**`.env.example` → `.env`** kopyalayın. Örnek dosyada veritabanı, SMTP
+ve Gemini değerleri bilerek boştur. Yalnızca yerel `.env` dosyanızı
+doldurun. `.env` dosyasını veya gerçek parola, API anahtarı, bağlantı
+dizgisini örneğe ya da README’ye koymayın.
 
 ```sh
 ahdcode --version
-cp .env.example .env  # yalnızca .env henüz yoksa
+cp .env.example .env   # yalnızca .env henüz yoksa
 chmod 600 .env
 ```
 
-`.env` makineye özeldir ve `.gitignore` tarafından bilinçli olarak dışlanır. Gerçek değerleri Git'e veya belgelere koymayın. Süreç ortamında tanımlı değişkenler, boş olsalar bile `.env` değerlerinden önceliklidir. Her iki giriş dosyası yapılandırmayı çalışma zamanında yükler; derleme gizli değerleri ikiliye gömmez. Ayar değişikliklerinden sonra uygulamayı yeniden başlatın.
+Süreç ortamındaki değişkenler, boş olsalar bile `.env` değerinden
+önceliklidir. `ahdcode build` bunları gömmez: çalıştırılabilir dosya
+yapılandırmayı başlangıçta okur.
 
-Geliştirme değerleri: `APP_NAME=Ahd Akademi Matematik`, `APP_ENV=development`, `APP_HOST=ahdakademi.com`, `APP_PROTOCOL=http`, `SERVER_HOST=127.0.0.1`, `SERVER_PORT=8160`. `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USERNAME`, `DB_PASSWORD`, `DB_SECURITY` değerlerini kendi MySQL kurulumunuza göre girin. Hazır bir veritabanı kullanıcısı/parolası dağıtılmaz.
-
-Yetkili MySQL hesabıyla hedef yerel veritabanını oluşturun:
+Şemayı oluşturun, sonra uygulamayı başlatın:
 
 ```sql
 CREATE DATABASE IF NOT EXISTS ahd_math_portal
   CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 ```
 
-Mevcut veritabanında önce tabloları inceleyin. Şema beş InnoDB tabloyu `IF NOT EXISTS` ile oluşturur; mevcut ayar değerlerini değiştirmez. Eski/uyumsuz bir şemayı otomatik taşımadığı için verili veritabanını silerek kurulum yapmayın.
-
 ```sh
 mysql --host=127.0.0.1 --port=3306 --user=KULLANICINIZ -p ahd_math_portal < database/schema.sql
 ahdcode dev app.ahd
 ```
 
-Normal geliştirme adresi **http://127.0.0.1:8160**. `http://ahdakademi.com.test` yalnızca mantıksal geliştirme kimliğidir; v0.15 `.test` için DNS/çözümleyici kurmaz. Geliştirme parola sıfırlama bağlantıları gerçek dinleme adresini kullanır. MySQL gereklidir; SMTP ve Gemini isteğe bağlıdır.
+[http://127.0.0.1:8160](http://127.0.0.1:8160) adresini açın.
 
-## Bu Mac'te yerel HTTPS
-
-İsteğe bağlı HTTPS önizlemesi **https://ahdakademi.com.test:8443** adresindedir. Caddy TLS bağlantısını karşılar ve istekleri `127.0.0.1:8161` üzerindeki uygulamaya aktarır. 8443 yönetici yetkisi gerektirmez. `Caddyfile.local` yalnızca loopback üzerinde dinler; dışarıya yayın yapmaz. Caddy yönetim API'si ve otomatik sertifika güveni kapalıdır.
-
-Caddy ve Python 3 yalnızca bu yardımcı önizleme aracının gereksinimleridir; portalın kendisinin çalışma zamanı gereksinimleri değildir.
-
-```sh
-brew install caddy
-mkdir -p .local
-/Users/ahd/go/bin/ahdcode build app.ahd -o .local/portal
-python3 scripts/local_https.py start
-python3 scripts/local_https.py status
-# İşi bitirince yalnızca bu önizlemenin kayıtlı süreçlerini durdurur:
-python3 scripts/local_https.py stop
-```
-
-HTTPS önizlemesi iç port olarak 8161'i kullandığından varsayılan 8160 HTTP geliştirme sunucusuyla çakışmaz. Yardımcı araç meşgul porttaki başka bir süreci sonlandırmaz. Kaynak kod değişikliğinde önizlemeyi durdurup yeniden derleyin ve başlatın; bu ikili dosya canlı kaynak izleyicisi değildir.
-
-`ahdakademi.com.test` için ayrıca yönetici onayıyla `/etc/hosts` içine `127.0.0.1 ahdakademi.com.test` yönlendirmesi gerekir. AhdCode v0.15 bunu kendiliğinden kurmaz.
-
-Araç `.env` dosyasına yazmaz. Yalnızca başlattığı süreç için `APP_ENV=production`, `APP_HOST=ahdakademi.com.test`, `APP_PROTOCOL=https`, `APP_PUBLIC_PORT=8443` ve loopback dinleme değerlerini ayarlar. Böylece `Secure` oturum çerezleri ve `https://ahdakademi.com.test:8443` parola sıfırlama bağlantıları gerçek HTTPS davranışını sınar. `APP_PUBLIC_PORT` bu uygulamaya ait isteğe bağlı dış port ayarıdır; framework sözleşmesini değiştirmez. Boş/geçersiz değer varsayılan kanonik URL'yi korur.
-
-`.local/` Git tarafından dışlanır; derlenmiş uygulama, süreç kimlikleri, günlükler ve Caddy'nin **özel CA anahtarları** burada kalır. Bu dizini paylaşmayın. Tarayıcı güveni ayrı bir işlemdir; Caddy otomatik olarak güven deposunu değiştirmez. Sertifika uyarısını kaldırmak için proje CA sertifikasını açık onayla yalnızca kullanıcıya, SSL/ahdakademi.com.test kuralıyla güvenilir ekleyebilirsiniz:
-
-```sh
-security add-trusted-cert -r trustRoot -p ssl -s ahdakademi.com.test \
-  -k "$HOME/Library/Keychains/login.keychain-db" \
-  .local/caddy-data/caddy/pki/authorities/local/root.crt
-```
-
-Bu güven tercihini kaldırmak için aynı sertifika dosyasıyla `security remove-trusted-cert .local/caddy-data/caddy/pki/authorities/local/root.crt` kullanın. İşlem sertifikanın kullanıcı güven kaydını değiştirir. CA dosyalarını silip yeniden üretirseniz eski güven kaydı yeni CA'yı kapsamaz. Kurulum davranışı için [Caddy yerel HTTPS belgesi](https://caddyserver.com/docs/automatic-https#local-https).
-
-## İlk yönetici
-
-Varsayılan yönetici/parola yoktur. `create_admin.ahd`, portal gibi yerel `.env` dosyasını yükler. E-posta yoksa yönetici oluşturur; varsa yalnızca o hesabın adını/parolasını değiştirir, hesabı etkin yönetici yapar ve `auth_version` değerini artırır. E-postayı dikkatli seçin.
-
-Aşağıdaki örneği Bash içinde kullanın; parola ekrana yazılmaz ve bir komut satırına gömülmez:
+**Varsayılan yönetici yoktur.** Birini etkileşimli oluşturun:
 
 ```bash
 read -r -p 'Yönetici adı: ' ADMIN_NAME
 read -r -p 'Yönetici e-posta: ' ADMIN_EMAIL
-read -r -s -p 'Parola (en az 10 karakter): ' ADMIN_PASSWORD
+read -r -s -p 'Yönetici parolası (en az 10 karakter): ' ADMIN_PASSWORD
 printf '\n'
 export ADMIN_NAME ADMIN_EMAIL ADMIN_PASSWORD
 ahdcode run create_admin.ahd
 unset ADMIN_PASSWORD ADMIN_EMAIL ADMIN_NAME
 ```
 
-Sonra `/login` ve `/admin` adreslerini kullanın. Kabul çalışması geçici kurulum hesabını oluşturup güncelleyerek doğrulamış, ardından yalnızca bu hesabı kaldırmıştır; kalıcı test hesabı bırakmaz. Yardımcı betiğin tüm doğrulama hataları sıfırdan farklı çıkış kodu üretmez; yazdığı sonucu da okuyun.
+## Özellikler
 
-## Kullanıcılar, sorular ve ayarlar
+- Her durum değişikliğinde CSRF ile kayıt / giriş / çıkış
+- Ana sayfada yayımlanmış sorular; taslaklar yayımlanana kadar gizli
+- PDF / PNG / JPEG çözüm yükleme (içerik koklama, 5 MiB, özel depolama)
+- Yönetici kullanıcı, soru, ayar ve yetkili çözüm indirme
+- İsteğe bağlı SMTP parola sıfırlama (30 dakikalık hash’li jetonlar)
+- İsteğe bağlı Gemini taslak — üretmek yayımlamaz
+- HTTP + HTML kazıma ile canlı matematik bülteni
 
-Kayıt e-postayı normalleştirir; parola en az on karakterdir. E-posta benzersizliğini veritabanı belirler. Parolalar Argon2id ile özetlenir; hatalı parola ve pasif hesap reddedilir. Girişte oturum kimliği yenilenir. Rol/aktiflik/parola sürümü her istekte veritabanından okunur; kullanıcılar yönetim yollarına erişemez.
+## Güvenlik duruşu
 
-Yönetici taslak oluşturur/düzenler; yayımlama ayrı bir işlemdir. Genel liste ve `/question?id=1` sorgusu yalnızca yayımlanmış soruları gösterir. `/admin/settings` üzerinden site adı ve yalnızca `#RRGGBB` biçiminde başlık rengi değişir. Gizli bilgiler bu tabloya yazılmaz.
+Geliştirmede loopback bağlanır. Parolalar Argon2id ile hash’lenir.
+Oturum girişte döner. CSRF `Security.secureEqual` ile karşılaştırılır.
+Yüklemeler `public/` dışındadır. Yönetici dosya indirmeden önce yetki
+kontrol eder. Site ayarları yalnızca görünen değerleri tutar — sır
+tutmaz.
 
-Durum değiştiren her yol oturum tabanlı CSRF doğrulaması yapar. Eksik/yanlış belirteç, gerekli yetki kontrolünden sonra 403 döndürür. Çıkış da CSRF alanı taşıyan POST formudur. `Web.UI` metin/öznitelik kaçışı yapar; kullanıcı ve model metni HTML olarak yürütülmez. Hatalı formda eski metin değerleri gösterilebilir; parola alanları geri doldurulmaz.
+Bu bir dogfood referansıdır, üretim sertleştirme iddiası değildir.
+Oturumlar bellektedir. Ölçülen sınırlar için [DOGFOOD.md](DOGFOOD.md).
 
-## Çözüm yüklemeleri
-
-`UPLOAD_ROOT=storage/solutions`, `public/` dışında tutulur. `UPLOAD_MAX_BYTES=5242880` dosya başına 5 MiB sınırıdır; istek gövdesinde multipart zarfı için ek 64 KiB bulunur. PDF/PNG/JPEG algılanan içeriğe göre kabul edilir; istemcinin uzantısı veya MIME iddiası yeterli değildir. Bu kontrol tam belge doğrulaması ya da zararlı yazılım taraması değildir.
-
-Dosya adını sunucu üretir; yükleyenin adı yalnızca gösterim bilgisidir. `UNIQUE(user_id, question_id)` her kullanıcı/soru çifti için tek çözümü zorunlu kılar. Yenileme/silme/yeniden gönderme arayüzü yoktur. Kayıt eklenemezse yalnızca o isteğin yeni dosyası mümkün olduğunca silinir. Veritabanını ve dosyaları birlikte yedekleyin.
-
-Yalnızca `/assets` → `public/` statik eşlemesi vardır. Özel çözümler statik olarak sunulmaz. `/admin/solutions/file?id=...` dosya okumadan önce yönetici yetkisi ister; normal kullanıcı indiremez. Reverse proxy üzerinden `storage/` dizinini ayrıca yayınlamayın.
-
-## SMTP ve parola sıfırlama
-
-Posta yapılandırılmayacaksa `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_FROM_ADDRESS`, `SMTP_FROM_NAME` boş bırakılır. `SMTP_SECURITY`: `none`, `starttls` veya `tls`. Sunucunun beklediği güvenlik türünü kullanın; bu makinedeki 587 portunda STARTTLS el sıkışması doğrulanmıştır. `SMTP_FROM_NAME` yapılandırmada okunur, fakat gönderilen mesajın görünen adına henüz uygulanmaz.
-
-Bilinen/bilinmeyen hesap ve teslim hatası için aynı genel yanıt gösterilir. SMTP yokken mesaj teslim edilmez; teslim durumu arayüzü yoktur. Bağlantı 30 dakika geçerlidir. Seçici ve gizli doğrulayıcı ayrı tutulur; veritabanında doğrulayıcının yalnızca özeti vardır. Kullanılmış/süresi dolmuş/yanlış doğrulayıcılı bağlantı reddedilir. Başarılı sıfırlama eski oturumları ve diğer sıfırlama kayıtlarını geçersiz kılar. Otomatik kabul testleri yerel SMTP alıcısı kullanır; gerçek posta göndermez.
-
-## İsteğe bağlı Gemini
-
-`GEMINI_API_KEY` ve `GEMINI_MODEL` birlikte tanımlanırsa yönetici taslak paneli açılır. Gerçek anahtar veya sabit model dağıtılmaz. Boşken portalın geri kalanı çalışır. `GEMINI_BASE_URL` yerel HTTP taklidi için isteğe bağlı, işletmeci kontrolündeki uç nokta ayarıdır.
-
-İstek AhdCode HTTP istemcisi ve JSON modülünden geçer; anahtar `x-goog-api-key` başlığındadır. Üretilen metin düzenlenebilir başlık/gövde alanlarına döner; kendiliğinden kaydedilmez veya yayımlanmaz. Yönetici önce taslağı kaydeder, ardından açıkça yayımlar. Bozuk JSON, beklenmeyen veri ve HTTP hatası mesaj olarak gösterilir. Kabul çalışması gerçek/billable üretim çağrısı yapmaz; kullanıcının gerçek model/anahtarının servis tarafından kabul edildiğini iddia etmez.
-
-## Bağımsız çalıştırma ve üretim
+## Derleme
 
 ```sh
-/Users/ahd/go/bin/ahdcode build app.ahd -o /tmp/ahd_math_portal
+ahdcode build app.ahd -o ./portal
 ```
 
-Taşınmış çalışma dizininde yalnızca çalıştırılabilir dosya, `public/`, özel yazılabilir `storage/solutions/` ve çalışma zamanı yapılandırması gerekir. Göreli yollar için bu dizinden başlatın. Şema önceden uygulanır; derleyici deposu, framework `.ahd` dosyaları, Internet, npm veya CDN çalışma zamanı gereksinimi değildir. MySQL yerel bağımlılık olarak kalır; harici posta/AI hizmetleri kendi bağlantılarını gerektirir.
+Dağıtım dizininde çalıştırılabilir dosya, `public/`, yazılabilir
+`storage/solutions/` ve çalışma zamanı yapılandırması (`.env` veya süreç
+ortamı) gerekir. İkiliyi o dizinden başlatın.
 
-Gerçek üretimde `APP_ENV=production`, herkese açık `APP_HOST` ve `APP_PROTOCOL=https` kullanın. TLS, Caddy/nginx veya uygun bir tünel/reverse proxy üzerinde sonlanır; uygulama iç HTTP soketinde kalır. Soketi yalnızca proxy erişimine açın. Güvenli çerezler herkese açık protokolü, üretim sıfırlama bağlantıları kanonik adresi kullanır. Bu projedeki `Caddyfile.local` Internet'e açık üretim yayını değildir.
+## Aynı aile
 
-## Bootstrap, dogfood ve bilinen sınırlar
+- [AhdCode](https://github.com/aliharundaldalli/AhdCode) — dil ve derleyici
+- [v0.15.0 — Web Foundations](https://github.com/aliharundaldalli/AhdCode/releases/tag/v0.15.0)
+- [Ahd Akademi Matematik](https://github.com/aliharundaldalli/ahdcode-math-portal) — bu genel tanıtım
+- [v0.4 Kütüphane Demosu](https://github.com/aliharundaldalli/ahdcode-library-demo)
+- [v0.4 Seminer Demosu](https://github.com/aliharundaldalli/ahdcode-seminer-demo)
 
-Gerçek yerel varlık `public/css/bootstrap.min.css`: **Bootstrap 5.3.3**, 232.803 bayt. Dosya başındaki telif/MIT bildirimi korunur; tam lisans `public/css/bootstrap.LICENSE` içindedir. `public/css/app.css` yerel ek stillerdir. Yerel stiller dışında uzak varlık ve script etiketi yoktur; formlar, etiketler, gezinme ve tablolar semantik `Web.UI` düğümleridir.
-
-Bu bir üretim güvenliği sertifikası değil, referans/dogfood uygulamasıdır. Oturumlar bellektedir; yeniden başlatma oturumları bitirir ve çoklu örnekler oturum paylaşmaz. Dahili hız sınırı, posta kuyruğu/yeniden deneme/teslim gözlemi, çok adımlı sıfırlama işlemi için transaction, zararlı dosya taraması, bütün listelerde sayfalama veya formül dizgisi yoktur. Bazı şema uzunluk sınırları forma yansıtılmamıştır; bazı DB hataları kaba mesajlara dönüştürülür. Bulunamayan genel soru sayfası mesajla HTTP 200 dönebilir. Genel sıfırlama mesajı aynı yanıt süresi garantisi değildir. [DOGFOOD.md](DOGFOOD.md) tekrar sayılarını ve v0.16 için somut öncelikleri kaydeder.
+Bu uygulama AhdCode ağacında da
+[`examples/v0.15/ahd_math_portal`](https://github.com/aliharundaldalli/AhdCode/tree/main/examples/v0.15/ahd_math_portal)
+olarak durur.

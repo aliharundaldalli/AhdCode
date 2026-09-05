@@ -1,0 +1,328 @@
+// Slider administration: list, toggle status, delete.
+require("Layouts/Admin.ahd")
+require("Services/Context.ahd")
+require("Services/Session.ahd")
+require("Services/Guard.ahd")
+require("Services/CSRF.ahd")
+require("Repositories/Sliders.ahd")
+require("Support/Validation.ahd")
+bring Web
+from Web bring (Request, Response, HTMLNode, Session)
+
+adminSlidersPage: Function := (request: Request) -> Response {
+    session: Local Session := sessionOpen(request)
+    context: Local PageContext := contextFor(session)
+    guard: Local GuardResult := adminGuard(session, context)
+    if guard.allowed == false {
+        return sessionCommit(session, guard.refusal)
+    }
+
+    sliders: Local List<SliderRecord> := slidersAll()
+    rows: Local List<HTMLNode> := []
+    for slider in sliders {
+        rows.add(adminSliderRow(session, slider))
+    }
+
+    mainSection: Local HTMLNode := Web.UI.div(
+        [
+            Web.UI.p(
+                "Henüz kayıtlı slayt bulunmuyor. Yeni bir slayt ekleyerek başlayabilirsiniz."
+                {"class": "alert alert-info mb-0"}
+            )
+        ]
+        {"class": "mb-4"}
+    )
+    if len(sliders) > 0 {
+        mainSection = Web.UI.div(
+            [
+                Web.UI.div(
+                    [
+                        Web.UI.table(
+                            [
+                                Web.UI.thead(
+                                    [
+                                        Web.UI.tr(
+                                            [
+                                                Web.UI.th("Görsel & Başlık")
+                                                Web.UI.th("Buton")
+                                                Web.UI.th("Sıra")
+                                                Web.UI.th("Durum")
+                                                Web.UI.th("İşlem")
+                                            ]
+                                        )
+                                    ]
+                                )
+                                Web.UI.tbody(rows)
+                            ]
+                            {"class": "table align-middle mb-0"}
+                        )
+                    ]
+                    {"class": "table-responsive"}
+                )
+            ]
+            {"class": "card border-0 shadow-sm rounded-4 overflow-hidden mb-4"}
+        )
+    }
+
+    content: Local List<HTMLNode> := [
+        Web.UI.div(
+            [
+                Web.UI.div(
+                    [
+                        Web.UI.h1(
+                            "Slayt Yönetimi"
+                            {"class": "h3 fw-bold text-slate-800 mb-1"}
+                        )
+                        Web.UI.p(
+                            "Anasayfada sergilenen hero slaytlarını yönetin, yeni slayt ekleyin veya düzenleyin."
+                            {"class": "text-muted small mb-0"}
+                        )
+                    ]
+                )
+                Web.UI.aNodes(
+                    "/admin/sliders/new"
+                    [
+                        Web.UI.i("", {"class": "fa-solid fa-plus me-2"})
+                        Web.UI.text("Yeni Slayt Ekle")
+                    ]
+                    {"class": "btn btn-primary shadow-sm px-3"}
+                )
+            ]
+            {
+                "class": "d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4"
+            }
+        )
+        mainSection
+    ]
+
+    return sessionCommit(
+        session
+        adminLayout(
+            session
+            "Slayt Yönetimi"
+            context.siteName
+            context.headerColor
+            context.user
+            "/admin/sliders"
+            context.flash
+            context.flashKind
+            content
+        )
+    )
+}
+
+adminSliderRow: Function := (
+    session: Session
+    slider: SliderRecord
+) -> HTMLNode {
+    statusBadge: Local HTMLNode := Web.UI.span(
+        "Pasif"
+        {"class": "badge text-bg-secondary"}
+    )
+    toggleLabel: Local String := "Aktif Et"
+    toggleIcon: Local String := "fa-solid fa-circle-check me-1"
+    toggleClass: Local String := "btn btn-sm btn-outline-success"
+    if slider.isActive {
+        statusBadge = Web.UI.span("Aktif", {"class": "badge text-bg-success"})
+        toggleLabel = "Pasife Al"
+        toggleIcon = "fa-solid fa-circle-pause me-1"
+        toggleClass = "btn btn-sm btn-outline-warning"
+    }
+
+    buttonCell: Local HTMLNode := Web.UI.span(
+        "Buton yok"
+        {"class": "text-body-tertiary small fst-italic"}
+    )
+    if slider.buttonText != "" {
+        buttonCell = Web.UI.div(
+            [
+                Web.UI.spanNodes(
+                    [
+                        Web.UI.i(
+                            ""
+                            {"class": "fa-solid fa-arrow-pointer me-1"}
+                        )
+                        Web.UI.text(slider.buttonText)
+                    ]
+                    {
+                        "class": "badge text-bg-primary-subtle text-primary border border-primary-subtle mb-1"
+                    }
+                )
+                Web.UI.div(
+                    [
+                        Web.UI.small(
+                            slider.buttonUrl
+                            {
+                                "class": "text-muted font-monospace"
+                                "style": "font-size: 0.75rem; word-break: break-all;"
+                            }
+                        )
+                    ]
+                )
+            ]
+        )
+    }
+
+    imagePreview: Local HTMLNode := Web.UI.img(
+        slider.imageUrl
+        slider.title
+        {
+            "class": "rounded-3 border object-fit-cover shadow-xs"
+            "style": "width: 96px; height: 56px; object-fit: cover;"
+            "loading": "lazy"
+        }
+    )
+
+    infoCell: Local HTMLNode := Web.UI.div(
+        [
+            imagePreview
+            Web.UI.div(
+                [
+                    Web.UI.div(
+                        [
+                            Web.UI.span(
+                                slider.title
+                                {"class": "fw-bold text-dark d-block mb-1"}
+                            )
+                        ]
+                    )
+                    Web.UI.small(
+                        slider.subtitle
+                        {
+                            "class": "text-muted text-truncate d-inline-block"
+                            "style": "max-width: 380px;"
+                        }
+                    )
+                ]
+            )
+        ]
+        {"class": "d-flex align-items-center gap-3"}
+    )
+
+    return Web.UI.tr(
+        [
+            Web.UI.tdNodes([infoCell])
+            Web.UI.tdNodes([buttonCell])
+            Web.UI.td(
+                str(slider.displayOrder)
+                {"class": "text-center fw-semibold text-secondary"}
+            )
+            Web.UI.tdNodes([statusBadge])
+            Web.UI.tdNodes(
+                [
+                    Web.UI.div(
+                        [
+                            Web.UI.aNodes(
+                                "/admin/sliders/edit?id={str(slider.id)}"
+                                [
+                                    Web.UI.i(
+                                        ""
+                                        {
+                                            "class": "fa-solid fa-pen-to-square me-1"
+                                        }
+                                    )
+                                    Web.UI.text("Düzenle")
+                                ]
+                                {"class": "btn btn-sm btn-outline-primary"}
+                            )
+                            Web.UI.formTo(
+                                "/admin/sliders/status"
+                                "post"
+                                [
+                                    csrfInput(session)
+                                    Web.UI.input(
+                                        "hidden"
+                                        "slider_id"
+                                        str(slider.id)
+                                    )
+                                    Web.UI.buttonNodes(
+                                        [
+                                            Web.UI.i("", {"class": toggleIcon})
+                                            Web.UI.text(toggleLabel)
+                                        ]
+                                        {"type": "submit", "class": toggleClass}
+                                    )
+                                ]
+                                {"class": "d-inline"}
+                            )
+                            Web.UI.formTo(
+                                "/admin/sliders/delete"
+                                "post"
+                                [
+                                    csrfInput(session)
+                                    Web.UI.input(
+                                        "hidden"
+                                        "slider_id"
+                                        str(slider.id)
+                                    )
+                                    Web.UI.buttonNodes(
+                                        [
+                                            Web.UI.i(
+                                                ""
+                                                {"class": "fa-solid fa-trash"}
+                                            )
+                                        ]
+                                        {
+                                            "type": "submit"
+                                            "class": "btn btn-sm btn-outline-danger"
+                                            "onclick": "return confirm('Bu slaytı silmek istediğinize emin misiniz?');"
+                                            "title": "Slaytı Sil"
+                                        }
+                                    )
+                                ]
+                                {"class": "d-inline"}
+                            )
+                        ]
+                        {"class": "d-flex align-items-center gap-2"}
+                    )
+                ]
+            )
+        ]
+    )
+}
+
+adminSliderStatusSubmit: Function := (request: Request) -> Response {
+    session: Local Session := sessionOpen(request)
+    context: Local PageContext := contextFor(session)
+    guard: Local GuardResult := adminGuard(session, context)
+    if guard.allowed == false {
+        return sessionCommit(session, guard.refusal)
+    }
+
+    if csrfValid(session, request) == false {
+        return sessionCommit(session, Web.text("Geçersiz form belirteci.", 403))
+    }
+
+    id: Local Int := validationPositiveInt(request.form("slider_id"))
+    slider: Local SliderRecord? := slidersFindById(id)
+    if slider == null {
+        return sessionCommit(session, Web.text("Slayt bulunamadı.", 404))
+    }
+
+    slidersSetActive(id, slider.isActive == false)
+    flashSet(session, "success", "Slayt durumu güncellendi.")
+    return sessionCommit(session, Web.redirect("/admin/sliders"))
+}
+
+adminSliderDeleteSubmit: Function := (request: Request) -> Response {
+    session: Local Session := sessionOpen(request)
+    context: Local PageContext := contextFor(session)
+    guard: Local GuardResult := adminGuard(session, context)
+    if guard.allowed == false {
+        return sessionCommit(session, guard.refusal)
+    }
+
+    if csrfValid(session, request) == false {
+        return sessionCommit(session, Web.text("Geçersiz form belirteci.", 403))
+    }
+
+    id: Local Int := validationPositiveInt(request.form("slider_id"))
+    slider: Local SliderRecord? := slidersFindById(id)
+    if slider == null {
+        return sessionCommit(session, Web.text("Slayt bulunamadı.", 404))
+    }
+
+    slidersDelete(id)
+    flashSet(session, "success", "Slayt başarıyla silindi.")
+    return sessionCommit(session, Web.redirect("/admin/sliders"))
+}
