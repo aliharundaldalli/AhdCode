@@ -12,9 +12,16 @@ AhdCode is an experimental statically checked general-purpose programming
 language focused on readable syntax, explicit intent, predictable semantics,
 and native compilation.
 
-The current release is **v0.16.0**. The core
+The current candidate is **v0.17.0**. The core
 language works end to end, but the project is not production-ready and
 breaking changes may still occur before 1.0.
+
+v0.17.0, **Web Init, Context Routes, Groups & Guards**, keeps `ahdcode init web`
+and adds explicit context-aware route registration, route groups, and
+ordered policy-agnostic guards. `context.respond` stays the only
+finalizer. There is no general middleware chain, auth framework, or ORM.
+See [Web](docs/WEB.md#17-v017-context-routes-groups-and-guards) and
+[`examples/v0.17/routes_guards`](examples/v0.17/routes_guards).
 
 v0.16.0, **Request Context, Forms, Validation, CSRF & Flash**, adds an explicit
 request/session context (`RequestContext`), one-time response and session

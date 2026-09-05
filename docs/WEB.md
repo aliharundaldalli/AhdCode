@@ -747,7 +747,7 @@ configuration contract.
 | Release | Area |
 | --- | --- |
 | v0.16 | Forms, validation, CSRF conveniences, flash, old input, form errors |
-| v0.17 | Richer routing, route groups, middleware composition, auth guards |
+| v0.17 | `ahdcode init web`, context-aware routes, route groups, ordered guards |
 
 ## Starting a project
 
@@ -766,6 +766,44 @@ API (`Web.UI.stylesheet`, `Web.UI.element("script", ...)`). Templates are
 embedded in the CLI: no network, no package manager, no overwrite. Open
 `http://127.0.0.1:8080`. `main.js` is optional static JavaScript, not a
 frontend runtime.
+
+## 17. v0.17: context routes, groups, and guards
+
+v0.17 is additive. `App.get(path, handler)` with
+`Function(Request) -> Response` still compiles. A second registration
+layer opens one `RequestContext` per request and still requires
+`context.respond` on the path that runs.
+
+```ahd
+routes := Web.routes(site, sessions)
+routes.get("/profile", profile)
+
+admin := routes.group("/admin")
+admin.get("/users", adminUsers, authenticated, adminOnly)
+```
+
+| Piece | Contract |
+| --- | --- |
+| handler | `Function(RequestContext) -> Response` |
+| guard | `Function(RequestContext) -> Response?` |
+| `null` | continue |
+| `Response` | stop; must already be `context.respond(...)` |
+
+Guard order is the extra arguments of `get`/`post`/`route`, then the
+handler. Defaults allow every request. There is no `next()`, no `use()`,
+no hidden finalizer, no auth policy inside Web, and no named route
+parameters. Function attributes cannot store a guard list, so the checks
+stay on the registration line.
+
+Group join is explicit. `/admin` + `/users` is `/admin/users`. `/admin` +
+`/*` is `/admin/*`. Fragments with `?`, `#`, `//`, or a guessed repair
+raise `WebRouteError`. HTTP still owns exact-vs-`/*` matching.
+
+A focused example is
+[`examples/v0.17/routes_guards`](../examples/v0.17/routes_guards).
+
+v0.17 does **not** add a general middleware chain, an auth framework, an
+ORM, automatic route discovery, or a frontend runtime.
 
 ## Example
 

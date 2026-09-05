@@ -4578,6 +4578,15 @@ ve diğer sırları seçmeyin. Otomatik eski girdi saklama, flash gösterimi,
 middleware veya auth çerçevesi yoktur. [Web rehberi](WEB_TR.md) tam akışı ve kesin
 API'yi öğretir; v0.15 API'leri kaynak uyumluluğunu korur.
 
+## v0.17: gruplar ve bekçiler
+
+`ahdcode init web` tek rotalı bir başlangıç yazar. Bağlam duyarlı rotalar,
+gruplar ve sıralı bekçiler ayrı katmandır:
+[`examples/v0.17/routes_guards`](../examples/v0.17/routes_guards).
+`Function(Request) -> Response` ile `App.get` çalışmayı sürdürür. Bekçi
+devam için `null`, durmak için sonlandırılmış `Response` döner. Web bir
+yöneticinin kim olduğunu bilmez. Genel ara katman zinciri yoktur.
+
 `Page`, `Layout` ve `Component` bir uygulamayı düzenleme biçimleridir, dil
 yapısı değil; işleyici adları da sıradan tanımlayıcılardır: örnek `Page` soneki
 olmadan `register`, `registerSubmit` ve `profile` işleyicilerine yönlendirir,

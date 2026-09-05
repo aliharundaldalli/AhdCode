@@ -12,9 +12,16 @@ AhdCode; okunabilir sözdizimi, açık niyet (explicit intent), öngörülebilir
 anlambilim (semantics) ve yerel (native) derlemeye odaklanan, deneysel,
 statik olarak denetlenen genel amaçlı bir programlama dilidir.
 
-Mevcut sürüm **v0.16.0**'dır. Çekirdek dil
+Mevcut aday **v0.17.0**'dır. Çekirdek dil
 uçtan uca çalışır, ancak proje üretime hazır değildir ve 1.0'dan önce kırıcı
 (breaking) değişiklikler olabilir.
+
+v0.17.0, **Web Init, Bağlam Rotaları, Gruplar ve Bekçiler**, `ahdcode init web`
+ile bağlam duyarlı rota kaydı, rota grupları ve sıralı, politikasız bekçiler
+ekler. Sonlandırıcı hâlâ yalnızca `context.respond`'dur. Genel ara katman
+zinciri, kimlik çerçevesi veya ORM yoktur.
+[Web](docs/WEB_TR.md#17-v017-bağlam-rotaları-gruplar-ve-bekçiler) ve
+[`examples/v0.17/routes_guards`](examples/v0.17/routes_guards) bölümüne bakın.
 
 v0.16.0, **İstek Bağlamı, Formlar, Doğrulama, CSRF ve Flash**, açık istek/oturum
 bağlamı (`RequestContext`), tek seferlik yanıt ve oturum sonlandırma

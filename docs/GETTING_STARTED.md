@@ -101,6 +101,11 @@ frontend runtime. There is no npm, bundler, or CDN. Forms, CSRF, and sessions
 are not included here; see the
 [v0.16 forms example](../examples/v0.16/forms_validation/README.md).
 
+Route groups and ordered guards are a later, explicit layer — see
+[Web §17](WEB.md#17-v017-context-routes-groups-and-guards) and
+[`examples/v0.17/routes_guards`](../examples/v0.17/routes_guards). The
+starter does not add them.
+
 ## Input
 
 `take` reads one line. It returns text, so numeric input uses an explicit

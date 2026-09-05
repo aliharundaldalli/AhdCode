@@ -71,6 +71,13 @@ HTTP.client(
     followRedirects: Bool := true
 ) -> Client
 HTTP.clientRequest(method: String, url: String) -> ClientRequest
+HTTP.contextHandler(
+    store: SessionStore
+    opener: Function(Request, SessionStore) -> RequestContext
+    handler: Function(RequestContext) -> Response
+    first: Function(RequestContext) -> Response
+    second: Function(RequestContext) -> Response
+) -> Function(Request) -> Response
 
 Request.file(name: String)  -> UploadedFile?
 Request.files(name: String) -> List<UploadedFile>
@@ -143,6 +150,10 @@ HTTPError  (Error'dan türer)
 `ClientRequest` ve `ClientResponse` opak yerleşik Sınıflardır. Atlanan
 `HTTP.sessions` argümanları `ahd_session`, `86400`, `false` ve `"Lax"`'tır.
 Atlanan `HTTP.client` argümanları `30`, `8388608` ve `true`'dur.
+
+`HTTP.contextHandler`, `Web.routes` tarafından kullanılan v0.17 kayıt
+adaptörüdür. Oturumu kendisi sonlandırmaz ve genel bir middleware zinciri
+değildir. Sıradan uygulamalar bağlam yollarını Web üzerinden kaydeder.
 
 ## İşleyici imzası
 

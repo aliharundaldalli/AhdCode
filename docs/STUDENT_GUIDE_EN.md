@@ -4535,6 +4535,15 @@ raises `WebContextError`. `context.session` remains the ordinary Session value,
 so application login and guards remain explicit. `Web.form(request)` is also
 available without a session. `Form.integer` separates missing null from invalid
 `FormValueError`; `Form.optional` separates missing from empty input.
+
+## v0.17: groups and guards
+
+`ahdcode init web` writes a one-route starter. Context-aware routes, groups,
+and ordered guards are a separate layer:
+[`examples/v0.17/routes_guards`](../examples/v0.17/routes_guards).
+`App.get` with `Function(Request) -> Response` still works. A guard returns
+`null` to continue or a finalized `Response` to stop. Web does not decide
+who an admin is. There is no general middleware chain.
 `Web.errors()` supports required, length, matches, email shape, allowed values,
 strict hex color, and custom field errors in deterministic order.
 

@@ -751,7 +751,7 @@ düşük seviyeli modüllere uzanın.
 | Sürüm | Alan |
 | --- | --- |
 | v0.16 | Formlar, doğrulama, CSRF kolaylıkları, flash, eski girdi, form hataları |
-| v0.17 | Zengin yönlendirme, rota grupları, ara katman bileşimi, yetki bekçileri |
+| v0.17 | `ahdcode init web`, bağlam duyarlı rotalar, rota grupları, sıralı bekçiler |
 
 ## Bir proje başlatmak
 
@@ -770,6 +770,41 @@ Yerleşim her iki varlığı da yayınlanmış Web HTML API’siyle bağlar
 gömülüdür: ağ yok, paket yöneticisi yok, üzerine yazma yok.
 `http://127.0.0.1:8080` adresini açın. `main.js` isteğe bağlı statik
 JavaScript’tir; ön yüz çalışma zamanı değildir.
+
+## 17. v0.17: bağlam rotaları, gruplar ve bekçiler
+
+v0.17 eklemedir. `Function(Request) -> Response` ile `App.get` derlenmeye
+devam eder. İkinci kayıt katmanı istek başına bir `RequestContext` açar;
+çalışan yol hâlâ `context.respond` ister.
+
+```ahd
+routes := Web.routes(site, sessions)
+routes.get("/profile", profile)
+
+admin := routes.group("/admin")
+admin.get("/users", adminUsers, authenticated, adminOnly)
+```
+
+| Parça | Sözleşme |
+| --- | --- |
+| işleyici | `Function(RequestContext) -> Response` |
+| bekçi | `Function(RequestContext) -> Response?` |
+| `null` | devam |
+| `Response` | dur; değer `context.respond(...)` ile bitmiş olmalıdır |
+
+Bekçi sırası `get`/`post`/`route` ek argümanları, sonra işleyicidir.
+Varsayılan her isteğe izin verir. `next()`, `use()`, gizli sonlandırıcı,
+Web içinde yetki politikası ve isimli rota parametresi yoktur. Function
+alanları bekçi listesi tutamaz; kontroller kayıt satırında kalır.
+
+Grup birleşimi açıktır. `/admin` + `/users` → `/admin/users`. `?`, `#`,
+`//` veya tahminî onarım `WebRouteError` yükseltir. Eşleşmeyi hâlâ HTTP
+yapar.
+
+Odak örnek: [`examples/v0.17/routes_guards`](../examples/v0.17/routes_guards).
+
+v0.17 genel ara katman zinciri, kimlik çerçevesi, ORM, otomatik rota
+keşfi veya ön yüz çalışma zamanı **eklemez**.
 
 ## Örnek
 

@@ -70,6 +70,13 @@ HTTP.client(
     followRedirects: Bool := true
 ) -> Client
 HTTP.clientRequest(method: String, url: String) -> ClientRequest
+HTTP.contextHandler(
+    store: SessionStore
+    opener: Function(Request, SessionStore) -> RequestContext
+    handler: Function(RequestContext) -> Response
+    first: Function(RequestContext) -> Response
+    second: Function(RequestContext) -> Response
+) -> Function(Request) -> Response
 
 Request.file(name: String)  -> UploadedFile?
 Request.files(name: String) -> List<UploadedFile>
@@ -148,6 +155,12 @@ Omitted `HTTP.deleteCookie` path is `"/"`. Omitted `HTTP.sessions` arguments
 are `ahd_session`, `86400`, `false`, and `"Lax"`. Omitted `HTTP.client`
 arguments are `30`, `8388608`, and `true`. Omitted `Client.post` content type
 is `text/plain; charset=utf-8`.
+
+`HTTP.contextHandler` is the v0.17 registration adapter used by
+`Web.routes`. It opens one `RequestContext` through `opener` and runs
+`first`, then `second`, then `handler`. It does not commit the session
+and is not a general middleware chain. Ordinary applications register
+context routes through Web.
 
 ## Handler signature
 

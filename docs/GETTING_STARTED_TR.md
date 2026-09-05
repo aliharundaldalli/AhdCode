@@ -100,6 +100,11 @@ ortamı hâlâ `.env`’den üstündür. Var olan dosyaların üzerine yazılmaz
 ve oturum burada yoktur; bkz.
 [v0.16 form örneği](../examples/v0.16/forms_validation/README_TR.md).
 
+Rota grupları ve sıralı bekçiler sonraki, açık bir katmandır — bkz.
+[Web §17](WEB_TR.md#17-v017-bağlam-rotaları-gruplar-ve-bekçiler) ve
+[`examples/v0.17/routes_guards`](../examples/v0.17/routes_guards). Başlangıç
+iskeleti bunları eklemez.
+
 ## Girdi
 
 `take` bir satır okur. Metin döndürür, bu yüzden sayısal girdi için açık bir
