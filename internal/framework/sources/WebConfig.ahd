@@ -14,6 +14,39 @@
 bring Env
 bring WebError
 from WebError bring WebConfigError
+// webLocalHostname derives the local development name from a public host.
+//
+// The registrable suffix is replaced rather than appended to, so
+// ahdakademi.com develops as ahdakademi.test rather than ahdakademi.com.test:
+// the local name reads as the same project instead of as the production name
+// with something bolted on, and .test (reserved by RFC 6761) can never be
+// delegated, so it never collides with a real domain or resolves to the real
+// server.
+//
+// This is the same derivation `ahdcode dev` uses when it claims a local
+// route, so a link built from AppConfig and the name the toolchain actually
+// serves are always the one address.
+webLocalHostname: Function := (host: String) -> String {
+    labels: Local List<String> := host.lower().split(".")
+    if len(labels) > 1 {
+        labels.eject(-1)
+    }
+
+    name: Local String := ""
+    for label in labels {
+        if name == "" {
+            name = label
+        } else {
+            name = "{name}.{label}"
+        }
+    }
+
+    if name == "" {
+        return "{host.lower()}.test"
+    }
+
+    return "{name}.test"
+}
 // AppConfig is one application's validated configuration. It is produced by
 // load() below, which either returns a complete value or raises -- there is
 // no partially valid AppConfig and no silent default for a required key.
@@ -33,23 +66,29 @@ AppConfig: Class<> := {
     url: Function := () -> String {
         return "{attribute.protocol}://{attribute.host}"
     }
-    // developmentURL is the same identity as seen from this machine during
-    // development: APP_HOST with .test appended, so ahdakademi.com is
-    // reachable locally as ahdakademi.com.test without ever colliding with
-    // the real name or resolving to the real server.
-    developmentURL: Function := () -> String {
-        return "{attribute.protocol}://{attribute.host}.test"
-    }
-    // developmentHost is the bare .test hostname, without scheme.
+    // developmentHost is the local name this machine routes to the
+    // application during development. The registrable suffix is replaced
+    // rather than appended to, so ahdakademi.com develops as
+    // ahdakademi.test: the local name reads as the same project instead of
+    // as the production name with something bolted on, and it can never
+    // collide with the real name or resolve to the real server.
+    //
+    // This is the same derivation `ahdcode dev` uses to claim a local route,
+    // so a link built from this value and the name the toolchain actually
+    // serves are always the one address.
     developmentHost: Function := () -> String {
-        return "{attribute.host}.test"
+        return webLocalHostname(attribute.host)
+    }
+    // developmentURL is that same identity with the configured scheme.
+    developmentURL: Function := () -> String {
+        return "{attribute.protocol}://{webLocalHostname(attribute.host)}"
     }
     // effectiveURL is the address to show and to link in this environment:
-    // the .test name in development, the real public name everywhere else.
+    // the local name in development, the real public name everywhere else.
     // Production never gains a .test suffix.
     effectiveURL: Function := () -> String {
         if attribute.environment == "development" {
-            return "{attribute.protocol}://{attribute.host}.test"
+            return "{attribute.protocol}://{webLocalHostname(attribute.host)}"
         }
 
         return "{attribute.protocol}://{attribute.host}"

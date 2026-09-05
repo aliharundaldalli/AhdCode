@@ -39,6 +39,20 @@ type devDescriptor struct {
 	StartedAt        string `json:"startedAt"`
 	ControlPort      int    `json:"controlPort"`
 	ControlToken     string `json:"controlToken"`
+
+	// LocalHostname and LocalURL are this session's v0.19 logical identity:
+	// the .test name the route registry granted it, and the address a person
+	// opens. They are reported here so a tool that already reads the
+	// descriptor can name the session the way a person does, without
+	// re-deriving anything.
+	//
+	// They are deliberately separate from the bind address, which stays a
+	// property of the application's own configuration, and both are optional:
+	// a non-Web session, or one for which local routing did not come up, has
+	// no logical identity and simply omits them. Neither grants any
+	// authority; only ControlPort/ControlToken do.
+	LocalHostname string `json:"localHostname,omitempty"`
+	LocalURL      string `json:"localURL,omitempty"`
 }
 
 // devFileFor derives app.dev from app.ahd, so `ahdcode dev app.ahd` and
@@ -163,7 +177,7 @@ func claimDevFile(path string) error {
 	return nil
 }
 
-func startDevDescriptor(path, source, workingDirectory string, controllerPID, childPID, controlPort int, controlToken string) error {
+func startDevDescriptor(path, source, workingDirectory string, controllerPID, childPID, controlPort int, controlToken string, local devLocalRoute) error {
 	absoluteSource, err := filepath.Abs(source)
 	if err != nil {
 		absoluteSource = source
@@ -178,6 +192,7 @@ func startDevDescriptor(path, source, workingDirectory string, controllerPID, ch
 		Source: absoluteSource, WorkingDirectory: absoluteDirectory,
 		StartedAt:   time.Now().UTC().Format(time.RFC3339),
 		ControlPort: controlPort, ControlToken: controlToken,
+		LocalHostname: local.route.Hostname, LocalURL: local.logicalURL(),
 	})
 }
 

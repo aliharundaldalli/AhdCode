@@ -26,6 +26,16 @@ type devLocalRoute struct {
 
 func (local devLocalRoute) allocated() bool { return local.route.Hostname != "" }
 
+// logicalURL is the address a person opens, or "" when this session has no
+// routed identity. It is never the bind address: a caller that wants that
+// asks for it by name.
+func (local devLocalRoute) logicalURL() string {
+	if !local.allocated() || local.routerPort == 0 {
+		return ""
+	}
+	return local.route.URL(local.routerPort)
+}
+
 // loopbackBind reduces the application's configured bind address to the
 // loopback address a router on this machine can actually reach.
 //

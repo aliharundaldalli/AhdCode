@@ -173,3 +173,50 @@ func TestLocalRouteIsNotLiveWithoutADescriptor(t *testing.T) {
 		t.Fatal("a route with an empty descriptor was reported live")
 	}
 }
+
+// G. The dev descriptor carries the logical identity as well as the bind
+// address, and the two stay distinct fields rather than one merged "URL".
+func TestDevDescriptorCarriesTheLogicalIdentity(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "app.dev")
+	local := devLocalRoute{
+		route:      localdev.Route{Hostname: "ahdakademi.test", BindHost: "127.0.0.1", BindPort: 18437},
+		routerPort: 7357,
+	}
+	firstToken, err := newRunControlToken()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := startDevDescriptor(path, "/projects/ahd/app.ahd", "/projects/ahd", os.Getpid(), 0, 51234,
+		firstToken, local); err != nil {
+		t.Fatal(err)
+	}
+	descriptor, err := readDevDescriptor(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if descriptor.LocalHostname != "ahdakademi.test" {
+		t.Errorf("localHostname was %q", descriptor.LocalHostname)
+	}
+	if descriptor.LocalURL != "http://ahdakademi.test:7357/" {
+		t.Errorf("localURL was %q", descriptor.LocalURL)
+	}
+
+	// A session with no routed identity simply omits both, and stays a
+	// perfectly valid descriptor.
+	plain := filepath.Join(t.TempDir(), "app.dev")
+	secondToken, err := newRunControlToken()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := startDevDescriptor(plain, "/projects/plain/app.ahd", "/projects/plain", os.Getpid(), 0, 51235,
+		secondToken, devLocalRoute{}); err != nil {
+		t.Fatal(err)
+	}
+	descriptor, err = readDevDescriptor(plain)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if descriptor.LocalHostname != "" || descriptor.LocalURL != "" {
+		t.Errorf("a session with no identity recorded one: %#v", descriptor)
+	}
+}

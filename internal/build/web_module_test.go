@@ -215,8 +215,9 @@ write(layout("A <b>title</b>", [card("Card")]))
 }
 
 // G. The environment contract: the canonical URL is APP_PROTOCOL://APP_HOST,
-// development derives the same identity with .test appended, and production
-// never gains that suffix.
+// development derives the local name by replacing the registrable suffix
+// with .test (example.com becomes example.test, the same derivation
+// `ahdcode dev` routes), and production never gains that suffix.
 func TestWebConfigDerivesEnvironmentURLs(t *testing.T) {
 	directory := writeSources(t, map[string]string{"main.ahd": `bring Web
 from Web bring AppConfig
@@ -228,7 +229,7 @@ write(config.effectiveURL())
 write(config.address())
 `})
 	for _, testCase := range []struct{ environment, expected string }{
-		{"development", "https://example.com.test"},
+		{"development", "https://example.test"},
 		{"test", "https://example.com"},
 		{"production", "https://example.com"},
 	} {
@@ -241,7 +242,7 @@ write(config.address())
 		if lines[0] != "https://example.com" {
 			t.Errorf("%s: canonical URL was %q", testCase.environment, lines[0])
 		}
-		if lines[1] != "https://example.com.test" {
+		if lines[1] != "https://example.test" {
 			t.Errorf("%s: development URL was %q", testCase.environment, lines[1])
 		}
 		if lines[2] != testCase.expected {

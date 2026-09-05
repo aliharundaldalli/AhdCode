@@ -309,6 +309,9 @@ func (c *devController) run() {
 						// actually listening: a local name must never
 						// exist for an application that is not there.
 						c.establishLocalRoute(c.webEnvironment)
+						// Republished so the descriptor carries the
+						// logical identity the route registry just granted.
+						c.publishDescriptor()
 						c.webBannerShown = true
 						announceWebApplication(c.output, c.webEnvironment, c.localRoute)
 					}
@@ -393,7 +396,7 @@ func (c *devController) publishDescriptor() {
 	if c.child != nil {
 		childPID = c.child.cmd.Process.Pid
 	}
-	_ = startDevDescriptor(c.descriptorPath, c.entry, filepath.Dir(c.entry), controllerPID, childPID, c.controlPort, c.devToken)
+	_ = startDevDescriptor(c.descriptorPath, c.entry, filepath.Dir(c.entry), controllerPID, childPID, c.controlPort, c.devToken, c.localRoute)
 }
 
 // finishShutdown removes every temporary/descriptor trace of this session
