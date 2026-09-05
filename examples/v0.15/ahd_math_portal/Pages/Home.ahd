@@ -63,7 +63,7 @@ homeSliderSection: Function := (sliders: List<SliderRecord>) -> HTMLNode {
                     Web.UI.i("", {"class": "fa-solid fa-arrow-right-long ms-2"})
                 ]
                 {
-                    "class": "btn btn-primary btn-lg rounded-pill px-4 py-2 shadow-lg hero-action-btn"
+                    "class": "btn btn-primary btn-sm rounded-pill px-3 py-1 shadow hero-action-btn"
                 }
             )
         }
@@ -85,25 +85,25 @@ homeSliderSection: Function := (sliders: List<SliderRecord>) -> HTMLNode {
                                         Web.UI.i(
                                             ""
                                             {
-                                                "class": "fa-solid fa-square-root-variable me-2"
+                                                "class": "fa-solid fa-square-root-variable me-1"
                                             }
                                         )
                                         Web.UI.text("Ahd Akademi")
                                     ]
                                     {
-                                        "class": "badge bg-primary-subtle text-primary border border-primary-subtle px-3 py-2 rounded-pill mb-3"
+                                        "class": "badge bg-primary text-white px-2 py-1 rounded-pill mb-2 hero-slide-badge"
                                     }
                                 )
                                 Web.UI.h2(
                                     slider.title
                                     {
-                                        "class": "display-6 fw-bold text-white mb-3 hero-slide-title"
+                                        "class": "h4 fw-bold text-white mb-2 hero-slide-title"
                                     }
                                 )
                                 Web.UI.p(
                                     slider.subtitle
                                     {
-                                        "class": "lead text-light text-opacity-90 mb-4 hero-slide-desc"
+                                        "class": "small text-light text-opacity-95 mb-3 hero-slide-desc"
                                     }
                                 )
                                 buttonNode
