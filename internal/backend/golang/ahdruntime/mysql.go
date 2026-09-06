@@ -724,7 +724,11 @@ func ahdMySQLStageMessage(err error, stage string) string {
 	}
 	switch stage {
 	case "connect":
-		return "MySQL connection failed"
+		// The server's own typed error is safe to show for the same reason it
+		// is safe after a query: it originates on the server and cannot carry
+		// this client's DSN. It is what turns an opaque refusal into
+		// "Access denied for user 'root'@'localhost'".
+		return "MySQL connection failed" + ahdMySQLServerDetail(err)
 	case "query":
 		return "MySQL query failed" + ahdMySQLServerDetail(err)
 	case "execute":

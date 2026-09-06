@@ -153,6 +153,31 @@ tEN: Function := (key: String) -> String {
     if key == "sqlite_empty_body" {
         return "Set AHD_DATA_SQLITE_PATHS for explicit files, or AHD_DATA_PROJECT_ROOT to discover .db, .sqlite, and .sqlite3 files directly inside a project folder. AhdDataStudio never scans the whole machine."
     }
+    if key == "conn_title" { return "MySQL Connection" }
+    if key == "conn_intro" { return "Studio connects to a MySQL server you already run. These settings start from the AHD_DATA_MYSQL_* environment and can be changed here while Studio is running." }
+    if key == "conn_host" { return "Host" }
+    if key == "conn_host_hint" { return "For a server on this machine, 127.0.0.1" }
+    if key == "conn_port" { return "Port" }
+    if key == "conn_port_hint" { return "MySQL usually listens on 3306" }
+    if key == "conn_user" { return "Username" }
+    if key == "conn_user_hint" { return "A MySQL account that already exists" }
+    if key == "conn_password" { return "Password" }
+    if key == "conn_password_hint_set" { return "A password is set. Leave this empty to keep it." }
+    if key == "conn_password_hint_unset" { return "No password is set." }
+    if key == "conn_security" { return "Security" }
+    if key == "conn_security_hint" { return "Choose tls only if your server requires it" }
+    if key == "conn_test" { return "Test Connection" }
+    if key == "conn_connect" { return "Connect" }
+    if key == "conn_open" { return "Connection settings" }
+    if key == "conn_ok" { return "Connected to" }
+    if key == "conn_failed" { return "MySQL connection failed:" }
+    if key == "conn_failed_detail" { return "Studio tried" }
+    if key == "conn_scope" { return "These credentials are kept only by the running Studio process. They are not written to the database registry or to any file, and stopping Studio forgets them. Studio never creates MySQL accounts and never changes permissions." }
+    if key == "conn_error_host" { return "Enter a host name or address, with no spaces." }
+    if key == "conn_error_port" { return "Enter a port number between 1 and 65535." }
+    if key == "conn_error_user" { return "Enter the MySQL username to connect as." }
+    if key == "conn_error_security" { return "Security must be none or tls." }
+    if key == "conn_error_csrf" { return "That form had expired. Please try again." }
     return key
 }
 
@@ -262,6 +287,31 @@ tTR: Function := (key: String) -> String {
     if key == "sqlite_empty_body" {
         return "Açık dosyalar için AHD_DATA_SQLITE_PATHS, klasör içi keşif için AHD_DATA_PROJECT_ROOT ayarlayın. AhdDataStudio tüm makineyi tarmaz."
     }
+    if key == "conn_title" { return "MySQL Bağlantısı" }
+    if key == "conn_intro" { return "Studio, sizin çalıştırdığınız bir MySQL sunucusuna bağlanır. Bu ayarlar AHD_DATA_MYSQL_* ortam değişkenlerinden başlar ve Studio çalışırken buradan değiştirilebilir." }
+    if key == "conn_host" { return "Sunucu" }
+    if key == "conn_host_hint" { return "Bu makinedeki bir sunucu için 127.0.0.1" }
+    if key == "conn_port" { return "Port" }
+    if key == "conn_port_hint" { return "MySQL genellikle 3306 portunu dinler" }
+    if key == "conn_user" { return "Kullanıcı adı" }
+    if key == "conn_user_hint" { return "Halihazırda var olan bir MySQL hesabı" }
+    if key == "conn_password" { return "Parola" }
+    if key == "conn_password_hint_set" { return "Bir parola ayarlı. Korumak için boş bırakın." }
+    if key == "conn_password_hint_unset" { return "Ayarlı parola yok." }
+    if key == "conn_security" { return "Güvenlik" }
+    if key == "conn_security_hint" { return "tls seçeneğini yalnızca sunucunuz gerektiriyorsa kullanın" }
+    if key == "conn_test" { return "Bağlantıyı Sına" }
+    if key == "conn_connect" { return "Bağlan" }
+    if key == "conn_open" { return "Bağlantı ayarları" }
+    if key == "conn_ok" { return "Bağlanıldı:" }
+    if key == "conn_failed" { return "MySQL bağlantısı başarısız:" }
+    if key == "conn_failed_detail" { return "Studio şu adresi denedi:" }
+    if key == "conn_scope" { return "Bu kimlik bilgileri yalnızca çalışan Studio sürecinde tutulur. Veritabanı kayıt defterine veya herhangi bir dosyaya yazılmaz; Studio kapanınca unutulur. Studio hiçbir zaman MySQL hesabı oluşturmaz ve yetki değiştirmez." }
+    if key == "conn_error_host" { return "Boşluk içermeyen bir sunucu adı veya adresi girin." }
+    if key == "conn_error_port" { return "1 ile 65535 arasında bir port numarası girin." }
+    if key == "conn_error_user" { return "Bağlanılacak MySQL kullanıcı adını girin." }
+    if key == "conn_error_security" { return "Güvenlik none veya tls olmalıdır." }
+    if key == "conn_error_csrf" { return "Bu form zaman aşımına uğradı. Lütfen tekrar deneyin." }
     return tEN(key)
 }
 

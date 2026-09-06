@@ -50,7 +50,7 @@ mysqlHome: Function := (request: Request) -> Response {
             }
             body: Local List<HTMLNode> := [
                 HTML.element("h1", {"class": "h4 mb-2"}, [HTML.text("MySQL")])
-                databaseContext("MySQL", Env.getOr("AHD_DATA_MYSQL_HOST", "127.0.0.1") + ":" + Env.getOr("AHD_DATA_MYSQL_PORT", "3306"))
+                databaseContext("MySQL", mysqlEndpoint())
                 HTML.element(
                     "p"
                     {"class": "text-muted"}
@@ -111,7 +111,7 @@ mysqlHome: Function := (request: Request) -> Response {
         except MySQLError as error {
             return sessions.commit(
                 session
-                HTTP.html(layout("MySQL", token, errorNodes(error.message)))
+                HTTP.html(layout("MySQL", token, mysqlProblemNodes(error.message)))
             )
         }
         ultimately {
@@ -121,8 +121,30 @@ mysqlHome: Function := (request: Request) -> Response {
     except MySQLError as error {
         return sessions.commit(
             session
-            HTTP.html(layout("MySQL", token, errorNodes(error.message)))
+            HTTP.html(layout("MySQL", token, mysqlProblemNodes(error.message)))
         )
     }
+}
+
+// mysqlProblemNodes reports what the server actually said and offers the
+// connection form, so a wrong password is a correctable mistake rather than a
+// dead end that needs environment variables and a restart.
+mysqlProblemNodes: Function := (message: String) -> List<HTMLNode> {
+    nodes: Local List<HTMLNode> := errorNodes(message)
+    nodes.add(
+        HTML.element(
+            "p"
+            {"class": "text-muted"}
+            [HTML.text(t("conn_failed_detail") + " " + mysqlEndpoint() + ".")]
+        )
+    )
+    nodes.add(
+        HTML.element(
+            "a"
+            {"class": "btn btn-sm btn-primary", "href": "/AhdDataStudio/mysql/connection"}
+            [HTML.text(t("conn_open"))]
+        )
+    )
+    return nodes
 }
 

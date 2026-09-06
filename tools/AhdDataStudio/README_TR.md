@@ -69,6 +69,31 @@ Yapılandırma Env (veya bu dizindeki `.env`) iledir:
 | `AHD_DATA_MYSQL_PASSWORD` | boş | parola — asla commit edilmez |
 | `AHD_DATA_MYSQL_SECURITY` | `none` | `none` veya `tls` |
 
+Bu değişkenler başlangıç değerlerini belirler. Studio çalışırken aynı
+değerler **MySQL → Bağlantı ayarları** sayfasından değiştirilebilir; yerel bir
+sunucuya bağlanmak için terminal gerekmez:
+
+| Alan | Varsayılan |
+|---|---|
+| Sunucu | `127.0.0.1` |
+| Port | `3306` |
+| Kullanıcı adı | `root` |
+| Parola | boş |
+| Güvenlik | `none` |
+
+**Bağlantıyı Sına** alanları doğrulayıp gerçek bir sunucu bağlantısı açar;
+**Bağlan** aynısını yapıp şema listesini açar. Bağlantı `database: null` ile
+kurulduğu için veritabanı adı sorulmaz.
+
+Parola yalnızca yazılır. Forma geri basılmaz ve alan boş bırakıldığında
+kullanımdaki parola korunur. Kimlik bilgileri yalnızca çalışan Studio
+sürecinde tutulur: kayıt defterine, dosyaya veya çereze yazılmaz; Studio
+kapanınca unutulur. Başarısız bağlantı, sunucunun söylediğini parola
+çıkarılmış olarak bildirir.
+
+Studio hiçbir zaman MySQL kurmaz, hesap oluşturmaz, parola sıfırlamaz veya
+yetki değiştirmez. Yalnızca sizin verdiğiniz bilgilerle bağlanır.
+
 Studio `database: null` ile bağlanır, ardından bu kimlik bilgilerinin
 görebildiği her şemayı listeler (`SHOW DATABASES` / `INFORMATION_SCHEMA`).
 MySQL izinleri korunur; Studio onları aşmaz.

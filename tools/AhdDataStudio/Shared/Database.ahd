@@ -7,17 +7,21 @@ from JSON bring JSONError
 bring MySQL
 from MySQL bring MySQLDatabase
 bring Path
-
+// connectMysql opens a server-level connection with no database selected, so
+// the caller can list schemas through SHOW DATABASES and INFORMATION_SCHEMA.
+// The values come from Shared/Connection.ahd, which starts from the
+// AHD_DATA_MYSQL_* environment and is then editable from the connection form.
 connectMysql: Function := () -> MySQLDatabase {
-    host: Local String := Env.getOr("AHD_DATA_MYSQL_HOST", "127.0.0.1")
-    username: Local String := Env.getOr("AHD_DATA_MYSQL_USER", "root")
-    password: Local String := Env.getOr("AHD_DATA_MYSQL_PASSWORD", "")
-    portText: Local String := Env.getOr("AHD_DATA_MYSQL_PORT", "3306")
-    security: Local String := Env.getOr("AHD_DATA_MYSQL_SECURITY", "none")
-    port: Local Int := int(portText)
-    return MySQL.connect(host, username, password, port, null, security)
+    port: Local Int := int(mysqlPortText())
+    return MySQL.connect(
+        mysqlHost()
+        mysqlUser()
+        mysqlPassword()
+        port
+        null
+        mysqlSecurity()
+    )
 }
-
 // registeredSqlitePaths reads the AhdCode database registry.
 //
 // The registry is written by the CLI (`ahdcode init web admin` registers the
@@ -60,7 +64,6 @@ registeredSqlitePaths: Function := () -> List<String> {
     except JSONError {}
     return found
 }
-
 // allowedSqlitePaths is the one allowlist every SQLite page in Studio checks
 // a requested path against. v0.19 adds the registry as a third source, ahead
 // of the two environment sources it already had, and deduplicates across all
@@ -121,7 +124,6 @@ sqliteRegistryOwned: Function := (path: String) -> Bool {
     registered: Local List<String> := registeredSqlitePaths()
     return path in registered
 }
-
 // forgetRegisteredSqlite drops one registry entry from AHD_DATA_REGISTRY.
 // It rewrites the same CLI registry document and never deletes a SQLite file.
 forgetRegisteredSqlite: Function := (path: String) -> Bool {
@@ -223,4 +225,3 @@ looksLikeQuery: Function := (sql: String) -> Bool {
     }
     return false
 }
-

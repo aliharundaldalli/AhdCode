@@ -1,0 +1,156 @@
+// MySQL connection settings for the running AhdDataStudio process.
+//
+// The environment variables remain the way to configure Studio before it
+// starts; they are read once here as the starting values. The connection form
+// then edits those same values in memory, so a person on a normal desktop does
+// not have to open a terminal to reach their local MySQL server.
+//
+// Credentials live only in this process. Nothing is written to the database
+// registry, to a file, or to a cookie, and stopping Studio forgets them.
+bring Env
+
+mysqlDefaultHost: Function := () -> String {
+    return "127.0.0.1"
+}
+
+mysqlDefaultPort: Function := () -> String {
+    return "3306"
+}
+
+mysqlDefaultUser: Function := () -> String {
+    return "root"
+}
+
+mysqlDefaultSecurity: Function := () -> String {
+    return "none"
+}
+// loadMysqlSettings seeds the in-process settings from the environment. It runs
+// once at startup, before any request is served.
+loadMysqlSettings: Function := () -> Nothing {
+    mysqlHostValue: Global String
+    mysqlPortValue: Global String
+    mysqlUserValue: Global String
+    mysqlPasswordValue: Global String
+    mysqlSecurityValue: Global String
+    mysqlHostValue = Env.getOr("AHD_DATA_MYSQL_HOST", mysqlDefaultHost())
+    mysqlPortValue = Env.getOr("AHD_DATA_MYSQL_PORT", mysqlDefaultPort())
+    mysqlUserValue = Env.getOr("AHD_DATA_MYSQL_USER", mysqlDefaultUser())
+    mysqlPasswordValue = Env.getOr("AHD_DATA_MYSQL_PASSWORD", "")
+    mysqlSecurityValue = Env.getOr(
+        "AHD_DATA_MYSQL_SECURITY"
+        mysqlDefaultSecurity()
+    )
+    if mysqlHostValue == "" {
+        mysqlHostValue = mysqlDefaultHost()
+    }
+    if mysqlPortValue == "" {
+        mysqlPortValue = mysqlDefaultPort()
+    }
+    if mysqlUserValue == "" {
+        mysqlUserValue = mysqlDefaultUser()
+    }
+    if mysqlSecurityValue != "tls" {
+        mysqlSecurityValue = mysqlDefaultSecurity()
+    }
+}
+
+mysqlHost: Function := () -> String {
+    mysqlHostValue: Global String
+    return mysqlHostValue
+}
+
+mysqlPortText: Function := () -> String {
+    mysqlPortValue: Global String
+    return mysqlPortValue
+}
+
+mysqlUser: Function := () -> String {
+    mysqlUserValue: Global String
+    return mysqlUserValue
+}
+// mysqlPassword is read by the connection helper only. No page renders it.
+mysqlPassword: Function := () -> String {
+    mysqlPasswordValue: Global String
+    return mysqlPasswordValue
+}
+
+mysqlSecurity: Function := () -> String {
+    mysqlSecurityValue: Global String
+    return mysqlSecurityValue
+}
+// mysqlPasswordSet reports whether a password is configured without revealing
+// it, so the form can say what leaving the field blank will do.
+mysqlPasswordSet: Function := () -> Bool {
+    mysqlPasswordValue: Global String
+    return mysqlPasswordValue != ""
+}
+
+mysqlEndpoint: Function := () -> String {
+    return mysqlHost() + ":" + mysqlPortText()
+}
+// validateMysqlSettings returns an empty string when the values are usable, and
+// otherwise the one problem to show the person who typed them.
+validateMysqlSettings: Function := (
+    host: String
+    portText: String
+    username: String
+    security: String
+) -> String {
+    if host.trim() == "" {
+        return t("conn_error_host")
+    }
+    if host.contains(" ") or host.contains("\t") {
+        return t("conn_error_host")
+    }
+    if portText.trim() == "" {
+        return t("conn_error_port")
+    }
+    attempt {
+        port: Local Int := int(portText.trim())
+        if port < 1 or port > 65535 {
+            return t("conn_error_port")
+        }
+    }
+    except DomainError {
+        return t("conn_error_port")
+    }
+    except OverflowError {
+        return t("conn_error_port")
+    }
+    if username.trim() == "" {
+        return t("conn_error_user")
+    }
+    if security != "none" and security != "tls" {
+        return t("conn_error_security")
+    }
+    return ""
+}
+// applyMysqlSettings stores validated values for this process. An empty
+// password means "keep the one already configured", so the form never has to
+// render a secret back in order to preserve it.
+applyMysqlSettings: Function := (
+    host: String
+    portText: String
+    username: String
+    password: String
+    security: String
+    passwordProvided: Bool
+) -> Nothing {
+    mysqlHostValue: Global String
+    mysqlPortValue: Global String
+    mysqlUserValue: Global String
+    mysqlPasswordValue: Global String
+    mysqlSecurityValue: Global String
+    mysqlHostValue = host.trim()
+    mysqlPortValue = portText.trim()
+    mysqlUserValue = username.trim()
+    mysqlSecurityValue = security
+    if passwordProvided {
+        mysqlPasswordValue = password
+    }
+}
+// clearMysqlPassword forgets the stored password without disturbing the rest.
+clearMysqlPassword: Function := () -> Nothing {
+    mysqlPasswordValue: Global String
+    mysqlPasswordValue = ""
+}

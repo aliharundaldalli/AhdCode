@@ -64,6 +64,18 @@ the user's Go installation and settings are not changed. Core builds, SQLite,
 Studio, and LaTeX require no network. MySQL and SMTP still require the external
 servers you configure. See the payload's `THIRD_PARTY_NOTICES.md` and `licenses/`.
 
+## Visual Studio Code extension
+
+Every package carries the editor extension under `vscode/` in the installation
+root, next to a short `README.txt`. AhdCode does not need it, and setup never
+installs it for you.
+
+In VS Code, open the Extensions view, open its `...` menu, choose **Install
+from VSIX...**, and select `vscode/ahdcode-<version>.vsix` from the
+installation root. Google Antigravity IDE offers the same operation. The file
+carries everything it needs; no npm and no network are involved. The same
+`.vsix` is published beside the platform artifacts as a standalone download.
+
 ## First application
 
 ```sh

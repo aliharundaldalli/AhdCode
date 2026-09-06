@@ -43,14 +43,61 @@ def zip_payload(payload,out):
   for p in sorted(payload.rglob('*')):
    if p.is_file():
     info=zipfile.ZipInfo(p.relative_to(payload).as_posix(),(2026,1,1,0,0,0));info.external_attr=(p.stat().st_mode&0o777)<<16;info.compress_type=zipfile.ZIP_DEFLATED;z.writestr(info,p.read_bytes())
+
+# The LaTeX runtime is staged outside the repository, so it is the one payload
+# component a release could plausibly acquire in a damaged form: a truncated
+# copy, a text-mode transfer, or a Git LFS pointer standing in for the real
+# file. Existence is not evidence, so the bundle is checked by magic, size and
+# digest, and each engine by its executable format for the platform it ships to.
+LFS_POINTER = b'version https://git-lfs.github.com/spec/'
+TTB_MAGIC = b'tectonicbundle'
+EXECUTABLE_MAGIC = {'darwin': [b'\xcf\xfa\xed\xfe', b'\xca\xfe\xba\xbe'], 'linux': [b'\x7fELF'], 'windows': [b'MZ']}
+
+def check_bundle(path, expected):
+ if not path.is_file(): raise SystemExit('LaTeX bundle is missing: ' + str(path))
+ head = path.open('rb').read(len(LFS_POINTER))
+ if head.startswith(LFS_POINTER): raise SystemExit('LaTeX bundle is a Git LFS pointer, not the bundle: ' + str(path))
+ if not head.startswith(TTB_MAGIC): raise SystemExit('LaTeX bundle does not start with the Tectonic bundle magic: ' + str(path))
+ size = path.stat().st_size
+ if size != expected['ttb_size']: raise SystemExit('LaTeX bundle is %d bytes, expected %d: %s' % (size, expected['ttb_size'], path))
+ digest = sha(path)
+ if digest != expected['ttb_sha256']: raise SystemExit('LaTeX bundle digest %s does not match the pinned %s' % (digest, expected['ttb_sha256']))
+
+def check_engine(path, goos):
+ if not path.is_file(): raise SystemExit('LaTeX engine is missing: ' + str(path))
+ head = path.open('rb').read(4)
+ if head.startswith(LFS_POINTER[:4]): raise SystemExit('LaTeX engine is a Git LFS pointer: ' + str(path))
+ if not any(head.startswith(magic) for magic in EXECUTABLE_MAGIC[goos]):
+  raise SystemExit('LaTeX engine is not a %s executable: %s' % (goos, path))
+ if path.stat().st_size < 1 << 20: raise SystemExit('LaTeX engine is implausibly small: ' + str(path))
+
+
+def check_vsix(path):
+ """The editor extension is built by a separate, network-using step, so the
+ platform build treats it as an input to verify rather than trust."""
+ if not path.is_file(): raise SystemExit('VS Code extension package is missing: ' + str(path))
+ if not zipfile.is_zipfile(path): raise SystemExit('VS Code extension package is not a .vsix archive: ' + str(path))
+ with zipfile.ZipFile(path) as archive:
+  names=set(archive.namelist())
+  for required in ['extension.vsixmanifest','extension/package.json','extension/extension.js']:
+   if required not in names: raise SystemExit('VS Code extension package is missing %s: %s' % (required,path))
+  manifest=json.loads(archive.read('extension/package.json'))
+  if not any(n.startswith('extension/node_modules/vscode-languageclient/') for n in names):
+   raise SystemExit('VS Code extension package does not bundle its language client: ' + str(path))
+ return manifest['version']
+
 def main():
- ap=argparse.ArgumentParser();ap.add_argument('--downloads',type=pathlib.Path,required=True);ap.add_argument('--latex-runtime',type=pathlib.Path,required=True);ap.add_argument('--modules',type=pathlib.Path,required=True);ap.add_argument('--output',type=pathlib.Path,required=True);ap.add_argument('--platform',choices=['darwin','windows','linux','all'],default='all');a=ap.parse_args()
+ ap=argparse.ArgumentParser();ap.add_argument('--downloads',type=pathlib.Path,required=True);ap.add_argument('--latex-runtime',type=pathlib.Path,required=True);ap.add_argument('--modules',type=pathlib.Path,required=True);ap.add_argument('--output',type=pathlib.Path,required=True);ap.add_argument('--vsix',type=pathlib.Path,help='the .vsix from tooling/distribution/build_vsix.py');ap.add_argument('--without-vsix',action='store_true',help='deliberately ship no editor extension');ap.add_argument('--platform',choices=['darwin','windows','linux','all'],default='all');a=ap.parse_args()
  version=__import__('re').search(r'Number\s*=\s*"([^"]+)"',(R/'internal/ahdversion/version.go').read_text())[1]
  commit=subprocess.check_output(['git','rev-parse','HEAD'],cwd=R,text=True).strip()
  raw=a.modules.read_text();decoder=json.JSONDecoder();modules=[]
  while raw.strip():m,end=decoder.raw_decode(raw.lstrip());modules.append(m);raw=raw.lstrip()[end:]
  go=json.loads((R/'tooling/distribution/go-assets.json').read_text());latex=json.loads((R/'tooling/latex/assets.json').read_text())
- bundle=a.latex_runtime/'ahdcode-latex.ttb';assert sha(bundle)==latex['bundle']['ttb_sha256']
+ # Omitting the extension is a decision, never an oversight: the release
+ # that shipped without one is the reason this is not merely optional.
+ if not a.vsix and not a.without_vsix: raise SystemExit('pass --vsix <file> (build it with tooling/distribution/build_vsix.py) or --without-vsix')
+ vsix_version=check_vsix(a.vsix) if a.vsix else None
+ bundle=a.latex_runtime/'ahdcode-latex.ttb';check_bundle(bundle,latex['bundle'])
  a.output.mkdir(parents=True,exist_ok=True);records=[]
  for goos,arch,label in [('darwin','arm64','macos-arm64'),('windows','amd64','windows-x64'),('linux','amd64','linux-x64')]:
   if a.platform not in ['all',goos]:continue
@@ -58,6 +105,9 @@ def main():
   asset=next(x for x in go['files'] if x['os']==goos and x['arch']==arch);archive=a.downloads/asset['filename'];assert sha(archive)==asset['sha256'];extract(archive,payload/'libexec')
   engine=next(x for x in latex['engines'] if x['goos']==goos and x['goarch']==arch);archive=a.downloads/engine['filename'];assert sha(archive)==engine['sha256'];latexdir=payload/'libexec/ahdcode/latex';latexdir.mkdir();extract(archive,latexdir)
   shutil.copy2(bundle,latexdir/bundle.name);shutil.copy2(R/'tooling/latex/THIRD_PARTY_NOTICES.txt',latexdir/'THIRD_PARTY_NOTICES.txt');shutil.copytree(R/'tooling/latex/licenses',latexdir/'licenses')
+  # Re-check the staged copies: a transform between the source and the payload
+  # is exactly what this gate exists to catch.
+  check_bundle(latexdir/bundle.name,latex['bundle']);check_engine(latexdir/('tectonic.exe' if goos=='windows' else 'tectonic'),goos)
   suffix='.exe' if goos=='windows' else ''
   for name in ['ahdcode','ahdsqlite','ahdnumeric','ahdplot']:
    target=payload/('bin' if name=='ahdcode' else 'libexec/ahdcode')/(name+suffix);build('./cmd/'+name,target,goos,arch)
@@ -67,6 +117,21 @@ def main():
    (payload/'launcher').mkdir();build('./tooling/distribution/windows/launcher',payload/'launcher/ahdcode.exe',goos,arch)
   licenses(payload,modules)
   shutil.copytree(R/'internal/initweb/docbundle',payload/'docs')
+  if a.vsix:
+   editor=payload/'vscode';editor.mkdir();shutil.copy2(a.vsix,editor/a.vsix.name)
+   (editor/'README.txt').write_text(
+    'AhdCode for Visual Studio Code\n\n'
+    'This folder holds the AhdCode editor extension as a .vsix file. AhdCode\n'
+    'itself does not need it, and nothing installs it for you.\n\n'
+    'To install it:\n'
+    '  1. Open Visual Studio Code.\n'
+    '  2. Open the Extensions view.\n'
+    '  3. Open the "..." menu at the top of that view.\n'
+    '  4. Choose "Install from VSIX..." and select ' + a.vsix.name + '.\n\n'
+    'Google Antigravity IDE offers the same "Install from VSIX..." operation.\n\n'
+    'The extension runs .ahd files from the editor and connects to the AhdCode\n'
+    'language server (ahdcode lsp) for diagnostics and hover. It needs no npm,\n'
+    'no network, and no separate download.\n')
   (payload/'VERSION').write_text(version+'\n');(staging/'VERSION').write_text(version+'\n')
   (payload/'BUILD.json').write_text(json.dumps({'version':version,'commit':commit,'platform':goos,'architecture':arch,'go':go['version'],'tectonic':latex['tectonic_version']},indent=2)+'\n')
   if goos=='windows':shutil.copy2(R/'tooling/distribution/windows/uninstall.ps1',payload/'uninstall.ps1')
@@ -85,7 +150,10 @@ def main():
     run(['hdiutil','create','-volname','AhdCode '+version,'-srcfolder',staging,'-format','UDZO','-ov',artifact])
    else:
     with tarfile.open(artifact,'w:gz') as t:t.add(staging,arcname='AhdCode-'+version)
-  records.append({'filename':artifact.name,'size':artifact.stat().st_size,'sha256':sha(artifact),'platform':goos,'architecture':arch,'components':['CLI','Studio (embedded)','starters (embedded)','English docs','Go '+go['version'],'ahdsqlite','ahdnumeric','ahdplot','Tectonic '+latex['tectonic_version']+' offline']+(['graphical per-user setup','stable ahdcode.exe launcher'] if goos=='windows' else []),'notices':'payload/THIRD_PARTY_NOTICES.md'})
+  records.append({'filename':artifact.name,'size':artifact.stat().st_size,'sha256':sha(artifact),'platform':goos,'architecture':arch,'components':['CLI','Studio (embedded)','starters (embedded)','English docs','Go '+go['version'],'ahdsqlite','ahdnumeric','ahdplot','Tectonic '+latex['tectonic_version']+' offline']+(['VS Code extension '+vsix_version] if vsix_version else [])+(['graphical per-user setup','stable ahdcode.exe launcher'] if goos=='windows' else []),'notices':'payload/THIRD_PARTY_NOTICES.md'})
   (a.output/('manifest-'+goos+'.json')).write_text(json.dumps({'version':version,'commit':commit,'artifacts':[records[-1]]},indent=2)+'\n');print('ARTIFACT',artifact,records[-1]['sha256'],flush=True)
- (a.output/'release-manifest.json').write_text(json.dumps({'version':version,'commit':commit,'artifacts':records},indent=2)+'\n')
+ # The standalone artifact and the copy inside each package are the same
+ # bytes, because both are copies of the one file that was verified.
+ if a.vsix: shutil.copy2(a.vsix,a.output/a.vsix.name)
+ (a.output/'release-manifest.json').write_text(json.dumps({'version':version,'commit':commit,'extension':vsix_version,'artifacts':records},indent=2)+'\n')
 if __name__=='__main__':main()

@@ -1,0 +1,357 @@
+// The MySQL connection form.
+//
+// Studio already accepted AHD_DATA_MYSQL_* before it started; this page edits
+// the same values while it runs, so connecting to a local server needs no
+// terminal. The password is write-only: it is never rendered back into the
+// form, and leaving the field empty keeps whatever is already configured.
+bring HTML
+from HTML bring HTMLNode
+bring HTTP
+from HTTP bring Request
+from HTTP bring Response
+from HTTP bring SessionStore
+from HTTP bring Session
+bring MySQL
+from MySQL bring MySQLDatabase
+from MySQL bring MySQLError
+
+connectionTextField: Function := (
+    name: String
+    label: String
+    value: String
+    hint: String
+) -> HTMLNode {
+    return HTML.element(
+        "div"
+        {"class": "col-md-6"}
+        [
+            HTML.element(
+                "label"
+                {
+                    "class": "form-label small fw-semibold mb-1"
+                    "for": "conn-" + name
+                }
+                [HTML.text(label)]
+            )
+            HTML.element(
+                "input"
+                {
+                    "type": "text"
+                    "name": name
+                    "id": "conn-" + name
+                    "value": value
+                    "class": "form-control form-control-sm"
+                    "autocomplete": "off"
+                }
+                []
+            )
+            HTML.element(
+                "div"
+                {"class": "studio-field-meta"}
+                [HTML.text(hint)]
+            )
+        ]
+    )
+}
+// connectionPasswordField never receives a value attribute. The stored password
+// is not sent to the browser, and the hint says what an empty field means.
+connectionPasswordField: Function := () -> HTMLNode {
+    hint: Local String := t("conn_password_hint_unset")
+    if mysqlPasswordSet() {
+        hint = t("conn_password_hint_set")
+    }
+    return HTML.element(
+        "div"
+        {"class": "col-md-6"}
+        [
+            HTML.element(
+                "label"
+                {
+                    "class": "form-label small fw-semibold mb-1"
+                    "for": "conn-password"
+                }
+                [HTML.text(t("conn_password"))]
+            )
+            HTML.element(
+                "input"
+                {
+                    "type": "password"
+                    "name": "password"
+                    "id": "conn-password"
+                    "class": "form-control form-control-sm"
+                    "autocomplete": "new-password"
+                }
+                []
+            )
+            HTML.element(
+                "div"
+                {"class": "studio-field-meta"}
+                [HTML.text(hint)]
+            )
+        ]
+    )
+}
+
+connectionSecurityField: Function := (selected: String) -> HTMLNode {
+    noneAttributes: Local Pair<String, String> := {"value": "none"}
+    tlsAttributes: Local Pair<String, String> := {"value": "tls"}
+    if selected == "tls" {
+        tlsAttributes = {"value": "tls", "selected": "selected"}
+    }
+    else {
+        noneAttributes = {"value": "none", "selected": "selected"}
+    }
+    return HTML.element(
+        "div"
+        {"class": "col-md-6"}
+        [
+            HTML.element(
+                "label"
+                {
+                    "class": "form-label small fw-semibold mb-1"
+                    "for": "conn-security"
+                }
+                [HTML.text(t("conn_security"))]
+            )
+            HTML.element(
+                "select"
+                {
+                    "name": "security"
+                    "id": "conn-security"
+                    "class": "form-select form-select-sm"
+                }
+                [
+                    HTML.element("option", noneAttributes, [HTML.text("none")])
+                    HTML.element("option", tlsAttributes, [HTML.text("tls")])
+                ]
+            )
+            HTML.element(
+                "div"
+                {"class": "studio-field-meta"}
+                [HTML.text(t("conn_security_hint"))]
+            )
+        ]
+    )
+}
+
+connectionNotice: Function := (
+    kind: String
+    message: String
+) -> List<HTMLNode> {
+    if message == "" {
+        return []
+    }
+    return [
+        HTML.element(
+            "div"
+            {"class": "alert " + kind, "role": "alert"}
+            [HTML.text(redact(message))]
+        )
+    ]
+}
+
+connectionBody: Function := (
+    token: String
+    notice: String
+    noticeKind: String
+) -> List<HTMLNode> {
+    body: Local List<HTMLNode> := [
+        HTML.element("h1", {"class": "h4 mb-2"}, [HTML.text(t("conn_title"))])
+        HTML.element("p", {"class": "text-muted"}, [HTML.text(t("conn_intro"))])
+    ]
+    for node in connectionNotice(noticeKind, notice) {
+        body.add(node)
+    }
+    body.add(
+        HTML.element(
+            "form"
+            {
+                "method": "post"
+                "action": "/AhdDataStudio/mysql/connection"
+                "class": "card p-3 bg-white"
+            }
+            [
+                csrfField(token)
+                HTML.element(
+                    "div"
+                    {"class": "row g-3"}
+                    [
+                        connectionTextField(
+                            "host"
+                            t("conn_host")
+                            mysqlHost()
+                            t("conn_host_hint")
+                        )
+                        connectionTextField(
+                            "port"
+                            t("conn_port")
+                            mysqlPortText()
+                            t("conn_port_hint")
+                        )
+                        connectionTextField(
+                            "username"
+                            t("conn_user")
+                            mysqlUser()
+                            t("conn_user_hint")
+                        )
+                        connectionPasswordField()
+                        connectionSecurityField(mysqlSecurity())
+                    ]
+                )
+                HTML.element(
+                    "div"
+                    {"class": "d-flex gap-2 mt-3"}
+                    [
+                        HTML.element(
+                            "button"
+                            {
+                                "type": "submit"
+                                "name": "action"
+                                "value": "test"
+                                "class": "btn btn-sm btn-outline-secondary"
+                            }
+                            [HTML.text(t("conn_test"))]
+                        )
+                        HTML.element(
+                            "button"
+                            {
+                                "type": "submit"
+                                "name": "action"
+                                "value": "connect"
+                                "class": "btn btn-sm btn-primary"
+                            }
+                            [HTML.text(t("conn_connect"))]
+                        )
+                    ]
+                )
+            ]
+        )
+    )
+    body.add(
+        HTML.element(
+            "p"
+            {"class": "text-muted small mt-3"}
+            [HTML.text(t("conn_scope"))]
+        )
+    )
+    return body
+}
+
+mysqlConnectionPage: Function := (request: Request) -> Response {
+    sessions: Global SessionStore
+    session: Local Session := sessions.open(request)
+    token: Local String := csrfToken(session)
+    notice: Local String := ""
+    kind: Local String := "alert-danger"
+    reason: Local String? := request.query("problem")
+    if reason != null {
+        if reason == "csrf" {
+            notice = t("conn_error_csrf")
+        }
+    }
+    return sessions.commit(
+        session
+        HTTP.html(
+            layout(t("conn_title"), token, connectionBody(token, notice, kind))
+        )
+    )
+}
+// probeMysql opens a server-level connection and asks it one harmless question,
+// which is the same thing every Studio page does before it lists schemas.
+probeMysql: Function := () -> String {
+    attempt {
+        db: Local MySQLDatabase := connectMysql()
+        attempt {
+            mysqlDatabases(db)
+            return ""
+        }
+        ultimately {
+            db.close()
+        }
+    }
+    except MySQLError as error {
+        return error.message
+    }
+}
+
+mysqlConnectionSave: Function := (request: Request) -> Response {
+    sessions: Global SessionStore
+    session: Local Session := sessions.open(request)
+    token: Local String := csrfToken(session)
+    if csrfOK(request, session) == false {
+        return sessions.commit(
+            session
+            HTTP.redirect("/AhdDataStudio/mysql/connection?problem=csrf")
+        )
+    }
+    host: Local String := formValue(request, "host")
+    port: Local String := formValue(request, "port")
+    username: Local String := formValue(request, "username")
+    password: Local String := formValue(request, "password")
+    security: Local String := formValue(request, "security")
+    action: Local String := formValue(request, "action")
+
+    problem: Local String := validateMysqlSettings(
+        host
+        port
+        username
+        security
+    )
+    if problem != "" {
+        return sessions.commit(
+            session
+            HTTP.html(
+                layout(
+                    t("conn_title")
+                    token
+                    connectionBody(token, problem, "alert-danger")
+                )
+            )
+        )
+    }
+    applyMysqlSettings(host, port, username, password, security, password != "")
+
+    failure: Local String := probeMysql()
+    if failure != "" {
+        // The driver message already names the failure; Studio adds only the
+        // address it tried, which the driver never sees.
+        message: Local String := failure + " · " + t(
+            "conn_failed_detail"
+        ) + " " + mysqlEndpoint()
+        return sessions.commit(
+            session
+            HTTP.html(
+                layout(
+                    t("conn_title")
+                    token
+                    connectionBody(token, message, "alert-danger")
+                )
+            )
+        )
+    }
+    if action == "test" {
+        return sessions.commit(
+            session
+            HTTP.html(
+                layout(
+                    t("conn_title")
+                    token
+                    connectionBody(
+                        token
+                        t("conn_ok") + " " + mysqlEndpoint()
+                        "alert-success"
+                    )
+                )
+            )
+        )
+    }
+    return sessions.commit(session, HTTP.redirect("/AhdDataStudio/mysql"))
+}
+
+formValue: Function := (request: Request, name: String) -> String {
+    value: Local String? := request.form(name)
+    if value == null {
+        return ""
+    }
+    return value
+}

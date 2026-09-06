@@ -15,3 +15,12 @@ pageSize: Int := 50
 mysqlSchemaCache: List<String> := []
 mysqlActiveSchema: String := ""
 studioLang: String := "en"
+// MySQL connection settings for this Studio process. Shared/Connection.ahd
+// seeds them from the AHD_DATA_MYSQL_* environment at startup and the
+// connection form edits them while Studio runs. They are process state only:
+// nothing here is written to the registry, to a file, or to a cookie.
+mysqlHostValue: String := "127.0.0.1"
+mysqlPortValue: String := "3306"
+mysqlUserValue: String := "root"
+mysqlPasswordValue: String := ""
+mysqlSecurityValue: String := "none"

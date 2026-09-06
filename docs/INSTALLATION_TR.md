@@ -35,6 +35,13 @@ Linux x64: `AhdCode-1.0.0-rc.1-linux-x64.tar.gz` arşivini açın ve
 `sh install.sh --setup-path` çalıştırın. Kök `~/.local/share/ahdcode` dizinidir;
 PATH bloğu `~/.profile` dosyasına eklenir.
 
+VS Code eklentisi: her pakette kurulum kökü altındaki `vscode/` klasöründe bir
+`.vsix` dosyası ve kısa bir `README.txt` bulunur. AhdCode için gerekli değildir
+ve kurulum onu sizin yerinize yüklemez. VS Code'da Eklentiler görünümünü açın,
+`...` menüsünden **Install from VSIX...** seçin ve kurulum kökündeki
+`vscode/ahdcode-<sürüm>.vsix` dosyasını gösterin. Antigravity IDE aynı işlemi
+sunar. Dosya gereken her şeyi taşır; npm veya ağ gerekmez.
+
 Paket; özel Go 1.27.0, `ahdsqlite`, `ahdnumeric`, `ahdplot`, çevrimdışı Tectonic
 0.17.0 ve 5.546.077 baytlık kaynak paketini içerir. CLI; sürüm-eş Studio,
 starter, Bootstrap, framework ve İngilizce proje belgelerini gömer. Sistem Go

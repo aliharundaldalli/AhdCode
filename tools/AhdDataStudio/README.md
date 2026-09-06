@@ -66,6 +66,31 @@ Configure through Env (or `.env` in this directory):
 | `AHD_DATA_MYSQL_PASSWORD` | empty | password — never committed |
 | `AHD_DATA_MYSQL_SECURITY` | `none` | `none` or `tls` |
 
+Those variables set the starting values. **MySQL → Connection settings** in
+Studio edits the same values while it is running, so connecting to a local
+server needs no terminal:
+
+| Field | Default |
+|---|---|
+| Host | `127.0.0.1` |
+| Port | `3306` |
+| Username | `root` |
+| Password | empty |
+| Security | `none` |
+
+**Test Connection** validates the fields and opens a real server connection;
+**Connect** does the same and then opens the schema list. No database name is
+asked for, because the connection is made with `database: null`.
+
+The password is write-only. It is never rendered back into the form, and
+leaving that field empty keeps the password already in use. Credentials are
+held only by the running Studio process: nothing is written to the database
+registry, to a file, or to a cookie, and stopping Studio forgets them. A
+failed connection reports what the server said, with the password removed.
+
+Studio never installs MySQL, creates accounts, resets passwords, or changes
+permissions. It only connects with credentials you supply.
+
 The Studio connects with `database: null`, then lists every schema those
 credentials can see (`SHOW DATABASES` / `INFORMATION_SCHEMA`). MySQL
 permissions are respected; the Studio does not bypass them.

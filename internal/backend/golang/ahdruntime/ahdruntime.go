@@ -24,6 +24,7 @@ import (
 	_ "image/png"
 	"io"
 	"math"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -880,7 +881,7 @@ func ahdLatexCompile(class *AhdClass, input, workingDirectory, output string) {
 	contextValue, cancel := context.WithTimeout(context.Background(), ahdLatexCompileTimeout)
 	defer cancel()
 	command := exec.CommandContext(contextValue, engine,
-		"--untrusted", "--color", "never", "--bundle", bundle, "--only-cached",
+		"--untrusted", "--color", "never", "--bundle", ahdLatexBundleSpec(bundle), "--only-cached",
 		"--outdir", outputDirectory, input)
 	command.Dir = workingDirectory
 	command.Env = append(os.Environ(), "TECTONIC_CACHE_DIR="+cacheDirectory)
@@ -906,6 +907,29 @@ func ahdLatexCompile(class *AhdClass, input, workingDirectory, output string) {
 	if err := ahdLatexPublish(generated, output); err != nil {
 		AhdRaiseClass(class, "could not write output PDF: "+err.Error())
 	}
+}
+
+// ahdLatexBundleSpec renders the resource bundle's location the way Tectonic
+// needs to receive it.
+//
+// Tectonic parses --bundle as a URL before it considers it a path, and a
+// Windows absolute path such as C:\...\ahdcode-latex.ttb parses as the
+// unsupported scheme "c". The engine then reports that the argument "doesn't
+// specify a valid bundle" however sound the file itself is, which is why a
+// correctly packaged bundle failed on Windows and worked everywhere else. A
+// file URL is unambiguous on every platform, and percent-encoding keeps a
+// path containing spaces or "#" intact.
+func ahdLatexBundleSpec(path string) string {
+	return ahdLatexBundleURL(filepath.ToSlash(path))
+}
+
+// ahdLatexBundleURL is the platform-independent half, so the Windows shape can
+// be exercised from any development machine.
+func ahdLatexBundleURL(slashed string) string {
+	if !strings.HasPrefix(slashed, "/") {
+		slashed = "/" + slashed
+	}
+	return (&url.URL{Scheme: "file", Path: slashed}).String()
 }
 
 func ahdLatexRuntime() (string, string, error) {

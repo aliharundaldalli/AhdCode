@@ -1,10 +1,19 @@
+// redact removes the MySQL password from anything Studio is about to show.
+//
+// The password in use is the one held for this process, which starts from
+// AHD_DATA_MYSQL_PASSWORD and may since have been replaced through the
+// connection form. Both are checked so a driver message can never echo either.
 bring Env
 
 redact: Function := (message: String) -> String {
-    password: Local String := Env.getOr("AHD_DATA_MYSQL_PASSWORD", "")
-    if password != "" {
-        return message.replace(password, "[redacted]")
+    cleaned: Local String := message
+    active: Local String := mysqlPassword()
+    if active != "" {
+        cleaned = cleaned.replace(active, "[redacted]")
     }
-    return message
+    fromEnv: Local String := Env.getOr("AHD_DATA_MYSQL_PASSWORD", "")
+    if fromEnv != "" {
+        cleaned = cleaned.replace(fromEnv, "[redacted]")
+    }
+    return cleaned
 }
-
