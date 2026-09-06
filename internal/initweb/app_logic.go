@@ -62,9 +62,12 @@ usersPublicRows: Function := () -> List<HTMLNode> {
     for user in usersAll() {
         rows.add(
             Web.UI.tr(
-                [Web.UI.td(user.name), Web.UI.td(roleLabel(user.role))]
+                [Web.UI.td(user.name), Web.UI.tdNodes([roleBadge(user.role)])]
             )
         )
+    }
+    if len(rows) == 0 {
+        rows.add(Web.UI.tr([Web.UI.td("No members found.", {"colspan": "2"})]))
     }
     return rows
 }
@@ -116,8 +119,10 @@ logout: Function := (context: RequestContext) -> Response {
     if context.csrfValid() == false {
         return context.respond(Web.text("Forbidden", 403))
     }
-    context.session.destroy()
-    return context.respond(Web.redirect("/"))
+    context.session.clear()
+    context.session.rotate()
+    context.flashSet("notice", "You have been signed out.")
+    return context.respond(Web.redirect("/login"))
 }
 
 login: Function := (context: RequestContext) -> Response {
@@ -142,11 +147,7 @@ loginSubmit: Function := (context: RequestContext) -> Response {
     }
     if authenticate(context, form.value("email"), form.value("password")) {
         context.flashSet("notice", "Signed in.")
-        if currentUserRole(context) == "administrator" {
-            return context.respond(Web.redirect("/admin/users"))
-        }
-
-        return context.respond(Web.redirect("/settings"))
+        return context.respond(Web.redirect("/dashboard"))
     }
 
     return context.respond(
@@ -163,13 +164,17 @@ loginSubmit: Function := (context: RequestContext) -> Response {
 
 const mvcHomeControllerSource = `require("Models/User.ahd")
 require("Views/Home.ahd")
+require("Views/Dashboard.ahd")
 bring Web
 from Web bring (RequestContext, Response, HTMLNode)
 
+dashboard: Function := (context: RequestContext) -> Response {
+    return context.respond(dashboardView(context))
+}
 ` + appHelpersSource + `
 
 home: Function := (context: RequestContext) -> Response {
-    return context.respond(homeView(configuration(), usersPublicRows()))
+    return context.respond(homeView(context, configuration(), usersPublicRows()))
 }
 `
 
@@ -262,6 +267,7 @@ memberUpdate: Function := (context: RequestContext) -> Response {
     }
     usersUpdateName(user.publicId, form.value("name"))
     context.session.set("user_name", form.value("name"))
+    context.flashSet("notice", "Profile updated.")
     return context.respond(Web.redirect("/members/{user.publicId}"))
 }
 
@@ -274,6 +280,8 @@ const mvcAdminControllerSource = `require("Models/User.ahd")
 require("Views/Admin/Users/Index.ahd")
 require("Views/Admin/Users/Show.ahd")
 require("Views/Admin/Users/Form.ahd")
+require("Views/Admin/Users/Edit.ahd")
+require("Views/Admin/Users/Delete.ahd")
 require("Controllers/Home.ahd")
 require("Controllers/Auth.ahd")
 bring Web
@@ -285,15 +293,21 @@ adminUsersIndex: Function := (context: RequestContext) -> Response {
         rows.add(
             Web.UI.tr(
                 [
-                    Web.UI.tdNodes(
-                        [Web.UI.a("/admin/users/{user.publicId}", user.name)]
-                    )
-                    Web.UI.td(user.email)
-                    Web.UI.td(roleLabel(user.role))
-                    Web.UI.td(user.publicId)
+                    Web.UI.td(user.name)
+                    Web.UI.tdNodes([roleBadge(user.role)])
+                    Web.UI.tdNodes([
+                        Web.UI.div([
+                            Web.UI.a("/admin/users/{user.publicId}", "View", {"class": "btn btn-outline-secondary btn-sm"})
+                            Web.UI.a("/admin/users/edit/{user.publicId}", "Edit", {"class": "btn btn-outline-primary btn-sm"})
+                            Web.UI.a("/admin/users/delete/{user.publicId}", "Delete", {"class": "btn btn-outline-danger btn-sm"})
+                        ], {"class": "app-row-actions"})
+                    ])
                 ]
             )
         )
+    }
+    if len(rows) == 0 {
+        rows.add(Web.UI.tr([Web.UI.td("No members found.", {"colspan": "3"})]))
     }
     notice: Local String := ""
     flash: Local String? := context.flashTake("notice")
@@ -358,7 +372,7 @@ adminUsersCreate: Function := (context: RequestContext) -> Response {
         form.value("password")
         role
     )
-    context.flashSet("notice", "User created.")
+    context.flashSet("notice", "Member created.")
     return context.respond(Web.redirect("/admin/users/{created}"))
 }
 
@@ -391,7 +405,16 @@ adminUsersUpdate: Function := (context: RequestContext) -> Response {
     if user == null {
         return context.respond(Web.text("Not Found", 404))
     }
+    errors: Local ValidationErrors := Web.errors()
+    errors.required("name", form.value("name"), "Name is required.")
+    if errors.any() {
+        return context.respond(adminEditView(context, publicId, form.value("name"), errors, 422))
+    }
     usersUpdateName(publicId, form.value("name"))
+    if publicId == currentPublicID(context) {
+        context.session.set("user_name", form.value("name"))
+    }
+    context.flashSet("notice", "Member updated.")
     return context.respond(Web.redirect("/admin/users/{publicId}"))
 }
 
@@ -408,14 +431,34 @@ adminUsersDelete: Function := (context: RequestContext) -> Response {
         return context.respond(Web.redirect("/admin/users"))
     }
     usersDelete(publicId)
-    context.flashSet("notice", "User deleted.")
+    context.flashSet("notice", "Member deleted.")
     return context.respond(Web.redirect("/admin/users"))
+}
+adminUsersEdit: Function := (context: RequestContext) -> Response {
+    user: Local UserRecord? := usersFindByPublicID(pathPublicID(context))
+    if user == null {
+        return context.respond(Web.text("Not Found", 404))
+    }
+    return context.respond(adminEditView(context, user.publicId, user.name, Web.errors()))
+}
+
+adminUsersConfirmDelete: Function := (context: RequestContext) -> Response {
+    user: Local UserRecord? := usersFindByPublicID(pathPublicID(context))
+    if user == null {
+        return context.respond(Web.text("Not Found", 404))
+    }
+    if user.publicId == currentPublicID(context) {
+        context.flashSet("notice", "You cannot delete your own account.")
+        return context.respond(Web.redirect("/admin/users"))
+    }
+    return context.respond(deleteMemberView(context, user.name, user.publicId))
 }
 `
 
 const crudAuthSource = `require("users.ahd")
 require("Views/Login.ahd")
 require("Views/Home.ahd")
+require("Views/Dashboard.ahd")
 bring Security
 bring Web
 from Web bring (RequestContext, Response, Form, ValidationErrors, HTMLNode)
@@ -429,10 +472,31 @@ require("Views/Members/Edit.ahd")
 require("Views/Admin/Users/Index.ahd")
 require("Views/Admin/Users/Show.ahd")
 require("Views/Admin/Users/Form.ahd")
+require("Views/Admin/Users/Edit.ahd")
+require("Views/Admin/Users/Delete.ahd")
 bring HTTP
 bring Web
 from Web bring (RequestContext, Response, Form, HTMLNode, ValidationErrors)
 
+adminUsersEdit: Function := (context: RequestContext) -> Response {
+    user: Local UserRecord? := usersFindByPublicID(pathPublicID(context))
+    if user == null {
+        return context.respond(Web.text("Not Found", 404))
+    }
+    return context.respond(adminEditView(context, user.publicId, user.name, Web.errors()))
+}
+
+adminUsersConfirmDelete: Function := (context: RequestContext) -> Response {
+    user: Local UserRecord? := usersFindByPublicID(pathPublicID(context))
+    if user == null {
+        return context.respond(Web.text("Not Found", 404))
+    }
+    if user.publicId == currentPublicID(context) {
+        context.flashSet("notice", "You cannot delete your own account.")
+        return context.respond(Web.redirect("/admin/users"))
+    }
+    return context.respond(deleteMemberView(context, user.name, user.publicId))
+}
 ` + appHelpersSource + `
 
 memberShow: Function := (context: RequestContext) -> Response {
@@ -505,6 +569,7 @@ memberUpdate: Function := (context: RequestContext) -> Response {
     }
     usersUpdateName(user.publicId, form.value("name"))
     context.session.set("user_name", form.value("name"))
+    context.flashSet("notice", "Profile updated.")
     return context.respond(Web.redirect("/members/{user.publicId}"))
 }
 
@@ -518,15 +583,21 @@ adminUsersIndex: Function := (context: RequestContext) -> Response {
         rows.add(
             Web.UI.tr(
                 [
-                    Web.UI.tdNodes(
-                        [Web.UI.a("/admin/users/{user.publicId}", user.name)]
-                    )
-                    Web.UI.td(user.email)
-                    Web.UI.td(roleLabel(user.role))
-                    Web.UI.td(user.publicId)
+                    Web.UI.td(user.name)
+                    Web.UI.tdNodes([roleBadge(user.role)])
+                    Web.UI.tdNodes([
+                        Web.UI.div([
+                            Web.UI.a("/admin/users/{user.publicId}", "View", {"class": "btn btn-outline-secondary btn-sm"})
+                            Web.UI.a("/admin/users/edit/{user.publicId}", "Edit", {"class": "btn btn-outline-primary btn-sm"})
+                            Web.UI.a("/admin/users/delete/{user.publicId}", "Delete", {"class": "btn btn-outline-danger btn-sm"})
+                        ], {"class": "app-row-actions"})
+                    ])
                 ]
             )
         )
+    }
+    if len(rows) == 0 {
+        rows.add(Web.UI.tr([Web.UI.td("No members found.", {"colspan": "3"})]))
     }
     notice: Local String := ""
     flash: Local String? := context.flashTake("notice")
@@ -591,7 +662,7 @@ adminUsersCreate: Function := (context: RequestContext) -> Response {
         form.value("password")
         role
     )
-    context.flashSet("notice", "User created.")
+    context.flashSet("notice", "Member created.")
     return context.respond(Web.redirect("/admin/users/{created}"))
 }
 
@@ -624,7 +695,16 @@ adminUsersUpdate: Function := (context: RequestContext) -> Response {
     if user == null {
         return context.respond(Web.text("Not Found", 404))
     }
+    errors: Local ValidationErrors := Web.errors()
+    errors.required("name", form.value("name"), "Name is required.")
+    if errors.any() {
+        return context.respond(adminEditView(context, publicId, form.value("name"), errors, 422))
+    }
     usersUpdateName(publicId, form.value("name"))
+    if publicId == currentPublicID(context) {
+        context.session.set("user_name", form.value("name"))
+    }
+    context.flashSet("notice", "Member updated.")
     return context.respond(Web.redirect("/admin/users/{publicId}"))
 }
 
@@ -632,13 +712,16 @@ adminUsersDelete: Function := (context: RequestContext) -> Response {
     if context.csrfValid() == false {
         return context.respond(Web.text("Forbidden", 403))
     }
+    if context.request.method() != "POST" {
+        return context.respond(Web.text("Method Not Allowed", 405))
+    }
     publicId: Local String := context.form().value("public_id")
     if publicId == currentPublicID(context) {
         context.flashSet("notice", "You cannot delete your own account.")
         return context.respond(Web.redirect("/admin/users"))
     }
     usersDelete(publicId)
-    context.flashSet("notice", "User deleted.")
+    context.flashSet("notice", "Member deleted.")
     return context.respond(Web.redirect("/admin/users"))
 }
 `

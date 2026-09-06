@@ -49,6 +49,7 @@ func managedFor(options Options) []fileSpec {
 		)
 	}
 	if options.isAppStarter() {
+		files = append(files, fileSpec{relPath: "public/members.css", perm: 0o644, embedPath: "templates/shared/public/members.css"})
 		files = append(files, appStarterFiles(options)...)
 	}
 	files = append(files, documentationFiles(options)...)

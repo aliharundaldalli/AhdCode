@@ -26,6 +26,9 @@ func appStarterFiles(options Options) []fileSpec {
 		{relPath: "Views/Layouts/Main.ahd", perm: 0o644, content: []byte(appMainLayoutSource)},
 		{relPath: "Views/Layouts/Guest.ahd", perm: 0o644, content: []byte(appGuestLayoutSource)},
 		{relPath: "Views/Layouts/Signed.ahd", perm: 0o644, content: []byte(appSignedLayoutSource)},
+		{relPath: "Views/Dashboard.ahd", perm: 0o644, content: []byte(appDashboardViewSource)},
+		{relPath: "Views/Admin/Users/Edit.ahd", perm: 0o644, content: []byte(appAdminEditViewSource)},
+		{relPath: "Views/Admin/Users/Delete.ahd", perm: 0o644, content: []byte(appDeleteViewSource)},
 		{relPath: "Views/Home.ahd", perm: 0o644, content: []byte(appHomeViewSource)},
 		{relPath: "Views/Login.ahd", perm: 0o644, content: []byte(appLoginViewSource)},
 		{relPath: "Views/Members/Show.ahd", perm: 0o644, content: []byte(appMemberShowViewSource)},
@@ -137,6 +140,7 @@ from Web bring RouteSet
 
 registerRoutes: Function := (routes: RouteSet) -> Nothing {
     routes.get("/", home)
+    routes.get("/dashboard", dashboard, signedIn)
     routes.get("/login", login)
     routes.post("/login", loginSubmit)
     routes.post("/logout", logout)
@@ -147,6 +151,8 @@ registerRoutes: Function := (routes: RouteSet) -> Nothing {
     routes.get("/admin/users", adminUsersIndex, signedIn, administrator)
     routes.get("/admin/users/new", adminUsersNew, signedIn, administrator)
     routes.post("/admin/users", adminUsersCreate, signedIn, administrator)
+    routes.get("/admin/users/edit/*", adminUsersEdit, signedIn, administrator)
+    routes.get("/admin/users/delete/*", adminUsersConfirmDelete, signedIn, administrator)
     routes.get("/admin/users/*", adminUsersShow, signedIn, administrator)
     routes.post("/admin/users/update", adminUsersUpdate, signedIn, administrator)
     routes.post("/admin/users/delete", adminUsersDelete, signedIn, administrator)
@@ -157,10 +163,11 @@ const crudRoutesSource = `require("auth.ahd")
 require("users.ahd")
 require("Views/Home.ahd")
 bring Web
-from Web bring (RouteSet, RequestContext, Response)
+from Web bring (RouteSet, RequestContext, Response, HTMLNode)
 
 registerRoutes: Function := (routes: RouteSet) -> Nothing {
     routes.get("/", home)
+    routes.get("/dashboard", dashboard, signedIn)
     routes.get("/login", login)
     routes.post("/login", loginSubmit)
     routes.post("/logout", logout)
@@ -171,13 +178,18 @@ registerRoutes: Function := (routes: RouteSet) -> Nothing {
     routes.get("/admin/users", adminUsersIndex, signedIn, administrator)
     routes.get("/admin/users/new", adminUsersNew, signedIn, administrator)
     routes.post("/admin/users", adminUsersCreate, signedIn, administrator)
+    routes.get("/admin/users/edit/*", adminUsersEdit, signedIn, administrator)
+    routes.get("/admin/users/delete/*", adminUsersConfirmDelete, signedIn, administrator)
     routes.get("/admin/users/*", adminUsersShow, signedIn, administrator)
     routes.post("/admin/users/update", adminUsersUpdate, signedIn, administrator)
     routes.post("/admin/users/delete", adminUsersDelete, signedIn, administrator)
 }
 
 home: Function := (context: RequestContext) -> Response {
-    return context.respond(homeView(configuration(), usersPublicRows()))
+    return context.respond(homeView(context, configuration(), usersPublicRows()))
+}
+dashboard: Function := (context: RequestContext) -> Response {
+    return context.respond(dashboardView(context))
 }
 `
 
@@ -216,13 +228,13 @@ appNavbar: Function := (
     context: RequestContext
 ) -> HTMLNode {
     links: Local List<HTMLNode> := [
-        Web.UI.a("/", "Home", {"class": "app-nav-link"})
-        Web.UI.a("/settings", "Profile", {"class": "app-nav-link"})
+        navLink(context, "/", "Home")
+        navLink(context, "/dashboard", "Dashboard")
     ]
     if role == "administrator" {
-        links.add(Web.UI.a("/admin/users", "Users", {"class": "app-nav-link"}))
+        links.add(navLink(context, "/admin/users", "Members"))
     }
-    links.add(Web.UI.span(userName, {"class": "app-nav-user"}))
+    links.add(navLink(context, "/members/{currentPublicID(context)}", "Profile"))
     links.add(
         Web.UI.formTo(
             "/logout"
@@ -230,10 +242,10 @@ appNavbar: Function := (
             [
                 Web.UI.csrfField(context)
                 Web.UI.button(
-                    "Log out"
+                    "Log Out"
                     {
                         "type": "submit"
-                        "class": "app-nav-link app-nav-button"
+                        "class": "btn btn-outline-secondary btn-sm"
                     }
                 )
             ]
@@ -253,6 +265,13 @@ appNavbar: Function := (
         {"class": "app-navbar"}
     )
 }
+navLink: Function := (context: RequestContext, href: String, label: String) -> HTMLNode {
+    attributes: Local Pair<String, String> := {"class": "app-nav-link"}
+    if context.request.path() == href {
+        attributes = {"class": "app-nav-link", "aria-current": "page"}
+    }
+    return Web.UI.a(href, label, attributes)
+}
 `
 
 const appMainLayoutSource = `require("Components/Navbar.ahd")
@@ -264,8 +283,7 @@ starterAssets: Function := () -> List<HTMLNode> {
     return [
         Web.Assets.stylesheet("vendor/bootstrap/bootstrap.min.css")
         Web.Assets.stylesheet("style.css")
-        Web.Assets.script("vendor/bootstrap/bootstrap.bundle.min.js")
-        Web.Assets.script("main.js")
+        Web.Assets.stylesheet("members.css")
     ]
 }
 
@@ -328,7 +346,7 @@ signedLayout: Function := (
             Web.UI.div(
                 [
                     appNavbar(config.name, userName, role, context)
-                    Web.UI.main(content, {"class": "app-main app-dashboard"})
+                    Web.UI.main([starterNotice(context), Web.UI.div(content, {"class": "app-content"})], {"class": "app-main app-dashboard"})
                     footer(config.name)
                 ]
                 {"class": "app-shell"}
@@ -338,17 +356,57 @@ signedLayout: Function := (
         status
     )
 }
+publicLayout: Function := (
+    context: RequestContext
+    config: AppConfig
+    title: String
+    content: List<HTMLNode>
+) -> Response {
+    if context.session.has("user_public_id") {
+        return signedLayout(context, config, title, currentUserName(context), currentUserRole(context), content)
+    }
+    return mainLayout(config, title, content)
+}
+
+starterNotice: Function := (context: RequestContext) -> HTMLNode {
+    notice: Local String? := context.flashTake("notice")
+    if notice != null {
+        return Web.UI.p(notice, {"class": "app-flash", "role": "status"})
+    }
+    return Web.UI.div([])
+}
+
+roleBadge: Function := (role: String) -> HTMLNode {
+    return Web.UI.span(roleLabel(role), {"class": "badge app-role"})
+}
+
+roleSelect: Function := (role: String) -> HTMLNode {
+    member: Local Pair<String, String> := {}
+    admin: Local Pair<String, String> := {}
+    if role == "administrator" {
+        admin = {"selected": "selected"}
+    } else {
+        member = {"selected": "selected"}
+    }
+    return Web.UI.select("role", [
+        Web.UI.option("member", "Member", member)
+        Web.UI.option("administrator", "Administrator", admin)
+    ], {"id": "role", "class": "form-select"})
+}
+
 `
 
-const appHomeViewSource = `require("Views/Layouts/Main.ahd")
+const appHomeViewSource = `require("Views/Layouts/Signed.ahd")
 bring Web
-from Web bring (HTMLNode, Response, AppConfig)
+from Web bring (HTMLNode, Response, AppConfig, RequestContext)
 
 homeView: Function := (
+    context: RequestContext
     config: AppConfig
     members: List<HTMLNode>
 ) -> Response {
-    return mainLayout(
+    return publicLayout(
+        context
         config
         "Welcome"
         [
@@ -356,25 +414,21 @@ homeView: Function := (
                 [
                     Web.UI.h1("Welcome to {config.name}")
                     Web.UI.p(
-                        "A public home page, member profiles, and an administrator user list."
+                        "A place for our members."
                         {"class": "app-lead"}
-                    )
-                    Web.UI.div(
-                        [Web.UI.a("/login", "Log In", {"class": "app-button"})]
-                        {"class": "app-actions"}
                     )
                 ]
                 {"class": "app-stage"}
             )
             Web.UI.section(
                 [
-                    Web.UI.h2("Members")
+                    Web.UI.h2("Our Members")
                     Web.UI.table(
                         [
                             Web.UI.thead(
                                 [
                                     Web.UI.tr(
-                                        [Web.UI.th("Name"), Web.UI.th("Role")]
+                                        [Web.UI.th("Name"), Web.UI.th("Membership")]
                                     )
                                 ]
                             )
@@ -500,7 +554,7 @@ memberShowView: Function := (
 ) -> Response {
     actions: Local List<HTMLNode> := []
     if canEdit {
-        actions.add(Web.UI.a("/settings", "Edit profile", {"class": "app-button"}))
+        actions.add(Web.UI.a("/settings", "Edit Profile", {"class": "app-button"}))
     }
     return signedLayout(
         context
@@ -510,8 +564,7 @@ memberShowView: Function := (
         role
         [
             Web.UI.h1(shownName)
-            Web.UI.p(roleLabel(shownRole))
-            Web.UI.p("Public id: {publicId}")
+            roleBadge(shownRole)
             Web.UI.div(actions, {"class": "app-actions"})
         ]
         status
@@ -564,9 +617,10 @@ memberEditView: Function := (
                         {"id": "name", "class": "form-control"}
                     )
                     Web.UI.button(
-                        "Save"
+                        "Save Changes"
                         {"type": "submit", "class": "app-button mt-3"}
                     )
+                    Web.UI.a("/dashboard", "Cancel", {"class": "btn btn-outline-secondary mt-3 ms-2"})
                 ]
             )
         ]
@@ -594,14 +648,14 @@ adminUsersIndexView: Function := (
     return signedLayout(
         context
         config
-        "Users"
+        "Members"
         userName
         role
         [
             Web.UI.div(flash)
-            Web.UI.h1("Users")
+            Web.UI.h1("Members")
             Web.UI.pNodes(
-                [Web.UI.a("/admin/users/new", "Create user", {"class": "app-button"})]
+                [Web.UI.a("/admin/users/new", "+ Add Member", {"class": "app-button"})]
             )
             Web.UI.table(
                 [
@@ -610,9 +664,8 @@ adminUsersIndexView: Function := (
                             Web.UI.tr(
                                 [
                                     Web.UI.th("Name")
-                                    Web.UI.th("Email")
-                                    Web.UI.th("Role")
-                                    Web.UI.th("Public id")
+                                    Web.UI.th("Membership")
+                                    Web.UI.th("Actions")
                                 ]
                             )
                         ]
@@ -649,24 +702,14 @@ adminUserShowView: Function := (
         [
             Web.UI.h1(shownName)
             Web.UI.p(shownEmail)
-            Web.UI.p(roleLabel(shownRole))
-            Web.UI.p("Public id: {publicId}")
-            Web.UI.formTo(
-                "/admin/users/delete"
-                "post"
+            roleBadge(shownRole)
+            Web.UI.div(
                 [
-                    Web.UI.csrfField(context)
-                    Web.UI.input(
-                        "hidden"
-                        "public_id"
-                        publicId
-                        {}
-                    )
-                    Web.UI.button(
-                        "Delete"
-                        {"type": "submit", "class": "app-button"}
-                    )
+                    Web.UI.a("/admin/users/edit/{publicId}", "Edit", {"class": "btn btn-primary"})
+                    Web.UI.a("/admin/users/delete/{publicId}", "Delete", {"class": "btn btn-outline-danger"})
+                    Web.UI.a("/admin/users", "Back to Members", {"class": "btn btn-outline-secondary"})
                 ]
+                {"class": "app-actions"}
             )
         ]
     )
@@ -700,12 +743,12 @@ adminUserFormView: Function := (
     return signedLayout(
         context
         config
-        "Create user"
+        "Create Member"
         userName
         role
         [
             Web.UI.div(items)
-            Web.UI.h1("Create user")
+            Web.UI.h1("Create Member")
             Web.UI.formTo(
                 "/admin/users"
                 "post"
@@ -732,21 +775,87 @@ adminUserFormView: Function := (
                         ""
                         {"id": "password", "class": "form-control"}
                     )
-                    Web.UI.labelFor("role", "Role")
-                    Web.UI.input(
-                        "text"
-                        "role"
-                        old.value("role")
-                        {"id": "role", "class": "form-control"}
-                    )
+                    Web.UI.labelFor("role", "Membership")
+                    roleSelect(old.value("role"))
+                    Web.UI.p("Your password is stored securely as a hash.", {"class": "form-text"})
                     Web.UI.button(
-                        "Create"
+                        "Create Member"
                         {"type": "submit", "class": "app-button mt-3"}
                     )
+                    Web.UI.a("/admin/users", "Cancel", {"class": "btn btn-outline-secondary mt-3 ms-2"})
                 ]
             )
         ]
         status
     )
 }
+`
+
+const appDashboardViewSource = `require("Views/Layouts/Signed.ahd")
+bring Web
+from Web bring (RequestContext, Response, HTMLNode)
+
+
+dashboardView: Function := (context: RequestContext) -> Response {
+    actions: Local List<HTMLNode> := [
+        Web.UI.a("/members/{currentPublicID(context)}", "View Profile", {"class": "btn btn-outline-secondary"})
+        Web.UI.a("/settings", "Edit Profile", {"class": "btn btn-primary"})
+    ]
+    if currentUserRole(context) == "administrator" {
+        actions.add(Web.UI.a("/admin/users", "Members", {"class": "btn btn-outline-secondary"}))
+        actions.add(Web.UI.a("/admin/users/new", "+ Add Member", {"class": "btn btn-primary"}))
+    }
+    return signedLayout(context, configuration(), "Dashboard", currentUserName(context), currentUserRole(context), [
+        Web.UI.h1("Welcome, {currentUserName(context)}")
+        Web.UI.p("Manage your profile and find your next action below.", {"class": "app-lead"})
+        roleBadge(currentUserRole(context))
+        Web.UI.div(actions, {"class": "app-actions"})
+    ])
+}
+
+`
+
+const appAdminEditViewSource = `require("Views/Layouts/Signed.ahd")
+bring Web
+from Web bring (RequestContext, Response, HTMLNode, ValidationErrors)
+
+
+adminEditView: Function := (context: RequestContext, publicId: String, name: String, errors: ValidationErrors, status: Int := 200) -> Response {
+    messages: Local List<HTMLNode> := []
+    for message in errors.messages() {
+        messages.add(Web.UI.p(message, {"class": "app-flash", "role": "alert"}))
+    }
+    return signedLayout(context, configuration(), "Edit Member", currentUserName(context), currentUserRole(context), [
+        Web.UI.h1("Edit Member")
+        Web.UI.div(messages)
+        Web.UI.formTo("/admin/users/update", "post", [
+            Web.UI.csrfField(context)
+            Web.UI.input("hidden", "public_id", publicId)
+            Web.UI.labelFor("name", "Name")
+            Web.UI.input("text", "name", name, {"id": "name", "class": "form-control"})
+            Web.UI.button("Save Changes", {"type": "submit", "class": "btn btn-primary mt-3"})
+            Web.UI.a("/admin/users/{publicId}", "Cancel", {"class": "btn btn-outline-secondary mt-3 ms-2"})
+        ])
+    ], status)
+}
+`
+
+const appDeleteViewSource = `require("Views/Layouts/Signed.ahd")
+bring Web
+from Web bring (RequestContext, Response, HTMLNode)
+
+
+deleteMemberView: Function := (context: RequestContext, name: String, publicId: String) -> Response {
+    return signedLayout(context, configuration(), "Delete Member", currentUserName(context), currentUserRole(context), [
+        Web.UI.h1("Delete {name}?")
+        Web.UI.p("This action cannot be undone.")
+        Web.UI.formTo("/admin/users/delete", "post", [
+            Web.UI.csrfField(context)
+            Web.UI.input("hidden", "public_id", publicId)
+            Web.UI.a("/admin/users", "Cancel", {"class": "btn btn-outline-secondary me-2"})
+            Web.UI.button("Delete Member", {"type": "submit", "class": "btn btn-danger"})
+        ])
+    ])
+}
+
 `
