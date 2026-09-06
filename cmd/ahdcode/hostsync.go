@@ -11,11 +11,11 @@ import (
 )
 
 type hostSyncResult struct {
-	mapped   bool
-	mutated  bool
-	message  string
-	refused  bool
-	nonTTY   bool
+	mapped  bool
+	mutated bool
+	message string
+	refused bool
+	nonTTY  bool
 }
 
 type hostSyncRequest struct {

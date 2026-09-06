@@ -232,11 +232,11 @@ func httpOperationShapes() map[TypeOperation]httpOperationShape {
 	handler := httpHandlerType()
 	strings := types.List{Element: types.String}
 	return map[TypeOperation]httpOperationShape{
-		HTTPServerGet:    {[]types.Type{types.String, handler}, types.Nothing, false, "pass a path String and a (request: Request) -> Response Function"},
-		HTTPServerPost:   {[]types.Type{types.String, handler}, types.Nothing, false, "pass a path String and a (request: Request) -> Response Function"},
-		HTTPServerRoute:  {[]types.Type{types.String, types.String, handler}, types.Nothing, false, "pass a method String, a path String, and a (request: Request) -> Response Function"},
-		HTTPServerStatic: {[]types.Type{types.String, types.String}, types.Nothing, false, "pass a URL path prefix String and a filesystem root directory String"},
-		HTTPServerManaged: {[]types.Type{types.String, types.String}, types.Nothing, false, "pass a URL path prefix String and a filesystem root directory String"},
+		HTTPServerGet:            {[]types.Type{types.String, handler}, types.Nothing, false, "pass a path String and a (request: Request) -> Response Function"},
+		HTTPServerPost:           {[]types.Type{types.String, handler}, types.Nothing, false, "pass a path String and a (request: Request) -> Response Function"},
+		HTTPServerRoute:          {[]types.Type{types.String, types.String, handler}, types.Nothing, false, "pass a method String, a path String, and a (request: Request) -> Response Function"},
+		HTTPServerStatic:         {[]types.Type{types.String, types.String}, types.Nothing, false, "pass a URL path prefix String and a filesystem root directory String"},
+		HTTPServerManaged:        {[]types.Type{types.String, types.String}, types.Nothing, false, "pass a URL path prefix String and a filesystem root directory String"},
 		HTTPServerApplyWebLimits: {none, types.Nothing, false, "call applyWebLimits with no argument"},
 		HTTPServerStart:          {none, types.Nothing, false, "call start with no argument"},
 

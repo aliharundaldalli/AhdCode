@@ -4,7 +4,7 @@ import "testing"
 
 func TestBuiltinIdentityCannotBeShadowedByASiblingFile(t *testing.T) {
 	workspace, result := compileMemory(t, map[string]string{
-		"/Main.ahd": "bring Identity\nvalue := Identity.id()",
+		"/Main.ahd":     "bring Identity\nvalue := Identity.id()",
 		"/Identity.ahd": `id: Bool := true`,
 	}, "/Main.ahd")
 	requireClean(t, result)

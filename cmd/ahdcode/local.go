@@ -270,6 +270,7 @@ func runLocalHosts(arguments []string, input io.Reader, output, errorOutput io.W
 //     the exact command to run and exits, because a script that blocks
 //     waiting for a password that will never be typed is worse than one that
 //     fails immediately.
+//
 // The hosts file path is a parameter rather than read from the platform
 // inside this function, so the whole decision tree above -- including the
 // paths that would otherwise shell out -- is exercisable against a temporary

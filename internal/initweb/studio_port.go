@@ -16,7 +16,7 @@ const (
 	ahdDataMySQLPortKey     = "AHD_DATA_MYSQL_PORT"
 	ahdDataMySQLSecurityKey = "AHD_DATA_MYSQL_SECURITY"
 	ahdDataSQLitePathsKey   = "AHD_DATA_SQLITE_PATHS"
-	AhdDataStudioHost = "ahddatabasestudio.test"
+	AhdDataStudioHost       = "ahddatabasestudio.test"
 	// v0.19 routes ahddatabasestudio.test through the local router, so the
 	// canonical URL no longer carries Studio's port or its mount path. The
 	// loopback URL below keeps working unchanged and is what `ahdcode
