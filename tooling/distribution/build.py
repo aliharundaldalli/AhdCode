@@ -86,6 +86,18 @@ def check_vsix(path):
    raise SystemExit('VS Code extension package does not bundle its language client: ' + str(path))
  return manifest['version']
 
+
+def zip_tree(source, out, root):
+ """Archive a staging directory, executable bits and all, under one top-level
+ folder. Used for the macOS ZIP, which carries the same tree the DMG does."""
+ with zipfile.ZipFile(out,'w',zipfile.ZIP_DEFLATED,compresslevel=6) as z:
+  for p in sorted(source.rglob('*')):
+   if p.is_symlink(): raise SystemExit('unexpected symlink in the payload: ' + str(p))
+   if not p.is_file(): continue
+   info=zipfile.ZipInfo(root+'/'+p.relative_to(source).as_posix(),(2026,1,1,0,0,0))
+   info.external_attr=(p.stat().st_mode&0o777)<<16;info.compress_type=zipfile.ZIP_DEFLATED
+   z.writestr(info,p.read_bytes())
+
 def main():
  ap=argparse.ArgumentParser();ap.add_argument('--downloads',type=pathlib.Path,required=True);ap.add_argument('--latex-runtime',type=pathlib.Path,required=True);ap.add_argument('--modules',type=pathlib.Path,required=True);ap.add_argument('--output',type=pathlib.Path,required=True);ap.add_argument('--vsix',type=pathlib.Path,help='the .vsix from tooling/distribution/build_vsix.py');ap.add_argument('--without-vsix',action='store_true',help='deliberately ship no editor extension');ap.add_argument('--platform',choices=['darwin','windows','linux','all'],default='all');a=ap.parse_args()
  version=__import__('re').search(r'Number\s*=\s*"([^"]+)"',(R/'internal/ahdversion/version.go').read_text())[1]
@@ -101,6 +113,7 @@ def main():
  a.output.mkdir(parents=True,exist_ok=True);records=[]
  for goos,arch,label in [('darwin','arm64','macos-arm64'),('windows','amd64','windows-x64'),('linux','amd64','linux-x64')]:
   if a.platform not in ['all',goos]:continue
+  extra=None
   staging=a.output/('stage-'+label);staging.mkdir();payload=staging/'payload';(payload/'bin').mkdir(parents=True);(payload/'libexec/ahdcode').mkdir(parents=True)
   asset=next(x for x in go['files'] if x['os']==goos and x['arch']==arch);archive=a.downloads/asset['filename'];assert sha(archive)==asset['sha256'];extract(archive,payload/'libexec')
   engine=next(x for x in latex['engines'] if x['goos']==goos and x['goarch']==arch);archive=a.downloads/engine['filename'];assert sha(archive)==engine['sha256'];latexdir=payload/'libexec/ahdcode/latex';latexdir.mkdir();extract(archive,latexdir)
@@ -148,10 +161,16 @@ def main():
    if goos=='darwin':
     shutil.copy2(R/'tooling/distribution/Install.command',staging/'Install.command')
     run(['hdiutil','create','-volname','AhdCode '+version,'-srcfolder',staging,'-format','UDZO','-ov',artifact])
+    # The ZIP is the same staging tree as the DMG, so both carry one identity.
+    extra=a.output/('AhdCode-'+version+'-'+label+'.zip');zip_tree(staging,extra,'AhdCode-'+version)
    else:
     with tarfile.open(artifact,'w:gz') as t:t.add(staging,arcname='AhdCode-'+version)
   records.append({'filename':artifact.name,'size':artifact.stat().st_size,'sha256':sha(artifact),'platform':goos,'architecture':arch,'components':['CLI','Studio (embedded)','starters (embedded)','English docs','Go '+go['version'],'ahdsqlite','ahdnumeric','ahdplot','Tectonic '+latex['tectonic_version']+' offline']+(['VS Code extension '+vsix_version] if vsix_version else [])+(['graphical per-user setup','stable ahdcode.exe launcher'] if goos=='windows' else []),'notices':'payload/THIRD_PARTY_NOTICES.md'})
-  (a.output/('manifest-'+goos+'.json')).write_text(json.dumps({'version':version,'commit':commit,'artifacts':[records[-1]]},indent=2)+'\n');print('ARTIFACT',artifact,records[-1]['sha256'],flush=True)
+  print('ARTIFACT',artifact,records[-1]['sha256'],flush=True)
+  if extra is not None:
+   companion=dict(records[-1]);companion['filename']=extra.name;companion['size']=extra.stat().st_size;companion['sha256']=sha(extra)
+   records.append(companion);print('ARTIFACT',extra,companion['sha256'],flush=True)
+  (a.output/('manifest-'+goos+'.json')).write_text(json.dumps({'version':version,'commit':commit,'artifacts':[r for r in records if r['platform']==goos]},indent=2)+'\n')
  # The standalone artifact and the copy inside each package are the same
  # bytes, because both are copies of the one file that was verified.
  if a.vsix: shutil.copy2(a.vsix,a.output/a.vsix.name)
