@@ -88,7 +88,7 @@ home: Function := (request: Request) -> Response {
                     HTML.element("strong", {}, [HTML.text(Path.base(path))])
                     HTML.element("span", {"class": "studio-path"}, [HTML.text(path)])
                 ])
-                queryFormClass("/AhdDataStudio/sqlite/database", {"db": path}, t("open"), "btn btn-sm btn-outline-primary")
+                sqliteDatabaseAction(path, token, "btn btn-sm btn-outline-primary")
             ])
         )
     }

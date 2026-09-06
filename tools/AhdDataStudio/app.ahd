@@ -96,6 +96,7 @@ startStudio: Function := () -> Nothing {
     app.post("/AhdDataStudio/mysql/truncate", mysqlTruncate)
     app.get("/AhdDataStudio/sqlite", sqliteHome)
     app.get("/AhdDataStudio/sqlite/database", sqliteOpenPage)
+    app.post("/AhdDataStudio/sqlite/unregister", sqliteUnregister)
     app.get("/AhdDataStudio/sqlite/table", sqliteStructurePage)
     app.get("/AhdDataStudio/sqlite/indexes", sqliteIndexesPage)
     app.get("/AhdDataStudio/sqlite/browse", sqliteBrowsePage)

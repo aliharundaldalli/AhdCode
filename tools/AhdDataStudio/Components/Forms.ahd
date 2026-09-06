@@ -55,6 +55,69 @@ queryForm: Function := (
     )
 }
 
+postFormClass: Function := (
+    action: String
+    fields: Pair<String, String>
+    token: String
+    label: String
+    buttonClass: String
+) -> HTMLNode {
+    children: Local List<HTMLNode> := [csrfField(token)]
+    for name in fields {
+        children.add(hiddenField(name, fields[name]))
+    }
+    children.add(
+        HTML.element(
+            "button"
+            {"type": "submit", "class": buttonClass, "title": label}
+            [HTML.text(label)]
+        )
+    )
+    return HTML.element(
+        "form"
+        {"method": "post", "action": action, "class": "d-inline"}
+        children
+    )
+}
+
+sqliteDatabaseAction: Function := (
+    path: String
+    token: String
+    openClass: String
+) -> HTMLNode {
+    if sqliteFileAvailable(path) {
+        return queryFormClass(
+            "/AhdDataStudio/sqlite/database"
+            {"db": path}
+            t("open")
+            openClass
+        )
+    }
+    nodes: Local List<HTMLNode> := [
+        HTML.element(
+            "span"
+            {"class": "badge rounded-pill text-bg-warning"}
+            [HTML.text(t("unavailable"))]
+        )
+    ]
+    if sqliteRegistryOwned(path) {
+        nodes.add(
+            postFormClass(
+                "/AhdDataStudio/sqlite/unregister"
+                {"db": path}
+                token
+                t("remove_registration")
+                "btn btn-sm btn-outline-danger"
+            )
+        )
+    }
+    return HTML.element(
+        "div"
+        {"class": "d-flex gap-2 justify-content-end align-items-center flex-wrap"}
+        nodes
+    )
+}
+
 fieldNode: Function := (
     name: String
     sqlType: String

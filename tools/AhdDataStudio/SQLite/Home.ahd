@@ -10,6 +10,44 @@ bring SQLite
 from SQLite bring Database
 from SQLite bring SQLiteError
 
+sqliteUnregister: Function := (request: Request) -> Response {
+    sessions: Global SessionStore
+    session: Local Session := sessions.open(request)
+    token: Local String := csrfToken(session)
+    rejected: Local Response? := rejectGetStateChange(request, session, token)
+    if rejected != null {
+        return rejected
+    }
+    path: Local String? := request.form("db")
+    if path == null {
+        return sessions.commit(
+            session
+            HTTP.html(layout("SQLite", token, errorNodes("db is required")))
+        )
+    }
+    if sqliteRegistryOwned(path) == false {
+        return sessions.commit(
+            session
+            HTTP.html(
+                layout(
+                    "SQLite"
+                    token
+                    errorNodes("sqlite path is not in the AhdCode database registry")
+                )
+            )
+        )
+    }
+    rotateCsrf(session)
+    forgotten: Local Bool := forgetRegisteredSqlite(path)
+    if forgotten == false {
+        return sessions.commit(
+            session
+            HTTP.html(layout("SQLite", token, errorNodes(t("sqlite_unavailable_body"))))
+        )
+    }
+    return sessions.commit(session, HTTP.redirect("/AhdDataStudio/sqlite"))
+}
+
 sqliteHome: Function := (request: Request) -> Response {
     sessions: Global SessionStore
     session: Local Session := sessions.open(request)
@@ -41,14 +79,7 @@ sqliteHome: Function := (request: Request) -> Response {
                     HTML.element(
                         "td"
                         {"class": "text-end"}
-                        [
-                            queryFormClass(
-                                "/AhdDataStudio/sqlite/database"
-                                {"db": path}
-                                t("open")
-                                "btn btn-sm btn-primary"
-                            )
-                        ]
+                        [sqliteDatabaseAction(path, token, "btn btn-sm btn-primary")]
                     )
                 ]
             )
@@ -146,6 +177,16 @@ sqliteOpenPage: Function := (request: Request) -> Response {
         return sessions.commit(
             session
             HTTP.html(layout("SQLite", token, errorNodes("db is required")))
+        )
+    }
+    if sqliteFileAvailable(path) == false {
+        body: Local List<HTMLNode> := [
+            emptyState(t("unavailable"), t("sqlite_unavailable_body"))
+            sqliteDatabaseAction(path, token, "btn btn-sm btn-primary")
+        ]
+        return sessions.commit(
+            session
+            HTTP.html(layout("SQLite", token, body))
         )
     }
     attempt {

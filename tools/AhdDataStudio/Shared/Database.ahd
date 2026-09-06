@@ -113,6 +113,67 @@ sqlitePathAllowed: Function := (path: String) -> Bool {
     return path in allowed
 }
 
+sqliteFileAvailable: Function := (path: String) -> Bool {
+    return File.exists(path)
+}
+
+sqliteRegistryOwned: Function := (path: String) -> Bool {
+    registered: Local List<String> := registeredSqlitePaths()
+    return path in registered
+}
+
+// forgetRegisteredSqlite drops one registry entry from AHD_DATA_REGISTRY.
+// It rewrites the same CLI registry document and never deletes a SQLite file.
+forgetRegisteredSqlite: Function := (path: String) -> Bool {
+    registry: Local String := Env.getOr("AHD_DATA_REGISTRY", "")
+    if registry == "" {
+        return false
+    }
+    if sqliteRegistryOwned(path) == false {
+        return false
+    }
+    attempt {
+        document: Local JSONValue := JSON.read(registry)
+        entries: Local JSONValue? := document.get("databases")
+        kept: Local List<JSONValue> := []
+        removed: Local Bool := false
+        if entries != null {
+            for entry in entries.array() {
+                file: Local JSONValue? := entry.get("path")
+                if file != null {
+                    if file.string() == path {
+                        removed = true
+                    }
+                    else {
+                        kept.add(entry)
+                    }
+                }
+                else {
+                    kept.add(entry)
+                }
+            }
+        }
+        if removed == false {
+            return false
+        }
+        JSON.write(
+            JSON.object(
+                {
+                    "schema": JSON.fromString("ahdcode.localdatabases")
+                    "version": JSON.fromInt(1)
+                    "databases": JSON.array(kept)
+                }
+            )
+            registry
+            true
+        )
+        return true
+    }
+    except JSONError {
+        return false
+    }
+}
+
 isSqliteExt: Function := (path: String) -> Bool {
     ext: Local String := Path.ext(path).lower()
     return ext == ".db" or ext == ".sqlite" or ext == ".sqlite3"

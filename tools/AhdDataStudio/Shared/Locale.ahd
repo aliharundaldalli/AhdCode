@@ -87,6 +87,15 @@ tEN: Function := (key: String) -> String {
     if key == "open" {
         return "Open"
     }
+    if key == "unavailable" {
+        return "Unavailable"
+    }
+    if key == "remove_registration" {
+        return "Remove registration"
+    }
+    if key == "sqlite_unavailable_body" {
+        return "This registered SQLite file is not on disk. The file was not deleted by AhdDataStudio."
+    }
     if key == "home_eyebrow" {
         return "Developer database workspace"
     }
@@ -186,6 +195,15 @@ tTR: Function := (key: String) -> String {
     }
     if key == "open" {
         return "Aç"
+    }
+    if key == "unavailable" {
+        return "Kullanılamıyor"
+    }
+    if key == "remove_registration" {
+        return "Kaydı kaldır"
+    }
+    if key == "sqlite_unavailable_body" {
+        return "Bu kayıtlı SQLite dosyası diskte yok. AhdDataStudio dosyayı silmedi."
     }
     if key == "home_eyebrow" {
         return "Geliştirici veritabanı çalışma alanı"
