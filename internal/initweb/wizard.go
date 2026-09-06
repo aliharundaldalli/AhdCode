@@ -4,12 +4,18 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 )
 
 func resolveOptions(root string, options Options) (Options, error) {
 	if options.Input == nil {
 		options.Input = strings.NewReader("")
+	}
+	if options.SecretFile == nil {
+		if file, ok := options.Input.(*os.File); ok {
+			options.SecretFile = file
+		}
 	}
 	if _, ok := options.Input.(*bufio.Reader); !ok {
 		options.Input = bufio.NewReader(options.Input)
@@ -321,7 +327,7 @@ func promptLine(options Options, label string) (string, error) {
 
 func promptSecret(options Options, label string) (string, error) {
 	fmt.Fprint(options.Output, label+"\n> ")
-	return readSecret(options.Input, options.Output)
+	return readSecret(options.Input, options.Output, options.SecretFile)
 }
 
 func normalizeStarter(value string) (string, error) {

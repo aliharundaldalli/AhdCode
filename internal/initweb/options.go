@@ -1,6 +1,9 @@
 package initweb
 
-import "io"
+import (
+	"io"
+	"os"
+)
 
 const (
 	StarterEmpty = "empty"
@@ -43,6 +46,10 @@ type Options struct {
 	Input         io.Reader
 	Output        io.Writer
 	IsTTY         bool
+	// SecretFile is the original terminal, when Input is an *os.File.
+	// resolveOptions wraps Input in a bufio.Reader, which would otherwise
+	// hide the handle from echo suppression.
+	SecretFile *os.File
 }
 
 func (options Options) isAdmin() bool { return options.Starter == StarterAdmin }

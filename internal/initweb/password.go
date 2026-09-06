@@ -29,9 +29,9 @@ func readLine(input io.Reader) (string, error) {
 	return strings.TrimRight(line, "\r\n"), nil
 }
 
-func readSecret(input io.Reader, output io.Writer) (string, error) {
-	if file, ok := input.(*os.File); ok && isTerminalFile(file) {
-		restore, err := disableEcho(int(file.Fd()))
+func readSecret(input io.Reader, output io.Writer, terminal *os.File) (string, error) {
+	if terminal != nil && isTerminalFile(terminal) {
+		restore, err := disableEcho(int(terminal.Fd()))
 		if err == nil {
 			defer restore()
 			defer fmt.Fprintln(output)
