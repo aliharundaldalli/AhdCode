@@ -1,37 +1,57 @@
 # Kurulum, yükseltme ve kaldırma
 
-RC paketleri bağımsız QA için adaydır; final v1.0.0 henüz yayımlanmamıştır.
-Windows canlı kurulum testi tamamlanmadan Windows QA geçti denmez.
+İşletim sisteminize uygun paketi AhdCode v1.0.0 sürümünden indirin. Her paket
+kendi kendine yeterlidir: derleyici, özel Go araç zinciri, AhdDataStudio,
+SQLite/numeric/plot yardımcıları, çevrimdışı LaTeX motoru, proje starter'ları
+ve İngilizce belgeler paketin içindedir.
 
-macOS Apple Silicon: `AhdCode-1.0.0-rc.1-macos-arm64.dmg` dosyasını açın,
-`Install.command` çalıştırın. Kurulum kullanıcı Library dizinindeki
-`Application Support/AhdCode/versions/<sürüm>` altına yapılır. `current` etkin
-sürümü seçer; `bin/ahdcode` sabit başlatıcıdır. `~/.zprofile` içine yalnızca
-AhdCode'a ait, kaldırılabilir bir PATH bloğu eklenir. Yeni giriş kabuğunda
-`ahdcode --version` çalıştırın. RC henüz Developer ID imzalı/noter onaylı değildir;
-normal güvenilir macOS dağıtımı için bu işlem final öncesinde tamamlanmalıdır.
+## macOS (Apple Silicon)
 
-Windows x64: `AhdCode-1.0.0-rc.1-windows-x64.exe` dosyasına Dosya
-Gezgini'nde çift tıklayın. Kurulum küçük bir grafik programdır: ne kuracağını
-gösterir, gömülü paketi ilerleme penceresiyle açıp doğrular ve bir onay
-penceresiyle biter. Konsol, terminal veya komut yazmak gerekmez.
+AhdCode v1.0.0 Apple Silicon Mac'leri destekler — M1, M2, M3, M4 ve sonraki
+arm64 modeller. Intel sürümü yoktur.
+
+`AhdCode-1.0.0-macos-arm64.pkg` dosyasına çift tıklayıp kurulumu izleyin. Paket
+Developer ID ile imzalı ve Apple tarafından noter onaylıdır; normal biçimde
+açılır, hiçbir güvenlik atlatması gerekmez. Yalnızca sizin hesabınıza kurar,
+yönetici şifresi istemez ve ev dizininizin dışına hiçbir şey yazmaz.
+
+Dosyalar `~/Library/AhdCode/versions/<sürüm>` altına kurulur. `current` etkin
+sürümü seçer, sabit komut `~/Library/AhdCode/bin/ahdcode`'dur. PATH'e yalnızca
+bu tek dizin eklenir.
+
+Ardından **yeni** bir Terminal açıp `ahdcode --version` çalıştırın. Zaten açık
+olan bir terminal başlatıldığı ortamı korur; yeni açılan değişikliği hemen
+görür.
+
+`AhdCode-1.0.0-macos-arm64.zip`, aynı paketi VS Code eklentisiyle birlikte
+sunan alternatif bir indirmedir. Disk imajı tercih edenler için aynı içeriğe
+sahip bir `.dmg` de yayımlanır; önerilen kurulum biçimi `.pkg`'dir.
+
+## Windows x64
+
+`AhdCode-1.0.0-windows-x64.exe` dosyasına Dosya Gezgini'nde çift tıklayın.
+Kurulum küçük bir grafik programdır: ne kuracağını gösterir, gömülü paketi
+ilerleme penceresiyle açıp doğrular ve bir onay penceresiyle biter. Konsol,
+terminal veya komut yazmak gerekmez.
+
+Kurulum programı şu an kod imzalı değildir; bu nedenle Windows SmartScreen
+"yayıncı bilinmiyor" uyarısı gösterebilir. **Daha fazla bilgi → Yine de
+çalıştır** ile devam edin. Yayımlanan SHA-256 özetleriyle dosyanın resmî
+olduğunu doğrulayabilirsiniz.
 
 Dosyalar `%LOCALAPPDATA%\AhdCode\versions\<sürüm>` altına kurulur. Sabit komut
-`%LOCALAPPDATA%\AhdCode\bin\ahdcode.exe` olup kullanıcı PATH değerine yalnızca
-bu tek dizin, yalnızca ilk kurulumda eklenir. Yönetici izni, Git veya sistem Go
-gerekmez; kaldırma kaydı Installed Apps içine yazılır.
+`%LOCALAPPDATA%\AhdCode\bin\ahdcode.exe`'dir ve kullanıcı PATH'ine yalnızca bu
+tek dizin, yalnızca ilk kurulumda eklenir. Yönetici izni, Git veya sistem Go
+kurulumu gerekmez; kaldırma kaydı Installed Apps içine yazılır.
 
 Ardından **yeni** bir PowerShell veya Komut İstemi açıp `ahdcode --version`
-çalıştırın. Zaten açık olan bir terminal başlatıldığı ortamı korur; bu Windows'un
-normal davranışıdır ve yeni açılan terminal değişikliği hemen görür.
+çalıştırın.
 
-`AhdCode-1.0.0-rc.1-windows-x64.exe --silent` hiçbir pencere açmadan kurar.
-Kurulum grafik bir program olduğu için, betikten çağırırken bitmesini beklemek
-isterseniz `Start-Process -Wait` kullanın.
+`AhdCode-1.0.0-windows-x64.exe --silent` hiçbir pencere açmadan kurar.
+`AhdCode-1.0.0-windows-x64.zip` aynı kurulumu VS Code eklentisiyle birlikte
+sunar.
 
-Windows canlı kurulum/kaldırma QA gereklidir; RC imzasızdır.
-
-Linux x64: `AhdCode-1.0.0-rc.1-linux-x64.tar.gz` arşivini açın ve
+Linux x64: `AhdCode-1.0.0-linux-x64.tar.gz` arşivini açın ve
 `sh install.sh --setup-path` çalıştırın. Kök `~/.local/share/ahdcode` dizinidir;
 PATH bloğu `~/.profile` dosyasına eklenir.
 
@@ -70,7 +90,7 @@ sırası hangi CLI'ın çalışacağını belirler.
 macOS kaldırma:
 
 ```sh
-sh "$HOME/Library/Application Support/AhdCode/current/install.sh" --uninstall
+sh "$HOME/Library/AhdCode/current/install.sh" --uninstall
 ```
 
 Linux için yol `~/.local/share/ahdcode/current/install.sh` olur. Windows'ta

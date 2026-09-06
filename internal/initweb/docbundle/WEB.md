@@ -568,7 +568,7 @@ Editing `public/app.css` does not.
 It also **refuses** `APP_PROTOCOL=https`:
 
 ```
-✗ Local HTTPS is not available in AhdCode v1.0.0-rc.1.
+✗ Local HTTPS is not available in AhdCode v1.0.0.
   ahdcode dev serves plaintext HTTP, so it cannot honour
   APP_PROTOCOL=https.
 
@@ -805,7 +805,7 @@ configuration contract.
 | v0.17 | `ahdcode init web`, context-aware routes, route groups, ordered guards |
 | v0.18 | Web starters: Empty, Basic, Admin; local Bootstrap; Admin DB bootstrap |
 | v0.20 | Component-owned CSS/JS, `managedAssets`, `Identity.id()`, Web limits, MVC/CRUD |
-| v1.0.0-rc.1 | No Web API change; self-contained platform packaging |
+| v1.0.0 | No Web API change; self-contained platform packaging |
 
 ## 22. v0.20: Web assets, resource boundaries, and application patterns
 

@@ -6,18 +6,18 @@
 > Uygulama açısından iki belge aynı kuralları açıklar; metinsel bir çeviri
 > uyuşmazlığı oluşursa İngilizce ana spesifikasyon esas alınır.
 
-**Durum:** Yaşayan (living) 1.0 öncesi dil spesifikasyonu<br>
+**Durum:** AhdCode v1.0.0 için normatif dil spesifikasyonu<br>
 **Tarihsel not:** Uyumluluk için tarihsel dosya adı korunmuştur<br>
-**Açıklama revizyonu:** 2026-09-05; normatif 1.0 öncesi çekirdek spesifikasyon<br>
+**Açıklama revizyonu:** 2026-09-07; v1.0.0'da yayımlanan hâliyle normatif çekirdek spesifikasyon<br>
 **Birincil uygulama hedefi:** Go<br>
 **Dosya uzantısı:** `.ahd`<br>
-**Kapsam:** Çekirdek dil dilbilgisi (grammar), statik tür sistemi ve yürütme anlambilimi (semantics). Bu spesifikasyon, v0.1 önyükleme (bootstrap) çekirdek tasarımı olarak başlamış ve 1.0 öncesi dil yüzeyi geliştikçe (ör. bildirim çıkarımı, açık `T?`, yalnızca-ifade lambda'lar ve Class Protocol Methods) normatif revizyonlar almıştır. Standart kütüphane modülleri (`Math`, `Regex`, `Data`, `Time`, vb.), birinci taraf çalışma zamanı servisleri (`HTTP`, `SQLite`, `MySQL`, `SMTP`) ve üst düzey uygulama çatıları (`Web`), çekirdek dilbilgisini değiştirmeden bu temel anlambilim üzerine kurulur ve `docs/` altındaki özel belgelerinde belgelenir.
+**Kapsam:** Çekirdek dil dilbilgisi (grammar), statik tür sistemi ve yürütme anlambilimi (semantics). Bu spesifikasyon, v0.1 önyükleme (bootstrap) çekirdek tasarımı olarak başlamış ve 1.0 öncesinde (ör. bildirim çıkarımı, açık `T?`, yalnızca-ifade lambda'lar ve Class Protocol Methods) normatif revizyonlar almıştır. Artık çekirdek dili v1.0.0'da yayımlandığı hâliyle anlatır. Standart kütüphane modülleri (`Math`, `Regex`, `Data`, `Time`, vb.), birinci taraf çalışma zamanı servisleri (`HTTP`, `SQLite`, `MySQL`, `SMTP`) ve üst düzey uygulama çatıları (`Web`), çekirdek dilbilgisini değiştirmeden bu temel anlambilim üzerine kurulur ve `docs/` altındaki özel belgelerinde belgelenir.
 
 ---
 
 ## 1. Tasarım Felsefesi
 
-AhdCode, sabit tasarım ilkeleri ve gelişen 1.0 öncesi yüzey anlayışıyla tasarlanmıştır:
+AhdCode sabit tasarım ilkeleriyle tasarlanmıştır ve v1.0.0 bu ilkelerin ürettiği çekirdek yüzeyi sabitler:
 
 1. **Minimum satır sayısı yerine okunabilirlik.**
 2. **Kısa teknik bir kısaltmanın hiçbir değer katmadığı yerde sade İngilizce kelimeler kullanın.**
@@ -31,9 +31,9 @@ AhdCode, sabit tasarım ilkeleri ve gelişen 1.0 öncesi yüzey anlayışıyla t
 10. **Önce çekirdek dil. Web ve ağ servisleri, dilbilgisinin temeli olarak değil, çalışma zamanı/çatı katmanları olarak yer alır.**
 11. **Ürün davranışı olarak tanılama (diagnostics):** Eyleme geçirilebilir ipuçlarıyla yapıya duyarlı net hatalar.
 
-### Sabit İlkeler, Gelişen 1.0 Öncesi Yüzey
+### Sabit İlkeler ve 1.0 Yüzeyine Nasıl Ulaşıldı
 
-AhdCode, 1.0 öncesini kalıcı olarak dondurulmuş bir durum olarak görmez; sözdizimini gelişigüzel de değiştirmez. Yukarıdaki temel ilkeler sabittir. Gerçek uygulama, dogfooding ve pratik uygulama ihtiyaçları somut eksikleri gösterdiğinde, 1.0 öncesi dil kararları bilinçli olarak revize edilir. Bildirim tür çıkarımı, açık null olabilen türler (`T?`), açık leksikal/küresel bağımlılık listelerine sahip yalnızca-ifade lambda'lar (`#isim`, `@isim`) ve kapalı Class Protocol Methods kümesi gibi yetenekler; statik tiplemeyi, belirlenirciliği, açıklığı ve gizli sihrin reddedilmesini kesin olarak koruyan bilinçli evrimleri yansıtır.
+AhdCode, 1.0 öncesi dönemi kalıcı olarak dondurulmuş bir durum olarak görmedi; sözdizimini gelişigüzel de değiştirmedi. Yukarıdaki temel ilkeler sabittir. Gerçek uygulama, dogfooding ve pratik uygulama ihtiyaçları somut eksikleri gösterdiğinde, 1.0 öncesi dil kararları bilinçli olarak revize edildi; v1.0.0 bu yüzeyi sabitler. Bildirim tür çıkarımı, açık null olabilen türler (`T?`), açık leksikal/küresel bağımlılık listelerine sahip yalnızca-ifade lambda'lar (`#isim`, `@isim`) ve kapalı Class Protocol Methods kümesi gibi yetenekler; statik tiplemeyi, belirlenirciliği, açıklığı ve gizli sihrin reddedilmesini kesin olarak koruyan bilinçli evrimleri yansıtır.
 
 AhdCode, Python gibi yaklaşılabilir, C ailesi diller gibi görsel olarak yapılandırılmış ve aşırı törensellik olmadan statik olarak kontrollü hissettirmelidir.
 
@@ -3888,7 +3888,7 @@ Karmaşık matematik, daha sonraki bir Complex olanağına aittir.
 
 ---
 
-## 40. Desteklenmeyen 1.0 Öncesi Çekirdek Dil Özellikleri <a id="40-desteklenmeyen-v01-özellikleri"></a>
+## 40. v1.0.0 Çekirdeğinden Bilinçli Olarak Dışarıda Bırakılanlar <a id="40-desteklenmeyen-v01-özellikleri"></a>
 
 Çekirdek dil sözleşmesinden kasıtlı olarak hariç tutulanlar (HTTP, HTML, MySQL, SMTP ve Web gibi sunucu taraflı servisler çekirdek dilbilgisi uzantıları olarak değil, birinci taraf çalışma zamanı/çatı modülleri olarak uygulanmıştır):
 

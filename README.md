@@ -12,10 +12,9 @@ AhdCode is an experimental statically checked general-purpose programming
 language focused on readable syntax, explicit intent, predictable semantics,
 and native compilation.
 
-The current candidate is **v1.0.0-rc.1**, the first release candidate for 1.0,
-published for independent quality assurance. The language, toolchain, and Web
-framework are feature-complete for 1.0; no further breaking language changes
-are planned before the final release. Final v1.0.0 has not been released yet.
+This is **v1.0.0**, the first stable release. The language, toolchain, and Web
+framework are feature-complete, and the language surface described here is
+what 1.0 commits to.
 
 It ships as a self-contained platform package: the `ahdcode` CLI, a private
 Go 1.27.0 toolchain, AhdDataStudio, the `ahdsqlite`, `ahdnumeric`, and
@@ -462,7 +461,7 @@ diagnostics and hover. The same VSIX targets VS Code and Antigravity. See its
 
 ## Current limitations
 
-AhdCode v1.0.0-rc.1 is a release candidate published for independent quality assurance. It has not yet been released as final v1.0.0.
+AhdCode v1.0.0 is the first stable release. The exclusions below are deliberate design decisions, not gaps awaiting a later version.
 
 Within the language, AhdCode intentionally excludes block/statement lambdas, arbitrary/implicit mutable closures, general user-defined operator overloading (outside the ten fixed Class Protocol Methods), multiple return values/tuples, reflection, traits/interfaces, and multiple inheritance. In tooling, AhdCode uses compile-time local source composition ([`require(...)`](docs/REQUIRE.md)) and bundled offline modules rather than an external package manager or remote registry. Language server references and rename operate within the compile graph rather than an asynchronous background workspace index. See the [specification's unsupported-feature list](AHDCODE_LANGUAGE_SPEC_v0.1.md#40-unsupported-v01-features).
 

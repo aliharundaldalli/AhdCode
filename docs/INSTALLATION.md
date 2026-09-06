@@ -1,28 +1,45 @@
 # Installation, upgrade, and removal
 
-Use the RC package for your operating system. RC packages are candidates for
-independent QA; final v1.0.0 is not yet released. Windows live installation QA
-is required before claiming Windows release readiness.
+Download the package for your operating system from the AhdCode v1.0.0 release.
+Every package is self-contained: it carries the compiler, a private Go
+toolchain, AhdDataStudio, the SQLite, numeric and plot helpers, an offline
+LaTeX engine, the project starters, and the English documentation.
 
 ## macOS (Apple Silicon)
 
-Open `AhdCode-1.0.0-rc.1-macos-arm64.dmg`, then run `Install.command`.
-The installer explains its per-user location and PATH change before installation.
-It installs into `~/Library/Application Support/AhdCode/versions/<version>`.
-`current` selects the active version; `bin/ahdcode` is the stable launcher.
-One clearly marked, removable PATH block is added to `~/.zprofile`.
-Open a new login shell and run `ahdcode --version`.
+AhdCode v1.0.0 supports Apple Silicon Macs — M1, M2, M3, M4 and later arm64
+models. There is no Intel build.
 
-This RC is not Developer ID signed or notarized. Its checksum identifies the
-candidate bytes. Distribution signing/notarization remains required for a normal
-trusted macOS download experience before final release.
+Double-click `AhdCode-1.0.0-macos-arm64.pkg` and follow the installer. The
+package is signed with a Developer ID and notarized by Apple, so it opens
+normally; no security workaround is needed. It installs for your account only,
+asks for no administrator password, and writes nothing outside your home
+folder.
+
+Files go under `~/Library/AhdCode/versions/<version>`. `current` selects the
+active version and `~/Library/AhdCode/bin/ahdcode` is the stable command. That
+one folder is added to your PATH.
+
+Then open a **new** Terminal and run `ahdcode --version`. A terminal that was
+already open keeps the environment it started with; a new one picks up the
+change immediately.
+
+`AhdCode-1.0.0-macos-arm64.zip` is an alternate download that bundles the same
+package together with the VS Code extension. A `.dmg` with the same payload is
+also published for anyone who prefers a disk image; the `.pkg` is the
+recommended installer.
 
 ## Windows x64
 
-Double-click `AhdCode-1.0.0-rc.1-windows-x64.exe` in File Explorer. Setup is a
-small graphical per-user program: it shows what it will install, unpacks and
-checks its embedded payload with a progress window, and finishes with a
-confirmation. No console, no terminal, and no typed commands are involved.
+Double-click `AhdCode-1.0.0-windows-x64.exe` in File Explorer. Setup is a small
+graphical per-user program: it shows what it will install, unpacks and checks
+its embedded payload with a progress window, and finishes with a confirmation.
+No console, no terminal, and no typed commands are involved.
+
+The installer is not currently code-signed, so Windows SmartScreen may show an
+unknown-publisher warning. Choose **More info** and then **Run anyway** to
+continue. The published SHA-256 checksums let you confirm you have the official
+file.
 
 Files go under `%LOCALAPPDATA%\AhdCode\versions\<version>`. The stable command
 is `%LOCALAPPDATA%\AhdCode\bin\ahdcode.exe`, and only that one folder is added
@@ -31,22 +48,20 @@ a system Go installation are not required, and an uninstall entry is registered
 in Windows Installed Apps.
 
 Then open a **new** PowerShell or Command Prompt and run `ahdcode --version`.
-A terminal that was already open keeps the environment it started with, which is
-how Windows works; a new one picks up the change immediately.
 
-`AhdCode-1.0.0-rc.1-windows-x64.exe --silent` installs with no windows at all,
-for scripted deployment. Because setup is a graphical program, run it from a
-script as `Start-Process -Wait` if you need to block until it finishes.
-
-Windows live installation and removal QA is still required. The RC is unsigned.
+`AhdCode-1.0.0-windows-x64.exe --silent` installs with no windows at all, for
+scripted deployment. Because setup is a graphical program, run it from a script
+as `Start-Process -Wait` if you need to block until it finishes.
+`AhdCode-1.0.0-windows-x64.zip` bundles the same installer with the VS Code
+extension.
 
 ## Linux x64
 
-Extract `AhdCode-1.0.0-rc.1-linux-x64.tar.gz` and run:
+Extract `AhdCode-1.0.0-linux-x64.tar.gz` and run:
 
 ```sh
-tar -xzf AhdCode-1.0.0-rc.1-linux-x64.tar.gz
-cd AhdCode-1.0.0-rc.1
+tar -xzf AhdCode-1.0.0-linux-x64.tar.gz
+cd AhdCode-1.0.0
 sh install.sh --setup-path
 ```
 
@@ -102,10 +117,10 @@ on disk; the stable launcher switches to the new version. Installing the same
 version does not overwrite its files. A legacy Go-installed CLI is not removed;
 PATH ordering determines which CLI runs (`command -v ahdcode` / `where ahdcode`).
 
-On macOS:
+On macOS, remove the installation root and its PATH block:
 
 ```sh
-sh "$HOME/Library/Application Support/AhdCode/current/install.sh" --uninstall
+sh "$HOME/Library/AhdCode/current/install.sh" --uninstall
 ```
 
 On Linux:

@@ -12,10 +12,9 @@ AhdCode; okunabilir sözdizimi, açık niyet (explicit intent), öngörülebilir
 anlambilim (semantics) ve yerel (native) derlemeye odaklanan, deneysel,
 statik olarak denetlenen genel amaçlı bir programlama dilidir.
 
-Mevcut aday, 1.0 için ilk sürüm adayı olan **v1.0.0-rc.1**'dır ve bağımsız
-kalite denetimi için yayımlanmıştır. Dil, araç zinciri ve Web çatısı 1.0 için
-özellik olarak tamamlanmıştır; nihai sürümden önce başka kırıcı (breaking) dil
-değişikliği planlanmamaktadır. Nihai v1.0.0 henüz yayımlanmamıştır.
+Bu, ilk kararlı sürüm olan **v1.0.0**'dır. Dil, araç zinciri ve Web çatısı
+özellik olarak tamamlanmıştır; burada anlatılan dil yüzeyi 1.0'ın taahhüt
+ettiği yüzeydir.
 
 Ürün, kendi kendine yeten bir platform paketi olarak dağıtılır: `ahdcode` CLI,
 özel Go 1.27.0 araç zinciri, AhdDataStudio, `ahdsqlite`, `ahdnumeric` ve
@@ -482,7 +481,7 @@ VS Code hem de Antigravity'i hedefler.
 
 ## Mevcut sınırlamalar
 
-AhdCode v1.0.0-rc.1, bağımsız kalite denetimi için yayımlanmış bir sürüm adayıdır. Nihai v1.0.0 olarak henüz yayımlanmamıştır.
+AhdCode v1.0.0 ilk kararlı sürümdür. Aşağıdaki dışarıda bırakmalar bilinçli tasarım kararlarıdır; sonraki bir sürümü bekleyen eksikler değildir.
 
 Dil içinde AhdCode; kasıtlı olarak blok/deyim lambda'larını, keyfi/örtük değişken closure'ları, genel kullanıcı-tanımlı operatör aşırı yüklemesini (on sabit Class Protocol Method dışında), çoklu dönüş değerlerini/tuple'ları, reflection'ı, trait/interface'leri ve çoklu kalıtımı hariç tutar. Araçlarda ise AhdCode harici bir paket yöneticisi veya uzak kayıt defteri yerine derleme zamanı yerel kaynak birleştirmesi ([`require(...)`](docs/REQUIRE_TR.md)) ve paketli çevrimdışı modülleri kullanır. Dil sunucusu referans bulma ve yeniden adlandırma işlemleri arka plan çalışma alanı indeksi yerine derleme grafiği içinde çalışır. Bkz. [spesifikasyonun desteklenmeyen özellik listesi](AHDCODE_LANGUAGE_SPEC_v0.1_TR.md#40-desteklenmeyen-v01-özellikleri).
 

@@ -571,7 +571,7 @@ derler ve yeniden başlatır. `public/app.css`'i düzenlemek bunu yapmaz.
 `APP_PROTOCOL=https`'i de **reddeder**:
 
 ```
-✗ Local HTTPS is not available in AhdCode v1.0.0-rc.1.
+✗ Local HTTPS is not available in AhdCode v1.0.0.
   ahdcode dev serves plaintext HTTP, so it cannot honour
   APP_PROTOCOL=https.
 
@@ -812,7 +812,7 @@ düşük seviyeli modüllere uzanın.
 | v0.17 | `ahdcode init web`, bağlam duyarlı rotalar, rota grupları, sıralı bekçiler |
 | v0.18 | Web starter'lar: Empty, Basic, Admin; yerel Bootstrap; Admin DB kurulumu |
 | v0.20 | Bileşen CSS/JS, `managedAssets`, `Identity.id()`, Web sınırları, MVC/CRUD |
-| v1.0.0-rc.1 | Web API değişikliği yok; kendi kendine yeten platform paketlemesi |
+| v1.0.0 | Web API değişikliği yok; kendi kendine yeten platform paketlemesi |
 
 ## 22. v0.20: Web varlıkları, kaynak sınırları ve uygulama kalıpları
 

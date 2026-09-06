@@ -1,17 +1,17 @@
 # AhdCode Language Specification v0.1
 
-**Status:** Living pre-1.0 language specification<br>
+**Status:** Normative language specification for AhdCode v1.0.0<br>
 **Historical note:** Historical filename retained for compatibility<br>
-**Clarification revision:** 2026-09-05; normative pre-1.0 core specification<br>
+**Clarification revision:** 2026-09-07; normative core specification as released in v1.0.0<br>
 **Primary implementation target:** Go<br>
 **File extension:** `.ahd`<br>
-**Scope:** Core language grammar, static type system, and execution semantics. The specification originated as the v0.1 bootstrap core design and has received normative revisions as the pre-1.0 language evolved (e.g. declaration inference, explicit `T?`, expression-only lambdas, and Class Protocol Methods). Standard library modules (`Math`, `Regex`, `Data`, `Time`, etc.), first-party runtime services (`HTTP`, `SQLite`, `MySQL`, `SMTP`), and higher-level application frameworks (`Web`) build on top of these core semantics without altering core grammar, and are documented in their dedicated guides in `docs/`.
+**Scope:** Core language grammar, static type system, and execution semantics. The specification originated as the v0.1 bootstrap core design and received normative revisions before 1.0 (e.g. declaration inference, explicit `T?`, expression-only lambdas, and Class Protocol Methods). It now describes the core language as released in v1.0.0. Standard library modules (`Math`, `Regex`, `Data`, `Time`, etc.), first-party runtime services (`HTTP`, `SQLite`, `MySQL`, `SMTP`), and higher-level application frameworks (`Web`) build on top of these core semantics without altering core grammar, and are documented in their dedicated guides in `docs/`.
 
 ---
 
 ## 1. Design Philosophy
 
-AhdCode is designed around stable design principles with an evolving pre-1.0 surface:
+AhdCode is designed around stable design principles, and v1.0.0 fixes the core surface they produced:
 
 1. **Readability over minimum line count.**
 2. **Use plain English words when a short technical abbreviation adds no value.**
@@ -25,9 +25,9 @@ AhdCode is designed around stable design principles with an evolving pre-1.0 sur
 10. **Core language first. Web and network services exist as runtime/framework layers, not as the foundation of the grammar.**
 11. **Diagnostics as product behavior:** precise, construct-aware errors with actionable hints.
 
-### Stable Principles, Evolving Pre-1.0 Surface
+### Stable Principles, and How the 1.0 Surface Was Reached
 
-AhdCode does not treat pre-1.0 as permanently feature-frozen, nor does it casually churn syntax. The core principles above remain constant. As real implementation, dogfooding, and practical application needs demonstrate concrete gaps, pre-1.0 language decisions are revised deliberately. Capabilities such as declaration type inference, explicit nullable types (`T?`), expression-only lambdas with explicit dependency lists (`#name`, `@name`), and the closed set of Class Protocol Methods reflect deliberate evolutions that strictly preserve static typing, determinism, explicitness, and the rejection of hidden magic.
+AhdCode never treated the pre-1.0 period as permanently feature-frozen, nor did it casually churn syntax. The core principles above remain constant. Where real implementation, dogfooding, and practical application needs demonstrated concrete gaps, pre-1.0 language decisions were revised deliberately; v1.0.0 settles that surface. Capabilities such as declaration type inference, explicit nullable types (`T?`), expression-only lambdas with explicit dependency lists (`#name`, `@name`), and the closed set of Class Protocol Methods reflect deliberate evolutions that strictly preserve static typing, determinism, explicitness, and the rejection of hidden magic.
 
 AhdCode should feel approachable like Python, visually structured like C-family languages, and statically controlled without excessive ceremony.
 
@@ -3490,9 +3490,9 @@ Complex mathematics belongs to a Complex facility later.
 
 ---
 
-## 40. Unsupported Pre-1.0 Core Language Features <a id="40-unsupported-v01-features"></a>
+## 40. Core Language Features Deliberately Excluded from v1.0.0 <a id="40-unsupported-v01-features"></a>
 
-Intentionally excluded from the core language contract (server-side services such as HTTP, HTML, MySQL, SMTP, and Web are implemented as first-party runtime/framework modules, not as core grammar extensions):
+Intentionally excluded from the v1.0.0 core language contract (server-side services such as HTTP, HTML, MySQL, SMTP, and Web are implemented as first-party runtime/framework modules, not as core grammar extensions):
 
 - static class members
 - Getter/Setter syntax

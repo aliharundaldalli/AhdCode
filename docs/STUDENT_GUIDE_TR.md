@@ -1,4 +1,4 @@
-# AhdCode v1.0.0-rc.1 Türkçe Öğrenci Rehberi
+# AhdCode v1.0.0 Türkçe Öğrenci Rehberi
 
 Bu rehber, **daha önce hiç programlama yapmamış birinin de takip edebilmesi** için hazırlanmıştır. Baştan sona sırayla okuyabilirsiniz; her bölümde önce ne yapmak istediğimizi görecek, sonra çalışan bir örnek yazacak, en son gerekli kuralları öğreneceksiniz.
 
@@ -96,7 +96,7 @@ Merhaba!
 
 AhdCode, programı çalıştırmadan önce yazdığınız kodu kontrol eder. Örneğin bir metni sayı gibi kullanmaya çalışırsanız veya `null` olabilecek bir değeri kontrol etmeden kullanırsanız, mümkün olduğunda hatayı daha program başlamadan söyler. Ama başlangıçta bunun ayrıntılarını düşünmeniz gerekmiyor; ilerleyen bölümlerde örneklerle göreceğiz.
 
-AhdCode v1.0.0-rc.1 bağımsız QA adayıdır. Final v1.0.0 henüz yayımlanmamıştır.
+AhdCode v1.0.0 ilk kararlı sürümdür.
 
 Onunla küçük komut satırı programları yazabilir veya bunları yerel executable uygulamalara derleyebilirsiniz; veriyi yerel bir SQLite veritabanında ya da bir MySQL sunucusunda tutabilirsiniz; birinci taraf `Web` çatısıyla eksiksiz bir web uygulaması kurabilirsiniz — sayfalar, yerleşimler, formlar, doğrulama, CSRF, flash mesajları, oturumlar ve dosya yüklemeleri; dış HTTP ve HTTPS API'leri çağırabilir, HTML ayrıştırabilir, SMTP ile e-posta gönderebilir, `Security` ile parola hashleyip güvenli belirteç üretebilir ve dil sunucusunu (`ahdcode lsp`) VS Code gibi bir editörden kullanabilirsiniz.
 

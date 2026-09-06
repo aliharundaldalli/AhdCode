@@ -47,6 +47,85 @@ git clone https://github.com/aliharundaldalli/AhdCode.git
 cd AhdCode
 ```
 
+## Released distribution and its signing state
+
+This section describes how AhdCode v1.0.0 is *distributed*. The rest of this
+document is about building from source. Keep the two apart: a user who wants to
+install AhdCode should download a release artifact, not clone this repository.
+
+Prefer the official GitHub Release for
+`https://github.com/aliharundaldalli/AhdCode`. Never direct a user to a
+third-party mirror, and never fetch a build from an unofficial host. The
+release publishes SHA-256 checksums; use them to confirm an artifact's
+integrity when it matters.
+
+### macOS
+
+The public macOS target is **Apple Silicon (arm64)** only. There is no Intel
+build in v1.0.0; do not tell a user otherwise unless a future release actually
+ships one.
+
+`AhdCode-1.0.0-macos-arm64.pkg` is the recommended installer. It is signed with
+a Developer ID certificate and notarized by Apple, and the notarization ticket
+is stapled to the file, so it installs on a normal Mac with no security prompt
+even when it arrives by download or AirDrop. Gatekeeper reports
+`source=Notarized Developer ID`.
+
+Because the package is notarized, **do not** tell a user to strip the quarantine
+attribute, run `xattr`, use Control-click → Open, or otherwise work around
+Gatekeeper. Those were release-candidate testing workarounds. If a signed
+release artifact is genuinely refused, that is a signal to investigate, not to
+bypass.
+
+The package installs per-user into `~/Library/AhdCode` and needs no
+administrator password.
+
+### Windows
+
+The v1.0.0 Windows installer is **not Authenticode code-signed**. Windows
+SmartScreen may therefore show an unknown-publisher or low-reputation warning.
+State this plainly and accurately:
+
+- Never claim the Windows installer is signed. It is not.
+- This is a distribution-signing limitation. It is not evidence that the
+  installer failed an integrity check, and it is not a finding about the
+  software itself.
+- Never instruct a user to disable Windows Defender, SmartScreen, or any other
+  system protection. Choosing **More info → Run anyway** for a file the user
+  deliberately downloaded is enough.
+- The published SHA-256 checksum is the way to confirm the file is the official
+  one.
+
+Installation is per-user under `%LOCALAPPDATA%\AhdCode` through the graphical
+installer. Do not tell a user to copy files into place with PowerShell instead.
+
+### VS Code extension
+
+The extension is versioned independently of AhdCode and is distributed as a
+`.vsix` release artifact. Install it through VS Code: Extensions → the `...`
+menu → **Install from VSIX...**.
+
+It is **not** published to the Visual Studio Marketplace. Do not claim that it
+is. The `.vsix` carried inside a platform bundle ZIP is byte-identical to the
+standalone release asset.
+
+### AhdDataStudio credentials
+
+AhdDataStudio connects to a MySQL server the user already runs. Its connection
+settings — host, port, username, password, security — are edited in the Studio
+UI, and the `AHD_DATA_MYSQL_*` environment variables remain supported as
+startup defaults. Do not tell a user that setting environment variables in a
+terminal is required, and do not present `root` as mandatory; any MySQL account
+works.
+
+Credentials are held only by the running Studio process. They are never written
+to the database registry, to a file, or to a cookie, and the password is never
+rendered back into the page. Preserve that: do not add a credential store, do
+not log a password, and do not place one in a URL or an error message.
+
+AhdDataStudio never installs MySQL, creates accounts, resets passwords, grants
+permissions, or bypasses database security. Do not add any of that.
+
 ## macOS
 
 ### 1. Inspect prerequisites
