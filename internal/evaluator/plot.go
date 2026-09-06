@@ -536,8 +536,7 @@ func discoverPlotRuntime() (string, error) {
 	if custom := os.Getenv("AHDCODE_PLOT_RUNTIME"); custom != "" {
 		return custom, nil
 	}
-	if executable, err := os.Executable(); err == nil {
-		bin := filepath.Dir(executable)
+	if bin, ok := interpreterBinDirectory(); ok {
 		candidates := []string{
 			filepath.Join(bin, "ahdplot"),
 			filepath.Join(bin, "..", "libexec", "ahdcode", "ahdplot"),

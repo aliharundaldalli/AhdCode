@@ -9,7 +9,7 @@ setup_path=false
 uninstall=false
 while [ "$#" -gt 0 ]; do
   case "$1" in
-    --prefix) prefix=$2; shift 2;;
+    --prefix) [ "$#" -ge 2 ] || { echo '--prefix needs an absolute installation root.' >&2; exit 2; }; prefix=$2; shift 2;;
     --setup-path) setup_path=true; shift;;
     --uninstall) uninstall=true; shift;;
     *) echo "Unknown installer option: $1" >&2; exit 2;;

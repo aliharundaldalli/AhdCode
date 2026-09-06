@@ -22,8 +22,7 @@ func discoverNumericRuntime() (string, error) {
 	if custom := os.Getenv("AHDCODE_NUMERIC_RUNTIME"); custom != "" {
 		candidates = append(candidates, custom, filepath.Join(custom, name))
 	}
-	if executable, err := os.Executable(); err == nil {
-		bin := filepath.Dir(executable)
+	if bin, ok := interpreterBinDirectory(); ok {
 		candidates = append(candidates, filepath.Join(bin, name), filepath.Join(bin, "..", "libexec", "ahdcode", name))
 	}
 	for _, candidate := range candidates {

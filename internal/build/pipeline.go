@@ -482,8 +482,7 @@ func findHelperRuntimeRoot(name, override string) string {
 			candidates = append(candidates, custom)
 		}
 	}
-	if executable, err := os.Executable(); err == nil {
-		bin := filepath.Dir(executable)
+	if bin, ok := compilerBinDirectory(); ok {
 		candidates = append(candidates, bin, filepath.Join(bin, "..", "libexec", "ahdcode"))
 	}
 	for _, candidate := range candidates {
@@ -510,8 +509,7 @@ func findNumericRuntimeRoot() string {
 			candidates = append(candidates, custom)
 		}
 	}
-	if executable, err := os.Executable(); err == nil {
-		bin := filepath.Dir(executable)
+	if bin, ok := compilerBinDirectory(); ok {
 		candidates = append(candidates, bin, filepath.Join(bin, "..", "libexec", "ahdcode"))
 	}
 	for _, candidate := range candidates {
@@ -538,8 +536,7 @@ func findPlotRuntimeRoot() string {
 	if custom := os.Getenv("AHDCODE_PLOT_RUNTIME"); custom != "" {
 		candidates = append(candidates, filepath.Dir(custom))
 	}
-	if executable, err := os.Executable(); err == nil {
-		bin := filepath.Dir(executable)
+	if bin, ok := compilerBinDirectory(); ok {
 		candidates = append(candidates, bin, filepath.Join(bin, "..", "libexec", "ahdcode"))
 	}
 	for _, candidate := range candidates {
@@ -560,8 +557,7 @@ func findPlotRuntimeRoot() string {
 
 func findLatexRuntimeRoot() string {
 	candidates := []string{os.Getenv("AHDCODE_LATEX_RUNTIME")}
-	if executable, err := os.Executable(); err == nil {
-		bin := filepath.Dir(executable)
+	if bin, ok := compilerBinDirectory(); ok {
 		candidates = append(candidates,
 			filepath.Join(bin, "latex"),
 			filepath.Join(bin, "..", "libexec", "ahdcode", "latex"),
