@@ -363,6 +363,8 @@ command-line tool, no CGO, and no network access.
 `CGO_ENABLED=0 go build ./...` succeeds. The helper is installed next to the
 compiler:
 
+**Release packages include this runtime. The following staging instructions are for source-build contributors only.**
+
 ```bash
 go install ./cmd/ahdcode ./cmd/ahdnumeric ./cmd/ahdplot ./cmd/ahdsqlite
 ```

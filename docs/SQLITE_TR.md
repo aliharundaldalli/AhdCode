@@ -366,6 +366,8 @@ paket gibi derler. Sistem `libsqlite3`'ü, `sqlite3` komut satırı aracı, CGO 
 da ağ erişimi yoktur. `CGO_ENABLED=0 go build ./...` başarılıdır. Yardımcı,
 derleyicinin yanına kurulur:
 
+**Sürüm paketleri bu runtime bileşenini içerir. Aşağıdaki hazırlama adımları yalnızca kaynaktan derleyen geliştiriciler içindir.**
+
 ```bash
 go install ./cmd/ahdcode ./cmd/ahdnumeric ./cmd/ahdplot ./cmd/ahdsqlite
 ```

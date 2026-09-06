@@ -12,7 +12,7 @@ AhdCode; okunabilir sözdizimi, açık niyet (explicit intent), öngörülebilir
 anlambilim (semantics) ve yerel (native) derlemeye odaklanan, deneysel,
 statik olarak denetlenen genel amaçlı bir programlama dilidir.
 
-Mevcut aday **v0.20.0**'dır. Çekirdek dil
+Mevcut aday **v1.0.0-rc.1**'dır. Çekirdek dil
 uçtan uca çalışır, ancak proje üretime hazır değildir ve 1.0'dan önce kırıcı
 (breaking) değişiklikler olabilir.
 
@@ -322,13 +322,16 @@ Kavramsal netliği korumak için AhdCode'un yetenekleri dört belirgin mimari ka
    - **Tanılama Motoru:** Net hata kodları ve ipuçlarıyla yapıya duyarlı derleyici tanılamaları
    - **Yerel Geliştirici Arayüzü:** [AhdDataStudio](tools/AhdDataStudio/README_TR.md) (localhost MySQL ve SQLite yönetim aracı), `ahdcode databases list|add|remove` (kullanıcıya özel SQLite kayıt defteri)
 
+## Kurulum
+
+[Kurulum](docs/INSTALLATION_TR.md) belgesindeki platform paketini kullanın. Özel Go araç zinciri, çevrimdışı LaTeX, yardımcı programlar, Studio, starter ve belgeler pakete dahildir.
+
 ## Kaynak koddan derleme
 
 AhdCode şu anda Go 1.26 veya daha yeni bir sürüm gerektirir.
 
 ```bash
 cd AhdCode
-go test ./...
 go install ./cmd/ahdcode ./cmd/ahdnumeric ./cmd/ahdplot ./cmd/ahdsqlite
 ```
 

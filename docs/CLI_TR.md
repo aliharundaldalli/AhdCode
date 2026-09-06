@@ -228,7 +228,7 @@ Bir şey başlatmadan önce iki yapılandırmayı reddeder:
   çalıştırmak, ya onu development saymak ya da `APP_ENV`'i yeniden yazmak
   olurdu.
 - `APP_PROTOCOL=https`. `dev` düz metin HTTP sunar; alt süreci başlatmak,
-  yapılandırma `https` derken `http` sunmak olurdu. v0.19 `.test` adlarını
+  yapılandırma `https` derken `http` sunmak olurdu. AhdCode `.test` adlarını
   düz metin HTTP üzerinden yönlendirir; hâlâ yerel bir sertifika otoritesi
   veya sertifika yönetimi getirmez ve `dev` ne protokolü düşürür ne de
   güvenilmeyen bir sertifika üretir — bkz.
@@ -305,7 +305,7 @@ Yaptığı iş bilinçli olarak dardır:
 - yöntem, yol, sorgu, başlıklar ve gövde değiştirilmeden iletilir; uygulama,
   geri döngü portunu değil yazılan adı görür.
 
-v0.19'da yerel geliştirme **düz metin HTTP**'dir. Yerel TLS, sertifika
+bu sürümde yerel geliştirme **düz metin HTTP**'dir. Yerel TLS, sertifika
 otoritesi ve ACME yoktur.
 
 ### Hangi port
@@ -468,7 +468,7 @@ ahdcode databases list
 ahdcode databases remove ./database/app.db
 ```
 
-- v0.19'da **yalnızca SQLite**. MySQL yapılandırması tam olarak olduğu yerde
+- bu sürümde **yalnızca SQLite**. MySQL yapılandırması tam olarak olduğu yerde
   kalır — açık AhdDataStudio ayarları — çünkü bir MySQL kaynağı kimlik
   bilgilerinden ayrılamaz ve kimlik bilgilerinin bir kayıt defterinde yeri
   yoktur.

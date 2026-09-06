@@ -1,8 +1,8 @@
 # Env standard module
 
-[English] · [Türkçe](ENV_TR.md)
+[English] · Türkçe
 
-[Back to README](../README.md) · [Modules](MODULES.md) · [File and Path](FILESYSTEM.md)
+[Back to README](README.md) · [Modules](MODULES.md) · [File and Path](FILESYSTEM.md)
 
 `Env` is the compiler-registered `builtin:Env` module. It is explicit and a
 sibling `Env.ahd` cannot shadow it:

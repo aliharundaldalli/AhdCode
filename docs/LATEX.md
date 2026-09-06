@@ -375,6 +375,8 @@ transaction.
 `pdfFile` is unchanged: it still takes exactly `(input, output)`, because its
 caller already owns the `.tex` file on disk.
 
+**Release packages include this runtime. The following staging instructions are for source-build contributors only.**
+
 Compilation is done by the offline Tectonic engine and a local resource bundle. The standard source installation (`go install`) does not install the LaTeX runtime files. A user who wants to use LaTeX must explicitly stage them once using the `package-latex` tool:
 
 ```bash

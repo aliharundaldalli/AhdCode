@@ -1,8 +1,8 @@
 # require(...)
 
-[English] · [Türkçe](REQUIRE_TR.md)
+[English] · Türkçe
 
-[Back to README](../README.md) · [CLI](CLI.md) · [Modules](MODULES.md)
+[Back to README](README.md) · [CLI](CLI.md) · [Modules](MODULES.md)
 
 `require("Path/To/File.ahd")` (v0.14) composes another local `.ahd` source
 file into this program at **compile time**. It is not a runtime include, not

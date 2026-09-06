@@ -486,7 +486,7 @@ is public, subject to the existing containment, traversal, and dotfile
 protections. `public/app.css` is then served at `/assets/app.css`. This
 delegates to `server.static`.
 
-`managedAssets` is the v0.20 default for new applications. Only files a
+`managedAssets` is the default for new applications. Only files a
 Layout, Page, or Component declared through `Web.Assets` become
 browser-addressable. A neighbour that was never declared is not. Public is
 an access policy, not a directory name. This delegates to `server.managed`.
@@ -581,7 +581,7 @@ It also **refuses** `APP_PROTOCOL=https`:
 ```
 
 `ahdcode dev` starts the application, and the application binds a plaintext
-HTTP socket. There is no path in v0.19 by which `APP_PROTOCOL=https` results
+HTTP socket. There is no path in this release by which `APP_PROTOCOL=https` results
 in TLS here, so starting the child would mean serving `http` while the
 configuration says `https`. It refuses instead of downgrading: a silent
 downgrade would hide a secure-cookie or mixed-content problem until
@@ -641,7 +641,7 @@ the same string.
 
 ### Is the name routed?
 
-In v0.19, yes — over HTTP, on this machine only. `ahdcode dev` registers the
+Yes — over HTTP, on this machine only. `ahdcode dev` registers the
 name in AhdCode's per-user route registry and hosts a small loopback-only
 router that serves every registered route. Two things still have to be true
 for the clean URL to open in a browser:
@@ -663,7 +663,7 @@ running never pushes a new session onto a suffixed name.
 
 ## 14. Local HTTPS — current limitation
 
-v0.19 routes `.test` names over **plaintext HTTP**. It still **does not ship**
+AhdCode routes `.test` names over **plaintext HTTP**. It still **does not ship**
 a local certificate authority, a certificate manager, or ACME, and there is no
 `ahdcode trust` command.
 
@@ -717,7 +717,7 @@ SERVER_PORT=8080            →   127.0.0.1:8080
 
 Never derive a public URL from `SERVER_PORT`.
 
-v0.19 is not a production certificate manager: no ACME, no Let's Encrypt
+AhdCode is not a production certificate manager: no ACME, no Let's Encrypt
 automation, no DNS challenges, no renewal service. The local router is
 strictly a development convenience -- loopback only, never a deployment
 target. If your `HTTP` primitives
@@ -1240,3 +1240,18 @@ Use `Web.context`, `Web.form`, `Web.errors`, and `Form.old` as the normal
 constructors. `WebContextError` and `FormValueError` inherit `Error` and its
 attributes; existing error identities are unchanged. New APIs appear through
 the compiled ModuleInterface in completion, hover, and signature help.
+
+
+## MVC and CRUD application workflows
+
+Both starters show the same member application and schema. MVC separates routes,
+controllers, models, views, and components; CRUD keeps routes, auth, and user logic
+in fewer top-level files. Both use the same views and managed local CSS, without JS.
+Home (`GET /`) retains authentication and adapts its navigation. `/dashboard` is
+signed-in only. Profile links use the session user's opaque `public_id`; `/settings`
+updates only that session identity, ignoring submitted identity/role fields.
+Administrators manage members at `/admin/users`: Add Member, View, Edit (name),
+and Delete. Delete opens a confirmation page; only the subsequent CSRF-protected
+POST deletes. Own-account deletion is refused. Public Home shows only names and
+membership; email is visible only in authorized administration. No public registration.
+The generated `Documents/PROJECT.md` records these workflows and the exact CLI version.

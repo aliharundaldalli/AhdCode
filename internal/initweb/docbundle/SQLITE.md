@@ -1,8 +1,8 @@
 # SQLite standard module
 
-[English] · [Türkçe](SQLITE_TR.md)
+[English] · Türkçe
 
-[Back to README](../README.md) · [Modules](MODULES.md) · [JSON](JSON.md) · [Student Guide](STUDENT_GUIDE_EN.md#35-sqlite-a-database-that-remembers)
+[Back to README](README.md) · [Modules](MODULES.md) · [JSON](JSON.md) · [Student Guide](STUDENT_GUIDE_EN.md#35-sqlite-a-database-that-remembers)
 
 `SQLite` is the compiler-registered `builtin:SQLite` module, introduced in
 AhdCode v0.3.0. It is explicit and a sibling `SQLite.ahd` cannot shadow it:
@@ -363,6 +363,8 @@ command-line tool, no CGO, and no network access.
 `CGO_ENABLED=0 go build ./...` succeeds. The helper is installed next to the
 compiler:
 
+**Release packages include this runtime. The following staging instructions are for source-build contributors only.**
+
 ```bash
 go install ./cmd/ahdcode ./cmd/ahdnumeric ./cmd/ahdplot ./cmd/ahdsqlite
 ```
@@ -379,7 +381,7 @@ database operation raises `SQLiteError` explaining how to set
 Database files written by AhdCode are ordinary SQLite 3 files, readable by
 every other SQLite implementation (for example Python's `sqlite3` module or
 the `sqlite3` CLI), and AhdCode reads files those tools produce. See
-[`THIRD_PARTY_NOTICES_SQLITE.md`](../THIRD_PARTY_NOTICES_SQLITE.md).
+`THIRD_PARTY_NOTICES_SQLITE.md`.
 
 ## Non-goals
 
@@ -393,4 +395,4 @@ and no generic database interface shared with a future MySQL module. `SQLite`
 is its own module.
 
 See also: [Student Guide — SQLite](STUDENT_GUIDE_EN.md#35-sqlite-a-database-that-remembers) ·
-[`examples/v0.3/01_sqlite_notes.ahd`](../examples/v0.3/01_sqlite_notes.ahd).
+`examples/v0.3/01_sqlite_notes.ahd`.

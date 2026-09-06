@@ -1,4 +1,4 @@
-# AhdCode v0.20.0 English Student Guide
+# AhdCode v1.0.0-rc.1 English Student Guide
 
 This guide is designed so that **even someone who has never programmed before** can follow along. You can read it in order from beginning to end; in each section, you will first see what we want to achieve, then write a working example, and finally learn the necessary rules.
 
@@ -95,7 +95,7 @@ Hello!
 
 AhdCode checks the code you wrote before running the program. For example, if you try to use text like a number, or if you use a value that could be `null` without checking it, it will tell you the error before the program even starts, whenever possible. But you don't need to think about these details at the beginning; we'll see examples in later sections.
 
-AhdCode v0.20.0 is the current release. It is still pre-1.0: the language works end to end, but things may still change before 1.0.
+AhdCode v1.0.0-rc.1 is the release candidate for independent QA. Final v1.0.0 has not yet been released.
 
 With it you can write small command-line programs or compile them into native executables; keep data in a local SQLite database or a MySQL server; build a complete web application with the first-party `Web` framework -- pages, layouts, forms, validation, CSRF, flash messages, sessions, and file uploads; call external HTTP and HTTPS APIs; parse HTML; send mail through SMTP; hash passwords and generate secure tokens with `Security`; and use the language server (`ahdcode lsp`) from an editor such as VS Code.
 
@@ -109,23 +109,18 @@ You do not need to know which version added what to use the language. If you are
 
 ## 2. Installation and your first program
 
-To build AhdCode from source, you must have Go 1.26 or newer installed on your computer. Run the following commands in the project folder:
+Install the release package for your platform following [Installation](INSTALLATION.md).
+The packaged product includes its own Go toolchain, AhdDataStudio, runtime helpers,
+and offline LaTeX resources. You do not need Git, a source checkout, system Go,
+`AHDCODE_ROOT`, npm, or a separate TeX installation.
+
+Open a new terminal and confirm:
 
 ```bash
-cd AhdCode
-go test ./...
-go install ./cmd/ahdcode ./cmd/ahdnumeric ./cmd/ahdplot ./cmd/ahdsqlite
-export PATH="$(go env GOPATH)/bin:$PATH"
 ahdcode --version
 ```
 
-If you want to use the `Latex` module, you must also stage the offline Latex runtime bundle. This step performs a one-time network fetch to download pinned resources:
-
-```bash
-go run ./tooling/latex/cmd/package-latex --output "$(go env GOPATH)"
-```
-
-If the last command prints `AhdCode v0.20.0`, you are ready.
+Source builds are a contributor workflow; see the root README's source-build section.
 
 Now create a file named `hello.ahd` and write this inside:
 

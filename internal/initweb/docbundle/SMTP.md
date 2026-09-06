@@ -1,8 +1,8 @@
 # SMTP standard module
 
-[English] · [Türkçe](SMTP_TR.md)
+[English] · Türkçe
 
-[Back to README](../README.md) · [Modules](MODULES.md) · [Env](ENV.md) · [Student Guide](STUDENT_GUIDE_EN.md#41-sending-email-smtp)
+[Back to README](README.md) · [Modules](MODULES.md) · [Env](ENV.md) · [Student Guide](STUDENT_GUIDE_EN.md#41-sending-email-smtp)
 
 `SMTP` is the compiler-registered `builtin:SMTP` module, introduced in
 AhdCode v0.9.0. It is explicit and a sibling `SMTP.ahd` cannot shadow it:

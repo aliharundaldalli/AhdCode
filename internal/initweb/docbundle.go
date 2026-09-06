@@ -15,20 +15,57 @@ var projectDocs embed.FS
 // generated Web project. Turkish files, historical examples, and QA notes
 // are intentionally absent.
 var documentationManifest = []string{
+	"ARCHIVE.md",
+	"CLASSES.md",
 	"CLI.md",
+	"COLLECTIONS.md",
+	"CONTROL_FLOW.md",
+	"CSV.md",
+	"DATA.md",
+	"DIAGNOSTICS.md",
 	"ENV.md",
+	"ERRORS.md",
+	"EXCEL.md",
+	"FILESYSTEM.md",
+	"FORMATTER.md",
+	"FUNCTIONS.md",
+	"FUNDAMENTALS.md",
 	"GETTING_STARTED.md",
 	"HTML.md",
 	"HTTP.md",
 	"IDENTITY.md",
+	"INSTALLATION.md",
+	"JSON.md",
+	"KEYVALUE.md",
 	"LANGUAGE_TOUR.md",
+	"LATEX.md",
+	"LISTS.md",
+	"LIST_API.md",
+	"LSP.md",
+	"MATH.md",
 	"MODULES.md",
 	"MYSQL.md",
+	"NUMERIC.md",
+	"PDF.md",
+	"PLOT.md",
+	"PRACTICAL_MODULES.md",
+	"PROTOCOLS.md",
+	"REGEX.md",
+	"REPL.md",
 	"REQUIRE.md",
 	"SECURITY.md",
 	"SMTP.md",
 	"SQLITE.md",
+	"STATISTICS.md",
+	"STRING_API.md",
+	"STUDENT_GUIDE_EN.md",
+	"TIME.md",
+	"TYPES_AND_NULL.md",
 	"WEB.md",
+	"WORD.md",
+	"XML.md",
+	"README.md",
+	"AHDCODE_LANGUAGE_SPEC_v0.1.md",
 }
 
 func documentationFiles(options Options) []fileSpec {
@@ -44,7 +81,7 @@ func documentationFiles(options Options) []fileSpec {
 		files = append(files, fileSpec{
 			relPath: "Documents/AhdCode/" + name,
 			perm:    0o644,
-			content: content,
+			content: append([]byte("<!-- Exact-version documentation: "+ahdversion.Display+" -->\n\n"), content...),
 		})
 	}
 	return files
@@ -78,12 +115,12 @@ func renderProjectDoc(options Options) string {
 	case StarterMVC:
 		b.WriteString("This application uses an MVC layout: `Routes/`, `Controllers/`, `Models/`, `Views/`, and `Components/`.\n")
 		b.WriteString("Public pages list members by name and role. Signed-in members can open only their own profile.\n")
-		b.WriteString("Administrators can list, view, create, and delete users. Deletes are POST-only and CSRF-protected.\n")
+		b.WriteString("Administrators can list, view, create, edit names, and delete members after confirmation. Deletes are POST-only and CSRF-protected.\n")
 		b.WriteString("Public identifiers are `public_id` values from `Identity.id()`, never numeric database ids.\n")
 	case StarterCRUD:
 		b.WriteString("This application uses a flatter CRUD layout: `app.ahd`, `routes.ahd`, `auth.ahd`, `users.ahd`, and `Views/`.\n")
 		b.WriteString("Public pages list members by name and role. Signed-in members can open only their own profile.\n")
-		b.WriteString("Administrators can list, view, create, and delete users. Deletes are POST-only and CSRF-protected.\n")
+		b.WriteString("Administrators can list, view, create, edit names, and delete members after confirmation. Deletes are POST-only and CSRF-protected.\n")
 		b.WriteString("Public identifiers are `public_id` values from `Identity.id()`, never numeric database ids.\n")
 	case StarterAdmin:
 		b.WriteString("This application has a public home page and a signed-in administrator dashboard.\n")

@@ -488,7 +488,7 @@ mevcut kapsama, dizin gezinme ve gizli dosya korumalarıyla kamusaldır.
 `public/app.css` böylece `/assets/app.css` adresinden sunulur. Bu
 `server.static`'e devredilir.
 
-`managedAssets` yeni uygulamalar için v0.20 varsayılanıdır. Yalnızca bir
+`managedAssets` yeni uygulamalar için varsayılanıdır. Yalnızca bir
 Layout, Page veya Component'in `Web.Assets` ile bildirdiği dosyalar
 tarayıcıdan okunabilir. Hiç bildirilmemiş bir komşu dosya okunamaz.
 Kamusal olmak bir erişim politikasıdır, bir dizin adı değildir. Bu
@@ -584,7 +584,7 @@ derler ve yeniden başlatır. `public/app.css`'i düzenlemek bunu yapmaz.
 ```
 
 `ahdcode dev` uygulamayı başlatır ve uygulama düz metin bir HTTP soketine
-bağlanır. v0.19'da `APP_PROTOCOL=https`'in burada TLS'e dönüştüğü bir yol
+bağlanır. bu sürümde `APP_PROTOCOL=https`'in burada TLS'e dönüştüğü bir yol
 yoktur; alt süreci başlatmak, yapılandırma `https` derken `http` sunmak
 olurdu. Düşürmek yerine reddeder: sessiz bir düşüş, güvenli çerez veya karışık
 içerik sorununu production'a kadar gizlerdi.
@@ -644,7 +644,7 @@ açabileceği ad her zaman aynı dizedir.
 
 ### Ad yönlendiriliyor mu?
 
-v0.19'da evet — HTTP üzerinden ve yalnızca bu makinede. `ahdcode dev` adı
+bu sürümde evet — HTTP üzerinden ve yalnızca bu makinede. `ahdcode dev` adı
 AhdCode'un kullanıcıya özel rota kayıt defterine yazar ve kayıtlı bütün
 rotaları sunan, yalnızca geri döngüyü dinleyen küçük bir yönlendirici
 barındırır. Temiz adresin bir tarayıcıda açılması için iki şeyin daha doğru
@@ -1192,3 +1192,17 @@ Olağan kurucular `Web.context`, `Web.form`, `Web.errors` ve `Form.old` olmalıd
 `WebContextError` ve `FormValueError`, `Error` ve özniteliklerini miras alır;
 mevcut hata kimlikleri değişmez. Tamamlama, hover ve imza yardımı yeni API'leri
 derlenmiş ModuleInterface üzerinden öğrenir.
+
+
+## MVC ve CRUD uygulama akışları
+
+İki starter aynı üye uygulamasını ve şemayı gösterir. MVC; Routes, Controllers,
+Models, Views ve Components kullanır; CRUD route, auth ve kullanıcı mantığını daha
+az üst düzey dosyada tutar. Görünümler ve yönetilen yerel CSS aynıdır; JS gerekmez.
+Home (`GET /`) oturumu korur. `/dashboard` oturum gerektirir. Profil bağlantıları
+opak `public_id` kullanır. `/settings` yalnızca oturum sahibinin adını değiştirir;
+gönderilen kimlik/rol alanları yetki sağlamaz. Yönetici `/admin/users` altında
+Add Member, View, Edit (ad) ve Delete eylemlerini görür. Delete önce onay sayfasını
+açar; silme yalnızca CSRF korumalı POST ile yapılır. Kendi hesabını silme reddedilir.
+Açık ana sayfa yalnızca ad ve üyelik gösterir; e-posta yetkili yönetici görünümündedir.
+Açık kayıt yoktur. `Documents/PROJECT.md` tam CLI sürümünü ve bu akışları kaydeder.

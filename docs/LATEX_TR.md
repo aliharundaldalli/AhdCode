@@ -387,6 +387,8 @@ iki ayrı atomik yeniden adlandırmadır.
 `pdfFile` değişmedi: hâlâ tam olarak `(input, output)` alır, çünkü çağıranı
 `.tex` dosyasını zaten diskte sahiplenir.
 
+**Sürüm paketleri bu runtime bileşenini içerir. Aşağıdaki hazırlama adımları yalnızca kaynaktan derleyen geliştiriciler içindir.**
+
 Derleme, çevrimdışı Tectonic motoru ve yerel bir kaynak paketi tarafından yapılır. Kaynak koddan yapılan standart `go install` adımı LaTeX runtime dosyalarını kurmaz. LaTeX kullanmak isteyen kullanıcı, bunları `package-latex` aracıyla bir kez ayrıca hazırlar (stage):
 
 ```bash

@@ -6,38 +6,18 @@
 
 ## Install the compiler
 
-AhdCode currently builds with Go 1.25 or newer.
+Install the release package for your platform following [Installation](INSTALLATION.md).
+The packaged product includes its own Go toolchain, AhdDataStudio, runtime helpers,
+and offline LaTeX resources. You do not need Git, a source checkout, system Go,
+`AHDCODE_ROOT`, npm, or a separate TeX installation.
 
-```bash
-cd AhdCode
-go test ./...
-go install ./cmd/ahdcode ./cmd/ahdnumeric ./cmd/ahdplot ./cmd/ahdsqlite
-```
-
-If you plan to use the `Latex` module or the `PDF` module's `.save()` (they
-share one offline renderer), you must also stage the offline Latex/Tectonic
-runtime bundle. `Archive` needs no such staging. `SQLite` uses the bundled
-`ahdsqlite` helper installed above; it does not need a system `sqlite3`. This
-step performs a
-one-time network fetch for pinned resources:
-
-```bash
-go run ./tooling/latex/cmd/package-latex --output "$(go env GOPATH)"
-```
-
-After staging, ordinary AhdCode Latex execution remains offline.
-
-Ensure Go's binary directory is on `PATH`:
-
-```bash
-export PATH="$(go env GOPATH)/bin:$PATH"
-```
-
-Confirm the installation:
+Open a new terminal and confirm:
 
 ```bash
 ahdcode --version
 ```
+
+Source builds are a contributor workflow; see the root README's source-build section.
 
 ## Your first program
 
@@ -96,7 +76,7 @@ MySQL and the administrator account.
 Empty and Basic do not ask for a database and do not generate login or
 `database/`. Admin, MVC, and CRUD initialize the schema and administrator
 immediately: after `ahdcode dev app.ahd` the app is ready. Logout is POST
-`/logout` and redirects to `/`. Every starter also writes `AHDCODE.md` and
+`/logout`. Admin redirects to `/`; MVC/CRUD rotate to an anonymous session and redirect to `/login` with a signed-out notice. Every starter also writes `AHDCODE.md` and
 an English `Documents/AhdCode/` snapshot. Those files are not runtime.
 
 `.env` is gitignored. Admin SQLite ignores `database/*.db` and keeps
@@ -183,3 +163,18 @@ language constructs, and handler names are ordinary identifiers: the example
 routes to `register`, `registerSubmit` and `profile` with no `Page` suffix,
 while applications that already use `registerPage` keep working unchanged. See
 [10.1 Naming](WEB.md#101-naming).
+
+
+## MVC and CRUD application workflows
+
+Both starters show the same member application and schema. MVC separates routes,
+controllers, models, views, and components; CRUD keeps routes, auth, and user logic
+in fewer top-level files. Both use the same views and managed local CSS, without JS.
+Home (`GET /`) retains authentication and adapts its navigation. `/dashboard` is
+signed-in only. Profile links use the session user's opaque `public_id`; `/settings`
+updates only that session identity, ignoring submitted identity/role fields.
+Administrators manage members at `/admin/users`: Add Member, View, Edit (name),
+and Delete. Delete opens a confirmation page; only the subsequent CSRF-protected
+POST deletes. Own-account deletion is refused. Public Home shows only names and
+membership; email is visible only in authorized administration. No public registration.
+The generated `Documents/PROJECT.md` records these workflows and the exact CLI version.

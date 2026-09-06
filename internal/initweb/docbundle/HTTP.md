@@ -1,8 +1,8 @@
 # HTTP standard module
 
-[English] · [Türkçe](HTTP_TR.md)
+[English] · Türkçe
 
-[Back to README](../README.md) · [Modules](MODULES.md) · [HTML](HTML.md) · [Student Guide](STUDENT_GUIDE_EN.md#38-http-client)
+[Back to README](README.md) · [Modules](MODULES.md) · [HTML](HTML.md) · [Student Guide](STUDENT_GUIDE_EN.md#38-http-client)
 
 > **v0.15:** `HTTP` is the low-level module and stays exactly as documented
 > here. The first-party [`Web`](WEB.md) framework composes it -- `Web.app`

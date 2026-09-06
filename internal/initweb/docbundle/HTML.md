@@ -1,8 +1,8 @@
 # HTML standard module
 
-[English] · [Türkçe](HTML_TR.md)
+[English] · Türkçe
 
-[Back to README](../README.md) · [Modules](MODULES.md) · [HTTP](HTTP.md) · [Student Guide](STUDENT_GUIDE_EN.md#36-a-small-web-page)
+[Back to README](README.md) · [Modules](MODULES.md) · [HTTP](HTTP.md) · [Student Guide](STUDENT_GUIDE_EN.md#36-a-small-web-page)
 
 > **v0.15:** `HTML` is the low-level builder and stays exactly as documented
 > here. [`Web.UI`](WEB.md#9-webui) is an ergonomic layer written in AhdCode
@@ -162,7 +162,7 @@ itself is pure with respect to networking:
   markup, and
 - it never executes anything.
 
-Parsing `<img src="...">`, `<script src="...">`, `<link href="...">`, or
+Parsing ``, `<script src="...">`, `<link href="...">`, or
 `<iframe src="...">` produces ordinary, unreachable `HTMLElement` values
 naming those URLs as plain attribute text -- nothing is ever dialed.
 

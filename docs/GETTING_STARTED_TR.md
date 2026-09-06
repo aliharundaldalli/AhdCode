@@ -4,39 +4,18 @@
 
 ## Derleyiciyi kurun
 
-AhdCode şu anda Go 1.25 veya daha yeni bir sürümle derlenir.
+Platformunuza uygun sürüm paketini [Kurulum](INSTALLATION_TR.md) adımlarına göre kurun.
+Paket; özel Go araç zincirini, AhdDataStudio'yu, yardımcı programları ve çevrimdışı
+LaTeX kaynaklarını içerir. Git, kaynak deposu, sistem Go kurulumu, `AHDCODE_ROOT`,
+npm veya ayrı TeX kurulumu gerekmez.
 
-```bash
-cd AhdCode
-go test ./...
-go install ./cmd/ahdcode ./cmd/ahdnumeric ./cmd/ahdplot ./cmd/ahdsqlite
-```
-
-Eğer `Latex` modülünü veya `PDF` modülünün `.save()` metodunu kullanmayı
-planlıyorsanız (ikisi de aynı çevrimdışı render motorunu paylaşır),
-çevrimdışı (offline) Latex/Tectonic çalışma zamanını da hazırlamanız (stage)
-gerekir. `Archive` böyle bir hazırlığa ihtiyaç duymaz. `SQLite`, yukarıda
-kurulan paketli `ahdsqlite` yardımcısını kullanır; sistem `sqlite3` gerekmez.
-Bu adım, sabitlenmiş
-kaynakları indirmek için bir defaya mahsus ağ bağlantısı kullanır:
-
-```bash
-go run ./tooling/latex/cmd/package-latex --output "$(go env GOPATH)"
-```
-
-Hazırlık (staging) aşamasından sonra, AhdCode'un normal Latex işlemleri tamamen çevrimdışı çalışmaya devam eder.
-
-Go'nun ikili dosya (binary) dizininin `PATH`'te olduğundan emin olun:
-
-```bash
-export PATH="$(go env GOPATH)/bin:$PATH"
-```
-
-Kurulumu doğrulayın:
+Yeni bir terminal açıp doğrulayın:
 
 ```bash
 ahdcode --version
 ```
+
+Kaynaktan derleme, geliştirici iş akışıdır; kök README belgesine bakın.
 
 ## İlk programınız
 
@@ -183,3 +162,17 @@ yapısı değil; işleyici adları da sıradan tanımlayıcılardır: örnek `Pa
 olmadan `register`, `registerSubmit` ve `profile` işleyicilerine yönlendirir,
 `registerPage` kullanan uygulamalar ise değişmeden çalışmayı sürdürür. Bkz.
 [10.1 Adlandırma](WEB_TR.md#101-adlandırma).
+
+
+## MVC ve CRUD uygulama akışları
+
+İki starter aynı üye uygulamasını ve şemayı gösterir. MVC; Routes, Controllers,
+Models, Views ve Components kullanır; CRUD route, auth ve kullanıcı mantığını daha
+az üst düzey dosyada tutar. Görünümler ve yönetilen yerel CSS aynıdır; JS gerekmez.
+Home (`GET /`) oturumu korur. `/dashboard` oturum gerektirir. Profil bağlantıları
+opak `public_id` kullanır. `/settings` yalnızca oturum sahibinin adını değiştirir;
+gönderilen kimlik/rol alanları yetki sağlamaz. Yönetici `/admin/users` altında
+Add Member, View, Edit (ad) ve Delete eylemlerini görür. Delete önce onay sayfasını
+açar; silme yalnızca CSRF korumalı POST ile yapılır. Kendi hesabını silme reddedilir.
+Açık ana sayfa yalnızca ad ve üyelik gösterir; e-posta yetkili yönetici görünümündedir.
+Açık kayıt yoktur. `Documents/PROJECT.md` tam CLI sürümünü ve bu akışları kaydeder.

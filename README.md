@@ -12,7 +12,7 @@ AhdCode is an experimental statically checked general-purpose programming
 language focused on readable syntax, explicit intent, predictable semantics,
 and native compilation.
 
-The current candidate is **v0.20.0**. The core
+The current candidate is **v1.0.0-rc.1**. The core
 language works end to end, but the project is not production-ready and
 breaking changes may still occur before 1.0.
 
@@ -305,13 +305,16 @@ To maintain conceptual clarity, AhdCode's capabilities are organized into four d
    - **Diagnostics Engine:** construct-aware compiler diagnostics with clear error codes and hints
    - **Local Developer UI:** [AhdDataStudio](tools/AhdDataStudio/README.md) (localhost MySQL and SQLite management tool), `ahdcode databases list|add|remove` (per-user SQLite registry)
 
+## Installation
+
+Use the platform package described in [Installation](docs/INSTALLATION.md). It includes the private Go toolchain, offline LaTeX, SQLite/numeric/plot helpers, Studio, starters, and docs.
+
 ## Build from source
 
 AhdCode currently requires Go 1.26 or newer.
 
 ```bash
 cd AhdCode
-go test ./...
 go install ./cmd/ahdcode ./cmd/ahdnumeric ./cmd/ahdplot ./cmd/ahdsqlite
 ```
 

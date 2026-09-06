@@ -1,8 +1,8 @@
 # MySQL standard module
 
-[English] · [Türkçe](MYSQL_TR.md)
+[English] · Türkçe
 
-[Back to README](../README.md) · [Modules](MODULES.md) · [SQLite](SQLITE.md) · [Env](ENV.md) · [Student Guide](STUDENT_GUIDE_EN.md#51-mysql-a-network-database-server)
+[Back to README](README.md) · [Modules](MODULES.md) · [SQLite](SQLITE.md) · [Env](ENV.md) · [Student Guide](STUDENT_GUIDE_EN.md#51-mysql-a-network-database-server)
 
 `MySQL` is the compiler-registered `builtin:MySQL` module, introduced in
 AhdCode v0.11.0. It connects to a real MySQL server over the network using
@@ -303,7 +303,7 @@ error-checked surface. The MySQL wire protocol (including
 `caching_sha2_password`'s RSA key exchange) is exactly that kind of code:
 AhdCode's job is the safe, typed `connect`/`execute`/`query`/`begin` contract
 above, not re-deriving a production-grade protocol implementation. See
-[`THIRD_PARTY_NOTICES_MYSQL.md`](../THIRD_PARTY_NOTICES_MYSQL.md) for the
+`THIRD_PARTY_NOTICES_MYSQL.md` for the
 vendored code's licenses.
 
 ## Non-goals
@@ -317,4 +317,4 @@ are also out of scope for v0.11.0. MariaDB may work incidentally over the
 same wire protocol, but only MySQL 8.x is a tested target.
 
 See also: [Student Guide — MySQL](STUDENT_GUIDE_EN.md#51-mysql-a-network-database-server) ·
-[`examples/v0.11`](../examples/v0.11/README.md).
+`examples/v0.11`.

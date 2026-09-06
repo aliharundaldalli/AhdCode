@@ -1,8 +1,8 @@
 # Security standard module
 
-[English] · [Türkçe](SECURITY_TR.md)
+[English] · Türkçe
 
-[Back to README](../README.md) · [Modules](MODULES.md) · [HTTP](HTTP.md) · [SQLite](SQLITE.md) · [Student Guide](STUDENT_GUIDE_EN.md#50-security-password-hashing-and-secure-tokens)
+[Back to README](README.md) · [Modules](MODULES.md) · [HTTP](HTTP.md) · [SQLite](SQLITE.md) · [Student Guide](STUDENT_GUIDE_EN.md#50-security-password-hashing-and-secure-tokens)
 
 `Security` is the compiler-registered `builtin:Security` module, introduced in
 AhdCode v0.10.0. It is explicit and a sibling `Security.ahd` cannot shadow it:
@@ -227,7 +227,7 @@ Passwords never appear in error messages.
 
 ## See also
 
-- [v0.10 examples](../examples/v0.10/README.md)
+- v0.10 examples
 - [Student Guide — Security](STUDENT_GUIDE_EN.md#50-security-password-hashing-and-secure-tokens)
 - [HTTP module](HTTP.md) — sessions, CSRF context
 - [SQLite module](SQLITE.md) — storing hashes

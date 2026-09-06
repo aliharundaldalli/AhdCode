@@ -1,8 +1,8 @@
 # Language tour
 
-[English] · [Türkçe](LANGUAGE_TOUR_TR.md)
+[English] · Türkçe
 
-[Back to README](../README.md) · [Types and null](TYPES_AND_NULL.md)
+[Back to README](README.md) · [Types and null](TYPES_AND_NULL.md)
 
 ## Declarations and mutation
 

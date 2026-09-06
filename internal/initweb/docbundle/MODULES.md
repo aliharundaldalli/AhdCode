@@ -1,8 +1,8 @@
 # Modules
 
-[English] · [Türkçe](MODULES_TR.md)
+[English] · Türkçe
 
-[Back to README](../README.md) · [Math](MATH.md) · [File and Path](FILESYSTEM.md)
+[Back to README](README.md) · [Math](MATH.md) · [File and Path](FILESYSTEM.md)
 
 A local module is a sibling `.ahd` file. The reference is one case-sensitive
 identifier: `Utilities` resolves to `Utilities.ahd` beside the importing file.

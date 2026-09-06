@@ -1,4 +1,4 @@
-# AhdCode v0.20.0 Türkçe Öğrenci Rehberi
+# AhdCode v1.0.0-rc.1 Türkçe Öğrenci Rehberi
 
 Bu rehber, **daha önce hiç programlama yapmamış birinin de takip edebilmesi** için hazırlanmıştır. Baştan sona sırayla okuyabilirsiniz; her bölümde önce ne yapmak istediğimizi görecek, sonra çalışan bir örnek yazacak, en son gerekli kuralları öğreneceksiniz.
 
@@ -96,7 +96,7 @@ Merhaba!
 
 AhdCode, programı çalıştırmadan önce yazdığınız kodu kontrol eder. Örneğin bir metni sayı gibi kullanmaya çalışırsanız veya `null` olabilecek bir değeri kontrol etmeden kullanırsanız, mümkün olduğunda hatayı daha program başlamadan söyler. Ama başlangıçta bunun ayrıntılarını düşünmeniz gerekmiyor; ilerleyen bölümlerde örneklerle göreceğiz.
 
-AhdCode v0.20.0 güncel sürümdür. Hâlâ 1.0 öncesidir: dil uçtan uca çalışır, ama 1.0'dan önce bazı şeyler değişebilir.
+AhdCode v1.0.0-rc.1 bağımsız QA adayıdır. Final v1.0.0 henüz yayımlanmamıştır.
 
 Onunla küçük komut satırı programları yazabilir veya bunları yerel executable uygulamalara derleyebilirsiniz; veriyi yerel bir SQLite veritabanında ya da bir MySQL sunucusunda tutabilirsiniz; birinci taraf `Web` çatısıyla eksiksiz bir web uygulaması kurabilirsiniz — sayfalar, yerleşimler, formlar, doğrulama, CSRF, flash mesajları, oturumlar ve dosya yüklemeleri; dış HTTP ve HTTPS API'leri çağırabilir, HTML ayrıştırabilir, SMTP ile e-posta gönderebilir, `Security` ile parola hashleyip güvenli belirteç üretebilir ve dil sunucusunu (`ahdcode lsp`) VS Code gibi bir editörden kullanabilirsiniz.
 
@@ -110,23 +110,18 @@ Dili kullanmak için hangi sürümün neyi eklediğini bilmeniz gerekmez. Merak 
 
 ## 2. Kurulum ve ilk programınız
 
-AhdCode'u kaynak kodundan kurmak için bilgisayarınızda Go 1.26 veya daha yeni bir sürüm bulunmalıdır. Proje klasöründe şu komutları çalıştırın:
+Platformunuza uygun sürüm paketini [Kurulum](INSTALLATION_TR.md) adımlarına göre kurun.
+Paket; özel Go araç zincirini, AhdDataStudio'yu, yardımcı programları ve çevrimdışı
+LaTeX kaynaklarını içerir. Git, kaynak deposu, sistem Go kurulumu, `AHDCODE_ROOT`,
+npm veya ayrı TeX kurulumu gerekmez.
+
+Yeni bir terminal açıp doğrulayın:
 
 ```bash
-cd AhdCode
-go test ./...
-go install ./cmd/ahdcode ./cmd/ahdnumeric ./cmd/ahdplot ./cmd/ahdsqlite
-export PATH="$(go env GOPATH)/bin:$PATH"
 ahdcode --version
 ```
 
-Eğer `Latex` modülünü kullanmayı planlıyorsanız, çevrimdışı (offline) Latex çalışma zamanını da hazırlamanız (stage) gerekir. Bu adım, sabitlenmiş kaynakları indirmek için bir defaya mahsus ağ bağlantısı kullanır:
-
-```bash
-go run ./tooling/latex/cmd/package-latex --output "$(go env GOPATH)"
-```
-
-Son komut `AhdCode v0.20.0` yazıyorsa hazırsınız.
+Kaynaktan derleme, geliştirici iş akışıdır; kök README belgesine bakın.
 
 Şimdi `hello.ahd` adında bir dosya oluşturun ve içine şunu yazın:
 

@@ -297,7 +297,7 @@ What it does is narrow by design:
 - method, path, query, headers, and body are forwarded unchanged, and the
   application sees the name that was typed rather than the loopback port.
 
-Local development is **plaintext HTTP** in v0.19. There is no local TLS, no
+Local development is **plaintext HTTP** in this release. There is no local TLS, no
 certificate authority, and no ACME.
 
 ### Which port
@@ -459,7 +459,7 @@ ahdcode databases list
 ahdcode databases remove ./database/app.db
 ```
 
-- **SQLite only** in v0.19. MySQL configuration stays exactly where it is —
+- **SQLite only** in this release. MySQL configuration stays exactly where it is —
   explicit AhdDataStudio settings — because a MySQL source is inseparable
   from credentials, and credentials have no place in a registry.
 - `add` requires the file to exist; the registry describes databases, it does
