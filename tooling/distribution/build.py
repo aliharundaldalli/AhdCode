@@ -218,6 +218,6 @@ def main():
   (a.output/('manifest-'+goos+'.json')).write_text(json.dumps({'version':version,'commit':commit,'artifacts':[r for r in records if r['platform']==goos]},indent=2)+'\n')
  # The standalone artifact and the copy inside each package are the same
  # bytes, because both are copies of the one file that was verified.
- if a.vsix: shutil.copy2(a.vsix,a.output/a.vsix.name)
+ if a.vsix and a.vsix.resolve()!=(a.output/a.vsix.name).resolve(): shutil.copy2(a.vsix,a.output/a.vsix.name)
  (a.output/'release-manifest.json').write_text(json.dumps({'version':version,'commit':commit,'extension':vsix_version,'artifacts':records},indent=2)+'\n')
 if __name__=='__main__':main()
