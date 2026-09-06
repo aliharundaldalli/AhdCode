@@ -41,6 +41,7 @@ const (
 	smtpRuntimeFileName     = "ahdcode_smtp_runtime.go"
 	mysqlRuntimeFileName    = "ahdcode_mysql_runtime.go"
 	securityRuntimeFileName = "ahdcode_security_runtime.go"
+	identityRuntimeFileName = "ahdcode_identity_runtime.go"
 )
 
 // storage describes the Go representation chosen for one IR symbol.
@@ -143,6 +144,10 @@ func Generate(compilation *ir.Compilation) (*GeneratedProgram, []diagnostics.Dia
 	if err != nil {
 		return nil, append(generator.diagnostics, backendError(CodeFormatFailure, "embedded Security runtime source is not valid Go: "+err.Error(), source.Span{}, "the Security backend runtime must remain gofmt-clean"))
 	}
+	identityRuntime, err := format.Source([]byte(identityRuntimeSource()))
+	if err != nil {
+		return nil, append(generator.diagnostics, backendError(CodeFormatFailure, "embedded Identity runtime source is not valid Go: "+err.Error(), source.Span{}, "the Identity backend runtime must remain gofmt-clean"))
+	}
 	files := []GeneratedFile{
 		{Name: programFileName, Content: string(formatted)},
 		{Name: runtimeFileName, Content: string(runtime)},
@@ -154,6 +159,7 @@ func Generate(compilation *ir.Compilation) (*GeneratedProgram, []diagnostics.Dia
 		{Name: htmlRuntimeFileName, Content: string(htmlRuntime)},
 		{Name: smtpRuntimeFileName, Content: string(smtpRuntime)},
 		{Name: securityRuntimeFileName, Content: string(securityRuntime)},
+		{Name: identityRuntimeFileName, Content: string(identityRuntime)},
 	}
 	// Unlike every other runtime file above (standard library only, so always
 	// safe to include), ahdcode_mysql_runtime.go imports the vendored
@@ -207,6 +213,10 @@ func smtpRuntimeSource() string {
 
 func securityRuntimeSource() string {
 	return strings.Replace(ahdruntime.SecuritySource, "package ahdruntime", "package main", 1)
+}
+
+func identityRuntimeSource() string {
+	return strings.Replace(ahdruntime.IdentitySource, "package ahdruntime", "package main", 1)
 }
 
 func mysqlRuntimeSource() string {

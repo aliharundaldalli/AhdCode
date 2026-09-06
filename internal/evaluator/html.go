@@ -91,6 +91,10 @@ func (session *Session) htmlBuiltin(name string, args []any) any {
 			nodes[index] = session.htmlNodeData(item)
 		}
 		return session.htmlNodeFrom(ahdruntime.AhdHTMLElement(class, args[0].(string), keys, vals, nodes))
+	case "asset":
+		return session.htmlNodeFrom(ahdruntime.AhdHTMLAsset(class, args[0].(string), args[1].(string)))
+	case "inlineAsset":
+		return session.htmlNodeFrom(ahdruntime.AhdHTMLInlineAsset(class, args[0].(string), args[1].(string), args[2].(string)))
 	case "render":
 		return ahdruntime.AhdHTMLRender(class, session.htmlNodeData(args[0]))
 	case "document":
@@ -100,6 +104,18 @@ func (session *Session) htmlBuiltin(name string, args []any) any {
 			nodes[index] = session.htmlNodeData(item)
 		}
 		return ahdruntime.AhdHTMLDocument(class, args[0].(string), nodes)
+	case "composeDocument":
+		body := session.requireList(args[1])
+		head := session.requireList(args[2])
+		bodyNodes := make([]string, len(body.Items))
+		for index, item := range body.Items {
+			bodyNodes[index] = session.htmlNodeData(item)
+		}
+		headNodes := make([]string, len(head.Items))
+		for index, item := range head.Items {
+			headNodes[index] = session.htmlNodeData(item)
+		}
+		return ahdruntime.AhdHTMLComposeDocument(class, args[0].(string), bodyNodes, headNodes)
 	case "parse":
 		return session.htmlDocumentFrom(ahdruntime.AhdHTMLParse(class, args[0].(string)))
 	}

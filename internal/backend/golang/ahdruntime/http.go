@@ -50,15 +50,27 @@ type ahdHTTPServerState struct {
 	host         string
 	port         int
 	maxBodyBytes int64
-	routes       map[ahdHTTPRouteKey]AhdHTTPHandler
-	methods      map[string][]string
-	started      bool
-	httpServer   *http.Server
+	// maxUploadBytes and maxUploadFiles are Web runtime limits. Zero keeps
+	// the historical HTTP.server behaviour: the whole body is still bounded
+	// by maxBodyBytes, but there is no extra per-file or file-count cap.
+	maxUploadBytes int64
+	maxUploadFiles int
+	readTimeout    time.Duration
+	writeTimeout   time.Duration
+	idleTimeout    time.Duration
+	routes         map[ahdHTTPRouteKey]AhdHTTPHandler
+	methods        map[string][]string
+	started        bool
+	httpServer     *http.Server
 	// staticRoutes are prefix-matched, checked only after routes misses
 	// entirely (see ahdHTTPDispatcher.ServeHTTP): a program that registers
 	// both an exact route and an overlapping static prefix always has the
 	// exact route win, with zero ambiguity, because it is looked up first.
 	staticRoutes []ahdHTTPStaticEntry
+	// managedRoutes serve only files that a Component/Page/Layout declared
+	// through the Web asset system. A file that merely sits beside them is
+	// not browser-addressable.
+	managedRoutes []ahdHTTPStaticEntry
 }
 
 // ahdHTTPStaticEntry is one server.static(prefix, root) registration.
@@ -300,12 +312,30 @@ func AhdHTTPServerStart(class *AhdClass, handle string) {
 	if err != nil {
 		AhdRaiseClass(class, "HTTP server could not bind "+addr+": "+err.Error())
 	}
+	server.mutex.Lock()
+	readTimeout := server.readTimeout
+	writeTimeout := server.writeTimeout
+	idleTimeout := server.idleTimeout
+	server.mutex.Unlock()
+	if readTimeout <= 0 {
+		readTimeout = ahdHTTPReadTimeout
+	}
+	if writeTimeout <= 0 {
+		writeTimeout = ahdHTTPWriteTimeout
+	}
+	if idleTimeout <= 0 {
+		idleTimeout = ahdHTTPIdleTimeout
+	}
+	headerTimeout := ahdHTTPReadHeaderTimeout
+	if readTimeout < headerTimeout {
+		headerTimeout = readTimeout
+	}
 	httpServer := &http.Server{
 		Handler:           ahdHTTPDispatcher{class: class, state: server},
-		ReadHeaderTimeout: ahdHTTPReadHeaderTimeout,
-		ReadTimeout:       ahdHTTPReadTimeout,
-		WriteTimeout:      ahdHTTPWriteTimeout,
-		IdleTimeout:       ahdHTTPIdleTimeout,
+		ReadHeaderTimeout: headerTimeout,
+		ReadTimeout:       readTimeout,
+		WriteTimeout:      writeTimeout,
+		IdleTimeout:       idleTimeout,
 	}
 	server.mutex.Lock()
 	server.httpServer = httpServer
@@ -538,7 +568,235 @@ func AhdHTTPServerStatic(class *AhdClass, handle, prefix, root string) {
 			AhdRaiseClass(class, "HTTP static prefix "+ahdHTMLQuote(prefix)+" overlaps the already-registered prefix "+ahdHTMLQuote(existing.prefix))
 		}
 	}
+	for _, existing := range server.managedRoutes {
+		if strings.HasPrefix(existing.prefix, normalizedPrefix) || strings.HasPrefix(normalizedPrefix, existing.prefix) {
+			AhdRaiseClass(class, "HTTP static prefix "+ahdHTMLQuote(prefix)+" overlaps the already-registered prefix "+ahdHTMLQuote(existing.prefix))
+		}
+	}
 	server.staticRoutes = append(server.staticRoutes, ahdHTTPStaticEntry{prefix: normalizedPrefix, root: canonicalRoot})
+}
+
+// AhdHTTPServerManaged registers a managed asset prefix. Unlike static, a
+// file under root is served only after the Web asset system has declared it.
+func AhdHTTPServerManaged(class *AhdClass, handle, prefix, root string) {
+	if !strings.HasPrefix(prefix, "/") || strings.ContainsAny(prefix, "?#") {
+		AhdRaiseClass(class, "HTTP managed prefix "+ahdHTMLQuote(prefix)+" must begin with / and must not contain ? or #")
+	}
+	normalizedPrefix := prefix
+	if !strings.HasSuffix(normalizedPrefix, "/") {
+		normalizedPrefix += "/"
+	}
+	info, err := os.Stat(root)
+	if err != nil || !info.IsDir() {
+		AhdRaiseClass(class, "HTTP managed root "+ahdHTMLQuote(root)+" is not a directory")
+	}
+	canonicalRoot, err := filepath.Abs(root)
+	if err != nil {
+		AhdRaiseClass(class, "HTTP managed root "+ahdHTMLQuote(root)+" could not be resolved")
+	}
+	if evaluated, evalErr := filepath.EvalSymlinks(canonicalRoot); evalErr == nil {
+		canonicalRoot = evaluated
+	}
+
+	server := ahdHTTPLookup(class, handle)
+	server.mutex.Lock()
+	defer server.mutex.Unlock()
+	if server.started {
+		AhdRaiseClass(class, "HTTP routes cannot be changed after start")
+	}
+	for _, existing := range server.staticRoutes {
+		if strings.HasPrefix(existing.prefix, normalizedPrefix) || strings.HasPrefix(normalizedPrefix, existing.prefix) {
+			AhdRaiseClass(class, "HTTP managed prefix "+ahdHTMLQuote(prefix)+" overlaps the already-registered prefix "+ahdHTMLQuote(existing.prefix))
+		}
+	}
+	for _, existing := range server.managedRoutes {
+		if strings.HasPrefix(existing.prefix, normalizedPrefix) || strings.HasPrefix(normalizedPrefix, existing.prefix) {
+			AhdRaiseClass(class, "HTTP managed prefix "+ahdHTMLQuote(prefix)+" overlaps the already-registered prefix "+ahdHTMLQuote(existing.prefix))
+		}
+	}
+	server.managedRoutes = append(server.managedRoutes, ahdHTTPStaticEntry{prefix: normalizedPrefix, root: canonicalRoot})
+	ahdHTMLSetManagedAssetPrefix(normalizedPrefix)
+}
+
+const (
+	ahdWebEnvMaxBodySize    = "AHD_WEB_MAX_BODY_SIZE"
+	ahdWebEnvMaxUploadSize  = "AHD_WEB_MAX_UPLOAD_SIZE"
+	ahdWebEnvMaxUploadFiles = "AHD_WEB_MAX_UPLOAD_FILES"
+	ahdWebEnvReadTimeout    = "AHD_WEB_READ_TIMEOUT"
+	ahdWebEnvWriteTimeout   = "AHD_WEB_WRITE_TIMEOUT"
+	ahdWebEnvIdleTimeout    = "AHD_WEB_IDLE_TIMEOUT"
+
+	ahdWebDefaultMaxBody   int64 = 16 << 20
+	ahdWebDefaultMaxUpload int64 = 8 << 20
+	ahdWebDefaultMaxFiles        = 10
+)
+
+var (
+	ahdWebDefaultRead  = 30 * time.Second
+	ahdWebDefaultWrite = 30 * time.Second
+	ahdWebDefaultIdle  = 60 * time.Second
+)
+
+// AhdHTTPServerApplyWebLimits reads the AHD_WEB_* environment once at
+// application startup and freezes the values on this server. Unset keys
+// become the documented defaults. A malformed value fails instead of
+// falling back silently.
+func AhdHTTPServerApplyWebLimits(class *AhdClass, handle string) {
+	body, err := ahdHTTPParseSize(ahdWebEnvMaxBodySize, ahdHTTPWebEnvOr(ahdWebEnvMaxBodySize, "16MB"))
+	if err != nil {
+		AhdRaiseClass(class, err.Error())
+	}
+	upload, err := ahdHTTPParseSize(ahdWebEnvMaxUploadSize, ahdHTTPWebEnvOr(ahdWebEnvMaxUploadSize, "8MB"))
+	if err != nil {
+		AhdRaiseClass(class, err.Error())
+	}
+	files, err := ahdHTTPParseCount(ahdWebEnvMaxUploadFiles, ahdHTTPWebEnvOr(ahdWebEnvMaxUploadFiles, "10"))
+	if err != nil {
+		AhdRaiseClass(class, err.Error())
+	}
+	readTimeout, err := ahdHTTPParseDuration(ahdWebEnvReadTimeout, ahdHTTPWebEnvOr(ahdWebEnvReadTimeout, "30s"))
+	if err != nil {
+		AhdRaiseClass(class, err.Error())
+	}
+	writeTimeout, err := ahdHTTPParseDuration(ahdWebEnvWriteTimeout, ahdHTTPWebEnvOr(ahdWebEnvWriteTimeout, "30s"))
+	if err != nil {
+		AhdRaiseClass(class, err.Error())
+	}
+	idleTimeout, err := ahdHTTPParseDuration(ahdWebEnvIdleTimeout, ahdHTTPWebEnvOr(ahdWebEnvIdleTimeout, "60s"))
+	if err != nil {
+		AhdRaiseClass(class, err.Error())
+	}
+	if upload > body {
+		AhdRaiseClass(class, ahdWebEnvMaxUploadSize+" must not be greater than "+ahdWebEnvMaxBodySize)
+	}
+	AhdHTTPServerSetLimits(class, handle, body, upload, files, readTimeout, writeTimeout, idleTimeout)
+}
+
+// AhdHTTPServerSetLimits freezes integer/duration limits on one server.
+func AhdHTTPServerSetLimits(class *AhdClass, handle string, maxBody, maxUpload int64, maxFiles int, readTimeout, writeTimeout, idleTimeout time.Duration) {
+	if maxBody < 0 || maxUpload < 0 || maxFiles < 0 || readTimeout < 0 || writeTimeout < 0 || idleTimeout < 0 {
+		AhdRaiseClass(class, "HTTP Web limits must not be negative")
+	}
+	if maxUpload > maxBody {
+		AhdRaiseClass(class, ahdWebEnvMaxUploadSize+" must not be greater than "+ahdWebEnvMaxBodySize)
+	}
+	server := ahdHTTPLookup(class, handle)
+	server.mutex.Lock()
+	defer server.mutex.Unlock()
+	if server.started {
+		AhdRaiseClass(class, "HTTP routes cannot be changed after start")
+	}
+	server.maxBodyBytes = maxBody
+	server.maxUploadBytes = maxUpload
+	server.maxUploadFiles = maxFiles
+	server.readTimeout = readTimeout
+	server.writeTimeout = writeTimeout
+	server.idleTimeout = idleTimeout
+}
+
+func ahdHTTPWebEnvOr(key, fallback string) string {
+	value := strings.TrimSpace(os.Getenv(key))
+	if value == "" {
+		return fallback
+	}
+	return value
+}
+
+func ahdHTTPParseSize(key, raw string) (int64, error) {
+	text := strings.TrimSpace(raw)
+	if text == "" {
+		return 0, fmt.Errorf("%s must be a size such as 16MB", key)
+	}
+	unit := 1
+	upper := strings.ToUpper(text)
+	switch {
+	case strings.HasSuffix(upper, "GB"):
+		unit = 1 << 30
+		text = strings.TrimSpace(text[:len(text)-2])
+	case strings.HasSuffix(upper, "MB"):
+		unit = 1 << 20
+		text = strings.TrimSpace(text[:len(text)-2])
+	case strings.HasSuffix(upper, "KB"):
+		unit = 1 << 10
+		text = strings.TrimSpace(text[:len(text)-2])
+	case strings.HasSuffix(upper, "B") && !strings.HasSuffix(upper, "KB") && !strings.HasSuffix(upper, "MB") && !strings.HasSuffix(upper, "GB"):
+		unit = 1
+		text = strings.TrimSpace(text[:len(text)-1])
+	}
+	if text == "" {
+		return 0, fmt.Errorf("%s must be a size such as 16MB", key)
+	}
+	if strings.HasPrefix(text, "-") {
+		return 0, fmt.Errorf("%s must not be negative", key)
+	}
+	value, err := strconv.ParseInt(text, 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("%s=%s is not a valid size. Use forms such as 16MB, 8KB, or 512B", key, raw)
+	}
+	if value < 0 {
+		return 0, fmt.Errorf("%s must not be negative", key)
+	}
+	if unit > 1 && value > (1<<63-1)/int64(unit) {
+		return 0, fmt.Errorf("%s is too large", key)
+	}
+	return value * int64(unit), nil
+}
+
+func ahdHTTPParseCount(key, raw string) (int, error) {
+	text := strings.TrimSpace(raw)
+	if text == "" {
+		return 0, fmt.Errorf("%s must be a whole number of files", key)
+	}
+	if strings.HasPrefix(text, "-") {
+		return 0, fmt.Errorf("%s must not be negative", key)
+	}
+	value, err := strconv.ParseInt(text, 10, 32)
+	if err != nil {
+		return 0, fmt.Errorf("%s=%s is not a valid file count", key, raw)
+	}
+	if value < 0 {
+		return 0, fmt.Errorf("%s must not be negative", key)
+	}
+	return int(value), nil
+}
+
+func ahdHTTPParseDuration(key, raw string) (time.Duration, error) {
+	text := strings.TrimSpace(raw)
+	if text == "" {
+		return 0, fmt.Errorf("%s must be a duration such as 30s", key)
+	}
+	upper := strings.ToLower(text)
+	multiplier := time.Duration(0)
+	switch {
+	case strings.HasSuffix(upper, "ms"):
+		multiplier = time.Millisecond
+		text = strings.TrimSpace(text[:len(text)-2])
+	case strings.HasSuffix(upper, "s") && !strings.HasSuffix(upper, "ms"):
+		multiplier = time.Second
+		text = strings.TrimSpace(text[:len(text)-1])
+	case strings.HasSuffix(upper, "m"):
+		multiplier = time.Minute
+		text = strings.TrimSpace(text[:len(text)-1])
+	default:
+		return 0, fmt.Errorf("%s=%s is not a valid duration. Use forms such as 30s, 500ms, or 1m", key, raw)
+	}
+	if text == "" {
+		return 0, fmt.Errorf("%s must be a duration such as 30s", key)
+	}
+	if strings.HasPrefix(text, "-") {
+		return 0, fmt.Errorf("%s must not be negative", key)
+	}
+	value, err := strconv.ParseInt(text, 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("%s=%s is not a valid duration. Use forms such as 30s, 500ms, or 1m", key, raw)
+	}
+	if value < 0 {
+		return 0, fmt.Errorf("%s must not be negative", key)
+	}
+	if value > int64((1<<63-1)/int64(multiplier)) {
+		return 0, fmt.Errorf("%s is too large", key)
+	}
+	return time.Duration(value) * multiplier, nil
 }
 
 // ahdHTTPServeStatic attempts to serve request as a static file under one of
@@ -594,6 +852,60 @@ func ahdHTTPServeStatic(state *ahdHTTPServerState, writer http.ResponseWriter, r
 		// leaf is. A candidate that does not exist at all (the ordinary
 		// missing-file case) also surfaces here as an error, since
 		// EvalSymlinks requires every component to resolve.
+		resolved, err := filepath.EvalSymlinks(candidate)
+		if err != nil || !ahdHTTPWithinRoot(entry.root, resolved) {
+			ahdHTTPWritePlain(writer, http.StatusNotFound, "Not Found")
+			return true
+		}
+		info, err := os.Stat(resolved)
+		if err != nil {
+			ahdHTTPWritePlain(writer, http.StatusNotFound, "Not Found")
+			return true
+		}
+		if info.IsDir() {
+			ahdHTTPWritePlain(writer, http.StatusNotFound, "Not Found")
+			return true
+		}
+		file, err := os.Open(resolved)
+		if err != nil {
+			ahdHTTPWritePlain(writer, http.StatusNotFound, "Not Found")
+			return true
+		}
+		defer func() { _ = file.Close() }()
+		if contentType := mime.TypeByExtension(filepath.Ext(resolved)); contentType != "" {
+			writer.Header().Set("Content-Type", contentType)
+		}
+		http.ServeContent(writer, request, filepath.Base(resolved), info.ModTime(), file)
+		return true
+	}
+	return false
+}
+
+// ahdHTTPServeManaged is the declared-asset counterpart of static serving.
+// An undeclared neighbour, a directory request, traversal, and a dotfile
+// are all 404. The surrounding directory is never listed.
+func ahdHTTPServeManaged(state *ahdHTTPServerState, writer http.ResponseWriter, request *http.Request, method, path string) bool {
+	if method != http.MethodGet && method != http.MethodHead {
+		return false
+	}
+	state.mutex.Lock()
+	entries := append([]ahdHTTPStaticEntry(nil), state.managedRoutes...)
+	state.mutex.Unlock()
+
+	for _, entry := range entries {
+		if !strings.HasPrefix(path, entry.prefix) {
+			continue
+		}
+		relative := path[len(entry.prefix):]
+		if relative == "" || ahdHTTPStaticSegmentBlocked(relative) || !ahdHTMLAssetExposed(relative) {
+			ahdHTTPWritePlain(writer, http.StatusNotFound, "Not Found")
+			return true
+		}
+		candidate := filepath.Join(entry.root, filepath.FromSlash(relative))
+		if !ahdHTTPWithinRoot(entry.root, candidate) {
+			ahdHTTPWritePlain(writer, http.StatusNotFound, "Not Found")
+			return true
+		}
 		resolved, err := filepath.EvalSymlinks(candidate)
 		if err != nil || !ahdHTTPWithinRoot(entry.root, resolved) {
 			ahdHTTPWritePlain(writer, http.StatusNotFound, "Not Found")
@@ -683,11 +995,16 @@ func (dispatcher ahdHTTPDispatcher) ServeHTTP(writer http.ResponseWriter, reques
 	dispatcher.state.mutex.Lock()
 	handler, found, allowed := ahdHTTPLookupRoute(dispatcher.state, method, path)
 	maxBody := dispatcher.state.maxBodyBytes
+	maxUpload := dispatcher.state.maxUploadBytes
+	maxFiles := dispatcher.state.maxUploadFiles
 	dispatcher.state.mutex.Unlock()
 
 	if !found {
 		if len(allowed) == 0 {
 			if ahdHTTPServeStatic(dispatcher.state, writer, request, method, path) {
+				return
+			}
+			if ahdHTTPServeManaged(dispatcher.state, writer, request, method, path) {
 				return
 			}
 			ahdHTTPWritePlain(writer, http.StatusNotFound, "Not Found")
@@ -710,8 +1027,16 @@ func (dispatcher ahdHTTPDispatcher) ServeHTTP(writer http.ResponseWriter, reques
 		return
 	}
 
-	snapshot, uploadIDs, err := ahdHTTPMaterialize(request, body)
+	snapshot, uploadIDs, err := ahdHTTPMaterialize(request, body, maxUpload, maxFiles)
 	if err != nil {
+		if errors.Is(err, errHTTPUploadTooLarge) {
+			ahdHTTPWritePlain(writer, http.StatusRequestEntityTooLarge, "Payload Too Large")
+			return
+		}
+		if errors.Is(err, errHTTPTooManyUploads) {
+			ahdHTTPWritePlain(writer, http.StatusBadRequest, "Too Many Files")
+			return
+		}
 		ahdHTTPWritePlain(writer, http.StatusBadRequest, "Bad Request")
 		return
 	}
@@ -748,7 +1073,7 @@ func (dispatcher ahdHTTPDispatcher) ServeHTTP(writer http.ResponseWriter, reques
 // uploaded file registered for this request; the caller must release it once
 // the handler has finished, so unsaved temporary files never outlive the
 // request that produced them.
-func ahdHTTPMaterialize(request *http.Request, body []byte) (ahdHTTPRequestData, []string, error) {
+func ahdHTTPMaterialize(request *http.Request, body []byte, maxUploadBytes int64, maxUploadFiles int) (ahdHTTPRequestData, []string, error) {
 	var uploadIDs []string
 	rawQuery := ""
 	path := ""
@@ -792,7 +1117,7 @@ func ahdHTTPMaterialize(request *http.Request, body []byte) (ahdHTTPRequestData,
 		if boundary == "" {
 			return ahdHTTPRequestData{}, nil, errHTTPMultipartBoundary
 		}
-		ids, err := ahdHTTPParseMultipart(body, boundary, &snapshot)
+		ids, err := ahdHTTPParseMultipart(body, boundary, &snapshot, maxUploadBytes, maxUploadFiles)
 		if err != nil {
 			return ahdHTTPRequestData{}, nil, err
 		}
@@ -802,6 +1127,8 @@ func ahdHTTPMaterialize(request *http.Request, body []byte) (ahdHTTPRequestData,
 }
 
 var errHTTPMultipartBoundary = errors.New("multipart/form-data request has no boundary")
+var errHTTPUploadTooLarge = errors.New("uploaded file is too large")
+var errHTTPTooManyUploads = errors.New("too many uploaded files")
 
 var errHTTPEncodedUTF8 = errors.New("HTTP encoded parameter is not valid UTF-8")
 
@@ -1951,7 +2278,7 @@ func ahdHTTPUploadDetect(head []byte, size int64) string {
 // Text parts join the ordinary form/formAll values; file parts are written to
 // private temporary files and registered. The caller owns releasing the
 // returned ids.
-func ahdHTTPParseMultipart(body []byte, boundary string, snapshot *ahdHTTPRequestData) ([]string, error) {
+func ahdHTTPParseMultipart(body []byte, boundary string, snapshot *ahdHTTPRequestData, maxUploadBytes int64, maxUploadFiles int) ([]string, error) {
 	reader := multipart.NewReader(bytes.NewReader(body), boundary)
 	form := map[string][]string{}
 	var ids []string
@@ -1982,7 +2309,12 @@ func ahdHTTPParseMultipart(body []byte, boundary string, snapshot *ahdHTTPReques
 			form[field] = append(form[field], string(value))
 			continue
 		}
-		entry, id, fileErr := ahdHTTPStoreUploadPart(part, field)
+		if maxUploadFiles > 0 && len(ids)+1 > maxUploadFiles {
+			_ = part.Close()
+			release()
+			return nil, errHTTPTooManyUploads
+		}
+		entry, id, fileErr := ahdHTTPStoreUploadPart(part, field, maxUploadBytes)
 		_ = part.Close()
 		if fileErr != nil {
 			release()
@@ -2000,7 +2332,7 @@ func ahdHTTPParseMultipart(body []byte, boundary string, snapshot *ahdHTTPReques
 
 // ahdHTTPStoreUploadPart writes one file part to a temporary file and
 // registers it, returning the metadata the request snapshot carries.
-func ahdHTTPStoreUploadPart(part *multipart.Part, field string) (ahdHTTPUploadEntry, string, error) {
+func ahdHTTPStoreUploadPart(part *multipart.Part, field string, maxUploadBytes int64) (ahdHTTPUploadEntry, string, error) {
 	name, err := ahdHTTPUploadSafeName(part.FileName())
 	if err != nil {
 		return ahdHTTPUploadEntry{}, "", err
@@ -2020,6 +2352,11 @@ func ahdHTTPStoreUploadPart(part *multipart.Part, field string) (ahdHTTPUploadEn
 	for {
 		read, readErr := part.Read(buffer)
 		if read > 0 {
+			if maxUploadBytes > 0 && size+int64(read) > maxUploadBytes {
+				_ = file.Close()
+				_ = os.Remove(tempPath)
+				return ahdHTTPUploadEntry{}, "", errHTTPUploadTooLarge
+			}
 			if len(head) < ahdHTTPUploadSniffBytes {
 				room := ahdHTTPUploadSniffBytes - len(head)
 				if room > read {

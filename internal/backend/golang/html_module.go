@@ -35,10 +35,18 @@ func (generator *generator) htmlCall(value *ir.CallExpr) string {
 		return generator.htmlNodeFrom("AhdHTMLElement("+errorClass+", "+text(0, `""`)+", "+
 			generator.htmlAttributeKeys(value, 1)+", "+generator.htmlAttributeValues(value, 1)+", "+
 			generator.htmlNodeTexts(value, 2)+")", meta)
+	case "asset":
+		return generator.htmlNodeFrom("AhdHTMLAsset("+errorClass+", "+text(0, `""`)+", "+text(1, `""`)+")", meta)
+	case "inlineAsset":
+		return generator.htmlNodeFrom("AhdHTMLInlineAsset("+errorClass+", "+text(0, `""`)+", "+
+			text(1, `""`)+", "+text(2, `""`)+")", meta)
 	case "render":
 		return "AhdHTMLRender(" + errorClass + ", " + generator.htmlNodeOf(value.Arguments[0].Value) + ")"
 	case "document":
 		return "AhdHTMLDocument(" + errorClass + ", " + text(0, `""`) + ", " + generator.htmlNodeTexts(value, 1) + ")"
+	case "composeDocument":
+		return "AhdHTMLComposeDocument(" + errorClass + ", " + text(0, `""`) + ", " +
+			generator.htmlNodeTexts(value, 1) + ", " + generator.htmlNodeTexts(value, 2) + ")"
 	case "parse":
 		return generator.htmlDocumentFrom("AhdHTMLParse("+errorClass+", "+text(0, `""`)+")", meta)
 	default:

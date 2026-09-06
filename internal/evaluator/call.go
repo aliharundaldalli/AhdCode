@@ -209,6 +209,8 @@ func (session *Session) builtin(identity ir.CallableID, receiver any, arguments 
 		return session.smtpBuiltin(strings.TrimPrefix(name, "builtin:SMTP::"), values(arguments))
 	case strings.HasPrefix(name, "builtin:Security::"):
 		return session.securityBuiltin(strings.TrimPrefix(name, "builtin:Security::"), values(arguments))
+	case strings.HasPrefix(name, "builtin:Identity::"):
+		return session.identityBuiltin(strings.TrimPrefix(name, "builtin:Identity::"), values(arguments))
 	}
 	session.raise("Error", "unsupported builtin "+name)
 	return nil

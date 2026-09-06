@@ -70,7 +70,7 @@ func materializeUpload(t *testing.T, fields map[string]string, files []uploadFix
 	body, contentType := buildMultipart(t, fields, converted)
 	request := httptest.NewRequest(http.MethodPost, "/upload", bytes.NewReader(body))
 	request.Header.Set("Content-Type", contentType)
-	snapshot, ids, err := ahdHTTPMaterialize(request, body)
+	snapshot, ids, err := ahdHTTPMaterialize(request, body, 0, 0)
 	if err != nil {
 		t.Fatalf("multipart materialization failed: %v", err)
 	}
@@ -335,7 +335,7 @@ func TestMultipartMalformedIsRejectedBeforeHandler(t *testing.T) {
 			body := []byte(test.body)
 			request := httptest.NewRequest(http.MethodPost, "/upload", bytes.NewReader(body))
 			request.Header.Set("Content-Type", test.contentType)
-			if _, _, err := ahdHTTPMaterialize(request, body); err == nil {
+			if _, _, err := ahdHTTPMaterialize(request, body, 0, 0); err == nil {
 				t.Fatal("expected malformed multipart to fail materialization (400), not reach a handler")
 			}
 		})

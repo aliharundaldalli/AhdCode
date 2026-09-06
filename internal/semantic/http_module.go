@@ -54,7 +54,7 @@ func HTTPUploadedFileIdentity() *types.ClassSymbol {
 // name the members each Class publishes through built-in type operations, so
 // has/has not reports the real surface and the IR Class agrees with the
 // frontend.
-var HTTPServerOperations = []string{"get", "post", "route", "static", "start"}
+var HTTPServerOperations = []string{"get", "post", "route", "static", "managed", "applyWebLimits", "start"}
 var HTTPRequestOperations = []string{
 	"method", "path", "query", "queryAll", "header", "headerAll", "body", "form", "formAll",
 	"cookie", "cookieAll", "file", "files",
@@ -236,7 +236,9 @@ func httpOperationShapes() map[TypeOperation]httpOperationShape {
 		HTTPServerPost:   {[]types.Type{types.String, handler}, types.Nothing, false, "pass a path String and a (request: Request) -> Response Function"},
 		HTTPServerRoute:  {[]types.Type{types.String, types.String, handler}, types.Nothing, false, "pass a method String, a path String, and a (request: Request) -> Response Function"},
 		HTTPServerStatic: {[]types.Type{types.String, types.String}, types.Nothing, false, "pass a URL path prefix String and a filesystem root directory String"},
-		HTTPServerStart:  {none, types.Nothing, false, "call start with no argument"},
+		HTTPServerManaged: {[]types.Type{types.String, types.String}, types.Nothing, false, "pass a URL path prefix String and a filesystem root directory String"},
+		HTTPServerApplyWebLimits: {none, types.Nothing, false, "call applyWebLimits with no argument"},
+		HTTPServerStart:          {none, types.Nothing, false, "call start with no argument"},
 
 		HTTPRequestMethod:    {none, types.String, false, "call method with no argument"},
 		HTTPRequestPath:      {none, types.String, false, "call path with no argument"},
@@ -298,7 +300,8 @@ func httpOperationShapes() map[TypeOperation]httpOperationShape {
 var httpOperationNames = map[string]map[string]TypeOperation{
 	"Server": {
 		"get": HTTPServerGet, "post": HTTPServerPost, "route": HTTPServerRoute,
-		"static": HTTPServerStatic, "start": HTTPServerStart,
+		"static": HTTPServerStatic, "managed": HTTPServerManaged,
+		"applyWebLimits": HTTPServerApplyWebLimits, "start": HTTPServerStart,
 	},
 	"Request": {
 		"method": HTTPRequestMethod, "path": HTTPRequestPath,

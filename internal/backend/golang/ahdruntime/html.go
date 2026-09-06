@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"html"
 	"strings"
+	"sync"
 	"unicode/utf8"
 )
 
@@ -85,6 +86,9 @@ func ahdHTMLRenderNode(node ahdHTMLNode) string {
 	if node.Kind == "text" {
 		return html.EscapeString(node.Text)
 	}
+	if node.Kind == "asset" {
+		return ""
+	}
 	var builder strings.Builder
 	builder.WriteByte('<')
 	builder.WriteString(node.Name)
@@ -141,7 +145,7 @@ func ahdHTMLNameOK(name string, attribute bool) bool {
 
 func ahdHTMLDecode(class *AhdClass, data string) ahdHTMLNode {
 	var node ahdHTMLNode
-	if err := json.Unmarshal([]byte(data), &node); err != nil || (node.Kind != "text" && node.Kind != "element") {
+	if err := json.Unmarshal([]byte(data), &node); err != nil || (node.Kind != "text" && node.Kind != "element" && node.Kind != "asset") {
 		AhdRaiseClass(class, "HTML node storage is corrupted")
 	}
 	return node
@@ -158,6 +162,221 @@ func ahdHTMLQuote(value string) string {
 	}
 	builder.WriteByte('"')
 	return builder.String()
+}
+
+const (
+	ahdHTMLAssetStylesheet   = "stylesheet"
+	ahdHTMLAssetScript       = "script"
+	ahdHTMLAssetScriptDefer  = "script-defer"
+	ahdHTMLAssetScriptModule = "script-module"
+	ahdHTMLAssetInlineCSS    = "inline-css"
+	ahdHTMLAssetInlineJS     = "inline-js"
+)
+
+var ahdHTMLExposedAssets = struct {
+	mutex sync.Mutex
+	paths map[string]bool
+}{paths: map[string]bool{}}
+
+var ahdHTMLManagedPrefix = struct {
+	mutex sync.Mutex
+	value string
+}{value: "/assets/"}
+
+// AhdHTMLAsset is a Component/Page/Layout file requirement. The node is
+// invisible in ordinary HTML.render output; HTML.composeDocument collects it
+// into the document head (stylesheets) or the documented script location.
+// A relative path is also recorded as a managed public asset.
+func AhdHTMLAsset(class *AhdClass, kind, path string) string {
+	if !ahdHTMLFileAssetKind(kind) {
+		AhdRaiseClass(class, "HTML asset kind "+ahdHTMLQuote(kind)+" is not stylesheet, script, script-defer, or script-module")
+	}
+	if path == "" {
+		AhdRaiseClass(class, "HTML asset path must not be empty")
+	}
+	if strings.ContainsAny(path, "\\\x00") || strings.Contains(path, "..") {
+		AhdRaiseClass(class, "HTML asset path "+ahdHTMLQuote(path)+" is not a safe relative path")
+	}
+	if !strings.HasPrefix(path, "/") {
+		if ahdHTTPStaticSegmentBlocked(path) {
+			AhdRaiseClass(class, "HTML asset path "+ahdHTMLQuote(path)+" is not a safe relative path")
+		}
+		ahdHTMLExposeAsset(path)
+	}
+	encoded, _ := json.Marshal(ahdHTMLNode{Kind: "asset", Name: kind, Text: path})
+	return string(encoded)
+}
+
+// AhdHTMLInlineAsset is an explicit keyed inline stylesheet or script. The
+// content is executable, not escaped page text, and is rejected if it could
+// break out of its host element.
+func AhdHTMLInlineAsset(class *AhdClass, kind, key, content string) string {
+	if kind != ahdHTMLAssetInlineCSS && kind != ahdHTMLAssetInlineJS {
+		AhdRaiseClass(class, "HTML inline asset kind "+ahdHTMLQuote(kind)+" is not inline-css or inline-js")
+	}
+	if key == "" {
+		AhdRaiseClass(class, "HTML inline asset key must not be empty")
+	}
+	if kind == ahdHTMLAssetInlineCSS && ahdHTMLContainsClose(content, "</style") {
+		AhdRaiseClass(class, "HTML inline CSS must not contain a closing style tag")
+	}
+	if kind == ahdHTMLAssetInlineJS && ahdHTMLContainsClose(content, "</script") {
+		AhdRaiseClass(class, "HTML inline JavaScript must not contain a closing script tag")
+	}
+	encoded, _ := json.Marshal(ahdHTMLNode{
+		Kind: "asset", Name: kind, Text: content, AttrKeys: []string{key},
+	})
+	return string(encoded)
+}
+
+// AhdHTMLComposeDocument builds a complete HTML document and lifts asset
+// requirements out of the composed tree. Walk order is the extra head list
+// and then the body, depth-first, left to right. The first occurrence of a
+// given requirement wins; later duplicates are dropped.
+func AhdHTMLComposeDocument(class *AhdClass, title string, body, head []string) string {
+	type requirement struct {
+		kind    string
+		path    string
+		content string
+		key     string
+	}
+	seen := map[string]bool{}
+	var collected []requirement
+	var walk func(ahdHTMLNode)
+	walk = func(node ahdHTMLNode) {
+		if node.Kind == "asset" {
+			key := node.Name + "\x00" + node.Text
+			if node.Name == ahdHTMLAssetInlineCSS || node.Name == ahdHTMLAssetInlineJS {
+				if len(node.AttrKeys) == 0 {
+					AhdRaiseClass(class, "HTML node storage is corrupted")
+				}
+				key = node.Name + "\x00" + node.AttrKeys[0]
+			}
+			if seen[key] {
+				return
+			}
+			seen[key] = true
+			item := requirement{kind: node.Name, path: node.Text, content: node.Text}
+			if len(node.AttrKeys) > 0 {
+				item.key = node.AttrKeys[0]
+			}
+			collected = append(collected, item)
+			return
+		}
+		for _, child := range node.Children {
+			walk(child)
+		}
+	}
+	decodeAll := func(nodes []string) []ahdHTMLNode {
+		out := make([]ahdHTMLNode, len(nodes))
+		for index, data := range nodes {
+			out[index] = ahdHTMLDecode(class, data)
+			walk(out[index])
+		}
+		return out
+	}
+	headNodes := decodeAll(head)
+	bodyNodes := decodeAll(body)
+
+	prefix := ahdHTMLManagedAssetPrefix()
+	var builder strings.Builder
+	builder.WriteString("<!doctype html><html><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><title>")
+	builder.WriteString(html.EscapeString(title))
+	builder.WriteString("</title>")
+	for _, item := range collected {
+		switch item.kind {
+		case ahdHTMLAssetStylesheet:
+			builder.WriteString(`<link rel="stylesheet" href="`)
+			builder.WriteString(html.EscapeString(ahdHTMLAssetURL(prefix, item.path)))
+			builder.WriteString(`">`)
+		case ahdHTMLAssetInlineCSS:
+			builder.WriteString("<style>")
+			builder.WriteString(item.content)
+			builder.WriteString("</style>")
+		}
+	}
+	for _, node := range headNodes {
+		builder.WriteString(ahdHTMLRenderNode(node))
+	}
+	builder.WriteString("</head><body>")
+	for _, node := range bodyNodes {
+		builder.WriteString(ahdHTMLRenderNode(node))
+	}
+	for _, item := range collected {
+		switch item.kind {
+		case ahdHTMLAssetScript:
+			builder.WriteString(`<script src="`)
+			builder.WriteString(html.EscapeString(ahdHTMLAssetURL(prefix, item.path)))
+			builder.WriteString(`"></script>`)
+		case ahdHTMLAssetScriptDefer:
+			builder.WriteString(`<script src="`)
+			builder.WriteString(html.EscapeString(ahdHTMLAssetURL(prefix, item.path)))
+			builder.WriteString(`" defer></script>`)
+		case ahdHTMLAssetScriptModule:
+			builder.WriteString(`<script type="module" src="`)
+			builder.WriteString(html.EscapeString(ahdHTMLAssetURL(prefix, item.path)))
+			builder.WriteString(`"></script>`)
+		case ahdHTMLAssetInlineJS:
+			builder.WriteString("<script>")
+			builder.WriteString(item.content)
+			builder.WriteString("</script>")
+		}
+	}
+	builder.WriteString("</body></html>")
+	return builder.String()
+}
+
+func ahdHTMLFileAssetKind(kind string) bool {
+	switch kind {
+	case ahdHTMLAssetStylesheet, ahdHTMLAssetScript, ahdHTMLAssetScriptDefer, ahdHTMLAssetScriptModule:
+		return true
+	default:
+		return false
+	}
+}
+
+func ahdHTMLContainsClose(content, needle string) bool {
+	return strings.Contains(strings.ToLower(content), needle)
+}
+
+func ahdHTMLAssetURL(prefix, path string) string {
+	if strings.HasPrefix(path, "/") {
+		return path
+	}
+	return prefix + path
+}
+
+func ahdHTMLExposeAsset(path string) {
+	ahdHTMLExposedAssets.mutex.Lock()
+	ahdHTMLExposedAssets.paths[path] = true
+	ahdHTMLExposedAssets.mutex.Unlock()
+}
+
+func ahdHTMLAssetExposed(path string) bool {
+	ahdHTMLExposedAssets.mutex.Lock()
+	defer ahdHTMLExposedAssets.mutex.Unlock()
+	return ahdHTMLExposedAssets.paths[path]
+}
+
+func ahdHTMLResetExposedAssets() {
+	ahdHTMLExposedAssets.mutex.Lock()
+	ahdHTMLExposedAssets.paths = map[string]bool{}
+	ahdHTMLExposedAssets.mutex.Unlock()
+}
+
+func ahdHTMLSetManagedAssetPrefix(prefix string) {
+	if !strings.HasSuffix(prefix, "/") {
+		prefix += "/"
+	}
+	ahdHTMLManagedPrefix.mutex.Lock()
+	ahdHTMLManagedPrefix.value = prefix
+	ahdHTMLManagedPrefix.mutex.Unlock()
+}
+
+func ahdHTMLManagedAssetPrefix() string {
+	ahdHTMLManagedPrefix.mutex.Lock()
+	defer ahdHTMLManagedPrefix.mutex.Unlock()
+	return ahdHTMLManagedPrefix.value
 }
 
 // The HTML parsing half of the HTML standard module: HTML.parse and the

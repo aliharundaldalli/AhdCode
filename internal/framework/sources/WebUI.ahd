@@ -63,6 +63,45 @@ UIKit: Class<> := {
     stylesheet: Function := (href: String) -> HTMLNode {
         return HTML.element("link", {"rel": "stylesheet", "href": href}, [])
     }
+    // Attribute helpers close the ordinary class / id / style / data-* /
+    // aria-* gap without a dynamic object type. They copy the Pair they are
+    // handed; they never mutate the caller's map.
+    withClass: Function := (
+        attributes: Pair<String, String>
+        class: String
+    ) -> Pair<String, String> {
+        return KeyValue.with(attributes, "class", class)
+    }
+
+    withID: Function := (
+        attributes: Pair<String, String>
+        id: String
+    ) -> Pair<String, String> {
+        return KeyValue.with(attributes, "id", id)
+    }
+
+    withStyle: Function := (
+        attributes: Pair<String, String>
+        style: String
+    ) -> Pair<String, String> {
+        return KeyValue.with(attributes, "style", style)
+    }
+
+    withData: Function := (
+        attributes: Pair<String, String>
+        name: String
+        value: String
+    ) -> Pair<String, String> {
+        return KeyValue.with(attributes, "data-{name}", value)
+    }
+
+    withAria: Function := (
+        attributes: Pair<String, String>
+        name: String
+        value: String
+    ) -> Pair<String, String> {
+        return KeyValue.with(attributes, "aria-{name}", value)
+    }
     // --- Document structure ---
     html: Function := (
         children: List<HTMLNode>

@@ -92,16 +92,19 @@ func TestHTMLModuleInterfaceExportsExactSurface(t *testing.T) {
 	if module == nil || module.ModuleID != "builtin:HTML" {
 		t.Fatalf("HTML is not a registered builtin module: %#v", module)
 	}
-	wantExports := []string{"HTMLDocument", "HTMLElement", "HTMLError", "HTMLNode", "document", "element", "parse", "render", "text"}
+	wantExports := []string{"HTMLDocument", "HTMLElement", "HTMLError", "HTMLNode", "asset", "composeDocument", "document", "element", "inlineAsset", "parse", "render", "text"}
 	if strings.Join(module.ExportNames, ",") != strings.Join(wantExports, ",") {
 		t.Fatalf("HTML exports %v; want %v", module.ExportNames, wantExports)
 	}
 	signatures := map[string]string{
-		"text":     "(value: String) -> HTMLNode",
-		"element":  "(name: String, attributes: Pair<String, String>, children: List<HTMLNode>) -> HTMLNode",
-		"render":   "(node: HTMLNode) -> String",
-		"document": "(title: String, body: List<HTMLNode>) -> String",
-		"parse":    "(source: String) -> HTMLDocument",
+		"text":            "(value: String) -> HTMLNode",
+		"element":         "(name: String, attributes: Pair<String, String>, children: List<HTMLNode>) -> HTMLNode",
+		"asset":           "(kind: String, path: String) -> HTMLNode",
+		"inlineAsset":     "(kind: String, key: String, content: String) -> HTMLNode",
+		"render":          "(node: HTMLNode) -> String",
+		"document":        "(title: String, body: List<HTMLNode>) -> String",
+		"composeDocument": "(title: String, body: List<HTMLNode>, head: List<HTMLNode>) -> String",
+		"parse":           "(source: String) -> HTMLDocument",
 	}
 	for name, want := range signatures {
 		symbol := module.Exports[name]

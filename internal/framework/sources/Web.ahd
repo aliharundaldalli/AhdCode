@@ -60,10 +60,16 @@ bring WebValidation
 from WebValidation bring (FieldError, ValidationErrors)
 bring WebUI
 from WebUI bring UIKit
+bring WebAssets
+from WebAssets bring AssetKit
 // UI is the semantic HTML component layer: Web.UI.section, Web.UI.h1,
 // Web.UI.p, Web.UI.img, and the rest. Every String it takes as content is
 // escaped, so a value out of a database or a form stays text.
 UI: UIKit := UIKit()
+// Assets is how a Layout, Page, or Component declares the CSS and JavaScript
+// it needs. The node is composed with the rest of the page; Web.document
+// collects it. There is no component runtime.
+Assets: AssetKit := AssetKit()
 // loadEnvironment reads a local .env file into the process environment.
 //
 // Precedence is fixed and deliberate: a variable already exported by the
@@ -92,9 +98,11 @@ configure: Function := (envPath: String := ".env") -> AppConfig {
 // process listens on, which is not the same thing as the application's public
 // URL: behind a reverse proxy the two differ by design.
 app: Function := (config: AppConfig) -> App {
+    server: Local Server := HTTP.server(config.serverHost, config.serverPort)
+    server.applyWebLimits()
     return App(
         config: config
-        server: HTTP.server(config.serverHost, config.serverPort)
+        server: server
     )
 }
 // start is the ordinary entry point: load .env if present, validate the
@@ -118,27 +126,7 @@ document: Function := (
     body: List<HTMLNode>
     head: List<HTMLNode> := []
 ) -> String {
-    headNodes: Local List<HTMLNode> := [
-        HTML.element("meta", {"charset": "utf-8"}, [])
-        HTML.element(
-            "meta"
-            {
-                "name": "viewport"
-                "content": "width=device-width, initial-scale=1"
-            }
-            []
-        )
-        HTML.element("title", {}, [HTML.text(title)])
-    ]
-    for node in head {
-        headNodes.add(node)
-    }
-    shell: Local HTMLNode := HTML.element(
-        "html"
-        {}
-        [HTML.element("head", {}, headNodes), HTML.element("body", {}, body)]
-    )
-    return "<!doctype html>{HTML.render(shell)}"
+    return HTML.composeDocument(title, body, head)
 }
 // page is document as a response: the ordinary last line of a Layout.
 page: Function := (

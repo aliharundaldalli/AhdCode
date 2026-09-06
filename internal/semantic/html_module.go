@@ -74,11 +74,22 @@ func htmlModuleInterface() *ModuleInterface {
 		types.Parameter{Name: "name", Type: types.String},
 		types.Parameter{Name: "attributes", Type: attributes},
 		types.Parameter{Name: "children", Type: children}))
+	addStandardExport(module, standardFunction(htmlModuleID, "asset", node,
+		types.Parameter{Name: "kind", Type: types.String},
+		types.Parameter{Name: "path", Type: types.String}))
+	addStandardExport(module, standardFunction(htmlModuleID, "inlineAsset", node,
+		types.Parameter{Name: "kind", Type: types.String},
+		types.Parameter{Name: "key", Type: types.String},
+		types.Parameter{Name: "content", Type: types.String}))
 	addStandardExport(module, standardFunction(htmlModuleID, "render", types.String,
 		types.Parameter{Name: "node", Type: node}))
 	addStandardExport(module, standardFunction(htmlModuleID, "document", types.String,
 		types.Parameter{Name: "title", Type: types.String},
 		types.Parameter{Name: "body", Type: children}))
+	addStandardExport(module, standardFunction(htmlModuleID, "composeDocument", types.String,
+		types.Parameter{Name: "title", Type: types.String},
+		types.Parameter{Name: "body", Type: children},
+		types.Parameter{Name: "head", Type: children}))
 	addStandardExport(module, standardFunction(htmlModuleID, "parse", htmlDocumentType(),
 		types.Parameter{Name: "source", Type: types.String}))
 	sort.Strings(module.ExportNames)

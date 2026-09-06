@@ -35,8 +35,18 @@ App: Class<> := {
     // assets serves a directory of static files under a URL prefix. Editing a
     // file under root changes what the browser gets on the next request; it
     // never rebuilds AhdCode source, because none of it is AhdCode source.
+    // This is an explicit public decision: the whole tree under root is
+    // exposed, subject to the existing containment, traversal, and dotfile
+    // protections.
     assets: Function := (prefix: String, root: String) -> Nothing {
         attribute.server.static(prefix, root)
+    }
+    // managedAssets serves only files a Layout, Page, or Component has
+    // declared through Web.Assets. A neighbour that was never declared is
+    // not browser-addressable. Public is an access policy, not a directory
+    // name.
+    managedAssets: Function := (prefix: String, root: String) -> Nothing {
+        attribute.server.managed(prefix, root)
     }
     // start binds the socket and serves. It does not return.
     start: Function := () -> Nothing {

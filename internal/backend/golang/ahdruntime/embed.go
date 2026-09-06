@@ -61,3 +61,6 @@ var MySQLSource string
 //
 //go:embed security.go
 var SecuritySource string
+
+//go:embed identity.go
+var IdentitySource string

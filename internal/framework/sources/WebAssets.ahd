@@ -1,0 +1,42 @@
+// Web.Assets -- Component, Page, and Layout owned CSS and JavaScript.
+//
+// A requirement is an ordinary HTMLNode. It is invisible in page body
+// output. Web.document / Web.page collect every requirement from the
+// composed tree, emit each unique one once, and keep first-seen order:
+// extra head nodes first, then the body, depth-first, left to right.
+//
+// A relative path is also a managed public asset. A file that merely sits
+// next to a declared stylesheet is not browser-addressable. An unused
+// component is never called, so its requirement is never collected.
+//
+// There is no bundler, no npm, and no CDN download. Inline JavaScript is
+// executable code: do not interpolate arbitrary user text into it. Pass
+// user data through an encoded form such as JSON.
+bring HTML
+from HTML bring HTMLNode
+
+AssetKit: Class<> := {
+    stylesheet: Function := (path: String) -> HTMLNode {
+        return HTML.asset("stylesheet", path)
+    }
+
+    script: Function := (path: String) -> HTMLNode {
+        return HTML.asset("script", path)
+    }
+
+    scriptDefer: Function := (path: String) -> HTMLNode {
+        return HTML.asset("script-defer", path)
+    }
+
+    scriptModule: Function := (path: String) -> HTMLNode {
+        return HTML.asset("script-module", path)
+    }
+
+    inlineCSS: Function := (key: String, css: String) -> HTMLNode {
+        return HTML.inlineAsset("inline-css", key, css)
+    }
+
+    inlineJS: Function := (key: String, js: String) -> HTMLNode {
+        return HTML.inlineAsset("inline-js", key, js)
+    }
+}

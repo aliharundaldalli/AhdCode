@@ -255,6 +255,15 @@ func (session *Session) httpOperation(name string, receiver any, args []any) any
 	case "Server.route":
 		ahdruntime.AhdHTTPServerRoute(class, session.httpHandleOf(receiver), arg(0), arg(1), session.httpHandler(args[2]))
 		return Nothing
+	case "Server.static":
+		ahdruntime.AhdHTTPServerStatic(class, session.httpHandleOf(receiver), arg(0), arg(1))
+		return Nothing
+	case "Server.managed":
+		ahdruntime.AhdHTTPServerManaged(class, session.httpHandleOf(receiver), arg(0), arg(1))
+		return Nothing
+	case "Server.applyWebLimits":
+		ahdruntime.AhdHTTPServerApplyWebLimits(class, session.httpHandleOf(receiver))
+		return Nothing
 	case "Server.start":
 		ahdruntime.AhdHTTPServerStart(class, session.httpHandleOf(receiver))
 		return Nothing

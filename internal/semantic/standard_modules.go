@@ -23,6 +23,7 @@ func StandardModuleInterfaces() map[string]*ModuleInterface {
 		"File":       fileModuleInterface(),
 		"HTML":       htmlModuleInterface(),
 		"HTTP":       httpModuleInterface(),
+		"Identity":   identityModuleInterface(),
 		"JSON":       jsonModuleInterface(),
 		"KeyValue":   keyValueModuleInterface(),
 		"Latex":      latexModuleInterface(),

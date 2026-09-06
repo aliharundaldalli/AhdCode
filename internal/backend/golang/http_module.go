@@ -121,6 +121,11 @@ func (generator *generator) httpOperation(name string, value *ir.CallExpr) strin
 	case "Server.static":
 		return "AhdHTTPServerStatic(" + errorClass + ", " + generator.httpDataOf(httpServerClass, httpServerHandleField, value.Callee) + ", " +
 			text(0) + ", " + text(1) + ")"
+	case "Server.managed":
+		return "AhdHTTPServerManaged(" + errorClass + ", " + generator.httpDataOf(httpServerClass, httpServerHandleField, value.Callee) + ", " +
+			text(0) + ", " + text(1) + ")"
+	case "Server.applyWebLimits":
+		return "AhdHTTPServerApplyWebLimits(" + errorClass + ", " + generator.httpDataOf(httpServerClass, httpServerHandleField, value.Callee) + ")"
 	case "Server.start":
 		return "AhdHTTPServerStart(" + errorClass + ", " + generator.httpDataOf(httpServerClass, httpServerHandleField, value.Callee) + ")"
 	case "Request.method":
