@@ -220,8 +220,8 @@ It refuses two configurations, before starting anything:
   command would mean either treating it as development or rewriting
   `APP_ENV`.
 - `APP_PROTOCOL=https`. `dev` serves plaintext HTTP, so starting the child
-  would mean serving `http` while the configuration says `https`. v0.19
-  routes `.test` names over plaintext HTTP and still ships no local
+  would mean serving `http` while the configuration says `https`. AhdCode
+  routes `.test` names over plaintext HTTP and ships no local
   certificate authority and no certificate management, and `dev` neither
   downgrades the protocol nor generates an untrusted certificate — see
   [Web](WEB.md#14-local-https--current-limitation).

@@ -12,12 +12,19 @@ AhdCode; okunabilir sözdizimi, açık niyet (explicit intent), öngörülebilir
 anlambilim (semantics) ve yerel (native) derlemeye odaklanan, deneysel,
 statik olarak denetlenen genel amaçlı bir programlama dilidir.
 
-Mevcut aday **v1.0.0-rc.1**'dır. Çekirdek dil
-uçtan uca çalışır, ancak proje üretime hazır değildir ve 1.0'dan önce kırıcı
-(breaking) değişiklikler olabilir.
+Mevcut aday, 1.0 için ilk sürüm adayı olan **v1.0.0-rc.1**'dır ve bağımsız
+kalite denetimi için yayımlanmıştır. Dil, araç zinciri ve Web çatısı 1.0 için
+özellik olarak tamamlanmıştır; nihai sürümden önce başka kırıcı (breaking) dil
+değişikliği planlanmamaktadır. Nihai v1.0.0 henüz yayımlanmamıştır.
 
-v0.20.0, **Web Varlıkları, Kaynak Sınırları ve Uygulama Örüntüleri**, 1.0
-öncesi son özellik sürümüdür. Bileşenler HTML döndüren sıradan fonksiyonlar
+Ürün, kendi kendine yeten bir platform paketi olarak dağıtılır: `ahdcode` CLI,
+özel Go 1.27.0 araç zinciri, AhdDataStudio, `ahdsqlite`, `ahdnumeric` ve
+`ahdplot` yardımcıları, sabitlenmiş kaynak paketiyle çevrimdışı Tectonic LaTeX
+motoru, Web starter'ları ve bu sürüme ait İngilizce belge paketi.
+Bkz. [Kurulum](docs/INSTALLATION_TR.md).
+
+1.0 Web yüzeyi, v0.20.0'ın **Web Varlıkları, Kaynak Sınırları ve Uygulama
+Örüntüleri** sürümüyle geldi. Bileşenler HTML döndüren sıradan fonksiyonlar
 olarak kalır. Düzenler CSS ve JavaScript'i `Web.Assets` ile bildirir;
 `managedAssets` yalnızca bildirilen dosyaları sunar. `Identity.id()` herkese
 açık tanımlayıcı üretir. Web uygulamaları gövde, yükleme ve zaman aşımı
@@ -289,7 +296,7 @@ AhdCode kalıcı tasarım ilkelerine dayanır:
 
 ### 1.0 Öncesi Dil Evrimi
 
-AhdCode, 1.0 öncesini kalıcı olarak dondurulmuş bir durum olarak görmez; sözdizimini gelişigüzel de değiştirmez. Yukarıdaki temel ilkeler sabittir. Gerçek uygulama, dogfooding ve pratik uygulama ihtiyaçları somut eksikleri gösterdiğinde, 1.0 öncesi dil kararları bilinçli olarak revize edilir. Bildirim tür çıkarımı, açık null olabilen türler (`T?`), açık leksikal/küresel bağımlılık listelerine sahip yalnızca-ifade lambda'lar (`#isim`, `@isim`) ve kapalı Class Protocol Methods kümesi gibi yetenekler; statik tiplemeyi, belirlenirciliği, açıklığı ve gizli sihrin reddedilmesini kesin olarak koruyan bilinçli evrimleri yansıtır.
+AhdCode, 1.0 öncesi dönemi kalıcı olarak dondurulmuş bir durum olarak görmedi; sözdizimini gelişigüzel de değiştirmedi. Yukarıdaki temel ilkeler sabittir. Gerçek uygulama, dogfooding ve pratik uygulama ihtiyaçları somut eksikleri gösterdiğinde, 1.0 öncesi dil kararları bilinçli olarak revize edildi. Bildirim tür çıkarımı, açık null olabilen türler (`T?`), açık leksikal/küresel bağımlılık listelerine sahip yalnızca-ifade lambda'lar (`#isim`, `@isim`) ve kapalı Class Protocol Methods kümesi gibi yetenekler; statik tiplemeyi, belirlenirciliği, açıklığı ve gizli sihrin reddedilmesini kesin olarak koruyan bilinçli evrimleri yansıtır.
 
 ## Mimari Taksonomi
 
@@ -475,7 +482,7 @@ VS Code hem de Antigravity'i hedefler.
 
 ## Mevcut sınırlamalar
 
-AhdCode aktif 1.0 öncesi geliştirme aşamasındadır ve henüz üretime hazır değildir; 1.0'dan önce kırıcı değişiklikler olabilir.
+AhdCode v1.0.0-rc.1, bağımsız kalite denetimi için yayımlanmış bir sürüm adayıdır. Nihai v1.0.0 olarak henüz yayımlanmamıştır.
 
 Dil içinde AhdCode; kasıtlı olarak blok/deyim lambda'larını, keyfi/örtük değişken closure'ları, genel kullanıcı-tanımlı operatör aşırı yüklemesini (on sabit Class Protocol Method dışında), çoklu dönüş değerlerini/tuple'ları, reflection'ı, trait/interface'leri ve çoklu kalıtımı hariç tutar. Araçlarda ise AhdCode harici bir paket yöneticisi veya uzak kayıt defteri yerine derleme zamanı yerel kaynak birleştirmesi ([`require(...)`](docs/REQUIRE_TR.md)) ve paketli çevrimdışı modülleri kullanır. Dil sunucusu referans bulma ve yeniden adlandırma işlemleri arka plan çalışma alanı indeksi yerine derleme grafiği içinde çalışır. Bkz. [spesifikasyonun desteklenmeyen özellik listesi](AHDCODE_LANGUAGE_SPEC_v0.1_TR.md#40-desteklenmeyen-v01-özellikleri).
 

@@ -163,8 +163,8 @@ A malformed value is rejected with a message that says which rule it broke,
 rather than trimmed into something that merely looks right.
 
 `APP_ENV=test` is a recognized, isolated environment for automated tests. It
-does not enable production behaviour and derives no `.test` name. v0.19 adds
-no testing DSL.
+does not enable production behaviour and derives no `.test` name. AhdCode
+ships no testing DSL.
 
 Configuration errors name the offending key and never echo its value, so a
 bad `DB_PASSWORD` cannot reach a log through the error path.
@@ -535,7 +535,7 @@ The address under `Open:` is `SERVER_HOST` and `SERVER_PORT`, the socket the
 application actually binds. It always works.
 
 The line under `Local identity:` is the `.test` name derived from `APP_HOST`,
-which v0.19 both derives **and routes**: `ahdcode dev` claims it in the
+which AhdCode both derives **and routes**: `ahdcode dev` claims it in the
 AhdCode route registry and serves it from a loopback-only local router that
 runs for as long as the session does. See
 [CLI](CLI.md#local-development-test-names-and-the-router) for the router, the
@@ -568,7 +568,7 @@ Editing `public/app.css` does not.
 It also **refuses** `APP_PROTOCOL=https`:
 
 ```
-✗ Local HTTPS is not available in AhdCode v0.19.
+✗ Local HTTPS is not available in AhdCode v1.0.0-rc.1.
   ahdcode dev serves plaintext HTTP, so it cannot honour
   APP_PROTOCOL=https.
 
@@ -805,6 +805,7 @@ configuration contract.
 | v0.17 | `ahdcode init web`, context-aware routes, route groups, ordered guards |
 | v0.18 | Web starters: Empty, Basic, Admin; local Bootstrap; Admin DB bootstrap |
 | v0.20 | Component-owned CSS/JS, `managedAssets`, `Identity.id()`, Web limits, MVC/CRUD |
+| v1.0.0-rc.1 | No Web API change; self-contained platform packaging |
 
 ## 22. v0.20: Web assets, resource boundaries, and application patterns
 
@@ -882,8 +883,8 @@ ahdcode dev app.ahd
 ```
 
 On a terminal, `init web` asks Empty, Basic, Admin, MVC, or CRUD. You can
-also run `ahdcode init web empty|basic|admin|mvc|crud`. This is a pre-1.0
-change from the v0.17 immediate scaffold.
+also run `ahdcode init web empty|basic|admin|mvc|crud`, which generates
+immediately without the wizard.
 
 Templates and [Bootstrap 5.3.3](https://getbootstrap.com/) (MIT) ship inside
 the CLI. Generated pages load only local files:
@@ -895,6 +896,21 @@ the CLI. Generated pages load only local files:
 - `/assets/ahdcode-logo.png`
 
 There is no CDN, npm, or network fetch during `init web`.
+
+
+## MVC and CRUD application workflows
+
+Both starters show the same member application and schema. MVC separates routes,
+controllers, models, views, and components; CRUD keeps routes, auth, and user logic
+in fewer top-level files. Both use the same views and managed local CSS, without JS.
+Home (`GET /`) retains authentication and adapts its navigation. `/dashboard` is
+signed-in only. Profile links use the session user's opaque `public_id`; `/settings`
+updates only that session identity, ignoring submitted identity/role fields.
+Administrators manage members at `/admin/users`: Add Member, View, Edit (name),
+and Delete. Delete opens a confirmation page; only the subsequent CSRF-protected
+POST deletes. Own-account deletion is refused. Public Home shows only names and
+membership; email is visible only in authorized administration. No public registration.
+The generated `Documents/PROJECT.md` records these workflows and the exact CLI version.
 
 ## 18. v0.18: Web starters and application bootstrap
 
@@ -1240,18 +1256,3 @@ Use `Web.context`, `Web.form`, `Web.errors`, and `Form.old` as the normal
 constructors. `WebContextError` and `FormValueError` inherit `Error` and its
 attributes; existing error identities are unchanged. New APIs appear through
 the compiled ModuleInterface in completion, hover, and signature help.
-
-
-## MVC and CRUD application workflows
-
-Both starters show the same member application and schema. MVC separates routes,
-controllers, models, views, and components; CRUD keeps routes, auth, and user logic
-in fewer top-level files. Both use the same views and managed local CSS, without JS.
-Home (`GET /`) retains authentication and adapts its navigation. `/dashboard` is
-signed-in only. Profile links use the session user's opaque `public_id`; `/settings`
-updates only that session identity, ignoring submitted identity/role fields.
-Administrators manage members at `/admin/users`: Add Member, View, Edit (name),
-and Delete. Delete opens a confirmation page; only the subsequent CSRF-protected
-POST deletes. Own-account deletion is refused. Public Home shows only names and
-membership; email is visible only in authorized administration. No public registration.
-The generated `Documents/PROJECT.md` records these workflows and the exact CLI version.

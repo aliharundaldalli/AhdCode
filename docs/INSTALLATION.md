@@ -32,6 +32,8 @@ Windows live installation and removal QA is still required. The RC is unsigned.
 Extract `AhdCode-1.0.0-rc.1-linux-x64.tar.gz` and run:
 
 ```sh
+tar -xzf AhdCode-1.0.0-rc.1-linux-x64.tar.gz
+cd AhdCode-1.0.0-rc.1
 sh install.sh --setup-path
 ```
 

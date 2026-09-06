@@ -12,12 +12,19 @@ AhdCode is an experimental statically checked general-purpose programming
 language focused on readable syntax, explicit intent, predictable semantics,
 and native compilation.
 
-The current candidate is **v1.0.0-rc.1**. The core
-language works end to end, but the project is not production-ready and
-breaking changes may still occur before 1.0.
+The current candidate is **v1.0.0-rc.1**, the first release candidate for 1.0,
+published for independent quality assurance. The language, toolchain, and Web
+framework are feature-complete for 1.0; no further breaking language changes
+are planned before the final release. Final v1.0.0 has not been released yet.
 
-v0.20.0, **Web Assets, Resource Boundaries & Application Patterns**, is the
-final feature release before 1.0. Components stay ordinary functions that
+It ships as a self-contained platform package: the `ahdcode` CLI, a private
+Go 1.27.0 toolchain, AhdDataStudio, the `ahdsqlite`, `ahdnumeric`, and
+`ahdplot` helpers, an offline Tectonic LaTeX engine with its pinned resource
+bundle, the Web starters, and an exact-version English documentation bundle.
+See [Installation](INSTALLATION.md).
+
+The 1.0 Web surface, introduced by v0.20.0 as **Web Assets, Resource
+Boundaries & Application Patterns**, keeps components as ordinary functions that
 return HTML. Layouts declare CSS and JavaScript with `Web.Assets`;
 `managedAssets` serves only those declared files. `Identity.id()` mints
 public identifiers. Web applications apply explicit body, upload, and
@@ -270,9 +277,9 @@ AhdCode is grounded in enduring design principles:
 - **Canonical formatting:** one single authoritative presentation style enforced by `ahdcode format`.
 - **Diagnostics as product behavior:** precise, construct-aware errors with actionable hints.
 
-### Pre-1.0 Language Evolution
+### Language Evolution Before 1.0
 
-AhdCode does not treat pre-1.0 as permanently feature-frozen, nor does it casually churn syntax. The core principles above remain constant. As real implementation, dogfooding, and practical application needs demonstrate concrete gaps, pre-1.0 language decisions are revised deliberately. Capabilities such as declaration type inference, explicit nullable types (`T?`), expression-only lambdas with explicit lexical/global dependency lists (`#name`, `@name`), and the closed set of Class Protocol Methods reflect deliberate evolutions that strictly preserve static typing, determinism, explicitness, and the rejection of hidden magic.
+AhdCode never treated the pre-1.0 period as permanently feature-frozen, nor did it casually churn syntax. The core principles above remain constant. Where real implementation, dogfooding, and practical application needs demonstrated concrete gaps, pre-1.0 language decisions were revised deliberately. Capabilities such as declaration type inference, explicit nullable types (`T?`), expression-only lambdas with explicit lexical/global dependency lists (`#name`, `@name`), and the closed set of Class Protocol Methods reflect deliberate evolutions that strictly preserve static typing, determinism, explicitness, and the rejection of hidden magic.
 
 ## Architecture Taxonomy
 
@@ -455,7 +462,7 @@ installation guide.
 
 ## Current limitations
 
-AhdCode is in active pre-1.0 development and is not yet production-ready; breaking changes may still occur before 1.0.
+AhdCode v1.0.0-rc.1 is a release candidate published for independent quality assurance. It has not yet been released as final v1.0.0.
 
 Within the language, AhdCode intentionally excludes block/statement lambdas, arbitrary/implicit mutable closures, general user-defined operator overloading (outside the ten fixed Class Protocol Methods), multiple return values/tuples, reflection, traits/interfaces, and multiple inheritance. In tooling, AhdCode uses compile-time local source composition ([`require(...)`](REQUIRE.md)) and bundled offline modules rather than an external package manager or remote registry. Language server references and rename operate within the compile graph rather than an asynchronous background workspace index. See the [specification's unsupported-feature list](AHDCODE_LANGUAGE_SPEC_v0.1.md#40-unsupported-v01-features).
 

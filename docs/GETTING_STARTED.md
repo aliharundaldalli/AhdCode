@@ -4,7 +4,7 @@
 
 [Back to README](../README.md) · [Language tour](LANGUAGE_TOUR.md) · [CLI](CLI.md)
 
-## Install the compiler
+## Install AhdCode
 
 Install the release package for your platform following [Installation](INSTALLATION.md).
 The packaged product includes its own Go toolchain, AhdDataStudio, runtime helpers,
@@ -76,8 +76,9 @@ MySQL and the administrator account.
 Empty and Basic do not ask for a database and do not generate login or
 `database/`. Admin, MVC, and CRUD initialize the schema and administrator
 immediately: after `ahdcode dev app.ahd` the app is ready. Logout is POST
-`/logout`. Admin redirects to `/`; MVC/CRUD rotate to an anonymous session and redirect to `/login` with a signed-out notice. Every starter also writes `AHDCODE.md` and
-an English `Documents/AhdCode/` snapshot. Those files are not runtime.
+`/logout`. Admin redirects to `/`; MVC and CRUD rotate to an anonymous
+session and redirect to `/login` with a signed-out notice. Every starter also
+writes `AHDCODE.md` and an English `Documents/AhdCode/` snapshot. Those files are not runtime.
 
 `.env` is gitignored. Admin SQLite ignores `database/*.db` and keeps
 `database/schema.sql` trackable. `.env.example` never contains entered
@@ -86,9 +87,8 @@ there is no `--force`.
 
 Open `http://127.0.0.1:8080`. Bootstrap 5.3.3 is local. `main.js` is an
 ordinary static file, not a frontend runtime. There is no npm or CDN.
-v0.17 route, guard, form, CSRF, and flash APIs are unchanged. This is a
-pre-1.0 behavior change: bare `ahdcode init web` is now a wizard instead of
-immediate generation.
+The v0.17 route, guard, form, CSRF, and flash APIs are unchanged. Bare
+`ahdcode init web` is a wizard; pass a starter name to generate immediately.
 
 ## Input
 
@@ -164,17 +164,9 @@ routes to `register`, `registerSubmit` and `profile` with no `Page` suffix,
 while applications that already use `registerPage` keep working unchanged. See
 [10.1 Naming](WEB.md#101-naming).
 
-
 ## MVC and CRUD application workflows
 
-Both starters show the same member application and schema. MVC separates routes,
-controllers, models, views, and components; CRUD keeps routes, auth, and user logic
-in fewer top-level files. Both use the same views and managed local CSS, without JS.
-Home (`GET /`) retains authentication and adapts its navigation. `/dashboard` is
-signed-in only. Profile links use the session user's opaque `public_id`; `/settings`
-updates only that session identity, ignoring submitted identity/role fields.
-Administrators manage members at `/admin/users`: Add Member, View, Edit (name),
-and Delete. Delete opens a confirmation page; only the subsequent CSRF-protected
-POST deletes. Own-account deletion is refused. Public Home shows only names and
-membership; email is visible only in authorized administration. No public registration.
-The generated `Documents/PROJECT.md` records these workflows and the exact CLI version.
+The MVC and CRUD starters build the same member application from different
+source layouts. Their routes, roles, navigation, and administration workflows
+are described in [Web](WEB.md#mvc-and-crud-application-workflows), and each
+generated project repeats them in its own `Documents/PROJECT.md`.

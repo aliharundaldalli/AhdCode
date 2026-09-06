@@ -2,7 +2,7 @@
 
 [English](GETTING_STARTED.md) · [Türkçe] · [Dil turu](LANGUAGE_TOUR_TR.md) · [CLI](CLI_TR.md)
 
-## Derleyiciyi kurun
+## AhdCode kurulumu
 
 Platformunuza uygun sürüm paketini [Kurulum](INSTALLATION_TR.md) adımlarına göre kurun.
 Paket; özel Go araç zincirini, AhdDataStudio'yu, yardımcı programları ve çevrimdışı
@@ -84,9 +84,8 @@ içermez. Var olan dosyaların ve var olan veritabanlarının üzerine yazılmaz
 
 `http://127.0.0.1:8080` adresini açın. Bootstrap 5.3.3 yereldır. `main.js`
 sıradan bir statik dosyadır; ön yüz çalışma zamanı değildir. npm veya CDN
-yoktur. v0.17 rota, bekçi, form, CSRF ve flash API'leri değişmez. Bu, 1.0
-öncesi bir davranış değişikliğidir: yalın `ahdcode init web` artık hemen
-üretmek yerine sihirbaz açar.
+yoktur. v0.17 rota, bekçi, form, CSRF ve flash API'leri değişmez. Yalın
+`ahdcode init web` sihirbaz açar; starter adı verildiğinde hemen üretir.
 
 ## Girdi
 
@@ -163,16 +162,9 @@ olmadan `register`, `registerSubmit` ve `profile` işleyicilerine yönlendirir,
 `registerPage` kullanan uygulamalar ise değişmeden çalışmayı sürdürür. Bkz.
 [10.1 Adlandırma](WEB_TR.md#101-adlandırma).
 
-
 ## MVC ve CRUD uygulama akışları
 
-İki starter aynı üye uygulamasını ve şemayı gösterir. MVC; Routes, Controllers,
-Models, Views ve Components kullanır; CRUD route, auth ve kullanıcı mantığını daha
-az üst düzey dosyada tutar. Görünümler ve yönetilen yerel CSS aynıdır; JS gerekmez.
-Home (`GET /`) oturumu korur. `/dashboard` oturum gerektirir. Profil bağlantıları
-opak `public_id` kullanır. `/settings` yalnızca oturum sahibinin adını değiştirir;
-gönderilen kimlik/rol alanları yetki sağlamaz. Yönetici `/admin/users` altında
-Add Member, View, Edit (ad) ve Delete eylemlerini görür. Delete önce onay sayfasını
-açar; silme yalnızca CSRF korumalı POST ile yapılır. Kendi hesabını silme reddedilir.
-Açık ana sayfa yalnızca ad ve üyelik gösterir; e-posta yetkili yönetici görünümündedir.
-Açık kayıt yoktur. `Documents/PROJECT.md` tam CLI sürümünü ve bu akışları kaydeder.
+MVC ve CRUD starter'ları aynı üye uygulamasını farklı kaynak düzenleriyle
+kurar. Rotaları, rolleri, gezinme ve yönetim akışları [Web](WEB_TR.md#mvc-ve-crud-uygulama-akışları)
+belgesinde anlatılır; üretilen her proje bunları kendi `Documents/PROJECT.md`
+dosyasında yineler.

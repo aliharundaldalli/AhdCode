@@ -537,7 +537,7 @@ Waiting for changes...
 `SERVER_HOST` ve `SERVER_PORT`'tur. Her zaman çalışır.
 
 `Local identity:` altındaki satır, `APP_HOST`'tan türetilen `.test` adıdır ve
-v0.19 bu adı hem türetir **hem de yönlendirir**: `ahdcode dev` onu AhdCode
+AhdCode bu adı hem türetir **hem de yönlendirir**: `ahdcode dev` onu AhdCode
 rota kayıt defterinde alır ve oturum sürdüğü sürece çalışan, yalnızca geri
 döngüyü dinleyen yerel bir yönlendiriciden sunar. Yönlendirici, bağlandığı
 port ve `ahdcode local hosts` için bkz.
@@ -571,7 +571,7 @@ derler ve yeniden başlatır. `public/app.css`'i düzenlemek bunu yapmaz.
 `APP_PROTOCOL=https`'i de **reddeder**:
 
 ```
-✗ Local HTTPS is not available in AhdCode v0.19.
+✗ Local HTTPS is not available in AhdCode v1.0.0-rc.1.
   ahdcode dev serves plaintext HTTP, so it cannot honour
   APP_PROTOCOL=https.
 
@@ -669,7 +669,7 @@ oturumu asla sonekli bir ada itmez.
 
 ## 14. Yerel HTTPS — mevcut sınır
 
-v0.19, `.test` adlarını **düz metin HTTP** üzerinden yönlendirir. Hâlâ yerel
+AhdCode, `.test` adlarını **düz metin HTTP** üzerinden yönlendirir. Yerel
 bir sertifika otoritesi, sertifika yöneticisi veya ACME **getirmez** ve
 `ahdcode trust` komutu yoktur.
 
@@ -812,6 +812,7 @@ düşük seviyeli modüllere uzanın.
 | v0.17 | `ahdcode init web`, bağlam duyarlı rotalar, rota grupları, sıralı bekçiler |
 | v0.18 | Web starter'lar: Empty, Basic, Admin; yerel Bootstrap; Admin DB kurulumu |
 | v0.20 | Bileşen CSS/JS, `managedAssets`, `Identity.id()`, Web sınırları, MVC/CRUD |
+| v1.0.0-rc.1 | Web API değişikliği yok; kendi kendine yeten platform paketlemesi |
 
 ## 22. v0.20: Web varlıkları, kaynak sınırları ve uygulama kalıpları
 
@@ -872,12 +873,26 @@ ahdcode dev app.ahd
 ```
 
 Bir terminalde `init web` Empty, Basic, Admin, MVC veya CRUD sorar. Ayrıca
-`ahdcode init web empty|basic|admin|mvc|crud` çalıştırılabilir. Bu, v0.17'nin hemen
-iskelet yazmasından 1.0 öncesi bir değişikliktir.
+`ahdcode init web empty|basic|admin|mvc|crud` çalıştırılabilir; bu biçim
+sihirbaz açmadan hemen üretir.
 
 Şablonlar ve [Bootstrap 5.3.3](https://getbootstrap.com/) (MIT) CLI içindedir.
 Üretilen sayfalar yalnızca yerel dosyaları yükler. `init web` sırasında CDN,
 npm veya ağ indirmesi yoktur.
+
+
+## MVC ve CRUD uygulama akışları
+
+İki starter aynı üye uygulamasını ve şemayı gösterir. MVC; Routes, Controllers,
+Models, Views ve Components kullanır; CRUD route, auth ve kullanıcı mantığını daha
+az üst düzey dosyada tutar. Görünümler ve yönetilen yerel CSS aynıdır; JS gerekmez.
+Home (`GET /`) oturumu korur. `/dashboard` oturum gerektirir. Profil bağlantıları
+opak `public_id` kullanır. `/settings` yalnızca oturum sahibinin adını değiştirir;
+gönderilen kimlik/rol alanları yetki sağlamaz. Yönetici `/admin/users` altında
+Add Member, View, Edit (ad) ve Delete eylemlerini görür. Delete önce onay sayfasını
+açar; silme yalnızca CSRF korumalı POST ile yapılır. Kendi hesabını silme reddedilir.
+Açık ana sayfa yalnızca ad ve üyelik gösterir; e-posta yetkili yönetici görünümündedir.
+Açık kayıt yoktur. `Documents/PROJECT.md` tam CLI sürümünü ve bu akışları kaydeder.
 
 ## 18. v0.18: Web starter'lar ve uygulama başlangıcı
 
@@ -1192,17 +1207,3 @@ Olağan kurucular `Web.context`, `Web.form`, `Web.errors` ve `Form.old` olmalıd
 `WebContextError` ve `FormValueError`, `Error` ve özniteliklerini miras alır;
 mevcut hata kimlikleri değişmez. Tamamlama, hover ve imza yardımı yeni API'leri
 derlenmiş ModuleInterface üzerinden öğrenir.
-
-
-## MVC ve CRUD uygulama akışları
-
-İki starter aynı üye uygulamasını ve şemayı gösterir. MVC; Routes, Controllers,
-Models, Views ve Components kullanır; CRUD route, auth ve kullanıcı mantığını daha
-az üst düzey dosyada tutar. Görünümler ve yönetilen yerel CSS aynıdır; JS gerekmez.
-Home (`GET /`) oturumu korur. `/dashboard` oturum gerektirir. Profil bağlantıları
-opak `public_id` kullanır. `/settings` yalnızca oturum sahibinin adını değiştirir;
-gönderilen kimlik/rol alanları yetki sağlamaz. Yönetici `/admin/users` altında
-Add Member, View, Edit (ad) ve Delete eylemlerini görür. Delete önce onay sayfasını
-açar; silme yalnızca CSRF korumalı POST ile yapılır. Kendi hesabını silme reddedilir.
-Açık ana sayfa yalnızca ad ve üyelik gösterir; e-posta yetkili yönetici görünümündedir.
-Açık kayıt yoktur. `Documents/PROJECT.md` tam CLI sürümünü ve bu akışları kaydeder.

@@ -60,7 +60,7 @@ node --version
 npm --version
 ```
 
-Git and Go are required for the compiler; AhdCode currently requires Go 1.25
+Git and Go are required for the compiler; AhdCode's source build currently requires Go 1.26
 or newer. VS Code and its `code` launcher are required only for editor-extension
 installation. Node.js/npm are required only to test and package the repository's
 local VSIX. If any needed command is missing or Go is too old, stop, explain
@@ -161,7 +161,7 @@ node --version
 npm --version
 ```
 
-Git and Go are required for the compiler; AhdCode currently requires Go 1.25
+Git and Go are required for the compiler; AhdCode's source build currently requires Go 1.26
 or newer. VS Code/`code` are required only for editor-extension installation,
 and Node.js/npm only for testing and packaging the VSIX. If something needed
 is absent, explain it and ask before using `winget`, Chocolatey, an installer,
