@@ -20,7 +20,7 @@ func resolveOptions(root string, options Options) (Options, error) {
 
 	if options.Starter == "" {
 		if !options.IsTTY {
-			return options, fmt.Errorf("ahdcode init web needs a starter when input is not a terminal.\nUse: ahdcode init web empty|basic|admin")
+			return options, fmt.Errorf("ahdcode init web needs a starter when input is not a terminal.\nUse: ahdcode init web empty|basic|admin|mvc|crud")
 		}
 		starter, err := promptStarter(options)
 		if err != nil {
@@ -54,17 +54,24 @@ func resolveOptions(root string, options Options) (Options, error) {
 		return options, err
 	}
 
-	if options.Starter != StarterAdmin {
+	if !options.usesDatabase() {
 		return options, nil
 	}
 
-	return resolveAdminOptions(options)
+	resolved, err := resolveAdminOptions(options)
+	if err != nil {
+		return options, err
+	}
+	if resolved.isAppStarter() {
+		return resolveMailOptions(resolved)
+	}
+	return resolved, nil
 }
 
 func resolveAdminOptions(options Options) (Options, error) {
 	if options.Database == "" {
 		if !options.IsTTY {
-			return options, fmt.Errorf("Admin initialization requires an interactive terminal")
+			return options, fmt.Errorf("%s initialization requires an interactive terminal", options.starterTitle())
 		}
 		driver, err := promptDatabase(options)
 		if err != nil {
@@ -110,7 +117,7 @@ func resolveAdminOptions(options Options) (Options, error) {
 
 	if strings.TrimSpace(options.AdminName) == "" {
 		if !options.IsTTY {
-			return options, fmt.Errorf("Admin initialization requires an interactive terminal")
+			return options, fmt.Errorf("%s initialization requires an interactive terminal", options.starterTitle())
 		}
 		name, err := promptLine(options, "Admin name:")
 		if err != nil {
@@ -124,7 +131,7 @@ func resolveAdminOptions(options Options) (Options, error) {
 
 	if strings.TrimSpace(options.AdminEmail) == "" {
 		if !options.IsTTY {
-			return options, fmt.Errorf("Admin initialization requires an interactive terminal")
+			return options, fmt.Errorf("%s initialization requires an interactive terminal", options.starterTitle())
 		}
 		email, err := promptLine(options, "Admin email:")
 		if err != nil {
@@ -138,7 +145,7 @@ func resolveAdminOptions(options Options) (Options, error) {
 
 	if options.AdminPassword == "" {
 		if !options.IsTTY {
-			return options, fmt.Errorf("Admin initialization requires an interactive terminal")
+			return options, fmt.Errorf("%s initialization requires an interactive terminal", options.starterTitle())
 		}
 		password, err := promptSecret(options, "Admin password:")
 		if err != nil {
@@ -200,7 +207,7 @@ func resolveMySQLOptions(options Options) (Options, error) {
 
 	if strings.TrimSpace(options.MySQLUser) == "" {
 		if !options.IsTTY {
-			return options, fmt.Errorf("Admin initialization requires an interactive terminal")
+			return options, fmt.Errorf("%s initialization requires an interactive terminal", options.starterTitle())
 		}
 		user, err := promptLine(options, "Username:")
 		if err != nil {
@@ -223,8 +230,74 @@ func resolveMySQLOptions(options Options) (Options, error) {
 	return options, nil
 }
 
+func resolveMailOptions(options Options) (Options, error) {
+	if options.MailPort == "" {
+		options.MailPort = "587"
+	}
+	if options.MailSecurity == "" {
+		options.MailSecurity = "starttls"
+	}
+	if options.MailFromName == "" {
+		options.MailFromName = options.AppName
+	}
+	if options.MailHost != "" || !options.IsTTY {
+		return options, nil
+	}
+	fmt.Fprint(options.Output, "Configure SMTP now? [y/N]\n> ")
+	line, err := readLine(options.Input)
+	if err != nil {
+		return options, err
+	}
+	answer := strings.ToLower(strings.TrimSpace(line))
+	if answer != "y" && answer != "yes" {
+		return options, nil
+	}
+	host, err := promptLine(options, "MAIL_HOST:")
+	if err != nil {
+		return options, err
+	}
+	options.MailHost = strings.TrimSpace(host)
+	port, err := promptLine(options, "MAIL_PORT [587]:")
+	if err != nil {
+		return options, err
+	}
+	if strings.TrimSpace(port) != "" {
+		options.MailPort = strings.TrimSpace(port)
+	}
+	user, err := promptLine(options, "MAIL_USERNAME:")
+	if err != nil {
+		return options, err
+	}
+	options.MailUsername = strings.TrimSpace(user)
+	password, err := promptSecret(options, "MAIL_PASSWORD:")
+	if err != nil {
+		return options, err
+	}
+	options.MailPassword = password
+	from, err := promptLine(options, "MAIL_FROM_ADDRESS:")
+	if err != nil {
+		return options, err
+	}
+	options.MailFromAddr = strings.TrimSpace(from)
+	name, err := promptLine(options, fmt.Sprintf("MAIL_FROM_NAME [%s]:", options.AppName))
+	if err != nil {
+		return options, err
+	}
+	if strings.TrimSpace(name) != "" {
+		options.MailFromName = strings.TrimSpace(name)
+	}
+	security, err := promptLine(options, "MAIL_SECURITY [starttls]:")
+	if err != nil {
+		return options, err
+	}
+	if strings.TrimSpace(security) != "" {
+		options.MailSecurity = strings.TrimSpace(security)
+	}
+	return options, nil
+}
+
 func promptStarter(options Options) (string, error) {
-	fmt.Fprint(options.Output, "AhdCode Web Application Setup\n\nChoose a starter:\n\n  1. Empty\n  2. Basic\n  3. Admin\n\n> ")
+	fmt.Fprint(options.Output, "AhdCode Web Application Setup\n\nChoose a starter:\n\n  1. Empty\n  2. Basic\n  3. Admin\n  4. MVC\n  5. CRUD\n\n> ")
 	line, err := readLine(options.Input)
 	if err != nil {
 		return "", err
@@ -259,8 +332,12 @@ func normalizeStarter(value string) (string, error) {
 		return StarterBasic, nil
 	case "3", StarterAdmin:
 		return StarterAdmin, nil
+	case "4", StarterMVC:
+		return StarterMVC, nil
+	case "5", StarterCRUD:
+		return StarterCRUD, nil
 	default:
-		return "", fmt.Errorf("unknown starter %q; choose Empty, Basic, or Admin", value)
+		return "", fmt.Errorf("unknown starter %q; choose Empty, Basic, Admin, MVC, or CRUD", value)
 	}
 }
 

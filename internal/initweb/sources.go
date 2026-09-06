@@ -6,6 +6,10 @@ func renderApp(options Options) string {
 		return basicAppSource
 	case StarterAdmin:
 		return adminAppSource
+	case StarterMVC:
+		return mvcAppSource
+	case StarterCRUD:
+		return crudAppSource
 	default:
 		return emptyAppSource
 	}
@@ -51,6 +55,12 @@ func renderUsersRepo(options Options) string {
 }
 
 func schemaSQL(options Options) string {
+	if options.isAppStarter() {
+		if options.isMySQL() {
+			return appMySQLSchemaSQL
+		}
+		return appSQLiteSchemaSQL
+	}
 	if options.isMySQL() {
 		return mysqlSchemaSQL
 	}

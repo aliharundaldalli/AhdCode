@@ -32,7 +32,7 @@ func sqliteInitializeFile(path string, options Options) error {
 	}
 	defer conn.Close()
 
-	if err := conn.Exec(sqliteSchemaSQL); err != nil {
+	if err := conn.Exec(schemaSQL(options)); err != nil {
 		return fmt.Errorf("schema initialization failed:\n%v", err)
 	}
 
@@ -41,6 +41,9 @@ func sqliteInitializeFile(path string, options Options) error {
 		return fmt.Errorf("administrator creation failed")
 	}
 	now := time.Now().UTC().Format("2006-01-02 15:04:05")
+	if options.isAppStarter() {
+		return sqliteInsertAppUsers(conn, options, hash, now)
+	}
 	stmt, tail, err := conn.Prepare(
 		"INSERT INTO users (name, email, password_hash, is_admin, created_at, updated_at) VALUES (?, ?, ?, 1, ?, ?)",
 	)
@@ -108,4 +111,47 @@ func inspectSQLiteAdminHash(path string) (string, error) {
 		return "", fmt.Errorf("administrator row is missing")
 	}
 	return stmt.ColumnText(0), nil
+}
+
+func sqliteInsertAppUsers(conn *sqlite3.Conn, options Options, adminHash, now string) error {
+	adminID, err := newPublicID()
+	if err != nil {
+		return fmt.Errorf("administrator creation failed")
+	}
+	if err := sqliteInsertUser(conn, adminID, options.AdminName, options.AdminEmail, adminHash, "administrator", now); err != nil {
+		return err
+	}
+	memberPassword, err := newOpaquePassword()
+	if err != nil {
+		return fmt.Errorf("member creation failed")
+	}
+	memberHash, err := hashPassword(memberPassword)
+	if err != nil {
+		return fmt.Errorf("member creation failed")
+	}
+	memberID, err := newPublicID()
+	if err != nil {
+		return fmt.Errorf("member creation failed")
+	}
+	return sqliteInsertUser(conn, memberID, "Ayşe Yılmaz", "ayse@example.com", memberHash, "member", now)
+}
+
+func sqliteInsertUser(conn *sqlite3.Conn, publicID, name, email, hash, role, now string) error {
+	stmt, tail, err := conn.Prepare(
+		"INSERT INTO users (public_id, name, email, password_hash, role, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+	)
+	if err != nil || stmt == nil || strings.TrimSpace(tail) != "" {
+		return fmt.Errorf("administrator creation failed")
+	}
+	defer stmt.Close()
+	values := []string{publicID, name, email, hash, role, now, now}
+	for index, value := range values {
+		if err := stmt.BindText(index+1, value); err != nil {
+			return fmt.Errorf("administrator creation failed")
+		}
+	}
+	if err := stmt.Exec(); err != nil {
+		return fmt.Errorf("administrator creation failed")
+	}
+	return nil
 }

@@ -139,8 +139,8 @@ func writeSuccess(output io.Writer, options Options, sqliteAbs string, registrat
 	case StarterBasic:
 		fmt.Fprintf(output, "Starter: Basic\nApplication: %s\n\n", options.AppName)
 		fmt.Fprint(output, "Application configuration ready.\nMail configuration is available in .env.\n\n")
-	case StarterAdmin:
-		fmt.Fprintf(output, "Starter: Admin\nApplication: %s\n", options.AppName)
+	case StarterAdmin, StarterMVC, StarterCRUD:
+		fmt.Fprintf(output, "Starter: %s\nApplication: %s\n", options.starterTitle(), options.AppName)
 		if options.isSQLite() {
 			fmt.Fprint(output, "Database: SQLite\n")
 		} else {
@@ -151,8 +151,10 @@ func writeSuccess(output io.Writer, options Options, sqliteAbs string, registrat
 	default:
 		fmt.Fprintf(output, "Starter: Empty\nApplication: %s\n\n", options.AppName)
 	}
+	fmt.Fprint(output, "Project documentation copied to AHDCODE.md and Documents/.\n")
+	fmt.Fprint(output, "Those files are not part of the running application.\n\n")
 	fmt.Fprint(output, "Next:\n  ahdcode dev app.ahd\n")
-	if options.isAdmin() {
+	if options.usesDatabase() {
 		fmt.Fprintf(output, "  AhdDataStudio: %s\n", ahdDataStudioURL)
 		if options.isSQLite() && sqliteAbs != "" {
 			fmt.Fprintf(output, "  SQLite file: %s\n", sqliteAbs)

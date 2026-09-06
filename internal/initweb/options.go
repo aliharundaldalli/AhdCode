@@ -6,6 +6,8 @@ const (
 	StarterEmpty = "empty"
 	StarterBasic = "basic"
 	StarterAdmin = "admin"
+	StarterMVC   = "mvc"
+	StarterCRUD  = "crud"
 
 	DriverSQLite = "sqlite"
 	DriverMySQL  = "mysql"
@@ -31,15 +33,52 @@ type Options struct {
 	AdminName     string
 	AdminEmail    string
 	AdminPassword string
+	MailHost      string
+	MailPort      string
+	MailUsername  string
+	MailPassword  string
+	MailFromAddr  string
+	MailFromName  string
+	MailSecurity  string
 	Input         io.Reader
 	Output        io.Writer
 	IsTTY         bool
 }
 
 func (options Options) isAdmin() bool { return options.Starter == StarterAdmin }
+func (options Options) isAppStarter() bool {
+	return options.Starter == StarterMVC || options.Starter == StarterCRUD
+}
+func (options Options) usesDatabase() bool {
+	return options.isAdmin() || options.isAppStarter()
+}
 func (options Options) isMySQL() bool {
-	return options.isAdmin() && options.Database == DriverMySQL
+	return options.usesDatabase() && options.Database == DriverMySQL
 }
 func (options Options) isSQLite() bool {
-	return options.isAdmin() && options.Database == DriverSQLite
+	return options.usesDatabase() && options.Database == DriverSQLite
+}
+func (options Options) starterTitle() string {
+	switch options.Starter {
+	case StarterBasic:
+		return "Basic"
+	case StarterAdmin:
+		return "Admin"
+	case StarterMVC:
+		return "MVC"
+	case StarterCRUD:
+		return "CRUD"
+	default:
+		return "Empty"
+	}
+}
+func (options Options) footerCredit() string {
+	switch options.Starter {
+	case StarterMVC:
+		return "Built with AhdCode · MVC Starter"
+	case StarterCRUD:
+		return "Built with AhdCode · CRUD Starter"
+	default:
+		return "Built with AhdCode"
+	}
 }

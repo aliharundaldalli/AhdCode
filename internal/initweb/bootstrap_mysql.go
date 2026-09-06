@@ -120,12 +120,18 @@ func bootstrapMySQL(options Options, operator mysqlOperator) (created bool, err 
 	if err := operator.UseDatabase(options.DatabaseName); err != nil {
 		return true, fmt.Errorf("schema initialization failed:\n%v", err)
 	}
-	if err := operator.Exec(strings.TrimSpace(mysqlSchemaSQL), nil); err != nil {
+	if err := operator.Exec(strings.TrimSpace(schemaSQL(options)), nil); err != nil {
 		return true, fmt.Errorf("schema initialization failed:\n%v", sanitizeSecret(err.Error(), options.MySQLPassword))
 	}
 	hash, err := hashPassword(options.AdminPassword)
 	if err != nil {
 		return true, fmt.Errorf("administrator creation failed")
+	}
+	if options.isAppStarter() {
+		if err := mysqlInsertAppUsers(operator, options, hash); err != nil {
+			return true, err
+		}
+		return true, nil
 	}
 	if err := operator.Exec(
 		"INSERT INTO users (name, email, password_hash, is_admin, created_at, updated_at) VALUES (?, ?, ?, 1, NOW(), NOW())",
@@ -138,6 +144,50 @@ func bootstrapMySQL(options Options, operator mysqlOperator) (created bool, err 
 		return true, fmt.Errorf("administrator creation failed")
 	}
 	return true, nil
+}
+
+func mysqlInsertAppUsers(operator mysqlOperator, options Options, adminHash string) error {
+	adminID, err := newPublicID()
+	if err != nil {
+		return fmt.Errorf("administrator creation failed")
+	}
+	if err := operator.Exec(
+		"INSERT INTO users (public_id, name, email, password_hash, role, created_at, updated_at) VALUES (?, ?, ?, ?, ?, NOW(), NOW())",
+		[]string{
+			ahdruntime.MySQLFromString(adminID),
+			ahdruntime.MySQLFromString(options.AdminName),
+			ahdruntime.MySQLFromString(options.AdminEmail),
+			ahdruntime.MySQLFromString(adminHash),
+			ahdruntime.MySQLFromString("administrator"),
+		},
+	); err != nil {
+		return fmt.Errorf("administrator creation failed")
+	}
+	memberPassword, err := newOpaquePassword()
+	if err != nil {
+		return fmt.Errorf("member creation failed")
+	}
+	memberHash, err := hashPassword(memberPassword)
+	if err != nil {
+		return fmt.Errorf("member creation failed")
+	}
+	memberID, err := newPublicID()
+	if err != nil {
+		return fmt.Errorf("member creation failed")
+	}
+	if err := operator.Exec(
+		"INSERT INTO users (public_id, name, email, password_hash, role, created_at, updated_at) VALUES (?, ?, ?, ?, ?, NOW(), NOW())",
+		[]string{
+			ahdruntime.MySQLFromString(memberID),
+			ahdruntime.MySQLFromString("Ayşe Yılmaz"),
+			ahdruntime.MySQLFromString("ayse@example.com"),
+			ahdruntime.MySQLFromString(memberHash),
+			ahdruntime.MySQLFromString("member"),
+		},
+	); err != nil {
+		return fmt.Errorf("member creation failed")
+	}
+	return nil
 }
 
 func sanitizeSecret(message, secret string) string {

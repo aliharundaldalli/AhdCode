@@ -15,10 +15,6 @@ func managedFor(options Options) []fileSpec {
 		{relPath: ".env.example", perm: 0o644, content: []byte(renderEnv(options, true))},
 		{relPath: ".gitignore", perm: 0o644, mergeGI: true, content: []byte(renderGitignore(options))},
 		{relPath: "Config/App.ahd", perm: 0o644, embedPath: "templates/shared/Config/App.ahd"},
-		{relPath: "Components/Navbar.ahd", perm: 0o644, content: []byte(renderNavbar(options))},
-		{relPath: "Components/Footer.ahd", perm: 0o644, embedPath: "templates/shared/Components/Footer.ahd"},
-		{relPath: "Layouts/Main.ahd", perm: 0o644, content: []byte(renderMainLayout(options))},
-		{relPath: "Pages/Home.ahd", perm: 0o644, content: []byte(renderHome(options))},
 		{relPath: "public/style.css", perm: 0o644, embedPath: "templates/shared/public/style.css"},
 		{relPath: "public/main.js", perm: 0o644, embedPath: "templates/shared/public/main.js"},
 		{relPath: "public/ahdcode-logo.png", perm: 0o644, embedPath: "templates/shared/public/ahdcode-logo.png"},
@@ -26,7 +22,15 @@ func managedFor(options Options) []fileSpec {
 		{relPath: "public/vendor/bootstrap/bootstrap.bundle.min.js", perm: 0o644, embedPath: "templates/vendor/bootstrap/bootstrap.bundle.min.js"},
 		{relPath: "public/vendor/bootstrap/LICENSE", perm: 0o644, embedPath: "templates/vendor/bootstrap/LICENSE"},
 	}
-	if options.Starter == StarterBasic || options.Starter == StarterAdmin {
+	if !options.isAppStarter() {
+		files = append(files,
+			fileSpec{relPath: "Components/Navbar.ahd", perm: 0o644, content: []byte(renderNavbar(options))},
+			fileSpec{relPath: "Components/Footer.ahd", perm: 0o644, embedPath: "templates/shared/Components/Footer.ahd"},
+			fileSpec{relPath: "Layouts/Main.ahd", perm: 0o644, content: []byte(renderMainLayout(options))},
+			fileSpec{relPath: "Pages/Home.ahd", perm: 0o644, content: []byte(renderHome(options))},
+		)
+	}
+	if options.Starter == StarterBasic || options.Starter == StarterAdmin || options.isAppStarter() {
 		files = append(files, fileSpec{
 			relPath:   "Config/Mail.ahd",
 			perm:      0o644,
@@ -44,6 +48,10 @@ func managedFor(options Options) []fileSpec {
 			fileSpec{relPath: "Repositories/Users.ahd", perm: 0o644, content: []byte(renderUsersRepo(options))},
 		)
 	}
+	if options.isAppStarter() {
+		files = append(files, appStarterFiles(options)...)
+	}
+	files = append(files, documentationFiles(options)...)
 	return files
 }
 
@@ -51,14 +59,20 @@ func requiredDirsFor(options Options) []string {
 	dirs := []string{
 		"Config",
 		"Components",
-		"Layouts",
-		"Pages",
 		"public",
 		"public/vendor",
 		"public/vendor/bootstrap",
+		"Documents",
+		"Documents/AhdCode",
+	}
+	if !options.isAppStarter() {
+		dirs = append(dirs, "Layouts", "Pages")
 	}
 	if options.Starter == StarterAdmin {
 		dirs = append(dirs, "Repositories", "Services", "database")
+	}
+	if options.isAppStarter() {
+		dirs = append(dirs, appStarterDirs(options)...)
 	}
 	return dirs
 }
@@ -69,7 +83,7 @@ func sqliteRelPath(options Options) string {
 
 func renderGitignore(options Options) string {
 	text := ".env\n*.dev\n*.run\n"
-	if options.isAdmin() {
+	if options.usesDatabase() {
 		text += "database/*.db\n"
 	}
 	return text
@@ -83,15 +97,37 @@ func renderEnv(options Options, example bool) string {
 	b.WriteString("APP_PROTOCOL=http\n")
 	b.WriteString("SERVER_HOST=127.0.0.1\n")
 	b.WriteString("SERVER_PORT=8080\n")
-	if options.Starter == StarterBasic || options.Starter == StarterAdmin {
+	if options.Starter == StarterBasic || options.Starter == StarterAdmin || options.isAppStarter() {
 		b.WriteString("\n")
-		b.WriteString("MAIL_HOST=\n")
-		b.WriteString("MAIL_PORT=587\n")
-		b.WriteString("MAIL_USERNAME=\n")
-		b.WriteString("MAIL_PASSWORD=\n")
-		b.WriteString("MAIL_FROM_ADDRESS=\n")
-		b.WriteString(envLine("MAIL_FROM_NAME", options.AppName) + "\n")
-		b.WriteString("MAIL_SECURITY=starttls\n")
+		if options.isAppStarter() && !example {
+			b.WriteString(envLine("MAIL_HOST", options.MailHost) + "\n")
+			port := options.MailPort
+			if port == "" {
+				port = "587"
+			}
+			b.WriteString(envLine("MAIL_PORT", port) + "\n")
+			b.WriteString(envLine("MAIL_USERNAME", options.MailUsername) + "\n")
+			b.WriteString(envLine("MAIL_PASSWORD", options.MailPassword) + "\n")
+			b.WriteString(envLine("MAIL_FROM_ADDRESS", options.MailFromAddr) + "\n")
+			fromName := options.MailFromName
+			if fromName == "" {
+				fromName = options.AppName
+			}
+			b.WriteString(envLine("MAIL_FROM_NAME", fromName) + "\n")
+			security := options.MailSecurity
+			if security == "" {
+				security = "starttls"
+			}
+			b.WriteString(envLine("MAIL_SECURITY", security) + "\n")
+		} else {
+			b.WriteString("MAIL_HOST=\n")
+			b.WriteString("MAIL_PORT=587\n")
+			b.WriteString("MAIL_USERNAME=\n")
+			b.WriteString("MAIL_PASSWORD=\n")
+			b.WriteString("MAIL_FROM_ADDRESS=\n")
+			b.WriteString(envLine("MAIL_FROM_NAME", options.AppName) + "\n")
+			b.WriteString("MAIL_SECURITY=starttls\n")
+		}
 	}
 	if options.isSQLite() {
 		b.WriteString("\n")

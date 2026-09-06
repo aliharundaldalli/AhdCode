@@ -6,6 +6,9 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"ahdcode/internal/ahdversion"
+	"ahdcode/internal/localdev"
 )
 
 func emptyOpts() Options {
@@ -124,6 +127,15 @@ func TestWebFreshDirectory(t *testing.T) {
 	}
 	if !strings.Contains(out.String(), "Starter: Empty") || !strings.Contains(out.String(), "ahdcode dev app.ahd") {
 		t.Fatalf("success output missing:\n%s", out.String())
+	}
+	if !strings.Contains(out.String(), "Project documentation copied") {
+		t.Fatalf("docs copy was not reported:\n%s", out.String())
+	}
+	if _, err := os.Stat(filepath.Join(root, "AHDCODE.md")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(root, "Documents/AhdCode/WEB.md")); err != nil {
+		t.Fatal(err)
 	}
 	wantLogo, err := templates.ReadFile("templates/shared/public/ahdcode-logo.png")
 	if err != nil {
@@ -278,6 +290,83 @@ func TestAdminSQLiteBootstrap(t *testing.T) {
 		if _, err := os.Stat(filepath.Join(root, rel)); err != nil {
 			t.Fatalf("missing %s", rel)
 		}
+	}
+}
+
+func TestMVCSQLiteBootstrap(t *testing.T) {
+	t.Setenv(localdev.HomeEnvKey, t.TempDir())
+	t.Setenv("AHDCODE_STUDIO_CACHE", t.TempDir())
+	root := t.TempDir()
+	var out bytes.Buffer
+	password := "qa-admin-pass"
+	err := Web(root, &out, ioDiscard{}, Options{
+		Starter:       StarterMVC,
+		AppName:       "MVC Portal",
+		Database:      DriverSQLite,
+		DatabaseName:  "mvc_portal",
+		AdminName:     "Ali Example",
+		AdminEmail:    "ali@example.com",
+		AdminPassword: password,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, rel := range []string{
+		"Routes/Web.ahd",
+		"Controllers/Home.ahd",
+		"Models/User.ahd",
+		"Views/Home.ahd",
+		"storage/private/welcome.txt",
+		"AHDCODE.md",
+		"Documents/AhdCode/WEB.md",
+	} {
+		if _, err := os.Stat(filepath.Join(root, rel)); err != nil {
+			t.Fatalf("missing %s", rel)
+		}
+	}
+	if _, err := os.Stat(filepath.Join(root, "Pages/Home.ahd")); !os.IsNotExist(err) {
+		t.Fatal("MVC created Pages/Home.ahd")
+	}
+	app, err := os.ReadFile(filepath.Join(root, "app.ahd"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(app), "managedAssets") {
+		t.Fatal("MVC app.ahd does not dogfood managedAssets")
+	}
+	footer, err := os.ReadFile(filepath.Join(root, "Components/Footer.ahd"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(footer), "Built with AhdCode · MVC Starter") {
+		t.Fatalf("footer:\n%s", footer)
+	}
+	schema, err := os.ReadFile(filepath.Join(root, "database/schema.sql"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(schema), "public_id") || strings.Contains(string(schema), "is_admin") {
+		t.Fatalf("MVC schema:\n%s", schema)
+	}
+	env, _ := os.ReadFile(filepath.Join(root, ".env"))
+	if strings.Contains(string(env), password) {
+		t.Fatal(".env contains the admin password")
+	}
+	example, _ := os.ReadFile(filepath.Join(root, ".env.example"))
+	if strings.Contains(string(example), password) {
+		t.Fatal(".env.example contains a secret")
+	}
+	if !strings.Contains(out.String(), "Starter: MVC") || !strings.Contains(out.String(), "Project documentation copied") {
+		t.Fatalf("stdout=%s", out.String())
+	}
+	if err := os.RemoveAll(filepath.Join(root, "Documents")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(filepath.Join(root, "AHDCODE.md")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(root, "app.ahd")); err != nil {
+		t.Fatal("removing docs deleted the application")
 	}
 }
 
@@ -462,7 +551,7 @@ func TestNonTTYBareInitFails(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected non-tty failure")
 	}
-	if !strings.Contains(err.Error(), "empty|basic|admin") {
+	if !strings.Contains(err.Error(), "empty|basic|admin|mvc|crud") {
 		t.Fatalf("error = %v", err)
 	}
 }
@@ -510,8 +599,8 @@ func TestNamesAndIdentifiers(t *testing.T) {
 }
 
 func TestRegisterSQLiteWithStudioEnv(t *testing.T) {
-	t.Setenv("AHDCODE_ROOT", "")
 	root := t.TempDir()
+	t.Setenv("AHDCODE_ROOT", root)
 	studio := filepath.Join(root, "tools", "AhdDataStudio")
 	if err := os.MkdirAll(studio, 0o755); err != nil {
 		t.Fatal(err)
@@ -729,6 +818,81 @@ func (s *scriptedMySQL) Exec(sqlText string, parameters []string) error {
 	return nil
 }
 func (s *scriptedMySQL) Close() {}
+
+func TestAllStartersReceiveDocumentationBundle(t *testing.T) {
+	starters := []Options{
+		{Starter: StarterEmpty, AppName: "Empty Docs"},
+		{Starter: StarterBasic, AppName: "Basic Docs"},
+		{
+			Starter:       StarterAdmin,
+			AppName:       "Admin Docs",
+			Database:      DriverSQLite,
+			DatabaseName:  "admin_docs",
+			AdminName:     "QA Admin",
+			AdminEmail:    "qa@example.com",
+			AdminPassword: "qa-admin-pass",
+		},
+		{
+			Starter:       StarterMVC,
+			AppName:       "MVC Docs",
+			Database:      DriverSQLite,
+			DatabaseName:  "mvc_docs",
+			AdminName:     "QA Admin",
+			AdminEmail:    "qa@example.com",
+			AdminPassword: "qa-admin-pass",
+		},
+		{
+			Starter:       StarterCRUD,
+			AppName:       "CRUD Docs",
+			Database:      DriverSQLite,
+			DatabaseName:  "crud_docs",
+			AdminName:     "QA Admin",
+			AdminEmail:    "qa@example.com",
+			AdminPassword: "qa-admin-pass",
+		},
+	}
+	for _, options := range starters {
+		t.Run(options.Starter, func(t *testing.T) {
+			t.Setenv(localdev.HomeEnvKey, t.TempDir())
+			t.Setenv("AHDCODE_STUDIO_CACHE", t.TempDir())
+			root := t.TempDir()
+			if err := Web(root, ioDiscard{}, ioDiscard{}, options); err != nil {
+				t.Fatal(err)
+			}
+			ahdcode, err := os.ReadFile(filepath.Join(root, "AHDCODE.md"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !strings.Contains(string(ahdcode), ahdversion.Display) {
+				t.Fatalf("AHDCODE.md does not identify %s:\n%s", ahdversion.Display, ahdcode)
+			}
+			if !strings.Contains(string(ahdcode), "Documents/AhdCode/") {
+				t.Fatal("AHDCODE.md does not name the local documentation")
+			}
+			project, err := os.ReadFile(filepath.Join(root, "Documents/PROJECT.md"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !strings.Contains(string(project), options.starterTitle()) {
+				t.Fatalf("PROJECT.md missing starter title:\n%s", project)
+			}
+			for _, name := range documentationManifest {
+				if _, err := os.Stat(filepath.Join(root, "Documents/AhdCode", name)); err != nil {
+					t.Fatalf("missing English doc %s: %v", name, err)
+				}
+			}
+			entries, err := os.ReadDir(filepath.Join(root, "Documents/AhdCode"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, entry := range entries {
+				if strings.HasSuffix(entry.Name(), "_TR.md") || strings.Contains(entry.Name(), "v0.15") || strings.Contains(entry.Name(), "v0.16") {
+					t.Fatalf("bundle contains excluded file %s", entry.Name())
+				}
+			}
+		})
+	}
+}
 
 func containsCall(calls []string, name string) bool {
 	for _, call := range calls {
