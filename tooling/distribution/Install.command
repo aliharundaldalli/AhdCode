@@ -1,6 +1,6 @@
 #!/bin/sh
+# Kept for the ZIP and for anyone who opens the DMG's script directly. The
+# normal macOS experience is the .pkg, which needs no terminal at all.
 set -eu
 cd -- "$(dirname -- "$0")"
-printf 'AhdCode setup installs into your user Library and adds one owned PATH block to .zprofile.\nPress Enter to install, or Control-C to cancel.\n'
-read -r answer
 exec sh ./install.sh --setup-path

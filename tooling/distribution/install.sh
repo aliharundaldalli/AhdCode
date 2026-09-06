@@ -3,7 +3,10 @@ set -eu
 source_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 version=$(cat "$source_dir/VERSION")
 case "$version" in *[!0-9A-Za-z.-]*|'') echo 'Invalid version' >&2; exit 1;; esac
-case $(uname -s) in Darwin) default_prefix="$HOME/Library/Application Support/AhdCode";; *) default_prefix="$HOME/.local/share/ahdcode";; esac
+# ~/Library/Application Support/ahdcode is where AhdCode keeps the user's
+# database registry and local routes, and macOS volumes are normally
+# case-insensitive, so installing beside it collided with that data.
+case $(uname -s) in Darwin) default_prefix="$HOME/Library/AhdCode";; *) default_prefix="$HOME/.local/share/ahdcode";; esac
 prefix=$default_prefix
 setup_path=false
 uninstall=false
@@ -24,7 +27,7 @@ fi
 if "$uninstall"; then
   [ -f "$prefix/.ahdcode-install" ] || { echo 'No owned installation found.' >&2; exit 1; }
   if [ "$prefix" = "$default_prefix" ]; then
-    for profile in "$HOME/.zprofile" "$HOME/.profile"; do
+    for profile in "$HOME/.zprofile" "$HOME/.zshrc" "$HOME/.bash_profile" "$HOME/.profile" "$HOME/.bashrc"; do
       if [ -f "$profile" ] && [ ! -L "$profile" ]; then
         temporary=$(mktemp "${profile}.ahdcode.XXXXXX")
         awk '/^# >>> AhdCode PATH >>>$/{skip=1;next} /^# <<< AhdCode PATH <<<$/{skip=0;next} !skip' "$profile" > "$temporary"
@@ -52,12 +55,20 @@ case $(uname -s) in Darwin) mv -fh "$prefix/.current-new" "$prefix/current";; *)
 ln -sfn ../current/bin/ahdcode "$prefix/bin/ahdcode"
 if "$setup_path"; then
   [ "$prefix" = "$default_prefix" ] || { echo '--setup-path is supported only for the default installation root.' >&2; exit 2; }
-  case $(uname -s) in Darwin) profile="$HOME/.zprofile"; path_line='export PATH="$HOME/Library/Application Support/AhdCode/bin:$PATH"';; *) profile="$HOME/.profile"; path_line='export PATH="$HOME/.local/share/ahdcode/bin:$PATH"';; esac
-  [ ! -L "$profile" ] || { echo 'Refusing to edit a symlinked shell profile.' >&2; exit 1; }
-  touch "$profile"
-  if ! grep -q '^# >>> AhdCode PATH >>>$' "$profile"; then
-    printf '\n# >>> AhdCode PATH >>>\n%s\n# <<< AhdCode PATH <<<\n' "$path_line" >> "$profile"
-  fi
+  case $(uname -s) in
+    Darwin) profiles="$HOME/.zprofile $HOME/.zshrc $HOME/.bash_profile"; path_line='export PATH="$HOME/Library/AhdCode/bin:$PATH"';;
+    *) profiles="$HOME/.profile $HOME/.bashrc $HOME/.zshrc"; path_line='export PATH="$HOME/.local/share/ahdcode/bin:$PATH"';;
+  esac
+  # zsh reads .zprofile only in a login shell. A terminal inside an editor is
+  # usually not one, so the block goes to the interactive files too; otherwise
+  # the command is missing exactly where people first look for it.
+  for profile in $profiles; do
+    [ -L "$profile" ] && continue
+    [ -e "$profile" ] || : > "$profile"
+    if ! grep -q '^# >>> AhdCode PATH >>>$' "$profile"; then
+      printf '\n# >>> AhdCode PATH >>>\n%s\n# <<< AhdCode PATH <<<\n' "$path_line" >> "$profile"
+    fi
+  done
 fi
 printf 'Installed %s\nCLI: %s/bin/ahdcode\nOpen a new shell after PATH setup.\n' "$version" "$prefix"
 printf 'Uninstall: sh "%s/current/install.sh" --prefix "%s" --uninstall\n' "$prefix" "$prefix"

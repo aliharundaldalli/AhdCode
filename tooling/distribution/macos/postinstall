@@ -1,0 +1,40 @@
+#!/bin/sh
+# Runs after the payload lands in the user's home. The installer executes this
+# as the installing user for a home-directory package, so everything here stays
+# inside that account and no administrator rights are involved.
+set -eu
+
+# $3 is the destination the installer chose. For a home-directory package that
+# is the user's home; fall back to HOME when the script is exercised directly.
+home=${3:-}
+case "$home" in ""|"/") home=$HOME;; esac
+
+root="$home/Library/AhdCode"
+version=$(cat "$root/versions/VERSION.current" 2>/dev/null || true)
+[ -n "$version" ] || { echo "AhdCode: no version was recorded" >&2; exit 1; }
+target="$root/versions/$version"
+[ -x "$target/bin/ahdcode" ] || { echo "AhdCode: ahdcode is missing from $target" >&2; exit 1; }
+
+# The stable launcher: one path that never changes between versions, so PATH is
+# written once and an upgrade only moves this link.
+ln -sfn "versions/$version" "$root/.current-new"
+mv -fh "$root/.current-new" "$root/current"
+mkdir -p "$root/bin"
+ln -sfn ../current/bin/ahdcode "$root/bin/ahdcode"
+printf 'AhdCode installer v1\n' > "$root/.ahdcode-install"
+
+# zsh reads .zprofile only for login shells. A terminal inside an editor is
+# usually not a login shell, so the same block goes to .zshrc as well; without
+# it `ahdcode` is missing exactly where people first look for it.
+line='export PATH="$HOME/Library/AhdCode/bin:$PATH"'
+for profile in "$home/.zprofile" "$home/.zshrc" "$home/.bash_profile"; do
+    [ -L "$profile" ] && continue
+    [ -e "$profile" ] || : > "$profile"
+    grep -q '^# >>> AhdCode PATH >>>$' "$profile" 2>/dev/null && continue
+    printf '\n# >>> AhdCode PATH >>>\n%s\n# <<< AhdCode PATH <<<\n' "$line" >> "$profile"
+done
+
+# Report success only if the command actually runs.
+"$root/bin/ahdcode" --version >/dev/null 2>&1 || {
+    echo "AhdCode: the installed command did not run" >&2; exit 1; }
+exit 0
