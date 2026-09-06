@@ -21,7 +21,11 @@ jobs:
           cache-dependency-path: go.sum
 
       - name: Run tests
-        run: go test -count=1 ./...
+        # internal/build compiles many native programs and has measured between
+        # 415s and 565s on these runners, which leaves no margin under Go's
+        # default 10m per-package timeout. The race step below already carries an
+        # explicit timeout for the same reason.
+        run: go test -count=1 -timeout 25m ./...
 
       - name: Run vet
         run: go vet ./...
