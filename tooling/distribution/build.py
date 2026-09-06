@@ -13,10 +13,10 @@ def extract(archive,dest):
   with zipfile.ZipFile(archive) as z:z.extractall(dest)
  else:
   with tarfile.open(archive) as t:t.extractall(dest,filter='data')
-def build(target,output,goos,arch):
+def build(target,output,goos,arch,ldflags='-buildid='):
  env=dict(os.environ,GOFLAGS='-p=1',GOMAXPROCS='2',GOOS=goos,GOARCH=arch,CGO_ENABLED='0')
  print('Building',goos,arch,target,flush=True)
- run(['nice','-n','10','go','build','-trimpath','-ldflags=-buildid=','-o',output,target],cwd=R,env=env)
+ run(['nice','-n','10','go','build','-trimpath','-ldflags='+ldflags,'-o',output,target],cwd=R,env=env)
  time.sleep(4)
 def licenses(payload,modules):
  dest=payload/'licenses';dest.mkdir()
@@ -61,6 +61,10 @@ def main():
   suffix='.exe' if goos=='windows' else ''
   for name in ['ahdcode','ahdsqlite','ahdnumeric','ahdplot']:
    target=payload/('bin' if name=='ahdcode' else 'libexec/ahdcode')/(name+suffix);build('./cmd/'+name,target,goos,arch)
+  if goos=='windows':
+   # The stable launcher lives beside the release it activates; setup copies it
+   # to <root>\bin\ahdcode.exe, the one directory that goes on PATH.
+   (payload/'launcher').mkdir();build('./tooling/distribution/windows/launcher',payload/'launcher/ahdcode.exe',goos,arch)
   licenses(payload,modules)
   shutil.copytree(R/'internal/initweb/docbundle',payload/'docs')
   (payload/'VERSION').write_text(version+'\n');(staging/'VERSION').write_text(version+'\n')
@@ -70,7 +74,9 @@ def main():
   artifact=a.output/('AhdCode-'+version+'-'+label+('.exe' if goos=='windows' else '.dmg' if goos=='darwin' else '.tar.gz'))
   if goos=='windows':
    zipped=R/'tooling/distribution/windows/payload.zip'
-   try:zip_payload(payload,zipped);build('./tooling/distribution/windows',artifact,goos,arch)
+   # -H=windowsgui keeps Explorer from opening a console: setup is graphical and
+   # never reads stdin. It still attaches to a parent console when one exists.
+   try:zip_payload(payload,zipped);build('./tooling/distribution/windows',artifact,goos,arch,'-buildid= -H=windowsgui')
    finally:zipped.unlink(missing_ok=True)
   else:
    shutil.copy2(R/'tooling/distribution/install.sh',staging/'install.sh')
@@ -79,7 +85,7 @@ def main():
     run(['hdiutil','create','-volname','AhdCode '+version,'-srcfolder',staging,'-format','UDZO','-ov',artifact])
    else:
     with tarfile.open(artifact,'w:gz') as t:t.add(staging,arcname='AhdCode-'+version)
-  records.append({'filename':artifact.name,'size':artifact.stat().st_size,'sha256':sha(artifact),'platform':goos,'architecture':arch,'components':['CLI','Studio (embedded)','starters (embedded)','English docs','Go '+go['version'],'ahdsqlite','ahdnumeric','ahdplot','Tectonic '+latex['tectonic_version']+' offline'],'notices':'payload/THIRD_PARTY_NOTICES.md'})
+  records.append({'filename':artifact.name,'size':artifact.stat().st_size,'sha256':sha(artifact),'platform':goos,'architecture':arch,'components':['CLI','Studio (embedded)','starters (embedded)','English docs','Go '+go['version'],'ahdsqlite','ahdnumeric','ahdplot','Tectonic '+latex['tectonic_version']+' offline']+(['graphical per-user setup','stable ahdcode.exe launcher'] if goos=='windows' else []),'notices':'payload/THIRD_PARTY_NOTICES.md'})
   (a.output/('manifest-'+goos+'.json')).write_text(json.dumps({'version':version,'commit':commit,'artifacts':[records[-1]]},indent=2)+'\n');print('ARTIFACT',artifact,records[-1]['sha256'],flush=True)
  (a.output/'release-manifest.json').write_text(json.dumps({'version':version,'commit':commit,'artifacts':records},indent=2)+'\n')
 if __name__=='__main__':main()

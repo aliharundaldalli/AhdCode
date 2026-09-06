@@ -19,12 +19,25 @@ trusted macOS download experience before final release.
 
 ## Windows x64
 
-Run `AhdCode-1.0.0-rc.1-windows-x64.exe`. This is a native per-user setup program
-with a console confirmation. It extracts and checks its embedded payload, keeps
-versions under `%LOCALAPPDATA%\AhdCode\versions`, and adds only its stable `bin`
-directory to the user PATH. It does not require administrator access or Git.
-It registers an uninstall entry in Windows Installed Apps. Sign out and back in
-if an existing terminal launcher has cached the old environment.
+Double-click `AhdCode-1.0.0-rc.1-windows-x64.exe` in File Explorer. Setup is a
+small graphical per-user program: it shows what it will install, unpacks and
+checks its embedded payload with a progress window, and finishes with a
+confirmation. No console, no terminal, and no typed commands are involved.
+
+Files go under `%LOCALAPPDATA%\AhdCode\versions\<version>`. The stable command
+is `%LOCALAPPDATA%\AhdCode\bin\ahdcode.exe`, and only that one folder is added
+to your user PATH — once, on first installation. Administrator rights, Git, and
+a system Go installation are not required, and an uninstall entry is registered
+in Windows Installed Apps.
+
+Then open a **new** PowerShell or Command Prompt and run `ahdcode --version`.
+A terminal that was already open keeps the environment it started with, which is
+how Windows works; a new one picks up the change immediately.
+
+`AhdCode-1.0.0-rc.1-windows-x64.exe --silent` installs with no windows at all,
+for scripted deployment. Because setup is a graphical program, run it from a
+script as `Start-Process -Wait` if you need to block until it finishes.
+
 Windows live installation and removal QA is still required. The RC is unsigned.
 
 ## Linux x64
@@ -89,8 +102,8 @@ On Linux:
 sh "$HOME/.local/share/ahdcode/current/install.sh" --uninstall
 ```
 
-On Windows, use Installed Apps or run the installation root's `uninstall.ps1`
-with PowerShell. Confirm `YES` when prompted. Removal deletes the owned product
+On Windows, use Installed Apps, which runs the installation root's
+`uninstall.ps1`. Confirm `YES` when prompted. Removal deletes the owned product
 root and only its PATH entry/block. It preserves projects, databases, `.env`
 files outside that root, source repositories, registry data, and Studio/build
 caches. Close AhdCode applications before removal. No system service is stopped.

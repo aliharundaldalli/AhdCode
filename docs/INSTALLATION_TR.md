@@ -11,11 +11,24 @@ AhdCode'a ait, kaldırılabilir bir PATH bloğu eklenir. Yeni giriş kabuğunda
 `ahdcode --version` çalıştırın. RC henüz Developer ID imzalı/noter onaylı değildir;
 normal güvenilir macOS dağıtımı için bu işlem final öncesinde tamamlanmalıdır.
 
-Windows x64: `AhdCode-1.0.0-rc.1-windows-x64.exe` yerel kurulum programını
-çalıştırın. Konsol onayından sonra gömülü paket doğrulanıp
-`%LOCALAPPDATA%\AhdCode\versions` altına açılır. Kullanıcı PATH değerine yalnızca
-kendi `bin` dizini eklenir. Yönetici izni, Git veya sistem Go gerekmez. Kaldırma
-kaydı Installed Apps içine yazılır. PATH eskiyse oturumu kapatıp açın.
+Windows x64: `AhdCode-1.0.0-rc.1-windows-x64.exe` dosyasına Dosya
+Gezgini'nde çift tıklayın. Kurulum küçük bir grafik programdır: ne kuracağını
+gösterir, gömülü paketi ilerleme penceresiyle açıp doğrular ve bir onay
+penceresiyle biter. Konsol, terminal veya komut yazmak gerekmez.
+
+Dosyalar `%LOCALAPPDATA%\AhdCode\versions\<sürüm>` altına kurulur. Sabit komut
+`%LOCALAPPDATA%\AhdCode\bin\ahdcode.exe` olup kullanıcı PATH değerine yalnızca
+bu tek dizin, yalnızca ilk kurulumda eklenir. Yönetici izni, Git veya sistem Go
+gerekmez; kaldırma kaydı Installed Apps içine yazılır.
+
+Ardından **yeni** bir PowerShell veya Komut İstemi açıp `ahdcode --version`
+çalıştırın. Zaten açık olan bir terminal başlatıldığı ortamı korur; bu Windows'un
+normal davranışıdır ve yeni açılan terminal değişikliği hemen görür.
+
+`AhdCode-1.0.0-rc.1-windows-x64.exe --silent` hiçbir pencere açmadan kurar.
+Kurulum grafik bir program olduğu için, betikten çağırırken bitmesini beklemek
+isterseniz `Start-Process -Wait` kullanın.
+
 Windows canlı kurulum/kaldırma QA gereklidir; RC imzasızdır.
 
 Linux x64: `AhdCode-1.0.0-rc.1-linux-x64.tar.gz` arşivini açın ve
