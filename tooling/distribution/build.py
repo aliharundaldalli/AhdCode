@@ -88,15 +88,30 @@ def check_vsix(path):
 
 
 def zip_tree(source, out, root):
- """Archive a staging directory, executable bits and all, under one top-level
- folder. Used for the macOS ZIP, which carries the same tree the DMG does."""
- with zipfile.ZipFile(out,'w',zipfile.ZIP_DEFLATED,compresslevel=6) as z:
-  for p in sorted(source.rglob('*')):
-   if p.is_symlink(): raise SystemExit('unexpected symlink in the payload: ' + str(p))
-   if not p.is_file(): continue
-   info=zipfile.ZipInfo(root+'/'+p.relative_to(source).as_posix(),(2026,1,1,0,0,0))
-   info.external_attr=(p.stat().st_mode&0o777)<<16;info.compress_type=zipfile.ZIP_DEFLATED
-   z.writestr(info,p.read_bytes())
+ """Archive a staging directory under one top-level folder, with the execute
+ bits intact after Finder expands it.
+
+ A zip written by Python records mode 0755 correctly and Info-ZIP's `unzip`
+ honours it, but Finder expands archives with `ditto`, which drops the bit and
+ leaves Install.command and every binary non-executable. `ditto -c -k` writes
+ the metadata ditto itself reads back, so the archive survives a double-click."""
+ renamed=source.parent/root
+ source.rename(renamed)
+ try:
+  run(['ditto','-c','-k','--sequesterRsrc','--keepParent',renamed,out])
+ finally:
+  renamed.rename(source)
+ verify_zip_modes(out,root)
+
+def verify_zip_modes(archive, root):
+ """Expand the way Finder does and insist the entry points are runnable."""
+ import tempfile
+ with tempfile.TemporaryDirectory(prefix='ahdcode-zipcheck-') as workspace:
+  run(['ditto','-x','-k',archive,workspace])
+  for relative in ['Install.command','install.sh','payload/bin/ahdcode']:
+   path=pathlib.Path(workspace)/root/relative
+   if not path.is_file(): raise SystemExit('the archive is missing ' + relative)
+   if not os.access(path,os.X_OK): raise SystemExit('Finder would expand ' + relative + ' without its execute bit')
 
 def main():
  ap=argparse.ArgumentParser();ap.add_argument('--downloads',type=pathlib.Path,required=True);ap.add_argument('--latex-runtime',type=pathlib.Path,required=True);ap.add_argument('--modules',type=pathlib.Path,required=True);ap.add_argument('--output',type=pathlib.Path,required=True);ap.add_argument('--vsix',type=pathlib.Path,help='the .vsix from tooling/distribution/build_vsix.py');ap.add_argument('--without-vsix',action='store_true',help='deliberately ship no editor extension');ap.add_argument('--platform',choices=['darwin','windows','linux','all'],default='all');a=ap.parse_args()
