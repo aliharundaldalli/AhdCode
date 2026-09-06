@@ -87,13 +87,16 @@ ahdcode init web
 ahdcode dev app.ahd
 ```
 
-Bir TTY'de komut Empty, Basic veya Admin, ardından uygulama adını sorar.
-`ahdcode init web empty` ve `ahdcode init web basic` ilk soruyu atlar.
-Admin SQLite veya MySQL ve yönetici hesabı ile devam eder.
+Bir TTY'de komut Empty, Basic, Admin, MVC veya CRUD, ardından uygulama
+adını sorar. `ahdcode init web empty` ve `ahdcode init web basic` ilk
+soruyu atlar. Admin, MVC ve CRUD SQLite veya MySQL ve yönetici hesabı ile
+devam eder.
 
-Empty ve Basic veritabanı sormaz; giriş veya `database/` üretmez. Admin
-şemayı ve yöneticiyi hemen kurar: `ahdcode dev app.ahd` sonrası uygulama
-hazırdır. Çıkış POST `/logout` ile yapılır ve `/` adresine döner.
+Empty ve Basic veritabanı sormaz; giriş veya `database/` üretmez. Admin,
+MVC ve CRUD şemayı ve yöneticiyi hemen kurar: `ahdcode dev app.ahd` sonrası
+uygulama hazırdır. Çıkış POST `/logout` ile yapılır ve `/` adresine döner.
+Her starter ayrıca `AHDCODE.md` ve İngilizce `Documents/AhdCode/` kopyasını
+yazar. Bu dosyalar çalışma zamanı değildir.
 
 `.env` gitignore'dadır. Admin SQLite `database/*.db` dosyalarını yok sayar;
 `database/schema.sql` izlenebilir kalır. `.env.example` girilen parolaları

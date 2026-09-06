@@ -48,8 +48,11 @@ değerleri çizim anında Go `html.EscapeString` ile kaçırılır.
 // Oluşturucu (v0.4.0)
 HTML.text(value: String) -> HTMLNode
 HTML.element(name: String, attributes: Pair<String, String>, children: List<HTMLNode>) -> HTMLNode
+HTML.asset(kind: String, path: String) -> HTMLNode
+HTML.inlineAsset(kind: String, key: String, content: String) -> HTMLNode
 HTML.render(node: HTMLNode) -> String
 HTML.document(title: String, body: List<HTMLNode>) -> String
+HTML.composeDocument(title: String, body: List<HTMLNode>, head: List<HTMLNode>) -> String
 
 // Ayrıştırıcı (v0.7.0)
 HTML.parse(source: String) -> HTMLDocument
@@ -69,8 +72,8 @@ HTMLError  (Error'dan türer)
 
 `HTMLNode`, `HTMLDocument` ve `HTMLElement` opak yerleşik Sınıflardır:
 hiçbiri `HTMLNode()` / `HTMLDocument()` / `HTMLElement()` ile oluşturulamaz.
-`HTMLNode` yalnızca `text`/`element`'ten gelir. `HTMLDocument` yalnızca
-`HTML.parse`'tan gelir. `HTMLElement` yalnızca `HTMLDocument.select`,
+`HTMLNode` `text`, `element`, `asset` veya `inlineAsset`'ten gelir.
+`HTMLDocument` yalnızca `HTML.parse`'tan gelir. `HTMLElement` yalnızca `HTMLDocument.select`,
 `HTMLDocument.first`, `HTMLElement.select` veya `HTMLElement.first`'ten
 gelir. `HTMLDocument` ve `HTMLElement` salt okunurdur: `setAttr`, `append`,
 `remove` ya da başka hiçbir değiştirme işlemi yoktur.

@@ -60,7 +60,7 @@ kopya değil, aynı türlerdir: `Web` üzerinden ulaşılan bir `Request` çıpl
 `HTTP.Server` üzerine değişmeden kaydolur. Yalnızca `Web` geneldir; çatının iç
 modüllerine yalnızca çatı kaynağından erişilebilir.
 
-`Math`, `Time`, `Latex`, `Word`, `Excel`, `PDF`, `Archive`, `Path`, `File`, `Regex`, `CSV`, `Data`, `Statistics`, `Plot`, `Numeric`, `JSON`, `SQLite`, `HTTP`, `HTML`, `SMTP`, `XML`, `Env`, `Lists` ve `KeyValue` derleyici tarafından
+`Math`, `Time`, `Latex`, `Word`, `Excel`, `PDF`, `Archive`, `Path`, `File`, `Regex`, `CSV`, `Data`, `Statistics`, `Plot`, `Numeric`, `JSON`, `SQLite`, `HTTP`, `HTML`, `SMTP`, `XML`, `Env`, `Lists`, `KeyValue`, `Security` ve `Identity` derleyici tarafından
 kayıtlıdır (compiler-registered) ve aynı içe aktarım biçimlerini kullanır.
 Yerel bir dosya, aynı isimdeki standart bir modülün yerini alamaz (shadow
 edemez). `HTTP` hem gelen sunucu (`Server` / `Request` / `Response`, çerezler,

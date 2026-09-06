@@ -197,6 +197,7 @@ academy.start()
 | `post(path, handler)` | tam bir yol için POST kaydeder |
 | `route(method, path, handler)` | desteklenen herhangi bir yöntem |
 | `assets(prefix, root)` | statik dosya dizinini sunar |
+| `managedAssets(prefix, root)` | yalnızca `Web.Assets` ile bildirilen dosyaları sunar |
 | `start()` | bağlanır ve sunar; geri dönmez |
 | `configuration()` | doğrulanmış `AppConfig` |
 
@@ -475,12 +476,28 @@ yoktur. `require` zinciri açıktır ve rota argümanı düz bir değerdir.
 
 ## 11. Statik varlıklar
 
+İki ayrı kamusal karar vardır. Birbirinin yerine geçmezler.
+
 ```ahd
 academy.assets("/assets", "public")
+academy.managedAssets("/assets", "public")
 ```
 
-`public/app.css` böylece `/assets/app.css` adresinden sunulur. Bu, yayınlanmış
+`assets` yayınlanmış açık statik bağlamadır: `root` altındaki ağaç,
+mevcut kapsama, dizin gezinme ve gizli dosya korumalarıyla kamusaldır.
+`public/app.css` böylece `/assets/app.css` adresinden sunulur. Bu
 `server.static`'e devredilir.
+
+`managedAssets` yeni uygulamalar için v0.20 varsayılanıdır. Yalnızca bir
+Layout, Page veya Component'in `Web.Assets` ile bildirdiği dosyalar
+tarayıcıdan okunabilir. Hiç bildirilmemiş bir komşu dosya okunamaz.
+Kamusal olmak bir erişim politikasıdır, bir dizin adı değildir. Bu
+`server.managed`'e devredilir. Olağan önek `/assets/`'tir.
+
+`Web.UI.stylesheet("/assets/app.css")` ekstra head listesinde görünen bir
+`<link>`'tir. `Web.Assets.stylesheet("app.css")` görünmez bir
+gereksinimdir: `Web.document` / `Web.page` onu toplar, bir kez yazar ve
+göreli dosyayı yönetilen sunuma kaydeder.
 
 Statik bir dosyayı düzenlemek, tarayıcının bir sonraki istekte alacağını
 değiştirir. AhdCode kaynağını **yeniden derlemez**, çünkü hiçbiri AhdCode
@@ -633,11 +650,13 @@ rotaları sunan, yalnızca geri döngüyü dinleyen küçük bir yönlendirici
 barındırır. Temiz adresin bir tarayıcıda açılması için iki şeyin daha doğru
 olması gerekir:
 
-1. **adın çözülmesi.** `ahdcode local hosts apply`, sistem hosts dosyasına
-   sorduktan sonra tek bir sınırlanmış `127.0.0.1` eşlemeleri bloğu ekler.
-   İşaretlerin dışındaki her şey olduğu gibi bırakılır, etkileşimsiz bir
-   oturum asla sormaz ve yetki yükseltmez, reddetmek de hiçbir şeyi bozmaz —
-   geri döngü adresi her zaman çalışır.
+1. **adın çözülmesi.** İlk TTY `ahdcode dev` oturumu yerel `.test` adlarını
+   etkinleştirmek isteyip istemediğinizi sorar. Onaydan sonra gereken
+   AhdCode'a ait konak adları otomatik tutulur. İşaretlerin dışındaki her şey
+   olduğu gibi bırakılır. Etkileşimsiz bir oturum asla sormaz ve yetki
+   yükseltmez. Reddetmek hiçbir şeyi bozmaz — geri döngü bağ adresi her
+   zaman çalışır. `ahdcode local hosts apply` elle kurtarma komutu olarak
+   kalır.
 2. **yönlendiricinin 80 portunu tutması.** Dener; platform izin vermezse
    belirlenimci yedek `7357`'yi alır ve bunun yerine
    `http://ahdakademi.test:7357/` yazar. 80 portu için hiçbir yetki
@@ -792,6 +811,56 @@ düşük seviyeli modüllere uzanın.
 | v0.16 | Formlar, doğrulama, CSRF kolaylıkları, flash, eski girdi, form hataları |
 | v0.17 | `ahdcode init web`, bağlam duyarlı rotalar, rota grupları, sıralı bekçiler |
 | v0.18 | Web starter'lar: Empty, Basic, Admin; yerel Bootstrap; Admin DB kurulumu |
+| v0.20 | Bileşen CSS/JS, `managedAssets`, `Identity.id()`, Web sınırları, MVC/CRUD |
+
+## 22. v0.20: Web varlıkları, kaynak sınırları ve uygulama kalıpları
+
+Layout, Page ve Component, `HTMLNode` döndüren sıradan fonksiyonlar olarak
+kalır. Ayrıca varlık gereksinimleri de döndürebilirler. Bir gereksinim
+sıradan `HTML.render` gövde çıktısında görünmez.
+
+`Web.document` ve `Web.page` `HTML.composeDocument` çağırır. Toplama önce
+ekstra head listesini, sonra gövdeyi, derinlik öncelikli soldan sağa
+dolaşır. İlk anahtar kazanır. Dosya anahtarı `kind + path`, satır içi
+anahtar `kind +` çağıranın verdiği açık anahtardır.
+
+| Çağrı | Yazar |
+| --- | --- |
+| `Web.Assets.stylesheet(path)` | `<head>` içinde `<link rel="stylesheet">` |
+| `Web.Assets.script(path)` | `</body>` öncesi `<script src>` |
+| `Web.Assets.scriptDefer(path)` | ertelenmiş betik |
+| `Web.Assets.scriptModule(path)` | `type="module"` betik |
+| `Web.Assets.inlineCSS(key, css)` | `<head>` içinde `<style>` |
+| `Web.Assets.inlineJS(key, js)` | `</body>` öncesi `<script>` |
+
+Göreli yollar yönetilen sunuma kaydedilir. `..`, `\`, NUL ve gizli dosya
+bölümleri reddedilir. Satır içi CSS/JS HTML kaçışından geçmez; koddur,
+sayfa metni değildir. `</style` ve `</script` dizileri reddedilir. Satır
+içi JavaScript çalıştırılabilir koddur: rastgele kullanıcı metnini içine
+gömeyin. Kullanıcı verisini JSON gibi kodlanmış bir biçimde geçirin.
+
+`Web.UI.withClass`, `withID`, `withStyle`, `withData` ve `withAria` dinamik
+nesne türü olmadan bir öznitelik `Pair`'ini kopyalar.
+
+Özel dosyalar kamusal köklerin dışında durur, örneğin `storage/private/`.
+Bunları yetkili bir rota ve mevcut `HTTP.file` ile sunun. Bir yetkili
+kaynağı görmek komşuları açmaz. Depolama adları opak olmalıdır
+(`Identity.id()`). Opak kimlik yetkilendirme değildir.
+
+`Identity.id()` 22 karakterlik doldurulmamış URL-güvenli Base64 üretir.
+Bu herkese açık bir tanımlayıcıdır, sır değildir. Bkz. [Identity](IDENTITY_TR.md).
+
+`Web.app`, HTTP sunucusu oluşturulduktan sonra [Web çalışma zamanı
+sınırlarını](ENV_TR.md) uygular.
+
+`ahdcode init web` ayrıca MVC ve CRUD sunar. İkisi de Admin'in SQLite veya
+MySQL kurulumunu yeniden kullanır. Kullanıcılar `public_id` ile açılır.
+Silme yalnızca POST ve CSRF korumalıdır. MVC `Routes/`, `Controllers/`,
+`Models/` ve `Views/` kullanır. CRUD daha yalındır.
+
+Her starter bu sürüme ait `AHDCODE.md` ve İngilizce `Documents/AhdCode/`
+kopyasını alır. Bu dosyalar çalışma zamanı değildir ve yayımlanmaz.
+Silmek `ahdcode run`, `dev` veya `build` davranışını değiştirmez.
 
 ## Bir proje başlatmak
 
@@ -802,8 +871,8 @@ ahdcode init web
 ahdcode dev app.ahd
 ```
 
-Bir terminalde `init web` Empty, Basic veya Admin sorar. Ayrıca
-`ahdcode init web empty|basic|admin` çalıştırılabilir. Bu, v0.17'nin hemen
+Bir terminalde `init web` Empty, Basic, Admin, MVC veya CRUD sorar. Ayrıca
+`ahdcode init web empty|basic|admin|mvc|crud` çalıştırılabilir. Bu, v0.17'nin hemen
 iskelet yazmasından 1.0 öncesi bir değişikliktir.
 
 Şablonlar ve [Bootstrap 5.3.3](https://getbootstrap.com/) (MIT) CLI içindedir.

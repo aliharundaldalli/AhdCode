@@ -157,7 +157,8 @@ session is routed at: `ahdakademi.com` develops as `ahdakademi.test`. See
 | --- | --- | --- |
 | `AHDCODE_LOCAL_HOME` | CLI | Overrides the per-user directory holding the route and database registries. Must be absolute. Ordinary use never sets it. |
 | `AHDCODE_LOCAL_ROUTER_PORT` | CLI | The local router's fallback port when port 80 cannot be bound. Defaults to `7357`. A value outside 1–65535 is ignored rather than fatal. |
-| `AHDCODE_ROOT` | CLI | Your AhdCode source checkout, used to find `tools/AhdDataStudio` from elsewhere. |
+| `AHDCODE_ROOT` | CLI | Developer override: use `tools/AhdDataStudio` from this source checkout instead of the bundled exact-version Studio. Ordinary installed use leaves it unset. |
+| `AHDCODE_STUDIO_CACHE` | CLI | Absolute directory for the materialized Studio cache. Tests and packaging use this; ordinary use leaves it unset. |
 | `AHDCODE_SQLITE_RUNTIME` | runtime | Path to the bundled `ahdsqlite` helper, when it is not installed alongside `ahdcode`. |
 
 ### AhdDataStudio
@@ -175,3 +176,20 @@ session is routed at: `ahdakademi.com` develops as `ahdakademi.test`. See
 Studio combines the three SQLite sources — registry, `AHD_DATA_SQLITE_PATHS`,
 `AHD_DATA_PROJECT_ROOT` — deduplicated in that fixed order. Nothing recursive
 and nothing machine-wide is ever scanned.
+
+### Web runtime limits
+
+`Web.app` applies these after the HTTP server is created. Unset uses the
+default. A malformed value fails the process; it is never silently ignored.
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `AHD_WEB_MAX_BODY_SIZE` | `16MB` | Maximum request body. Units are 1024-based (`B`, `KB`, `MB`, `GB`). |
+| `AHD_WEB_MAX_UPLOAD_SIZE` | `8MB` | Maximum size of one uploaded file. Must not exceed `AHD_WEB_MAX_BODY_SIZE`. |
+| `AHD_WEB_MAX_UPLOAD_FILES` | `10` | Maximum number of uploaded files in one request. |
+| `AHD_WEB_READ_TIMEOUT` | `30s` | Server read timeout (`ms`, `s`, `m`). |
+| `AHD_WEB_WRITE_TIMEOUT` | `30s` | Server write timeout. |
+| `AHD_WEB_IDLE_TIMEOUT` | `60s` | Server idle timeout. |
+
+A raw `HTTP.server` keeps its historical 1MiB body default and 15s/15s/60s
+timeouts until `applyWebLimits()` is called.

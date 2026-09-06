@@ -48,8 +48,11 @@ attribute values passed to the builder are escaped with Go's
 // Builder (v0.4.0)
 HTML.text(value: String) -> HTMLNode
 HTML.element(name: String, attributes: Pair<String, String>, children: List<HTMLNode>) -> HTMLNode
+HTML.asset(kind: String, path: String) -> HTMLNode
+HTML.inlineAsset(kind: String, key: String, content: String) -> HTMLNode
 HTML.render(node: HTMLNode) -> String
 HTML.document(title: String, body: List<HTMLNode>) -> String
+HTML.composeDocument(title: String, body: List<HTMLNode>, head: List<HTMLNode>) -> String
 
 // Parser (v0.7.0)
 HTML.parse(source: String) -> HTMLDocument
@@ -69,8 +72,8 @@ HTMLError  (derives from Error)
 
 `HTMLNode`, `HTMLDocument`, and `HTMLElement` are opaque built-in Classes:
 none can be constructed with `HTMLNode()` / `HTMLDocument()` /
-`HTMLElement()`. `HTMLNode` comes only from `text`/`element`. `HTMLDocument`
-comes only from `HTML.parse`. `HTMLElement` comes only from
+`HTMLElement()`. `HTMLNode` comes from `text`, `element`, `asset`, or `inlineAsset`.
+`HTMLDocument` comes only from `HTML.parse`. `HTMLElement` comes only from
 `HTMLDocument.select`, `HTMLDocument.first`, `HTMLElement.select`, or
 `HTMLElement.first`. `HTMLDocument` and `HTMLElement` are read-only: there is
 no `setAttr`, `append`, `remove`, or any other mutation.

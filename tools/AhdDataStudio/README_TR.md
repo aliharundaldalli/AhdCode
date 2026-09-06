@@ -31,9 +31,10 @@ Süreç hâlâ yalnızca **127.0.0.1:8081** dinler. `0.0.0.0` veya internete
 açılmamalıdır.
 
 Temiz adın çözülmesi için `ahddatabasestudio.test` geri döngüye eşlenmelidir.
-`ahdcode local hosts apply` bunu ekler — sorduktan sonra, tek bir sınırlanmış
-blok hâlinde, dosyadaki diğer her şeye dokunmadan — ya da satırı kendiniz
-ekleyebilirsiniz:
+Yerel konak bütünleştirmesi bir kez yetkilendirildikten sonra `ahdcode
+databases` bu adı otomatik tutar. İlk uçbirim kullanımı herhangi bir yetki
+sorusundan önce onay ister. `ahdcode local hosts apply` elle kurtarma
+komutu olarak kalır, ya da satırı kendiniz ekleyebilirsiniz:
 
 ```text
 127.0.0.1 ahddatabasestudio.test

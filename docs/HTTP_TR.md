@@ -91,6 +91,9 @@ UploadedFile.save(directory: String) -> String
 Server.get(path: String, handler: Function)   -> Nothing
 Server.post(path: String, handler: Function)  -> Nothing
 Server.route(method: String, path: String, handler: Function) -> Nothing
+Server.static(prefix: String, root: String)   -> Nothing
+Server.managed(prefix: String, root: String)  -> Nothing
+Server.applyWebLimits()                       -> Nothing
 Server.start()                                -> Nothing
 
 Request.method()                   -> String
@@ -250,6 +253,18 @@ dizin olmalıdır, ve iki kayıtlı önek çakışamaz.
 Statik bir dosyayı düzenlemek `ahdcode dev`'in yeniden derlemesini asla
 tetiklemez -- statik sunum her istekte doğrudan diskten okur, bu yüzden
 elle bir tarayıcı yenilemesi her zaman yeterlidir.
+
+## Yönetilen dosyalar
+
+`server.managed(prefix, root)` (v0.20) `static()` ile aynı kapsama, dizin
+gezinme ve gizli dosya kurallarını kullanır, ancak yalnızca birleşik
+belgenin `HTML.asset` / `Web.Assets` ile kaydettiği dosyaları sunar. `root`
+içinde duran bir dosya tek başına tarayıcıdan okunamaz. Dizin listesi yine
+yoktur.
+
+`applyWebLimits()` [Web çalışma zamanı sınırlarını](ENV_TR.md) kurar.
+`Web.app` bunu çağırır. Ham `HTTP.server`, bu çağrılana kadar tarihsel
+1MiB gövde ve 15s/15s/60s zaman aşımlarını korur.
 
 ## İstek kopyası
 

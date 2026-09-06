@@ -1,4 +1,4 @@
-# AhdCode v0.19.0 English Student Guide
+# AhdCode v0.20.0 English Student Guide
 
 This guide is designed so that **even someone who has never programmed before** can follow along. You can read it in order from beginning to end; in each section, you will first see what we want to achieve, then write a working example, and finally learn the necessary rules.
 
@@ -95,7 +95,7 @@ Hello!
 
 AhdCode checks the code you wrote before running the program. For example, if you try to use text like a number, or if you use a value that could be `null` without checking it, it will tell you the error before the program even starts, whenever possible. But you don't need to think about these details at the beginning; we'll see examples in later sections.
 
-AhdCode v0.19.0 is the current release. It is still pre-1.0: the language works end to end, but things may still change before 1.0.
+AhdCode v0.20.0 is the current release. It is still pre-1.0: the language works end to end, but things may still change before 1.0.
 
 With it you can write small command-line programs or compile them into native executables; keep data in a local SQLite database or a MySQL server; build a complete web application with the first-party `Web` framework -- pages, layouts, forms, validation, CSRF, flash messages, sessions, and file uploads; call external HTTP and HTTPS APIs; parse HTML; send mail through SMTP; hash passwords and generate secure tokens with `Security`; and use the language server (`ahdcode lsp`) from an editor such as VS Code.
 
@@ -125,7 +125,7 @@ If you want to use the `Latex` module, you must also stage the offline Latex run
 go run ./tooling/latex/cmd/package-latex --output "$(go env GOPATH)"
 ```
 
-If the last command prints `AhdCode v0.19.0`, you are ready.
+If the last command prints `AhdCode v0.20.0`, you are ready.
 
 Now create a file named `hello.ahd` and write this inside:
 
@@ -4836,20 +4836,22 @@ one and its name is free again for whoever asks next.
 
 ### Making the name resolve
 
-A `.test` name still has to mean something to your computer. Ask AhdCode to
-set that up:
+The first time `ahdcode dev` needs a `.test` name on a terminal, it asks:
 
-```bash
-ahdcode local hosts apply
+```text
+Enable local .test names? [Y/n]
 ```
 
-It shows you exactly what it will add -- a few `127.0.0.1` lines between two
-marker comments -- and asks before doing anything, because changing the system
-hosts file needs administrator access. Everything else in that file is left
-alone. You can undo it with `ahdcode local hosts remove`.
+That question happens before any administrator password prompt. After you
+say yes, later project names are added automatically. You do not run a
+separate command for every project.
 
-If you would rather not, nothing breaks: the `Open:` address keeps working
-exactly as before.
+`ahdcode local hosts apply` and `remove` are still there if you want to
+repair or undo the AhdCode-owned block by hand. Everything outside that
+block is left alone.
+
+If you say no, or you are not on a terminal, nothing breaks: the bind
+address (`http://127.0.0.1:<port>`) keeps working.
 
 ### Seeing what is running
 

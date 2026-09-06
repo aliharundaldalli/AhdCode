@@ -12,30 +12,29 @@ AhdCode; okunabilir sözdizimi, açık niyet (explicit intent), öngörülebilir
 anlambilim (semantics) ve yerel (native) derlemeye odaklanan, deneysel,
 statik olarak denetlenen genel amaçlı bir programlama dilidir.
 
-Mevcut aday **v0.19.0**'dır. Çekirdek dil
+Mevcut aday **v0.20.0**'dır. Çekirdek dil
 uçtan uca çalışır, ancak proje üretime hazır değildir ve 1.0'dan önce kırıcı
 (breaking) değişiklikler olabilir.
 
-v0.19.0, **Yerel Geliştirme ve Veritabanı Keşfi**, yerel AhdCode
-geliştirmesini bütünleşik hâle getirir. `ahdcode dev`, bir HTTP Web
-uygulamasına `APP_HOST`'tan türetilen bir `.test` adı verir —
-`ahdakademi.com`, `http://ahdakademi.test/` olarak geliştirilir — ve onu Go
-standart kütüphanesinden kurulu, yalnızca geri döngüyü dinleyen küçük bir
-yönlendiriciden sunar: Caddy yok, nginx yok, artalan süreci yok, kurulan bir
-şey yok. Aynı adı isteyen ikinci proje `ahdakademi1.test` alır.
-`ahdcode local status` bütün yerel rotaları bildirir; `ahdcode local hosts
-apply` ise sistem hosts dosyasındaki tek bir sınırlanmış bloğu, sorduktan
-sonra ve dışındaki hiçbir satıra dokunmadan yönetir.
+v0.20.0, **Web Varlıkları, Kaynak Sınırları ve Uygulama Örüntüleri**, 1.0
+öncesi son özellik sürümüdür. Bileşenler HTML döndüren sıradan fonksiyonlar
+olarak kalır. Düzenler CSS ve JavaScript'i `Web.Assets` ile bildirir;
+`managedAssets` yalnızca bildirilen dosyaları sunar. `Identity.id()` herkese
+açık tanımlayıcı üretir. Web uygulamaları gövde, yükleme ve zaman aşımı
+sınırlarını açıkça uygular. `ahdcode init web` artık Empty, Basic, Admin,
+MVC ve CRUD sunar; her proje bu sürüme ait İngilizce belge paketini alır.
 
-`ahdcode init web admin` artık oluşturduğu SQLite veritabanını kaydeder;
-böylece AhdDataStudio'da düzenlenecek hiçbir ortam değişkeni olmadan görünür.
-`ahdcode databases list|add|remove` bu kayıt defterini elle yönetir; `remove`
-bir kaydı unutur ve dosyaya asla dokunmaz. Studio'nun kanonik adresi
-`http://ahddatabasestudio.test/` olur; `http://127.0.0.1:8081/AhdDataStudio`
-tam olarak desteklenmeye devam eder. Yerel geliştirme HTTP'dir: hâlâ yerel
-TLS, sertifika otoritesi veya ACME yoktur. Bu sürümde hiçbir dil sözdizimi
-veya tür anlamı değişmemiştir. Bkz.
-[CLI](docs/CLI_TR.md#yerel-geliştirme-test-adları-ve-yönlendirici).
+İlk TTY `ahdcode dev` oturumu yerel `.test` adlarını etkinleştirmeden önce
+bir kez sorar. Onaydan sonra yeni proje konak adları otomatik tutulur.
+`ahdcode local hosts apply` mutlu yolda zorunlu bir adım değil, kurtarma
+komutudur. `ahdcode databases`, kurulu CLI'ye gömülü tam sürüm
+AhdDataStudio'yu başlatır; AhdCode deposuna veya `AHDCODE_ROOT` değerine
+ihtiyaç duymaz. `AHDCODE_ROOT` yalnızca geliştirici geçersiz kılmasıdır.
+
+Yerel geliştirme hâlâ HTTP'dir: yerel TLS, sertifika otoritesi veya ACME
+yoktur. Bu sürümde dil sözdizimi değişmemiştir. Bkz.
+[CLI](docs/CLI_TR.md#yerel-geliştirme-test-adları-ve-yönlendirici) ve
+[Web](docs/WEB_TR.md).
 
 v0.18.5, **Web Starter ve Uygulama Başlangıcı**, `ahdcode init web` komutunu
 Empty, Basic veya Admin seçen bir sihirbaza çevirir. Empty cilalı bir

@@ -159,7 +159,8 @@ adını belirler: `ahdakademi.com`, `ahdakademi.test` olarak geliştirilir. Bkz.
 | --- | --- | --- |
 | `AHDCODE_LOCAL_HOME` | CLI | Rota ve veritabanı kayıt defterlerini tutan kullanıcıya özel dizini değiştirir. Mutlak olmalıdır. Olağan kullanımda ayarlanmaz. |
 | `AHDCODE_LOCAL_ROUTER_PORT` | CLI | 80 portuna bağlanılamadığında yerel yönlendiricinin yedek portu. Varsayılan `7357`. 1–65535 dışındaki bir değer ölümcül değildir, yok sayılır. |
-| `AHDCODE_ROOT` | CLI | AhdCode kaynak deponuz; `tools/AhdDataStudio` dizinini başka yerden bulmak için kullanılır. |
+| `AHDCODE_ROOT` | CLI | Geliştirici geçersiz kılması: paketlenmiş sürüm-eş Studio yerine bu kaynak ağacındaki `tools/AhdDataStudio` kullanılır. Olağan kurulumda ayarlanmaz. |
+| `AHDCODE_STUDIO_CACHE` | CLI | Materialize edilmiş Studio önbelleğinin mutlak dizini. Test ve paketleme içindir; olağan kullanımda ayarlanmaz. |
 | `AHDCODE_SQLITE_RUNTIME` | çalışma zamanı | `ahdcode` ile birlikte kurulu değilse paketlenmiş `ahdsqlite` yardımcısının yolu. |
 
 ### AhdDataStudio
@@ -177,3 +178,21 @@ adını belirler: `ahdakademi.com`, `ahdakademi.test` olarak geliştirilir. Bkz.
 Studio üç SQLite kaynağını — kayıt defteri, `AHD_DATA_SQLITE_PATHS`,
 `AHD_DATA_PROJECT_ROOT` — bu sabit sırayla birleştirip yinelenenleri ayıklar.
 Özyinelemeli veya makine geneli hiçbir tarama yapılmaz.
+
+### Web çalışma zamanı sınırları
+
+`Web.app` bunları HTTP sunucusu oluşturulduktan sonra uygular. Ayarlanmamış
+değer varsayılanı kullanır. Bozuk bir değer süreci durdurur; sessizce yok
+sayılmaz.
+
+| Değişken | Varsayılan | Anlamı |
+| --- | --- | --- |
+| `AHD_WEB_MAX_BODY_SIZE` | `16MB` | En büyük istek gövdesi. Birimler 1024 tabanlıdır (`B`, `KB`, `MB`, `GB`). |
+| `AHD_WEB_MAX_UPLOAD_SIZE` | `8MB` | Bir yüklenen dosyanın en büyük boyutu. `AHD_WEB_MAX_BODY_SIZE`'ı aşamaz. |
+| `AHD_WEB_MAX_UPLOAD_FILES` | `10` | Bir istekteki en fazla yüklenen dosya sayısı. |
+| `AHD_WEB_READ_TIMEOUT` | `30s` | Sunucu okuma zaman aşımı (`ms`, `s`, `m`). |
+| `AHD_WEB_WRITE_TIMEOUT` | `30s` | Sunucu yazma zaman aşımı. |
+| `AHD_WEB_IDLE_TIMEOUT` | `60s` | Sunucu boşta zaman aşımı. |
+
+Ham `HTTP.server`, `applyWebLimits()` çağrılana kadar tarihsel 1MiB gövde
+ve 15s/15s/60s zaman aşımlarını korur.

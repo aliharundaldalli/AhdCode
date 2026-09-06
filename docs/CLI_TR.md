@@ -8,7 +8,7 @@ Mevcut komut yüzeyi (command surface) şudur:
 
 ```text
 ahdcode
-ahdcode init web [empty|basic|admin]
+ahdcode init web [empty|basic|admin|mvc|crud]
 ahdcode databases
 ahdcode databases list
 ahdcode databases add <file.db>
@@ -27,9 +27,11 @@ ahdcode --version
 ```
 
 `ahdcode init web` **bulunulan dizine** bir Web starter yazar. Bir TTY'de
-Empty, Basic veya Admin sorar. Etkileşimsiz kullanım `empty`, `basic` veya
-`admin` geçmelidir. Şablonlar, Bootstrap 5.3.3 ve AhdCode logosu gömülüdür:
-çevrimdışı, paket yöneticisi yok, üzerine yazma yok. Sonraki adım:
+Empty, Basic, Admin, MVC veya CRUD sorar. Etkileşimsiz kullanım `empty`,
+`basic`, `admin`, `mvc` veya `crud` geçmelidir. Şablonlar, Bootstrap 5.3.3
+ve AhdCode logosu gömülüdür: çevrimdışı, paket yöneticisi yok, üzerine
+yazma yok. Her starter bu sürüme ait `AHDCODE.md` ve İngilizce
+`Documents/AhdCode/` kopyasını da alır. Sonraki adım:
 `ahdcode dev app.ahd`.
 
 `run`, normal önyüz (frontend) ve Go arkayüzünden (backend) derler, ardından
@@ -369,6 +371,18 @@ tam olarak bir sınırlanmış bloğu yönetir:
 # END AHDCODE LOCAL
 ```
 
+Yerel konak bütünleştirmesini bir kez onayladıktan sonra `ahdcode dev` geçerli
+konak adını bu blokta otomatik tutar. İlk TTY oturumu sorar:
+
+```text
+Enable local .test names? [Y/n]
+```
+
+Onay, herhangi bir yetki sorusundan önce gelir. `checkmate.test` gibi sonraki
+bir proje aynı yetkili mekanizma ile eklenir; her konak adı için ayrı bir
+komut çalıştırmanız gerekmez. `ahdcode local hosts apply` ve `remove` elle
+yönetim ve kurtarma olarak kalır.
+
 `ahdcode local hosts` bloğu ve yerinde olup olmadığını yazar.
 `ahdcode local hosts apply` onu yazar; `ahdcode local hosts remove` geri alır.
 Üçünde de:
@@ -400,11 +414,19 @@ başlığın her zaman yazdığı kendi geri döngü adresinden erişilebilir ka
 
 ## `ahdcode databases`
 
-Paketle gelen AhdDataStudio veritabanı çalışma alanını başlatır. Kaynak keşfi
-önce `$AHDCODE_ROOT/tools/AhdDataStudio/app.ahd` dosyasına, sonra geçerli
-dizinden yukarı doğru `tools/AhdDataStudio` dizinine (veya Studio dizininin
-kendisine) bakar. Başka bir projede çalışırken `AHDCODE_ROOT` değerini AhdCode
-kaynak deposuna ayarlayın. Makine veya ev dizini taraması yapılmaz.
+Bu kurulu AhdCode sürümüne ait AhdDataStudio'yu başlatır. Olağan yol AhdCode
+deposuna, üst dizin taramasına veya `AHDCODE_ROOT` değerine ihtiyaç duymaz.
+CLI, araç zincirine gömülü tam sürüm Studio'yu kullanıcı önbelleğine çıkarır
+ve onu çalıştırır.
+
+`AHDCODE_ROOT` bir geliştirici geçersiz kılmasıdır: ayarlıysa paketlenmiş
+kopya yerine o ağaçtaki `tools/AhdDataStudio` kullanılır. Geçersiz kılma
+ayarlıysa ve Studio orada yoksa komut başka yer aramaz, başarısız olur.
+Olağan kurulumda `AHDCODE_ROOT` ayarlanmaz.
+
+`ahdcode databases list`, `add` ve `remove` Studio'yu başlatmaz ve
+materialize etmez. Yalnızca kullanıcıya özel SQLite kayıt defterini okur
+ve yazar.
 
 Başlatılırken `.env` yoksa `.env.example` dosyasından `0600` izinleriyle
 kopyalanır; mevcut `.env` korunur. Sunucu yalnızca `127.0.0.1:8081` adresine
@@ -429,8 +451,9 @@ böylece hem temiz ad hem de çıplak geri döngü kökü işe yarar bir yere d�
 
 CLI, DNS sorgulamadan yerel hosts dosyasını okur. `ahddatabasestudio.test`
 için çelişkisiz bir IPv4 eşlemesi bulamazsa doğrudan geri döngü adresini açar.
-Hosts dosyalarını otomatik değiştirmez — bunun için `ahdcode local hosts apply`
-vardır ve o da önce sorar.
+Yerel konak bütünleştirmesi zaten yetkilendirilmişse Studio adı otomatik
+tutulur. İlk TTY kullanımı herhangi bir yetki sorusundan önce onay ister.
+Reddetme veya etkileşimsiz oturum Studio'yu doğrudan bağ adresinde bırakır.
 
 ### `ahdcode databases list | add | remove`
 

@@ -90,6 +90,9 @@ UploadedFile.save(directory: String) -> String
 Server.get(path: String, handler: Function)   -> Nothing
 Server.post(path: String, handler: Function)  -> Nothing
 Server.route(method: String, path: String, handler: Function) -> Nothing
+Server.static(prefix: String, root: String)   -> Nothing
+Server.managed(prefix: String, root: String)  -> Nothing
+Server.applyWebLimits()                       -> Nothing
 Server.start()                                -> Nothing
 
 Request.method()                   -> String
@@ -260,6 +263,18 @@ exist and be a directory, and two registered prefixes may not overlap.
 Editing a static file never triggers `ahdcode dev`'s rebuild -- static
 serving reads straight from disk on every request, so a manual browser
 refresh is always enough. See the [CLI guide](CLI.md#dev-watch-scope).
+
+## Managed files
+
+`server.managed(prefix, root)` (v0.20) uses the same containment,
+traversal, and dotfile rules as `static()`, but only serves files that a
+composed document registered through `HTML.asset` / `Web.Assets`. A file
+that merely sits in `root` is not browser-addressable. There is still no
+directory listing.
+
+`applyWebLimits()` installs the [Web runtime limits](ENV.md#web-runtime-limits).
+`Web.app` calls it. A raw `HTTP.server` keeps the historical 1MiB body
+default and 15s/15s/60s timeouts until this is called.
 
 ## Request snapshot
 

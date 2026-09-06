@@ -8,7 +8,7 @@ The current command surface is:
 
 ```text
 ahdcode
-ahdcode init web [empty|basic|admin]
+ahdcode init web [empty|basic|admin|mvc|crud]
 ahdcode databases
 ahdcode databases list
 ahdcode databases add <file.db>
@@ -27,9 +27,11 @@ ahdcode --version
 ```
 
 `ahdcode init web` writes a Web starter into the **current directory**. On a
-TTY it asks Empty, Basic, or Admin. Non-interactive use must pass
-`empty`, `basic`, or `admin`. Templates, Bootstrap 5.3.3, and the AhdCode
-logo are embedded: offline, no package manager, no overwrite. Next:
+TTY it asks Empty, Basic, Admin, MVC, or CRUD. Non-interactive use must pass
+`empty`, `basic`, `admin`, `mvc`, or `crud`. Templates, Bootstrap 5.3.3, and
+the AhdCode logo are embedded: offline, no package manager, no overwrite.
+Every starter also receives `AHDCODE.md` and an English `Documents/AhdCode/`
+snapshot for this version. Those files are not runtime. Next:
 `ahdcode dev app.ahd`.
 
 `run` compiles through the normal frontend and Go backend, then executes the
@@ -361,6 +363,18 @@ block in the system hosts file:
 # END AHDCODE LOCAL
 ```
 
+After you approve local host integration once, `ahdcode dev` maintains the
+current hostname in that block automatically. The first TTY session asks:
+
+```text
+Enable local .test names? [Y/n]
+```
+
+Consent happens before any privilege prompt. A later project such as
+`checkmate.test` is added through the same authorized mechanism; you do not
+run a separate command for every hostname. `ahdcode local hosts apply` and
+`remove` remain as manual administration and recovery.
+
 `ahdcode local hosts` prints the block and whether it is in place.
 `ahdcode local hosts apply` writes it; `ahdcode local hosts remove` takes it
 back out. In all three cases:
@@ -393,11 +407,18 @@ always prints.
 
 ## `ahdcode databases`
 
-Launches the bundled AhdDataStudio database workspace. Source discovery checks
-`$AHDCODE_ROOT/tools/AhdDataStudio/app.ahd` first, then walks upward from the
-current directory for `tools/AhdDataStudio` (or the Studio directory itself).
-Set `AHDCODE_ROOT` to your AhdCode source checkout when working elsewhere.
-Only these locations are checked; no machine or home-directory scan is performed.
+Launches the AhdDataStudio that belongs to this installed AhdCode version.
+The ordinary path does not need the AhdCode repository, a parent-directory
+walk, or `AHDCODE_ROOT`. The CLI materializes the exact-version Studio
+bundled in the toolchain into the per-user cache, then starts it.
+
+`AHDCODE_ROOT` remains a developer override: when it is set, that checkout's
+`tools/AhdDataStudio` is used instead of the bundled copy. If the override
+is set and Studio is missing there, the command fails rather than searching
+elsewhere. Ordinary installed use leaves `AHDCODE_ROOT` unset.
+
+`ahdcode databases list`, `add`, and `remove` never launch or materialize
+Studio. They only read and write the per-user SQLite registry.
 
 On launch, a missing `.env` is copied from `.env.example` with mode `0600`;
 an existing `.env` is preserved. The server binds only to `127.0.0.1:8081`.
@@ -421,8 +442,10 @@ clean name and the bare loopback root land somewhere useful.
 
 The CLI reads the local hosts file without DNS lookups. Unless it finds an
 unambiguous IPv4 mapping for `ahddatabasestudio.test`, it opens the direct
-loopback URL. It never modifies hosts files automatically — that is what
-`ahdcode local hosts apply` is for, and it asks first.
+loopback URL. If local host integration is already authorized, the Studio
+name is maintained automatically. First use on a TTY asks before any
+privilege prompt. A refusal or a non-TTY session keeps Studio on the
+direct bind address.
 
 ### `ahdcode databases list | add | remove`
 

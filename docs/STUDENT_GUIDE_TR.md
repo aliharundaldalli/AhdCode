@@ -1,4 +1,4 @@
-# AhdCode v0.19.0 Türkçe Öğrenci Rehberi
+# AhdCode v0.20.0 Türkçe Öğrenci Rehberi
 
 Bu rehber, **daha önce hiç programlama yapmamış birinin de takip edebilmesi** için hazırlanmıştır. Baştan sona sırayla okuyabilirsiniz; her bölümde önce ne yapmak istediğimizi görecek, sonra çalışan bir örnek yazacak, en son gerekli kuralları öğreneceksiniz.
 
@@ -96,7 +96,7 @@ Merhaba!
 
 AhdCode, programı çalıştırmadan önce yazdığınız kodu kontrol eder. Örneğin bir metni sayı gibi kullanmaya çalışırsanız veya `null` olabilecek bir değeri kontrol etmeden kullanırsanız, mümkün olduğunda hatayı daha program başlamadan söyler. Ama başlangıçta bunun ayrıntılarını düşünmeniz gerekmiyor; ilerleyen bölümlerde örneklerle göreceğiz.
 
-AhdCode v0.19.0 güncel sürümdür. Hâlâ 1.0 öncesidir: dil uçtan uca çalışır, ama 1.0'dan önce bazı şeyler değişebilir.
+AhdCode v0.20.0 güncel sürümdür. Hâlâ 1.0 öncesidir: dil uçtan uca çalışır, ama 1.0'dan önce bazı şeyler değişebilir.
 
 Onunla küçük komut satırı programları yazabilir veya bunları yerel executable uygulamalara derleyebilirsiniz; veriyi yerel bir SQLite veritabanında ya da bir MySQL sunucusunda tutabilirsiniz; birinci taraf `Web` çatısıyla eksiksiz bir web uygulaması kurabilirsiniz — sayfalar, yerleşimler, formlar, doğrulama, CSRF, flash mesajları, oturumlar ve dosya yüklemeleri; dış HTTP ve HTTPS API'leri çağırabilir, HTML ayrıştırabilir, SMTP ile e-posta gönderebilir, `Security` ile parola hashleyip güvenli belirteç üretebilir ve dil sunucusunu (`ahdcode lsp`) VS Code gibi bir editörden kullanabilirsiniz.
 
@@ -126,7 +126,7 @@ Eğer `Latex` modülünü kullanmayı planlıyorsanız, çevrimdışı (offline)
 go run ./tooling/latex/cmd/package-latex --output "$(go env GOPATH)"
 ```
 
-Son komut `AhdCode v0.19.0` yazıyorsa hazırsınız.
+Son komut `AhdCode v0.20.0` yazıyorsa hazırsınız.
 
 Şimdi `hello.ahd` adında bir dosya oluşturun ve içine şunu yazın:
 
@@ -4875,20 +4875,22 @@ sıradaki için yeniden serbest kalsın.
 
 ### Adın çözülmesini sağlamak
 
-Bir `.test` adının bilgisayarınız için bir anlam ifade etmesi gerekir. Bunu
-AhdCode'un ayarlamasını isteyin:
+`ahdcode dev` bir uçbirimde ilk kez bir `.test` adına ihtiyaç duyduğunda
+sorar:
 
-```bash
-ahdcode local hosts apply
+```text
+Enable local .test names? [Y/n]
 ```
 
-Ne ekleyeceğini tam olarak gösterir — iki işaret yorumu arasında birkaç
-`127.0.0.1` satırı — ve bir şey yapmadan önce sorar; çünkü sistem hosts
-dosyasını değiştirmek yönetici erişimi ister. O dosyadaki başka her şeye
-dokunulmaz. `ahdcode local hosts remove` ile geri alabilirsiniz.
+Bu soru herhangi bir yönetici parolasından önce gelir. Evet derseniz sonraki
+proje adları otomatik eklenir. Her proje için ayrı bir komut çalıştırmanız
+gerekmez.
 
-İstemezseniz hiçbir şey bozulmaz: `Open:` adresi tam olarak eskisi gibi
-çalışmaya devam eder.
+`ahdcode local hosts apply` ve `remove` AhdCode'un bloğunu elle onarmak veya
+geri almak için durur. Bloğun dışındaki her şey olduğu gibi kalır.
+
+Hayır derseniz veya bir uçbirimde değilseniz hiçbir şey bozulmaz: bağ adresi
+(`http://127.0.0.1:<port>`) çalışmaya devam eder.
 
 ### Neyin çalıştığını görmek
 

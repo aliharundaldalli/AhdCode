@@ -194,6 +194,7 @@ academy.start()
 | `post(path, handler)` | register POST on one exact path |
 | `route(method, path, handler)` | register any supported method |
 | `assets(prefix, root)` | serve a directory of static files |
+| `managedAssets(prefix, root)` | serve only files declared through `Web.Assets` |
 | `start()` | bind and serve; does not return |
 | `configuration()` | the validated `AppConfig` |
 
@@ -473,12 +474,28 @@ require chain is explicit and the route argument is a plain value.
 
 ## 11. Static assets
 
+Two public decisions exist. They are not interchangeable.
+
 ```ahd
 academy.assets("/assets", "public")
+academy.managedAssets("/assets", "public")
 ```
 
-`public/app.css` is then served at `/assets/app.css`. This delegates to the
-released `server.static`.
+`assets` is the released explicit static mount: the whole tree under `root`
+is public, subject to the existing containment, traversal, and dotfile
+protections. `public/app.css` is then served at `/assets/app.css`. This
+delegates to `server.static`.
+
+`managedAssets` is the v0.20 default for new applications. Only files a
+Layout, Page, or Component declared through `Web.Assets` become
+browser-addressable. A neighbour that was never declared is not. Public is
+an access policy, not a directory name. This delegates to `server.managed`.
+The usual prefix is `/assets/`.
+
+`Web.UI.stylesheet("/assets/app.css")` is a visible `<link>` in the extra
+head list. `Web.Assets.stylesheet("app.css")` is an invisible requirement:
+`Web.document` / `Web.page` collect it, emit it once, and register the
+relative file for managed exposure.
 
 Editing a static file changes what the browser gets on the next request. It
 does **not** rebuild AhdCode source, because none of it is AhdCode source.
@@ -629,11 +646,12 @@ name in AhdCode's per-user route registry and hosts a small loopback-only
 router that serves every registered route. Two things still have to be true
 for the clean URL to open in a browser:
 
-1. **the name resolves.** `ahdcode local hosts apply` adds one delimited block
-   of `127.0.0.1` mappings to the system hosts file, after asking. Everything
-   outside its markers is left exactly as it is, a non-interactive session
-   never prompts and never elevates, and declining breaks nothing — the
-   loopback address always works.
+1. **the name resolves.** The first TTY `ahdcode dev` asks whether to enable
+   local `.test` names. After that approval, required AhdCode-owned hostnames
+   are maintained automatically. Everything outside the managed markers is
+   left exactly as it is. A non-interactive session never prompts and never
+   elevates. Declining breaks nothing — the loopback bind address always
+   works. `ahdcode local hosts apply` remains a manual recovery command.
 2. **the router holds port 80.** It tries, and takes the deterministic
    fallback `7357` when the platform will not allow it, printing
    `http://ahdakademi.test:7357/` instead. Nothing elevates to get port 80.
@@ -786,6 +804,73 @@ configuration contract.
 | v0.16 | Forms, validation, CSRF conveniences, flash, old input, form errors |
 | v0.17 | `ahdcode init web`, context-aware routes, route groups, ordered guards |
 | v0.18 | Web starters: Empty, Basic, Admin; local Bootstrap; Admin DB bootstrap |
+| v0.20 | Component-owned CSS/JS, `managedAssets`, `Identity.id()`, Web limits, MVC/CRUD |
+
+## 22. v0.20: Web assets, resource boundaries, and application patterns
+
+Layouts, Pages, and Components stay ordinary functions that return
+`HTMLNode`. They may also return asset requirements. A requirement is
+invisible in ordinary `HTML.render` body output.
+
+```ahd
+bring Web
+from Web bring HTMLNode
+
+card: Function := () -> HTMLNode {
+    return Web.UI.section(
+        [Web.Assets.stylesheet("css/card.css"), Web.UI.h2("Card")]
+    )
+}
+```
+
+`Web.document` and `Web.page` call `HTML.composeDocument`. Collection walks
+the extra head list, then the body, depth-first, left to right. The first
+key wins; later duplicates are omitted. File keys are `kind + path`. Inline
+keys are `kind +` the explicit key the caller passed.
+
+| Call | Emits |
+| --- | --- |
+| `Web.Assets.stylesheet(path)` | `<link rel="stylesheet">` in `<head>` |
+| `Web.Assets.script(path)` | `<script src>` before `</body>` |
+| `Web.Assets.scriptDefer(path)` | deferred script |
+| `Web.Assets.scriptModule(path)` | `type="module"` script |
+| `Web.Assets.inlineCSS(key, css)` | `<style>` in `<head>` |
+| `Web.Assets.inlineJS(key, js)` | `<script>` before `</body>` |
+
+Relative paths register for managed exposure. `..`, `\`, NUL, and dotfile
+segments are rejected. Inline CSS/JS is not HTML-escaped, because it is
+code, not page text. `</style` and `</script` sequences are rejected so
+they cannot break out of their host element. Inline JavaScript is
+executable: do not interpolate arbitrary user text into it. Pass user data
+through an encoded form such as JSON.
+
+`Web.UI.withClass`, `withID`, `withStyle`, `withData`, and `withAria` copy
+an attribute `Pair` without a dynamic object type. Values stay escaped.
+
+Private files belong outside publicly mounted roots, for example
+`storage/private/`. Serve them through an authorized route with the
+existing `HTTP.file` primitive. Seeing one authorized resource must not
+reveal neighbouring files. Storage names should be opaque
+(`Identity.id()`), never the original upload filename and never a
+sequential database id. An opaque id is not authorization.
+
+`Identity.id()` mints a 22-character unpadded URL-safe Base64 value. It is
+a public identifier, not a secret. Passwords, sessions, and CSRF tokens
+stay on `Security`. See [Identity](IDENTITY.md).
+
+`Web.app` applies the [Web runtime limits](ENV.md#web-runtime-limits) after
+the HTTP server is created. A raw `HTTP.server` keeps its historical
+defaults until `applyWebLimits()` is called.
+
+`ahdcode init web` also offers MVC and CRUD. Both reuse Admin's SQLite or
+MySQL bootstrap, seed an administrator plus a demo member, and expose
+users by `public_id`. Deletes are POST-only and CSRF-protected. MVC uses
+`Routes/`, `Controllers/`, `Models/`, and `Views/`. CRUD is flatter:
+`app.ahd`, `routes.ahd`, `auth.ahd`, `users.ahd`, and `Views/`.
+
+Every starter receives `AHDCODE.md` and an English `Documents/AhdCode/`
+snapshot for this version. Those files are not runtime and are not
+published. Deleting them does not change `ahdcode run`, `dev`, or `build`.
 
 ## Starting a project
 
@@ -796,9 +881,9 @@ ahdcode init web
 ahdcode dev app.ahd
 ```
 
-On a terminal, `init web` asks Empty, Basic, or Admin. You can also run
-`ahdcode init web empty|basic|admin`. This is a pre-1.0 change from the
-v0.17 immediate scaffold.
+On a terminal, `init web` asks Empty, Basic, Admin, MVC, or CRUD. You can
+also run `ahdcode init web empty|basic|admin|mvc|crud`. This is a pre-1.0
+change from the v0.17 immediate scaffold.
 
 Templates and [Bootstrap 5.3.3](https://getbootstrap.com/) (MIT) ship inside
 the CLI. Generated pages load only local files:

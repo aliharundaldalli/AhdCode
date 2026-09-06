@@ -88,14 +88,16 @@ ahdcode init web
 ahdcode dev app.ahd
 ```
 
-On a TTY the command asks Empty, Basic, or Admin, then the application name.
-`ahdcode init web empty` and `ahdcode init web basic` skip the first question.
-Admin continues with SQLite or MySQL and the administrator account.
+On a TTY the command asks Empty, Basic, Admin, MVC, or CRUD, then the
+application name. `ahdcode init web empty` and `ahdcode init web basic`
+skip the first question. Admin, MVC, and CRUD continue with SQLite or
+MySQL and the administrator account.
 
 Empty and Basic do not ask for a database and do not generate login or
-`database/`. Admin initializes the schema and administrator immediately:
-after `ahdcode dev app.ahd` the app is ready. Logout is POST `/logout` and
-redirects to `/`.
+`database/`. Admin, MVC, and CRUD initialize the schema and administrator
+immediately: after `ahdcode dev app.ahd` the app is ready. Logout is POST
+`/logout` and redirects to `/`. Every starter also writes `AHDCODE.md` and
+an English `Documents/AhdCode/` snapshot. Those files are not runtime.
 
 `.env` is gitignored. Admin SQLite ignores `database/*.db` and keeps
 `database/schema.sql` trackable. `.env.example` never contains entered

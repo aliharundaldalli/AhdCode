@@ -12,28 +12,30 @@ AhdCode is an experimental statically checked general-purpose programming
 language focused on readable syntax, explicit intent, predictable semantics,
 and native compilation.
 
-The current candidate is **v0.19.0**. The core
+The current candidate is **v0.20.0**. The core
 language works end to end, but the project is not production-ready and
 breaking changes may still occur before 1.0.
 
-v0.19.0, **Local Development & Database Discovery**, makes local AhdCode
-development feel integrated. `ahdcode dev` gives an HTTP Web application a
-`.test` name derived from `APP_HOST` — `ahdakademi.com` develops as
-`http://ahdakademi.test/` — and serves it through a small loopback-only
-router built from the Go standard library: no Caddy, no nginx, no daemon, and
-nothing installed. A second project wanting the same name gets
-`ahdakademi1.test`. `ahdcode local status` reports every local route, and
-`ahdcode local hosts apply` manages one delimited block in the system hosts
-file, after asking, without touching a line outside it.
+v0.20.0, **Web Assets, Resource Boundaries & Application Patterns**, is the
+final feature release before 1.0. Components stay ordinary functions that
+return HTML. Layouts declare CSS and JavaScript with `Web.Assets`;
+`managedAssets` serves only those declared files. `Identity.id()` mints
+public identifiers. Web applications apply explicit body, upload, and
+timeout limits. `ahdcode init web` now offers Empty, Basic, Admin, MVC, and
+CRUD starters, and every project receives an exact-version English
+documentation bundle.
 
-`ahdcode init web admin` now registers the SQLite database it creates, so it
-appears in AhdDataStudio with no environment variable to edit, and
-`ahdcode databases list|add|remove` manages that registry by hand — `remove`
-forgets an entry and never touches the file. Studio's canonical URL becomes
-`http://ahddatabasestudio.test/`, with `http://127.0.0.1:8081/AhdDataStudio`
-still fully supported. Local development is HTTP: there is still no local
-TLS, certificate authority, or ACME. No language syntax or type semantics
-changed in this release. See [CLI](docs/CLI.md#local-development-test-names-and-the-router).
+A first TTY `ahdcode dev` asks once before enabling local `.test` names.
+After that approval, new project hostnames are maintained automatically.
+`ahdcode local hosts apply` remains a recovery command, not a required step
+on the happy path. `ahdcode databases` starts the exact-version AhdDataStudio
+bundled in the installed CLI; it does not need the AhdCode repository or
+`AHDCODE_ROOT`. `AHDCODE_ROOT` is a developer override only.
+
+Local development is still HTTP: there is no local TLS, certificate
+authority, or ACME. No language syntax changed in this release. See
+[CLI](docs/CLI.md#local-development-test-names-and-the-router) and
+[Web](docs/WEB.md).
 
 v0.18.5, **Web Starter & Application Bootstrap**, turns `ahdcode init web`
 into a starter wizard: Empty, Basic, or Admin. Empty is a polished welcome

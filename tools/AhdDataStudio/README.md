@@ -28,9 +28,10 @@ The process still binds **127.0.0.1:8081** only. It must not be exposed on
 `0.0.0.0` or the public internet.
 
 For the clean name to resolve, `ahddatabasestudio.test` has to map to
-loopback. `ahdcode local hosts apply` adds it — after asking, in one delimited
-block, leaving everything else in the file untouched — or you can add the line
-yourself:
+loopback. After local host integration is authorized once, `ahdcode
+databases` maintains that name automatically. First use on a terminal asks
+before any privilege prompt. `ahdcode local hosts apply` remains available
+as a manual recovery command, or you can add the line yourself:
 
 ```text
 127.0.0.1 ahddatabasestudio.test
