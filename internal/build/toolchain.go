@@ -11,8 +11,22 @@ import (
 )
 
 // FindGoToolchain locates the Go toolchain used to build generated programs.
-// PATH is authoritative; the well-known install locations are only a fallback.
+// Installed releases prefer their own private Go toolchain. Source builds
+// retain PATH and standard-location discovery for contributors.
 func FindGoToolchain() (string, error) {
+	if executable, err := os.Executable(); err == nil {
+		if resolved, err := filepath.EvalSymlinks(executable); err == nil {
+			executable = resolved
+		}
+		name := "go"
+		if runtime.GOOS == "windows" {
+			name += ".exe"
+		}
+		candidate := filepath.Join(filepath.Dir(executable), "..", "libexec", "go", "bin", name)
+		if info, err := os.Stat(candidate); err == nil && info.Mode().IsRegular() {
+			return filepath.Clean(candidate), nil
+		}
+	}
 	if located, err := exec.LookPath("go"); err == nil {
 		return located, nil
 	}

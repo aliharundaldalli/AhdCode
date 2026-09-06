@@ -206,9 +206,13 @@ func (workspace *Workspace) BuildExecutable(outputPath string) []diagnostics.Dia
 	}
 	args := []string{"build", "-trimpath"}
 	env := append(os.Environ(), "GOTOOLCHAIN=local")
+	// A user GOROOT must not redirect a bundled executable into another Go installation.
+	if filepath.Base(filepath.Dir(filepath.Dir(workspace.toolchain))) == "go" {
+		env = append(env, "GOROOT="+filepath.Dir(filepath.Dir(workspace.toolchain)))
+	}
 	if workspace.vendored {
 		args = append(args, "-mod=vendor")
-		env = append(env, "GOFLAGS=-mod=vendor", "GOPROXY=off", "GOSUMDB=off")
+		env = append(env, "GOFLAGS="+os.Getenv("GOFLAGS")+" -mod=vendor", "GOPROXY=off", "GOSUMDB=off")
 	}
 	args = append(args, "-o", absolute, ".")
 	command := exec.Command(workspace.toolchain, args...)
