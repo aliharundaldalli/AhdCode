@@ -124,15 +124,14 @@ func fileIdentity(path string) string {
 }
 
 func (cache *runCache) path(key string) string {
-	return filepath.Join(cache.directory, key)
+	return ExecutablePath(filepath.Join(cache.directory, key))
 }
 
 // lookup reports an existing executable for this key. A missing or unusable
 // entry is simply a miss.
 func (cache *runCache) lookup(key string) (string, bool) {
 	executable := cache.path(key)
-	info, err := os.Stat(executable)
-	if err != nil || info.IsDir() || info.Mode()&0o111 == 0 {
+	if !runnableFile(executable) {
 		return "", false
 	}
 	// Touch the entry so eviction keeps what is actually being run.
@@ -145,7 +144,7 @@ func (cache *runCache) lookup(key string) (string, bool) {
 // build writes there directly, so publishing never copies the binary and never
 // crosses a filesystem boundary.
 func (cache *runCache) reserve() (string, bool) {
-	temporary, err := os.CreateTemp(cache.directory, "partial-")
+	temporary, err := os.CreateTemp(cache.directory, executableTempPattern("partial-"))
 	if err != nil {
 		return "", false
 	}
@@ -160,14 +159,16 @@ func (cache *runCache) reserve() (string, bool) {
 // concurrent run either sees no entry at all or sees a complete one. A failure
 // to publish is not a run failure: the caller keeps using what it just built.
 func (cache *runCache) publish(key, built string) (string, bool) {
-	if err := os.Chmod(built, 0o700); err != nil {
+	_ = os.Chmod(built, 0o700)
+	// Everything that could reject the entry is checked before the rename, so
+	// a refusal always leaves the executable where the caller expects it. A
+	// check made afterwards would move the file out from under a caller that
+	// then has nothing to run.
+	if !runnableFile(built) {
 		return "", false
 	}
 	final := cache.path(key)
 	if err := os.Rename(built, final); err != nil {
-		return "", false
-	}
-	if _, usable := cache.lookup(key); !usable {
 		return "", false
 	}
 	cache.prune()

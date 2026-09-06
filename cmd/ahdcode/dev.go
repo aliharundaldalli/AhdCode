@@ -197,7 +197,7 @@ func (c *devController) startBuild() {
 	c.building = true
 	c.buildGeneration++
 	c.printf("→ Building...\n")
-	outputPath := filepath.Join(c.binDir, fmt.Sprintf("candidate-%d", c.buildGeneration))
+	outputPath := build.ExecutablePath(filepath.Join(c.binDir, fmt.Sprintf("candidate-%d", c.buildGeneration)))
 	go func() {
 		path, result := build.BuildProgram(c.entry, outputPath)
 		c.events <- devControllerEvent{kind: eventBuildFinished, buildOK: !result.HasErrors(), buildPath: path, buildResult: result}

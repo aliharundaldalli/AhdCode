@@ -157,6 +157,24 @@ func missingToolchain(err error) diagnostics.Diagnostic {
 	}
 }
 
+// launchFailure reports a native executable that was built but could not be
+// started. It is deliberately separate from workspaceFailure: once a binary
+// exists, "check the available disk space" is the wrong thing to tell someone,
+// and it hides the two situations that actually occur — a missing artifact and
+// an operating system that refused to start one that is present.
+func launchFailure(executable string, err error) diagnostics.Diagnostic {
+	hint := "the executable exists but the operating system refused to start it; check whether a security tool is blocking it"
+	if _, statErr := os.Stat(executable); statErr != nil {
+		hint = "the build reported success but left no executable at that path"
+	}
+	return diagnostics.Diagnostic{
+		Code:     backend.CodeWorkspaceFailure,
+		Severity: diagnostics.SeverityError,
+		Message:  "could not run the generated executable " + executable + ": " + err.Error(),
+		Hint:     hint,
+	}
+}
+
 func workspaceFailure(message string) diagnostics.Diagnostic {
 	return diagnostics.Diagnostic{
 		Code: backend.CodeWorkspaceFailure, Severity: diagnostics.SeverityError, Message: message,
@@ -244,7 +262,7 @@ func DefaultOutputPath(entryPath string) string {
 	if err != nil {
 		return name
 	}
-	return filepath.Join(directory, name)
+	return ExecutablePath(filepath.Join(directory, name))
 }
 
 // BuildProgram compiles one entry module into a native executable at
@@ -257,6 +275,9 @@ func BuildProgram(entryPath, outputPath string) (string, Result) {
 	if outputPath == "" {
 		outputPath = DefaultOutputPath(entryPath)
 	}
+	// An explicit -o is honoured, but still has to name something this platform
+	// can actually launch.
+	outputPath = ExecutablePath(outputPath)
 	result.Program = configureLatexRuntime(result.Program)
 	result.Program = configurePlotRuntime(result.Program)
 	result.Program = configureNumericRuntime(result.Program)
@@ -307,7 +328,7 @@ func runExecutable(program *backend.GeneratedProgram) (string, func(), []diagnos
 	// so publishing the result is a rename rather than a copy.
 	executable := reserved
 	if executable == "" {
-		executable = filepath.Join(workspace.Directory, "ahdcode-program")
+		executable = ExecutablePath(filepath.Join(workspace.Directory, "ahdcode-program"))
 	}
 	if built := workspace.BuildExecutable(executable); len(built) != 0 {
 		workspace.Close()
@@ -367,7 +388,7 @@ func RunProgramObserved(entryPath string, arguments []string, stdin io.Reader, s
 	command.Stdout = stdout
 	command.Stderr = stderr
 	if err := command.Start(); err != nil {
-		result.Diagnostics = append(result.Diagnostics, workspaceFailure("could not run the generated executable: "+err.Error()))
+		result.Diagnostics = append(result.Diagnostics, launchFailure(executable, err))
 		return 1, result
 	}
 	if started != nil && command.Process != nil {
@@ -378,7 +399,12 @@ func RunProgramObserved(entryPath string, arguments []string, stdin io.Reader, s
 		if errors.As(err, &exit) {
 			return exit.ExitCode(), result
 		}
-		result.Diagnostics = append(result.Diagnostics, workspaceFailure("could not run the generated executable: "+err.Error()))
+		result.Diagnostics = append(result.Diagnostics, diagnostics.Diagnostic{
+			Code:     backend.CodeWorkspaceFailure,
+			Severity: diagnostics.SeverityError,
+			Message:  "the generated program was started but did not finish normally: " + err.Error(),
+			Hint:     "the program itself ran; this reports how it ended, not a compilation problem",
+		})
 		return 1, result
 	}
 	return 0, result
