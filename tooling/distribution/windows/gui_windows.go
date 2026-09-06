@@ -9,7 +9,6 @@ package main
 
 import (
 	"os"
-	"runtime"
 	"sync"
 	"syscall"
 	"time"
@@ -304,15 +303,15 @@ func (w *progressWindow) Done() {
 	procPostMessage.Call(uintptr(w.hwnd), wmAppDone, 0, 0)
 }
 
-// Pump runs the message loop on the calling thread until Done is called. The
-// installation itself runs on another goroutine, so the window keeps repainting
-// and Windows never marks the program as not responding.
+// Pump runs the message loop until Done is called. Windows delivers messages to
+// the thread that created the window, so the caller must have locked its
+// goroutine to that thread before creating it. The installation itself runs on
+// another goroutine, so the window keeps repainting and Windows never marks the
+// program as not responding.
 func (w *progressWindow) Pump() {
 	if w == nil || !w.ok {
 		return
 	}
-	runtime.LockOSThread()
-	defer runtime.UnlockOSThread()
 	var message msg
 	for {
 		result, _, _ := procGetMessage.Call(uintptr(unsafe.Pointer(&message)), 0, 0, 0)

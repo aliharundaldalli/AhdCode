@@ -1,6 +1,7 @@
 package winsetup
 
 import (
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -202,5 +203,49 @@ func TestLauncherDirectoryIsVersionIndependent(t *testing.T) {
 	}
 	if strings.Count(raw, directory) != 1 {
 		t.Fatalf("three upgrades produced %d PATH entries: %q", strings.Count(raw, directory), raw)
+	}
+}
+
+// Scenarios 3 and 9: after an upgrade the unchanged launcher must resolve the
+// newly recorded version, and a broken installation must say so rather than
+// silently run nothing.
+func TestResolveActive(t *testing.T) {
+	root := filepath.Join("C:", "Users", "someone", "AppData", "Local", "AhdCode")
+	installed := map[string]bool{
+		ActiveExecutable(root, "1.0.0-rc.1"): true,
+		ActiveExecutable(root, "1.0.0"):      true,
+	}
+	stat := func(path string) bool { return installed[path] }
+	pointer := func(value string) func(string) ([]byte, error) {
+		return func(name string) ([]byte, error) {
+			if name != filepath.Join(root, LauncherPointerName) {
+				t.Fatalf("launcher read %q, want the pointer file", name)
+			}
+			return []byte(value), nil
+		}
+	}
+
+	got, err := ResolveActive(root, pointer("1.0.0-rc.1\r\n"), stat)
+	if err != nil || got != ActiveExecutable(root, "1.0.0-rc.1") {
+		t.Fatalf("ResolveActive = %q, %v", got, err)
+	}
+	// An upgrade rewrites only the pointer file; PATH and the launcher stay put.
+	got, err = ResolveActive(root, pointer("1.0.0\r\n"), stat)
+	if err != nil || got != ActiveExecutable(root, "1.0.0") {
+		t.Fatalf("after upgrade ResolveActive = %q, %v", got, err)
+	}
+
+	missing := func(string) ([]byte, error) { return nil, os.ErrNotExist }
+	if _, err := ResolveActive(root, missing, stat); err == nil {
+		t.Error("ResolveActive accepted a missing pointer file")
+	}
+	if _, err := ResolveActive(root, pointer("  \r\n"), stat); err == nil {
+		t.Error("ResolveActive accepted a blank pointer file")
+	}
+	if _, err := ResolveActive(root, pointer(`..\..\Windows`), stat); err == nil {
+		t.Error("ResolveActive accepted a traversal in the pointer file")
+	}
+	if _, err := ResolveActive(root, pointer("9.9.9\r\n"), stat); err == nil {
+		t.Error("ResolveActive accepted a version that is not installed")
 	}
 }

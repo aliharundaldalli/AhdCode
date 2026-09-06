@@ -54,17 +54,8 @@ func resolve() (string, error) {
 		executable = resolved
 	}
 	root := filepath.Dir(filepath.Dir(executable))
-	pointer, err := os.ReadFile(filepath.Join(root, winsetup.LauncherPointerName))
-	if err != nil {
-		return "", errors.New("no active AhdCode version is recorded")
-	}
-	version, err := winsetup.ReadPointer(pointer)
-	if err != nil {
-		return "", err
-	}
-	target := winsetup.ActiveExecutable(root, version)
-	if information, err := os.Stat(target); err != nil || !information.Mode().IsRegular() {
-		return "", fmt.Errorf("AhdCode %s is recorded as active but is not installed", version)
-	}
-	return target, nil
+	return winsetup.ResolveActive(root, os.ReadFile, func(path string) bool {
+		information, err := os.Stat(path)
+		return err == nil && information.Mode().IsRegular()
+	})
 }

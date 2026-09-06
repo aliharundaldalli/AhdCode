@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -94,6 +95,11 @@ func main() {
 // runGraphical is the Explorer double-click experience: one confirmation
 // click, a progress window, then one dismissal click.
 func runGraphical() {
+	// Every window is created and pumped on one OS thread, because Windows
+	// delivers messages only to the thread that owns the window.
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
+
 	root := installationRoot()
 	prompt := "AhdCode will be installed for your account only.\n\n" +
 		"Location:\n" + root + "\n\n" +
@@ -204,7 +210,11 @@ func install(report reporter) error {
 		return err
 	}
 	err = winsetup.Extract(archive, staging, inventory, func(written, total int) {
-		report.Update(fmt.Sprintf("Installing files... (%d of %d)", written, total), 5+written*85/total)
+		percent := 90
+		if total > 0 {
+			percent = 5 + written*85/total
+		}
+		report.Update(fmt.Sprintf("Installing files... (%d of %d)", written, total), percent)
 	})
 	if err != nil {
 		return err

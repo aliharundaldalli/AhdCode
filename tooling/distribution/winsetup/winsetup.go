@@ -78,6 +78,26 @@ func LauncherDirectory(root string) string {
 	return filepath.Join(root, "bin")
 }
 
+// ResolveActive reports the executable the stable launcher must run for an
+// installation root. read supplies the pointer file's bytes and stat reports
+// whether a resolved path is a usable file; both are injected so the whole
+// decision is testable away from Windows.
+func ResolveActive(root string, read func(string) ([]byte, error), stat func(string) bool) (string, error) {
+	content, err := read(filepath.Join(root, LauncherPointerName))
+	if err != nil {
+		return "", errors.New("no active AhdCode version is recorded")
+	}
+	version, err := ReadPointer(content)
+	if err != nil {
+		return "", err
+	}
+	target := ActiveExecutable(root, version)
+	if !stat(target) {
+		return "", errors.New("AhdCode " + version + " is recorded as active but is not installed")
+	}
+	return target, nil
+}
+
 // SplitPath separates a raw PATH value into entries, preserving them exactly.
 // Windows tolerates empty segments, and dropping them would silently rewrite
 // an unrelated part of the user's PATH, so they are kept.
