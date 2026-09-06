@@ -22,13 +22,15 @@ import (
 	"ahdcode/internal/lsp"
 	"ahdcode/internal/repl"
 	"ahdcode/internal/source"
+
+	"golang.org/x/term"
 )
 
-const usage = `AhdCode v0.19.0 toolchain
+const usage = `AhdCode v0.20.0 toolchain
 
 usage:
   ahdcode                                    start the interactive REPL
-  ahdcode init  web [empty|basic|admin]      initialize this directory as a Web app
+  ahdcode init  web [empty|basic|admin|mvc|crud]  initialize this directory as a Web app
   ahdcode databases                          start AhdDataStudio at ahddatabasestudio.test
   ahdcode databases list                     list registered local databases
   ahdcode databases add <file.db>            register a SQLite file with AhdDataStudio
@@ -60,7 +62,7 @@ local development:
   bind address are reported separately and neither replaces the other.
 `
 
-const version = "AhdCode v0.19.0"
+const version = "AhdCode v0.20.0"
 
 func main() {
 	os.Exit(run(os.Args[1:]))
@@ -125,7 +127,7 @@ func runInit(arguments []string, input io.Reader, output, errorOutput io.Writer)
 		return 2
 	}
 	if len(arguments) > 2 {
-		fmt.Fprintln(errorOutput, "ahdcode init web: only empty, basic, or admin may follow")
+		fmt.Fprintln(errorOutput, "ahdcode init web: only empty, basic, admin, mvc, or crud may follow")
 		return 2
 	}
 	root, err := os.Getwd()
@@ -153,11 +155,7 @@ func isInteractive(input io.Reader) bool {
 	if !ok {
 		return false
 	}
-	info, err := file.Stat()
-	if err != nil {
-		return false
-	}
-	return info.Mode()&os.ModeCharDevice != 0
+	return term.IsTerminal(int(file.Fd()))
 }
 
 func runBuild(arguments []string, outputWriter, errorOutput io.Writer) int {

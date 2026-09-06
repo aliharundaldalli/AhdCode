@@ -104,6 +104,7 @@ func TestAdminSQLiteRegistersItselfInTheRegistry(t *testing.T) {
 	t.Chdir(project)
 	t.Setenv("AHDCODE_ROOT", "")
 	_ = os.Unsetenv("AHDCODE_ROOT")
+	t.Setenv("AHDCODE_STUDIO_CACHE", t.TempDir())
 
 	var out bytes.Buffer
 	err := Web(project, &out, &out, Options{
@@ -150,6 +151,7 @@ func TestInitRegistersOnlyTheDatabaseItCreated(t *testing.T) {
 	t.Chdir(project)
 	t.Setenv("AHDCODE_ROOT", "")
 	_ = os.Unsetenv("AHDCODE_ROOT")
+	t.Setenv("AHDCODE_STUDIO_CACHE", t.TempDir())
 
 	var out bytes.Buffer
 	if err := Web(project, &out, &out, Options{
@@ -187,6 +189,7 @@ func TestRegistrationFailureKeepsTheDatabaseAndTheApp(t *testing.T) {
 	t.Chdir(project)
 	t.Setenv("AHDCODE_ROOT", "")
 	_ = os.Unsetenv("AHDCODE_ROOT")
+	t.Setenv("AHDCODE_STUDIO_CACHE", t.TempDir())
 
 	var out bytes.Buffer
 	if err := Web(project, &out, &out, Options{

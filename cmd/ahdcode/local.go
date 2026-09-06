@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -141,6 +142,19 @@ func runLocalStatus(output, errorOutput io.Writer) int {
 	return 0
 }
 
+func hostResolvesLoopback(name string) bool {
+	ips, err := net.LookupHost(name)
+	if err != nil {
+		return false
+	}
+	for _, ip := range ips {
+		if ip == "127.0.0.1" || ip == "::1" {
+			return true
+		}
+	}
+	return false
+}
+
 func hostnamesOf(routes []localdev.Route) []string {
 	names := make([]string, 0, len(routes))
 	for _, route := range routes {
@@ -152,6 +166,7 @@ func hostnamesOf(routes []localdev.Route) []string {
 func writeLocalHostsStatus(output io.Writer, active []string) {
 	content := localdev.ReadSystemHosts()
 	fmt.Fprintf(output, "System hosts: %s\n", localdev.SystemHostsPath())
+	fmt.Fprintf(output, "  Host integration: %s\n", hostIntegrationState(content, localdev.HostsAuthorized()))
 	managed := localdev.HostsBlockNames(content)
 	if len(managed) == 0 {
 		fmt.Fprintln(output, "  managed block: absent")
@@ -162,10 +177,14 @@ func writeLocalHostsStatus(output io.Writer, active []string) {
 		state := "not mapped"
 		if localdev.HostsMapsLoopback(content, name) {
 			state = "mapped to 127.0.0.1"
+			if hostResolvesLoopback(name) {
+				state += "; resolvable"
+			} else {
+				state += "; not yet resolvable"
+			}
 		}
 		fmt.Fprintf(output, "  %s: %s\n", name, state)
 	}
-	fmt.Fprintln(output, "  (`ahdcode local hosts` shows how to add the missing ones)")
 }
 
 // mergedHostnames is the union AhdCode's managed block should contain: every

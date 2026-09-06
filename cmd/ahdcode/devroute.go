@@ -116,6 +116,22 @@ func (c *devController) establishLocalRoute(environment webEnvironment) {
 	}
 }
 
+func (c *devController) syncLocalHosts() {
+	if !c.localRoute.allocated() {
+		return
+	}
+	result := syncManagedHostname(hostSyncRequest{
+		hostname:    c.localRoute.route.Hostname,
+		input:       os.Stdin,
+		output:      c.output,
+		errorOutput: c.errorOut,
+		interactive: isInteractive(os.Stdin),
+	})
+	if result.message != "" && c.localRoute.note == "" {
+		c.localRoute.note = result.message
+	}
+}
+
 // releaseLocalRoute gives the hostname back. It runs from the controller's
 // own shutdown, so it covers every way a session ends that leaves the
 // controller able to act: Ctrl-C, `ahdcode stop`, and `ahdcode kill`. A
@@ -155,10 +171,10 @@ func writeLocalIdentity(output io.Writer, environment webEnvironment, local devL
 	fmt.Fprintf(output, "  %s\n", local.route.URL(local.routerPort))
 	switch {
 	case local.note != "":
-		fmt.Fprintf(output, "  (not routed: %s)\n", local.note)
+		fmt.Fprintf(output, "  (%s)\n", local.note)
 	case !localdev.HostsMapsLoopback(localdev.ReadSystemHosts(), local.route.Hostname):
-		fmt.Fprintf(output, "  (%s is not in %s yet; run `ahdcode local hosts apply`)\n",
-			local.route.Hostname, localdev.SystemHostsPath())
+		fmt.Fprintf(output, "  (%s is not mapped to 127.0.0.1; the bind address below still works)\n",
+			local.route.Hostname)
 	case local.routerPort != localRouterPreferredPort:
 		fmt.Fprintf(output, "  (port %d was not available, so the local URL carries :%d)\n",
 			localRouterPreferredPort, local.routerPort)

@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	"ahdcode/internal/studio"
 )
 
 const (
@@ -37,35 +39,29 @@ func AhdDataStudioPublicURL() string { return ahdDataStudioURL }
 // is used whenever the clean name is not resolvable on this machine.
 func AhdDataStudioLoopbackURL() string { return ahdDataStudioBindURL }
 
-// LocateAhdDataStudio finds tools/AhdDataStudio/app.ahd from AHDCODE_ROOT
-// or by walking up from the current directory.
+// LocateAhdDataStudio resolves the exact-version AhdDataStudio that belongs
+// to this CLI. AHDCODE_ROOT is an explicit developer override. The ordinary
+// installed-product path materializes the Studio bundled in the toolchain.
 func LocateAhdDataStudio() (string, error) {
 	if root := strings.TrimSpace(os.Getenv("AHDCODE_ROOT")); root != "" {
 		candidate := filepath.Join(root, "tools", "AhdDataStudio")
 		if studioAppExists(candidate) {
 			return candidate, nil
 		}
+		return "", fmt.Errorf("AHDCODE_ROOT is set but %s does not contain AhdDataStudio.", candidate)
 	}
-	cwd, err := os.Getwd()
+	dir, err := materializeBundledStudio()
 	if err != nil {
-		return "", fmt.Errorf("cannot find AhdDataStudio.\n%v", err)
+		return "", fmt.Errorf("cannot start AhdDataStudio.\n%v", err)
 	}
-	dir := cwd
-	for {
-		nested := filepath.Join(dir, "tools", "AhdDataStudio")
-		if studioAppExists(nested) {
-			return nested, nil
-		}
-		if filepath.Base(dir) == "AhdDataStudio" && studioAppExists(dir) {
-			return dir, nil
-		}
-		parent := filepath.Dir(dir)
-		if parent == dir {
-			break
-		}
-		dir = parent
+	if studioAppExists(dir) {
+		return dir, nil
 	}
-	return "", fmt.Errorf("cannot find AhdDataStudio.\nRun ahdcode databases from the AhdCode repository, or set AHDCODE_ROOT.")
+	return "", fmt.Errorf("cannot start AhdDataStudio.\nThe bundled Studio for this AhdCode version is missing.")
+}
+
+func materializeBundledStudio() (string, error) {
+	return studio.Materialize()
 }
 
 func studioAppExists(dir string) bool {
@@ -195,26 +191,13 @@ func ahdDataStudioEnvFiles() []string {
 		files = append(files, clean)
 	}
 
-	// Explicit source root takes precedence over nearest cwd/upward discovery.
 	if root := strings.TrimSpace(os.Getenv("AHDCODE_ROOT")); root != "" {
 		add(filepath.Join(root, "tools", "AhdDataStudio", ".env"))
 	}
-	if dir, err := LocateAhdDataStudio(); err == nil {
+	// Do not materialize Studio just to look for a leftover .env. Registry
+	// operations and init must stay independent of Studio extraction.
+	if dir, err := studio.CacheDir(); err == nil && studioAppExists(dir) {
 		add(filepath.Join(dir, ".env"))
-	}
-	if cwd, err := os.Getwd(); err == nil {
-		dir := cwd
-		for {
-			add(filepath.Join(dir, "tools", "AhdDataStudio", ".env"))
-			if filepath.Base(dir) == "AhdDataStudio" {
-				add(filepath.Join(dir, ".env"))
-			}
-			parent := filepath.Dir(dir)
-			if parent == dir {
-				break
-			}
-			dir = parent
-		}
 	}
 	return files
 }

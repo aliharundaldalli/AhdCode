@@ -309,6 +309,7 @@ func (c *devController) run() {
 						// actually listening: a local name must never
 						// exist for an application that is not there.
 						c.establishLocalRoute(c.webEnvironment)
+						c.syncLocalHosts()
 						// Republished so the descriptor carries the
 						// logical identity the route registry just granted.
 						c.publishDescriptor()

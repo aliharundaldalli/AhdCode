@@ -27,7 +27,7 @@ func TestCommandDispatch(t *testing.T) {
 	if code := runWithIO(nil, bytes.NewBuffer(nil), &out, &errors); code != 0 {
 		t.Fatalf("expected REPL exit 0; received %d", code)
 	}
-	if !strings.Contains(out.String(), "AhdCode v0.19.0\nahd> ") {
+	if !strings.Contains(out.String(), "AhdCode v0.20.0\nahd> ") {
 		t.Fatalf("REPL banner/prompt = %q", out.String())
 	}
 	if code := run([]string{"nonsense"}); code != 2 {
@@ -117,7 +117,7 @@ func TestHelpVersionAndUnknownFlags(t *testing.T) {
 		{[]string{"--help"}, 0, "ahdcode format"},
 		{[]string{"--help"}, 0, "ahdcode lsp"},
 		{[]string{"--help"}, 0, "ahdcode databases"},
-		{[]string{"--version"}, 0, "AhdCode v0.19.0"},
+		{[]string{"--version"}, 0, "AhdCode v0.20.0"},
 		{[]string{"--help"}, 0, "ahdcode local status"},
 		{[]string{"databases", "--bad"}, 2, "unknown subcommand"},
 		{[]string{"local"}, 2, "a subcommand is required"},
@@ -294,7 +294,7 @@ func TestInitWebWritesCurrentDirectory(t *testing.T) {
 	if code := runWithIO([]string{"init", "web"}, bytes.NewBuffer(nil), &out, &errors); code != 1 {
 		t.Fatalf("bare init web on non-tty: exit %d stderr=%q", code, errors.String())
 	}
-	if !strings.Contains(errors.String(), "empty|basic|admin") {
+	if !strings.Contains(errors.String(), "empty|basic|admin|mvc|crud") {
 		t.Fatalf("non-tty hint = %q", errors.String())
 	}
 	errors.Reset()
@@ -307,5 +307,28 @@ func TestInitWebWritesCurrentDirectory(t *testing.T) {
 	}
 	if !strings.Contains(out.String(), "Starter: Empty") {
 		t.Fatalf("stdout=%q", out.String())
+	}
+}
+
+func TestIsInteractiveRejectsNonTerminals(t *testing.T) {
+	devNull, err := os.Open(os.DevNull)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer devNull.Close()
+	if isInteractive(devNull) {
+		t.Fatal("/dev/null must not be treated as a terminal")
+	}
+	reader, writer, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer reader.Close()
+	defer writer.Close()
+	if isInteractive(reader) {
+		t.Fatal("a pipe must not be treated as a terminal")
+	}
+	if isInteractive(bytes.NewBuffer(nil)) {
+		t.Fatal("a buffer must not be treated as a terminal")
 	}
 }

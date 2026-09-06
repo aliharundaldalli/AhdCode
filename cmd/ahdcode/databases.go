@@ -154,8 +154,18 @@ func startAhdDataStudio(input io.Reader, output, errorOutput io.Writer) int {
 	fmt.Fprintf(output, "AhdDataStudio: %s\n", localdev.Route{Hostname: localdev.StudioHost}.URL(routerPort))
 	fmt.Fprintf(output, "Direct: %s\n", initweb.AhdDataStudioLoopbackURL())
 	if openURL == initweb.AhdDataStudioLoopbackURL() {
-		fmt.Fprintf(output, "%s is not mapped to 127.0.0.1 yet; run `ahdcode local hosts apply` to use the clean URL.\n",
-			localdev.StudioHost)
+		result := syncManagedHostname(hostSyncRequest{
+			hostname:    localdev.StudioHost,
+			input:       input,
+			output:      output,
+			errorOutput: errorOutput,
+			interactive: isInteractive(input),
+		})
+		if result.mapped {
+			openURL = localdev.Route{Hostname: localdev.StudioHost}.URL(routerPort)
+		} else if result.message != "" {
+			fmt.Fprintf(output, "%s\n", result.message)
+		}
 	}
 	fmt.Fprintf(output, "Using: %s\n", openURL)
 
