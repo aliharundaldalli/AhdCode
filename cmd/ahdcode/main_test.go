@@ -1,6 +1,7 @@
 package main
 
 import (
+	"ahdcode/internal/ahdversion"
 	"bytes"
 	"fmt"
 	"os"
@@ -27,7 +28,7 @@ func TestCommandDispatch(t *testing.T) {
 	if code := runWithIO(nil, bytes.NewBuffer(nil), &out, &errors); code != 0 {
 		t.Fatalf("expected REPL exit 0; received %d", code)
 	}
-	if !strings.Contains(out.String(), "AhdCode v0.20.0\nahd> ") {
+	if !strings.Contains(out.String(), ahdversion.Display+"\nahd> ") {
 		t.Fatalf("REPL banner/prompt = %q", out.String())
 	}
 	if code := run([]string{"nonsense"}); code != 2 {
@@ -117,7 +118,7 @@ func TestHelpVersionAndUnknownFlags(t *testing.T) {
 		{[]string{"--help"}, 0, "ahdcode format"},
 		{[]string{"--help"}, 0, "ahdcode lsp"},
 		{[]string{"--help"}, 0, "ahdcode databases"},
-		{[]string{"--version"}, 0, "AhdCode v0.20.0"},
+		{[]string{"--version"}, 0, ahdversion.Display},
 		{[]string{"--help"}, 0, "ahdcode local status"},
 		{[]string{"databases", "--bad"}, 2, "unknown subcommand"},
 		{[]string{"local"}, 2, "a subcommand is required"},

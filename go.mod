@@ -6,6 +6,7 @@ require (
 	github.com/go-sql-driver/mysql v1.10.1
 	github.com/ncruces/go-sqlite3 v0.35.4
 	golang.org/x/crypto v0.56.0
+	golang.org/x/sys v0.47.0
 	golang.org/x/term v0.45.0
 	golang.org/x/text v0.41.0
 	gonum.org/v1/gonum v0.16.0
@@ -23,5 +24,4 @@ require (
 	github.com/ncruces/go-sqlite3-wasm/v5 v5.0.35304 // indirect
 	github.com/ncruces/julianday v1.0.0 // indirect
 	golang.org/x/image v0.30.0 // indirect
-	golang.org/x/sys v0.47.0 // indirect
 )

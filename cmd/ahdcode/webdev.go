@@ -220,13 +220,13 @@ func checkWebEnvironment(environment webEnvironment) error {
 		// mean serving http while the configuration -- and any URL printed
 		// from it -- says https. Refusing is the honest outcome; downgrading
 		// silently would hide a secure-cookie or mixed-content problem until
-		// production. v0.19 routes .test names over plaintext HTTP and adds
+		// production. AhdCode routes .test names over plaintext HTTP and adds
 		// no certificate authority, so this is unchanged.
 		identity := "https://" + environment.host
 		if environment.environment == "development" && environment.host != "" {
 			identity = environment.developmentURL()
 		}
-		message := "Local HTTPS is not available in AhdCode v0.19.\n" +
+		message := "Local HTTPS is not available in " + version + ".\n" +
 			"  ahdcode dev serves plaintext HTTP, so it cannot honour\n" +
 			"  APP_PROTOCOL=https.\n"
 		if environment.host != "" {

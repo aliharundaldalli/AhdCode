@@ -15,6 +15,7 @@ import (
 	"syscall"
 	"time"
 
+	"ahdcode/internal/ahdversion"
 	"ahdcode/internal/build"
 	"ahdcode/internal/diagnostics"
 	"ahdcode/internal/formatter"
@@ -26,7 +27,7 @@ import (
 	"golang.org/x/term"
 )
 
-const usage = `AhdCode v0.20.0 toolchain
+var usage = version + ` toolchain
 
 usage:
   ahdcode                                    start the interactive REPL
@@ -62,7 +63,7 @@ local development:
   bind address are reported separately and neither replaces the other.
 `
 
-const version = "AhdCode v0.20.0"
+const version = ahdversion.Display
 
 func main() {
 	os.Exit(run(os.Args[1:]))
