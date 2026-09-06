@@ -113,8 +113,35 @@ def verify_zip_modes(archive, root):
    if not path.is_file(): raise SystemExit('the archive is missing ' + relative)
    if not os.access(path,os.X_OK): raise SystemExit('Finder would expand ' + relative + ' without its execute bit')
 
+
+MACHO_MAGIC = {b'\xcf\xfa\xed\xfe', b'\xce\xfa\xed\xfe', b'\xca\xfe\xba\xbe'}
+
+def macho_files(root):
+ """Every Mach-O file in the payload. Notarization refuses a package that
+ carries even one unsigned executable, so this looks at magic numbers rather
+ than trusting file names or the execute bit."""
+ found=[]
+ for p in sorted(root.rglob('*')):
+  if not p.is_file() or p.is_symlink(): continue
+  with open(p,'rb') as f: head=f.read(4)
+  if head in MACHO_MAGIC: found.append(p)
+ return found
+
+def sign_payload(root, identity):
+ """Sign with the hardened runtime and a secure timestamp, which notarization
+ requires. The private Go toolchain is signed too: it ships inside the package
+ and Apple checks all of it."""
+ targets=macho_files(root)
+ if not targets: raise SystemExit('no Mach-O files found to sign under ' + str(root))
+ for target in targets:
+  run(['codesign','--force','--options','runtime','--timestamp','--sign',identity,target])
+ for target in targets:
+  result=subprocess.run(['codesign','--verify','--strict','--verbose=1',str(target)],capture_output=True,text=True)
+  if result.returncode!=0: raise SystemExit('signature did not verify: %s\n%s' % (target,result.stderr.strip()))
+ print('Signed and verified',len(targets),'Mach-O files',flush=True)
+
 def main():
- ap=argparse.ArgumentParser();ap.add_argument('--downloads',type=pathlib.Path,required=True);ap.add_argument('--latex-runtime',type=pathlib.Path,required=True);ap.add_argument('--modules',type=pathlib.Path,required=True);ap.add_argument('--output',type=pathlib.Path,required=True);ap.add_argument('--vsix',type=pathlib.Path,help='the .vsix from tooling/distribution/build_vsix.py');ap.add_argument('--without-vsix',action='store_true',help='deliberately ship no editor extension');ap.add_argument('--platform',choices=['darwin','windows','linux','all'],default='all');a=ap.parse_args()
+ ap=argparse.ArgumentParser();ap.add_argument('--downloads',type=pathlib.Path,required=True);ap.add_argument('--latex-runtime',type=pathlib.Path,required=True);ap.add_argument('--modules',type=pathlib.Path,required=True);ap.add_argument('--output',type=pathlib.Path,required=True);ap.add_argument('--sign-app',default='',help='Developer ID Application identity for the packaged binaries');ap.add_argument('--vsix',type=pathlib.Path,help='the .vsix from tooling/distribution/build_vsix.py');ap.add_argument('--without-vsix',action='store_true',help='deliberately ship no editor extension');ap.add_argument('--platform',choices=['darwin','windows','linux','all'],default='all');a=ap.parse_args()
  version=__import__('re').search(r'Number\s*=\s*"([^"]+)"',(R/'internal/ahdversion/version.go').read_text())[1]
  commit=subprocess.check_output(['git','rev-parse','HEAD'],cwd=R,text=True).strip()
  raw=a.modules.read_text();decoder=json.JSONDecoder();modules=[]
@@ -160,6 +187,9 @@ def main():
     'The extension runs .ahd files from the editor and connects to the AhdCode\n'
     'language server (ahdcode lsp) for diagnostics and hover. It needs no npm,\n'
     'no network, and no separate download.\n')
+  # Signing has to happen before the inventory is taken: codesign rewrites
+  # each binary, so hashes recorded earlier would no longer match.
+  if goos=='darwin' and a.sign_app: sign_payload(payload,a.sign_app)
   (payload/'VERSION').write_text(version+'\n');(staging/'VERSION').write_text(version+'\n')
   (payload/'BUILD.json').write_text(json.dumps({'version':version,'commit':commit,'platform':goos,'architecture':arch,'go':go['version'],'tectonic':latex['tectonic_version']},indent=2)+'\n')
   if goos=='windows':shutil.copy2(R/'tooling/distribution/windows/uninstall.ps1',payload/'uninstall.ps1')
