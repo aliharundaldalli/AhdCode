@@ -16,6 +16,7 @@ var projectDocs embed.FS
 // are intentionally absent.
 var documentationManifest = []string{
 	"ARCHIVE.md",
+	"BITS.md",
 	"CLASSES.md",
 	"CLI.md",
 	"COLLECTIONS.md",

@@ -799,6 +799,9 @@ func (generator *generator) call(value *ir.CallExpr) string {
 	if strings.HasPrefix(string(value.Callable), smtpModulePrefix) {
 		return generator.smtpCall(value)
 	}
+	if strings.HasPrefix(string(value.Callable), bitsModulePrefix) {
+		return generator.bitsCall(value)
+	}
 	if strings.HasPrefix(string(value.Callable), securityModulePrefix) {
 		return generator.securityCall(value)
 	}

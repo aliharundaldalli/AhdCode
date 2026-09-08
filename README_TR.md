@@ -12,9 +12,13 @@ AhdCode; okunabilir sözdizimi, açık niyet (explicit intent), öngörülebilir
 anlambilim (semantics) ve yerel (native) derlemeye odaklanan, deneysel,
 statik olarak denetlenen genel amaçlı bir programlama dilidir.
 
-Bu, ilk kararlı sürüm olan **v1.0.0**'dır. Dil, araç zinciri ve Web çatısı
-özellik olarak tamamlanmıştır; burada anlatılan dil yüzeyi 1.0'ın taahhüt
-ettiği yüzeydir.
+Bu, **v1.1.0**'dır. Dil, araç zinciri ve Web çatısı özellik olarak
+tamamlanmıştır; burada anlatılan çekirdek dil yüzeyi 1.0'ın taahhüt ettiği ve
+1.1'in değiştirmeden koruduğu yüzeydir.
+
+v1.1.0 bir ara (minor) sürümdür: `Bits` standart modülünü ekler ve `Security`
+modülünü genişletir; çekirdek dilbilgisini ya da mevcut davranışların hiçbirini
+değiştirmez. Bkz. [v1.1.0 ile gelenler](#v110-ile-gelenler).
 
 Ürün, kendi kendine yeten bir platform paketi olarak dağıtılır: `ahdcode` CLI,
 özel Go 1.27.0 araç zinciri, AhdDataStudio, `ahdsqlite`, `ahdnumeric` ve
@@ -480,6 +484,37 @@ VS Code hem de Antigravity'i hedefler.
 [Kurulum rehberine](editors/vscode/README_TR.md) bakın.
 
 ## Mevcut sınırlamalar
+
+## v1.1.0 ile gelenler <a id="v110-ile-gelenler"></a>
+
+v1.1.0 bir **ara (minor)** sürümdür. Bir yeni standart modül ekler, bir
+mevcut modülü genişletir. Çekirdek dilbilgisi, tür sistemi ve daha önce
+yayımlanmış her fonksiyon v1.0.0 davranışını korur.
+
+**Yeni standart modül: [`Bits`](docs/BITS.md)** — dilin işaretli 64 bit `Int`
+türü üzerinde bit işlemleri. AhdCode dilbilgisinde bit operatörü yoktur
+(`and`, `or` ve `not` mantıksal operatörlerdir, `^` üs almadır); bu yüzden
+işlemler adlandırılmış çağrılardır:
+
+`bitAnd`, `bitOr`, `bitXor`, `bitNot`, `shiftLeft`, `shiftRight`,
+`shiftRightUnsigned`, `rotateLeft`, `rotateRight`, `count`, `leadingZeros`,
+`trailingZeros` ve kaydırma/döndürme mesafesi `0..63` dışına çıktığında
+yükselen `BitsError` hata türü.
+
+**Genişletilen modül: [`Security`](docs/SECURITY.md)** — parola primitifleri
+değişmedi; modül artık özetler (digest), mesaj doğrulama, yaygın kodlamalar,
+RS256 imzaları ve doğrulamalı simetrik şifrelemeyi de kapsıyor:
+
+`sha256`, `sha512`, `hmacSHA256`, `hmacVerify`, `base64Encode`, `base64Decode`,
+`base64UrlEncode`, `base64UrlDecode`, `hexEncode`, `hexDecode`, `randomHex`,
+`rsaSignSHA256`, `rsaVerifySHA256`, `aesEncrypt`, `aesDecrypt`.
+
+Kriptografik bir seçim varsa bir kez yapılır ve ayar olarak dışarı açılmaz:
+özet için SHA-2, MAC için HMAC-SHA256, imza için SHA-256 üzerinde
+RSASSA-PKCS1-v1_5 (JWT'nin RS256 dediği algoritma) ve şifreleme için
+AES-256-GCM.
+
+---
 
 AhdCode v1.0.0 ilk kararlı sürümdür. Aşağıdaki dışarıda bırakmalar bilinçli tasarım kararlarıdır; sonraki bir sürümü bekleyen eksikler değildir.
 

@@ -64,3 +64,10 @@ var SecuritySource string
 
 //go:embed identity.go
 var IdentitySource string
+
+// BitsSource is emitted as a separate generated Go file. It provides the
+// bitwise operations AhdCode's grammar has no operators for, using only
+// math/bits from the standard library.
+//
+//go:embed bits.go
+var BitsSource string

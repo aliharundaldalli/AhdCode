@@ -12,9 +12,19 @@ package ahdruntime
 // crypto/subtle and random bytes from crypto/rand).
 
 import (
+	"crypto"
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/hmac"
 	"crypto/rand"
+	"crypto/rsa"
+	"crypto/sha256"
+	"crypto/sha512"
 	"crypto/subtle"
+	"crypto/x509"
 	"encoding/base64"
+	"encoding/hex"
+	"encoding/pem"
 	"fmt"
 	"math/bits"
 	"strconv"
@@ -664,4 +674,240 @@ func AhdSecurityToken(errorClass *AhdClass) string {
 // Intended for fixed-length secret comparison (tokens, HMACs).
 func AhdSecuritySecureEqual(expected, received string) bool {
 	return subtle.ConstantTimeCompare([]byte(expected), []byte(received)) == 1
+}
+
+// ---------------------------------------------------------------------------
+// Digest, encoding and RSA signing
+//
+// These exist so AhdCode programs can build signed tokens (JWT/JWS) and verify
+// webhook signatures without shelling out. They are deliberately narrow: one
+// digest, one encoding, one signature scheme -- the combination RFC 7518 calls
+// RS256.
+// ---------------------------------------------------------------------------
+
+// AhdSecuritySHA256 returns the SHA-256 digest of text as lowercase hex.
+func AhdSecuritySHA256(text string) string {
+	sum := sha256.Sum256([]byte(text))
+	return hex.EncodeToString(sum[:])
+}
+
+// AhdSecurityBase64UrlEncode encodes text with unpadded base64url (RFC 4648
+// section 5). JWT segments use exactly this alphabet and omit padding.
+func AhdSecurityBase64UrlEncode(text string) string {
+	return base64.RawURLEncoding.EncodeToString([]byte(text))
+}
+
+// AhdSecurityBase64UrlDecode reverses AhdSecurityBase64UrlEncode. Padded input
+// is accepted too, because other systems emit it.
+func AhdSecurityBase64UrlDecode(errorClass *AhdClass, encoded string) string {
+	trimmed := strings.TrimRight(encoded, "=")
+	decoded, err := base64.RawURLEncoding.DecodeString(trimmed)
+	if err != nil {
+		AhdRaiseClass(errorClass, "Security base64url input is malformed")
+	}
+	return string(decoded)
+}
+
+// ahdSecurityParseRSAPrivateKey accepts a PEM-encoded RSA private key in either
+// PKCS#1 ("RSA PRIVATE KEY") or PKCS#8 ("PRIVATE KEY") form. Service-account
+// files from Google use PKCS#8; OpenSSL still emits PKCS#1 by default.
+func ahdSecurityParseRSAPrivateKey(errorClass *AhdClass, pemText string) *rsa.PrivateKey {
+	block, _ := pem.Decode([]byte(pemText))
+	if block == nil {
+		AhdRaiseClass(errorClass, "Security private key is not valid PEM")
+	}
+	if parsed, err := x509.ParsePKCS1PrivateKey(block.Bytes); err == nil {
+		return parsed
+	}
+	parsed, err := x509.ParsePKCS8PrivateKey(block.Bytes)
+	if err != nil {
+		AhdRaiseClass(errorClass, "Security private key could not be parsed")
+	}
+	key, ok := parsed.(*rsa.PrivateKey)
+	if !ok {
+		AhdRaiseClass(errorClass, "Security private key is not an RSA key")
+	}
+	return key
+}
+
+// AhdSecurityRSASignSHA256 signs message with RSASSA-PKCS1-v1_5 over SHA-256
+// and returns the signature as unpadded base64url. This is the "RS256"
+// algorithm used by JSON Web Tokens.
+func AhdSecurityRSASignSHA256(errorClass *AhdClass, privateKeyPEM, message string) string {
+	key := ahdSecurityParseRSAPrivateKey(errorClass, privateKeyPEM)
+	digest := sha256.Sum256([]byte(message))
+	signature, err := rsa.SignPKCS1v15(rand.Reader, key, crypto.SHA256, digest[:])
+	if err != nil {
+		AhdRaiseClass(errorClass, "Security RSA signing failed")
+	}
+	return base64.RawURLEncoding.EncodeToString(signature)
+}
+
+// ---------------------------------------------------------------------------
+// Digests, MACs, encodings and authenticated encryption
+//
+// Everything below is a thin, opinionated wrapper over the Go standard
+// library. Where a choice exists it is made once, safely, and not exposed as a
+// knob: SHA-256/512 for digests, HMAC-SHA256 for MACs, AES-256-GCM for
+// symmetric encryption. Callers cannot select a broken mode such as ECB, and
+// cannot forget the authentication tag.
+// ---------------------------------------------------------------------------
+
+// AhdSecuritySHA512 returns the SHA-512 digest of text as lowercase hex.
+func AhdSecuritySHA512(text string) string {
+	sum := sha512.Sum512([]byte(text))
+	return hex.EncodeToString(sum[:])
+}
+
+// AhdSecurityHMACSHA256 returns the HMAC-SHA256 of message under key, hex encoded.
+func AhdSecurityHMACSHA256(key, message string) string {
+	mac := hmac.New(sha256.New, []byte(key))
+	mac.Write([]byte(message))
+	return hex.EncodeToString(mac.Sum(nil))
+}
+
+// AhdSecurityHMACVerify compares a received hex MAC with the expected one in
+// constant time. Use this instead of comparing hex strings with ==.
+func AhdSecurityHMACVerify(key, message, receivedHex string) bool {
+	expected := AhdSecurityHMACSHA256(key, message)
+	return subtle.ConstantTimeCompare([]byte(expected), []byte(receivedHex)) == 1
+}
+
+// AhdSecurityBase64Encode encodes text with standard padded base64.
+func AhdSecurityBase64Encode(text string) string {
+	return base64.StdEncoding.EncodeToString([]byte(text))
+}
+
+// AhdSecurityBase64Decode reverses AhdSecurityBase64Encode.
+func AhdSecurityBase64Decode(errorClass *AhdClass, encoded string) string {
+	decoded, err := base64.StdEncoding.DecodeString(encoded)
+	if err != nil {
+		AhdRaiseClass(errorClass, "Security base64 input is malformed")
+	}
+	return string(decoded)
+}
+
+// AhdSecurityHexEncode encodes text as lowercase hex.
+func AhdSecurityHexEncode(text string) string {
+	return hex.EncodeToString([]byte(text))
+}
+
+// AhdSecurityHexDecode reverses AhdSecurityHexEncode.
+func AhdSecurityHexDecode(errorClass *AhdClass, encoded string) string {
+	decoded, err := hex.DecodeString(encoded)
+	if err != nil {
+		AhdRaiseClass(errorClass, "Security hex input is malformed")
+	}
+	return string(decoded)
+}
+
+// AhdSecurityRandomHex returns count cryptographically random bytes as hex.
+// A 32-byte value is the right size for an AES-256 key or an HMAC secret.
+func AhdSecurityRandomHex(errorClass *AhdClass, count int64) string {
+	if count < 1 || count > 1024 {
+		AhdRaiseClass(errorClass, "Security random byte count must be between 1 and 1024")
+	}
+	buf := make([]byte, count)
+	if _, err := rand.Read(buf); err != nil {
+		AhdRaiseClass(errorClass, "Security random token generation failed")
+	}
+	return hex.EncodeToString(buf)
+}
+
+// ahdSecurityParseRSAPublicKey accepts a PEM-encoded public key (PKIX) or an
+// RSA public key (PKCS#1).
+func ahdSecurityParseRSAPublicKey(errorClass *AhdClass, pemText string) *rsa.PublicKey {
+	block, _ := pem.Decode([]byte(pemText))
+	if block == nil {
+		AhdRaiseClass(errorClass, "Security public key is not valid PEM")
+	}
+	if parsed, err := x509.ParsePKCS1PublicKey(block.Bytes); err == nil {
+		return parsed
+	}
+	parsed, err := x509.ParsePKIXPublicKey(block.Bytes)
+	if err != nil {
+		AhdRaiseClass(errorClass, "Security public key could not be parsed")
+	}
+	key, ok := parsed.(*rsa.PublicKey)
+	if !ok {
+		AhdRaiseClass(errorClass, "Security public key is not an RSA key")
+	}
+	return key
+}
+
+// AhdSecurityRSAVerifySHA256 checks an RS256 signature produced by
+// AhdSecurityRSASignSHA256. It returns false for a bad signature and raises
+// only when the key or the encoding itself is unusable.
+func AhdSecurityRSAVerifySHA256(errorClass *AhdClass, publicKeyPEM, message, signatureBase64Url string) bool {
+	key := ahdSecurityParseRSAPublicKey(errorClass, publicKeyPEM)
+	signature, err := base64.RawURLEncoding.DecodeString(strings.TrimRight(signatureBase64Url, "="))
+	if err != nil {
+		AhdRaiseClass(errorClass, "Security base64url input is malformed")
+	}
+	digest := sha256.Sum256([]byte(message))
+	return rsa.VerifyPKCS1v15(key, crypto.SHA256, digest[:], signature) == nil
+}
+
+// ahdSecurityAESKey decodes a hex AES key and enforces AES-256.
+func ahdSecurityAESKey(errorClass *AhdClass, keyHex string) []byte {
+	key, err := hex.DecodeString(keyHex)
+	if err != nil {
+		AhdRaiseClass(errorClass, "Security AES key must be hex encoded")
+	}
+	if len(key) != 32 {
+		AhdRaiseClass(errorClass, "Security AES key must be 32 bytes (64 hex characters)")
+	}
+	return key
+}
+
+// AhdSecurityAESGCMEncrypt encrypts plaintext with AES-256-GCM under the given
+// hex key and returns base64(nonce || ciphertext || tag).
+//
+// The nonce is random per call and carried with the message, so the caller
+// never has to manage it -- reusing a nonce with the same key destroys GCM's
+// security, and this API makes that mistake impossible.
+func AhdSecurityAESGCMEncrypt(errorClass *AhdClass, keyHex, plaintext string) string {
+	key := ahdSecurityAESKey(errorClass, keyHex)
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		AhdRaiseClass(errorClass, "Security AES cipher could not be created")
+	}
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		AhdRaiseClass(errorClass, "Security AES-GCM could not be created")
+	}
+	nonce := make([]byte, gcm.NonceSize())
+	if _, err := rand.Read(nonce); err != nil {
+		AhdRaiseClass(errorClass, "Security random token generation failed")
+	}
+	sealed := gcm.Seal(nonce, nonce, []byte(plaintext), nil)
+	return base64.StdEncoding.EncodeToString(sealed)
+}
+
+// AhdSecurityAESGCMDecrypt reverses AhdSecurityAESGCMEncrypt. A modified or
+// truncated payload fails authentication and raises rather than returning
+// attacker-influenced plaintext.
+func AhdSecurityAESGCMDecrypt(errorClass *AhdClass, keyHex, payload string) string {
+	key := ahdSecurityAESKey(errorClass, keyHex)
+	raw, err := base64.StdEncoding.DecodeString(payload)
+	if err != nil {
+		AhdRaiseClass(errorClass, "Security base64 input is malformed")
+	}
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		AhdRaiseClass(errorClass, "Security AES cipher could not be created")
+	}
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		AhdRaiseClass(errorClass, "Security AES-GCM could not be created")
+	}
+	if len(raw) < gcm.NonceSize() {
+		AhdRaiseClass(errorClass, "Security AES-GCM payload is too short")
+	}
+	nonce := raw[:gcm.NonceSize()]
+	plaintext, err := gcm.Open(nil, nonce, raw[gcm.NonceSize():], nil)
+	if err != nil {
+		AhdRaiseClass(errorClass, "Security AES-GCM authentication failed")
+	}
+	return string(plaintext)
 }

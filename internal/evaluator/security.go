@@ -1,9 +1,19 @@
 package evaluator
 
 import (
+	"crypto"
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/hmac"
 	"crypto/rand"
+	"crypto/rsa"
+	"crypto/sha256"
+	"crypto/sha512"
 	"crypto/subtle"
+	"crypto/x509"
 	"encoding/base64"
+	"encoding/hex"
+	"encoding/pem"
 	"fmt"
 	"strconv"
 	"strings"
@@ -41,6 +51,51 @@ func (session *Session) securityBuiltin(name string, args []any) any {
 		expected := args[0].(string)
 		received := args[1].(string)
 		return subtle.ConstantTimeCompare([]byte(expected), []byte(received)) == 1
+	case "sha256":
+		sum := sha256.Sum256([]byte(args[0].(string)))
+		return hex.EncodeToString(sum[:])
+	case "sha512":
+		sum := sha512.Sum512([]byte(args[0].(string)))
+		return hex.EncodeToString(sum[:])
+	case "hmacSHA256":
+		return session.securityHMAC(args[0].(string), args[1].(string))
+	case "hmacVerify":
+		expected := session.securityHMAC(args[0].(string), args[1].(string))
+		return subtle.ConstantTimeCompare([]byte(expected), []byte(args[2].(string))) == 1
+	case "base64Encode":
+		return base64.StdEncoding.EncodeToString([]byte(args[0].(string)))
+	case "base64Decode":
+		decoded, err := base64.StdEncoding.DecodeString(args[0].(string))
+		if err != nil {
+			session.raise("SecurityError", "Security base64 input is malformed")
+		}
+		return string(decoded)
+	case "base64UrlEncode":
+		return base64.RawURLEncoding.EncodeToString([]byte(args[0].(string)))
+	case "base64UrlDecode":
+		decoded, err := base64.RawURLEncoding.DecodeString(strings.TrimRight(args[0].(string), "="))
+		if err != nil {
+			session.raise("SecurityError", "Security base64url input is malformed")
+		}
+		return string(decoded)
+	case "hexEncode":
+		return hex.EncodeToString([]byte(args[0].(string)))
+	case "hexDecode":
+		decoded, err := hex.DecodeString(args[0].(string))
+		if err != nil {
+			session.raise("SecurityError", "Security hex input is malformed")
+		}
+		return string(decoded)
+	case "randomHex":
+		return session.securityRandomHex(args[0].(int64))
+	case "rsaSignSHA256":
+		return session.securityRSASign(args[0].(string), args[1].(string))
+	case "rsaVerifySHA256":
+		return session.securityRSAVerify(args[0].(string), args[1].(string), args[2].(string))
+	case "aesEncrypt":
+		return session.securityAESEncrypt(args[0].(string), args[1].(string))
+	case "aesDecrypt":
+		return session.securityAESDecrypt(args[0].(string), args[1].(string))
 	}
 	session.raise("Error", "unsupported Security function "+name)
 	return nil
@@ -142,4 +197,131 @@ func securityPHCDecode(encoded string) (memory, time, parallelism uint32, salt, 
 		return 0, 0, 0, nil, nil, "Security password hash has unsafe parameters"
 	}
 	return memory, time, parallelism, salt, hash, ""
+}
+
+// The helpers below mirror ahdruntime/security.go exactly: same algorithms,
+// same key sizes, same error messages. A program must behave identically in
+// the REPL and after compilation.
+
+func (session *Session) securityHMAC(key, message string) string {
+	mac := hmac.New(sha256.New, []byte(key))
+	mac.Write([]byte(message))
+	return hex.EncodeToString(mac.Sum(nil))
+}
+
+func (session *Session) securityRandomHex(count int64) string {
+	if count < 1 || count > 1024 {
+		session.raise("SecurityError", "Security random byte count must be between 1 and 1024")
+	}
+	buf := make([]byte, count)
+	if _, err := rand.Read(buf); err != nil {
+		session.raise("SecurityError", "Security random token generation failed")
+	}
+	return hex.EncodeToString(buf)
+}
+
+func (session *Session) securityRSAPrivateKey(pemText string) *rsa.PrivateKey {
+	block, _ := pem.Decode([]byte(pemText))
+	if block == nil {
+		session.raise("SecurityError", "Security private key is not valid PEM")
+	}
+	if parsed, err := x509.ParsePKCS1PrivateKey(block.Bytes); err == nil {
+		return parsed
+	}
+	parsed, err := x509.ParsePKCS8PrivateKey(block.Bytes)
+	if err != nil {
+		session.raise("SecurityError", "Security private key could not be parsed")
+	}
+	key, ok := parsed.(*rsa.PrivateKey)
+	if !ok {
+		session.raise("SecurityError", "Security private key is not an RSA key")
+	}
+	return key
+}
+
+func (session *Session) securityRSASign(privateKeyPEM, message string) string {
+	key := session.securityRSAPrivateKey(privateKeyPEM)
+	digest := sha256.Sum256([]byte(message))
+	signature, err := rsa.SignPKCS1v15(rand.Reader, key, crypto.SHA256, digest[:])
+	if err != nil {
+		session.raise("SecurityError", "Security RSA signing failed")
+	}
+	return base64.RawURLEncoding.EncodeToString(signature)
+}
+
+func (session *Session) securityRSAVerify(publicKeyPEM, message, signatureBase64Url string) bool {
+	block, _ := pem.Decode([]byte(publicKeyPEM))
+	if block == nil {
+		session.raise("SecurityError", "Security public key is not valid PEM")
+	}
+	var key *rsa.PublicKey
+	if parsed, err := x509.ParsePKCS1PublicKey(block.Bytes); err == nil {
+		key = parsed
+	} else {
+		parsed, err := x509.ParsePKIXPublicKey(block.Bytes)
+		if err != nil {
+			session.raise("SecurityError", "Security public key could not be parsed")
+		}
+		rsaKey, ok := parsed.(*rsa.PublicKey)
+		if !ok {
+			session.raise("SecurityError", "Security public key is not an RSA key")
+		}
+		key = rsaKey
+	}
+	signature, err := base64.RawURLEncoding.DecodeString(strings.TrimRight(signatureBase64Url, "="))
+	if err != nil {
+		session.raise("SecurityError", "Security base64url input is malformed")
+	}
+	digest := sha256.Sum256([]byte(message))
+	return rsa.VerifyPKCS1v15(key, crypto.SHA256, digest[:], signature) == nil
+}
+
+func (session *Session) securityAESKey(keyHex string) []byte {
+	key, err := hex.DecodeString(keyHex)
+	if err != nil {
+		session.raise("SecurityError", "Security AES key must be hex encoded")
+	}
+	if len(key) != 32 {
+		session.raise("SecurityError", "Security AES key must be 32 bytes (64 hex characters)")
+	}
+	return key
+}
+
+func (session *Session) securityAESEncrypt(keyHex, plaintext string) string {
+	block, err := aes.NewCipher(session.securityAESKey(keyHex))
+	if err != nil {
+		session.raise("SecurityError", "Security AES cipher could not be created")
+	}
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		session.raise("SecurityError", "Security AES-GCM could not be created")
+	}
+	nonce := make([]byte, gcm.NonceSize())
+	if _, err := rand.Read(nonce); err != nil {
+		session.raise("SecurityError", "Security random token generation failed")
+	}
+	return base64.StdEncoding.EncodeToString(gcm.Seal(nonce, nonce, []byte(plaintext), nil))
+}
+
+func (session *Session) securityAESDecrypt(keyHex, payload string) string {
+	raw, err := base64.StdEncoding.DecodeString(payload)
+	if err != nil {
+		session.raise("SecurityError", "Security base64 input is malformed")
+	}
+	block, err := aes.NewCipher(session.securityAESKey(keyHex))
+	if err != nil {
+		session.raise("SecurityError", "Security AES cipher could not be created")
+	}
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		session.raise("SecurityError", "Security AES-GCM could not be created")
+	}
+	if len(raw) < gcm.NonceSize() {
+		session.raise("SecurityError", "Security AES-GCM payload is too short")
+	}
+	plaintext, err := gcm.Open(nil, raw[:gcm.NonceSize()], raw[gcm.NonceSize():], nil)
+	if err != nil {
+		session.raise("SecurityError", "Security AES-GCM authentication failed")
+	}
+	return string(plaintext)
 }

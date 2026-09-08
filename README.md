@@ -12,9 +12,13 @@ AhdCode is an experimental statically checked general-purpose programming
 language focused on readable syntax, explicit intent, predictable semantics,
 and native compilation.
 
-This is **v1.0.0**, the first stable release. The language, toolchain, and Web
-framework are feature-complete, and the language surface described here is
-what 1.0 commits to.
+This is **v1.1.0**. The language, toolchain, and Web framework are
+feature-complete, and the core language surface described here is what 1.0
+committed to and 1.1 keeps unchanged.
+
+v1.1.0 is a minor release: it adds the `Bits` standard module and extends
+`Security`, without altering the core grammar or any existing behaviour. See
+[What is new in v1.1.0](#what-is-new-in-v110).
 
 It ships as a self-contained platform package: the `ahdcode` CLI, a private
 Go 1.27.0 toolchain, AhdDataStudio, the `ahdsqlite`, `ahdnumeric`, and
@@ -460,6 +464,36 @@ diagnostics and hover. The same VSIX targets VS Code and Antigravity. See its
 [installation guide](editors/vscode/README.md).
 
 ## Current limitations
+
+## What is new in v1.1.0 <a id="what-is-new-in-v110"></a>
+
+v1.1.0 is a **minor** release. It adds one new standard module and extends an
+existing one. The core grammar, the type system, and every previously released
+function keep their v1.0.0 behaviour.
+
+**New standard module: [`Bits`](docs/BITS.md)** — bitwise operations on the
+language's signed 64-bit `Int`. AhdCode's grammar has no bitwise operators
+(`and`, `or` and `not` are the logical operators and `^` is exponentiation), so
+these are named calls:
+
+`bitAnd`, `bitOr`, `bitXor`, `bitNot`, `shiftLeft`, `shiftRight`,
+`shiftRightUnsigned`, `rotateLeft`, `rotateRight`, `count`, `leadingZeros`,
+`trailingZeros`, plus the `BitsError` error type raised when a shift or rotate
+distance falls outside `0..63`.
+
+**Extended module: [`Security`](docs/SECURITY.md)** — the password primitives
+are unchanged; the module now also covers digests, message authentication, the
+common encodings, RS256 signatures and authenticated symmetric encryption:
+
+`sha256`, `sha512`, `hmacSHA256`, `hmacVerify`, `base64Encode`, `base64Decode`,
+`base64UrlEncode`, `base64UrlDecode`, `hexEncode`, `hexDecode`, `randomHex`,
+`rsaSignSHA256`, `rsaVerifySHA256`, `aesEncrypt`, `aesDecrypt`.
+
+Where a cryptographic choice exists it is made once and is not exposed as a
+knob: SHA-2 for digests, HMAC-SHA256 for MACs, RSASSA-PKCS1-v1_5 over SHA-256
+(the algorithm JWT calls RS256) for signatures, and AES-256-GCM for encryption.
+
+---
 
 AhdCode v1.0.0 is the first stable release. The exclusions below are deliberate design decisions, not gaps awaiting a later version.
 

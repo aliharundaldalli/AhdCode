@@ -41,6 +41,29 @@ func securityModuleInterface() *ModuleInterface {
 	// Security.secureEqual(expected: String, received: String) -> Bool
 	addStandardExport(module, standardFunction(securityModuleID, "secureEqual", types.Bool, name("expected"), name("received")))
 
+	// Digests and message authentication.
+	addStandardExport(module, standardFunction(securityModuleID, "sha256", types.String, name("text")))
+	addStandardExport(module, standardFunction(securityModuleID, "sha512", types.String, name("text")))
+	addStandardExport(module, standardFunction(securityModuleID, "hmacSHA256", types.String, name("key"), name("message")))
+	addStandardExport(module, standardFunction(securityModuleID, "hmacVerify", types.Bool, name("key"), name("message"), name("receivedHex")))
+
+	// Encodings.
+	addStandardExport(module, standardFunction(securityModuleID, "base64Encode", types.String, name("text")))
+	addStandardExport(module, standardFunction(securityModuleID, "base64Decode", types.String, name("encoded")))
+	addStandardExport(module, standardFunction(securityModuleID, "base64UrlEncode", types.String, name("text")))
+	addStandardExport(module, standardFunction(securityModuleID, "base64UrlDecode", types.String, name("encoded")))
+	addStandardExport(module, standardFunction(securityModuleID, "hexEncode", types.String, name("text")))
+	addStandardExport(module, standardFunction(securityModuleID, "hexDecode", types.String, name("encoded")))
+
+	// Random material.
+	addStandardExport(module, standardFunction(securityModuleID, "randomHex", types.String, types.Parameter{Name: "count", Type: types.Int}))
+
+	// RSA signatures (RS256) and authenticated symmetric encryption.
+	addStandardExport(module, standardFunction(securityModuleID, "rsaSignSHA256", types.String, name("privateKeyPem"), name("message")))
+	addStandardExport(module, standardFunction(securityModuleID, "rsaVerifySHA256", types.Bool, name("publicKeyPem"), name("message"), name("signature")))
+	addStandardExport(module, standardFunction(securityModuleID, "aesEncrypt", types.String, name("keyHex"), name("plaintext")))
+	addStandardExport(module, standardFunction(securityModuleID, "aesDecrypt", types.String, name("keyHex"), name("payload")))
+
 	sort.Strings(module.ExportNames)
 	return module
 }
