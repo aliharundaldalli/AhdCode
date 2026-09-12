@@ -1130,6 +1130,18 @@ func ahdSVGParseTransform(text string) (ahdSVGMatrix, bool) {
 	}
 }
 
+// ahdSVGOpaqueAlpha reports whether a color's own alpha component is fully
+// opaque. Transparency is drawn from opacity, fill-opacity, and
+// stroke-opacity; a translucent color is rejected rather than drawn opaque.
+func ahdSVGOpaqueAlpha(text string) bool {
+	if strings.HasSuffix(text, "%") {
+		value, err := strconv.ParseFloat(strings.TrimSuffix(text, "%"), 64)
+		return err == nil && value >= 100
+	}
+	value, err := strconv.ParseFloat(text, 64)
+	return err == nil && value >= 1
+}
+
 func ahdSVGParseColor(text string, current ahdSVGColor) (ahdSVGColor, bool) {
 	text = strings.ToLower(strings.TrimSpace(text))
 	if text == "currentcolor" {
@@ -1137,6 +1149,9 @@ func ahdSVGParseColor(text string, current ahdSVGColor) (ahdSVGColor, bool) {
 	}
 	if strings.HasPrefix(text, "#") {
 		hex := text[1:]
+		if (len(hex) == 4 || len(hex) == 8) && strings.Trim(hex[len(hex)/4*3:], "f") != "" {
+			return ahdSVGColor{}, false
+		}
 		if len(hex) == 3 || len(hex) == 4 {
 			expanded := ""
 			for _, digit := range hex[:3] {
@@ -1161,6 +1176,9 @@ func ahdSVGParseColor(text string, current ahdSVGColor) (ahdSVGColor, bool) {
 			return ahdSVGColor{}, false
 		}
 		parts := strings.FieldsFunc(text[open+1:closing], func(r rune) bool { return r == ',' || r == ' ' || r == '/' })
+		if len(parts) > 3 && !ahdSVGOpaqueAlpha(parts[3]) {
+			return ahdSVGColor{}, false
+		}
 		if len(parts) < 3 {
 			return ahdSVGColor{}, false
 		}
