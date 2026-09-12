@@ -107,6 +107,10 @@ write("ok")
 	if bytes.Contains(objects, []byte("/Subtype/Image")) || bytes.Contains(objects, []byte("/Subtype /Image")) {
 		t.Fatal("the vector report contains a raster image")
 	}
+	// Latex keeps its automatic heading bookmarks next to explicit ones.
+	if !bytes.Contains(objects, []byte("/D(section.1)")) {
+		t.Fatal("Latex headings lost their automatic outline entries")
+	}
 	tex, _ := os.ReadFile(strings.TrimSuffix(output, ".pdf") + ".tex")
 	for _, want := range []string{"\\usepackage{fancyhdr}", "\\usepackage{lastpage}", "\\pdfbookmark", "paperwidth=21.0cm"} {
 		if !strings.Contains(string(tex), want) && !strings.Contains(string(tex), strings.TrimPrefix(want, "\\")) {

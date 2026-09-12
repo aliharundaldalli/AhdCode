@@ -128,7 +128,37 @@ func (generator *generator) pdfOperation(name string, value *ir.CallExpr) string
 		}
 		return generator.expr(value.Arguments[index].Value)
 	}
+	number := func(index int, fallback string) string {
+		if index >= len(value.Arguments) || value.Arguments[index].Value == nil {
+			return fallback
+		}
+		return generator.value(value.Arguments[index].Value, ir.Type{Kind: ir.RealType}, false)
+	}
 	switch name {
+	case "PDFDocument.layout":
+		return generator.pdfDocumentFrom("AhdPDFLayout("+receiver+", "+text(0, `""`)+", "+boolean(1, "false")+", "+
+			generator.pdfSizePair(value, 2)+", "+generator.pdfSizePair(value, 3)+")", meta)
+	case "PDFDocument.header", "PDFDocument.footer":
+		part := `"` + strings.TrimPrefix(name, "PDFDocument.") + `"`
+		return generator.pdfDocumentFrom("AhdPDFRunning("+receiver+", "+part+", "+text(0, `""`)+", "+text(1, `""`)+", "+
+			text(2, `""`)+")", meta)
+	case "PDFDocument.pageNumbers":
+		return generator.pdfDocumentFrom("AhdPDFPageNumbers("+receiver+", "+text(0, `"center"`)+", "+boolean(1, "false")+")", meta)
+	case "PDFDocument.qr":
+		generator.usesCodes = true
+		return generator.pdfDocumentFrom("AhdPDFQR("+receiver+", "+text(0, `""`)+", "+number(1, "3.0")+", "+
+			text(2, `"M"`)+", "+text(3, `"center"`)+")", meta)
+	case "PDFDocument.barcode":
+		generator.usesCodes = true
+		return generator.pdfDocumentFrom("AhdPDFBarcode("+receiver+", "+text(0, `""`)+", "+text(1, `""`)+", "+
+			number(2, "8.0")+", "+number(3, "2.0")+", "+text(4, `"center"`)+")", meta)
+	case "PDFDocument.link":
+		return generator.pdfDocumentFrom("AhdPDFLink("+receiver+", "+text(0, `""`)+", "+text(1, `""`)+", "+text(2, `"left"`)+")", meta)
+	case "PDFDocument.bookmark":
+		return generator.pdfDocumentFrom("AhdPDFBookmark("+receiver+", "+text(0, `""`)+", "+integer(1, "int64(1)")+")", meta)
+	case "PDFDocument.metadata":
+		return generator.pdfDocumentFrom("AhdPDFMetadata("+receiver+", "+text(0, `""`)+", "+text(1, `""`)+", "+text(2, `""`)+", "+
+			list(3, "AhdNewList[string]()")+", "+text(4, `""`)+")", meta)
 	case "PDFDocument.heading":
 		return generator.pdfDocumentFrom("AhdPDFHeading("+receiver+", "+text(0, `""`)+", "+integer(1, "int64(0)")+")", meta)
 	case "PDFDocument.paragraph":
@@ -138,8 +168,8 @@ func (generator *generator) pdfOperation(name string, value *ir.CallExpr) string
 		return generator.pdfDocumentFrom("AhdPDFTable("+receiver+", "+list(0, "AhdNewList[string]()")+", "+
 			list(1, "AhdNewList[*AhdList[string]]()")+", "+text(2, `"left"`)+")", meta)
 	case "PDFDocument.image":
-		return generator.pdfDocumentFrom("AhdPDFImage("+receiver+", "+text(0, `""`)+", "+
-			generator.pdfSizePair(value, 1)+")", meta)
+		return generator.pdfDocumentFrom("AhdPDFImageComplete("+receiver+", "+text(0, `""`)+", "+
+			generator.pdfSizePair(value, 1)+", "+generator.pdfSizePair(value, 2)+")", meta)
 	case "PDFDocument.pageBreak":
 		return generator.pdfDocumentFrom("AhdPDFPageBreak("+receiver+")", meta)
 	case "PDFDocument.save":

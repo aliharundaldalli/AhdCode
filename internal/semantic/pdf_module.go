@@ -28,8 +28,10 @@ func PDFDocumentIdentity() *types.ClassSymbol { return pdfDocumentClass }
 // frontend about the published surface. PDFDocument is deliberately smaller
 // than Word's Document: it publishes no read-only accessors, keeping the
 // public surface to the minimal construction/publication operations the
-// v0.1.20 release calls for.
-var PDFDocumentOperations = []string{"heading", "paragraph", "table", "image", "pageBreak", "save"}
+// v0.1.20 release calls for, plus the v1.3.0 page layout, running text,
+// machine-readable code, navigation, and document property operations.
+var PDFDocumentOperations = []string{"heading", "paragraph", "table", "image", "pageBreak", "save",
+	"layout", "header", "footer", "pageNumbers", "qr", "barcode", "link", "bookmark", "metadata"}
 
 func pdfDocumentType() types.Type { return types.Class{Symbol: pdfDocumentClass} }
 
@@ -98,10 +100,28 @@ func pdfOperationShapes() map[TypeOperation]pdfOperationShape {
 			"pass the paragraph text, and optionally align, bold, italic, and underline in that order"},
 		PDFDocumentTable: {[]types.Type{headers, rows, types.String}, 2, document,
 			"pass headers and rows, and optionally align"},
-		PDFDocumentImage: {[]types.Type{types.String, pdfSizePairType()}, 1, document,
-			"pass the image path, and optionally a Pair<String, Real> of width/height in centimeters"},
+		PDFDocumentImage: {[]types.Type{types.String, pdfSizePairType(), pdfSizePairType()}, 1, document,
+			"pass the image path, and optionally a Pair<String, Real> of width/height in centimeters and a transform Pair of rotation, opacity, and trims"},
 		PDFDocumentPageBreak: {none, 0, document, "call pageBreak with no argument"},
 		PDFDocumentSave:      {[]types.Type{types.String}, 1, types.Nothing, "pass the destination .pdf path"},
+		PDFDocumentLayout: {[]types.Type{types.String, types.Bool, pdfSizePairType(), pdfSizePairType()}, 1, document,
+			"pass the paper (A3, A4, A5, Letter, Legal, or Custom), and optionally landscape, a pageSize Pair, and a margins Pair in that order"},
+		PDFDocumentHeader: {[]types.Type{types.String, types.String, types.String}, 1, document,
+			"pass the left text, and optionally the center and right text"},
+		PDFDocumentFooter: {[]types.Type{types.String, types.String, types.String}, 1, document,
+			"pass the left text, and optionally the center and right text"},
+		PDFDocumentPageNumbers: {[]types.Type{types.String, types.Bool}, 0, document,
+			"optionally pass align (left, center, or right) and whether to show the page count"},
+		PDFDocumentQR: {[]types.Type{types.String, types.Real, types.String, types.String}, 1, document,
+			"pass the value, and optionally the size in centimeters, the level (L, M, Q, or H), and align in that order"},
+		PDFDocumentBarcode: {[]types.Type{types.String, types.String, types.Real, types.Real, types.String}, 2, document,
+			"pass the kind (Code128, EAN13, or UPCA) and the value, and optionally width and height in centimeters and align"},
+		PDFDocumentLink: {[]types.Type{types.String, types.String, types.String}, 2, document,
+			"pass the link text and an https://, http://, or mailto: URL, and optionally align"},
+		PDFDocumentBookmark: {[]types.Type{types.String, types.Int}, 1, document,
+			"pass the bookmark title, and optionally an Int level from 1 to 4"},
+		PDFDocumentMetadata: {[]types.Type{types.String, types.String, types.String, types.List{Element: types.String}, types.String}, 1, document,
+			"pass the title, and optionally author, subject, a List<String> of keywords, and creator in that order"},
 	}
 }
 
@@ -109,6 +129,9 @@ var pdfOperationNames = map[string]TypeOperation{
 	"heading": PDFDocumentHeading, "paragraph": PDFDocumentParagraph,
 	"table": PDFDocumentTable, "image": PDFDocumentImage,
 	"pageBreak": PDFDocumentPageBreak, "save": PDFDocumentSave,
+	"layout": PDFDocumentLayout, "header": PDFDocumentHeader, "footer": PDFDocumentFooter,
+	"pageNumbers": PDFDocumentPageNumbers, "qr": PDFDocumentQR, "barcode": PDFDocumentBarcode,
+	"link": PDFDocumentLink, "bookmark": PDFDocumentBookmark, "metadata": PDFDocumentMetadata,
 }
 
 // pdfOperationFor names the built-in member a PDFDocument instance publishes.

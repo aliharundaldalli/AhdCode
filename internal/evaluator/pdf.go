@@ -1,12 +1,7 @@
 package evaluator
 
 import (
-	"bytes"
 	"encoding/json"
-	"image"
-	_ "image/jpeg"
-	_ "image/png"
-	"os"
 	"strconv"
 	"strings"
 
@@ -14,22 +9,22 @@ import (
 	"ahdcode/internal/ir"
 )
 
-// The PDF standard module's REPL implementation. It mirrors the native
-// backend's ahdruntime/pdf.go logic function-for-function -- the same block
-// encoding, the same LaTeX-body construction rules -- but operates on the
-// evaluator's own List/Pair/Instance representation instead of
-// AhdList/AhdPair, exactly as word.go independently reimplements the Word
-// runtime rather than importing ahdruntime for its own document model.
-// save() is the one exception: it cannot invoke the offline Tectonic
-// renderer interactively, so it raises PDFError just like Latex.pdf/pdfFile
-// already do in this same evaluator.
+// The PDF standard module's REPL implementation. heading, paragraph, table,
+// and pageBreak mirror the native ahdruntime/pdf.go block encoding on the
+// evaluator's own List/Pair/Instance representation; image and every v1.3.0
+// operation call the shared runtime block builders, so the evaluator stores
+// the same blocks and reports the same messages a compiled program does.
+// save() cannot invoke the offline Tectonic renderer interactively, so it
+// raises PDFError just like Latex.pdf/pdfFile already do in this same
+// evaluator.
 
 const pdfDocumentClassID = ir.ClassID("builtin:PDF::class::PDFDocument")
 
 var pdfBlocksField = ir.FieldID(string(pdfDocumentClassID) + "::field::blocks")
 
-// pdfBlock is the private content-block shape, identical in spirit to the
-// native runtime's ahdPDFBlock.
+// pdfBlock is the private content-block shape of the v1.2.0 blocks the
+// evaluator still encodes itself, identical to the native ahdPDFBlock's
+// fields of the same names.
 type pdfBlock struct {
 	Kind      string     `json:"kind"`
 	Text      string     `json:"text,omitempty"`
@@ -46,26 +41,6 @@ type pdfBlock struct {
 	HeightCM  float64    `json:"heightCM,omitempty"`
 }
 
-// pdfDocumentBlocks reads the one hidden storage field of a PDFDocument
-// instance. The stored List is never handed out, so a caller cannot reach it
-// to mutate.
-func (s *Session) pdfDocumentBlocks(value any) []pdfBlock {
-	instance := s.requireInstance(value)
-	stored, ok := instance.Fields[pdfBlocksField].(*List)
-	if !ok {
-		s.raise("PDFError", "value is not a PDFDocument")
-	}
-	blocks := make([]pdfBlock, len(stored.Items))
-	for index, raw := range stored.Items {
-		var block pdfBlock
-		if err := json.Unmarshal([]byte(raw.(string)), &block); err != nil {
-			s.raise("PDFError", "PDFDocument storage is corrupted")
-		}
-		blocks[index] = block
-	}
-	return blocks
-}
-
 // pdfDocumentValue materializes a block list as a new PDFDocument instance.
 func (s *Session) pdfDocumentValue(blocks []pdfBlock) *Instance {
 	items := make([]any, len(blocks))
@@ -79,11 +54,43 @@ func (s *Session) pdfDocumentValue(blocks []pdfBlock) *Instance {
 }
 
 func (s *Session) pdfAppend(value any, block pdfBlock) *Instance {
-	blocks := s.pdfDocumentBlocks(value)
-	next := make([]pdfBlock, len(blocks)+1)
-	copy(next, blocks)
-	next[len(blocks)] = block
-	return s.pdfDocumentValue(next)
+	encoded, _ := json.Marshal(block)
+	return s.pdfAppendText(value, string(encoded), "")
+}
+
+// pdfAppendText appends one encoded block, or raises the problem the shared
+// runtime builder reported. Stored blocks are copied as they are, so fields
+// this evaluator's pdfBlock does not name survive every later append.
+func (s *Session) pdfAppendText(value any, text, problem string) *Instance {
+	instance := s.requireInstance(value)
+	stored, ok := instance.Fields[pdfBlocksField].(*List)
+	if !ok {
+		s.raise("PDFError", "value is not a PDFDocument")
+	}
+	if problem != "" {
+		s.raise("PDFError", problem)
+	}
+	items := append(append([]any(nil), stored.Items...), text)
+	return &Instance{Class: pdfDocumentClassID, Fields: map[ir.FieldID]any{pdfBlocksField: &List{Items: items}}}
+}
+
+// pdfAppendTo returns an appender for one runtime builder's (block, problem)
+// result.
+func (s *Session) pdfAppendTo(value any) func(text, problem string) *Instance {
+	return func(text, problem string) *Instance { return s.pdfAppendText(value, text, problem) }
+}
+
+// pdfStrings reads a List<String> argument, or an empty list when omitted.
+func (s *Session) pdfStrings(args []any, index int) []string {
+	if index >= len(args) || args[index] == nil {
+		return []string{}
+	}
+	list := s.requireList(args[index])
+	values := make([]string, len(list.Items))
+	for position, item := range list.Items {
+		values[position] = item.(string)
+	}
+	return values
 }
 
 func (s *Session) pdfBuiltin(name string, args []any) any {
@@ -128,7 +135,32 @@ func (s *Session) pdfOperation(name string, receiver any, args []any) any {
 	case "PDFDocument.table":
 		return s.pdfTable(receiver, args)
 	case "PDFDocument.image":
-		return s.pdfImage(receiver, args)
+		sizeKeys, sizeValues := s.latexRealEntries(pairArg(args, 1))
+		transformKeys, transformValues := s.latexRealEntries(pairArg(args, 2))
+		return s.pdfAppendTo(receiver)(ahdruntime.AhdPDFImageBlock(arg(0, "").(string), sizeKeys, sizeValues, transformKeys, transformValues))
+	case "PDFDocument.layout":
+		sizeKeys, sizeValues := s.latexRealEntries(pairArg(args, 2))
+		marginKeys, marginValues := s.latexRealEntries(pairArg(args, 3))
+		return s.pdfAppendTo(receiver)(ahdruntime.AhdPDFLayoutBlock(arg(0, "").(string), arg(1, false).(bool),
+			sizeKeys, sizeValues, marginKeys, marginValues))
+	case "PDFDocument.header", "PDFDocument.footer":
+		return s.pdfAppendTo(receiver)(ahdruntime.AhdPDFRunningBlock(strings.TrimPrefix(name, "PDFDocument."),
+			arg(0, "").(string), arg(1, "").(string), arg(2, "").(string)))
+	case "PDFDocument.pageNumbers":
+		return s.pdfAppendTo(receiver)(ahdruntime.AhdPDFPageNumbersBlock(arg(0, "center").(string), arg(1, false).(bool)))
+	case "PDFDocument.qr":
+		return s.pdfAppendTo(receiver)(ahdruntime.AhdPDFQRBlock(arg(0, "").(string), latexReal(args, 1, 3.0),
+			arg(2, "M").(string), arg(3, "center").(string)))
+	case "PDFDocument.barcode":
+		return s.pdfAppendTo(receiver)(ahdruntime.AhdPDFBarcodeBlock(arg(0, "").(string), arg(1, "").(string),
+			latexReal(args, 2, 8.0), latexReal(args, 3, 2.0), arg(4, "center").(string)))
+	case "PDFDocument.link":
+		return s.pdfAppendTo(receiver)(ahdruntime.AhdPDFLinkBlock(arg(0, "").(string), arg(1, "").(string), arg(2, "left").(string)))
+	case "PDFDocument.bookmark":
+		return s.pdfAppendTo(receiver)(ahdruntime.AhdPDFBookmarkBlock(arg(0, "").(string), arg(1, int64(1)).(int64)))
+	case "PDFDocument.metadata":
+		return s.pdfAppendTo(receiver)(ahdruntime.AhdPDFMetadataBlock(arg(0, "").(string), arg(1, "").(string),
+			arg(2, "").(string), s.pdfStrings(args, 3), arg(4, "").(string)))
 	case "PDFDocument.pageBreak":
 		return s.pdfAppend(receiver, pdfBlock{Kind: "pageBreak"})
 	case "PDFDocument.save":
@@ -169,79 +201,6 @@ func (s *Session) pdfTable(receiver any, args []any) any {
 		grid[index] = cells
 	}
 	return s.pdfAppend(receiver, pdfBlock{Kind: "table", Headers: headerValues, Rows: grid, Align: align})
-}
-
-func (s *Session) pdfImage(receiver any, args []any) any {
-	path := args[0].(string)
-	if path == "" {
-		s.raise("PDFError", "image path must not be empty")
-	}
-	data, err := os.ReadFile(path)
-	if err != nil {
-		s.raise("PDFError", "could not read image: "+err.Error())
-	}
-	format, naturalWidth, naturalHeight := pdfDecodeImage(s, data)
-	size := &Pair{Values: map[any]any{}}
-	if len(args) > 1 && args[1] != nil {
-		size = s.requirePair(args[1])
-	}
-	widthCM, heightCM := s.pdfImageExtent(size, naturalWidth, naturalHeight)
-	return s.pdfAppend(receiver, pdfBlock{Kind: "image", Media: data, MediaExt: format, WidthCM: widthCM, HeightCM: heightCM})
-}
-
-func pdfDecodeImage(s *Session, data []byte) (string, int, int) {
-	config, formatName, err := image.DecodeConfig(bytes.NewReader(data))
-	if err != nil {
-		s.raise("PDFError", "unsupported image format: PDF supports PNG and JPEG")
-	}
-	switch formatName {
-	case "png":
-		return "png", config.Width, config.Height
-	case "jpeg":
-		return "jpeg", config.Width, config.Height
-	default:
-		s.raise("PDFError", "unsupported image format: PDF supports PNG and JPEG")
-		return "", 0, 0
-	}
-}
-
-func (s *Session) pdfImageExtent(size *Pair, naturalWidth, naturalHeight int) (float64, float64) {
-	var width, height float64
-	var hasWidth, hasHeight bool
-	for _, key := range size.Keys {
-		k := key.(string)
-		switch k {
-		case "width":
-			hasWidth = true
-			width = size.Values[key].(float64)
-		case "height":
-			hasHeight = true
-			height = size.Values[key].(float64)
-		default:
-			s.raise("PDFError", "image size supports only width and height")
-		}
-	}
-	if hasWidth && width <= 0 {
-		s.raise("PDFError", "image width must be positive")
-	}
-	if hasHeight && height <= 0 {
-		s.raise("PDFError", "image height must be positive")
-	}
-	if !hasWidth && !hasHeight {
-		return 0, 0
-	}
-	if naturalWidth <= 0 || naturalHeight <= 0 {
-		naturalWidth, naturalHeight = 1, 1
-	}
-	aspect := float64(naturalHeight) / float64(naturalWidth)
-	switch {
-	case hasWidth && hasHeight:
-		return width, height
-	case hasWidth:
-		return width, width * aspect
-	default:
-		return height / aspect, height
-	}
 }
 
 // pdfBlocksFromWord converts a Word Document's own blocks directly into PDF

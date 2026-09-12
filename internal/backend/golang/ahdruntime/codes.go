@@ -520,25 +520,42 @@ func AhdLatexBarcode(kind, value string, width, height float64) string {
 	return text
 }
 
-// AhdPDFQR appends a vector QR block built by the shared encoder. The block
-// stores generated vector source, never caller text.
-func AhdPDFQR(doc AhdPDFDocument, value string, size float64, level, align string) AhdPDFDocument {
-	ahdPDFRequireBlockAlign("qr", align)
+// AhdPDFQRBlock is PDFDocument.qr: a vector QR block built by the shared
+// encoder. The block stores generated vector source, never caller text.
+func AhdPDFQRBlock(value string, size float64, level, align string) (string, string) {
+	if problem := ahdPDFBlockAlign("PDFDocument.qr", align); problem != "" {
+		return "", problem
+	}
 	text, problem := AhdLatexQRText("PDFDocument.qr", value, size, level)
 	if problem != "" {
-		ahdPDFRaise(problem)
+		return "", problem
 	}
-	return ahdPDFAppend(doc, ahdPDFBlock{Kind: "vector", Text: text, Align: align})
+	return ahdPDFBlockText(ahdPDFBlock{Kind: "vector", Text: text, Align: align}), ""
 }
 
-// AhdPDFBarcode appends a vector barcode block built by the shared encoder.
-func AhdPDFBarcode(doc AhdPDFDocument, kind, value string, width, height float64, align string) AhdPDFDocument {
-	ahdPDFRequireBlockAlign("barcode", align)
+// AhdPDFBarcodeBlock is PDFDocument.barcode: a vector barcode block built by
+// the shared encoder.
+func AhdPDFBarcodeBlock(kind, value string, width, height float64, align string) (string, string) {
+	if problem := ahdPDFBlockAlign("PDFDocument.barcode", align); problem != "" {
+		return "", problem
+	}
 	text, problem := AhdLatexBarcodeText("PDFDocument.barcode", kind, value, width, height)
 	if problem != "" {
-		ahdPDFRaise(problem)
+		return "", problem
 	}
-	return ahdPDFAppend(doc, ahdPDFBlock{Kind: "vector", Text: text, Align: align})
+	return ahdPDFBlockText(ahdPDFBlock{Kind: "vector", Text: text, Align: align}), ""
+}
+
+// AhdPDFQR is the native entry point of PDFDocument.qr.
+func AhdPDFQR(doc AhdPDFDocument, value string, size float64, level, align string) AhdPDFDocument {
+	text, problem := AhdPDFQRBlock(value, size, level, align)
+	return ahdPDFAppendText(doc, text, problem)
+}
+
+// AhdPDFBarcode is the native entry point of PDFDocument.barcode.
+func AhdPDFBarcode(doc AhdPDFDocument, kind, value string, width, height float64, align string) AhdPDFDocument {
+	text, problem := AhdPDFBarcodeBlock(kind, value, width, height, align)
+	return ahdPDFAppendText(doc, text, problem)
 }
 
 // ---------------------------------------------------------------------------

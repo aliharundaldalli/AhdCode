@@ -255,14 +255,29 @@ func AhdLatexBookmarkText(operation, title string, level int64) (string, string)
 // byte-for-byte what it was; once subject, keywords, or creator is set, the
 // document's title and author are recorded as properties too.
 func ahdDocumentMetadata(operation, title, author, subject string, keywords []string, creator string) (string, string) {
-	for _, keyword := range keywords {
-		if strings.TrimSpace(keyword) == "" || strings.Contains(keyword, ",") {
-			return "", operation + " keywords must be non-empty and must not contain commas"
-		}
+	if problem := ahdDocumentKeywordsProblem(operation, keywords); problem != "" {
+		return "", problem
 	}
 	if subject == "" && len(keywords) == 0 && creator == "" {
 		return "", ""
 	}
+	return ahdDocumentProperties(title, author, subject, keywords, creator), ""
+}
+
+// ahdDocumentKeywordsProblem validates PDF keywords: each is non-empty and
+// free of the commas that separate them.
+func ahdDocumentKeywordsProblem(operation string, keywords []string) string {
+	for _, keyword := range keywords {
+		if strings.TrimSpace(keyword) == "" || strings.Contains(keyword, ",") {
+			return operation + " keywords must be non-empty and must not contain commas"
+		}
+	}
+	return ""
+}
+
+// ahdDocumentProperties records every non-empty PDF document property, or
+// returns "" when all are empty.
+func ahdDocumentProperties(title, author, subject string, keywords []string, creator string) string {
 	var fields []string
 	add := func(name, value string) {
 		if value != "" {
@@ -274,7 +289,10 @@ func ahdDocumentMetadata(operation, title, author, subject string, keywords []st
 	add("pdfsubject", subject)
 	add("pdfkeywords", strings.Join(keywords, ", "))
 	add("pdfcreator", creator)
-	return "\\hypersetup{" + strings.Join(fields, ",") + "}\n", ""
+	if len(fields) == 0 {
+		return ""
+	}
+	return "\\hypersetup{" + strings.Join(fields, ",") + "}\n"
 }
 
 // ---------------------------------------------------------------------------
@@ -343,8 +361,14 @@ func AhdLatexFeaturePreamble(texts ...string) string {
 		result.WriteString("\\usepackage{lastpage}\n")
 	}
 	if ahdDocumentHasMarker(ahdBookmarkMarker, texts...) {
-		result.WriteString("\\newcounter{ahdbookmark}\n" +
-			"\\newcommand{\\ahdbookmark}[2]{\\stepcounter{ahdbookmark}\\pdfbookmark[#1]{#2}{ahdbookmark.\\theahdbookmark}}\n")
+		// An explicit bookmark is written at every level, including below the
+		// depth where automatic heading bookmarks stop (the PDF module turns
+		// those off entirely). hyperref sets the depth globally, so the
+		// previous depth is restored explicitly.
+		result.WriteString("\\newcounter{ahdbookmark}\n\\makeatletter\n" +
+			"\\newcommand{\\ahdbookmark}[2]{\\stepcounter{ahdbookmark}\\let\\ahd@bookmarksdepth\\Hy@bookmarksdepth" +
+			"\\hypersetup{bookmarksdepth=4}\\pdfbookmark[#1]{#2}{ahdbookmark.\\theahdbookmark}" +
+			"\\global\\let\\Hy@bookmarksdepth\\ahd@bookmarksdepth}\n\\makeatother\n")
 	}
 	if ahdDocumentHasMarker(ahdImageMarker, texts...) {
 		result.WriteString(ahdImageMacros)
