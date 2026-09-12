@@ -71,3 +71,10 @@ var IdentitySource string
 //
 //go:embed bits.go
 var BitsSource string
+
+// CharactersSource is emitted as a separate generated Go file. It provides the
+// Unicode code-point operations of the Characters module using only unicode
+// and unicode/utf8 from the standard library.
+//
+//go:embed characters.go
+var CharactersSource string

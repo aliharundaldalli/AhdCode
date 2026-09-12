@@ -43,6 +43,7 @@ const (
 	securityRuntimeFileName = "ahdcode_security_runtime.go"
 	identityRuntimeFileName = "ahdcode_identity_runtime.go"
 	bitsRuntimeFileName     = "ahdcode_bits_runtime.go"
+	charactersRuntimeFile   = "ahdcode_characters_runtime.go"
 )
 
 // storage describes the Go representation chosen for one IR symbol.
@@ -153,6 +154,10 @@ func Generate(compilation *ir.Compilation) (*GeneratedProgram, []diagnostics.Dia
 	if err != nil {
 		return nil, append(generator.diagnostics, backendError(CodeFormatFailure, "embedded Bits runtime source is not valid Go: "+err.Error(), source.Span{}, "the Bits backend runtime must remain gofmt-clean"))
 	}
+	charactersRuntime, err := format.Source([]byte(charactersRuntimeSource()))
+	if err != nil {
+		return nil, append(generator.diagnostics, backendError(CodeFormatFailure, "embedded Characters runtime source is not valid Go: "+err.Error(), source.Span{}, "the Characters backend runtime must remain gofmt-clean"))
+	}
 	files := []GeneratedFile{
 		{Name: programFileName, Content: string(formatted)},
 		{Name: runtimeFileName, Content: string(runtime)},
@@ -166,6 +171,7 @@ func Generate(compilation *ir.Compilation) (*GeneratedProgram, []diagnostics.Dia
 		{Name: securityRuntimeFileName, Content: string(securityRuntime)},
 		{Name: identityRuntimeFileName, Content: string(identityRuntime)},
 		{Name: bitsRuntimeFileName, Content: string(bitsRuntime)},
+		{Name: charactersRuntimeFile, Content: string(charactersRuntime)},
 	}
 	// Unlike every other runtime file above (standard library only, so always
 	// safe to include), ahdcode_mysql_runtime.go imports the vendored
@@ -227,6 +233,10 @@ func identityRuntimeSource() string {
 
 func bitsRuntimeSource() string {
 	return strings.Replace(ahdruntime.BitsSource, "package ahdruntime", "package main", 1)
+}
+
+func charactersRuntimeSource() string {
+	return strings.Replace(ahdruntime.CharactersSource, "package ahdruntime", "package main", 1)
 }
 
 func mysqlRuntimeSource() string {

@@ -17,6 +17,7 @@ func StandardModuleInterfaces() map[string]*ModuleInterface {
 	return map[string]*ModuleInterface{
 		"Archive":    archiveModuleInterface(),
 		"Bits":       bitsModuleInterface(),
+		"Characters": charactersModuleInterface(),
 		"CSV":        csvModuleInterface(),
 		"Data":       dataModuleInterface(),
 		"Env":        envModuleInterface(),

@@ -209,6 +209,8 @@ func (session *Session) builtin(identity ir.CallableID, receiver any, arguments 
 		return session.smtpBuiltin(strings.TrimPrefix(name, "builtin:SMTP::"), values(arguments))
 	case strings.HasPrefix(name, "builtin:Bits::"):
 		return session.bitsBuiltin(strings.TrimPrefix(name, "builtin:Bits::"), values(arguments))
+	case strings.HasPrefix(name, "builtin:Characters::"):
+		return session.charactersBuiltin(strings.TrimPrefix(name, "builtin:Characters::"), values(arguments))
 	case strings.HasPrefix(name, "builtin:Security::"):
 		return session.securityBuiltin(strings.TrimPrefix(name, "builtin:Security::"), values(arguments))
 	case strings.HasPrefix(name, "builtin:Identity::"):

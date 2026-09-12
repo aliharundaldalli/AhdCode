@@ -166,6 +166,11 @@ func LowerCompilation(compilation module.CompilationResult) Result {
 					bitsModule(ir.ModuleID(current.ID), current.Source.Name, current.Source.Path))
 				continue
 			}
+			if string(current.ID) == CharactersModuleID {
+				result.Modules = append(result.Modules,
+					charactersModule(ir.ModuleID(current.ID), current.Source.Name, current.Source.Path))
+				continue
+			}
 			if string(current.ID) == SecurityModuleID {
 				result.Modules = append(result.Modules,
 					securityModule(ir.ModuleID(current.ID), current.Source.Name, current.Source.Path))
