@@ -712,6 +712,12 @@ func (a *analyzer) analyzeCallWithCallee(call *ast.CallExpr, callee expressionIn
 			hint, supplied = smtpConstructionHint(class.Symbol)
 		}
 		if !supplied {
+			hint, supplied = qrConstructionHint(class.Symbol)
+		}
+		if !supplied {
+			hint, supplied = barcodeConstructionHint(class.Symbol)
+		}
+		if !supplied {
 			hint, supplied = mysqlConstructionHint(class.Symbol)
 		}
 		if !supplied {
@@ -833,6 +839,9 @@ func typeOperationFor(receiver types.Type, name string) (TypeOperation, bool) {
 			return operation, true
 		}
 		if operation, ok := cronOperationFor(receiver, name); ok {
+			return operation, true
+		}
+		if operation, ok := codesOperationFor(receiver, name); ok {
 			return operation, true
 		}
 		return dataOperationFor(receiver, name)
@@ -1069,6 +1078,9 @@ func (a *analyzer) analyzeTypeOperation(call *ast.CallExpr, member *ast.MemberEx
 	}
 	if shape, isCron := cronOperationShapes()[operation]; isCron {
 		return a.analyzeCronOperation(call, operation, shape, current, flow), true
+	}
+	if shape, isCode := codesOperationShapes()[operation]; isCode {
+		return a.analyzeCodesOperation(call, operation, shape, current, flow), true
 	}
 	switch operation {
 	case ListAdd, ListEject, PairEject:

@@ -27,6 +27,9 @@ type GeneratedProgram struct {
 	RequiresNumeric bool
 	RequiresSQLite  bool
 	RequiresMySQL   bool
+	// RequiresCodes reports that the program uses QR or barcode encoding, so
+	// its workspace needs the vendored encoder source.
+	RequiresCodes bool
 }
 
 const (
@@ -45,6 +48,7 @@ const (
 	bitsRuntimeFileName     = "ahdcode_bits_runtime.go"
 	charactersRuntimeFile   = "ahdcode_characters_runtime.go"
 	cronRuntimeFileName     = "ahdcode_cron_runtime.go"
+	codesRuntimeFileName    = "ahdcode_codes_runtime.go"
 )
 
 // storage describes the Go representation chosen for one IR symbol.
@@ -73,6 +77,7 @@ type generator struct {
 	usesNumeric bool
 	usesSQLite  bool
 	usesMySQL   bool
+	usesCodes   bool
 	// frames tracks the enclosing loop and attempt structure so break,
 	// continue, and return transfer through error handling correctly.
 	frames []frame
@@ -192,8 +197,22 @@ func Generate(compilation *ir.Compilation) (*GeneratedProgram, []diagnostics.Dia
 		}
 		files = append(files, GeneratedFile{Name: mysqlRuntimeFileName, Content: string(mysqlRuntime)})
 	}
+	// ahdcode_codes_runtime.go imports the vendored QR and barcode encoder,
+	// so, like the MySQL runtime, it joins only a program that uses codes.
+	if generator.usesCodes {
+		codesRuntime, err := format.Source([]byte(codesRuntimeSource()))
+		if err != nil {
+			return nil, append(generator.diagnostics, backendError(CodeFormatFailure, "embedded codes runtime source is not valid Go: "+err.Error(), source.Span{}, "the QR and Barcode backend runtime must remain gofmt-clean"))
+		}
+		files = append(files, GeneratedFile{Name: codesRuntimeFileName, Content: string(codesRuntime)})
+	}
 	return &GeneratedProgram{Files: files,
-		RequiresLatex: generator.usesLatex, RequiresPlot: generator.usesPlot, RequiresNumeric: generator.usesNumeric, RequiresSQLite: generator.usesSQLite, RequiresMySQL: generator.usesMySQL}, generator.diagnostics
+		RequiresLatex: generator.usesLatex, RequiresPlot: generator.usesPlot, RequiresNumeric: generator.usesNumeric, RequiresSQLite: generator.usesSQLite, RequiresMySQL: generator.usesMySQL,
+		RequiresCodes: generator.usesCodes}, generator.diagnostics
+}
+
+func codesRuntimeSource() string {
+	return strings.Replace(ahdruntime.CodesSource, "package ahdruntime", "package main", 1)
 }
 
 // runtimeSource re-points the shared runtime package at the generated program.

@@ -85,3 +85,11 @@ var CharactersSource string
 //
 //go:embed cron.go
 var CronSource string
+
+// CodesSource is emitted as a separate generated Go file only into a program
+// that uses QR or barcode encoding. Unlike the standard-library-only runtime
+// files above, it imports the vendored github.com/boombuler/barcode encoder
+// (see ahdruntime/codesvendor), the same way MySQLSource imports its driver.
+//
+//go:embed codes.go
+var CodesSource string

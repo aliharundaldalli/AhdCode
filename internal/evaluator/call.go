@@ -211,6 +211,10 @@ func (session *Session) builtin(identity ir.CallableID, receiver any, arguments 
 		return session.bitsBuiltin(strings.TrimPrefix(name, "builtin:Bits::"), values(arguments))
 	case strings.HasPrefix(name, "builtin:Cron::"):
 		return session.cronBuiltin(strings.TrimPrefix(name, "builtin:Cron::"), values(arguments))
+	case strings.HasPrefix(name, "builtin:QR::"):
+		return session.qrBuiltin(strings.TrimPrefix(name, "builtin:QR::"), values(arguments))
+	case strings.HasPrefix(name, "builtin:Barcode::"):
+		return session.barcodeBuiltin(strings.TrimPrefix(name, "builtin:Barcode::"), values(arguments))
 	case strings.HasPrefix(name, "builtin:Characters::"):
 		return session.charactersBuiltin(strings.TrimPrefix(name, "builtin:Characters::"), values(arguments))
 	case strings.HasPrefix(name, "builtin:Security::"):
@@ -373,6 +377,9 @@ func (session *Session) core(name string, receiver any, arguments []any) any {
 	}
 	if strings.HasPrefix(name, "Scheduler.") {
 		return session.cronOperation(name, receiver, arguments)
+	}
+	if strings.HasPrefix(name, "QRCode.") || strings.HasPrefix(name, "BarcodeCode.") {
+		return session.codesOperation(name, receiver, arguments)
 	}
 	session.raise("Error", "unsupported Fundamentals operation "+name)
 	return nil

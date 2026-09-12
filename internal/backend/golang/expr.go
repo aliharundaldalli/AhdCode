@@ -808,6 +808,12 @@ func (generator *generator) call(value *ir.CallExpr) string {
 	if strings.HasPrefix(string(value.Callable), cronModulePrefix) {
 		return generator.cronCall(value)
 	}
+	if strings.HasPrefix(string(value.Callable), qrModulePrefix) {
+		return generator.qrCall(value)
+	}
+	if strings.HasPrefix(string(value.Callable), barcodeModulePrefix) {
+		return generator.barcodeCall(value)
+	}
 	if strings.HasPrefix(string(value.Callable), securityModulePrefix) {
 		return generator.securityCall(value)
 	}
@@ -1089,6 +1095,9 @@ func (generator *generator) builtinCall(value *ir.CallExpr) string {
 		}
 		if strings.HasPrefix(name, "Scheduler.") {
 			return generator.cronOperation(name, value)
+		}
+		if strings.HasPrefix(name, "QRCode.") || strings.HasPrefix(name, "BarcodeCode.") {
+			return generator.codesOperation(name, value)
 		}
 		return generator.unsupported("Fundamentals function "+name, meta.Span)
 	}

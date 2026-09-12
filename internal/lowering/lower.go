@@ -176,6 +176,16 @@ func LowerCompilation(compilation module.CompilationResult) Result {
 					charactersModule(ir.ModuleID(current.ID), current.Source.Name, current.Source.Path))
 				continue
 			}
+			if string(current.ID) == QRModuleID {
+				result.Modules = append(result.Modules,
+					qrModule(ir.ModuleID(current.ID), current.Source.Name, current.Source.Path))
+				continue
+			}
+			if string(current.ID) == BarcodeModuleID {
+				result.Modules = append(result.Modules,
+					barcodeModule(ir.ModuleID(current.ID), current.Source.Name, current.Source.Path))
+				continue
+			}
 			if string(current.ID) == SecurityModuleID {
 				result.Modules = append(result.Modules,
 					securityModule(ir.ModuleID(current.ID), current.Source.Name, current.Source.Path))

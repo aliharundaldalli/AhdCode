@@ -121,9 +121,10 @@ func (generator *generator) smtpHelper(class ir.ClassID) (string, bool) {
 
 // emitSMTPHelpers writes the constructor wrapper of each String-backed handle
 // Class actually used. Cron's Scheduler shares that representation, so the
-// same loop emits it.
+// same loop emits it, as do the QR module's QRCode and the Barcode module's
+// BarcodeCode, whose hidden String holds the validated symbol.
 func (generator *generator) emitSMTPHelpers(writer *emitter) {
-	for _, class := range []ir.ClassID{smtpClientClass, smtpMessageClass, cronSchedulerClass} {
+	for _, class := range []ir.ClassID{smtpClientClass, smtpMessageClass, cronSchedulerClass, qrCodeClass, barcodeCodeClass} {
 		name, known := generator.timeHelpers[class]
 		if !known {
 			continue

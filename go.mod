@@ -3,6 +3,7 @@ module ahdcode
 go 1.26.0
 
 require (
+	github.com/boombuler/barcode v1.1.0
 	github.com/go-sql-driver/mysql v1.10.1
 	github.com/ncruces/go-sqlite3 v0.35.4
 	golang.org/x/crypto v0.56.0

@@ -1,0 +1,7 @@
+# github.com/boombuler/barcode v1.1.0
+## explicit
+github.com/boombuler/barcode
+github.com/boombuler/barcode/code128
+github.com/boombuler/barcode/ean
+github.com/boombuler/barcode/qr
+github.com/boombuler/barcode/utils

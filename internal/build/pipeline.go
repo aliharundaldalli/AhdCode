@@ -7,10 +7,12 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 
 	backend "ahdcode/internal/backend/golang"
+	"ahdcode/internal/backend/golang/ahdruntime/codesvendor"
 	"ahdcode/internal/backend/golang/ahdruntime/mysqlvendor"
 	"ahdcode/internal/diagnostics"
 	"ahdcode/internal/framework"
@@ -121,23 +123,28 @@ func NewWorkspace(program *backend.GeneratedProgram) (*Workspace, []diagnostics.
 		return nil, []diagnostics.Diagnostic{workspaceFailure("could not create a temporary build workspace: " + err.Error())}
 	}
 	workspace := &Workspace{Directory: directory, toolchain: toolchain}
-	goMod := workspaceModule
-	if program != nil && program.RequiresMySQL {
-		goMod = mysqlvendor.GoMod
-		workspace.vendored = true
+	trees := workspaceVendorTrees(program)
+	goMod, goSum := workspaceModule, ""
+	switch {
+	case len(trees) == 1 && program.RequiresMySQL:
+		// A MySQL-only program keeps exactly the workspace it always had.
+		goMod, goSum = mysqlvendor.GoMod, mysqlvendor.GoSum
+	case len(trees) > 0:
+		goMod, goSum = composedGoMod(trees), composedGoSum(trees)
 	}
+	workspace.vendored = len(trees) > 0
 	if err := os.WriteFile(filepath.Join(directory, "go.mod"), []byte(goMod), 0o600); err != nil {
 		workspace.Close()
 		return nil, []diagnostics.Diagnostic{workspaceFailure("could not write the generated go.mod: " + err.Error())}
 	}
 	if workspace.vendored {
-		if err := os.WriteFile(filepath.Join(directory, "go.sum"), []byte(mysqlvendor.GoSum), 0o600); err != nil {
+		if err := os.WriteFile(filepath.Join(directory, "go.sum"), []byte(goSum), 0o600); err != nil {
 			workspace.Close()
 			return nil, []diagnostics.Diagnostic{workspaceFailure("could not write the generated go.sum: " + err.Error())}
 		}
-		if err := writeVendorTree(directory); err != nil {
+		if err := writeVendorTrees(directory, trees); err != nil {
 			workspace.Close()
-			return nil, []diagnostics.Diagnostic{workspaceFailure("could not stage the vendored MySQL driver: " + err.Error())}
+			return nil, []diagnostics.Diagnostic{workspaceFailure("could not stage the vendored dependency source: " + err.Error())}
 		}
 	}
 	for _, file := range program.Files {
@@ -190,26 +197,97 @@ func (workspace *Workspace) Close() {
 	_ = os.RemoveAll(workspace.Directory)
 }
 
-// writeVendorTree copies the embedded, pinned go-sql-driver/mysql (and its
-// own dependency, filippo.io/edwards25519) source into directory/vendor,
-// exactly as `go mod vendor` produced it at AhdCode development time. Nothing
-// here regenerates or refetches that tree: it is a plain file copy of
-// mysqlvendor.Vendor, which was embedded into the ahdcode binary itself.
-func writeVendorTree(directory string) error {
-	return fs.WalkDir(mysqlvendor.Vendor, "vendor", func(path string, entry fs.DirEntry, err error) error {
+// vendorTree is one pinned dependency tree embedded in the ahdcode binary.
+type vendorTree struct {
+	files    fs.ReadFileFS
+	requires []string
+	sum      string
+}
+
+// workspaceVendorTrees lists the embedded trees a generated program needs:
+// github.com/go-sql-driver/mysql (with filippo.io/edwards25519) for MySQL, and
+// github.com/boombuler/barcode for QR and barcode encoding.
+func workspaceVendorTrees(program *backend.GeneratedProgram) []vendorTree {
+	var trees []vendorTree
+	if program != nil && program.RequiresMySQL {
+		trees = append(trees, vendorTree{files: mysqlvendor.Vendor, requires: mysqlvendor.Requires, sum: mysqlvendor.GoSum})
+	}
+	if program != nil && program.RequiresCodes {
+		trees = append(trees, vendorTree{files: codesvendor.Vendor, requires: codesvendor.Requires, sum: codesvendor.GoSum})
+	}
+	return trees
+}
+
+// composedGoMod is the go.mod for a workspace that vendors more than one
+// tree: every tree's require lines in one sorted block.
+func composedGoMod(trees []vendorTree) string {
+	var requires []string
+	for _, tree := range trees {
+		requires = append(requires, tree.requires...)
+	}
+	sort.Strings(requires)
+	return workspaceModule + "\nrequire (\n\t" + strings.Join(requires, "\n\t") + "\n)\n"
+}
+
+func composedGoSum(trees []vendorTree) string {
+	var lines []string
+	for _, tree := range trees {
+		lines = append(lines, strings.Split(strings.TrimSpace(tree.sum), "\n")...)
+	}
+	sort.Strings(lines)
+	return strings.Join(lines, "\n") + "\n"
+}
+
+// writeVendorTrees copies the embedded, pinned dependency source into
+// directory/vendor, exactly as `go mod vendor` produced each tree at AhdCode
+// development time. Nothing here regenerates or refetches a tree: it is a
+// plain file copy of source embedded into the ahdcode binary itself. Each tree
+// carries its own vendor/modules.txt; their module sections are merged in
+// module-path order, the order `go mod vendor` writes.
+func writeVendorTrees(directory string, trees []vendorTree) error {
+	var sections []string
+	for _, tree := range trees {
+		err := fs.WalkDir(tree.files, "vendor", func(path string, entry fs.DirEntry, err error) error {
+			if err != nil {
+				return err
+			}
+			target := filepath.Join(directory, path)
+			if entry.IsDir() {
+				return os.MkdirAll(target, 0o755)
+			}
+			content, err := tree.files.ReadFile(path)
+			if err != nil {
+				return err
+			}
+			if path == "vendor/modules.txt" {
+				sections = append(sections, vendorModuleSections(string(content))...)
+				return nil
+			}
+			return os.WriteFile(target, content, 0o600)
+		})
 		if err != nil {
 			return err
 		}
-		target := filepath.Join(directory, path)
-		if entry.IsDir() {
-			return os.MkdirAll(target, 0o755)
+	}
+	sort.Strings(sections)
+	return os.WriteFile(filepath.Join(directory, "vendor", "modules.txt"), []byte(strings.Join(sections, "")), 0o600)
+}
+
+// vendorModuleSections splits a vendor/modules.txt into one section per
+// module: the "# module version" line and every line up to the next one.
+func vendorModuleSections(content string) []string {
+	var sections []string
+	for _, line := range strings.SplitAfter(content, "\n") {
+		if line == "" {
+			continue
 		}
-		content, err := mysqlvendor.Vendor.ReadFile(path)
-		if err != nil {
-			return err
+		if strings.HasPrefix(line, "# ") || len(sections) == 0 {
+			sections = append(sections, line)
+			continue
 		}
-		return os.WriteFile(target, content, 0o600)
-	})
+		sections[len(sections)-1] += line
+	}
+	return sections
 }
 
 // BuildExecutable compiles the generated program to a native executable.

@@ -72,6 +72,14 @@ func AhdPDFNew() AhdPDFDocument { return AhdPDFDocument{} }
 var ahdPDFParagraphAlignments = map[string]bool{"left": true, "center": true, "right": true, "justify": true}
 var ahdPDFTableAlignments = map[string]bool{"left": true, "center": true, "right": true}
 
+// ahdPDFRequireBlockAlign validates the placement of a block that is not a
+// paragraph: a QR symbol, barcode, link, or image sits left, center, or right.
+func ahdPDFRequireBlockAlign(operation, align string) {
+	if !ahdPDFTableAlignments[align] {
+		ahdPDFRaise(operation + " align must be left, center, or right")
+	}
+}
+
 func AhdPDFHeading(doc AhdPDFDocument, text string, level int64) AhdPDFDocument {
 	if level < 1 || level > 6 {
 		ahdPDFRaise("heading level must be between 1 and 6")

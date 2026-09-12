@@ -1,0 +1,32 @@
+[
+  {
+    "file": "qr-url-M.png",
+    "format": "QR_CODE",
+    "payload": "https://ahdcode.org/verify?id=AHD-2026-0042\u0026lang=tr#top"
+  },
+  {
+    "file": "qr-turkish-emoji-H.png",
+    "format": "QR_CODE",
+    "payload": "Doğrulama: Ayşe Yılmaz — İstanbul 😊"
+  },
+  {
+    "file": "qr-long-url-L.png",
+    "format": "QR_CODE",
+    "payload": "https://ahdcode.org/certificates/verify?number=AHD-2026-000042\u0026recipient=Ay%C5%9Fe%20Y%C4%B1lmaz\u0026course=Numerical%20Methods\u0026issued=2026-09-12\u0026signature=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+  },
+  {
+    "file": "ean13-computed.png",
+    "format": "EAN_13",
+    "payload": "5901234123457"
+  },
+  {
+    "file": "upca-computed.png",
+    "format": "UPC_A",
+    "payload": "036000291452"
+  },
+  {
+    "file": "code128-mixed.png",
+    "format": "CODE_128",
+    "payload": "AHD-Asset 00042/b"
+  }
+]

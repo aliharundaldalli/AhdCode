@@ -20,9 +20,10 @@ def build(target,output,goos,arch,ldflags='-buildid='):
  time.sleep(4)
 def licenses(payload,modules):
  dest=payload/'licenses';dest.mkdir()
- for name in ['LICENSE','THIRD_PARTY_NOTICES_MYSQL.md','THIRD_PARTY_NOTICES_NUMERIC.md','THIRD_PARTY_NOTICES_PLOT.md','THIRD_PARTY_NOTICES_SQLITE.md']:shutil.copy2(R/name,payload/name)
+ for name in ['LICENSE','THIRD_PARTY_NOTICES_CODES.md','THIRD_PARTY_NOTICES_MYSQL.md','THIRD_PARTY_NOTICES_NUMERIC.md','THIRD_PARTY_NOTICES_PLOT.md','THIRD_PARTY_NOTICES_SQLITE.md']:shutil.copy2(R/name,payload/name)
  shutil.copy2(R/'tooling/distribution/THIRD_PARTY_NOTICES.md',payload/'THIRD_PARTY_NOTICES.md')
  shutil.copytree(R/'internal/backend/golang/ahdruntime/mysqlvendor/vendor',dest/'mysql-source')
+ shutil.copytree(R/'internal/backend/golang/ahdruntime/codesvendor/vendor',dest/'codes-source')
  (dest/'bootstrap').mkdir();shutil.copy2(R/'internal/initweb/templates/vendor/bootstrap/LICENSE',dest/'bootstrap/LICENSE')
  shutil.copy2(R/'tooling/latex/resources.json',dest/'latex-resources.json')
  inventory=[]

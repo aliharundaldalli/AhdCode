@@ -16,6 +16,7 @@ const mathModuleID = "builtin:Math"
 func StandardModuleInterfaces() map[string]*ModuleInterface {
 	return map[string]*ModuleInterface{
 		"Archive":    archiveModuleInterface(),
+		"Barcode":    barcodeModuleInterface(),
 		"Bits":       bitsModuleInterface(),
 		"Characters": charactersModuleInterface(),
 		"Cron":       cronModuleInterface(),
@@ -37,6 +38,7 @@ func StandardModuleInterfaces() map[string]*ModuleInterface {
 		"Path":       pathModuleInterface(),
 		"PDF":        pdfModuleInterface(),
 		"Plot":       plotModuleInterface(),
+		"QR":         qrModuleInterface(),
 		"Regex":      regexModuleInterface(),
 		"Security":   securityModuleInterface(),
 		"SMTP":       smtpModuleInterface(),

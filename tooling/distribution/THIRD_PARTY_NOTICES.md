@@ -12,11 +12,13 @@ No npm or CDN runtime is included.
 
 The exact Go module versions and complete license/notice texts are inventoried
 in `licenses/modules.json` and `licenses/modules/`. They include Go's x packages
-(BSD), go-sql-driver/mysql (MPL 2.0), edwards25519 (BSD), go-sqlite3 and its WASM
-component (MIT), gonum/plot (BSD), font and PDF dependencies. The unchanged MySQL
-source and license accompany this distribution under `licenses/mysql-source`;
-see `THIRD_PARTY_NOTICES_MYSQL.md`. SQLite, numeric, and plot-specific notices
-are included alongside this document. Source URLs/versions are preserved in
+(BSD), go-sql-driver/mysql (MPL 2.0), edwards25519 (BSD), boombuler/barcode (MIT),
+go-sqlite3 and its WASM component (MIT), gonum/plot (BSD), font and PDF
+dependencies. The unchanged MySQL source and license accompany this distribution
+under `licenses/mysql-source`; see `THIRD_PARTY_NOTICES_MYSQL.md`. The unchanged
+QR and barcode encoder source and license accompany it under
+`licenses/codes-source`; see `THIRD_PARTY_NOTICES_CODES.md`. SQLite, numeric,
+and plot-specific notices are included alongside this document. Source URLs/versions are preserved in
 the module inventory and notices. No database server is redistributed.
 
 The unmodified Tectonic 0.17.0 engine and the minimal offline resource bundle

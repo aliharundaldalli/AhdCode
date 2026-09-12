@@ -31,6 +31,10 @@ require github.com/go-sql-driver/mysql v1.10.1
 require filippo.io/edwards25519 v1.2.0 // indirect
 `
 
+// Requires lists GoMod's require lines, so a workspace that also vendors
+// another pinned tree can compose one go.mod from both.
+var Requires = []string{"github.com/go-sql-driver/mysql v1.10.1", "filippo.io/edwards25519 v1.2.0 // indirect"}
+
 // GoSum is not required for a -mod=vendor build (vendor mode never consults
 // it), but is included for the same reason `go mod vendor` writes one
 // alongside vendor/: a generated workspace that looks like an ordinary

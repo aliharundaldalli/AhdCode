@@ -98,6 +98,8 @@ var (
 	AhdClassBitsError           = &AhdClass{Name: "BitsError", Parent: AhdClassError}
 	AhdClassCharactersError     = &AhdClass{Name: "CharactersError", Parent: AhdClassError}
 	AhdClassCronError           = &AhdClass{Name: "CronError", Parent: AhdClassError}
+	AhdClassQRError             = &AhdClass{Name: "QRError", Parent: AhdClassError}
+	AhdClassBarcodeError        = &AhdClass{Name: "BarcodeError", Parent: AhdClassError}
 )
 
 // AhdInstance is every AhdCode Class instance. The generated interface of each
