@@ -95,7 +95,11 @@ func TestDocumentationBundleDescribesThisRelease(t *testing.T) {
 		"CHARACTERS.md": {"no `Char` type", "grapheme"},
 		"LATEX.md":      {"Latex.tikz", "pgfornament", "landscape"},
 		"WEB.md":        {"CRON.md", "Cron: scheduled application work"},
-		"MODULES.md":    {"`Cron`", "`Characters`"},
+		"MODULES.md":    {"`Cron`", "`Characters`", "`Bits`"},
+		// v1.1.0 once lost these sections because they lived only in the
+		// bundle; they must stay reachable from the canonical documents.
+		"SECURITY.md": {"hmacSHA256", "hmacVerify", "base64UrlEncode", "randomHex", "rsaSignSHA256", "aesEncrypt", "AES-256-GCM"},
+		"BITS.md":     {"Bits.shiftRightUnsigned"},
 	}
 	for name, phrases := range required {
 		text, err := fs.ReadFile(projectDocs, "docbundle/"+name)

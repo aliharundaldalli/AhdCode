@@ -316,13 +316,13 @@ Kavramsal netliği korumak için AhdCode'un yetenekleri dört belirgin mimari ka
    - Modül çözümleme (`bring`, `from ... bring`) ve derleme zamanı yerel kaynak birleştirme ([`require(...)`](docs/REQUIRE_TR.md))
 
 2. **Standart Kütüphane (Birinci Taraf Gömülü Modüller):**
-   - **Matematik ve Hesaplama:** [`Math`](docs/MATH_TR.md), [`Regex`](docs/REGEX_TR.md), [`Statistics`](docs/STATISTICS_TR.md), [`Numeric`](docs/NUMERIC_TR.md), [`Plot`](docs/PLOT_TR.md)
-   - **Veri ve Koleksiyonlar:** [`Lists`](docs/LISTS_TR.md), [`KeyValue`](docs/KEYVALUE_TR.md), [`CSV`](docs/CSV_TR.md), [`Data`](docs/DATA_TR.md), [`JSON`](docs/JSON_TR.md), [`XML`](docs/XML_TR.md)
+   - **Matematik ve Hesaplama:** [`Math`](docs/MATH_TR.md), [`Bits`](docs/BITS_TR.md) (`Int` üzerinde bit işlemleri), [`Regex`](docs/REGEX_TR.md), [`Statistics`](docs/STATISTICS_TR.md), [`Numeric`](docs/NUMERIC_TR.md), [`Plot`](docs/PLOT_TR.md)
+   - **Veri ve Koleksiyonlar:** [`Lists`](docs/LISTS_TR.md), [`KeyValue`](docs/KEYVALUE_TR.md), [`Characters`](docs/CHARACTERS_TR.md) (Unicode kod noktaları ve sınıflandırma), [`CSV`](docs/CSV_TR.md), [`Data`](docs/DATA_TR.md), [`JSON`](docs/JSON_TR.md), [`XML`](docs/XML_TR.md)
    - **Belge Üretimi:** [`Word`](docs/WORD_TR.md), [`Excel`](docs/EXCEL_TR.md), [`PDF`](docs/PDF_TR.md), [`Latex`](docs/LATEX_TR.md), [`Archive`](docs/ARCHIVE_TR.md)
-   - **Sistem ve Ortam:** [`Time`](docs/TIME_TR.md), [`Path`](docs/FILESYSTEM_TR.md), [`File`](docs/FILESYSTEM_TR.md), [`Env`](docs/ENV_TR.md)
+   - **Sistem ve Ortam:** [`Time`](docs/TIME_TR.md), [`Cron`](docs/CRON_TR.md) (sınırlı, süreç içi zamanlama), [`Path`](docs/FILESYSTEM_TR.md), [`File`](docs/FILESYSTEM_TR.md), [`Env`](docs/ENV_TR.md)
 
 3. **Birinci Taraf Çalışma Zamanı / Çatı Modülleri:**
-   - **Ağ, Sunucu ve Depolama İlkelleri:** [`HTTP`](docs/HTTP_TR.md) (bellek içi sunucu, istek/yanıt, çerezler, oturumlar, statik dosya sunucusu, client), [`HTML`](docs/HTML_TR.md) (anlamsal kurucu, ayrıştırıcı, seçici motoru), [`Security`](docs/SECURITY_TR.md) (Argon2id özetleme, güvenli token'lar, sabit zamanlı karşılaştırma), [`SQLite`](docs/SQLITE_TR.md) (yerel tipli veritabanı köprüsü), [`MySQL`](docs/MYSQL_TR.md) (bağlantı havuzu ve işlemlerle ağ veritabanı), [`SMTP`](docs/SMTP_TR.md) (yalnızca gönderim yapan posta istemcisi)
+   - **Ağ, Sunucu ve Depolama İlkelleri:** [`HTTP`](docs/HTTP_TR.md) (bellek içi sunucu, istek/yanıt, çerezler, oturumlar, statik dosya sunucusu, client), [`HTML`](docs/HTML_TR.md) (anlamsal kurucu, ayrıştırıcı, seçici motoru), [`Security`](docs/SECURITY_TR.md) (Argon2id özetleme, güvenli token'lar, sabit zamanlı karşılaştırma, SHA-2 özetleri, HMAC, kodlamalar, RS256 imzaları, AES-256-GCM), [`SQLite`](docs/SQLITE_TR.md) (yerel tipli veritabanı köprüsü), [`MySQL`](docs/MYSQL_TR.md) (bağlantı havuzu ve işlemlerle ağ veritabanı), [`SMTP`](docs/SMTP_TR.md) (yalnızca gönderim yapan posta istemcisi)
    - **Web Uygulama Çatısı:** [`Web`](docs/WEB_TR.md) (birinci taraf gömülü web çatısı, [`Web.UI`](docs/WEB_TR.md#9-webui) anlamsal bileşenleri, `RequestContext`, tipli `Forms`, sıralı `ValidationErrors`, seçilmiş `OldInput`, oturuma bağlı CSRF ve flash yaşam döngüsü)
 
 4. **Geliştirici Araçları:**
@@ -522,7 +522,7 @@ v1.1.0 bir **ara (minor)** sürümdür. Bir yeni standart modül ekler, bir
 mevcut modülü genişletir. Çekirdek dilbilgisi, tür sistemi ve daha önce
 yayımlanmış her fonksiyon v1.0.0 davranışını korur.
 
-**Yeni standart modül: [`Bits`](docs/BITS.md)** — dilin işaretli 64 bit `Int`
+**Yeni standart modül: [`Bits`](docs/BITS_TR.md)** — dilin işaretli 64 bit `Int`
 türü üzerinde bit işlemleri. AhdCode dilbilgisinde bit operatörü yoktur
 (`and`, `or` ve `not` mantıksal operatörlerdir, `^` üs almadır); bu yüzden
 işlemler adlandırılmış çağrılardır:
@@ -532,7 +532,7 @@ işlemler adlandırılmış çağrılardır:
 `trailingZeros` ve kaydırma/döndürme mesafesi `0..63` dışına çıktığında
 yükselen `BitsError` hata türü.
 
-**Genişletilen modül: [`Security`](docs/SECURITY.md)** — parola primitifleri
+**Genişletilen modül: [`Security`](docs/SECURITY_TR.md)** — parola primitifleri
 değişmedi; modül artık özetler (digest), mesaj doğrulama, yaygın kodlamalar,
 RS256 imzaları ve doğrulamalı simetrik şifrelemeyi de kapsıyor:
 

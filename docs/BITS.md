@@ -1,6 +1,6 @@
 # Bits standard module
 
-[English] · Türkçe
+[English] · [Türkçe](BITS_TR.md)
 
 [Back to README](../README.md) · [Modules](MODULES.md) · [Math](MATH.md) · [Numeric](NUMERIC.md) · [Security](SECURITY.md)
 

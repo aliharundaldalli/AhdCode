@@ -12,9 +12,17 @@ bring Security
 from Security bring SecurityError
 ```
 
-`Security` is a narrow set of cryptographic primitives: Argon2id password
-hashing, opaque random tokens, and constant-time string comparison. It is **not**
-a full authentication framework, not a JWT library, and not an encryption API.
+`Security` is a narrow, opinionated set of cryptographic primitives: Argon2id
+password hashing, opaque random tokens, constant-time comparison, SHA-2
+digests, HMAC, the common encodings, RS256 signatures and AES-256-GCM
+encryption. It is **not** a full authentication framework and not a JWT
+library: `rsaSignSHA256` and `base64UrlEncode` give you the pieces a JWT is
+built from, but assembling, validating and rotating tokens is your program's
+job.
+
+Where a cryptographic choice exists it is made once, safely, and is not exposed
+as a knob — one digest family, one MAC, one signature scheme, one authenticated
+cipher. You cannot select a broken mode or forget an authentication tag.
 
 ## ⚠ Critical warnings
 
@@ -32,7 +40,71 @@ Security.passwordHash(password: String)                  -> String
 Security.passwordVerify(password: String, encodedHash: String) -> Bool
 Security.token()                                         -> String
 Security.secureEqual(expected: String, received: String) -> Bool
+
+Security.sha256(text: String)                            -> String
+Security.sha512(text: String)                            -> String
+Security.hmacSHA256(key: String, message: String)        -> String
+Security.hmacVerify(key: String, message: String, receivedHex: String) -> Bool
+
+Security.base64Encode(text: String)                      -> String
+Security.base64Decode(encoded: String)                   -> String
+Security.base64UrlEncode(text: String)                   -> String
+Security.base64UrlDecode(encoded: String)                -> String
+Security.hexEncode(text: String)                         -> String
+Security.hexDecode(encoded: String)                      -> String
+
+Security.randomHex(count: Int)                           -> String
+
+Security.rsaSignSHA256(privateKeyPem: String, message: String)   -> String
+Security.rsaVerifySHA256(publicKeyPem: String, message: String, signature: String) -> Bool
+Security.aesEncrypt(keyHex: String, plaintext: String)   -> String
+Security.aesDecrypt(keyHex: String, payload: String)     -> String
 ```
+
+### Digests, MACs and encodings
+
+`sha256` and `sha512` return lowercase hex. `hmacSHA256` returns lowercase hex
+too. Compare a received MAC with `hmacVerify`, never with `==`: `hmacVerify`
+uses a constant-time comparison, so it does not leak how many leading
+characters matched.
+
+`base64UrlEncode` emits the URL-safe alphabet (`-` and `_`) **without**
+padding, which is what JWT and JWS segments require. `base64UrlDecode` accepts
+padded input as well, because other systems emit it.
+
+`randomHex(count)` returns `count` cryptographically random bytes as hex, so
+the string is twice as long as the byte count. `count` must be between 1 and
+1024. Thirty-two bytes is the right size for an AES-256 key or an HMAC secret.
+
+### Signatures
+
+`rsaSignSHA256` is RSASSA-PKCS1-v1_5 over SHA-256 — the algorithm JSON Web
+Tokens call **RS256** — and returns the signature as unpadded base64url. The
+private key is PEM, in either PKCS#1 (`RSA PRIVATE KEY`) or PKCS#8
+(`PRIVATE KEY`) form; service-account files use PKCS#8. `rsaVerifySHA256`
+accepts a PKIX or PKCS#1 public key and returns `false` for a bad signature,
+raising only when the key or the encoding itself is unusable.
+
+Together with `base64UrlEncode` these are enough to build a signed JWT:
+
+```ahd
+header: String := Security.base64UrlEncode("{\"alg\":\"RS256\",\"typ\":\"JWT\"}")
+claims: String := Security.base64UrlEncode(claimsJson)
+signature: String := Security.rsaSignSHA256(privateKeyPem, header + "." + claims)
+token: String := header + "." + claims + "." + signature
+```
+
+### Symmetric encryption
+
+`aesEncrypt` and `aesDecrypt` are AES-256-GCM. The key is 32 bytes given as 64
+hex characters; any other length is rejected. The nonce is generated per call
+and carried inside the returned base64 payload, so the caller never manages it
+— reusing a nonce with the same key destroys GCM's security, and this API makes
+that mistake impossible.
+
+Decryption is authenticated: a modified or truncated payload raises
+`SecurityError` instead of returning attacker-influenced plaintext. There is no
+mode selection, so a broken mode such as ECB cannot be chosen by accident.
 
 ### Error type
 
