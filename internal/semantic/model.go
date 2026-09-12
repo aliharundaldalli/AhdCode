@@ -564,6 +564,13 @@ const (
 	SMTPMessageWithText     TypeOperation = "SMTPMessage.withText"
 	SMTPMessageWithHtml     TypeOperation = "SMTPMessage.withHtml"
 
+	// Cron (v1.2.0) is bounded in-process scheduling. Scheduler is a mutable
+	// handle: add registers a validated job, run blocks the calling program
+	// until a task calls stop or raises, and stop is idempotent.
+	CronSchedulerAdd  TypeOperation = "Scheduler.add"
+	CronSchedulerRun  TypeOperation = "Scheduler.run"
+	CronSchedulerStop TypeOperation = "Scheduler.stop"
+
 	// MySQL (v0.11.0) is native network database connectivity. MySQLDatabase
 	// is one live connection pool; MySQLTransaction pins one underlying SQL
 	// transaction independently of the Database it came from; MySQLResult is

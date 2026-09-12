@@ -209,6 +209,8 @@ func (session *Session) builtin(identity ir.CallableID, receiver any, arguments 
 		return session.smtpBuiltin(strings.TrimPrefix(name, "builtin:SMTP::"), values(arguments))
 	case strings.HasPrefix(name, "builtin:Bits::"):
 		return session.bitsBuiltin(strings.TrimPrefix(name, "builtin:Bits::"), values(arguments))
+	case strings.HasPrefix(name, "builtin:Cron::"):
+		return session.cronBuiltin(strings.TrimPrefix(name, "builtin:Cron::"), values(arguments))
 	case strings.HasPrefix(name, "builtin:Characters::"):
 		return session.charactersBuiltin(strings.TrimPrefix(name, "builtin:Characters::"), values(arguments))
 	case strings.HasPrefix(name, "builtin:Security::"):
@@ -368,6 +370,9 @@ func (session *Session) core(name string, receiver any, arguments []any) any {
 	}
 	if strings.HasPrefix(name, "SMTPClient.") || strings.HasPrefix(name, "SMTPMessage.") {
 		return session.smtpOperation(name, receiver, arguments)
+	}
+	if strings.HasPrefix(name, "Scheduler.") {
+		return session.cronOperation(name, receiver, arguments)
 	}
 	session.raise("Error", "unsupported Fundamentals operation "+name)
 	return nil

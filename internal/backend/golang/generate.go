@@ -44,6 +44,7 @@ const (
 	identityRuntimeFileName = "ahdcode_identity_runtime.go"
 	bitsRuntimeFileName     = "ahdcode_bits_runtime.go"
 	charactersRuntimeFile   = "ahdcode_characters_runtime.go"
+	cronRuntimeFileName     = "ahdcode_cron_runtime.go"
 )
 
 // storage describes the Go representation chosen for one IR symbol.
@@ -158,6 +159,10 @@ func Generate(compilation *ir.Compilation) (*GeneratedProgram, []diagnostics.Dia
 	if err != nil {
 		return nil, append(generator.diagnostics, backendError(CodeFormatFailure, "embedded Characters runtime source is not valid Go: "+err.Error(), source.Span{}, "the Characters backend runtime must remain gofmt-clean"))
 	}
+	cronRuntime, err := format.Source([]byte(cronRuntimeSource()))
+	if err != nil {
+		return nil, append(generator.diagnostics, backendError(CodeFormatFailure, "embedded Cron runtime source is not valid Go: "+err.Error(), source.Span{}, "the Cron backend runtime must remain gofmt-clean"))
+	}
 	files := []GeneratedFile{
 		{Name: programFileName, Content: string(formatted)},
 		{Name: runtimeFileName, Content: string(runtime)},
@@ -172,6 +177,7 @@ func Generate(compilation *ir.Compilation) (*GeneratedProgram, []diagnostics.Dia
 		{Name: identityRuntimeFileName, Content: string(identityRuntime)},
 		{Name: bitsRuntimeFileName, Content: string(bitsRuntime)},
 		{Name: charactersRuntimeFile, Content: string(charactersRuntime)},
+		{Name: cronRuntimeFileName, Content: string(cronRuntime)},
 	}
 	// Unlike every other runtime file above (standard library only, so always
 	// safe to include), ahdcode_mysql_runtime.go imports the vendored
@@ -237,6 +243,10 @@ func bitsRuntimeSource() string {
 
 func charactersRuntimeSource() string {
 	return strings.Replace(ahdruntime.CharactersSource, "package ahdruntime", "package main", 1)
+}
+
+func cronRuntimeSource() string {
+	return strings.Replace(ahdruntime.CronSource, "package ahdruntime", "package main", 1)
 }
 
 func mysqlRuntimeSource() string {

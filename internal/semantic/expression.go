@@ -714,6 +714,9 @@ func (a *analyzer) analyzeCallWithCallee(call *ast.CallExpr, callee expressionIn
 		if !supplied {
 			hint, supplied = mysqlConstructionHint(class.Symbol)
 		}
+		if !supplied {
+			hint, supplied = cronConstructionHint(class.Symbol)
+		}
 		if supplied {
 			// A compiler-supplied value is produced by a standard-module
 			// function that validates its arguments, never by direct
@@ -827,6 +830,9 @@ func typeOperationFor(receiver types.Type, name string) (TypeOperation, bool) {
 			return operation, true
 		}
 		if operation, ok := smtpOperationFor(receiver, name); ok {
+			return operation, true
+		}
+		if operation, ok := cronOperationFor(receiver, name); ok {
 			return operation, true
 		}
 		return dataOperationFor(receiver, name)
@@ -1060,6 +1066,9 @@ func (a *analyzer) analyzeTypeOperation(call *ast.CallExpr, member *ast.MemberEx
 	}
 	if shape, isSMTP := smtpOperationShapes()[operation]; isSMTP {
 		return a.analyzeSMTPOperation(call, operation, shape, current, flow), true
+	}
+	if shape, isCron := cronOperationShapes()[operation]; isCron {
+		return a.analyzeCronOperation(call, operation, shape, current, flow), true
 	}
 	switch operation {
 	case ListAdd, ListEject, PairEject:

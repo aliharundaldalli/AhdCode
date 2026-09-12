@@ -119,8 +119,11 @@ func (generator *generator) smtpHelper(class ir.ClassID) (string, bool) {
 	return name, true
 }
 
+// emitSMTPHelpers writes the constructor wrapper of each String-backed handle
+// Class actually used. Cron's Scheduler shares that representation, so the
+// same loop emits it.
 func (generator *generator) emitSMTPHelpers(writer *emitter) {
-	for _, class := range []ir.ClassID{smtpClientClass, smtpMessageClass} {
+	for _, class := range []ir.ClassID{smtpClientClass, smtpMessageClass, cronSchedulerClass} {
 		name, known := generator.timeHelpers[class]
 		if !known {
 			continue

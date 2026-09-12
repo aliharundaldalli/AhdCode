@@ -78,3 +78,10 @@ var BitsSource string
 //
 //go:embed characters.go
 var CharactersSource string
+
+// CronSource is emitted as a separate generated Go file. It provides the
+// Cron schedule parser, occurrence search, and blocking scheduler loop using
+// only strconv, strings, sync, and time from the standard library.
+//
+//go:embed cron.go
+var CronSource string

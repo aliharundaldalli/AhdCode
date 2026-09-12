@@ -805,6 +805,9 @@ func (generator *generator) call(value *ir.CallExpr) string {
 	if strings.HasPrefix(string(value.Callable), charactersModulePrefix) {
 		return generator.charactersCall(value)
 	}
+	if strings.HasPrefix(string(value.Callable), cronModulePrefix) {
+		return generator.cronCall(value)
+	}
 	if strings.HasPrefix(string(value.Callable), securityModulePrefix) {
 		return generator.securityCall(value)
 	}
@@ -1083,6 +1086,9 @@ func (generator *generator) builtinCall(value *ir.CallExpr) string {
 		}
 		if strings.HasPrefix(name, "SMTPClient.") || strings.HasPrefix(name, "SMTPMessage.") {
 			return generator.smtpOperation(name, value)
+		}
+		if strings.HasPrefix(name, "Scheduler.") {
+			return generator.cronOperation(name, value)
 		}
 		return generator.unsupported("Fundamentals function "+name, meta.Span)
 	}
