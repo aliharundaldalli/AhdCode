@@ -32,7 +32,7 @@ document(
     body: String, title: String = "", author: String = "", date: String = "",
     type: String = "Article", margin: Real = 2.54, color: String = "",
     cover: String = "", theorems: Pair<String, String> = {},
-    theme: String = "Default"
+    theme: String = "Default", landscape: Bool = false
 )                                         -> String
 
 chapter(title: String)                   -> String
@@ -55,6 +55,10 @@ contents()                               -> String
 ref(label: String)                       -> String
 cite(key: String)                        -> String
 bibliography(references: Pair<String, String>) -> String
+
+tikz(source: String, libraries: List<String> = [])    -> String
+overlay(source: String, libraries: List<String> = []) -> String
+border(inset: Real = 1.0, thickness: Real = 1.0, color: String = "") -> String
 
 LatexError
 ```
@@ -107,8 +111,9 @@ yeni parametre varsayılan değerindeyken hâlâ bir `Article` üretir.
   hiçbir zaman doldurulmaz — çıktı, çalıştırmalar ve makineler arasında
   belirlenimci (deterministic) kalır.
 - **`margin`**, **santimetre** cinsinden tek bir belge-geneli değerdir,
-  varsayılanı `2.54`'tür (etkin v0.1.14 yerleşimi); sayfa-başı kenar boşluğu,
-  kağıt boyutu veya yönelim kontrolü yoktur. Pozitif olmalıdır.
+  varsayılanı `2.54`'tür (etkin v0.1.14 yerleşimi); sayfa-başı kenar boşluğu
+  veya kağıt boyutu kontrolü yoktur, yönelim ayrı `landscape` parametresidir.
+  Pozitif olmalıdır.
 - **`color`**, isteğe bağlı bir `#RRGGBB` vurgu rengidir (varsayılan olarak
   boş, v0.1.14 çıktısını tam olarak korur). Ayarlandığında, AhdCode
   tarafından üretilen vurgular için kullanılan bir `ahdaccent` rengi
@@ -129,12 +134,18 @@ yeni parametre varsayılan değerindeyken hâlâ bir `Article` üretir.
   başlığı `\maketitle` yerine bir başlık-sayfası çerçevesi olarak render
   eder ve aşağıda açıklanan dar slayt yüzeyini destekler.
 - **`theme`**, tam olarak büyük/küçük harfe duyarlı `"Default"`, `"Madrid"`
-  ve `"Warsaw"` değerlerini kabul eder, varsayılanı `"Default"`'tır ve son
-  konumsal parametredir. Madrid ve Warsaw `type: "Beamer"` gerektirir;
-  Article veya Report ile seçilmeleri `ValueError` fırlatır. Bilinmeyen tema
-  adları da `ValueError` fırlatır ve LaTeX kaynağına hiçbir zaman doğrudan
-  geçirilmez. Özel `color` theme'den sonra uygulanır; theme yerleşimini
-  korurken yapısal vurgu rengini override eder.
+  ve `"Warsaw"` değerlerini kabul eder, varsayılanı `"Default"`'tır ve onuncu
+  konumsal parametredir; ardından yalnızca `landscape` gelir. Madrid ve Warsaw
+  `type: "Beamer"` gerektirir; Article veya Report ile seçilmeleri
+  `ValueError` fırlatır. Bilinmeyen tema adları da `ValueError` fırlatır ve
+  LaTeX kaynağına hiçbir zaman doğrudan geçirilmez. Özel `color` theme'den
+  sonra uygulanır; theme yerleşimini korurken yapısal vurgu rengini override
+  eder.
+- **`landscape`** (v1.2.0) varsayılan olarak `false`'tur. `true`, bir Article
+  veya Report belgesinin her sayfasını aynı kağıt ve aynı `margin` ile yan
+  çevirir. Genel bir yerleşim anahtarıdır, bir sertifika kipi değildir. Beamer
+  slaytları zaten geniştir; bu yüzden `type: "Beamer"` ile `landscape: true`
+  `ValueError` fırlatır.
 
 ## Article, Report, Beamer
 
@@ -338,6 +349,172 @@ hücre kaçışlı ve `mathColumns: List<Int>`, belirli sıfır tabanlı sütunl
 kaçış yerine ham satır içi matematiğe (`\( ... \)`) dahil eder. Yukarıdaki
 v0.1.14 davranışına bakın; v0.1.15 için bu konuda hiçbir şey değişmedi.
 
+## TikZ ile vektör grafik (v1.2.0)
+
+Kenarlıklar, süslemeler, mühürler, rozetler, filigranlar, diyagramlar, oklar ve
+konumlandırılmış etiketler metinle aynı Latex belgesine aittir. TikZ/PGF vektör
+çizimin temelidir ve Latex çalışma zamanıyla birlikte çevrimdışı paketlenir; bu
+yüzden bir PDF'i süslemek hiçbir zaman ikinci bir PDF kütüphanesi ya da önceden
+üretilmiş bir kenarlık görseli gerektirmez.
+
+```text
+belge dizgisi (typography) -> Latex
+vektör grafik              -> TikZ/PGF, Latex.tikz ve Latex.overlay ile
+hazır süslemeler           -> pgfornament
+raster görseller           -> Latex.image ve Latex.figure
+PDF çıktısı                -> Latex.pdf
+```
+
+TikZ, TikZ olarak kalır. AhdCode çizim komutlarını çevirmez ve `line`,
+`circle` veya `path` sarmalayıcıları yayınlamaz: aşağıdaki yardımcılar TikZ
+kaynağınızı belgeye değiştirmeden yerleştirir ve yalnızca adını verdiği
+paketlenmiş kütüphaneleri yükler.
+
+### TikZ'i ham üçlü String'lerle yazın
+
+Ham üçlü String, `r"""..."""`, ters eğik çizgileri, süslü ve köşeli
+parantezleri ve `%` işaretini tam yazıldığı gibi korur, birden çok satıra yayılır
+ve `{...}` interpolasyonu yapmaz; böylece bir düğüm içindeki `{AhdCode}` metin
+olarak kalır. Normal bir String'de aynı süslü parantezler interpolasyon olurdu.
+
+```ahd
+bring Latex as L
+
+drawing: String := L.tikz(r"""
+\draw (0,0) rectangle (4,2);
+\node at (2,1) {AhdCode};
+""")
+write(drawing)
+```
+
+Program verisini TikZ içine koymak için ham parçaları kaçışlanmış metinle
+birleştirin; ham parçalar TikZ, veri ise metin olarak kalır:
+
+```ahd
+bring Latex as L
+
+name: String := "Ayşe & Ali"
+label: String := L.tikz(r"\node[draw] {" + L.escape(name) + r"};")
+write(label)
+```
+
+### tikz
+
+`tikz(source, libraries)`, metin akışında bir görsel gibi duran bir
+`tikzpicture` parçası döndürür; bu yüzden `center`, `minipage` veya bir frame
+içinde çalışır. Tüm resmin seçenekleri kaynağın içine yazılır, örneğin
+`\begin{scope}[scale=2] ... \end{scope}`.
+
+### overlay
+
+`overlay(source, libraries)` metne göre değil, sayfanın kendisine göre çizer.
+Kaynağı TikZ'in sayfa çapalarını kullanabilir: `current page.north`,
+`current page.south west`, `current page.north east`, `current page.center` ve
+diğerleri.
+
+```ahd
+bring Latex as L
+
+watermark: String := L.overlay(r"""
+\node[opacity=0.08, rotate=30, scale=8] at (current page.center) {DRAFT};
+""")
+body: String := r"\thispagestyle{empty}" + "\n" + watermark + L.section("Report")
+write(L.document(body))
+```
+
+Bir overlay, parçaya ulaşıldığı anda doldurulmakta olan sayfaya çizilir ve o
+sayfanın metnini asla kaydırmaz. Süslediği sayfanın başına koyun; birden çok
+sayfa için her sayfaya bir tane ekleyin. Hiçbir şey rasterleştirilmez.
+
+### border
+
+`border(inset, thickness, color)`, tek bir dikdörtgen sayfa kenarlığı çizen
+sıradan bir overlay'dir: `inset` her sayfa kenarından santimetre cinsinden
+mesafedir (varsayılan `1.0`, negatif olamaz), `thickness` punto (point)
+cinsinden çizgi kalınlığıdır (varsayılan `1.0`, pozitif) ve `color` isteğe bağlı
+bir `#RRGGBB` değeridir. İki çağrı çift kenarlık verir. Daha ayrıntılı her şey —
+yuvarlatılmış köşeler, kesik çizgiler, süslemeler — `overlay` içinde TikZ'dir.
+
+### Paketlenmiş kütüphaneler ve pgfornament
+
+`libraries`, büyük/küçük harfe duyarlı olarak tam olarak şu adları kabul eder:
+
+```text
+calc  positioning  arrows.meta  shapes.geometric
+decorations.pathmorphing  decorations.pathreplacing
+patterns  fit  backgrounds  pgfornament
+```
+
+`pgfornament`, pgfornament paketini ve onun 196 Vectorian süslemesini yükler;
+bunlar `\pgfornament[width=3cm]{63}` ile çizilir, paketin `symmetry` seçeneği
+bir süslemeyi her köşeye aynalar. Başka her ad, hiçbir şey derlenmeden
+`ValueError` fırlatır.
+
+`document()`, TikZ'i yalnızca gövdesinde veya kapağında bir `tikz`, `overlay`
+veya `border` parçası varsa yükler; ardından istenen her kütüphaneyi yukarıdaki
+sırayla bir kez yükler. Böyle bir parça içermeyen bir belge, v1.2.0 öncesiyle
+bayt bayt aynıdır. Gövdeye elle yazılmış bir `\begin{tikzpicture}` TikZ'i sizin
+yerinize yüklemez — `Latex.tikz` kullanın. `Latex.pdf`'e verdiğiniz eksiksiz
+bir kaynak `\usepackage{tikz}`'i ve yukarıdaki kütüphaneleri kendisi
+yükleyebilir.
+
+### Bir sertifika
+
+```ahd
+bring Latex as L
+from Latex bring LatexError
+
+frame: String := L.border(inset: 0.8, thickness: 2.4, color: "#1F4E79")
+frame += L.border(inset: 1.25, thickness: 0.6, color: "#B08D57")
+corner: String := L.overlay(
+    source: r"""
+\node[anchor=north west] at ([shift={(1.5cm,-1.5cm)}]current page.north west)
+    {\pgfornament[width=3cm]{63}};
+"""
+    libraries: ["pgfornament"]
+)
+title: String := r"{\Huge\bfseries Certificate of Achievement}\par\vspace{1cm}" + "\n"
+title += r"{\LARGE\itshape " + L.escape("Ayşe Yılmaz") + r"}\par" + "\n"
+body: String := r"\thispagestyle{empty}" + "\n" + frame + corner
+body += r"\vspace*{\fill}" + "\n" + L.center(title) + r"\vspace*{\fill}" + "\n"
+
+attempt {
+    L.pdf(L.document(body: body, landscape: true), "certificate.pdf")
+} except LatexError as error {
+    write(error.message)
+}
+```
+
+Her köşede süsleme, filigran, TikZ mührü ve imza satırları içeren eksiksiz
+sertifika:
+[`examples/v0.1/61_tikz_certificate.ahd`](../examples/v0.1/61_tikz_certificate.ahd).
+
+### TikZ hataları ve güvenlik
+
+Yardımcılar, bir parça oluşturulurken kendi girdilerini doğrular: paketlenmemiş
+bir kütüphane adı, negatif bir kenarlık `inset`'i, pozitif olmayan bir
+`thickness`, geçersiz bir kenarlık rengi ve Beamer ile `landscape`
+`ValueError` fırlatır.
+
+TikZ kaynağının kendisi Latex girdisidir ve AhdCode derleyicisi tarafından
+denetlenmez. Bir TikZ sözdizimi hatası, elle yüklenen ve paketlenmemiş bir
+kütüphane veya eksik bir paket, ilk TeX hatası korunarak `LatexError` ile
+derlemeyi başarısız kılar:
+
+```text
+compilation failed: error: document.tex:13: Package tikz Error: Cannot parse this coordinate.
+compilation failed: error: document.tex:3: Package tikz Error: I did not find the tikz library 'shadows'. ...
+compilation failed: error: document.tex:3: ! LaTeX Error: File `tcolorbox.sty' not found.
+```
+
+TikZ bir kum havuzu (sandbox) değildir. Her Latex belgesiyle aynı güvenilmeyen
+(untrusted) kip motorunda çalışır: kabuk kaçışı kullanılamaz ve hiçbir şey
+indirilmez.
+
+TCPDF veya FPDF, Canvas, SVG modülü, tarayıcı tabanlı render, ikinci bir PDF
+motoru, TikZ komutlarını taklit eden bir çizim API'si, sertifika modülü, keyfi
+paket yükleme veya rasterleştirilmiş süsleme yoktur.
+
 ## Derleme
 
 `pdf`, bir kaynak String'i derler; `pdfFile`, var olan bir `.tex` dosyasını
@@ -414,7 +591,10 @@ makinede derlenir. Ayrıca kurulu bir TeX dağıtımı ve çalışma zamanı kay
 indirmesi yoktur. Bu, Beamer'ı da kapsar: hazırlanan (staged) kaynak paketi
 `beamer.cls`'i, `beamerbase*` bileşenlerini, üzerine inşa edildiği PGF/
 TikZ çekirdeğini ve `translator`'ı taşır, bu yüzden bir Beamer sunumu tam
-olarak Article/Report gibi derlenir — çevrimdışı, sistem TeX olmadan.
+olarak Article/Report gibi derlenir — çevrimdışı, sistem TeX olmadan. v1.2.0'dan
+beri paket ayrıca TikZ'i, `Latex.tikz`'in kabul ettiği dokuz TikZ kütüphanesini
+ve Vectorian süslemeleriyle pgfornament'i taşır; her dosya kaynak manifestinde
+sağlama toplamıyla sabitlenmiştir.
 
 ## Güvenlik
 
@@ -443,8 +623,10 @@ hiçbir zaman zaten geçerli bir hedef PDF'i yok etmez.
 Girdi-alanı doğrulaması mevcut Latex API sözleşmesini izler ve `ValueError`
 fırlatır: geçersiz `document()` type, margin, color veya theme; Beamer dışında
 Default olmayan theme; geçersiz teorem kaydı/referansı; geçersiz table,
-minipage veya image-size seçeneği ve desteklenmeyen image uzantısı. Theme
-doğrulaması bilinçli olarak farklı bir hata sınıfı eklemez.
+minipage veya image-size seçeneği; desteklenmeyen image uzantısı ve v1.2.0'dan
+beri paketlenmemiş bir TikZ kütüphane adı, geçersiz `border` değerleri ve
+Beamer ile `landscape`. Theme doğrulaması bilinçli olarak farklı bir hata
+sınıfı eklemez.
 
 `LatexError` yürütme hatalarını kapsar: derleme başarısızlığı, eksik
 çevrimdışı motor veya paket, zaman aşımı, motor süreç başarısızlığı,
@@ -467,11 +649,14 @@ attempt {
 
 `article`, `report`, `beamer`, `amsmath`/`amssymb`/`mathtools`,
 `graphicx`, `booktabs`, `array`, `geometry`, `xcolor`, `hyperref`,
-`fontspec`, Beamer'ın üzerine inşa edildiği PGF/TikZ çekirdeği ve
-`translator` paketleri, Default/Madrid/Warsaw Beamer theme kapanışı, Latin Modern yazı tipleri, Computer Modern
+`fontspec`, `calc`, `positioning`, `arrows.meta`, `shapes.geometric`,
+`decorations.pathmorphing`, `decorations.pathreplacing`, `patterns`, `fit` ve
+`backgrounds` kütüphaneleriyle PGF ve TikZ, `pgfornament`, `translator`,
+Default/Madrid/Warsaw Beamer theme kapanışı, Latin Modern yazı tipleri, Computer Modern
 matematik ve heceleme (hyphenation) verisi. Türkçe dahil Unicode metin,
 kutudan çıktığı gibi çalışır.
 
-Bu sürümde olmayanlar: BibTeX, bir paket yöneticisi, genel bir TikZ çizim
-API'si, keyfi Beamer theme'leri/overlay'leri/konuşmacı notları, bir PDF düzenleyici
+Bu sürümde olmayanlar: BibTeX, bir paket yöneticisi, TikZ komutlarını taklit
+eden bir çizim API'si, yukarıdaki listenin dışındaki TikZ kütüphaneleri, keyfi
+Beamer theme'leri, Beamer overlay'leri, konuşmacı notları, bir PDF düzenleyici
 veya ayrıştırıcı ve Markdown veya HTML dönüşümü.

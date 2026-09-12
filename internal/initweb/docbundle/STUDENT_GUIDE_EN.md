@@ -1,4 +1,4 @@
-# AhdCode v1.0.0 English Student Guide
+# AhdCode v1.2.0 English Student Guide
 
 This guide is designed so that **even someone who has never programmed before** can follow along. You can read it in order from beginning to end; in each section, you will first see what we want to achieve, then write a working example, and finally learn the necessary rules.
 
@@ -95,7 +95,10 @@ Hello!
 
 AhdCode checks the code you wrote before running the program. For example, if you try to use text like a number, or if you use a value that could be `null` without checking it, it will tell you the error before the program even starts, whenever possible. But you don't need to think about these details at the beginning; we'll see examples in later sections.
 
-AhdCode v1.0.0 is the first stable release.
+AhdCode v1.0.0 is the first stable release. The current release, v1.2.0, adds
+scheduling with [Cron](CRON.md), Unicode character tools with
+[Characters](CHARACTERS.md), and TikZ vector graphics for [Latex](LATEX.md);
+this guide does not need them, and their reference pages explain them.
 
 With it you can write small command-line programs or compile them into native executables; keep data in a local SQLite database or a MySQL server; build a complete web application with the first-party `Web` framework -- pages, layouts, forms, validation, CSRF, flash messages, sessions, and file uploads; call external HTTP and HTTPS APIs; parse HTML; send mail through SMTP; hash passwords and generate secure tokens with `Security`; and use the language server (`ahdcode lsp`) from an editor such as VS Code.
 

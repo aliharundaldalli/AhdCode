@@ -12,13 +12,14 @@ AhdCode is an experimental statically checked general-purpose programming
 language focused on readable syntax, explicit intent, predictable semantics,
 and native compilation.
 
-This is **v1.1.0**. The language, toolchain, and Web framework are
+This is **v1.2.0**. The language, toolchain, and Web framework are
 feature-complete, and the core language surface described here is what 1.0
-committed to and 1.1 keeps unchanged.
+committed to and 1.1 and 1.2 keep unchanged.
 
-v1.1.0 is a minor release: it adds the `Bits` standard module and extends
-`Security`, without altering the core grammar or any existing behaviour. See
-[What is new in v1.1.0](#what-is-new-in-v110).
+v1.2.0 is a minor release, **Scheduling, Vector Documents & Character
+Utilities**: it adds the `Cron` and `Characters` standard modules and TikZ
+vector graphics for `Latex`, without altering the core grammar or any existing
+behaviour. See [What is new in v1.2.0](#what-is-new-in-v120).
 
 It ships as a self-contained platform package: the `ahdcode` CLI, a private
 Go 1.27.0 toolchain, AhdDataStudio, the `ahdsqlite`, `ahdnumeric`, and
@@ -464,6 +465,35 @@ diagnostics and hover. The same VSIX targets VS Code and Antigravity. See its
 [installation guide](editors/vscode/README.md).
 
 ## Current limitations
+
+## What is new in v1.2.0 <a id="what-is-new-in-v120"></a>
+
+v1.2.0 is a **minor** release, **Scheduling, Vector Documents & Character
+Utilities**. It adds two standard modules and vector graphics for `Latex`. The
+core grammar, the type system, and every previously released function keep
+their behaviour; `Latex.document` gains one optional final parameter.
+
+**New standard module: [`Cron`](docs/CRON.md)** — bounded, in-process
+scheduling on classic five-field schedules: `Cron.scheduler()`,
+`Scheduler.add(expression, task)`, `Scheduler.run()`, `Scheduler.stop()`,
+`Cron.next(expression, after)`, and `CronError`. Jobs run while the program
+that scheduled them runs. Cron is not the operating system's crontab, a daemon,
+or a job queue, and it never changes system scheduling configuration.
+
+**New standard module: [`Characters`](docs/CHARACTERS.md)** — Unicode
+code-point operations with no `Char` type: `list`, `count`, `codePoint`,
+`fromCodePoint`, `isLetter`, `isDigit`, `isWhitespace`, `isUpper`, `isLower`,
+`isAlphaNumeric`, `isPunctuation`, `isSymbol`, and `CharactersError`. A
+character is a `String` holding one code point; grapheme clusters are not
+segmented.
+
+**Extended module: [`Latex`](docs/LATEX.md#vector-graphics-with-tikz-v120)** —
+TikZ/PGF vector graphics through the same offline pipeline: `Latex.tikz`,
+`Latex.overlay`, `Latex.border`, and `Latex.document(..., landscape: true)`.
+The offline resource bundle now also carries TikZ, nine TikZ libraries, and
+pgfornament with its ornaments, so certificates, page borders, watermarks, and
+diagrams need neither a second PDF library nor a pre-rendered image. See
+[`examples/v0.1/61_tikz_certificate.ahd`](examples/v0.1/61_tikz_certificate.ahd).
 
 ## What is new in v1.1.0 <a id="what-is-new-in-v110"></a>
 

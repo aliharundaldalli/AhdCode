@@ -17,10 +17,12 @@ var projectDocs embed.FS
 var documentationManifest = []string{
 	"ARCHIVE.md",
 	"BITS.md",
+	"CHARACTERS.md",
 	"CLASSES.md",
 	"CLI.md",
 	"COLLECTIONS.md",
 	"CONTROL_FLOW.md",
+	"CRON.md",
 	"CSV.md",
 	"DATA.md",
 	"DIAGNOSTICS.md",
@@ -101,6 +103,8 @@ func renderAHDCODE(options Options) string {
 	b.WriteString("## Documentation\n\n")
 	b.WriteString("English reference copies for this AhdCode version live in `Documents/AhdCode/`.\n")
 	b.WriteString("Start with `Documents/AhdCode/WEB.md` and `Documents/AhdCode/CLI.md`.\n")
+	b.WriteString("Scheduled work is `Documents/AhdCode/CRON.md`, Unicode characters are `CHARACTERS.md`,\n")
+	b.WriteString("and PDF documents with TikZ vector graphics are `LATEX.md`.\n")
 	b.WriteString("`Documents/PROJECT.md` describes this application.\n\n")
 	b.WriteString("These files are for humans and assistants. They are not loaded at runtime.\n")
 	b.WriteString("Deleting `AHDCODE.md` or `Documents/` does not change `ahdcode run`, `dev`, or `build`.\n")

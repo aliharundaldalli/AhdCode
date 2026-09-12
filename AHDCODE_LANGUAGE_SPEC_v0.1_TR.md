@@ -3755,9 +3755,11 @@ uyuşmazlığı, sıradan bir derleme-zamanı tanılaması olarak kalır.
 
 ### 37.11 Bu sürümde olmayanlar
 
-BibTeX yönetimi, paket yöneticisi, genel bir TikZ çizim API'si, keyfi Beamer
-theme'leri, overlay'ler, konuşmacı notları, PDF düzenleyici veya ayrıştırıcı
-ve Markdown veya HTML dönüşümü yoktur.
+BibTeX yönetimi, paket yöneticisi, TikZ komutlarını taklit eden bir çizim
+API'si, keyfi Beamer theme'leri, Beamer overlay'leri, konuşmacı notları, PDF
+düzenleyici veya ayrıştırıcı ve Markdown veya HTML dönüşümü yoktur. TikZ
+kaynağının kendisi, sayfa overlay'leri, sayfa kenarlıkları ve yatay belgeler
+v1.2.0'dan beri Latex hattının parçasıdır (§71).
 
 ---
 
@@ -6004,6 +6006,189 @@ yalnızca o zaman `.tex` yan dosyasını yaz. Bir derleme hatası hiçbir dosyay
 yayınlamaz ve mevcut bir hedefe asla dokunmaz. Dosya sistemi genelinde
 iki-dosyalı bir işlem olmadığından, yayınlama tek bir atomik çift yerine iki
 ayrı atomik yeniden adlandırmadır. `Latex.pdfFile` değişmedi.
+
+## 69. Characters Standart Modülü (v1.2.0)
+
+`Characters`, derleyiciye kayıtlı `builtin:Characters` standart modülüdür.
+`String`'i değiştirmeden açık Unicode karakter işlemleri ekler.
+
+### 69.1 Birim
+
+Bir karakter, tam olarak bir kod noktası taşıyan bir `String` ile temsil edilen
+tek bir Unicode kod noktasıdır (Unicode skaler değeri). **Characters bir `Char`
+türü**, bayt-String türü veya grafem kümesi anlambilimi **eklemez**: `e` ve
+ardından U+0301 gibi birden çok kod noktasından oluşan ve tek görünen bir glif
+birden çok karakterdir. Bu, `len`, String indeksleme ve String yinelemesinin
+zaten kullandığı birimdir (§5.7, §6.3).
+
+### 69.2 Yüzey
+
+```text
+Characters.list(text: String)                -> List<String>
+Characters.count(text: String)               -> Int
+Characters.codePoint(character: String)      -> Int
+Characters.fromCodePoint(value: Int)         -> String
+Characters.isLetter(character: String)       -> Bool
+Characters.isDigit(character: String)        -> Bool
+Characters.isWhitespace(character: String)   -> Bool
+Characters.isUpper(character: String)        -> Bool
+Characters.isLower(character: String)        -> Bool
+Characters.isAlphaNumeric(character: String) -> Bool
+Characters.isPunctuation(character: String)  -> Bool
+Characters.isSymbol(character: String)       -> Bool
+CharactersError
+```
+
+Her argüman `NonNull`'dır.
+
+### 69.3 Anlambilim
+
+`list`, `text`'in her kod noktasını kaynak sırasıyla tek kod noktalı bir String
+olarak döndürür ve `text`'i değiştirmez. `count` kod noktası sayısıdır ve her
+zaman `len(text)`'e eşittir. `codePoint`, tek kod noktalı argümanının skaler
+değerini döndürür. `fromCodePoint`, tam olarak `55296..57343` (U+D800..U+DFFF)
+hariç `0..1114111` Unicode skaler değerlerini kabul eder.
+
+Sınıflandırma, AhdCode'un derlendiği araç zincirinin derleyici ve derlenmiş
+programlarca paylaşılan Unicode karakter veritabanını kullanır: `isLetter` Genel
+Kategori L; `isDigit` yalnızca Genel Kategori `Nd`; `isWhitespace` `White_Space`
+özelliği; `isUpper` `Lu`; `isLower` `Ll`; `isAlphaNumeric` L veya `Nd`;
+`isPunctuation` Genel Kategori P; `isSymbol` Genel Kategori S'dir. Hiçbir
+sınıflandırma yerel ayara (locale) bağlı değildir.
+
+### 69.4 Hatalar
+
+Yanlış statik argüman türü veya sayısı sıradan bir derleme zamanı tanısıdır
+(`SEM004`, `SEM016`). Tam olarak bir kod noktası taşımayan bir `character`
+argümanı veya skaler değer olmayan bir `fromCodePoint` değeri, `Error`'dan türeyen
+`CharactersError`'ı fırlatır. Hiçbir işlem yalnızca ilk kod noktasına bakmaz,
+U+FFFD koymaz, kesmez veya sarmaz.
+
+### 69.5 Bu sürümde olmayanlar
+
+`Char` türü, bayt String'leri, grafem bölütleme, Unicode normalleştirme, yerel
+ayara özgü kurallar, karakter adları ve yazı sistemi özellikleri yoktur.
+
+## 70. Cron Standart Modülü (v1.2.0)
+
+`Cron`, derleyiciye kayıtlı `builtin:Cron` standart modülüdür. Sınırlı, süreç
+içi bir zamanlayıcıdır: AhdCode Function'larını, onları zamanlayan program
+çalışırken beş alanlı zamanlamalarla çalıştırır. **Cron bir orkestrasyon çatısı
+değildir**: kalıcı iş deposu, worker havuzu, dağıtık koordinasyon, yeniden deneme
+politikası, HTTP tetikleyicisi, daemon veya işletim sistemi zamanlayıcı
+entegrasyonu yoktur ve sistem yapılandırmasını asla değiştirmez.
+
+### 70.1 Yüzey
+
+```text
+Cron.scheduler()                                        -> Scheduler
+Cron.next(expression: String, after: DateTime)          -> DateTime
+Scheduler.add(expression: String, task: () -> Nothing)  -> Nothing
+Scheduler.run()                                         -> Nothing
+Scheduler.stop()                                        -> Nothing
+CronError
+```
+
+`DateTime`, Time modülünün Class'ıdır (§36). Bir `Scheduler` değeri yalnızca
+`Cron.scheduler()` ile üretilir; doğrudan oluşturma `SEM016`'dır. Her argüman
+`NonNull`'dır.
+
+### 70.2 Zamanlama dilbilgisi
+
+```text
+schedule := field sep field sep field sep field sep field
+field    := item ("," item)*
+item     := "*" ["/" step] | number ["-" number ["/" step]]
+sep      := bir veya daha fazla boşluk ya da sekme karakteri
+```
+
+Alanlar dakika `0..59`, saat `0..23`, ayın günü `1..31`, ay `1..12` ve haftanın
+günü `0..7`'dir; `0` ve `7` Pazar'dır. Sayı ondalık rakamlardan oluşur. `a-b`
+aralığı `a <= b` gerektirir. Adım yalnızca `*`'ın veya `a < b` olan bir aralığın
+ardından gelir ve `1..(high - low)` içindedir. Baştaki ve sondaki boşluk ile
+sekmeler yok sayılır. Adlar, takma adlar, saniye, `?`, `L`, `W`, `#` ve saat
+dilimleri dilbilgisinin parçası değildir.
+
+Ayın günü ve haftanın günü alanlarının ikisi de `*` dışındaki bir şeyle
+başlıyorsa, alanlardan herhangi biri eşleşen gün eşleşir; aksi halde gün ikisine
+de uymalıdır. Bir zamanlama, kaydedilmeden veya değerlendirilmeden önce tamamen
+doğrulanır. Haftanın günü alanı `*` ile başlayan ve ayın günü değerleri
+aylarının hiçbirinde bulunmayan bir zamanlama asla çalışamaz ve reddedilir.
+
+### 70.3 Gerçekleşmeler ve saat dilimleri
+
+Bir gerçekleşme, sivil okuması her alanla eşleşen bir dakikanın başlangıcıdır.
+`Cron.next(expression, after)`, `after`'ın taşıdığı sabit UTC ofsetinde
+değerlendirilen ve `after`'dan kesin olarak sonraki ilk gerçekleşmeyi döndürür;
+sonuç aynı ofseti taşır. `Scheduler.run`, zamanlamaları ana bilgisayarın yerel
+saat diliminde, yaz saati kurallarıyla değerlendirir: bir değişimin atladığı
+sivil okuma gerçekleşmez, tekrarladığı okuma iki kez gerçekleşir. 9999 yılından
+sonra gerçekleşme yoktur.
+
+### 70.4 Görevler ve yaşam döngüsü
+
+Görev, imzası tam olarak `() -> Nothing` ile uyumlu bir Function değeridir;
+başka her biçim `SEM004`'tür. `add` zamanlamayı doğrular ve işi ekler; Scheduler
+çalışırken `CronError` fırlatır.
+
+`run` çağıranını bloklar. Görevler çağıranda birer birer çalışır. Vadesi gelen
+her gerçekleşme için vadesi gelen her iş, kayıt sırasıyla bir kez çalışır. Bir
+işin sonraki gerçekleşmesi, görevi döndükten sonra zamanlayıcının gördüğü en geç
+zamandan hesaplanır; böylece bir görev sırasında geçen gerçekleşme kuyruğa
+alınmaz, atlanır ve geriye alınan bir saat hiçbir gerçekleşmeyi tekrarlamaz.
+Bekleyen program çıktısı her beklemeden önce boşaltılır. Scheduler'da iş yoksa
+veya zaten çalışıyorsa `run` `CronError` fırlatır. Bir görevin fırlattığı hata
+`run`'dan değişmeden yayılır ve çalıştırmayı bitirir.
+
+`stop`, çalışan bir Scheduler'ın o anki görev döndüğünde geri dönmesini ister.
+Scheduler boştayken veya zaten dururken hiçbir şey yapmaz; durdurulan bir
+Scheduler yeniden çalıştırılabilir. `run` arkasında hiçbir arka plan etkinliği
+bırakmaz; süreç sonlandığında tüm zamanlama biter.
+
+### 70.5 Bu sürümde olmayanlar
+
+Kalıcı veya yeniden denenen işler, çakışan çalıştırmalar, iş başına saat dilimi,
+saniye, cron takma adları veya adları, kabuk komutu işleri, HTTP tetikleyicileri
+ve aynı programda çalışan bir Web sunucusunun yanında eşzamanlı çalıştırma yoktur.
+
+## 71. Latex Vektör Grafikleri: TikZ, Overlay, Border ve Landscape (v1.2.0)
+
+TikZ, Latex hattının (§37) parçasıdır; ikinci bir grafik dili değildir. AhdCode,
+TikZ kaynağını aynı çevrimdışı motora ve kaynak paketine değiştirmeden geçirir
+ve TikZ komutlarını taklit eden bir çizim API'si eklemez.
+
+```text
+Latex.tikz(source: String, libraries: List<String> = [])    -> String
+Latex.overlay(source: String, libraries: List<String> = []) -> String
+Latex.border(inset: Real = 1.0, thickness: Real = 1.0, color: String = "") -> String
+Latex.document(..., theme: String = "Default", landscape: Bool = false) -> String
+```
+
+`tikz`, `source`'u olduğu gibi içeren bir `tikzpicture` parçası döndürür.
+`overlay`, `remember picture,overlay` seçenekli bir `tikzpicture` döndürür; bu
+resim, parçaya ulaşıldığında doldurulan sayfaya çekirdeğin shipout ön plan kancası
+(hook) üzerinden çizilir; böylece `current page.north west` gibi TikZ sayfa
+çapaları kullanılabilir ve sayfanın metni kaymaz. `border`, sayfa kenarlarından
+`inset` santimetre içeride, `thickness` punto kalınlığında ve isteğe bağlı
+`#RRGGBB` renginde tek bir dikdörtgen çizen bir overlay döndürür.
+
+`libraries` tam olarak `calc`, `positioning`, `arrows.meta`,
+`shapes.geometric`, `decorations.pathmorphing`, `decorations.pathreplacing`,
+`patterns`, `fit`, `backgrounds` ve `pgfornament` adlarını kabul eder.
+`document`, gövdesi veya kapağı bunları isteyen parçalar içerdiğinde tam olarak
+TikZ'i, istenen TikZ kütüphanelerini bu sırayla içeren tek bir
+`\usetikzlibrary`'yi ve `pgfornament`'i yükler; böyle bir parça içermeyen belge
+değişmez. `landscape: true`, Article ve Report için yatay sayfa geometrisi
+ayarlar.
+
+Paketlenmemiş bir kütüphane adı, negatif bir `inset`, pozitif olmayan bir
+`thickness`, geçersiz bir `color` ve Beamer ile `landscape` `ValueError`
+fırlatır. TikZ kaynağı Latex girdisidir: derleme hataları mevcut derleme yolu
+(§37.7, §37.10) üzerinden `LatexError` fırlatır ve asla anlamsal tanı değildir.
+Çevrimdışı paket PGF'yi, TikZ'i, yukarıdaki kütüphaneleri ve süslemeleriyle
+pgfornament'i taşır; derleme kabuk kaçışı ve ağ erişimi olmadan güvenilmeyen
+kipte kalır. Ne kaçış işlemi ne de interpolasyon yaptıkları için ham String
+literalleri (§6.4), TikZ yazmanın doğal yoludur.
 
 ---
 

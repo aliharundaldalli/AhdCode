@@ -20,7 +20,9 @@ ahdcode run examples/v0.1/14_grade_app.ahd
 `Latex` and `PDF` share one offline renderer. Before running any example that
 compiles a PDF -- `16_latex.ahd`, `34_latex_report.ahd`, `35_latex_beamer.ahd`,
 `36_full_workflow.ahd`, `41_latex_beamer_themes.ahd`, `55_pdf_basic.ahd`,
-`56_pdf_word_excel.ahd`, or `58_latex_pdf_tex_archive.ahd` -- stage it once:
+`56_pdf_word_excel.ahd`, `58_latex_pdf_tex_archive.ahd`, or
+`61_tikz_certificate.ahd` -- stage it once from a source checkout (release
+packages already include it):
 
 ```bash
 go run ./tooling/latex/cmd/package-latex --output "$(go env GOPATH)"
@@ -89,5 +91,8 @@ library and runs anywhere, offline, with no external renderer.
 | `56_pdf_word_excel.ahd` | `PDF.fromWord` and `PDF.fromExcel` semantic conversion into PDF |
 | `57_archive.ahd` | Archive module: creation-only ZIP, TAR, and TAR.GZ packaging |
 | `58_latex_pdf_tex_archive.ahd` | `Latex.pdf(..., "tex")` source sidecar packaged into a ZIP with Archive |
+| `59_characters.ahd` | Characters module: code points, classification, Turkish letters, emoji, a combining sequence, and CharactersError |
+| `60_cron.ahd` | Cron module: `Cron.next`, a validation error, and a self-stopping heartbeat Scheduler (ends within about two minutes) |
+| `61_tikz_certificate.ahd` | Latex + TikZ: a landscape certificate with vector borders, pgfornament corners, a watermark, and a seal |
 
 `Greeting.ahd` is the sibling module used by `11_modules.ahd`.

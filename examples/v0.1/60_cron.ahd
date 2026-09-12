@@ -1,0 +1,43 @@
+// 60 - A bounded Cron scheduler.
+//
+// Cron runs AhdCode Functions on a classic five-field schedule while this
+// program is running. It is not the operating system's crontab, launchd,
+// systemd, or Task Scheduler: when the program stops, its jobs stop too.
+//
+// This example writes a heartbeat file once a minute and stops itself after two
+// beats, so it ends on its own within about two minutes.
+bring Cron
+bring Time
+bring File
+from Cron bring (Scheduler, CronError)
+
+now := Time.now()
+write("next quarter hour:  " + Cron.next("*/15 * * * *", now).toString())
+write("next weekday 09:00: " + Cron.next("0 9 * * 1-5", now).toString())
+
+attempt {
+    write(Cron.next("61 * * * *", now).toString())
+}
+except CronError as error {
+    write(error.message)
+}
+
+jobs: Scheduler := Cron.scheduler()
+beats: Int := 0
+
+heartbeat: Function := () -> Nothing {
+    jobs: Global Scheduler
+    beats: Global Int
+    beats += 1
+    line: Local String := "beat {beats} at {Time.now().toString()}"
+    File.writeText("heartbeat.txt", line + "\n")
+    write(line)
+    if beats == 2 {
+        jobs.stop()
+    }
+}
+
+jobs.add("* * * * *", heartbeat)
+write("waiting for the next minute...")
+jobs.run()
+write("stopped after {beats} beats")

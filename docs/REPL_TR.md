@@ -110,3 +110,21 @@ Bunları bir `.ahd` dosyasından `ahdcode run` veya `ahdcode build` ile
 çalıştırın. `Archive`'ın böyle bir sınırlaması yoktur — `Archive.zip`/`tar`/
 `tarGzip` REPL'de tamamen çalışır, çünkü arşivleme yalnızca Go standart
 kütüphanesini kullanır.
+
+v1.2.0 vektör yardımcıları da markup yardımcılarıdır: `Latex.tikz`,
+`Latex.overlay`, `Latex.border` ve `Latex.document(..., landscape: true)`
+REPL'de, derlenmiş bir programdakiyle tamamen aynı kaynağı oluşturur; böylece
+bir çizim etkileşimli olarak kurulup incelenebilir ve ardından bir dosyadan
+derlenebilir.
+
+## REPL'de Characters ve Cron
+
+[Characters](CHARACTERS_TR.md) REPL'de tamamen çalışır ve derlenmiş bir
+programla aynı sonuçları ve `CharactersError` mesajlarını verir.
+
+[Cron](CRON_TR.md), derlenmiş bir programla aynı ayrıştırıcıyı ve zamanlayıcıyı
+kullanır; bu yüzden `Cron.next` ve zamanlama doğrulaması etkileşimli olarak
+denemek için kullanışlıdır. `Scheduler.run()`, görevlerinden biri `stop`
+çağırana kadar oturumu bloklar ve Ctrl+C isteme (prompt) dönmek yerine REPL'in
+kendisini sonlandırır. Uzun ömürlü Scheduler'ları bir `.ahd` dosyasından
+çalıştırın.

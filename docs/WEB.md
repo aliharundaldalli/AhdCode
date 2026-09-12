@@ -568,7 +568,7 @@ Editing `public/app.css` does not.
 It also **refuses** `APP_PROTOCOL=https`:
 
 ```
-✗ Local HTTPS is not available in AhdCode v1.0.0.
+✗ Local HTTPS is not available in AhdCode v1.2.0.
   ahdcode dev serves plaintext HTTP, so it cannot honour
   APP_PROTOCOL=https.
 
@@ -806,6 +806,96 @@ configuration contract.
 | v0.18 | Web starters: Empty, Basic, Admin; local Bootstrap; Admin DB bootstrap |
 | v0.20 | Component-owned CSS/JS, `managedAssets`, `Identity.id()`, Web limits, MVC/CRUD |
 | v1.0.0 | No Web API change; self-contained platform packaging |
+| v1.2.0 | No Web API change; [Cron](CRON.md) for scheduled work beside an application, [Characters](CHARACTERS.md), and TikZ in [Latex](LATEX.md) |
+
+## Cron: scheduled application work
+
+Applications often need periodic work: emptying an application-owned temporary
+directory, regenerating a small local report, refreshing a cache file. The
+[Cron](CRON.md) module runs such work inside an AhdCode program, on a
+five-field schedule, while that program runs.
+
+Cron is application-level scheduling. It is not the operating system's
+crontab, launchd, a systemd timer, Windows Task Scheduler, or a persistent
+worker queue, and neither Cron nor `ahdcode init web` changes any system
+scheduling configuration. Jobs exist only while their program runs: when it
+stops — or the machine restarts — they stop, and nothing resumes on its own.
+
+`Web.app` serving requests and `Scheduler.run()` both occupy the program that
+calls them. Put scheduled work in a second program beside `app.ahd`, such as
+`jobs.ahd`, and run the two side by side. They share the project's files and
+database, not memory.
+
+```ahd
+bring Cron
+bring File
+bring Path
+bring Time
+from Cron bring Scheduler
+
+// jobs.ahd: scheduled work for this application.
+jobs: Scheduler := Cron.scheduler()
+
+// Every 15 minutes, empty storage/tmp, a directory only this application writes.
+cleanTemporary: Function := () -> Nothing {
+    directory: Local String := Path.join(["storage", "tmp"])
+    if File.exists(directory) {
+        for name in File.list(directory) {
+            File.delete(Path.join([directory, name]))
+        }
+    }
+}
+
+// Every day at 06:00, write a small local status report.
+writeReport: Function := () -> Nothing {
+    if not File.exists("storage") {
+        File.createDir("storage")
+    }
+    stamp: Local String := Time.now().toString()
+    File.writeText(Path.join(["storage", "status.txt"]), "report generated at " + stamp + "\n")
+    write("report written at " + stamp)
+}
+
+jobs.add("*/15 * * * *", cleanTemporary)
+jobs.add("0 6 * * *", writeReport)
+write("next cleanup: " + Cron.next("*/15 * * * *", Time.now()).toString())
+jobs.run()
+```
+
+During development, run it in a second terminal with `ahdcode run jobs.ahd`;
+in production, build it with `ahdcode build jobs.ahd` and run the executable
+next to the application's, under whatever already runs your application.
+Schedules use the host's local time zone. A task that raises ends `jobs.run()`
+with that error, so decide inside the task what a failure should do. See
+[Cron](CRON.md) for the schedule syntax, lifecycle, and messages.
+
+## Characters and vector documents in Web projects
+
+To inspect user text character by character — a username's allowed characters,
+the length of a display name — use [Characters](CHARACTERS.md). A character is
+a `String` holding one Unicode code point; AhdCode has no `Char` type, and one
+displayed glyph can be several code points.
+
+```ahd
+bring Characters
+
+username: String := "ayşe_42"
+valid: Bool := true
+for character in Characters.list(username) {
+    if not (Characters.isAlphaNumeric(character) or character == "_") {
+        valid = false
+    }
+}
+write(valid)
+```
+
+Certificates, diplomas, badges, decorated reports, page borders, and watermarks
+are Latex documents with TikZ vector graphics: `Latex.tikz`, `Latex.overlay`,
+`Latex.border`, and `Latex.document(..., landscape: true)`. Do not add TCPDF,
+FPDF, or a pre-rendered border image to draw shapes on a document the
+application already produces through Latex. See
+[Latex: vector graphics with TikZ](LATEX.md#vector-graphics-with-tikz-v120) and
+the complete certificate in `examples/v0.1/61_tikz_certificate.ahd`.
 
 ## 22. v0.20: Web assets, resource boundaries, and application patterns
 

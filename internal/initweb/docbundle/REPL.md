@@ -105,3 +105,20 @@ an error (`LatexError`/`PDFError`) when called interactively. Run them from a
 `.ahd` file with `ahdcode run` or `ahdcode build` instead. `Archive` has no
 such limitation -- `Archive.zip`/`tar`/`tarGzip` work fully in the REPL,
 since archiving uses only the Go standard library.
+
+The v1.2.0 vector helpers are markup helpers too: `Latex.tikz`,
+`Latex.overlay`, `Latex.border`, and `Latex.document(..., landscape: true)`
+build exactly the same source in the REPL as in a compiled program, so a
+drawing can be assembled and inspected interactively and then compiled from a
+file.
+
+## Characters and Cron in the REPL
+
+[Characters](CHARACTERS.md) works fully in the REPL and reports the same
+results and `CharactersError` messages as a compiled program.
+
+[Cron](CRON.md) uses the same parser and scheduler as a compiled program, so
+`Cron.next` and schedule validation are convenient to try interactively.
+`Scheduler.run()` blocks the session until one of its tasks calls `stop`, and
+Ctrl+C ends the REPL itself rather than returning to the prompt. Run long-lived
+Schedulers from a `.ahd` file.

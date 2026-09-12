@@ -20,8 +20,10 @@ ahdcode run examples/v0.1/14_grade_app.ahd
 `Latex` ve `PDF`, tek bir çevrimdışı render motorunu paylaşır. Bir PDF
 derleyen herhangi bir örneği çalıştırmadan önce -- `16_latex.ahd`,
 `34_latex_report.ahd`, `35_latex_beamer.ahd`, `36_full_workflow.ahd`,
-`41_latex_beamer_themes.ahd`, `55_pdf_basic.ahd`, `56_pdf_word_excel.ahd`
-veya `58_latex_pdf_tex_archive.ahd` -- onu bir kez hazırlayın (stage):
+`41_latex_beamer_themes.ahd`, `55_pdf_basic.ahd`, `56_pdf_word_excel.ahd`,
+`58_latex_pdf_tex_archive.ahd` veya `61_tikz_certificate.ahd` -- kaynak
+deposundan çalışıyorsanız onu bir kez hazırlayın (stage; sürüm paketleri zaten
+içerir):
 
 ```bash
 go run ./tooling/latex/cmd/package-latex --output "$(go env GOPATH)"
@@ -91,6 +93,9 @@ yerde, çevrimdışı çalışır.
 | `56_pdf_word_excel.ahd` | `PDF.fromWord` ve `PDF.fromExcel` ile PDF'e anlamsal dönüşüm |
 | `57_archive.ahd` | Archive modülü: yalnızca oluşturma amaçlı ZIP, TAR ve TAR.GZ paketleme |
 | `58_latex_pdf_tex_archive.ahd` | `Latex.pdf(..., "tex")` kaynak yan dosyasının Archive ile ZIP'lenmesi |
+| `59_characters.ahd` | Characters modülü: kod noktaları, sınıflandırma, Türkçe harfler, emoji, birleşen dizi ve CharactersError |
+| `60_cron.ahd` | Cron modülü: `Cron.next`, bir doğrulama hatası ve kendini durduran bir kalp atışı Scheduler'ı (yaklaşık iki dakikada biter) |
+| `61_tikz_certificate.ahd` | Latex + TikZ: vektör kenarlıklar, pgfornament köşeleri, filigran ve mühürlü yatay bir sertifika |
 
 `Greeting.ahd`, `11_modules.ahd` tarafından kullanılan kardeş (sibling)
 modüldür.

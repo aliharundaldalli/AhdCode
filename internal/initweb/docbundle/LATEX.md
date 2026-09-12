@@ -32,7 +32,7 @@ document(
     body: String, title: String = "", author: String = "", date: String = "",
     type: String = "Article", margin: Real = 2.54, color: String = "",
     cover: String = "", theorems: Pair<String, String> = {},
-    theme: String = "Default"
+    theme: String = "Default", landscape: Bool = false
 )                                         -> String
 
 chapter(title: String)                   -> String
@@ -55,6 +55,10 @@ contents()                               -> String
 ref(label: String)                       -> String
 cite(key: String)                        -> String
 bibliography(references: Pair<String, String>) -> String
+
+tikz(source: String, libraries: List<String> = [])    -> String
+overlay(source: String, libraries: List<String> = []) -> String
+border(inset: Real = 1.0, thickness: Real = 1.0, color: String = "") -> String
 
 LatexError
 ```
@@ -105,8 +109,9 @@ every new parameter at its default.
 - **`date`** defaults to `""` and is never filled in automatically with the
   system date — output stays deterministic across runs and machines.
 - **`margin`** is one document-wide value in **centimeters**, defaulting to
-  `2.54` (the effective v0.1.14 layout); there is no per-side margin, paper
-  size, or orientation control. It must be positive.
+  `2.54` (the effective v0.1.14 layout); there is no per-side margin or paper
+  size control, and orientation is the separate `landscape` parameter. It must
+  be positive.
 - **`color`** is an optional `#RRGGBB` accent color (empty by default,
   preserving v0.1.14 output exactly). When set, it defines an `ahdaccent`
   color used for AhdCode-generated accents — the title/cover area and, for
@@ -127,12 +132,17 @@ every new parameter at its default.
   the title as a title-page frame instead of `\maketitle`, and supports the
   narrow slide surface described below.
 - **`theme`** accepts exactly `"Default"`, `"Madrid"`, and `"Warsaw"`
-  (case-sensitive), defaults to `"Default"`, and is the final positional
-  parameter. Madrid and Warsaw require `type: "Beamer"`; selecting either
-  for Article or Report raises `ValueError`. Unknown theme names also raise
-  `ValueError` and are never interpolated into LaTeX source. A custom
-  `color` is applied after the theme, so it overrides the theme's structural
-  accent while retaining the theme layout.
+  (case-sensitive), defaults to `"Default"`, and is the tenth positional
+  parameter, followed only by `landscape`. Madrid and Warsaw require
+  `type: "Beamer"`; selecting either for Article or Report raises
+  `ValueError`. Unknown theme names also raise `ValueError` and are never
+  interpolated into LaTeX source. A custom `color` is applied after the theme,
+  so it overrides the theme's structural accent while retaining the theme
+  layout.
+- **`landscape`** (v1.2.0) defaults to `false`. `true` turns every page of an
+  Article or Report sideways on the same paper, with the same `margin`. It is
+  a general layout switch, not a certificate mode. Beamer slides are already
+  wide, so `landscape: true` with `type: "Beamer"` raises `ValueError`.
 
 ## Article, Report, Beamer
 
@@ -327,6 +337,165 @@ cell escaped, and `mathColumns: List<Int>` opting specific zero-based columns
 into raw inline math (`\( ... \)`) instead of escaping. See the v0.1.14
 behavior above; nothing about it changed for v0.1.15.
 
+## Vector graphics with TikZ (v1.2.0)
+
+Borders, ornaments, seals, badges, watermarks, diagrams, arrows, and positioned
+labels belong to the same Latex document as the text. TikZ/PGF is the vector
+drawing foundation and is bundled offline with the Latex runtime, so decorating
+a PDF never requires a second PDF library or a pre-rendered border image.
+
+```text
+document typography    -> Latex
+vector graphics        -> TikZ/PGF, through Latex.tikz and Latex.overlay
+ready-made ornaments   -> pgfornament
+raster images          -> Latex.image and Latex.figure
+PDF output             -> Latex.pdf
+```
+
+TikZ stays TikZ. AhdCode does not translate drawing commands and publishes no
+`line`, `circle`, or `path` wrappers: the helpers below place your TikZ source
+into the document unchanged and load exactly the bundled libraries it names.
+
+### Write TikZ in raw triple Strings
+
+A raw triple String, `r"""..."""`, keeps backslashes, braces, brackets, and `%`
+exactly as typed, spans lines, and performs no `{...}` interpolation, so
+`{AhdCode}` inside a node stays text. In a normal String the same braces would
+be an interpolation.
+
+```ahd
+bring Latex as L
+
+drawing: String := L.tikz(r"""
+\draw (0,0) rectangle (4,2);
+\node at (2,1) {AhdCode};
+""")
+write(drawing)
+```
+
+To place program data inside TikZ, join raw parts with escaped text; the raw
+parts stay TikZ and the data stays text:
+
+```ahd
+bring Latex as L
+
+name: String := "Ayşe & Ali"
+label: String := L.tikz(r"\node[draw] {" + L.escape(name) + r"};")
+write(label)
+```
+
+### tikz
+
+`tikz(source, libraries)` returns a `tikzpicture` fragment that sits in the
+text flow, like an image, so it works inside `center`, `minipage`, or a frame.
+Options for the whole picture go inside the source, for example
+`\begin{scope}[scale=2] ... \end{scope}`.
+
+### overlay
+
+`overlay(source, libraries)` draws against the page itself instead of the text.
+Its source can use TikZ's page anchors: `current page.north`,
+`current page.south west`, `current page.north east`, `current page.center`,
+and the rest.
+
+```ahd
+bring Latex as L
+
+watermark: String := L.overlay(r"""
+\node[opacity=0.08, rotate=30, scale=8] at (current page.center) {DRAFT};
+""")
+body: String := r"\thispagestyle{empty}" + "\n" + watermark + L.section("Report")
+write(L.document(body))
+```
+
+An overlay is drawn on the page being filled when the fragment is reached, and
+it never moves that page's text. Put it at the start of the page it decorates;
+for several pages, add one per page. Nothing is rasterized.
+
+### border
+
+`border(inset, thickness, color)` is an ordinary overlay that draws one
+rectangular page border: `inset` centimeters from every page edge (default
+`1.0`, not negative), `thickness` in points (default `1.0`, positive), and an
+optional `#RRGGBB` `color`. Two calls give a double border. Anything more
+elaborate — rounded corners, dashes, ornaments — is TikZ in `overlay`.
+
+### Bundled libraries and pgfornament
+
+`libraries` accepts exactly these names, case-sensitively:
+
+```text
+calc  positioning  arrows.meta  shapes.geometric
+decorations.pathmorphing  decorations.pathreplacing
+patterns  fit  backgrounds  pgfornament
+```
+
+`pgfornament` loads the pgfornament package and its 196 Vectorian ornaments,
+drawn with `\pgfornament[width=3cm]{63}`; the package's `symmetry` option
+mirrors one ornament into each corner. Any other name raises `ValueError`
+before anything compiles.
+
+`document()` loads TikZ only when its body or cover contains a `tikz`,
+`overlay`, or `border` fragment, and then loads each requested library once, in
+the order above. A document without such a fragment is byte-for-byte what it
+was before v1.2.0. A hand-written `\begin{tikzpicture}` in a body does not load
+TikZ for you — use `Latex.tikz`. A complete source you pass to `Latex.pdf` may
+load `\usepackage{tikz}` and the libraries above itself.
+
+### A certificate
+
+```ahd
+bring Latex as L
+from Latex bring LatexError
+
+frame: String := L.border(inset: 0.8, thickness: 2.4, color: "#1F4E79")
+frame += L.border(inset: 1.25, thickness: 0.6, color: "#B08D57")
+corner: String := L.overlay(
+    source: r"""
+\node[anchor=north west] at ([shift={(1.5cm,-1.5cm)}]current page.north west)
+    {\pgfornament[width=3cm]{63}};
+"""
+    libraries: ["pgfornament"]
+)
+title: String := r"{\Huge\bfseries Certificate of Achievement}\par\vspace{1cm}" + "\n"
+title += r"{\LARGE\itshape " + L.escape("Ayşe Yılmaz") + r"}\par" + "\n"
+body: String := r"\thispagestyle{empty}" + "\n" + frame + corner
+body += r"\vspace*{\fill}" + "\n" + L.center(title) + r"\vspace*{\fill}" + "\n"
+
+attempt {
+    L.pdf(L.document(body: body, landscape: true), "certificate.pdf")
+} except LatexError as error {
+    write(error.message)
+}
+```
+
+The complete certificate — ornaments in every corner, a watermark, a TikZ
+seal, and signature lines — is
+`examples/v0.1/61_tikz_certificate.ahd`.
+
+### TikZ errors and safety
+
+The helpers validate their own input when a fragment is built: an unbundled
+library name, a negative border inset, a thickness that is not positive, an
+invalid border color, and `landscape` with Beamer raise `ValueError`.
+
+TikZ source itself is Latex input and is not checked by the AhdCode compiler.
+A TikZ syntax error, a library loaded by hand that is not bundled, or a missing
+package fails compilation with `LatexError`, keeping the first TeX error:
+
+```text
+compilation failed: error: document.tex:13: Package tikz Error: Cannot parse this coordinate.
+compilation failed: error: document.tex:3: Package tikz Error: I did not find the tikz library 'shadows'. ...
+compilation failed: error: document.tex:3: ! LaTeX Error: File `tcolorbox.sty' not found.
+```
+
+TikZ is not a sandbox. It runs in the same untrusted-mode engine as every Latex
+document: shell escape stays unavailable, and nothing is downloaded.
+
+There is no TCPDF or FPDF, Canvas, SVG module, browser renderer, second PDF
+engine, drawing API that mirrors TikZ commands, certificate module, arbitrary
+package loading, or rasterized decoration.
+
 ## Compiling
 
 `pdf` compiles a source String; `pdfFile` compiles an existing `.tex` file and
@@ -401,7 +570,9 @@ cache and no network. There is no separately installed TeX distribution and no
 runtime resource download. This includes Beamer: the staged resource bundle
 carries `beamer.cls`, its `beamerbase*` components, the PGF/TikZ core it
 builds on, and `translator`, so a Beamer presentation compiles exactly like
-Article/Report — offline, with no system TeX.
+Article/Report — offline, with no system TeX. Since v1.2.0 it also carries
+TikZ, the nine TikZ libraries `Latex.tikz` accepts, and pgfornament with its
+Vectorian ornaments; every file is pinned by checksum in the resource manifest.
 
 ## Security
 
@@ -428,8 +599,10 @@ never destroys an already valid destination PDF.
 Input-domain validation follows the existing Latex API contract and raises
 `ValueError`: invalid `document()` type, margin, color, or theme; a non-Default
 theme outside Beamer; invalid theorem registration/reference; invalid table,
-minipage, or image-size options; and an unsupported image extension. Theme
-validation deliberately does not introduce a different error class.
+minipage, or image-size options; an unsupported image extension; and, since
+v1.2.0, an unbundled TikZ library name, invalid `border` values, and
+`landscape` with Beamer. Theme validation deliberately does not introduce a
+different error class.
 
 `LatexError` covers execution failures: compilation failure, a missing staged
 engine or bundle, timeout, engine process failure, a PDF that was not produced,
@@ -451,11 +624,14 @@ attempt {
 ## Supported baseline
 
 `article`, `report`, `beamer`, `amsmath`/`amssymb`/`mathtools`, `graphicx`,
-`booktabs`, `array`, `geometry`, `xcolor`, `hyperref`, `fontspec`, the PGF/
-TikZ core and `translator` packages Beamer builds on, Latin Modern fonts,
+`booktabs`, `array`, `geometry`, `xcolor`, `hyperref`, `fontspec`, PGF and
+TikZ with the `calc`, `positioning`, `arrows.meta`, `shapes.geometric`,
+`decorations.pathmorphing`, `decorations.pathreplacing`, `patterns`, `fit`, and
+`backgrounds` libraries, `pgfornament`, `translator`, Latin Modern fonts,
 Computer Modern maths, the Default/Madrid/Warsaw Beamer theme closure, and
 hyphenation data. Unicode text — including Turkish — works out of the box.
 
-Not in this version: BibTeX, a package manager, a general TikZ drawing API,
-arbitrary Beamer themes, overlays, speaker notes, a PDF editor or parser, and
-Markdown or HTML conversion.
+Not in this version: BibTeX, a package manager, a drawing API that mirrors
+TikZ commands, TikZ libraries beyond the list above, arbitrary Beamer themes,
+Beamer overlays, speaker notes, a PDF editor or parser, and Markdown or HTML
+conversion.

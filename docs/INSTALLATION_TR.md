@@ -1,16 +1,17 @@
 # Kurulum, yükseltme ve kaldırma
 
-İşletim sisteminize uygun paketi AhdCode v1.0.0 sürümünden indirin. Her paket
+İşletim sisteminize uygun paketi kurmak istediğiniz AhdCode sürümünden indirin;
+aşağıdaki dosya adlarında `<sürüm>` o sürümün numarasıdır. Her paket
 kendi kendine yeterlidir: derleyici, özel Go araç zinciri, AhdDataStudio,
 SQLite/numeric/plot yardımcıları, çevrimdışı LaTeX motoru, proje starter'ları
 ve İngilizce belgeler paketin içindedir.
 
 ## macOS (Apple Silicon)
 
-AhdCode v1.0.0 Apple Silicon Mac'leri destekler — M1, M2, M3, M4 ve sonraki
+macOS paketi Apple Silicon Mac'leri hedefler — M1, M2, M3, M4 ve sonraki
 arm64 modeller. Intel sürümü yoktur.
 
-`AhdCode-1.0.0-macos-arm64.pkg` dosyasına çift tıklayıp kurulumu izleyin. Paket
+`AhdCode-<sürüm>-macos-arm64.pkg` dosyasına çift tıklayıp kurulumu izleyin. Paket
 Developer ID ile imzalı ve Apple tarafından noter onaylıdır; normal biçimde
 açılır, hiçbir güvenlik atlatması gerekmez. Yalnızca sizin hesabınıza kurar,
 yönetici şifresi istemez ve ev dizininizin dışına hiçbir şey yazmaz.
@@ -23,13 +24,13 @@ Ardından **yeni** bir Terminal açıp `ahdcode --version` çalıştırın. Zate
 olan bir terminal başlatıldığı ortamı korur; yeni açılan değişikliği hemen
 görür.
 
-`AhdCode-1.0.0-macos-arm64.zip`, aynı paketi VS Code eklentisiyle birlikte
+`AhdCode-<sürüm>-macos-arm64.zip`, aynı paketi VS Code eklentisiyle birlikte
 sunan alternatif bir indirmedir. Disk imajı tercih edenler için aynı içeriğe
 sahip bir `.dmg` de yayımlanır; önerilen kurulum biçimi `.pkg`'dir.
 
 ## Windows x64
 
-`AhdCode-1.0.0-windows-x64.exe` dosyasına Dosya Gezgini'nde çift tıklayın.
+`AhdCode-<sürüm>-windows-x64.exe` dosyasına Dosya Gezgini'nde çift tıklayın.
 Kurulum küçük bir grafik programdır: ne kuracağını gösterir, gömülü paketi
 ilerleme penceresiyle açıp doğrular ve bir onay penceresiyle biter. Konsol,
 terminal veya komut yazmak gerekmez.
@@ -47,11 +48,11 @@ kurulumu gerekmez; kaldırma kaydı Installed Apps içine yazılır.
 Ardından **yeni** bir PowerShell veya Komut İstemi açıp `ahdcode --version`
 çalıştırın.
 
-`AhdCode-1.0.0-windows-x64.exe --silent` hiçbir pencere açmadan kurar.
-`AhdCode-1.0.0-windows-x64.zip` aynı kurulumu VS Code eklentisiyle birlikte
+`AhdCode-<sürüm>-windows-x64.exe --silent` hiçbir pencere açmadan kurar.
+`AhdCode-<sürüm>-windows-x64.zip` aynı kurulumu VS Code eklentisiyle birlikte
 sunar.
 
-Linux x64: `AhdCode-1.0.0-linux-x64.tar.gz` arşivini açın ve
+Linux x64: `AhdCode-<sürüm>-linux-x64.tar.gz` arşivini açın ve
 `sh install.sh --setup-path` çalıştırın. Kök `~/.local/share/ahdcode` dizinidir;
 PATH bloğu `~/.profile` dosyasına eklenir.
 
@@ -63,7 +64,8 @@ ve kurulum onu sizin yerinize yüklemez. VS Code'da Eklentiler görünümünü a
 sunar. Dosya gereken her şeyi taşır; npm veya ağ gerekmez.
 
 Paket; özel Go 1.27.0, `ahdsqlite`, `ahdnumeric`, `ahdplot`, çevrimdışı Tectonic
-0.17.0 ve 5.546.077 baytlık kaynak paketini içerir. CLI; sürüm-eş Studio,
+0.17.0 ve sabitlenmiş kaynak paketini içerir; paket, TikZ'i, dokuz TikZ
+kütüphanesini ve pgfornament'i ekleyen v1.2.0'dan beri 6.343.094 bayttır. CLI; sürüm-eş Studio,
 starter, Bootstrap, framework ve İngilizce proje belgelerini gömer. Sistem Go
 kurulumu ve ayarları değişmez. Temel derleme, SQLite, Studio ve LaTeX çevrimdışıdır.
 MySQL/SMTP için yapılandırdığınız harici sunucular gereklidir. Lisanslar paketin

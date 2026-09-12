@@ -1,0 +1,81 @@
+// 61 - A certificate drawn with vector graphics.
+//
+// Latex typesets the text, TikZ draws the frame, the seal, and the watermark,
+// and the bundled pgfornament package supplies the corner ornaments. The frame
+// is not a pre-rendered image: every line in the PDF stays vector, and no
+// second PDF library is involved.
+//
+// TikZ is written in raw triple Strings (r"""..."""), which keep backslashes
+// and braces exactly as typed. Text that comes from the program, such as the
+// recipient's name, goes through Latex.escape before it joins the document.
+bring Latex as L
+from Latex bring LatexError
+
+recipient: String := L.escape("Ayşe Yılmaz")
+course: String := L.escape("Numerical Methods with AhdCode")
+issued: String := "12 September 2026"
+// Two rectangular page borders: a strong outer line and a fine inner one.
+frame: String := L.border(inset: 0.8, thickness: 2.4, color: "#1F4E79")
+frame += L.border(inset: 1.25, thickness: 0.6, color: "#B08D57")
+// Ornaments in the four corners and a faint diagonal watermark, positioned
+// against the page itself rather than against the text.
+decoration: String := L.overlay(source: r"""
+\definecolor{gold}{HTML}{B08D57}
+\node[anchor=north west, inner sep=0pt] at ([shift={(1.5cm,-1.5cm)}]current page.north west)
+    {\color{gold}\pgfornament[width=3cm]{63}};
+\node[anchor=north east, inner sep=0pt] at ([shift={(-1.5cm,-1.5cm)}]current page.north east)
+    {\color{gold}\pgfornament[width=3cm, symmetry=v]{63}};
+\node[anchor=south west, inner sep=0pt] at ([shift={(1.5cm,1.5cm)}]current page.south west)
+    {\color{gold}\pgfornament[width=3cm, symmetry=h]{63}};
+\node[anchor=south east, inner sep=0pt] at ([shift={(-1.5cm,1.5cm)}]current page.south east)
+    {\color{gold}\pgfornament[width=3cm, symmetry=c]{63}};
+\node[opacity=0.05, rotate=25, scale=10] at (current page.center) {\bfseries AhdCode};
+""", libraries: ["pgfornament"])
+
+divider: String := L.tikz(
+    r"\node {\color{ahdaccent}\pgfornament[width=7cm]{88}};"
+    ["pgfornament"]
+)
+
+seal: String := L.tikz(source: r"""
+\definecolor{gold}{HTML}{B08D57}
+\foreach \angle in {0, 15, ..., 345} {
+    \draw[gold, line width=0.8pt] (\angle:1.05cm) -- (\angle:1.3cm);
+}
+\draw[ahdaccent, line width=1.6pt] (0,0) circle (1cm);
+\draw[gold, decorate, decoration={zigzag, amplitude=0.6pt, segment length=3pt}] (0,0) circle (0.8cm);
+\node[ahdaccent, font=\bfseries\small, align=center] at (0,0) {AHD\\CODE};
+""", libraries: ["decorations.pathmorphing"])
+
+signature: Function := (label: String) -> String {
+    line: Local String := r"\rule{6cm}{0.4pt}\\[4pt]" + L.escape(label)
+    return L.minipage(line, 7.0, "center")
+}
+instructor: String := signature("Course Instructor")
+issuer: String := signature("Issued " + issued)
+
+heading: String := r"{\color{ahdaccent}\fontsize{38}{44}\selectfont\bfseries Certificate of Achievement}"
+text: String := heading + r"\par" + "\n" + divider + r"\par\vspace{0.4cm}" + "\n"
+text += r"{\Large This certificate is proudly presented to}\par\vspace{0.5cm}" + "\n"
+text += r"{\fontsize{32}{38}\selectfont\itshape " + recipient + r"}\par\vspace{0.5cm}" + "\n"
+text += r"{\large for successfully completing}\par\vspace{0.2cm}" + "\n"
+text += r"{\Large\bfseries " + course + r"}\par\vspace{0.6cm}" + "\n"
+text += seal + r"\par\vspace{0.4cm}" + "\n"
+text += instructor + r"\hspace{2cm}" + issuer
+
+page: String := r"\thispagestyle{empty}" + "\n" + frame + decoration
+page += r"\vspace*{\fill}" + "\n" + L.center(text) + r"\vspace*{\fill}" + "\n"
+document: String := L.document(
+    body: page
+    margin: 2.5
+    color: "#1F4E79"
+    landscape: true
+)
+
+attempt {
+    L.pdf(document, "certificate.pdf", "tex")
+    write("certificate.pdf and certificate.tex written")
+}
+except LatexError as error {
+    write("certificate failed: " + error.message)
+}

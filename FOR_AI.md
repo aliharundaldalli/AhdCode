@@ -482,6 +482,34 @@ DOCX/XLSX round trip, no LibreOffice/Office dependency) and never mutate the
 source Document/Workbook. Do not expect pixel-perfect fidelity with what
 Word/Excel itself would render.
 
+**Use `Characters` for character and code-point work.** A character is a
+`String` holding one Unicode code point; AhdCode has no `Char` type. Use
+`Characters.list`, `count`, `codePoint`, `fromCodePoint`, and the `is...`
+classifiers instead of walking UTF-8 bytes or comparing against `"A"`..`"Z"`
+ranges. One displayed glyph may be several code points — `e` followed by U+0301
+is two characters — and Characters v1.2.0 does not segment grapheme clusters,
+so never promise that it does. See [`docs/CHARACTERS.md`](docs/CHARACTERS.md).
+
+**Use Latex + TikZ for vector PDF decoration.** Borders, ornaments, diagrams,
+badges, watermarks, and certificate layouts are `Latex.tikz`,
+`Latex.overlay`, `Latex.border`, and `Latex.document(..., landscape: true)`.
+Write TikZ in raw triple Strings (`r"""..."""`) and pass program text through
+`Latex.escape`. Do not add TCPDF, FPDF, wkhtmltopdf, a headless browser, or a
+pre-rendered border image merely to draw on a document AhdCode already produces
+with Latex, and do not invent `TikZ.line`-style wrappers. `libraries` accepts
+only the bundled names listed in
+[`docs/LATEX.md`](docs/LATEX.md#vector-graphics-with-tikz-v120).
+
+**Use `Cron` for in-process scheduling, and state its boundary.**
+`Cron.scheduler()`, `Scheduler.add(expression, task)`, `Scheduler.run()`, and
+`Scheduler.stop()` run named `() -> Nothing` Functions on five-field schedules
+while the program runs, and the jobs stop when that process stops. Do not edit
+a user's crontab, launchd, systemd timers, or Task Scheduler, and do not invent
+a daemon, a worker queue, or an HTTP endpoint just to trigger work unless the
+application genuinely needs scheduling outside a running AhdCode program — and
+then ask first. `Scheduler.run` blocks like a Web server, so put jobs in a
+second program beside `app.ahd`. See [`docs/CRON.md`](docs/CRON.md).
+
 ## Completion report
 
 Report the detected OS, prerequisite versions, repository path/branch/status,

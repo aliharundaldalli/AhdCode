@@ -571,7 +571,7 @@ derler ve yeniden başlatır. `public/app.css`'i düzenlemek bunu yapmaz.
 `APP_PROTOCOL=https`'i de **reddeder**:
 
 ```
-✗ Local HTTPS is not available in AhdCode v1.0.0.
+✗ Local HTTPS is not available in AhdCode v1.2.0.
   ahdcode dev serves plaintext HTTP, so it cannot honour
   APP_PROTOCOL=https.
 
@@ -813,6 +813,99 @@ düşük seviyeli modüllere uzanın.
 | v0.18 | Web starter'lar: Empty, Basic, Admin; yerel Bootstrap; Admin DB kurulumu |
 | v0.20 | Bileşen CSS/JS, `managedAssets`, `Identity.id()`, Web sınırları, MVC/CRUD |
 | v1.0.0 | Web API değişikliği yok; kendi kendine yeten platform paketlemesi |
+| v1.2.0 | Web API değişikliği yok; uygulamanın yanında zamanlanmış işler için [Cron](CRON_TR.md), [Characters](CHARACTERS_TR.md) ve [Latex](LATEX_TR.md) içinde TikZ |
+
+## Cron: zamanlanmış uygulama işleri
+
+Uygulamalar sık sık dönemsel işlere ihtiyaç duyar: uygulamaya ait geçici bir
+dizini boşaltmak, küçük bir yerel raporu yeniden üretmek, bir önbellek dosyasını
+yenilemek. [Cron](CRON_TR.md) modülü bu tür işleri, bir AhdCode programının
+içinde, beş alanlı bir zamanlamayla ve o program çalıştığı sürece çalıştırır.
+
+Cron, uygulama düzeyinde zamanlamadır. İşletim sisteminin crontab'ı, launchd,
+bir systemd timer, Windows Görev Zamanlayıcı veya kalıcı bir worker kuyruğu
+değildir; ne Cron ne de `ahdcode init web` hiçbir sistem zamanlama
+yapılandırmasını değiştirir. İşler yalnızca programları çalışırken vardır:
+program durduğunda — veya makine yeniden başladığında — işler durur ve hiçbir
+şey kendiliğinden devam etmez.
+
+İstek karşılayan `Web.app` ile `Scheduler.run()`, onları çağıran programı meşgul
+eder. Zamanlanmış işi `app.ahd`'nin yanında, örneğin `jobs.ahd` gibi ikinci bir
+programa koyun ve ikisini yan yana çalıştırın. İkisi belleği değil, projenin
+dosyalarını ve veritabanını paylaşır.
+
+```ahd
+bring Cron
+bring File
+bring Path
+bring Time
+from Cron bring Scheduler
+
+// jobs.ahd: bu uygulamanın zamanlanmış işleri.
+jobs: Scheduler := Cron.scheduler()
+
+// Her 15 dakikada bir, yalnızca bu uygulamanın yazdığı storage/tmp dizinini boşalt.
+cleanTemporary: Function := () -> Nothing {
+    directory: Local String := Path.join(["storage", "tmp"])
+    if File.exists(directory) {
+        for name in File.list(directory) {
+            File.delete(Path.join([directory, name]))
+        }
+    }
+}
+
+// Her gün 06:00'da küçük bir yerel durum raporu yaz.
+writeReport: Function := () -> Nothing {
+    if not File.exists("storage") {
+        File.createDir("storage")
+    }
+    stamp: Local String := Time.now().toString()
+    File.writeText(Path.join(["storage", "status.txt"]), "report generated at " + stamp + "\n")
+    write("report written at " + stamp)
+}
+
+jobs.add("*/15 * * * *", cleanTemporary)
+jobs.add("0 6 * * *", writeReport)
+write("next cleanup: " + Cron.next("*/15 * * * *", Time.now()).toString())
+jobs.run()
+```
+
+Geliştirme sırasında onu ikinci bir terminalde `ahdcode run jobs.ahd` ile
+çalıştırın; üretimde `ahdcode build jobs.ahd` ile derleyip çalıştırılabilir
+dosyayı, uygulamanızı zaten çalıştıran düzen içinde uygulamanın yanında
+çalıştırın. Zamanlamalar ana bilgisayarın yerel saat dilimini kullanır. Hata
+fırlatan bir görev `jobs.run()`'ı o hatayla bitirir; bu yüzden bir hatanın ne
+yapacağına görevin içinde karar verin. Zamanlama sözdizimi, yaşam döngüsü ve
+mesajlar için bkz. [Cron](CRON_TR.md).
+
+## Web projelerinde Characters ve vektör belgeler
+
+Kullanıcı metnini karakter karakter incelemek için — bir kullanıcı adının izin
+verilen karakterleri, bir görünen adın uzunluğu — [Characters](CHARACTERS_TR.md)
+kullanın. Bir karakter, tek bir Unicode kod noktası taşıyan bir `String`'dir;
+AhdCode'da `Char` türü yoktur ve ekranda tek görünen bir glif birden çok kod
+noktası olabilir.
+
+```ahd
+bring Characters
+
+username: String := "ayşe_42"
+valid: Bool := true
+for character in Characters.list(username) {
+    if not (Characters.isAlphaNumeric(character) or character == "_") {
+        valid = false
+    }
+}
+write(valid)
+```
+
+Sertifikalar, diplomalar, rozetler, süslü raporlar, sayfa kenarlıkları ve
+filigranlar TikZ vektör grafikli Latex belgeleridir: `Latex.tikz`,
+`Latex.overlay`, `Latex.border` ve `Latex.document(..., landscape: true)`.
+Uygulamanın zaten Latex ile ürettiği bir belgeye şekil çizmek için TCPDF, FPDF
+veya önceden üretilmiş bir kenarlık görseli eklemeyin. Bkz.
+[Latex: TikZ ile vektör grafik](LATEX_TR.md#tikz-ile-vektör-grafik-v120) ve
+`examples/v0.1/61_tikz_certificate.ahd` içindeki eksiksiz sertifika.
 
 ## 22. v0.20: Web varlıkları, kaynak sınırları ve uygulama kalıpları
 

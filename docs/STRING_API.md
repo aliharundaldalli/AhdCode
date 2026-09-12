@@ -34,3 +34,9 @@ write("ali HARUN".capitalize())
 
 These operations publish no named parameters, and v0.1 defines no aliases such
 as `strip`, `toLowerCase`, or parameterless `split`.
+
+A String's "character" is one Unicode code point: `len`, indexing, and
+`for character in text` all count code points, never UTF-8 bytes. For
+code-point values, conversion to a `List<String>`, and Unicode classification
+such as letters, digits, and whitespace, use the [Characters](CHARACTERS.md)
+module (v1.2.0). It works in the same unit and adds no `Char` type.

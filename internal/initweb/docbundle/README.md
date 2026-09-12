@@ -12,9 +12,14 @@ AhdCode is an experimental statically checked general-purpose programming
 language focused on readable syntax, explicit intent, predictable semantics,
 and native compilation.
 
-This is **v1.0.0**, the first stable release. The language, toolchain, and Web
-framework are feature-complete, and the language surface described here is
-what 1.0 commits to.
+This is **v1.2.0**. The language, toolchain, and Web framework are
+feature-complete, and the core language surface described here is what 1.0
+committed to and 1.1 and 1.2 keep unchanged.
+
+v1.2.0 is a minor release, **Scheduling, Vector Documents & Character
+Utilities**: it adds the `Cron` and `Characters` standard modules and TikZ
+vector graphics for `Latex`, without altering the core grammar or any existing
+behaviour. See [What is new in v1.2.0](#what-is-new-in-v120).
 
 It ships as a self-contained platform package: the `ahdcode` CLI, a private
 Go 1.27.0 toolchain, AhdDataStudio, the `ahdsqlite`, `ahdnumeric`, and
@@ -300,7 +305,7 @@ To maintain conceptual clarity, AhdCode's capabilities are organized into four d
    - **System & Environment:** [`Time`](TIME.md), [`Path`](FILESYSTEM.md), [`File`](FILESYSTEM.md), [`Env`](ENV.md)
 
 3. **First-Party Runtime / Framework Modules:**
-   - **Network, Server & Storage Primitives:** [`HTTP`](HTTP.md) (in-memory server, request/response, cookies, sessions, static file server, client), [`HTML`](HTML.md) (semantic builder, parser, selector engine), [`Security`](SECURITY.md) (Argon2id hashing, secure tokens, constant-time comparison, SHA-2, HMAC, RS256 signatures, AES-256-GCM), [`Bits`](BITS.md) (bitwise operations on Int), [`SQLite`](SQLITE.md) (local typed database bridge), [`MySQL`](MYSQL.md) (network database with connection pool and transactions), [`SMTP`](SMTP.md) (send-only mail client)
+   - **Network, Server & Storage Primitives:** [`HTTP`](HTTP.md) (in-memory server, request/response, cookies, sessions, static file server, client), [`HTML`](HTML.md) (semantic builder, parser, selector engine), [`Security`](SECURITY.md) (Argon2id hashing, secure tokens, constant-time comparison), [`SQLite`](SQLITE.md) (local typed database bridge), [`MySQL`](MYSQL.md) (network database with connection pool and transactions), [`SMTP`](SMTP.md) (send-only mail client)
    - **Web Application Framework:** [`Web`](WEB.md) (first-party bundled web framework, [`Web.UI`](WEB.md#9-webui) semantic components, `RequestContext`, typed `Forms`, ordered `ValidationErrors`, selected `OldInput`, session-bound CSRF, and flash lifecycle)
 
 4. **Developer Tools:**
@@ -460,6 +465,65 @@ diagnostics and hover. The same VSIX targets VS Code and Antigravity. See its
 installation guide.
 
 ## Current limitations
+
+## What is new in v1.2.0 <a id="what-is-new-in-v120"></a>
+
+v1.2.0 is a **minor** release, **Scheduling, Vector Documents & Character
+Utilities**. It adds two standard modules and vector graphics for `Latex`. The
+core grammar, the type system, and every previously released function keep
+their behaviour; `Latex.document` gains one optional final parameter.
+
+**New standard module: [`Cron`](CRON.md)** — bounded, in-process
+scheduling on classic five-field schedules: `Cron.scheduler()`,
+`Scheduler.add(expression, task)`, `Scheduler.run()`, `Scheduler.stop()`,
+`Cron.next(expression, after)`, and `CronError`. Jobs run while the program
+that scheduled them runs. Cron is not the operating system's crontab, a daemon,
+or a job queue, and it never changes system scheduling configuration.
+
+**New standard module: [`Characters`](CHARACTERS.md)** — Unicode
+code-point operations with no `Char` type: `list`, `count`, `codePoint`,
+`fromCodePoint`, `isLetter`, `isDigit`, `isWhitespace`, `isUpper`, `isLower`,
+`isAlphaNumeric`, `isPunctuation`, `isSymbol`, and `CharactersError`. A
+character is a `String` holding one code point; grapheme clusters are not
+segmented.
+
+**Extended module: [`Latex`](LATEX.md#vector-graphics-with-tikz-v120)** —
+TikZ/PGF vector graphics through the same offline pipeline: `Latex.tikz`,
+`Latex.overlay`, `Latex.border`, and `Latex.document(..., landscape: true)`.
+The offline resource bundle now also carries TikZ, nine TikZ libraries, and
+pgfornament with its ornaments, so certificates, page borders, watermarks, and
+diagrams need neither a second PDF library nor a pre-rendered image. See
+`examples/v0.1/61_tikz_certificate.ahd`.
+
+## What is new in v1.1.0 <a id="what-is-new-in-v110"></a>
+
+v1.1.0 is a **minor** release. It adds one new standard module and extends an
+existing one. The core grammar, the type system, and every previously released
+function keep their v1.0.0 behaviour.
+
+**New standard module: [`Bits`](BITS.md)** — bitwise operations on the
+language's signed 64-bit `Int`. AhdCode's grammar has no bitwise operators
+(`and`, `or` and `not` are the logical operators and `^` is exponentiation), so
+these are named calls:
+
+`bitAnd`, `bitOr`, `bitXor`, `bitNot`, `shiftLeft`, `shiftRight`,
+`shiftRightUnsigned`, `rotateLeft`, `rotateRight`, `count`, `leadingZeros`,
+`trailingZeros`, plus the `BitsError` error type raised when a shift or rotate
+distance falls outside `0..63`.
+
+**Extended module: [`Security`](SECURITY.md)** — the password primitives
+are unchanged; the module now also covers digests, message authentication, the
+common encodings, RS256 signatures and authenticated symmetric encryption:
+
+`sha256`, `sha512`, `hmacSHA256`, `hmacVerify`, `base64Encode`, `base64Decode`,
+`base64UrlEncode`, `base64UrlDecode`, `hexEncode`, `hexDecode`, `randomHex`,
+`rsaSignSHA256`, `rsaVerifySHA256`, `aesEncrypt`, `aesDecrypt`.
+
+Where a cryptographic choice exists it is made once and is not exposed as a
+knob: SHA-2 for digests, HMAC-SHA256 for MACs, RSASSA-PKCS1-v1_5 over SHA-256
+(the algorithm JWT calls RS256) for signatures, and AES-256-GCM for encryption.
+
+---
 
 AhdCode v1.0.0 is the first stable release. The exclusions below are deliberate design decisions, not gaps awaiting a later version.
 

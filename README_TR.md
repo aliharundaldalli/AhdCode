@@ -12,13 +12,14 @@ AhdCode; okunabilir sözdizimi, açık niyet (explicit intent), öngörülebilir
 anlambilim (semantics) ve yerel (native) derlemeye odaklanan, deneysel,
 statik olarak denetlenen genel amaçlı bir programlama dilidir.
 
-Bu, **v1.1.0**'dır. Dil, araç zinciri ve Web çatısı özellik olarak
+Bu, **v1.2.0**'dır. Dil, araç zinciri ve Web çatısı özellik olarak
 tamamlanmıştır; burada anlatılan çekirdek dil yüzeyi 1.0'ın taahhüt ettiği ve
-1.1'in değiştirmeden koruduğu yüzeydir.
+1.1 ile 1.2'nin değiştirmeden koruduğu yüzeydir.
 
-v1.1.0 bir ara (minor) sürümdür: `Bits` standart modülünü ekler ve `Security`
-modülünü genişletir; çekirdek dilbilgisini ya da mevcut davranışların hiçbirini
-değiştirmez. Bkz. [v1.1.0 ile gelenler](#v110-ile-gelenler).
+v1.2.0 bir ara (minor) sürümdür, **Zamanlama, Vektör Belgeler ve Karakter
+Araçları**: `Cron` ve `Characters` standart modüllerini ve `Latex` için TikZ
+vektör grafiklerini ekler; çekirdek dilbilgisini ya da mevcut davranışların
+hiçbirini değiştirmez. Bkz. [v1.2.0 ile gelenler](#v120-ile-gelenler).
 
 Ürün, kendi kendine yeten bir platform paketi olarak dağıtılır: `ahdcode` CLI,
 özel Go 1.27.0 araç zinciri, AhdDataStudio, `ahdsqlite`, `ahdnumeric` ve
@@ -484,6 +485,36 @@ VS Code hem de Antigravity'i hedefler.
 [Kurulum rehberine](editors/vscode/README_TR.md) bakın.
 
 ## Mevcut sınırlamalar
+
+## v1.2.0 ile gelenler <a id="v120-ile-gelenler"></a>
+
+v1.2.0 bir **ara (minor)** sürümdür, **Zamanlama, Vektör Belgeler ve Karakter
+Araçları**. İki standart modül ve `Latex` için vektör grafik ekler. Çekirdek
+dilbilgisi, tür sistemi ve daha önce yayımlanmış her fonksiyon davranışını
+korur; `Latex.document` yalnızca isteğe bağlı bir son parametre kazanır.
+
+**Yeni standart modül: [`Cron`](docs/CRON_TR.md)** — klasik beş alanlı
+zamanlamalarla sınırlı, süreç içi zamanlama: `Cron.scheduler()`,
+`Scheduler.add(expression, task)`, `Scheduler.run()`, `Scheduler.stop()`,
+`Cron.next(expression, after)` ve `CronError`. İşler, onları zamanlayan
+program çalıştığı sürece çalışır. Cron işletim sisteminin crontab'ı, bir
+daemon veya bir iş kuyruğu değildir ve sistem zamanlama yapılandırmasını asla
+değiştirmez.
+
+**Yeni standart modül: [`Characters`](docs/CHARACTERS_TR.md)** — `Char` türü
+olmadan Unicode kod noktası işlemleri: `list`, `count`, `codePoint`,
+`fromCodePoint`, `isLetter`, `isDigit`, `isWhitespace`, `isUpper`, `isLower`,
+`isAlphaNumeric`, `isPunctuation`, `isSymbol` ve `CharactersError`. Bir
+karakter, tek kod noktası taşıyan bir `String`'dir; grafem kümeleri bölütlenmez.
+
+**Genişletilen modül: [`Latex`](docs/LATEX_TR.md#tikz-ile-vektör-grafik-v120)** —
+aynı çevrimdışı hat üzerinden TikZ/PGF vektör grafikleri: `Latex.tikz`,
+`Latex.overlay`, `Latex.border` ve `Latex.document(..., landscape: true)`.
+Çevrimdışı kaynak paketi artık TikZ'i, dokuz TikZ kütüphanesini ve
+süslemeleriyle pgfornament'i de taşır; sertifikalar, sayfa kenarlıkları,
+filigranlar ve diyagramlar ne ikinci bir PDF kütüphanesi ne de önceden
+üretilmiş bir görsel gerektirir. Bkz.
+[`examples/v0.1/61_tikz_certificate.ahd`](examples/v0.1/61_tikz_certificate.ahd).
 
 ## v1.1.0 ile gelenler <a id="v110-ile-gelenler"></a>
 

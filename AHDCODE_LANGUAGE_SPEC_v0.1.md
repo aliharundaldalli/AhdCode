@@ -3366,9 +3366,11 @@ ordinary compile-time diagnostic.
 
 ### 37.11 Not in this version
 
-No BibTeX management, package manager, a general TikZ drawing API, arbitrary
-Beamer themes, overlays, speaker notes, PDF editor or parser, and no Markdown or HTML
-conversion.
+No BibTeX management, package manager, a drawing API that mirrors TikZ
+commands, arbitrary Beamer themes, Beamer overlays, speaker notes, PDF editor or
+parser, and no Markdown or HTML conversion. TikZ source itself, page overlays,
+page borders, and landscape documents are part of the Latex pipeline since
+v1.2.0 (§71).
 
 ---
 
@@ -5550,6 +5552,188 @@ renames rather than one atomic pair: a PDF that already published
 successfully stays published even if the subsequent sidecar write fails.
 `Latex.pdfFile` is unchanged — it still takes exactly `(input, output)`,
 because its caller already owns the `.tex` file on disk.
+
+## 69. Characters Standard Module (v1.2.0)
+
+`Characters` is the compiler-registered standard module `builtin:Characters`.
+It adds explicit Unicode character operations without changing `String`.
+
+### 69.1 Unit
+
+A character is one Unicode code point (a Unicode scalar value), represented by a
+`String` that holds exactly one code point. **Characters does not introduce a
+`Char` type**, a byte-string type, or grapheme-cluster semantics: a displayed
+glyph made of several code points, such as `e` followed by U+0301, is several
+characters. This is the unit `len`, String indexing, and String iteration
+already use (§5.7, §6.3).
+
+### 69.2 Surface
+
+```text
+Characters.list(text: String)                -> List<String>
+Characters.count(text: String)               -> Int
+Characters.codePoint(character: String)      -> Int
+Characters.fromCodePoint(value: Int)         -> String
+Characters.isLetter(character: String)       -> Bool
+Characters.isDigit(character: String)        -> Bool
+Characters.isWhitespace(character: String)   -> Bool
+Characters.isUpper(character: String)        -> Bool
+Characters.isLower(character: String)        -> Bool
+Characters.isAlphaNumeric(character: String) -> Bool
+Characters.isPunctuation(character: String)  -> Bool
+Characters.isSymbol(character: String)       -> Bool
+CharactersError
+```
+
+Every argument is `NonNull`.
+
+### 69.3 Semantics
+
+`list` returns each code point of `text` as a one-code-point String in source
+order and leaves `text` unchanged. `count` is the number of code points and
+always equals `len(text)`. `codePoint` returns the scalar value of its
+one-code-point argument. `fromCodePoint` accepts exactly the Unicode scalar
+values `0..1114111` excluding `55296..57343` (U+D800..U+DFFF).
+
+Classification uses the Unicode character database of the toolchain AhdCode is
+built with, shared by the compiler and compiled programs: `isLetter` is General
+Category L; `isDigit` is General Category `Nd` only; `isWhitespace` is the
+`White_Space` property; `isUpper` is `Lu`; `isLower` is `Ll`; `isAlphaNumeric`
+is L or `Nd`; `isPunctuation` is General Category P; `isSymbol` is General
+Category S. No classification depends on a locale.
+
+### 69.4 Errors
+
+A wrong static argument type or arity is an ordinary compile-time diagnostic
+(`SEM004`, `SEM016`). A `character` argument that does not hold exactly one code
+point, or a `fromCodePoint` value that is not a scalar value, raises
+`CharactersError`, which derives from `Error`. No operation inspects only the
+first code point, substitutes U+FFFD, truncates, or wraps.
+
+### 69.5 Not in this version
+
+No `Char` type, byte Strings, grapheme segmentation, Unicode normalization,
+locale-specific rules, character names, or script properties.
+
+## 70. Cron Standard Module (v1.2.0)
+
+`Cron` is the compiler-registered standard module `builtin:Cron`. It is a
+bounded, in-process scheduler: it runs AhdCode Functions on five-field schedules
+while the program that scheduled them is running. **Cron is not an
+orchestration framework**: it has no persistent job store, worker pool,
+distributed coordination, retry policy, HTTP trigger, daemon, or operating
+system scheduler integration, and it never modifies system configuration.
+
+### 70.1 Surface
+
+```text
+Cron.scheduler()                                        -> Scheduler
+Cron.next(expression: String, after: DateTime)          -> DateTime
+Scheduler.add(expression: String, task: () -> Nothing)  -> Nothing
+Scheduler.run()                                         -> Nothing
+Scheduler.stop()                                        -> Nothing
+CronError
+```
+
+`DateTime` is the Time module Class (§36). A `Scheduler` value is produced only
+by `Cron.scheduler()`; direct construction is `SEM016`. Every argument is
+`NonNull`.
+
+### 70.2 Schedule grammar
+
+```text
+schedule := field sep field sep field sep field sep field
+field    := item ("," item)*
+item     := "*" ["/" step] | number ["-" number ["/" step]]
+sep      := one or more space or tab characters
+```
+
+The fields are minute `0..59`, hour `0..23`, day of month `1..31`, month `1..12`,
+and day of week `0..7`, where `0` and `7` both mean Sunday. A number is decimal
+digits. A range `a-b` requires `a <= b`. A step follows only `*` or a range with
+`a < b` and lies in `1..(high - low)`. Leading and trailing spaces and tabs are
+ignored. Names, aliases, seconds, `?`, `L`, `W`, `#`, and time zones are not part
+of the grammar.
+
+When both the day-of-month and day-of-week fields begin with something other
+than `*`, a day matches if either field matches; otherwise it must match both.
+A schedule is validated completely before it is registered or evaluated. A
+schedule whose day-of-week field begins with `*` and whose day-of-month values
+occur in none of its months can never run and is rejected.
+
+### 70.3 Occurrences and time zones
+
+An occurrence is the start of a minute whose civil reading matches every field.
+`Cron.next(expression, after)` returns the first occurrence strictly after
+`after`, evaluated in the fixed UTC offset `after` carries; the result carries
+the same offset. `Scheduler.run` evaluates schedules in the host's local time
+zone, including its daylight-saving rules: a civil reading a change skips does
+not occur, and a reading a change repeats occurs twice. There is no occurrence
+after the year 9999.
+
+### 70.4 Tasks and lifecycle
+
+A task is a Function value whose signature is exactly compatible with
+`() -> Nothing`; any other shape is `SEM004`. `add` validates the schedule and
+appends the job; it raises `CronError` while the Scheduler runs.
+
+`run` blocks its caller. Tasks execute on the caller one at a time. For each
+due occurrence, every due job runs once, in registration order. A job's next
+occurrence is computed after its task returns, from the latest time the
+scheduler has observed, so an occurrence that passes during a task is skipped
+rather than queued and a clock moving backwards never repeats one. Pending
+program output is flushed before each wait. `run` raises `CronError` when the
+Scheduler has no jobs or is already running. An error raised by a task
+propagates out of `run` unchanged and ends the run.
+
+`stop` requests that a running Scheduler return once the current task returns.
+It is a no-op when the Scheduler is idle or already stopping, and a stopped
+Scheduler may run again. `run` leaves no background activity behind; when the
+process exits, all scheduling ends.
+
+### 70.5 Not in this version
+
+No persistent or retried jobs, overlapping runs, per-job time zones, seconds,
+cron aliases or names, shell-command jobs, HTTP triggers, or concurrent execution
+beside a running Web server in the same program.
+
+## 71. Latex Vector Graphics: TikZ, Overlay, Border, and Landscape (v1.2.0)
+
+TikZ is part of the Latex pipeline (§37), not a second graphics language.
+AhdCode passes TikZ source unchanged to the same offline engine and resource
+bundle and adds no drawing API that mirrors TikZ commands.
+
+```text
+Latex.tikz(source: String, libraries: List<String> = [])    -> String
+Latex.overlay(source: String, libraries: List<String> = []) -> String
+Latex.border(inset: Real = 1.0, thickness: Real = 1.0, color: String = "") -> String
+Latex.document(..., theme: String = "Default", landscape: Bool = false) -> String
+```
+
+`tikz` returns a `tikzpicture` fragment containing `source` verbatim. `overlay`
+returns a `tikzpicture` with `remember picture,overlay`, drawn through the
+kernel's shipout foreground hook on the page being filled when the fragment is
+reached, so TikZ page anchors such as `current page.north west` are available
+and the page's text does not move. `border` returns an overlay that draws one
+rectangle `inset` centimeters inside the page edges with a line `thickness`
+points wide in an optional `#RRGGBB` color.
+
+`libraries` accepts exactly `calc`, `positioning`, `arrows.meta`,
+`shapes.geometric`, `decorations.pathmorphing`, `decorations.pathreplacing`,
+`patterns`, `fit`, `backgrounds`, and `pgfornament`. `document` loads TikZ, one
+`\usetikzlibrary` with the requested TikZ libraries in that order, and
+`pgfornament` exactly when its body or cover contains fragments that request
+them; a document without such a fragment is unchanged. `landscape: true` sets
+landscape page geometry for Article and Report.
+
+An unbundled library name, a negative `inset`, a `thickness` that is not
+positive, an invalid `color`, and `landscape` with Beamer raise `ValueError`.
+TikZ source is Latex input: its compilation failures raise `LatexError` through
+the existing compilation path (§37.7, §37.10) and are never semantic
+diagnostics. The offline bundle carries PGF, TikZ, the libraries above, and
+pgfornament with its ornaments; compilation stays in untrusted mode without
+shell escape or network access. Raw String literals (§6.4) are the natural way
+to write TikZ, because they perform neither escape processing nor interpolation.
 
 ---
 

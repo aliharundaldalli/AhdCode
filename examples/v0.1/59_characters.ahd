@@ -1,0 +1,68 @@
+// 59 - Unicode characters as code points.
+//
+// Characters works on Unicode code points. One character is an ordinary
+// String that holds exactly one code point; AhdCode has no Char type. A glyph
+// a reader sees as one symbol can be several code points, and Characters does
+// not merge them into grapheme clusters.
+bring Characters
+from Characters bring CharactersError
+
+text: String := "AhdCode – Türkçe: çğıöşü 😊"
+
+write("code points: {Characters.count(text)}")
+write("len agrees: {len(text) == Characters.count(text)}")
+
+letters: Int := 0
+digits: Int := 0
+spaces: Int := 0
+punctuation: Int := 0
+symbols: Int := 0
+for character in Characters.list(text) {
+    if Characters.isLetter(character) {
+        letters += 1
+    }
+    if Characters.isDigit(character) {
+        digits += 1
+    }
+    if Characters.isWhitespace(character) {
+        spaces += 1
+    }
+    if Characters.isPunctuation(character) {
+        punctuation += 1
+    }
+    if Characters.isSymbol(character) {
+        symbols += 1
+    }
+}
+write("letters: {letters}, digits: {digits}, spaces: {spaces}")
+write("punctuation: {punctuation}, symbols: {symbols}")
+
+write(Characters.list("çğıöşü"))
+for character in Characters.list("ÇĞİÖŞÜ") {
+    point: Local Int := Characters.codePoint(character)
+    upper: Local Bool := Characters.isUpper(character)
+    write("{character} {point} upper: {upper}")
+}
+write("ı lower: {Characters.isLower("ı")}, ٣ digit: {Characters.isDigit("٣")}")
+
+smile: Int := Characters.codePoint("😊")
+write(
+    "😊 is code point {smile} and returns as {Characters.fromCodePoint(smile)}"
+)
+// "e" followed by U+0301 COMBINING ACUTE ACCENT displays as one glyph, é,
+// but it is two code points.
+decomposed: String := "e" + Characters.fromCodePoint(769)
+write("{decomposed} holds {Characters.count(decomposed)} code points")
+
+attempt {
+    write(str(Characters.codePoint("AB")))
+}
+except CharactersError as error {
+    write(error.message)
+}
+attempt {
+    write(Characters.fromCodePoint(55296))
+}
+except CharactersError as error {
+    write(error.message)
+}

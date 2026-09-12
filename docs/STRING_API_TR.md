@@ -37,3 +37,9 @@ bir `index` araması da `DomainError` fırlatır; `-1` gibi bir gösterge
 Bu işlemler isimlendirilmiş parametre yayınlamaz ve v0.1, `strip`,
 `toLowerCase` veya parametresiz bir `split` gibi takma adlar (alias)
 tanımlamaz.
+
+Bir String'in "karakteri" bir Unicode kod noktasıdır: `len`, indeksleme ve
+`for character in text` kod noktalarını sayar, asla UTF-8 baytlarını değil.
+Kod noktası değerleri, `List<String>`'e dönüşüm ve harf, rakam ve boşluk gibi
+Unicode sınıflandırmaları için [Characters](CHARACTERS_TR.md) modülünü
+(v1.2.0) kullanın. Aynı birimde çalışır ve bir `Char` türü eklemez.
