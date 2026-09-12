@@ -117,8 +117,23 @@ from Security bring SecurityError
 - Unsupported algorithm or version in a stored hash
 - Parameters outside safe bounds (checked before running Argon2)
 - Entropy failure during random generation (extremely rare)
+- Malformed input to `base64Decode`, `base64UrlDecode` or `hexDecode`, a
+  signature that is not base64url in `rsaVerifySHA256`, or an `aesDecrypt`
+  payload that is not standard Base64
+- A `randomHex` count outside 1..1024
+- An RSA key that is not PEM, cannot be parsed, or is not an RSA key
+  (`rsaSignSHA256`, `rsaVerifySHA256`), or a parsed key the signing operation
+  rejects
+- An AES key that is not hex or is not 32 bytes (`aesEncrypt`, `aesDecrypt`);
+  `aesDecrypt` checks the key before the payload
+- An `aesDecrypt` payload that is too short or fails authentication — a wrong
+  key, or modified or truncated data
 
-Wrong passwords return `false`; they **never** raise `SecurityError`.
+Wrong passwords return `false`; they **never** raise `SecurityError`. In the
+same way `hmacVerify` and `rsaVerifySHA256` return `false` for a MAC or
+signature that does not match, including a received MAC that is not valid hex.
+`sha256`, `sha512`, `hmacSHA256`, `hmacVerify`, `base64Encode`,
+`base64UrlEncode`, `hexEncode` and `secureEqual` never raise.
 
 ## passwordHash
 
@@ -206,7 +221,7 @@ weaker source.
 Use tokens for:
 - CSRF hidden fields
 - Password-reset links
-- Session IDs (if you are not using `HTTP.sessionStore`)
+- Session IDs (if you are not using `HTTP.sessions`)
 
 Do **not** use tokens as JWTs — they carry no claims, no expiry, and are not signed.
 
@@ -230,33 +245,45 @@ timing differences.
 ```ahd
 bring HTTP
 bring Security
+from HTTP bring (Server, Request, Response, SessionStore, Session)
 
-app := HTTP.server("127.0.0.1", 8080)
-store := HTTP.sessionStore("SESSID", Env.getOr("SESSION_SECRET", "dev-only"))
+sessions: SessionStore := HTTP.sessions("SESSID")
 
-app.get("/form", fn(req) -> Response {
-    session := store.session(req)
-    tok := Security.token()
-    session.set("csrf", tok)
-    return HTTP.html("<form method='POST' action='/submit'>" +
-        "<input type='hidden' name='csrf' value='" + tok + "'/>" +
-        "<button>Submit</button></form>")
-})
+showForm: Function := (request: Request) -> Response {
+    sessions: Global SessionStore
+    session: Local Session := sessions.open(request)
+    token: Local String := Security.token()
+    session.set("csrf", token)
+    page: Local String := """<form method="post" action="/submit">
+<input type="hidden" name="csrf" value="{token}"/>
+<button>Submit</button></form>"""
+    return sessions.commit(session, HTTP.html(page))
+}
 
-app.post("/submit", fn(req) -> Response {
-    session := store.session(req)
-    stored: String?    := session.get("csrf")
-    submitted: String? := req.field("csrf")
+handleSubmit: Function := (request: Request) -> Response {
+    sessions: Global SessionStore
+    session: Local Session := sessions.open(request)
+    stored: Local String? := session.get("csrf")
+    submitted: Local String? := request.form("csrf")
     if stored == null or submitted == null {
-        return HTTP.text("rejected", 403)
+        return sessions.commit(session, HTTP.text("rejected", 403))
     }
     if Security.secureEqual(stored, submitted) {
-        session.set("csrf", Security.token())   // rotate after use
-        return HTTP.text("ok")
+        session.set("csrf", Security.token()) // rotate after use
+        return sessions.commit(session, HTTP.text("ok"))
     }
-    return HTTP.text("rejected", 403)
-})
+    return sessions.commit(session, HTTP.text("rejected", 403))
+}
+
+app: Server := HTTP.server("127.0.0.1", 8080)
+app.get("/form", showForm)
+app.post("/submit", handleSubmit)
+app.start()
 ```
+
+Handlers are ordinary named Functions registered with `app.get` and
+`app.post`. Every response goes through `sessions.commit`, which writes the
+session cookie.
 
 ## SQLite storage example
 
@@ -293,9 +320,26 @@ fn login(db: Database, username: String, attempt: String) -> Bool {
 | `Security password hash uses an unsupported algorithm` | Not argon2id / not v19 |
 | `Security password hash has unsafe parameters` | Parameters out of safe bounds |
 | `Security password input is too large` | Password exceeded 1 MiB |
-| `Security random token generation failed` | OS entropy failure |
+| `Security random token generation failed` | OS entropy failure (`token`, `passwordHash`, `randomHex`, `aesEncrypt`) |
+| `Security base64 input is malformed` | `base64Decode` or the `aesDecrypt` payload is not padded standard Base64 |
+| `Security base64url input is malformed` | `base64UrlDecode` input or the `rsaVerifySHA256` signature is not base64url |
+| `Security hex input is malformed` | `hexDecode` received an odd length or a non-hex character |
+| `Security random byte count must be between 1 and 1024` | `randomHex` count out of range |
+| `Security private key is not valid PEM` | `rsaSignSHA256` key contains no PEM block |
+| `Security private key could not be parsed` | The PEM block is neither PKCS#1 nor PKCS#8 |
+| `Security private key is not an RSA key` | A PKCS#8 key of another algorithm, such as EC |
+| `Security RSA signing failed` | The key parsed but signing rejected it, for example a 512-bit key |
+| `Security public key is not valid PEM` | `rsaVerifySHA256` key contains no PEM block |
+| `Security public key could not be parsed` | The PEM block is neither PKCS#1 nor PKIX |
+| `Security public key is not an RSA key` | A PKIX key of another algorithm, such as EC |
+| `Security AES key must be hex encoded` | `aesEncrypt` / `aesDecrypt` key is not hex |
+| `Security AES key must be 32 bytes (64 hex characters)` | The key is hex but not 32 bytes |
+| `Security AES-GCM payload is too short` | The decoded payload is shorter than the 12-byte nonce |
+| `Security AES-GCM authentication failed` | Wrong key, or modified or truncated ciphertext |
+| `Security AES cipher could not be created` | Internal cipher setup failure; not expected once the key is valid |
+| `Security AES-GCM could not be created` | Internal GCM setup failure; not expected once the key is valid |
 
-Passwords never appear in error messages.
+Passwords, keys, plaintext and MAC values never appear in error messages.
 
 ## See also
 

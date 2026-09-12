@@ -122,8 +122,23 @@ from Security bring SecurityError
 - Saklanmış bir hash'te desteklenmeyen algoritma veya sürüm
 - Güvenli sınırların dışındaki parametreler (Argon2 çalıştırılmadan önce denetlenir)
 - Rastgele üretim sırasında entropi hatası (son derece nadir)
+- `base64Decode`, `base64UrlDecode` veya `hexDecode`'a verilen hatalı girdi,
+  `rsaVerifySHA256`'da base64url olmayan bir imza veya `aesDecrypt`'te standart
+  Base64 olmayan bir yük
+- 1..1024 aralığının dışındaki bir `randomHex` sayısı
+- PEM olmayan, ayrıştırılamayan veya RSA anahtarı olmayan bir anahtar
+  (`rsaSignSHA256`, `rsaVerifySHA256`) ya da ayrıştırılmış ama imzalama
+  işleminin reddettiği bir anahtar
+- Hex olmayan veya 32 bayt olmayan bir AES anahtarı (`aesEncrypt`,
+  `aesDecrypt`); `aesDecrypt` anahtarı yükten önce denetler
+- Çok kısa olan veya doğrulamadan geçemeyen bir `aesDecrypt` yükü — yanlış
+  anahtar ya da değiştirilmiş veya kesilmiş veri
 
-Yanlış parolalar `false` döndürür; **asla** `SecurityError` fırlatmaz.
+Yanlış parolalar `false` döndürür; **asla** `SecurityError` fırlatmaz. Aynı
+şekilde `hmacVerify` ve `rsaVerifySHA256`, eşleşmeyen bir MAC veya imza için —
+geçerli hex olmayan bir alınan MAC dahil — `false` döndürür.
+`sha256`, `sha512`, `hmacSHA256`, `hmacVerify`, `base64Encode`,
+`base64UrlEncode`, `hexEncode` ve `secureEqual` hiçbir zaman hata fırlatmaz.
 
 ## passwordHash
 
@@ -210,7 +225,7 @@ bir kaynağa geri dönmez.
 Belirteçleri şunlar için kullanın:
 - CSRF gizli alanları
 - Parola sıfırlama bağlantıları
-- Oturum kimlikleri (`HTTP.sessionStore` kullanmıyorsanız)
+- Oturum kimlikleri (`HTTP.sessions` kullanmıyorsanız)
 
 Belirteçleri JWT olarak **kullanmayın** — iddia taşımazlar, son kullanma
 süreleri yoktur ve imzalı değildirler.
@@ -235,33 +250,45 @@ gizle ilgili bilgi sızdırabilir.
 ```ahd
 bring HTTP
 bring Security
+from HTTP bring (Server, Request, Response, SessionStore, Session)
 
-app := HTTP.server("127.0.0.1", 8080)
-store := HTTP.sessionStore("SESSID", Env.getOr("SESSION_SECRET", "dev-only"))
+sessions: SessionStore := HTTP.sessions("SESSID")
 
-app.get("/form", fn(req) -> Response {
-    session := store.session(req)
-    tok := Security.token()
-    session.set("csrf", tok)
-    return HTTP.html("<form method='POST' action='/submit'>" +
-        "<input type='hidden' name='csrf' value='" + tok + "'/>" +
-        "<button>Submit</button></form>")
-})
+showForm: Function := (request: Request) -> Response {
+    sessions: Global SessionStore
+    session: Local Session := sessions.open(request)
+    token: Local String := Security.token()
+    session.set("csrf", token)
+    page: Local String := """<form method="post" action="/submit">
+<input type="hidden" name="csrf" value="{token}"/>
+<button>Submit</button></form>"""
+    return sessions.commit(session, HTTP.html(page))
+}
 
-app.post("/submit", fn(req) -> Response {
-    session := store.session(req)
-    stored: String?    := session.get("csrf")
-    submitted: String? := req.field("csrf")
+handleSubmit: Function := (request: Request) -> Response {
+    sessions: Global SessionStore
+    session: Local Session := sessions.open(request)
+    stored: Local String? := session.get("csrf")
+    submitted: Local String? := request.form("csrf")
     if stored == null or submitted == null {
-        return HTTP.text("rejected", 403)
+        return sessions.commit(session, HTTP.text("rejected", 403))
     }
     if Security.secureEqual(stored, submitted) {
-        session.set("csrf", Security.token())   // rotate after use
-        return HTTP.text("ok")
+        session.set("csrf", Security.token()) // rotate after use
+        return sessions.commit(session, HTTP.text("ok"))
     }
-    return HTTP.text("rejected", 403)
-})
+    return sessions.commit(session, HTTP.text("rejected", 403))
+}
+
+app: Server := HTTP.server("127.0.0.1", 8080)
+app.get("/form", showForm)
+app.post("/submit", handleSubmit)
+app.start()
 ```
+
+İşleyiciler, `app.get` ve `app.post` ile kaydedilen sıradan adlandırılmış
+Function'lardır. Her yanıt, oturum çerezini yazan `sessions.commit` üzerinden
+geçer.
 
 ## SQLite saklama örneği
 
@@ -298,9 +325,26 @@ fn login(db: Database, username: String, attempt: String) -> Bool {
 | `Security password hash uses an unsupported algorithm` | argon2id değil / v19 değil |
 | `Security password hash has unsafe parameters` | Parametreler güvenli sınırların dışında |
 | `Security password input is too large` | Parola 1 MiB'ı aştı |
-| `Security random token generation failed` | İşletim sistemi entropi hatası |
+| `Security random token generation failed` | İşletim sistemi entropi hatası (`token`, `passwordHash`, `randomHex`, `aesEncrypt`) |
+| `Security base64 input is malformed` | `base64Decode` girdisi veya `aesDecrypt` yükü dolgulu standart Base64 değil |
+| `Security base64url input is malformed` | `base64UrlDecode` girdisi veya `rsaVerifySHA256` imzası base64url değil |
+| `Security hex input is malformed` | `hexDecode` tek sayıda karakter veya hex olmayan bir karakter aldı |
+| `Security random byte count must be between 1 and 1024` | `randomHex` sayısı aralık dışında |
+| `Security private key is not valid PEM` | `rsaSignSHA256` anahtarında PEM bloğu yok |
+| `Security private key could not be parsed` | PEM bloğu ne PKCS#1 ne de PKCS#8 |
+| `Security private key is not an RSA key` | EC gibi başka bir algoritmaya ait PKCS#8 anahtarı |
+| `Security RSA signing failed` | Anahtar ayrıştırıldı ama imzalama onu reddetti; örneğin 512 bitlik bir anahtar |
+| `Security public key is not valid PEM` | `rsaVerifySHA256` anahtarında PEM bloğu yok |
+| `Security public key could not be parsed` | PEM bloğu ne PKCS#1 ne de PKIX |
+| `Security public key is not an RSA key` | EC gibi başka bir algoritmaya ait PKIX anahtarı |
+| `Security AES key must be hex encoded` | `aesEncrypt` / `aesDecrypt` anahtarı hex değil |
+| `Security AES key must be 32 bytes (64 hex characters)` | Anahtar hex ama 32 bayt değil |
+| `Security AES-GCM payload is too short` | Çözülmüş yük 12 baytlık nonce'tan kısa |
+| `Security AES-GCM authentication failed` | Yanlış anahtar ya da değiştirilmiş veya kesilmiş şifreli metin |
+| `Security AES cipher could not be created` | İç şifre kurulum hatası; anahtar geçerliyken beklenmez |
+| `Security AES-GCM could not be created` | İç GCM kurulum hatası; anahtar geçerliyken beklenmez |
 
-Parolalar hiçbir zaman hata mesajlarında yer almaz.
+Parolalar, anahtarlar, düz metin ve MAC değerleri hiçbir zaman hata mesajlarında yer almaz.
 
 ## Ayrıca bakınız
 
