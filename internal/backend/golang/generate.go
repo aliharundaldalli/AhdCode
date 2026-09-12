@@ -49,6 +49,8 @@ const (
 	charactersRuntimeFile   = "ahdcode_characters_runtime.go"
 	cronRuntimeFileName     = "ahdcode_cron_runtime.go"
 	codesRuntimeFileName    = "ahdcode_codes_runtime.go"
+	svgRuntimeFileName      = "ahdcode_svg_runtime.go"
+	documentRuntimeFileName = "ahdcode_document_runtime.go"
 )
 
 // storage describes the Go representation chosen for one IR symbol.
@@ -183,6 +185,16 @@ func Generate(compilation *ir.Compilation) (*GeneratedProgram, []diagnostics.Dia
 		{Name: bitsRuntimeFileName, Content: string(bitsRuntime)},
 		{Name: charactersRuntimeFile, Content: string(charactersRuntime)},
 		{Name: cronRuntimeFileName, Content: string(cronRuntime)},
+	}
+	for _, shared := range []struct{ name, source, label string }{
+		{svgRuntimeFileName, ahdruntime.SVGSource, "SVG"},
+		{documentRuntimeFileName, ahdruntime.DocumentSource, "document"},
+	} {
+		formattedShared, err := format.Source([]byte(strings.Replace(shared.source, "package ahdruntime", "package main", 1)))
+		if err != nil {
+			return nil, append(generator.diagnostics, backendError(CodeFormatFailure, "embedded "+shared.label+" runtime source is not valid Go: "+err.Error(), source.Span{}, "the "+shared.label+" backend runtime must remain gofmt-clean"))
+		}
+		files = append(files, GeneratedFile{Name: shared.name, Content: string(formattedShared)})
 	}
 	// Unlike every other runtime file above (standard library only, so always
 	// safe to include), ahdcode_mysql_runtime.go imports the vendored

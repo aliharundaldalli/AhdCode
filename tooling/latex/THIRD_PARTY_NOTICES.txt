@@ -39,7 +39,8 @@ Full license texts accompany this file in the `licenses/` directory.
   The AhdCode bundle includes only the files needed by the supported document
   baseline — the `article`/`report`/`beamer` classes, `amsmath`/`amssymb`/
   `mathtools`, `graphicx`, `booktabs`, `array`, `geometry`, `xcolor`,
-  `hyperref`, `fontspec`, PGF and TikZ with the `calc`, `positioning`,
+  `hyperref`, `fancyhdr`, `lastpage`, `fontspec`, PGF and TikZ with the
+  `calc`, `positioning`,
   `arrows.meta`, `shapes.geometric`, `decorations.pathmorphing`,
   `decorations.pathreplacing`, `patterns`, `fit`, and `backgrounds`
   libraries, `pgfopts`, the `pgfornament` package with its Vectorian ornament

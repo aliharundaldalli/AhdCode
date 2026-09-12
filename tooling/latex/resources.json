@@ -726,6 +726,12 @@
     "sha256": "d25966b6774e1153ada51b5c52eb5084b76708181861fa090844a18c2092a905"
   },
   {
+    "name": "fancyhdr.sty",
+    "offset": 108744192,
+    "length": 17086,
+    "sha256": "3d2922548e0e5f1a6c5676eda6ebb6dc20d7d305b4d8c2be5f1c833fb1084e6d"
+  },
+  {
     "name": "fontenc.sty",
     "offset": 144089600,
     "length": 4946,
@@ -1444,6 +1450,12 @@
     "offset": 1451520,
     "length": 6593,
     "sha256": "a8a8e36e120beb9a19ffc2ca7c83445a1308ac9602a50cab1128deac14f5bee9"
+  },
+  {
+    "name": "lastpage.sty",
+    "offset": 143698944,
+    "length": 10253,
+    "sha256": "cedfc8770d1107be28994062bcfd1ba849d960e67b160e2511556b409a42c6da"
   },
   {
     "name": "latex.ltx",

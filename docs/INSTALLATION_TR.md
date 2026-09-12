@@ -65,7 +65,8 @@ sunar. Dosya gereken her şeyi taşır; npm veya ağ gerekmez.
 
 Paket; özel Go 1.27.0, `ahdsqlite`, `ahdnumeric`, `ahdplot`, çevrimdışı Tectonic
 0.17.0 ve sabitlenmiş kaynak paketini içerir; paket, TikZ'i, dokuz TikZ
-kütüphanesini ve pgfornament'i ekleyen v1.2.0'dan beri 6.343.094 bayttır. CLI; sürüm-eş Studio,
+kütüphanesini ve pgfornament'i ekleyen v1.2.0'ın üzerine fancyhdr ve lastpage'i
+ekleyen v1.3.0'dan beri 6.350.367 bayttır. CLI; sürüm-eş Studio,
 starter, Bootstrap, framework ve İngilizce proje belgelerini gömer. Sistem Go
 kurulumu ve ayarları değişmez. Temel derleme, SQLite, Studio ve LaTeX çevrimdışıdır.
 MySQL/SMTP için yapılandırdığınız harici sunucular gereklidir. Lisanslar paketin

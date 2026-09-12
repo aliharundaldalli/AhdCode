@@ -512,52 +512,13 @@ func AhdLatexTheorem(kind, body, label string) string {
 	}() + ahdLatexLabel(label) + "\\end{" + id + "}\n"
 }
 
-func ahdLatexSizes(size *AhdPair[string, float64]) string {
-	if size == nil {
-		return ""
-	}
-	size.require()
-	options := []string{}
-	known := map[string]bool{}
-	for _, key := range size.keys {
-		if key != "width" && key != "height" {
-			AhdRaiseClass(AhdClassValueError, "Latex image size supports only width and height")
-		}
-		if known[key] {
-			AhdRaiseClass(AhdClassValueError, "duplicate Latex image size option")
-		}
-		known[key] = true
-		value := size.values[key]
-		if value <= 0 {
-			AhdRaiseClass(AhdClassValueError, "Latex image dimensions must be positive")
-		}
-		options = append(options, key+"="+ahdFormatReal(value)+"cm")
-	}
-	if len(options) == 0 {
-		return ""
-	}
-	return "[" + strings.Join(options, ",") + "]"
-}
-func ahdLatexAsset(path string) (string, string) {
-	if path == "" {
-		AhdRaiseClass(AhdClassValueError, "Latex image path must not be empty")
-	}
-	extension := strings.ToLower(filepath.Ext(path))
-	if extension != ".png" && extension != ".pdf" && extension != ".jpg" && extension != ".jpeg" {
-		AhdRaiseClass(AhdClassValueError, "Latex image supports PNG, PDF, and JPEG assets")
-	}
-	sum := sha256.Sum256([]byte(path))
-	staged := fmt.Sprintf("ahdasset-%x%s", sum[:8], extension)
-	marker := "% AHDCODE_ASSET " + base64.RawStdEncoding.EncodeToString([]byte(path)) + " " + staged + "\n"
-	return marker, staged
-}
+// AhdLatexImage and AhdLatexFigure keep the v1.2.0 entry points; the image
+// builders themselves, including v1.3.0 transforms and SVG, are in document.go.
 func AhdLatexImage(path string, size *AhdPair[string, float64]) string {
-	marker, staged := ahdLatexAsset(path)
-	return marker + "\\includegraphics" + ahdLatexSizes(size) + "{" + staged + "}\n"
+	return AhdLatexImageComplete(path, size, nil)
 }
 func AhdLatexFigure(path, caption, label string, size *AhdPair[string, float64]) string {
-	marker, staged := ahdLatexAsset(path)
-	return marker + "\\begin{figure}[!ht]\n\\centering\n\\includegraphics" + ahdLatexSizes(size) + "{" + staged + "}\n\\caption{" + AhdLatexEscape(caption) + "}\n" + ahdLatexLabel(label) + "\\end{figure}\n"
+	return AhdLatexFigureComplete(path, caption, label, size, nil)
 }
 func AhdLatexBibliography(references *AhdPair[string, string]) string {
 	if references == nil {
@@ -733,124 +694,11 @@ func AhdLatexBorder(inset, thickness float64, color string) string {
 
 var ahdLatexBeamerThemes = map[string]bool{"Default": true, "Madrid": true, "Warsaw": true}
 
+// AhdLatexDocumentFull keeps the v1.2.0 entry point: every v1.3.0 parameter
+// at its default, so its output is exactly the v1.2.0 document.
 func AhdLatexDocumentFull(body, title, author, date, documentType string, margin float64, color, cover string, theorems *AhdPair[string, string], theme string, landscape bool) string {
-	classes := map[string]string{"Article": "article", "Report": "report", "Beamer": "beamer"}
-	documentClass := classes[documentType]
-	if documentClass == "" {
-		AhdRaiseClass(AhdClassValueError, "Latex.document type must be Article, Report, or Beamer")
-	}
-	if margin <= 0 {
-		AhdRaiseClass(AhdClassValueError, "Latex.document margin must be positive")
-	}
-	if color != "" {
-		matched, _ := regexp.MatchString(`^#[0-9A-Fa-f]{6}$`, color)
-		if !matched {
-			AhdRaiseClass(AhdClassValueError, "Latex.document color must use #RRGGBB")
-		}
-	}
-	if !ahdLatexBeamerThemes[theme] {
-		AhdRaiseClass(AhdClassValueError, "Latex.document theme must be Default, Madrid, or Warsaw")
-	}
-	if theme != "Default" && documentType != "Beamer" {
-		AhdRaiseClass(AhdClassValueError, "Latex.document theme requires a Beamer document")
-	}
-	if landscape && documentType == "Beamer" {
-		AhdRaiseClass(AhdClassValueError, "Latex.document landscape requires an Article or Report document")
-	}
-	tikz, problem := AhdLatexTikZPreamble(cover, body)
-	if problem != "" {
-		AhdRaiseClass(AhdClassValueError, problem)
-	}
-	var result strings.Builder
-	result.WriteString("\\documentclass{" + documentClass + "}\n")
-	if theme != "Default" {
-		// theme != "Default" already implies documentType == "Beamer", checked above.
-		result.WriteString("\\usetheme{" + theme + "}\n")
-	}
-	result.WriteString("\\usepackage{fontspec}\n")
-	result.WriteString("\\setmainfont{lmroman10-regular.otf}[BoldFont=lmroman10-bold.otf,ItalicFont=lmroman10-italic.otf,BoldItalicFont=lmroman10-bolditalic.otf]\n")
-	result.WriteString("\\usepackage{amsmath,amssymb,mathtools}\n")
-	result.WriteString("\\usepackage{geometry,graphicx,booktabs,array,xcolor,hyperref}\n")
-	geometry := "margin=" + ahdFormatReal(margin) + "cm"
-	if landscape {
-		geometry = "landscape," + geometry
-	}
-	result.WriteString("\\geometry{" + geometry + "}\n")
-	result.WriteString("\\hypersetup{hidelinks}\n")
-	if color != "" {
-		hex := strings.TrimPrefix(color, "#")
-		result.WriteString("\\definecolor{ahdaccent}{HTML}{" + strings.ToUpper(hex) + "}\n")
-		if documentType == "Beamer" {
-			result.WriteString("\\setbeamercolor{structure}{fg=ahdaccent}\n")
-		}
-	}
-	result.WriteString(tikz)
-	declared := map[string]string{}
-	if theorems != nil {
-		theorems.require()
-		for _, display := range theorems.keys {
-			if display == "" {
-				AhdRaiseClass(AhdClassValueError, "theorem type name must not be empty")
-			}
-			id := ahdLatexTheoremID(display)
-			rule := theorems.values[display]
-			switch rule {
-			case "":
-				result.WriteString("\\newtheorem{" + id + "}{" + AhdLatexEscape(display) + "}\n")
-			case "section", "subsection":
-				result.WriteString("\\newtheorem{" + id + "}{" + AhdLatexEscape(display) + "}[" + rule + "]\n")
-			case "chapter":
-				if documentType != "Report" {
-					AhdRaiseClass(AhdClassValueError, "chapter theorem counters require a Report document")
-				}
-				result.WriteString("\\newtheorem{" + id + "}{" + AhdLatexEscape(display) + "}[chapter]\n")
-			default:
-				shared := declared[rule]
-				if shared == "" {
-					AhdRaiseClass(AhdClassValueError, "theorem counter references an unknown or later type: "+rule)
-				}
-				result.WriteString("\\newtheorem{" + id + "}[" + shared + "]{" + AhdLatexEscape(display) + "}\n")
-			}
-			declared[display] = id
-		}
-	}
-	knownTheorems := map[string]bool{}
-	for _, id := range declared {
-		knownTheorems[id] = true
-	}
-	theoremPattern := regexp.MustCompile(`\\begin\{(ahdthm[0-9a-f]+)\}`)
-	for _, match := range theoremPattern.FindAllStringSubmatch(body, -1) {
-		if !knownTheorems[match[1]] {
-			AhdRaiseClass(AhdClassValueError, "document body uses an undeclared theorem type")
-		}
-	}
-	if title != "" {
-		result.WriteString("\\title{" + AhdLatexEscape(title) + "}\n")
-	}
-	if author != "" {
-		result.WriteString("\\author{" + AhdLatexEscape(author) + "}\n")
-	}
-	result.WriteString("\\date{" + AhdLatexEscape(date) + "}\n\\begin{document}\n")
-	if cover != "" {
-		result.WriteString(cover)
-		if !strings.HasSuffix(cover, "\n") {
-			result.WriteByte('\n')
-		}
-		result.WriteString("\\clearpage\n")
-	}
-	if title != "" {
-		if documentType == "Beamer" {
-			result.WriteString("\\begin{frame}\n\\titlepage\n\\end{frame}\n")
-		} else {
-			result.WriteString("\\maketitle\n")
-		}
-	}
-	result.WriteString(body)
-	if body != "" && !strings.HasSuffix(body, "\n") {
-		result.WriteByte('\n')
-	}
-	result.WriteString("\\end{document}\n")
-	return result.String()
+	return AhdLatexDocumentComplete(body, title, author, date, documentType, margin, color, cover, theorems, theme, landscape,
+		"Letter", nil, nil, "", nil, "")
 }
 
 // AhdLatexTable creates deterministic booktabs source. List elements retain
@@ -954,7 +802,7 @@ func AhdLatexPDF(source, output, sourceOutput string) {
 }
 
 func ahdLatexStageAssets(source, base, destination string) error {
-	pattern := regexp.MustCompile(`(?m)^% AHDCODE_ASSET ([A-Za-z0-9_-]+) (ahdasset-[0-9a-f]+\.(?:png|pdf|jpg|jpeg))$`)
+	pattern := regexp.MustCompile(`(?m)^% AHDCODE_ASSET ([A-Za-z0-9_-]+) (ahdasset-[0-9a-f]+\.(?:png|pdf|jpg|jpeg|svg))$`)
 	seen := map[string]bool{}
 	for _, match := range pattern.FindAllStringSubmatch(source, -1) {
 		if seen[match[2]] {
@@ -976,6 +824,26 @@ func ahdLatexStageAssets(source, base, destination string) error {
 		info, err := os.Stat(absolute)
 		if err != nil || !info.Mode().IsRegular() {
 			return fmt.Errorf("Latex asset is missing or not a regular file: %s", path)
+		}
+		if strings.HasSuffix(match[2], ".svg") {
+			// An SVG asset is staged as its vector PGF conversion. The
+			// converter reads only these bytes; nothing the SVG names is
+			// ever opened.
+			if info.Size() > ahdSVGMaximumBytes {
+				return fmt.Errorf("Latex SVG asset %s is larger than 5 MiB", path)
+			}
+			data, err := os.ReadFile(absolute)
+			if err != nil {
+				return fmt.Errorf("could not open Latex asset %s: %w", path, err)
+			}
+			picture, problem := AhdSVGConvert("Latex SVG asset "+path, data)
+			if problem != "" {
+				return fmt.Errorf("%s", problem)
+			}
+			if err := os.WriteFile(filepath.Join(destination, AhdLatexSVGInputName(match[2])), []byte(picture.Source), 0o600); err != nil {
+				return fmt.Errorf("could not stage Latex asset: %w", err)
+			}
+			continue
 		}
 		input, err := os.Open(absolute)
 		if err != nil {

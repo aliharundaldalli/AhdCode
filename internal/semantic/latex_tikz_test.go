@@ -1,6 +1,11 @@
 package semantic
 
-import "testing"
+import (
+	"strings"
+	"testing"
+
+	"ahdcode/internal/types"
+)
 
 func TestLatexVectorHelpersAreRegistered(t *testing.T) {
 	module := StandardModuleInterfaces()["Latex"]
@@ -16,9 +21,24 @@ func TestLatexVectorHelpersAreRegistered(t *testing.T) {
 		}
 	}
 	document := module.Exports["document"].Callable.Signature
-	last := document.Parameters[len(document.Parameters)-1]
-	if last.Name != "landscape" || !last.HasDefault {
-		t.Fatalf("document's final parameter = %+v, want an optional landscape Bool", last)
+	// landscape keeps its v1.2.0 position; v1.3.0 appends page layout and PDF
+	// properties after it, so existing positional calls keep their meaning.
+	var names []string
+	for _, parameter := range document.Parameters {
+		names = append(names, parameter.Name)
+	}
+	want := []string{"body", "title", "author", "date", "type", "margin", "color", "cover", "theorems", "theme", "landscape",
+		"paper", "pageSize", "margins", "subject", "keywords", "creator"}
+	if strings.Join(names, ",") != strings.Join(want, ",") {
+		t.Fatalf("document parameters = %v, want %v", names, want)
+	}
+	for _, parameter := range document.Parameters[1:] {
+		if !parameter.HasDefault {
+			t.Fatalf("document parameter %s must be optional", parameter.Name)
+		}
+	}
+	if landscape := document.Parameters[10]; landscape.Type != types.Bool {
+		t.Fatalf("landscape = %+v, want an optional Bool", landscape)
 	}
 }
 

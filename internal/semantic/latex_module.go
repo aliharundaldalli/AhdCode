@@ -60,8 +60,11 @@ func latexModuleInterface() *ModuleInterface {
 	add(latexFunction("equation", latexSignature(types.String, stringParameter("source"), types.Parameter{Name: "label", Type: types.String, HasDefault: true})))
 	add(latexFunction("theorem", latexSignature(types.String, stringParameter("type"), stringParameter("body"), types.Parameter{Name: "label", Type: types.String, HasDefault: true})))
 	sizePair := types.Pair{Key: types.String, Value: types.Real}
-	add(latexFunction("image", latexSignature(types.String, stringParameter("path"), types.Parameter{Name: "size", Type: sizePair, HasDefault: true})))
-	add(latexFunction("figure", latexSignature(types.String, stringParameter("path"), stringParameter("caption"), types.Parameter{Name: "label", Type: types.String, HasDefault: true}, types.Parameter{Name: "size", Type: sizePair, HasDefault: true})))
+	// v1.3.0 adds a trailing transform Pair (rotation, opacity, and trims) and
+	// SVG assets; existing image/figure calls keep their meaning.
+	transform := types.Parameter{Name: "transform", Type: sizePair, HasDefault: true}
+	add(latexFunction("image", latexSignature(types.String, stringParameter("path"), types.Parameter{Name: "size", Type: sizePair, HasDefault: true}, transform)))
+	add(latexFunction("figure", latexSignature(types.String, stringParameter("path"), stringParameter("caption"), types.Parameter{Name: "label", Type: types.String, HasDefault: true}, types.Parameter{Name: "size", Type: sizePair, HasDefault: true}, transform)))
 	add(latexFunction("minipage", latexSignature(types.String, stringParameter("body"), types.Parameter{Name: "width", Type: types.Real}, types.Parameter{Name: "alignment", Type: types.String, HasDefault: true})))
 	add(latexFunction("bibliography", latexSignature(types.String, types.Parameter{Name: "references", Type: types.Pair{Key: types.String, Value: types.String}})))
 	add(latexFunction("document", latexSignature(types.String,
@@ -76,7 +79,39 @@ func latexModuleInterface() *ModuleInterface {
 		types.Parameter{Name: "theorems", Type: types.Pair{Key: types.String, Value: types.String}, HasDefault: true},
 		types.Parameter{Name: "theme", Type: types.String, HasDefault: true},
 		types.Parameter{Name: "landscape", Type: types.Bool, HasDefault: true},
+		// v1.3.0 page layout and PDF properties, appended after every v1.2.0
+		// parameter so existing positional calls keep their meaning.
+		types.Parameter{Name: "paper", Type: types.String, HasDefault: true},
+		types.Parameter{Name: "pageSize", Type: sizePair, HasDefault: true},
+		types.Parameter{Name: "margins", Type: sizePair, HasDefault: true},
+		types.Parameter{Name: "subject", Type: types.String, HasDefault: true},
+		types.Parameter{Name: "keywords", Type: types.List{Element: types.String}, HasDefault: true},
+		types.Parameter{Name: "creator", Type: types.String, HasDefault: true},
 	)))
+	// v1.3.0 professional-document helpers. qr and barcode use the same
+	// encoders as the QR and Barcode modules; place, header, and footer build
+	// on the page foreground and page styles; link and bookmark add PDF
+	// navigation. None of them exposes raw renderer options.
+	add(latexFunction("qr", latexSignature(types.String, stringParameter("value"),
+		types.Parameter{Name: "size", Type: types.Real, HasDefault: true},
+		types.Parameter{Name: "level", Type: types.String, HasDefault: true})))
+	add(latexFunction("barcode", latexSignature(types.String, stringParameter("kind"), stringParameter("value"),
+		types.Parameter{Name: "width", Type: types.Real, HasDefault: true},
+		types.Parameter{Name: "height", Type: types.Real, HasDefault: true})))
+	add(latexFunction("place", latexSignature(types.String, stringParameter("content"),
+		types.Parameter{Name: "x", Type: types.Real}, types.Parameter{Name: "y", Type: types.Real},
+		types.Parameter{Name: "anchor", Type: types.String, HasDefault: true})))
+	for _, name := range []string{"header", "footer"} {
+		add(latexFunction(name, latexSignature(types.String,
+			types.Parameter{Name: "left", Type: types.String, HasDefault: true},
+			types.Parameter{Name: "center", Type: types.String, HasDefault: true},
+			types.Parameter{Name: "right", Type: types.String, HasDefault: true})))
+	}
+	add(latexFunction("pageNumber", latexSignature(types.String)))
+	add(latexFunction("pageCount", latexSignature(types.String)))
+	add(latexFunction("link", latexSignature(types.String, stringParameter("text"), stringParameter("url"))))
+	add(latexFunction("bookmark", latexSignature(types.String, stringParameter("title"),
+		types.Parameter{Name: "level", Type: types.Int, HasDefault: true})))
 	// v1.2.0 vector graphics. TikZ source stays TikZ: these helpers wrap it in
 	// the Latex pipeline and let document() load exactly the bundled libraries
 	// a fragment names. There is no drawing API that mirrors TikZ commands.

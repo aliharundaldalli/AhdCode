@@ -2,9 +2,7 @@ package evaluator
 
 import (
 	"crypto/sha256"
-	"encoding/base64"
 	"fmt"
-	"path/filepath"
 	"regexp"
 	"strings"
 
@@ -102,11 +100,43 @@ func (s *Session) latexBuiltin(name string, args []any) any {
 			s.raise("ValueError", "invalid Latex.minipage width or alignment")
 		}
 		return "\\begin{minipage}{" + formatReal(width) + "cm}\n" + command + "\n" + ensureNewline(str(0, "")) + "\\end{minipage}\n"
-	case "image":
-		return s.latexImage(str(0, ""), pairArg(args, 1))
-	case "figure":
-		marker, image := s.latexAsset(str(0, ""))
-		return marker + "\\begin{figure}[!ht]\n\\centering\n\\includegraphics" + s.latexSizes(pairArg(args, 3)) + "{" + image + "}\n\\caption{" + latexEscape(str(1, "")) + "}\n" + latexLabel(str(2, "")) + "\\end{figure}\n"
+	case "image", "figure":
+		// The runtime builds image and figure fragments -- including v1.3.0
+		// transforms and SVG assets -- so evaluator output is identical to a
+		// compiled program's.
+		sizeIndex, transformIndex := 1, 2
+		caption, label := "", ""
+		if name == "figure" {
+			sizeIndex, transformIndex = 3, 4
+			caption, label = str(1, ""), str(2, "")
+		}
+		sizeKeys, sizeValues := s.latexRealEntries(pairArg(args, sizeIndex))
+		transformKeys, transformValues := s.latexRealEntries(pairArg(args, transformIndex))
+		text, problem := ahdruntime.AhdLatexImageText(str(0, ""), sizeKeys, sizeValues, transformKeys, transformValues,
+			name == "figure", caption, label)
+		return s.latexText(text, problem)
+	case "qr":
+		return s.latexText(ahdruntime.AhdLatexQRText("Latex.qr", str(0, ""), latexReal(args, 1, 3.0), str(2, "M")))
+	case "barcode":
+		return s.latexText(ahdruntime.AhdLatexBarcodeText("Latex.barcode", str(0, ""), str(1, ""), latexReal(args, 2, 8.0), latexReal(args, 3, 2.0)))
+	case "place":
+		return s.latexText(ahdruntime.AhdLatexPlaceText(str(0, ""), latexReal(args, 1, 0), latexReal(args, 2, 0), str(3, "north west")))
+	case "header":
+		return ahdruntime.AhdLatexRunningText("head", str(0, ""), str(1, ""), str(2, ""))
+	case "footer":
+		return ahdruntime.AhdLatexRunningText("foot", str(0, ""), str(1, ""), str(2, ""))
+	case "pageNumber":
+		return ahdruntime.AhdLatexPageNumberText()
+	case "pageCount":
+		return ahdruntime.AhdLatexPageCountText()
+	case "link":
+		return s.latexText(ahdruntime.AhdLatexLinkText("Latex.link", str(0, ""), str(1, "")))
+	case "bookmark":
+		level := int64(1)
+		if len(args) > 1 && args[1] != nil {
+			level = args[1].(int64)
+		}
+		return s.latexText(ahdruntime.AhdLatexBookmarkText("Latex.bookmark", str(0, ""), level))
 	case "bibliography":
 		return s.latexBibliography(pairArg(args, 0))
 	case "document":
@@ -164,37 +194,33 @@ func pairArg(args []any, i int) *Pair {
 	}
 	return args[i].(*Pair)
 }
-func (s *Session) latexAsset(path string) (string, string) {
-	ext := strings.ToLower(filepath.Ext(path))
-	if path == "" || (ext != ".png" && ext != ".pdf" && ext != ".jpg" && ext != ".jpeg") {
-		s.raise("ValueError", "Latex image supports PNG, PDF, and JPEG assets")
+
+// latexText returns a runtime-built fragment, raising ValueError for a
+// problem the way a compiled program's Latex helpers do.
+func (s *Session) latexText(text, problem string) string {
+	if problem != "" {
+		s.raise("ValueError", problem)
 	}
-	sum := sha256.Sum256([]byte(path))
-	staged := fmt.Sprintf("ahdasset-%x%s", sum[:8], ext)
-	return "% AHDCODE_ASSET " + base64.RawStdEncoding.EncodeToString([]byte(path)) + " " + staged + "\n", staged
+	return text
 }
-func (s *Session) latexSizes(p *Pair) string {
+
+func latexReal(args []any, index int, fallback float64) float64 {
+	if index < len(args) && args[index] != nil {
+		return numericFloat(args[index])
+	}
+	return fallback
+}
+
+// latexRealEntries reads a Pair<String, Real> argument in insertion order.
+func (s *Session) latexRealEntries(p *Pair) ([]string, []float64) {
 	p = s.requirePair(p)
-	options := []string{}
-	for _, key := range p.Keys {
-		k := key.(string)
-		if k != "width" && k != "height" {
-			s.raise("ValueError", "Latex image size supports only width and height")
-		}
-		value := p.Values[key].(float64)
-		if value <= 0 {
-			s.raise("ValueError", "Latex image dimensions must be positive")
-		}
-		options = append(options, k+"="+formatReal(value)+"cm")
+	keys := make([]string, len(p.Keys))
+	values := make([]float64, len(p.Keys))
+	for index, key := range p.Keys {
+		keys[index] = key.(string)
+		values[index] = numericFloat(p.Values[key])
 	}
-	if len(options) == 0 {
-		return ""
-	}
-	return "[" + strings.Join(options, ",") + "]"
-}
-func (s *Session) latexImage(path string, size *Pair) string {
-	marker, image := s.latexAsset(path)
-	return marker + "\\includegraphics" + s.latexSizes(size) + "{" + image + "}\n"
+	return keys, values
 }
 func (s *Session) latexBibliography(p *Pair) string {
 	p = s.requirePair(p)
@@ -213,111 +239,24 @@ func (s *Session) latexDocument(args []any) string {
 		}
 		return args[i].(string)
 	}
-	body, title, author, date, kind := get(0, ""), get(1, ""), get(2, ""), get(3, ""), get(4, "Article")
-	classes := map[string]string{"Article": "article", "Report": "report", "Beamer": "beamer"}
-	class := classes[kind]
-	if class == "" {
-		s.raise("ValueError", "Latex.document type must be Article, Report, or Beamer")
+	// The runtime builds the whole document, so evaluator output is identical
+	// to a compiled program's for every parameter.
+	theorems := s.requirePair(pairArg(args, 8))
+	names := make([]string, len(theorems.Keys))
+	rules := make([]string, len(theorems.Keys))
+	for index, key := range theorems.Keys {
+		names[index], rules[index] = key.(string), theorems.Values[key].(string)
 	}
-	margin := 2.54
-	if len(args) > 5 && args[5] != nil {
-		margin = numericFloat(args[5])
-	}
-	color, cover := get(6, ""), get(7, "")
-	if margin <= 0 {
-		s.raise("ValueError", "Latex.document margin must be positive")
-	}
-	if color != "" && !regexp.MustCompile(`^#[0-9A-Fa-f]{6}$`).MatchString(color) {
-		s.raise("ValueError", "Latex.document color must use #RRGGBB")
-	}
-	theme := get(9, "Default")
-	if !latexBeamerThemes[theme] {
-		s.raise("ValueError", "Latex.document theme must be Default, Madrid, or Warsaw")
-	}
-	if theme != "Default" && kind != "Beamer" {
-		s.raise("ValueError", "Latex.document theme requires a Beamer document")
-	}
-	landscape := len(args) > 10 && args[10] != nil && args[10].(bool)
-	if landscape && kind == "Beamer" {
-		s.raise("ValueError", "Latex.document landscape requires an Article or Report document")
-	}
-	tikz, problem := ahdruntime.AhdLatexTikZPreamble(cover, body)
-	if problem != "" {
-		s.raise("ValueError", problem)
-	}
-	geometry := "margin=" + formatReal(margin) + "cm"
-	if landscape {
-		geometry = "landscape," + geometry
-	}
-	theorems := pairArg(args, 8)
-	var b strings.Builder
-	b.WriteString("\\documentclass{" + class + "}\n")
-	if theme != "Default" {
-		// theme != "Default" already implies kind == "Beamer", checked above.
-		b.WriteString("\\usetheme{" + theme + "}\n")
-	}
-	b.WriteString("\\usepackage{fontspec}\n\\setmainfont{lmroman10-regular.otf}[BoldFont=lmroman10-bold.otf,ItalicFont=lmroman10-italic.otf,BoldItalicFont=lmroman10-bolditalic.otf]\n\\usepackage{amsmath,amssymb,mathtools}\n\\usepackage{geometry,graphicx,booktabs,array,xcolor,hyperref}\n\\geometry{" + geometry + "}\n\\hypersetup{hidelinks}\n")
-	if color != "" {
-		b.WriteString("\\definecolor{ahdaccent}{HTML}{" + strings.ToUpper(strings.TrimPrefix(color, "#")) + "}\n")
-		if kind == "Beamer" {
-			b.WriteString("\\setbeamercolor{structure}{fg=ahdaccent}\n")
-		}
-	}
-	b.WriteString(tikz)
-	declared := map[string]string{}
-	for _, key := range theorems.Keys {
-		display, rule := key.(string), theorems.Values[key].(string)
-		if display == "" {
-			s.raise("ValueError", "theorem type name must not be empty")
-		}
-		id := latexTheoremID(display)
-		switch {
-		case rule == "":
-			b.WriteString("\\newtheorem{" + id + "}{" + latexEscape(display) + "}\n")
-		case rule == "section" || rule == "subsection":
-			b.WriteString("\\newtheorem{" + id + "}{" + latexEscape(display) + "}[" + rule + "]\n")
-		case rule == "chapter":
-			if kind != "Report" {
-				s.raise("ValueError", "chapter theorem counters require a Report document")
-			}
-			b.WriteString("\\newtheorem{" + id + "}{" + latexEscape(display) + "}[chapter]\n")
-		default:
-			shared := declared[rule]
-			if shared == "" {
-				s.raise("ValueError", "theorem counter references an unknown or later type: "+rule)
-			}
-			b.WriteString("\\newtheorem{" + id + "}[" + shared + "]{" + latexEscape(display) + "}\n")
-		}
-		declared[display] = id
-	}
-	knownTheorems := map[string]bool{}
-	for _, id := range declared {
-		knownTheorems[id] = true
-	}
-	for _, match := range latexTheoremPattern.FindAllStringSubmatch(body, -1) {
-		if !knownTheorems[match[1]] {
-			s.raise("ValueError", "document body uses an undeclared theorem type")
-		}
-	}
-	if title != "" {
-		b.WriteString("\\title{" + latexEscape(title) + "}\n")
-	}
-	if author != "" {
-		b.WriteString("\\author{" + latexEscape(author) + "}\n")
-	}
-	b.WriteString("\\date{" + latexEscape(date) + "}\n\\begin{document}\n")
-	if cover != "" {
-		b.WriteString(ensureNewline(cover) + "\\clearpage\n")
-	}
-	if title != "" {
-		if kind == "Beamer" {
-			b.WriteString("\\begin{frame}\n\\titlepage\n\\end{frame}\n")
-		} else {
-			b.WriteString("\\maketitle\n")
-		}
-	}
-	b.WriteString(ensureNewline(body) + "\\end{document}\n")
-	return b.String()
+	sizeKeys, sizeValues := s.latexRealEntries(pairArg(args, 12))
+	marginKeys, marginValues := s.latexRealEntries(pairArg(args, 13))
+	return s.latexText(ahdruntime.AhdLatexDocumentText(ahdruntime.AhdLatexDocumentOptions{
+		Body: get(0, ""), Title: get(1, ""), Author: get(2, ""), Date: get(3, ""), Type: get(4, "Article"),
+		Margin: latexReal(args, 5, 2.54), Color: get(6, ""), Cover: get(7, ""),
+		TheoremNames: names, TheoremRules: rules, Theme: get(9, "Default"),
+		Landscape: len(args) > 10 && args[10] != nil && args[10].(bool), Paper: get(11, "Letter"),
+		PageSizeKeys: sizeKeys, PageSizeValues: sizeValues, MarginKeys: marginKeys, MarginValues: marginValues,
+		Subject: get(14, ""), Keywords: s.latexStrings(args, 15), Creator: get(16, ""),
+	}))
 }
 func (s *Session) latexTable(args []any) string {
 	headers := s.requireList(args[0])

@@ -93,3 +93,17 @@ var CronSource string
 //
 //go:embed codes.go
 var CodesSource string
+
+// SVGSource is emitted as a separate generated Go file. It converts SVG
+// document assets to vector PGF drawing commands using only encoding/xml and
+// other standard packages, so the generated workspace stays dependency-free.
+//
+//go:embed svg.go
+var SVGSource string
+
+// DocumentSource is emitted as a separate generated Go file. It holds the
+// professional-document builders Latex and PDF share: page layout, headers
+// and footers, placement, links, bookmarks, metadata, and image transforms.
+//
+//go:embed document.go
+var DocumentSource string

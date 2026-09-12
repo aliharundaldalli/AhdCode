@@ -74,8 +74,9 @@ one owned PATH block to `~/.profile`. Open a login shell or source that profile.
 The CLI embeds exact-version AhdDataStudio, first-party framework sources,
 starters, Bootstrap, and English project documentation. The package also includes
 private Go 1.27.0, `ahdsqlite`, `ahdnumeric`, `ahdplot`, and the pinned offline
-Tectonic 0.17.0 engine plus its pinned resource bundle — 6,343,094 bytes since
-v1.2.0 added TikZ, nine TikZ libraries, and pgfornament. The uncompressed
+Tectonic 0.17.0 engine plus its pinned resource bundle — 6,350,367 bytes since
+v1.3.0 added fancyhdr and lastpage to the v1.2.0 TikZ, nine TikZ libraries, and
+pgfornament. The uncompressed
 engine size varies by platform. Native AhdCode builds use private Go before PATH;
 the user's Go installation and settings are not changed. Core builds, SQLite,
 Studio, and LaTeX require no network. MySQL and SMTP still require the external
