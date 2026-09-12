@@ -574,12 +574,164 @@ func AhdLatexBibliography(references *AhdPair[string, string]) string {
 // AhdLatexDocument returns one stable complete document. Font files are named
 // explicitly so the supported baseline never depends on a system font.
 func AhdLatexDocument(body, title, author string) string {
-	return AhdLatexDocumentFull(body, title, author, "", "Article", 2.54, "", "", AhdBuildPair([]string{}, []string{}), "Default")
+	return AhdLatexDocumentFull(body, title, author, "", "Article", 2.54, "", "", AhdBuildPair([]string{}, []string{}), "Default", false)
+}
+
+// AhdLatexTikZLibraries is the closed set of names Latex.tikz and
+// Latex.overlay accept: the TikZ libraries the bundled offline resources
+// carry, then the pgfornament ornament package. A generated preamble loads
+// them in this order, so output never depends on the order a caller wrote.
+var AhdLatexTikZLibraries = []string{
+	"calc", "positioning", "arrows.meta", "shapes.geometric",
+	"decorations.pathmorphing", "decorations.pathreplacing",
+	"patterns", "fit", "backgrounds", "pgfornament",
+}
+
+// ahdLatexTikZMarker finds the comment line every generated TikZ fragment
+// begins with. document() loads TikZ only when a fragment carries one.
+var ahdLatexTikZMarker = regexp.MustCompile(`(?m)^% AHDCODE_TIKZ(?: ([A-Za-z.,]+))?$`)
+
+func ahdLatexTikZLibraryKnown(name string) bool {
+	for _, candidate := range AhdLatexTikZLibraries {
+		if name == candidate {
+			return true
+		}
+	}
+	return false
+}
+
+// AhdLatexTikZText builds one TikZ fragment. TikZ source is passed through
+// exactly; AhdCode neither parses nor rewrites it. An overlay is drawn through
+// the kernel's shipout/foreground hook on the page being filled when it is
+// reached, so it never moves that page's text. The function returns a problem
+// message instead of raising, so the evaluator shares it unchanged.
+func AhdLatexTikZText(operation, source string, libraries []string, overlay bool) (string, string) {
+	requested := map[string]bool{}
+	for _, name := range libraries {
+		if !ahdLatexTikZLibraryKnown(name) {
+			return "", "Latex." + operation + " library " + strconv.Quote(name) +
+				" is not bundled; supported names are " + strings.Join(AhdLatexTikZLibraries, ", ")
+		}
+		requested[name] = true
+	}
+	var result strings.Builder
+	result.WriteString("% AHDCODE_TIKZ")
+	separator := " "
+	for _, name := range AhdLatexTikZLibraries {
+		if requested[name] {
+			result.WriteString(separator + name)
+			separator = ","
+		}
+	}
+	result.WriteByte('\n')
+	body := source
+	if body != "" && !strings.HasSuffix(body, "\n") {
+		body += "\n"
+	}
+	if overlay {
+		result.WriteString("\\AddToHookNext{shipout/foreground}{\\put(0,0){\\begin{tikzpicture}[remember picture,overlay]\n" +
+			body + "\\end{tikzpicture}}}%\n")
+	} else {
+		result.WriteString("\\begin{tikzpicture}\n" + body + "\\end{tikzpicture}\n")
+	}
+	return result.String(), ""
+}
+
+// AhdLatexBorderText builds a rectangular page border as an ordinary overlay:
+// inset is centimeters from each page edge, thickness is the line width in
+// points, and color is an optional #RRGGBB. Anything more elaborate is TikZ.
+func AhdLatexBorderText(inset, thickness float64, color string) (string, string) {
+	if inset < 0 {
+		return "", "Latex.border inset must not be negative"
+	}
+	if thickness <= 0 {
+		return "", "Latex.border thickness must be positive"
+	}
+	var source strings.Builder
+	stroke := ""
+	if color != "" {
+		if matched, _ := regexp.MatchString(`^#[0-9A-Fa-f]{6}$`, color); !matched {
+			return "", "Latex.border color must use #RRGGBB"
+		}
+		source.WriteString("\\definecolor{ahdborder}{HTML}{" + strings.ToUpper(color[1:]) + "}\n")
+		stroke = ",draw=ahdborder"
+	}
+	distance := ahdFormatReal(inset) + "cm"
+	source.WriteString("\\draw[line width=" + ahdFormatReal(thickness) + "pt" + stroke + "] ([shift={(" +
+		distance + "," + distance + ")}]current page.south west) rectangle ([shift={(-" +
+		distance + ",-" + distance + ")}]current page.north east);\n")
+	return AhdLatexTikZText("border", source.String(), nil, true)
+}
+
+// AhdLatexTikZPreamble returns the preamble lines the TikZ fragments in texts
+// need, or "" when there are none, so a document without TikZ is byte-for-byte
+// what it was before v1.2.0.
+func AhdLatexTikZPreamble(texts ...string) (string, string) {
+	used := false
+	requested := map[string]bool{}
+	for _, text := range texts {
+		for _, match := range ahdLatexTikZMarker.FindAllStringSubmatch(text, -1) {
+			used = true
+			if match[1] == "" {
+				continue
+			}
+			for _, name := range strings.Split(match[1], ",") {
+				if !ahdLatexTikZLibraryKnown(name) {
+					return "", "Latex.document found a TikZ fragment naming an unbundled library " + strconv.Quote(name)
+				}
+				requested[name] = true
+			}
+		}
+	}
+	if !used {
+		return "", ""
+	}
+	var libraries []string
+	for _, name := range AhdLatexTikZLibraries {
+		if requested[name] && name != "pgfornament" {
+			libraries = append(libraries, name)
+		}
+	}
+	result := "\\usepackage{tikz}\n"
+	if len(libraries) > 0 {
+		result += "\\usetikzlibrary{" + strings.Join(libraries, ",") + "}\n"
+	}
+	if requested["pgfornament"] {
+		result += "\\usepackage{pgfornament}\n"
+	}
+	return result, ""
+}
+
+// AhdLatexTikZ is the native entry point of Latex.tikz.
+func AhdLatexTikZ(source string, libraries *AhdList[string]) string {
+	text, problem := AhdLatexTikZText("tikz", source, libraries.Snapshot(), false)
+	if problem != "" {
+		AhdRaiseClass(AhdClassValueError, problem)
+	}
+	return text
+}
+
+// AhdLatexOverlay is the native entry point of Latex.overlay.
+func AhdLatexOverlay(source string, libraries *AhdList[string]) string {
+	text, problem := AhdLatexTikZText("overlay", source, libraries.Snapshot(), true)
+	if problem != "" {
+		AhdRaiseClass(AhdClassValueError, problem)
+	}
+	return text
+}
+
+// AhdLatexBorder is the native entry point of Latex.border.
+func AhdLatexBorder(inset, thickness float64, color string) string {
+	text, problem := AhdLatexBorderText(inset, thickness, color)
+	if problem != "" {
+		AhdRaiseClass(AhdClassValueError, problem)
+	}
+	return text
 }
 
 var ahdLatexBeamerThemes = map[string]bool{"Default": true, "Madrid": true, "Warsaw": true}
 
-func AhdLatexDocumentFull(body, title, author, date, documentType string, margin float64, color, cover string, theorems *AhdPair[string, string], theme string) string {
+func AhdLatexDocumentFull(body, title, author, date, documentType string, margin float64, color, cover string, theorems *AhdPair[string, string], theme string, landscape bool) string {
 	classes := map[string]string{"Article": "article", "Report": "report", "Beamer": "beamer"}
 	documentClass := classes[documentType]
 	if documentClass == "" {
@@ -600,6 +752,13 @@ func AhdLatexDocumentFull(body, title, author, date, documentType string, margin
 	if theme != "Default" && documentType != "Beamer" {
 		AhdRaiseClass(AhdClassValueError, "Latex.document theme requires a Beamer document")
 	}
+	if landscape && documentType == "Beamer" {
+		AhdRaiseClass(AhdClassValueError, "Latex.document landscape requires an Article or Report document")
+	}
+	tikz, problem := AhdLatexTikZPreamble(cover, body)
+	if problem != "" {
+		AhdRaiseClass(AhdClassValueError, problem)
+	}
 	var result strings.Builder
 	result.WriteString("\\documentclass{" + documentClass + "}\n")
 	if theme != "Default" {
@@ -610,7 +769,11 @@ func AhdLatexDocumentFull(body, title, author, date, documentType string, margin
 	result.WriteString("\\setmainfont{lmroman10-regular.otf}[BoldFont=lmroman10-bold.otf,ItalicFont=lmroman10-italic.otf,BoldItalicFont=lmroman10-bolditalic.otf]\n")
 	result.WriteString("\\usepackage{amsmath,amssymb,mathtools}\n")
 	result.WriteString("\\usepackage{geometry,graphicx,booktabs,array,xcolor,hyperref}\n")
-	result.WriteString("\\geometry{margin=" + ahdFormatReal(margin) + "cm}\n")
+	geometry := "margin=" + ahdFormatReal(margin) + "cm"
+	if landscape {
+		geometry = "landscape," + geometry
+	}
+	result.WriteString("\\geometry{" + geometry + "}\n")
 	result.WriteString("\\hypersetup{hidelinks}\n")
 	if color != "" {
 		hex := strings.TrimPrefix(color, "#")
@@ -619,6 +782,7 @@ func AhdLatexDocumentFull(body, title, author, date, documentType string, margin
 			result.WriteString("\\setbeamercolor{structure}{fg=ahdaccent}\n")
 		}
 	}
+	result.WriteString(tikz)
 	declared := map[string]string{}
 	if theorems != nil {
 		theorems.require()

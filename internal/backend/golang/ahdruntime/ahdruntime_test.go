@@ -1116,7 +1116,7 @@ func TestLatexTableTwoArgumentOutputIsUnchanged(t *testing.T) {
 func TestLatexBeamerThemesAreBoundedAndComposeWithColor(t *testing.T) {
 	theorems := AhdNewPair[string, string]()
 	for _, theme := range []string{"Madrid", "Warsaw"} {
-		source := AhdLatexDocumentFull("Body", "Title", "Author", "", "Beamer", 2.5, "#8A1538", "", theorems, theme)
+		source := AhdLatexDocumentFull("Body", "Title", "Author", "", "Beamer", 2.5, "#8A1538", "", theorems, theme, false)
 		themeLine := `\usetheme{` + theme + `}`
 		colorLine := `\definecolor{ahdaccent}{HTML}{8A1538}`
 		if !strings.Contains(source, themeLine) || !strings.Contains(source, colorLine) {
@@ -1126,15 +1126,15 @@ func TestLatexBeamerThemesAreBoundedAndComposeWithColor(t *testing.T) {
 			t.Fatalf("custom color must follow and override %s:\n%s", theme, source)
 		}
 	}
-	defaultSource := AhdLatexDocumentFull("Body", "", "", "", "Beamer", 2.5, "", "", theorems, "Default")
+	defaultSource := AhdLatexDocumentFull("Body", "", "", "", "Beamer", 2.5, "", "", theorems, "Default", false)
 	if strings.Contains(defaultSource, `\usetheme{`) {
 		t.Fatalf("Default unexpectedly emitted a named Beamer theme:\n%s", defaultSource)
 	}
 	expectRaise(t, AhdClassValueError, func() {
-		AhdLatexDocumentFull("Body", "", "", "", "Beamer", 2.5, "", "", theorems, "Metropolis")
+		AhdLatexDocumentFull("Body", "", "", "", "Beamer", 2.5, "", "", theorems, "Metropolis", false)
 	})
 	expectRaise(t, AhdClassValueError, func() {
-		AhdLatexDocumentFull("Body", "", "", "", "Article", 2.5, "", "", theorems, "Madrid")
+		AhdLatexDocumentFull("Body", "", "", "", "Article", 2.5, "", "", theorems, "Madrid", false)
 	})
 }
 

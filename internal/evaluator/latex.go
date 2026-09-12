@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"ahdcode/internal/backend/golang/ahdruntime"
 )
 
 func latexEscape(text string) string {
@@ -111,10 +113,45 @@ func (s *Session) latexBuiltin(name string, args []any) any {
 		return s.latexDocument(args)
 	case "table":
 		return s.latexTable(args)
+	case "tikz", "overlay":
+		// The runtime builds the fragment, so evaluator output is identical to
+		// a compiled program's.
+		text, problem := ahdruntime.AhdLatexTikZText(name, str(0, ""), s.latexStrings(args, 1), name == "overlay")
+		if problem != "" {
+			s.raise("ValueError", problem)
+		}
+		return text
+	case "border":
+		inset, thickness := 1.0, 1.0
+		if len(args) > 0 && args[0] != nil {
+			inset = numericFloat(args[0])
+		}
+		if len(args) > 1 && args[1] != nil {
+			thickness = numericFloat(args[1])
+		}
+		text, problem := ahdruntime.AhdLatexBorderText(inset, thickness, str(2, ""))
+		if problem != "" {
+			s.raise("ValueError", problem)
+		}
+		return text
 	}
 	s.raise("Error", "unsupported Latex function "+name)
 	return nil
 }
+
+// latexStrings reads an optional List<String> argument; an omitted list is empty.
+func (s *Session) latexStrings(args []any, i int) []string {
+	if i >= len(args) || args[i] == nil {
+		return nil
+	}
+	list := s.requireList(args[i])
+	items := make([]string, len(list.Items))
+	for index, item := range list.Items {
+		items[index] = item.(string)
+	}
+	return items
+}
+
 func ensureNewline(text string) string {
 	if text != "" && !strings.HasSuffix(text, "\n") {
 		return text + "\n"
@@ -200,6 +237,18 @@ func (s *Session) latexDocument(args []any) string {
 	if theme != "Default" && kind != "Beamer" {
 		s.raise("ValueError", "Latex.document theme requires a Beamer document")
 	}
+	landscape := len(args) > 10 && args[10] != nil && args[10].(bool)
+	if landscape && kind == "Beamer" {
+		s.raise("ValueError", "Latex.document landscape requires an Article or Report document")
+	}
+	tikz, problem := ahdruntime.AhdLatexTikZPreamble(cover, body)
+	if problem != "" {
+		s.raise("ValueError", problem)
+	}
+	geometry := "margin=" + formatReal(margin) + "cm"
+	if landscape {
+		geometry = "landscape," + geometry
+	}
 	theorems := pairArg(args, 8)
 	var b strings.Builder
 	b.WriteString("\\documentclass{" + class + "}\n")
@@ -207,13 +256,14 @@ func (s *Session) latexDocument(args []any) string {
 		// theme != "Default" already implies kind == "Beamer", checked above.
 		b.WriteString("\\usetheme{" + theme + "}\n")
 	}
-	b.WriteString("\\usepackage{fontspec}\n\\setmainfont{lmroman10-regular.otf}[BoldFont=lmroman10-bold.otf,ItalicFont=lmroman10-italic.otf,BoldItalicFont=lmroman10-bolditalic.otf]\n\\usepackage{amsmath,amssymb,mathtools}\n\\usepackage{geometry,graphicx,booktabs,array,xcolor,hyperref}\n\\geometry{margin=" + formatReal(margin) + "cm}\n\\hypersetup{hidelinks}\n")
+	b.WriteString("\\usepackage{fontspec}\n\\setmainfont{lmroman10-regular.otf}[BoldFont=lmroman10-bold.otf,ItalicFont=lmroman10-italic.otf,BoldItalicFont=lmroman10-bolditalic.otf]\n\\usepackage{amsmath,amssymb,mathtools}\n\\usepackage{geometry,graphicx,booktabs,array,xcolor,hyperref}\n\\geometry{" + geometry + "}\n\\hypersetup{hidelinks}\n")
 	if color != "" {
 		b.WriteString("\\definecolor{ahdaccent}{HTML}{" + strings.ToUpper(strings.TrimPrefix(color, "#")) + "}\n")
 		if kind == "Beamer" {
 			b.WriteString("\\setbeamercolor{structure}{fg=ahdaccent}\n")
 		}
 	}
+	b.WriteString(tikz)
 	declared := map[string]string{}
 	for _, key := range theorems.Keys {
 		display, rule := key.(string), theorems.Values[key].(string)

@@ -39,10 +39,19 @@ Full license texts accompany this file in the `licenses/` directory.
   The AhdCode bundle includes only the files needed by the supported document
   baseline — the `article`/`report`/`beamer` classes, `amsmath`/`amssymb`/
   `mathtools`, `graphicx`, `booktabs`, `array`, `geometry`, `xcolor`,
-  `hyperref`, `fontspec`, the PGF/TikZ core and `translator` packages Beamer
-  builds on, the LaTeX kernel and expl3 support files, and their transitive
-  dependencies. Every included file is listed by name, byte range, and
-  SHA-256 in `tooling/latex/resources.json`.
+  `hyperref`, `fontspec`, PGF and TikZ with the `calc`, `positioning`,
+  `arrows.meta`, `shapes.geometric`, `decorations.pathmorphing`,
+  `decorations.pathreplacing`, `patterns`, `fit`, and `backgrounds`
+  libraries, `pgfopts`, the `pgfornament` package with its Vectorian ornament
+  files, the `translator` package Beamer builds on, the LaTeX kernel and expl3
+  support files, and their transitive dependencies. Every included file is
+  listed by name, byte range, and SHA-256 in `tooling/latex/resources.json`.
+
+  PGF and TikZ may be distributed under the LPPL or the GNU General Public
+  License; AhdCode redistributes them under the LPPL. `pgfornament` (copyright
+  2020 Alain Matthes) and `pgfopts` state the LPPL, version 1.3 or later, and
+  the Vectorian ornament files are redistributed unmodified as part of the
+  `pgfornament` distribution in TeX Live.
 
   The LPPL permits redistribution of unmodified files. AhdCode does not modify
   any TeX macro file; the files are copied byte-for-byte from the pinned

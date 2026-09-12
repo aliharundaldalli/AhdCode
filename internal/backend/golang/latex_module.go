@@ -79,7 +79,17 @@ func (generator *generator) latexCall(value *ir.CallExpr) string {
 		if len(value.Arguments) > 9 && !value.Arguments[9].UsesDefault {
 			theme = argument(9)
 		}
-		return "AhdLatexDocumentFull(" + argument(0) + ", " + argument(1) + ", " + argument(2) + ", " + argument(3) + ", " + typeArg + ", " + realArgument(5, "2.54") + ", " + argument(6) + ", " + argument(7) + ", " + theorems + ", " + theme + ")"
+		landscape := "false"
+		if len(value.Arguments) > 10 && !value.Arguments[10].UsesDefault && value.Arguments[10].Value != nil {
+			landscape = generator.value(value.Arguments[10].Value, ir.Type{Kind: ir.BoolType}, false)
+		}
+		return "AhdLatexDocumentFull(" + argument(0) + ", " + argument(1) + ", " + argument(2) + ", " + argument(3) + ", " + typeArg + ", " + realArgument(5, "2.54") + ", " + argument(6) + ", " + argument(7) + ", " + theorems + ", " + theme + ", " + landscape + ")"
+	case "tikz":
+		return "AhdLatexTikZ(" + argument(0) + ", " + generator.latexStringList(value, 1) + ")"
+	case "overlay":
+		return "AhdLatexOverlay(" + argument(0) + ", " + generator.latexStringList(value, 1) + ")"
+	case "border":
+		return "AhdLatexBorder(" + realArgument(0, "1.0") + ", " + realArgument(1, "1.0") + ", " + argument(2) + ")"
 	case "table":
 		if len(value.Arguments) < 2 || value.Arguments[0].Value == nil || value.Arguments[1].Value == nil {
 			generator.fail(CodeGenerationFailure, "Latex.table has a missing argument", meta.Span, "the IR call is malformed")
@@ -95,6 +105,15 @@ func (generator *generator) latexCall(value *ir.CallExpr) string {
 	default:
 		return generator.unsupported("Latex function "+name, meta.Span)
 	}
+}
+
+// latexStringList renders an optional List<String> argument; an omitted list
+// is empty.
+func (generator *generator) latexStringList(value *ir.CallExpr, index int) string {
+	if index >= len(value.Arguments) || value.Arguments[index].UsesDefault || value.Arguments[index].Value == nil {
+		return "AhdNewList[string]()"
+	}
+	return generator.expr(value.Arguments[index].Value)
 }
 
 func (generator *generator) latexSizePair(value *ir.CallExpr, index int) string {

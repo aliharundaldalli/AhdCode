@@ -75,6 +75,18 @@ func latexModuleInterface() *ModuleInterface {
 		types.Parameter{Name: "cover", Type: types.String, HasDefault: true},
 		types.Parameter{Name: "theorems", Type: types.Pair{Key: types.String, Value: types.String}, HasDefault: true},
 		types.Parameter{Name: "theme", Type: types.String, HasDefault: true},
+		types.Parameter{Name: "landscape", Type: types.Bool, HasDefault: true},
+	)))
+	// v1.2.0 vector graphics. TikZ source stays TikZ: these helpers wrap it in
+	// the Latex pipeline and let document() load exactly the bundled libraries
+	// a fragment names. There is no drawing API that mirrors TikZ commands.
+	libraries := types.Parameter{Name: "libraries", Type: types.List{Element: types.String}, HasDefault: true}
+	add(latexFunction("tikz", latexSignature(types.String, stringParameter("source"), libraries)))
+	add(latexFunction("overlay", latexSignature(types.String, stringParameter("source"), libraries)))
+	add(latexFunction("border", latexSignature(types.String,
+		types.Parameter{Name: "inset", Type: types.Real, HasDefault: true},
+		types.Parameter{Name: "thickness", Type: types.Real, HasDefault: true},
+		types.Parameter{Name: "color", Type: types.String, HasDefault: true},
 	)))
 	add(latexFunction("table", latexSignature(types.String,
 		types.Parameter{Name: "headers", Type: types.List{Element: types.String}},

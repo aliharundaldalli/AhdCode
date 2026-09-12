@@ -23,6 +23,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 )
 
 const hardLatexPayloadLimit = int64(250 * 1024 * 1024)
@@ -330,25 +331,18 @@ func fetchResources(url string, resources []resource, directory string) error {
 	worker := func() {
 		defer wait.Done()
 		for item := range jobs {
-			request, err := http.NewRequest(http.MethodGet, url, nil)
-			if err == nil {
-				request.Header.Set("Range", fmt.Sprintf("bytes=%d-%d", item.Offset, item.Offset+item.Length-1))
-				var response *http.Response
-				response, err = client.Do(request)
-				if err == nil {
-					if response.StatusCode != http.StatusPartialContent {
-						err = fmt.Errorf("resource %s range returned %s", item.Name, response.Status)
-					} else {
-						data, readError := io.ReadAll(io.LimitReader(response.Body, item.Length+1))
-						if readError != nil {
-							err = readError
-						} else if int64(len(data)) != item.Length || bytesSHA256(data) != item.SHA256 {
-							err = fmt.Errorf("resource %s checksum or length mismatch", item.Name)
-						} else {
-							err = os.WriteFile(filepath.Join(directory, item.Name), data, 0o600)
-						}
-					}
-					response.Body.Close()
+			// The pinned source rate-limits bursts of range requests. A
+			// throttled, failed-server, or dropped request is retried with a
+			// bounded backoff; a checksum or length mismatch is never retried.
+			var err error
+			for attempt := 0; attempt < 6; attempt++ {
+				if attempt > 0 {
+					time.Sleep(time.Duration(attempt*attempt) * 500 * time.Millisecond)
+				}
+				var retry bool
+				retry, err = fetchResource(client, url, item, directory)
+				if err == nil || !retry {
+					break
 				}
 			}
 			if err != nil {
@@ -380,6 +374,33 @@ func fetchResources(url string, resources []resource, directory string) error {
 	default:
 		return nil
 	}
+}
+
+// fetchResource downloads one pinned byte range and verifies it. It reports
+// whether a failure is transient and worth retrying.
+func fetchResource(client *http.Client, url string, item resource, directory string) (bool, error) {
+	request, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return false, err
+	}
+	request.Header.Set("Range", fmt.Sprintf("bytes=%d-%d", item.Offset, item.Offset+item.Length-1))
+	response, err := client.Do(request)
+	if err != nil {
+		return true, err
+	}
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusPartialContent {
+		retry := response.StatusCode == http.StatusTooManyRequests || response.StatusCode >= 500
+		return retry, fmt.Errorf("resource %s range returned %s", item.Name, response.Status)
+	}
+	data, err := io.ReadAll(io.LimitReader(response.Body, item.Length+1))
+	if err != nil {
+		return true, err
+	}
+	if int64(len(data)) != item.Length || bytesSHA256(data) != item.SHA256 {
+		return false, fmt.Errorf("resource %s checksum or length mismatch", item.Name)
+	}
+	return false, os.WriteFile(filepath.Join(directory, item.Name), data, 0o600)
 }
 
 func extractEngine(archivePath, kind, output string) error {
