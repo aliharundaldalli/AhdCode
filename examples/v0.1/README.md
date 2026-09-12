@@ -20,16 +20,18 @@ ahdcode run examples/v0.1/14_grade_app.ahd
 `Latex` and `PDF` share one offline renderer. Before running any example that
 compiles a PDF -- `16_latex.ahd`, `34_latex_report.ahd`, `35_latex_beamer.ahd`,
 `36_full_workflow.ahd`, `41_latex_beamer_themes.ahd`, `55_pdf_basic.ahd`,
-`56_pdf_word_excel.ahd`, `58_latex_pdf_tex_archive.ahd`, or
-`61_tikz_certificate.ahd` -- stage it once from a source checkout (release
-packages already include it):
+`56_pdf_word_excel.ahd`, `58_latex_pdf_tex_archive.ahd`,
+`61_tikz_certificate.ahd`, `64_verifiable_certificate.ahd`,
+`65_product_label.ahd`, `66_latex_professional_report.ahd`,
+`67_pdf_professional_report.ahd`, or `68_svg_assets.ahd` -- stage it once from
+a source checkout (release packages already include it):
 
 ```bash
 go run ./tooling/latex/cmd/package-latex --output "$(go env GOPATH)"
 ```
 
-`57_archive.ahd` needs no such staging: `Archive` uses only the Go standard
-library and runs anywhere, offline, with no external renderer.
+`57_archive.ahd`, `62_qr.ahd`, and `63_barcode.ahd` need no such staging:
+`Archive`, `QR`, and `Barcode` run anywhere, offline, with no external renderer.
 
 | Example | Topic |
 |---|---|
@@ -94,5 +96,12 @@ library and runs anywhere, offline, with no external renderer.
 | `59_characters.ahd` | Characters module: code points, classification, Turkish letters, emoji, a combining sequence, and CharactersError |
 | `60_cron.ahd` | Cron module: `Cron.next`, a validation error, and a self-stopping heartbeat Scheduler (ends within about two minutes) |
 | `61_tikz_certificate.ahd` | Latex + TikZ: a landscape certificate with vector borders, pgfornament corners, a watermark, and a seal |
+| `62_qr.ahd` | QR module: `QR.create`, error-correction levels, the module matrix, PNG and SVG output, and QRError |
+| `63_barcode.ahd` | Barcode module: EAN-13 and UPC-A check digits, Code 128, bar patterns, PNG and SVG output, and BarcodeError |
+| `64_verifiable_certificate.ahd` | Latex: a certificate with an SVG logo and a verification QR code placed on the page, a link, and PDF properties |
+| `65_product_label.ahd` | Barcode, QR, and PDF: EAN-13, Code 128, and QR files plus a 10 x 10 cm vector PDF label |
+| `66_latex_professional_report.ahd` | Latex: A4 margins, a header with an SVG logo, "Page X of Y" footers, a bookmark, PDF properties, and a QR code |
+| `67_pdf_professional_report.ahd` | PDF: the same report through `layout`, `header`, `footer`, `pageNumbers`, `bookmark`, `metadata`, `qr`, and `link` |
+| `68_svg_assets.ahd` | SVG files as vector images in Latex and PDF, image transforms, and a rejected unsupported SVG |
 
 `Greeting.ahd` is the sibling module used by `11_modules.ahd`.

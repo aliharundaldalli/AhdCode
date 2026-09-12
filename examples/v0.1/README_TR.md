@@ -21,16 +21,18 @@ ahdcode run examples/v0.1/14_grade_app.ahd
 derleyen herhangi bir örneği çalıştırmadan önce -- `16_latex.ahd`,
 `34_latex_report.ahd`, `35_latex_beamer.ahd`, `36_full_workflow.ahd`,
 `41_latex_beamer_themes.ahd`, `55_pdf_basic.ahd`, `56_pdf_word_excel.ahd`,
-`58_latex_pdf_tex_archive.ahd` veya `61_tikz_certificate.ahd` -- kaynak
-deposundan çalışıyorsanız onu bir kez hazırlayın (stage; sürüm paketleri zaten
-içerir):
+`58_latex_pdf_tex_archive.ahd`, `61_tikz_certificate.ahd`,
+`64_verifiable_certificate.ahd`, `65_product_label.ahd`,
+`66_latex_professional_report.ahd`, `67_pdf_professional_report.ahd` veya
+`68_svg_assets.ahd` -- kaynak deposundan çalışıyorsanız onu bir kez hazırlayın
+(stage; sürüm paketleri zaten içerir):
 
 ```bash
 go run ./tooling/latex/cmd/package-latex --output "$(go env GOPATH)"
 ```
 
-`57_archive.ahd` böyle bir hazırlığa ihtiyaç duymaz: `Archive` yalnızca Go
-standart kütüphanesini kullanır ve harici bir render motoru olmadan, her
+`57_archive.ahd`, `62_qr.ahd` ve `63_barcode.ahd` böyle bir hazırlığa ihtiyaç
+duymaz: `Archive`, `QR` ve `Barcode` harici bir render motoru olmadan, her
 yerde, çevrimdışı çalışır.
 
 | Örnek | Konu |
@@ -96,6 +98,13 @@ yerde, çevrimdışı çalışır.
 | `59_characters.ahd` | Characters modülü: kod noktaları, sınıflandırma, Türkçe harfler, emoji, birleşen dizi ve CharactersError |
 | `60_cron.ahd` | Cron modülü: `Cron.next`, bir doğrulama hatası ve kendini durduran bir kalp atışı Scheduler'ı (yaklaşık iki dakikada biter) |
 | `61_tikz_certificate.ahd` | Latex + TikZ: vektör kenarlıklar, pgfornament köşeleri, filigran ve mühürlü yatay bir sertifika |
+| `62_qr.ahd` | QR modülü: `QR.create`, hata düzeltme seviyeleri, modül matrisi, PNG ve SVG çıktısı ve QRError |
+| `63_barcode.ahd` | Barcode modülü: EAN-13 ve UPC-A kontrol basamakları, Code 128, çubuk desenleri, PNG ve SVG çıktısı ve BarcodeError |
+| `64_verifiable_certificate.ahd` | Latex: sayfaya yerleştirilmiş SVG logo ve doğrulama QR kodu, bağlantı ve PDF özellikleri olan bir sertifika |
+| `65_product_label.ahd` | Barcode, QR ve PDF: EAN-13, Code 128 ve QR dosyaları ile 10 x 10 cm vektör PDF etiketi |
+| `66_latex_professional_report.ahd` | Latex: A4 kenar boşlukları, SVG logolu üst bilgi, "Sayfa X / Y" alt bilgileri, yer imi, PDF özellikleri ve QR kodu |
+| `67_pdf_professional_report.ahd` | PDF: aynı rapor; `layout`, `header`, `footer`, `pageNumbers`, `bookmark`, `metadata`, `qr` ve `link` ile |
+| `68_svg_assets.ahd` | Latex ve PDF'te vektör görsel olarak SVG dosyaları, görsel dönüşümleri ve reddedilen desteklenmeyen bir SVG |
 
 `Greeting.ahd`, `11_modules.ahd` tarafından kullanılan kardeş (sibling)
 modüldür.

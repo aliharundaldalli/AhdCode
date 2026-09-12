@@ -1,0 +1,41 @@
+// 65 - A product label.
+//
+// One product, three machine-readable codes: an EAN-13 for the checkout, a
+// Code 128 with the stock-keeping unit for the warehouse, and a QR code that
+// opens the product page. Each code is saved as a standalone PNG or SVG for
+// other tools, and all three go onto a 10 x 10 cm PDF label as vector
+// graphics.
+bring Barcode
+bring QR
+bring PDF
+from PDF bring PDFDocument
+from PDF bring PDFError
+
+sku: String := "AHD-WIDGET-42"
+product := Barcode.ean13("590123412345")
+warehouse := Barcode.code128(sku)
+page := QR.create("https://ahdcode.org/p/" + sku, "Q")
+
+product.savePNG("label-ean13.png")
+warehouse.saveSVG("label-code128.svg", 7.0, 1.6)
+page.saveSVG("label-qr.svg", 3.0)
+write("EAN-13 with its check digit: " + product.value())
+
+margins: Pair<String, Real> := {"top": 0.6, "right": 0.6, "bottom": 0.6, "left": 0.6}
+label: PDFDocument := PDF.new().layout("Custom", false, {"width": 10.0, "height": 10.0}, margins)
+// An empty footer removes the page number a label does not need.
+label = label.footer("")
+label = label.metadata("Label " + sku, "AhdCode Widgets", "Product label", ["label", "EAN-13", "Code 128"], "AhdCode")
+label = label.paragraph("AhdCode Widget, Model 42", "center", true, false, false)
+label = label.barcode("EAN13", product.value(), 6.0, 1.8, "center")
+label = label.barcode("Code128", warehouse.value(), 7.0, 1.2, "center")
+label = label.qr(page.value(), 2.4, "Q", "center")
+label = label.link("ahdcode.org/p/" + sku, page.value(), "center")
+
+attempt {
+    label.save("product-label.pdf")
+    write("product-label.pdf saved")
+}
+except PDFError as error {
+    write("label failed: " + error.message)
+}

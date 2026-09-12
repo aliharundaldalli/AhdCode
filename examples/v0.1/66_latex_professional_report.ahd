@@ -1,0 +1,51 @@
+// 66 - A professional multi-page report with Latex.
+//
+// Every page gets a running header with a vector SVG logo and a footer with a
+// link and "Page X of Y". The page is A4 with a deeper top margin, the PDF
+// carries document properties, an explicit bookmark jumps to the
+// verification code, and the report ends with a QR code for its online
+// version. 67 builds the same report with the PDF module.
+bring Latex as L
+bring File
+from Latex bring LatexError
+
+File.writeText("report-logo.svg", r"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 60" width="240" height="60">
+<rect x="0" y="0" width="240" height="60" rx="12" fill="#1F4E79"/>
+<circle cx="30" cy="30" r="16" fill="#B08D57"/>
+<path d="M60 44 L76 16 L92 44 Z M104 16 H116 V44 H104 Z M128 16 H150 A14 14 0 0 1 150 44 H128 Z" fill="#FFFFFF"/>
+</svg>""")
+
+online: String := "https://ahdcode.org/reports/2026-q3"
+header: String := L.header(L.image("report-logo.svg", {"height": 0.7}), L.escape("Quarterly Report"), L.escape("Q3 2026"))
+footer: String := L.footer(L.link("ahdcode.org", "https://ahdcode.org"), "", "Page " + L.pageNumber() + " of " + L.pageCount())
+
+paragraph: String := L.escape("Revenue, costs, and delivery times were measured for every region. ")
+paragraph += L.escape("Each section below summarizes the quarter and compares it with the previous one, ")
+paragraph += L.escape("so the figures can be read without the underlying spreadsheets.") + "\n\n"
+
+body: String := header + footer + L.contents() + L.section("Summary") + paragraph + paragraph
+for region in ["North", "South", "East", "West", "Central"] {
+    body += L.section("Region " + region) + paragraph + paragraph + paragraph
+    body += L.table(["Metric", "Q2", "Q3"], [["Revenue", "118", "126"], ["Orders", "940", "1012"]])
+}
+body += L.pageBreak() + L.bookmark("Verification code") + L.section("Online version")
+body += L.center(L.qr(online, 3.5, "Q") + r"\par" + "\n" + L.link(L.escape("Open the online report"), online))
+
+source: String := L.document(
+    body: body
+    title: "Quarterly Report"
+    author: "AhdCode Analytics"
+    paper: "A4"
+    margins: {"top": 3.0, "bottom": 2.5, "left": 2.5, "right": 2.5}
+    subject: "Quarterly results for Q3 2026"
+    keywords: ["report", "Q3 2026", "regions"]
+    creator: "AhdCode"
+)
+
+attempt {
+    L.pdf(source, "latex-professional-report.pdf")
+    write("latex-professional-report.pdf written")
+}
+except LatexError as error {
+    write("report failed: " + error.message)
+}

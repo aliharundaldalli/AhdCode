@@ -1,0 +1,67 @@
+// 68 - SVG assets in Latex and PDF documents.
+//
+// An SVG file becomes vector drawing commands inside the PDF: no rasterizing,
+// no browser, and no external converter. Shapes, paths (including arcs),
+// groups with transforms, fills, strokes, dashes, and opacity are supported.
+// Text, gradients, masks, filters, embedded images, scripts, and external
+// references are rejected with a clear error instead of being dropped or
+// approximated. Images also take a transform: rotation, opacity, and trims.
+bring Latex as L
+bring PDF
+bring File
+from Latex bring LatexError
+from PDF bring PDFDocument
+from PDF bring PDFError
+
+File.writeText("svg-chart.svg", r"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 240" width="400" height="240">
+<rect x="0" y="0" width="400" height="240" fill="#F7F4EE"/>
+<g transform="translate(40 200)" stroke="#1F4E79" stroke-width="2">
+  <line x1="0" y1="0" x2="330" y2="0"/>
+  <line x1="0" y1="0" x2="0" y2="-180"/>
+  <line x1="0" y1="-60" x2="330" y2="-60" stroke-dasharray="6 4" stroke-opacity="0.4"/>
+  <line x1="0" y1="-120" x2="330" y2="-120" stroke-dasharray="6 4" stroke-opacity="0.4"/>
+</g>
+<g transform="translate(40 200)" fill="#1F4E79">
+  <rect x="20" y="-90" width="40" height="90"/>
+  <rect x="90" y="-140" width="40" height="140"/>
+  <rect x="160" y="-110" width="40" height="110" fill-opacity="0.7"/>
+  <rect x="230" y="-165" width="40" height="165" fill="#B08D57"/>
+</g>
+<polyline points="80,120 150,70 220,95 290,40" fill="none" stroke="#B08D57" stroke-width="4" stroke-linejoin="round"/>
+<circle cx="290" cy="40" r="8" fill="#B08D57"/>
+<path d="M340 200 A 30 30 0 0 1 370 170" fill="none" stroke="#1F4E79" stroke-width="3"/>
+</svg>""")
+File.writeText("svg-with-text.svg", r"""<svg xmlns="http://www.w3.org/2000/svg" width="100" height="40"><text x="4" y="24">Label</text></svg>""")
+
+// Latex: a numbered figure and a rotated, faded, trimmed copy.
+body: String := L.section("Vector chart")
+body += L.figure("svg-chart.svg", "Quarterly orders, kept as vector graphics", "fig:chart", {"width": 12.0})
+body += L.center(L.image("svg-chart.svg", {"width": 6.0}, {"rotation": -8.0, "opacity": 0.5, "trimRight": 1.0}))
+attempt {
+    L.pdf(L.document(body: body, paper: "A4"), "svg-latex.pdf")
+    write("svg-latex.pdf written")
+}
+except LatexError as error {
+    write("Latex failed: " + error.message)
+}
+
+// PDF: the same chart through typed operations.
+doc: PDFDocument := PDF.new().heading("Vector chart", 1)
+doc = doc.image("svg-chart.svg", {"width": 12.0})
+doc = doc.paragraph("A rotated, faded, and trimmed copy:")
+doc = doc.image("svg-chart.svg", {"width": 6.0}, {"rotation": -8.0, "opacity": 0.5, "trimRight": 1.0})
+attempt {
+    doc.save("svg-pdf.pdf")
+    write("svg-pdf.pdf saved")
+}
+except PDFError as error {
+    write("PDF failed: " + error.message)
+}
+
+// PDF converts an SVG when it is added, so an unsupported one fails at once.
+attempt {
+    doc = doc.image("svg-with-text.svg")
+}
+except PDFError as error {
+    write("PDFError: " + error.message)
+}

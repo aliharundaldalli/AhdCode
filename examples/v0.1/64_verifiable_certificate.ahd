@@ -1,0 +1,75 @@
+// 64 - A verifiable certificate.
+//
+// Builds on 61: the same vector frame, pgfornament corners, and watermark,
+// plus the v1.3.0 document helpers. An SVG logo and a verification QR code
+// are placed at exact positions on the page, a clickable link points to the
+// same verification page, and the PDF carries subject, keywords, and creator
+// properties. The logo and the QR code stay vector graphics: nothing is
+// rasterized, and no external converter or network service is involved.
+bring Latex as L
+bring File
+from Latex bring LatexError
+
+File.writeText("certificate-logo.svg", r"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+<circle cx="60" cy="60" r="56" fill="#1F4E79"/>
+<circle cx="60" cy="60" r="44" fill="none" stroke="#B08D57" stroke-width="6"/>
+<path d="M36 84 L60 30 L84 84 Z" fill="#FFFFFF"/>
+</svg>""")
+
+serial: String := "AHD-2026-0042"
+verification: String := "https://ahdcode.org/verify?id=" + serial
+recipient: String := L.escape("Ayşe Yılmaz")
+course: String := L.escape("Numerical Methods with AhdCode")
+
+frame: String := L.border(inset: 0.8, thickness: 2.4, color: "#1F4E79")
+frame += L.border(inset: 1.25, thickness: 0.6, color: "#B08D57")
+decoration: String := L.overlay(source: r"""
+\definecolor{gold}{HTML}{B08D57}
+\node[anchor=north east, inner sep=0pt] at ([shift={(-1.6cm,-1.6cm)}]current page.north east)
+    {\color{gold}\pgfornament[width=2.5cm, symmetry=v]{63}};
+\node[anchor=south west, inner sep=0pt] at ([shift={(1.6cm,1.6cm)}]current page.south west)
+    {\color{gold}\pgfornament[width=2.5cm, symmetry=h]{63}};
+\node[opacity=0.05, rotate=25, scale=10] at (current page.center) {\bfseries AhdCode};
+""", libraries: ["pgfornament"])
+
+// The A4 landscape page is 29.7 cm wide and 21 cm tall; place measures from
+// its top-left corner. The anchor names the point of the content that lands
+// on (x, y).
+marks: String := L.place(L.image("certificate-logo.svg", {"height": 2.4}), 2.2, 2.0)
+marks += L.place(r"{\footnotesize " + L.escape("No. " + serial) + r"}", 2.2, 4.7)
+marks += L.place(L.qr(verification, 2.6, "Q"), 27.3, 18.2, "south east")
+marks += L.place(r"{\footnotesize " + L.escape("Scan to verify") + r"}", 26.0, 18.4, "north")
+
+signature: Function := (label: String) -> String {
+    line: Local String := r"\rule{6cm}{0.4pt}\\[4pt]" + L.escape(label)
+    return L.minipage(line, 7.0, "center")
+}
+
+text: String := r"{\color{ahdaccent}\fontsize{36}{42}\selectfont\bfseries Certificate of Achievement}\par\vspace{0.8cm}" + "\n"
+text += r"{\Large This certificate is proudly presented to}\par\vspace{0.5cm}" + "\n"
+text += r"{\fontsize{30}{36}\selectfont\itshape " + recipient + r"}\par\vspace{0.5cm}" + "\n"
+text += r"{\large for successfully completing}\par\vspace{0.2cm}" + "\n"
+text += r"{\Large\bfseries " + course + r"}\par\vspace{0.6cm}" + "\n"
+text += "Verify at " + L.link("ahdcode.org/verify", verification) + r"\par\vspace{1.2cm}" + "\n"
+text += signature("Course Instructor") + r"\hspace{2cm}" + signature("Issued 12 September 2026")
+
+page: String := r"\thispagestyle{empty}" + "\n" + frame + decoration + marks
+page += r"\vspace*{\fill}" + "\n" + L.center(text) + r"\vspace*{\fill}" + "\n"
+document: String := L.document(
+    body: page
+    margin: 2.5
+    color: "#1F4E79"
+    landscape: true
+    paper: "A4"
+    subject: "Certificate of Achievement " + serial
+    keywords: ["certificate", "AhdCode", serial]
+    creator: "AhdCode"
+)
+
+attempt {
+    L.pdf(document, "verifiable-certificate.pdf")
+    write("verifiable-certificate.pdf written")
+}
+except LatexError as error {
+    write("certificate failed: " + error.message)
+}

@@ -1,0 +1,44 @@
+// 67 - The same professional report with the PDF module.
+//
+// PDF builds the document from typed operations, and every String stays plain
+// text. The page layout, running header and footer, page numbers with the
+// total, PDF properties, bookmarks, SVG logo, QR code, and link match 66
+// without writing any LaTeX. A PDFDocument's outline is exactly its bookmark
+// calls; headings do not add entries of their own.
+bring PDF
+bring File
+from PDF bring PDFDocument
+from PDF bring PDFError
+
+File.writeText("report-logo.svg", r"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 60" width="240" height="60">
+<rect x="0" y="0" width="240" height="60" rx="12" fill="#1F4E79"/>
+<circle cx="30" cy="30" r="16" fill="#B08D57"/>
+<path d="M60 44 L76 16 L92 44 Z M104 16 H116 V44 H104 Z M128 16 H150 A14 14 0 0 1 150 44 H128 Z" fill="#FFFFFF"/>
+</svg>""")
+
+online: String := "https://ahdcode.org/reports/2026-q3"
+paragraph: String := "Revenue, costs, and delivery times were measured for every region. Each section below summarizes the quarter and compares it with the previous one, so the figures can be read without the underlying spreadsheets."
+
+doc: PDFDocument := PDF.new().layout("A4", false, {}, {"top": 3.0, "bottom": 2.5, "left": 2.5, "right": 2.5})
+doc = doc.header("AhdCode Analytics", "Quarterly Report", "Q3 2026")
+doc = doc.footer("ahdcode.org").pageNumbers("right", true)
+doc = doc.metadata("Quarterly Report", "AhdCode Analytics", "Quarterly results for Q3 2026", ["report", "Q3 2026", "regions"], "AhdCode")
+doc = doc.image("report-logo.svg", {"height": 1.2})
+doc = doc.bookmark("Summary").heading("Summary", 1)
+doc = doc.paragraph(paragraph, "justify").paragraph(paragraph, "justify")
+for region in ["North", "South", "East", "West", "Central"] {
+    doc = doc.bookmark("Region " + region, 2).heading("Region " + region, 2)
+    doc = doc.paragraph(paragraph, "justify").paragraph(paragraph, "justify").paragraph(paragraph, "justify")
+    doc = doc.table(["Metric", "Q2", "Q3"], [["Revenue", "118", "126"], ["Orders", "940", "1012"]], "left")
+}
+doc = doc.pageBreak().bookmark("Online version").heading("Online version", 1)
+doc = doc.qr(online, 3.5, "Q", "center")
+doc = doc.link("Open the online report", online, "center")
+
+attempt {
+    doc.save("pdf-professional-report.pdf")
+    write("pdf-professional-report.pdf saved")
+}
+except PDFError as error {
+    write("report failed: " + error.message)
+}

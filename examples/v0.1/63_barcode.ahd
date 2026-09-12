@@ -1,0 +1,31 @@
+// 63 - Barcodes.
+//
+// Barcode creates the linear symbols retail and logistics use: EAN-13 and
+// UPC-A for products, and Code 128 for ASCII text such as order numbers.
+// EAN-13 and UPC-A compute their check digit when it is left off and reject a
+// wrong one. A BarcodeCode is immutable: it exposes its bar pattern and writes
+// a PNG or a vector SVG, with the standard quiet zones included.
+bring Barcode
+from Barcode bring BarcodeCode
+from Barcode bring BarcodeError
+
+product: BarcodeCode := Barcode.ean13("590123412345")
+write(product.kind() + " " + product.value())
+write("modules: " + str(len(product.pattern())))
+product.savePNG("product-ean13.png")
+product.saveSVG("product-ean13.svg", 6.0, 2.0)
+
+grocery: BarcodeCode := Barcode.upca("03600029145")
+write(grocery.kind() + " " + grocery.value())
+grocery.saveSVG("grocery-upca.svg")
+
+shipment: BarcodeCode := Barcode.code128("AHD-2026-0042")
+write(shipment.kind() + " " + shipment.value())
+shipment.savePNG("shipment-code128.png", 1200, 300)
+
+attempt {
+    Barcode.ean13("5901234123450")
+}
+except BarcodeError as error {
+    write("BarcodeError: " + error.message)
+}

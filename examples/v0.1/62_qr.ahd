@@ -1,0 +1,35 @@
+// 62 - QR codes.
+//
+// QR.create encodes any String -- a URL, contact text, Turkish letters, or
+// emoji -- at an error-correction level: L, M (the default), Q, or H. A higher
+// level survives more damage and needs more modules. The QRCode value is
+// immutable: it exposes the symbol as a Bool matrix and writes a crisp PNG or
+// a vector SVG. Everything happens in the program; there is no network
+// service and no external tool. QR creates codes; it does not read them.
+bring QR
+from QR bring QRCode
+from QR bring QRError
+
+site: QRCode := QR.create("https://ahdcode.org")
+write("value: " + site.value())
+write("level: " + site.level())
+write("modules per side: " + str(site.size()))
+matrix: List<List<Bool>> := site.matrix()
+write("matrix rows: " + str(len(matrix)))
+
+// A PNG is pixel-exact: every module is a whole number of pixels, and a quiet
+// zone of four modules surrounds the symbol. An SVG stays sharp at any size.
+site.savePNG("site-qr.png")
+site.savePNG("site-qr-print.png", 1024)
+site.saveSVG("site-qr.svg", 4.0)
+
+greeting: QRCode := QR.create("Merhaba Dünya! 😊 AhdCode", "H")
+greeting.saveSVG("greeting-qr.svg")
+write("level H modules per side: " + str(greeting.size()))
+
+attempt {
+    QR.create("https://ahdcode.org", "X")
+}
+except QRError as error {
+    write("QRError: " + error.message)
+}
