@@ -297,23 +297,40 @@ Yalnızca PHC dizisini saklayın. Ayrı bir tuz sütunu gerekmez.
 ```ahd
 bring Security
 bring SQLite
-from Security bring SecurityError
+from SQLite bring Database
 
-db := SQLite.open("users.db")
-db.execute("CREATE TABLE IF NOT EXISTS users (username TEXT PRIMARY KEY, hash TEXT NOT NULL)")
-
+db: Database := SQLite.open("users.db")
+db.execute(
+    "CREATE TABLE IF NOT EXISTS users (username TEXT PRIMARY KEY, hash TEXT NOT NULL)"
+)
 // Register
-fn register(db: Database, username: String, password: String) {
-    db.execute("INSERT INTO users (username, hash) VALUES (?, ?)",
-        [SQLite.fromString(username), SQLite.fromString(Security.passwordHash(password))])
+register: Function := (
+    database: Database
+    username: String
+    password: String
+) -> Nothing {
+    database.execute(
+        "INSERT INTO users (username, hash) VALUES (?, ?)"
+        [
+            SQLite.fromString(username)
+            SQLite.fromString(Security.passwordHash(password))
+        ]
+    )
 }
-
 // Login
-fn login(db: Database, username: String, attempt: String) -> Bool {
-    rows := db.query("SELECT hash FROM users WHERE username = ?",
-        [SQLite.fromString(username)])
-    if len(rows) == 0 { return false }
-    return Security.passwordVerify(attempt, rows[0]["hash"].string())
+login: Function := (
+    database: Database
+    username: String
+    candidate: String
+) -> Bool {
+    rows: Local := database.query(
+        "SELECT hash FROM users WHERE username = ?"
+        [SQLite.fromString(username)]
+    )
+    if len(rows) == 0 {
+        return false
+    }
+    return Security.passwordVerify(candidate, rows[0]["hash"].string())
 }
 ```
 
