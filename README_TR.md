@@ -12,14 +12,16 @@ AhdCode; okunabilir sözdizimi, açık niyet (explicit intent), öngörülebilir
 anlambilim (semantics) ve yerel (native) derlemeye odaklanan, deneysel,
 statik olarak denetlenen genel amaçlı bir programlama dilidir.
 
-Bu, **v1.2.0**'dır. Dil, araç zinciri ve Web çatısı özellik olarak
+Bu, **v1.3.0**'dır. Dil, araç zinciri ve Web çatısı özellik olarak
 tamamlanmıştır; burada anlatılan çekirdek dil yüzeyi 1.0'ın taahhüt ettiği ve
-1.1 ile 1.2'nin değiştirmeden koruduğu yüzeydir.
+1.1, 1.2 ile 1.3'ün değiştirmeden koruduğu yüzeydir.
 
-v1.2.0 bir ara (minor) sürümdür, **Zamanlama, Vektör Belgeler ve Karakter
-Araçları**: `Cron` ve `Characters` standart modüllerini ve `Latex` için TikZ
-vektör grafiklerini ekler; çekirdek dilbilgisini ya da mevcut davranışların
-hiçbirini değiştirmez. Bkz. [v1.2.0 ile gelenler](#v120-ile-gelenler).
+v1.3.0 bir ara (minor) sürümdür, **Profesyonel Belgeler ve Makine Kodları**:
+`QR` ve `Barcode` standart modüllerini ve `Latex` ile `PDF` için profesyonel
+belge özelliklerini — sayfa düzeni, üst ve alt bilgiler, bağlantılar, yer
+imleri, PDF özellikleri, QR kodları, barkodlar, görsel dönüşümleri ve SVG
+varlıkları — ekler; çekirdek dilbilgisini ya da mevcut davranışların hiçbirini
+değiştirmez. Bkz. [v1.3.0 ile gelenler](#v130-ile-gelenler).
 
 Ürün, kendi kendine yeten bir platform paketi olarak dağıtılır: `ahdcode` CLI,
 özel Go 1.27.0 araç zinciri, AhdDataStudio, `ahdsqlite`, `ahdnumeric` ve
@@ -318,7 +320,7 @@ Kavramsal netliği korumak için AhdCode'un yetenekleri dört belirgin mimari ka
 2. **Standart Kütüphane (Birinci Taraf Gömülü Modüller):**
    - **Matematik ve Hesaplama:** [`Math`](docs/MATH_TR.md), [`Bits`](docs/BITS_TR.md) (`Int` üzerinde bit işlemleri), [`Regex`](docs/REGEX_TR.md), [`Statistics`](docs/STATISTICS_TR.md), [`Numeric`](docs/NUMERIC_TR.md), [`Plot`](docs/PLOT_TR.md)
    - **Veri ve Koleksiyonlar:** [`Lists`](docs/LISTS_TR.md), [`KeyValue`](docs/KEYVALUE_TR.md), [`Characters`](docs/CHARACTERS_TR.md) (Unicode kod noktaları ve sınıflandırma), [`CSV`](docs/CSV_TR.md), [`Data`](docs/DATA_TR.md), [`JSON`](docs/JSON_TR.md), [`XML`](docs/XML_TR.md)
-   - **Belge Üretimi:** [`Word`](docs/WORD_TR.md), [`Excel`](docs/EXCEL_TR.md), [`PDF`](docs/PDF_TR.md), [`Latex`](docs/LATEX_TR.md), [`Archive`](docs/ARCHIVE_TR.md)
+   - **Belge Üretimi:** [`Word`](docs/WORD_TR.md), [`Excel`](docs/EXCEL_TR.md), [`PDF`](docs/PDF_TR.md), [`Latex`](docs/LATEX_TR.md), [`QR`](docs/QR_TR.md) (QR kodları), [`Barcode`](docs/BARCODE_TR.md) (Code 128, EAN-13, UPC-A), [`Archive`](docs/ARCHIVE_TR.md)
    - **Sistem ve Ortam:** [`Time`](docs/TIME_TR.md), [`Cron`](docs/CRON_TR.md) (sınırlı, süreç içi zamanlama), [`Path`](docs/FILESYSTEM_TR.md), [`File`](docs/FILESYSTEM_TR.md), [`Env`](docs/ENV_TR.md)
 
 3. **Birinci Taraf Çalışma Zamanı / Çatı Modülleri:**
@@ -439,6 +441,8 @@ bakın.
 - [Word modülü](docs/WORD_TR.md)
 - [Excel modülü](docs/EXCEL_TR.md)
 - [PDF modülü](docs/PDF_TR.md)
+- [QR modülü](docs/QR_TR.md)
+- [Barcode modülü](docs/BARCODE_TR.md)
 - [Archive modülü](docs/ARCHIVE_TR.md)
 - [File ve Path modülleri](docs/FILESYSTEM_TR.md)
 - [Regex modülü](docs/REGEX_TR.md)
@@ -485,6 +489,42 @@ VS Code hem de Antigravity'i hedefler.
 [Kurulum rehberine](editors/vscode/README_TR.md) bakın.
 
 ## Mevcut sınırlamalar
+
+## v1.3.0 ile gelenler <a id="v130-ile-gelenler"></a>
+
+v1.3.0 bir **ara (minor)** sürümdür, **Profesyonel Belgeler ve Makine
+Kodları**. İki standart modül ve `Latex` ile `PDF` için profesyonel belge
+özellikleri ekler. Çekirdek dilbilgisi, tip sistemi ve daha önce yayımlanmış
+her fonksiyon davranışını korur; yeni parametreler isteğe bağlıdır ve sona
+eklenir, yeni özellikleri kullanmayan bir belge önceki gibi render edilir.
+
+**Yeni standart modül: [`QR`](docs/QR_TR.md)** — `QR.create(value, level)`,
+L, M, Q veya H hata düzeltme seviyesinde değişmez bir `QRCode` oluşturur,
+modül matrisini sunar ve keskin PNG ya da vektör SVG dosyaları kaydeder;
+`QRError` ile.
+
+**Yeni standart modül: [`Barcode`](docs/BARCODE_TR.md)** — `Barcode.code128`,
+`Barcode.ean13` ve `Barcode.upca`, hesaplanan veya doğrulanan kontrol
+basamaklarıyla değişmez `BarcodeCode` değerleri oluşturur, çubuk desenini
+sunar ve PNG ya da SVG dosyaları kaydeder; `BarcodeError` ile.
+
+**Genişletilen modül: [`Latex`](docs/LATEX_TR.md#profesyonel-belgeler-v130)** —
+`qr`, `barcode`, `place`, `header`, `footer`, `pageNumber`, `pageCount`,
+`link` ve `bookmark`; `document(paper:, pageSize:, margins:, subject:,
+keywords:, creator:)`; SVG dosyaları ile döndürme, opaklık ve kırpma içeren
+bir `transform` destekleyen `image`/`figure`. Çevrimdışı paket `fancyhdr` ve
+`lastpage`'i ekler.
+
+**Genişletilen modül: [`PDF`](docs/PDF_TR.md)** — `layout`, `header`,
+`footer`, `pageNumbers`, `qr`, `barcode`, `link`, `bookmark`, `metadata` ile
+SVG dosyaları ve `transform` destekleyen `image`; her String yine kaçışlanır
+ve ham TeX yoktur.
+
+SVG dosyaları program içinde vektör çizime dönüşür: asla rasterleştirilmez;
+tarayıcı, Inkscape veya başka bir harici dönüştürücü kullanılmaz. QR kodları
+ve barkodlar, vendor edilmiş MIT lisanslı bir kodlayıcıyla çevrimdışı
+üretilir. Bkz. [`examples/v0.1/62_qr.ahd`](examples/v0.1/62_qr.ahd) ile
+[`examples/v0.1/68_svg_assets.ahd`](examples/v0.1/68_svg_assets.ahd) arası.
 
 ## v1.2.0 ile gelenler <a id="v120-ile-gelenler"></a>
 

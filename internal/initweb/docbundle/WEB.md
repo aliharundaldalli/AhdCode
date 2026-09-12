@@ -568,7 +568,7 @@ Editing `public/app.css` does not.
 It also **refuses** `APP_PROTOCOL=https`:
 
 ```
-✗ Local HTTPS is not available in AhdCode v1.2.0.
+✗ Local HTTPS is not available in AhdCode v1.3.0.
   ahdcode dev serves plaintext HTTP, so it cannot honour
   APP_PROTOCOL=https.
 
@@ -807,6 +807,7 @@ configuration contract.
 | v0.20 | Component-owned CSS/JS, `managedAssets`, `Identity.id()`, Web limits, MVC/CRUD |
 | v1.0.0 | No Web API change; self-contained platform packaging |
 | v1.2.0 | No Web API change; [Cron](CRON.md) for scheduled work beside an application, [Characters](CHARACTERS.md), and TikZ in [Latex](LATEX.md) |
+| v1.3.0 | No Web API change; [QR](QR.md), [Barcode](BARCODE.md), and professional documents in [Latex](LATEX.md) and [PDF](PDF.md) |
 
 ## Cron: scheduled application work
 
@@ -896,6 +897,30 @@ FPDF, or a pre-rendered border image to draw shapes on a document the
 application already produces through Latex. See
 [Latex: vector graphics with TikZ](LATEX.md#vector-graphics-with-tikz-v120) and
 the complete certificate in `examples/v0.1/61_tikz_certificate.ahd`.
+
+Since v1.3.0 the same documents can carry machine-readable codes and
+professional page layout. `Latex.qr`, `Latex.barcode`, `Latex.place`,
+`Latex.header`, `Latex.footer`, `Latex.link`, and `Latex.bookmark` add a
+verification QR code, a product barcode, headers and footers with
+"Page X of Y", links, and an outline; `Latex.document` takes `paper`,
+`margins`, and PDF properties; and `Latex.image` accepts SVG logos, kept as
+vector graphics. An application that prefers typed operations to LaTeX uses
+the same features through `PDFDocument.layout`, `header`, `footer`,
+`pageNumbers`, `qr`, `barcode`, `link`, `bookmark`, and `metadata`. The
+[QR](QR.md) and [Barcode](BARCODE.md) modules write the same codes as PNG or
+SVG files — for a ticket's QR code, for example:
+
+```ahd
+bring QR
+
+QR.create("https://example.test/tickets/42", "Q").savePNG("ticket-42.png", 600)
+```
+
+Codes are generated inside the application process, so no third-party QR
+service ever receives the ticket URL. See
+[Latex: professional documents](LATEX.md#professional-documents-v130),
+[PDF](PDF.md), `examples/v0.1/64_verifiable_certificate.ahd`, and
+`examples/v0.1/65_product_label.ahd`.
 
 ## 22. v0.20: Web assets, resource boundaries, and application patterns
 

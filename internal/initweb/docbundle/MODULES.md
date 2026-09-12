@@ -57,7 +57,7 @@ same types, not copies: a `Request` reached through `Web` registers on a bare
 `HTTP.Server` unchanged. Only `Web` is public; the framework's internal
 modules are reachable from framework source alone.
 
-`Math`, `Time`, `Cron`, `Latex`, `Word`, `Excel`, `PDF`, `Archive`, `Path`, `File`, `Regex`, `Characters`, `CSV`, `Data`, `Statistics`, `Plot`, `Numeric`, `JSON`, `SQLite`, `HTTP`, `HTML`, `SMTP`, `XML`, `Env`, `Lists`, `KeyValue`, `Security`, `Identity`, and `Bits` are compiler-registered and use
+`Math`, `Time`, `Cron`, `Latex`, `Word`, `Excel`, `PDF`, `QR`, `Barcode`, `Archive`, `Path`, `File`, `Regex`, `Characters`, `CSV`, `Data`, `Statistics`, `Plot`, `Numeric`, `JSON`, `SQLite`, `HTTP`, `HTML`, `SMTP`, `XML`, `Env`, `Lists`, `KeyValue`, `Security`, `Identity`, and `Bits` are compiler-registered and use
 these same import forms. A local file cannot shadow a standard module of the
 same name. `HTTP` is both the inbound server (`Server` / `Request` /
 `Response`, cookies, sessions) and the outbound `Client` / `ClientRequest` /
@@ -69,7 +69,7 @@ bring File as F
 F.writeText("note.txt", "hello")
 ```
 
-See [Time](TIME.md), [Cron](CRON.md), [Characters](CHARACTERS.md), [Bits](BITS.md), [Latex](LATEX.md), [CSV](CSV.md), [Data](DATA.md), [Statistics](STATISTICS.md), [Plot](PLOT.md), [Numeric](NUMERIC.md), [Word](WORD.md), [Excel](EXCEL.md), [PDF](PDF.md), [Archive](ARCHIVE.md), [JSON](JSON.md), [SQLite](SQLITE.md), [HTTP](HTTP.md), [HTML](HTML.md), [SMTP](SMTP.md), [XML](XML.md), [Env](ENV.md), [Lists](LISTS.md), [KeyValue](KEYVALUE.md), [Identity](IDENTITY.md), and the other module-specific references
+See [Time](TIME.md), [Cron](CRON.md), [Characters](CHARACTERS.md), [Bits](BITS.md), [Latex](LATEX.md), [CSV](CSV.md), [Data](DATA.md), [Statistics](STATISTICS.md), [Plot](PLOT.md), [Numeric](NUMERIC.md), [Word](WORD.md), [Excel](EXCEL.md), [PDF](PDF.md), [QR](QR.md), [Barcode](BARCODE.md), [Archive](ARCHIVE.md), [JSON](JSON.md), [SQLite](SQLITE.md), [HTTP](HTTP.md), [HTML](HTML.md), [SMTP](SMTP.md), [XML](XML.md), [Env](ENV.md), [Lists](LISTS.md), [KeyValue](KEYVALUE.md), [Identity](IDENTITY.md), and the other module-specific references
 for their typed surfaces and catchable domain errors.
 
 To learn CSV, Data, Plot, Excel, Word, Latex, HTTP(S), and HTML as connected

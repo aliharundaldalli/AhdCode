@@ -60,7 +60,7 @@ kopya değil, aynı türlerdir: `Web` üzerinden ulaşılan bir `Request` çıpl
 `HTTP.Server` üzerine değişmeden kaydolur. Yalnızca `Web` geneldir; çatının iç
 modüllerine yalnızca çatı kaynağından erişilebilir.
 
-`Math`, `Time`, `Cron`, `Latex`, `Word`, `Excel`, `PDF`, `Archive`, `Path`, `File`, `Regex`, `Characters`, `CSV`, `Data`, `Statistics`, `Plot`, `Numeric`, `JSON`, `SQLite`, `HTTP`, `HTML`, `SMTP`, `XML`, `Env`, `Lists`, `KeyValue`, `Security`, `Identity` ve `Bits` derleyici tarafından
+`Math`, `Time`, `Cron`, `Latex`, `Word`, `Excel`, `PDF`, `QR`, `Barcode`, `Archive`, `Path`, `File`, `Regex`, `Characters`, `CSV`, `Data`, `Statistics`, `Plot`, `Numeric`, `JSON`, `SQLite`, `HTTP`, `HTML`, `SMTP`, `XML`, `Env`, `Lists`, `KeyValue`, `Security`, `Identity` ve `Bits` derleyici tarafından
 kayıtlıdır (compiler-registered) ve aynı içe aktarım biçimlerini kullanır.
 Yerel bir dosya, aynı isimdeki standart bir modülün yerini alamaz (shadow
 edemez). `HTTP` hem gelen sunucu (`Server` / `Request` / `Response`, çerezler,
@@ -76,7 +76,7 @@ F.writeText("note.txt", "hello")
 
 Tipli yüzeyleri ve yakalanabilir alan hataları için [Time](TIME_TR.md),
 [Cron](CRON_TR.md), [Characters](CHARACTERS_TR.md), [Bits](BITS_TR.md), [Latex](LATEX_TR.md),
-[CSV](CSV_TR.md), [Data](DATA_TR.md), [Statistics](STATISTICS_TR.md), [Plot](PLOT_TR.md), [Numeric](NUMERIC_TR.md), [Word](WORD_TR.md), [Excel](EXCEL_TR.md), [PDF](PDF_TR.md), [Archive](ARCHIVE_TR.md), [JSON](JSON_TR.md), [SQLite](SQLITE_TR.md), [HTTP](HTTP_TR.md), [HTML](HTML_TR.md), [SMTP](SMTP_TR.md), [XML](XML_TR.md), [Env](ENV_TR.md), [Lists](LISTS_TR.md), [KeyValue](KEYVALUE_TR.md) ve diğer modül referanslarına bakın.
+[CSV](CSV_TR.md), [Data](DATA_TR.md), [Statistics](STATISTICS_TR.md), [Plot](PLOT_TR.md), [Numeric](NUMERIC_TR.md), [Word](WORD_TR.md), [Excel](EXCEL_TR.md), [PDF](PDF_TR.md), [QR](QR_TR.md), [Barcode](BARCODE_TR.md), [Archive](ARCHIVE_TR.md), [JSON](JSON_TR.md), [SQLite](SQLITE_TR.md), [HTTP](HTTP_TR.md), [HTML](HTML_TR.md), [SMTP](SMTP_TR.md), [XML](XML_TR.md), [Env](ENV_TR.md), [Lists](LISTS_TR.md), [KeyValue](KEYVALUE_TR.md) ve diğer modül referanslarına bakın.
 
 CSV, Data, Plot, Excel, Word, Latex, HTTP(S) ve HTML'i tek tek API olarak
 değil, birbirine bağlanan öğrenci projeleri içinde öğrenmek için

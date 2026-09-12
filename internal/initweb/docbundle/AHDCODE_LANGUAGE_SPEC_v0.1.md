@@ -5457,7 +5457,8 @@ as ordinary text. `PDF` exposes no raw-markup escape hatch; use `Latex`
 directly for LaTeX source control.
 
 v0.1.20 uses a fixed A4 portrait layout with a 2.54cm margin; there is no
-page-size, orientation, or margin configuration.
+page-size, orientation, or margin configuration. v1.3.0 keeps that layout as
+the default and adds `layout` and the other operations of §73.2.
 
 `save(path)` requires a `.pdf` destination; another extension raises
 `PDFError`. It builds the PDFDocument's blocks into an internal LaTeX body,
@@ -5734,6 +5735,150 @@ diagnostics. The offline bundle carries PGF, TikZ, the libraries above, and
 pgfornament with its ornaments; compilation stays in untrusted mode without
 shell escape or network access. Raw String literals (§6.4) are the natural way
 to write TikZ, because they perform neither escape processing nor interpolation.
+
+## 72. QR and Barcode Standard Modules (v1.3.0)
+
+`bring QR` resolves to the compiler-supplied module `builtin:QR` and
+`bring Barcode` to `builtin:Barcode`; sibling files cannot shadow them. The
+modules add no syntax.
+
+```text
+QR.create(value: String, level: String = "M") -> QRCode
+QRCode.value()  -> String
+QRCode.level()  -> String
+QRCode.size()   -> Int
+QRCode.matrix() -> List<List<Bool>>
+QRCode.savePNG(path: String, pixels: Int = 512) -> Nothing
+QRCode.saveSVG(path: String, size: Real = 5.0)  -> Nothing
+
+Barcode.code128(value: String) -> BarcodeCode
+Barcode.ean13(value: String)   -> BarcodeCode
+Barcode.upca(value: String)    -> BarcodeCode
+BarcodeCode.kind()    -> String
+BarcodeCode.value()   -> String
+BarcodeCode.pattern() -> List<Bool>
+BarcodeCode.savePNG(path: String, width: Int = 800, height: Int = 240) -> Nothing
+BarcodeCode.saveSVG(path: String, width: Real = 8.0, height: Real = 2.4) -> Nothing
+```
+
+`QRCode` and `BarcodeCode` are immutable compiler-supplied Classes with one
+hidden field and no public constructor; their members are positional-only type
+operations. `QR.create` validates by encoding: `level` is exactly `L`, `M`,
+`Q`, or `H`, and `value` is a non-empty UTF-8 String that fits the largest
+symbol at that level. `size()` counts modules per side and `matrix()` lists
+them row by row from the top, `true` for dark, both without the four-module
+quiet zone. Code 128 accepts 1 to 80 ASCII characters; EAN-13 accepts 12
+digits, whose check digit is computed, or 13, whose check digit is verified;
+UPC-A accepts 11 or 12. A wrong check digit is an error and is never replaced.
+`value()` includes the check digit, and `pattern()` excludes the quiet zones of
+10 and 10 (Code 128), 11 and 7 (EAN-13), and 9 and 9 (UPC-A) modules.
+
+`savePNG` renders black on white at exactly the requested pixel dimensions
+with whole-pixel modules, leftover pixels widening the quiet zones evenly;
+`pixels` is `size() + 8` to 10000, a barcode `width` is its module count with
+quiet zones to 10000, and `height` is 1 to 10000. `saveSVG` dimensions are
+centimeters greater than 0 and at most 1000. The destination must carry the
+matching extension; the output is verified and published through a temporary
+file and a rename. Every failure raises `QRError` or `BarcodeError`, both
+derived from `Error`.
+
+The same encoders produce `Latex.qr`, `Latex.barcode`, `PDFDocument.qr`, and
+`PDFDocument.barcode` (§73), so a value yields the same symbol in every output.
+Encoding runs inside the program without network access or an external process,
+and a native program that uses no code carries no encoder. Decoding is not
+provided.
+
+## 73. Professional Document Helpers in Latex and PDF (v1.3.0)
+
+### 73.1 Latex
+
+```text
+Latex.qr(value: String, size: Real = 3.0, level: String = "M")             -> String
+Latex.barcode(kind: String, value: String, width: Real = 8.0, height: Real = 2.0) -> String
+Latex.place(content: String, x: Real, y: Real, anchor: String = "north west") -> String
+Latex.header(left: String = "", center: String = "", right: String = "")   -> String
+Latex.footer(left: String = "", center: String = "", right: String = "")   -> String
+Latex.pageNumber()                                                         -> String
+Latex.pageCount()                                                          -> String
+Latex.link(text: String, url: String)                                      -> String
+Latex.bookmark(title: String, level: Int = 1)                              -> String
+Latex.image(path: String, size: Pair<String, Real> = {}, transform: Pair<String, Real> = {}) -> String
+Latex.figure(path: String, caption: String, label: String = "",
+    size: Pair<String, Real> = {}, transform: Pair<String, Real> = {})     -> String
+Latex.document(..., landscape: Bool = false, paper: String = "Letter",
+    pageSize: Pair<String, Real> = {}, margins: Pair<String, Real> = {},
+    subject: String = "", keywords: List<String> = [], creator: String = "") -> String
+```
+
+Every helper returns a Latex fragment. `qr` and `barcode` are TikZ vector
+fragments (§71) drawn by the §72 encoders. `place` puts `content` `x` and `y`
+centimeters from the page's top-left corner (0 to 1000) with one of the anchors
+`north west`, `north`, `north east`, `west`, `center`, `east`, `south west`,
+`south`, and `south east`, through the shipout foreground hook of the page
+being filled, without moving text. `header` and `footer` set three regions of
+every page from the page on which they are reached; `pageNumber` and
+`pageCount` are the current page and the total count. `link` escapes its text
+and accepts only `https://`, `http://`, and `mailto:` URLs without control
+characters, at most 8192 bytes, encoding the URL so it cannot leave its
+argument. `bookmark` adds a PDF outline entry at level 1 to 4. `transform`
+accepts `rotation` (-360 to 360), `opacity` (0 to 1), and `trimLeft`, `trimTop`,
+`trimRight`, and `trimBottom` (0 to 1000 centimeters), applied after sizing as
+trim, rotation, then opacity. `paper` is exactly `A3`, `A4`, `A5`, `Letter`,
+`Legal`, or `Custom`; `Custom` requires `pageSize` with `width` and `height`;
+`margins` accepts `top`, `right`, `bottom`, and `left`, each defaulting to
+`margin`. Page layout, headers, and footers require Article or Report.
+`subject`, `keywords`, and `creator` record PDF properties, together with
+`title` and `author` once any of them is set; keywords are non-empty and free of
+commas. Input validation raises `ValueError`.
+
+`document` loads fancyhdr, lastpage, TikZ, the bookmark counter, and the image
+transform macros only when a fragment needs them, and emits page geometry and
+properties only when they are set; a document using none of them is
+byte-for-byte its v1.2.0 output.
+
+### 73.2 PDF
+
+```text
+PDFDocument.image(String, Pair<String, Real> = {}, Pair<String, Real> = {}) -> PDFDocument
+PDFDocument.layout(String, Bool = false, Pair<String, Real> = {}, Pair<String, Real> = {}) -> PDFDocument
+PDFDocument.header(String, String = "", String = "")             -> PDFDocument
+PDFDocument.footer(String, String = "", String = "")             -> PDFDocument
+PDFDocument.pageNumbers(String = "center", Bool = false)         -> PDFDocument
+PDFDocument.qr(String, Real = 3.0, String = "M", String = "center") -> PDFDocument
+PDFDocument.barcode(String, String, Real = 8.0, Real = 2.0, String = "center") -> PDFDocument
+PDFDocument.link(String, String, String = "left")                -> PDFDocument
+PDFDocument.bookmark(String, Int = 1)                            -> PDFDocument
+PDFDocument.metadata(String, String = "", String = "", List<String> = [], String = "") -> PDFDocument
+```
+
+The operations keep §66's model: positional-only, immutable, every String
+escaped, and no raw-markup operation. `qr`, `barcode`, `link`, `bookmark`, and
+`image` are content blocks rendered in order; `layout`, `header`, `footer`,
+`pageNumbers`, and `metadata` are document settings, and the last call of each
+wins. Without `layout` the page stays A4 portrait with 2.54 cm margins. Header
+and footer text is a single line; a footer replaces the default centered page
+number, and `pageNumbers` fills one footer region, which must be empty. The
+outline contains exactly the `bookmark` entries. Every validation — layout,
+text, URL, level, keyword, code value, image, and SVG — happens when the
+operation is called and raises `PDFError`, with the message of the shared
+runtime builder the interactive evaluator also uses.
+
+### 73.3 SVG assets
+
+`Latex.image`, `Latex.figure`, and `PDFDocument.image` accept `.svg` files. An
+SVG is converted inside the program, without an external process, into PGF
+drawing commands the offline engine draws; it is never rasterized. The
+supported subset is static vector artwork: `svg`, `g`, `path`, `rect`,
+`circle`, `ellipse`, `line`, `polyline`, `polygon`, same-document `use`,
+`defs`, simple `style` rules, solid colors, opacity, strokes and dashes,
+transforms, `viewBox`, and `preserveAspectRatio`. Text, gradients, patterns,
+clipping, masks, filters, markers, embedded images, scripts, animation, event
+attributes, external or `url(...)` references, colors with their own
+transparency, DOCTYPE declarations, and processing instructions are rejected
+with a message naming the feature. Latex converts at compilation and raises
+`LatexError`; PDF converts when `image` is called and raises `PDFError`. An SVG
+is bounded to 5 MiB, 100,000 elements, nesting depth 64, and 2,000,000 path
+segments.
 
 ---
 

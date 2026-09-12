@@ -32,7 +32,10 @@ document(
     body: String, title: String = "", author: String = "", date: String = "",
     type: String = "Article", margin: Real = 2.54, color: String = "",
     cover: String = "", theorems: Pair<String, String> = {},
-    theme: String = "Default", landscape: Bool = false
+    theme: String = "Default", landscape: Bool = false,
+    paper: String = "Letter", pageSize: Pair<String, Real> = {},
+    margins: Pair<String, Real> = {}, subject: String = "",
+    keywords: List<String> = [], creator: String = ""
 )                                         -> String
 
 chapter(title: String)                   -> String
@@ -44,8 +47,11 @@ equation(source: String, label: String = "") -> String
 theorem(type: String, body: String, label: String = "") -> String
 
 table(headers: List<String>, rows: List<List<String>>, mathColumns: List<Int> = []) -> String
-image(path: String, size: Pair<String, Real> = {})    -> String
-figure(path: String, caption: String, label: String = "", size: Pair<String, Real> = {}) -> String
+image(path: String, size: Pair<String, Real> = {}, transform: Pair<String, Real> = {}) -> String
+figure(
+    path: String, caption: String, label: String = "",
+    size: Pair<String, Real> = {}, transform: Pair<String, Real> = {}
+)                                         -> String
 
 minipage(body: String, width: Real, alignment: String = "left") -> String
 center(body: String)                     -> String
@@ -109,9 +115,9 @@ every new parameter at its default.
 - **`date`** defaults to `""` and is never filled in automatically with the
   system date — output stays deterministic across runs and machines.
 - **`margin`** is one document-wide value in **centimeters**, defaulting to
-  `2.54` (the effective v0.1.14 layout); there is no per-side margin or paper
-  size control, and orientation is the separate `landscape` parameter. It must
-  be positive.
+  `2.54` (the effective v0.1.14 layout). It must be positive. `margins`
+  (v1.3.0) overrides individual sides, `paper` and `pageSize` choose the page,
+  and orientation is the separate `landscape` parameter.
 - **`color`** is an optional `#RRGGBB` accent color (empty by default,
   preserving v0.1.14 output exactly). When set, it defines an `ahdaccent`
   color used for AhdCode-generated accents — the title/cover area and, for
@@ -143,6 +149,33 @@ every new parameter at its default.
   Article or Report sideways on the same paper, with the same `margin`. It is
   a general layout switch, not a certificate mode. Beamer slides are already
   wide, so `landscape: true` with `type: "Beamer"` raises `ValueError`.
+- **`paper`** (v1.3.0) defaults to `"Letter"`, the US Letter page every Latex
+  document has always used, and accepts exactly `"A3"`, `"A4"`, `"A5"`,
+  `"Letter"`, `"Legal"`, or `"Custom"`. `"Custom"` requires **`pageSize`**
+  with both `"width"` and `"height"` in centimeters; `pageSize` with any other
+  paper raises `ValueError`.
+- **`margins`** (v1.3.0) accepts any of `"top"`, `"right"`, `"bottom"`, and
+  `"left"` in centimeters; a side left out uses `margin`. Every length must be
+  greater than 0 and at most 1000, and the margins must leave room for
+  content. A non-default `paper`, a `pageSize`, or `margins` with
+  `type: "Beamer"` raises `ValueError`: slides have their own size.
+- **`subject`**, **`keywords`**, and **`creator`** (v1.3.0) set PDF document
+  properties. Once any of them is set, `title` and `author` are recorded as
+  properties too. Each keyword must be non-empty and free of commas. With all
+  three left empty, the document is byte-for-byte what it was before v1.3.0.
+
+```ahd
+source := L.document(
+    body: body
+    title: "Quarterly Report"
+    author: "AhdCode Analytics"
+    paper: "A4"
+    margins: {"top": 3.0, "bottom": 2.5}
+    subject: "Quarterly results"
+    keywords: ["report", "2026"]
+    creator: "AhdCode"
+)
+```
 
 ## Article, Report, Beamer
 
@@ -237,19 +270,40 @@ rule outside a Report document.
 
 ## Image and figure
 
-`image(path, size)` is an unnumbered figure fragment; `figure(path, caption,
-label, size)` is numbered, captioned, and (with a label) referenceable via
-`ref`. `size` is `Pair<String, Real>` with only `"width"`/`"height"` keys, in
-centimeters: width only or height only preserves aspect ratio, both fit
-explicitly, and an empty Pair uses the image's natural size.
+`image(path, size, transform)` is an unnumbered figure fragment;
+`figure(path, caption, label, size, transform)` is numbered, captioned, and
+(with a label) referenceable via `ref`. `size` is `Pair<String, Real>` with
+only `"width"`/`"height"` keys, in centimeters: width only or height only
+preserves aspect ratio, both fit explicitly, and an empty Pair uses the
+image's natural size.
 
 ```ahd
 body += L.image("logo.png", {"width": 6.0})
 body += L.figure("result.pdf", "Numerical solution", "fig:solution", {"width": 12.0})
 ```
 
-Supported formats are PNG, PDF, and JPEG. There is no crop, trim, rotation,
-subfigures, or exposed `graphicx`/float-placement options.
+Supported formats are PNG, PDF, JPEG, and (v1.3.0) SVG, which stays vector;
+see [SVG assets](#svg-assets-v130).
+
+`transform` (v1.3.0) is a `Pair<String, Real>` with these keys:
+
+| Key | Meaning | Range |
+|---|---|---|
+| `"rotation"` | degrees, counterclockwise | -360 to 360 |
+| `"opacity"` | 0 is invisible, 1 is opaque | 0 to 1 |
+| `"trimLeft"`, `"trimTop"`, `"trimRight"`, `"trimBottom"` | centimeters removed from that edge of the sized image | 0 to 1000 |
+
+The image is sized first, then trimmed, rotated, and faded; vector content
+stays vector. An unknown key, a value out of range, or trims that would remove
+the whole width or height raise `ValueError`. Without a transform, an image
+fragment is exactly what it was before v1.3.0.
+
+```ahd
+body += L.image("photo.jpg", {"width": 8.0}, {"trimTop": 1.0, "trimBottom": 1.0})
+body += L.figure("stamp.png", "Approved", "fig:stamp", {"width": 4.0}, {"rotation": 12.0, "opacity": 0.6})
+```
+
+There are no subfigures or exposed `graphicx`/float-placement options.
 
 ### Asset staging
 
@@ -492,9 +546,163 @@ compilation failed: error: document.tex:3: ! LaTeX Error: File `tcolorbox.sty' n
 TikZ is not a sandbox. It runs in the same untrusted-mode engine as every Latex
 document: shell escape stays unavailable, and nothing is downloaded.
 
-There is no TCPDF or FPDF, Canvas, SVG module, browser renderer, second PDF
-engine, drawing API that mirrors TikZ commands, certificate module, arbitrary
-package loading, or rasterized decoration.
+There is no TCPDF or FPDF, Canvas, SVG drawing module, browser renderer,
+second PDF engine, drawing API that mirrors TikZ commands, certificate module,
+arbitrary package loading, or rasterized decoration.
+
+## Professional documents (v1.3.0)
+
+Running headers and footers with page numbers, content at exact positions on
+the page, links, PDF outline bookmarks, QR codes, barcodes, and SVG logos are
+ordinary Latex fragments: build them with the helpers below and join them into
+`document()`'s body like any other fragment. `document()` loads a supporting
+package only when a fragment needs it, so a document without these fragments
+is byte-for-byte what it was before v1.3.0.
+
+```text
+running header/footer  -> header, footer, pageNumber, pageCount
+exact page position    -> place
+navigation             -> link, bookmark
+machine-readable codes -> qr, barcode
+page and properties    -> document(paper:, pageSize:, margins:, subject:, keywords:, creator:)
+vector logos           -> image and figure with an .svg path
+```
+
+A complete report with all of them is
+[`examples/v0.1/66_latex_professional_report.ahd`](../examples/v0.1/66_latex_professional_report.ahd),
+and a certificate with a verification QR code is
+[`examples/v0.1/64_verifiable_certificate.ahd`](../examples/v0.1/64_verifiable_certificate.ahd).
+
+### header, footer, pageNumber, pageCount
+
+`header(left, center, right)` and `footer(left, center, right)` set the three
+regions at the top and bottom of every page. The regions hold generated Latex
+— escaped text, `pageNumber()`, `pageCount()`, a `link`, an `image` such as an
+SVG logo, or a `qr` symbol — so pass ordinary text through `escape`.
+`pageNumber()` is the current page number and `pageCount()` the document's
+total page count; both also work in body text.
+
+```ahd
+logo: String := L.image("logo.svg", {"height": 0.8})
+header: String := L.header(logo, L.escape("Quarterly Report"), L.escape("Q3 2026"))
+footer: String := L.footer(L.link("ahdcode.org", "https://ahdcode.org"), "", "Page " + L.pageNumber() + " of " + L.pageCount())
+source := L.document(body: header + footer + body, paper: "A4")
+```
+
+A Latex document shows the page number centered in the footer by default. A
+`header` alone keeps it; a `footer` sets all three footer regions, so include
+`pageNumber()` where the number should appear. The settings take effect from
+the page on which the fragment is reached: put them at the start of the body to
+cover every page, and add another `header` or `footer` later to change the
+following pages. Headers and footers also apply to title and chapter pages and
+draw no rules. They require an Article or Report document; with Beamer,
+`document()` raises `ValueError`.
+
+### place
+
+`place(content, x, y, anchor)` puts content at an exact position on the page.
+`x` and `y` are centimeters from the top-left corner of the page, from 0 to
+1000, and `anchor` names the point of the content that lands there:
+`"north west"` (the default), `"north"`, `"north east"`, `"west"`, `"center"`,
+`"east"`, `"south west"`, `"south"`, or `"south east"`. Placed content never
+moves the page's text. It is drawn on the page being filled when the fragment
+is reached, so place content once for each page it belongs on. For drawing with
+TikZ coordinates and page anchors, use `overlay`.
+
+```ahd
+body += L.place(L.image("logo.svg", {"height": 2.0}), 2.0, 2.0)
+body += L.place(L.qr("https://ahdcode.org/verify?id=42", 2.5, "Q"), 19.0, 27.5, "south east")
+```
+
+### link and bookmark
+
+`link(text, url)` makes `text` clickable; `text` is escaped. `url` must start
+with `https://`, `http://`, or `mailto:` and must not contain control
+characters; any other scheme, including `javascript:` and `file:`, raises
+`ValueError`. Special characters in the URL are encoded, so the link opens
+exactly the given URL and cannot break out into the document. Links are drawn
+without a colored box.
+
+`bookmark(title, level)` adds an entry to the PDF outline — the viewer's
+sidebar — pointing at the position where the fragment is reached. Level 1 is a
+top-level entry; levels 2 to 4 nest under the nearest preceding entry of a
+smaller level. `chapter`, `section`, and `subsection` already appear in the
+outline on their own; use `bookmark` for anything else, such as a cover, a
+table, or a verification code.
+
+```ahd
+body += L.bookmark("Verification code") + L.center(L.qr("https://ahdcode.org/verify?id=42"))
+body += "Verify at " + L.link("ahdcode.org/verify", "https://ahdcode.org/verify?id=42") + "."
+```
+
+The page size, margins, and PDF properties are `document()` parameters; see
+[One `document()` for Article, Report, and Beamer](#one-document-for-article-report-and-beamer).
+
+## QR codes and barcodes (v1.3.0)
+
+`qr(value, size, level)` draws a QR symbol `size` centimeters square (default
+`3.0`), quiet zone included, at level `"L"`, `"M"` (the default), `"Q"`, or
+`"H"`. `barcode(kind, value, width, height)` draws a `"Code128"`, `"EAN13"`, or
+`"UPCA"` barcode `width` by `height` centimeters (default `8.0` by `2.0`), quiet
+zones included. Both are TikZ vector fragments built by the same encoders as
+the [QR](QR.md) and [Barcode](BARCODE.md) modules — no image file and no
+rasterizing — and work in the body, in `center` and `minipage`, in `header` and
+`footer`, and in `place`. They need no `bring QR` or `bring Barcode`.
+
+```ahd
+body += L.center(L.qr("https://ahdcode.org", 3.0, "Q"))
+body += L.barcode("EAN13", "590123412345", 6.0, 2.0)
+```
+
+An invalid value — an empty or oversized QR value, an unknown level or kind, a
+wrong EAN-13 check digit, a non-ASCII Code 128 character — raises `ValueError`
+when the fragment is built, with the same message the QR and Barcode modules
+give.
+
+## SVG assets (v1.3.0)
+
+`image` and `figure` accept an `.svg` path. When the document compiles, the SVG
+is converted inside the program into PGF drawing commands, so it stays vector
+in the PDF. Nothing is rasterized, and no browser, Inkscape, shell command, or
+network access is involved; the conversion reads only the SVG file itself.
+`PDFDocument.image` uses the same converter.
+
+Supported:
+
+- the elements `svg`, `g`, `path` (every path command, including arcs),
+  `rect` (including rounded corners), `circle`, `ellipse`, `line`,
+  `polyline`, `polygon`, `use` referring to an element of the same file
+  (`#id`), `defs`, `title`, `desc`, `metadata`, and `style`;
+- presentation attributes, inline `style` attributes, and `<style>` rules
+  whose selectors are an element name, `.class`, `#id`, or `*`;
+- `fill` and `stroke` as a hex color, `rgb()`, a CSS color name, `none`, or
+  `currentColor`; `fill-rule`; `opacity`, `fill-opacity`, and
+  `stroke-opacity`;
+- `stroke-width`, `stroke-linecap`, `stroke-linejoin`, `stroke-miterlimit`,
+  `stroke-dasharray`, and `stroke-dashoffset`; `display: none` and
+  `visibility`;
+- `transform` with `matrix`, `translate`, `scale`, `rotate`, `skewX`, and
+  `skewY`; `viewBox`, `preserveAspectRatio`, `width`, and `height`, with
+  lengths in `px`, `pt`, `pc`, `mm`, `cm`, or `in`.
+
+Rejected with a message naming what is unsupported, never dropped or
+approximated:
+
+- text (`text`, `tspan`, `textPath`) — convert text to outlines in the SVG
+  editor;
+- gradients, patterns, clipping paths, masks, filters, markers, `symbol`,
+  `switch`, and colors with their own transparency such as `#00000080` or
+  `rgba(0, 0, 0, 0.5)` — use `fill-opacity` or `stroke-opacity` instead;
+- embedded or linked images, `script`, `foreignObject`, links (`a`),
+  animation, nested `svg`, event attributes such as `onload`, `url(...)`
+  references, and any reference outside the file;
+- CSS at-rules such as `@import`, a DOCTYPE or entity declarations, and
+  processing instructions.
+
+An SVG is limited to 5 MiB, 100,000 elements, 64 levels of nesting, and
+2,000,000 path segments. Latex converts an SVG when the document compiles, so an
+unsupported SVG raises `LatexError`; `PDFDocument.image` converts it when called
+and raises `PDFError`.
 
 ## Compiling
 
@@ -572,7 +780,9 @@ carries `beamer.cls`, its `beamerbase*` components, the PGF/TikZ core it
 builds on, and `translator`, so a Beamer presentation compiles exactly like
 Article/Report — offline, with no system TeX. Since v1.2.0 it also carries
 TikZ, the nine TikZ libraries `Latex.tikz` accepts, and pgfornament with its
-Vectorian ornaments; every file is pinned by checksum in the resource manifest.
+Vectorian ornaments, and since v1.3.0 `fancyhdr` and `lastpage` for headers,
+footers, and page counts; every file is pinned by checksum in the resource
+manifest.
 
 ## Security
 
@@ -581,7 +791,9 @@ and no AhdCode source construct can enable it. The engine is launched with an
 argument vector — never a shell command string — so paths containing spaces,
 Unicode, quotes, `$`, `;`, `&`, or parentheses stay safe. Asset staging copies
 files by path, never through a shell, and rejects a missing, unreadable, or
-unsupported-format asset before compilation starts.
+unsupported-format asset before compilation starts. An SVG asset is converted
+by AhdCode itself from the file's bytes: nothing in it is executed, and it
+cannot load another file or a URL.
 
 Compilation is bounded by a 30-second timeout. On timeout the engine process is
 terminated, temporary files are removed, and a `LatexError` is raised.
@@ -599,16 +811,19 @@ never destroys an already valid destination PDF.
 Input-domain validation follows the existing Latex API contract and raises
 `ValueError`: invalid `document()` type, margin, color, or theme; a non-Default
 theme outside Beamer; invalid theorem registration/reference; invalid table,
-minipage, or image-size options; an unsupported image extension; and, since
+minipage, or image-size options; an unsupported image extension; since
 v1.2.0, an unbundled TikZ library name, invalid `border` values, and
-`landscape` with Beamer. Theme validation deliberately does not introduce a
+`landscape` with Beamer; and, since v1.3.0, an invalid `qr` or `barcode` value,
+`place` coordinate or anchor, `link` URL, `bookmark` level, image `transform`,
+`paper`, `pageSize`, `margins`, or keyword, and page layout, headers, or
+footers with Beamer. Theme validation deliberately does not introduce a
 different error class.
 
 `LatexError` covers execution failures: compilation failure, a missing staged
 engine or bundle, timeout, engine process failure, a PDF that was not produced,
-and an asset file that cannot be staged. Engine diagnostics are bounded so a
-malformed document cannot flood the terminal, while the first useful TeX
-error is preserved.
+and an asset file that cannot be staged, including an unsupported SVG. Engine
+diagnostics are bounded so a malformed document cannot flood the terminal,
+while the first useful TeX error is preserved.
 
 ```ahd
 bring Latex as L

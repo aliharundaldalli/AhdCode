@@ -16,6 +16,7 @@ var projectDocs embed.FS
 // are intentionally absent.
 var documentationManifest = []string{
 	"ARCHIVE.md",
+	"BARCODE.md",
 	"BITS.md",
 	"CHARACTERS.md",
 	"CLASSES.md",
@@ -53,6 +54,7 @@ var documentationManifest = []string{
 	"PLOT.md",
 	"PRACTICAL_MODULES.md",
 	"PROTOCOLS.md",
+	"QR.md",
 	"REGEX.md",
 	"REPL.md",
 	"REQUIRE.md",
@@ -104,7 +106,7 @@ func renderAHDCODE(options Options) string {
 	b.WriteString("English reference copies for this AhdCode version live in `Documents/AhdCode/`.\n")
 	b.WriteString("Start with `Documents/AhdCode/WEB.md` and `Documents/AhdCode/CLI.md`.\n")
 	b.WriteString("Scheduled work is `Documents/AhdCode/CRON.md`, Unicode characters are `CHARACTERS.md`,\n")
-	b.WriteString("and PDF documents with TikZ vector graphics are `LATEX.md`.\n")
+	b.WriteString("PDF documents are `LATEX.md` and `PDF.md`, and QR codes and barcodes are `QR.md` and `BARCODE.md`.\n")
 	b.WriteString("`Documents/PROJECT.md` describes this application.\n\n")
 	b.WriteString("These files are for humans and assistants. They are not loaded at runtime.\n")
 	b.WriteString("Deleting `AHDCODE.md` or `Documents/` does not change `ahdcode run`, `dev`, or `build`.\n")

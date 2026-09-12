@@ -797,6 +797,33 @@ except LatexError as error {
 öğrenmek için faydalıdır. Render motorunun bir kez hazırlanmış olması gerekir;
 kurulum adımı öğrenci rehberindedir.
 
+### 6.5 Profesyonel son dokunuşlar (v1.3.0)
+
+Sınıf dışına çıkan bir rapor genellikle A4 sayfalar, sayfa numaralı üst ve alt
+bilgi, PDF özellikleri ve bazen çevrimiçi sürümü açan bir QR kodu ister. Her biri
+bir Latex parçası ya da bir `document()` parametresidir:
+
+```ahd
+header: String := L.header(L.escape("Analiz"), "", L.escape("Grup 4"))
+footer: String := L.footer("", "Sayfa " + L.pageNumber() + " / " + L.pageCount(), "")
+body += L.center(L.qr("https://example.test/analiz", 3.0))
+
+source := L.document(
+    body: header + footer + body
+    title: "Analiz"
+    type: "Report"
+    paper: "A4"
+    subject: "Veri analizi raporu"
+    keywords: ["analiz", "atölye"]
+)
+```
+
+`header` ve `footer`'ı her sayfayı kapsamaları için gövdenin başına koyun. Bir
+SVG logo `L.image` içinde PNG gibi çalışır ve vektör olarak kalır. Aynı son
+dokunuşlar LaTeX yazmadan `PDFDocument.layout`, `header`, `footer`,
+`pageNumbers`, `qr` ve `metadata` ile de yapılabilir; bkz. [PDF](PDF_TR.md),
+[QR](QR_TR.md) ve [Barcode](BARCODE_TR.md).
+
 ### Atölye görevi
 
 Bir başlık, iki bölüm, numaralı denklem, tablo, Plot görseli ve tek kaynakça

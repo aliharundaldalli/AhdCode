@@ -5923,7 +5923,8 @@ kaçışlanır: `\ { } $ & # % _ ^ ~` her zaman sıradan metin olarak görünür
 doğrudan `Latex` kullanın.
 
 v0.1.20, 2.54cm kenar boşluklu sabit bir A4 dikey düzen kullanır; sayfa
-boyutu, yönü veya kenar boşluğu yapılandırması yoktur.
+boyutu, yönü veya kenar boşluğu yapılandırması yoktur. v1.3.0 bu düzeni
+varsayılan olarak korur ve `layout` ile §73.2'nin diğer işlemlerini ekler.
 
 `save(path)` bir `.pdf` hedefi gerektirir; başka bir uzantı `PDFError`
 fırlatır. PDFDocument'in bloklarını dahili bir LaTeX gövdesine dönüştürür,
@@ -6189,6 +6190,154 @@ fırlatır. TikZ kaynağı Latex girdisidir: derleme hataları mevcut derleme yo
 pgfornament'i taşır; derleme kabuk kaçışı ve ağ erişimi olmadan güvenilmeyen
 kipte kalır. Ne kaçış işlemi ne de interpolasyon yaptıkları için ham String
 literalleri (§6.4), TikZ yazmanın doğal yoludur.
+
+## 72. QR ve Barcode Standart Modülleri (v1.3.0)
+
+`bring QR`, derleyici tarafından sağlanan `builtin:QR` modülüne, `bring Barcode`
+ise `builtin:Barcode` modülüne çözülür; kardeş dosyalar onları gölgeleyemez.
+Modüller söz dizimi eklemez.
+
+```text
+QR.create(value: String, level: String = "M") -> QRCode
+QRCode.value()  -> String
+QRCode.level()  -> String
+QRCode.size()   -> Int
+QRCode.matrix() -> List<List<Bool>>
+QRCode.savePNG(path: String, pixels: Int = 512) -> Nothing
+QRCode.saveSVG(path: String, size: Real = 5.0)  -> Nothing
+
+Barcode.code128(value: String) -> BarcodeCode
+Barcode.ean13(value: String)   -> BarcodeCode
+Barcode.upca(value: String)    -> BarcodeCode
+BarcodeCode.kind()    -> String
+BarcodeCode.value()   -> String
+BarcodeCode.pattern() -> List<Bool>
+BarcodeCode.savePNG(path: String, width: Int = 800, height: Int = 240) -> Nothing
+BarcodeCode.saveSVG(path: String, width: Real = 8.0, height: Real = 2.4) -> Nothing
+```
+
+`QRCode` ve `BarcodeCode`, tek bir gizli alanı olan ve genel kurucusu
+bulunmayan, derleyicinin sağladığı değişmez Class'lardır; üyeleri yalnızca
+konumsal argüman alan tip işlemleridir. `QR.create` kodlayarak doğrular:
+`level` tam olarak `L`, `M`, `Q` veya `H`'dir; `value`, o seviyede en büyük
+sembole sığan, boş olmayan bir UTF-8 String'dir. `size()` bir kenardaki modül
+sayısını verir, `matrix()` ise modülleri yukarıdan aşağıya satır satır, koyu
+için `true` olarak listeler; ikisi de dört modüllük sessiz bölgeyi içermez.
+Code 128, 1 ile 80 arası ASCII karakter kabul eder; EAN-13, kontrol basamağı
+hesaplanan 12 veya kontrol basamağı doğrulanan 13 basamak kabul eder; UPC-A 11
+veya 12 kabul eder. Yanlış bir kontrol basamağı hatadır ve asla değiştirilmez.
+`value()` kontrol basamağını içerir; `pattern()` 10 ve 10 (Code 128), 11 ve 7
+(EAN-13), 9 ve 9 (UPC-A) modüllük sessiz bölgeleri içermez.
+
+`savePNG`, tam sayı pikselli modüllerle, istenen piksel boyutlarında beyaz
+zemine siyah çizer; artan pikseller sessiz bölgeleri eşit olarak genişletir.
+`pixels` `size() + 8` ile 10000 arasıdır; bir barkodun `width` değeri sessiz
+bölgeler dahil modül sayısıyla 10000 arasında, `height` 1 ile 10000
+arasındadır. `saveSVG` boyutları 0'dan büyük ve en çok 1000 santimetredir. Hedef
+uygun uzantıyı taşımalıdır; çıktı doğrulanır ve geçici bir dosya ile yeniden
+adlandırma üzerinden yayımlanır. Her hata, `Error`'dan türeyen `QRError` veya
+`BarcodeError` fırlatır.
+
+Aynı kodlayıcılar `Latex.qr`, `Latex.barcode`, `PDFDocument.qr` ve
+`PDFDocument.barcode`'u (§73) üretir; bu yüzden bir değer her çıktıda aynı
+sembolü verir. Kodlama, ağ erişimi veya harici süreç olmadan program içinde
+çalışır ve hiçbir kod kullanmayan native bir program kodlayıcı taşımaz. Kod
+çözme sağlanmaz.
+
+## 73. Latex ve PDF'te Profesyonel Belge Yardımcıları (v1.3.0)
+
+### 73.1 Latex
+
+```text
+Latex.qr(value: String, size: Real = 3.0, level: String = "M")             -> String
+Latex.barcode(kind: String, value: String, width: Real = 8.0, height: Real = 2.0) -> String
+Latex.place(content: String, x: Real, y: Real, anchor: String = "north west") -> String
+Latex.header(left: String = "", center: String = "", right: String = "")   -> String
+Latex.footer(left: String = "", center: String = "", right: String = "")   -> String
+Latex.pageNumber()                                                         -> String
+Latex.pageCount()                                                          -> String
+Latex.link(text: String, url: String)                                      -> String
+Latex.bookmark(title: String, level: Int = 1)                              -> String
+Latex.image(path: String, size: Pair<String, Real> = {}, transform: Pair<String, Real> = {}) -> String
+Latex.figure(path: String, caption: String, label: String = "",
+    size: Pair<String, Real> = {}, transform: Pair<String, Real> = {})     -> String
+Latex.document(..., landscape: Bool = false, paper: String = "Letter",
+    pageSize: Pair<String, Real> = {}, margins: Pair<String, Real> = {},
+    subject: String = "", keywords: List<String> = [], creator: String = "") -> String
+```
+
+Her yardımcı bir Latex parçası döndürür. `qr` ve `barcode`, §72
+kodlayıcılarının çizdiği TikZ vektör parçalarıdır (§71). `place`, `content`'i
+sayfanın sol üst köşesinden `x` ve `y` santimetre (0 ile 1000) uzağa `north
+west`, `north`, `north east`, `west`, `center`, `east`, `south west`, `south`
+ve `south east` çapalarından biriyle, doldurulmakta olan sayfanın shipout ön
+plan kancası üzerinden ve metni kaydırmadan yerleştirir. `header` ve `footer`,
+ulaşıldıkları sayfadan itibaren her sayfanın üç bölgesini ayarlar; `pageNumber`
+ve `pageCount` geçerli sayfa ve toplam sayıdır. `link` metnini kaçışlar ve
+yalnızca kontrol karakteri içermeyen, en çok 8192 baytlık `https://`,
+`http://` ve `mailto:` URL'lerini kabul eder; URL argümanından taşamayacak
+biçimde kodlanır. `bookmark`, 1 ile 4 arası seviyede bir PDF anahat girdisi
+ekler. `transform`, `rotation` (-360 ile 360), `opacity` (0 ile 1) ve
+`trimLeft`, `trimTop`, `trimRight` ile `trimBottom` (0 ile 1000 santimetre)
+kabul eder; boyutlandırmadan sonra kırpma, döndürme ve opaklık sırasıyla
+uygulanır. `paper` tam olarak `A3`, `A4`, `A5`, `Letter`, `Legal` veya
+`Custom`'dır; `Custom`, `width` ve `height` içeren `pageSize` gerektirir;
+`margins`, her biri varsayılan olarak `margin` olan `top`, `right`, `bottom` ve
+`left` kabul eder. Sayfa düzeni, üst ve alt bilgiler Article veya Report
+gerektirir. `subject`, `keywords` ve `creator` PDF özelliklerini kaydeder;
+bunlardan biri ayarlandığında `title` ve `author` da kaydedilir; anahtar
+sözcükler boş olmamalı ve virgül içermemelidir. Girdi doğrulaması `ValueError`
+fırlatır.
+
+`document`, fancyhdr, lastpage, TikZ, yer imi sayacı ve görsel dönüşüm
+makrolarını yalnızca bir parça onlara ihtiyaç duyduğunda yükler; sayfa
+geometrisini ve özellikleri yalnızca ayarlandıklarında yazar. Bunların hiçbirini
+kullanmayan bir belge, v1.2.0 çıktısıyla bayt bayt aynıdır.
+
+### 73.2 PDF
+
+```text
+PDFDocument.image(String, Pair<String, Real> = {}, Pair<String, Real> = {}) -> PDFDocument
+PDFDocument.layout(String, Bool = false, Pair<String, Real> = {}, Pair<String, Real> = {}) -> PDFDocument
+PDFDocument.header(String, String = "", String = "")             -> PDFDocument
+PDFDocument.footer(String, String = "", String = "")             -> PDFDocument
+PDFDocument.pageNumbers(String = "center", Bool = false)         -> PDFDocument
+PDFDocument.qr(String, Real = 3.0, String = "M", String = "center") -> PDFDocument
+PDFDocument.barcode(String, String, Real = 8.0, Real = 2.0, String = "center") -> PDFDocument
+PDFDocument.link(String, String, String = "left")                -> PDFDocument
+PDFDocument.bookmark(String, Int = 1)                            -> PDFDocument
+PDFDocument.metadata(String, String = "", String = "", List<String> = [], String = "") -> PDFDocument
+```
+
+İşlemler §66'nın modelini korur: yalnızca konumsal, değişmez, her String
+kaçışlanmış ve ham işaretleme işlemi yok. `qr`, `barcode`, `link`, `bookmark`
+ve `image` sırayla render edilen içerik bloklarıdır; `layout`, `header`,
+`footer`, `pageNumbers` ve `metadata` belge ayarlarıdır ve her birinin son
+çağrısı geçerlidir. `layout` olmadan sayfa, 2.54 cm kenar boşluklu dikey A4
+olarak kalır. Üst ve alt bilgi metni tek satırdır; bir alt bilgi varsayılan
+ortalanmış sayfa numarasının yerini alır, `pageNumbers` ise boş olması gereken
+bir alt bilgi bölgesini doldurur. Anahat tam olarak `bookmark` girdilerini
+içerir. Her doğrulama — sayfa düzeni, metin, URL, seviye, anahtar sözcük, kod
+değeri, görsel ve SVG — işlem çağrıldığında yapılır ve etkileşimli
+değerlendiricinin de kullandığı paylaşılan çalışma zamanı oluşturucusunun
+mesajıyla `PDFError` fırlatır.
+
+### 73.3 SVG varlıkları
+
+`Latex.image`, `Latex.figure` ve `PDFDocument.image` `.svg` dosyaları kabul
+eder. Bir SVG, harici süreç olmadan program içinde, çevrimdışı motorun çizdiği
+PGF çizim komutlarına dönüştürülür; asla rasterleştirilmez. Desteklenen alt
+küme statik vektör çizimdir: `svg`, `g`, `path`, `rect`, `circle`, `ellipse`,
+`line`, `polyline`, `polygon`, aynı belgedeki `use`, `defs`, basit `style`
+kuralları, düz renkler, opaklık, çizgiler ve kesik çizgiler, dönüşümler,
+`viewBox` ve `preserveAspectRatio`. Metin, gradyanlar, desenler, kırpma,
+maskeler, filtreler, işaretçiler, gömülü görseller, betikler, animasyon, olay
+öznitelikleri, harici veya `url(...)` başvuruları, kendi saydamlığı olan
+renkler, DOCTYPE bildirimleri ve işleme talimatları, özelliği belirten bir
+mesajla reddedilir. Latex derleme sırasında dönüştürür ve `LatexError`
+fırlatır; PDF, `image` çağrıldığında dönüştürür ve `PDFError` fırlatır. Bir SVG
+en çok 5 MiB, 100.000 öğe, 64 iç içe seviye ve 2.000.000 path parçasıyla
+sınırlıdır.
 
 ---
 

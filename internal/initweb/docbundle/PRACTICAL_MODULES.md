@@ -791,6 +791,33 @@ The third argument preserves the `.tex` source, which is useful for learning
 and diagnosing compilation failures. The offline renderer must have been
 staged once as described in the student guide.
 
+### 6.6 Professional finishing (v1.3.0)
+
+A report that leaves the classroom usually needs A4 pages, a running header
+and footer with page numbers, PDF properties, and sometimes a QR code that opens
+the online version. Each is a Latex fragment or a `document()` parameter:
+
+```ahd
+header: String := L.header(L.escape("Analysis"), "", L.escape("Group 4"))
+footer: String := L.footer("", "Page " + L.pageNumber() + " of " + L.pageCount(), "")
+body += L.center(L.qr("https://example.test/analysis", 3.0))
+
+source := L.document(
+    body: header + footer + body
+    title: "Analysis"
+    type: "Report"
+    paper: "A4"
+    subject: "Data analysis report"
+    keywords: ["analysis", "workshop"]
+)
+```
+
+Put `header` and `footer` at the start of the body so that they cover every
+page. An SVG logo works in `L.image` like a PNG and stays vector. The same
+finishing is available without LaTeX through `PDFDocument.layout`, `header`,
+`footer`, `pageNumbers`, `qr`, and `metadata`; see [PDF](PDF.md), [QR](QR.md),
+and [Barcode](BARCODE.md).
+
 ### Workshop task
 
 Create a Report containing a title, two sections, a labelled equation, a

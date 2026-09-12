@@ -571,7 +571,7 @@ derler ve yeniden başlatır. `public/app.css`'i düzenlemek bunu yapmaz.
 `APP_PROTOCOL=https`'i de **reddeder**:
 
 ```
-✗ Local HTTPS is not available in AhdCode v1.2.0.
+✗ Local HTTPS is not available in AhdCode v1.3.0.
   ahdcode dev serves plaintext HTTP, so it cannot honour
   APP_PROTOCOL=https.
 
@@ -814,6 +814,7 @@ düşük seviyeli modüllere uzanın.
 | v0.20 | Bileşen CSS/JS, `managedAssets`, `Identity.id()`, Web sınırları, MVC/CRUD |
 | v1.0.0 | Web API değişikliği yok; kendi kendine yeten platform paketlemesi |
 | v1.2.0 | Web API değişikliği yok; uygulamanın yanında zamanlanmış işler için [Cron](CRON_TR.md), [Characters](CHARACTERS_TR.md) ve [Latex](LATEX_TR.md) içinde TikZ |
+| v1.3.0 | Web API değişikliği yok; [QR](QR_TR.md), [Barcode](BARCODE_TR.md) ve [Latex](LATEX_TR.md) ile [PDF](PDF_TR.md) içinde profesyonel belgeler |
 
 ## Cron: zamanlanmış uygulama işleri
 
@@ -906,6 +907,30 @@ Uygulamanın zaten Latex ile ürettiği bir belgeye şekil çizmek için TCPDF, 
 veya önceden üretilmiş bir kenarlık görseli eklemeyin. Bkz.
 [Latex: TikZ ile vektör grafik](LATEX_TR.md#tikz-ile-vektör-grafik-v120) ve
 `examples/v0.1/61_tikz_certificate.ahd` içindeki eksiksiz sertifika.
+
+v1.3.0'dan beri aynı belgeler makine tarafından okunan kodlar ve profesyonel
+sayfa düzeni taşıyabilir. `Latex.qr`, `Latex.barcode`, `Latex.place`,
+`Latex.header`, `Latex.footer`, `Latex.link` ve `Latex.bookmark`; doğrulama QR
+kodu, ürün barkodu, "Sayfa X / Y" içeren üst ve alt bilgiler, bağlantılar ve bir
+anahat ekler; `Latex.document`, `paper`, `margins` ve PDF özelliklerini alır;
+`Latex.image` ise vektör grafik olarak kalan SVG logoları kabul eder. LaTeX
+yerine tipli işlemleri tercih eden bir uygulama aynı özellikleri
+`PDFDocument.layout`, `header`, `footer`, `pageNumbers`, `qr`, `barcode`,
+`link`, `bookmark` ve `metadata` ile kullanır. [QR](QR_TR.md) ve
+[Barcode](BARCODE_TR.md) modülleri aynı kodları PNG veya SVG dosyası olarak
+yazar — örneğin bir biletin QR kodu için:
+
+```ahd
+bring QR
+
+QR.create("https://example.test/tickets/42", "Q").savePNG("ticket-42.png", 600)
+```
+
+Kodlar uygulama sürecinin içinde üretilir; bu yüzden bilet URL'si hiçbir
+üçüncü taraf QR servisine gitmez. Bkz.
+[Latex: profesyonel belgeler](LATEX_TR.md#profesyonel-belgeler-v130),
+[PDF](PDF_TR.md), `examples/v0.1/64_verifiable_certificate.ahd` ve
+`examples/v0.1/65_product_label.ahd`.
 
 ## 22. v0.20: Web varlıkları, kaynak sınırları ve uygulama kalıpları
 

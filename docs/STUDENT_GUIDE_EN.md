@@ -1,4 +1,4 @@
-# AhdCode v1.2.0 English Student Guide
+# AhdCode v1.3.0 English Student Guide
 
 This guide is designed so that **even someone who has never programmed before** can follow along. You can read it in order from beginning to end; in each section, you will first see what we want to achieve, then write a working example, and finally learn the necessary rules.
 

@@ -12,14 +12,16 @@ AhdCode is an experimental statically checked general-purpose programming
 language focused on readable syntax, explicit intent, predictable semantics,
 and native compilation.
 
-This is **v1.2.0**. The language, toolchain, and Web framework are
+This is **v1.3.0**. The language, toolchain, and Web framework are
 feature-complete, and the core language surface described here is what 1.0
-committed to and 1.1 and 1.2 keep unchanged.
+committed to and 1.1, 1.2, and 1.3 keep unchanged.
 
-v1.2.0 is a minor release, **Scheduling, Vector Documents & Character
-Utilities**: it adds the `Cron` and `Characters` standard modules and TikZ
-vector graphics for `Latex`, without altering the core grammar or any existing
-behaviour. See [What is new in v1.2.0](#what-is-new-in-v120).
+v1.3.0 is a minor release, **Professional Documents & Machine Codes**: it adds
+the `QR` and `Barcode` standard modules and professional document features —
+page layout, headers and footers, links, bookmarks, PDF properties, QR codes,
+barcodes, image transforms, and SVG assets — for `Latex` and `PDF`, without
+altering the core grammar or any existing behaviour. See
+[What is new in v1.3.0](#what-is-new-in-v130).
 
 It ships as a self-contained platform package: the `ahdcode` CLI, a private
 Go 1.27.0 toolchain, AhdDataStudio, the `ahdsqlite`, `ahdnumeric`, and
@@ -301,7 +303,7 @@ To maintain conceptual clarity, AhdCode's capabilities are organized into four d
 2. **Standard Library (First-party Bundled Modules):**
    - **Mathematics & Computation:** [`Math`](docs/MATH.md), [`Bits`](docs/BITS.md) (bitwise operations on `Int`), [`Regex`](docs/REGEX.md), [`Statistics`](docs/STATISTICS.md), [`Numeric`](docs/NUMERIC.md), [`Plot`](docs/PLOT.md)
    - **Data & Collections:** [`Lists`](docs/LISTS.md), [`KeyValue`](docs/KEYVALUE.md), [`Characters`](docs/CHARACTERS.md) (Unicode code points and classification), [`CSV`](docs/CSV.md), [`Data`](docs/DATA.md), [`JSON`](docs/JSON.md), [`XML`](docs/XML.md)
-   - **Document Generation:** [`Word`](docs/WORD.md), [`Excel`](docs/EXCEL.md), [`PDF`](docs/PDF.md), [`Latex`](docs/LATEX.md), [`Archive`](docs/ARCHIVE.md)
+   - **Document Generation:** [`Word`](docs/WORD.md), [`Excel`](docs/EXCEL.md), [`PDF`](docs/PDF.md), [`Latex`](docs/LATEX.md), [`QR`](docs/QR.md) (QR codes), [`Barcode`](docs/BARCODE.md) (Code 128, EAN-13, UPC-A), [`Archive`](docs/ARCHIVE.md)
    - **System & Environment:** [`Time`](docs/TIME.md), [`Cron`](docs/CRON.md) (bounded in-process scheduling), [`Path`](docs/FILESYSTEM.md), [`File`](docs/FILESYSTEM.md), [`Env`](docs/ENV.md)
 
 3. **First-Party Runtime / Framework Modules:**
@@ -419,6 +421,8 @@ See the [CLI guide](docs/CLI.md), [formatter guide](docs/FORMATTER.md),
 - [Word module](docs/WORD.md)
 - [Excel module](docs/EXCEL.md)
 - [PDF module](docs/PDF.md)
+- [QR module](docs/QR.md)
+- [Barcode module](docs/BARCODE.md)
 - [Archive module](docs/ARCHIVE.md)
 - [File and Path modules](docs/FILESYSTEM.md)
 - [Regex module](docs/REGEX.md)
@@ -465,6 +469,41 @@ diagnostics and hover. The same VSIX targets VS Code and Antigravity. See its
 [installation guide](editors/vscode/README.md).
 
 ## Current limitations
+
+## What is new in v1.3.0 <a id="what-is-new-in-v130"></a>
+
+v1.3.0 is a **minor** release, **Professional Documents & Machine Codes**. It
+adds two standard modules and professional document features for `Latex` and
+`PDF`. The core grammar, the type system, and every previously released
+function keep their behaviour; new parameters are optional and come last, and
+a document that uses none of the new features renders exactly as before.
+
+**New standard module: [`QR`](docs/QR.md)** — `QR.create(value, level)` makes
+an immutable `QRCode` at error-correction level L, M, Q, or H, exposes its
+module matrix, and saves sharp PNG or vector SVG files, with `QRError`.
+
+**New standard module: [`Barcode`](docs/BARCODE.md)** — `Barcode.code128`,
+`Barcode.ean13`, and `Barcode.upca` make immutable `BarcodeCode` values with
+computed or verified check digits, expose the bar pattern, and save PNG or SVG
+files, with `BarcodeError`.
+
+**Extended module: [`Latex`](docs/LATEX.md#professional-documents-v130)** —
+`qr`, `barcode`, `place`, `header`, `footer`, `pageNumber`, `pageCount`,
+`link`, and `bookmark`; `document(paper:, pageSize:, margins:, subject:,
+keywords:, creator:)`; and `image`/`figure` with SVG files and a `transform`
+of rotation, opacity, and trims. The offline bundle adds `fancyhdr` and
+`lastpage`.
+
+**Extended module: [`PDF`](docs/PDF.md)** — `layout`, `header`, `footer`,
+`pageNumbers`, `qr`, `barcode`, `link`, `bookmark`, `metadata`, and `image`
+with SVG files and a `transform`, with every String still escaped and no raw
+TeX.
+
+SVG files become vector drawing inside the program: never rasterized, and with
+no browser, Inkscape, or other external converter. QR codes and barcodes are
+generated offline by a vendored, MIT-licensed encoder. See
+[`examples/v0.1/62_qr.ahd`](examples/v0.1/62_qr.ahd) through
+[`examples/v0.1/68_svg_assets.ahd`](examples/v0.1/68_svg_assets.ahd).
 
 ## What is new in v1.2.0 <a id="what-is-new-in-v120"></a>
 

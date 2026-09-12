@@ -457,8 +457,9 @@ bridge. `PDF.fromExcel(workbook)` (v0.1.20+) covers "export a Workbook as
 PDF" — see below.
 
 **PDF text is text; do not inject raw LaTeX.** Every `PDFDocument` operation
-(`heading`, `paragraph`, `table`) escapes its String arguments before they
-ever reach the renderer — `\ { } $ & # % _ ^ ~` all appear as ordinary text.
+(`heading`, `paragraph`, `table`, `header`, `footer`, `link`, `bookmark`,
+`metadata`) escapes its String arguments before they ever reach the renderer
+— `\ { } $ & # % _ ^ ~` all appear as ordinary text.
 `PDF` has no raw-content escape hatch. Use [`Latex`](docs/LATEX.md) directly
 when actual LaTeX source control is the goal, not `PDF`.
 
@@ -499,6 +500,27 @@ pre-rendered border image merely to draw on a document AhdCode already produces
 with Latex, and do not invent `TikZ.line`-style wrappers. `libraries` accepts
 only the bundled names listed in
 [`docs/LATEX.md`](docs/LATEX.md#vector-graphics-with-tikz-v120).
+
+**Use QR, Barcode, and the v1.3.0 document helpers for codes and professional
+documents.** `QR.create(value, level)` and `Barcode.code128`/`ean13`/`upca`
+create codes and save PNG or SVG files; `Latex.qr`/`Latex.barcode` and
+`PDFDocument.qr`/`PDFDocument.barcode` draw the same symbols as vector
+graphics. For page layout use `Latex.header`, `Latex.footer`,
+`Latex.pageNumber`, `Latex.pageCount`, `Latex.place`, `Latex.link`,
+`Latex.bookmark`, and `Latex.document(paper:, pageSize:, margins:, subject:,
+keywords:, creator:)`, or the `PDFDocument` operations `layout`, `header`,
+`footer`, `pageNumbers`, `link`, `bookmark`, and `metadata`. `Latex.image`,
+`Latex.figure`, and `PDFDocument.image` accept SVG files, kept vector, and a
+`transform` Pair of `rotation`, `opacity`, and `trimLeft`/`trimTop`/
+`trimRight`/`trimBottom`. Do not call an online QR or barcode service, shell
+out to `qrencode`, Inkscape, or `rsvg-convert`, rasterize an SVG, or add a
+second PDF library. QR and Barcode do not decode codes, and QR codes have no
+colors or logos in v1.3.0 — do not promise either. `PDF` still has no raw TeX:
+never put LaTeX into `PDFDocument` text. `Latex.document` defaults to US Letter
+and `PDF` to A4, so pass `paper: "A4"` to `Latex.document` when the user
+expects A4. See [`docs/QR.md`](docs/QR.md), [`docs/BARCODE.md`](docs/BARCODE.md),
+[`docs/LATEX.md`](docs/LATEX.md#professional-documents-v130), and
+[`docs/PDF.md`](docs/PDF.md).
 
 **Use `Cron` for in-process scheduling, and state its boundary.**
 `Cron.scheduler()`, `Scheduler.add(expression, task)`, `Scheduler.run()`, and
