@@ -1,0 +1,43 @@
+require("Live.ahd")
+bring Web
+bring Env
+bring JSON
+bring Security
+from Web bring (Request, Response)
+// POST /internal/notify lets a trusted process -- jobs.ahd here -- push a
+// notice to every open dashboard.
+//
+// The guard is a bearer token built from existing primitives: the expected
+// token comes from Env.secret, and the comparison is constant-time. It is an
+// example of the pattern, not a scoped API authentication framework.
+unauthorized: Function := () -> Response {
+    return Web.text(
+        "unauthorized"
+        401
+    ).withHeader("WWW-Authenticate", "Bearer")
+}
+
+notify: Function := (request: Request) -> Response {
+    token: Local String? := Env.secret("NOTIFY_TOKEN")
+    if token == null or token == "" {
+        return Web.text("notifications are not configured", 503)
+    }
+    received: Local String? := request.header("Authorization")
+    if received == null {
+        return unauthorized()
+    }
+    if Security.secureEqual("Bearer " + token, received) == false {
+        return unauthorized()
+    }
+    text: Local String := request.body()
+    if text == "" {
+        return Web.text("empty notice", 400)
+    }
+    line: Local String := JSON.stringify(
+        JSON.object(
+            {"type": JSON.fromString("notice"), "text": JSON.fromString(text)}
+        )
+    )
+    delivered: Local Int := liveBroadcast(line)
+    return Web.text("delivered to {delivered} dashboard(s)")
+}

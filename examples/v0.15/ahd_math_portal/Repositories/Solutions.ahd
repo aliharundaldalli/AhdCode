@@ -49,9 +49,7 @@ solutionsFindForUser: Function := (
     userId: Int
     questionId: Int
 ) -> SolutionRecord? {
-    rows: Local List<Pair<String, MySQLValue>> := connection(
-        
-    ).query(
+    rows: Local List<Pair<String, MySQLValue>> := connection().query(
         "{solutionsSelect()} WHERE s.user_id = ? AND s.question_id = ? LIMIT 1"
         [MySQL.fromInt(userId), MySQL.fromInt(questionId)]
     )
@@ -63,9 +61,10 @@ solutionsFindForUser: Function := (
 }
 
 solutionsFindById: Function := (id: Int) -> SolutionRecord? {
-    rows: Local List<Pair<String, MySQLValue>> := connection(
-        
-    ).query("{solutionsSelect()} WHERE s.id = ? LIMIT 1", [MySQL.fromInt(id)])
+    rows: Local List<Pair<String, MySQLValue>> := connection().query(
+        "{solutionsSelect()} WHERE s.id = ? LIMIT 1"
+        [MySQL.fromInt(id)]
+    )
     if len(rows) == 0 {
         return null
     }
@@ -74,9 +73,9 @@ solutionsFindById: Function := (id: Int) -> SolutionRecord? {
 }
 
 solutionsRecent: Function := () -> List<SolutionRecord> {
-    rows: Local List<Pair<String, MySQLValue>> := connection(
-        
-    ).query("{solutionsSelect()} ORDER BY s.id DESC LIMIT 50")
+    rows: Local List<Pair<String, MySQLValue>> := connection().query(
+        "{solutionsSelect()} ORDER BY s.id DESC LIMIT 50"
+    )
     records: Local List<SolutionRecord> := []
     for row in rows {
         records.add(solutionsFromRow(row))
@@ -86,9 +85,7 @@ solutionsRecent: Function := () -> List<SolutionRecord> {
 }
 
 solutionsForQuestion: Function := (questionId: Int) -> List<SolutionRecord> {
-    rows: Local List<Pair<String, MySQLValue>> := connection(
-        
-    ).query(
+    rows: Local List<Pair<String, MySQLValue>> := connection().query(
         "{solutionsSelect()} WHERE s.question_id = ? ORDER BY s.id DESC"
         [MySQL.fromInt(questionId)]
     )
@@ -111,9 +108,7 @@ solutionsCreate: Function := (
     fileSize: Int
 ) -> Bool {
     attempt {
-        connection(
-            
-        ).execute(
+        connection().execute(
             "INSERT INTO solutions (user_id, question_id, original_filename, stored_filename, mime_type, file_size) VALUES (?, ?, ?, ?, ?, ?)"
             [
                 MySQL.fromInt(userId)
@@ -132,9 +127,9 @@ solutionsCreate: Function := (
 }
 
 solutionsCount: Function := () -> Int {
-    rows: Local List<Pair<String, MySQLValue>> := connection(
-        
-    ).query("SELECT COUNT(*) AS total FROM solutions")
+    rows: Local List<Pair<String, MySQLValue>> := connection().query(
+        "SELECT COUNT(*) AS total FROM solutions"
+    )
     if len(rows) == 0 {
         return 0
     }
@@ -143,9 +138,7 @@ solutionsCount: Function := () -> Int {
 }
 
 solutionsForUser: Function := (userId: Int) -> List<SolutionRecord> {
-    rows: Local List<Pair<String, MySQLValue>> := connection(
-        
-    ).query(
+    rows: Local List<Pair<String, MySQLValue>> := connection().query(
         "{solutionsSelect()} WHERE s.user_id = ? ORDER BY s.id DESC"
         [MySQL.fromInt(userId)]
     )

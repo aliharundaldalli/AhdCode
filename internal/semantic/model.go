@@ -521,6 +521,43 @@ const (
 	// inside the application-supplied directory and returns the stored path.
 	HTTPUploadedFileSave TypeOperation = "UploadedFile.save"
 
+	// WebSocket server support (v1.4.0). Server.websocket registers an
+	// endpoint; WebSocketEndpoint is immutable configuration; WebSocket is one
+	// accepted connection.
+	HTTPServerWebSocket                        TypeOperation = "Server.websocket"
+	HTTPWebSocketEndpointWithOpen              TypeOperation = "WebSocketEndpoint.withOpen"
+	HTTPWebSocketEndpointWithClose             TypeOperation = "WebSocketEndpoint.withClose"
+	HTTPWebSocketEndpointWithAccept            TypeOperation = "WebSocketEndpoint.withAccept"
+	HTTPWebSocketEndpointWithAllowedOrigins    TypeOperation = "WebSocketEndpoint.withAllowedOrigins"
+	HTTPWebSocketEndpointWithMaxMessageBytes   TypeOperation = "WebSocketEndpoint.withMaxMessageBytes"
+	HTTPWebSocketEndpointWithMaxQueuedMessages TypeOperation = "WebSocketEndpoint.withMaxQueuedMessages"
+	HTTPWebSocketEndpointWithMaxConnections    TypeOperation = "WebSocketEndpoint.withMaxConnections"
+	HTTPWebSocketID                            TypeOperation = "WebSocket.id"
+	HTTPWebSocketSend                          TypeOperation = "WebSocket.send"
+	HTTPWebSocketClose                         TypeOperation = "WebSocket.close"
+	HTTPWebSocketIsOpen                        TypeOperation = "WebSocket.isOpen"
+
+	// The PostgreSQL standard module (v1.4.0).
+	PostgreSQLDatabasePing        TypeOperation = "PostgreSQLDatabase.ping"
+	PostgreSQLDatabaseExecute     TypeOperation = "PostgreSQLDatabase.execute"
+	PostgreSQLDatabaseQuery       TypeOperation = "PostgreSQLDatabase.query"
+	PostgreSQLDatabaseBegin       TypeOperation = "PostgreSQLDatabase.begin"
+	PostgreSQLDatabaseClose       TypeOperation = "PostgreSQLDatabase.close"
+	PostgreSQLTransactionExecute  TypeOperation = "PostgreSQLTransaction.execute"
+	PostgreSQLTransactionQuery    TypeOperation = "PostgreSQLTransaction.query"
+	PostgreSQLTransactionCommit   TypeOperation = "PostgreSQLTransaction.commit"
+	PostgreSQLTransactionRollback TypeOperation = "PostgreSQLTransaction.rollback"
+	PostgreSQLResultAffectedRows  TypeOperation = "PostgreSQLResult.affectedRows"
+	PostgreSQLValueKind           TypeOperation = "PostgreSQLValue.kind"
+	PostgreSQLValueIsNull         TypeOperation = "PostgreSQLValue.isNull"
+	PostgreSQLValueBool           TypeOperation = "PostgreSQLValue.bool"
+	PostgreSQLValueInt            TypeOperation = "PostgreSQLValue.int"
+	PostgreSQLValueReal           TypeOperation = "PostgreSQLValue.real"
+	PostgreSQLValueString         TypeOperation = "PostgreSQLValue.string"
+	PostgreSQLValueIsBinary       TypeOperation = "PostgreSQLValue.isBinary"
+	PostgreSQLValueBinarySize     TypeOperation = "PostgreSQLValue.binarySize"
+	PostgreSQLValueBinaryBase64   TypeOperation = "PostgreSQLValue.binaryBase64"
+
 	// The XML standard module's XMLNode members. XMLNode is a closed,
 	// immutable Element/Text value.
 	XMLNodeKind TypeOperation = "XMLNode.kind"

@@ -19,6 +19,9 @@ const (
 	httpClientResponseClassID = ir.ClassID(HTTPModuleID + "::class::ClientResponse")
 	httpUploadedFileClassID   = ir.ClassID(HTTPModuleID + "::class::UploadedFile")
 	httpErrorClassID          = ir.ClassID(HTTPModuleID + "::class::HTTPError")
+	// WebSocket server support (v1.4.0).
+	httpWebSocketClassID         = ir.ClassID(HTTPModuleID + "::class::WebSocket")
+	httpWebSocketEndpointClassID = ir.ClassID(HTTPModuleID + "::class::WebSocketEndpoint")
 )
 
 var (
@@ -32,6 +35,10 @@ var (
 	HTTPClientRequestDataFieldID  = ir.FieldID(string(httpClientRequestClassID) + "::field::data")
 	HTTPClientResponseDataFieldID = ir.FieldID(string(httpClientResponseClassID) + "::field::data")
 	HTTPUploadedFileDataFieldID   = ir.FieldID(string(httpUploadedFileClassID) + "::field::data")
+	// A WebSocket holds its connection identifier; a WebSocketEndpoint holds
+	// the handle of its runtime configuration, which carries the callbacks.
+	HTTPWebSocketDataFieldID           = ir.FieldID(string(httpWebSocketClassID) + "::field::data")
+	HTTPWebSocketEndpointHandleFieldID = ir.FieldID(string(httpWebSocketEndpointClassID) + "::field::handle")
 )
 
 func httpModule(id ir.ModuleID, name, path string) *ir.Module {
@@ -53,6 +60,8 @@ func httpModule(id ir.ModuleID, name, path string) *ir.Module {
 		{httpClientRequestClassID, "ClientRequest", HTTPClientRequestDataFieldID, "data", semantic.HTTPClientRequestOperations},
 		{httpClientResponseClassID, "ClientResponse", HTTPClientResponseDataFieldID, "data", semantic.HTTPClientResponseOperations},
 		{httpUploadedFileClassID, "UploadedFile", HTTPUploadedFileDataFieldID, "data", semantic.HTTPUploadedFileOperations},
+		{httpWebSocketClassID, "WebSocket", HTTPWebSocketDataFieldID, "data", semantic.HTTPWebSocketOperations},
+		{httpWebSocketEndpointClassID, "WebSocketEndpoint", HTTPWebSocketEndpointHandleFieldID, "handle", semantic.HTTPWebSocketEndpointOperations},
 	}
 	for _, spec := range specs {
 		field := ir.Field{ID: spec.field, Name: spec.fieldName, Type: ir.Type{Kind: ir.StringType}, NullState: ir.NonNull, Hidden: true}

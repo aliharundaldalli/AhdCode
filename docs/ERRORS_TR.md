@@ -37,6 +37,8 @@ Yaygın yerleşik (built-in) hatalar şunları içerir:
 | `FileError` | `File` modülü işlem hatası; `IOError`'dan türer |
 | `RegexError` | `Regex.compile`'a geçersiz bir desen (pattern); `Error`'dan türer |
 | `CSVError` | bozuk CSV, geçersiz ayraç veya geçersiz kayıt/başlık şekli; `Error`'dan türer |
+| `UUIDError` | bozuk UUID metni ya da yeni bir UUID için rastgele kaynak veya geçerli saat olmaması; `Error`'dan türer |
+| `PostgreSQLError` | PostgreSQL bağlantı, sorgu, çalıştırma, işlem ya da değer türü hatası; `Error`'dan türer |
 | `KeyError` | eksik Pair anahtarı |
 | `NullError` | çalışma zamanı null güvenliği sınırı |
 | `ConstantError` | derin dondurulmuş (deep-frozen) bir referans üzerinden değişiklik |

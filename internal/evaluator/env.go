@@ -5,6 +5,8 @@ import (
 	"os"
 	"regexp"
 	"strings"
+
+	"ahdcode/internal/backend/golang/ahdruntime"
 )
 
 // The Env standard module's REPL implementation. It mirrors the native
@@ -85,6 +87,19 @@ func (s *Session) envBuiltin(name string, args []any) any {
 			}
 		}
 		return Nothing
+	case "secret":
+		// Env.secret shares the native runtime's lookup, resolving a relative
+		// NAME_FILE path against the session's working directory.
+		name := args[0].(string)
+		s.envValidateName(name)
+		value, present, problem := ahdruntime.AhdEnvSecretLookup(name, s.sessionPath)
+		if problem != "" {
+			s.raise("EnvError", problem)
+		}
+		if !present {
+			return nil
+		}
+		return value
 	}
 	s.raise("Error", "unsupported Env function "+name)
 	return nil

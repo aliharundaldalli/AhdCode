@@ -38,9 +38,7 @@ usersSelect: Function := () -> String {
 }
 
 usersFindByEmail: Function := (email: String) -> UserRecord? {
-    rows: Local List<Pair<String, MySQLValue>> := connection(
-        
-    ).query(
+    rows: Local List<Pair<String, MySQLValue>> := connection().query(
         "{usersSelect()} WHERE email = ? LIMIT 1"
         [MySQL.fromString(email)]
     )
@@ -52,9 +50,10 @@ usersFindByEmail: Function := (email: String) -> UserRecord? {
 }
 
 usersFindById: Function := (id: Int) -> UserRecord? {
-    rows: Local List<Pair<String, MySQLValue>> := connection(
-        
-    ).query("{usersSelect()} WHERE id = ? LIMIT 1", [MySQL.fromInt(id)])
+    rows: Local List<Pair<String, MySQLValue>> := connection().query(
+        "{usersSelect()} WHERE id = ? LIMIT 1"
+        [MySQL.fromInt(id)]
+    )
     if len(rows) == 0 {
         return null
     }
@@ -63,9 +62,9 @@ usersFindById: Function := (id: Int) -> UserRecord? {
 }
 
 usersAll: Function := () -> List<UserRecord> {
-    rows: Local List<Pair<String, MySQLValue>> := connection(
-        
-    ).query("{usersSelect()} ORDER BY id")
+    rows: Local List<Pair<String, MySQLValue>> := connection().query(
+        "{usersSelect()} ORDER BY id"
+    )
     records: Local List<UserRecord> := []
     for row in rows {
         records.add(usersFromRow(row))
@@ -83,9 +82,7 @@ usersCreate: Function := (
     role: String
 ) -> Int? {
     attempt {
-        result: Local := connection(
-            
-        ).execute(
+        result: Local := connection().execute(
             "INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, ?)"
             [
                 MySQL.fromString(name)
@@ -107,9 +104,7 @@ usersSetActive: Function := (id: Int, active: Bool) -> Nothing {
         flag = 1
     }
 
-    connection(
-        
-    ).execute(
+    connection().execute(
         "UPDATE users SET is_active = ? WHERE id = ?"
         [MySQL.fromInt(flag), MySQL.fromInt(id)]
     )
@@ -118,18 +113,16 @@ usersSetActive: Function := (id: Int, active: Bool) -> Nothing {
 // statement, so every session authenticated with the old password stops being
 // accepted on its next request.
 usersSetPassword: Function := (id: Int, passwordHash: String) -> Nothing {
-    connection(
-        
-    ).execute(
+    connection().execute(
         "UPDATE users SET password_hash = ?, auth_version = auth_version + 1 WHERE id = ?"
         [MySQL.fromString(passwordHash), MySQL.fromInt(id)]
     )
 }
 
 usersCount: Function := () -> Int {
-    rows: Local List<Pair<String, MySQLValue>> := connection(
-        
-    ).query("SELECT COUNT(*) AS total FROM users")
+    rows: Local List<Pair<String, MySQLValue>> := connection().query(
+        "SELECT COUNT(*) AS total FROM users"
+    )
     if len(rows) == 0 {
         return 0
     }
@@ -138,9 +131,7 @@ usersCount: Function := () -> Int {
 }
 
 usersUpdateName: Function := (id: Int, name: String) -> Nothing {
-    connection(
-        
-    ).execute(
+    connection().execute(
         "UPDATE users SET name = ? WHERE id = ?"
         [MySQL.fromString(name), MySQL.fromInt(id)]
     )

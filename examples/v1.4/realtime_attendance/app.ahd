@@ -1,0 +1,37 @@
+// v1.4.0 dogfood: realtime attendance.
+//
+//     cp .env.example .env      # then set DB_PASSWORD and NOTIFY_TOKEN
+//     psql ... -f schema.sql    # once, against your PostgreSQL database
+//     ahdcode dev app.ahd       # the Web application
+//     ahdcode run jobs.ahd      # optional, beside it
+//
+// Web, PostgreSQL, a WebSocket, UUID v7, Env.secret, and Cron in one small
+// application. Nothing is downloaded at build or run time.
+require("Config/Database.ahd")
+require("Config/Sessions.ahd")
+require("Live.ahd")
+require("Pages/Account.ahd")
+require("Pages/Dashboard.ahd")
+require("Pages/CheckIn.ahd")
+require("Pages/Notify.ahd")
+bring Web
+from Web bring App
+
+application: App := Web.start()
+// Fail at startup, not on the first request, when the database is unreachable.
+attendanceDatabase().ping()
+
+routes := Web.routes(application, attendanceSessions())
+routes.get("/", dashboard)
+routes.post("/sign-in", signIn)
+routes.post("/sign-out", signOut)
+routes.post("/check-in", checkIn)
+
+application.post("/internal/notify", notify)
+application.websocket("/live", liveEndpoint())
+application.managedAssets("/assets", "public")
+
+write(
+    "{application.configuration().name} — http://{application.configuration().address()}"
+)
+application.start()

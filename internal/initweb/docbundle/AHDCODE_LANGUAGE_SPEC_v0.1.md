@@ -5880,6 +5880,201 @@ with a message naming the feature. Latex converts at compilation and raises
 is bounded to 5 MiB, 100,000 elements, nesting depth 64, and 2,000,000 path
 segments.
 
+## 74. UUID Standard Module (v1.4.0)
+
+`bring UUID` resolves to the compiler-supplied module `builtin:UUID`; a sibling
+file cannot shadow it. The module adds no syntax.
+
+```text
+UUID.v4()                  -> UUIDValue
+UUID.v7()                  -> UUIDValue
+UUID.parse(text: String)   -> UUIDValue
+UUID.isValid(text: String) -> Bool
+UUID.zero()                -> UUIDValue
+
+UUIDValue.string()                  -> String
+UUIDValue.version()                 -> Int
+UUIDValue.isZero()                  -> Bool
+UUIDValue.equals(other: UUIDValue)  -> Bool
+UUIDValue.compare(other: UUIDValue) -> Int
+```
+
+`UUIDValue` is an immutable compiler-supplied Class with one hidden field and
+no public constructor; its members are positional-only type operations. There
+is no implicit conversion from or to `String`. `==` keeps the identity meaning
+of every built-in Class, and `str` of a `UUIDValue` is `<UUIDValue>`;
+`string()` is the canonical text.
+
+UUID text is exactly 36 characters: hexadecimal digits in groups of
+8-4-4-4-12 with `-` at offsets 8, 13, 18, and 23. Digits are case-insensitive
+on input; `string()` is lowercase. Whitespace, braces, a `urn:uuid:` prefix,
+and the 32-digit form are rejected. Every 128-bit value parses, whatever its
+version or variant. `parse` raises `UUIDError` without repeating the input;
+`isValid` never raises. `version()` is the 4-bit version field as written.
+`isZero()` is true only for `UUID.zero()`, all zero bits. `equals` compares all
+128 bits; `compare` returns `-1`, `0`, or `1` in RFC 9562 byte order, which is
+lowercase text order.
+
+`v4` takes 122 bits from the operating system's cryptographic random source
+and sets version 4 and variant `10`. `v7` follows RFC 9562 §5.7: 48 bits of
+Unix milliseconds and a 12-bit sub-millisecond fraction form a 60-bit clock
+value, followed by 62 random bits, version 7, and variant `10`. Within one
+process every `v7` value is strictly greater than the previous one, including
+when the wall clock moves backwards, because the next clock value is the
+larger of the current time and the last value plus one. Sustained generation
+above 4096 values per millisecond moves the embedded time ahead of the clock.
+Ordering across processes within one millisecond, exact creation time, and
+unguessability are not provided. A clock outside 1970 to the 48-bit
+millisecond range and an entropy failure raise `UUIDError`, derived from
+`Error`. `Identity.id()` and `Security.token()` are unchanged, and no
+conversion exists between them and `UUIDValue`.
+
+## 75. Env.secret (v1.4.0)
+
+```text
+Env.secret(name: String) -> String?
+```
+
+| `NAME` | `NAME_FILE` | Result |
+| --- | --- | --- |
+| absent | absent | `null` |
+| present (even `""`) | absent | the value of `NAME` |
+| absent | a non-empty path | the file's contents |
+| absent | `""` | `EnvError` |
+| present | present | `EnvError` |
+
+`name` is validated as `Env.set` validates it. The path is used as given,
+relative to the working directory, and symbolic links are followed. The file
+must be at most 1 MiB, valid UTF-8, and free of NUL bytes; exactly one trailing
+`\n` or `\r\n` is removed and nothing else is trimmed. A missing or unreadable
+file raises `EnvError` and never falls back to `NAME`. Messages name the
+variable and never contain the value, the file's contents, or the path.
+
+## 76. PostgreSQL Standard Module (v1.4.0)
+
+`bring PostgreSQL` resolves to the compiler-supplied module
+`builtin:PostgreSQL`; a sibling file cannot shadow it.
+
+```text
+PostgreSQL.connect(host: String, username: String, password: String,
+                   port: Int = 5432, database: String? = null,
+                   security: String = "tls", timeoutSeconds: Int = 10) -> PostgreSQLDatabase
+PostgreSQL.nullValue()               -> PostgreSQLValue
+PostgreSQL.fromInt(value: Int)       -> PostgreSQLValue
+PostgreSQL.fromReal(value: Real)     -> PostgreSQLValue
+PostgreSQL.fromString(value: String) -> PostgreSQLValue
+PostgreSQL.fromBool(value: Bool)     -> PostgreSQLValue
+
+PostgreSQLDatabase.ping()                                            -> Nothing
+PostgreSQLDatabase.execute(sql: String, params: List<PostgreSQLValue> = []) -> PostgreSQLResult
+PostgreSQLDatabase.query(sql: String, params: List<PostgreSQLValue> = [])   -> List<Pair<String, PostgreSQLValue>>
+PostgreSQLDatabase.begin()                                           -> PostgreSQLTransaction
+PostgreSQLDatabase.close()                                           -> Nothing
+PostgreSQLTransaction.execute / query                                (same shapes)
+PostgreSQLTransaction.commit()                                       -> Nothing
+PostgreSQLTransaction.rollback()                                     -> Nothing
+PostgreSQLResult.affectedRows()                                      -> Int
+PostgreSQLValue.kind() -> String, isNull() -> Bool, bool() -> Bool, int() -> Int,
+real() -> Real, string() -> String, isBinary() -> Bool, binarySize() -> Int,
+binaryBase64() -> String
+```
+
+All five Classes are opaque. `connect` dials, authenticates, and pings within
+`timeoutSeconds` before it returns. `security` is exactly `"tls"` (TLS 1.2 or
+newer, system trust roots extended only by `SSL_CERT_FILE`, hostname verified)
+or `"none"`. `port` is `1..65535`; `timeoutSeconds` is `1..9223372036` and
+bounds the dial, the TLS handshake, and each statement, which is cancelled on
+the server when it runs longer. `database` `null` or `""` selects the server
+default. Only these arguments choose the connection: `PG*` environment
+variables, password files, client certificates, and service files have no
+effect, except that a `PGSERVICE` naming an unreadable service makes `connect`
+fail with a message saying so.
+
+Placeholders are `$1..$n`; SQL text is never rewritten. Each call prepares one
+unnamed statement with the extended protocol and binds its values as text the
+server converts in context; more than one statement in a call fails, and the
+parameter count must match the placeholders. There is no statement cache and
+no `lastInsertId`; generated values are read with `RETURNING`. Result columns
+map by declared type: NULL to `Null`; `boolean` to `Bool`; `smallint`,
+`integer`, `bigint` to `Int`; `real`, `double precision` to `Real`, with NaN and
+infinities raising; `bytea` to `Binary`; `date` to `YYYY-MM-DD`, `timestamp` to
+`YYYY-MM-DD HH:MM:SS[.ffffff]`, and `timestamptz` to the same form in UTC with
+`+00`, read in binary form so session `DateStyle` and `TimeZone` never change
+them, with PostgreSQL's `infinity` and BC spellings; `numeric`, `uuid`,
+`json`, `jsonb`, and every other scalar to `String` as the server's text.
+Arrays and composite or record values raise, naming the column. Duplicate
+column labels raise; wrong-kind accessors raise.
+
+`begin()` pins one pooled connection in a `READ COMMITTED` transaction. After a
+failed statement every later statement in it raises; `commit()` of such a
+transaction raises and ends it, and `rollback()` after a failed `commit()`
+does nothing. Otherwise `commit` and `rollback` are one-shot. The database is a
+connection pool safe for concurrent use. `close()` rolls back open
+transactions, is idempotent, and makes every later use raise. Every failure is
+`PostgreSQLError`, derived from `Error`, with the categories connection
+failed, connection timed out, TLS verification failed, query failed, execution
+failed, and transaction failed; server errors add the SQLSTATE and primary
+message but never `DETAIL`, `HINT`, or `WHERE`, and no message contains the
+password. The client is `github.com/jackc/pgx/v5` v5.11.0, vendored so a
+PostgreSQL program builds offline; a program that does not use PostgreSQL does
+not receive it.
+
+## 77. WebSocket Server Endpoints in HTTP (v1.4.0)
+
+```text
+HTTP.websocket(onMessage: Function(WebSocket, String) -> Nothing) -> WebSocketEndpoint
+WebSocketEndpoint.withOpen(handler: Function(WebSocket, Request) -> Nothing)      -> WebSocketEndpoint
+WebSocketEndpoint.withClose(handler: Function(WebSocket, Int, String) -> Nothing) -> WebSocketEndpoint
+WebSocketEndpoint.withAccept(check: Function(Request) -> Response?)               -> WebSocketEndpoint
+WebSocketEndpoint.withAllowedOrigins(origins: List<String>)                       -> WebSocketEndpoint
+WebSocketEndpoint.withMaxMessageBytes(bytes: Int)                                 -> WebSocketEndpoint
+WebSocketEndpoint.withMaxQueuedMessages(count: Int)                               -> WebSocketEndpoint
+WebSocketEndpoint.withMaxConnections(count: Int)                                  -> WebSocketEndpoint
+Server.websocket(path: String, endpoint: WebSocketEndpoint) -> Nothing
+WebSocket.id() -> String
+WebSocket.send(text: String) -> Bool
+WebSocket.close(code: Int = 1000, reason: String = "") -> Nothing
+WebSocket.isOpen() -> Bool
+Web.websocket(onMessage: Function(WebSocket, String) -> Nothing) -> WebSocketEndpoint
+App.websocket(path: String, endpoint: WebSocketEndpoint) -> Nothing
+```
+
+`WebSocketEndpoint` is immutable configuration. The defaults are
+`maxMessageBytes` 65536 (`1..16777216`), `maxQueuedMessages` 64 (`1..4096`),
+and `maxConnections` 1024 (`1..1000000`); an out-of-range value, a malformed or
+wildcard origin, registering after `start()`, or a path that is also a `GET`
+route raises `HTTPError`. `Web` re-exports `WebSocket` and
+`WebSocketEndpoint`; endpoints are not registered on `RouteSet` or
+`RouteGroup`.
+
+A `GET` on an endpoint path is handled in this order: upgrade headers (`426`
+when absent, `400` when malformed); the connection limit (`503`); the origin
+policy (`403`), which by default allows no `Origin` header or an `Origin` host
+and port equal to the request `Host`, and with `withAllowedOrigins` requires an
+exact lowercase `scheme://host[:port]` match; the `withAccept` check, whose
+returned `Response` is sent with no upgrade; `onOpen(socket, request)`; and
+then the `101` response, so a client that sees the connection open knows
+`onOpen` has returned. If the upgrade fails after `onOpen`, `onClose(1006, "")`
+still runs. A non-`GET` method is `405`.
+
+Every callback holds the same per-server mutex as HTTP handlers. Per socket,
+`onOpen` runs exactly once and first, `onMessage` in arrival order, and
+`onClose` exactly once and last; the next message is read only after the
+previous callback returned. `send` never blocks: it queues on the socket's
+bounded queue and returns `false` when the socket is closing or closed; a full
+queue closes the socket with `1008` and `outbound queue full`. Only text
+messages are accepted: a binary message closes with `1003`, invalid UTF-8 with
+`1007`, and a message over `maxMessageBytes` with `1009`. `close` accepts
+`1000`, `1001`, `1008`, `1011`, and `3000..4999` with a reason of at most 123
+UTF-8 bytes, sends queued messages first, and waits at most five seconds for
+the handshake. The server pings every 30 seconds and treats a missing pong
+after 30 more as lost; a lost connection or stalled write reports `1006`,
+which is never sent. An error raised by `onOpen` or `onMessage` is written to
+stderr and closes the socket with `1011`; `onClose` still runs. Compression,
+subprotocols, binary messages, and a WebSocket client are not provided. The
+protocol implementation is `github.com/coder/websocket` v1.8.15, vendored; a
+program that creates no endpoint does not receive it.
+
 ---
 
 # End of AhdCode v0.1 Core Specification

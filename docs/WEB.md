@@ -195,6 +195,7 @@ academy.start()
 | `route(method, path, handler)` | register any supported method |
 | `assets(prefix, root)` | serve a directory of static files |
 | `managedAssets(prefix, root)` | serve only files declared through `Web.Assets` |
+| `websocket(path, endpoint)` | register a [WebSocket](WEBSOCKET.md) endpoint built with `Web.websocket` (v1.4.0) |
 | `start()` | bind and serve; does not return |
 | `configuration()` | the validated `AppConfig` |
 
@@ -568,7 +569,7 @@ Editing `public/app.css` does not.
 It also **refuses** `APP_PROTOCOL=https`:
 
 ```
-✗ Local HTTPS is not available in AhdCode v1.3.0.
+✗ Local HTTPS is not available in AhdCode v1.4.0.
   ahdcode dev serves plaintext HTTP, so it cannot honour
   APP_PROTOCOL=https.
 
@@ -776,6 +777,8 @@ modules already report well.
 - **Sessions, CSRF, and password hashing** remain the explicit `Session`,
   `Security`, and `HTTP` primitives. Web adds no magic around them.
 - **Static assets** go through the released `server.static` boundary.
+- **WebSocket endpoints** are same-origin by default and authenticate in
+  `withAccept`, before the upgrade; see [WebSocket](WEBSOCKET.md#security).
 - **`bring Web`** resolves offline from embedded bytes. No download, ever.
 
 ## 20. Relation to HTTP and HTML
@@ -808,6 +811,7 @@ configuration contract.
 | v1.0.0 | No Web API change; self-contained platform packaging |
 | v1.2.0 | No Web API change; [Cron](CRON.md) for scheduled work beside an application, [Characters](CHARACTERS.md), and TikZ in [Latex](LATEX.md) |
 | v1.3.0 | No Web API change; [QR](QR.md), [Barcode](BARCODE.md), and professional documents in [Latex](LATEX.md) and [PDF](PDF.md) |
+| v1.4.0 | `Web.websocket` and `App.websocket` for [WebSocket](WEBSOCKET.md) endpoints; [PostgreSQL](POSTGRESQL.md), [UUID](UUID.md), and [`Env.secret`](ENV.md#secret) beside an application |
 
 ## Cron: scheduled application work
 

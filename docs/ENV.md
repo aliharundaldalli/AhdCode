@@ -22,6 +22,7 @@ inference, no shell interpolation, and no command execution anywhere in it.
 Env.get(name: String)    -> String?
 Env.getOr(name: String, fallback: String) -> String
 Env.exists(name: String) -> Bool
+Env.secret(name: String) -> String?
 
 Env.set(name: String, value: String) -> Nothing
 Env.unset(name: String)  -> Nothing
@@ -56,6 +57,51 @@ conversion — convert explicitly:
 ```ahd
 port: Int := int(Env.getOr("PORT", "8080"))
 ```
+
+## secret
+
+`Env.secret(name)` (v1.4.0) reads a secret the way container platforms
+deliver it: from the variable `name`, or from the file whose path is in
+`name_FILE`.
+
+| `NAME` | `NAME_FILE` | Result |
+| --- | --- | --- |
+| absent | absent | `null` |
+| present (even `""`) | absent | the value of `NAME` |
+| absent | a non-empty path | the file's contents |
+| absent | `""` | `EnvError` |
+| present | present | `EnvError`: set only one |
+
+```ahd
+password: String? := Env.secret("DB_PASSWORD")
+if password == null {
+    write("Set DB_PASSWORD, or DB_PASSWORD_FILE to a file that holds it.")
+}
+```
+
+- The path is used as given, relative to the working directory, and symbolic
+  links are followed.
+- The file must be at most 1 MiB, valid UTF-8, and free of NUL bytes.
+- Exactly one trailing `\n` or `\r\n` is removed, so a file written with a
+  final line break works. Nothing else is trimmed.
+- A missing or unreadable file raises `EnvError`; it never falls back to
+  `NAME`.
+- `name` is validated the same way `Env.set` validates it.
+
+The messages name the variable and never include the value, the file's
+contents, or its path:
+
+```text
+DB_PASSWORD and DB_PASSWORD_FILE are both set; set only one
+DB_PASSWORD_FILE is set but empty
+the secret file named by DB_PASSWORD_FILE could not be read
+the secret file named by DB_PASSWORD_FILE is larger than 1 MiB
+the secret file named by DB_PASSWORD_FILE is not valid UTF-8
+the secret file named by DB_PASSWORD_FILE contains a NUL byte
+```
+
+The result is an ordinary `String` in your program; `Env.secret` does not hide
+it afterwards. Keep it out of logs and responses.
 
 ## set and unset
 
@@ -123,8 +169,9 @@ than silently letting the last one win.
 
 `EnvError` derives directly from `Error` and covers: a missing/unreadable
 `.env` file, a malformed assignment, an invalid key, an unterminated quoted
-value, a duplicate key, an invalid escape sequence, and an OS-level
-`set`/`unset` failure. Error messages never include the variable's value.
+value, a duplicate key, an invalid escape sequence, an OS-level
+`set`/`unset` failure, and a secret `Env.secret` cannot read. Error messages
+never include the variable's value.
 
 ```ahd
 attempt {
@@ -193,3 +240,17 @@ default. A malformed value fails the process; it is never silently ignored.
 
 A raw `HTTP.server` keeps its historical 1MiB body default and 15s/15s/60s
 timeouts until `applyWebLimits()` is called.
+
+### Test suite
+
+Read only by AhdCode's own `go test` suite, never by AhdCode programs:
+
+| Variable | Meaning |
+| --- | --- |
+| `AHDCODE_TEST_POSTGRESQL_HOST` | Runs the PostgreSQL integration tests against this server. Unset, they skip. |
+| `AHDCODE_TEST_POSTGRESQL_PORT` | Port. Defaults to `5432`. |
+| `AHDCODE_TEST_POSTGRESQL_USERNAME`, `AHDCODE_TEST_POSTGRESQL_PASSWORD` | A role that may create and drop schemas. |
+| `AHDCODE_TEST_POSTGRESQL_DATABASE` | Database. Unset uses the server's default. |
+| `AHDCODE_TEST_POSTGRESQL_SECURITY` | `tls` (default) or `none`. |
+
+Each test works in its own `ahd_test_<random>` schema and drops it afterwards.

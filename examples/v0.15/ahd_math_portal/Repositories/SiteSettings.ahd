@@ -9,9 +9,7 @@ bring MySQL
 from MySQL bring (MySQLDatabase, MySQLValue)
 
 settingsGet: Function := (key: String, fallback: String) -> String {
-    rows: Local List<Pair<String, MySQLValue>> := connection(
-        
-    ).query(
+    rows: Local List<Pair<String, MySQLValue>> := connection().query(
         "SELECT setting_value FROM site_settings WHERE setting_key = ? LIMIT 1"
         [MySQL.fromString(key)]
     )
@@ -28,9 +26,7 @@ settingsGet: Function := (key: String, fallback: String) -> String {
 }
 
 settingsSet: Function := (key: String, value: String) -> Nothing {
-    connection(
-        
-    ).execute(
+    connection().execute(
         "INSERT INTO site_settings (setting_key, setting_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)"
         [MySQL.fromString(key), MySQL.fromString(value)]
     )

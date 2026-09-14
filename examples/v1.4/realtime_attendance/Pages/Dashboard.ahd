@@ -1,0 +1,72 @@
+require("Config/Database.ahd")
+require("Layouts/Main.ahd")
+require("Pages/Account.ahd")
+bring Web
+from Web bring (RequestContext, Response, HTMLNode)
+
+checkInItem: Function := (student: String, at: String) -> HTMLNode {
+    return Web.UI.liNodes([Web.UI.strong(student), Web.UI.span(" at " + at)])
+}
+// dashboard renders the latest check-ins on the server. live.js only adds
+// what arrives afterwards, so the page is complete without JavaScript.
+dashboard: Function := (context: RequestContext) -> Response {
+    name: Local String? := context.session.get("user_name")
+    if name == null {
+        return context.respond(signInPage(context))
+    }
+    database: Local := attendanceDatabase()
+    recent: Local := database.query(
+        "SELECT student, created_at FROM check_ins ORDER BY created_at DESC LIMIT 20"
+    )
+    items: Local List<HTMLNode> := []
+    for row in recent {
+        items.add(
+            checkInItem(row["student"].string(), row["created_at"].string())
+        )
+    }
+
+    content: Local List<HTMLNode> := [
+        Web.UI.h1("Realtime Attendance")
+        Web.UI.p("Signed in as " + name)
+    ]
+    notice: Local String? := context.flashTake("notice")
+    if notice != null {
+        content.add(Web.UI.p(notice, {"role": "status"}))
+    }
+    content.add(
+        Web.UI.formTo(
+            "/check-in"
+            "post"
+            [
+                Web.UI.csrfField(context)
+                Web.UI.labelFor("student", "Student")
+                Web.UI.input(
+                    "text"
+                    "student"
+                    ""
+                    {"id": "student", "maxlength": "80", "required": "required"}
+                )
+                Web.UI.button("Check in", {"type": "submit"})
+            ]
+        )
+    )
+    content.add(
+        Web.UI.p(
+            "Live updates need JavaScript."
+            {"id": "live-status", "role": "status"}
+        )
+    )
+    content.add(Web.UI.ul(items, {"id": "check-ins"}))
+    content.add(
+        Web.UI.formTo(
+            "/sign-out"
+            "post"
+            [
+                Web.UI.csrfField(context)
+                Web.UI.button("Sign out", {"type": "submit"})
+            ]
+        )
+    )
+    content.add(Web.Assets.scriptModule("js/live.js"))
+    return context.respond(attendanceLayout("Dashboard", content))
+}

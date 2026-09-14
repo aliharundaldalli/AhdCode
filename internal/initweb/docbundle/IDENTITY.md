@@ -17,5 +17,9 @@ it for passwords, session secrets, or CSRF tokens. Those belong to
 
 There is no decode API. The identifier is an opaque string.
 
+When another system expects a UUID, such as a PostgreSQL `uuid` column or an
+external API, use [`UUID`](UUID.md) instead. `Identity.id()` is unchanged in
+v1.4.0, and there is no conversion between the two.
+
 AhdCode Web starters store a private numeric `id` for the database and a
 separate `public_id` for URLs. Routes never expose the numeric id.

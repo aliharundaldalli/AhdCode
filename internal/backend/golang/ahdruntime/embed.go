@@ -65,6 +65,35 @@ var SecuritySource string
 //go:embed identity.go
 var IdentitySource string
 
+// UUIDSource is emitted as a separate generated Go file. It generates, parses,
+// and compares RFC 9562 UUIDs using only bytes, crypto/rand, sync, and time from
+// the standard library.
+//
+//go:embed uuid.go
+var UUIDSource string
+
+// WebSocketSource is emitted as a separate generated Go file. It holds the
+// standard-library-only part of WebSocket server support: endpoints, route
+// registration, and the WebSocket members, so the HTTP dispatcher always
+// compiles.
+//
+//go:embed websocket.go
+var WebSocketSource string
+
+// WebSocketConnSource is emitted only into a program that creates a WebSocket
+// endpoint. It imports the vendored github.com/coder/websocket (see
+// ahdruntime/websocketvendor), the same way MySQLSource imports its driver.
+//
+//go:embed websocket_conn.go
+var WebSocketConnSource string
+
+// PostgreSQLSource is emitted only into a program that uses PostgreSQL. It
+// imports the vendored github.com/jackc/pgx/v5 graph (see
+// ahdruntime/postgresqlvendor), the same way MySQLSource imports its driver.
+//
+//go:embed postgresql.go
+var PostgreSQLSource string
+
 // BitsSource is emitted as a separate generated Go file. It provides the
 // bitwise operations AhdCode's grammar has no operators for, using only
 // math/bits from the standard library.

@@ -1,4 +1,4 @@
-# AhdCode v1.3.0 English Student Guide
+# AhdCode v1.4.0 English Student Guide
 
 This guide is designed so that **even someone who has never programmed before** can follow along. You can read it in order from beginning to end; in each section, you will first see what we want to achieve, then write a working example, and finally learn the necessary rules.
 
@@ -4237,13 +4237,16 @@ After finishing this guide, you can deepen your knowledge of the language detail
 - [JSON](JSON.md)
 - [SQLite](SQLITE.md)
 - [MySQL](MYSQL.md)
+- [PostgreSQL](POSTGRESQL.md)
 - [HTTP](HTTP.md)
+- [WebSocket](WEBSOCKET.md)
 - [Security](SECURITY.md)
 - [HTML](HTML.md)
 - [XML](XML.md)
 - [Env](ENV.md)
 - [Lists](LISTS.md)
 - [KeyValue](KEYVALUE.md)
+- [UUID](UUID.md)
 - [File and Path](FILESYSTEM.md)
 - [Regex](REGEX.md)
 - [CSV](CSV.md)
@@ -4265,8 +4268,10 @@ v0.12 raffle application, the
 v0.14 multi-file Web application, the
 v0.15 Web applications, the
 v0.16 forms and validation example,
-the v0.17 routes and guards example, and the
-v0.18 Web starters for more working programs.
+the v0.17 routes and guards example, the
+v0.18 Web starters, and the
+v1.4 realtime attendance application
+for more working programs.
 
 ## 50. Security: password hashing and secure tokens
 
@@ -4877,3 +4882,114 @@ Two honest limits:
 For deployment, `APP_HOST` and `APP_PROTOCOL` describe the *public* address
 and a real server in front of your application terminates HTTPS. The
 [Web guide](WEB.md#15-production) explains that split.
+
+## 57. Realtime web and data (v1.4.0)
+
+v1.4.0 adds four things that fit together: UUIDs, secrets read from files, a
+PostgreSQL module, and WebSocket endpoints that push updates to a browser.
+Each has a full reference; this section shows the idea of each in a few lines.
+
+### 57.1 UUIDs
+
+A UUID is a 36-character identifier that databases and other programs
+understand. `UUID.v7()` makes one that starts with the current time, so newer
+ones sort after older ones.
+
+```ahd
+bring UUID
+from UUID bring UUIDValue
+
+first: UUIDValue := UUID.v7()
+second: UUIDValue := UUID.v7()
+write(first.string())                 // 01a0a0c9-8fa6-733f-9f09-81191abcce97
+write(first.compare(second))          // -1: first was made earlier
+write(UUID.parse(first.string()).equals(first))   // true
+```
+
+Two things to remember. Compare UUIDs with `equals`, not `==`: `==` asks
+whether two variables hold the *same object*. And a UUID is not a secret —
+anyone can read roughly when a v7 UUID was made. For secrets, keep using
+`Security.token()` (section 50). See [UUID](UUID.md).
+
+### 57.2 Secrets from files
+
+Servers often hand a password to a program as a *file*, and put the file's
+path in a variable ending in `_FILE`. `Env.secret` handles both styles:
+
+```ahd
+bring Env
+
+password: String? := Env.secret("DB_PASSWORD")
+if password == null {
+    write("Set DB_PASSWORD, or DB_PASSWORD_FILE to a file that holds it.")
+}
+```
+
+It reads `DB_PASSWORD` if it is set, or else the file named by
+`DB_PASSWORD_FILE`. Setting both is an error, so you always know which one was
+used. See [Env](ENV.md#secret).
+
+### 57.3 PostgreSQL
+
+PostgreSQL works like the MySQL module from section 51, with a few
+differences. Placeholders are numbered, `$1`, `$2`, …, and generated values
+come back through `RETURNING`:
+
+```ahd
+bring PostgreSQL
+from PostgreSQL bring PostgreSQLDatabase
+
+db: PostgreSQLDatabase := PostgreSQL.connect("127.0.0.1", "app", "secret", 5432, "school", "none")
+rows := db.query(
+    "INSERT INTO students (name, active) VALUES ($1, $2) RETURNING id"
+    [PostgreSQL.fromString("Ayşe"), PostgreSQL.fromBool(true)]
+)
+write(rows[0]["id"].int())
+```
+
+Inside a transaction, PostgreSQL is strict: once one statement fails, the
+whole transaction is broken, and `commit()` raises instead of saving part of
+it. Catch the error and call `rollback()`. See [PostgreSQL](POSTGRESQL.md).
+
+### 57.4 WebSocket: pushing updates to a browser
+
+A normal web page only learns something new when it asks. A WebSocket stays
+open, so the server can send a message the moment something happens.
+
+```ahd
+bring HTTP
+bring KeyValue
+from HTTP bring (Server, Request, WebSocket, WebSocketEndpoint)
+
+clients: Pair<String, WebSocket> := {}
+
+joined: Function := (socket: WebSocket, request: Request) -> Nothing {
+    clients: Global Pair<String, WebSocket>
+    clients[socket.id()] = socket
+}
+
+received: Function := (socket: WebSocket, text: String) -> Nothing {
+    clients: Global Pair<String, WebSocket>
+    for other in KeyValue.values(clients) {
+        other.send(text)
+    }
+}
+
+endpoint: WebSocketEndpoint := HTTP.websocket(received).withOpen(joined)
+server: Server := HTTP.server("127.0.0.1", 8080)
+server.websocket("/chat", endpoint)
+server.start()
+```
+
+In the browser, `new WebSocket("ws://127.0.0.1:8080/chat")` connects to it.
+Callbacks run one at a time, just like HTTP handlers, so the `clients` Pair
+needs no special care — but keep callbacks short. If the connection drops,
+nothing reconnects by itself; that is your page's JavaScript's job. See
+[WebSocket](WEBSOCKET.md).
+
+### 57.5 Putting it together
+
+The realtime attendance application
+uses all four: a check-in form saves a row with a `UUID.v7()` key in
+PostgreSQL, reads the database password with `Env.secret`, and every open
+dashboard shows the new check-in immediately over a WebSocket.

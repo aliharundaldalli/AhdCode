@@ -1,0 +1,33 @@
+// The one PostgreSQL pool this application shares.
+//
+// The password comes from DB_PASSWORD, or from the file DB_PASSWORD_FILE
+// names, so a mounted container secret never has to be copied into a
+// variable. The pool opens on first use, after Web.start has loaded .env.
+bring PostgreSQL
+bring Env
+from PostgreSQL bring PostgreSQLDatabase
+
+attendanceConnection: PostgreSQLDatabase? := null
+
+attendanceDatabase: Function := () -> PostgreSQLDatabase {
+    attendanceConnection: Global PostgreSQLDatabase?
+    current: Local PostgreSQLDatabase? := attendanceConnection
+    if current != null {
+        return current
+    }
+    password: Local String? := Env.secret("DB_PASSWORD")
+    if password == null {
+        toss Error("Set DB_PASSWORD, or DB_PASSWORD_FILE to a file holding it.")
+    }
+    database: Local String? := Env.get("DB_DATABASE")
+    opened: Local PostgreSQLDatabase := PostgreSQL.connect(
+        Env.getOr("DB_HOST", "127.0.0.1")
+        Env.getOr("DB_USERNAME", "attendance")
+        password
+        int(Env.getOr("DB_PORT", "5432"))
+        database
+        Env.getOr("DB_SECURITY", "tls")
+    )
+    attendanceConnection = opened
+    return opened
+}

@@ -12,16 +12,15 @@ AhdCode; okunabilir sözdizimi, açık niyet (explicit intent), öngörülebilir
 anlambilim (semantics) ve yerel (native) derlemeye odaklanan, deneysel,
 statik olarak denetlenen genel amaçlı bir programlama dilidir.
 
-Bu, **v1.3.0**'dır. Dil, araç zinciri ve Web çatısı özellik olarak
+Bu, **v1.4.0**'dır. Dil, araç zinciri ve Web çatısı özellik olarak
 tamamlanmıştır; burada anlatılan çekirdek dil yüzeyi 1.0'ın taahhüt ettiği ve
-1.1, 1.2 ile 1.3'ün değiştirmeden koruduğu yüzeydir.
+1.1, 1.2, 1.3 ile 1.4'ün değiştirmeden koruduğu yüzeydir.
 
-v1.3.0 bir ara (minor) sürümdür, **Profesyonel Belgeler ve Makine Kodları**:
-`QR` ve `Barcode` standart modüllerini ve `Latex` ile `PDF` için profesyonel
-belge özelliklerini — sayfa düzeni, üst ve alt bilgiler, bağlantılar, yer
-imleri, PDF özellikleri, QR kodları, barkodlar, görsel dönüşümleri ve SVG
-varlıkları — ekler; çekirdek dilbilgisini ya da mevcut davranışların hiçbirini
-değiştirmez. Bkz. [v1.3.0 ile gelenler](#v130-ile-gelenler).
+v1.4.0 bir ara (minor) sürümdür, **Gerçek Zamanlı Web ve Veri**: `UUID` ve
+`PostgreSQL` standart modüllerini, `Web` geçişiyle birlikte `HTTP` içinde
+WebSocket sunucu uç noktalarını ve dosya olarak iletilen gizli değerler için
+`Env.secret`'i ekler; çekirdek dilbilgisini ya da mevcut davranışların
+hiçbirini değiştirmez. Bkz. [v1.4.0 ile gelenler](#v140-ile-gelenler).
 
 Ürün, kendi kendine yeten bir platform paketi olarak dağıtılır: `ahdcode` CLI,
 özel Go 1.27.0 araç zinciri, AhdDataStudio, `ahdsqlite`, `ahdnumeric` ve
@@ -193,9 +192,9 @@ taşır; oturum değerleri sunucuda kalır ve süreç bitince kaybolur. Bu bir
 kimlik doğrulama çerçevesi değildir. v0.3.0 pratik uygulama geliştirmeyi tipli
 bir [SQLite](docs/SQLITE_TR.md) köprüsüyle başlatmıştı. HTTP, çalışma zamanının
 içindeki Go `net/http` paketini kullanır; ayrı bir HTTP, çerez, oturum veya
-istemci yardımcısı yoktur. Gelen multipart yüklemeler v0.8.0 ile geldi; giden
-dosya ekleri, WebSocket ve bir yapay zeka satıcı modülü hâlâ sürümün parçası
-değildir.
+istemci yardımcısı yoktur. Gelen multipart yüklemeler v0.8.0, WebSocket sunucu
+uç noktaları v1.4.0 ile geldi; giden dosya ekleri, bir WebSocket istemcisi ve
+bir yapay zeka satıcı modülü hâlâ sürümün parçası değildir.
 
 v0.2.2, v0.2.1'in tanılama, hover, completion, tanıma git, belge sembolleri,
 signature help ve referans bulma özelliklerinin üzerine pratik günlük AhdCode
@@ -319,12 +318,12 @@ Kavramsal netliği korumak için AhdCode'un yetenekleri dört belirgin mimari ka
 
 2. **Standart Kütüphane (Birinci Taraf Gömülü Modüller):**
    - **Matematik ve Hesaplama:** [`Math`](docs/MATH_TR.md), [`Bits`](docs/BITS_TR.md) (`Int` üzerinde bit işlemleri), [`Regex`](docs/REGEX_TR.md), [`Statistics`](docs/STATISTICS_TR.md), [`Numeric`](docs/NUMERIC_TR.md), [`Plot`](docs/PLOT_TR.md)
-   - **Veri ve Koleksiyonlar:** [`Lists`](docs/LISTS_TR.md), [`KeyValue`](docs/KEYVALUE_TR.md), [`Characters`](docs/CHARACTERS_TR.md) (Unicode kod noktaları ve sınıflandırma), [`CSV`](docs/CSV_TR.md), [`Data`](docs/DATA_TR.md), [`JSON`](docs/JSON_TR.md), [`XML`](docs/XML_TR.md)
+   - **Veri ve Koleksiyonlar:** [`Lists`](docs/LISTS_TR.md), [`KeyValue`](docs/KEYVALUE_TR.md), [`Characters`](docs/CHARACTERS_TR.md) (Unicode kod noktaları ve sınıflandırma), [`CSV`](docs/CSV_TR.md), [`Data`](docs/DATA_TR.md), [`JSON`](docs/JSON_TR.md), [`XML`](docs/XML_TR.md), [`UUID`](docs/UUID_TR.md) (RFC 9562 sürüm 4 ve zamana göre sıralı sürüm 7 kimlikleri)
    - **Belge Üretimi:** [`Word`](docs/WORD_TR.md), [`Excel`](docs/EXCEL_TR.md), [`PDF`](docs/PDF_TR.md), [`Latex`](docs/LATEX_TR.md), [`QR`](docs/QR_TR.md) (QR kodları), [`Barcode`](docs/BARCODE_TR.md) (Code 128, EAN-13, UPC-A), [`Archive`](docs/ARCHIVE_TR.md)
    - **Sistem ve Ortam:** [`Time`](docs/TIME_TR.md), [`Cron`](docs/CRON_TR.md) (sınırlı, süreç içi zamanlama), [`Path`](docs/FILESYSTEM_TR.md), [`File`](docs/FILESYSTEM_TR.md), [`Env`](docs/ENV_TR.md)
 
 3. **Birinci Taraf Çalışma Zamanı / Çatı Modülleri:**
-   - **Ağ, Sunucu ve Depolama İlkelleri:** [`HTTP`](docs/HTTP_TR.md) (bellek içi sunucu, istek/yanıt, çerezler, oturumlar, statik dosya sunucusu, client), [`HTML`](docs/HTML_TR.md) (anlamsal kurucu, ayrıştırıcı, seçici motoru), [`Security`](docs/SECURITY_TR.md) (Argon2id özetleme, güvenli token'lar, sabit zamanlı karşılaştırma, SHA-2 özetleri, HMAC, kodlamalar, RS256 imzaları, AES-256-GCM), [`SQLite`](docs/SQLITE_TR.md) (yerel tipli veritabanı köprüsü), [`MySQL`](docs/MYSQL_TR.md) (bağlantı havuzu ve işlemlerle ağ veritabanı), [`SMTP`](docs/SMTP_TR.md) (yalnızca gönderim yapan posta istemcisi)
+   - **Ağ, Sunucu ve Depolama İlkelleri:** [`HTTP`](docs/HTTP_TR.md) (bellek içi sunucu, istek/yanıt, çerezler, oturumlar, statik dosya sunucusu, [WebSocket uç noktaları](docs/WEBSOCKET_TR.md), client), [`HTML`](docs/HTML_TR.md) (anlamsal kurucu, ayrıştırıcı, seçici motoru), [`Security`](docs/SECURITY_TR.md) (Argon2id özetleme, güvenli token'lar, sabit zamanlı karşılaştırma, SHA-2 özetleri, HMAC, kodlamalar, RS256 imzaları, AES-256-GCM), [`SQLite`](docs/SQLITE_TR.md) (yerel tipli veritabanı köprüsü), [`MySQL`](docs/MYSQL_TR.md) (bağlantı havuzu ve işlemlerle ağ veritabanı), [`PostgreSQL`](docs/POSTGRESQL_TR.md) (bağlantı havuzu ve işlemlerle ağ veritabanı), [`SMTP`](docs/SMTP_TR.md) (yalnızca gönderim yapan posta istemcisi)
    - **Web Uygulama Çatısı:** [`Web`](docs/WEB_TR.md) (birinci taraf gömülü web çatısı, [`Web.UI`](docs/WEB_TR.md#9-webui) anlamsal bileşenleri, `RequestContext`, tipli `Forms`, sıralı `ValidationErrors`, seçilmiş `OldInput`, oturuma bağlı CSRF ve flash yaşam döngüsü)
 
 4. **Geliştirici Araçları:**
@@ -453,13 +452,16 @@ bakın.
 - [Numeric modülü ve Complex skalerleri](docs/NUMERIC_TR.md)
 - [JSON modülü](docs/JSON_TR.md)
 - [SQLite modülü](docs/SQLITE_TR.md)
+- [PostgreSQL modülü](docs/POSTGRESQL_TR.md)
 - [HTTP modülü](docs/HTTP_TR.md)
+- [WebSocket uç noktaları](docs/WEBSOCKET_TR.md)
 - [HTML modülü](docs/HTML_TR.md)
 - [SMTP modülü](docs/SMTP_TR.md)
 - [XML modülü](docs/XML_TR.md)
 - [Env modülü](docs/ENV_TR.md)
 - [Lists modülü](docs/LISTS_TR.md)
 - [KeyValue modülü](docs/KEYVALUE_TR.md)
+- [UUID modülü](docs/UUID_TR.md)
 - [Tanılamaları anlama](docs/DIAGNOSTICS_TR.md)
 - [Dil sunucusu](docs/LSP_TR.md)
 - [Yapay zekâ destekli yerel kurulum](FOR_AI.md)
@@ -472,6 +474,7 @@ bakın.
 - [v0.8 multipart formlar ve dosya yükleme](examples/v0.8/README_TR.md)
 - [v0.9 SMTP posta gönderimi](examples/v0.9/README_TR.md)
 - [v0.12 MySQL çekiliş](examples/v0.12/raffle/README_TR.md) — katılım kodu, hash’li yönetici girişi, kazanan ilanı
+- [v1.4 gerçek zamanlı yoklama](examples/v1.4/realtime_attendance/README_TR.md) — Web, PostgreSQL, WebSocket, UUID v7, `Env.secret` ve Cron
 - [AhdDataStudio](tools/AhdDataStudio/README_TR.md) — yerel MySQL + SQLite geliştirme arayüzü
 - [v0.4 Kütüphane Demosu](https://github.com/aliharundaldalli/ahdcode-library-demo) (ayrı başlangıç web uygulaması)
 - [v0.4 Seminer Demosu](https://github.com/aliharundaldalli/ahdcode-seminer-demo) (Hatay, çok sayfalı)
@@ -489,6 +492,44 @@ VS Code hem de Antigravity'i hedefler.
 [Kurulum rehberine](editors/vscode/README_TR.md) bakın.
 
 ## Mevcut sınırlamalar
+
+## v1.4.0 ile gelenler <a id="v140-ile-gelenler"></a>
+
+v1.4.0 bir **ara (minor)** sürümdür, **Gerçek Zamanlı Web ve Veri**. İki
+standart modül, WebSocket sunucu uç noktaları ve `Env.secret` ekler. Çekirdek
+dilbilgisi, tip sistemi ve daha önce yayımlanmış her fonksiyon davranışını
+korur.
+
+**Yeni standart modül: [`UUID`](docs/UUID_TR.md)** — `UUID.v4()` ve zamana göre
+sıralı `UUID.v7()` değiştirilemez `UUIDValue` değerleri üretir. `UUID.parse`
+yalnızca kanonik 36 karakterlik biçimi kabul eder ve değerler `equals` ile
+`compare` kullanılarak karşılaştırılır. `Identity.id()` değişmedi.
+
+**Yeni standart modül: [`PostgreSQL`](docs/POSTGRESQL_TR.md)** — MySQL
+ailesinde `connect`, `execute`, `query` ve `begin`; `$1` yer tutucuları,
+`boolean`, tam `numeric`, UTC `timestamptz`, `RETURNING` ve PostgreSQL'in
+iptal edilmiş işlem kuralı açıkça tanımlanmış olarak. Sunucuyu yalnızca
+`connect` argümanları seçer: `PG*` değişkenlerinin ve `~/.pgpass`'in etkisi
+yoktur. pgx gömülüdür; derlemeler çevrimdışı kalır.
+
+**[`HTTP`](docs/WEBSOCKET_TR.md) içinde WebSocket uç noktaları** —
+`HTTP.websocket`, `Server.websocket` ve `App.websocket`, rotalarınızla aynı
+sunucuda metin mesajlı uç noktalar barındırır. Geri çağrılar HTTP
+işleyicileriyle birlikte tek tek çalışır; istemci bağlantıyı açık gördüğünde
+`onOpen` dönmüştür; varsayılan köken politikası aynı kökendir; `withAccept`
+yükseltmeden önce kimlik doğrular; mesaj boyutu, kuyruk ve bağlantı sayısı
+sınırlıdır.
+
+**Genişletilen modül: [`Env`](docs/ENV_TR.md#secret)** — `Env.secret(name)`,
+`NAME` değişkenini ya da konteyner platformlarının bağlanan gizli değerler için
+kullandığı `NAME_FILE` ile adı verilen dosyayı okur.
+
+`UUID` ve `PostgreSQL` artık standart modül adlarıdır: bir programın yanındaki
+yerel `UUID.ahd` ya da `PostgreSQL.ahd`, `bring UUID` veya `bring PostgreSQL`
+ile yüklenmez; v1.3.0'daki `QR` ve `Barcode` gibi. Bkz.
+[`examples/v0.1/69_uuid.ahd`](examples/v0.1/69_uuid.ahd) ile
+[`examples/v0.1/72_websocket_echo.ahd`](examples/v0.1/72_websocket_echo.ahd)
+arası ve [gerçek zamanlı yoklama uygulaması](examples/v1.4/realtime_attendance/README_TR.md).
 
 ## v1.3.0 ile gelenler <a id="v130-ile-gelenler"></a>
 

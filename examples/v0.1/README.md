@@ -103,5 +103,9 @@ go run ./tooling/latex/cmd/package-latex --output "$(go env GOPATH)"
 | `66_latex_professional_report.ahd` | Latex: A4 margins, a header with an SVG logo, "Page X of Y" footers, a bookmark, PDF properties, and a QR code |
 | `67_pdf_professional_report.ahd` | PDF: the same report through `layout`, `header`, `footer`, `pageNumbers`, `bookmark`, `metadata`, `qr`, and `link` |
 | `68_svg_assets.ahd` | SVG files as vector images in Latex and PDF, image transforms, and a rejected unsupported SVG |
+| `69_uuid.ahd` | UUID module: v4 and time-ordered v7, canonical parsing, `equals`/`compare`, the zero UUID, and UUIDError |
+| `70_env_secret.ahd` | `Env.secret`: a secret from `NAME` or from the file `NAME_FILE` names, and the both-set error |
+| `71_postgresql.ahd` | PostgreSQL (opt-in, needs a server): `$1` parameters, NUMERIC, BYTEA, TIMESTAMPTZ, `RETURNING`, and a rolled-back transaction |
+| `72_websocket_echo.ahd` | WebSocket endpoint on `HTTP`: echo, broadcast from an HTTP route, limits, and close codes (runs until stopped) |
 
 `Greeting.ahd` is the sibling module used by `11_modules.ahd`.

@@ -820,6 +820,12 @@ func (generator *generator) call(value *ir.CallExpr) string {
 	if strings.HasPrefix(string(value.Callable), identityModulePrefix) {
 		return generator.identityCall(value)
 	}
+	if strings.HasPrefix(string(value.Callable), uuidModulePrefix) {
+		return generator.uuidCall(value)
+	}
+	if strings.HasPrefix(string(value.Callable), postgresqlModulePrefix) {
+		return generator.postgresqlCall(value)
+	}
 	if method, ok := value.Callee.(*ir.MemberExpr); ok && method.Kind == ir.MethodMember {
 		function := generator.functions[method.Callable]
 		if function == nil {
@@ -1082,9 +1088,14 @@ func (generator *generator) builtinCall(value *ir.CallExpr) string {
 			strings.HasPrefix(name, "MySQLResult.") || strings.HasPrefix(name, "MySQLValue.") {
 			return generator.mysqlOperation(name, value)
 		}
+		if strings.HasPrefix(name, "PostgreSQLDatabase.") || strings.HasPrefix(name, "PostgreSQLTransaction.") ||
+			strings.HasPrefix(name, "PostgreSQLResult.") || strings.HasPrefix(name, "PostgreSQLValue.") {
+			return generator.postgresqlOperation(name, value)
+		}
 		if strings.HasPrefix(name, "Server.") || strings.HasPrefix(name, "Request.") || strings.HasPrefix(name, "Response.") ||
 			strings.HasPrefix(name, "Cookie.") || strings.HasPrefix(name, "SessionStore.") || strings.HasPrefix(name, "Session.") ||
-			strings.HasPrefix(name, "Client.") || strings.HasPrefix(name, "ClientRequest.") || strings.HasPrefix(name, "ClientResponse.") || strings.HasPrefix(name, "UploadedFile.") {
+			strings.HasPrefix(name, "Client.") || strings.HasPrefix(name, "ClientRequest.") || strings.HasPrefix(name, "ClientResponse.") || strings.HasPrefix(name, "UploadedFile.") ||
+			strings.HasPrefix(name, "WebSocket.") || strings.HasPrefix(name, "WebSocketEndpoint.") {
 			return generator.httpOperation(name, value)
 		}
 		if strings.HasPrefix(name, "HTMLDocument.") || strings.HasPrefix(name, "HTMLElement.") {
@@ -1098,6 +1109,9 @@ func (generator *generator) builtinCall(value *ir.CallExpr) string {
 		}
 		if strings.HasPrefix(name, "QRCode.") || strings.HasPrefix(name, "BarcodeCode.") {
 			return generator.codesOperation(name, value)
+		}
+		if strings.HasPrefix(name, "UUIDValue.") {
+			return generator.uuidOperation(name, value)
 		}
 		return generator.unsupported("Fundamentals function "+name, meta.Span)
 	}

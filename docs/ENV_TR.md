@@ -22,6 +22,7 @@ boolean çıkarım, shell interpolation veya komut çalıştırma olmadan.
 Env.get(name: String)    -> String?
 Env.getOr(name: String, fallback: String) -> String
 Env.exists(name: String) -> Bool
+Env.secret(name: String) -> String?
 
 Env.set(name: String, value: String) -> Nothing
 Env.unset(name: String)  -> Nothing
@@ -56,6 +57,52 @@ dönüştürün:
 ```ahd
 port: Int := int(Env.getOr("PORT", "8080"))
 ```
+
+## secret
+
+`Env.secret(name)` (v1.4.0) gizli bir değeri konteyner platformlarının
+ilettiği biçimde okur: `name` değişkeninden ya da yolu `name_FILE` içinde
+bulunan dosyadan.
+
+| `NAME` | `NAME_FILE` | Sonuç |
+| --- | --- | --- |
+| yok | yok | `null` |
+| var (`""` bile olsa) | yok | `NAME` değeri |
+| yok | boş olmayan bir yol | dosyanın içeriği |
+| yok | `""` | `EnvError` |
+| var | var | `EnvError`: yalnızca birini ayarlayın |
+
+```ahd
+password: String? := Env.secret("DB_PASSWORD")
+if password == null {
+    write("DB_PASSWORD'u ya da onu tutan dosyayı gösteren DB_PASSWORD_FILE'ı ayarlayın.")
+}
+```
+
+- Yol olduğu gibi, çalışma dizinine göre kullanılır ve sembolik bağlantılar
+  izlenir.
+- Dosya en fazla 1 MiB, geçerli UTF-8 ve NUL baytı içermeyen bir dosya
+  olmalıdır.
+- Sondaki tam olarak bir `\n` ya da `\r\n` kaldırılır; böylece son satır sonu
+  olan bir dosya çalışır. Başka hiçbir şey kırpılmaz.
+- Eksik ya da okunamayan bir dosya `EnvError` verir; asla `NAME` değerine geri
+  dönmez.
+- `name`, `Env.set` ile aynı şekilde doğrulanır.
+
+Mesajlar değişkenin adını verir; değeri, dosyanın içeriğini ya da yolunu asla
+içermez:
+
+```text
+DB_PASSWORD and DB_PASSWORD_FILE are both set; set only one
+DB_PASSWORD_FILE is set but empty
+the secret file named by DB_PASSWORD_FILE could not be read
+the secret file named by DB_PASSWORD_FILE is larger than 1 MiB
+the secret file named by DB_PASSWORD_FILE is not valid UTF-8
+the secret file named by DB_PASSWORD_FILE contains a NUL byte
+```
+
+Sonuç, programınızda sıradan bir `String`'dir; `Env.secret` onu sonradan
+gizlemez. Günlüklerin ve yanıtların dışında tutun.
 
 ## set ve unset
 
@@ -123,9 +170,9 @@ kazanmasına izin vermek yerine `EnvError` ile reddedilir.
 
 `EnvError` doğrudan `Error`'dan türer ve şunları kapsar: eksik/okunamayan
 bir `.env` dosyası, bozuk bir atama, geçersiz bir anahtar, sonlandırılmamış
-tırnaklı bir değer, yinelenen bir anahtar, geçersiz bir kaçış dizisi ve bir
-OS düzeyinde `set`/`unset` hatası. Hata mesajları asla değişkenin değerini
-içermez.
+tırnaklı bir değer, yinelenen bir anahtar, geçersiz bir kaçış dizisi, bir OS
+düzeyinde `set`/`unset` hatası ve `Env.secret`'in okuyamadığı bir gizli değer.
+Hata mesajları asla değişkenin değerini içermez.
 
 ```ahd
 attempt {
@@ -196,3 +243,17 @@ sayılmaz.
 
 Ham `HTTP.server`, `applyWebLimits()` çağrılana kadar tarihsel 1MiB gövde
 ve 15s/15s/60s zaman aşımlarını korur.
+
+### Test paketi
+
+Yalnızca AhdCode'un kendi `go test` paketi okur, AhdCode programları asla:
+
+| Değişken | Anlamı |
+| --- | --- |
+| `AHDCODE_TEST_POSTGRESQL_HOST` | PostgreSQL entegrasyon testlerini bu sunucuya karşı çalıştırır. Ayarlanmamışsa testler atlanır. |
+| `AHDCODE_TEST_POSTGRESQL_PORT` | Port. Varsayılan `5432`. |
+| `AHDCODE_TEST_POSTGRESQL_USERNAME`, `AHDCODE_TEST_POSTGRESQL_PASSWORD` | Şema oluşturup silebilen bir rol. |
+| `AHDCODE_TEST_POSTGRESQL_DATABASE` | Veritabanı. Ayarlanmamışsa sunucunun varsayılanı kullanılır. |
+| `AHDCODE_TEST_POSTGRESQL_SECURITY` | `tls` (varsayılan) ya da `none`. |
+
+Her test kendi `ahd_test_<rastgele>` şemasında çalışır ve sonunda onu siler.

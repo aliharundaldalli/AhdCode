@@ -16,19 +16,24 @@ const (
 	evaluatorHTTPClientRequestClass  = ir.ClassID("builtin:HTTP::class::ClientRequest")
 	evaluatorHTTPClientResponseClass = ir.ClassID("builtin:HTTP::class::ClientResponse")
 	evaluatorHTTPUploadedFileClass   = ir.ClassID("builtin:HTTP::class::UploadedFile")
+	// WebSocket server support (v1.4.0).
+	evaluatorHTTPWebSocketClass         = ir.ClassID("builtin:HTTP::class::WebSocket")
+	evaluatorHTTPWebSocketEndpointClass = ir.ClassID("builtin:HTTP::class::WebSocketEndpoint")
 )
 
 var (
-	evaluatorHTTPServerField         = ir.FieldID("builtin:HTTP::class::Server::field::handle")
-	evaluatorHTTPRequestField        = ir.FieldID("builtin:HTTP::class::Request::field::data")
-	evaluatorHTTPResponseField       = ir.FieldID("builtin:HTTP::class::Response::field::data")
-	evaluatorHTTPCookieField         = ir.FieldID("builtin:HTTP::class::Cookie::field::data")
-	evaluatorHTTPSessionStoreField   = ir.FieldID("builtin:HTTP::class::SessionStore::field::handle")
-	evaluatorHTTPSessionField        = ir.FieldID("builtin:HTTP::class::Session::field::data")
-	evaluatorHTTPClientField         = ir.FieldID("builtin:HTTP::class::Client::field::handle")
-	evaluatorHTTPClientRequestField  = ir.FieldID("builtin:HTTP::class::ClientRequest::field::data")
-	evaluatorHTTPClientResponseField = ir.FieldID("builtin:HTTP::class::ClientResponse::field::data")
-	evaluatorHTTPUploadedFileField   = ir.FieldID("builtin:HTTP::class::UploadedFile::field::data")
+	evaluatorHTTPServerField            = ir.FieldID("builtin:HTTP::class::Server::field::handle")
+	evaluatorHTTPRequestField           = ir.FieldID("builtin:HTTP::class::Request::field::data")
+	evaluatorHTTPResponseField          = ir.FieldID("builtin:HTTP::class::Response::field::data")
+	evaluatorHTTPCookieField            = ir.FieldID("builtin:HTTP::class::Cookie::field::data")
+	evaluatorHTTPSessionStoreField      = ir.FieldID("builtin:HTTP::class::SessionStore::field::handle")
+	evaluatorHTTPSessionField           = ir.FieldID("builtin:HTTP::class::Session::field::data")
+	evaluatorHTTPClientField            = ir.FieldID("builtin:HTTP::class::Client::field::handle")
+	evaluatorHTTPClientRequestField     = ir.FieldID("builtin:HTTP::class::ClientRequest::field::data")
+	evaluatorHTTPClientResponseField    = ir.FieldID("builtin:HTTP::class::ClientResponse::field::data")
+	evaluatorHTTPUploadedFileField      = ir.FieldID("builtin:HTTP::class::UploadedFile::field::data")
+	evaluatorHTTPWebSocketField         = ir.FieldID("builtin:HTTP::class::WebSocket::field::data")
+	evaluatorHTTPWebSocketEndpointField = ir.FieldID("builtin:HTTP::class::WebSocketEndpoint::field::handle")
 )
 
 func (session *Session) httpServer(handle string) *Instance {
@@ -194,6 +199,8 @@ func (session *Session) httpBuiltin(name string, args []any) any {
 		return session.httpClientRequest(ahdruntime.AhdHTTPClientRequest(class, args[0].(string), args[1].(string)))
 	case "contextHandler":
 		return session.httpContextHandler(args)
+	case "websocket":
+		return session.httpWebSocketEndpoint(ahdruntime.AhdHTTPWebSocket(class, session.webSocketMessageHandler(args[0])))
 	}
 	session.raise("Error", "unsupported HTTP function "+name)
 	return nil
@@ -399,6 +406,42 @@ func (session *Session) httpOperation(name string, receiver any, args []any) any
 	case "UploadedFile.save":
 		return ahdruntime.AhdHTTPUploadedFileSave(class,
 			session.httpDataOf(receiver, evaluatorHTTPUploadedFileClass, evaluatorHTTPUploadedFileField, "UploadedFile"), arg(0))
+	case "Server.websocket":
+		ahdruntime.AhdHTTPServerWebSocket(class, session.httpHandleOf(receiver), arg(0),
+			session.httpDataOf(args[1], evaluatorHTTPWebSocketEndpointClass, evaluatorHTTPWebSocketEndpointField, "WebSocketEndpoint"))
+		return Nothing
+	case "WebSocketEndpoint.withOpen":
+		return session.httpWebSocketEndpoint(ahdruntime.AhdWebSocketEndpointWithOpen(class, session.webSocketEndpointData(receiver), session.webSocketOpenHandler(args[0])))
+	case "WebSocketEndpoint.withClose":
+		return session.httpWebSocketEndpoint(ahdruntime.AhdWebSocketEndpointWithClose(class, session.webSocketEndpointData(receiver), session.webSocketCloseHandler(args[0])))
+	case "WebSocketEndpoint.withAccept":
+		return session.httpWebSocketEndpoint(ahdruntime.AhdWebSocketEndpointWithAccept(class, session.webSocketEndpointData(receiver), session.webSocketAcceptHandler(args[0])))
+	case "WebSocketEndpoint.withAllowedOrigins":
+		list, ok := args[0].(*List)
+		if !ok {
+			session.raise("HTTPError", "WebSocketEndpoint.withAllowedOrigins needs a List<String>")
+		}
+		origins := make([]string, len(list.Items))
+		for index, item := range list.Items {
+			origins[index] = item.(string)
+		}
+		return session.httpWebSocketEndpoint(ahdruntime.AhdWebSocketEndpointWithAllowedOrigins(class, session.webSocketEndpointData(receiver), origins))
+	case "WebSocketEndpoint.withMaxMessageBytes":
+		return session.httpWebSocketEndpoint(ahdruntime.AhdWebSocketEndpointWithMaxMessageBytes(class, session.webSocketEndpointData(receiver), args[0].(int64)))
+	case "WebSocketEndpoint.withMaxQueuedMessages":
+		return session.httpWebSocketEndpoint(ahdruntime.AhdWebSocketEndpointWithMaxQueuedMessages(class, session.webSocketEndpointData(receiver), args[0].(int64)))
+	case "WebSocketEndpoint.withMaxConnections":
+		return session.httpWebSocketEndpoint(ahdruntime.AhdWebSocketEndpointWithMaxConnections(class, session.webSocketEndpointData(receiver), args[0].(int64)))
+	case "WebSocket.id":
+		return ahdruntime.AhdWebSocketID(class, session.httpDataOf(receiver, evaluatorHTTPWebSocketClass, evaluatorHTTPWebSocketField, "WebSocket"))
+	case "WebSocket.send":
+		return ahdruntime.AhdWebSocketSend(class, session.httpDataOf(receiver, evaluatorHTTPWebSocketClass, evaluatorHTTPWebSocketField, "WebSocket"), arg(0))
+	case "WebSocket.close":
+		ahdruntime.AhdWebSocketClose(class, session.httpDataOf(receiver, evaluatorHTTPWebSocketClass, evaluatorHTTPWebSocketField, "WebSocket"),
+			session.httpIntArg(args, 0, 1000), session.httpStringArg(args, 1, ""))
+		return Nothing
+	case "WebSocket.isOpen":
+		return ahdruntime.AhdWebSocketIsOpen(session.httpDataOf(receiver, evaluatorHTTPWebSocketClass, evaluatorHTTPWebSocketField, "WebSocket"))
 	}
 	session.raise("Error", "unsupported HTTP operation "+name)
 	return nil
@@ -418,4 +461,60 @@ func (session *Session) httpStringList(list *ahdruntime.AhdList[string]) *List {
 		result[index] = item
 	}
 	return &List{Items: result}
+}
+
+func (session *Session) httpWebSocket(data string) *Instance {
+	return &Instance{Class: evaluatorHTTPWebSocketClass, Fields: map[ir.FieldID]any{evaluatorHTTPWebSocketField: data}}
+}
+
+func (session *Session) httpWebSocketEndpoint(handle string) *Instance {
+	return &Instance{Class: evaluatorHTTPWebSocketEndpointClass, Fields: map[ir.FieldID]any{evaluatorHTTPWebSocketEndpointField: handle}}
+}
+
+func (session *Session) webSocketEndpointData(value any) string {
+	return session.httpDataOf(value, evaluatorHTTPWebSocketEndpointClass, evaluatorHTTPWebSocketEndpointField, "WebSocketEndpoint")
+}
+
+func (session *Session) webSocketFunction(value any, name string) *FunctionValue {
+	function, ok := value.(*FunctionValue)
+	if !ok || function == nil {
+		session.raise("HTTPError", "WebSocket "+name+" is missing")
+	}
+	return function
+}
+
+// The WebSocket callbacks run the AhdCode Function through the same session a
+// route handler uses. The runtime calls them holding the server mutex, so the
+// session is never entered by two callbacks at once.
+func (session *Session) webSocketMessageHandler(value any) ahdruntime.AhdWebSocketMessageHandler {
+	function := session.webSocketFunction(value, "onMessage handler")
+	return func(socket string, text string) {
+		session.invoke(function, []argumentValue{{value: session.httpWebSocket(socket)}, {value: text}})
+	}
+}
+
+func (session *Session) webSocketOpenHandler(value any) ahdruntime.AhdWebSocketOpenHandler {
+	function := session.webSocketFunction(value, "onOpen handler")
+	return func(socket string, request string) {
+		session.invoke(function, []argumentValue{{value: session.httpWebSocket(socket)}, {value: session.httpRequest(request)}})
+	}
+}
+
+func (session *Session) webSocketCloseHandler(value any) ahdruntime.AhdWebSocketCloseHandler {
+	function := session.webSocketFunction(value, "onClose handler")
+	return func(socket string, code int64, reason string) {
+		session.invoke(function, []argumentValue{{value: session.httpWebSocket(socket)}, {value: code}, {value: reason}})
+	}
+}
+
+func (session *Session) webSocketAcceptHandler(value any) ahdruntime.AhdWebSocketAcceptHandler {
+	function := session.webSocketFunction(value, "accept check")
+	return func(request string) *string {
+		result := session.invoke(function, []argumentValue{{value: session.httpRequest(request)}})
+		if result == nil {
+			return nil
+		}
+		data := session.httpDataOf(result, evaluatorHTTPResponseClass, evaluatorHTTPResponseField, "Response")
+		return &data
+	}
 }

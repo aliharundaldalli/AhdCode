@@ -1,0 +1,63 @@
+// jobs.ahd -- scheduled work beside app.ahd.
+//
+//     ahdcode run jobs.ahd
+//
+// Once a minute it counts the last hour's check-ins and posts a one-line
+// summary to POST /internal/notify with the bearer token, so every open
+// dashboard shows it. A Web server and a Cron scheduler each occupy the
+// program that runs them, so this is a second program sharing the database.
+require("Config/Database.ahd")
+bring Web
+bring Cron
+bring Env
+bring HTTP
+bring PostgreSQL
+from Cron bring Scheduler
+from HTTP bring (Client, ClientRequest, ClientResponse, HTTPError)
+from PostgreSQL bring PostgreSQLError
+
+Web.loadEnvironment()
+
+jobs: Scheduler := Cron.scheduler()
+client: Client := HTTP.client(10)
+
+postSummary: Function := () -> Nothing {
+    client: Global Client
+    token: Local String? := Env.secret("NOTIFY_TOKEN")
+    if token == null {
+        write("NOTIFY_TOKEN is not set; skipping the summary")
+        return
+    }
+    summary: Local String := ""
+    attempt {
+        database: Local := attendanceDatabase()
+        counted: Local := database.query(
+            "SELECT count(*) AS total FROM check_ins WHERE created_at > now() - interval '1 hour'"
+        )
+        total: Local Int := counted[0]["total"].int()
+        summary = str(total) + " check-in(s) in the last hour"
+    }
+    except PostgreSQLError as error {
+        write("could not count check-ins: " + error.message)
+        return
+    }
+    outgoing: Local ClientRequest := HTTP.clientRequest(
+        "POST"
+        Env.getOr("NOTIFY_URL", "http://127.0.0.1:8140/internal/notify")
+    )
+    outgoing = outgoing.withHeader("Authorization", "Bearer " + token)
+    outgoing = outgoing.withHeader("Content-Type", "text/plain; charset=utf-8")
+    outgoing = outgoing.withBody(summary)
+    attempt {
+        response: Local ClientResponse := client.send(outgoing)
+        status: Local String := str(response.status())
+        write("summary posted (" + status + "): " + response.body())
+    }
+    except HTTPError as error {
+        write("could not reach the application: " + error.message)
+    }
+}
+
+jobs.add("* * * * *", postSummary)
+write("posting a summary every minute; stop with Ctrl+C")
+jobs.run()

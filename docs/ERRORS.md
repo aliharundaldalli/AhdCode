@@ -35,6 +35,8 @@ Common built-in errors include:
 | `FileError` | `File` module operation failure; derives from `IOError` |
 | `RegexError` | invalid pattern passed to `Regex.compile`; derives from `Error` |
 | `CSVError` | malformed CSV, invalid delimiter, or invalid record/header shape; derives from `Error` |
+| `UUIDError` | malformed UUID text, or no random source or valid clock for a new UUID; derives from `Error` |
+| `PostgreSQLError` | PostgreSQL connection, query, execution, transaction, or value-kind failure; derives from `Error` |
 | `KeyError` | missing Pair key |
 | `NullError` | runtime null safety boundary |
 | `ConstantError` | mutation through a deep-frozen reference |

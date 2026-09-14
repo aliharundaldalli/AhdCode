@@ -360,13 +360,22 @@ func skipGapSilently(b *builder) {
 // immediately follows up to the next unavoidable break); otherwise it
 // breaks to one item per line with no comma at all, matching the canonical
 // style. A comment found between items always forces the broken form.
+//
+// An empty construct with no comment inside -- `f()`, `[]`, `() -> T` -- is
+// atomic: it has no item to put on its own line, so breaking it would only
+// strand an indentation-only line between the delimiters.
 func (b *builder) delimitedGroup(itemCount int, renderItem func(index int) doc) doc {
 	open := b.leaf()
 	var body []doc
 	forced := false
 	if lead := b.gap(); !isEmptyDoc(lead) {
 		forced = true
-		body = append(body, lead, hardline())
+		body = append(body, lead)
+		if itemCount > 0 {
+			body = append(body, hardline())
+		}
+	} else if itemCount == 0 {
+		return concat(open, b.leaf())
 	}
 	for index := 0; index < itemCount; index++ {
 		if index > 0 {

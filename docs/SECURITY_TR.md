@@ -230,6 +230,11 @@ Belirteçleri şunlar için kullanın:
 Belirteçleri JWT olarak **kullanmayın** — iddia taşımazlar, son kullanma
 süreleri yoktur ve imzalı değildirler.
 
+Belirteç bir gizli değerdir. Gizli olmayan kimlikler için
+[`Identity.id()`](IDENTITY_TR.md) ya da [`UUID`](UUID_TR.md) kullanın. Bir UUID
+asla belirtecin yerine geçmemelidir: zamana göre sıralı bir `UUID.v7()` üstelik
+ne zaman oluşturulduğunu da gösterir.
+
 ## secureEqual
 
 ```ahd
@@ -244,6 +249,12 @@ Güvenilmeyen bir kaynaktan gelen bir değeri bilinen bir gizle (CSRF belirteci,
 API anahtarı, webhook imzası) karşılaştırdığınız her durumda `secureEqual`
 kullanın. Sıradan `==` sabit zamanlı değildir ve zamanlama farkları üzerinden
 gizle ilgili bilgi sızdırabilir.
+
+Bir bearer token koruması `"Bearer " + token` değerini isteğin
+`Authorization` başlığıyla bu şekilde karşılaştırır ve beklenen token'ı
+[`Env.secret`](ENV_TR.md#secret) ile okur;
+[gerçek zamanlı yoklama örneği](../examples/v1.4/realtime_attendance/Pages/Notify.ahd)
+kalıbın tamamını gösterir.
 
 ## CSRF koruma kalıbı
 

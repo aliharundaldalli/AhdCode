@@ -39,9 +39,7 @@ questionsSelect: Function := () -> String {
 }
 
 questionsPublished: Function := () -> List<QuestionRecord> {
-    rows: Local List<Pair<String, MySQLValue>> := connection(
-        
-    ).query(
+    rows: Local List<Pair<String, MySQLValue>> := connection().query(
         "{questionsSelect()} WHERE status = 'published' ORDER BY published_at DESC, id DESC"
     )
     records: Local List<QuestionRecord> := []
@@ -53,9 +51,9 @@ questionsPublished: Function := () -> List<QuestionRecord> {
 }
 
 questionsAll: Function := () -> List<QuestionRecord> {
-    rows: Local List<Pair<String, MySQLValue>> := connection(
-        
-    ).query("{questionsSelect()} ORDER BY id DESC")
+    rows: Local List<Pair<String, MySQLValue>> := connection().query(
+        "{questionsSelect()} ORDER BY id DESC"
+    )
     records: Local List<QuestionRecord> := []
     for row in rows {
         records.add(questionsFromRow(row))
@@ -66,9 +64,7 @@ questionsAll: Function := () -> List<QuestionRecord> {
 // questionsFindPublished is the public lookup: a draft id returns null here
 // even when the id is guessed correctly.
 questionsFindPublished: Function := (id: Int) -> QuestionRecord? {
-    rows: Local List<Pair<String, MySQLValue>> := connection(
-        
-    ).query(
+    rows: Local List<Pair<String, MySQLValue>> := connection().query(
         "{questionsSelect()} WHERE id = ? AND status = 'published' LIMIT 1"
         [MySQL.fromInt(id)]
     )
@@ -80,9 +76,10 @@ questionsFindPublished: Function := (id: Int) -> QuestionRecord? {
 }
 
 questionsFindAny: Function := (id: Int) -> QuestionRecord? {
-    rows: Local List<Pair<String, MySQLValue>> := connection(
-        
-    ).query("{questionsSelect()} WHERE id = ? LIMIT 1", [MySQL.fromInt(id)])
+    rows: Local List<Pair<String, MySQLValue>> := connection().query(
+        "{questionsSelect()} WHERE id = ? LIMIT 1"
+        [MySQL.fromInt(id)]
+    )
     if len(rows) == 0 {
         return null
     }
@@ -96,9 +93,7 @@ questionsCreate: Function := (
     body: String
     createdBy: Int
 ) -> Int? {
-    result: Local := connection(
-        
-    ).execute(
+    result: Local := connection().execute(
         "INSERT INTO questions (title, topic, body, status, created_by) VALUES (?, ?, ?, 'draft', ?)"
         [
             MySQL.fromString(title)
@@ -116,9 +111,7 @@ questionsUpdate: Function := (
     topic: String
     body: String
 ) -> Nothing {
-    connection(
-        
-    ).execute(
+    connection().execute(
         "UPDATE questions SET title = ?, topic = ?, body = ? WHERE id = ?"
         [
             MySQL.fromString(title)
@@ -131,27 +124,21 @@ questionsUpdate: Function := (
 // Publishing is an explicit admin action, and it is the only place
 // published_at is set.
 questionsPublish: Function := (id: Int) -> Nothing {
-    connection(
-        
-    ).execute(
+    connection().execute(
         "UPDATE questions SET status = 'published', published_at = COALESCE(published_at, NOW()) WHERE id = ?"
         [MySQL.fromInt(id)]
     )
 }
 
 questionsUnpublish: Function := (id: Int) -> Nothing {
-    connection(
-        
-    ).execute(
+    connection().execute(
         "UPDATE questions SET status = 'draft' WHERE id = ?"
         [MySQL.fromInt(id)]
     )
 }
 
 questionsCountByStatus: Function := (status: String) -> Int {
-    rows: Local List<Pair<String, MySQLValue>> := connection(
-        
-    ).query(
+    rows: Local List<Pair<String, MySQLValue>> := connection().query(
         "SELECT COUNT(*) AS total FROM questions WHERE status = ?"
         [MySQL.fromString(status)]
     )
@@ -163,9 +150,7 @@ questionsCountByStatus: Function := (status: String) -> Int {
 }
 
 questionsTopics: Function := () -> List<String> {
-    rows: Local List<Pair<String, MySQLValue>> := connection(
-        
-    ).query(
+    rows: Local List<Pair<String, MySQLValue>> := connection().query(
         "SELECT DISTINCT topic FROM questions WHERE status = 'published' AND topic != '' ORDER BY topic ASC"
     )
     topics: Local List<String> := []
@@ -196,9 +181,10 @@ questionsFilter: Function := (
     }
 
     sql = "{sql} ORDER BY published_at DESC, id DESC"
-    rows: Local List<Pair<String, MySQLValue>> := connection(
-        
-    ).query(sql, params)
+    rows: Local List<Pair<String, MySQLValue>> := connection().query(
+        sql
+        params
+    )
     records: Local List<QuestionRecord> := []
     for row in rows {
         records.add(questionsFromRow(row))

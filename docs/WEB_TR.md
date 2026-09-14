@@ -198,6 +198,7 @@ academy.start()
 | `route(method, path, handler)` | desteklenen herhangi bir yöntem |
 | `assets(prefix, root)` | statik dosya dizinini sunar |
 | `managedAssets(prefix, root)` | yalnızca `Web.Assets` ile bildirilen dosyaları sunar |
+| `websocket(path, endpoint)` | `Web.websocket` ile kurulan bir [WebSocket](WEBSOCKET_TR.md) uç noktasını kaydeder (v1.4.0) |
 | `start()` | bağlanır ve sunar; geri dönmez |
 | `configuration()` | doğrulanmış `AppConfig` |
 
@@ -571,7 +572,7 @@ derler ve yeniden başlatır. `public/app.css`'i düzenlemek bunu yapmaz.
 `APP_PROTOCOL=https`'i de **reddeder**:
 
 ```
-✗ Local HTTPS is not available in AhdCode v1.3.0.
+✗ Local HTTPS is not available in AhdCode v1.4.0.
   ahdcode dev serves plaintext HTTP, so it cannot honour
   APP_PROTOCOL=https.
 
@@ -782,6 +783,9 @@ yalnızca yeniden markalardı.
 - **Oturumlar, CSRF ve parola özetleme** açık `Session`, `Security` ve `HTTP`
   ilkelleri olarak kalır. Web bunların etrafına sihir eklemez.
 - **Statik varlıklar** yayınlanmış `server.static` sınırından geçer.
+- **WebSocket uç noktaları** varsayılan olarak aynı kökenlidir ve kimliği
+  yükseltmeden önce `withAccept` içinde doğrular; bkz.
+  [WebSocket](WEBSOCKET_TR.md#güvenlik).
 - **`bring Web`** gömülü baytlardan çevrimdışı çözülür. Hiçbir zaman indirme
   yoktur.
 
@@ -815,6 +819,7 @@ düşük seviyeli modüllere uzanın.
 | v1.0.0 | Web API değişikliği yok; kendi kendine yeten platform paketlemesi |
 | v1.2.0 | Web API değişikliği yok; uygulamanın yanında zamanlanmış işler için [Cron](CRON_TR.md), [Characters](CHARACTERS_TR.md) ve [Latex](LATEX_TR.md) içinde TikZ |
 | v1.3.0 | Web API değişikliği yok; [QR](QR_TR.md), [Barcode](BARCODE_TR.md) ve [Latex](LATEX_TR.md) ile [PDF](PDF_TR.md) içinde profesyonel belgeler |
+| v1.4.0 | [WebSocket](WEBSOCKET_TR.md) uç noktaları için `Web.websocket` ve `App.websocket`; uygulamanın yanında [PostgreSQL](POSTGRESQL_TR.md), [UUID](UUID_TR.md) ve [`Env.secret`](ENV_TR.md#secret) |
 
 ## Cron: zamanlanmış uygulama işleri
 

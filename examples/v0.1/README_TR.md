@@ -105,6 +105,10 @@ yerde, çevrimdışı çalışır.
 | `66_latex_professional_report.ahd` | Latex: A4 kenar boşlukları, SVG logolu üst bilgi, "Sayfa X / Y" alt bilgileri, yer imi, PDF özellikleri ve QR kodu |
 | `67_pdf_professional_report.ahd` | PDF: aynı rapor; `layout`, `header`, `footer`, `pageNumbers`, `bookmark`, `metadata`, `qr` ve `link` ile |
 | `68_svg_assets.ahd` | Latex ve PDF'te vektör görsel olarak SVG dosyaları, görsel dönüşümleri ve reddedilen desteklenmeyen bir SVG |
+| `69_uuid.ahd` | UUID modülü: v4 ve zamana göre sıralı v7, kanonik ayrıştırma, `equals`/`compare`, sıfır UUID ve UUIDError |
+| `70_env_secret.ahd` | `Env.secret`: `NAME` değişkeninden ya da `NAME_FILE` ile adı verilen dosyadan gizli değer ve ikisinin birden ayarlanması hatası |
+| `71_postgresql.ahd` | PostgreSQL (isteğe bağlı, sunucu gerekir): `$1` parametreleri, NUMERIC, BYTEA, TIMESTAMPTZ, `RETURNING` ve geri alınan bir işlem |
+| `72_websocket_echo.ahd` | `HTTP` üzerinde WebSocket uç noktası: yankı, bir HTTP rotasından yayın, sınırlar ve kapatma kodları (durdurulana kadar çalışır) |
 
 `Greeting.ahd`, `11_modules.ahd` tarafından kullanılan kardeş (sibling)
 modüldür.

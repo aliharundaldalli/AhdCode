@@ -14,6 +14,8 @@ import (
 	backend "ahdcode/internal/backend/golang"
 	"ahdcode/internal/backend/golang/ahdruntime/codesvendor"
 	"ahdcode/internal/backend/golang/ahdruntime/mysqlvendor"
+	"ahdcode/internal/backend/golang/ahdruntime/postgresqlvendor"
+	"ahdcode/internal/backend/golang/ahdruntime/websocketvendor"
 	"ahdcode/internal/diagnostics"
 	"ahdcode/internal/framework"
 	"ahdcode/internal/ir"
@@ -205,8 +207,11 @@ type vendorTree struct {
 }
 
 // workspaceVendorTrees lists the embedded trees a generated program needs:
-// github.com/go-sql-driver/mysql (with filippo.io/edwards25519) for MySQL, and
-// github.com/boombuler/barcode for QR and barcode encoding.
+// github.com/go-sql-driver/mysql (with filippo.io/edwards25519) for MySQL,
+// github.com/boombuler/barcode for QR and barcode encoding,
+// github.com/coder/websocket for WebSocket endpoints, and the
+// github.com/jackc/pgx/v5 graph for PostgreSQL. The trees never share a
+// module (see vendor_trees_test.go), so any combination composes cleanly.
 func workspaceVendorTrees(program *backend.GeneratedProgram) []vendorTree {
 	var trees []vendorTree
 	if program != nil && program.RequiresMySQL {
@@ -214,6 +219,12 @@ func workspaceVendorTrees(program *backend.GeneratedProgram) []vendorTree {
 	}
 	if program != nil && program.RequiresCodes {
 		trees = append(trees, vendorTree{files: codesvendor.Vendor, requires: codesvendor.Requires, sum: codesvendor.GoSum})
+	}
+	if program != nil && program.RequiresWebSocket {
+		trees = append(trees, vendorTree{files: websocketvendor.Vendor, requires: websocketvendor.Requires, sum: websocketvendor.GoSum})
+	}
+	if program != nil && program.RequiresPostgreSQL {
+		trees = append(trees, vendorTree{files: postgresqlvendor.Vendor, requires: postgresqlvendor.Requires, sum: postgresqlvendor.GoSum})
 	}
 	return trees
 }

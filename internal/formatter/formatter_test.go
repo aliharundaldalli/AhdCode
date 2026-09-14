@@ -147,6 +147,31 @@ func TestLongConstructsBreakToOneItemPerLineWithNoTrailingComma(t *testing.T) {
 	}
 }
 
+// TestEmptyArgumentListsAreNeverBrokenOpen guards against a long line forcing
+// a zero-argument call apart into `first.string(`, an indentation-only line,
+// and `)`, which is both unreadable and trailing whitespace.
+func TestEmptyArgumentListsAreNeverBrokenOpen(t *testing.T) {
+	input := `bring UUID
+first := UUID.v4()
+second := UUID.v4()
+write("a fairly long label that pushes past the width " + first.string() + " and " + second.string())
+`
+	formatted := formatText(t, input)
+	for number, line := range strings.Split(strings.TrimSuffix(formatted, "\n"), "\n") {
+		if strings.TrimSpace(line) == "" {
+			t.Fatalf("line %d is whitespace-only (%q):\n%s", number+1, line, formatted)
+		}
+	}
+	for _, wanted := range []string{"first.string()", "second.string()"} {
+		if !strings.Contains(formatted, wanted) {
+			t.Fatalf("formatted text broke %q apart:\n%s", wanted, formatted)
+		}
+	}
+	if twice := formatText(t, formatted); twice != formatted {
+		t.Fatalf("formatter is not idempotent:\nfirst:\n%s\nsecond:\n%s", formatted, twice)
+	}
+}
+
 func TestCommentsTripleStringsInterpolationAndUnicodeSurvive(t *testing.T) {
 	input := `// başlık
 ad : String := "Ayşe" // kişi

@@ -1,0 +1,82 @@
+// 72 - WebSocket: an echo and broadcast server on the HTTP module.
+//
+//     ahdcode run 72_websocket_echo.ahd
+//
+// Open http://127.0.0.1:8172/ and, in the browser console, run:
+//
+//     socket = new WebSocket("ws://127.0.0.1:8172/live?name=ada")
+//     socket.onmessage = (event) => console.log(event.data)
+//     socket.send("hello")
+//
+// Send one line to every connected socket with:
+//
+//     curl --data "news" http://127.0.0.1:8172/broadcast
+//
+// WebSocket callbacks run one at a time, like HTTP handlers, so keep them
+// short. Only text messages are supported; a browser on another origin is
+// refused unless the endpoint allows it with withAllowedOrigins.
+bring HTTP
+bring Env
+bring KeyValue
+from HTTP bring (Server, Request, Response, WebSocket, WebSocketEndpoint)
+
+clients: Pair<String, WebSocket> := {}
+
+home: Function := (request: Request) -> Response {
+    return HTTP.text("WebSocket echo server: connect to /live from this page")
+}
+
+joined: Function := (socket: WebSocket, request: Request) -> Nothing {
+    clients: Global Pair<String, WebSocket>
+    clients[socket.id()] = socket
+    name: Local String? := request.query("name")
+    if name != null {
+        socket.send("welcome, " + name)
+    }
+    else {
+        socket.send("welcome")
+    }
+    write("open " + socket.id())
+}
+
+received: Function := (socket: WebSocket, text: String) -> Nothing {
+    if text == "bye" {
+        socket.close(1000, "goodbye")
+    }
+    else {
+        socket.send("echo: " + text)
+    }
+}
+
+left: Function := (socket: WebSocket, code: Int, reason: String) -> Nothing {
+    clients: Global Pair<String, WebSocket>
+    clients = KeyValue.without(clients, socket.id())
+    write("closed " + socket.id() + " with " + str(code))
+}
+
+broadcast: Function := (request: Request) -> Response {
+    clients: Global Pair<String, WebSocket>
+    delivered: Local Int := 0
+    for socket in KeyValue.values(clients) {
+        // send returns false when the socket is no longer open.
+        if socket.send(request.body()) {
+            delivered += 1
+        }
+    }
+    return HTTP.text("sent to {delivered} socket(s)")
+}
+
+endpoint: WebSocketEndpoint := HTTP.websocket(received)
+endpoint = endpoint.withOpen(joined)
+endpoint = endpoint.withClose(left)
+endpoint = endpoint.withMaxMessageBytes(4096)
+endpoint = endpoint.withMaxConnections(100)
+
+server: Server := HTTP.server(
+    "127.0.0.1"
+    int(Env.getOr("SERVER_PORT", "8172"))
+)
+server.get("/", home)
+server.websocket("/live", endpoint)
+server.post("/broadcast", broadcast)
+server.start()

@@ -1,0 +1,118 @@
+// 71 - PostgreSQL: parameters, NUMERIC, BYTEA, TIMESTAMPTZ, RETURNING, and a
+// transaction that rolls back.
+//
+// This example needs a server, so it is opt-in. Export DB_HOST, DB_USERNAME,
+// and DB_PASSWORD (or DB_PASSWORD_FILE); DB_PORT, DB_DATABASE, and DB_SECURITY
+// are optional. DB_SECURITY is "tls" unless you set "none" for a local
+// plaintext server. The example works inside its own schema,
+// ahdcode_example_71, and drops it again at the end.
+bring PostgreSQL
+bring Env
+bring UUID
+from PostgreSQL bring (
+    PostgreSQLDatabase
+    PostgreSQLTransaction
+    PostgreSQLResult
+    PostgreSQLError
+)
+
+demo: Function := (
+    host: String
+    username: String
+    password: String
+) -> Nothing {
+    database: Local String? := Env.get("DB_DATABASE")
+    db: Local PostgreSQLDatabase := PostgreSQL.connect(
+        host
+        username
+        password
+        int(Env.getOr("DB_PORT", "5432"))
+        database
+        Env.getOr("DB_SECURITY", "tls")
+    )
+    db.execute("DROP SCHEMA IF EXISTS ahdcode_example_71 CASCADE")
+    db.execute("CREATE SCHEMA ahdcode_example_71")
+    db.execute(
+        "CREATE TABLE ahdcode_example_71.books (id uuid PRIMARY KEY, title text NOT NULL, price numeric(8, 2) NOT NULL, cover bytea, added timestamptz NOT NULL DEFAULT now())"
+    )
+    // Placeholders are $1, $2, ...; values are always bound, never spliced in.
+    added: Local := db.query(
+        "INSERT INTO ahdcode_example_71.books (id, title, price, cover) VALUES ($1::uuid, $2, $3::numeric, decode($4, 'base64')) RETURNING id, added"
+        [
+            PostgreSQL.fromString(UUID.v7().string())
+            PostgreSQL.fromString("Kuyucaklı Yusuf")
+            PostgreSQL.fromString("249.90")
+            PostgreSQL.fromString("iVBORw0KGgo=")
+        ]
+    )
+    idKind: Local String := added[0]["id"].kind()
+    addedKind: Local String := added[0]["added"].kind()
+    write("RETURNING id: " + idKind + ", added: " + addedKind)
+
+    rows: Local := db.query(
+        "SELECT title, price, cover FROM ahdcode_example_71.books"
+    )
+    for row in rows {
+        // NUMERIC stays exact text; BYTEA is read as binary.
+        title: Local String := row["title"].string()
+        cost: Local String := row["price"].string()
+        size: Local String := str(row["cover"].binarySize())
+        write(title + " costs " + cost + "; cover is " + size + " bytes")
+        write("cover as base64: " + row["cover"].binaryBase64())
+    }
+
+    discounted: Local PostgreSQLResult := db.execute(
+        "UPDATE ahdcode_example_71.books SET price = price * $1::numeric"
+        [PostgreSQL.fromString("0.90")]
+    )
+    write("rows discounted: " + str(discounted.affectedRows()))
+    repriced: Local := db.query("SELECT price FROM ahdcode_example_71.books")
+    write("price now: " + repriced[0]["price"].string())
+
+    transaction: Local PostgreSQLTransaction := db.begin()
+    attempt {
+        transaction.execute(
+            "INSERT INTO ahdcode_example_71.books (id, title, price) VALUES ($1::uuid, $2, $3::numeric)"
+            [
+                PostgreSQL.fromString(UUID.v7().string())
+                PostgreSQL.fromString("Draft")
+                PostgreSQL.fromString("10")
+            ]
+        )
+        transaction.execute(
+            "INSERT INTO ahdcode_example_71.books (id, title, price) VALUES ($1::uuid, $2, $3::numeric)"
+            [
+                PostgreSQL.fromString("not-a-uuid")
+                PostgreSQL.fromString("Broken")
+                PostgreSQL.fromString("10")
+            ]
+        )
+        transaction.commit()
+    }
+    except PostgreSQLError as error {
+        write("rolled back: " + error.message)
+        transaction.rollback()
+    }
+    count: Local := db.query(
+        "SELECT count(*) AS books FROM ahdcode_example_71.books"
+    )
+    write("books after the rollback: " + str(count[0]["books"].int()))
+
+    db.execute("DROP SCHEMA ahdcode_example_71 CASCADE")
+    db.close()
+}
+
+start: Function := () -> Nothing {
+    host: Local String := Env.getOr("DB_HOST", "")
+    username: Local String := Env.getOr("DB_USERNAME", "")
+    password: Local String? := Env.secret("DB_PASSWORD")
+    if host == "" or username == "" or password == null {
+        write(
+            "Set DB_HOST, DB_USERNAME, and DB_PASSWORD (or DB_PASSWORD_FILE) to run this example."
+        )
+        return
+    }
+    demo(host, username, password)
+}
+
+start()

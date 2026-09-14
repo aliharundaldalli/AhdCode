@@ -16,6 +16,7 @@ import argparse
 import pathlib
 import shutil
 import subprocess
+import sys
 import tempfile
 from xml.etree import ElementTree
 
@@ -99,6 +100,10 @@ def main():
     parser.add_argument('--output', type=pathlib.Path, required=True)
     parser.add_argument('--sign', default='',
                         help='Developer ID Installer identity; unsigned when omitted')
+    parser.add_argument('--leak-forbid-file', type=pathlib.Path, action='append', default=[],
+                        help='a developer-local file whose exact contents must not appear in the package')
+    parser.add_argument('--leak-forbid-env-values', type=pathlib.Path, action='append', default=[],
+                        help='a developer .env file whose specific values must not appear in the package')
     arguments = parser.parse_args()
 
     payload = arguments.payload.resolve()
@@ -141,6 +146,14 @@ def main():
         run(product)
 
     verify(arguments.output, arguments.version, bool(arguments.sign))
+    # The package passes the same leak gate as every other artifact, inspecting
+    # its fully expanded payload.
+    gate = [sys.executable, ROOT / 'tooling/distribution/leak_gate.py']
+    for path in arguments.leak_forbid_file:
+        gate += ['--forbid-file', path]
+    for path in arguments.leak_forbid_env_values:
+        gate += ['--forbid-env-values', path]
+    run(gate + [arguments.output])
     print('Built', arguments.output, arguments.output.stat().st_size, 'bytes')
 
 

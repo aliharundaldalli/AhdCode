@@ -1,4 +1,4 @@
-# AhdCode v1.3.0 Türkçe Öğrenci Rehberi
+# AhdCode v1.4.0 Türkçe Öğrenci Rehberi
 
 Bu rehber, **daha önce hiç programlama yapmamış birinin de takip edebilmesi** için hazırlanmıştır. Baştan sona sırayla okuyabilirsiniz; her bölümde önce ne yapmak istediğimizi görecek, sonra çalışan bir örnek yazacak, en son gerekli kuralları öğreneceksiniz.
 
@@ -4272,13 +4272,16 @@ derinleştirebilirsiniz:
 - [JSON](JSON_TR.md)
 - [SQLite](SQLITE_TR.md)
 - [MySQL](MYSQL_TR.md)
+- [PostgreSQL](POSTGRESQL_TR.md)
 - [HTTP](HTTP_TR.md)
+- [WebSocket](WEBSOCKET_TR.md)
 - [Security](SECURITY_TR.md)
 - [HTML](HTML_TR.md)
 - [XML](XML_TR.md)
 - [Env](ENV_TR.md)
 - [Lists](LISTS_TR.md)
 - [KeyValue](KEYVALUE_TR.md)
+- [UUID](UUID_TR.md)
 - [File ve Path](FILESYSTEM_TR.md)
 - [Regex](REGEX_TR.md)
 - [CSV](CSV_TR.md)
@@ -4310,8 +4313,10 @@ klasörüne, [v0.3 SQLite Not Defteri](../examples/v0.3/README_TR.md),
 [v0.14 çok dosyalı Web uygulaması](../examples/v0.14/multi_file_web),
 [v0.15 Web uygulamaları](../examples/v0.15/ahd_academi),
 [v0.16 form ve doğrulama örneği](../examples/v0.16/forms_validation/README_TR.md),
-[v0.17 rota ve bekçi örneği](../examples/v0.17/routes_guards) ve
-[v0.18 Web starter'ları](../examples/v0.18/README_TR.md) sayfalarına bakın.
+[v0.17 rota ve bekçi örneği](../examples/v0.17/routes_guards),
+[v0.18 Web starter'ları](../examples/v0.18/README_TR.md) ve
+[v1.4 gerçek zamanlı yoklama uygulaması](../examples/v1.4/realtime_attendance/README_TR.md)
+sayfalarına bakın.
 
 ## 50. Güvenlik: parola hashleme ve güvenli belirteçler
 
@@ -4915,3 +4920,118 @@ yanıtı budur.
 Dağıtım için `APP_HOST` ve `APP_PROTOCOL` *herkese açık* adresi tanımlar ve
 uygulamanızın önündeki gerçek bir sunucu HTTPS'i sonlandırır. Bu ayrımı
 [Web rehberi](WEB_TR.md#15-production) anlatır.
+
+## 57. Gerçek zamanlı web ve veri (v1.4.0)
+
+v1.4.0 birbirine uyan dört şey ekler: UUID'ler, dosyadan okunan gizli değerler,
+bir PostgreSQL modülü ve tarayıcıya güncelleme gönderen WebSocket uç noktaları.
+Her birinin tam bir başvuru belgesi vardır; bu bölüm her birinin fikrini birkaç
+satırda gösterir.
+
+### 57.1 UUID'ler
+
+UUID, veritabanlarının ve başka programların anladığı 36 karakterlik bir
+kimliktir. `UUID.v7()` o anki zamanla başlayan bir UUID üretir; bu yüzden yeni
+olanlar eskilerden sonra sıralanır.
+
+```ahd
+bring UUID
+from UUID bring UUIDValue
+
+first: UUIDValue := UUID.v7()
+second: UUIDValue := UUID.v7()
+write(first.string())                 // 01a0a0c9-8fa6-733f-9f09-81191abcce97
+write(first.compare(second))          // -1: first daha önce üretildi
+write(UUID.parse(first.string()).equals(first))   // true
+```
+
+İki şeyi unutmayın. UUID'leri `==` ile değil `equals` ile karşılaştırın: `==`,
+iki değişkenin *aynı nesneyi* tutup tutmadığını sorar. Ayrıca UUID bir sır
+değildir — bir v7 UUID'nin aşağı yukarı ne zaman üretildiğini herkes okuyabilir.
+Sırlar için `Security.token()` kullanmaya devam edin (50. bölüm). Bkz.
+[UUID](UUID_TR.md).
+
+### 57.2 Dosyadan gizli değerler
+
+Sunucular bir programa parolayı çoğu zaman bir *dosya* olarak verir ve dosyanın
+yolunu `_FILE` ile biten bir değişkene koyar. `Env.secret` iki biçimi de
+karşılar:
+
+```ahd
+bring Env
+
+password: String? := Env.secret("DB_PASSWORD")
+if password == null {
+    write("DB_PASSWORD'u ya da onu tutan dosyayı gösteren DB_PASSWORD_FILE'ı ayarlayın.")
+}
+```
+
+`DB_PASSWORD` ayarlıysa onu, değilse `DB_PASSWORD_FILE` ile adı verilen dosyayı
+okur. İkisini birden ayarlamak hatadır; böylece hangisinin kullanıldığını her
+zaman bilirsiniz. Bkz. [Env](ENV_TR.md#secret).
+
+### 57.3 PostgreSQL
+
+PostgreSQL, 51. bölümdeki MySQL modülü gibi çalışır; birkaç farkla. Yer
+tutucular numaralıdır, `$1`, `$2`, … ve üretilen değerler `RETURNING` ile geri
+gelir:
+
+```ahd
+bring PostgreSQL
+from PostgreSQL bring PostgreSQLDatabase
+
+db: PostgreSQLDatabase := PostgreSQL.connect("127.0.0.1", "app", "secret", 5432, "school", "none")
+rows := db.query(
+    "INSERT INTO students (name, active) VALUES ($1, $2) RETURNING id"
+    [PostgreSQL.fromString("Ayşe"), PostgreSQL.fromBool(true)]
+)
+write(rows[0]["id"].int())
+```
+
+PostgreSQL bir işlemin (transaction) içinde katıdır: bir ifade başarısız
+olduğunda işlemin tamamı bozulur ve `commit()` bir kısmını kaydetmek yerine
+hata verir. Hatayı yakalayın ve `rollback()` çağırın. Bkz.
+[PostgreSQL](POSTGRESQL_TR.md).
+
+### 57.4 WebSocket: tarayıcıya güncelleme göndermek
+
+Normal bir web sayfası yeni bir şeyi ancak sorduğunda öğrenir. WebSocket açık
+kalır; böylece sunucu bir şey olduğu anda mesaj gönderebilir.
+
+```ahd
+bring HTTP
+bring KeyValue
+from HTTP bring (Server, Request, WebSocket, WebSocketEndpoint)
+
+clients: Pair<String, WebSocket> := {}
+
+joined: Function := (socket: WebSocket, request: Request) -> Nothing {
+    clients: Global Pair<String, WebSocket>
+    clients[socket.id()] = socket
+}
+
+received: Function := (socket: WebSocket, text: String) -> Nothing {
+    clients: Global Pair<String, WebSocket>
+    for other in KeyValue.values(clients) {
+        other.send(text)
+    }
+}
+
+endpoint: WebSocketEndpoint := HTTP.websocket(received).withOpen(joined)
+server: Server := HTTP.server("127.0.0.1", 8080)
+server.websocket("/chat", endpoint)
+server.start()
+```
+
+Tarayıcıda `new WebSocket("ws://127.0.0.1:8080/chat")` ona bağlanır. Geri
+çağrılar HTTP işleyicileri gibi tek tek çalışır; bu yüzden `clients` Pair'i
+özel bir önlem gerektirmez — ama geri çağrıları kısa tutun. Bağlantı koparsa
+hiçbir şey kendiliğinden yeniden bağlanmaz; bu, sayfanızın JavaScript'inin
+işidir. Bkz. [WebSocket](WEBSOCKET_TR.md).
+
+### 57.5 Hepsi bir arada
+
+[Gerçek zamanlı yoklama uygulaması](../examples/v1.4/realtime_attendance/README_TR.md)
+dördünü birlikte kullanır: bir yoklama formu PostgreSQL'e `UUID.v7()` anahtarlı
+bir satır kaydeder, veritabanı parolasını `Env.secret` ile okur ve açık olan her
+pano yeni yoklamayı WebSocket üzerinden hemen gösterir.

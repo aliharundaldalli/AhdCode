@@ -1,0 +1,64 @@
+require("Config/Database.ahd")
+require("Live.ahd")
+bring Web
+bring UUID
+bring JSON
+bring PostgreSQL
+from Web bring (RequestContext, Response)
+from UUID bring UUIDValue
+from PostgreSQL bring PostgreSQLError
+// checkIn stores one check-in with a time-ordered UUID v7 key, reads the
+// server's created_at back through RETURNING, tells every open dashboard, and
+// redirects (POST, then redirect, then GET).
+checkIn: Function := (context: RequestContext) -> Response {
+    if context.csrfValid() == false {
+        return context.respond(
+            Web.text("invalid form token; reload the page", 403)
+        )
+    }
+    name: Local String? := context.session.get("user_name")
+    if name == null {
+        return context.respond(Web.redirect("/"))
+    }
+    student: Local String? := context.request.form("student")
+    if student == null {
+        return context.respond(Web.redirect("/"))
+    }
+    if student == "" {
+        context.flashSet("notice", "Enter a student name.")
+        return context.respond(Web.redirect("/"))
+    }
+
+    checkInID: Local UUIDValue := UUID.v7()
+    createdAt: Local String := ""
+    attempt {
+        database: Local := attendanceDatabase()
+        stored: Local := database.query(
+            "INSERT INTO check_ins (id, student) VALUES ($1::uuid, $2) RETURNING created_at"
+            [
+                PostgreSQL.fromString(checkInID.string())
+                PostgreSQL.fromString(student)
+            ]
+        )
+        createdAt = stored[0]["created_at"].string()
+    }
+    except PostgreSQLError as error {
+        write("check-in not saved: " + error.message)
+        context.flashSet("notice", "The check-in could not be saved.")
+        return context.respond(Web.redirect("/"))
+    }
+
+    line: Local String := JSON.stringify(
+        JSON.object(
+            {
+                "type": JSON.fromString("check-in")
+                "id": JSON.fromString(checkInID.string())
+                "student": JSON.fromString(student)
+                "at": JSON.fromString(createdAt)
+            }
+        )
+    )
+    liveBroadcast(line)
+    context.flashSet("notice", student + " checked in.")
+    return context.respond(Web.redirect("/"))
+}

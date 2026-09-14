@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Build self-contained release artifacts. Native builds run strictly sequentially."""
-import argparse,hashlib,json,os,pathlib,shutil,subprocess,tarfile,time,zipfile
+import argparse,hashlib,json,os,pathlib,shutil,subprocess,sys,tarfile,time,zipfile
 R=pathlib.Path(__file__).resolve().parents[2]
 def sha(p):
  h=hashlib.sha256()
@@ -20,7 +20,7 @@ def build(target,output,goos,arch,ldflags='-buildid='):
  time.sleep(4)
 def licenses(payload,modules):
  dest=payload/'licenses';dest.mkdir()
- for name in ['LICENSE','THIRD_PARTY_NOTICES_CODES.md','THIRD_PARTY_NOTICES_MYSQL.md','THIRD_PARTY_NOTICES_NUMERIC.md','THIRD_PARTY_NOTICES_PLOT.md','THIRD_PARTY_NOTICES_SQLITE.md']:shutil.copy2(R/name,payload/name)
+ for name in ['LICENSE','THIRD_PARTY_NOTICES_CODES.md','THIRD_PARTY_NOTICES_MYSQL.md','THIRD_PARTY_NOTICES_NUMERIC.md','THIRD_PARTY_NOTICES_PLOT.md','THIRD_PARTY_NOTICES_POSTGRESQL.md','THIRD_PARTY_NOTICES_SQLITE.md','THIRD_PARTY_NOTICES_WEBSOCKET.md']:shutil.copy2(R/name,payload/name)
  shutil.copy2(R/'tooling/distribution/THIRD_PARTY_NOTICES.md',payload/'THIRD_PARTY_NOTICES.md')
  shutil.copytree(R/'internal/backend/golang/ahdruntime/mysqlvendor/vendor',dest/'mysql-source')
  shutil.copytree(R/'internal/backend/golang/ahdruntime/codesvendor/vendor',dest/'codes-source')
@@ -142,9 +142,15 @@ def sign_payload(root, identity):
  print('Signed and verified',len(targets),'Mach-O files',flush=True)
 
 def main():
- ap=argparse.ArgumentParser();ap.add_argument('--downloads',type=pathlib.Path,required=True);ap.add_argument('--latex-runtime',type=pathlib.Path,required=True);ap.add_argument('--modules',type=pathlib.Path,required=True);ap.add_argument('--output',type=pathlib.Path,required=True);ap.add_argument('--sign-app',default='',help='Developer ID Application identity for the packaged binaries');ap.add_argument('--vsix',type=pathlib.Path,help='the .vsix from tooling/distribution/build_vsix.py');ap.add_argument('--without-vsix',action='store_true',help='deliberately ship no editor extension');ap.add_argument('--platform',choices=['darwin','windows','linux','all'],default='all');a=ap.parse_args()
+ ap=argparse.ArgumentParser();ap.add_argument('--downloads',type=pathlib.Path,required=True);ap.add_argument('--latex-runtime',type=pathlib.Path,required=True);ap.add_argument('--modules',type=pathlib.Path,required=True);ap.add_argument('--output',type=pathlib.Path,required=True);ap.add_argument('--sign-app',default='',help='Developer ID Application identity for the packaged binaries');ap.add_argument('--vsix',type=pathlib.Path,help='the .vsix from tooling/distribution/build_vsix.py');ap.add_argument('--without-vsix',action='store_true',help='deliberately ship no editor extension');ap.add_argument('--platform',choices=['darwin','windows','linux','all'],default='all');ap.add_argument('--leak-forbid-file',type=pathlib.Path,action='append',default=[],help='a developer-local file whose exact contents must not appear in any artifact');ap.add_argument('--leak-forbid-env-values',type=pathlib.Path,action='append',default=[],help='a developer .env file whose specific values must not appear in any artifact');ap.add_argument('--allow-dirty-tree',action='store_true',help='development only: build from a tree with uncommitted, untracked, or ignored files; never for a release');a=ap.parse_args()
  version=__import__('re').search(r'Number\s*=\s*"([^"]+)"',(R/'internal/ahdversion/version.go').read_text())[1]
  commit=subprocess.check_output(['git','rev-parse','HEAD'],cwd=R,text=True).strip()
+ # The CLI embeds tools/AhdDataStudio (go:embed all:), the starter templates, and
+ # the docbundle verbatim, so any untracked or ignored file in the tree ships
+ # inside every artifact: the first v1.4.0 candidate carried a developer .env this
+ # way. Release artifacts are built only from a clean git worktree.
+ dirty=subprocess.check_output(['git','status','--porcelain','--ignored','--untracked-files=all'],cwd=R,text=True)
+ if dirty.strip() and not a.allow_dirty_tree:raise SystemExit('refusing to build release artifacts from a tree with uncommitted, untracked, or ignored files; build from a clean git worktree:\n'+dirty[:4000])
  raw=a.modules.read_text();decoder=json.JSONDecoder();modules=[]
  while raw.strip():m,end=decoder.raw_decode(raw.lstrip());modules.append(m);raw=raw.lstrip()[end:]
  go=json.loads((R/'tooling/distribution/go-assets.json').read_text());latex=json.loads((R/'tooling/latex/assets.json').read_text())
@@ -221,4 +227,11 @@ def main():
  # bytes, because both are copies of the one file that was verified.
  if a.vsix and a.vsix.resolve()!=(a.output/a.vsix.name).resolve(): shutil.copy2(a.vsix,a.output/a.vsix.name)
  (a.output/'release-manifest.json').write_text(json.dumps({'version':version,'commit':commit,'extension':vsix_version,'artifacts':records},indent=2)+'\n')
+ # Every artifact passes the leak gate before it can be signed, notarized, or
+ # published. It inspects the delivered contents, not the file names alone.
+ studio=a.output/'studio-files.txt';studio.write_text(subprocess.check_output(['git','ls-files','tools/AhdDataStudio'],cwd=R,text=True))
+ gate=[sys.executable,R/'tooling/distribution/leak_gate.py','--studio-files',studio,'--manifest-dir',a.output/'manifests']
+ for path in a.leak_forbid_file:gate+=['--forbid-file',path]
+ for path in a.leak_forbid_env_values:gate+=['--forbid-env-values',path]
+ run(gate+[a.output/r['filename'] for r in records]+([a.output/a.vsix.name] if a.vsix else []))
 if __name__=='__main__':main()

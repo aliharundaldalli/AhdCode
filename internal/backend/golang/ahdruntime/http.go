@@ -71,6 +71,9 @@ type ahdHTTPServerState struct {
 	// through the Web asset system. A file that merely sits beside them is
 	// not browser-addressable.
 	managedRoutes []ahdHTTPStaticEntry
+	// webSockets are the Server.websocket registrations (v1.4.0), keyed by
+	// path. A GET on such a path is a WebSocket upgrade (see websocket.go).
+	webSockets map[string]*ahdHTTPWebSocketRoute
 }
 
 // ahdHTTPStaticEntry is one server.static(prefix, root) registration.
@@ -477,6 +480,9 @@ func ahdHTTPRegister(class *AhdClass, handle, method, path string, handler AhdHT
 	key := ahdHTTPRouteKey{method: method, path: path}
 	if _, exists := server.routes[key]; exists {
 		AhdRaiseClass(class, "HTTP route "+method+" "+path+" is already registered")
+	}
+	if _, exists := server.webSockets[path]; exists && method == http.MethodGet {
+		AhdRaiseClass(class, "HTTP route GET "+path+" is already registered as a WebSocket endpoint")
 	}
 	server.routes[key] = handler
 	if !ahdHTTPContains(server.methods[path], method) {
@@ -993,11 +999,24 @@ func (dispatcher ahdHTTPDispatcher) ServeHTTP(writer http.ResponseWriter, reques
 	path := request.URL.Path
 	method := request.Method
 	dispatcher.state.mutex.Lock()
+	socketRoute := ahdHTTPLookupWebSocket(dispatcher.state, path)
 	handler, found, allowed := ahdHTTPLookupRoute(dispatcher.state, method, path)
 	maxBody := dispatcher.state.maxBodyBytes
 	maxUpload := dispatcher.state.maxUploadBytes
 	maxFiles := dispatcher.state.maxUploadFiles
 	dispatcher.state.mutex.Unlock()
+
+	// A WebSocket endpoint answers GET on its path. Any other method on that
+	// path follows the ordinary routes, with GET listed as allowed.
+	if socketRoute != nil {
+		if method == http.MethodGet {
+			ahdHTTPServeWebSocket(dispatcher, socketRoute, writer, request)
+			return
+		}
+		if !ahdHTTPContains(allowed, http.MethodGet) {
+			allowed = append(allowed, http.MethodGet)
+		}
+	}
 
 	if !found {
 		if len(allowed) == 0 {

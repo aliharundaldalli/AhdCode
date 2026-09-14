@@ -37,6 +37,8 @@ func (generator *generator) envCall(value *ir.CallExpr) string {
 		return "AhdEnvGetOr(" + text(0, `""`) + ", " + text(1, `""`) + ")"
 	case "exists":
 		return "AhdEnvHas(" + text(0, `""`) + ")"
+	case "secret":
+		return "AhdEnvSecret(" + errorClass + ", " + text(0, `""`) + ")"
 	case "set":
 		return "AhdEnvSet(" + errorClass + ", " + text(0, `""`) + ", " + text(1, `""`) + ")"
 	case "unset":

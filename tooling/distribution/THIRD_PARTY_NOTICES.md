@@ -13,8 +13,10 @@ No npm or CDN runtime is included.
 The exact Go module versions and complete license/notice texts are inventoried
 in `licenses/modules.json` and `licenses/modules/`. They include Go's x packages
 (BSD), go-sql-driver/mysql (MPL 2.0), edwards25519 (BSD), boombuler/barcode (MIT),
-go-sqlite3 and its WASM component (MIT), gonum/plot (BSD), font and PDF
-dependencies. The unchanged MySQL source and license accompany this distribution
+jackc/pgx with jackc/pgpassfile, jackc/pgservicefile, and jackc/puddle (MIT),
+coder/websocket (ISC), go-sqlite3 and its WASM component (MIT), gonum/plot
+(BSD), font and PDF dependencies. The PostgreSQL and WebSocket notices are
+`THIRD_PARTY_NOTICES_POSTGRESQL.md` and `THIRD_PARTY_NOTICES_WEBSOCKET.md`. The unchanged MySQL source and license accompany this distribution
 under `licenses/mysql-source`; see `THIRD_PARTY_NOTICES_MYSQL.md`. The unchanged
 QR and barcode encoder source and license accompany it under
 `licenses/codes-source`; see `THIRD_PARTY_NOTICES_CODES.md`. SQLite, numeric,

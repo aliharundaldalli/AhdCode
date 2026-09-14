@@ -32,6 +32,8 @@ from HTTP bring Session
 from HTTP bring Client
 from HTTP bring ClientRequest
 from HTTP bring ClientResponse
+from HTTP bring WebSocket
+from HTTP bring WebSocketEndpoint
 ```
 
 `HTTP` is a small, typed local web server **and** an outbound HTTP/HTTPS
@@ -40,8 +42,9 @@ a `Response`. v0.5.0 adds HTTP cookies and an in-memory server-side
 `SessionStore`. v0.6.0 adds `Client`, `ClientRequest`, and `ClientResponse` so
 a program can call external HTTP and HTTPS APIs. v0.9.1 adds `HTTP.file` and
 `HTTP.download`, binary-safe responses for a file already on disk. Server `Request`/`Response`
-and outbound `ClientRequest`/`ClientResponse` are distinct types. There is no
-middleware, router DSL, multipart, WebSocket, path parameters, authentication
+and outbound `ClientRequest`/`ClientResponse` are distinct types. v1.4.0 adds
+WebSocket server endpoints on the same `Server`; see [WebSocket](WEBSOCKET.md).
+There is no middleware, router DSL, multipart, path parameters, authentication
 framework, or AI vendor module. The implementation uses Go's `net/http` inside
 the AhdCode runtime; there is no companion HTTP, cookie, session, or client
 helper process.
@@ -56,6 +59,7 @@ HTTP.html(body: String, status: Int := 200)                        -> Response
 HTTP.redirect(location: String, status: Int := 303)                -> Response
 HTTP.file(path: String, contentType: String)                       -> Response
 HTTP.download(path: String, contentType: String, fileName: String) -> Response
+HTTP.websocket(onMessage: Function(WebSocket, String) -> Nothing)  -> WebSocketEndpoint
 HTTP.cookie(name: String, value: String)                           -> Cookie
 HTTP.deleteCookie(name: String, path: String := "/")               -> Cookie
 HTTP.sessions(
@@ -92,6 +96,7 @@ Server.post(path: String, handler: Function)  -> Nothing
 Server.route(method: String, path: String, handler: Function) -> Nothing
 Server.static(prefix: String, root: String)   -> Nothing
 Server.managed(prefix: String, root: String)  -> Nothing
+Server.websocket(path: String, endpoint: WebSocketEndpoint) -> Nothing
 Server.applyWebLimits()                       -> Nothing
 Server.start()                                -> Nothing
 
@@ -623,12 +628,21 @@ If a handler raises any Error (or panics in the runtime), the client receives
 **500** `Internal Server Error`. The internal message is written to stderr, not
 to the client. The server keeps serving later requests.
 
+## WebSocket endpoints
+
+v1.4.0 adds WebSocket server endpoints. `HTTP.websocket(onMessage)` builds an
+immutable `WebSocketEndpoint`; `withOpen`, `withClose`, `withAccept`,
+`withAllowedOrigins`, and the three limits return configured copies; and
+`Server.websocket(path, endpoint)` registers it before `start()`. The
+[WebSocket guide](WEBSOCKET.md) documents the surface, the handshake and
+lifecycle, origins, limits, and deployment behind a reverse proxy.
+
 ## Concurrency
 
 Go's `net/http` accepts connections concurrently. AhdCode handlers on one
 `Server` are **serialized** with an unexported mutex. Two handlers never run
-at the same time on the same server. There is no AhdCode thread, goroutine,
-async, or lock API.
+at the same time on the same server, and WebSocket callbacks share the same
+mutex. There is no AhdCode thread, goroutine, async, or lock API.
 
 ## Outbound client
 

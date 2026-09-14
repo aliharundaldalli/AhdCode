@@ -17,5 +17,9 @@ Parola, oturum sırrı veya CSRF jetonu için kullanmayın. Bunlar
 
 Çözümleme API'si yoktur. Tanımlayıcı opak bir dizgedir.
 
+Başka bir sistem UUID beklediğinde, örneğin bir PostgreSQL `uuid` sütunu ya da
+harici bir API, bunun yerine [`UUID`](UUID_TR.md) kullanın. `Identity.id()`
+v1.4.0'da değişmedi ve ikisi arasında dönüşüm yoktur.
+
 AhdCode Web başlangıç uygulamaları veritabanı için özel sayısal bir `id` ve
 URL'ler için ayrı bir `public_id` saklar. Rotalar sayısal kimliği göstermez.

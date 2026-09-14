@@ -31,6 +31,11 @@ var (
 	httpUploadedFileClass       = ir.ClassID("builtin:HTTP::class::UploadedFile")
 	httpUploadedFileDataField   = ir.FieldID("builtin:HTTP::class::UploadedFile::field::data")
 	webRequestContextClass      = ir.ClassID("framework:WebContext::class::RequestContext")
+	// WebSocket server support (v1.4.0).
+	httpWebSocketClass               = ir.ClassID("builtin:HTTP::class::WebSocket")
+	httpWebSocketDataField           = ir.FieldID("builtin:HTTP::class::WebSocket::field::data")
+	httpWebSocketEndpointClass       = ir.ClassID("builtin:HTTP::class::WebSocketEndpoint")
+	httpWebSocketEndpointHandleField = ir.FieldID("builtin:HTTP::class::WebSocketEndpoint::field::handle")
 )
 
 func (generator *generator) httpCall(value *ir.CallExpr) string {
@@ -91,6 +96,15 @@ func (generator *generator) httpCall(value *ir.CallExpr) string {
 			text(0, `""`)+", "+text(1, `""`)+")", meta)
 	case "contextHandler":
 		return generator.httpContextHandler(value, meta)
+	case "websocket":
+		// Creating an endpoint is the one way a program can have a WebSocket
+		// route, so it is what brings the vendored connection runtime.
+		generator.usesWebSocket = true
+		if len(value.Arguments) != 1 || value.Arguments[0].Value == nil {
+			return generator.unsupported("HTTP.websocket with a malformed argument list", meta.Span)
+		}
+		return generator.httpValueFrom(httpWebSocketEndpointClass, "AhdHTTPWebSocket("+errorClass+", "+
+			generator.webSocketCallback(value.Arguments[0].Value, "message", meta)+")", meta)
 	default:
 		return generator.unsupported("HTTP function "+name, meta.Span)
 	}
@@ -245,6 +259,44 @@ func (generator *generator) httpOperation(name string, value *ir.CallExpr) strin
 		return "AhdHTTPUploadedFileSize(" + errorClass + ", " + generator.httpDataOf(httpUploadedFileClass, httpUploadedFileDataField, value.Callee) + ")"
 	case "UploadedFile.save":
 		return "AhdHTTPUploadedFileSave(" + errorClass + ", " + generator.httpDataOf(httpUploadedFileClass, httpUploadedFileDataField, value.Callee) + ", " + text(0) + ")"
+	case "Server.websocket":
+		return "AhdHTTPServerWebSocket(" + errorClass + ", " + generator.httpDataOf(httpServerClass, httpServerHandleField, value.Callee) + ", " +
+			text(0) + ", " + generator.httpDataOf(httpWebSocketEndpointClass, httpWebSocketEndpointHandleField, value.Arguments[1].Value) + ")"
+	case "WebSocketEndpoint.withOpen", "WebSocketEndpoint.withClose", "WebSocketEndpoint.withAccept":
+		kinds := map[string]string{"WebSocketEndpoint.withOpen": "open", "WebSocketEndpoint.withClose": "close", "WebSocketEndpoint.withAccept": "accept"}
+		runtimeNames := map[string]string{"WebSocketEndpoint.withOpen": "AhdWebSocketEndpointWithOpen", "WebSocketEndpoint.withClose": "AhdWebSocketEndpointWithClose", "WebSocketEndpoint.withAccept": "AhdWebSocketEndpointWithAccept"}
+		return generator.httpValueFrom(httpWebSocketEndpointClass, runtimeNames[name]+"("+errorClass+", "+
+			generator.httpDataOf(httpWebSocketEndpointClass, httpWebSocketEndpointHandleField, value.Callee)+", "+
+			generator.webSocketCallback(value.Arguments[0].Value, kinds[name], meta)+")", meta)
+	case "WebSocketEndpoint.withAllowedOrigins":
+		return generator.httpValueFrom(httpWebSocketEndpointClass, "AhdWebSocketEndpointWithAllowedOrigins("+errorClass+", "+
+			generator.httpDataOf(httpWebSocketEndpointClass, httpWebSocketEndpointHandleField, value.Callee)+", "+
+			generator.expr(value.Arguments[0].Value)+".Snapshot())", meta)
+	case "WebSocketEndpoint.withMaxMessageBytes":
+		return generator.httpValueFrom(httpWebSocketEndpointClass, "AhdWebSocketEndpointWithMaxMessageBytes("+errorClass+", "+
+			generator.httpDataOf(httpWebSocketEndpointClass, httpWebSocketEndpointHandleField, value.Callee)+", "+integer(0)+")", meta)
+	case "WebSocketEndpoint.withMaxQueuedMessages":
+		return generator.httpValueFrom(httpWebSocketEndpointClass, "AhdWebSocketEndpointWithMaxQueuedMessages("+errorClass+", "+
+			generator.httpDataOf(httpWebSocketEndpointClass, httpWebSocketEndpointHandleField, value.Callee)+", "+integer(0)+")", meta)
+	case "WebSocketEndpoint.withMaxConnections":
+		return generator.httpValueFrom(httpWebSocketEndpointClass, "AhdWebSocketEndpointWithMaxConnections("+errorClass+", "+
+			generator.httpDataOf(httpWebSocketEndpointClass, httpWebSocketEndpointHandleField, value.Callee)+", "+integer(0)+")", meta)
+	case "WebSocket.id":
+		return "AhdWebSocketID(" + errorClass + ", " + generator.httpDataOf(httpWebSocketClass, httpWebSocketDataField, value.Callee) + ")"
+	case "WebSocket.send":
+		return "AhdWebSocketSend(" + errorClass + ", " + generator.httpDataOf(httpWebSocketClass, httpWebSocketDataField, value.Callee) + ", " + text(0) + ")"
+	case "WebSocket.close":
+		code := "int64(1000)"
+		if len(value.Arguments) > 0 && value.Arguments[0].Value != nil && !value.Arguments[0].UsesDefault {
+			code = integer(0)
+		}
+		reason := `""`
+		if len(value.Arguments) > 1 && value.Arguments[1].Value != nil && !value.Arguments[1].UsesDefault {
+			reason = text(1)
+		}
+		return "AhdWebSocketClose(" + errorClass + ", " + generator.httpDataOf(httpWebSocketClass, httpWebSocketDataField, value.Callee) + ", " + code + ", " + reason + ")"
+	case "WebSocket.isOpen":
+		return "AhdWebSocketIsOpen(" + generator.httpDataOf(httpWebSocketClass, httpWebSocketDataField, value.Callee) + ")"
 	default:
 		return generator.unsupported("HTTP operation "+name, meta.Span)
 	}
@@ -292,6 +344,40 @@ func (generator *generator) httpHandler(value *ir.CallExpr, index int) string {
 	getter := generator.fieldName(httpResponseDataField) + "_get()"
 	return "func(handler func(" + reqType + ") " + resType + ") AhdHTTPHandler { " +
 		"return func(data string) string { return handler(" + helper + "(data))." + getter + " } }(" + handler + ")"
+}
+
+// webSocketCallback adapts one AhdCode Function to a WebSocket runtime callback.
+// A Function value's scalar parameters use the nullable representation, so a
+// String or Int argument is passed by address; a WebSocket and a Request are
+// rebuilt from their hidden Strings. The accept check maps a null Response to
+// a nil refusal.
+func (generator *generator) webSocketCallback(function ir.Expr, kind string, meta ir.ExprBase) string {
+	handler := generator.expr(function)
+	socketHelper, socketOK := generator.httpHelper(httpWebSocketClass)
+	requestHelper, requestOK := generator.httpHelper(httpRequestClass)
+	if !socketOK || !requestOK {
+		return generator.unsupported("a WebSocket callback without its Class declarations", meta.Span)
+	}
+	socketType := generator.interfaceName(httpWebSocketClass)
+	requestType := generator.interfaceName(httpRequestClass)
+	responseType := generator.interfaceName(httpResponseClass)
+	switch kind {
+	case "message":
+		return "func(handler func(" + socketType + ", *string)) AhdWebSocketMessageHandler { " +
+			"return func(socket string, text string) { handler(" + socketHelper + "(socket), &text) } }(" + handler + ")"
+	case "open":
+		return "func(handler func(" + socketType + ", " + requestType + ")) AhdWebSocketOpenHandler { " +
+			"return func(socket string, request string) { handler(" + socketHelper + "(socket), " + requestHelper + "(request)) } }(" + handler + ")"
+	case "close":
+		return "func(handler func(" + socketType + ", *int64, *string)) AhdWebSocketCloseHandler { " +
+			"return func(socket string, code int64, reason string) { handler(" + socketHelper + "(socket), &code, &reason) } }(" + handler + ")"
+	case "accept":
+		getter := generator.fieldName(httpResponseDataField) + "_get()"
+		return "func(handler func(" + requestType + ") " + responseType + ") AhdWebSocketAcceptHandler { " +
+			"return func(request string) *string { response := handler(" + requestHelper + "(request)); " +
+			"if response == nil { return nil }; data := response." + getter + "; return &data } }(" + handler + ")"
+	}
+	return generator.unsupported("a WebSocket callback of kind "+kind, meta.Span)
 }
 
 // httpUploadListResult wraps a []string of encoded upload metadata back
@@ -359,7 +445,7 @@ func (generator *generator) emitHTTPHelpers(writer *emitter) {
 		httpServerClass, httpRequestClass, httpResponseClass,
 		httpCookieClass, httpSessionStoreClass, httpSessionClass,
 		httpClientClass, httpClientRequestClass, httpClientResponseClass,
-		httpUploadedFileClass,
+		httpUploadedFileClass, httpWebSocketClass, httpWebSocketEndpointClass,
 	} {
 		name, known := generator.timeHelpers[class]
 		if !known {

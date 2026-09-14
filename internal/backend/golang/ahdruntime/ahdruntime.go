@@ -100,6 +100,8 @@ var (
 	AhdClassCronError           = &AhdClass{Name: "CronError", Parent: AhdClassError}
 	AhdClassQRError             = &AhdClass{Name: "QRError", Parent: AhdClassError}
 	AhdClassBarcodeError        = &AhdClass{Name: "BarcodeError", Parent: AhdClassError}
+	AhdClassUUIDError           = &AhdClass{Name: "UUIDError", Parent: AhdClassError}
+	AhdClassPostgreSQLError     = &AhdClass{Name: "PostgreSQLError", Parent: AhdClassError}
 )
 
 // AhdInstance is every AhdCode Class instance. The generated interface of each
@@ -7646,6 +7648,73 @@ func AhdEnvUnset(class *AhdClass, name string) {
 	if err := os.Unsetenv(name); err != nil {
 		AhdRaiseClass(class, "could not unset the environment variable")
 	}
+}
+
+// ahdEnvSecretMaximumBytes bounds the secret file Env.secret reads.
+const ahdEnvSecretMaximumBytes = 1 << 20
+
+// AhdEnvSecretLookup resolves Env.secret(name) (v1.4.0). NAME holds the value
+// directly, or NAME_FILE names a file holding it; the two are mutually
+// exclusive, and a file that cannot be used never falls back to NAME. The file
+// must be at most 1 MiB of valid UTF-8 without NUL bytes, and exactly one
+// trailing "\n" or "\r\n" is removed. resolve maps the NAME_FILE path to the
+// path to open, so the REPL can honour its own working directory. It returns
+// the value, whether a value exists, and a problem message when the lookup must
+// raise EnvError. Messages name the variable, never the value, the file
+// contents, or the path.
+func AhdEnvSecretLookup(name string, resolve func(string) string) (string, bool, string) {
+	value, direct := os.LookupEnv(name)
+	path, indirect := os.LookupEnv(name + "_FILE")
+	switch {
+	case direct && indirect:
+		return "", false, name + " and " + name + "_FILE are both set; set only one"
+	case direct:
+		return value, true, ""
+	case !indirect:
+		return "", false, ""
+	case path == "":
+		return "", false, name + "_FILE is set but empty"
+	}
+	unreadable := "the secret file named by " + name + "_FILE could not be read"
+	file, err := os.Open(resolve(path))
+	if err != nil {
+		return "", false, unreadable
+	}
+	defer file.Close()
+	content, err := io.ReadAll(io.LimitReader(file, ahdEnvSecretMaximumBytes+1))
+	if err != nil {
+		return "", false, unreadable
+	}
+	if len(content) > ahdEnvSecretMaximumBytes {
+		return "", false, "the secret file named by " + name + "_FILE is larger than 1 MiB"
+	}
+	if !utf8.Valid(content) {
+		return "", false, "the secret file named by " + name + "_FILE is not valid UTF-8"
+	}
+	text := string(content)
+	if strings.IndexByte(text, 0) >= 0 {
+		return "", false, "the secret file named by " + name + "_FILE contains a NUL byte"
+	}
+	if strings.HasSuffix(text, "\r\n") {
+		text = text[:len(text)-2]
+	} else if strings.HasSuffix(text, "\n") {
+		text = text[:len(text)-1]
+	}
+	return text, true, ""
+}
+
+// AhdEnvSecret is Env.secret for a generated program: paths are relative to
+// the process working directory.
+func AhdEnvSecret(class *AhdClass, name string) *string {
+	ahdEnvValidateName(class, name)
+	value, present, problem := AhdEnvSecretLookup(name, func(path string) string { return path })
+	if problem != "" {
+		AhdRaiseClass(class, problem)
+	}
+	if !present {
+		return nil
+	}
+	return &value
 }
 
 // ---------------------------------------------------------------------------

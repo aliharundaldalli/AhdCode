@@ -10,7 +10,7 @@
 // Web.routes for RequestContext handlers, groups, and guards. There is still
 // no general middleware chain and no second router.
 bring HTTP
-from HTTP bring Server
+from HTTP bring (Server, WebSocketEndpoint)
 bring WebConfig
 from WebConfig bring AppConfig
 
@@ -47,6 +47,11 @@ App: Class<> := {
     // name.
     managedAssets: Function := (prefix: String, root: String) -> Nothing {
         attribute.server.managed(prefix, root)
+    }
+    // websocket registers a WebSocket endpoint on one path (v1.4.0). Its
+    // callbacks share the server's handler mutex with every route.
+    websocket: Function := (path: String, endpoint: WebSocketEndpoint) -> Nothing {
+        attribute.server.websocket(path, endpoint)
     }
     // start binds the socket and serves. It does not return.
     start: Function := () -> Nothing {

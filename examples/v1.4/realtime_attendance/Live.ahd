@@ -1,0 +1,61 @@
+// The /live WebSocket: who may connect, and the registry broadcasts use.
+//
+// WebSocket callbacks run one at a time together with HTTP handlers, so the
+// registry is an ordinary Pair and needs no locking. The endpoint keeps the
+// default same-origin policy: another site's page cannot open it.
+require("Config/Sessions.ahd")
+bring Web
+bring KeyValue
+from Web bring (Request, Response, Session, WebSocket, WebSocketEndpoint)
+
+liveSockets: Pair<String, WebSocket> := {}
+// liveAccept runs before the upgrade. Returning a Response refuses the
+// connection with it; returning null accepts.
+liveAccept: Function := (request: Request) -> Response? {
+    session: Local Session := attendanceSessions().open(request)
+    if session.get("user_id") == null {
+        return Web.text("sign in first", 401)
+    }
+    return null
+}
+
+liveOpen: Function := (socket: WebSocket, request: Request) -> Nothing {
+    liveSockets: Global Pair<String, WebSocket>
+    liveSockets[socket.id()] = socket
+}
+// The dashboard only listens. A client that sends anything is closed.
+liveMessage: Function := (socket: WebSocket, text: String) -> Nothing {
+    socket.close(1008, "this socket is read-only")
+}
+
+liveClose: Function := (
+    socket: WebSocket
+    code: Int
+    reason: String
+) -> Nothing {
+    liveSockets: Global Pair<String, WebSocket>
+    liveSockets = KeyValue.without(liveSockets, socket.id())
+}
+// liveBroadcast sends one line to every open dashboard and returns how many
+// accepted it. A socket too slow to keep up is closed by the runtime once its
+// bounded queue is full; nothing here waits for it.
+liveBroadcast: Function := (line: String) -> Int {
+    liveSockets: Global Pair<String, WebSocket>
+    delivered: Local Int := 0
+    for socket in KeyValue.values(liveSockets) {
+        if socket.send(line) {
+            delivered += 1
+        }
+    }
+    return delivered
+}
+
+liveEndpoint: Function := () -> WebSocketEndpoint {
+    endpoint: Local WebSocketEndpoint := Web.websocket(liveMessage)
+    endpoint = endpoint.withAccept(liveAccept)
+    endpoint = endpoint.withOpen(liveOpen)
+    endpoint = endpoint.withClose(liveClose)
+    endpoint = endpoint.withMaxMessageBytes(1024)
+    endpoint = endpoint.withMaxConnections(200)
+    return endpoint
+}

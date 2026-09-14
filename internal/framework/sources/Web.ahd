@@ -39,6 +39,9 @@ from HTTP bring (
     Cookie
     UploadedFile
     HTTPError
+    WebSocket
+    WebSocketEndpoint
+    websocket
 )
 bring HTML
 from HTML bring (HTMLNode, HTMLError)

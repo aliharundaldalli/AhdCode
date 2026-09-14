@@ -1,0 +1,66 @@
+require("Layouts/Main.ahd")
+bring Web
+bring UUID
+from Web bring (RequestContext, Response)
+
+signInPage: Function := (
+    context: RequestContext
+    status: Int := 200
+) -> Response {
+    return attendanceLayout(
+        "Sign in"
+        [
+            Web.UI.h1("Realtime Attendance")
+            Web.UI.p("Sign in with your name to record and watch check-ins.")
+            Web.UI.formTo(
+                "/sign-in"
+                "post"
+                [
+                    Web.UI.csrfField(context)
+                    Web.UI.labelFor("name", "Your name")
+                    Web.UI.input(
+                        "text"
+                        "name"
+                        ""
+                        {
+                            "id": "name"
+                            "maxlength": "80"
+                            "required": "required"
+                        }
+                    )
+                    Web.UI.button("Sign in", {"type": "submit"})
+                ]
+            )
+        ]
+        status
+    )
+}
+// signIn keeps the example's policy deliberately small: a name is enough.
+// user_id is what the /live accept check looks for.
+signIn: Function := (context: RequestContext) -> Response {
+    if context.csrfValid() == false {
+        return context.respond(
+            Web.text("invalid form token; reload the page", 403)
+        )
+    }
+    name: Local String? := context.request.form("name")
+    if name == null {
+        return context.respond(signInPage(context, 422))
+    }
+    if name == "" {
+        return context.respond(signInPage(context, 422))
+    }
+    context.session.set("user_id", UUID.v4().string())
+    context.session.set("user_name", name)
+    return context.respond(Web.redirect("/"))
+}
+
+signOut: Function := (context: RequestContext) -> Response {
+    if context.csrfValid() == false {
+        return context.respond(
+            Web.text("invalid form token; reload the page", 403)
+        )
+    }
+    context.session.clear()
+    return context.respond(Web.redirect("/"))
+}

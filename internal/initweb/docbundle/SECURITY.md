@@ -225,6 +225,10 @@ Use tokens for:
 
 Do **not** use tokens as JWTs — they carry no claims, no expiry, and are not signed.
 
+A token is a secret. For identifiers that are not secret, use
+[`Identity.id()`](IDENTITY.md) or [`UUID`](UUID.md). A UUID must never stand in
+for a token: a time-ordered `UUID.v7()` even reveals when it was created.
+
 ## secureEqual
 
 ```ahd
@@ -239,6 +243,12 @@ Use `secureEqual` whenever you compare a value from an untrusted source
 against a known secret (CSRF token, API key, webhook signature). Ordinary
 `==` is not constant-time and may leak information about the secret through
 timing differences.
+
+A bearer-token guard compares `"Bearer " + token` with the request's
+`Authorization` header this way, reading the expected token with
+[`Env.secret`](ENV.md#secret); the
+realtime attendance example
+shows the whole pattern.
 
 ## CSRF protection pattern
 

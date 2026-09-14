@@ -38,6 +38,7 @@ func StandardModuleInterfaces() map[string]*ModuleInterface {
 		"Path":       pathModuleInterface(),
 		"PDF":        pdfModuleInterface(),
 		"Plot":       plotModuleInterface(),
+		"PostgreSQL": postgresqlModuleInterface(),
 		"QR":         qrModuleInterface(),
 		"Regex":      regexModuleInterface(),
 		"Security":   securityModuleInterface(),
@@ -45,6 +46,7 @@ func StandardModuleInterfaces() map[string]*ModuleInterface {
 		"SQLite":     sqliteModuleInterface(),
 		"Statistics": statisticsModuleInterface(),
 		"Time":       timeModuleInterface(),
+		"UUID":       uuidModuleInterface(),
 		"Word":       wordModuleInterface(),
 		"XML":        xmlModuleInterface(),
 	}

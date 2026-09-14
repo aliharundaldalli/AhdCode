@@ -43,6 +43,9 @@ func envModuleInterface() *ModuleInterface {
 	addStandardExport(module, standardFunction(envModuleID, "unset", types.Nothing, name("name")))
 	addStandardExport(module, standardFunction(envModuleID, "read", record, name("path")))
 	addStandardExport(module, standardFunction(envModuleID, "load", types.Nothing, name("path"), override))
+	// secret (v1.4.0) reads NAME or the file named by NAME_FILE; null means
+	// neither is set.
+	addStandardExport(module, standardNullableFunction(envModuleID, "secret", types.String, name("name")))
 
 	sort.Strings(module.ExportNames)
 	return module
@@ -50,9 +53,9 @@ func envModuleInterface() *ModuleInterface {
 
 // standardNullableFunction is standardFunction's one-off variant for a
 // standard-module function whose *result* (not the function binding itself)
-// is statically MaybeNull - Env.get is the only such function across the
-// v0.1.17 modules, so this stays local rather than becoming a third shared
-// helper alongside standardFunction/standardInterface.
+// is statically MaybeNull - Env.get and Env.secret are its only users, so this
+// stays local rather than becoming a third shared helper alongside
+// standardFunction/standardInterface.
 func standardNullableFunction(moduleID, name string, result types.Type, parameters ...types.Parameter) *Symbol {
 	signature := &types.Signature{Parameters: parameters, Return: result}
 	return &Symbol{

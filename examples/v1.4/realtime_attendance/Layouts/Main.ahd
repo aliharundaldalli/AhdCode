@@ -1,0 +1,15 @@
+bring Web
+from Web bring (HTMLNode, Response)
+
+attendanceLayout: Function := (
+    title: String
+    content: List<HTMLNode>
+    status: Int := 200
+) -> Response {
+    return Web.page(
+        title + " — Realtime Attendance"
+        [Web.UI.main(content)]
+        []
+        status
+    )
+}

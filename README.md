@@ -12,16 +12,15 @@ AhdCode is an experimental statically checked general-purpose programming
 language focused on readable syntax, explicit intent, predictable semantics,
 and native compilation.
 
-This is **v1.3.0**. The language, toolchain, and Web framework are
+This is **v1.4.0**. The language, toolchain, and Web framework are
 feature-complete, and the core language surface described here is what 1.0
-committed to and 1.1, 1.2, and 1.3 keep unchanged.
+committed to and 1.1, 1.2, 1.3, and 1.4 keep unchanged.
 
-v1.3.0 is a minor release, **Professional Documents & Machine Codes**: it adds
-the `QR` and `Barcode` standard modules and professional document features —
-page layout, headers and footers, links, bookmarks, PDF properties, QR codes,
-barcodes, image transforms, and SVG assets — for `Latex` and `PDF`, without
+v1.4.0 is a minor release, **Realtime Web & Data**: it adds the `UUID` and
+`PostgreSQL` standard modules, WebSocket server endpoints in `HTTP` with a
+`Web` pass-through, and `Env.secret` for secrets delivered as files, without
 altering the core grammar or any existing behaviour. See
-[What is new in v1.3.0](#what-is-new-in-v130).
+[What is new in v1.4.0](#what-is-new-in-v140).
 
 It ships as a self-contained platform package: the `ahdcode` CLI, a private
 Go 1.27.0 toolchain, AhdDataStudio, the `ahdsqlite`, `ahdnumeric`, and
@@ -183,8 +182,9 @@ the server and disappear when the process exits. This is not an authentication
 framework. v0.3.0 began practical application development with a typed
 [SQLite](docs/SQLITE.md) bridge. HTTP uses Go's `net/http` inside the runtime;
 there is no companion HTTP, cookie, session, or client helper. Inbound
-multipart uploads arrived in v0.8.0; outbound file attachments, WebSocket, and an AI
-vendor module are still not part of the release.
+multipart uploads arrived in v0.8.0 and WebSocket server endpoints in v1.4.0;
+outbound file attachments, a WebSocket client, and an AI vendor module are
+still not part of the release.
 
 v0.2.2 completed the practical everyday AhdCode language server on top of
 v0.2.1's diagnostics, hover, completion, go to definition, document symbols,
@@ -302,12 +302,12 @@ To maintain conceptual clarity, AhdCode's capabilities are organized into four d
 
 2. **Standard Library (First-party Bundled Modules):**
    - **Mathematics & Computation:** [`Math`](docs/MATH.md), [`Bits`](docs/BITS.md) (bitwise operations on `Int`), [`Regex`](docs/REGEX.md), [`Statistics`](docs/STATISTICS.md), [`Numeric`](docs/NUMERIC.md), [`Plot`](docs/PLOT.md)
-   - **Data & Collections:** [`Lists`](docs/LISTS.md), [`KeyValue`](docs/KEYVALUE.md), [`Characters`](docs/CHARACTERS.md) (Unicode code points and classification), [`CSV`](docs/CSV.md), [`Data`](docs/DATA.md), [`JSON`](docs/JSON.md), [`XML`](docs/XML.md)
+   - **Data & Collections:** [`Lists`](docs/LISTS.md), [`KeyValue`](docs/KEYVALUE.md), [`Characters`](docs/CHARACTERS.md) (Unicode code points and classification), [`CSV`](docs/CSV.md), [`Data`](docs/DATA.md), [`JSON`](docs/JSON.md), [`XML`](docs/XML.md), [`UUID`](docs/UUID.md) (RFC 9562 version 4 and time-ordered version 7 identifiers)
    - **Document Generation:** [`Word`](docs/WORD.md), [`Excel`](docs/EXCEL.md), [`PDF`](docs/PDF.md), [`Latex`](docs/LATEX.md), [`QR`](docs/QR.md) (QR codes), [`Barcode`](docs/BARCODE.md) (Code 128, EAN-13, UPC-A), [`Archive`](docs/ARCHIVE.md)
    - **System & Environment:** [`Time`](docs/TIME.md), [`Cron`](docs/CRON.md) (bounded in-process scheduling), [`Path`](docs/FILESYSTEM.md), [`File`](docs/FILESYSTEM.md), [`Env`](docs/ENV.md)
 
 3. **First-Party Runtime / Framework Modules:**
-   - **Network, Server & Storage Primitives:** [`HTTP`](docs/HTTP.md) (in-memory server, request/response, cookies, sessions, static file server, client), [`HTML`](docs/HTML.md) (semantic builder, parser, selector engine), [`Security`](docs/SECURITY.md) (Argon2id hashing, secure tokens, constant-time comparison, SHA-2 digests, HMAC, encodings, RS256 signatures, AES-256-GCM), [`SQLite`](docs/SQLITE.md) (local typed database bridge), [`MySQL`](docs/MYSQL.md) (network database with connection pool and transactions), [`SMTP`](docs/SMTP.md) (send-only mail client)
+   - **Network, Server & Storage Primitives:** [`HTTP`](docs/HTTP.md) (in-memory server, request/response, cookies, sessions, static file server, [WebSocket endpoints](docs/WEBSOCKET.md), client), [`HTML`](docs/HTML.md) (semantic builder, parser, selector engine), [`Security`](docs/SECURITY.md) (Argon2id hashing, secure tokens, constant-time comparison, SHA-2 digests, HMAC, encodings, RS256 signatures, AES-256-GCM), [`SQLite`](docs/SQLITE.md) (local typed database bridge), [`MySQL`](docs/MYSQL.md) (network database with connection pool and transactions), [`PostgreSQL`](docs/POSTGRESQL.md) (network database with connection pool and transactions), [`SMTP`](docs/SMTP.md) (send-only mail client)
    - **Web Application Framework:** [`Web`](docs/WEB.md) (first-party bundled web framework, [`Web.UI`](docs/WEB.md#9-webui) semantic components, `RequestContext`, typed `Forms`, ordered `ValidationErrors`, selected `OldInput`, session-bound CSRF, and flash lifecycle)
 
 4. **Developer Tools:**
@@ -433,13 +433,16 @@ See the [CLI guide](docs/CLI.md), [formatter guide](docs/FORMATTER.md),
 - [Numeric module and Complex scalars](docs/NUMERIC.md)
 - [JSON module](docs/JSON.md)
 - [SQLite module](docs/SQLITE.md)
+- [PostgreSQL module](docs/POSTGRESQL.md)
 - [HTTP module](docs/HTTP.md)
+- [WebSocket endpoints](docs/WEBSOCKET.md)
 - [HTML module](docs/HTML.md)
 - [SMTP module](docs/SMTP.md)
 - [XML module](docs/XML.md)
 - [Env module](docs/ENV.md)
 - [Lists module](docs/LISTS.md)
 - [KeyValue module](docs/KEYVALUE.md)
+- [UUID module](docs/UUID.md)
 - [Understanding diagnostics](docs/DIAGNOSTICS.md)
 - [Language server](docs/LSP.md)
 - [AI-assisted local setup](FOR_AI.md)
@@ -453,6 +456,7 @@ See the [CLI guide](docs/CLI.md), [formatter guide](docs/FORMATTER.md),
 - [v0.9 SMTP mail sending](examples/v0.9/README.md)
 - [v0.12 MySQL raffle](examples/v0.12/raffle/README.md) — join codes, hashed admin login, announced winner
 - [v0.14 multi-file web example](examples/v0.14/multi_file_web/README.md) — require(...), dependency-aware dev, static assets
+- [v1.4 realtime attendance](examples/v1.4/realtime_attendance/README.md) — Web, PostgreSQL, WebSocket, UUID v7, `Env.secret`, and Cron
 - [AhdDataStudio](tools/AhdDataStudio/README.md) — local MySQL + SQLite development UI
 - [v0.4 Library Demo](https://github.com/aliharundaldalli/ahdcode-library-demo) (separate beginner web app)
 - [v0.4 Seminar Demo](https://github.com/aliharundaldalli/ahdcode-seminer-demo) (Hatay, multi-page)
@@ -469,6 +473,42 @@ diagnostics and hover. The same VSIX targets VS Code and Antigravity. See its
 [installation guide](editors/vscode/README.md).
 
 ## Current limitations
+
+## What is new in v1.4.0 <a id="what-is-new-in-v140"></a>
+
+v1.4.0 is a **minor** release, **Realtime Web & Data**. It adds two standard
+modules, WebSocket server endpoints, and `Env.secret`. The core grammar, the
+type system, and every previously released function keep their behaviour.
+
+**New standard module: [`UUID`](docs/UUID.md)** — `UUID.v4()` and the
+time-ordered `UUID.v7()` make immutable `UUIDValue`s. `UUID.parse` accepts only
+the canonical 36-character form, and values compare with `equals` and
+`compare`. `Identity.id()` is unchanged.
+
+**New standard module: [`PostgreSQL`](docs/POSTGRESQL.md)** — `connect`,
+`execute`, `query`, and `begin` in the MySQL family, with `$1` placeholders,
+`boolean`, exact `numeric`, `timestamptz` in UTC, `RETURNING`, and PostgreSQL's
+aborted-transaction rule made explicit. Only `connect`'s arguments choose the
+server: `PG*` variables and `~/.pgpass` have no effect. pgx is vendored, so
+builds stay offline.
+
+**WebSocket endpoints in [`HTTP`](docs/WEBSOCKET.md)** — `HTTP.websocket`,
+`Server.websocket`, and `App.websocket` host text-message endpoints on the same
+server as your routes. Callbacks run one at a time with HTTP handlers, `onOpen`
+has returned before the client sees the connection open, the default origin
+policy is same-origin, `withAccept` authenticates before the upgrade, and
+message size, queue, and connection count are bounded.
+
+**Extended module: [`Env`](docs/ENV.md#secret)** — `Env.secret(name)` reads
+`NAME`, or the file named by `NAME_FILE`, the convention container platforms
+use for mounted secrets.
+
+`UUID` and `PostgreSQL` are now standard module names: a local `UUID.ahd` or
+`PostgreSQL.ahd` beside a program is no longer what `bring UUID` or
+`bring PostgreSQL` loads, as with `QR` and `Barcode` in v1.3.0. See
+[`examples/v0.1/69_uuid.ahd`](examples/v0.1/69_uuid.ahd) through
+[`examples/v0.1/72_websocket_echo.ahd`](examples/v0.1/72_websocket_echo.ahd)
+and the [realtime attendance application](examples/v1.4/realtime_attendance/README.md).
 
 ## What is new in v1.3.0 <a id="what-is-new-in-v130"></a>
 

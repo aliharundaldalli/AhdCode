@@ -4,7 +4,9 @@ go 1.26.0
 
 require (
 	github.com/boombuler/barcode v1.1.0
+	github.com/coder/websocket v1.8.15
 	github.com/go-sql-driver/mysql v1.10.1
+	github.com/jackc/pgx/v5 v5.11.0
 	github.com/ncruces/go-sqlite3 v0.35.4
 	golang.org/x/crypto v0.56.0
 	golang.org/x/sys v0.47.0
@@ -22,7 +24,11 @@ require (
 	git.sr.ht/~sbinet/gg v0.7.0 // indirect
 	github.com/ajstarks/svgo v0.0.0-20211024235047-1546f124cd8b // indirect
 	github.com/golang/freetype v0.0.0-20170609003504-e2365dfdc4a0 // indirect
+	github.com/jackc/pgpassfile v1.0.0 // indirect
+	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
+	github.com/jackc/puddle/v2 v2.2.2 // indirect
 	github.com/ncruces/go-sqlite3-wasm/v5 v5.0.35304 // indirect
 	github.com/ncruces/julianday v1.0.0 // indirect
 	golang.org/x/image v0.30.0 // indirect
+	golang.org/x/sync v0.22.0 // indirect
 )

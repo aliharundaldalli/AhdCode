@@ -37,9 +37,9 @@ slidersSelect: Function := () -> String {
 }
 
 slidersAll: Function := () -> List<SliderRecord> {
-    rows: Local List<Pair<String, MySQLValue>> := connection(
-        
-    ).query("{slidersSelect()} ORDER BY display_order ASC, id DESC")
+    rows: Local List<Pair<String, MySQLValue>> := connection().query(
+        "{slidersSelect()} ORDER BY display_order ASC, id DESC"
+    )
     records: Local List<SliderRecord> := []
     for row in rows {
         records.add(slidersFromRow(row))
@@ -49,9 +49,7 @@ slidersAll: Function := () -> List<SliderRecord> {
 }
 
 slidersActive: Function := () -> List<SliderRecord> {
-    rows: Local List<Pair<String, MySQLValue>> := connection(
-        
-    ).query(
+    rows: Local List<Pair<String, MySQLValue>> := connection().query(
         "{slidersSelect()} WHERE is_active = 1 ORDER BY display_order ASC, id ASC"
     )
     records: Local List<SliderRecord> := []
@@ -63,9 +61,10 @@ slidersActive: Function := () -> List<SliderRecord> {
 }
 
 slidersFindById: Function := (id: Int) -> SliderRecord? {
-    rows: Local List<Pair<String, MySQLValue>> := connection(
-        
-    ).query("{slidersSelect()} WHERE id = ? LIMIT 1", [MySQL.fromInt(id)])
+    rows: Local List<Pair<String, MySQLValue>> := connection().query(
+        "{slidersSelect()} WHERE id = ? LIMIT 1"
+        [MySQL.fromInt(id)]
+    )
     if len(rows) == 0 {
         return null
     }
@@ -87,9 +86,7 @@ slidersCreate: Function := (
         activeInt = 1
     }
 
-    result: Local := connection(
-        
-    ).execute(
+    result: Local := connection().execute(
         "INSERT INTO sliders (title, subtitle, image_url, button_text, button_url, display_order, is_active) VALUES (?, ?, ?, ?, ?, ?, ?)"
         [
             MySQL.fromString(title)
@@ -119,9 +116,7 @@ slidersUpdate: Function := (
         activeInt = 1
     }
 
-    connection(
-        
-    ).execute(
+    connection().execute(
         "UPDATE sliders SET title = ?, subtitle = ?, image_url = ?, button_text = ?, button_url = ?, display_order = ?, is_active = ? WHERE id = ?"
         [
             MySQL.fromString(title)
@@ -142,16 +137,15 @@ slidersSetActive: Function := (id: Int, active: Bool) -> Nothing {
         activeInt = 1
     }
 
-    connection(
-        
-    ).execute(
+    connection().execute(
         "UPDATE sliders SET is_active = ? WHERE id = ?"
         [MySQL.fromInt(activeInt), MySQL.fromInt(id)]
     )
 }
 
 slidersDelete: Function := (id: Int) -> Nothing {
-    connection(
-        
-    ).execute("DELETE FROM sliders WHERE id = ?", [MySQL.fromInt(id)])
+    connection().execute(
+        "DELETE FROM sliders WHERE id = ?"
+        [MySQL.fromInt(id)]
+    )
 }

@@ -387,7 +387,8 @@ query builder, or migration framework. A query row is
 `Pair<String, SQLiteValue>`. SQL `NULL` is a `SQLiteValue` of kind `Null`,
 not AhdCode `null`. Wrong-kind accessors raise `SQLiteError`. `BLOB` is
 unsupported. Duplicate result-column labels raise `SQLiteError`; use `AS`.
-Do not invent a shared `Database` interface for a future MySQL module.
+Do not invent a shared `Database` interface across SQLite, MySQL, and
+PostgreSQL.
 
 The correct insert is:
 
@@ -531,6 +532,40 @@ a daemon, a worker queue, or an HTTP endpoint just to trigger work unless the
 application genuinely needs scheduling outside a running AhdCode program — and
 then ask first. `Scheduler.run` blocks like a Web server, so put jobs in a
 second program beside `app.ahd`. See [`docs/CRON.md`](docs/CRON.md).
+
+**PostgreSQL placeholders are `$1`, `$2`, …, never `?`.** `bring PostgreSQL`
+binds `PostgreSQL.fromString`/`fromInt`/`fromReal`/`fromBool`/`nullValue`
+values; there is no `fromBinary`, `lastInsertId`, ORM, or connection string —
+read generated values with `RETURNING` through `query`. Cast ambiguous text in
+SQL (`$1::uuid`, `$1::numeric`). One call runs one statement. After a failed
+statement the transaction is aborted and `commit()` raises; catch it and call
+`rollback()`. Do not tell users to set `PGHOST`, `PGPASSWORD`, or `~/.pgpass`:
+only `PostgreSQL.connect` arguments choose the server. Read the password with
+`Env.secret`. See [`docs/POSTGRESQL.md`](docs/POSTGRESQL.md).
+
+**A UUID is a `UUIDValue`, compared with `equals`/`compare`, not `==`.**
+`UUID.v4()` and `UUID.v7()` create them, `UUID.parse` accepts only the
+36-character form, and `value.string()` is the text (`str(value)` is
+`<UUIDValue>`). A UUID is never a secret — use `Security.token()` for
+secrets — and `Identity.id()` is a different, unchanged identifier with no
+conversion between them. See [`docs/UUID.md`](docs/UUID.md).
+
+**WebSocket support is server-side, text-only, and serialized.**
+`HTTP.websocket(onMessage)` with `withOpen`/`withClose`/`withAccept` and
+`Server.websocket` or `App.websocket` register an endpoint; there is no
+WebSocket client, no binary message, and no registration on `RouteSet`.
+Callbacks hold the same mutex as HTTP handlers, so keep them short and keep
+the socket registry in an ordinary `Pair<String, WebSocket>` removed in
+`onClose`. `send` never blocks and returns `false` when it cannot queue.
+Authenticate in `withAccept` before the upgrade; keep the same-origin default
+unless the user names exact origins. Do not add goroutines, channels, or an
+event-bus layer, and do not promise automatic reconnection — the browser page
+reconnects itself. See [`docs/WEBSOCKET.md`](docs/WEBSOCKET.md).
+
+**Read deployment secrets with `Env.secret(name)`.** It returns `NAME`, or the
+contents of the file named by `NAME_FILE`, or `null`; both set is an
+`EnvError`. Never print or log the value. See
+[`docs/ENV.md`](docs/ENV.md#secret).
 
 ## Completion report
 

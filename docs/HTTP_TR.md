@@ -32,6 +32,8 @@ from HTTP bring Session
 from HTTP bring Client
 from HTTP bring ClientRequest
 from HTTP bring ClientResponse
+from HTTP bring WebSocket
+from HTTP bring WebSocketEndpoint
 ```
 
 `HTTP` küçük, tipli yerel bir web sunucusu **ve** giden bir HTTP/HTTPS
@@ -41,8 +43,9 @@ taraflı `SessionStore` ekler. v0.6.0, dış HTTP ve HTTPS API'lerini çağırma
 için `Client`, `ClientRequest` ve `ClientResponse` ekler. v0.9.1, diskteki bir
 dosya için ikili-güvenli yanıtlar sağlayan `HTTP.file` ve `HTTP.download`
 ekler. Sunucu `Request`/`Response` ile giden `ClientRequest`/`ClientResponse`
-ayrı türlerdir.
-Middleware, yönlendirici DSL'si, multipart, WebSocket, yol parametresi, kimlik
+ayrı türlerdir. v1.4.0, aynı `Server` üzerinde WebSocket sunucu uç noktaları
+ekler; bkz. [WebSocket](WEBSOCKET_TR.md).
+Middleware, yönlendirici DSL'si, multipart, yol parametresi, kimlik
 doğrulama çerçevesi veya yapay zeka satıcı modülü yoktur. Uygulama, AhdCode
 çalışma zamanının içindeki Go `net/http` paketini kullanır; ayrı bir HTTP,
 çerez, oturum veya istemci yardımcı süreci yoktur.
@@ -57,6 +60,7 @@ HTTP.html(body: String, status: Int := 200)                        -> Response
 HTTP.redirect(location: String, status: Int := 303)                -> Response
 HTTP.file(path: String, contentType: String)                       -> Response
 HTTP.download(path: String, contentType: String, fileName: String) -> Response
+HTTP.websocket(onMessage: Function(WebSocket, String) -> Nothing)  -> WebSocketEndpoint
 HTTP.cookie(name: String, value: String)                           -> Cookie
 HTTP.deleteCookie(name: String, path: String := "/")               -> Cookie
 HTTP.sessions(
@@ -93,6 +97,7 @@ Server.post(path: String, handler: Function)  -> Nothing
 Server.route(method: String, path: String, handler: Function) -> Nothing
 Server.static(prefix: String, root: String)   -> Nothing
 Server.managed(prefix: String, root: String)  -> Nothing
+Server.websocket(path: String, endpoint: WebSocketEndpoint) -> Nothing
 Server.applyWebLimits()                       -> Nothing
 Server.start()                                -> Nothing
 
@@ -545,11 +550,21 @@ port değişince `Authorization` ve `Cookie` iletilmez.
 değil. Sunucu sonraki isteklere hizmet etmeye devam eder. 400 ve üzeri HTTP
 durum kodu tek başına `HTTPError` değildir.
 
+## WebSocket uç noktaları
+
+v1.4.0 WebSocket sunucu uç noktaları ekler. `HTTP.websocket(onMessage)`
+değiştirilemez bir `WebSocketEndpoint` kurar; `withOpen`, `withClose`,
+`withAccept`, `withAllowedOrigins` ve üç sınır yapılandırılmış kopyalar
+döndürür; `Server.websocket(path, endpoint)` onu `start()` çağrısından önce
+kaydeder. [WebSocket rehberi](WEBSOCKET_TR.md) yüzeyi, el sıkışmayı ve yaşam
+döngüsünü, kökenleri, sınırları ve ters vekil arkasında dağıtımı anlatır.
+
 ## Eşzamanlılık
 
 Go `net/http` bağlantıları eşzamanlı kabul eder. Bir `Server` üzerindeki
 AhdCode işleyicileri dışa kapalı bir kilit ile **serileştirilir**. Aynı
-sunucuda iki işleyici aynı anda çalışmaz.
+sunucuda iki işleyici aynı anda çalışmaz; WebSocket geri çağrıları da aynı
+kilidi paylaşır.
 
 ## Bu modülün yapmadıkları
 

@@ -30,27 +30,37 @@ type GeneratedProgram struct {
 	// RequiresCodes reports that the program uses QR or barcode encoding, so
 	// its workspace needs the vendored encoder source.
 	RequiresCodes bool
+	// RequiresWebSocket reports that the program registers a WebSocket
+	// endpoint, so its workspace needs the vendored WebSocket source.
+	RequiresWebSocket bool
+	// RequiresPostgreSQL reports that the program uses PostgreSQL, so its
+	// workspace needs the vendored pgx dependency graph.
+	RequiresPostgreSQL bool
 }
 
 const (
-	programFileName         = "ahdcode_program.go"
-	runtimeFileName         = "ahdcode_runtime.go"
-	excelRuntimeFileName    = "ahdcode_excel_runtime.go"
-	pdfRuntimeFileName      = "ahdcode_pdf_runtime.go"
-	archiveRuntimeFileName  = "ahdcode_archive_runtime.go"
-	sqliteRuntimeFileName   = "ahdcode_sqlite_runtime.go"
-	httpRuntimeFileName     = "ahdcode_http_runtime.go"
-	htmlRuntimeFileName     = "ahdcode_html_runtime.go"
-	smtpRuntimeFileName     = "ahdcode_smtp_runtime.go"
-	mysqlRuntimeFileName    = "ahdcode_mysql_runtime.go"
-	securityRuntimeFileName = "ahdcode_security_runtime.go"
-	identityRuntimeFileName = "ahdcode_identity_runtime.go"
-	bitsRuntimeFileName     = "ahdcode_bits_runtime.go"
-	charactersRuntimeFile   = "ahdcode_characters_runtime.go"
-	cronRuntimeFileName     = "ahdcode_cron_runtime.go"
-	codesRuntimeFileName    = "ahdcode_codes_runtime.go"
-	svgRuntimeFileName      = "ahdcode_svg_runtime.go"
-	documentRuntimeFileName = "ahdcode_document_runtime.go"
+	programFileName              = "ahdcode_program.go"
+	runtimeFileName              = "ahdcode_runtime.go"
+	excelRuntimeFileName         = "ahdcode_excel_runtime.go"
+	pdfRuntimeFileName           = "ahdcode_pdf_runtime.go"
+	archiveRuntimeFileName       = "ahdcode_archive_runtime.go"
+	sqliteRuntimeFileName        = "ahdcode_sqlite_runtime.go"
+	httpRuntimeFileName          = "ahdcode_http_runtime.go"
+	websocketRuntimeFileName     = "ahdcode_websocket_runtime.go"
+	websocketConnRuntimeFileName = "ahdcode_websocket_conn_runtime.go"
+	htmlRuntimeFileName          = "ahdcode_html_runtime.go"
+	smtpRuntimeFileName          = "ahdcode_smtp_runtime.go"
+	mysqlRuntimeFileName         = "ahdcode_mysql_runtime.go"
+	postgresqlRuntimeFileName    = "ahdcode_postgresql_runtime.go"
+	securityRuntimeFileName      = "ahdcode_security_runtime.go"
+	identityRuntimeFileName      = "ahdcode_identity_runtime.go"
+	uuidRuntimeFileName          = "ahdcode_uuid_runtime.go"
+	bitsRuntimeFileName          = "ahdcode_bits_runtime.go"
+	charactersRuntimeFile        = "ahdcode_characters_runtime.go"
+	cronRuntimeFileName          = "ahdcode_cron_runtime.go"
+	codesRuntimeFileName         = "ahdcode_codes_runtime.go"
+	svgRuntimeFileName           = "ahdcode_svg_runtime.go"
+	documentRuntimeFileName      = "ahdcode_document_runtime.go"
 )
 
 // storage describes the Go representation chosen for one IR symbol.
@@ -80,6 +90,11 @@ type generator struct {
 	usesSQLite  bool
 	usesMySQL   bool
 	usesCodes   bool
+	// usesWebSocket is set where a program creates an endpoint with
+	// HTTP.websocket, the only way a WebSocket route can exist.
+	usesWebSocket bool
+	// usesPostgreSQL is set by any PostgreSQL function or member.
+	usesPostgreSQL bool
 	// frames tracks the enclosing loop and attempt structure so break,
 	// continue, and return transfer through error handling correctly.
 	frames []frame
@@ -142,6 +157,10 @@ func Generate(compilation *ir.Compilation) (*GeneratedProgram, []diagnostics.Dia
 	if err != nil {
 		return nil, append(generator.diagnostics, backendError(CodeFormatFailure, "embedded HTTP runtime source is not valid Go: "+err.Error(), source.Span{}, "the HTTP backend runtime must remain gofmt-clean"))
 	}
+	websocketRuntime, err := format.Source([]byte(websocketRuntimeSource()))
+	if err != nil {
+		return nil, append(generator.diagnostics, backendError(CodeFormatFailure, "embedded WebSocket runtime source is not valid Go: "+err.Error(), source.Span{}, "the WebSocket backend runtime must remain gofmt-clean"))
+	}
 	htmlRuntime, err := format.Source([]byte(htmlRuntimeSource()))
 	if err != nil {
 		return nil, append(generator.diagnostics, backendError(CodeFormatFailure, "embedded HTML runtime source is not valid Go: "+err.Error(), source.Span{}, "the HTML backend runtime must remain gofmt-clean"))
@@ -157,6 +176,10 @@ func Generate(compilation *ir.Compilation) (*GeneratedProgram, []diagnostics.Dia
 	identityRuntime, err := format.Source([]byte(identityRuntimeSource()))
 	if err != nil {
 		return nil, append(generator.diagnostics, backendError(CodeFormatFailure, "embedded Identity runtime source is not valid Go: "+err.Error(), source.Span{}, "the Identity backend runtime must remain gofmt-clean"))
+	}
+	uuidRuntime, err := format.Source([]byte(uuidRuntimeSource()))
+	if err != nil {
+		return nil, append(generator.diagnostics, backendError(CodeFormatFailure, "embedded UUID runtime source is not valid Go: "+err.Error(), source.Span{}, "the UUID backend runtime must remain gofmt-clean"))
 	}
 	bitsRuntime, err := format.Source([]byte(bitsRuntimeSource()))
 	if err != nil {
@@ -178,10 +201,12 @@ func Generate(compilation *ir.Compilation) (*GeneratedProgram, []diagnostics.Dia
 		{Name: archiveRuntimeFileName, Content: string(archiveRuntime)},
 		{Name: sqliteRuntimeFileName, Content: string(sqliteRuntime)},
 		{Name: httpRuntimeFileName, Content: string(httpRuntime)},
+		{Name: websocketRuntimeFileName, Content: string(websocketRuntime)},
 		{Name: htmlRuntimeFileName, Content: string(htmlRuntime)},
 		{Name: smtpRuntimeFileName, Content: string(smtpRuntime)},
 		{Name: securityRuntimeFileName, Content: string(securityRuntime)},
 		{Name: identityRuntimeFileName, Content: string(identityRuntime)},
+		{Name: uuidRuntimeFileName, Content: string(uuidRuntime)},
 		{Name: bitsRuntimeFileName, Content: string(bitsRuntime)},
 		{Name: charactersRuntimeFile, Content: string(charactersRuntime)},
 		{Name: cronRuntimeFileName, Content: string(cronRuntime)},
@@ -218,9 +243,27 @@ func Generate(compilation *ir.Compilation) (*GeneratedProgram, []diagnostics.Dia
 		}
 		files = append(files, GeneratedFile{Name: codesRuntimeFileName, Content: string(codesRuntime)})
 	}
+	// ahdcode_websocket_conn_runtime.go imports the vendored WebSocket library,
+	// so it joins only a program that creates a WebSocket endpoint.
+	if generator.usesWebSocket {
+		connRuntime, err := format.Source([]byte(websocketConnRuntimeSource()))
+		if err != nil {
+			return nil, append(generator.diagnostics, backendError(CodeFormatFailure, "embedded WebSocket connection runtime source is not valid Go: "+err.Error(), source.Span{}, "the WebSocket backend runtime must remain gofmt-clean"))
+		}
+		files = append(files, GeneratedFile{Name: websocketConnRuntimeFileName, Content: string(connRuntime)})
+	}
+	// ahdcode_postgresql_runtime.go imports the vendored pgx graph, so it joins
+	// only a program that uses PostgreSQL.
+	if generator.usesPostgreSQL {
+		postgresqlRuntime, err := format.Source([]byte(postgresqlRuntimeSource()))
+		if err != nil {
+			return nil, append(generator.diagnostics, backendError(CodeFormatFailure, "embedded PostgreSQL runtime source is not valid Go: "+err.Error(), source.Span{}, "the PostgreSQL backend runtime must remain gofmt-clean"))
+		}
+		files = append(files, GeneratedFile{Name: postgresqlRuntimeFileName, Content: string(postgresqlRuntime)})
+	}
 	return &GeneratedProgram{Files: files,
 		RequiresLatex: generator.usesLatex, RequiresPlot: generator.usesPlot, RequiresNumeric: generator.usesNumeric, RequiresSQLite: generator.usesSQLite, RequiresMySQL: generator.usesMySQL,
-		RequiresCodes: generator.usesCodes}, generator.diagnostics
+		RequiresCodes: generator.usesCodes, RequiresWebSocket: generator.usesWebSocket, RequiresPostgreSQL: generator.usesPostgreSQL}, generator.diagnostics
 }
 
 func codesRuntimeSource() string {
@@ -252,6 +295,18 @@ func httpRuntimeSource() string {
 	return strings.Replace(ahdruntime.HTTPSource, "package ahdruntime", "package main", 1)
 }
 
+func websocketRuntimeSource() string {
+	return strings.Replace(ahdruntime.WebSocketSource, "package ahdruntime", "package main", 1)
+}
+
+func websocketConnRuntimeSource() string {
+	return strings.Replace(ahdruntime.WebSocketConnSource, "package ahdruntime", "package main", 1)
+}
+
+func postgresqlRuntimeSource() string {
+	return strings.Replace(ahdruntime.PostgreSQLSource, "package ahdruntime", "package main", 1)
+}
+
 func htmlRuntimeSource() string {
 	return strings.Replace(ahdruntime.HTMLSource, "package ahdruntime", "package main", 1)
 }
@@ -266,6 +321,10 @@ func securityRuntimeSource() string {
 
 func identityRuntimeSource() string {
 	return strings.Replace(ahdruntime.IdentitySource, "package ahdruntime", "package main", 1)
+}
+
+func uuidRuntimeSource() string {
+	return strings.Replace(ahdruntime.UUIDSource, "package ahdruntime", "package main", 1)
 }
 
 func bitsRuntimeSource() string {
@@ -527,6 +586,7 @@ func (generator *generator) emitProgram() string {
 	generator.emitXMLHelpers(writer)
 	generator.emitSQLiteHelpers(writer)
 	generator.emitMySQLHelpers(writer)
+	generator.emitPostgreSQLHelpers(writer)
 	generator.emitHTTPHelpers(writer)
 	generator.emitHTMLHelpers(writer)
 	generator.emitSMTPHelpers(writer)

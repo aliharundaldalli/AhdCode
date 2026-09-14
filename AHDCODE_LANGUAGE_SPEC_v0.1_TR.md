@@ -6339,6 +6339,203 @@ fırlatır; PDF, `image` çağrıldığında dönüştürür ve `PDFError` fırl
 en çok 5 MiB, 100.000 öğe, 64 iç içe seviye ve 2.000.000 path parçasıyla
 sınırlıdır.
 
+## 74. UUID Standart Modülü (v1.4.0)
+
+`bring UUID`, derleyicinin sağladığı `builtin:UUID` modülüne çözülür; kardeş bir
+dosya onu gölgeleyemez. Modül sözdizimi eklemez.
+
+```text
+UUID.v4()                  -> UUIDValue
+UUID.v7()                  -> UUIDValue
+UUID.parse(text: String)   -> UUIDValue
+UUID.isValid(text: String) -> Bool
+UUID.zero()                -> UUIDValue
+
+UUIDValue.string()                  -> String
+UUIDValue.version()                 -> Int
+UUIDValue.isZero()                  -> Bool
+UUIDValue.equals(other: UUIDValue)  -> Bool
+UUIDValue.compare(other: UUIDValue) -> Int
+```
+
+`UUIDValue`, tek gizli alanı olan ve genel kurucusu bulunmayan değiştirilemez,
+derleyicinin sağladığı bir sınıftır; üyeleri yalnızca konumsal tür işlemleridir.
+`String`'e ya da `String`'den örtük dönüşüm yoktur. `==` her yerleşik sınıftaki
+kimlik anlamını korur ve bir `UUIDValue`'nun `str` karşılığı `<UUIDValue>`'dur;
+kanonik metin `string()`'dir.
+
+UUID metni tam 36 karakterdir: 8, 13, 18 ve 23. konumlarda `-` bulunan,
+8-4-4-4-12 gruplarında onaltılık rakamlar. Girişte rakamların büyük küçük harf
+ayrımı yoktur; `string()` küçük harftir. Boşluk, süslü parantez, `urn:uuid:`
+ön eki ve 32 rakamlı biçim reddedilir. Sürümü ya da varyantı ne olursa olsun
+her 128 bitlik değer ayrıştırılır. `parse`, girdiyi tekrarlamadan `UUIDError`
+fırlatır; `isValid` hiç fırlatmaz. `version()`, yazıldığı hâliyle 4 bitlik sürüm
+alanıdır. `isZero()` yalnızca tüm bitleri sıfır olan `UUID.zero()` için
+doğrudur. `equals` 128 bitin tamamını karşılaştırır; `compare`, küçük harfli
+metin sırasıyla aynı olan RFC 9562 bayt sırasına göre `-1`, `0` ya da `1`
+döndürür.
+
+`v4`, 122 biti işletim sisteminin kriptografik rastgele kaynağından alır ve
+sürüm 4 ile `10` varyantını ayarlar. `v7`, RFC 9562 §5.7'yi izler: 48 bitlik Unix
+milisaniyesi ile 12 bitlik milisaniye altı kesir 60 bitlik bir saat değeri
+oluşturur; ardından 62 rastgele bit, sürüm 7 ve `10` varyantı gelir. Tek bir
+süreç içinde her `v7` değeri bir öncekinden kesinlikle büyüktür; duvar saati
+geriye gitse bile, çünkü sonraki saat değeri o anki zaman ile son değerin bir
+fazlasından büyük olanıdır. Milisaniyede 4096'nın üzerinde sürekli üretim, gömülü
+zamanı saatin önüne geçirir. Aynı milisaniye içinde süreçler arası sıra, tam
+oluşturulma zamanı ve tahmin edilemezlik sağlanmaz. 1970 ile 48 bitlik
+milisaniye aralığının dışındaki bir saat ve rastgelelik hatası, `Error`'dan
+türeyen `UUIDError` fırlatır. `Identity.id()` ve `Security.token()` değişmemiştir
+ve bunlarla `UUIDValue` arasında dönüşüm yoktur.
+
+## 75. Env.secret (v1.4.0)
+
+```text
+Env.secret(name: String) -> String?
+```
+
+| `NAME` | `NAME_FILE` | Sonuç |
+| --- | --- | --- |
+| yok | yok | `null` |
+| var (`""` bile olsa) | yok | `NAME` değeri |
+| yok | boş olmayan bir yol | dosyanın içeriği |
+| yok | `""` | `EnvError` |
+| var | var | `EnvError` |
+
+`name`, `Env.set`'in doğruladığı biçimde doğrulanır. Yol olduğu gibi, çalışma
+dizinine göre kullanılır ve sembolik bağlantılar izlenir. Dosya en fazla 1 MiB,
+geçerli UTF-8 ve NUL baytı içermeyen bir dosya olmalıdır; sondaki tam olarak bir
+`\n` ya da `\r\n` kaldırılır ve başka hiçbir şey kırpılmaz. Eksik ya da
+okunamayan bir dosya `EnvError` fırlatır ve asla `NAME`'e geri dönmez. Mesajlar
+değişkeni adlandırır; değeri, dosyanın içeriğini ya da yolu asla içermez.
+
+## 76. PostgreSQL Standart Modülü (v1.4.0)
+
+`bring PostgreSQL`, derleyicinin sağladığı `builtin:PostgreSQL` modülüne
+çözülür; kardeş bir dosya onu gölgeleyemez.
+
+```text
+PostgreSQL.connect(host: String, username: String, password: String,
+                   port: Int = 5432, database: String? = null,
+                   security: String = "tls", timeoutSeconds: Int = 10) -> PostgreSQLDatabase
+PostgreSQL.nullValue()               -> PostgreSQLValue
+PostgreSQL.fromInt(value: Int)       -> PostgreSQLValue
+PostgreSQL.fromReal(value: Real)     -> PostgreSQLValue
+PostgreSQL.fromString(value: String) -> PostgreSQLValue
+PostgreSQL.fromBool(value: Bool)     -> PostgreSQLValue
+
+PostgreSQLDatabase.ping()                                            -> Nothing
+PostgreSQLDatabase.execute(sql: String, params: List<PostgreSQLValue> = []) -> PostgreSQLResult
+PostgreSQLDatabase.query(sql: String, params: List<PostgreSQLValue> = [])   -> List<Pair<String, PostgreSQLValue>>
+PostgreSQLDatabase.begin()                                           -> PostgreSQLTransaction
+PostgreSQLDatabase.close()                                           -> Nothing
+PostgreSQLTransaction.execute / query                                (aynı biçimler)
+PostgreSQLTransaction.commit()                                       -> Nothing
+PostgreSQLTransaction.rollback()                                     -> Nothing
+PostgreSQLResult.affectedRows()                                      -> Int
+PostgreSQLValue.kind() -> String, isNull() -> Bool, bool() -> Bool, int() -> Int,
+real() -> Real, string() -> String, isBinary() -> Bool, binarySize() -> Int,
+binaryBase64() -> String
+```
+
+Beş sınıfın hepsi opaktır. `connect`, dönmeden önce `timeoutSeconds` içinde
+bağlanır, kimlik doğrular ve ping atar. `security` tam olarak `"tls"` (TLS 1.2 ya
+da daha yenisi, yalnızca `SSL_CERT_FILE` ile genişletilen sistem güven kökleri,
+doğrulanan ana makine adı) ya da `"none"`'dır. `port` `1..65535`'tir;
+`timeoutSeconds` `1..9223372036`'dır ve bağlanmayı, TLS el sıkışmasını ve her
+ifadeyi sınırlar; daha uzun süren ifade sunucuda iptal edilir. `database` için
+`null` ya da `""` sunucu varsayılanını seçer. Bağlantıyı yalnızca bu argümanlar
+seçer: `PG*` ortam değişkenleri, parola dosyaları, istemci sertifikaları ve servis
+dosyalarının etkisi yoktur; tek istisna, okunamayan bir servisi gösteren
+`PGSERVICE`'in `connect`'i bunu belirten bir mesajla başarısız kılmasıdır.
+
+Yer tutucular `$1..$n`'dir; SQL metni asla yeniden yazılmaz. Her çağrı
+genişletilmiş protokolle adsız tek bir ifade hazırlar ve değerlerini sunucunun
+bağlama göre dönüştürdüğü metin olarak bağlar; bir çağrıda birden fazla ifade
+başarısız olur ve parametre sayısı yer tutucularla eşleşmelidir. İfade
+önbelleği ve `lastInsertId` yoktur; üretilen değerler `RETURNING` ile okunur.
+Sonuç sütunları bildirilen türe göre eşlenir: NULL `Null`'a; `boolean` `Bool`'a;
+`smallint`, `integer`, `bigint` `Int`'e; `real`, `double precision` `Real`'e, NaN
+ve sonsuzluklar hata verir; `bytea` `Binary`'ye; `date` `YYYY-MM-DD`'ye,
+`timestamp` `YYYY-MM-DD HH:MM:SS[.ffffff]`'e, `timestamptz` ise aynı biçimde
+UTC ve `+00` ile; bunlar ikili biçimde okunur, bu yüzden oturumun `DateStyle` ve
+`TimeZone` ayarları onları değiştirmez ve PostgreSQL'in `infinity` ile MÖ
+yazımları korunur; `numeric`, `uuid`, `json`, `jsonb` ve diğer tüm skalerler
+sunucunun metni olarak `String`'e. Diziler ve bileşik ya da record değerler
+sütunu adlandırarak hata verir. Yinelenen sütun etiketleri ve yanlış türdeki
+erişimciler hata verir.
+
+`begin()`, havuzdan bir bağlantıyı `READ COMMITTED` bir işlemde sabitler.
+Başarısız bir ifadeden sonra işlemdeki sonraki her ifade hata verir; böyle bir
+işlemin `commit()`'i hata verir ve işlemi bitirir, başarısız bir `commit()`
+sonrasındaki `rollback()` hiçbir şey yapmaz. Bunun dışında `commit` ve
+`rollback` tek kullanımlıktır. Veritabanı eşzamanlı kullanıma uygun bir
+bağlantı havuzudur. `close()` açık işlemleri geri alır, tekrarlanabilir ve
+sonraki her kullanımı hatalı kılar. Her hata `Error`'dan türeyen
+`PostgreSQLError`'dır ve kategorileri bağlantı başarısız, bağlantı zaman aşımı,
+TLS doğrulaması başarısız, sorgu başarısız, çalıştırma başarısız ve işlem
+başarısızdır; sunucu hataları SQLSTATE ile birincil mesajı ekler ama `DETAIL`,
+`HINT` ya da `WHERE`'i asla eklemez ve hiçbir mesaj parolayı içermez. İstemci,
+PostgreSQL programının çevrimdışı derlenmesi için gömülü olan
+`github.com/jackc/pgx/v5` v5.11.0'dır; PostgreSQL kullanmayan bir program onu
+almaz.
+
+## 77. HTTP'de WebSocket Sunucu Uç Noktaları (v1.4.0)
+
+```text
+HTTP.websocket(onMessage: Function(WebSocket, String) -> Nothing) -> WebSocketEndpoint
+WebSocketEndpoint.withOpen(handler: Function(WebSocket, Request) -> Nothing)      -> WebSocketEndpoint
+WebSocketEndpoint.withClose(handler: Function(WebSocket, Int, String) -> Nothing) -> WebSocketEndpoint
+WebSocketEndpoint.withAccept(check: Function(Request) -> Response?)               -> WebSocketEndpoint
+WebSocketEndpoint.withAllowedOrigins(origins: List<String>)                       -> WebSocketEndpoint
+WebSocketEndpoint.withMaxMessageBytes(bytes: Int)                                 -> WebSocketEndpoint
+WebSocketEndpoint.withMaxQueuedMessages(count: Int)                               -> WebSocketEndpoint
+WebSocketEndpoint.withMaxConnections(count: Int)                                  -> WebSocketEndpoint
+Server.websocket(path: String, endpoint: WebSocketEndpoint) -> Nothing
+WebSocket.id() -> String
+WebSocket.send(text: String) -> Bool
+WebSocket.close(code: Int = 1000, reason: String = "") -> Nothing
+WebSocket.isOpen() -> Bool
+Web.websocket(onMessage: Function(WebSocket, String) -> Nothing) -> WebSocketEndpoint
+App.websocket(path: String, endpoint: WebSocketEndpoint) -> Nothing
+```
+
+`WebSocketEndpoint` değiştirilemez bir yapılandırmadır. Varsayılanlar
+`maxMessageBytes` 65536 (`1..16777216`), `maxQueuedMessages` 64 (`1..4096`) ve
+`maxConnections` 1024'tür (`1..1000000`); aralık dışı bir değer, bozuk ya da
+joker bir köken, `start()` sonrasında kayıt veya aynı zamanda bir `GET` rotası
+olan yol `HTTPError` fırlatır. `Web`, `WebSocket` ve `WebSocketEndpoint`'i yeniden
+dışa aktarır; uç noktalar `RouteSet` ya da `RouteGroup` üzerine kaydedilmez.
+
+Bir uç nokta yoluna gelen `GET` şu sırayla işlenir: yükseltme başlıkları (yoksa
+`426`, bozuksa `400`); bağlantı sınırı (`503`); varsayılan olarak `Origin`
+başlığı olmayan ya da ana makinesi ve portu isteğin `Host` değerine eşit bir
+`Origin`'e izin veren, `withAllowedOrigins` ile ise küçük harfli tam
+`scheme://host[:port]` eşleşmesi isteyen köken politikası (`403`); döndürdüğü
+`Response` yükseltme olmadan gönderilen `withAccept` denetimi;
+`onOpen(socket, request)`; ve ardından `101` yanıtı; böylece bağlantıyı açık
+gören bir istemci `onOpen`'ın döndüğünü bilir. `onOpen` sonrasında yükseltme
+başarısız olursa `onClose(1006, "")` yine çalışır. `GET` dışındaki bir yöntem
+`405`'tir.
+
+Her geri çağrı, HTTP işleyicileriyle aynı sunucu başına kilidi tutar. Soket
+başına `onOpen` tam bir kez ve ilk, `onMessage` geliş sırasıyla, `onClose` tam bir
+kez ve son çalışır; sonraki mesaj ancak önceki geri çağrı döndükten sonra
+okunur. `send` hiç beklemez: soketin sınırlı kuyruğuna ekler ve soket kapanıyor
+ya da kapalıysa `false` döndürür; dolu bir kuyruk soketi `1008` ve
+`outbound queue full` ile kapatır. Yalnızca metin mesajları kabul edilir: ikili
+mesaj `1003`, geçersiz UTF-8 `1007`, `maxMessageBytes`'ı aşan mesaj `1009` ile
+kapatır. `close`, en fazla 123 UTF-8 baytlık bir nedenle `1000`, `1001`, `1008`,
+`1011` ve `3000..4999` kodlarını kabul eder, önce kuyruktaki mesajları gönderir
+ve el sıkışma için en fazla beş saniye bekler. Sunucu 30 saniyede bir ping atar
+ve 30 saniye daha pong gelmezse bağlantıyı kopmuş sayar; kopan bağlantı ya da
+takılan yazma, ağda asla gönderilmeyen `1006`'yı bildirir. `onOpen` ya da
+`onMessage` içinde oluşan bir hata stderr'e yazılır ve soketi `1011` ile
+kapatır; `onClose` yine çalışır. Sıkıştırma, alt protokoller, ikili mesajlar ve
+WebSocket istemcisi sağlanmaz. Protokol uygulaması gömülü
+`github.com/coder/websocket` v1.8.15'tir; uç nokta oluşturmayan bir program onu
+almaz.
+
 ---
 
 # AhdCode v0.1 Çekirdek Spesifikasyonu Sonu

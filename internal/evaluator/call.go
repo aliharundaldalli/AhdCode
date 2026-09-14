@@ -221,6 +221,10 @@ func (session *Session) builtin(identity ir.CallableID, receiver any, arguments 
 		return session.securityBuiltin(strings.TrimPrefix(name, "builtin:Security::"), values(arguments))
 	case strings.HasPrefix(name, "builtin:Identity::"):
 		return session.identityBuiltin(strings.TrimPrefix(name, "builtin:Identity::"), values(arguments))
+	case strings.HasPrefix(name, "builtin:UUID::"):
+		return session.uuidBuiltin(strings.TrimPrefix(name, "builtin:UUID::"), values(arguments))
+	case strings.HasPrefix(name, "builtin:PostgreSQL::"):
+		return session.postgresqlBuiltin(strings.TrimPrefix(name, "builtin:PostgreSQL::"), values(arguments))
 	}
 	session.raise("Error", "unsupported builtin "+name)
 	return nil
@@ -364,9 +368,14 @@ func (session *Session) core(name string, receiver any, arguments []any) any {
 		strings.HasPrefix(name, "MySQLResult.") || strings.HasPrefix(name, "MySQLValue.") {
 		return session.mysqlOperation(name, receiver, arguments)
 	}
+	if strings.HasPrefix(name, "PostgreSQLDatabase.") || strings.HasPrefix(name, "PostgreSQLTransaction.") ||
+		strings.HasPrefix(name, "PostgreSQLResult.") || strings.HasPrefix(name, "PostgreSQLValue.") {
+		return session.postgresqlOperation(name, receiver, arguments)
+	}
 	if strings.HasPrefix(name, "Server.") || strings.HasPrefix(name, "Request.") || strings.HasPrefix(name, "Response.") ||
 		strings.HasPrefix(name, "Cookie.") || strings.HasPrefix(name, "SessionStore.") || strings.HasPrefix(name, "Session.") ||
-		strings.HasPrefix(name, "Client.") || strings.HasPrefix(name, "ClientRequest.") || strings.HasPrefix(name, "ClientResponse.") || strings.HasPrefix(name, "UploadedFile.") {
+		strings.HasPrefix(name, "Client.") || strings.HasPrefix(name, "ClientRequest.") || strings.HasPrefix(name, "ClientResponse.") || strings.HasPrefix(name, "UploadedFile.") ||
+		strings.HasPrefix(name, "WebSocket.") || strings.HasPrefix(name, "WebSocketEndpoint.") {
 		return session.httpOperation(name, receiver, arguments)
 	}
 	if strings.HasPrefix(name, "HTMLDocument.") || strings.HasPrefix(name, "HTMLElement.") {
@@ -380,6 +389,9 @@ func (session *Session) core(name string, receiver any, arguments []any) any {
 	}
 	if strings.HasPrefix(name, "QRCode.") || strings.HasPrefix(name, "BarcodeCode.") {
 		return session.codesOperation(name, receiver, arguments)
+	}
+	if strings.HasPrefix(name, "UUIDValue.") {
+		return session.uuidOperation(name, receiver, arguments)
 	}
 	session.raise("Error", "unsupported Fundamentals operation "+name)
 	return nil
