@@ -76,6 +76,11 @@ says so and links to the reference page that lists every signature.
 - [54. Groups, guards, and the starters](#54-groups-guards-and-the-starters)
 - [55. Databases you can see: `ahdcode databases`](#55-databases-you-can-see-ahdcode-databases)
 - [56. Your application's local address](#56-your-applications-local-address)
+- [57. UUID: unique identifiers](#57-uuid-unique-identifiers)
+- [58. Reading secrets from files](#58-reading-secrets-from-files)
+- [59. PostgreSQL: a powerful network database](#59-postgresql-a-powerful-network-database)
+- [60. WebSocket: live connections](#60-websocket-live-connections)
+- [61. Putting it together: a realtime attendance app](#61-putting-it-together-a-realtime-attendance-app)
 
 ## 1. What is AhdCode?
 
@@ -2776,6 +2781,8 @@ write(port)
 
 Do not hard-code secrets into source files; a `.env` file that you do not commit is the usual place for local configuration.
 
+**Passwords on a server.** `Env.secret("DB_PASSWORD")`, added in v1.4.0, reads the value either from the `DB_PASSWORD` variable or from the file named by `DB_PASSWORD_FILE`, and returns `null` when neither is set. Docker and similar platforms hand passwords to programs this way, as files. The rules and examples are in [section 58](#58-reading-secrets-from-files).
+
 **Try it yourself:** Call `getOr` with a name you have not set and confirm you see the fallback, then `int(...)` that String.
 
 See [the Env module reference](ENV.md).
@@ -4134,6 +4141,36 @@ Seeing an error message is a normal part of programming. Most errors simply tell
 - Why: That splices the title into SQL. A title such as `Robert'); DROP TABLE notes;--` is no longer data.
 - Correct: Use a `?` placeholder and `SQLite.fromString(title)`. Parameter binding keeps the text as data.
 
+**22. Comparing UUIDs with `==`**
+- Wrong: `if id == otherId { ... }`
+- Why: `==` asks whether two variables point at the same object. Even two UUIDs parsed separately from the same text give `false`.
+- Correct: `if id.equals(otherId) { ... }`
+
+**23. Turning a UUID into text with `str(...)`**
+- Wrong: `write("id: " + str(id))`
+- Why: `str` writes `<UUIDValue>` for built-in classes, not the UUID itself.
+- Correct: `write("id: " + id.string())`
+
+**24. Using the `?` placeholder in PostgreSQL**
+- Wrong: `db.query("SELECT name FROM students WHERE email = ?", [PostgreSQL.fromString(email)])`
+- Why: PostgreSQL's placeholders are numbered. `?` is not a placeholder there, and the query is rejected with an error such as `(42601) syntax error`.
+- Correct: `WHERE email = $1`
+
+**25. Continuing a PostgreSQL transaction after an error**
+- Wrong: Catching an error from `transaction.execute(...)`, carrying on with the same transaction, and expecting `commit()` to save the rest.
+- Why: PostgreSQL aborts the transaction at the first error. Every later statement fails with `(25P02)`, and `commit()` saves nothing.
+- Correct: Call `rollback()` when you catch the error; start again with a new `db.begin()` if needed.
+
+**26. Forgetting to remove a WebSocket from the registry**
+- Wrong: Adding the connection to a `Pair` in `withOpen` but never writing `withClose`.
+- Why: Closed connections stay in the registry, `send` returns `false` for them, and the registry keeps growing.
+- Correct: In `withClose`, `registry = KeyValue.without(registry, socket.id())`.
+
+**27. Doing long work inside a WebSocket callback**
+- Wrong: Doing something that takes seconds inside the message callback, such as waiting for a slow external API.
+- Why: Callbacks and HTTP handlers on the same server run one at a time. If one waits, every request and connection waits.
+- Correct: Keep callbacks short. A quick database query is fine; a long wait is not.
+
 ## 46. Small Projects
 
 These small projects bring together what is taught in the guide. Try building them on your own!
@@ -4147,6 +4184,9 @@ These small projects bring together what is taught in the guide. Try building th
 7. **Seeded Random Game**: Generate a "secret number" between 1 and 100 using `Math.seed(42)`. Ask the user to guess the number. Guide them with "higher" or "lower" until they guess correctly. Because a seed is used, the secret number will be the same every time you run the program—perfect for testing!
 8. **SQLite Notes App**: Open `notes.db`, create a `notes` table if it is missing, and let the user add a note, list notes, search by title, update a note, and delete a note. Use `?` parameters for every value. Close the program and run it again: the old notes must still be there.
 9. **Web Notes App**: Serve notes in a browser on `127.0.0.1`. List notes with `HTML.text`, add a note with POST `/notes` and bound SQLite parameters, then redirect to `/`. Dynamic text must not be concatenated into raw HTML.
+10. **Live Chat Room**: Improve the chat room from 60.4. Send messages as JSON (`type`, `name`, `text`), show join and leave notices in a different color in the browser, reject empty messages and messages longer than 300 characters, and list who is in the room with a `/who` command.
+11. **PostgreSQL Grade Book**: Add a `grades` table to the `students` table from section 59 (`id uuid`, `student_id uuid REFERENCES students(id)`, `course text`, `score numeric(5, 2)`). Write a program that adds students and grades, computes each student's average in SQL with `avg`, and saves all of a class's grades in a single transaction.
+12. **Live Poll**: Build a poll page that keeps the options and votes in PostgreSQL. After a vote is stored with `POST /vote`, send the current counts as JSON to every open page over a WebSocket, so the numbers change without reloading.
 
 ## 47. Exercises
 
@@ -4181,6 +4221,16 @@ Instead of immediately looking for full solutions, build each program in small s
 22. Serve `HTTP.text("ok")` on `GET /ok` at `127.0.0.1` and open it in a browser.
 23. Use `HTTP.client().get` on a public HTTPS page, print `status()`, and treat `HTTPError` separately from a 404 `ClientResponse`.
 
+### v1.4.0: UUIDs, secrets, PostgreSQL, and WebSocket
+24. Create five `UUID.v4()` values. Check that each `version()` is 4 and that no two are equal with `equals`.
+25. Ask the user for an identifier with `take()`. If it is valid, print its lower-case form; otherwise print "invalid id". The program must not stop with an error for any input.
+26. Write a program that reads `Env.secret("SMTP_PASSWORD")`: it prints a helpful message when there is no value, and only the length when there is one. Try it first with the variable, then with `SMTP_PASSWORD_FILE`.
+27. Create a `books` table in PostgreSQL (`id uuid`, `title text`, `price numeric(8, 2)`), add three books, and find the most expensive one with `ORDER BY price DESC LIMIT 1`.
+28. Give every book in the table from 27 a 10% discount, print `affectedRows()`, then read the new average with `round(avg(price), 2)`.
+29. Add two books in one transaction, and deliberately send `"not-an-id"` as the second book's `id`. After `rollback()`, print how many books the table holds.
+30. Write a WebSocket server on `/upper` that sends "hello" as soon as a connection opens and sends every incoming message back in upper case.
+31. Add an HTTP handler to the chat room from 60.4 that sends text arriving at `POST /admin` to everyone with an `[admin]` prefix. Protect the request with a token, as in 60.5.
+
 ## 48. Solution Hints
 
 1. The result of `take` is a String; use `int(...)` for age, and `+ 1` for the new age.
@@ -4206,6 +4256,14 @@ Instead of immediately looking for full solutions, build each program in small s
 21. `SQLite.open("notes.db")`, `CREATE TABLE IF NOT EXISTS`, `INSERT ... VALUES (?, ?)` with `SQLite.fromString`, then `query` with `ORDER BY id`. After `close()`, open the same path again.
 22. `HTTP.server("127.0.0.1", 8080)`, `app.get("/ok", handler)`, `HTTP.text("ok")`, then `app.start()`.
 23. `HTTP.client()`, `client.get("https://example.com/")`, `response.status()`. A 404 is still `ClientResponse`; a TLS or timeout failure is `HTTPError`.
+24. Put the ids in a `List<UUIDValue>` and compare every pair with `equals` in two nested loops (do not compare an id with itself).
+25. `UUID.isValid(text)` never raises. Ask it first, then print `UUID.parse(text).string()`.
+26. The result of `Env.secret` is a `String?`; use `len(...)` after the `null` check. When trying the file, remember to remove the variable with `Env.unset("SMTP_PASSWORD")`.
+27. Write the `$1::uuid` and `$3::numeric` casts. The `price` column is read with `string()`.
+28. `UPDATE books SET price = price * $1::numeric` with `PostgreSQL.fromString("0.90")`.
+29. Use the pattern from 59.7: two `execute` calls and `commit()` inside `attempt`, `rollback()` inside `except PostgreSQLError`. The count must match the count before the transaction.
+30. `socket.send("hello")` in `withOpen`, and `socket.send(text.upper())` in the message callback.
+31. HTTP handlers and WebSocket callbacks share the same lock, so the handler can call `sendToAll`. Read the token with `Env.secret` and compare it with `Security.secureEqual`.
 
 ## 49. Next steps and technical docs
 
@@ -4883,113 +4941,1692 @@ For deployment, `APP_HOST` and `APP_PROTOCOL` describe the *public* address
 and a real server in front of your application terminates HTTPS. The
 [Web guide](WEB.md#15-production) explains that split.
 
-## 57. Realtime web and data (v1.4.0)
+## 57. UUID: unique identifiers
 
-v1.4.0 adds four things that fit together: UUIDs, secrets read from files, a
-PostgreSQL module, and WebSocket endpoints that push updates to a browser.
-Each has a full reference; this section shows the idea of each in a few lines.
+The first of the four things v1.4.0 adds is the `UUID` module. The next
+sections cover secrets read from files (58), PostgreSQL (59), and WebSocket
+(60); section 61 puts all four together in one application.
 
-### 57.1 UUIDs
+### 57.1 Why do we need identifiers?
 
-A UUID is a 36-character identifier that databases and other programs
-understand. `UUID.v7()` makes one that starts with the current time, so newer
-ones sort after older ones.
+In section 35 every note got a number from `INTEGER PRIMARY KEY AUTOINCREMENT`:
+1, 2, 3. With one file and one program that works beautifully. Now think
+about these situations:
+
+- Two servers add a record at the same moment. If both decide the next number
+  is 5, two different records end up with the same number.
+- Someone who sees `/invoice/41` in the address bar starts trying
+  `/invoice/42`.
+- You want to give a record an identifier *before* it is written to the
+  database, for example in a message you send to a browser.
+
+A **UUID** (Universally Unique Identifier) is a 128-bit identifier that can be
+created anywhere without a central counter. As text it is always 36
+characters:
+
+```text
+01a0a0c9-8fa6-733f-9f09-81191abcce97
+^^^^^^^^ ^^^^ ^
+8        4    version digit (7 here)
+```
+
+The chance of the same UUID being created twice is so small that two servers
+can create identifiers without asking each other.
+
+### 57.2 Creating UUIDs: v4 and v7
 
 ```ahd
 bring UUID
 from UUID bring UUIDValue
 
-first: UUIDValue := UUID.v7()
-second: UUIDValue := UUID.v7()
-write(first.string())                 // 01a0a0c9-8fa6-733f-9f09-81191abcce97
-write(first.compare(second))          // -1: first was made earlier
-write(UUID.parse(first.string()).equals(first))   // true
+random: UUIDValue := UUID.v4()
+ordered: UUIDValue := UUID.v7()
+
+write(random.string())
+write(ordered.string())
+write("versions: " + str(random.version()) + " and " + str(ordered.version()))
 ```
 
-Two things to remember. Compare UUIDs with `equals`, not `==`: `==` asks
-whether two variables hold the *same object*. And a UUID is not a secret —
-anyone can read roughly when a v7 UUID was made. For secrets, keep using
-`Security.token()` (section 50). See [UUID](UUID.md).
+The output differs on every run, but its shape never changes:
 
-### 57.2 Secrets from files
+```text
+3f2b8c1e-9a4d-4f6b-8e21-5c7d9a0b1e44
+01a0a0c9-8fa6-733f-9f09-81191abcce97
+versions: 4 and 7
+```
 
-Servers often hand a password to a program as a *file*, and put the file's
-path in a variable ending in `_FILE`. `Env.secret` handles both styles:
+- `UUID.v4()` is completely random.
+- `UUID.v7()` starts with the current time and adds random bits after it. That
+  is why **a v7 created later always sorts later.** If you use it as a
+  database primary key, v7 is usually the better choice.
+
+A `UUIDValue` is not a `String`. Call `.string()` when you need the text.
+
+### 57.3 v7 values line up in creation order
 
 ```ahd
-bring Env
+bring UUID
+from UUID bring UUIDValue
 
-password: String? := Env.secret("DB_PASSWORD")
-if password == null {
-    write("Set DB_PASSWORD, or DB_PASSWORD_FILE to a file that holds it.")
+ids: List<UUIDValue> := []
+for i in between(0, 5) {
+    ids.add(UUID.v7())
+}
+
+inOrder: Bool := true
+for i in between(1, len(ids)) {
+    if ids[i - 1].compare(ids[i]) >= 0 {
+        inOrder = false
+    }
+}
+
+for id in ids {
+    write(id.string())
+}
+write("in creation order: " + str(inOrder))
+```
+
+`a.compare(b)` returns `-1` when `a` comes first, `0` when they are equal, and
+`1` when `a` comes later. Inside one program every `UUID.v7()` is greater than
+the one before, even if the computer's clock is set back. The same order holds
+for the text: sorting v7 strings alphabetically sorts them by creation time.
+
+Try the same loop with `UUID.v4()`: the result is usually `false`, because v4
+promises no order.
+
+### 57.4 From text to a UUID: `parse` and `isValid`
+
+An identifier that arrives from a user, an address, or a file is a `String`.
+`UUID.parse` turns it into a `UUIDValue`. The rules are strict: exactly 36
+characters in 8-4-4-4-12 groups separated by `-`. Upper case is accepted; the
+output is always lower case.
+
+```ahd
+bring UUID
+
+inputs: List<String> := [
+    "017F22E2-79B0-7CC3-98C4-DC0C0C07398F"
+    "017f22e2-79b0-7cc3-98c4-dc0c0c07398f"
+    r"{017f22e2-79b0-7cc3-98c4-dc0c0c07398f}"
+    "urn:uuid:017f22e2-79b0-7cc3-98c4-dc0c0c07398f"
+    "017f22e279b07cc398c4dc0c0c07398f"
+    " 017f22e2-79b0-7cc3-98c4-dc0c0c07398f"
+    "hello"
+]
+
+for text in inputs {
+    if UUID.isValid(text) {
+        write("valid   -> " + UUID.parse(text).string())
+    }
+    else {
+        write("invalid -> " + text)
+    }
 }
 ```
 
-It reads `DB_PASSWORD` if it is set, or else the file named by
-`DB_PASSWORD_FILE`. Setting both is an error, so you always know which one was
-used. See [Env](ENV.md#secret).
+Expected output:
 
-### 57.3 PostgreSQL
+```text
+valid   -> 017f22e2-79b0-7cc3-98c4-dc0c0c07398f
+valid   -> 017f22e2-79b0-7cc3-98c4-dc0c0c07398f
+invalid -> {017f22e2-79b0-7cc3-98c4-dc0c0c07398f}
+invalid -> urn:uuid:017f22e2-79b0-7cc3-98c4-dc0c0c07398f
+invalid -> 017f22e279b07cc398c4dc0c0c07398f
+invalid ->  017f22e2-79b0-7cc3-98c4-dc0c0c07398f
+invalid -> hello
+```
 
-PostgreSQL works like the MySQL module from section 51, with a few
-differences. Placeholders are numbered, `$1`, `$2`, …, and generated values
-come back through `RETURNING`:
+Why is the line with braces written as `r"..."`? A `{` inside an ordinary
+String starts interpolation (section 6). In a raw String, `{` is just a
+character.
+
+`isValid` never raises. `parse` raises `UUIDError` for invalid text, which you
+can catch as in section 18:
 
 ```ahd
+bring UUID
+from UUID bring (UUIDValue, UUIDError)
+
+readId: Function := (text: String) -> UUIDValue? {
+    attempt {
+        return UUID.parse(text)
+    }
+    except UUIDError as error {
+        write("rejected: " + error.message)
+        return null
+    }
+}
+
+found: UUIDValue? := readId("017f22e2-79b0-7cc3-98c4-dc0c0c07398f")
+if found != null {
+    write("found: " + found.string())
+}
+
+broken: UUIDValue? := readId("42")
+write("bad input returned null: " + str(broken == null))
+```
+
+The error message never repeats the rejected text, so a value typed by a user
+does not end up in your logs.
+
+### 57.5 Comparing two UUIDs: `equals`, `compare`, and the `==` trap
+
+```ahd
+bring UUID
+from UUID bring UUIDValue
+
+a: UUIDValue := UUID.parse("017f22e2-79b0-7cc3-98c4-dc0c0c07398f")
+b: UUIDValue := UUID.parse("017F22E2-79B0-7CC3-98C4-DC0C0C07398F")
+c: UUIDValue := a
+
+write(a.equals(b))
+write(a == b)
+write(a == c)
+write(a.compare(b))
+write(str(a))
+write(a.string())
+```
+
+Expected output:
+
+```text
+true
+false
+true
+0
+<UUIDValue>
+017f22e2-79b0-7cc3-98c4-dc0c0c07398f
+```
+
+- `equals` asks whether two UUIDs carry **the same 128 bits**. Use it whenever
+  you compare identifiers.
+- `==` follows the reference behavior from section 13: do two variables point
+  at **the same object**? `a` and `b` were parsed separately, so `false`;
+  `c := a` shares the object, so `true`.
+- `str(a)` writes `<UUIDValue>`, not the text. For the text, call
+  `a.string()`.
+
+### 57.6 The zero UUID
+
+```ahd
+bring UUID
+from UUID bring UUIDValue
+
+owner: UUIDValue := UUID.zero()
+write(owner.string())
+write("not assigned yet: " + str(owner.isZero()))
+
+owner = UUID.v7()
+write("not assigned yet: " + str(owner.isZero()))
+```
+
+`UUID.zero()` is `00000000-0000-0000-0000-000000000000`. Some systems use it
+for "no identifier". In your own code, `UUIDValue?` and `null` (section 16)
+usually say "not there yet" more clearly; use the zero UUID only when the
+system you talk to expects it.
+
+### 57.7 Which identifier should I use?
+
+| | `Identity.id()` | `Security.token()` | `UUID.v4()` | `UUID.v7()` |
+| --- | --- | --- | --- | --- |
+| Purpose | public id inside AhdCode | **secret** token | id other systems understand | time-ordered id |
+| Text | 22 characters | 43 characters | 36 characters | 36 characters |
+| Secret? | no | **yes** | no | no; reveals when it was made |
+
+The most important rule: **a UUID is not a secret.** For anything that must
+not be guessed, such as a session key, a password reset link, or an API key,
+use `Security.token()` (section 50). Anyone who looks at a v7 UUID can read
+roughly when it was created.
+
+### 57.8 Storing UUIDs in a database
+
+Store the 36-character text. In SQLite (section 35) a `TEXT` column is enough:
+
+```ahd
+bring SQLite
+bring UUID
+from SQLite bring Database
+from UUID bring UUIDValue
+
+db: Database := SQLite.open(":memory:")
+db.execute("CREATE TABLE lessons (id TEXT PRIMARY KEY, title TEXT NOT NULL)")
+
+for title in ["Variables", "Loops", "Functions"] {
+    db.execute(
+        "INSERT INTO lessons (id, title) VALUES (?, ?)"
+        [SQLite.fromString(UUID.v7().string()), SQLite.fromString(title)]
+    )
+}
+
+rows := db.query("SELECT id, title FROM lessons ORDER BY id")
+for row in rows {
+    id: Local UUIDValue := UUID.parse(row["id"].string())
+    write(row["title"].string() + " -> version " + str(id.version()))
+}
+db.close()
+```
+
+Expected output:
+
+```text
+Variables -> version 7
+Loops -> version 7
+Functions -> version 7
+```
+
+`ORDER BY id` returned the rows in insertion order, because v7 strings sort by
+creation time. In MySQL use `CHAR(36)`; PostgreSQL has its own `uuid` type
+(section 59).
+
+**Try it yourself:** In the program from 57.8, write `UUID.v4()` instead of
+`UUID.v7()` and see that `ORDER BY id` no longer follows insertion order.
+
+Full reference: [UUID](UUID.md) ·
+[`examples/v0.1/69_uuid.ahd`](../examples/v0.1/69_uuid.ahd).
+
+## 58. Reading secrets from files
+
+### 58.1 Where should a password live?
+
+Writing a database password into source code is the worst option: the code
+goes into git history, and it does not come out easily. Section 33 showed the
+`.env` file and environment variables; for local work that is the right place.
+
+On servers people usually go one step further: platforms such as Docker,
+Kubernetes, or systemd place the password in **a file** the program can read,
+and pass the file's path in a variable ending in `_FILE`:
+
+```text
+DB_PASSWORD_FILE=/run/secrets/db_password
+```
+
+`Env.secret("DB_PASSWORD")` handles both styles in one call.
+
+### 58.2 The rules
+
+| `DB_PASSWORD` | `DB_PASSWORD_FILE` | `Env.secret("DB_PASSWORD")` |
+| --- | --- | --- |
+| unset | unset | `null` |
+| set (even to `""`) | unset | the value of `DB_PASSWORD` |
+| unset | a file path | the file's contents |
+| unset | `""` | `EnvError` |
+| set | set | `EnvError`: set only one |
+
+- **One** trailing line break (`\n` or `\r\n`) is removed from the file;
+  nothing else is trimmed.
+- The file must be at most 1 MiB, valid UTF-8, and contain no NUL byte.
+- A missing or unreadable file raises `EnvError`; `Env.secret` never quietly
+  falls back to another value.
+- Setting both is an error, so a forgotten old variable can never silently win.
+
+### 58.3 Reading from a file
+
+This program creates its own secret file and then reads it:
+
+```ahd
+bring Env
+bring File
+bring Path
+
+folder := "secret-demo"
+if File.exists(folder) == false {
+    File.createDir(folder)
+}
+path := Path.join([folder, "db_password.txt"])
+File.writeText(path, "very-secret-pass\n")
+
+Env.unset("DB_PASSWORD")
+Env.unset("DB_PASSWORD_FILE")
+missing: String? := Env.secret("DB_PASSWORD")
+write("neither set, result is null: " + str(missing == null))
+
+Env.set("DB_PASSWORD_FILE", path)
+password: String? := Env.secret("DB_PASSWORD")
+if password != null {
+    write("read from the file, length: " + str(len(password)))
+    write(
+        "trailing line break removed: " + str(password.endsWith("\n") == false)
+    )
+}
+```
+
+Expected output:
+
+```text
+neither set, result is null: true
+read from the file, length: 16
+trailing line break removed: true
+```
+
+The program prints only the length, never the password itself. That is a
+deliberate habit: a secret should not go to the screen, a log, or an HTTP
+response.
+
+### 58.4 Catching errors
+
+```ahd
+bring Env
+from Env bring EnvError
+
+check: Function := (situation: String) -> Nothing {
+    attempt {
+        value: Local String? := Env.secret("API_KEY")
+        if value == null {
+            write(situation + ": not set")
+        }
+        else {
+            write(situation + ": read")
+        }
+    }
+    except EnvError as error {
+        write(situation + ": " + error.message)
+    }
+}
+
+Env.unset("API_KEY")
+Env.unset("API_KEY_FILE")
+check("neither")
+
+Env.set("API_KEY", "abc123")
+check("only API_KEY")
+
+Env.set("API_KEY_FILE", "api_key.txt")
+check("both")
+
+Env.unset("API_KEY")
+check("missing file")
+
+Env.set("API_KEY_FILE", "")
+check("empty path")
+```
+
+Expected output (with no `api_key.txt` in the working folder):
+
+```text
+neither: not set
+only API_KEY: read
+both: API_KEY and API_KEY_FILE are both set; set only one
+missing file: the secret file named by API_KEY_FILE could not be read
+empty path: API_KEY_FILE is set but empty
+```
+
+The messages name the **variable**; they never contain the value, the file's
+contents, or its path.
+
+### 58.5 `.env` locally, a file on the server
+
+Locally, a `.env` file you do not commit is enough:
+
+```text
+DB_PASSWORD=local-development-password
+```
+
+`Web.start()` and `Web.configure()` load `.env` themselves. In a plain script,
+call `Env.load(".env")` before `Env.secret`.
+
+On the server the same program reads from a file without any change. With
+Docker Compose:
+
+```yaml
+services:
+  app:
+    image: my-app
+    environment:
+      DB_PASSWORD_FILE: /run/secrets/db_password
+    secrets:
+      - db_password
+
+secrets:
+  db_password:
+    file: ./db_password.txt
+```
+
+With systemd (`%d` is systemd's credentials directory):
+
+```ini
+[Service]
+LoadCredential=db_password:/etc/myapp/db_password
+Environment=DB_PASSWORD_FILE=%d/db_password
+```
+
+### 58.6 Remember
+
+- `Env.secret` *reads* the value; it does not hide it afterwards. What you get
+  is an ordinary `String`. `write(password)` would print it.
+- Do not set `DB_PASSWORD` and `DB_PASSWORD_FILE` together.
+- Keep the secret file out of git, just like `.env`.
+
+**Try it yourself:** In the program from 58.3, write `"pass\n\n"` to the file.
+What length do you get? (Hint: only *one* line break is removed.)
+
+Full reference: [Env](ENV.md#secret) ·
+[`examples/v0.1/70_env_secret.ahd`](../examples/v0.1/70_env_secret.ahd).
+
+## 59. PostgreSQL: a powerful network database
+
+In section 51 you connected to a database server over the network with MySQL.
+**PostgreSQL** is also a server, and one of the most widely used databases in
+the world. AhdCode v1.4.0 brings a separate `PostgreSQL` module for it.
+
+A few things that make PostgreSQL worth learning:
+
+- Rich types such as `uuid`, `boolean`, `numeric`, `timestamptz`, and `jsonb`.
+- Strict transactions: when one step fails, the rest of the transaction is
+  refused too, so no half-saved record is left behind.
+- Clear, consistent error codes (SQLSTATE).
+
+The programs in this section build on each other: you will create a table, then
+add and read students, update them, and work with transactions.
+
+### 59.1 A PostgreSQL server on your computer
+
+A server on your own computer is enough for practice. With Docker it is one
+command:
+
+```bash
+docker run --name ahd-postgres -e POSTGRES_USER=app -e POSTGRES_PASSWORD=local-password -e POSTGRES_DB=school -p 5432:5432 -d postgres:18
+```
+
+On macOS with Homebrew:
+
+```bash
+brew install postgresql@18
+brew services start postgresql@18
+"$(brew --prefix postgresql@18)/bin/createuser" --pwprompt app
+"$(brew --prefix postgresql@18)/bin/createdb" --owner app school
+```
+
+On Ubuntu/Debian:
+
+```bash
+sudo apt install postgresql
+sudo -u postgres createuser --pwprompt app
+sudo -u postgres createdb --owner app school
+```
+
+On Windows, use the installer from
+[postgresql.org](https://www.postgresql.org/download/), then create the `app`
+user and the `school` database with pgAdmin.
+
+Then create a `.env` file in your working folder, and do not commit it:
+
+```text
+DB_HOST=127.0.0.1
+DB_PORT=5432
+DB_USERNAME=app
+DB_PASSWORD=local-password
+DB_DATABASE=school
+DB_SECURITY=none
+```
+
+`DB_SECURITY=none` means an unencrypted connection and is only appropriate for
+a server **on your own computer**. For a real server on a network use `tls`
+(the default).
+
+### 59.2 A shared connection file
+
+Every program in this section connects the same way. To avoid repeating it,
+write the connection once in `Connection.ahd` and use it with `require(...)`
+from section 19:
+
+```ahd
+// Connection.ahd -- the connection every program in this section shares.
+bring Env
+bring File
 bring PostgreSQL
 from PostgreSQL bring PostgreSQLDatabase
 
-db: PostgreSQLDatabase := PostgreSQL.connect("127.0.0.1", "app", "secret", 5432, "school", "none")
-rows := db.query(
-    "INSERT INTO students (name, active) VALUES ($1, $2) RETURNING id"
-    [PostgreSQL.fromString("Ayşe"), PostgreSQL.fromBool(true)]
-)
-write(rows[0]["id"].int())
+connectSchool: Function := () -> PostgreSQLDatabase {
+    if File.exists(".env") {
+        Env.load(".env")
+    }
+    password: Local String? := Env.secret("DB_PASSWORD")
+    if password == null {
+        toss Error("Set DB_PASSWORD or DB_PASSWORD_FILE.")
+    }
+    return PostgreSQL.connect(
+        Env.getOr("DB_HOST", "127.0.0.1")
+        Env.getOr("DB_USERNAME", "app")
+        password
+        int(Env.getOr("DB_PORT", "5432"))
+        Env.getOr("DB_DATABASE", "school")
+        Env.getOr("DB_SECURITY", "tls")
+    )
+}
 ```
 
-Inside a transaction, PostgreSQL is strict: once one statement fails, the
-whole transaction is broken, and `commit()` raises instead of saving part of
-it. Catch the error and call `rollback()`. See [PostgreSQL](POSTGRESQL.md).
+The arguments of `PostgreSQL.connect` are, in order: host, user name,
+password, port, database, and security mode. `connect` does not just remember
+them: it really connects, authenticates, and checks that the server answers.
+A wrong password or a stopped server raises `PostgreSQLError` right here, not
+on your first query.
 
-### 57.4 WebSocket: pushing updates to a browser
+PostgreSQL's own environment variables such as `PGHOST` or `PGPASSWORD`, and the
+`~/.pgpass` file, change nothing. Only the arguments to `connect` decide where
+the program connects.
 
-A normal web page only learns something new when it asks. A WebSocket stays
-open, so the server can send a message the moment something happens.
+A first try:
+
+```ahd
+require("Connection.ahd")
+bring PostgreSQL
+from PostgreSQL bring PostgreSQLError
+
+attempt {
+    db: Local := connectSchool()
+    result: Local := db.query("SELECT current_database() AS name")
+    write("connected: " + result[0]["name"].string())
+    db.close()
+}
+except PostgreSQLError as error {
+    write("could not connect: " + error.message)
+}
+```
+
+Expected output:
+
+```text
+connected: school
+```
+
+### 59.3 Creating a table
+
+```ahd
+require("Connection.ahd")
+
+db := connectSchool()
+db.execute("""
+    CREATE TABLE IF NOT EXISTS students (
+        id uuid PRIMARY KEY,
+        name text NOT NULL,
+        email text NOT NULL UNIQUE,
+        active boolean NOT NULL DEFAULT true,
+        average numeric(5, 2),
+        enrolled_at timestamptz NOT NULL DEFAULT now()
+    )
+    """)
+write("students table is ready")
+db.close()
+```
+
+| Column | Type | Meaning |
+| --- | --- | --- |
+| `id` | `uuid` | the UUID from section 57; the application creates it with `UUID.v7()` |
+| `name` | `text` | text of any length |
+| `email` | `text ... UNIQUE` | the same email cannot be stored twice |
+| `active` | `boolean` | a real `true`/`false` |
+| `average` | `numeric(5, 2)` | an exact decimal such as `91.50`; may be empty (`NULL`) |
+| `enrolled_at` | `timestamptz` | a time that knows its time zone; defaults to "now" |
+
+Thanks to `IF NOT EXISTS`, running the program a second time does not fail.
+
+### 59.4 Adding rows: `$1`, `$2`, and `RETURNING`
+
+MySQL and SQLite used `?`. PostgreSQL's placeholders are **numbered**: `$1`,
+`$2`, `$3`... The values are still always sent separately and never pasted
+into the SQL text.
+
+```ahd
+require("Connection.ahd")
+bring PostgreSQL
+bring UUID
+from PostgreSQL bring PostgreSQLDatabase
+
+addStudent: Function := (
+    db: PostgreSQLDatabase
+    name: String
+    email: String
+    average: String
+) -> Nothing {
+    added: Local := db.query(
+        "INSERT INTO students (id, name, email, average) VALUES ($1::uuid, $2, $3, $4::numeric) RETURNING id, enrolled_at"
+        [
+            PostgreSQL.fromString(UUID.v7().string())
+            PostgreSQL.fromString(name)
+            PostgreSQL.fromString(email)
+            PostgreSQL.fromString(average)
+        ]
+    )
+    write(name + " added, id: " + added[0]["id"].string())
+}
+
+db := connectSchool()
+db.execute("DELETE FROM students")
+addStudent(db, "Ada Lovelace", "ada@example.com", "91.50")
+addStudent(db, "Alan Turing", "alan@example.com", "78.25")
+addStudent(db, "Grace Hopper", "grace@example.com", "85.00")
+db.close()
+```
+
+Expected output (your ids will differ):
+
+```text
+Ada Lovelace added, id: 01a0a0c9-8fa6-733f-9f09-81191abcce97
+Alan Turing added, id: 01a0a0c9-8fa7-7a41-b3c2-0d5e6f718293
+Grace Hopper added, id: 01a0a0c9-8fa7-7b10-8c77-2e9d4a5b6c01
+```
+
+Notice four things:
+
+1. **`$1::uuid` and `$4::numeric`**: `PostgreSQL.fromString` sends text.
+   `::uuid` means "read this text as a uuid". Where the type is not obvious,
+   write these casts in the SQL.
+2. **`RETURNING id, enrolled_at`**: PostgreSQL has no `lastInsertId()`. You ask
+   for values the server generated (here the default `enrolled_at`) with
+   `RETURNING` and read them with `query`.
+3. **`DELETE FROM students`**: the table is emptied first so that running the
+   program again does not hit the `UNIQUE` email rule.
+4. **One call, one statement**: sending two statements separated by a
+   semicolon, such as `"UPDATE ...; DROP TABLE ..."`, fails and runs neither.
+
+There are five ways to send a value: `PostgreSQL.fromString`, `fromInt`,
+`fromReal`, `fromBool`, and `nullValue()`.
+
+### 59.5 Reading rows and types
+
+```ahd
+require("Connection.ahd")
+
+db := connectSchool()
+rows := db.query(
+    "SELECT name, active, average, enrolled_at FROM students ORDER BY name"
+)
+for row in rows {
+    name: Local String := row["name"].string()
+    active: Local Bool := row["active"].bool()
+    average: Local String := row["average"].string()
+    write(name + " | active: " + str(active) + " | average: " + average)
+}
+
+first := rows[0]
+write("name: " + first["name"].kind())
+write("active: " + first["active"].kind())
+write("average: " + first["average"].kind())
+write("enrolled_at: " + first["enrolled_at"].kind())
+write("sample time: " + first["enrolled_at"].string())
+db.close()
+```
+
+Expected output (your time will differ):
+
+```text
+Ada Lovelace | active: true | average: 91.50
+Alan Turing | active: true | average: 78.25
+Grace Hopper | active: true | average: 85.00
+name: String
+active: Bool
+average: String
+enrolled_at: String
+sample time: 2026-09-15 08:30:12.482913+00
+```
+
+Every row has the familiar `Pair` shape from section 35. You read the values
+like this:
+
+| PostgreSQL type | `kind()` | Read with |
+| --- | --- | --- |
+| `NULL` | `"Null"` | `isNull()` |
+| `boolean` | `"Bool"` | `bool()` |
+| `smallint`, `integer`, `bigint` | `"Int"` | `int()` |
+| `real`, `double precision` | `"Real"` | `real()` |
+| `numeric` | `"String"` | `string()`, for example `"91.50"` |
+| `uuid`, `text`, `json`, `jsonb` | `"String"` | `string()` |
+| `date`, `timestamp`, `timestamptz` | `"String"` | `string()`; `timestamptz` is always UTC (`+00`) |
+| `bytea` | `"Binary"` | `binarySize()`, `binaryBase64()` |
+
+Two important details:
+
+- **`numeric` arrives as a `String`.** Turning a value like `91.50` into a
+  `Real` can introduce rounding errors, so AhdCode never does it silently. If
+  you need arithmetic, write `real(average)` explicitly or let SQL do the math.
+- **Times are shown in UTC.** A `timestamptz` is an instant; AhdCode always
+  writes it with `+00`. Calling the wrong accessor (for example `int()` on
+  `average`) raises a descriptive `PostgreSQLError`.
+
+### 59.6 Updating, NULL, and summary queries
+
+```ahd
+require("Connection.ahd")
+bring PostgreSQL
+from PostgreSQL bring PostgreSQLResult
+
+db := connectSchool()
+
+raised: PostgreSQLResult := db.execute(
+    "UPDATE students SET average = average + $1::numeric WHERE average < $2::numeric"
+    [PostgreSQL.fromString("5"), PostgreSQL.fromString("80")]
+)
+write("averages raised: " + str(raised.affectedRows()))
+
+inactive: PostgreSQLResult := db.execute(
+    "UPDATE students SET active = $1, average = NULL WHERE email = $2"
+    [PostgreSQL.fromBool(false), PostgreSQL.fromString("grace@example.com")]
+)
+write("made inactive: " + str(inactive.affectedRows()))
+
+rows := db.query("SELECT name, active, average FROM students ORDER BY name")
+for row in rows {
+    average: Local String := "none"
+    if row["average"].isNull() == false {
+        average = row["average"].string()
+    }
+    active: Local String := str(row["active"].bool())
+    write(
+        row["name"].string() + " | active: " + active + " | average: " + average
+    )
+}
+
+summary := db.query(
+    "SELECT count(*) AS total, round(avg(average), 2) AS overall FROM students WHERE active"
+)
+total: Int := summary[0]["total"].int()
+overall: String := summary[0]["overall"].string()
+write("active students: " + str(total) + ", overall average: " + overall)
+db.close()
+```
+
+Expected output:
+
+```text
+averages raised: 1
+made inactive: 1
+Ada Lovelace | active: true | average: 91.50
+Alan Turing | active: true | average: 83.25
+Grace Hopper | active: false | average: none
+active students: 2, overall average: 87.38
+```
+
+- `execute` returns a `PostgreSQLResult`; `affectedRows()` tells you how many
+  rows that statement changed.
+- SQL `NULL` is not AhdCode `null`: it is a `PostgreSQLValue` whose `kind()` is
+  `"Null"`. Ask `isNull()` before reading it.
+- `count(*)` returns a `bigint` and is read with `int()`; `avg(...)` is
+  `numeric`, so it arrives as a `String`.
+
+Deleting follows the same pattern:
+
+```ahd
+require("Connection.ahd")
+bring PostgreSQL
+
+db := connectSchool()
+deleted := db.execute(
+    "DELETE FROM students WHERE active = $1"
+    [PostgreSQL.fromBool(false)]
+)
+write("students deleted: " + str(deleted.affectedRows()))
+db.close()
+```
+
+### 59.7 Transactions: all or nothing
+
+A transaction groups several statements so that either all of them are saved
+or none of them are. `db.begin()` gives you a `PostgreSQLTransaction`; you run
+the statements through it and finish with `commit()` or `rollback()`.
+
+```ahd
+require("Connection.ahd")
+bring PostgreSQL
+bring UUID
+from PostgreSQL bring (PostgreSQLTransaction, PostgreSQLError)
+
+db := connectSchool()
+insert := "INSERT INTO students (id, name, email) VALUES ($1::uuid, $2, $3)"
+
+transaction: PostgreSQLTransaction := db.begin()
+attempt {
+    transaction.execute(
+        insert
+        [
+            PostgreSQL.fromString(UUID.v7().string())
+            PostgreSQL.fromString("Katherine Johnson")
+            PostgreSQL.fromString("katherine@example.com")
+        ]
+    )
+    // The same email again: the UNIQUE rule refuses this statement.
+    transaction.execute(
+        insert
+        [
+            PostgreSQL.fromString(UUID.v7().string())
+            PostgreSQL.fromString("Katherine Johnson (copy)")
+            PostgreSQL.fromString("katherine@example.com")
+        ]
+    )
+    transaction.commit()
+    write("both rows saved")
+}
+except PostgreSQLError as error {
+    transaction.rollback()
+    write("rolled back: " + error.message)
+}
+
+counted := db.query(
+    "SELECT count(*) AS n FROM students WHERE email = $1"
+    [PostgreSQL.fromString("katherine@example.com")]
+)
+write("rows for katherine@example.com: " + str(counted[0]["n"].int()))
+db.close()
+```
+
+Expected output:
+
+```text
+rolled back: PostgreSQL execution failed: (23505) duplicate key value violates unique constraint "students_email_key"
+rows for katherine@example.com: 0
+```
+
+The first `INSERT` succeeded, yet **nothing** was written to the table. The
+transaction was rolled back, so no half-saved record remains.
+
+**PostgreSQL's strict rule.** In MySQL you can keep going after a statement
+inside a transaction fails. In PostgreSQL you cannot: once a statement fails,
+the transaction is **aborted**. The following program breaks that rule on
+purpose:
+
+```ahd
+require("Connection.ahd")
+bring PostgreSQL
+from PostgreSQL bring (PostgreSQLTransaction, PostgreSQLError)
+
+db := connectSchool()
+transaction: PostgreSQLTransaction := db.begin()
+
+attempt {
+    transaction.execute(
+        "UPDATE students SET average = $1::numeric WHERE email = $2"
+        [
+            PostgreSQL.fromString("excellent")
+            PostgreSQL.fromString("ada@example.com")
+        ]
+    )
+}
+except PostgreSQLError as error {
+    write("statement 1: " + error.message)
+}
+
+attempt {
+    transaction.execute(
+        "UPDATE students SET active = true WHERE email = $1"
+        [PostgreSQL.fromString("alan@example.com")]
+    )
+}
+except PostgreSQLError as error {
+    write("statement 2: " + error.message)
+}
+
+attempt {
+    transaction.commit()
+}
+except PostgreSQLError as error {
+    write("commit: " + error.message)
+}
+transaction.rollback()
+db.close()
+```
+
+Expected output:
+
+```text
+statement 1: PostgreSQL execution failed: (22P02) invalid input syntax for type numeric: "excellent"
+statement 2: PostgreSQL execution failed: (25P02) current transaction is aborted, commands ignored until end of transaction block
+commit: PostgreSQL transaction was rolled back because an earlier statement failed
+```
+
+The rule is:
+
+- After the first error, **every** statement in the same transaction is
+  refused.
+- `commit()` on an aborted transaction saves nothing and raises.
+- `rollback()` after a failed `commit()` quietly does nothing. That is why the
+  `attempt` / `except` / `rollback()` pattern in the first program of 59.7 is
+  always safe.
+
+### 59.8 Understanding error codes
+
+Every error from the server carries a five-character **SQLSTATE** code in
+parentheses. Some you will meet often:
+
+| Code | Meaning |
+| --- | --- |
+| `23505` | a `UNIQUE` rule was violated (the value already exists) |
+| `23502` | a `NOT NULL` column was left empty |
+| `23503` | a foreign key rule was violated |
+| `22P02` | a value could not be converted to the type (`"excellent"` is not a number) |
+| `42P01` | there is no such table |
+| `42703` | there is no such column |
+| `42601` | SQL syntax error |
+| `25P02` | the transaction was aborted by an earlier error |
+
+Show users a sentence they understand, not the technical message:
+
+```ahd
+require("Connection.ahd")
+bring PostgreSQL
+bring UUID
+from PostgreSQL bring PostgreSQLError
+
+userMessage: Function := (error: PostgreSQLError) -> String {
+    if error.message.contains("(23505)") {
+        return "There is already an account with this email address."
+    }
+    if error.message.contains("(23502)") {
+        return "A required field was left empty."
+    }
+    return "The record could not be saved. Please try again later."
+}
+
+db := connectSchool()
+attempt {
+    db.execute(
+        "INSERT INTO students (id, name, email) VALUES ($1::uuid, $2, $3)"
+        [
+            PostgreSQL.fromString(UUID.v7().string())
+            PostgreSQL.fromString("Ada Lovelace")
+            PostgreSQL.fromString("ada@example.com")
+        ]
+    )
+}
+except PostgreSQLError as error {
+    write(userMessage(error))
+}
+db.close()
+```
+
+Expected output:
+
+```text
+There is already an account with this email address.
+```
+
+Error messages never include your password or the server's `DETAIL` / `HINT`
+fields, which can repeat row values. Still, write the detailed message to the
+server log, not to the user.
+
+### 59.9 Differences from MySQL
+
+| | MySQL (section 51) | PostgreSQL |
+| --- | --- | --- |
+| Placeholders | `?` | `$1`, `$2`, … |
+| Default port | `3306` | `5432` |
+| Generated ids | `lastInsertId()` | `query` with `RETURNING` |
+| Booleans | integers | real `boolean`; `fromBool` and `bool()` |
+| Dates and times | the server's text | fixed formats; `timestamptz` in UTC |
+| An error inside a transaction | the transaction stays usable | the transaction is aborted; `commit()` raises |
+| Several statements in one call | not supported | raises, and none run |
+
+One program can `bring` `SQLite`, `MySQL`, and `PostgreSQL` together; their
+types are separate and do not mix.
+
+### 59.10 Closing and cleaning up
+
+`db.close()` releases the connection pool; using a closed database raises
+`this PostgreSQLDatabase is closed`. A web application usually keeps a single
+connection open and shares it between all requests; a `PostgreSQLDatabase` is
+a pool that is safe for concurrent use. The application in section 61 shows
+this.
+
+To drop this section's table:
+
+```ahd
+require("Connection.ahd")
+
+db := connectSchool()
+db.execute("DROP TABLE IF EXISTS students")
+write("table dropped")
+db.close()
+```
+
+**Try it yourself:** Create a `courses` table (`id uuid`, `name text`,
+`credits integer`), add three courses, and read the result of
+`SELECT sum(credits) AS total FROM courses` with `int()`.
+
+Full reference: [PostgreSQL](POSTGRESQL.md) ·
+[`examples/v0.1/71_postgresql.ahd`](../examples/v0.1/71_postgresql.ahd).
+
+## 60. WebSocket: live connections
+
+### 60.1 How WebSocket differs from HTTP
+
+The web pages in section 36 work by **request and response**: the browser asks,
+the server answers, and the connection is done. For the server to say "a new
+message arrived", the browser has to ask again.
+
+A **WebSocket** is a connection that stays open. It is set up once; after that
+either side can send a message at any moment:
+
+```text
+HTTP:       browser --request--> server --response--> (connection ends)
+
+WebSocket:  browser ==opening==> server
+            browser <--message--- server    (the server sends whenever it wants)
+            browser ---message--> server
+            ...                             (open until one side closes it)
+```
+
+Chat applications, live scoreboards, attendance dashboards, and notifications
+work this way. In AhdCode v1.4.0, WebSocket is the **server** side: endpoints
+live on the `Server` from the `HTTP` module, next to your routes. The client on
+the other end is usually JavaScript in a browser.
+
+### 60.2 An echo server
+
+The program below serves both a page and a WebSocket endpoint. The page
+connects, and every message you type comes back from the server.
+
+```ahd
+bring HTTP
+from HTTP bring (Server, Request, Response, WebSocket)
+
+page: Function := (request: Request) -> Response {
+    return HTTP.html(r"""<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>Echo</title>
+<input id="message" placeholder="Type something">
+<button id="send">Send</button>
+<ul id="received"></ul>
+<script>
+const socket = new WebSocket(`ws://${location.host}/echo`);
+const list = document.getElementById("received");
+socket.addEventListener("message", (event) => {
+  const item = document.createElement("li");
+  item.textContent = event.data;
+  list.append(item);
+});
+document.getElementById("send").addEventListener("click", () => {
+  const box = document.getElementById("message");
+  socket.send(box.value);
+  box.value = "";
+});
+</script>
+""")
+}
+
+reply: Function := (socket: WebSocket, text: String) -> Nothing {
+    socket.send("server received: " + text)
+}
+
+server: Server := HTTP.server("127.0.0.1", 8080)
+server.get("/", page)
+server.websocket("/echo", HTTP.websocket(reply))
+server.start()
+```
+
+Run it with `ahdcode run echo.ahd` and open `http://127.0.0.1:8080/`. Type
+something and press **Send**; `server received: ...` appears below.
+
+Piece by piece:
+
+- `HTTP.websocket(reply)` creates an **endpoint**. `reply` is called with
+  `(socket, text)` for every message.
+- `server.websocket("/echo", ...)` attaches the endpoint to `/echo`. Do this
+  **before** `server.start()`. The same path cannot be both a `get` route and a
+  WebSocket.
+- `socket.send(text)` sends a message on that connection.
+- `${location.host}` in the HTML belongs to JavaScript. Because it is inside
+  an `r"""..."""` raw String, AhdCode does not treat `{...}` as interpolation.
+- The browser writes the incoming message with `textContent`, not
+  `innerHTML`. Even if someone sends `<script>`, it only shows up as text.
+
+### 60.3 The life cycle: open, message, close
+
+A connection has three moments, and you can give a callback for each. This
+program records every moment in a log and shows the log at `/log`:
+
+```ahd
+bring HTTP
+from HTTP bring (Server, Request, Response, WebSocket, WebSocketEndpoint)
+
+events: List<String> := []
+
+record: Function := (line: String) -> Nothing {
+    events: Global List<String>
+    events.add(line)
+}
+
+opened: Function := (socket: WebSocket, request: Request) -> Nothing {
+    record("opened: " + socket.id())
+    socket.send("welcome")
+}
+
+received: Function := (socket: WebSocket, text: String) -> Nothing {
+    record(socket.id() + " wrote: " + text)
+    if text == "goodbye" {
+        socket.close(1000, "see you")
+    }
+    else {
+        socket.send("got: " + text)
+    }
+}
+
+closed: Function := (socket: WebSocket, code: Int, reason: String) -> Nothing {
+    record(
+        "closed: " + socket.id() + " code " + str(code) + " reason: " + reason
+    )
+}
+
+logPage: Function := (request: Request) -> Response {
+    events: Global List<String>
+    text: Local String := ""
+    for line in events {
+        text = text + line + "\n"
+    }
+    return HTTP.text(text)
+}
+
+endpoint: WebSocketEndpoint := HTTP.websocket(received)
+endpoint = endpoint.withOpen(opened)
+endpoint = endpoint.withClose(closed)
+
+server: Server := HTTP.server("127.0.0.1", 8080)
+server.get("/log", logPage)
+server.websocket("/live", endpoint)
+server.start()
+```
+
+While the server runs, open `http://127.0.0.1:8080/log` in a browser (empty for
+now), open the developer console, and type:
+
+```js
+socket = new WebSocket("ws://127.0.0.1:8080/live")
+socket.onmessage = (event) => console.log(event.data)
+socket.send("hello")
+socket.send("goodbye")
+```
+
+The console shows `welcome` and `got: hello`. Then reload the page; the log
+looks like this:
+
+```text
+opened: 3kQ9mZ0bT1u2w8xY4vLc7A
+3kQ9mZ0bT1u2w8xY4vLc7A wrote: hello
+3kQ9mZ0bT1u2w8xY4vLc7A wrote: goodbye
+closed: 3kQ9mZ0bT1u2w8xY4vLc7A code 1000 reason: see you
+```
+
+The log is an ordinary `List<String>`; the callbacks and the `/log` handler
+share it through `Global`. That WebSocket callbacks can share data with HTTP
+handlers is the key idea behind 60.4 and 60.5.
+
+AhdCode guarantees this order:
+
+1. `withOpen` runs **exactly once** per connection, and first. It finishes
+   before the browser sees the connection as open; a message sent from
+   `opened` arrives as the first message.
+2. The message callback runs once per message, in arrival order.
+3. `withClose` runs **exactly once** per connection, and last, whether the
+   connection closed cleanly or dropped.
+
+`socket.id()` is text unique to the connection and never reused. Close codes:
+
+| Code | Meaning |
+| --- | --- |
+| `1000` | normal closure |
+| `1001` | going away (for example the page was closed) |
+| `1003` | a binary message was sent; only text is supported |
+| `1006` | the connection dropped; never sent on the wire, only reported |
+| `1007` | the message is not valid UTF-8 |
+| `1008` | policy violation (for example the send queue filled up) |
+| `1009` | the message is larger than allowed |
+| `1011` | a callback on the server raised an error |
+
+For `close` you may use `1000`, `1001`, `1008`, `1011`, and codes from `3000`
+to `4999`.
+
+**Callbacks run one at a time.** HTTP handlers and WebSocket callbacks on the
+same server never run at the same moment. That lets you use shared variables
+without locks; it also means one slow callback makes everyone wait. Keep
+callbacks short.
+
+### 60.4 A chat room: keeping a registry and sending to everyone
+
+To send a message to everyone, you have to keep the open connections
+somewhere. AhdCode does not do that for you; an ordinary `Pair` is enough:
 
 ```ahd
 bring HTTP
 bring KeyValue
-from HTTP bring (Server, Request, WebSocket, WebSocketEndpoint)
+from HTTP bring (Server, Request, Response, WebSocket, WebSocketEndpoint)
 
-clients: Pair<String, WebSocket> := {}
+connections: Pair<String, WebSocket> := {}
+names: Pair<String, String> := {}
+
+sendToAll: Function := (text: String) -> Int {
+    connections: Global Pair<String, WebSocket>
+    delivered: Local Int := 0
+    for socket in KeyValue.values(connections) {
+        if socket.send(text) {
+            delivered += 1
+        }
+    }
+    return delivered
+}
 
 joined: Function := (socket: WebSocket, request: Request) -> Nothing {
-    clients: Global Pair<String, WebSocket>
-    clients[socket.id()] = socket
-}
-
-received: Function := (socket: WebSocket, text: String) -> Nothing {
-    clients: Global Pair<String, WebSocket>
-    for other in KeyValue.values(clients) {
-        other.send(text)
+    connections: Global Pair<String, WebSocket>
+    names: Global Pair<String, String>
+    name: Local String := "guest"
+    requested: Local String? := request.query("name")
+    if requested != null {
+        if requested.trim() != "" {
+            name = requested.trim()
+        }
     }
+    sendToAll(name + " joined the chat")
+    connections[socket.id()] = socket
+    names[socket.id()] = name
+    socket.send(
+        "welcome " + name + ", " + str(len(connections)) + " people are here"
+    )
 }
 
-endpoint: WebSocketEndpoint := HTTP.websocket(received).withOpen(joined)
+messageArrived: Function := (socket: WebSocket, text: String) -> Nothing {
+    names: Global Pair<String, String>
+    if text.trim() == "" {
+        return
+    }
+    sendToAll(names[socket.id()] + ": " + text)
+}
+
+left: Function := (socket: WebSocket, code: Int, reason: String) -> Nothing {
+    connections: Global Pair<String, WebSocket>
+    names: Global Pair<String, String>
+    name: Local String := names[socket.id()]
+    connections = KeyValue.without(connections, socket.id())
+    names = KeyValue.without(names, socket.id())
+    sendToAll(name + " left")
+}
+
+page: Function := (request: Request) -> Response {
+    return HTTP.html(r"""<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>Chat</title>
+<ul id="feed"></ul>
+<form id="form"><input id="text" autocomplete="off"><button>Send</button></form>
+<script>
+const name = prompt("Your name?") || "guest";
+const socket = new WebSocket(`ws://${location.host}/chat?name=${encodeURIComponent(name)}`);
+socket.addEventListener("message", (event) => {
+  const item = document.createElement("li");
+  item.textContent = event.data;
+  document.getElementById("feed").append(item);
+});
+document.getElementById("form").addEventListener("submit", (event) => {
+  event.preventDefault();
+  const box = document.getElementById("text");
+  socket.send(box.value);
+  box.value = "";
+});
+</script>
+""")
+}
+
+endpoint: WebSocketEndpoint := HTTP.websocket(messageArrived)
+endpoint = endpoint.withOpen(joined)
+endpoint = endpoint.withClose(left)
+endpoint = endpoint.withMaxMessageBytes(2000)
+endpoint = endpoint.withMaxConnections(50)
+
 server: Server := HTTP.server("127.0.0.1", 8080)
+server.get("/", page)
 server.websocket("/chat", endpoint)
 server.start()
 ```
 
-In the browser, `new WebSocket("ws://127.0.0.1:8080/chat")` connects to it.
-Callbacks run one at a time, just like HTTP handlers, so the `clients` Pair
-needs no special care — but keep callbacks short. If the connection drops,
-nothing reconnects by itself; that is your page's JavaScript's job. See
-[WebSocket](WEBSOCKET.md).
+Open `http://127.0.0.1:8080/` in two browser tabs, enter two different names,
+and chat. When you close one tab, "... left" appears in the other.
 
-### 57.5 Putting it together
+Key points:
 
-The [realtime attendance application](../examples/v1.4/realtime_attendance/README.md)
-uses all four: a check-in form saves a row with a `UUID.v7()` key in
-PostgreSQL, reads the database password with `Env.secret`, and every open
-dashboard shows the new check-in immediately over a WebSocket.
+- **The registry gains an entry in `withOpen` and loses it in `withClose`.**
+  `KeyValue.without` (section 34) returns a new `Pair` without that key.
+- **`send` never waits.** It puts the message on that connection's queue and
+  returns `true`, or `false` when the connection is closed. If a client is too
+  slow to read and its queue (64 messages by default) fills up, the connection
+  is closed with `1008`, so one slow client cannot fill the server's memory.
+- **Limits.** `withMaxMessageBytes(2000)` closes a connection that sends a
+  message over 2000 bytes with `1009`; `withMaxConnections(50)` turns the 51st
+  connection away with `503` during the opening. The defaults are 65536 bytes
+  and 1024 connections.
+- The join announcement is sent **before** the new person is added to the
+  registry, so they do not receive their own join message.
+
+### 60.5 JSON messages, and broadcasting from an HTTP handler
+
+In real applications messages are usually JSON (section 31) rather than plain
+text, so the browser can decide what to do from the message's *type*.
+
+A broadcast also does not always start with a WebSocket message: a form
+submission, another program, or a scheduled job may want to "tell everyone".
+Callbacks and HTTP handlers share the same lock, so an HTTP handler can
+broadcast straight through the registry.
+
+```ahd
+bring HTTP
+bring JSON
+bring KeyValue
+bring Env
+bring Security
+from HTTP bring (Server, Request, Response, WebSocket, WebSocketEndpoint)
+from JSON bring (JSONValue, JSONError)
+
+boards: Pair<String, WebSocket> := {}
+
+event: Function := (kind: String, text: String) -> String {
+    return JSON.stringify(
+        JSON.object(
+            {"type": JSON.fromString(kind), "text": JSON.fromString(text)}
+        )
+    )
+}
+
+broadcast: Function := (line: String) -> Int {
+    boards: Global Pair<String, WebSocket>
+    delivered: Local Int := 0
+    for socket in KeyValue.values(boards) {
+        if socket.send(line) {
+            delivered += 1
+        }
+    }
+    return delivered
+}
+
+opened: Function := (socket: WebSocket, request: Request) -> Nothing {
+    boards: Global Pair<String, WebSocket>
+    boards[socket.id()] = socket
+    socket.send(event("info", "connected"))
+}
+
+received: Function := (socket: WebSocket, text: String) -> Nothing {
+    attempt {
+        document: Local JSONValue := JSON.parse(text)
+        kind: Local JSONValue? := document.get("type")
+        if kind != null {
+            if kind.string() == "ping" {
+                socket.send(event("pong", "still here"))
+                return
+            }
+        }
+        socket.send(event("error", "unknown message type"))
+    }
+    except JSONError as error {
+        socket.send(event("error", "expected JSON"))
+    }
+}
+
+closed: Function := (socket: WebSocket, code: Int, reason: String) -> Nothing {
+    boards: Global Pair<String, WebSocket>
+    boards = KeyValue.without(boards, socket.id())
+}
+
+announce: Function := (request: Request) -> Response {
+    expected: Local String? := Env.secret("NOTICE_TOKEN")
+    given: Local String? := request.header("Authorization")
+    if expected == null or given == null {
+        return HTTP.text("unauthorized", 401)
+    }
+    if Security.secureEqual("Bearer " + expected, given) == false {
+        return HTTP.text("unauthorized", 401)
+    }
+    delivered: Local Int := broadcast(event("notice", request.body()))
+    return HTTP.text("sent to {delivered} board(s)")
+}
+
+endpoint: WebSocketEndpoint := HTTP.websocket(received)
+endpoint = endpoint.withOpen(opened)
+endpoint = endpoint.withClose(closed)
+
+server: Server := HTTP.server("127.0.0.1", 8080)
+server.websocket("/board", endpoint)
+server.post("/announce", announce)
+server.start()
+```
+
+Run it:
+
+```bash
+NOTICE_TOKEN=a-long-random-value ahdcode run board.ahd
+```
+
+Send a notice from another terminal:
+
+```bash
+curl -H "Authorization: Bearer a-long-random-value" --data "No class tomorrow" http://127.0.0.1:8080/announce
+```
+
+Every open board receives this message, and `curl` prints how many boards it
+reached:
+
+```text
+{"type":"notice","text":"No class tomorrow"}
+```
+
+In this example:
+
+- Messages are built with `JSON.object`, not by joining strings, so a notice
+  containing `"` or `\` cannot break the JSON.
+- Incoming text is parsed with `JSON.parse`; malformed JSON raises `JSONError`
+  and the client gets a polite error message.
+- `/announce` requires a token read with `Env.secret` from section 58 and
+  compares it with `Security.secureEqual` from section 50.
+
+In the browser, read the JSON like this:
+
+```js
+socket.addEventListener("message", (event) => {
+  const message = JSON.parse(event.data);
+  if (message.type === "notice") {
+    alert(message.text);
+  }
+});
+socket.send(JSON.stringify({ type: "ping" }));
+```
+
+### 60.6 Security: who may connect?
+
+**Origin check.** Browsers send the page's address in an `Origin` header every
+time they open a WebSocket. By default AhdCode allows only the **same origin**:
+a page on `http://127.0.0.1:8080` may connect, while a page on another site
+gets `403`. If your application serves a front end that runs on a separate
+domain, list the allowed origins exactly:
+
+```ahd
+endpoint = endpoint.withAllowedOrigins(["https://school.example.com"])
+```
+
+A wildcard (`"*"`) is not accepted.
+
+**Signed-in users.** Use `withAccept` to refuse a connection before it opens.
+Returning `null` accepts; returning a `Response` refuses. With the session
+store from section 37:
+
+```ahd
+accept: Function := (request: Request) -> Response? {
+    sessions: Global SessionStore
+    session: Local Session := sessions.open(request)
+    if session.get("user_id") == null {
+        return HTTP.text("sign in first", 401)
+    }
+    return null
+}
+endpoint = endpoint.withAccept(accept)
+```
+
+Browsers do not let you add your own headers when opening a WebSocket, but
+they do send cookies, so a session cookie is the right tool for browsers. When
+another program connects, an `Authorization: Bearer ...` header like the one
+in 60.5 works.
+
+**Limits to know:**
+
+- Only text messages are supported; a binary message closes the connection
+  with `1003`.
+- Message contents are never written to the log.
+- v1.4.0 has no WebSocket **client** that connects from AhdCode to another
+  server.
+
+### 60.7 Reconnecting in the browser
+
+When the server restarts (`ahdcode dev` does that on every save) or the network
+drops, the connection closes. **Neither side reconnects by itself**; the
+page's JavaScript has to. A simple pattern that doubles the wait on every
+attempt:
+
+```js
+let wait = 1000;
+
+function connect() {
+  const socket = new WebSocket(`ws://${location.host}/board`);
+  socket.addEventListener("open", () => {
+    wait = 1000;
+  });
+  socket.addEventListener("message", (event) => {
+    console.log(event.data);
+  });
+  socket.addEventListener("close", () => {
+    setTimeout(connect, wait);
+    wait = Math.min(wait * 2, 30000);
+  });
+}
+
+connect();
+```
+
+The server sends every connection a `ping` every 30 seconds; a client that does
+not answer is closed with `1006`. That way dropped connections do not stay in
+your registry forever.
+
+### 60.8 With the `Web` framework, and in production
+
+In the `Web` framework from section 52, the same endpoint is created with
+`Web.websocket` and registered with `App.websocket`:
+
+```ahd
+bring Web
+from Web bring (App, WebSocket)
+
+echo: Function := (socket: WebSocket, text: String) -> Nothing {
+    socket.send(text)
+}
+
+site: App := Web.start()
+site.websocket("/live", Web.websocket(echo))
+site.start()
+```
+
+`Web.start()` reads settings such as `APP_NAME` and `APP_ENV` from section 52
+out of `.env`. WebSocket endpoints cannot be added to a route group
+(`RouteGroup`); put your guard check in `withAccept`.
+
+When you deploy, the reverse proxy in front of the application must pass the
+upgrade through. Caddy's `reverse_proxy` does this with no extra settings; on
+sites that use HTTPS, the browser connects with `wss://` instead of `ws://`.
+For nginx settings see the
+[WebSocket reference](WEBSOCKET.md#behind-a-reverse-proxy).
+
+**Try it yourself:** Add a `/who` command to the chat room from 60.4: when a
+user types `/who`, send only that user the names of everyone in the room.
+
+Full reference: [WebSocket](WEBSOCKET.md) ·
+[`examples/v0.1/72_websocket_echo.ahd`](../examples/v0.1/72_websocket_echo.ahd).
+
+## 61. Putting it together: a realtime attendance app
+
+[`examples/v1.4/realtime_attendance`](../examples/v1.4/realtime_attendance/README.md)
+combines what you learned in sections 57–60 in one Web application. A teacher
+signs in, types a student's name, and presses **Check in**; every open
+dashboard shows the new check-in immediately, without reloading the page.
+
+### 61.1 Running it
+
+Start a PostgreSQL server as in 59.1, then create a user and a database named
+`attendance`:
+
+```bash
+createuser --pwprompt attendance
+createdb --owner attendance attendance
+```
+
+Then:
+
+```bash
+cd examples/v1.4/realtime_attendance
+cp .env.example .env
+psql "host=127.0.0.1 dbname=attendance user=attendance" -f schema.sql
+ahdcode dev app.ahd
+```
+
+Set `DB_PASSWORD` and a long random `NOTIFY_TOKEN` in `.env`. The application
+opens at `http://127.0.0.1:8140/`. Open it in two browser windows and check a
+student in from one; the other updates at once. Optionally, run
+`ahdcode run jobs.ahd` in a second terminal: once a minute it announces a
+summary of the last hour to the dashboards.
+
+### 61.2 The journey of one check-in
+
+```text
+browser: form POST /check-in
+   │
+   ▼
+Pages/CheckIn.ahd
+   ├─ a new id from UUID.v7()                                (section 57)
+   ├─ INSERT ... VALUES ($1::uuid, $2) RETURNING created_at  (section 59)
+   ├─ build a JSON line and liveBroadcast(...)               (section 60)
+   └─ Web.redirect("/")
+   │
+   ▼
+Live.ahd: send to every WebSocket in the registry
+   │
+   ▼
+public/js/live.js: JSON.parse, add to the list with textContent
+```
+
+The database connection is opened once in `Config/Database.ahd`, and its
+password is read as in section 58:
+
+```text
+password: Local String? := Env.secret("DB_PASSWORD")
+if password == null {
+    toss Error("Set DB_PASSWORD, or DB_PASSWORD_FILE to a file holding it.")
+}
+```
+
+`Live.ahd` accepts only signed-in users, as in 60.6, and expects no messages
+from the dashboard:
+
+```text
+liveMessage: Function := (socket: WebSocket, text: String) -> Nothing {
+    socket.close(1008, "this socket is read-only")
+}
+```
+
+`Pages/CheckIn.ahd` stores the record and tells everyone:
+
+```text
+checkInID: Local UUIDValue := UUID.v7()
+stored: Local := database.query(
+    "INSERT INTO check_ins (id, student) VALUES ($1::uuid, $2) RETURNING created_at"
+    [
+        PostgreSQL.fromString(checkInID.string())
+        PostgreSQL.fromString(student)
+    ]
+)
+```
+
+### 61.3 Design decisions worth noticing
+
+- **The page is complete without JavaScript.** The dashboard renders the
+  latest 20 check-ins on the server; `live.js` only adds what arrives later.
+- **Save first, then announce.** The broadcast happens after the `INSERT`
+  succeeds, so a check-in that was never stored never appears on a dashboard.
+- **Reconnecting is visible.** When the connection drops, `live.js` shows a
+  countdown and increases the wait from 1 second up to 30 seconds.
+- **A second program.** A Web server and a Cron scheduler each occupy the
+  program that runs them, so `jobs.ahd` runs separately and sends its summary
+  to `POST /internal/notify` with a bearer token: the same pattern as
+  `/announce` in 60.5.
+
+**Try it yourself:** Add a line to the application that shows how many
+check-ins were taken today. Hint:
+`SELECT count(*) AS n FROM check_ins WHERE created_at >= date_trunc('day', now())`.

@@ -77,6 +77,11 @@ verir.
 - [54. Gruplar, bekçiler ve starter'lar](#54-gruplar-bekçiler-ve-starterlar)
 - [55. Görebildiğiniz veritabanları: `ahdcode databases`](#55-görebildiğiniz-veritabanları-ahdcode-databases)
 - [56. Uygulamanızın yerel adresi](#56-uygulamanızın-yerel-adresi)
+- [57. UUID: benzersiz kimlikler](#57-uuid-benzersiz-kimlikler)
+- [58. Gizli değerleri dosyadan okumak](#58-gizli-değerleri-dosyadan-okumak)
+- [59. PostgreSQL: güçlü bir ağ veritabanı](#59-postgresql-güçlü-bir-ağ-veritabanı)
+- [60. WebSocket: canlı bağlantılar](#60-websocket-canlı-bağlantılar)
+- [61. Hepsi bir arada: gerçek zamanlı yoklama uygulaması](#61-hepsi-bir-arada-gerçek-zamanlı-yoklama-uygulaması)
 
 ## 1. AhdCode nedir?
 
@@ -2804,6 +2809,8 @@ write(port)
 
 Sırları kaynak dosyaya gömmeyin; commit etmediğiniz bir `.env` yerel yapılandırma için olağan yerdir.
 
+**Sunucudaki parolalar.** v1.4.0 ile gelen `Env.secret("DB_PASSWORD")`, değeri ya `DB_PASSWORD` değişkeninden ya da `DB_PASSWORD_FILE` değişkeninin gösterdiği dosyadan okur; ikisi de yoksa `null` döndürür. Docker ve benzeri platformlar parolaları bu şekilde, dosya olarak verir. Kurallar ve örnekler [58. bölümde](#58-gizli-değerleri-dosyadan-okumak).
+
 **Siz deneyin:** Ayarlamadığınız bir adla `getOr` çağırıp yedeği gördüğünüzü doğrulayın, sonra o String'i `int(...)` edin.
 
 [Env modül referansına](ENV_TR.md) bakın.
@@ -4168,6 +4175,36 @@ Hata mesajı görmek programlamanın normal bir parçasıdır. Çoğu hata, bilg
 - Neden: Bu, başlığı SQL'e yapıştırır. `Robert'); DROP TABLE notes;--` gibi bir başlık artık veri değildir.
 - Doğru: `?` yer tutucusu ve `SQLite.fromString(title)` kullanın. Parametre bağlama metni veri olarak tutar.
 
+**22. UUID'leri `==` ile karşılaştırmak**
+- Yanlış: `if kimlik == digerKimlik { ... }`
+- Neden: `==` iki değişkenin aynı nesneyi gösterip göstermediğini sorar. Aynı metinden ayrı ayrı ayrıştırılmış iki UUID bile `false` verir.
+- Doğru: `if kimlik.equals(digerKimlik) { ... }`
+
+**23. Bir UUID'yi `str(...)` ile metne çevirmek**
+- Yanlış: `write("kimlik: " + str(kimlik))`
+- Neden: `str`, yerleşik sınıflar için `<UUIDValue>` yazar; UUID'nin kendisini değil.
+- Doğru: `write("kimlik: " + kimlik.string())`
+
+**24. PostgreSQL'de `?` yer tutucusu kullanmak**
+- Yanlış: `db.query("SELECT ad FROM ogrenciler WHERE eposta = ?", [PostgreSQL.fromString(eposta)])`
+- Neden: PostgreSQL'in yer tutucuları numaralıdır. `?` onun için bir yer tutucu değildir; sorgu `(42601) syntax error` gibi bir hatayla reddedilir.
+- Doğru: `WHERE eposta = $1`
+
+**25. PostgreSQL işleminde bir hatadan sonra devam etmek**
+- Yanlış: Bir `islem.execute(...)` hatasını yakalayıp aynı işlemle devam etmek ve sonunda `commit()`'in kaydetmesini beklemek.
+- Neden: PostgreSQL ilk hatadan sonra işlemi iptal eder. Sonraki her ifade `(25P02)` hatası verir ve `commit()` hiçbir şey kaydetmez.
+- Doğru: Hatayı yakalayınca `rollback()` çağırın; gerekiyorsa yeni bir `db.begin()` ile baştan başlayın.
+
+**26. WebSocket bağlantısını kayıttan silmeyi unutmak**
+- Yanlış: `withOpen` içinde bağlantıyı bir `Pair`'e eklemek ama `withClose` yazmamak.
+- Neden: Kapanan bağlantılar kayıtta kalır, `send` onlar için `false` döner ve kayıt sürekli büyür.
+- Doğru: `withClose` içinde `kayit = KeyValue.without(kayit, socket.id())`.
+
+**27. Bir WebSocket geri çağrısında uzun süren iş yapmak**
+- Yanlış: Mesaj geri çağrısının içinde saniyelerce süren bir iş yapmak, örneğin yavaş bir dış API'yi beklemek.
+- Neden: Aynı sunucudaki geri çağrılar ve HTTP işleyicileri birer birer çalışır. Biri beklerse bütün istekler ve bağlantılar bekler.
+- Doğru: Geri çağrıları kısa tutun. Veritabanına kısa bir sorgu sorun değildir; uzun beklemek sorundur.
+
 ## 46. Küçük Projeler
 
 Bu küçük projeler rehberde öğretilenleri bir araya getirir. Onları tek başınıza kurmayı deneyin!
@@ -4181,6 +4218,9 @@ Bu küçük projeler rehberde öğretilenleri bir araya getirir. Onları tek ba�
 7. **Tohumlu (Seeded) Rastgele Oyun**: `Math.seed(42)` kullanarak 1 ile 100 arasında "gizli bir sayı" üretin. Kullanıcıdan sayıyı tahmin etmesini isteyin. Doğru tahmin edene kadar "daha yüksek" veya "daha düşük" diye yönlendirin. Tohum kullanıldığı için, gizli sayı programı her çalıştırdığınızda aynı olacaktır—test yapmak için mükemmel!
 8. **SQLite Not Defteri**: `notes.db` açın, yoksa bir `notes` tablosu oluşturun ve kullanıcının not eklemesine, listelemesine, başlığa göre aramasına, güncellemesine ve silmesine izin verin. Her değer için `?` parametreleri kullanın. Programı kapatıp yeniden çalıştırın: eski notlar durmalıdır.
 9. **Web Not Defteri**: Notları `127.0.0.1` üzerinde bir tarayıcıda sunun. Notları `HTML.text` ile listeleyin, POST `/notes` ve bağlı SQLite parametreleriyle not ekleyin, sonra `/` adresine yönlendirin. Dinamik metin ham HTML'e birleştirilmemelidir.
+10. **Canlı Sohbet Odası**: 60.4'teki sohbet odasını geliştirin. Mesajları JSON olarak gönderin (`tur`, `ad`, `metin`), tarayıcıda katılma/ayrılma bildirimlerini farklı renkte gösterin, boş ya da 300 karakterden uzun mesajları reddedin ve `/kim` komutuyla odadakileri listeleyin.
+11. **PostgreSQL Not Defteri**: 59. bölümdeki `ogrenciler` tablosuna bir `notlar` tablosu ekleyin (`id uuid`, `ogrenci_id uuid REFERENCES ogrenciler(id)`, `ders text`, `puan numeric(5, 2)`). Öğrenci ve not ekleyen, her öğrencinin ortalamasını SQL'de `avg` ile hesaplayan ve bir sınıfın bütün notlarını tek bir işlemde (transaction) kaydeden bir program yazın.
+12. **Canlı Anket**: Seçenekleri ve oyları PostgreSQL'de tutan bir anket sayfası kurun. Bir oy `POST /oy` ile kaydedildikten sonra güncel sayıları JSON olarak bütün açık sayfalara WebSocket ile gönderin; sayfa yenilenmeden sayılar değişsin.
 
 ## 47. Egzersizler
 
@@ -4215,6 +4255,16 @@ Tam çözümleri hemen aramak yerine her programı küçük adımlarla kurun.
 22. `127.0.0.1` üzerinde `GET /ok` için `HTTP.text("ok")` sunun ve tarayıcıda açın.
 23. Genel bir HTTPS sayfasında `HTTP.client().get` kullanın, `status()` yazın ve `HTTPError` ile 404 `ClientResponse` ayrımını yapın.
 
+### v1.4.0: UUID, gizli değerler, PostgreSQL ve WebSocket
+24. Beş `UUID.v4()` üretin. Her birinin `version()` değerinin 4 olduğunu ve hiçbir ikisinin `equals` ile eşit olmadığını doğrulayın.
+25. Kullanıcıdan `take()` ile bir kimlik isteyin. Geçerliyse küçük harfli biçimini, değilse "geçersiz kimlik" yazdırın. Hiçbir girdide program hatayla durmasın.
+26. `Env.secret("SMTP_PASSWORD")` okuyan bir program yazın: değer yoksa açıklayıcı bir mesaj, varsa yalnızca uzunluğunu yazdırsın. Önce değişkenle, sonra `SMTP_PASSWORD_FILE` ile deneyin.
+27. PostgreSQL'de bir `kitaplar` tablosu oluşturun (`id uuid`, `ad text`, `fiyat numeric(8, 2)`), üç kitap ekleyin ve en pahalı kitabı `ORDER BY fiyat DESC LIMIT 1` ile bulun.
+28. 27'deki tabloda bütün fiyatlara %10 indirim uygulayın, `affectedRows()` değerini yazdırın, sonra `round(avg(fiyat), 2)` ile yeni ortalamayı okuyun.
+29. Bir işlemde (transaction) iki kitap ekleyin; ikincisinin `id` değeri için bilerek `"kimlik-degil"` gönderin. `rollback()` sonrasında tabloda kaç kitap olduğunu yazdırın.
+30. `/buyuk` yolunda, bağlantı açılır açılmaz "merhaba" gönderen ve gelen her mesajı büyük harfe çevirip geri yollayan bir WebSocket sunucusu yazın.
+31. 60.4'teki sohbet odasına, `POST /yonetici` ile gelen metni herkese `[yönetici]` önekiyle gönderen bir HTTP işleyicisi ekleyin. İsteği 60.5'teki gibi bir belirteçle koruyun.
+
 ## 48. Çözüm İpuçları
 
 1. `take` sonucu String'dir; yaş için `int(...)` ve yeni yaş için `+ 1` kullanın.
@@ -4240,6 +4290,14 @@ Tam çözümleri hemen aramak yerine her programı küçük adımlarla kurun.
 21. `SQLite.open("notes.db")`, `CREATE TABLE IF NOT EXISTS`, `SQLite.fromString` ile `INSERT ... VALUES (?, ?)`, sonra `ORDER BY id` ile `query`. `close()` sonrası aynı yolu yeniden açın.
 22. `HTTP.server("127.0.0.1", 8080)`, `app.get("/ok", handler)`, `HTTP.text("ok")`, sonra `app.start()`.
 23. `HTTP.client()`, `client.get("https://example.com/")`, `response.status()`. 404 hâlâ `ClientResponse`; TLS veya zaman aşımı `HTTPError`.
+24. Kimlikleri bir `List<UUIDValue>` içine koyun; iç içe iki döngüyle her çifti `equals` ile karşılaştırın (bir kimliği kendisiyle karşılaştırmayın).
+25. `UUID.isValid(metin)` hiçbir zaman hata vermez. Önce onu sorun, sonra `UUID.parse(metin).string()` yazdırın.
+26. `Env.secret` sonucu `String?`'dir; `null` kontrolünden sonra `len(...)` kullanın. Dosyayla denerken `Env.unset("SMTP_PASSWORD")` ile değişkeni kaldırmayı unutmayın.
+27. `$1::uuid` ve `$3::numeric` dönüşümlerini yazın. `fiyat` sütunu `string()` ile okunur.
+28. `UPDATE kitaplar SET fiyat = fiyat * $1::numeric` ve `PostgreSQL.fromString("0.90")`.
+29. 59.7'deki kalıbı kullanın: `attempt` içinde iki `execute` ve `commit()`, `except PostgreSQLError` içinde `rollback()`. Sayı, işlemden önceki sayıyla aynı çıkmalıdır.
+30. `withOpen` içinde `socket.send("merhaba")`, mesaj geri çağrısında `socket.send(metin.upper())`.
+31. HTTP işleyicileri ve WebSocket geri çağrıları aynı kilidi paylaşır; işleyiciden `herkeseGonder` çağırabilirsiniz. Belirteci `Env.secret` ile okuyup `Security.secureEqual` ile karşılaştırın.
 
 ## 49. Sonraki adımlar ve teknik belgeler
 
@@ -4921,117 +4979,1691 @@ Dağıtım için `APP_HOST` ve `APP_PROTOCOL` *herkese açık* adresi tanımlar 
 uygulamanızın önündeki gerçek bir sunucu HTTPS'i sonlandırır. Bu ayrımı
 [Web rehberi](WEB_TR.md#15-production) anlatır.
 
-## 57. Gerçek zamanlı web ve veri (v1.4.0)
+## 57. UUID: benzersiz kimlikler
 
-v1.4.0 birbirine uyan dört şey ekler: UUID'ler, dosyadan okunan gizli değerler,
-bir PostgreSQL modülü ve tarayıcıya güncelleme gönderen WebSocket uç noktaları.
-Her birinin tam bir başvuru belgesi vardır; bu bölüm her birinin fikrini birkaç
-satırda gösterir.
+v1.4.0 ile gelen dört yeniliğin ilki `UUID` modülüdür. Sonraki bölümler
+sırasıyla gizli değerleri (58), PostgreSQL'i (59) ve WebSocket'i (60) anlatır;
+61. bölüm dördünü tek bir uygulamada birleştirir.
 
-### 57.1 UUID'ler
+### 57.1 Neden bir kimliğe ihtiyacımız var?
 
-UUID, veritabanlarının ve başka programların anladığı 36 karakterlik bir
-kimliktir. `UUID.v7()` o anki zamanla başlayan bir UUID üretir; bu yüzden yeni
-olanlar eskilerden sonra sıralanır.
+35. bölümde her nota `INTEGER PRIMARY KEY AUTOINCREMENT` ile 1, 2, 3 diye
+numara verdik. Tek bir dosya ve tek bir program varken bu harikadır. Ama şu
+durumları düşünün:
+
+- İki ayrı sunucu aynı anda yeni kayıt ekliyor. İkisi de sıradaki numaranın 5
+  olduğunu düşünürse iki farklı kayıt aynı numarayı alır.
+- Adres çubuğunda `/fatura/41` gören biri `/fatura/42`'yi denemeye başlar.
+- Kaydı veritabanına yazmadan *önce* ona bir kimlik vermek istiyorsunuz;
+  örneğin tarayıcıya göndereceğiniz bir mesajda.
+
+**UUID** (Universally Unique Identifier), merkezî bir sayaç olmadan her yerde
+üretilebilen 128 bitlik bir kimliktir. Metin olarak her zaman 36 karakterdir:
+
+```text
+01a0a0c9-8fa6-733f-9f09-81191abcce97
+^^^^^^^^ ^^^^ ^
+8        4    sürüm rakamı (burada 7)
+```
+
+Aynı UUID'nin iki kez üretilmesi pratikte imkânsızdır; bu yüzden iki sunucu
+birbirine sormadan kimlik üretebilir.
+
+### 57.2 UUID üretmek: v4 ve v7
 
 ```ahd
 bring UUID
 from UUID bring UUIDValue
 
-first: UUIDValue := UUID.v7()
-second: UUIDValue := UUID.v7()
-write(first.string())                 // 01a0a0c9-8fa6-733f-9f09-81191abcce97
-write(first.compare(second))          // -1: first daha önce üretildi
-write(UUID.parse(first.string()).equals(first))   // true
+rastgele: UUIDValue := UUID.v4()
+sirali: UUIDValue := UUID.v7()
+
+write(rastgele.string())
+write(sirali.string())
+write("sürümler: " + str(rastgele.version()) + " ve " + str(sirali.version()))
 ```
 
-İki şeyi unutmayın. UUID'leri `==` ile değil `equals` ile karşılaştırın: `==`,
-iki değişkenin *aynı nesneyi* tutup tutmadığını sorar. Ayrıca UUID bir sır
-değildir — bir v7 UUID'nin aşağı yukarı ne zaman üretildiğini herkes okuyabilir.
-Sırlar için `Security.token()` kullanmaya devam edin (50. bölüm). Bkz.
-[UUID](UUID_TR.md).
+Çıktı her çalıştırmada farklıdır, ama biçimi hep aynıdır:
 
-### 57.2 Dosyadan gizli değerler
+```text
+3f2b8c1e-9a4d-4f6b-8e21-5c7d9a0b1e44
+01a0a0c9-8fa6-733f-9f09-81191abcce97
+sürümler: 4 ve 7
+```
 
-Sunucular bir programa parolayı çoğu zaman bir *dosya* olarak verir ve dosyanın
-yolunu `_FILE` ile biten bir değişkene koyar. `Env.secret` iki biçimi de
-karşılar:
+- `UUID.v4()` tamamen rastgeledir.
+- `UUID.v7()` o anki zamanla başlar, sonuna rastgele bitler ekler. Bu yüzden
+  **sonra üretilen v7 her zaman sonra sıralanır.** Veritabanında birincil
+  anahtar olarak kullanacaksanız çoğu zaman v7 daha iyi seçimdir.
+
+Bir `UUIDValue` bir `String` değildir. Metne ihtiyacınız olduğunda
+`.string()` çağırırsınız.
+
+### 57.3 v7 değerleri üretim sırasıyla dizilir
 
 ```ahd
-bring Env
+bring UUID
+from UUID bring UUIDValue
 
-password: String? := Env.secret("DB_PASSWORD")
-if password == null {
-    write("DB_PASSWORD'u ya da onu tutan dosyayı gösteren DB_PASSWORD_FILE'ı ayarlayın.")
+kimlikler: List<UUIDValue> := []
+for i in between(0, 5) {
+    kimlikler.add(UUID.v7())
+}
+
+sirali: Bool := true
+for i in between(1, len(kimlikler)) {
+    if kimlikler[i - 1].compare(kimlikler[i]) >= 0 {
+        sirali = false
+    }
+}
+
+for kimlik in kimlikler {
+    write(kimlik.string())
+}
+write("üretim sırasıyla dizili: " + str(sirali))
+```
+
+`a.compare(b)`, `a` önce geliyorsa `-1`, eşitse `0`, sonra geliyorsa `1`
+döndürür. Tek bir program içinde her `UUID.v7()` bir öncekinden büyüktür;
+bilgisayarın saati geriye alınsa bile. Aynı sıra metinde de geçerlidir: v7
+metinlerini alfabetik sıralamak onları üretim zamanına göre sıralar.
+
+Aynı döngüyü `UUID.v4()` ile deneyin: sonuç çoğu zaman `false` olur, çünkü v4
+bir sıra vaat etmez.
+
+### 57.4 Metinden UUID'ye: `parse` ve `isValid`
+
+Kullanıcıdan, bir adresten ya da bir dosyadan gelen kimlik bir `String`'dir.
+Onu `UUID.parse` ile `UUIDValue`'ya çevirirsiniz. Kurallar katıdır: tam 36
+karakter, `-` ile ayrılmış 8-4-4-4-12 gruplar. Büyük harf kabul edilir, çıktı
+her zaman küçük harftir.
+
+```ahd
+bring UUID
+
+girdiler: List<String> := [
+    "017F22E2-79B0-7CC3-98C4-DC0C0C07398F"
+    "017f22e2-79b0-7cc3-98c4-dc0c0c07398f"
+    r"{017f22e2-79b0-7cc3-98c4-dc0c0c07398f}"
+    "urn:uuid:017f22e2-79b0-7cc3-98c4-dc0c0c07398f"
+    "017f22e279b07cc398c4dc0c0c07398f"
+    " 017f22e2-79b0-7cc3-98c4-dc0c0c07398f"
+    "merhaba"
+]
+
+for metin in girdiler {
+    if UUID.isValid(metin) {
+        write("geçerli  -> " + UUID.parse(metin).string())
+    }
+    else {
+        write("geçersiz -> " + metin)
+    }
 }
 ```
 
-`DB_PASSWORD` ayarlıysa onu, değilse `DB_PASSWORD_FILE` ile adı verilen dosyayı
-okur. İkisini birden ayarlamak hatadır; böylece hangisinin kullanıldığını her
-zaman bilirsiniz. Bkz. [Env](ENV_TR.md#secret).
+Beklenen çıktı:
 
-### 57.3 PostgreSQL
+```text
+geçerli  -> 017f22e2-79b0-7cc3-98c4-dc0c0c07398f
+geçerli  -> 017f22e2-79b0-7cc3-98c4-dc0c0c07398f
+geçersiz -> {017f22e2-79b0-7cc3-98c4-dc0c0c07398f}
+geçersiz -> urn:uuid:017f22e2-79b0-7cc3-98c4-dc0c0c07398f
+geçersiz -> 017f22e279b07cc398c4dc0c0c07398f
+geçersiz ->  017f22e2-79b0-7cc3-98c4-dc0c0c07398f
+geçersiz -> merhaba
+```
 
-PostgreSQL, 51. bölümdeki MySQL modülü gibi çalışır; birkaç farkla. Yer
-tutucular numaralıdır, `$1`, `$2`, … ve üretilen değerler `RETURNING` ile geri
-gelir:
+Süslü parantezli satırı neden `r"..."` ile yazdık? Sıradan bir String içindeki
+`{` araya değer eklemeyi (interpolasyon) başlatır (6. bölüm). Ham String'de
+`{` sıradan bir karakterdir.
+
+`isValid` hiçbir zaman hata vermez. `parse` ise geçersiz metinde `UUIDError`
+fırlatır; bunu 18. bölümdeki gibi yakalayabilirsiniz:
 
 ```ahd
+bring UUID
+from UUID bring (UUIDValue, UUIDError)
+
+kimlikOku: Function := (metin: String) -> UUIDValue? {
+    attempt {
+        return UUID.parse(metin)
+    }
+    except UUIDError as error {
+        write("reddedildi: " + error.message)
+        return null
+    }
+}
+
+bulunan: UUIDValue? := kimlikOku("017f22e2-79b0-7cc3-98c4-dc0c0c07398f")
+if bulunan != null {
+    write("bulundu: " + bulunan.string())
+}
+
+hatali: UUIDValue? := kimlikOku("42")
+write("hatalı girdi null döndü: " + str(hatali == null))
+```
+
+Hata mesajı reddedilen metni hiçbir zaman tekrar etmez; kullanıcıdan gelen
+bir değeri günlüğe taşımaz.
+
+### 57.5 İki UUID'yi karşılaştırmak: `equals`, `compare` ve `==` tuzağı
+
+```ahd
+bring UUID
+from UUID bring UUIDValue
+
+a: UUIDValue := UUID.parse("017f22e2-79b0-7cc3-98c4-dc0c0c07398f")
+b: UUIDValue := UUID.parse("017F22E2-79B0-7CC3-98C4-DC0C0C07398F")
+c: UUIDValue := a
+
+write(a.equals(b))
+write(a == b)
+write(a == c)
+write(a.compare(b))
+write(str(a))
+write(a.string())
+```
+
+Beklenen çıktı:
+
+```text
+true
+false
+true
+0
+<UUIDValue>
+017f22e2-79b0-7cc3-98c4-dc0c0c07398f
+```
+
+- `equals` iki UUID'nin **aynı 128 biti** taşıyıp taşımadığını sorar. İki
+  kimliği karşılaştırırken bunu kullanın.
+- `==`, 13. bölümdeki referans davranışını izler: iki değişken **aynı nesneyi**
+  mi gösteriyor? `a` ve `b` ayrı ayrı ayrıştırıldığı için `false`, `c := a`
+  aynı nesneyi paylaştığı için `true`.
+- `str(a)` metni değil `<UUIDValue>` yazar. Metin için `a.string()`.
+
+### 57.6 Sıfır UUID
+
+```ahd
+bring UUID
+from UUID bring UUIDValue
+
+sahip: UUIDValue := UUID.zero()
+write(sahip.string())
+write("henüz atanmadı: " + str(sahip.isZero()))
+
+sahip = UUID.v7()
+write("henüz atanmadı: " + str(sahip.isZero()))
+```
+
+`UUID.zero()`, `00000000-0000-0000-0000-000000000000` değeridir. Bazı sistemler
+"boş kimlik" için bunu kullanır. Kendi kodunuzda "henüz yok" demek için çoğu
+zaman `UUIDValue?` ve `null` (16. bölüm) daha açıktır; sıfır UUID'yi ancak
+karşınızdaki sistem onu beklediğinde kullanın.
+
+### 57.7 Hangi kimliği ne zaman kullanmalı?
+
+| | `Identity.id()` | `Security.token()` | `UUID.v4()` | `UUID.v7()` |
+| --- | --- | --- | --- | --- |
+| Amaç | AhdCode içi genel kimlik | **gizli** belirteç | başka sistemlerle uyumlu kimlik | zamana göre sıralı kimlik |
+| Metin | 22 karakter | 43 karakter | 36 karakter | 36 karakter |
+| Gizli mi? | hayır | **evet** | hayır | hayır; ne zaman üretildiğini gösterir |
+
+En önemli kural: **UUID bir sır değildir.** Oturum anahtarı, parola sıfırlama
+bağlantısı, API anahtarı gibi tahmin edilmemesi gereken her şey için
+`Security.token()` kullanın (50. bölüm). Bir v7 UUID'ye bakan herkes aşağı
+yukarı ne zaman üretildiğini okuyabilir.
+
+### 57.8 UUID'leri bir veritabanında saklamak
+
+UUID'nin 36 karakterlik metnini saklarsınız. SQLite'ta (35. bölüm) `TEXT`
+sütunu yeterlidir:
+
+```ahd
+bring SQLite
+bring UUID
+from SQLite bring Database
+from UUID bring UUIDValue
+
+db: Database := SQLite.open(":memory:")
+db.execute("CREATE TABLE dersler (id TEXT PRIMARY KEY, baslik TEXT NOT NULL)")
+
+for baslik in ["Değişkenler", "Döngüler", "Fonksiyonlar"] {
+    db.execute(
+        "INSERT INTO dersler (id, baslik) VALUES (?, ?)"
+        [SQLite.fromString(UUID.v7().string()), SQLite.fromString(baslik)]
+    )
+}
+
+satirlar := db.query("SELECT id, baslik FROM dersler ORDER BY id")
+for satir in satirlar {
+    kimlik: Local UUIDValue := UUID.parse(satir["id"].string())
+    write(satir["baslik"].string() + " -> sürüm " + str(kimlik.version()))
+}
+db.close()
+```
+
+Beklenen çıktı:
+
+```text
+Değişkenler -> sürüm 7
+Döngüler -> sürüm 7
+Fonksiyonlar -> sürüm 7
+```
+
+`ORDER BY id` satırları ekleme sırasıyla getirdi, çünkü v7 metinleri üretim
+zamanına göre sıralanır. MySQL'de `CHAR(36)` kullanın; PostgreSQL'in ise kendi
+`uuid` türü vardır (59. bölüm).
+
+**Siz deneyin:** 57.8'deki programda `UUID.v7()` yerine `UUID.v4()` yazın ve
+`ORDER BY id` sırasının artık ekleme sırası olmadığını görün.
+
+Tam başvuru: [UUID](UUID_TR.md) ·
+[`examples/v0.1/69_uuid.ahd`](../examples/v0.1/69_uuid.ahd).
+
+## 58. Gizli değerleri dosyadan okumak
+
+### 58.1 Parolayı nereye koymalı?
+
+Bir veritabanı parolasını kaynak koda yazmak en kötü seçenektir: kod git
+geçmişine girer ve oradan kolay kolay silinmez. 33. bölümde `.env` dosyasını
+ve ortam değişkenlerini gördünüz; yerelde çalışırken doğru yer orasıdır.
+
+Sunucularda ise çoğu zaman bir adım daha ileri gidilir: Docker, Kubernetes ya
+da systemd gibi platformlar parolayı programın okuyabildiği **bir dosya**
+olarak yerleştirir ve dosyanın yolunu `_FILE` ile biten bir değişkende verir:
+
+```text
+DB_PASSWORD_FILE=/run/secrets/db_password
+```
+
+`Env.secret("DB_PASSWORD")` iki yolu da tek çağrıda karşılar.
+
+### 58.2 Kurallar
+
+| `DB_PASSWORD` | `DB_PASSWORD_FILE` | `Env.secret("DB_PASSWORD")` |
+| --- | --- | --- |
+| yok | yok | `null` |
+| var (`""` bile olsa) | yok | `DB_PASSWORD` değeri |
+| yok | bir dosya yolu | dosyanın içeriği |
+| yok | `""` | `EnvError` |
+| var | var | `EnvError`: yalnızca birini ayarlayın |
+
+- Dosyanın sonundaki **tek** satır sonu (`\n` ya da `\r\n`) kaldırılır; başka
+  hiçbir şey kırpılmaz.
+- Dosya en fazla 1 MiB, geçerli UTF-8 ve NUL baytı içermeyen bir dosya
+  olmalıdır.
+- Dosya yoksa ya da okunamıyorsa `EnvError` fırlatılır; `Env.secret` asla
+  sessizce başka bir değere geri dönmez.
+- İkisi birden ayarlıysa hata verir. Böylece unutulmuş eski bir değişken
+  hiçbir zaman gizlice kazanmaz.
+
+### 58.3 Dosyadan okumak
+
+Bu program kendi gizli dosyasını oluşturur, sonra onu okur:
+
+```ahd
+bring Env
+bring File
+bring Path
+
+klasor := "gizli-deneme"
+if File.exists(klasor) == false {
+    File.createDir(klasor)
+}
+dosya := Path.join([klasor, "db_password.txt"])
+File.writeText(dosya, "cok-gizli-parola\n")
+
+Env.unset("DB_PASSWORD")
+Env.unset("DB_PASSWORD_FILE")
+bos: String? := Env.secret("DB_PASSWORD")
+write("hiçbiri ayarlı değil, sonuç null: " + str(bos == null))
+
+Env.set("DB_PASSWORD_FILE", dosya)
+parola: String? := Env.secret("DB_PASSWORD")
+if parola != null {
+    write("dosyadan okundu, uzunluk: " + str(len(parola)))
+    write(
+        "sondaki satır sonu kaldırıldı: " + str(parola.endsWith("\n") == false)
+    )
+}
+```
+
+Beklenen çıktı:
+
+```text
+hiçbiri ayarlı değil, sonuç null: true
+dosyadan okundu, uzunluk: 16
+sondaki satır sonu kaldırıldı: true
+```
+
+Program parolanın kendisini değil, yalnızca uzunluğunu yazıyor. Bu bilinçli
+bir alışkanlıktır: gizli bir değer ekrana, günlüğe ya da bir HTTP yanıtına
+yazılmamalıdır.
+
+### 58.4 Hataları yakalamak
+
+```ahd
+bring Env
+from Env bring EnvError
+
+dene: Function := (durum: String) -> Nothing {
+    attempt {
+        deger: Local String? := Env.secret("API_KEY")
+        if deger == null {
+            write(durum + ": ayarlı değil")
+        }
+        else {
+            write(durum + ": okundu")
+        }
+    }
+    except EnvError as error {
+        write(durum + ": " + error.message)
+    }
+}
+
+Env.unset("API_KEY")
+Env.unset("API_KEY_FILE")
+dene("hiçbiri")
+
+Env.set("API_KEY", "abc123")
+dene("yalnızca API_KEY")
+
+Env.set("API_KEY_FILE", "api_key.txt")
+dene("ikisi birden")
+
+Env.unset("API_KEY")
+dene("olmayan dosya")
+
+Env.set("API_KEY_FILE", "")
+dene("boş yol")
+```
+
+Beklenen çıktı (çalışma klasöründe `api_key.txt` yokken):
+
+```text
+hiçbiri: ayarlı değil
+yalnızca API_KEY: okundu
+ikisi birden: API_KEY and API_KEY_FILE are both set; set only one
+olmayan dosya: the secret file named by API_KEY_FILE could not be read
+boş yol: API_KEY_FILE is set but empty
+```
+
+Mesajlar değişkenin **adını** söyler; değeri, dosyanın içeriğini ya da yolunu
+asla içermez.
+
+### 58.5 Yerelde `.env`, sunucuda dosya
+
+Yerelde commit etmediğiniz bir `.env` dosyası yeterlidir:
+
+```text
+DB_PASSWORD=yerel-gelistirme-parolasi
+```
+
+`Web.start()` ve `Web.configure()` `.env` dosyasını kendileri yükler. Sıradan
+bir betikte `Env.secret` çağırmadan önce `Env.load(".env")` çağırın.
+
+Sunucuda aynı program hiç değişmeden dosyadan okur. Docker Compose ile:
+
+```yaml
+services:
+  uygulama:
+    image: benim-uygulamam
+    environment:
+      DB_PASSWORD_FILE: /run/secrets/db_password
+    secrets:
+      - db_password
+
+secrets:
+  db_password:
+    file: ./db_password.txt
+```
+
+systemd ile (`%d`, systemd'nin kimlik bilgileri klasörüdür):
+
+```ini
+[Service]
+LoadCredential=db_password:/etc/uygulamam/db_password
+Environment=DB_PASSWORD_FILE=%d/db_password
+```
+
+### 58.6 Unutmayın
+
+- `Env.secret` değeri *okur*, sonra onu gizlemez. Elinizdeki sıradan bir
+  `String`'dir. `write(parola)` yazarsanız ekrana çıkar.
+- `DB_PASSWORD` ile `DB_PASSWORD_FILE`'ı birlikte ayarlamayın.
+- Gizli dosyayı da `.env` gibi git'e eklemeyin.
+
+**Siz deneyin:** 58.3'teki programda dosyaya `"parola\n\n"` yazın. Uzunluk kaç
+çıkıyor? (İpucu: yalnızca *bir* satır sonu kaldırılır.)
+
+Tam başvuru: [Env](ENV_TR.md#secret) ·
+[`examples/v0.1/70_env_secret.ahd`](../examples/v0.1/70_env_secret.ahd).
+
+## 59. PostgreSQL: güçlü bir ağ veritabanı
+
+51. bölümde MySQL ile ağ üzerinden bir veritabanı sunucusuna bağlandınız.
+**PostgreSQL** de bir sunucudur ve dünyada en çok kullanılan veritabanlarından
+biridir. AhdCode v1.4.0 onun için ayrı bir `PostgreSQL` modülü getirir.
+
+PostgreSQL'i öğrenmeye değer kılan birkaç özellik:
+
+- `uuid`, `boolean`, `numeric`, `timestamptz`, `jsonb` gibi zengin türler.
+- Katı işlemler (transaction): bir adım başarısız olursa işlemin geri kalanı
+  da reddedilir; yarım kayıt oluşmaz.
+- Açık ve tutarlı hata kodları (SQLSTATE).
+
+Bu bölümdeki programlar birbirini izler: önce bir tablo oluşturacak, sonra
+öğrenci ekleyip okuyacak, güncelleyecek ve işlemlerle çalışacaksınız.
+
+### 59.1 Yerelde bir PostgreSQL sunucusu
+
+Denemek için kendi bilgisayarınızda bir sunucu yeterlidir. Docker varsa tek
+komut:
+
+```bash
+docker run --name ahd-postgres -e POSTGRES_USER=app -e POSTGRES_PASSWORD=yerel-parola -e POSTGRES_DB=okul -p 5432:5432 -d postgres:18
+```
+
+macOS'ta Homebrew ile:
+
+```bash
+brew install postgresql@18
+brew services start postgresql@18
+"$(brew --prefix postgresql@18)/bin/createuser" --pwprompt app
+"$(brew --prefix postgresql@18)/bin/createdb" --owner app okul
+```
+
+Ubuntu/Debian'da:
+
+```bash
+sudo apt install postgresql
+sudo -u postgres createuser --pwprompt app
+sudo -u postgres createdb --owner app okul
+```
+
+Windows'ta [postgresql.org](https://www.postgresql.org/download/) adresindeki
+kurucuyu kullanın ve kurulumdan sonra pgAdmin ile `app` kullanıcısını ve `okul`
+veritabanını oluşturun.
+
+Ardından çalışma klasörünüzde commit etmeyeceğiniz bir `.env` dosyası açın:
+
+```text
+DB_HOST=127.0.0.1
+DB_PORT=5432
+DB_USERNAME=app
+DB_PASSWORD=yerel-parola
+DB_DATABASE=okul
+DB_SECURITY=none
+```
+
+`DB_SECURITY=none` şifresiz bağlantı demektir ve **yalnızca kendi
+bilgisayarınızdaki** bir sunucu için uygundur. Ağ üzerindeki gerçek bir
+sunucuda `tls` kullanın (varsayılan budur).
+
+### 59.2 Paylaşılan bağlantı dosyası
+
+Bu bölümdeki her program aynı şekilde bağlanır. Tekrar etmemek için bağlantıyı
+bir kez `Baglanti.ahd` dosyasına yazalım ve 19. bölümdeki `require(...)` ile
+kullanalım:
+
+```ahd
+// Baglanti.ahd -- bu bölümdeki programların paylaştığı bağlantı.
+bring Env
+bring File
 bring PostgreSQL
 from PostgreSQL bring PostgreSQLDatabase
 
-db: PostgreSQLDatabase := PostgreSQL.connect("127.0.0.1", "app", "secret", 5432, "school", "none")
-rows := db.query(
-    "INSERT INTO students (name, active) VALUES ($1, $2) RETURNING id"
-    [PostgreSQL.fromString("Ayşe"), PostgreSQL.fromBool(true)]
-)
-write(rows[0]["id"].int())
+okulBaglan: Function := () -> PostgreSQLDatabase {
+    if File.exists(".env") {
+        Env.load(".env")
+    }
+    parola: Local String? := Env.secret("DB_PASSWORD")
+    if parola == null {
+        toss Error("DB_PASSWORD ya da DB_PASSWORD_FILE ayarlayın.")
+    }
+    return PostgreSQL.connect(
+        Env.getOr("DB_HOST", "127.0.0.1")
+        Env.getOr("DB_USERNAME", "app")
+        parola
+        int(Env.getOr("DB_PORT", "5432"))
+        Env.getOr("DB_DATABASE", "okul")
+        Env.getOr("DB_SECURITY", "tls")
+    )
+}
 ```
 
-PostgreSQL bir işlemin (transaction) içinde katıdır: bir ifade başarısız
-olduğunda işlemin tamamı bozulur ve `commit()` bir kısmını kaydetmek yerine
-hata verir. Hatayı yakalayın ve `rollback()` çağırın. Bkz.
-[PostgreSQL](POSTGRESQL_TR.md).
+`PostgreSQL.connect` argümanları sırasıyla: sunucu, kullanıcı adı, parola,
+port, veritabanı ve güvenlik kipidir. `connect` yalnızca bilgileri saklamaz:
+sunucuya gerçekten bağlanır, kimliğinizi doğrular ve yanıt verdiğini denetler.
+Yanlış bir parola ya da kapalı bir sunucu hemen burada `PostgreSQLError`
+fırlatır, ilk sorgunuzda değil.
 
-### 57.4 WebSocket: tarayıcıya güncelleme göndermek
+`PGHOST`, `PGPASSWORD` gibi PostgreSQL'e özgü ortam değişkenleri ve `~/.pgpass`
+dosyası hiçbir şeyi değiştirmez. Nereye bağlanılacağına yalnızca `connect`
+argümanları karar verir.
 
-Normal bir web sayfası yeni bir şeyi ancak sorduğunda öğrenir. WebSocket açık
-kalır; böylece sunucu bir şey olduğu anda mesaj gönderebilir.
+İlk deneme:
+
+```ahd
+require("Baglanti.ahd")
+bring PostgreSQL
+from PostgreSQL bring PostgreSQLError
+
+attempt {
+    db: Local := okulBaglan()
+    sonuc: Local := db.query("SELECT current_database() AS ad")
+    write("bağlandı: " + sonuc[0]["ad"].string())
+    db.close()
+}
+except PostgreSQLError as error {
+    write("bağlanılamadı: " + error.message)
+}
+```
+
+Beklenen çıktı:
+
+```text
+bağlandı: okul
+```
+
+### 59.3 Tablo oluşturmak
+
+```ahd
+require("Baglanti.ahd")
+
+db := okulBaglan()
+db.execute("""
+    CREATE TABLE IF NOT EXISTS ogrenciler (
+        id uuid PRIMARY KEY,
+        ad text NOT NULL,
+        eposta text NOT NULL UNIQUE,
+        aktif boolean NOT NULL DEFAULT true,
+        ortalama numeric(5, 2),
+        kayit_zamani timestamptz NOT NULL DEFAULT now()
+    )
+    """)
+write("ogrenciler tablosu hazır")
+db.close()
+```
+
+| Sütun | Türü | Anlamı |
+| --- | --- | --- |
+| `id` | `uuid` | 57. bölümdeki UUID; uygulama `UUID.v7()` ile üretir |
+| `ad` | `text` | uzunluğu sınırsız metin |
+| `eposta` | `text ... UNIQUE` | aynı e-posta iki kez kaydedilemez |
+| `aktif` | `boolean` | gerçek bir `true`/`false` |
+| `ortalama` | `numeric(5, 2)` | kuruş hatası olmayan ondalık sayı, örneğin `91.50`; boş (`NULL`) olabilir |
+| `kayit_zamani` | `timestamptz` | saat dilimi bilen zaman; varsayılanı "şimdi" |
+
+`IF NOT EXISTS` sayesinde programı ikinci kez çalıştırmak hata vermez.
+
+### 59.4 Satır eklemek: `$1`, `$2` ve `RETURNING`
+
+MySQL ve SQLite `?` kullanıyordu. PostgreSQL'in yer tutucuları **numaralıdır**:
+`$1`, `$2`, `$3`... Değerler yine her zaman ayrı gönderilir ve asla SQL
+metninin içine yapıştırılmaz.
+
+```ahd
+require("Baglanti.ahd")
+bring PostgreSQL
+bring UUID
+from PostgreSQL bring PostgreSQLDatabase
+
+ogrenciEkle: Function := (
+    db: PostgreSQLDatabase
+    ad: String
+    eposta: String
+    ortalama: String
+) -> Nothing {
+    eklenen: Local := db.query(
+        "INSERT INTO ogrenciler (id, ad, eposta, ortalama) VALUES ($1::uuid, $2, $3, $4::numeric) RETURNING id, kayit_zamani"
+        [
+            PostgreSQL.fromString(UUID.v7().string())
+            PostgreSQL.fromString(ad)
+            PostgreSQL.fromString(eposta)
+            PostgreSQL.fromString(ortalama)
+        ]
+    )
+    write(ad + " eklendi, kimlik: " + eklenen[0]["id"].string())
+}
+
+db := okulBaglan()
+db.execute("DELETE FROM ogrenciler")
+ogrenciEkle(db, "Ayşe Yılmaz", "ayse@example.com", "91.50")
+ogrenciEkle(db, "Mehmet Kaya", "mehmet@example.com", "78.25")
+ogrenciEkle(db, "Zeynep Demir", "zeynep@example.com", "85.00")
+db.close()
+```
+
+Beklenen çıktı (kimlikler sizde farklı olur):
+
+```text
+Ayşe Yılmaz eklendi, kimlik: 01a0a0c9-8fa6-733f-9f09-81191abcce97
+Mehmet Kaya eklendi, kimlik: 01a0a0c9-8fa7-7a41-b3c2-0d5e6f718293
+Zeynep Demir eklendi, kimlik: 01a0a0c9-8fa7-7b10-8c77-2e9d4a5b6c01
+```
+
+Dört şeye dikkat edin:
+
+1. **`$1::uuid` ve `$4::numeric`**: `PostgreSQL.fromString` metin gönderir.
+   `::uuid` "bu metni uuid olarak yorumla" demektir. Türün belli olmadığı
+   yerlerde bu dönüşümleri SQL'de açıkça yazın.
+2. **`RETURNING id, kayit_zamani`**: PostgreSQL'de `lastInsertId()` yoktur.
+   Sunucunun ürettiği değerleri (burada varsayılan `kayit_zamani`) `RETURNING`
+   ile isteyip `query` ile okursunuz.
+3. **`DELETE FROM ogrenciler`**: programı yeniden çalıştırdığınızda `UNIQUE`
+   e-posta kuralına takılmamak için başta tabloyu boşalttık.
+4. **Bir çağrı, bir ifade**: `"UPDATE ...; DROP TABLE ..."` gibi noktalı
+   virgülle iki ifade göndermek hata verir ve hiçbiri çalışmaz.
+
+Değer göndermenin beş yolu vardır: `PostgreSQL.fromString`, `fromInt`,
+`fromReal`, `fromBool` ve `nullValue()`.
+
+### 59.5 Satırları okumak ve türler
+
+```ahd
+require("Baglanti.ahd")
+
+db := okulBaglan()
+satirlar := db.query(
+    "SELECT ad, aktif, ortalama, kayit_zamani FROM ogrenciler ORDER BY ad"
+)
+for satir in satirlar {
+    ad: Local String := satir["ad"].string()
+    aktif: Local Bool := satir["aktif"].bool()
+    ortalama: Local String := satir["ortalama"].string()
+    write(ad + " | aktif: " + str(aktif) + " | ortalama: " + ortalama)
+}
+
+ilk := satirlar[0]
+write("ad: " + ilk["ad"].kind())
+write("aktif: " + ilk["aktif"].kind())
+write("ortalama: " + ilk["ortalama"].kind())
+write("kayit_zamani: " + ilk["kayit_zamani"].kind())
+write("örnek zaman: " + ilk["kayit_zamani"].string())
+db.close()
+```
+
+Beklenen çıktı (zaman sizde farklı olur):
+
+```text
+Ayşe Yılmaz | aktif: true | ortalama: 91.50
+Mehmet Kaya | aktif: true | ortalama: 78.25
+Zeynep Demir | aktif: true | ortalama: 85.00
+ad: String
+aktif: Bool
+ortalama: String
+kayit_zamani: String
+örnek zaman: 2026-09-15 08:30:12.482913+00
+```
+
+Her satır, 35. bölümden tanıdığınız `Pair` biçimindedir. Değerleri şöyle
+okursunuz:
+
+| PostgreSQL türü | `kind()` | Okuma |
+| --- | --- | --- |
+| `NULL` | `"Null"` | `isNull()` |
+| `boolean` | `"Bool"` | `bool()` |
+| `smallint`, `integer`, `bigint` | `"Int"` | `int()` |
+| `real`, `double precision` | `"Real"` | `real()` |
+| `numeric` | `"String"` | `string()`, örneğin `"91.50"` |
+| `uuid`, `text`, `json`, `jsonb` | `"String"` | `string()` |
+| `date`, `timestamp`, `timestamptz` | `"String"` | `string()`; `timestamptz` her zaman UTC (`+00`) |
+| `bytea` | `"Binary"` | `binarySize()`, `binaryBase64()` |
+
+İki önemli ayrıntı:
+
+- **`numeric` bir `String` olarak gelir.** `91.50` gibi bir değeri `Real`'e
+  çevirmek kuruş hataları doğurabilir; bu yüzden AhdCode bunu sessizce yapmaz.
+  Aritmetik gerekiyorsa açıkça `real(ortalama)` yazın ya da hesabı SQL'de
+  yaptırın.
+- **Zamanlar UTC gösterilir.** `timestamptz` bir andır; AhdCode onu her zaman
+  `+00` ile yazar. Yanlış erişimciyi çağırmak (örneğin `ortalama` için
+  `int()`) açıklayıcı bir `PostgreSQLError` verir.
+
+### 59.6 Güncellemek, NULL ve özet sorgular
+
+```ahd
+require("Baglanti.ahd")
+bring PostgreSQL
+from PostgreSQL bring PostgreSQLResult
+
+db := okulBaglan()
+
+yukseltilen: PostgreSQLResult := db.execute(
+    "UPDATE ogrenciler SET ortalama = ortalama + $1::numeric WHERE ortalama < $2::numeric"
+    [PostgreSQL.fromString("5"), PostgreSQL.fromString("80")]
+)
+write("notu yükseltilen: " + str(yukseltilen.affectedRows()))
+
+pasif: PostgreSQLResult := db.execute(
+    "UPDATE ogrenciler SET aktif = $1, ortalama = NULL WHERE eposta = $2"
+    [PostgreSQL.fromBool(false), PostgreSQL.fromString("zeynep@example.com")]
+)
+write("pasif yapılan: " + str(pasif.affectedRows()))
+
+satirlar := db.query("SELECT ad, aktif, ortalama FROM ogrenciler ORDER BY ad")
+for satir in satirlar {
+    ortalama: Local String := "yok"
+    if satir["ortalama"].isNull() == false {
+        ortalama = satir["ortalama"].string()
+    }
+    aktif: Local String := str(satir["aktif"].bool())
+    write(
+        satir["ad"].string() + " | aktif: " + aktif + " | ortalama: " + ortalama
+    )
+}
+
+ozet := db.query(
+    "SELECT count(*) AS toplam, round(avg(ortalama), 2) AS genel FROM ogrenciler WHERE aktif"
+)
+toplam: Int := ozet[0]["toplam"].int()
+genel: String := ozet[0]["genel"].string()
+write("aktif öğrenci: " + str(toplam) + ", genel ortalama: " + genel)
+db.close()
+```
+
+Beklenen çıktı:
+
+```text
+notu yükseltilen: 1
+pasif yapılan: 1
+Ayşe Yılmaz | aktif: true | ortalama: 91.50
+Mehmet Kaya | aktif: true | ortalama: 83.25
+Zeynep Demir | aktif: false | ortalama: yok
+aktif öğrenci: 2, genel ortalama: 87.38
+```
+
+- `execute`, bir `PostgreSQLResult` döndürür; `affectedRows()` o ifadenin kaç
+  satırı değiştirdiğini söyler.
+- SQL `NULL`, AhdCode `null`'ı değildir: `kind()` değeri `"Null"` olan bir
+  `PostgreSQLValue`'dur. Okumadan önce `isNull()` ile sorun.
+- `count(*)` bir `bigint` döndürür ve `int()` ile okunur; `avg(...)` ise
+  `numeric` olduğu için `String` gelir.
+
+Silmek de aynı kalıptır:
+
+```ahd
+require("Baglanti.ahd")
+bring PostgreSQL
+
+db := okulBaglan()
+silinen := db.execute(
+    "DELETE FROM ogrenciler WHERE aktif = $1"
+    [PostgreSQL.fromBool(false)]
+)
+write("silinen öğrenci: " + str(silinen.affectedRows()))
+db.close()
+```
+
+### 59.7 Transaction: hep ya da hiç
+
+Bir işlem (transaction), birkaç ifadeyi "ya hepsi kaydedilsin ya hiçbiri" diye
+gruplar. `db.begin()` bir `PostgreSQLTransaction` verir; ifadeleri onun
+üzerinden çalıştırır, sonunda `commit()` ya da `rollback()` çağırırsınız.
+
+```ahd
+require("Baglanti.ahd")
+bring PostgreSQL
+bring UUID
+from PostgreSQL bring (PostgreSQLTransaction, PostgreSQLError)
+
+db := okulBaglan()
+kayit := "INSERT INTO ogrenciler (id, ad, eposta) VALUES ($1::uuid, $2, $3)"
+
+islem: PostgreSQLTransaction := db.begin()
+attempt {
+    islem.execute(
+        kayit
+        [
+            PostgreSQL.fromString(UUID.v7().string())
+            PostgreSQL.fromString("Can Öz")
+            PostgreSQL.fromString("can@example.com")
+        ]
+    )
+    // Aynı e-posta ikinci kez: UNIQUE kuralı bu ifadeyi reddeder.
+    islem.execute(
+        kayit
+        [
+            PostgreSQL.fromString(UUID.v7().string())
+            PostgreSQL.fromString("Can Öz (kopya)")
+            PostgreSQL.fromString("can@example.com")
+        ]
+    )
+    islem.commit()
+    write("iki kayıt da kaydedildi")
+}
+except PostgreSQLError as error {
+    islem.rollback()
+    write("geri alındı: " + error.message)
+}
+
+sayim := db.query(
+    "SELECT count(*) AS n FROM ogrenciler WHERE eposta = $1"
+    [PostgreSQL.fromString("can@example.com")]
+)
+write("can@example.com kayıt sayısı: " + str(sayim[0]["n"].int()))
+db.close()
+```
+
+Beklenen çıktı:
+
+```text
+geri alındı: PostgreSQL execution failed: (23505) duplicate key value violates unique constraint "ogrenciler_eposta_key"
+can@example.com kayıt sayısı: 0
+```
+
+İlk `INSERT` başarılı olduğu hâlde tabloya **hiçbir şey** yazılmadı. İşlem geri
+alındığı için yarım kayıt kalmadı.
+
+**PostgreSQL'in katı kuralı.** MySQL'de işlem içindeki bir ifade başarısız
+olursa işleme devam edebilirsiniz. PostgreSQL'de edemezsiniz: bir ifade
+başarısız olduktan sonra işlem **iptal edilmiş** sayılır. Aşağıdaki program bu
+kuralı bilerek çiğner:
+
+```ahd
+require("Baglanti.ahd")
+bring PostgreSQL
+from PostgreSQL bring (PostgreSQLTransaction, PostgreSQLError)
+
+db := okulBaglan()
+islem: PostgreSQLTransaction := db.begin()
+
+attempt {
+    islem.execute(
+        "UPDATE ogrenciler SET ortalama = $1::numeric WHERE eposta = $2"
+        [
+            PostgreSQL.fromString("çok iyi")
+            PostgreSQL.fromString("ayse@example.com")
+        ]
+    )
+}
+except PostgreSQLError as error {
+    write("1. ifade: " + error.message)
+}
+
+attempt {
+    islem.execute(
+        "UPDATE ogrenciler SET aktif = true WHERE eposta = $1"
+        [PostgreSQL.fromString("mehmet@example.com")]
+    )
+}
+except PostgreSQLError as error {
+    write("2. ifade: " + error.message)
+}
+
+attempt {
+    islem.commit()
+}
+except PostgreSQLError as error {
+    write("commit: " + error.message)
+}
+islem.rollback()
+db.close()
+```
+
+Beklenen çıktı:
+
+```text
+1. ifade: PostgreSQL execution failed: (22P02) invalid input syntax for type numeric: "çok iyi"
+2. ifade: PostgreSQL execution failed: (25P02) current transaction is aborted, commands ignored until end of transaction block
+commit: PostgreSQL transaction was rolled back because an earlier statement failed
+```
+
+Kurala göre:
+
+- İlk hatadan sonra aynı işlemdeki **her** ifade reddedilir.
+- İptal edilmiş bir işlemde `commit()` hiçbir şeyi kaydetmez ve hata verir.
+- Başarısız bir `commit()` sonrasında `rollback()` sessizce hiçbir şey yapmaz.
+  Bu yüzden 59.7'nin ilk programındaki `attempt` / `except` / `rollback()`
+  kalıbı her durumda güvenlidir.
+
+### 59.8 Hata kodlarını anlamak
+
+Sunucudan gelen her hata parantez içinde beş karakterlik bir **SQLSTATE**
+kodu taşır. En sık göreceklerinizden bazıları:
+
+| Kod | Anlamı |
+| --- | --- |
+| `23505` | `UNIQUE` kuralı ihlal edildi (aynı değer zaten var) |
+| `23502` | `NOT NULL` bir sütun boş bırakıldı |
+| `23503` | yabancı anahtar (foreign key) kuralı ihlal edildi |
+| `22P02` | değer o türe çevrilemedi (`"çok iyi"` bir sayı değil) |
+| `42P01` | böyle bir tablo yok |
+| `42703` | böyle bir sütun yok |
+| `42601` | SQL yazım hatası |
+| `25P02` | işlem daha önceki bir hata yüzünden iptal edildi |
+
+Kullanıcıya teknik mesajı değil, anlaşılır bir cümle gösterin:
+
+```ahd
+require("Baglanti.ahd")
+bring PostgreSQL
+bring UUID
+from PostgreSQL bring PostgreSQLError
+
+kullaniciMesaji: Function := (error: PostgreSQLError) -> String {
+    if error.message.contains("(23505)") {
+        return "Bu e-posta adresiyle zaten bir kayıt var."
+    }
+    if error.message.contains("(23502)") {
+        return "Zorunlu bir alan boş bırakıldı."
+    }
+    return "Kayıt yapılamadı. Lütfen daha sonra tekrar deneyin."
+}
+
+db := okulBaglan()
+attempt {
+    db.execute(
+        "INSERT INTO ogrenciler (id, ad, eposta) VALUES ($1::uuid, $2, $3)"
+        [
+            PostgreSQL.fromString(UUID.v7().string())
+            PostgreSQL.fromString("Ayşe Yılmaz")
+            PostgreSQL.fromString("ayse@example.com")
+        ]
+    )
+}
+except PostgreSQLError as error {
+    write(kullaniciMesaji(error))
+}
+db.close()
+```
+
+Beklenen çıktı:
+
+```text
+Bu e-posta adresiyle zaten bir kayıt var.
+```
+
+Hata mesajları parolanızı ve satır değerlerini tekrar eden `DETAIL` / `HINT`
+alanlarını hiçbir zaman içermez; yine de ayrıntılı mesajı kullanıcıya değil,
+sunucu günlüğüne yazın.
+
+### 59.9 MySQL'den farkları
+
+| | MySQL (51. bölüm) | PostgreSQL |
+| --- | --- | --- |
+| Yer tutucular | `?` | `$1`, `$2`, … |
+| Varsayılan port | `3306` | `5432` |
+| Üretilen kimlik | `lastInsertId()` | `RETURNING` ile `query` |
+| Mantıksal değerler | tamsayı | gerçek `boolean`; `fromBool` ve `bool()` |
+| Tarih ve saat | sunucunun metni | sabit biçimler; `timestamptz` UTC |
+| İşlem içinde hata | işlem kullanılabilir kalır | işlem iptal olur; `commit()` hata verir |
+| Tek çağrıda birden fazla ifade | desteklenmez | hata verir, hiçbiri çalışmaz |
+
+Bir program `SQLite`, `MySQL` ve `PostgreSQL`'i birlikte `bring` edebilir;
+türleri ayrıdır ve karışmaz.
+
+### 59.10 Kapatmak ve temizlemek
+
+`db.close()` bağlantı havuzunu bırakır; kapatılmış bir veritabanını kullanmak
+`this PostgreSQLDatabase is closed` hatası verir. Bir web uygulamasında
+genellikle tek bir bağlantı açık tutulur ve bütün istekler onu paylaşır;
+`PostgreSQLDatabase` aynı anda kullanıma uygun bir havuzdur. 61. bölümdeki
+uygulama bunu gösterir.
+
+Bu bölümün tablosunu silmek için:
+
+```ahd
+require("Baglanti.ahd")
+
+db := okulBaglan()
+db.execute("DROP TABLE IF EXISTS ogrenciler")
+write("tablo silindi")
+db.close()
+```
+
+**Siz deneyin:** Bir `dersler` tablosu (`id uuid`, `ad text`, `kredi integer`)
+oluşturun, üç ders ekleyin ve `SELECT sum(kredi) AS toplam FROM dersler`
+sonucunu `int()` ile okuyun.
+
+Tam başvuru: [PostgreSQL](POSTGRESQL_TR.md) ·
+[`examples/v0.1/71_postgresql.ahd`](../examples/v0.1/71_postgresql.ahd).
+
+## 60. WebSocket: canlı bağlantılar
+
+### 60.1 HTTP ile WebSocket arasındaki fark
+
+36. bölümdeki web sayfaları **istek-yanıt** ile çalışır: tarayıcı sorar, sunucu
+yanıtlar, bağlantı biter. Sunucunun "yeni bir mesaj geldi" diyebilmesi için
+tarayıcının tekrar sorması gerekir.
+
+**WebSocket** açık kalan bir bağlantıdır. Bir kez kurulur; sonra iki taraf da
+istediği an mesaj gönderebilir:
+
+```text
+HTTP:       tarayıcı --istek--> sunucu --yanıt--> (bağlantı biter)
+
+WebSocket:  tarayıcı ==açılış==> sunucu
+            tarayıcı <--mesaj--- sunucu    (sunucu istediği an gönderir)
+            tarayıcı ---mesaj--> sunucu
+            ...                            (biri kapatana kadar açık)
+```
+
+Sohbet uygulamaları, canlı skor tabloları, yoklama panoları ve bildirimler
+böyle çalışır. AhdCode v1.4.0'da WebSocket **sunucu** tarafıdır: uç noktalar
+`HTTP` modülündeki `Server` üzerinde, rotalarınızın yanında yaşar. Karşı
+taraftaki istemci çoğu zaman tarayıcıdaki JavaScript'tir.
+
+### 60.2 Yankı sunucusu
+
+Aşağıdaki program hem bir sayfa hem de bir WebSocket uç noktası sunar. Sayfa
+bağlanır; yazdığınız her mesaj sunucudan geri gelir.
+
+```ahd
+bring HTTP
+from HTTP bring (Server, Request, Response, WebSocket)
+
+sayfa: Function := (request: Request) -> Response {
+    return HTTP.html(r"""<!doctype html>
+<html lang="tr">
+<meta charset="utf-8">
+<title>Yankı</title>
+<input id="mesaj" placeholder="Bir şey yazın">
+<button id="gonder">Gönder</button>
+<ul id="gelenler"></ul>
+<script>
+const socket = new WebSocket(`ws://${location.host}/yanki`);
+const liste = document.getElementById("gelenler");
+socket.addEventListener("message", (olay) => {
+  const satir = document.createElement("li");
+  satir.textContent = olay.data;
+  liste.append(satir);
+});
+document.getElementById("gonder").addEventListener("click", () => {
+  const kutu = document.getElementById("mesaj");
+  socket.send(kutu.value);
+  kutu.value = "";
+});
+</script>
+""")
+}
+
+yanitla: Function := (socket: WebSocket, metin: String) -> Nothing {
+    socket.send("sunucu aldı: " + metin)
+}
+
+server: Server := HTTP.server("127.0.0.1", 8080)
+server.get("/", sayfa)
+server.websocket("/yanki", HTTP.websocket(yanitla))
+server.start()
+```
+
+`ahdcode run yanki.ahd` ile çalıştırın ve `http://127.0.0.1:8080/` adresini
+açın. Bir şey yazıp **Gönder**'e bastığınızda altında `sunucu aldı: ...`
+belirir.
+
+Parça parça:
+
+- `HTTP.websocket(yanitla)` bir **uç nokta** oluşturur. `yanitla`, her mesaj
+  geldiğinde `(socket, metin)` ile çağrılır.
+- `server.websocket("/yanki", ...)` uç noktayı `/yanki` yoluna bağlar. Bunu
+  `server.start()` çağrısından **önce** yapın. Aynı yol hem `get` rotası hem
+  de WebSocket olamaz.
+- `socket.send(metin)` o bağlantıya bir mesaj gönderir.
+- HTML içindeki `${location.host}` JavaScript'e aittir. Onu `r"""..."""` ham
+  String'i içine yazdığımız için AhdCode `{...}` kısmını interpolasyon sanmaz.
+- Tarayıcı gelen mesajı `textContent` ile yazar, `innerHTML` ile değil. Böylece
+  biri `<script>` gönderse bile bu yalnızca metin olarak görünür.
+
+### 60.3 Yaşam döngüsü: açılış, mesaj, kapanış
+
+Bir bağlantının üç anı vardır ve her biri için bir geri çağrı verebilirsiniz.
+Bu program her anı bir günlüğe yazar ve günlüğü `/gunluk` adresinde gösterir:
+
+```ahd
+bring HTTP
+from HTTP bring (Server, Request, Response, WebSocket, WebSocketEndpoint)
+
+gunluk: List<String> := []
+
+kaydet: Function := (satir: String) -> Nothing {
+    gunluk: Global List<String>
+    gunluk.add(satir)
+}
+
+acildi: Function := (socket: WebSocket, request: Request) -> Nothing {
+    kaydet("açıldı: " + socket.id())
+    socket.send("hoş geldiniz")
+}
+
+geldi: Function := (socket: WebSocket, metin: String) -> Nothing {
+    kaydet(socket.id() + " yazdı: " + metin)
+    if metin == "güle güle" {
+        socket.close(1000, "görüşürüz")
+    }
+    else {
+        socket.send("aldım: " + metin)
+    }
+}
+
+kapandi: Function := (socket: WebSocket, kod: Int, neden: String) -> Nothing {
+    kaydet("kapandı: " + socket.id() + " kod " + str(kod) + " neden: " + neden)
+}
+
+gunlukSayfasi: Function := (request: Request) -> Response {
+    gunluk: Global List<String>
+    metin: Local String := ""
+    for satir in gunluk {
+        metin = metin + satir + "\n"
+    }
+    return HTTP.text(metin)
+}
+
+ucNokta: WebSocketEndpoint := HTTP.websocket(geldi)
+ucNokta = ucNokta.withOpen(acildi)
+ucNokta = ucNokta.withClose(kapandi)
+
+server: Server := HTTP.server("127.0.0.1", 8080)
+server.get("/gunluk", gunlukSayfasi)
+server.websocket("/canli", ucNokta)
+server.start()
+```
+
+Sunucu çalışırken tarayıcıda `http://127.0.0.1:8080/gunluk` adresini açın
+(şimdilik boş), geliştirici konsolunu açıp şunu yazın:
+
+```js
+socket = new WebSocket("ws://127.0.0.1:8080/canli")
+socket.onmessage = (olay) => console.log(olay.data)
+socket.send("merhaba")
+socket.send("güle güle")
+```
+
+Konsolda `hoş geldiniz` ve `aldım: merhaba` görünür. Sonra sayfayı yenileyin;
+günlük şuna benzer:
+
+```text
+açıldı: 3kQ9mZ0bT1u2w8xY4vLc7A
+3kQ9mZ0bT1u2w8xY4vLc7A yazdı: merhaba
+3kQ9mZ0bT1u2w8xY4vLc7A yazdı: güle güle
+kapandı: 3kQ9mZ0bT1u2w8xY4vLc7A kod 1000 neden: görüşürüz
+```
+
+Günlük sıradan bir `List<String>`'dir; geri çağrılar ve `/gunluk` işleyicisi onu
+`Global` ile paylaşır. WebSocket geri çağrılarının HTTP işleyicileriyle aynı
+veriyi paylaşabilmesi, 60.4 ve 60.5'te kullanacağımız temel fikirdir.
+
+AhdCode şu sırayı garanti eder:
+
+1. `withOpen` her bağlantı için **tam bir kez** ve ilk olarak çalışır. Tarayıcı
+   bağlantıyı açık görmeden önce biter; `acildi` içinde gönderilen mesaj ilk
+   mesaj olarak ulaşır.
+2. Mesaj geri çağrısı her mesaj için geliş sırasıyla bir kez çalışır.
+3. `withClose` her bağlantı için **tam bir kez** ve en son çalışır; bağlantı
+   ister düzgün kapansın ister kopsun.
+
+`socket.id()`, bağlantıya özgü ve hiç tekrar kullanılmayan bir metindir.
+Kapanış kodları:
+
+| Kod | Anlamı |
+| --- | --- |
+| `1000` | normal kapanış |
+| `1001` | taraf ayrılıyor (örneğin sayfa kapandı) |
+| `1003` | ikili (binary) mesaj gönderildi; yalnızca metin desteklenir |
+| `1006` | bağlantı koptu; ağ üzerinden hiç gönderilmez, yalnızca bildirilir |
+| `1007` | mesaj geçerli UTF-8 değil |
+| `1008` | politika ihlali (örneğin gönderim kuyruğu doldu) |
+| `1009` | mesaj izin verilen boyuttan büyük |
+| `1011` | sunucudaki geri çağrı hata verdi |
+
+`close` için `1000`, `1001`, `1008`, `1011` ve `3000`–`4999` arası kodları
+kullanabilirsiniz.
+
+**Geri çağrılar birer birer çalışır.** Aynı sunucudaki HTTP işleyicileri ve
+WebSocket geri çağrıları asla aynı anda çalışmaz. Bu, paylaşılan değişkenleri
+kilitsiz kullanabilmenizi sağlar; ama yavaş bir geri çağrı herkesi bekletir.
+Geri çağrıları kısa tutun.
+
+### 60.4 Sohbet odası: kayıt tutmak ve herkese göndermek
+
+Bir mesajı herkese göndermek için açık bağlantıları bir yerde tutmanız gerekir.
+AhdCode bunu sizin yerinize yapmaz; sıradan bir `Pair` yeterlidir:
 
 ```ahd
 bring HTTP
 bring KeyValue
-from HTTP bring (Server, Request, WebSocket, WebSocketEndpoint)
+from HTTP bring (Server, Request, Response, WebSocket, WebSocketEndpoint)
 
-clients: Pair<String, WebSocket> := {}
+baglantilar: Pair<String, WebSocket> := {}
+isimler: Pair<String, String> := {}
 
-joined: Function := (socket: WebSocket, request: Request) -> Nothing {
-    clients: Global Pair<String, WebSocket>
-    clients[socket.id()] = socket
-}
-
-received: Function := (socket: WebSocket, text: String) -> Nothing {
-    clients: Global Pair<String, WebSocket>
-    for other in KeyValue.values(clients) {
-        other.send(text)
+herkeseGonder: Function := (metin: String) -> Int {
+    baglantilar: Global Pair<String, WebSocket>
+    ulasan: Local Int := 0
+    for socket in KeyValue.values(baglantilar) {
+        if socket.send(metin) {
+            ulasan += 1
+        }
     }
+    return ulasan
 }
 
-endpoint: WebSocketEndpoint := HTTP.websocket(received).withOpen(joined)
+katildi: Function := (socket: WebSocket, request: Request) -> Nothing {
+    baglantilar: Global Pair<String, WebSocket>
+    isimler: Global Pair<String, String>
+    ad: Local String := "misafir"
+    istenen: Local String? := request.query("isim")
+    if istenen != null {
+        if istenen.trim() != "" {
+            ad = istenen.trim()
+        }
+    }
+    herkeseGonder(ad + " sohbete katıldı")
+    baglantilar[socket.id()] = socket
+    isimler[socket.id()] = ad
+    socket.send(
+        "hoş geldin " + ad + ", odada " + str(len(baglantilar)) + " kişi var"
+    )
+}
+
+mesajGeldi: Function := (socket: WebSocket, metin: String) -> Nothing {
+    isimler: Global Pair<String, String>
+    if metin.trim() == "" {
+        return
+    }
+    herkeseGonder(isimler[socket.id()] + ": " + metin)
+}
+
+ayrildi: Function := (socket: WebSocket, kod: Int, neden: String) -> Nothing {
+    baglantilar: Global Pair<String, WebSocket>
+    isimler: Global Pair<String, String>
+    ad: Local String := isimler[socket.id()]
+    baglantilar = KeyValue.without(baglantilar, socket.id())
+    isimler = KeyValue.without(isimler, socket.id())
+    herkeseGonder(ad + " ayrıldı")
+}
+
+sayfa: Function := (request: Request) -> Response {
+    return HTTP.html(r"""<!doctype html>
+<html lang="tr">
+<meta charset="utf-8">
+<title>Sohbet</title>
+<ul id="akis"></ul>
+<form id="form"><input id="metin" autocomplete="off"><button>Gönder</button></form>
+<script>
+const ad = prompt("Adınız?") || "misafir";
+const socket = new WebSocket(`ws://${location.host}/sohbet?isim=${encodeURIComponent(ad)}`);
+socket.addEventListener("message", (olay) => {
+  const satir = document.createElement("li");
+  satir.textContent = olay.data;
+  document.getElementById("akis").append(satir);
+});
+document.getElementById("form").addEventListener("submit", (olay) => {
+  olay.preventDefault();
+  const kutu = document.getElementById("metin");
+  socket.send(kutu.value);
+  kutu.value = "";
+});
+</script>
+""")
+}
+
+ucNokta: WebSocketEndpoint := HTTP.websocket(mesajGeldi)
+ucNokta = ucNokta.withOpen(katildi)
+ucNokta = ucNokta.withClose(ayrildi)
+ucNokta = ucNokta.withMaxMessageBytes(2000)
+ucNokta = ucNokta.withMaxConnections(50)
+
 server: Server := HTTP.server("127.0.0.1", 8080)
-server.websocket("/chat", endpoint)
+server.get("/", sayfa)
+server.websocket("/sohbet", ucNokta)
 server.start()
 ```
 
-Tarayıcıda `new WebSocket("ws://127.0.0.1:8080/chat")` ona bağlanır. Geri
-çağrılar HTTP işleyicileri gibi tek tek çalışır; bu yüzden `clients` Pair'i
-özel bir önlem gerektirmez — ama geri çağrıları kısa tutun. Bağlantı koparsa
-hiçbir şey kendiliğinden yeniden bağlanmaz; bu, sayfanızın JavaScript'inin
-işidir. Bkz. [WebSocket](WEBSOCKET_TR.md).
+İki farklı tarayıcı sekmesinde `http://127.0.0.1:8080/` adresini açın, iki ayrı
+ad girin ve yazışın. Bir sekmeyi kapattığınızda diğerinde "... ayrıldı"
+görünür.
 
-### 57.5 Hepsi bir arada
+Önemli noktalar:
 
-[Gerçek zamanlı yoklama uygulaması](../examples/v1.4/realtime_attendance/README_TR.md)
-dördünü birlikte kullanır: bir yoklama formu PostgreSQL'e `UUID.v7()` anahtarlı
-bir satır kaydeder, veritabanı parolasını `Env.secret` ile okur ve açık olan her
-pano yeni yoklamayı WebSocket üzerinden hemen gösterir.
+- **Kayıt `withOpen` içinde eklenir, `withClose` içinde silinir.**
+  `KeyValue.without` (34. bölüm) anahtarı çıkarılmış yeni bir `Pair` döndürür.
+- **`send` beklemez.** Mesajı o bağlantının kuyruğuna koyar ve `true` döndürür;
+  bağlantı kapalıysa `false`. Mesajları okuyamayacak kadar yavaş bir istemcinin
+  kuyruğu (varsayılan 64 mesaj) dolarsa bağlantısı `1008` ile kapatılır;
+  böylece tek bir yavaş istemci sunucunun belleğini dolduramaz.
+- **Sınırlar.** `withMaxMessageBytes(2000)` 2000 bayttan büyük mesajı `1009` ile
+  reddeder; `withMaxConnections(50)` 51. bağlantıyı daha açılışta `503` ile
+  geri çevirir. Varsayılanlar 65536 bayt ve 1024 bağlantıdır.
+- Katılma duyurusunu, yeni kişiyi kayda eklemeden **önce** gönderdik; bu yüzden
+  kişi kendi katılma mesajını almaz.
+
+### 60.5 JSON mesajları ve bir HTTP işleyicisinden yayın
+
+Gerçek uygulamalarda mesajlar çoğu zaman düz metin değil JSON'dur (31. bölüm).
+Böylece tarayıcı gelen mesajın *türüne* bakarak ne yapacağına karar verir.
+
+Ayrıca yayın her zaman bir WebSocket mesajından başlamaz: bir form gönderimi,
+başka bir program ya da zamanlanmış bir iş de "herkese duyur" diyebilir. Geri
+çağrılar ve HTTP işleyicileri aynı kilidi paylaştığı için bir HTTP işleyicisi
+kayıt üzerinden doğrudan yayın yapabilir.
+
+```ahd
+bring HTTP
+bring JSON
+bring KeyValue
+bring Env
+bring Security
+from HTTP bring (Server, Request, Response, WebSocket, WebSocketEndpoint)
+from JSON bring (JSONValue, JSONError)
+
+panolar: Pair<String, WebSocket> := {}
+
+olay: Function := (tur: String, metin: String) -> String {
+    return JSON.stringify(
+        JSON.object(
+            {"tur": JSON.fromString(tur), "metin": JSON.fromString(metin)}
+        )
+    )
+}
+
+yayinla: Function := (satir: String) -> Int {
+    panolar: Global Pair<String, WebSocket>
+    ulasan: Local Int := 0
+    for socket in KeyValue.values(panolar) {
+        if socket.send(satir) {
+            ulasan += 1
+        }
+    }
+    return ulasan
+}
+
+acildi: Function := (socket: WebSocket, request: Request) -> Nothing {
+    panolar: Global Pair<String, WebSocket>
+    panolar[socket.id()] = socket
+    socket.send(olay("bilgi", "bağlandınız"))
+}
+
+geldi: Function := (socket: WebSocket, metin: String) -> Nothing {
+    attempt {
+        belge: Local JSONValue := JSON.parse(metin)
+        tur: Local JSONValue? := belge.get("tur")
+        if tur != null {
+            if tur.string() == "ping" {
+                socket.send(olay("pong", "buradayım"))
+                return
+            }
+        }
+        socket.send(olay("hata", "bilinmeyen mesaj türü"))
+    }
+    except JSONError as error {
+        socket.send(olay("hata", "JSON bekleniyordu"))
+    }
+}
+
+kapandi: Function := (socket: WebSocket, kod: Int, neden: String) -> Nothing {
+    panolar: Global Pair<String, WebSocket>
+    panolar = KeyValue.without(panolar, socket.id())
+}
+
+duyuru: Function := (request: Request) -> Response {
+    beklenen: Local String? := Env.secret("DUYURU_TOKEN")
+    gelen: Local String? := request.header("Authorization")
+    if beklenen == null or gelen == null {
+        return HTTP.text("yetkisiz", 401)
+    }
+    if Security.secureEqual("Bearer " + beklenen, gelen) == false {
+        return HTTP.text("yetkisiz", 401)
+    }
+    ulasan: Local Int := yayinla(olay("duyuru", request.body()))
+    return HTTP.text("{ulasan} panoya gönderildi")
+}
+
+ucNokta: WebSocketEndpoint := HTTP.websocket(geldi)
+ucNokta = ucNokta.withOpen(acildi)
+ucNokta = ucNokta.withClose(kapandi)
+
+server: Server := HTTP.server("127.0.0.1", 8080)
+server.websocket("/pano", ucNokta)
+server.post("/duyuru", duyuru)
+server.start()
+```
+
+Çalıştırın:
+
+```bash
+DUYURU_TOKEN=uzun-rastgele-bir-deger ahdcode run pano.ahd
+```
+
+Başka bir terminalden bir duyuru gönderin:
+
+```bash
+curl -H "Authorization: Bearer uzun-rastgele-bir-deger" --data "Yarın ders yok" http://127.0.0.1:8080/duyuru
+```
+
+Açık her panoya şu mesaj ulaşır ve `curl` kaç panoya gittiğini yazar:
+
+```text
+{"tur":"duyuru","metin":"Yarın ders yok"}
+```
+
+Bu örnekte:
+
+- Mesajlar `JSON.object` ile kurulur, metin birleştirerek değil. Böylece
+  `"` ya da `\` içeren bir duyuru JSON'u bozamaz.
+- Gelen metin `JSON.parse` ile ayrıştırılır; bozuk JSON `JSONError` fırlatır
+  ve istemciye kibar bir hata mesajı gider.
+- `/duyuru`, 58. bölümdeki `Env.secret` ile okunan bir belirteç ister ve onu
+  50. bölümdeki `Security.secureEqual` ile karşılaştırır.
+
+Tarayıcı tarafında JSON'u şöyle okursunuz:
+
+```js
+socket.addEventListener("message", (olay) => {
+  const mesaj = JSON.parse(olay.data);
+  if (mesaj.tur === "duyuru") {
+    alert(mesaj.metin);
+  }
+});
+socket.send(JSON.stringify({ tur: "ping" }));
+```
+
+### 60.6 Güvenlik: kim bağlanabilir?
+
+**Köken (origin) denetimi.** Tarayıcılar her WebSocket açılışında sayfanın
+adresini `Origin` başlığıyla gönderir. AhdCode varsayılan olarak yalnızca
+**aynı kökene** izin verir: `http://127.0.0.1:8080` üzerindeki bir sayfa
+bağlanabilir, başka bir sitedeki sayfa `403` alır. Uygulamanız ayrı bir alan
+adında çalışan bir ön yüze hizmet veriyorsa izin verilen kökenleri tam olarak
+yazın:
+
+```ahd
+ucNokta = ucNokta.withAllowedOrigins(["https://okul.example.com"])
+```
+
+Joker karakter (`"*"`) kabul edilmez.
+
+**Giriş yapmış kullanıcılar.** Bağlantıyı açılmadan önce reddetmek için
+`withAccept` kullanın. `null` döndürmek kabul etmek, bir `Response` döndürmek
+reddetmek demektir. 37. bölümdeki oturum deposuyla:
+
+```ahd
+kabul: Function := (request: Request) -> Response? {
+    oturumlar: Global SessionStore
+    oturum: Local Session := oturumlar.open(request)
+    if oturum.get("user_id") == null {
+        return HTTP.text("önce giriş yapın", 401)
+    }
+    return null
+}
+ucNokta = ucNokta.withAccept(kabul)
+```
+
+Tarayıcılar WebSocket açarken kendi başlığınızı eklemenize izin vermez, ama
+çerezleri gönderir; bu yüzden tarayıcı için oturum çerezi doğru yoldur.
+Başka bir programın bağlandığı durumlarda 60.5'teki gibi bir
+`Authorization: Bearer ...` başlığı kullanılabilir.
+
+**Bilmeniz gereken sınırlar:**
+
+- Yalnızca metin mesajları desteklenir; ikili mesaj bağlantıyı `1003` ile
+  kapatır.
+- Mesaj içerikleri hiçbir zaman günlüğe yazılmaz.
+- v1.4.0'da AhdCode'dan başka bir sunucuya bağlanan bir WebSocket **istemcisi**
+  yoktur.
+
+### 60.7 Tarayıcıda yeniden bağlanmak
+
+Sunucu yeniden başlatıldığında (`ahdcode dev` her kaydetmede bunu yapar) ya da
+ağ koptuğunda bağlantı kapanır. **Hiçbir taraf kendiliğinden yeniden
+bağlanmaz**; bunu sayfanın JavaScript'i yapmalıdır. Bekleme süresini her
+denemede ikiye katlayan basit bir kalıp:
+
+```js
+let bekleme = 1000;
+
+function baglan() {
+  const socket = new WebSocket(`ws://${location.host}/pano`);
+  socket.addEventListener("open", () => {
+    bekleme = 1000;
+  });
+  socket.addEventListener("message", (olay) => {
+    console.log(olay.data);
+  });
+  socket.addEventListener("close", () => {
+    setTimeout(baglan, bekleme);
+    bekleme = Math.min(bekleme * 2, 30000);
+  });
+}
+
+baglan();
+```
+
+Sunucu her bağlantıya 30 saniyede bir `ping` gönderir; yanıt vermeyen istemci
+`1006` ile kapatılır. Bu sayede kopmuş bağlantılar kayıtta sonsuza dek kalmaz.
+
+### 60.8 `Web` çatısıyla ve yayında
+
+52. bölümdeki `Web` çatısında aynı uç nokta `Web.websocket` ile oluşturulur ve
+`App.websocket` ile kaydedilir:
+
+```ahd
+bring Web
+from Web bring (App, WebSocket)
+
+yanki: Function := (socket: WebSocket, metin: String) -> Nothing {
+    socket.send(metin)
+}
+
+site: App := Web.start()
+site.websocket("/canli", Web.websocket(yanki))
+site.start()
+```
+
+`Web.start()`, 52. bölümdeki `APP_NAME`, `APP_ENV` gibi ayarları `.env`
+dosyasından okur. WebSocket uç noktaları bir rota grubuna (`RouteGroup`)
+eklenemez; bekçi kontrolünüzü `withAccept` içine yazın.
+
+Uygulamayı yayına aldığınızda önündeki ters vekil (reverse proxy) yükseltmeyi
+geçirmelidir. Caddy'nin `reverse_proxy` yönergesi bunu ek ayar olmadan yapar;
+HTTPS kullanan sitelerde tarayıcı `ws://` yerine `wss://` ile bağlanır. nginx
+ayarları için [WebSocket başvurusuna](WEBSOCKET_TR.md#ters-vekil-arkasında)
+bakın.
+
+**Siz deneyin:** 60.4'teki sohbet odasına bir `/kim` komutu ekleyin: bir
+kullanıcı `/kim` yazdığında yalnızca ona, odadaki kişilerin adlarını gönderin.
+
+Tam başvuru: [WebSocket](WEBSOCKET_TR.md) ·
+[`examples/v0.1/72_websocket_echo.ahd`](../examples/v0.1/72_websocket_echo.ahd).
+
+## 61. Hepsi bir arada: gerçek zamanlı yoklama uygulaması
+
+[`examples/v1.4/realtime_attendance`](../examples/v1.4/realtime_attendance/README_TR.md),
+57–60. bölümlerde öğrendiklerinizi tek bir Web uygulamasında birleştirir.
+Öğretmen giriş yapar, bir öğrencinin adını yazıp **Check in**'e basar;
+açık olan her pano yeni yoklamayı sayfa yenilenmeden hemen gösterir.
+
+### 61.1 Çalıştırmak
+
+59.1'deki gibi bir PostgreSQL sunucusu açın; ardından `attendance` adlı bir
+kullanıcı ve veritabanı oluşturun:
+
+```bash
+createuser --pwprompt attendance
+createdb --owner attendance attendance
+```
+
+Sonra:
+
+```bash
+cd examples/v1.4/realtime_attendance
+cp .env.example .env
+psql "host=127.0.0.1 dbname=attendance user=attendance" -f schema.sql
+ahdcode dev app.ahd
+```
+
+`.env` içinde `DB_PASSWORD` ile uzun ve rastgele bir `NOTIFY_TOKEN` ayarlayın.
+Uygulama `http://127.0.0.1:8140/` adresinde açılır. İki tarayıcı penceresinde
+açıp birinden yoklama alın; diğeri anında güncellenir. İsterseniz ikinci bir
+terminalde `ahdcode run jobs.ahd` çalıştırın: dakikada bir, son bir saatin
+özetini panolara duyurur.
+
+### 61.2 Bir yoklamanın yolculuğu
+
+```text
+tarayıcı: form POST /check-in
+   │
+   ▼
+Pages/CheckIn.ahd
+   ├─ UUID.v7() ile yeni kimlik                        (57. bölüm)
+   ├─ INSERT ... VALUES ($1::uuid, $2) RETURNING created_at   (59. bölüm)
+   ├─ JSON satırı kur ve liveBroadcast(...)            (60. bölüm)
+   └─ Web.redirect("/")
+   │
+   ▼
+Live.ahd: kayıttaki her WebSocket'e send
+   │
+   ▼
+public/js/live.js: JSON.parse, listeye textContent ile ekle
+```
+
+Veritabanı bağlantısı `Config/Database.ahd` içinde bir kez açılır ve parolası
+58. bölümdeki gibi okunur:
+
+```text
+password: Local String? := Env.secret("DB_PASSWORD")
+if password == null {
+    toss Error("Set DB_PASSWORD, or DB_PASSWORD_FILE to a file holding it.")
+}
+```
+
+`Live.ahd`, 60.6'daki gibi yalnızca giriş yapmış kullanıcıları kabul eder ve
+panodan mesaj beklemez:
+
+```text
+liveMessage: Function := (socket: WebSocket, text: String) -> Nothing {
+    socket.close(1008, "this socket is read-only")
+}
+```
+
+`Pages/CheckIn.ahd` kaydı yazar ve herkese duyurur:
+
+```text
+checkInID: Local UUIDValue := UUID.v7()
+stored: Local := database.query(
+    "INSERT INTO check_ins (id, student) VALUES ($1::uuid, $2) RETURNING created_at"
+    [
+        PostgreSQL.fromString(checkInID.string())
+        PostgreSQL.fromString(student)
+    ]
+)
+```
+
+### 61.3 Dikkat edilecek tasarım kararları
+
+- **Sayfa JavaScript olmadan da tamdır.** Pano son 20 yoklamayı sunucuda
+  çizer; `live.js` yalnızca sonradan gelenleri ekler.
+- **Önce kaydet, sonra duyur.** Yayın, `INSERT` başarılı olduktan sonra
+  yapılır; veritabanına yazılmamış bir yoklama asla panoda görünmez.
+- **Yeniden bağlanma görünürdür.** `live.js` bağlantı koptuğunda bir geri
+  sayım gösterir ve bekleme süresini 1 saniyeden 30 saniyeye kadar artırır.
+- **İkinci program.** Bir Web sunucusu da bir Cron zamanlayıcısı da çalıştığı
+  programı meşgul eder. Bu yüzden `jobs.ahd` ayrı çalışır ve özetini bearer
+  belirteçli `POST /internal/notify` ile gönderir; 60.5'teki `/duyuru` ile aynı
+  kalıp.
+
+**Siz deneyin:** Uygulamaya "bugün kaç yoklama alındı?" sayısını gösteren bir
+satır ekleyin. İpucu:
+`SELECT count(*) AS n FROM check_ins WHERE created_at >= date_trunc('day', now())`.

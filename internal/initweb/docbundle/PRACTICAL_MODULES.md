@@ -1112,9 +1112,10 @@ correct.”
 | Produce an academic PDF or slides | Workshop 6 | [Latex](LATEX.md) |
 | Call an API or website | Workshop 7 | [HTTP](HTTP.md) |
 | Build or parse HTML | Workshop 8 | [HTML](HTML.md) |
-| Store data in PostgreSQL | [Student Guide 57.3](STUDENT_GUIDE_EN.md#573-postgresql) | [PostgreSQL](POSTGRESQL.md) |
-| Push live updates to a browser | [Student Guide 57.4](STUDENT_GUIDE_EN.md#574-websocket-pushing-updates-to-a-browser) | [WebSocket](WEBSOCKET.md) |
-| Create or compare UUIDs | [Student Guide 57.1](STUDENT_GUIDE_EN.md#571-uuids) | [UUID](UUID.md) |
+| Store data in PostgreSQL | [Student Guide 59](STUDENT_GUIDE_EN.md#59-postgresql-a-powerful-network-database) | [PostgreSQL](POSTGRESQL.md) |
+| Push live updates to a browser | [Student Guide 60](STUDENT_GUIDE_EN.md#60-websocket-live-connections) | [WebSocket](WEBSOCKET.md) |
+| Create or compare UUIDs | [Student Guide 57](STUDENT_GUIDE_EN.md#57-uuid-unique-identifiers) | [UUID](UUID.md) |
+| Read a password from a file | [Student Guide 58](STUDENT_GUIDE_EN.md#58-reading-secrets-from-files) | [Env](ENV.md#secret) |
 
 Use the [English Student Guide](STUDENT_GUIDE_EN.md) for language fundamentals
 and the compiled example index for more complete

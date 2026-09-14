@@ -1117,9 +1117,10 @@ Bu kontroller, “program çalıştı” ile “çıktı doğru” arasındaki f
 | Akademik PDF/slayt | Atölye 6 | [Latex](LATEX_TR.md) |
 | API veya web isteği | Atölye 7 | [HTTP](HTTP_TR.md) |
 | HTML kurmak/ayrıştırmak | Atölye 8 | [HTML](HTML_TR.md) |
-| Veriyi PostgreSQL'de saklamak | [Öğrenci Rehberi 57.3](STUDENT_GUIDE_TR.md#573-postgresql) | [PostgreSQL](POSTGRESQL_TR.md) |
-| Tarayıcıya canlı güncelleme göndermek | [Öğrenci Rehberi 57.4](STUDENT_GUIDE_TR.md#574-websocket-tarayıcıya-güncelleme-göndermek) | [WebSocket](WEBSOCKET_TR.md) |
-| UUID üretmek ya da karşılaştırmak | [Öğrenci Rehberi 57.1](STUDENT_GUIDE_TR.md#571-uuidler) | [UUID](UUID_TR.md) |
+| Veriyi PostgreSQL'de saklamak | [Öğrenci Rehberi 59](STUDENT_GUIDE_TR.md#59-postgresql-güçlü-bir-ağ-veritabanı) | [PostgreSQL](POSTGRESQL_TR.md) |
+| Tarayıcıya canlı güncelleme göndermek | [Öğrenci Rehberi 60](STUDENT_GUIDE_TR.md#60-websocket-canlı-bağlantılar) | [WebSocket](WEBSOCKET_TR.md) |
+| UUID üretmek ya da karşılaştırmak | [Öğrenci Rehberi 57](STUDENT_GUIDE_TR.md#57-uuid-benzersiz-kimlikler) | [UUID](UUID_TR.md) |
+| Parolayı dosyadan okumak | [Öğrenci Rehberi 58](STUDENT_GUIDE_TR.md#58-gizli-değerleri-dosyadan-okumak) | [Env](ENV_TR.md#secret) |
 
 Ana dil temelleri için [Türkçe Öğrenci Rehberi](STUDENT_GUIDE_TR.md), çalışan
 tam programlar için [örnekler dizini](../examples/v0.1/README_TR.md) başlangıç
