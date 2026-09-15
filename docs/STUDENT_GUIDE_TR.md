@@ -68,7 +68,7 @@ verir.
 - [45. Sık yapılan başlangıç hataları](#45-sık-yapılan-başlangıç-hataları)
 - [46. Küçük Projeler](#46-küçük-projeler)
 - [47. Egzersizler](#47-egzersizler)
-- [48. Çözüm İpuçları](#48-çözüm-i̇puçları)
+- [48. Çözüm ipuçları](#48-çözüm-ipuçları)
 - [49. Sonraki adımlar ve teknik belgeler](#49-sonraki-adımlar-ve-teknik-belgeler)
 - [50. Güvenlik: parola hashleme ve güvenli belirteçler](#50-güvenlik-parola-hashleme-ve-güvenli-belirteçler)
 - [51. MySQL: ağ veritabanı sunucusu](#51-mysql-ağ-veritabanı-sunucusu)
@@ -4266,7 +4266,7 @@ Tam çözümleri hemen aramak yerine her programı küçük adımlarla kurun.
 30. `/buyuk` yolunda, bağlantı açılır açılmaz "merhaba" gönderen ve gelen her mesajı büyük harfe çevirip geri yollayan bir WebSocket sunucusu yazın.
 31. 60.4'teki sohbet odasına, `POST /yonetici` ile gelen metni herkese `[yönetici]` önekiyle gönderen bir HTTP işleyicisi ekleyin. İsteği 60.5'teki gibi bir belirteçle koruyun.
 
-## 48. Çözüm İpuçları
+## 48. Çözüm ipuçları
 
 1. `take` sonucu String'dir; yaş için `int(...)` ve yeni yaş için `+ 1` kullanın.
 2. Formülü küçük parçalara ayırın; `real(take(...))` ile başlayın ve Real sayılarını kullanın.
