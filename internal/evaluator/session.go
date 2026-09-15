@@ -21,6 +21,9 @@ type Session struct {
 	Input  *bufio.Reader
 	Output io.Writer
 	CWD    string
+	// ErrorOutput receives Terminal.error text. Unset, it is discarded, like an
+	// unset Output.
+	ErrorOutput io.Writer
 
 	globals      map[ir.SymbolID]*Cell
 	functions    map[ir.CallableID]*ir.Function

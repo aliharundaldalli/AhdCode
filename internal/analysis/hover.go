@@ -40,10 +40,11 @@ func (store *Store) Hover(path string, offset int) (Hover, bool) {
 
 // renderHover turns an already-resolved compiler Symbol into hover text,
 // reusing the compiler's own type/signature renderers (types.Display,
-// semantic.FormatSignature) verbatim rather than inventing a second one.
+// semantic.FormatCallable) verbatim rather than inventing a second one.
+// FormatCallable also shows the ? of a nullable parameter or return.
 func renderHover(symbol *semantic.Symbol) string {
 	if symbol.Callable != nil && symbol.Callable.Signature != nil {
-		return symbol.Name + ": " + semantic.FormatSignature(symbol.Callable.Signature)
+		return symbol.Name + ": " + semantic.FormatCallable(symbol.Callable)
 	}
 	switch symbol.Kind {
 	case semantic.ClassSymbol:

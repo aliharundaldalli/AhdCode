@@ -65,6 +65,7 @@ var documentationManifest = []string{
 	"STATISTICS.md",
 	"STRING_API.md",
 	"STUDENT_GUIDE_EN.md",
+	"TERMINAL.md",
 	"TIME.md",
 	"TYPES_AND_NULL.md",
 	"UUID.md",

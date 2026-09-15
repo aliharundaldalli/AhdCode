@@ -567,6 +567,25 @@ contents of the file named by `NAME_FILE`, or `null`; both set is an
 `EnvError`. Never print or log the value. See
 [`docs/ENV.md`](docs/ENV.md#secret).
 
+**Use `Terminal` for terminal-specific output; keep `write` and `str` for
+ordinary text.** `write`, `take`, and `str` are unchanged in v1.5.0; do not
+invent a Python-style `print(*values, sep=, end=)`. `Terminal.emit(parts,
+separator, ending)` takes a `List<String>` you produced yourself with `str(...)`
+or interpolation: it converts nothing and has no variadic form. A call is all
+positional or all named — `Terminal.emit(["a", "b"], " | ")` or
+`Terminal.emit(parts: ["a"], ending: "")`, never a positional List followed by
+a named `ending` in the same call. `Terminal.error` writes to standard error
+with no prefix. A
+compiled program buffers standard output, so a long-running program calls
+`Terminal.flush()` after output that must appear immediately. `Terminal.style`
+returns plain text unless `Terminal.supportsColor()` is true (standard output is
+a terminal, `NO_COLOR` unset or empty, `TERM` not `dumb`); the colors are
+`default` and the eight basic names, and any other name raises `TerminalError`.
+`Terminal.width()` and `height()` are `Int?`: never assume 80×24. There is no
+cursor control, raw keyboard input, progress bar, spinner, menu, or logging
+API, and do not shell out to `tput`, `stty`, or `clear`. See
+[`docs/TERMINAL.md`](docs/TERMINAL.md).
+
 ## Completion report
 
 Report the detected OS, prerequisite versions, repository path/branch/status,

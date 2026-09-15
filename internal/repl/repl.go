@@ -38,6 +38,7 @@ func Run(input io.Reader, output, errorOutput io.Writer, version string) int {
 	entry := filepath.Join(directory, ".ahdcode-repl-session.ahd")
 	reader := bufio.NewReader(input)
 	session := evaluator.New(reader, output, directory)
+	session.ErrorOutput = errorOutput
 	committedSource := ""
 	pending := ""
 	fmt.Fprintln(output, version)

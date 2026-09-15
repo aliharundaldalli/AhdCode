@@ -136,3 +136,27 @@ var SVGSource string
 //
 //go:embed document.go
 var DocumentSource string
+
+// TerminalSource is emitted as a separate generated Go file. It implements the
+// Terminal standard module over the same buffered standard output write uses,
+// using only the standard library.
+//
+//go:embed terminal.go
+var TerminalSource string
+
+// The Terminal platform files each carry a build constraint and are emitted
+// under an operating-system suffix, so a generated workspace compiles exactly
+// the one for its target. They use only the standard library's syscall
+// package.
+//
+//go:embed terminal_darwin.go
+var TerminalDarwinSource string
+
+//go:embed terminal_linux.go
+var TerminalLinuxSource string
+
+//go:embed terminal_windows.go
+var TerminalWindowsSource string
+
+//go:embed terminal_other.go
+var TerminalOtherSource string

@@ -712,6 +712,10 @@ const (
 	// KeyValueOverlay is the explicitly named changes-win counterpart of
 	// merge.
 	KeyValueOverlay ModuleOperation = "KeyValue.overlay"
+
+	// TerminalPretty writes one value as Terminal.pretty lays it out: the
+	// text write would produce, with List and Pair values spread over lines.
+	TerminalPretty ModuleOperation = "Terminal.pretty"
 )
 
 // listOperationMutates reports whether one List operation rewrites its

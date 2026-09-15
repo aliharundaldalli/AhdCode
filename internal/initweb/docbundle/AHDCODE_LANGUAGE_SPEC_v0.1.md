@@ -6075,6 +6075,82 @@ subprotocols, binary messages, and a WebSocket client are not provided. The
 protocol implementation is `github.com/coder/websocket` v1.8.15, vendored; a
 program that creates no endpoint does not receive it.
 
+## 78. Terminal Standard Module (v1.5.0)
+
+`bring Terminal` resolves to the compiler-supplied module `builtin:Terminal`; a
+sibling file cannot shadow it. The module adds no syntax, and `write`, `take`,
+and `str` are unchanged.
+
+```text
+Terminal.emit(parts: List<String>, separator: String := " ", ending: String := "\n") -> Nothing
+Terminal.error(text: String, ending: String := "\n")                               -> Nothing
+Terminal.flush()                                                                   -> Nothing
+Terminal.isInteractive()                                                           -> Bool
+Terminal.width()                                                                   -> Int?
+Terminal.height()                                                                  -> Int?
+Terminal.supportsColor()                                                           -> Bool
+Terminal.style(text: String, foreground: String := "default", background: String := "default",
+               bold: Bool := false, underline: Bool := false)                      -> String
+Terminal.pretty(value)                                                             -> Nothing
+
+TerminalError  (derived from Error)
+```
+
+The fixed-signature functions follow the ordinary call rules, including §15.3:
+a call is entirely positional or entirely named. `emit` writes the parts in
+order with `separator` only between adjacent parts and `ending` once, to
+standard output through the same destination as `write`; an empty List writes
+only `ending`. Nothing is converted: the argument is exactly `List<String>`.
+`error` writes `text` and `ending` to standard error, after first writing any
+buffered standard output. A native program buffers standard output; the buffer
+is written at exit, before `take` reads, before `error` writes, before an
+uncaught error is reported, and by `flush`. Standard error is unbuffered. A
+failed `flush` raises `TerminalError` with the message
+`standard output could not be flushed`.
+
+`isInteractive` is whether standard output is a terminal, determined by the
+operating system's terminal request on macOS and Linux and the console mode on
+Windows; standard input is not consulted. `width` and `height` are the columns
+and rows of that terminal, or `null` when standard output is not a terminal or
+the reported value is not positive; no default size and no environment variable
+is used. `supportsColor` is true exactly when standard output is a terminal,
+the terminal interprets escape sequences (always on macOS and Linux; on Windows
+when virtual terminal processing is already enabled, which is read and never
+changed), `NO_COLOR` is unset or empty, and `TERM` is not `dumb`. None of these
+operations raises for the absence of a terminal or starts a process.
+
+`style` accepts the color names `default`, `black`, `red`, `green`, `yellow`,
+`blue`, `magenta`, `cyan`, and `white` for both `foreground` and `background`;
+any other String raises `TerminalError`, whether or not color is supported.
+When `supportsColor()` is true and at least one of bold, underline, a
+non-default foreground, or a non-default background is requested, the result is
+`ESC [ codes m`, the text, and `ESC [ 0 m`, where codes are `1` for bold, `4` for
+underline, `30`–`37` for the foreground, and `40`–`47` for the background, in
+that order and separated by `;`. Each occurrence of `ESC [ 0 m` inside the text
+is followed by the same prefix, except at the end of the text. Otherwise the
+result is the text unchanged. `style` keeps no state.
+
+`pretty` is a type-directed module operation: its single positional argument
+is any value `write` accepts, and it has no Function value. It writes one
+layout of the value and a line break to standard output. A value whose static
+type is neither `List` nor `Pair` is written exactly as `write` writes it. A
+non-empty `List` is written as `[`, a line break, one element per line indented
+four spaces deeper than the line the List starts on, `,` after every element
+but the last, and the closing `]` at the starting indentation; a `Pair` is
+written the same way with `{`, `key: value` entries, and `}`. An empty List or
+Pair is `[]` or `{}`. Elements, keys, and values that are not themselves Lists
+or Pairs use the canonical `str` text inside a collection, so a Class value is
+`<ClassName>` and its attributes are never read.
+
+## 79. Terminal Runtime (v1.5.0)
+
+The Terminal runtime is implemented with the Go standard library, including
+`syscall` for terminal detection and size; a generated program receives one
+portable file and one file per operating system, selected by build constraint.
+It adds no module dependency, reads only the `NO_COLOR` and `TERM` environment
+variables, and accesses no file or network service. A program that does not
+bring `Terminal` behaves exactly as before.
+
 ---
 
 # End of AhdCode v0.1 Core Specification

@@ -159,7 +159,8 @@ func TestGeneratedProgramCarriesRuntime(t *testing.T) {
 	for _, file := range program.Files {
 		names = append(names, file.Name)
 	}
-	if strings.Join(names, ",") != programFileName+","+runtimeFileName+","+excelRuntimeFileName+","+pdfRuntimeFileName+","+archiveRuntimeFileName+","+sqliteRuntimeFileName+","+httpRuntimeFileName+","+websocketRuntimeFileName+","+htmlRuntimeFileName+","+smtpRuntimeFileName+","+securityRuntimeFileName+","+identityRuntimeFileName+","+uuidRuntimeFileName+","+bitsRuntimeFileName+","+charactersRuntimeFile+","+cronRuntimeFileName+","+svgRuntimeFileName+","+documentRuntimeFileName {
+	if strings.Join(names, ",") != programFileName+","+runtimeFileName+","+excelRuntimeFileName+","+pdfRuntimeFileName+","+archiveRuntimeFileName+","+sqliteRuntimeFileName+","+httpRuntimeFileName+","+websocketRuntimeFileName+","+htmlRuntimeFileName+","+smtpRuntimeFileName+","+securityRuntimeFileName+","+identityRuntimeFileName+","+uuidRuntimeFileName+","+bitsRuntimeFileName+","+charactersRuntimeFile+","+cronRuntimeFileName+","+svgRuntimeFileName+","+documentRuntimeFileName+
+		","+terminalRuntimeFileName+","+terminalDarwinRuntimeFileName+","+terminalLinuxRuntimeFileName+","+terminalWindowsRuntimeFileName+","+terminalOtherRuntimeFileName {
 		t.Fatalf("unexpected generated files %v", names)
 	}
 	for _, file := range program.Files {

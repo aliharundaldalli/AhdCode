@@ -304,7 +304,7 @@ To maintain conceptual clarity, AhdCode's capabilities are organized into four d
    - **Mathematics & Computation:** [`Math`](docs/MATH.md), [`Bits`](docs/BITS.md) (bitwise operations on `Int`), [`Regex`](docs/REGEX.md), [`Statistics`](docs/STATISTICS.md), [`Numeric`](docs/NUMERIC.md), [`Plot`](docs/PLOT.md)
    - **Data & Collections:** [`Lists`](docs/LISTS.md), [`KeyValue`](docs/KEYVALUE.md), [`Characters`](docs/CHARACTERS.md) (Unicode code points and classification), [`CSV`](docs/CSV.md), [`Data`](docs/DATA.md), [`JSON`](docs/JSON.md), [`XML`](docs/XML.md), [`UUID`](docs/UUID.md) (RFC 9562 version 4 and time-ordered version 7 identifiers)
    - **Document Generation:** [`Word`](docs/WORD.md), [`Excel`](docs/EXCEL.md), [`PDF`](docs/PDF.md), [`Latex`](docs/LATEX.md), [`QR`](docs/QR.md) (QR codes), [`Barcode`](docs/BARCODE.md) (Code 128, EAN-13, UPC-A), [`Archive`](docs/ARCHIVE.md)
-   - **System & Environment:** [`Time`](docs/TIME.md), [`Cron`](docs/CRON.md) (bounded in-process scheduling), [`Path`](docs/FILESYSTEM.md), [`File`](docs/FILESYSTEM.md), [`Env`](docs/ENV.md)
+   - **System & Environment:** [`Time`](docs/TIME.md), [`Cron`](docs/CRON.md) (bounded in-process scheduling), [`Path`](docs/FILESYSTEM.md), [`File`](docs/FILESYSTEM.md), [`Env`](docs/ENV.md), [`Terminal`](docs/TERMINAL.md) (v1.5.0: standard error, flushing, terminal detection and size, styled text, pretty layout)
 
 3. **First-Party Runtime / Framework Modules:**
    - **Network, Server & Storage Primitives:** [`HTTP`](docs/HTTP.md) (in-memory server, request/response, cookies, sessions, static file server, [WebSocket endpoints](docs/WEBSOCKET.md), client), [`HTML`](docs/HTML.md) (semantic builder, parser, selector engine), [`Security`](docs/SECURITY.md) (Argon2id hashing, secure tokens, constant-time comparison, SHA-2 digests, HMAC, encodings, RS256 signatures, AES-256-GCM), [`SQLite`](docs/SQLITE.md) (local typed database bridge), [`MySQL`](docs/MYSQL.md) (network database with connection pool and transactions), [`PostgreSQL`](docs/POSTGRESQL.md) (network database with connection pool and transactions), [`SMTP`](docs/SMTP.md) (send-only mail client)
@@ -443,6 +443,7 @@ See the [CLI guide](docs/CLI.md), [formatter guide](docs/FORMATTER.md),
 - [Lists module](docs/LISTS.md)
 - [KeyValue module](docs/KEYVALUE.md)
 - [UUID module](docs/UUID.md)
+- [Terminal module](docs/TERMINAL.md)
 - [Understanding diagnostics](docs/DIAGNOSTICS.md)
 - [Language server](docs/LSP.md)
 - [AI-assisted local setup](FOR_AI.md)
@@ -457,6 +458,7 @@ See the [CLI guide](docs/CLI.md), [formatter guide](docs/FORMATTER.md),
 - [v0.12 MySQL raffle](examples/v0.12/raffle/README.md) — join codes, hashed admin login, announced winner
 - [v0.14 multi-file web example](examples/v0.14/multi_file_web/README.md) — require(...), dependency-aware dev, static assets
 - [v1.4 realtime attendance](examples/v1.4/realtime_attendance/README.md) — Web, PostgreSQL, WebSocket, UUID v7, `Env.secret`, and Cron
+- [v1.5 Terminal demo](examples/v1.5/terminal_demo/README.md) — `Terminal.emit`, standard error, terminal detection, styled text, and pretty layout
 - [AhdDataStudio](tools/AhdDataStudio/README.md) — local MySQL + SQLite development UI
 - [v0.4 Library Demo](https://github.com/aliharundaldalli/ahdcode-library-demo) (separate beginner web app)
 - [v0.4 Seminar Demo](https://github.com/aliharundaldalli/ahdcode-seminer-demo) (Hatay, multi-page)

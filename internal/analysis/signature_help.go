@@ -41,7 +41,7 @@ func (store *Store) SignatureHelp(path string, offset int) (SignatureHelp, bool)
 	if !ok || callable == nil || callable.Signature == nil {
 		return SignatureHelp{}, false
 	}
-	parameters := semantic.FormatParameters(callable.Signature)
+	parameters := semantic.FormatCallableParameters(callable)
 	active := activeParameterIndex(call, offset)
 	if len(parameters) == 0 {
 		// A zero-parameter callable has no valid parameter index at all;
@@ -51,7 +51,7 @@ func (store *Store) SignatureHelp(path string, offset int) (SignatureHelp, bool)
 		active = len(parameters) - 1
 	}
 	return SignatureHelp{
-		Label:           semantic.FormatSignature(callable.Signature),
+		Label:           semantic.FormatCallable(callable),
 		Parameters:      parameters,
 		ActiveParameter: active,
 	}, true

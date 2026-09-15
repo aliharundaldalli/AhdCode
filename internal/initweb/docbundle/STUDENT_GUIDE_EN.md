@@ -81,6 +81,7 @@ says so and links to the reference page that lists every signature.
 - [59. PostgreSQL: a powerful network database](#59-postgresql-a-powerful-network-database)
 - [60. WebSocket: live connections](#60-websocket-live-connections)
 - [61. Putting it together: a realtime attendance app](#61-putting-it-together-a-realtime-attendance-app)
+- [62. Terminal: more control over output](#62-terminal-more-control-over-output)
 
 ## 1. What is AhdCode?
 
@@ -6630,3 +6631,148 @@ stored: Local := database.query(
 **Try it yourself:** Add a line to the application that shows how many
 check-ins were taken today. Hint:
 `SELECT count(*) AS n FROM check_ins WHERE created_at >= date_trunc('day', now())`.
+
+## 62. Terminal: more control over output
+
+`write` and `take` from section 7 are all most programs need. The `Terminal`
+module, added in v1.5.0, is for the moments when a program needs more: sending
+an error somewhere else, making output appear immediately, finding out whether
+anyone is watching, or coloring a word. `write`, `take`, and `str` do not
+change.
+
+### 62.1 Joining Strings with emit
+
+```ahd
+bring Terminal
+
+name := "Ali"
+score := 95
+Terminal.emit([name, str(score), "Passed"])
+Terminal.emit([name, str(score), "Passed"], " | ")
+Terminal.emit(parts: ["Loading"], ending: "")
+Terminal.emit(parts: ["..."], separator: "", ending: "\n")
+```
+
+Expected output:
+
+```text
+Ali 95 Passed
+Ali | 95 | Passed
+Loading...
+```
+
+`emit` takes a `List<String>`, puts the separator (a space by default) only
+between two parts, and ends with the ending (a line break by default). It never
+converts anything, which is why the example writes `str(score)`.
+
+Remember the rule from section 10: a call is entirely positional or entirely
+named. `Terminal.emit([name], " | ")` and `Terminal.emit(parts: [name],
+separator: " | ")` are both fine; a positional List followed by a named
+`separator` in the same call is a compile error.
+
+### 62.2 Errors go to standard error
+
+```ahd
+bring Terminal
+
+write("working...")
+Terminal.error("Configuration not found")
+```
+
+A program has two output streams. `write` and `emit` use **standard output**;
+`Terminal.error` uses **standard error**. Run the program with
+`ahdcode run program.ahd > output.txt`: `working...` goes into the file, but the
+error still appears on the screen, where the person running the program sees
+it.
+
+### 62.3 Making output appear now
+
+A compiled program collects its standard output and writes it in larger pieces,
+which is faster. The collected text is written when the program ends, before
+`take` reads a line, and before `Terminal.error` writes. A program that keeps
+running — a web server from section 36, or a loop that waits — can call
+`Terminal.flush()` to write it immediately:
+
+```ahd
+bring Terminal
+
+Terminal.emit(["Server starting on port 8080"])
+Terminal.flush()
+```
+
+### 62.4 Is anyone watching?
+
+```ahd
+bring Terminal
+
+width: Int? := Terminal.width()
+if Terminal.isInteractive() and width != null {
+    Terminal.emit(["This terminal is {width} columns wide."])
+}
+else {
+    Terminal.emit(["Output is going to a file or another program."])
+}
+```
+
+`Terminal.isInteractive()` is `true` when standard output is a terminal window,
+and `false` when it is redirected to a file or piped into another program.
+`Terminal.width()` and `Terminal.height()` are `Int?`: they are `null` when
+there is no terminal to measure, and AhdCode never guesses a size.
+
+### 62.5 Colors that disappear when they would get in the way
+
+```ahd
+bring Terminal
+
+success := Terminal.style(text: "Passed", foreground: "green", bold: true)
+failure := Terminal.style(text: "Failed", foreground: "red")
+Terminal.emit(["Ali:", success])
+Terminal.emit(["Mehmet:", failure])
+```
+
+In a terminal, `Passed` is bold green and `Failed` is red. Redirect the output
+to a file and the file holds plain `Passed` and `Failed`: `style` only adds
+color when `Terminal.supportsColor()` is `true`, which requires a terminal,
+`NO_COLOR` unset or empty, and `TERM` not `dumb`. The colors are `default`,
+`black`, `red`, `green`, `yellow`, `blue`, `magenta`, `cyan`, and `white`; any
+other name, even `"Red"`, raises `TerminalError`.
+
+### 62.6 Looking inside a collection
+
+```ahd
+bring Terminal
+
+grades: Pair<String, List<Int>> := {"Ali": [90, 95, 100], "Ayşe": [85, 91, 97]}
+write(grades)
+Terminal.pretty(grades)
+```
+
+Expected output:
+
+```text
+{"Ali": [90, 95, 100], "Ayşe": [85, 91, 97]}
+{
+    "Ali": [
+        90,
+        95,
+        100
+    ],
+    "Ayşe": [
+        85,
+        91,
+        97
+    ]
+}
+```
+
+`write` puts everything on one line; `Terminal.pretty` spreads a List or Pair
+over lines so a large collection is easy to read. Any other value is written
+exactly as `write` writes it.
+
+**Try it yourself:** Write a program that prints a table of three students
+with `Terminal.emit` and `" | "`, colors every score below 50 red, and writes a
+warning with `Terminal.error` when a score is missing. Run it normally, then
+with `> output.txt`, and compare.
+
+See the [Terminal module reference](TERMINAL.md) and
+`examples/v1.5/terminal_demo`.

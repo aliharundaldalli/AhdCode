@@ -1,0 +1,40 @@
+// v1.5.0 Terminal demo.
+//
+//     ahdcode run main.ahd
+//     ahdcode run main.ahd > output.txt
+//     NO_COLOR=1 ahdcode run main.ahd
+//
+// Run it in a terminal, then again with standard output redirected, and
+// compare: the capability lines change and the styled words become plain
+// text, while every other line stays exactly the same.
+bring Terminal
+
+grades: Pair<String, List<Int>> := {"Ali": [90, 95, 100], "Ayşe": [85, 91, 97]}
+
+write("1. write works exactly as before")
+Terminal.emit(["2.", "emit", "joins", "Strings"])
+Terminal.emit(["3. Ali", "95", "Passed"], " | ")
+Terminal.emit(parts: ["4. Loading"], ending: "")
+Terminal.emit(parts: ["..."], separator: "", ending: "\n")
+Terminal.error("5. this line goes to standard error")
+Terminal.flush()
+
+width: Int? := Terminal.width()
+height: Int? := Terminal.height()
+size: String := "unknown, because standard output is not a terminal"
+if width != null {
+    if height != null {
+        size = "{width} columns x {height} rows"
+    }
+}
+Terminal.emit(["6. interactive:", str(Terminal.isInteractive())])
+Terminal.emit(["7. size:", size])
+Terminal.emit(["8. color:", str(Terminal.supportsColor())])
+
+success := Terminal.style(text: "success", foreground: "green", bold: true)
+warning := Terminal.style(text: "warning", foreground: "yellow")
+failure := Terminal.style(text: "error", foreground: "red", underline: true)
+Terminal.emit(["9. " + success, warning, failure], " / ")
+Terminal.emit(["10. Unicode: çğıöşü İstanbul 🙂"])
+write("11. grades:")
+Terminal.pretty(grades)

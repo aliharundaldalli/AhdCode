@@ -45,6 +45,7 @@ func StandardModuleInterfaces() map[string]*ModuleInterface {
 		"SMTP":       smtpModuleInterface(),
 		"SQLite":     sqliteModuleInterface(),
 		"Statistics": statisticsModuleInterface(),
+		"Terminal":   terminalModuleInterface(),
 		"Time":       timeModuleInterface(),
 		"UUID":       uuidModuleInterface(),
 		"Word":       wordModuleInterface(),

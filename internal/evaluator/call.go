@@ -30,6 +30,10 @@ func (session *Session) evalCall(call *ir.CallExpr, current *frame) any {
 		session.writeText(session.textOf(call.Arguments[0].Value, current) + "\n")
 		return Nothing
 	}
+	if string(call.Callable) == "builtin:Terminal::pretty" && len(call.Arguments) == 1 && call.Arguments[0].Value != nil {
+		session.writeText(session.prettyOf(call.Arguments[0].Value, current) + "\n")
+		return Nothing
+	}
 	arguments := session.evalArguments(call.Arguments, current)
 	identity := string(call.Callable)
 	if strings.HasPrefix(identity, "builtin:") {
@@ -223,6 +227,8 @@ func (session *Session) builtin(identity ir.CallableID, receiver any, arguments 
 		return session.identityBuiltin(strings.TrimPrefix(name, "builtin:Identity::"), values(arguments))
 	case strings.HasPrefix(name, "builtin:UUID::"):
 		return session.uuidBuiltin(strings.TrimPrefix(name, "builtin:UUID::"), values(arguments))
+	case strings.HasPrefix(name, "builtin:Terminal::"):
+		return session.terminalBuiltin(strings.TrimPrefix(name, "builtin:Terminal::"), values(arguments))
 	case strings.HasPrefix(name, "builtin:PostgreSQL::"):
 		return session.postgresqlBuiltin(strings.TrimPrefix(name, "builtin:PostgreSQL::"), values(arguments))
 	}

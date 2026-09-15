@@ -6536,6 +6536,81 @@ WebSocket istemcisi sağlanmaz. Protokol uygulaması gömülü
 `github.com/coder/websocket` v1.8.15'tir; uç nokta oluşturmayan bir program onu
 almaz.
 
+## 78. Terminal Standart Modülü (v1.5.0)
+
+`bring Terminal`, derleyicinin sağladığı `builtin:Terminal` modülüne çözülür;
+yanındaki bir dosya onu gölgeleyemez. Modül yeni sözdizimi eklemez; `write`,
+`take` ve `str` değişmez.
+
+```text
+Terminal.emit(parts: List<String>, separator: String := " ", ending: String := "\n") -> Nothing
+Terminal.error(text: String, ending: String := "\n")                               -> Nothing
+Terminal.flush()                                                                   -> Nothing
+Terminal.isInteractive()                                                           -> Bool
+Terminal.width()                                                                   -> Int?
+Terminal.height()                                                                  -> Int?
+Terminal.supportsColor()                                                           -> Bool
+Terminal.style(text: String, foreground: String := "default", background: String := "default",
+               bold: Bool := false, underline: Bool := false)                      -> String
+Terminal.pretty(value)                                                             -> Nothing
+
+TerminalError  (Error'dan türer)
+```
+
+Sabit imzalı fonksiyonlar, §15.3 dahil sıradan çağrı kurallarına uyar: bir
+çağrı tamamen sıralı ya da tamamen isimli argümanlarla yapılır. `emit`,
+parçaları sırasıyla, `separator`'ı yalnızca komşu parçaların arasına ve
+`ending`'i bir kez, `write` ile aynı hedef üzerinden standart çıktıya yazar; boş
+bir List yalnızca `ending`'i yazar. Hiçbir şey dönüştürülmez: argüman tam olarak
+`List<String>`'dir. `error`, önce tamponlanmış standart çıktıyı yazar, sonra
+`text` ve `ending`'i standart hataya yazar. Yerel bir program standart çıktıyı
+tamponlar; tampon program bitince, `take` okumadan önce, `error` yazmadan önce,
+yakalanmamış bir hata bildirilmeden önce ve `flush` ile yazılır. Standart hata
+tamponlanmaz. Başarısız bir `flush`, `standard output could not be flushed`
+mesajıyla `TerminalError` verir.
+
+`isInteractive`, standart çıktının bir terminal olup olmadığıdır; macOS ve
+Linux'ta işletim sisteminin terminal isteğiyle, Windows'ta konsol kipiyle
+belirlenir; standart girdiye bakılmaz. `width` ve `height` bu terminalin sütun
+ve satır sayısıdır; standart çıktı terminal değilse ya da bildirilen değer pozitif
+değilse `null` olur; varsayılan boyut ya da ortam değişkeni kullanılmaz.
+`supportsColor`, tam olarak standart çıktı bir terminalken, terminal kaçış
+dizilerini yorumlarken (macOS ve Linux'ta her zaman; Windows'ta sanal terminal
+işleme zaten açıkken — bu okunur, asla değiştirilmez), `NO_COLOR` ayarlı değilken
+ya da boşken ve `TERM` `dumb` değilken doğrudur. Bu işlemlerin hiçbiri terminal
+olmaması yüzünden hata vermez ya da süreç başlatmaz.
+
+`style`, hem `foreground` hem `background` için `default`, `black`, `red`,
+`green`, `yellow`, `blue`, `magenta`, `cyan` ve `white` renk adlarını kabul eder;
+başka her String, renk desteklensin ya da desteklenmesin `TerminalError` verir.
+`supportsColor()` doğruyken ve kalın, altı çizili, varsayılan olmayan ön plan ya
+da varsayılan olmayan arka plandan en az biri istendiğinde sonuç `ESC [ kodlar
+m`, metin ve `ESC [ 0 m`'dir; kodlar kalın için `1`, altı çizili için `4`, ön plan
+için `30`–`37`, arka plan için `40`–`47`'dir, bu sırayla gelir ve `;` ile ayrılır.
+Metnin içindeki her `ESC [ 0 m`, metnin sonundaki hariç, aynı ön ekle izlenir.
+Aksi hâlde sonuç metnin kendisidir. `style` hiçbir durum tutmaz.
+
+`pretty`, türe göre çalışan bir modül işlemidir: tek sıralı argümanı `write`'ın
+kabul ettiği her değer olabilir ve Function değeri yoktur. Değerin tek bir
+düzenini ve bir satır sonunu standart çıktıya yazar. Statik türü `List` ya da
+`Pair` olmayan bir değer, `write`'ın yazdığı gibi yazılır. Boş olmayan bir `List`,
+`[`, bir satır sonu, List'in başladığı satırdan dört boşluk daha girintili ve
+satır başına bir eleman, sonuncusu dışındaki her elemandan sonra `,` ve başlangıç
+girintisinde kapanış `]` olarak yazılır; bir `Pair` aynı biçimde `{`, `anahtar:
+değer` girdileri ve `}` ile yazılır. Boş bir List ya da Pair `[]` ya da `{}`'dir.
+Kendisi List ya da Pair olmayan elemanlar, anahtarlar ve değerler, bir
+koleksiyonun içindeki kanonik `str` metnini kullanır; bu yüzden bir Class değeri
+`<ClassAdı>` olur ve özellikleri asla okunmaz.
+
+## 79. Terminal Çalışma Zamanı (v1.5.0)
+
+Terminal çalışma zamanı, terminal tespiti ve boyutu için `syscall` dahil Go
+standart kütüphanesiyle yazılmıştır; üretilen bir program taşınabilir bir dosya
+ve derleme kısıtıyla seçilen işletim sistemi başına bir dosya alır. Modül
+bağımlılığı eklemez, yalnızca `NO_COLOR` ve `TERM` ortam değişkenlerini okur ve
+hiçbir dosyaya ya da ağ hizmetine erişmez. `Terminal`'i `bring` etmeyen bir
+program eskisiyle tamamen aynı davranır.
+
 ---
 
 # AhdCode v0.1 Çekirdek Spesifikasyonu Sonu

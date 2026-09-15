@@ -306,6 +306,38 @@ func FormatSignature(signature *types.Signature) string {
 // as an LSP signature-help "active parameter", reuses this exact per-item
 // rendering instead of inventing a second one.
 func FormatParameters(signature *types.Signature) []string {
+	return formatParameters(signature, func(int) bool { return false })
+}
+
+// FormatCallable renders a callable the way FormatSignature renders its
+// signature, and also writes the ? a nullable parameter or return has in
+// source. types.Display deliberately omits nullability, which lives in the
+// callable's own null metadata instead, so tooling that shows a signature to a
+// person -- LSP hover and signature help -- uses this. Diagnostics keep
+// FormatSignature.
+func FormatCallable(callable *Callable) string {
+	if callable == nil || callable.Signature == nil {
+		return "Function<?>"
+	}
+	result := types.Display(callable.Signature.Return)
+	if callable.ReturnNull != NonNull && !types.Equal(callable.Signature.Return, types.Nothing) {
+		result += "?"
+	}
+	return fmt.Sprintf("(%s) -> %s", strings.Join(FormatCallableParameters(callable), ", "), result)
+}
+
+// FormatCallableParameters is FormatParameters with the ? of each parameter
+// the callable declares nullable, one label per parameter.
+func FormatCallableParameters(callable *Callable) []string {
+	if callable == nil {
+		return nil
+	}
+	return formatParameters(callable.Signature, func(index int) bool {
+		return index < len(callable.ParameterNull) && callable.ParameterNull[index] != NonNull
+	})
+}
+
+func formatParameters(signature *types.Signature, nullable func(int) bool) []string {
 	if signature == nil {
 		return nil
 	}
@@ -316,6 +348,9 @@ func FormatParameters(signature *types.Signature) []string {
 			prefix = parameter.Name + ": "
 		}
 		parameters[index] = prefix + types.Display(parameter.Type)
+		if nullable(index) {
+			parameters[index] += "?"
+		}
 		if parameter.HasDefault {
 			parameters[index] += " := default"
 		}

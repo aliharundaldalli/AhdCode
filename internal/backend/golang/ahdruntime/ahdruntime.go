@@ -101,6 +101,7 @@ var (
 	AhdClassQRError             = &AhdClass{Name: "QRError", Parent: AhdClassError}
 	AhdClassBarcodeError        = &AhdClass{Name: "BarcodeError", Parent: AhdClassError}
 	AhdClassUUIDError           = &AhdClass{Name: "UUIDError", Parent: AhdClassError}
+	AhdClassTerminalError       = &AhdClass{Name: "TerminalError", Parent: AhdClassError}
 	AhdClassPostgreSQLError     = &AhdClass{Name: "PostgreSQLError", Parent: AhdClassError}
 )
 

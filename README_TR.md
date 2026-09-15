@@ -320,7 +320,7 @@ Kavramsal netliği korumak için AhdCode'un yetenekleri dört belirgin mimari ka
    - **Matematik ve Hesaplama:** [`Math`](docs/MATH_TR.md), [`Bits`](docs/BITS_TR.md) (`Int` üzerinde bit işlemleri), [`Regex`](docs/REGEX_TR.md), [`Statistics`](docs/STATISTICS_TR.md), [`Numeric`](docs/NUMERIC_TR.md), [`Plot`](docs/PLOT_TR.md)
    - **Veri ve Koleksiyonlar:** [`Lists`](docs/LISTS_TR.md), [`KeyValue`](docs/KEYVALUE_TR.md), [`Characters`](docs/CHARACTERS_TR.md) (Unicode kod noktaları ve sınıflandırma), [`CSV`](docs/CSV_TR.md), [`Data`](docs/DATA_TR.md), [`JSON`](docs/JSON_TR.md), [`XML`](docs/XML_TR.md), [`UUID`](docs/UUID_TR.md) (RFC 9562 sürüm 4 ve zamana göre sıralı sürüm 7 kimlikleri)
    - **Belge Üretimi:** [`Word`](docs/WORD_TR.md), [`Excel`](docs/EXCEL_TR.md), [`PDF`](docs/PDF_TR.md), [`Latex`](docs/LATEX_TR.md), [`QR`](docs/QR_TR.md) (QR kodları), [`Barcode`](docs/BARCODE_TR.md) (Code 128, EAN-13, UPC-A), [`Archive`](docs/ARCHIVE_TR.md)
-   - **Sistem ve Ortam:** [`Time`](docs/TIME_TR.md), [`Cron`](docs/CRON_TR.md) (sınırlı, süreç içi zamanlama), [`Path`](docs/FILESYSTEM_TR.md), [`File`](docs/FILESYSTEM_TR.md), [`Env`](docs/ENV_TR.md)
+   - **Sistem ve Ortam:** [`Time`](docs/TIME_TR.md), [`Cron`](docs/CRON_TR.md) (sınırlı, süreç içi zamanlama), [`Path`](docs/FILESYSTEM_TR.md), [`File`](docs/FILESYSTEM_TR.md), [`Env`](docs/ENV_TR.md), [`Terminal`](docs/TERMINAL_TR.md) (v1.5.0: standart hata, tampon boşaltma, terminal tespiti ve boyutu, biçimli metin, okunabilir düzen)
 
 3. **Birinci Taraf Çalışma Zamanı / Çatı Modülleri:**
    - **Ağ, Sunucu ve Depolama İlkelleri:** [`HTTP`](docs/HTTP_TR.md) (bellek içi sunucu, istek/yanıt, çerezler, oturumlar, statik dosya sunucusu, [WebSocket uç noktaları](docs/WEBSOCKET_TR.md), client), [`HTML`](docs/HTML_TR.md) (anlamsal kurucu, ayrıştırıcı, seçici motoru), [`Security`](docs/SECURITY_TR.md) (Argon2id özetleme, güvenli token'lar, sabit zamanlı karşılaştırma, SHA-2 özetleri, HMAC, kodlamalar, RS256 imzaları, AES-256-GCM), [`SQLite`](docs/SQLITE_TR.md) (yerel tipli veritabanı köprüsü), [`MySQL`](docs/MYSQL_TR.md) (bağlantı havuzu ve işlemlerle ağ veritabanı), [`PostgreSQL`](docs/POSTGRESQL_TR.md) (bağlantı havuzu ve işlemlerle ağ veritabanı), [`SMTP`](docs/SMTP_TR.md) (yalnızca gönderim yapan posta istemcisi)
@@ -462,6 +462,7 @@ bakın.
 - [Lists modülü](docs/LISTS_TR.md)
 - [KeyValue modülü](docs/KEYVALUE_TR.md)
 - [UUID modülü](docs/UUID_TR.md)
+- [Terminal modülü](docs/TERMINAL_TR.md)
 - [Tanılamaları anlama](docs/DIAGNOSTICS_TR.md)
 - [Dil sunucusu](docs/LSP_TR.md)
 - [Yapay zekâ destekli yerel kurulum](FOR_AI.md)
@@ -475,6 +476,7 @@ bakın.
 - [v0.9 SMTP posta gönderimi](examples/v0.9/README_TR.md)
 - [v0.12 MySQL çekiliş](examples/v0.12/raffle/README_TR.md) — katılım kodu, hash’li yönetici girişi, kazanan ilanı
 - [v1.4 gerçek zamanlı yoklama](examples/v1.4/realtime_attendance/README_TR.md) — Web, PostgreSQL, WebSocket, UUID v7, `Env.secret` ve Cron
+- [v1.5 Terminal tanıtımı](examples/v1.5/terminal_demo/README_TR.md) — `Terminal.emit`, standart hata, terminal tespiti, biçimli metin ve okunabilir düzen
 - [AhdDataStudio](tools/AhdDataStudio/README_TR.md) — yerel MySQL + SQLite geliştirme arayüzü
 - [v0.4 Kütüphane Demosu](https://github.com/aliharundaldalli/ahdcode-library-demo) (ayrı başlangıç web uygulaması)
 - [v0.4 Seminer Demosu](https://github.com/aliharundaldalli/ahdcode-seminer-demo) (Hatay, çok sayfalı)

@@ -82,6 +82,7 @@ verir.
 - [59. PostgreSQL: güçlü bir ağ veritabanı](#59-postgresql-güçlü-bir-ağ-veritabanı)
 - [60. WebSocket: canlı bağlantılar](#60-websocket-canlı-bağlantılar)
 - [61. Hepsi bir arada: gerçek zamanlı yoklama uygulaması](#61-hepsi-bir-arada-gerçek-zamanlı-yoklama-uygulaması)
+- [62. Terminal: çıktı üzerinde daha fazla denetim](#62-terminal-çıktı-üzerinde-daha-fazla-denetim)
 
 ## 1. AhdCode nedir?
 
@@ -6667,3 +6668,149 @@ stored: Local := database.query(
 **Siz deneyin:** Uygulamaya "bugün kaç yoklama alındı?" sayısını gösteren bir
 satır ekleyin. İpucu:
 `SELECT count(*) AS n FROM check_ins WHERE created_at >= date_trunc('day', now())`.
+
+## 62. Terminal: çıktı üzerinde daha fazla denetim
+
+7. bölümdeki `write` ve `take` çoğu programa yeter. v1.5.0 ile gelen
+`Terminal` modülü, bir programın daha fazlasına ihtiyaç duyduğu anlar içindir:
+bir hatayı başka bir yere göndermek, çıktının hemen görünmesini sağlamak,
+çıktıya birinin bakıp bakmadığını anlamak ya da bir sözcüğü renklendirmek.
+`write`, `take` ve `str` değişmez.
+
+### 62.1 String'leri emit ile birleştirmek
+
+```ahd
+bring Terminal
+
+ad := "Ali"
+puan := 95
+Terminal.emit([ad, str(puan), "Geçti"])
+Terminal.emit([ad, str(puan), "Geçti"], " | ")
+Terminal.emit(parts: ["Yükleniyor"], ending: "")
+Terminal.emit(parts: ["..."], separator: "", ending: "\n")
+```
+
+Beklenen çıktı:
+
+```text
+Ali 95 Geçti
+Ali | 95 | Geçti
+Yükleniyor...
+```
+
+`emit` bir `List<String>` alır, ayırıcıyı (varsayılanı bir boşluk) yalnızca iki
+parçanın arasına koyar ve sonu (varsayılanı bir satır sonu) en sona ekler. Hiçbir
+şeyi dönüştürmez; örneğin `str(puan)` yazmasının nedeni budur.
+
+10. bölümdeki kuralı hatırlayın: bir çağrı ya tamamen sıralı ya da tamamen
+isimli argümanlarla yapılır. `Terminal.emit([ad], " | ")` ve
+`Terminal.emit(parts: [ad], separator: " | ")` ikisi de doğrudur;
+aynı çağrıda sıralı bir List'in ardından isimli bir `separator` yazmak ise
+derleme hatasıdır.
+
+### 62.2 Hatalar standart hataya gider
+
+```ahd
+bring Terminal
+
+write("çalışıyor...")
+Terminal.error("Yapılandırma bulunamadı")
+```
+
+Bir programın iki çıktı akışı vardır. `write` ve `emit` **standart çıktıyı**,
+`Terminal.error` ise **standart hatayı** kullanır. Programı
+`ahdcode run program.ahd > cikti.txt` ile çalıştırın: `çalışıyor...` dosyaya
+gider, ama hata yine ekranda, programı çalıştıran kişinin göreceği yerde görünür.
+
+### 62.3 Çıktının hemen görünmesini sağlamak
+
+Derlenmiş bir program standart çıktısını biriktirir ve daha büyük parçalar hâlinde
+yazar; bu daha hızlıdır. Biriken metin program bittiğinde, `take` bir satır
+okumadan önce ve `Terminal.error` yazmadan önce yazılır. 36. bölümdeki bir web
+sunucusu ya da bekleyen bir döngü gibi çalışmaya devam eden bir program, metni
+hemen yazmak için `Terminal.flush()` çağırabilir:
+
+```ahd
+bring Terminal
+
+Terminal.emit(["Sunucu 8080 portunda başlıyor"])
+Terminal.flush()
+```
+
+### 62.4 Çıktıya biri bakıyor mu?
+
+```ahd
+bring Terminal
+
+genislik: Int? := Terminal.width()
+if Terminal.isInteractive() and genislik != null {
+    Terminal.emit(["Bu terminal {genislik} sütun genişliğinde."])
+}
+else {
+    Terminal.emit(["Çıktı bir dosyaya ya da başka bir programa gidiyor."])
+}
+```
+
+`Terminal.isInteractive()`, standart çıktı bir terminal penceresiyse `true`, bir
+dosyaya yönlendirildiyse ya da başka bir programa aktarıldıysa `false` olur.
+`Terminal.width()` ve `Terminal.height()` `Int?` döndürür: ölçülecek bir terminal
+yoksa `null` olurlar ve AhdCode asla boyut tahmin etmez.
+
+### 62.5 Rahatsız edecekleri yerde kaybolan renkler
+
+```ahd
+bring Terminal
+
+gecti := Terminal.style(text: "Geçti", foreground: "green", bold: true)
+kaldi := Terminal.style(text: "Kaldı", foreground: "red")
+Terminal.emit(["Ali:", gecti])
+Terminal.emit(["Mehmet:", kaldi])
+```
+
+Terminalde `Geçti` kalın yeşil, `Kaldı` kırmızı görünür. Çıktıyı bir dosyaya
+yönlendirin; dosyada düz `Geçti` ve `Kaldı` olur: `style` yalnızca
+`Terminal.supportsColor()` `true` iken renk ekler; bunun için bir terminal,
+ayarlı olmayan ya da boş bir `NO_COLOR` ve `dumb` olmayan bir `TERM` gerekir.
+Renkler `default`, `black`, `red`, `green`, `yellow`, `blue`, `magenta`, `cyan` ve
+`white`'tır; `"Red"` bile olsa başka her ad `TerminalError` verir.
+
+### 62.6 Bir koleksiyonun içine bakmak
+
+```ahd
+bring Terminal
+
+notlar: Pair<String, List<Int>> := {"Ali": [90, 95, 100], "Ayşe": [85, 91, 97]}
+write(notlar)
+Terminal.pretty(notlar)
+```
+
+Beklenen çıktı:
+
+```text
+{"Ali": [90, 95, 100], "Ayşe": [85, 91, 97]}
+{
+    "Ali": [
+        90,
+        95,
+        100
+    ],
+    "Ayşe": [
+        85,
+        91,
+        97
+    ]
+}
+```
+
+`write` her şeyi tek satıra koyar; `Terminal.pretty` ise bir List ya da Pair'i
+satırlara yayar, böylece büyük bir koleksiyon kolayca okunur. Başka her değer
+`write`'ın yazdığı gibi yazılır.
+
+**Siz deneyin:** Üç öğrencinin tablosunu `Terminal.emit` ve `" | "` ile yazan,
+50'nin altındaki her puanı kırmızıya boyayan ve bir puan eksikse
+`Terminal.error` ile uyarı yazan bir program yazın. Programı önce normal, sonra
+`> cikti.txt` ile çalıştırıp karşılaştırın.
+
+[Terminal modül referansına](TERMINAL_TR.md) ve
+[`examples/v1.5/terminal_demo`](../examples/v1.5/terminal_demo/README_TR.md)
+klasörüne bakın.

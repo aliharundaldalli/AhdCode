@@ -44,6 +44,9 @@ func moduleOperationShapeOf(operation ModuleOperation) moduleOperationShape {
 	if shape, known := listsOperationShapes[operation]; known {
 		return shape
 	}
+	if shape, known := terminalOperationShapes[operation]; known {
+		return shape
+	}
 	return keyValueOperationShapes[operation]
 }
 
@@ -126,6 +129,9 @@ func (a *analyzer) analyzeModuleOperation(call *ast.CallExpr, operation ModuleOp
 		return info
 	}
 	if info, handled := a.analyzeKeyValueOperation(call, operation, current, flow); handled {
+		return info
+	}
+	if info, handled := a.analyzeTerminalOperation(call, operation, current, flow); handled {
 		return info
 	}
 	return moduleOperationFailure()

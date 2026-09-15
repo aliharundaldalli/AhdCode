@@ -823,6 +823,9 @@ func (generator *generator) call(value *ir.CallExpr) string {
 	if strings.HasPrefix(string(value.Callable), uuidModulePrefix) {
 		return generator.uuidCall(value)
 	}
+	if strings.HasPrefix(string(value.Callable), terminalModulePrefix) {
+		return generator.terminalCall(value)
+	}
 	if strings.HasPrefix(string(value.Callable), postgresqlModulePrefix) {
 		return generator.postgresqlCall(value)
 	}

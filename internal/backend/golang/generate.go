@@ -61,6 +61,14 @@ const (
 	codesRuntimeFileName         = "ahdcode_codes_runtime.go"
 	svgRuntimeFileName           = "ahdcode_svg_runtime.go"
 	documentRuntimeFileName      = "ahdcode_document_runtime.go"
+	// The Terminal runtime is one portable file plus one file per operating
+	// system. The operating-system suffix and each file's build constraint let
+	// the Go toolchain compile exactly the platform file for the target.
+	terminalRuntimeFileName        = "ahdcode_terminal_runtime.go"
+	terminalDarwinRuntimeFileName  = "ahdcode_terminal_runtime_darwin.go"
+	terminalLinuxRuntimeFileName   = "ahdcode_terminal_runtime_linux.go"
+	terminalWindowsRuntimeFileName = "ahdcode_terminal_runtime_windows.go"
+	terminalOtherRuntimeFileName   = "ahdcode_terminal_runtime_other.go"
 )
 
 // storage describes the Go representation chosen for one IR symbol.
@@ -214,6 +222,11 @@ func Generate(compilation *ir.Compilation) (*GeneratedProgram, []diagnostics.Dia
 	for _, shared := range []struct{ name, source, label string }{
 		{svgRuntimeFileName, ahdruntime.SVGSource, "SVG"},
 		{documentRuntimeFileName, ahdruntime.DocumentSource, "document"},
+		{terminalRuntimeFileName, ahdruntime.TerminalSource, "Terminal"},
+		{terminalDarwinRuntimeFileName, ahdruntime.TerminalDarwinSource, "Terminal macOS"},
+		{terminalLinuxRuntimeFileName, ahdruntime.TerminalLinuxSource, "Terminal Linux"},
+		{terminalWindowsRuntimeFileName, ahdruntime.TerminalWindowsSource, "Terminal Windows"},
+		{terminalOtherRuntimeFileName, ahdruntime.TerminalOtherSource, "Terminal fallback"},
 	} {
 		formattedShared, err := format.Source([]byte(strings.Replace(shared.source, "package ahdruntime", "package main", 1)))
 		if err != nil {
