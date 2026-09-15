@@ -12,15 +12,15 @@ AhdCode is an experimental statically checked general-purpose programming
 language focused on readable syntax, explicit intent, predictable semantics,
 and native compilation.
 
-This is **v1.4.0**. The language, toolchain, and Web framework are
+This is **v1.5.0**. The language, toolchain, and Web framework are
 feature-complete, and the core language surface described here is what 1.0
-committed to and 1.1, 1.2, 1.3, and 1.4 keep unchanged.
+committed to and 1.1, 1.2, 1.3, 1.4, and 1.5 keep unchanged.
 
-v1.4.0 is a minor release, **Realtime Web & Data**: it adds the `UUID` and
-`PostgreSQL` standard modules, WebSocket server endpoints in `HTTP` with a
-`Web` pass-through, and `Env.secret` for secrets delivered as files, without
-altering the core grammar or any existing behaviour. See
-[What is new in v1.4.0](#what-is-new-in-v140).
+v1.5.0 is a minor release, **Terminal**: it adds the `Terminal` standard
+module — standard error, explicit flushing, terminal detection and size, color
+that disappears when output is redirected, and readable collection layout —
+without altering the core grammar, the type system, or `write`, `take`, and
+`str`. See [What is new in v1.5.0](#what-is-new-in-v150).
 
 It ships as a self-contained platform package: the `ahdcode` CLI, a private
 Go 1.27.0 toolchain, AhdDataStudio, the `ahdsqlite`, `ahdnumeric`, and
@@ -475,6 +475,33 @@ diagnostics and hover. The same VSIX targets VS Code and Antigravity. See its
 [installation guide](editors/vscode/README.md).
 
 ## Current limitations
+
+## What is new in v1.5.0 <a id="what-is-new-in-v150"></a>
+
+v1.5.0 is a **minor** release, **Terminal**. It adds one standard module and
+keeps the core grammar, the type system, and every previously released function
+unchanged.
+
+**New standard module: [`Terminal`](docs/TERMINAL.md)** — the terminal-specific
+behaviour `write`, `take`, and `str` deliberately leave out:
+
+- `Terminal.emit(parts, separator, ending)` joins a `List<String>` onto standard
+  output and converts nothing.
+- `Terminal.error(text, ending)` writes to standard error, and
+  `Terminal.flush()` writes buffered standard output immediately.
+- `Terminal.isInteractive()`, `Terminal.width()`, and `Terminal.height()`
+  describe standard output; the sizes are `Int?` and never guessed.
+- `Terminal.supportsColor()` and `Terminal.style(...)` add color only on an
+  interactive terminal, honour `NO_COLOR` and `TERM=dumb`, and return plain text
+  when output is redirected.
+- `Terminal.pretty(value)` lays out a List or Pair over lines for reading.
+
+Terminal is not a TUI framework: there is no cursor control, raw keyboard input,
+or progress output. It adds no dependency, compiled programs and the REPL
+produce identical output, and editors now show the `?` of nullable parameters
+and returns in hover and signature help. `Terminal` is now a standard module
+name: a local `Terminal.ahd` beside a program is no longer what `bring Terminal`
+loads. See the [Terminal demo](examples/v1.5/terminal_demo/README.md).
 
 ## What is new in v1.4.0 <a id="what-is-new-in-v140"></a>
 

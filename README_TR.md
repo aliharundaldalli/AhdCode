@@ -12,15 +12,15 @@ AhdCode; okunabilir sözdizimi, açık niyet (explicit intent), öngörülebilir
 anlambilim (semantics) ve yerel (native) derlemeye odaklanan, deneysel,
 statik olarak denetlenen genel amaçlı bir programlama dilidir.
 
-Bu, **v1.4.0**'dır. Dil, araç zinciri ve Web çatısı özellik olarak
+Bu, **v1.5.0**'dır. Dil, araç zinciri ve Web çatısı özellik olarak
 tamamlanmıştır; burada anlatılan çekirdek dil yüzeyi 1.0'ın taahhüt ettiği ve
-1.1, 1.2, 1.3 ile 1.4'ün değiştirmeden koruduğu yüzeydir.
+1.1, 1.2, 1.3, 1.4 ile 1.5'in değiştirmeden koruduğu yüzeydir.
 
-v1.4.0 bir ara (minor) sürümdür, **Gerçek Zamanlı Web ve Veri**: `UUID` ve
-`PostgreSQL` standart modüllerini, `Web` geçişiyle birlikte `HTTP` içinde
-WebSocket sunucu uç noktalarını ve dosya olarak iletilen gizli değerler için
-`Env.secret`'i ekler; çekirdek dilbilgisini ya da mevcut davranışların
-hiçbirini değiştirmez. Bkz. [v1.4.0 ile gelenler](#v140-ile-gelenler).
+v1.5.0 bir ara (minor) sürümdür, **Terminal**: standart hata, açık tampon
+boşaltma, terminal tespiti ve boyutu, çıktı yönlendirildiğinde kaybolan renk ve
+okunabilir koleksiyon düzeni sunan `Terminal` standart modülünü ekler; çekirdek
+dilbilgisini, tip sistemini ya da `write`, `take` ve `str`'yi değiştirmez. Bkz.
+[v1.5.0 ile gelenler](#v150-ile-gelenler).
 
 Ürün, kendi kendine yeten bir platform paketi olarak dağıtılır: `ahdcode` CLI,
 özel Go 1.27.0 araç zinciri, AhdDataStudio, `ahdsqlite`, `ahdnumeric` ve
@@ -494,6 +494,34 @@ VS Code hem de Antigravity'i hedefler.
 [Kurulum rehberine](editors/vscode/README_TR.md) bakın.
 
 ## Mevcut sınırlamalar
+
+## v1.5.0 ile gelenler <a id="v150-ile-gelenler"></a>
+
+v1.5.0 bir **ara (minor)** sürümdür, **Terminal**. Tek bir standart modül ekler;
+çekirdek dilbilgisi, tip sistemi ve daha önce yayımlanmış her fonksiyon
+davranışını korur.
+
+**Yeni standart modül: [`Terminal`](docs/TERMINAL_TR.md)** — `write`, `take` ve
+`str`'nin bilerek dışarıda bıraktığı terminale özgü davranışlar:
+
+- `Terminal.emit(parts, separator, ending)` bir `List<String>`'i standart
+  çıktıya birleştirerek yazar ve hiçbir şeyi dönüştürmez.
+- `Terminal.error(text, ending)` standart hataya yazar, `Terminal.flush()` ise
+  tamponlanmış standart çıktıyı hemen yazar.
+- `Terminal.isInteractive()`, `Terminal.width()` ve `Terminal.height()` standart
+  çıktıyı anlatır; boyutlar `Int?`'dir ve asla tahmin edilmez.
+- `Terminal.supportsColor()` ve `Terminal.style(...)` rengi yalnızca etkileşimli
+  bir terminalde ekler, `NO_COLOR` ve `TERM=dumb`'a uyar ve çıktı
+  yönlendirildiğinde düz metin döndürür.
+- `Terminal.pretty(value)` bir List ya da Pair'i okunmak üzere satırlara yayar.
+
+Terminal bir TUI çatısı değildir: imleç denetimi, ham klavye girdisi ya da
+ilerleme çıktısı yoktur. Bağımlılık eklemez, derlenmiş programlar ve REPL aynı
+çıktıyı üretir ve editörler artık üzerine gelme (hover) ile imza yardımında
+null olabilen parametre ve dönüşlerin `?` işaretini gösterir. `Terminal` artık
+bir standart modül adıdır: bir programın yanındaki yerel `Terminal.ahd`,
+`bring Terminal` ile yüklenen şey değildir. Bkz.
+[Terminal tanıtımı](examples/v1.5/terminal_demo/README_TR.md).
 
 ## v1.4.0 ile gelenler <a id="v140-ile-gelenler"></a>
 
