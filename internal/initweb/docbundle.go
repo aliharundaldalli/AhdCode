@@ -35,6 +35,7 @@ var documentationManifest = []string{
 	"FUNCTIONS.md",
 	"FUNDAMENTALS.md",
 	"GETTING_STARTED.md",
+	"GRAPHICS.md",
 	"HTML.md",
 	"HTTP.md",
 	"IDENTITY.md",

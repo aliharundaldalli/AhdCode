@@ -6611,6 +6611,83 @@ bağımlılığı eklemez, yalnızca `NO_COLOR` ve `TERM` ortam değişkenlerini
 hiçbir dosyaya ya da ağ hizmetine erişmez. `Terminal`'i `bring` etmeyen bir
 program eskisiyle tamamen aynı davranır.
 
+## 80. Graphics Standart Modülü (v1.6.0)
+
+`bring Graphics`, derleyicinin sağladığı `builtin:Graphics` modülüne çözülür;
+yerel bir `Graphics.ahd` onu gölgeleyemez. `Graphics.open`'ı, `Canvas` ve
+`Turtle` Class'larını ve `Error`'dan türeyen `GraphicsError`'ı dışa aktarır.
+Canvas ve Turtle kurucu yayımlamaz.
+
+```text
+Graphics.open(width: Int := 800, height: Int := 600,
+              title: String := "AhdCode Graphics", background: String := "white") -> Canvas
+
+Canvas.clear(color: String := "white")                                            -> Nothing
+Canvas.line(x1: Real, y1: Real, x2: Real, y2: Real,
+            color: String := "black", width: Real := 1.0)                         -> Nothing
+Canvas.circle(x: Real, y: Real, radius: Real, stroke: String := "black",
+              fill: String? := null, width: Real := 1.0)                          -> Nothing
+Canvas.rectangle(x: Real, y: Real, width: Real, height: Real, stroke: String := "black",
+                 fill: String? := null, lineWidth: Real := 1.0)                   -> Nothing
+Canvas.save(path: String) -> Nothing      Canvas.wait()   -> Nothing
+Canvas.close()            -> Nothing      Canvas.isOpen() -> Bool
+Canvas.turtle()           -> Turtle
+
+Turtle.forward(distance: Real)  Turtle.backward(distance: Real)
+Turtle.left(degrees: Real)      Turtle.right(degrees: Real)
+Turtle.moveTo(x: Real, y: Real) Turtle.setHeading(degrees: Real)
+Turtle.penUp()  Turtle.penDown()  Turtle.setColor(color: String)  Turtle.setWidth(width: Real)
+Turtle.home()                                          (hepsi -> Nothing)
+Turtle.x() -> Real   Turtle.y() -> Real   Turtle.heading() -> Real
+```
+
+Canvas ve Turtle üyeleri parametre adlarını ve varsayılanlarını yayımlar; bu
+yüzden bunlara yapılan bir çağrı, bir modül fonksiyonu çağrısı gibi tam olarak
+bölüm 15.3'e uyar: ya tamamen konumsal ya da tamamen isimli, varsayılanlar
+atlanabilir. `Int` argümanlar `Real` parametrelere genişler. Yalnızca `fill`
+`null` kabul eder.
+
+Koordinatlar Kartezyendir: başlangıç noktası Canvas'ın merkezidir, `+x` sağı,
+`+y` yukarıyı gösterir ve bir birim bir pencere pikselidir. `rectangle` sol alt
+köşesini alır. Canvas dışındaki geometri hatasız kırpılır.
+
+Renkler `black`, `white`, `red`, `green`, `blue`, `yellow`, `cyan`, `magenta`,
+`gray` (büyük/küçük harfe duyarlı), `#RRGGBB` ya da `#RRGGBBAA`'dır. Bir Turtle
+`(0, 0)`'da, 0 yönünde (+x), kalemi aşağıda, `black` renkte ve 1 kalınlıkta
+başlar. `left(a)` `a` ekler, `right(a)` çıkarır; `heading()` `[0, 360)`
+aralığına normalleştirilir. `forward(d)` `(x + d·cos θ, y + d·sin θ)`'ya,
+`backward(d)` karşı noktaya gider; kalem aşağıdayken her hareket bir Canvas
+çizgisi çizer ve Turtle'ın durumu ancak o çizgi çizildikten sonra değişir.
+`home()` mevcut kalem durumuyla başlangıç noktasına gider, sonra yönü 0 yapar;
+`Canvas.clear` hiçbir Turtle'ı değiştirmez.
+
+`GraphicsError` şu durumlarda fırlatılır: 1..4096 dışında bir Canvas kenarı,
+bilinmeyen bir renk, 0'dan büyük olmayan bir çizgi kalınlığı, negatif bir
+yarıçap, genişlik ya da yükseklik, uzantısı `.png` ya da `.svg` olmayan
+(büyük/küçük harfe duyarsız) ya da yazılamayan bir kayıt yolu, kapanmış bir
+Canvas'a çizim ya da kayıt ve bulunamayan, başarısız olan ya da yanıt vermeyen
+bir pencere yardımcısı. Yarıçapı 0 olan çember ve bir kenarı sıfır olan
+dikdörtgen hiçbir şey çizmez. `wait` pencere kapanana kadar bekler, sonra
+Canvas'ı kapanmış sayar; `close` tekrarlanabilir (idempotent) ve Canvas'ı ve
+döndürdüğü her Turtle'ı serbest bırakır; ardından bu Turtle'lara yapılan her
+çağrı `GraphicsError` fırlatır.
+
+## 81. Graphics Çalışma Zamanı (v1.6.0)
+
+Graphics doğrulaması, renk ayrıştırma, Turtle durumu ve geometrisi ve yardımcı
+protokolü Go standart kitaplığıyla bir kez gerçekleştirilir ve değerlendirici
+ile yerel programlar tarafından paylaşılır. Açık her Canvas'ı, paketli
+`ahdgraphics` yardımcısının bir süreci çizer; ona standart girdi ve çıktısı
+üzerinden sınırlı JSON satırlarıyla ulaşılır, standart hatası protokolün parçası
+değildir. Yardımcı çizim listesini tutar, bir pencerede gösterir ve PNG (birim
+başına bir piksel) ile SVG çıktısını aynı listeden üretir. Kabuk komutu
+çalıştırmaz, ağa erişmez ve yalnızca `save`'in verdiği yola yazar. Bir programın
+açık Canvas'ları program bittiğinde kapanır. Yardımcı
+`AHDCODE_GRAPHICS_RUNTIME` ile, derleyicinin kaydettiği konumla ya da çalışan
+programın yanındaki kurulumla bulunur; `PATH` aranmaz.
+`AHDCODE_GRAPHICS_HEADLESS=1` her Canvas'ı pencere olmadan açar. `Graphics`'i
+getirmeyen bir program tam olarak eskisi gibi davranır.
+
 ---
 
 # AhdCode v0.1 Çekirdek Spesifikasyonu Sonu

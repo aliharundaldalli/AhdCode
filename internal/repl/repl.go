@@ -39,6 +39,8 @@ func Run(input io.Reader, output, errorOutput io.Writer, version string) int {
 	reader := bufio.NewReader(input)
 	session := evaluator.New(reader, output, directory)
 	session.ErrorOutput = errorOutput
+	// A Canvas the session opened and left open closes when the REPL ends.
+	defer evaluator.CloseGraphics()
 	committedSource := ""
 	pending := ""
 	fmt.Fprintln(output, version)

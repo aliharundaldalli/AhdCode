@@ -371,6 +371,7 @@ func BuildProgram(entryPath, outputPath string) (string, Result) {
 	result.Program = configurePlotRuntime(result.Program)
 	result.Program = configureNumericRuntime(result.Program)
 	result.Program = configureSQLiteRuntime(result.Program)
+	result.Program = configureGraphicsRuntime(result.Program)
 	workspace, failures := NewWorkspace(result.Program)
 	if len(failures) != 0 {
 		result.Diagnostics = append(result.Diagnostics, failures...)
@@ -466,6 +467,7 @@ func RunProgramObserved(entryPath string, arguments []string, stdin io.Reader, s
 	result.Program = configurePlotRuntime(result.Program)
 	result.Program = configureNumericRuntime(result.Program)
 	result.Program = configureSQLiteRuntime(result.Program)
+	result.Program = configureGraphicsRuntime(result.Program)
 	executable, cleanup, failures := runExecutable(result.Program)
 	defer cleanup()
 	result.Diagnostics = append(result.Diagnostics, failures...)
@@ -579,6 +581,24 @@ func configureSQLiteRuntime(program *backend.GeneratedProgram) *backend.Generate
 	copyProgram.RequiresSQLite = true
 	copyProgram.Files = append([]backend.GeneratedFile(nil), program.Files...)
 	copyProgram.Files = append(copyProgram.Files, backend.GeneratedFile{Name: "ahdcode_sqlite_runtime_hint.go", Content: "package main\n\nfunc init() { AhdSQLiteRuntimeHint = " + strconv.Quote(root) + " }\n"})
+	return &copyProgram
+}
+
+// configureGraphicsRuntime records the installed ahdgraphics helper's
+// directory in programs that use Graphics, mirroring configureSQLiteRuntime.
+// The runtime still checks that the helper exists and raises GraphicsError if
+// it is missing when a Canvas is opened.
+func configureGraphicsRuntime(program *backend.GeneratedProgram) *backend.GeneratedProgram {
+	if program == nil || !program.RequiresGraphics {
+		return program
+	}
+	root := findHelperRuntimeRoot("ahdgraphics", "AHDCODE_GRAPHICS_RUNTIME")
+	if root == "" {
+		return program
+	}
+	copyProgram := *program
+	copyProgram.Files = append([]backend.GeneratedFile(nil), program.Files...)
+	copyProgram.Files = append(copyProgram.Files, backend.GeneratedFile{Name: "ahdcode_graphics_runtime_hint.go", Content: "package main\n\nfunc init() { AhdGraphicsRuntimeHint = " + strconv.Quote(root) + " }\n"})
 	return &copyProgram
 }
 

@@ -5,6 +5,7 @@ editors/vscode/node_modules/
 # Build outputs
 /ahdcode
 /ahdplot
+/ahdgraphics
 
 # Benchmark test files
 speed*

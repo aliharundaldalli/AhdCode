@@ -370,6 +370,7 @@ derleyicinin yanına kurulur:
 
 ```bash
 go install ./cmd/ahdcode ./cmd/ahdnumeric ./cmd/ahdplot ./cmd/ahdsqlite
+go -C cmd/ahdgraphics install .
 ```
 
 İlk `SQLite.open`'da program bir yardımcı süreci başlatır ve onunla, tıpkı

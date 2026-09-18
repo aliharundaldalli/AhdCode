@@ -12,19 +12,20 @@ AhdCode; okunabilir sözdizimi, açık niyet (explicit intent), öngörülebilir
 anlambilim (semantics) ve yerel (native) derlemeye odaklanan, deneysel,
 statik olarak denetlenen genel amaçlı bir programlama dilidir.
 
-Bu, **v1.5.0**'dır. Dil, araç zinciri ve Web çatısı özellik olarak
+Bu, **v1.6.0**'dır. Dil, araç zinciri ve Web çatısı özellik olarak
 tamamlanmıştır; burada anlatılan çekirdek dil yüzeyi 1.0'ın taahhüt ettiği ve
-1.1, 1.2, 1.3, 1.4 ile 1.5'in değiştirmeden koruduğu yüzeydir.
+1.1, 1.2, 1.3, 1.4, 1.5 ile 1.6'nın değiştirmeden koruduğu yüzeydir.
 
-v1.5.0 bir ara (minor) sürümdür, **Terminal**: standart hata, açık tampon
-boşaltma, terminal tespiti ve boyutu, çıktı yönlendirildiğinde kaybolan renk ve
-okunabilir koleksiyon düzeni sunan `Terminal` standart modülünü ekler; çekirdek
-dilbilgisini, tip sistemini ya da `write`, `take` ve `str`'yi değiştirmez. Bkz.
-[v1.5.0 ile gelenler](#v150-ile-gelenler).
+v1.6.0 bir ara (minor) sürümdür, **Graphics + Turtle**: Kartezyen 2B bir Canvas
+içeren bir pencere, çizgi, çember ve dikdörtgen, PNG ve SVG kaydı ve
+koordinat, açı ve geometri öğretmek için bir Turtle kalemi sunan `Graphics`
+standart modülünü ekler; çekirdek dilbilgisini ya da tip sistemini değiştirmez.
+Bir oyun motoru ya da GUI kiti değildir. Bkz.
+[v1.6.0 ile gelenler](#v160-ile-gelenler).
 
 Ürün, kendi kendine yeten bir platform paketi olarak dağıtılır: `ahdcode` CLI,
-özel Go 1.27.0 araç zinciri, AhdDataStudio, `ahdsqlite`, `ahdnumeric` ve
-`ahdplot` yardımcıları, sabitlenmiş kaynak paketiyle çevrimdışı Tectonic LaTeX
+özel Go 1.27.0 araç zinciri, AhdDataStudio, `ahdsqlite`, `ahdnumeric`, `ahdplot`
+ve `ahdgraphics` yardımcıları, sabitlenmiş kaynak paketiyle çevrimdışı Tectonic LaTeX
 motoru, Web starter'ları ve bu sürüme ait İngilizce belge paketi.
 Bkz. [Kurulum](docs/INSTALLATION_TR.md).
 
@@ -317,7 +318,7 @@ Kavramsal netliği korumak için AhdCode'un yetenekleri dört belirgin mimari ka
    - Modül çözümleme (`bring`, `from ... bring`) ve derleme zamanı yerel kaynak birleştirme ([`require(...)`](docs/REQUIRE_TR.md))
 
 2. **Standart Kütüphane (Birinci Taraf Gömülü Modüller):**
-   - **Matematik ve Hesaplama:** [`Math`](docs/MATH_TR.md), [`Bits`](docs/BITS_TR.md) (`Int` üzerinde bit işlemleri), [`Regex`](docs/REGEX_TR.md), [`Statistics`](docs/STATISTICS_TR.md), [`Numeric`](docs/NUMERIC_TR.md), [`Plot`](docs/PLOT_TR.md)
+   - **Matematik ve Hesaplama:** [`Math`](docs/MATH_TR.md), [`Bits`](docs/BITS_TR.md) (`Int` üzerinde bit işlemleri), [`Regex`](docs/REGEX_TR.md), [`Statistics`](docs/STATISTICS_TR.md), [`Numeric`](docs/NUMERIC_TR.md), [`Plot`](docs/PLOT_TR.md), [`Graphics`](docs/GRAPHICS_TR.md) (Canvas pencereleri ve Turtle ile çizim)
    - **Veri ve Koleksiyonlar:** [`Lists`](docs/LISTS_TR.md), [`KeyValue`](docs/KEYVALUE_TR.md), [`Characters`](docs/CHARACTERS_TR.md) (Unicode kod noktaları ve sınıflandırma), [`CSV`](docs/CSV_TR.md), [`Data`](docs/DATA_TR.md), [`JSON`](docs/JSON_TR.md), [`XML`](docs/XML_TR.md), [`UUID`](docs/UUID_TR.md) (RFC 9562 sürüm 4 ve zamana göre sıralı sürüm 7 kimlikleri)
    - **Belge Üretimi:** [`Word`](docs/WORD_TR.md), [`Excel`](docs/EXCEL_TR.md), [`PDF`](docs/PDF_TR.md), [`Latex`](docs/LATEX_TR.md), [`QR`](docs/QR_TR.md) (QR kodları), [`Barcode`](docs/BARCODE_TR.md) (Code 128, EAN-13, UPC-A), [`Archive`](docs/ARCHIVE_TR.md)
    - **Sistem ve Ortam:** [`Time`](docs/TIME_TR.md), [`Cron`](docs/CRON_TR.md) (sınırlı, süreç içi zamanlama), [`Path`](docs/FILESYSTEM_TR.md), [`File`](docs/FILESYSTEM_TR.md), [`Env`](docs/ENV_TR.md), [`Terminal`](docs/TERMINAL_TR.md) (v1.5.0: standart hata, tampon boşaltma, terminal tespiti ve boyutu, biçimli metin, okunabilir düzen)
@@ -345,6 +346,7 @@ AhdCode şu anda Go 1.26 veya daha yeni bir sürüm gerektirir.
 ```bash
 cd AhdCode
 go install ./cmd/ahdcode ./cmd/ahdnumeric ./cmd/ahdplot ./cmd/ahdsqlite
+go -C cmd/ahdgraphics install .
 ```
 
 Yukarıdaki komut, derleyiciyi ve yerel numeric, plot ve SQLite yardımcılarını (helpers) kurar.
@@ -463,6 +465,7 @@ bakın.
 - [KeyValue modülü](docs/KEYVALUE_TR.md)
 - [UUID modülü](docs/UUID_TR.md)
 - [Terminal modülü](docs/TERMINAL_TR.md)
+- [Graphics modülü](docs/GRAPHICS_TR.md)
 - [Tanılamaları anlama](docs/DIAGNOSTICS_TR.md)
 - [Dil sunucusu](docs/LSP_TR.md)
 - [Yapay zekâ destekli yerel kurulum](FOR_AI.md)
@@ -477,6 +480,7 @@ bakın.
 - [v0.12 MySQL çekiliş](examples/v0.12/raffle/README_TR.md) — katılım kodu, hash’li yönetici girişi, kazanan ilanı
 - [v1.4 gerçek zamanlı yoklama](examples/v1.4/realtime_attendance/README_TR.md) — Web, PostgreSQL, WebSocket, UUID v7, `Env.secret` ve Cron
 - [v1.5 Terminal tanıtımı](examples/v1.5/terminal_demo/README_TR.md) — `Terminal.emit`, standart hata, terminal tespiti, biçimli metin ve okunabilir düzen
+- [v1.6 Graphics ve Turtle](examples/v1.6/graphics_turtle/README_TR.md) — Kartezyen Canvas, şekiller, Turtle ile yıldız ve spiral, PNG/SVG kaydı ve düzgün çokgen dersi
 - [AhdDataStudio](tools/AhdDataStudio/README_TR.md) — yerel MySQL + SQLite geliştirme arayüzü
 - [v0.4 Kütüphane Demosu](https://github.com/aliharundaldalli/ahdcode-library-demo) (ayrı başlangıç web uygulaması)
 - [v0.4 Seminer Demosu](https://github.com/aliharundaldalli/ahdcode-seminer-demo) (Hatay, çok sayfalı)
@@ -494,6 +498,36 @@ VS Code hem de Antigravity'i hedefler.
 [Kurulum rehberine](editors/vscode/README_TR.md) bakın.
 
 ## Mevcut sınırlamalar
+
+## v1.6.0 ile gelenler <a id="v160-ile-gelenler"></a>
+
+v1.6.0 bir **ara (minor)** sürümdür, **Graphics + Turtle**. Tek bir standart
+modül ekler; çekirdek dilbilgisini, tip sistemini ve daha önce yayımlanmış her
+fonksiyonun davranışını korur.
+
+**Yeni standart modül: [`Graphics`](docs/GRAPHICS_TR.md)** — görsel programlama
+ve 2B çizim:
+
+- `Graphics.open(width, height, title, background)` koordinatları Kartezyen
+  olan bir Canvas içeren bir pencere açar: `(0, 0)` merkezdir ve `+y` yukarıyı
+  gösterir.
+- `canvas.line`, `canvas.circle` ve `canvas.rectangle` renk adları ya da
+  `#RRGGBB`/`#RRGGBBAA` ile çizer; `fill` isteğe bağlıdır (`String?`) ve bir
+  dikdörtgen sol alt köşesiyle verilir.
+- `canvas.save("x.png")` ve `canvas.save("x.svg")` çizimi kaydeder;
+  `canvas.wait()` pencere kapanana kadar açık tutar, `canvas.close()` kapatır.
+- `canvas.turtle()` geometrisi belirlenimci olan, zamana ya da kare hızına
+  bağlı olmayan bir Turtle kalemi döndürür (`forward`, `left`, `right`,
+  `moveTo`, `penUp`, `penDown`, `setColor`, `setWidth`, `home`, `x`, `y`,
+  `heading`).
+
+Canvas ve Turtle çağrıları her zamanki kurala uyar: ya tamamen konumsal ya da
+tamamen isimli. Derlenmiş programlar, `ahdcode run` ve REPL tek bir
+gerçekleştirmeyi paylaşır. Her Canvas'ı, pencere kitaplığını derleyicinin ve
+derlenmiş programların dışında tutan ayrı bir program olan paketli
+`ahdgraphics` yardımcısı çizer. Graphics'te sprite, animasyon döngüsü, klavye
+ya da fare girdisi, ses, arayüz bileşeni ya da 3B yoktur. Bkz.
+[Graphics ve Turtle örnekleri](examples/v1.6/graphics_turtle/README_TR.md).
 
 ## v1.5.0 ile gelenler <a id="v150-ile-gelenler"></a>
 
@@ -668,6 +702,7 @@ Dil içinde AhdCode; kasıtlı olarak blok/deyim lambda'larını, keyfi/örtük 
 cmd/ahdcode/         CLI giriş noktası ve komut yönlendirici
 cmd/ahdnumeric/      paketli ileri doğrusal-cebir yardımcısı
 cmd/ahdplot/         paketli grafik render yardımcısı
+cmd/ahdgraphics/     paketli Graphics pencere yardımcısı (kendi Go modülü)
 cmd/ahdsqlite/       paketli CGO'suz SQLite yardımcısı
 internal/            derleyici ön yüzü, arka yüzü, çalışma zamanı, biçimlendirici, LSP ve REPL
 internal/framework/  paketli birinci taraf Web çatısı kaynağı

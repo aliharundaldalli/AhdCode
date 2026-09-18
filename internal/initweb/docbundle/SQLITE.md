@@ -367,6 +367,7 @@ compiler:
 
 ```bash
 go install ./cmd/ahdcode ./cmd/ahdnumeric ./cmd/ahdplot ./cmd/ahdsqlite
+go -C cmd/ahdgraphics install .
 ```
 
 At the first `SQLite.open` the program starts one helper process and talks to

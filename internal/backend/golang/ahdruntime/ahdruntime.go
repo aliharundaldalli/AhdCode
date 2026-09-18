@@ -363,6 +363,21 @@ func AhdFlush() {
 	_ = ahdOut.Flush()
 }
 
+var ahdExitHooks []func()
+
+// AhdOnExit registers cleanup that runs when a generated program ends, on
+// success or after an uncaught error, before the process exits. Graphics uses
+// it to close every Canvas window the program left open.
+func AhdOnExit(hook func()) {
+	ahdExitHooks = append(ahdExitHooks, hook)
+}
+
+func ahdRunExitHooks() {
+	for _, hook := range ahdExitHooks {
+		hook()
+	}
+}
+
 // AhdMain runs a generated program body and turns an uncaught AhdCode error
 // into a diagnostic exit instead of a Go panic trace.
 func AhdMain(install func(), body func()) {
@@ -377,6 +392,7 @@ func AhdMain(install func(), body func()) {
 			signal, ok := recovered.(*AhdSignal)
 			if !ok {
 				AhdFlush()
+				ahdRunExitHooks()
 				panic(recovered)
 			}
 			AhdFlush()
@@ -386,6 +402,7 @@ func AhdMain(install func(), body func()) {
 		body()
 	}()
 	AhdFlush()
+	ahdRunExitHooks()
 	if failed {
 		os.Exit(1)
 	}

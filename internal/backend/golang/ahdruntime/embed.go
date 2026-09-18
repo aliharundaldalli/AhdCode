@@ -160,3 +160,11 @@ var TerminalWindowsSource string
 
 //go:embed terminal_other.go
 var TerminalOtherSource string
+
+// GraphicsSource is emitted as a separate generated Go file. It is the AhdCode
+// side of the Graphics standard module: argument validation, color parsing,
+// Turtle state and geometry, and the protocol client of the bundled
+// ahdgraphics window helper. It uses only the standard library.
+//
+//go:embed graphics.go
+var GraphicsSource string

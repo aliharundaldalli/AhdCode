@@ -1,0 +1,83 @@
+// v1.6.0 Graphics and Turtle demo.
+//
+//     ahdcode run main.ahd
+//
+// Draws Cartesian axes, the three Canvas shapes, a Turtle star, and a spiral
+// of turning squares, saves the drawing as graphics-demo.png and
+// graphics-demo.svg, and keeps the window open until you close it.
+bring Graphics
+
+canvas := Graphics.open(
+    width: 800
+    height: 600
+    title: "AhdCode Graphics and Turtle"
+    background: "white"
+)
+// Axes: (0, 0) is the center, +x points right and +y points up.
+canvas.line(-400, 0, 400, 0, "gray", 1)
+canvas.line(0, -300, 0, 300, "gray", 1)
+tick := -350
+while tick <= 350 {
+    canvas.line(tick, -4, tick, 4, "gray", 1)
+    tick = tick + 50
+}
+// The three shapes. A rectangle is given by its lower-left corner.
+canvas.circle(
+    x: -250
+    y: 170
+    radius: 70
+    stroke: "blue"
+    fill: "#1e90ff40"
+    width: 3
+)
+canvas.rectangle(
+    x: -330
+    y: -250
+    width: 160
+    height: 100
+    stroke: "green"
+    fill: "#00800030"
+    lineWidth: 3
+)
+canvas.circle(x: -250, y: -200, radius: 6, stroke: "black", fill: "black")
+// A five-pointed star: each turn is 144 degrees, twice around in total.
+star := canvas.turtle()
+star.setColor("red")
+star.setWidth(3)
+star.penUp()
+star.moveTo(90, 150)
+star.penDown()
+point := 0
+while point < 5 {
+    star.forward(220)
+    star.right(144)
+    point = point + 1
+}
+// A spiral of squares: every square is a little larger and turned 10 degrees.
+spiral := canvas.turtle()
+spiral.penUp()
+spiral.moveTo(200, -150)
+spiral.penDown()
+colors := ["#8a2be2", "#1e90ff", "#008000", "#ff8c00", "#dc143c"]
+square := 0
+while square < 18 {
+    spiral.setColor(colors[square % 5])
+    side: Local Int := 0
+    while side < 4 {
+        spiral.forward(20 + square * 5)
+        spiral.left(90)
+        side = side + 1
+    }
+    spiral.left(10)
+    square = square + 1
+}
+
+canvas.save("graphics-demo.png")
+canvas.save("graphics-demo.svg")
+write("Saved graphics-demo.png and graphics-demo.svg.")
+write(
+    "After five 144-degree turns the star turtle faces {star.heading()} degrees."
+)
+write("Close the window to finish.")
+canvas.wait()
+write("Window closed.")

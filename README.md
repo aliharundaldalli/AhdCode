@@ -12,19 +12,20 @@ AhdCode is an experimental statically checked general-purpose programming
 language focused on readable syntax, explicit intent, predictable semantics,
 and native compilation.
 
-This is **v1.5.0**. The language, toolchain, and Web framework are
+This is **v1.6.0**. The language, toolchain, and Web framework are
 feature-complete, and the core language surface described here is what 1.0
-committed to and 1.1, 1.2, 1.3, 1.4, and 1.5 keep unchanged.
+committed to and 1.1, 1.2, 1.3, 1.4, 1.5, and 1.6 keep unchanged.
 
-v1.5.0 is a minor release, **Terminal**: it adds the `Terminal` standard
-module — standard error, explicit flushing, terminal detection and size, color
-that disappears when output is redirected, and readable collection layout —
-without altering the core grammar, the type system, or `write`, `take`, and
-`str`. See [What is new in v1.5.0](#what-is-new-in-v150).
+v1.6.0 is a minor release, **Graphics + Turtle**: it adds the `Graphics`
+standard module — a window with a Cartesian 2D Canvas, lines, circles, and
+rectangles, PNG and SVG export, and a Turtle pen for teaching coordinates,
+angles, and geometry — without altering the core grammar or the type system.
+It is not a game engine and not a GUI toolkit. See
+[What is new in v1.6.0](#what-is-new-in-v160).
 
 It ships as a self-contained platform package: the `ahdcode` CLI, a private
-Go 1.27.0 toolchain, AhdDataStudio, the `ahdsqlite`, `ahdnumeric`, and
-`ahdplot` helpers, an offline Tectonic LaTeX engine with its pinned resource
+Go 1.27.0 toolchain, AhdDataStudio, the `ahdsqlite`, `ahdnumeric`, `ahdplot`,
+and `ahdgraphics` helpers, an offline Tectonic LaTeX engine with its pinned resource
 bundle, the Web starters, and an exact-version English documentation bundle.
 See [Installation](docs/INSTALLATION.md).
 
@@ -301,7 +302,7 @@ To maintain conceptual clarity, AhdCode's capabilities are organized into four d
    - Module resolution (`bring`, `from ... bring`) and compile-time local source composition ([`require(...)`](docs/REQUIRE.md))
 
 2. **Standard Library (First-party Bundled Modules):**
-   - **Mathematics & Computation:** [`Math`](docs/MATH.md), [`Bits`](docs/BITS.md) (bitwise operations on `Int`), [`Regex`](docs/REGEX.md), [`Statistics`](docs/STATISTICS.md), [`Numeric`](docs/NUMERIC.md), [`Plot`](docs/PLOT.md)
+   - **Mathematics & Computation:** [`Math`](docs/MATH.md), [`Bits`](docs/BITS.md) (bitwise operations on `Int`), [`Regex`](docs/REGEX.md), [`Statistics`](docs/STATISTICS.md), [`Numeric`](docs/NUMERIC.md), [`Plot`](docs/PLOT.md), [`Graphics`](docs/GRAPHICS.md) (Canvas windows and Turtle drawing)
    - **Data & Collections:** [`Lists`](docs/LISTS.md), [`KeyValue`](docs/KEYVALUE.md), [`Characters`](docs/CHARACTERS.md) (Unicode code points and classification), [`CSV`](docs/CSV.md), [`Data`](docs/DATA.md), [`JSON`](docs/JSON.md), [`XML`](docs/XML.md), [`UUID`](docs/UUID.md) (RFC 9562 version 4 and time-ordered version 7 identifiers)
    - **Document Generation:** [`Word`](docs/WORD.md), [`Excel`](docs/EXCEL.md), [`PDF`](docs/PDF.md), [`Latex`](docs/LATEX.md), [`QR`](docs/QR.md) (QR codes), [`Barcode`](docs/BARCODE.md) (Code 128, EAN-13, UPC-A), [`Archive`](docs/ARCHIVE.md)
    - **System & Environment:** [`Time`](docs/TIME.md), [`Cron`](docs/CRON.md) (bounded in-process scheduling), [`Path`](docs/FILESYSTEM.md), [`File`](docs/FILESYSTEM.md), [`Env`](docs/ENV.md), [`Terminal`](docs/TERMINAL.md) (v1.5.0: standard error, flushing, terminal detection and size, styled text, pretty layout)
@@ -329,9 +330,12 @@ AhdCode currently requires Go 1.26 or newer.
 ```bash
 cd AhdCode
 go install ./cmd/ahdcode ./cmd/ahdnumeric ./cmd/ahdplot ./cmd/ahdsqlite
+go -C cmd/ahdgraphics install .
 ```
 
-The command above installs the compiler and the local numeric, plot, and SQLite helpers.
+The commands above install the compiler and the local numeric, plot, SQLite, and
+Graphics window helpers. The Graphics helper is its own Go module, so it is
+installed with `go -C cmd/ahdgraphics install .`.
 If you plan to use the `Latex` module **or** the `PDF` module's `.save()` (they
 share one offline renderer), you must also stage the offline Latex/Tectonic
 runtime bundle. `Archive` needs no such staging -- it is Go-standard-library
@@ -444,6 +448,7 @@ See the [CLI guide](docs/CLI.md), [formatter guide](docs/FORMATTER.md),
 - [KeyValue module](docs/KEYVALUE.md)
 - [UUID module](docs/UUID.md)
 - [Terminal module](docs/TERMINAL.md)
+- [Graphics module](docs/GRAPHICS.md)
 - [Understanding diagnostics](docs/DIAGNOSTICS.md)
 - [Language server](docs/LSP.md)
 - [AI-assisted local setup](FOR_AI.md)
@@ -459,6 +464,7 @@ See the [CLI guide](docs/CLI.md), [formatter guide](docs/FORMATTER.md),
 - [v0.14 multi-file web example](examples/v0.14/multi_file_web/README.md) — require(...), dependency-aware dev, static assets
 - [v1.4 realtime attendance](examples/v1.4/realtime_attendance/README.md) — Web, PostgreSQL, WebSocket, UUID v7, `Env.secret`, and Cron
 - [v1.5 Terminal demo](examples/v1.5/terminal_demo/README.md) — `Terminal.emit`, standard error, terminal detection, styled text, and pretty layout
+- [v1.6 Graphics and Turtle](examples/v1.6/graphics_turtle/README.md) — a Cartesian Canvas, shapes, a Turtle star and spiral, PNG/SVG export, and a regular-polygon lesson
 - [AhdDataStudio](tools/AhdDataStudio/README.md) — local MySQL + SQLite development UI
 - [v0.4 Library Demo](https://github.com/aliharundaldalli/ahdcode-library-demo) (separate beginner web app)
 - [v0.4 Seminar Demo](https://github.com/aliharundaldalli/ahdcode-seminer-demo) (Hatay, multi-page)
@@ -475,6 +481,37 @@ diagnostics and hover. The same VSIX targets VS Code and Antigravity. See its
 [installation guide](editors/vscode/README.md).
 
 ## Current limitations
+
+## What is new in v1.6.0 <a id="what-is-new-in-v160"></a>
+
+v1.6.0 is a **minor** release, **Graphics + Turtle**. It adds one standard
+module and keeps the core grammar, the type system, and every previously
+released function unchanged.
+
+**New standard module: [`Graphics`](docs/GRAPHICS.md)** — visual programming
+and 2D drawing:
+
+- `Graphics.open(width, height, title, background)` opens a window with a
+  Canvas whose coordinates are Cartesian: `(0, 0)` is the center and `+y` points
+  up.
+- `canvas.line`, `canvas.circle`, and `canvas.rectangle` draw with named colors
+  or `#RRGGBB`/`#RRGGBBAA`; `fill` is optional (`String?`), and a rectangle is
+  given by its lower-left corner.
+- `canvas.save("x.png")` and `canvas.save("x.svg")` export the drawing;
+  `canvas.wait()` keeps the window open until it is closed, and
+  `canvas.close()` closes it.
+- `canvas.turtle()` returns a Turtle pen (`forward`, `left`, `right`,
+  `moveTo`, `penUp`, `penDown`, `setColor`, `setWidth`, `home`, `x`, `y`,
+  `heading`) whose geometry is deterministic and does not depend on time or
+  frame rate.
+
+Canvas and Turtle calls follow the usual rule: all positional or all named.
+Compiled programs, `ahdcode run`, and the REPL share one implementation. Each
+Canvas is drawn by the bundled `ahdgraphics` helper, a separate program that
+keeps the window library out of the compiler and out of compiled programs.
+Graphics has no sprites, animation loop, keyboard or mouse input, audio,
+widgets, or 3D. See the
+[Graphics and Turtle examples](examples/v1.6/graphics_turtle/README.md).
 
 ## What is new in v1.5.0 <a id="what-is-new-in-v150"></a>
 
@@ -643,6 +680,7 @@ Within the language, AhdCode intentionally excludes block/statement lambdas, arb
 cmd/ahdcode/         CLI entry point and command router
 cmd/ahdnumeric/      bundled advanced linear-algebra helper
 cmd/ahdplot/         bundled chart-rendering helper
+cmd/ahdgraphics/     bundled Graphics window helper (its own Go module)
 cmd/ahdsqlite/       bundled CGO-free SQLite helper
 internal/            compiler frontend, backend, runtime, formatter, LSP, and REPL
 internal/framework/  bundled first-party Web framework source

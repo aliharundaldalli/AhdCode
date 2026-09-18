@@ -754,6 +754,9 @@ func (generator *generator) call(value *ir.CallExpr) string {
 	if strings.HasPrefix(string(value.Callable), plotModulePrefix) {
 		return generator.plotCall(value)
 	}
+	if strings.HasPrefix(string(value.Callable), graphicsModulePrefix) {
+		return generator.graphicsCall(value)
+	}
 	if strings.HasPrefix(string(value.Callable), numericModulePrefix) {
 		return generator.numericCall(value)
 	}
@@ -1064,6 +1067,9 @@ func (generator *generator) builtinCall(value *ir.CallExpr) string {
 		}
 		if strings.HasPrefix(name, "Chart.") || strings.HasPrefix(name, "Figure.") {
 			return generator.plotOperation(name, value)
+		}
+		if strings.HasPrefix(name, "Canvas.") || strings.HasPrefix(name, "Turtle.") {
+			return generator.graphicsOperation(name, value)
 		}
 		if strings.HasPrefix(name, "Vector.") || strings.HasPrefix(name, "Matrix.") {
 			return generator.numericOperation(name, value)

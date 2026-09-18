@@ -240,6 +240,16 @@ func (store *Store) memberCompletions(cached *entry, entryModule *module.Module,
 			seen[name] = true
 			items = append(items, CompletionItem{Label: name, Detail: renderHover(candidate)})
 		}
+		// A compiler-supplied Class may publish built-in members with real
+		// signatures; they come from the same semantic module metadata the
+		// compiler checks calls against.
+		for _, candidate := range semantic.BuiltinClassMembers(identity) {
+			if candidate == nil || seen[candidate.Name] || !strings.HasPrefix(candidate.Name, member.Name) {
+				continue
+			}
+			seen[candidate.Name] = true
+			items = append(items, CompletionItem{Label: candidate.Name, Detail: renderHover(candidate)})
+		}
 	}
 	return items
 }

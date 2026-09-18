@@ -1,0 +1,33 @@
+// A regular polygon, from its exterior angle.
+//
+//     ahdcode run turtle_polygon.ahd
+//
+// Walking once around any regular polygon turns the Turtle through 360
+// degrees, so each of the n turns is 360 / n degrees. Change sides and run
+// the program again.
+bring Graphics
+
+sides := 6
+length := 150.0
+exteriorAngle := 360.0 / sides
+interiorAngle := 180.0 - exteriorAngle
+write("A {sides}-sided polygon turns {exteriorAngle} degrees at each corner.")
+write("Each interior angle is {interiorAngle} degrees.")
+
+canvas := Graphics.open(500, 500, "Regular polygon", "white")
+turtle := canvas.turtle()
+turtle.setColor("blue")
+turtle.setWidth(2)
+// Start below the center so the polygon sits in the middle of the window.
+turtle.penUp()
+turtle.moveTo(-length / 2, -180)
+turtle.penDown()
+
+corner := 0
+while corner < sides {
+    turtle.forward(length)
+    turtle.left(exteriorAngle)
+    corner = corner + 1
+}
+write("Total turning: {exteriorAngle * sides} degrees.")
+canvas.wait()

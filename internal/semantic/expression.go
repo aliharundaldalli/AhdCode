@@ -682,6 +682,9 @@ func (a *analyzer) analyzeCallWithCallee(call *ast.CallExpr, callee expressionIn
 			hint, supplied = plotConstructionHint(class.Symbol)
 		}
 		if !supplied {
+			hint, supplied = graphicsConstructionHint(class.Symbol)
+		}
+		if !supplied {
 			hint, supplied = numericConstructionHint(class.Symbol)
 		}
 		if !supplied {
@@ -812,6 +815,9 @@ func typeOperationFor(receiver types.Type, name string) (TypeOperation, bool) {
 			return operation, true
 		}
 		if operation, ok := plotOperationFor(receiver, name); ok {
+			return operation, true
+		}
+		if operation, ok := graphicsOperationFor(receiver, name); ok {
 			return operation, true
 		}
 		if operation, ok := wordOperationFor(receiver, name); ok {
@@ -1020,6 +1026,9 @@ func (a *analyzer) analyzeTypeOperation(call *ast.CallExpr, member *ast.MemberEx
 		if target := receiver.symbol; target != nil && constantTarget(target) {
 			a.error(codeConstantAssignment, fmt.Sprintf("cannot %s Constant %q", member.Name, target.Name), member.Object.Span(), fmt.Sprintf("%s mutates the List in place; declare it without Constant", member.Name))
 		}
+	}
+	if TypeOperationBindsArguments(operation) {
+		return a.analyzeGraphicsOperation(call, member, operation, current, flow), true
 	}
 	for _, argument := range call.Arguments {
 		if argument.Name != "" {

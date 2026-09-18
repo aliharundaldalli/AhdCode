@@ -21,12 +21,15 @@ type GeneratedFile struct {
 
 // GeneratedProgram is the complete Go source of one AhdCode compilation.
 type GeneratedProgram struct {
-	Files           []GeneratedFile
-	RequiresLatex   bool
-	RequiresPlot    bool
-	RequiresNumeric bool
-	RequiresSQLite  bool
-	RequiresMySQL   bool
+	Files         []GeneratedFile
+	RequiresLatex bool
+	RequiresPlot  bool
+	// RequiresGraphics reports that the program uses Graphics, so the
+	// compiler records where the bundled ahdgraphics helper is installed.
+	RequiresGraphics bool
+	RequiresNumeric  bool
+	RequiresSQLite   bool
+	RequiresMySQL    bool
 	// RequiresCodes reports that the program uses QR or barcode encoding, so
 	// its workspace needs the vendored encoder source.
 	RequiresCodes bool
@@ -69,6 +72,7 @@ const (
 	terminalLinuxRuntimeFileName   = "ahdcode_terminal_runtime_linux.go"
 	terminalWindowsRuntimeFileName = "ahdcode_terminal_runtime_windows.go"
 	terminalOtherRuntimeFileName   = "ahdcode_terminal_runtime_other.go"
+	graphicsRuntimeFileName        = "ahdcode_graphics_runtime.go"
 )
 
 // storage describes the Go representation chosen for one IR symbol.
@@ -79,25 +83,26 @@ type storage struct {
 }
 
 type generator struct {
-	compilation *ir.Compilation
-	classes     map[ir.ClassID]*ir.Class
-	functions   map[ir.CallableID]*ir.Function
-	fields      map[ir.FieldID]ir.Field
-	slots       map[ir.SymbolID]storage
-	nullSymbols map[ir.SymbolID]bool
-	nullFields  map[ir.FieldID]bool
-	layouts     map[ir.ClassID]*layout
-	layoutOrder []*ir.Class
-	adapters    map[ir.CallableID]string
-	timeHelpers map[ir.ClassID]string
-	diagnostics []diagnostics.Diagnostic
-	temporary   int
-	usesLatex   bool
-	usesPlot    bool
-	usesNumeric bool
-	usesSQLite  bool
-	usesMySQL   bool
-	usesCodes   bool
+	compilation  *ir.Compilation
+	classes      map[ir.ClassID]*ir.Class
+	functions    map[ir.CallableID]*ir.Function
+	fields       map[ir.FieldID]ir.Field
+	slots        map[ir.SymbolID]storage
+	nullSymbols  map[ir.SymbolID]bool
+	nullFields   map[ir.FieldID]bool
+	layouts      map[ir.ClassID]*layout
+	layoutOrder  []*ir.Class
+	adapters     map[ir.CallableID]string
+	timeHelpers  map[ir.ClassID]string
+	diagnostics  []diagnostics.Diagnostic
+	temporary    int
+	usesLatex    bool
+	usesPlot     bool
+	usesGraphics bool
+	usesNumeric  bool
+	usesSQLite   bool
+	usesMySQL    bool
+	usesCodes    bool
 	// usesWebSocket is set where a program creates an endpoint with
 	// HTTP.websocket, the only way a WebSocket route can exist.
 	usesWebSocket bool
@@ -227,6 +232,7 @@ func Generate(compilation *ir.Compilation) (*GeneratedProgram, []diagnostics.Dia
 		{terminalLinuxRuntimeFileName, ahdruntime.TerminalLinuxSource, "Terminal Linux"},
 		{terminalWindowsRuntimeFileName, ahdruntime.TerminalWindowsSource, "Terminal Windows"},
 		{terminalOtherRuntimeFileName, ahdruntime.TerminalOtherSource, "Terminal fallback"},
+		{graphicsRuntimeFileName, ahdruntime.GraphicsSource, "Graphics"},
 	} {
 		formattedShared, err := format.Source([]byte(strings.Replace(shared.source, "package ahdruntime", "package main", 1)))
 		if err != nil {
@@ -275,7 +281,7 @@ func Generate(compilation *ir.Compilation) (*GeneratedProgram, []diagnostics.Dia
 		files = append(files, GeneratedFile{Name: postgresqlRuntimeFileName, Content: string(postgresqlRuntime)})
 	}
 	return &GeneratedProgram{Files: files,
-		RequiresLatex: generator.usesLatex, RequiresPlot: generator.usesPlot, RequiresNumeric: generator.usesNumeric, RequiresSQLite: generator.usesSQLite, RequiresMySQL: generator.usesMySQL,
+		RequiresLatex: generator.usesLatex, RequiresPlot: generator.usesPlot, RequiresGraphics: generator.usesGraphics, RequiresNumeric: generator.usesNumeric, RequiresSQLite: generator.usesSQLite, RequiresMySQL: generator.usesMySQL,
 		RequiresCodes: generator.usesCodes, RequiresWebSocket: generator.usesWebSocket, RequiresPostgreSQL: generator.usesPostgreSQL}, generator.diagnostics
 }
 

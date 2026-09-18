@@ -157,6 +157,7 @@ From the repository root:
 ```bash
 go test ./...
 go install ./cmd/ahdcode ./cmd/ahdnumeric ./cmd/ahdplot ./cmd/ahdsqlite
+go -C cmd/ahdgraphics install .
 ahdcode_exe="$(go env GOPATH)/bin/ahdcode"
 "$ahdcode_exe" --version
 ```
@@ -270,6 +271,7 @@ From the repository root:
 ```powershell
 go test ./...
 go install ./cmd/ahdcode ./cmd/ahdnumeric ./cmd/ahdplot ./cmd/ahdsqlite
+go -C cmd/ahdgraphics install .
 $AhdCodeExe = Join-Path (go env GOPATH) "bin\ahdcode.exe"
 & $AhdCodeExe --version
 ```
@@ -585,6 +587,20 @@ a terminal, `NO_COLOR` unset or empty, `TERM` not `dumb`); the colors are
 cursor control, raw keyboard input, progress bar, spinner, menu, or logging
 API, and do not shell out to `tput`, `stty`, or `clear`. See
 [`docs/TERMINAL.md`](docs/TERMINAL.md).
+
+For drawing, use `bring Graphics`: `Graphics.open(width, height)` returns a
+`Canvas`; `canvas.line`, `canvas.circle`, `canvas.rectangle`, `canvas.clear`,
+`canvas.save("x.png" or "x.svg")`, and `canvas.wait()` (keep the window open)
+are its whole surface, and `canvas.turtle()` returns a `Turtle` with `forward`,
+`backward`, `left`, `right`, `moveTo`, `setHeading`, `penUp`, `penDown`,
+`setColor`, `setWidth`, `home`, `x()`, `y()`, and `heading()`. Coordinates are
+Cartesian: `(0, 0)` is the center and `+y` is **up**; `rectangle(x, y, width,
+height)` takes the lower-left corner. Colors are the nine lower-case names
+(`black`, `white`, `red`, `green`, `blue`, `yellow`, `cyan`, `magenta`, `gray`)
+or `#RRGGBB`/`#RRGGBBAA`. Calls follow the all-positional-or-all-named rule.
+Graphics is not a game engine: do not invent `Turtle.speed`, `update`/`draw`
+loops, sprites, mouse or keyboard handlers, text, or images, and do not write
+`bring Turtle`. See [`docs/GRAPHICS.md`](docs/GRAPHICS.md).
 
 ## Completion report
 

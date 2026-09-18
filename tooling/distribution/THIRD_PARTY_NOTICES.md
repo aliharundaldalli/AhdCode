@@ -15,7 +15,9 @@ in `licenses/modules.json` and `licenses/modules/`. They include Go's x packages
 (BSD), go-sql-driver/mysql (MPL 2.0), edwards25519 (BSD), boombuler/barcode (MIT),
 jackc/pgx with jackc/pgpassfile, jackc/pgservicefile, and jackc/puddle (MIT),
 coder/websocket (ISC), go-sqlite3 and its WASM component (MIT), gonum/plot
-(BSD), font and PDF dependencies. The PostgreSQL and WebSocket notices are
+(BSD), font and PDF dependencies, and the Graphics window helper's Ebitengine,
+purego, and hideconsole (Apache 2.0) with golang.org/x/image (BSD); see
+`THIRD_PARTY_NOTICES_GRAPHICS.md`. The PostgreSQL and WebSocket notices are
 `THIRD_PARTY_NOTICES_POSTGRESQL.md` and `THIRD_PARTY_NOTICES_WEBSOCKET.md`. The unchanged MySQL source and license accompany this distribution
 under `licenses/mysql-source`; see `THIRD_PARTY_NOTICES_MYSQL.md`. The unchanged
 QR and barcode encoder source and license accompany it under

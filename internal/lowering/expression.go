@@ -546,6 +546,12 @@ func (lowerer *moduleLowerer) lowerTypeOperation(call *ast.CallExpr, operation s
 	// Sheet.columnWidth(Int, Real) widen correctly. Everything else falls
 	// back to the single receiver-derived expected type below.
 	if selected := lowerer.semantic.SelectedCallables[call]; selected != nil && selected.Signature != nil {
+		if semantic.TypeOperationBindsArguments(operation) {
+			// A member with published parameter names binds its arguments
+			// like a module function: by name, with omitted defaults marked.
+			result.Arguments = lowerer.lowerArguments(call, selected)
+			return result
+		}
 		parameters := selected.Signature.Parameters
 		for index, argument := range call.Arguments {
 			value := lowerer.lowerExpr(argument.Value)

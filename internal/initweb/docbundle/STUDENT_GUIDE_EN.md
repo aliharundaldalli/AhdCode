@@ -1,4 +1,4 @@
-# AhdCode v1.5.0 English Student Guide
+# AhdCode v1.6.0 English Student Guide
 
 This guide is designed so that **even someone who has never programmed before** can follow along. You can read it in order from beginning to end; in each section, you will first see what we want to achieve, then write a working example, and finally learn the necessary rules.
 
@@ -82,6 +82,7 @@ says so and links to the reference page that lists every signature.
 - [60. WebSocket: live connections](#60-websocket-live-connections)
 - [61. Putting it together: a realtime attendance app](#61-putting-it-together-a-realtime-attendance-app)
 - [62. Terminal: more control over output](#62-terminal-more-control-over-output)
+- [63. Graphics: drawing with a Canvas and a Turtle](#63-graphics-drawing-with-a-canvas-and-a-turtle)
 
 ## 1. What is AhdCode?
 
@@ -6776,3 +6777,94 @@ with `> output.txt`, and compare.
 
 See the [Terminal module reference](TERMINAL.md) and
 `examples/v1.5/terminal_demo`.
+
+## 63. Graphics: drawing with a Canvas and a Turtle
+
+Everything so far has been text. The `Graphics` module opens a window with a
+**Canvas** you can draw on, and gives you a **Turtle**: a pen you steer with
+"go forward", "turn left", and "turn right". It is made for learning
+coordinates, angles, and geometry, not for writing games.
+
+```ahd
+bring Graphics
+
+canvas := Graphics.open(400, 400)
+canvas.line(-200, 0, 200, 0, "gray")
+canvas.line(0, -200, 0, 200, "gray")
+
+turtle := canvas.turtle()
+turtle.setColor("blue")
+turtle.setWidth(2)
+side := 0
+while side < 4 {
+    turtle.forward(120)
+    turtle.left(90)
+    side = side + 1
+}
+write("Back at ({turtle.x()}, {turtle.y()}), heading {turtle.heading()}.")
+
+canvas.save("square.png")
+canvas.wait()
+```
+
+Expected output:
+
+```text
+Back at (0.0, 0.0), heading 0.0.
+```
+
+A window opens with two gray axes and a blue square, and the picture is saved
+as `square.png`. `canvas.wait()` keeps the window on screen until you close it.
+
+The Canvas uses the coordinates from mathematics class. `(0, 0)` is the
+**center** of the window, `x` grows to the right, and `y` grows **upwards**.
+On a 400 × 400 Canvas, `x` and `y` both run from -200 to +200.
+
+The Turtle starts at `(0, 0)`, facing right (heading 0), with its pen down.
+`forward(120)` draws a line 120 units long in the direction it is facing, and
+`left(90)` turns it a quarter turn counter-clockwise, so the square is drawn
+right, up, left, and down. Headings are angles: 0 is right, 90 up, 180 left,
+and 270 down. `turtle.penUp()` lets it move without drawing, and
+`turtle.penDown()` starts drawing again.
+
+The same idea draws any regular polygon. Going once around a shape turns the
+Turtle through 360 degrees in total, so each turn of an `n`-sided polygon is
+`360 / n` degrees:
+
+```ahd
+bring Graphics
+
+canvas := Graphics.open(500, 500)
+turtle := canvas.turtle()
+sides := 6
+turn := 360.0 / sides
+write("Each exterior angle is {turn} degrees.")
+count := 0
+while count < sides {
+    turtle.forward(100)
+    turtle.left(turn)
+    count = count + 1
+}
+canvas.save("hexagon.svg")
+canvas.wait()
+```
+
+Expected output:
+
+```text
+Each exterior angle is 60.0 degrees.
+```
+
+A Canvas can also draw shapes directly. `canvas.circle(x: 0, y: 0, radius: 50,
+fill: "yellow")` draws a filled circle around the center, and
+`canvas.rectangle(x: -40, y: -30, width: 80, height: 60)` draws a rectangle
+whose **lower-left** corner is `(-40, -30)`. Colors are names such as `"red"`
+or `"blue"`, or hexadecimal codes such as `"#1e90ff"`. A color Graphics does
+not know raises a `GraphicsError`.
+
+**Try it yourself:** Change `sides` to 3, 5, and 12 and watch the shape
+change. Then draw a star: move forward 150 and turn left 144 degrees, five
+times. Why does 144 work? (Hint: the Turtle turns around twice.)
+
+See the [Graphics module reference](GRAPHICS.md) and
+`examples/v1.6/graphics_turtle`.

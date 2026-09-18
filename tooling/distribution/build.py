@@ -13,14 +13,21 @@ def extract(archive,dest):
   with zipfile.ZipFile(archive) as z:z.extractall(dest)
  else:
   with tarfile.open(archive) as t:t.extractall(dest,filter='data')
-def build(target,output,goos,arch,ldflags='-buildid='):
+def build(target,output,goos,arch,ldflags='-buildid=',module=None):
  env=dict(os.environ,GOFLAGS='-p=1',GOMAXPROCS='2',GOOS=goos,GOARCH=arch,CGO_ENABLED='0')
  print('Building',goos,arch,target,flush=True)
- run(['nice','-n','10','go','build','-trimpath','-ldflags='+ldflags,'-o',output,target],cwd=R,env=env)
+ run(['nice','-n','10','go','build','-trimpath','-ldflags='+ldflags,'-o',output,target],cwd=module or R,env=env)
  time.sleep(4)
+# The Graphics window helper is its own Go module, so its window and rendering
+# dependencies never enter the compiler's module graph.
+GRAPHICS=R/'cmd/ahdgraphics'
+def graphics_modules():
+ raw=subprocess.check_output(['go','list','-m','-json','all'],cwd=GRAPHICS,text=True);decoder=json.JSONDecoder();found=[]
+ while raw.strip():m,end=decoder.raw_decode(raw.lstrip());found.append(m);raw=raw.lstrip()[end:]
+ return found
 def licenses(payload,modules):
  dest=payload/'licenses';dest.mkdir()
- for name in ['LICENSE','THIRD_PARTY_NOTICES_CODES.md','THIRD_PARTY_NOTICES_MYSQL.md','THIRD_PARTY_NOTICES_NUMERIC.md','THIRD_PARTY_NOTICES_PLOT.md','THIRD_PARTY_NOTICES_POSTGRESQL.md','THIRD_PARTY_NOTICES_SQLITE.md','THIRD_PARTY_NOTICES_WEBSOCKET.md']:shutil.copy2(R/name,payload/name)
+ for name in ['LICENSE','THIRD_PARTY_NOTICES_CODES.md','THIRD_PARTY_NOTICES_GRAPHICS.md','THIRD_PARTY_NOTICES_MYSQL.md','THIRD_PARTY_NOTICES_NUMERIC.md','THIRD_PARTY_NOTICES_PLOT.md','THIRD_PARTY_NOTICES_POSTGRESQL.md','THIRD_PARTY_NOTICES_SQLITE.md','THIRD_PARTY_NOTICES_WEBSOCKET.md']:shutil.copy2(R/name,payload/name)
  shutil.copy2(R/'tooling/distribution/THIRD_PARTY_NOTICES.md',payload/'THIRD_PARTY_NOTICES.md')
  shutil.copytree(R/'internal/backend/golang/ahdruntime/mysqlvendor/vendor',dest/'mysql-source')
  shutil.copytree(R/'internal/backend/golang/ahdruntime/codesvendor/vendor',dest/'codes-source')
@@ -173,11 +180,13 @@ def main():
   suffix='.exe' if goos=='windows' else ''
   for name in ['ahdcode','ahdsqlite','ahdnumeric','ahdplot']:
    target=payload/('bin' if name=='ahdcode' else 'libexec/ahdcode')/(name+suffix);build('./cmd/'+name,target,goos,arch)
+  build('.',payload/'libexec/ahdcode'/('ahdgraphics'+suffix),goos,arch,module=GRAPHICS)
   if goos=='windows':
    # The stable launcher lives beside the release it activates; setup copies it
    # to <root>\bin\ahdcode.exe, the one directory that goes on PATH.
    (payload/'launcher').mkdir();build('./tooling/distribution/windows/launcher',payload/'launcher/ahdcode.exe',goos,arch)
-  licenses(payload,modules)
+  seen={(m['Path'],m.get('Version')) for m in modules}
+  licenses(payload,modules+[m for m in graphics_modules() if (m['Path'],m.get('Version')) not in seen and not m.get('Main')])
   shutil.copytree(R/'internal/initweb/docbundle',payload/'docs')
   if a.vsix:
    editor=payload/'vscode';editor.mkdir();shutil.copy2(a.vsix,editor/a.vsix.name)
@@ -217,7 +226,7 @@ def main():
     extra=a.output/('AhdCode-'+version+'-'+label+'.zip');zip_tree(staging,extra,'AhdCode-'+version)
    else:
     with tarfile.open(artifact,'w:gz') as t:t.add(staging,arcname='AhdCode-'+version)
-  records.append({'filename':artifact.name,'size':artifact.stat().st_size,'sha256':sha(artifact),'platform':goos,'architecture':arch,'components':['CLI','Studio (embedded)','starters (embedded)','English docs','Go '+go['version'],'ahdsqlite','ahdnumeric','ahdplot','Tectonic '+latex['tectonic_version']+' offline']+(['VS Code extension '+vsix_version] if vsix_version else [])+(['graphical per-user setup','stable ahdcode.exe launcher'] if goos=='windows' else []),'notices':'payload/THIRD_PARTY_NOTICES.md'})
+  records.append({'filename':artifact.name,'size':artifact.stat().st_size,'sha256':sha(artifact),'platform':goos,'architecture':arch,'components':['CLI','Studio (embedded)','starters (embedded)','English docs','Go '+go['version'],'ahdsqlite','ahdnumeric','ahdplot','ahdgraphics','Tectonic '+latex['tectonic_version']+' offline']+(['VS Code extension '+vsix_version] if vsix_version else [])+(['graphical per-user setup','stable ahdcode.exe launcher'] if goos=='windows' else []),'notices':'payload/THIRD_PARTY_NOTICES.md'})
   print('ARTIFACT',artifact,records[-1]['sha256'],flush=True)
   if extra is not None:
    companion=dict(records[-1]);companion['filename']=extra.name;companion['size']=extra.stat().st_size;companion['sha256']=sha(extra)

@@ -1,4 +1,4 @@
-# AhdCode v1.5.0 Türkçe Öğrenci Rehberi
+# AhdCode v1.6.0 Türkçe Öğrenci Rehberi
 
 Bu rehber, **daha önce hiç programlama yapmamış birinin de takip edebilmesi** için hazırlanmıştır. Baştan sona sırayla okuyabilirsiniz; her bölümde önce ne yapmak istediğimizi görecek, sonra çalışan bir örnek yazacak, en son gerekli kuralları öğreneceksiniz.
 
@@ -83,6 +83,7 @@ verir.
 - [60. WebSocket: canlı bağlantılar](#60-websocket-canlı-bağlantılar)
 - [61. Hepsi bir arada: gerçek zamanlı yoklama uygulaması](#61-hepsi-bir-arada-gerçek-zamanlı-yoklama-uygulaması)
 - [62. Terminal: çıktı üzerinde daha fazla denetim](#62-terminal-çıktı-üzerinde-daha-fazla-denetim)
+- [63. Graphics: Canvas ve Turtle ile çizim](#63-graphics-canvas-ve-turtle-ile-çizim)
 
 ## 1. AhdCode nedir?
 
@@ -6814,3 +6815,97 @@ satırlara yayar, böylece büyük bir koleksiyon kolayca okunur. Başka her de�
 [Terminal modül referansına](TERMINAL_TR.md) ve
 [`examples/v1.5/terminal_demo`](../examples/v1.5/terminal_demo/README_TR.md)
 klasörüne bakın.
+
+## 63. Graphics: Canvas ve Turtle ile çizim
+
+Şimdiye kadar her şey metindi. `Graphics` modülü üzerine çizim yapabileceğiniz
+bir **Canvas** (tuval) içeren bir pencere açar ve size bir **Turtle**
+(kaplumbağa) verir: "ileri git", "sola dön" ve "sağa dön" diyerek
+yönlendirdiğiniz bir kalem. Oyun yazmak için değil, koordinatları, açıları ve
+geometriyi öğrenmek için yapılmıştır.
+
+```ahd
+bring Graphics
+
+canvas := Graphics.open(400, 400)
+canvas.line(-200, 0, 200, 0, "gray")
+canvas.line(0, -200, 0, 200, "gray")
+
+turtle := canvas.turtle()
+turtle.setColor("blue")
+turtle.setWidth(2)
+side := 0
+while side < 4 {
+    turtle.forward(120)
+    turtle.left(90)
+    side = side + 1
+}
+write("Başa döndü: ({turtle.x()}, {turtle.y()}), yön {turtle.heading()}.")
+
+canvas.save("kare.png")
+canvas.wait()
+```
+
+Beklenen çıktı:
+
+```text
+Başa döndü: (0.0, 0.0), yön 0.0.
+```
+
+İki gri eksen ve mavi bir kare içeren bir pencere açılır ve resim `kare.png`
+olarak kaydedilir. `canvas.wait()` pencereyi siz kapatana kadar ekranda tutar.
+
+Canvas, matematik dersindeki koordinatları kullanır. `(0, 0)` pencerenin
+**merkezidir**, `x` sağa doğru, `y` ise **yukarı** doğru büyür. 400 × 400'lük bir
+Canvas'ta `x` ve `y`'nin ikisi de -200'den +200'e kadar gider.
+
+Turtle `(0, 0)`'da, sağa bakarak (yön 0) ve kalemi aşağıda başlar.
+`forward(120)` baktığı yönde 120 birim uzunluğunda bir çizgi çizer, `left(90)`
+ise onu saat yönünün tersine çeyrek tur döndürür; böylece kare sağa, yukarı,
+sola ve aşağı doğru çizilir. Yönler açıdır: 0 sağ, 90 yukarı, 180 sol, 270
+aşağıdır. `turtle.penUp()` çizmeden hareket etmesini sağlar,
+`turtle.penDown()` yeniden çizmeye başlatır.
+
+Aynı fikir her düzgün çokgeni çizer. Bir şeklin çevresini bir kez dolaşmak
+Turtle'ı toplam 360 derece döndürür; bu yüzden `n` kenarlı bir çokgenin her
+dönüşü `360 / n` derecedir:
+
+```ahd
+bring Graphics
+
+canvas := Graphics.open(500, 500)
+turtle := canvas.turtle()
+sides := 6
+turn := 360.0 / sides
+write("Her dış açı {turn} derecedir.")
+count := 0
+while count < sides {
+    turtle.forward(100)
+    turtle.left(turn)
+    count = count + 1
+}
+canvas.save("altigen.svg")
+canvas.wait()
+```
+
+Beklenen çıktı:
+
+```text
+Her dış açı 60.0 derecedir.
+```
+
+Canvas şekilleri doğrudan da çizebilir. `canvas.circle(x: 0, y: 0, radius: 50,
+fill: "yellow")` merkez çevresinde dolu bir çember çizer,
+`canvas.rectangle(x: -40, y: -30, width: 80, height: 60)` ise **sol alt** köşesi
+`(-40, -30)` olan bir dikdörtgen çizer. Renkler `"red"` ya da `"blue"` gibi adlar
+ya da `"#1e90ff"` gibi onaltılık kodlardır. Graphics'in tanımadığı bir renk
+`GraphicsError` fırlatır.
+
+**Kendiniz deneyin:** `sides` değerini 3, 5 ve 12 yapın ve şeklin nasıl
+değiştiğini izleyin. Sonra bir yıldız çizin: beş kez 150 ileri gidin ve 144
+derece sola dönün. 144 neden işe yarar? (İpucu: Turtle kendi çevresinde iki kez
+döner.)
+
+[Graphics modülü başvurusuna](GRAPHICS_TR.md) ve
+[`examples/v1.6/graphics_turtle`](../examples/v1.6/graphics_turtle/README_TR.md)
+örneğine bakın.

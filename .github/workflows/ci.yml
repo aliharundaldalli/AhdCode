@@ -30,6 +30,13 @@ jobs:
       - name: Run vet
         run: go vet ./...
 
+      - name: Test and vet the Graphics window helper
+        # cmd/ahdgraphics is its own Go module, so the root ./... patterns do
+        # not reach it. Its tests are headless and need no display.
+        run: |
+          go -C cmd/ahdgraphics vet ./...
+          go -C cmd/ahdgraphics test -count=1 -race ./...
+
       - name: Run race tests
         # internal/build compiles many native programs under the race detector.
         # On GitHub runners that package can exceed Go's default 10m timeout.

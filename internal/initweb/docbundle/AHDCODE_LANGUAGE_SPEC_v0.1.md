@@ -6151,6 +6151,80 @@ It adds no module dependency, reads only the `NO_COLOR` and `TERM` environment
 variables, and accesses no file or network service. A program that does not
 bring `Terminal` behaves exactly as before.
 
+## 80. Graphics Standard Module (v1.6.0)
+
+`bring Graphics` resolves to the compiler-supplied module `builtin:Graphics`; a
+local `Graphics.ahd` cannot shadow it. It exports `Graphics.open`, the Classes
+`Canvas` and `Turtle`, and `GraphicsError`, which derives from `Error`. Canvas
+and Turtle publish no constructor.
+
+```text
+Graphics.open(width: Int := 800, height: Int := 600,
+              title: String := "AhdCode Graphics", background: String := "white") -> Canvas
+
+Canvas.clear(color: String := "white")                                            -> Nothing
+Canvas.line(x1: Real, y1: Real, x2: Real, y2: Real,
+            color: String := "black", width: Real := 1.0)                         -> Nothing
+Canvas.circle(x: Real, y: Real, radius: Real, stroke: String := "black",
+              fill: String? := null, width: Real := 1.0)                          -> Nothing
+Canvas.rectangle(x: Real, y: Real, width: Real, height: Real, stroke: String := "black",
+                 fill: String? := null, lineWidth: Real := 1.0)                   -> Nothing
+Canvas.save(path: String) -> Nothing      Canvas.wait()   -> Nothing
+Canvas.close()            -> Nothing      Canvas.isOpen() -> Bool
+Canvas.turtle()           -> Turtle
+
+Turtle.forward(distance: Real)  Turtle.backward(distance: Real)
+Turtle.left(degrees: Real)      Turtle.right(degrees: Real)
+Turtle.moveTo(x: Real, y: Real) Turtle.setHeading(degrees: Real)
+Turtle.penUp()  Turtle.penDown()  Turtle.setColor(color: String)  Turtle.setWidth(width: Real)
+Turtle.home()                                          (each -> Nothing)
+Turtle.x() -> Real   Turtle.y() -> Real   Turtle.heading() -> Real
+```
+
+The members of Canvas and Turtle publish parameter names and defaults, so a
+call to one of them follows section 15.3 exactly like a module function call:
+entirely positional or entirely named, with omitted defaults. `Int` arguments
+widen to `Real` parameters. Only `fill` accepts `null`.
+
+Coordinates are Cartesian: the origin is the center of the Canvas, `+x` points
+right, `+y` points up, and one unit is one window pixel. `rectangle` takes its
+lower-left corner. Geometry outside the Canvas is clipped without error.
+
+Colors are one of `black`, `white`, `red`, `green`, `blue`, `yellow`, `cyan`,
+`magenta`, `gray` (case-sensitive), `#RRGGBB`, or `#RRGGBBAA`. A Turtle starts at
+`(0, 0)` with heading 0 (+x), pen down, color `black`, width 1. `left(a)` adds
+`a` and `right(a)` subtracts it; `heading()` is normalized to `[0, 360)`.
+`forward(d)` moves to `(x + d·cos θ, y + d·sin θ)` and `backward(d)` to the
+opposite point; with the pen down every movement draws a Canvas line, and a
+Turtle's state changes only after that line is drawn. `home()` moves to the
+origin under the current pen state, then sets heading 0; `Canvas.clear` never
+changes a Turtle.
+
+`GraphicsError` is raised for a Canvas side outside 1..4096, an unknown color, a
+stroke width not greater than 0, a negative radius, width, or height, a save
+path whose extension is not `.png` or `.svg` (case-insensitive) or that cannot
+be written, drawing or saving on a closed Canvas, and a missing, failed, or
+unresponsive window helper. A circle of radius 0 and a rectangle with a zero
+side draw nothing. `wait` blocks until the window is closed and then marks the
+Canvas closed; `close` is idempotent and releases the Canvas and every Turtle it
+returned, after which any call on those Turtles raises `GraphicsError`.
+
+## 81. Graphics Runtime (v1.6.0)
+
+Graphics validation, color parsing, Turtle state and geometry, and the helper
+protocol are implemented once, with the Go standard library, and shared by the
+evaluator and native programs. Each open Canvas is drawn by one process of the
+bundled `ahdgraphics` helper, reached through bounded JSON lines over its
+standard input and output; its standard error is not part of the protocol.
+The helper keeps the drawing list, shows it in a window, and derives PNG
+(one pixel per unit) and SVG output from that same list. It executes no shell
+command, performs no network access, and writes only the path `save` names.
+A program's open Canvases close when the program ends. The helper is found
+through `AHDCODE_GRAPHICS_RUNTIME`, the location the compiler recorded, or the
+installation beside the running executable; `PATH` is not searched.
+`AHDCODE_GRAPHICS_HEADLESS=1` opens every Canvas without a window. A program
+that does not bring `Graphics` behaves exactly as before.
+
 ---
 
 # End of AhdCode v0.1 Core Specification
