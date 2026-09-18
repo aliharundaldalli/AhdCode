@@ -899,6 +899,9 @@ func timeOperationFor(receiver types.Type, name string) (TypeOperation, bool) {
 	case class.Symbol.Name == "DateTime" && !class.Reference:
 		operation, known := dateTimeOperationNames[name]
 		return operation, known
+	case class.Symbol.Name == "Duration" && !class.Reference:
+		operation, known := durationOperationNames[name]
+		return operation, known
 	}
 	return "", false
 }
@@ -908,6 +911,11 @@ var dateTimeOperationNames = map[string]TypeOperation{
 	"sameMoment": DateTimeSameMoment, "timestamp": DateTimeTimestamp,
 	"toUTC": DateTimeToUTC, "toLocal": DateTimeToLocal,
 	"toOffset": DateTimeToOffset, "toString": DateTimeToString,
+	"toISO": DateTimeToISO, "add": DateTimeAdd, "subtract": DateTimeSubtract,
+}
+
+var durationOperationNames = map[string]TypeOperation{
+	"add": DurationAdd, "subtract": DurationSubtract, "negate": DurationNegate, "abs": DurationAbs,
 }
 
 var calendarOperationNames = map[string]TypeOperation{

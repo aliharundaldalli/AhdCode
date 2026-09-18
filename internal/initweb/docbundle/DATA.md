@@ -318,6 +318,58 @@ both axes is rejected rather than silently producing a diagonal.
 pivot: there is no aggregation callback, no value column, no multi-index, and no
 missing-value model.
 
+## concat and innerJoin
+
+```text
+concat(other: Table) -> Table
+innerJoin(other: Table, key: String) -> Table
+innerJoin(other: Table, leftKey: String, rightKey: String) -> Table
+```
+
+`concat` stacks rows: the receiver's rows first, then `other`'s. Both Tables
+must have exactly the same column names in the same order; anything else
+raises `DataError`. Empty and header-only Tables are fine. There is no axis,
+index, or fill option.
+
+`innerJoin` pairs each receiver row with every `other` row whose key cell is
+the same String. `innerJoin(other, key)` uses the same column name on both
+sides; `innerJoin(other, leftKey, rightKey)` names each side's key column.
+
+- Matching is exact String equality: `"1"` and `"01"` differ, and `""` is an
+  ordinary key that matches `""`.
+- The result has every receiver column, then every `other` column except its
+  key column, in their original order.
+- If another `other` column has the same name as a receiver column, the join
+  raises `DataError` instead of renaming it; use `rename` or `drop` first.
+- Rows are ordered by receiver row, and for each receiver row by `other` row.
+  One-to-many and many-to-many keys produce every matching combination.
+- Rows without a match are left out. There is no left, right, or outer join
+  and no missing-value marker; a join with no matches keeps the full schema
+  and has zero rows.
+- An unknown key column raises `DataError`. The join builds an index of the
+  `other` rows by key, so it does not compare every pair of rows.
+
+```ahd
+bring Data
+from Data bring Table
+
+students: Table := Data.fromCSV("id,name\n1,Ada\n2,Alan\n3,Grace\n")
+grades: Table := Data.fromCSV("student,course,grade\n2,Math,A\n1,Math,B\n2,Physics,C\n")
+joined: Table := students.innerJoin(other: grades, leftKey: "id", rightKey: "student")
+write(joined.toCSV())
+more: Table := Data.fromCSV("id,name\n4,Linus\n")
+write(students.concat(more).rowCount())
+```
+
+```text
+id,name,course,grade
+1,Ada,Math,B
+2,Alan,Math,A
+2,Alan,Physics,C
+
+4
+```
+
 ## toCSV and writeCSV
 
 ```text
@@ -364,16 +416,18 @@ reference identity — Data does not invent value equality for tables.
 
 ## What Data is not
 
-Data is **not** pandas, and is not DataFrame-compatible. v0.1.12 deliberately
-has no join, merge, concat, pivot, melt, MultiIndex, index labels, query
-strings, SQL, window functions, rolling, resample, categorical dtypes, lazy
-execution, or expression trees. It has no schema inference, no automatic
-numeric or datetime parsing, and no null inference.
+Data is **not** pandas, and is not DataFrame-compatible. Beyond `concat` and
+`innerJoin` it deliberately has no left, right, or outer join, merge,
+automatic column suffixes, general pivot, melt, Series, MultiIndex, index
+labels, query strings, SQL, window functions, rolling, resample, categorical
+dtypes, lazy execution, or expression trees. It has no schema inference, no
+automatic numeric or datetime parsing, and no missing values (NA) or null
+inference.
 
-It also has no statistics. `sum`, `mean`, `median`, `variance`, `stdev`,
-`quantile`, `correlation`, and `describe` belong to a planned Statistics layer,
-which will consume `List<Int>` and `List<Real>` — which is exactly what an
-explicit conversion already produces:
+It also has no statistics. Descriptive statistics such as `mean`, `median`,
+`variance`, `quantile`, and `correlation` live in the separate
+[Statistics](STATISTICS.md) module, which consumes `List<Int>` and
+`List<Real>` — which is exactly what an explicit conversion already produces:
 
 ```ahd
 scores: List<Real> := table.column("score").map(

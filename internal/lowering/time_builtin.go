@@ -25,7 +25,7 @@ func timeFieldID(class, field string) ir.FieldID {
 // Time Class publishes through built-in type operations. They exist so member
 // existence reports what the value really offers.
 var (
-	timeDateTimeOperations = []string{"before", "after", "sameMoment", "timestamp", "toUTC", "toLocal", "toOffset", "toString"}
+	timeDateTimeOperations = []string{"before", "after", "sameMoment", "timestamp", "toUTC", "toLocal", "toOffset", "toString", "toISO", "add", "subtract"}
 	timeCalendarOperations = []string{"isLeapYear", "daysInMonth", "weekday"}
 )
 
@@ -64,6 +64,7 @@ func timeModule(id ir.ModuleID, name, path string) *ir.Module {
 		append(timeIntFields("Duration", []string{"milliseconds"}),
 			ir.Field{ID: timeFieldID("Duration", "seconds"), Name: "seconds",
 				Type: ir.Type{Kind: ir.RealType}, NullState: ir.NonNull})...)
+	duration.Operations = semantic.TimeDurationOperations
 	calendar := timeClassDeclaration("Calendar")
 	calendar.Operations = timeCalendarOperations
 

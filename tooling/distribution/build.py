@@ -27,7 +27,7 @@ def graphics_modules():
  return found
 def licenses(payload,modules):
  dest=payload/'licenses';dest.mkdir()
- for name in ['LICENSE','THIRD_PARTY_NOTICES_CODES.md','THIRD_PARTY_NOTICES_GRAPHICS.md','THIRD_PARTY_NOTICES_MYSQL.md','THIRD_PARTY_NOTICES_NUMERIC.md','THIRD_PARTY_NOTICES_PLOT.md','THIRD_PARTY_NOTICES_POSTGRESQL.md','THIRD_PARTY_NOTICES_SQLITE.md','THIRD_PARTY_NOTICES_WEBSOCKET.md']:shutil.copy2(R/name,payload/name)
+ for name in ['LICENSE','THIRD_PARTY_NOTICES_BCRYPT.md','THIRD_PARTY_NOTICES_CODES.md','THIRD_PARTY_NOTICES_GRAPHICS.md','THIRD_PARTY_NOTICES_MYSQL.md','THIRD_PARTY_NOTICES_NUMERIC.md','THIRD_PARTY_NOTICES_PLOT.md','THIRD_PARTY_NOTICES_POSTGRESQL.md','THIRD_PARTY_NOTICES_SQLITE.md','THIRD_PARTY_NOTICES_WEBSOCKET.md']:shutil.copy2(R/name,payload/name)
  shutil.copy2(R/'tooling/distribution/THIRD_PARTY_NOTICES.md',payload/'THIRD_PARTY_NOTICES.md')
  shutil.copytree(R/'internal/backend/golang/ahdruntime/mysqlvendor/vendor',dest/'mysql-source')
  shutil.copytree(R/'internal/backend/golang/ahdruntime/codesvendor/vendor',dest/'codes-source')

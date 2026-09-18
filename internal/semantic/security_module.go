@@ -36,6 +36,11 @@ func securityModuleInterface() *ModuleInterface {
 	addStandardExport(module, standardFunction(securityModuleID, "passwordHash", types.String, name("password")))
 	// Security.passwordVerify(password: String, encodedHash: String) -> Bool
 	addStandardExport(module, standardFunction(securityModuleID, "passwordVerify", types.Bool, name("password"), name("encodedHash")))
+	// Security.bcryptHash(password: String) -> String, for compatibility and
+	// migration only; passwordHash (Argon2id) stays the recommended hash.
+	addStandardExport(module, standardFunction(securityModuleID, "bcryptHash", types.String, name("password")))
+	// Security.bcryptVerify(password: String, encodedHash: String) -> Bool
+	addStandardExport(module, standardFunction(securityModuleID, "bcryptVerify", types.Bool, name("password"), name("encodedHash")))
 	// Security.token() -> String
 	addStandardExport(module, standardFunction(securityModuleID, "token", types.String))
 	// Security.secureEqual(expected: String, received: String) -> Bool

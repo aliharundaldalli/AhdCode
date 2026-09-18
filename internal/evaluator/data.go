@@ -5,6 +5,7 @@ import (
 	"sort"
 	"strconv"
 
+	"ahdcode/internal/backend/golang/ahdruntime"
 	"ahdcode/internal/ir"
 )
 
@@ -224,6 +225,20 @@ func (session *Session) dataOperation(name string, receiver any, arguments []any
 		return arguments[index].(int64)
 	}
 	switch name {
+	case "Table.concat":
+		other := session.tableOf(arguments[0])
+		columns, cells, fault := ahdruntime.AhdDataConcat(table.columns, table.cells, other.columns, other.cells)
+		session.fault(nil, fault)
+		return session.tableValue(dataTable{columns: columns, cells: cells})
+	case "Table.innerJoin":
+		other := session.tableOf(arguments[0])
+		leftKey, rightKey := text(1, ""), text(1, "")
+		if len(arguments) == 3 {
+			rightKey = text(2, "")
+		}
+		columns, cells, fault := ahdruntime.AhdDataInnerJoin(table.columns, table.cells, other.columns, other.cells, leftKey, rightKey)
+		session.fault(nil, fault)
+		return session.tableValue(dataTable{columns: columns, cells: cells})
 	case "Table.rowCount":
 		return int64(len(table.cells))
 	case "Table.columnCount":

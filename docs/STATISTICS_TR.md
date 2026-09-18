@@ -119,6 +119,55 @@ write(Statistics.quantile(values, 0.5))   // 2.5
 write(Statistics.quantile(values, 1.0))   // 4.0
 ```
 
+## İki List: kovaryans, korelasyon ve uydurulan doğru
+
+```text
+covariance(first, second)       -> Real
+sampleCovariance(first, second) -> Real
+correlation(first, second)      -> Real
+linearRegression(x, y)          -> Pair<String, Real>
+```
+
+Her argüman, herhangi bir birleşimde `List<Int>` veya `List<Real>` olabilir;
+dört overload açıkça yayımlanır. Int değerler, `mean`'de olduğu gibi Real
+olarak okunur. İki List aynı uzunlukta olmalıdır ve hiçbiri değiştirilmez.
+
+- `covariance` **popülasyon** kovaryansıdır, `n`'e böler; en az bir çift
+  ister. `sampleCovariance` `n - 1`'e böler ve en az iki çift ister.
+- `correlation` Pearson korelasyon katsayısıdır. En az iki çift ister ve
+  List'lerden birinin varyansı sıfırsa (tüm değerler eşitse) katsayı
+  tanımsız olduğu için `StatisticsError` fırlatır. Sonuç her zaman
+  `-1.0..1.0` içindedir: tam doğrusal veride son bitteki yuvarlama taşması
+  sınıra kırpılır.
+- `linearRegression(x, y)`, `y = slope * x + intercept` doğrusunu en küçük
+  kareler yöntemiyle uydurur ve `{"slope": …, "intercept": …}` Pair'ini bu
+  anahtar sırasıyla döndürür. En az iki çift ve hepsi eşit olmayan x
+  değerleri ister. Tüm y değerleri aynıysa eğim `0.0`, kesişim tam olarak o
+  değerdir.
+
+Her fonksiyon çarpmadan önce veriyi ortalamasına göre merkezler (iki geçişli
+hesap); böylece yıl veya timestamp gibi büyük kaymalar sonucu bozmaz. Farklı
+uzunlukta List'ler, boş List'ler ve tanımsız girdi `StatisticsError` fırlatır.
+
+```ahd
+bring Statistics
+
+hours: List<Int> := [1, 2, 3, 4, 5]
+scores: List<Real> := [52.0, 57.5, 61.0, 68.5, 71.0]
+write(Statistics.covariance(hours, scores))
+write(Statistics.correlation(hours, scores) > 0.99)
+fit := Statistics.linearRegression(x: hours, y: scores)
+write(fit["slope"])
+write(Statistics.linearRegression([1, 2, 3], [7, 7, 7]))
+```
+
+```text
+9.8
+true
+4.9
+{"slope": 0.0, "intercept": 7.0}
+```
+
 ## Boş ve tanımsız girdi
 
 Boş bir List'in `sum`'ı toplamsal birim öğedir -- `Int` için `0`, `Real` için
@@ -170,8 +219,10 @@ write(values)                     // [3, 1, 2]
 
 ## Statistics ne değildir
 
-`Statistics` modülü yalnızca betimleyici istatistiktir. Çıkarımsal test, regresyon,
-dağılım, rastgele örnekleme ve grafik çizimi yoktur. Bir `frequency` fonksiyonu
+`Statistics` modülü betimleyici istatistik ile tek bir basit en küçük kareler
+doğrusundan ibarettir. Çıkarımsal test (p-değeri veya hipotez testi), çoklu,
+polinom ya da lojistik regresyon, `rSquared` veya regresyon nesnesi, dağılım,
+rastgele örnekleme, makine öğrenmesi ve grafik çizimi yoktur. Bir `frequency` fonksiyonu
 da yoktur: bir frekans tablosu `Pair<K, Int>` olurdu ve bir Pair anahtarı
 `String`, `Int` veya `Bool` olmak zorundadır; bu yüzden `List<Real>` girdisinin
 ifade edilebilir bir sonucu yoktur. `mode` yaygın ihtiyacı karşılar ve

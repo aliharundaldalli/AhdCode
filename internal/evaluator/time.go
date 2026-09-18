@@ -2,8 +2,10 @@ package evaluator
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
+	"ahdcode/internal/backend/golang/ahdruntime"
 	"ahdcode/internal/ir"
 )
 
@@ -32,6 +34,10 @@ func (session *Session) evalTime(name string, arguments []any) any {
 		}
 		time.Sleep(time.Duration(milliseconds) * time.Millisecond)
 		return Nothing
+	case "parseISO":
+		value, fault := ahdruntime.AhdTimeParseISO(arguments[0].(string))
+		session.fault(nil, fault)
+		return session.dateTime(value)
 	case "duration":
 		return session.duration(arguments[0].(int64))
 	case "between":
@@ -112,6 +118,11 @@ func (session *Session) duration(milliseconds int64) *Instance {
 	}}
 }
 
+// durationMilliseconds reads the Int milliseconds a Duration value holds.
+func (session *Session) durationMilliseconds(value any) int64 {
+	return session.requireInstance(value).Fields[ir.FieldID("builtin:Time::class::Duration::field::milliseconds")].(int64)
+}
+
 func (session *Session) instant(value any) time.Time {
 	instance := session.requireInstance(value)
 	get := func(name string) int64 {
@@ -144,6 +155,20 @@ func (session *Session) timeOperation(name string, receiver any, arguments []any
 			session.raise("ValueError", "offsetMinutes is outside -840..840")
 		}
 		return session.dateTime(session.instant(receiver).In(time.FixedZone("", int(offset*60))))
+	case "DateTime.toISO":
+		return session.fault(ahdruntime.AhdTimeFormatISO(session.instant(receiver)))
+	case "DateTime.add", "DateTime.subtract":
+		value, fault := ahdruntime.AhdTimeShift(session.instant(receiver), session.durationMilliseconds(arguments[0]), name == "DateTime.subtract")
+		session.fault(nil, fault)
+		return session.dateTime(value)
+	case "Duration.add", "Duration.subtract":
+		value, fault := ahdruntime.AhdDurationArithmetic(strings.TrimPrefix(name, "Duration."), session.durationMilliseconds(receiver), session.durationMilliseconds(arguments[0]))
+		session.fault(nil, fault)
+		return session.duration(value)
+	case "Duration.negate", "Duration.abs":
+		value, fault := ahdruntime.AhdDurationArithmetic(strings.TrimPrefix(name, "Duration."), session.durationMilliseconds(receiver), 0)
+		session.fault(nil, fault)
+		return session.duration(value)
 	case "DateTime.toString":
 		return session.instant(receiver).Format("2006-01-02 15:04:05")
 	case "Calendar.isLeapYear":

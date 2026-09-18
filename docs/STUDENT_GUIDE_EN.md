@@ -1,4 +1,4 @@
-# AhdCode v1.6.0 English Student Guide
+# AhdCode v1.7.0 English Student Guide
 
 This guide is designed so that **even someone who has never programmed before** can follow along. You can read it in order from beginning to end; in each section, you will first see what we want to achieve, then write a working example, and finally learn the necessary rules.
 
@@ -83,6 +83,7 @@ says so and links to the reference page that lists every signature.
 - [61. Putting it together: a realtime attendance app](#61-putting-it-together-a-realtime-attendance-app)
 - [62. Terminal: more control over output](#62-terminal-more-control-over-output)
 - [63. Graphics: drawing with a Canvas and a Turtle](#63-graphics-drawing-with-a-canvas-and-a-turtle)
+- [64. Angles, time stamps, and joined tables](#64-angles-time-stamps-and-joined-tables)
 
 ## 1. What is AhdCode?
 
@@ -6868,3 +6869,82 @@ times. Why does 144 work? (Hint: the Turtle turns around twice.)
 
 See the [Graphics module reference](GRAPHICS.md) and
 [`examples/v1.6/graphics_turtle`](../examples/v1.6/graphics_turtle/README.md).
+
+## 64. Angles, time stamps, and joined tables
+
+Version 1.7 fills in a few everyday tools. None of them adds new syntax; they
+are ordinary functions and members.
+
+**Angles.** `Math.sin`, `Math.cos`, and the other trigonometric functions use
+radians. `Math.radians` and `Math.degrees` convert, and `Math.atan2(y, x)`
+gives the angle of a point, so you do not have to worry about which quarter
+of the plane it is in:
+
+```ahd
+bring Math
+
+write(Math.degrees(Math.atan2(1.0, 1.0)))
+write(Math.degrees(Math.atan2(y: 1.0, x: -1.0)))
+write(Math.hypot(6, 8))
+write(Math.gcd(84, 126))
+```
+
+Expected output:
+
+```text
+45.0
+135.0
+10.0
+42
+```
+
+**Time stamps.** Programs exchange dates as ISO 8601 text such as
+`2026-09-18T13:30:00+03:00`. `Time.parseISO` reads exactly that form (the
+`Z` or the `+03:00` at the end is required), `toISO()` writes it, and `add`
+moves a moment by a `Duration`:
+
+```ahd
+bring Time
+
+lesson := Time.parseISO("2026-09-18T13:30:00+03:00")
+finish := lesson.add(Time.duration(40 * 60000))
+write(finish.toISO())
+write(finish.toUTC().toISO())
+```
+
+Expected output:
+
+```text
+2026-09-18T14:10:00.000+03:00
+2026-09-18T11:10:00.000Z
+```
+
+**Joined tables.** Two Tables that share a column can be combined with
+`innerJoin`. Every student row is paired with each grade row that has the
+same `id`; rows without a partner are left out:
+
+```ahd
+bring Data
+from Data bring Table
+
+students: Table := Data.fromCSV("id,name\n1,Ada\n2,Alan\n")
+grades: Table := Data.fromCSV("id,grade\n2,A\n1,B\n3,C\n")
+write(students.innerJoin(grades, "id").toCSV())
+```
+
+Expected output:
+
+```text
+id,name,grade
+1,Ada,B
+2,Alan,A
+
+```
+
+**Try it yourself:** Use `Statistics.correlation` and
+`Statistics.linearRegression` on two `List<Int>` values, such as hours of
+study and test scores, and describe what the slope means.
+
+See [Math](MATH.md), [Time](TIME.md), [Data](DATA.md), and
+[Statistics](STATISTICS.md), and
+[`examples/v1.7`](../examples/v1.7/README.md).

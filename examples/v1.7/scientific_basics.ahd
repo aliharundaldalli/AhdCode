@@ -1,0 +1,33 @@
+// v1.7 Math and Numeric: a right triangle, angles, fractions, and vectors.
+bring Math
+bring Numeric
+// A ladder 5 m long leans against a wall with its foot 3 m out.
+height := Math.sqrt(5.0 * 5.0 - 3.0 * 3.0)
+angle := Math.degrees(Math.atan2(y: height, x: 3.0))
+write("height {Math.round(height, 2)} m, angle {Math.round(angle, 2)} degrees")
+write("hypot check {Math.hypot(3.0, height)}")
+write("asin(0.5) is {Math.round(Math.degrees(Math.asin(0.5)), 6)} degrees")
+// Reduce 84/126 and add 1/6 + 1/4 with gcd and lcm.
+divisor := Math.gcd(84, 126)
+write("84/126 = {Math.floor(84 / divisor)}/{Math.floor(126 / divisor)}")
+common := Math.lcm(6, 4)
+write("1/6 + 1/4 = {Math.floor(common / 6 + common / 4)}/{common}")
+write("2^10 has log2 {Math.log2(1024.0)}")
+// Vectors: the normal of a plane and the length of a diagonal.
+u := Numeric.vector([1, 0, 0])
+v := Numeric.vector([0, 1, 0])
+normal := u.cross(v)
+write("u x v = {normal.values()}")
+write("|(3, 4, 12)| = {Numeric.vector([3, 4, 12]).norm()}")
+// A rotation by 90 degrees applied with matvec.
+turn := Math.radians(90.0)
+rotation := Numeric.matrix(
+    [[Math.cos(turn), -Math.sin(turn)], [Math.sin(turn), Math.cos(turn)]]
+)
+point := rotation.matvec(Numeric.vector([1.0, 0.0]))
+write(
+    "rotated (1, 0) is ({Math.round(point.at(0), 6)}, {Math.round(point.at(1), 6)})"
+)
+write(
+    "rotated point length {Math.round(point.norm(), 6)} (a rotation keeps lengths)"
+)

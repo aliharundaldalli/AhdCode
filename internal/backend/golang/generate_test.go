@@ -160,8 +160,13 @@ func TestGeneratedProgramCarriesRuntime(t *testing.T) {
 		names = append(names, file.Name)
 	}
 	if strings.Join(names, ",") != programFileName+","+runtimeFileName+","+excelRuntimeFileName+","+pdfRuntimeFileName+","+archiveRuntimeFileName+","+sqliteRuntimeFileName+","+httpRuntimeFileName+","+websocketRuntimeFileName+","+htmlRuntimeFileName+","+smtpRuntimeFileName+","+securityRuntimeFileName+","+identityRuntimeFileName+","+uuidRuntimeFileName+","+bitsRuntimeFileName+","+charactersRuntimeFile+","+cronRuntimeFileName+","+svgRuntimeFileName+","+documentRuntimeFileName+
-		","+terminalRuntimeFileName+","+terminalDarwinRuntimeFileName+","+terminalLinuxRuntimeFileName+","+terminalWindowsRuntimeFileName+","+terminalOtherRuntimeFileName+","+graphicsRuntimeFileName {
+		","+terminalRuntimeFileName+","+terminalDarwinRuntimeFileName+","+terminalLinuxRuntimeFileName+","+terminalWindowsRuntimeFileName+","+terminalOtherRuntimeFileName+","+graphicsRuntimeFileName+","+fundamentalsRuntimeFileName {
 		t.Fatalf("unexpected generated files %v", names)
+	}
+	// The bcrypt runtime imports vendored x/crypto, so a program that does
+	// not call bcrypt never receives it.
+	if program.RequiresBcrypt {
+		t.Fatal("a program without bcrypt requires the bcrypt vendor tree")
 	}
 	for _, file := range program.Files {
 		if !strings.HasPrefix(file.Content, "// Code generated") && !strings.Contains(file.Content, "package main") {

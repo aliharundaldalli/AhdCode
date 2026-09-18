@@ -325,6 +325,61 @@ eksen için aynı sütunu vermek, sessizce bir köşegen üretmek yerine reddedi
 toplama (aggregation) callback'i, değer sütunu, multi-index veya eksik-değer
 modeli yoktur.
 
+## concat ve innerJoin
+
+```text
+concat(other: Table) -> Table
+innerJoin(other: Table, key: String) -> Table
+innerJoin(other: Table, leftKey: String, rightKey: String) -> Table
+```
+
+`concat` satırları alt alta ekler: önce alıcının satırları, sonra `other`'ın.
+İki Table'ın sütun adları aynı sırada ve birebir aynı olmalıdır; aksi hâlde
+`DataError` fırlatılır. Boş ve yalnızca başlık içeren Table'lar geçerlidir.
+Eksen, indeks veya doldurma seçeneği yoktur.
+
+`innerJoin`, alıcının her satırını anahtar hücresi aynı String olan her
+`other` satırıyla eşleştirir. `innerJoin(other, key)` iki tarafta da aynı
+sütun adını kullanır; `innerJoin(other, leftKey, rightKey)` her tarafın
+anahtar sütununu ayrı adlandırır.
+
+- Eşleşme birebir String eşitliğidir: `"1"` ile `"01"` farklıdır ve `""`,
+  `""` ile eşleşen sıradan bir anahtardır.
+- Sonuçta önce alıcının tüm sütunları, ardından `other`'ın anahtar sütunu
+  dışındaki sütunları özgün sıralarıyla yer alır.
+- `other`'ın başka bir sütunu alıcıdaki bir sütunla aynı adı taşıyorsa join
+  onu yeniden adlandırmak yerine `DataError` fırlatır; önce `rename` veya
+  `drop` kullanın.
+- Satırlar alıcı satırına, her alıcı satırı içinde de `other` satırına göre
+  sıralanır. Bire-çok ve çoka-çok anahtarlar her eşleşen birleşimi üretir.
+- Eşleşmeyen satırlar sonuçta yer almaz. Left, right veya outer join ve eksik
+  değer işareti yoktur; hiç eşleşmeyen bir join tam şemayı korur ve sıfır
+  satır içerir.
+- Bilinmeyen bir anahtar sütunu `DataError` fırlatır. Join, `other`
+  satırlarının anahtara göre bir indeksini kurar; her satır çiftini
+  karşılaştırmaz.
+
+```ahd
+bring Data
+from Data bring Table
+
+students: Table := Data.fromCSV("id,name\n1,Ada\n2,Alan\n3,Grace\n")
+grades: Table := Data.fromCSV("student,course,grade\n2,Math,A\n1,Math,B\n2,Physics,C\n")
+joined: Table := students.innerJoin(other: grades, leftKey: "id", rightKey: "student")
+write(joined.toCSV())
+more: Table := Data.fromCSV("id,name\n4,Linus\n")
+write(students.concat(more).rowCount())
+```
+
+```text
+id,name,course,grade
+1,Ada,Math,B
+2,Alan,Math,A
+2,Alan,Physics,C
+
+4
+```
+
 ## toCSV ve writeCSV
 
 ```text
@@ -371,16 +426,18 @@ referans kimliğini korur -- Data, tablolar için değer eşitliği icat etmez.
 
 ## Data ne değildir
 
-Data pandas **değildir** ve DataFrame uyumlu değildir. v0.1.12'de kasıtlı
-olarak join, merge, concat, pivot, melt, MultiIndex, indeks etiketleri, sorgu
-dizeleri, SQL, pencere (window) fonksiyonları, rolling, resample, kategorik
-dtype, tembel (lazy) yürütme veya ifade ağaçları yoktur. Şema çıkarımı,
-otomatik sayısal veya tarih ayrıştırma ve null çıkarımı yoktur.
+Data pandas **değildir** ve DataFrame uyumlu değildir. `concat` ve
+`innerJoin` dışında kasıtlı olarak left, right veya outer join, merge,
+otomatik sütun son ekleri, genel pivot, melt, Series, MultiIndex, indeks
+etiketleri, sorgu dizeleri, SQL, pencere (window) fonksiyonları, rolling,
+resample, kategorik dtype, tembel (lazy) yürütme veya ifade ağaçları yoktur.
+Şema çıkarımı, otomatik sayısal veya tarih ayrıştırma ve eksik değer (NA)
+ya da null çıkarımı yoktur.
 
-İstatistik de yoktur. `sum`, `mean`, `median`, `variance`, `stdev`, `quantile`,
-`correlation` ve `describe`, planlanan Statistics katmanına aittir; o katman
-`List<Int>` ve `List<Real>` tüketecektir -- ki bu, açık bir dönüşümün zaten
-ürettiği şeydir:
+İstatistik de yoktur. `mean`, `median`, `variance`, `quantile` ve
+`correlation` gibi betimleyici istatistikler ayrı
+[Statistics](STATISTICS_TR.md) modülündedir; o modül `List<Int>` ve
+`List<Real>` tüketir -- ki bu, açık bir dönüşümün zaten ürettiği şeydir:
 
 ```ahd
 scores: List<Real> := table.column("score").map(

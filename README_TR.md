@@ -12,16 +12,17 @@ AhdCode; okunabilir sözdizimi, açık niyet (explicit intent), öngörülebilir
 anlambilim (semantics) ve yerel (native) derlemeye odaklanan, deneysel,
 statik olarak denetlenen genel amaçlı bir programlama dilidir.
 
-Bu, **v1.6.0**'dır. Dil, araç zinciri ve Web çatısı özellik olarak
+Bu, **v1.7.0**'dır. Dil, araç zinciri ve Web çatısı özellik olarak
 tamamlanmıştır; burada anlatılan çekirdek dil yüzeyi 1.0'ın taahhüt ettiği ve
-1.1, 1.2, 1.3, 1.4, 1.5 ile 1.6'nın değiştirmeden koruduğu yüzeydir.
+1.1, 1.2, 1.3, 1.4, 1.5, 1.6 ile 1.7'nin değiştirmeden koruduğu yüzeydir.
 
-v1.6.0 bir ara (minor) sürümdür, **Graphics + Turtle**: Kartezyen 2B bir Canvas
-içeren bir pencere, çizgi, çember ve dikdörtgen, PNG ve SVG kaydı ve
-koordinat, açı ve geometri öğretmek için bir Turtle kalemi sunan `Graphics`
-standart modülünü ekler; çekirdek dilbilgisini ya da tip sistemini değiştirmez.
-Bir oyun motoru ya da GUI kiti değildir. Bkz.
-[v1.6.0 ile gelenler](#v160-ile-gelenler).
+v1.7.0 bir ara (minor) sürümdür, **Standart Kütüphane Tamamlama**: Math, Time,
+Numeric, Statistics, Data ve Security modüllerini ters ve hiperbolik
+trigonometri, ebob/ekok, katı ISO 8601 zaman metni ve an aritmetiği, Vector ve
+Matrix erişimi, kovaryans, korelasyon ve basit doğrusal regresyon, Table
+concat ve inner join ile bcrypt uyumluluğuyla güçlendirir; çekirdek
+dilbilgisini ya da tip sistemini değiştirmez ve yeni bağımlılık eklemez. Bkz.
+[v1.7.0 ile gelenler](#v170-ile-gelenler).
 
 Ürün, kendi kendine yeten bir platform paketi olarak dağıtılır: `ahdcode` CLI,
 özel Go 1.27.0 araç zinciri, AhdDataStudio, `ahdsqlite`, `ahdnumeric`, `ahdplot`
@@ -324,7 +325,7 @@ Kavramsal netliği korumak için AhdCode'un yetenekleri dört belirgin mimari ka
    - **Sistem ve Ortam:** [`Time`](docs/TIME_TR.md), [`Cron`](docs/CRON_TR.md) (sınırlı, süreç içi zamanlama), [`Path`](docs/FILESYSTEM_TR.md), [`File`](docs/FILESYSTEM_TR.md), [`Env`](docs/ENV_TR.md), [`Terminal`](docs/TERMINAL_TR.md) (v1.5.0: standart hata, tampon boşaltma, terminal tespiti ve boyutu, biçimli metin, okunabilir düzen)
 
 3. **Birinci Taraf Çalışma Zamanı / Çatı Modülleri:**
-   - **Ağ, Sunucu ve Depolama İlkelleri:** [`HTTP`](docs/HTTP_TR.md) (bellek içi sunucu, istek/yanıt, çerezler, oturumlar, statik dosya sunucusu, [WebSocket uç noktaları](docs/WEBSOCKET_TR.md), client), [`HTML`](docs/HTML_TR.md) (anlamsal kurucu, ayrıştırıcı, seçici motoru), [`Security`](docs/SECURITY_TR.md) (Argon2id özetleme, güvenli token'lar, sabit zamanlı karşılaştırma, SHA-2 özetleri, HMAC, kodlamalar, RS256 imzaları, AES-256-GCM), [`SQLite`](docs/SQLITE_TR.md) (yerel tipli veritabanı köprüsü), [`MySQL`](docs/MYSQL_TR.md) (bağlantı havuzu ve işlemlerle ağ veritabanı), [`PostgreSQL`](docs/POSTGRESQL_TR.md) (bağlantı havuzu ve işlemlerle ağ veritabanı), [`SMTP`](docs/SMTP_TR.md) (yalnızca gönderim yapan posta istemcisi)
+   - **Ağ, Sunucu ve Depolama İlkelleri:** [`HTTP`](docs/HTTP_TR.md) (bellek içi sunucu, istek/yanıt, çerezler, oturumlar, statik dosya sunucusu, [WebSocket uç noktaları](docs/WEBSOCKET_TR.md), client), [`HTML`](docs/HTML_TR.md) (anlamsal kurucu, ayrıştırıcı, seçici motoru), [`Security`](docs/SECURITY_TR.md) (Argon2id özetleme, bcrypt uyumluluğu, güvenli token'lar, sabit zamanlı karşılaştırma, SHA-2 özetleri, HMAC, kodlamalar, RS256 imzaları, AES-256-GCM), [`SQLite`](docs/SQLITE_TR.md) (yerel tipli veritabanı köprüsü), [`MySQL`](docs/MYSQL_TR.md) (bağlantı havuzu ve işlemlerle ağ veritabanı), [`PostgreSQL`](docs/POSTGRESQL_TR.md) (bağlantı havuzu ve işlemlerle ağ veritabanı), [`SMTP`](docs/SMTP_TR.md) (yalnızca gönderim yapan posta istemcisi)
    - **Web Uygulama Çatısı:** [`Web`](docs/WEB_TR.md) (birinci taraf gömülü web çatısı, [`Web.UI`](docs/WEB_TR.md#9-webui) anlamsal bileşenleri, `RequestContext`, tipli `Forms`, sıralı `ValidationErrors`, seçilmiş `OldInput`, oturuma bağlı CSRF ve flash yaşam döngüsü)
 
 4. **Geliştirici Araçları:**
@@ -480,6 +481,7 @@ bakın.
 - [v0.12 MySQL çekiliş](examples/v0.12/raffle/README_TR.md) — katılım kodu, hash’li yönetici girişi, kazanan ilanı
 - [v1.4 gerçek zamanlı yoklama](examples/v1.4/realtime_attendance/README_TR.md) — Web, PostgreSQL, WebSocket, UUID v7, `Env.secret` ve Cron
 - [v1.5 Terminal tanıtımı](examples/v1.5/terminal_demo/README_TR.md) — `Terminal.emit`, standart hata, terminal tespiti, biçimli metin ve okunabilir düzen
+- [v1.7 standart kütüphane tamamlama](examples/v1.7/README_TR.md) — trigonometri ve ebob/ekok, katı ISO zaman metni ve an aritmetiği, istatistikli Table join
 - [v1.6 Graphics ve Turtle](examples/v1.6/graphics_turtle/README_TR.md) — Kartezyen Canvas, şekiller, Turtle ile yıldız ve spiral, PNG/SVG kaydı ve düzgün çokgen dersi
 - [AhdDataStudio](tools/AhdDataStudio/README_TR.md) — yerel MySQL + SQLite geliştirme arayüzü
 - [v0.4 Kütüphane Demosu](https://github.com/aliharundaldalli/ahdcode-library-demo) (ayrı başlangıç web uygulaması)
@@ -498,6 +500,39 @@ VS Code hem de Antigravity'i hedefler.
 [Kurulum rehberine](editors/vscode/README_TR.md) bakın.
 
 ## Mevcut sınırlamalar
+
+## v1.7.0 ile gelenler <a id="v170-ile-gelenler"></a>
+
+v1.7.0 bir **ara (minor)** sürümdür, **Standart Kütüphane Tamamlama**. Mevcut
+altı modülü eklemeli fonksiyon ve üyelerle güçlendirir; temel dilbilgisi, tip
+sistemi ve daha önce yayımlanan her fonksiyon değişmeden kalır ve hiçbir
+bağımlılık eklenmez.
+
+- [`Math`](docs/MATH_TR.md): `asin`, `acos`, `atan`, `atan2`, `sinh`, `cosh`,
+  `tanh`, `hypot`, `log2`, `cbrt`, `radians`, `degrees`, `gcd` ve `lcm`.
+  Açılar düz Real değerler olarak kalır; ayrı bir açı tipi ve `Math.pow`
+  yoktur.
+- [`Time`](docs/TIME_TR.md): katı bir RFC 3339 alt kümesi için
+  `Time.parseISO` ve `DateTime.toISO` (`Z` veya `±HH:MM` göstergesi
+  zorunludur), `DateTime.add` ve `subtract` ile an aritmetiği, Duration için
+  tam `add`, `subtract`, `negate` ve `abs`. Adlandırılmış saat dilimi
+  veritabanı hâlâ yoktur.
+- [`Numeric`](docs/NUMERIC_TR.md): `Vector.at`, `norm`, `outer` ve `cross`;
+  `Matrix.at`, `row`, `column`, `diagonal`, `norm` (Frobenius), `hadamard` ve
+  `matvec`. Broadcasting yoktur.
+- [`Statistics`](docs/STATISTICS_TR.md): `covariance`, `sampleCovariance`,
+  `correlation` (Pearson) ve `{"slope", "intercept"}` döndüren
+  `linearRegression`. İstatistiksel test paketi yoktur.
+- [`Data`](docs/DATA_TR.md): tek ortak anahtarla veya sol ve sağ anahtarla
+  `Table.concat` ve `Table.innerJoin`. Yalnızca inner join; eksik değer ve
+  otomatik sütun son eki yoktur.
+- [`Security`](docs/SECURITY_TR.md): zaten sabitlenmiş `golang.org/x/crypto`
+  üzerinden, uyumluluk ve geçiş için `bcryptHash` ve `bcryptVerify`. Yeni
+  uygulamalar Argon2id'yi tercih etmelidir.
+
+Her ekleme derlenmiş programda, `ahdcode run`'da ve REPL'de aynı davranır;
+editörler her biri için tamamlama, hover ve imza yardımı gösterir. Bkz.
+[v1.7 örnekleri](examples/v1.7/README_TR.md).
 
 ## v1.6.0 ile gelenler <a id="v160-ile-gelenler"></a>
 

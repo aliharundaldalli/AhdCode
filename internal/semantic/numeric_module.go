@@ -23,8 +23,8 @@ func NumericMatrixIdentity() *types.ClassSymbol { return numericMatrixClass }
 func numericVectorType() types.Type             { return types.Class{Symbol: numericVectorClass} }
 func numericMatrixType() types.Type             { return types.Class{Symbol: numericMatrixClass} }
 
-var NumericVectorOperations = []string{"length", "values", "add", "subtract", "scale", "dot", "abs", "sqrt", "exp", "log", "sum", "min", "max"}
-var NumericMatrixOperations = []string{"rowCount", "columnCount", "rows", "transpose", "add", "subtract", "scale", "matmul", "determinant", "trace", "inverse", "solve", "rank", "lu", "qr", "cholesky", "svd", "eigenvalues", "abs", "sqrt", "exp", "log", "sum", "min", "max"}
+var NumericVectorOperations = []string{"length", "values", "add", "subtract", "scale", "dot", "abs", "sqrt", "exp", "log", "sum", "min", "max", "at", "norm", "outer", "cross"}
+var NumericMatrixOperations = []string{"rowCount", "columnCount", "rows", "transpose", "add", "subtract", "scale", "matmul", "determinant", "trace", "inverse", "solve", "rank", "lu", "qr", "cholesky", "svd", "eigenvalues", "abs", "sqrt", "exp", "log", "sum", "min", "max", "at", "row", "column", "diagonal", "norm", "hadamard", "matvec"}
 
 func numericModuleInterface() *ModuleInterface {
 	module := standardInterface(numericModuleID, "Numeric")
@@ -85,8 +85,8 @@ func numericFunction(name string, signatures ...*types.Signature) *Symbol {
 }
 
 var numericOperationNames = map[string]map[string]TypeOperation{
-	"Vector": {"length": NumericVectorLength, "values": NumericVectorValues, "add": NumericVectorAdd, "subtract": NumericVectorSubtract, "scale": NumericVectorScale, "dot": NumericVectorDot, "abs": NumericVectorAbs, "sqrt": NumericVectorSqrt, "exp": NumericVectorExp, "log": NumericVectorLog, "sum": NumericVectorSum, "min": NumericVectorMin, "max": NumericVectorMax},
-	"Matrix": {"rowCount": NumericMatrixRowCount, "columnCount": NumericMatrixColumnCount, "rows": NumericMatrixRows, "transpose": NumericMatrixTranspose, "add": NumericMatrixAdd, "subtract": NumericMatrixSubtract, "scale": NumericMatrixScale, "matmul": NumericMatrixMatmul, "determinant": NumericMatrixDeterminant, "trace": NumericMatrixTrace, "inverse": NumericMatrixInverse, "solve": NumericMatrixSolve, "rank": NumericMatrixRank, "lu": NumericMatrixLU, "qr": NumericMatrixQR, "cholesky": NumericMatrixCholesky, "svd": NumericMatrixSVD, "eigenvalues": NumericMatrixEigenvalues, "abs": NumericMatrixAbs, "sqrt": NumericMatrixSqrt, "exp": NumericMatrixExp, "log": NumericMatrixLog, "sum": NumericMatrixSum, "min": NumericMatrixMin, "max": NumericMatrixMax},
+	"Vector": {"length": NumericVectorLength, "values": NumericVectorValues, "add": NumericVectorAdd, "subtract": NumericVectorSubtract, "scale": NumericVectorScale, "dot": NumericVectorDot, "abs": NumericVectorAbs, "sqrt": NumericVectorSqrt, "exp": NumericVectorExp, "log": NumericVectorLog, "sum": NumericVectorSum, "min": NumericVectorMin, "max": NumericVectorMax, "at": NumericVectorAt, "norm": NumericVectorNorm, "outer": NumericVectorOuter, "cross": NumericVectorCross},
+	"Matrix": {"rowCount": NumericMatrixRowCount, "columnCount": NumericMatrixColumnCount, "rows": NumericMatrixRows, "transpose": NumericMatrixTranspose, "add": NumericMatrixAdd, "subtract": NumericMatrixSubtract, "scale": NumericMatrixScale, "matmul": NumericMatrixMatmul, "determinant": NumericMatrixDeterminant, "trace": NumericMatrixTrace, "inverse": NumericMatrixInverse, "solve": NumericMatrixSolve, "rank": NumericMatrixRank, "lu": NumericMatrixLU, "qr": NumericMatrixQR, "cholesky": NumericMatrixCholesky, "svd": NumericMatrixSVD, "eigenvalues": NumericMatrixEigenvalues, "abs": NumericMatrixAbs, "sqrt": NumericMatrixSqrt, "exp": NumericMatrixExp, "log": NumericMatrixLog, "sum": NumericMatrixSum, "min": NumericMatrixMin, "max": NumericMatrixMax, "at": NumericMatrixAt, "row": NumericMatrixRow, "column": NumericMatrixColumn, "diagonal": NumericMatrixDiagonal, "norm": NumericMatrixNorm, "hadamard": NumericMatrixHadamard, "matvec": NumericMatrixMatvec},
 }
 
 func numericOperationFor(receiver types.Type, name string) (TypeOperation, bool) {

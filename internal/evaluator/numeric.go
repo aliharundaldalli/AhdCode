@@ -4,6 +4,7 @@ import (
 	"math"
 	"sort"
 
+	"ahdcode/internal/backend/golang/ahdruntime"
 	"ahdcode/internal/ir"
 )
 
@@ -167,6 +168,9 @@ func (s *Session) numericMatrixValidated(rows [][]float64) *Instance {
 	return s.numericMatrix(rows)
 }
 func (s *Session) numericOperation(name string, receiver *Instance, args []any) any {
+	if result, ok := s.numericMemberOperation(name, receiver, args); ok {
+		return result
+	}
 	if receiver.Class == evalVectorClass {
 		v := s.vectorValues(receiver)
 		op := name[7:]
@@ -700,4 +704,42 @@ func (s *Session) matrixPair(keys []string, grids [][][]float64) *Pair {
 		pairSet(pair, key, s.numericMatrix(grids[i]))
 	}
 	return pair
+}
+
+// numericMemberOperation evaluates the v1.7 Vector and Matrix members with the
+// runtime helpers compiled programs use, so results and errors are identical.
+func (s *Session) numericMemberOperation(name string, receiver *Instance, args []any) (any, bool) {
+	vector := func(values []float64, fault *ahdruntime.AhdFault) any {
+		s.fault(nil, fault)
+		return s.numericVector(values)
+	}
+	matrix := func(rows [][]float64, fault *ahdruntime.AhdFault) any {
+		s.fault(nil, fault)
+		return s.numericMatrix(rows)
+	}
+	switch name {
+	case "Vector.at":
+		return s.fault(ahdruntime.AhdVectorAt(s.vectorValues(receiver), args[0].(int64))), true
+	case "Vector.norm":
+		return s.fault(ahdruntime.AhdVectorNorm(s.vectorValues(receiver))), true
+	case "Vector.outer":
+		return matrix(ahdruntime.AhdVectorOuter(s.vectorValues(receiver), s.vectorValues(args[0]))), true
+	case "Vector.cross":
+		return vector(ahdruntime.AhdVectorCross(s.vectorValues(receiver), s.vectorValues(args[0]))), true
+	case "Matrix.at":
+		return s.fault(ahdruntime.AhdMatrixAt(s.matrixRows(receiver), args[0].(int64), args[1].(int64))), true
+	case "Matrix.row":
+		return vector(ahdruntime.AhdMatrixRow(s.matrixRows(receiver), args[0].(int64))), true
+	case "Matrix.column":
+		return vector(ahdruntime.AhdMatrixColumn(s.matrixRows(receiver), args[0].(int64))), true
+	case "Matrix.diagonal":
+		return s.numericVector(ahdruntime.AhdMatrixDiagonal(s.matrixRows(receiver))), true
+	case "Matrix.norm":
+		return s.fault(ahdruntime.AhdMatrixNorm(s.matrixRows(receiver))), true
+	case "Matrix.hadamard":
+		return matrix(ahdruntime.AhdMatrixHadamard(s.matrixRows(receiver), s.matrixRows(args[0]))), true
+	case "Matrix.matvec":
+		return vector(ahdruntime.AhdMatrixVector(s.matrixRows(receiver), s.vectorValues(args[0]))), true
+	}
+	return nil, false
 }

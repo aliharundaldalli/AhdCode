@@ -86,6 +86,7 @@ func timeModuleInterface() *ModuleInterface {
 	add(timeFunction("dateTime", timeDateTimeSignature(instant)))
 	add(timeFunction("dateTimeUTC", timeDateTimeSignature(instant)))
 	add(timeFunction("dateTimeOffset", timeDateTimeOffsetSignature(instant)))
+	add(timeFunction("parseISO", timeSignature(instant, timeParameter("text", types.String))))
 
 	sort.Strings(module.ExportNames)
 	return module

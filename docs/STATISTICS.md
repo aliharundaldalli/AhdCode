@@ -119,6 +119,56 @@ write(Statistics.quantile(values, 0.5))   // 2.5
 write(Statistics.quantile(values, 1.0))   // 4.0
 ```
 
+## Two Lists: covariance, correlation, and a fitted line
+
+```text
+covariance(first, second)       -> Real
+sampleCovariance(first, second) -> Real
+correlation(first, second)      -> Real
+linearRegression(x, y)          -> Pair<String, Real>
+```
+
+Each argument is a `List<Int>` or a `List<Real>`, in any combination; the four
+overloads are published explicitly. Int values are read as Real, as `mean`
+reads them. The two Lists must have the same length, and neither is modified.
+
+- `covariance` is the **population** covariance, dividing by `n`; it needs at
+  least one pair. `sampleCovariance` divides by `n - 1` and needs at least two.
+- `correlation` is Pearson's correlation coefficient. It needs at least two
+  pairs, and raises `StatisticsError` when either List has zero variance (all
+  values equal), because the coefficient is then undefined. The result is
+  always in `-1.0..1.0`: for perfectly linear data a rounding overshoot of the
+  last bit is clamped to the boundary.
+- `linearRegression(x, y)` fits `y = slope * x + intercept` by ordinary least
+  squares and returns the Pair `{"slope": …, "intercept": …}` in that key
+  order. It needs at least two pairs and x values that are not all equal. When
+  every y is the same value, the slope is `0.0` and the intercept is exactly
+  that value.
+
+Every function centres the data on its mean before multiplying (a two-pass
+computation), so large offsets such as years or timestamps do not wash out
+the result. Lists of different lengths, empty Lists, and undefined input raise
+`StatisticsError`.
+
+```ahd
+bring Statistics
+
+hours: List<Int> := [1, 2, 3, 4, 5]
+scores: List<Real> := [52.0, 57.5, 61.0, 68.5, 71.0]
+write(Statistics.covariance(hours, scores))
+write(Statistics.correlation(hours, scores) > 0.99)
+fit := Statistics.linearRegression(x: hours, y: scores)
+write(fit["slope"])
+write(Statistics.linearRegression([1, 2, 3], [7, 7, 7]))
+```
+
+```text
+9.8
+true
+4.9
+{"slope": 0.0, "intercept": 7.0}
+```
+
 ## Empty and undefined input
 
 `sum` of an empty List is the additive identity — `0` for `Int` and `0.0` for
@@ -170,8 +220,11 @@ write(values)                     // [3, 1, 2]
 
 ## What Statistics is not
 
-The `Statistics` module is descriptive statistics only. There is no inferential testing, no
-regression, no distribution, no random sampling, and no plotting. There is no
+The `Statistics` module is descriptive statistics only, plus one simple
+least-squares line. There is no inferential testing (no p-values or hypothesis
+tests), no multiple, polynomial, or logistic regression, no `rSquared` or
+regression object, no distribution, no random sampling, no machine learning,
+and no plotting. There is no
 `frequency` function either: a frequency table would be `Pair<K, Int>`, and a
 Pair key must be `String`, `Int`, or `Bool`, so `List<Real>` input has no
 expressible result. `mode` covers the common need, and

@@ -40,6 +40,8 @@ etiketini (authentication tag) unutamazsınız.
 ```text
 Security.passwordHash(password: String)                  -> String
 Security.passwordVerify(password: String, encodedHash: String) -> Bool
+Security.bcryptHash(password: String)                    -> String
+Security.bcryptVerify(password: String, encodedHash: String) -> Bool
 Security.token()                                         -> String
 Security.secureEqual(expected: String, received: String) -> Bool
 
@@ -209,6 +211,63 @@ yeniden hesaplar ve sonucu `crypto/subtle.ConstantTimeCompare` ile karşılaşt�
 Bu sınırlar, saklanmış bir hash'in doğrulayıcıyı aşırı kaynak harcamaya veya
 patolojik derecede zayıf parametreler kullanmaya zorlamasını önler.
 
+## bcryptHash ve bcryptVerify (uyumluluk)
+
+Yeni uygulamalar Argon2id'yi tercih etmelidir. bcrypt uyumluluk ve geçiş için
+sağlanır.
+
+```text
+Security.bcryptHash(password: String) -> String
+Security.bcryptVerify(password: String, encodedHash: String) -> Bool
+```
+
+Bu iki fonksiyonu başka bir sistemin (PHP'nin `password_hash`'i, birçok Ruby,
+Python ve Node.js uygulaması) sakladığı parolaları doğrulamak ve başarılı bir
+girişte saklanan bcrypt hash'ini `passwordHash` ile değiştirmek için
+kullanın:
+
+```ahd
+bring Security
+
+stored := "$2y$10$.vGA1O9wmRjrwAVXD98HNOgsNpDczlqm3Jq7KnEd1rVAGv3Fykk1a"
+candidate := "rasmuslerdorf"
+if Security.bcryptVerify(candidate, stored) {
+    upgraded: Local := Security.passwordHash(candidate)
+    write(upgraded.startsWith("$argon2id$"))
+}
+```
+
+```text
+true
+```
+
+- `bcryptHash` her zaman cost 12 kullanır ve 60 karakterlik `$2a$12$…`
+  biçimini yazar. Cost bir parametre değildir.
+- `bcryptVerify`, cost değeri `04` ile `16` arasında olan `$2a$`, `$2b$` ve
+  `$2y$` öneklerini kabul eder; bu sürümle test edilen biçimler bunlardır.
+  Başka önekler (`$2x$` veya `$2$` gibi), başka uzunluk veya karakterler ve
+  daha yüksek bir cost `SecurityError` fırlatır; böylece saklanan bir hash tek
+  bir doğrulamayı saatlerce çalıştıramaz.
+- `04..16` cost aralığı bcrypt'in tam aralığı değil, AhdCode'un kaynak
+  güvenliği politikasıdır: bcrypt biçimi 31'e kadar cost değerine izin verir
+  ve her adım işi ikiye katlar. Cost değeri 17 veya daha yüksek olan bir hash
+  geçerli bcrypt'tir ama burada reddedilir; bu parolaları başka yerde yeniden
+  hash'leyin veya Argon2id'ye taşıyın.
+- bcrypt parolanın en fazla 72 UTF-8 baytını okur. Daha uzun bir parola
+  sessizce kısaltılmak yerine iki fonksiyonda da `SecurityError` fırlatır.
+  Boş parola geçerlidir.
+- Yanlış parola `false` döndürür. Hata mesajları hiçbir zaman parolayı,
+  hash'i veya iç Go hatasını içermez.
+- Otomatik algılama yoktur. `passwordVerify` yalnızca Argon2id kabul eder ve
+  bir bcrypt hash'i için `SecurityError` fırlatır; `bcryptVerify` yalnızca
+  bcrypt kabul eder ve Argon2id hash'i için hata fırlatır. Program, sakladığı
+  biçime uygun fonksiyonu seçer.
+
+bcrypt, AhdCode'un zaten bağımlı olduğu `golang.org/x/crypto` modülünden
+gelir; onu çağıran derlenmiş bir program bu sabitlenmiş, vendor'lanmış
+kaynağı çevrimdışı derler. Bkz.
+[THIRD_PARTY_NOTICES_BCRYPT.md](../THIRD_PARTY_NOTICES_BCRYPT.md).
+
 ## token
 
 ```ahd
@@ -353,6 +412,10 @@ login: Function := (
 | `Security password hash uses an unsupported algorithm` | argon2id değil / v19 değil |
 | `Security password hash has unsafe parameters` | Parametreler güvenli sınırların dışında |
 | `Security password input is too large` | Parola 1 MiB'ı aştı |
+| `bcrypt accepts a password of at most 72 UTF-8 bytes` | `bcryptHash` / `bcryptVerify` parolası 72 bayttan uzun |
+| `bcrypt hash is malformed or uses an unsupported format` | 60 karakterlik bir `$2a$`, `$2b$` veya `$2y$` hash'i değil |
+| `bcrypt hash cost is outside the supported range 04..16` | `bcryptVerify` hash cost değeri 4'ten küçük veya 16'dan büyük |
+| `bcrypt hashing failed` | `bcryptHash` sırasında işletim sistemi entropi hatası |
 | `Security random token generation failed` | İşletim sistemi entropi hatası (`token`, `passwordHash`, `randomHex`, `aesEncrypt`) |
 | `Security base64 input is malformed` | `base64Decode` girdisi veya `aesDecrypt` yükü dolgulu standart Base64 değil |
 | `Security base64url input is malformed` | `base64UrlDecode` girdisi veya `rsaVerifySHA256` imzası base64url değil |

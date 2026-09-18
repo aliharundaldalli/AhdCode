@@ -75,9 +75,16 @@ func mathModuleInterface() *ModuleInterface {
 	))
 	add(mathFunction("floor", mathSignature(types.Int, mathParameter("value", types.Real))))
 	add(mathFunction("ceil", mathSignature(types.Int, mathParameter("value", types.Real))))
-	for _, name := range []string{"sqrt", "sin", "cos", "tan", "log", "log10", "exp"} {
+	for _, name := range []string{"sqrt", "sin", "cos", "tan", "log", "log10", "exp",
+		"asin", "acos", "atan", "sinh", "cosh", "tanh", "log2", "cbrt"} {
 		add(mathFunction(name, mathSignature(types.Real, mathParameter("value", types.Real))))
 	}
+	add(mathFunction("atan2", mathSignature(types.Real, mathParameter("y", types.Real), mathParameter("x", types.Real))))
+	add(mathFunction("hypot", mathSignature(types.Real, mathParameter("x", types.Real), mathParameter("y", types.Real))))
+	add(mathFunction("radians", mathSignature(types.Real, mathParameter("degrees", types.Real))))
+	add(mathFunction("degrees", mathSignature(types.Real, mathParameter("radians", types.Real))))
+	add(mathFunction("gcd", mathSignature(types.Int, mathParameter("first", types.Int), mathParameter("second", types.Int))))
+	add(mathFunction("lcm", mathSignature(types.Int, mathParameter("first", types.Int), mathParameter("second", types.Int))))
 	add(mathFunction("seed", mathSignature(types.Nothing, mathParameter("value", types.Int))))
 	add(mathFunction("random", mathSignature(types.Real)))
 	add(mathFunction("randomInt", mathSignature(types.Int,

@@ -39,6 +39,9 @@ type GeneratedProgram struct {
 	// RequiresPostgreSQL reports that the program uses PostgreSQL, so its
 	// workspace needs the vendored pgx dependency graph.
 	RequiresPostgreSQL bool
+	// RequiresBcrypt reports that the program calls Security.bcryptHash or
+	// Security.bcryptVerify, so its workspace needs the vendored bcrypt source.
+	RequiresBcrypt bool
 }
 
 const (
@@ -73,6 +76,8 @@ const (
 	terminalWindowsRuntimeFileName = "ahdcode_terminal_runtime_windows.go"
 	terminalOtherRuntimeFileName   = "ahdcode_terminal_runtime_other.go"
 	graphicsRuntimeFileName        = "ahdcode_graphics_runtime.go"
+	bcryptRuntimeFileName          = "ahdcode_bcrypt_runtime.go"
+	fundamentalsRuntimeFileName    = "ahdcode_fundamentals_runtime.go"
 )
 
 // storage describes the Go representation chosen for one IR symbol.
@@ -108,6 +113,8 @@ type generator struct {
 	usesWebSocket bool
 	// usesPostgreSQL is set by any PostgreSQL function or member.
 	usesPostgreSQL bool
+	// usesBcrypt is set by Security.bcryptHash and Security.bcryptVerify.
+	usesBcrypt bool
 	// frames tracks the enclosing loop and attempt structure so break,
 	// continue, and return transfer through error handling correctly.
 	frames []frame
@@ -233,6 +240,7 @@ func Generate(compilation *ir.Compilation) (*GeneratedProgram, []diagnostics.Dia
 		{terminalWindowsRuntimeFileName, ahdruntime.TerminalWindowsSource, "Terminal Windows"},
 		{terminalOtherRuntimeFileName, ahdruntime.TerminalOtherSource, "Terminal fallback"},
 		{graphicsRuntimeFileName, ahdruntime.GraphicsSource, "Graphics"},
+		{fundamentalsRuntimeFileName, ahdruntime.FundamentalsSource, "standard-library fundamentals"},
 	} {
 		formattedShared, err := format.Source([]byte(strings.Replace(shared.source, "package ahdruntime", "package main", 1)))
 		if err != nil {
@@ -280,9 +288,18 @@ func Generate(compilation *ir.Compilation) (*GeneratedProgram, []diagnostics.Dia
 		}
 		files = append(files, GeneratedFile{Name: postgresqlRuntimeFileName, Content: string(postgresqlRuntime)})
 	}
+	// ahdcode_bcrypt_runtime.go imports the vendored golang.org/x/crypto
+	// bcrypt, so it joins only a program that calls a bcrypt function.
+	if generator.usesBcrypt {
+		bcryptRuntime, err := format.Source([]byte(strings.Replace(ahdruntime.BcryptSource, "package ahdruntime", "package main", 1)))
+		if err != nil {
+			return nil, append(generator.diagnostics, backendError(CodeFormatFailure, "embedded bcrypt runtime source is not valid Go: "+err.Error(), source.Span{}, "the Security backend runtime must remain gofmt-clean"))
+		}
+		files = append(files, GeneratedFile{Name: bcryptRuntimeFileName, Content: string(bcryptRuntime)})
+	}
 	return &GeneratedProgram{Files: files,
 		RequiresLatex: generator.usesLatex, RequiresPlot: generator.usesPlot, RequiresGraphics: generator.usesGraphics, RequiresNumeric: generator.usesNumeric, RequiresSQLite: generator.usesSQLite, RequiresMySQL: generator.usesMySQL,
-		RequiresCodes: generator.usesCodes, RequiresWebSocket: generator.usesWebSocket, RequiresPostgreSQL: generator.usesPostgreSQL}, generator.diagnostics
+		RequiresCodes: generator.usesCodes, RequiresWebSocket: generator.usesWebSocket, RequiresPostgreSQL: generator.usesPostgreSQL, RequiresBcrypt: generator.usesBcrypt}, generator.diagnostics
 }
 
 func codesRuntimeSource() string {

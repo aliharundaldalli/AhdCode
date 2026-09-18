@@ -1,6 +1,7 @@
 package lowering
 
 import (
+	"reflect"
 	"strings"
 	"testing"
 
@@ -867,11 +868,13 @@ func TestTimeClassesPublishTheirBuiltInMembers(t *testing.T) {
 		for _, class := range module.Classes {
 			found[class.Name] = class.Operations
 		}
-		if len(found["DateTime"]) != 8 || len(found["Calendar"]) != 3 {
+		if len(found["DateTime"]) != 11 || len(found["Calendar"]) != 3 {
 			t.Fatalf("published operations = %v", found)
 		}
-		if len(found["Duration"]) != 0 {
-			t.Fatalf("Duration reaches its members as fields, not operations: %v", found["Duration"])
+		// Duration's attributes are fields; its v1.7 arithmetic members are
+		// operations.
+		if !reflect.DeepEqual(found["Duration"], []string{"add", "subtract", "negate", "abs"}) {
+			t.Fatalf("Duration operations = %v", found["Duration"])
 		}
 		return
 	}

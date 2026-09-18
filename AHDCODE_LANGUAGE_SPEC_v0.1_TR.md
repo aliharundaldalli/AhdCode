@@ -6688,6 +6688,110 @@ programın yanındaki kurulumla bulunur; `PATH` aranmaz.
 `AHDCODE_GRAPHICS_HEADLESS=1` her Canvas'ı pencere olmadan açar. `Graphics`'i
 getirmeyen bir program tam olarak eskisi gibi davranır.
 
+## 82. Standart Kütüphane Tamamlama (v1.7.0)
+
+v1.7.0, mevcut altı modüle fonksiyon ve üye ekler. Hiçbir dilbilgisi, tip
+kuralı veya önceki davranış değişmez. Her ekleme Go standart kütüphanesiyle
+(bcrypt için sabitlenmiş `golang.org/x/crypto` ile) bir kez uygulanır ve
+evaluator ile yerel programlarca paylaşılır; bu yüzden sonuçlar ve hata
+mesajları aynıdır.
+
+```text
+Math.asin(value: Real) -> Real    Math.acos(value: Real) -> Real    Math.atan(value: Real) -> Real
+Math.sinh(value: Real) -> Real    Math.cosh(value: Real) -> Real    Math.tanh(value: Real) -> Real
+Math.atan2(y: Real, x: Real) -> Real     Math.hypot(x: Real, y: Real) -> Real
+Math.log2(value: Real) -> Real           Math.cbrt(value: Real) -> Real
+Math.radians(degrees: Real) -> Real      Math.degrees(radians: Real) -> Real
+Math.gcd(first: Int, second: Int) -> Int Math.lcm(first: Int, second: Int) -> Int
+
+Time.parseISO(text: String) -> DateTime
+DateTime.toISO() -> String
+DateTime.add(duration: Duration) -> DateTime    DateTime.subtract(duration: Duration) -> DateTime
+Duration.add(other: Duration) -> Duration       Duration.subtract(other: Duration) -> Duration
+Duration.negate() -> Duration                   Duration.abs() -> Duration
+
+Vector.at(index: Int) -> Real      Vector.norm() -> Real
+Vector.outer(other: Vector) -> Matrix             Vector.cross(other: Vector) -> Vector
+Matrix.at(row: Int, column: Int) -> Real          Matrix.row(index: Int) -> Vector
+Matrix.column(index: Int) -> Vector               Matrix.diagonal() -> Vector
+Matrix.norm() -> Real                             Matrix.hadamard(other: Matrix) -> Matrix
+Matrix.matvec(vector: Vector) -> Vector
+
+Statistics.covariance(first, second) -> Real        Statistics.sampleCovariance(first, second) -> Real
+Statistics.correlation(first, second) -> Real       Statistics.linearRegression(x, y) -> Pair<String, Real>
+    (her parametre List<Int> veya List<Real>; dört birleşimin hepsi overload'dur)
+
+Table.concat(other: Table) -> Table
+Table.innerJoin(other: Table, key: String) -> Table
+Table.innerJoin(other: Table, leftKey: String, rightKey: String) -> Table
+
+Security.bcryptHash(password: String) -> String
+Security.bcryptVerify(password: String, encodedHash: String) -> Bool
+```
+
+Yeni üyeler Canvas ve Turtle üyeleri gibi (bölüm 80) parametre adı yayımlar;
+bu yüzden her çağrı bölüm 15.3'e uyar: tamamen konumsal ya da tamamen
+adlandırılmış. `Int` argümanlar `Real` parametrelere genişler.
+
+**Math.** `asin`/`acos` `[-1, 1]` içinde, `log2` 0'dan büyük bir değer ister;
+aksi hâlde `DomainError`. Sonlu Real olmayan bir sonuç `DomainError`
+(tanımsız) veya `OverflowError` (çok büyük) fırlatır. `radians(d)` `d·π/180`,
+`degrees(r)` `r·180/π`'dir; normalleştirme yapılmaz. `gcd` ve `lcm` negatif
+değildir; `gcd(0, 0) = 0`, `lcm(a, 0) = lcm(0, b) = 0`; `lcm` denetimli
+aritmetikle `|(a / gcd(a, b))·b|`'dir ve Int dışına çıkan sonuç
+`OverflowError` fırlatır. Açı tipi ve `Math.pow` yoktur.
+
+**Time.** `parseISO` yalnızca `YYYY-MM-DDTHH:MM:SS`, isteğe bağlı `.` ve bir
+ile üç kesir basamağı (milisaniye, sağdan tamamlanır) ile zorunlu `Z` veya
+±14:00 içindeki `±HH:MM` ofsetini kabul eder. Başka her metin veya imkânsız
+sivil değer `ValueError` fırlatır. Sonuç yazılan ofseti korur. `toISO`,
+`YYYY-MM-DDTHH:MM:SS.mmm` ardından ofset 0 için `Z`, diğerleri için `±HH:MM`
+yazar; her `v` için `parseISO(v.toISO()).sameMoment(v)` sağlanır ve saniye
+içeren tarihsel bir ofset `ValueError` fırlatır (`v.toUTC().toISO()` yazın).
+`add` ve `subtract` anı Duration'ın milisaniyesi kadar kaydırır ve alıcının
+ofsetini korur; 1..9999 yılları dışındaki sonuç `ValueError` fırlatır.
+Duration aritmetiği milisaniyeler üzerinde denetimli Int aritmetiğidir ve
+`OverflowError` fırlatır. Saat dilimi veritabanı, DST kuralı, dönem veya
+operatör eklenmez.
+
+**Numeric.** İndeksler List kurallarına uyar (negatif sondan, aralık dışı
+`IndexError`). `norm` Vector için L2, Matrix için Frobenius'tur. `cross`
+uzunluk 3 ister ve sağ el kuralına uyar. `diagonal` `min(m, n)` elemanlıdır.
+`cross`, `hadamard` veya `matvec` içindeki boyut uyuşmazlığı, boş bir `outer`
+işleneni veya sonlu olmayan sonuç `NumericError` fırlatır. Broadcasting ve
+değiştirilebilir indeksleme yoktur.
+
+**Statistics.** İki List aynı ve sıfır olmayan uzunlukta olmalıdır; aksi
+hâlde `StatisticsError`. `covariance` `n`'e böler; `sampleCovariance`,
+`correlation` ve `linearRegression` `n ≥ 2` ister ve `sampleCovariance`
+`n − 1`'e böler. `correlation` Pearson katsayısıdır, List'lerden biri sıfır
+varyanslıysa `StatisticsError` fırlatır ve `[-1, 1]`'e kırpılır.
+`linearRegression` sıradan en küçük karelerdir ve önce `slope`, sonra
+`intercept` anahtarlarını döndürür; sıfır varyanslı x `StatisticsError`
+fırlatır, sabit y eğim 0 ve kesişim olarak o sabiti verir. Dördü de iki
+geçişli merkezlenmiş toplamlar kullanır ve girdilerini değiştirmez.
+
+**Data.** `concat` aynı sırada aynı sütun adlarını ister ve diğer Table'ın
+satırlarını alıcınınkilerin ardına ekler. `innerJoin` anahtar hücrelerini
+birebir String eşitliğiyle eşleştirir (`""` bir anahtardır); sonuçta alıcının
+tüm sütunları, ardından diğer Table'ın anahtar sütunu dışındaki sütunları yer
+alır; satırlar alıcı satırına, sonra diğer Table'ın satırına göre sıralanır
+ve eşleşen her birleşim üretilir. Adı alıcıda zaten bulunan bir sağ sütun
+veya bilinmeyen bir anahtar sütunu `DataError` fırlatır. Join diğer Table'ı
+anahtara göre indeksler. Outer join, eksik değer veya son ek yoktur.
+
+**Security.** `bcryptHash` sabit cost 12 ile hash'ler ve `$2a$` biçimini
+döndürür. `bcryptVerify` 60 karakterlik, cost değeri 04..16 olan `$2a$`, `$2b$`
+ve `$2y$` hash'lerini kabul eder ve parolanın eşleşip eşleşmediğini döndürür;
+başka her kodlama veya cost `SecurityError` fırlatır. 04..16 sınırı, bcrypt
+biçiminin 04..31 aralığından dar olan bir AhdCode kaynak güvenliği
+politikasıdır. İkisi de 72 UTF-8
+bayttan uzun parola için `SecurityError` fırlatır; hiçbir şey kırpılmaz ve
+mesajlar ne parolayı ne hash'i içerir. `passwordHash`/`passwordVerify`
+(Argon2id) değişmemiştir ve hiçbir doğrulayıcı diğerinin biçimini kabul
+etmez. Bir bcrypt fonksiyonu çağıran yerel program vendor'lanmış, sabitlenmiş
+kaynağı çevrimdışı derler.
+
 ---
 
 # AhdCode v0.1 Çekirdek Spesifikasyonu Sonu

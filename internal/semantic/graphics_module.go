@@ -186,27 +186,20 @@ func graphicsOperationFor(receiver types.Type, name string) (TypeOperation, bool
 // parameter names and defaults, so lowering orders its arguments by name and
 // marks omitted defaults, as it does for a module function call.
 func TypeOperationBindsArguments(operation TypeOperation) bool {
-	_, ok := graphicsMembers[operation]
-	return ok
+	return publishedMember(operation) != nil
 }
 
 // BuiltinClassMembers lists the built-in members a compiler-supplied Class
 // publishes as ordinary Symbols with real signatures, for editor completion.
 // Classes whose members have no published signature report none.
 func BuiltinClassMembers(identity *types.ClassSymbol) []*Symbol {
-	if identity == nil || identity.ModuleID != graphicsModuleID {
+	if identity == nil {
 		return nil
 	}
-	var names []string
-	switch identity.Name {
-	case "Canvas":
-		names = GraphicsCanvasOperations
-	case "Turtle":
-		names = GraphicsTurtleOperations
-	}
+	names := publishedMemberNames(identity)
 	members := make([]*Symbol, 0, len(names))
 	for _, name := range names {
-		members = append(members, graphicsMembers[TypeOperation(identity.Name+"."+name)])
+		members = append(members, publishedMember(TypeOperation(identity.Name+"."+name)))
 	}
 	return members
 }
@@ -231,7 +224,18 @@ func graphicsConstructionHint(identity *types.ClassSymbol) (string, bool) {
 // uses, and records that Callable so lowering and signature help see the
 // exact parameter list. Hover on the member resolves to its Symbol.
 func (a *analyzer) analyzeGraphicsOperation(call *ast.CallExpr, member *ast.MemberExpr, operation TypeOperation, current *scope, flow flowState) expressionInfo {
-	symbol := graphicsMembers[operation]
+	symbol := publishedMember(operation)
+	a.result.ResolvedSymbols[member] = symbol
+	if symbol.OverloadSet != nil && len(symbol.OverloadSet.Candidates) > 1 {
+		// An overloaded member (Table.innerJoin) selects its signature with
+		// the ordinary overload resolution a module function call uses.
+		selected := a.resolveOverloadCall(call, symbol.OverloadSet, a.analyzeCallArguments(call, current, flow, nil))
+		if selected == nil {
+			return expressionInfo{typeValue: types.Invalid, nullState: MaybeNull}
+		}
+		a.result.SelectedCallables[call] = selected
+		return expressionInfo{typeValue: selected.Signature.Return, nullState: NonNull}
+	}
 	callable := symbol.Callable
 	parameters := callable.Signature.Parameters
 	named := len(call.Arguments) > 0 && call.Arguments[0].Name != ""

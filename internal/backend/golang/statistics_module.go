@@ -1,6 +1,7 @@
 package golang
 
 import (
+	"strconv"
 	"strings"
 
 	"ahdcode/internal/ir"
@@ -38,6 +39,23 @@ func (generator *generator) statisticsCall(value *ir.CallExpr) string {
 		return generator.unsupported("Statistics."+name+" over List<"+element.String()+">", meta.Span)
 	}
 	values := generator.value(value.Arguments[0].Value, listType, false)
+	switch name {
+	case "covariance", "sampleCovariance", "correlation", "linearRegression":
+		if len(value.Arguments) != 2 || value.Arguments[1].Value == nil {
+			generator.fail(CodeGenerationFailure, "Statistics."+name+" has a missing argument", meta.Span, "the IR call is malformed")
+			return "nil"
+		}
+		first := "AhdStatisticsWiden(" + values + ")"
+		second := "AhdStatisticsWiden(" + generator.value(value.Arguments[1].Value, value.Arguments[1].Value.ExprMeta().Type, false) + ")"
+		switch name {
+		case "covariance", "sampleCovariance":
+			return "AhdStatisticsCovarianceChecked(" + first + ", " + second + ", " + strconv.FormatBool(name == "sampleCovariance") + ")"
+		case "correlation":
+			return "AhdStatisticsCorrelationChecked(" + first + ", " + second + ")"
+		default:
+			return "AhdStatisticsLinearRegressionChecked(" + first + ", " + second + ")"
+		}
+	}
 	// sum needs no error Class: the empty sum is defined, so it cannot fail the
 	// way an undefined statistic does.
 	if name == "sum" {

@@ -6225,6 +6225,108 @@ installation beside the running executable; `PATH` is not searched.
 `AHDCODE_GRAPHICS_HEADLESS=1` opens every Canvas without a window. A program
 that does not bring `Graphics` behaves exactly as before.
 
+## 82. Standard Library Completion (v1.7.0)
+
+v1.7.0 adds functions and members to six existing modules. It changes no
+grammar, type rule, or earlier behavior. Every addition is implemented once,
+with the Go standard library (bcrypt: the pinned `golang.org/x/crypto`), and
+shared by the evaluator and native programs, so results and error messages are
+identical.
+
+```text
+Math.asin(value: Real) -> Real    Math.acos(value: Real) -> Real    Math.atan(value: Real) -> Real
+Math.sinh(value: Real) -> Real    Math.cosh(value: Real) -> Real    Math.tanh(value: Real) -> Real
+Math.atan2(y: Real, x: Real) -> Real     Math.hypot(x: Real, y: Real) -> Real
+Math.log2(value: Real) -> Real           Math.cbrt(value: Real) -> Real
+Math.radians(degrees: Real) -> Real      Math.degrees(radians: Real) -> Real
+Math.gcd(first: Int, second: Int) -> Int Math.lcm(first: Int, second: Int) -> Int
+
+Time.parseISO(text: String) -> DateTime
+DateTime.toISO() -> String
+DateTime.add(duration: Duration) -> DateTime    DateTime.subtract(duration: Duration) -> DateTime
+Duration.add(other: Duration) -> Duration       Duration.subtract(other: Duration) -> Duration
+Duration.negate() -> Duration                   Duration.abs() -> Duration
+
+Vector.at(index: Int) -> Real      Vector.norm() -> Real
+Vector.outer(other: Vector) -> Matrix             Vector.cross(other: Vector) -> Vector
+Matrix.at(row: Int, column: Int) -> Real          Matrix.row(index: Int) -> Vector
+Matrix.column(index: Int) -> Vector               Matrix.diagonal() -> Vector
+Matrix.norm() -> Real                             Matrix.hadamard(other: Matrix) -> Matrix
+Matrix.matvec(vector: Vector) -> Vector
+
+Statistics.covariance(first, second) -> Real        Statistics.sampleCovariance(first, second) -> Real
+Statistics.correlation(first, second) -> Real       Statistics.linearRegression(x, y) -> Pair<String, Real>
+    (each parameter List<Int> or List<Real>; all four combinations are overloads)
+
+Table.concat(other: Table) -> Table
+Table.innerJoin(other: Table, key: String) -> Table
+Table.innerJoin(other: Table, leftKey: String, rightKey: String) -> Table
+
+Security.bcryptHash(password: String) -> String
+Security.bcryptVerify(password: String, encodedHash: String) -> Bool
+```
+
+The new members publish parameter names like Canvas and Turtle members
+(section 80), so each call follows section 15.3: entirely positional or
+entirely named. `Int` arguments widen to `Real` parameters.
+
+**Math.** `asin`/`acos` require a value in `[-1, 1]` and `log2` a value greater
+than 0; otherwise `DomainError`. A result that is not a finite Real raises
+`DomainError` (undefined) or `OverflowError` (too large). `radians(d)` is
+`d·π/180` and `degrees(r)` is `r·180/π`, without normalization. `gcd` and `lcm`
+are non-negative; `gcd(0, 0) = 0`, `lcm(a, 0) = lcm(0, b) = 0`, `lcm` is
+`|(a / gcd(a, b))·b|` in checked arithmetic, and a result outside Int raises
+`OverflowError`. There is no angle type and no `Math.pow`.
+
+**Time.** `parseISO` accepts exactly `YYYY-MM-DDTHH:MM:SS`, an optional `.` and
+one to three fraction digits (milliseconds, right-padded), and a required `Z` or
+`±HH:MM` offset within ±14:00. Any other text or an impossible civil value
+raises `ValueError`. The result keeps the written offset. `toISO` writes
+`YYYY-MM-DDTHH:MM:SS.mmm` followed by `Z` for offset 0 or `±HH:MM` otherwise;
+`parseISO(v.toISO()).sameMoment(v)` holds for every `v`, and a historical offset
+with a seconds part raises `ValueError` (write `v.toUTC().toISO()`). `add` and
+`subtract` shift the instant by the Duration's milliseconds and keep the
+receiver's offset; a result outside years 1..9999 raises `ValueError`. Duration
+arithmetic is checked Int arithmetic on milliseconds and raises
+`OverflowError`. No time-zone database, DST rule, period, or operator is
+introduced.
+
+**Numeric.** Indexes follow List rules (negative from the end, out of range
+`IndexError`). `norm` is L2 for a Vector and Frobenius for a Matrix. `cross`
+requires length 3 and is right-handed. `diagonal` has `min(m, n)` entries. A
+shape mismatch in `cross`, `hadamard`, or `matvec`, an empty `outer` operand,
+or a non-finite result raises `NumericError`. There is no broadcasting and no
+mutable indexing.
+
+**Statistics.** Both Lists must have the same, non-zero length, else
+`StatisticsError`. `covariance` divides by `n`; `sampleCovariance`,
+`correlation`, and `linearRegression` require `n ≥ 2`, and `sampleCovariance`
+divides by `n − 1`. `correlation` is Pearson's coefficient, raises
+`StatisticsError` when either List has zero variance, and is clamped to
+`[-1, 1]`. `linearRegression` is ordinary least squares and returns the keys
+`slope` then `intercept`; x with zero variance raises `StatisticsError`, and a
+constant y gives slope 0 and that constant as intercept. All four use two-pass
+centered sums and never modify their inputs.
+
+**Data.** `concat` requires identical column names in identical order and
+appends the other Table's rows after the receiver's. `innerJoin` matches key
+cells by exact String equality (`""` is a key); the result has every receiver
+column followed by the other Table's columns without its key column; rows are
+ordered by receiver row, then by the other Table's row, and every matching
+combination is emitted. A right column whose name is already a receiver
+column, or an unknown key column, raises `DataError`. The join indexes the
+other Table by key. There is no outer join, missing value, or suffixing.
+
+**Security.** `bcryptHash` hashes at the fixed cost 12 and returns the `$2a$`
+form. `bcryptVerify` accepts `$2a$`, `$2b$`, and `$2y$` hashes of 60 characters
+with cost 04..16 and returns whether the password matches; any other encoding
+or cost raises `SecurityError`. The 04..16 bound is an AhdCode resource-safety
+policy, narrower than the bcrypt format's 04..31. Both raise `SecurityError` for a password of
+more than 72 UTF-8 bytes; nothing is truncated, and messages contain neither
+the password nor the hash. `passwordHash`/`passwordVerify` (Argon2id) are
+unchanged, and neither verifier accepts the other's format. A native program
+that calls a bcrypt function builds the vendored, pinned source offline.
+
 ---
 
 # End of AhdCode v0.1 Core Specification

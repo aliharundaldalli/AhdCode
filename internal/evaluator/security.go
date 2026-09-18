@@ -19,6 +19,8 @@ import (
 	"strings"
 
 	"golang.org/x/crypto/argon2"
+
+	"ahdcode/internal/backend/golang/ahdruntime"
 )
 
 // The Security standard module's REPL implementation. It mirrors the native
@@ -45,6 +47,10 @@ func (session *Session) securityBuiltin(name string, args []any) any {
 		password := args[0].(string)
 		encodedHash := args[1].(string)
 		return session.securityPasswordVerify(password, encodedHash)
+	case "bcryptHash":
+		return session.fault(ahdruntime.AhdSecurityBcrypt(args[0].(string)))
+	case "bcryptVerify":
+		return session.fault(ahdruntime.AhdSecurityBcryptCheck(args[0].(string), args[1].(string)))
 	case "token":
 		return session.securityToken()
 	case "secureEqual":

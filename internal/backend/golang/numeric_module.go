@@ -148,6 +148,14 @@ func (generator *generator) numericOperation(name string, value *ir.CallExpr) st
 			return generator.numericVectorFrom("AhdNumericVectorElementwise("+numericErrorRuntime+", "+recv+", \""+op+"\")", meta)
 		case "sum", "min", "max":
 			return "AhdNumericVectorReduction(" + numericErrorRuntime + ", " + recv + ", \"" + op + "\")"
+		case "at":
+			return "AhdVectorAtChecked(" + recv + ", " + generator.value(arg(0), ir.Type{Kind: ir.IntType}, false) + ")"
+		case "norm":
+			return "AhdVectorNormChecked(" + recv + ")"
+		case "outer":
+			return generator.numericMatrixFrom("AhdVectorOuterChecked("+recv+", "+generator.numericVectorOf(arg(0))+")", meta)
+		case "cross":
+			return generator.numericVectorFrom("AhdVectorCrossChecked("+recv+", "+generator.numericVectorOf(arg(0))+")", meta)
 		}
 	}
 	op := strings.TrimPrefix(name, "Matrix.")
@@ -185,6 +193,18 @@ func (generator *generator) numericOperation(name string, value *ir.CallExpr) st
 		return generator.numericMatrixFrom("AhdNumericMatrixElementwise("+numericErrorRuntime+", "+recv+", \""+op+"\")", meta)
 	case "sum", "min", "max":
 		return "AhdNumericMatrixReduction(" + numericErrorRuntime + ", " + recv + ", \"" + op + "\")"
+	case "at":
+		return "AhdMatrixAtChecked(" + recv + ", " + generator.value(arg(0), ir.Type{Kind: ir.IntType}, false) + ", " + generator.value(arg(1), ir.Type{Kind: ir.IntType}, false) + ")"
+	case "row", "column":
+		return generator.numericVectorFrom("AhdMatrix"+title(op)+"Checked("+recv+", "+generator.value(arg(0), ir.Type{Kind: ir.IntType}, false)+")", meta)
+	case "diagonal":
+		return generator.numericVectorFrom("AhdMatrixDiagonalChecked("+recv+")", meta)
+	case "norm":
+		return "AhdMatrixNormChecked(" + recv + ")"
+	case "hadamard":
+		return generator.numericMatrixFrom("AhdMatrixHadamardChecked("+recv+", "+generator.numericMatrixOf(arg(0))+")", meta)
+	case "matvec":
+		return generator.numericVectorFrom("AhdMatrixVectorChecked("+recv+", "+generator.numericVectorOf(arg(0))+")", meta)
 	case "lu", "qr", "svd":
 		return generator.numericMatrixPair("AhdNumericMatrix"+strings.ToUpper(op)+"("+numericErrorRuntime+", "+recv+")", meta)
 	}

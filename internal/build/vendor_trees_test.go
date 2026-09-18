@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	backend "ahdcode/internal/backend/golang"
+	"ahdcode/internal/backend/golang/ahdruntime/bcryptvendor"
 	"ahdcode/internal/backend/golang/ahdruntime/codesvendor"
 	"ahdcode/internal/backend/golang/ahdruntime/mysqlvendor"
 	"ahdcode/internal/backend/golang/ahdruntime/postgresqlvendor"
@@ -28,6 +29,7 @@ func embeddedTrees() []embeddedTree {
 		{"codes", codesvendor.Vendor, codesvendor.Requires, codesvendor.GoSum},
 		{"websocket", websocketvendor.Vendor, websocketvendor.Requires, websocketvendor.GoSum},
 		{"postgresql", postgresqlvendor.Vendor, postgresqlvendor.Requires, postgresqlvendor.GoSum},
+		{"bcrypt", bcryptvendor.Vendor, bcryptvendor.Requires, bcryptvendor.GoSum},
 	}
 }
 
@@ -89,11 +91,12 @@ import (
 	_ "github.com/jackc/pgx/v5/pgconn"
 	_ "github.com/jackc/pgx/v5/pgtype"
 	_ "github.com/jackc/pgx/v5/pgxpool"
+	_ "golang.org/x/crypto/bcrypt"
 )
 
 func main() { fmt.Println("offline") }
 `}},
-		RequiresMySQL: true, RequiresCodes: true, RequiresWebSocket: true, RequiresPostgreSQL: true,
+		RequiresMySQL: true, RequiresCodes: true, RequiresWebSocket: true, RequiresPostgreSQL: true, RequiresBcrypt: true,
 	}
 	workspace, diagnostics := NewWorkspace(program)
 	if len(diagnostics) != 0 {
@@ -111,11 +114,11 @@ func main() { fmt.Println("offline") }
 	t.Setenv("GOMODCACHE", t.TempDir())
 	output := filepath.Join(t.TempDir(), "offline")
 	if diagnostics := workspace.BuildExecutable(output); len(diagnostics) != 0 {
-		t.Fatalf("four-tree vendored build failed: %s", diagnosticText(diagnostics))
+		t.Fatalf("five-tree vendored build failed: %s", diagnosticText(diagnostics))
 	}
 	result, err := exec.Command(output).CombinedOutput()
 	if err != nil || string(result) != "offline\n" {
-		t.Fatalf("four-tree program failed: %v %q", err, result)
+		t.Fatalf("five-tree program failed: %v %q", err, result)
 	}
 }
 
@@ -129,7 +132,8 @@ func TestVendorTreesFollowProgramRequirements(t *testing.T) {
 	}{
 		{&backend.GeneratedProgram{RequiresWebSocket: true}, []string{"github.com/coder/websocket"}, []string{"github.com/jackc/pgx/v5", "github.com/go-sql-driver/mysql"}},
 		{&backend.GeneratedProgram{RequiresPostgreSQL: true}, []string{"github.com/jackc/pgx/v5", "golang.org/x/text"}, []string{"github.com/coder/websocket", "github.com/boombuler/barcode"}},
-		{&backend.GeneratedProgram{}, nil, []string{"github.com/coder/websocket", "github.com/jackc/pgx/v5"}},
+		{&backend.GeneratedProgram{RequiresBcrypt: true}, []string{"golang.org/x/crypto"}, []string{"github.com/jackc/pgx/v5", "golang.org/x/text"}},
+		{&backend.GeneratedProgram{}, nil, []string{"github.com/coder/websocket", "github.com/jackc/pgx/v5", "golang.org/x/crypto"}},
 	}
 	for _, testCase := range cases {
 		workspace, diagnostics := NewWorkspace(testCase.program)

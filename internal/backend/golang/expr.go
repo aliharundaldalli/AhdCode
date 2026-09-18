@@ -969,6 +969,22 @@ func mathRuntimeCall(name string, arguments []string) (string, bool) {
 		if len(arguments) == 1 {
 			return call("AhdMathExp")
 		}
+	case "asin", "acos", "atan", "sinh", "cosh", "tanh", "log2", "cbrt", "radians", "degrees":
+		if len(arguments) == 1 {
+			return "AhdMathUnaryChecked(" + strconv.Quote(name) + ", " + arguments[0] + ")", true
+		}
+	case "atan2", "hypot":
+		if len(arguments) == 2 {
+			return "AhdMathBinaryChecked(" + strconv.Quote(name) + ", " + arguments[0] + ", " + arguments[1] + ")", true
+		}
+	case "gcd":
+		if len(arguments) == 2 {
+			return call("AhdMathGCDChecked")
+		}
+	case "lcm":
+		if len(arguments) == 2 {
+			return call("AhdMathLCMChecked")
+		}
 	case "seed":
 		if len(arguments) == 1 {
 			return call("AhdMathSeed")
@@ -1056,7 +1072,7 @@ func (generator *generator) builtinCall(value *ir.CallExpr) string {
 		if strings.HasPrefix(name, "List.") {
 			return generator.listOperation(strings.TrimPrefix(name, "List."), value)
 		}
-		if strings.HasPrefix(name, "DateTime.") || strings.HasPrefix(name, "Calendar.") {
+		if strings.HasPrefix(name, "DateTime.") || strings.HasPrefix(name, "Duration.") || strings.HasPrefix(name, "Calendar.") {
 			return generator.timeOperation(name, value)
 		}
 		if strings.HasPrefix(name, "Regex.") {

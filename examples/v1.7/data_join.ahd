@@ -1,0 +1,32 @@
+// v1.7 Data and Statistics: join two Tables, stack a late roster, and fit a line.
+bring Data
+bring Math
+bring Statistics
+from Data bring Table
+
+students: Table := Data.fromCSV("id,name\n1,Ada\n2,Alan\n3,Grace\n")
+late: Table := Data.fromCSV("id,name\n4,Linus\n")
+roster: Table := students.concat(late)
+study: Table := Data.fromCSV(
+    "student,hours,score\n1,2,58\n2,5,81\n3,3,66\n4,6,90\n9,1,40\n"
+)
+// Student 9 has no roster row, so the inner join leaves it out.
+joined: Table := roster.innerJoin(
+    other: study
+    leftKey: "id"
+    rightKey: "student"
+)
+write(joined.toCSV())
+
+hours: List<Int> := joined.column(
+    "hours"
+).map(lambda (value: String) -> int(value))
+scores: List<Int> := joined.column(
+    "score"
+).map(lambda (value: String) -> int(value))
+write("correlation {Math.round(Statistics.correlation(hours, scores), 4)}")
+fit := Statistics.linearRegression(x: hours, y: scores)
+write(
+    "score = {Math.round(fit["slope"], 3)} * hours + {Math.round(fit["intercept"], 3)}"
+)
+write("covariance {Statistics.covariance(hours, scores)}")

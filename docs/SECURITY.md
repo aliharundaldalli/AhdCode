@@ -38,6 +38,8 @@ cipher. You cannot select a broken mode or forget an authentication tag.
 ```text
 Security.passwordHash(password: String)                  -> String
 Security.passwordVerify(password: String, encodedHash: String) -> Bool
+Security.bcryptHash(password: String)                    -> String
+Security.bcryptVerify(password: String, encodedHash: String) -> Bool
 Security.token()                                         -> String
 Security.secureEqual(expected: String, received: String) -> Bool
 
@@ -204,6 +206,60 @@ stored salt, and compares the result using `crypto/subtle.ConstantTimeCompare`.
 These bounds prevent a stored hash from forcing the verifier to spend
 excessive resources or use pathologically weak parameters.
 
+## bcryptHash and bcryptVerify (compatibility)
+
+New applications should prefer Argon2id. bcrypt is provided for compatibility
+and migration.
+
+```text
+Security.bcryptHash(password: String) -> String
+Security.bcryptVerify(password: String, encodedHash: String) -> Bool
+```
+
+Use these two functions to check passwords stored by another system (PHP's
+`password_hash`, many Ruby, Python, and Node.js applications) and, on a
+successful login, replace the stored bcrypt hash with `passwordHash`:
+
+```ahd
+bring Security
+
+stored := "$2y$10$.vGA1O9wmRjrwAVXD98HNOgsNpDczlqm3Jq7KnEd1rVAGv3Fykk1a"
+candidate := "rasmuslerdorf"
+if Security.bcryptVerify(candidate, stored) {
+    upgraded: Local := Security.passwordHash(candidate)
+    write(upgraded.startsWith("$argon2id$"))
+}
+```
+
+```text
+true
+```
+
+- `bcryptHash` always uses cost 12 and writes the 60-character `$2a$12$…`
+  form. The cost is not a parameter.
+- `bcryptVerify` accepts the `$2a$`, `$2b$`, and `$2y$` prefixes with a cost
+  of `04` to `16`; these are the forms tested with this release. Other
+  prefixes (such as `$2x$` or `$2$`), other lengths or characters, and a
+  higher cost raise `SecurityError`, so a stored hash cannot make one
+  verification run for hours.
+- The `04..16` cost range is an AhdCode resource-safety policy, not the full
+  bcrypt range: the bcrypt format itself allows costs up to 31, and each step
+  doubles the work. A hash stored at cost 17 or more is valid bcrypt but is
+  refused here; rehash such passwords elsewhere or migrate them to Argon2id.
+- bcrypt reads at most 72 UTF-8 bytes of password. A longer password raises
+  `SecurityError` in both functions instead of being silently shortened. The
+  empty password is valid.
+- A wrong password returns `false`. Error messages never contain the
+  password, the hash, or an internal Go error.
+- There is no automatic detection. `passwordVerify` accepts only Argon2id and
+  raises `SecurityError` for a bcrypt hash; `bcryptVerify` accepts only bcrypt
+  and raises for an Argon2id hash. A program chooses the function for the
+  format it stores.
+
+bcrypt comes from the `golang.org/x/crypto` module AhdCode already depends
+on; a compiled program that calls it builds that pinned, vendored source
+offline. See [THIRD_PARTY_NOTICES_BCRYPT.md](../THIRD_PARTY_NOTICES_BCRYPT.md).
+
 ## token
 
 ```ahd
@@ -347,6 +403,10 @@ login: Function := (
 | `Security password hash uses an unsupported algorithm` | Not argon2id / not v19 |
 | `Security password hash has unsafe parameters` | Parameters out of safe bounds |
 | `Security password input is too large` | Password exceeded 1 MiB |
+| `bcrypt accepts a password of at most 72 UTF-8 bytes` | `bcryptHash` / `bcryptVerify` password longer than 72 bytes |
+| `bcrypt hash is malformed or uses an unsupported format` | Not a 60-character `$2a$`, `$2b$`, or `$2y$` hash |
+| `bcrypt hash cost is outside the supported range 04..16` | `bcryptVerify` hash cost below 4 or above 16 |
+| `bcrypt hashing failed` | OS entropy failure in `bcryptHash` |
 | `Security random token generation failed` | OS entropy failure (`token`, `passwordHash`, `randomHex`, `aesEncrypt`) |
 | `Security base64 input is malformed` | `base64Decode` or the `aesDecrypt` payload is not padded standard Base64 |
 | `Security base64url input is malformed` | `base64UrlDecode` input or the `rsaVerifySHA256` signature is not base64url |

@@ -3,6 +3,8 @@ package evaluator
 import (
 	"math"
 	"sort"
+
+	"ahdcode/internal/backend/golang/ahdruntime"
 )
 
 // The Statistics standard module's REPL implementation. It mirrors the native
@@ -48,6 +50,19 @@ func (session *Session) statisticsFinite(value float64, statistic string) float6
 // decides only whether an order statistic is returned as Int or Real.
 func (session *Session) statisticsBuiltin(name string, arguments []any) any {
 	numbers, integral := session.statisticsNumbers(arguments[0])
+	switch name {
+	case "covariance", "sampleCovariance", "correlation", "linearRegression":
+		second, _ := session.statisticsNumbers(arguments[1])
+		switch name {
+		case "covariance", "sampleCovariance":
+			return session.fault(ahdruntime.AhdStatisticsCovariance(numbers, second, name == "sampleCovariance"))
+		case "correlation":
+			return session.fault(ahdruntime.AhdStatisticsCorrelation(numbers, second))
+		}
+		slope, intercept, fault := ahdruntime.AhdStatisticsLinearRegression(numbers, second)
+		session.fault(nil, fault)
+		return &Pair{Keys: []any{"slope", "intercept"}, Values: map[any]any{"slope": slope, "intercept": intercept}}
+	}
 	// An order statistic returns one of the input's own values, so an Int input
 	// keeps Int; an averaging statistic is always Real.
 	element := func(value float64) any {

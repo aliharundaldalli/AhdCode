@@ -27,6 +27,12 @@ func (generator *generator) securityCall(value *ir.CallExpr) string {
 	switch name {
 	case "passwordHash":
 		return "AhdSecurityPasswordHash(" + errorClass + ", " + text(0) + ")"
+	case "bcryptHash":
+		generator.usesBcrypt = true
+		return "AhdSecurityBcryptHash(" + text(0) + ")"
+	case "bcryptVerify":
+		generator.usesBcrypt = true
+		return "AhdSecurityBcryptVerify(" + text(0) + ", " + text(1) + ")"
 	case "passwordVerify":
 		return "AhdSecurityPasswordVerify(" + errorClass + ", " + text(0) + ", " + text(1) + ")"
 	case "token":

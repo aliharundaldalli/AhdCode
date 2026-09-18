@@ -145,6 +145,19 @@ func (generator *generator) dataOperation(name string, value *ir.CallExpr) strin
 		return generator.expr(value.Arguments[index].Value)
 	}
 	switch name {
+	case "Table.concat":
+		return generator.tableFrom("AhdDataConcatChecked("+receiver+", "+generator.tableOf(value.Arguments[0].Value)+")", meta)
+	case "Table.innerJoin":
+		// innerJoin(other, key) joins on the same column name on both sides;
+		// innerJoin(other, leftKey, rightKey) names each side's key column.
+		left := text(1, `""`)
+		right := left
+		if len(value.Arguments) == 3 {
+			right = text(2, `""`)
+			return generator.tableFrom("AhdDataInnerJoinChecked("+receiver+", "+generator.tableOf(value.Arguments[0].Value)+", "+left+", "+right+")", meta)
+		}
+		return generator.tableFrom("func(first, second AhdTable, key string) AhdTable { return AhdDataInnerJoinChecked(first, second, key, key) }("+
+			receiver+", "+generator.tableOf(value.Arguments[0].Value)+", "+left+")", meta)
 	case "Table.rowCount":
 		return "AhdDataRowCount(" + receiver + ")"
 	case "Table.columnCount":

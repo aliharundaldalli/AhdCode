@@ -602,6 +602,31 @@ Graphics is not a game engine: do not invent `Turtle.speed`, `update`/`draw`
 loops, sprites, mouse or keyboard handlers, text, or images, and do not write
 `bring Turtle`. See [`docs/GRAPHICS.md`](docs/GRAPHICS.md).
 
+v1.7.0 completes six existing modules; use these instead of hand-written
+helpers. `Math.asin`, `acos`, `atan`, `atan2(y, x)` (y first), `sinh`, `cosh`,
+`tanh`, `hypot`, `log2`, `cbrt`, `radians`, `degrees`, `gcd`, and `lcm`; there
+is still no `Math.pow` (use `^`) and no angle type. `Time.parseISO(text)` reads
+only `YYYY-MM-DDTHH:MM:SS[.fff]` plus `Z` or `±HH:MM`, and `value.toISO()`
+writes it; do not pass dates without a designator, zone names such as
+`Europe/Istanbul`, or free text. `value.add(duration)`/`subtract(duration)`
+keep the offset, and `Duration.add`/`subtract`/`negate`/`abs` are checked; there
+is no `+` on DateTime, no months or years, and no time-zone database.
+`Vector.at`/`norm`/`outer`/`cross` and `Matrix.at`/`row`/`column`/`diagonal`/
+`norm`/`hadamard`/`matvec` read and combine without broadcasting.
+`Statistics.covariance`, `sampleCovariance`, `correlation`, and
+`linearRegression(x, y)` (a `Pair<String, Real>` with `slope` and `intercept`)
+take two equal-length numeric Lists; do not invent `rSquared`, p-values, or a
+regression object. `table.concat(other)` needs identical columns, and
+`table.innerJoin(other, key)` or `innerJoin(other, leftKey, rightKey)` is the
+only join: no left/outer join, no missing values, and a duplicate column name
+is a `DataError` (rename first). For passwords always use
+`Security.passwordHash` (Argon2id); `Security.bcryptHash`/`bcryptVerify` exist
+only to verify and migrate existing bcrypt hashes, and neither verifier
+auto-detects the other format. See [`docs/MATH.md`](docs/MATH.md),
+[`docs/TIME.md`](docs/TIME.md), [`docs/NUMERIC.md`](docs/NUMERIC.md),
+[`docs/STATISTICS.md`](docs/STATISTICS.md), [`docs/DATA.md`](docs/DATA.md),
+and [`docs/SECURITY.md`](docs/SECURITY.md).
+
 ## Completion report
 
 Report the detected OS, prerequisite versions, repository path/branch/status,

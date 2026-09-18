@@ -12,16 +12,17 @@ AhdCode is an experimental statically checked general-purpose programming
 language focused on readable syntax, explicit intent, predictable semantics,
 and native compilation.
 
-This is **v1.6.0**. The language, toolchain, and Web framework are
+This is **v1.7.0**. The language, toolchain, and Web framework are
 feature-complete, and the core language surface described here is what 1.0
-committed to and 1.1, 1.2, 1.3, 1.4, 1.5, and 1.6 keep unchanged.
+committed to and 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, and 1.7 keep unchanged.
 
-v1.6.0 is a minor release, **Graphics + Turtle**: it adds the `Graphics`
-standard module — a window with a Cartesian 2D Canvas, lines, circles, and
-rectangles, PNG and SVG export, and a Turtle pen for teaching coordinates,
-angles, and geometry — without altering the core grammar or the type system.
-It is not a game engine and not a GUI toolkit. See
-[What is new in v1.6.0](#what-is-new-in-v160).
+v1.7.0 is a minor release, **Standard Library Completion**: it strengthens
+Math, Time, Numeric, Statistics, Data, and Security with inverse and
+hyperbolic trigonometry, gcd/lcm, strict ISO 8601 time text and instant
+arithmetic, Vector and Matrix accessors, covariance, correlation, and a simple
+linear regression, Table concat and inner join, and bcrypt compatibility —
+without altering the core grammar or the type system and without a new
+dependency. See [What is new in v1.7.0](#what-is-new-in-v170).
 
 It ships as a self-contained platform package: the `ahdcode` CLI, a private
 Go 1.27.0 toolchain, AhdDataStudio, the `ahdsqlite`, `ahdnumeric`, `ahdplot`,
@@ -308,7 +309,7 @@ To maintain conceptual clarity, AhdCode's capabilities are organized into four d
    - **System & Environment:** [`Time`](docs/TIME.md), [`Cron`](docs/CRON.md) (bounded in-process scheduling), [`Path`](docs/FILESYSTEM.md), [`File`](docs/FILESYSTEM.md), [`Env`](docs/ENV.md), [`Terminal`](docs/TERMINAL.md) (v1.5.0: standard error, flushing, terminal detection and size, styled text, pretty layout)
 
 3. **First-Party Runtime / Framework Modules:**
-   - **Network, Server & Storage Primitives:** [`HTTP`](docs/HTTP.md) (in-memory server, request/response, cookies, sessions, static file server, [WebSocket endpoints](docs/WEBSOCKET.md), client), [`HTML`](docs/HTML.md) (semantic builder, parser, selector engine), [`Security`](docs/SECURITY.md) (Argon2id hashing, secure tokens, constant-time comparison, SHA-2 digests, HMAC, encodings, RS256 signatures, AES-256-GCM), [`SQLite`](docs/SQLITE.md) (local typed database bridge), [`MySQL`](docs/MYSQL.md) (network database with connection pool and transactions), [`PostgreSQL`](docs/POSTGRESQL.md) (network database with connection pool and transactions), [`SMTP`](docs/SMTP.md) (send-only mail client)
+   - **Network, Server & Storage Primitives:** [`HTTP`](docs/HTTP.md) (in-memory server, request/response, cookies, sessions, static file server, [WebSocket endpoints](docs/WEBSOCKET.md), client), [`HTML`](docs/HTML.md) (semantic builder, parser, selector engine), [`Security`](docs/SECURITY.md) (Argon2id hashing, bcrypt compatibility, secure tokens, constant-time comparison, SHA-2 digests, HMAC, encodings, RS256 signatures, AES-256-GCM), [`SQLite`](docs/SQLITE.md) (local typed database bridge), [`MySQL`](docs/MYSQL.md) (network database with connection pool and transactions), [`PostgreSQL`](docs/POSTGRESQL.md) (network database with connection pool and transactions), [`SMTP`](docs/SMTP.md) (send-only mail client)
    - **Web Application Framework:** [`Web`](docs/WEB.md) (first-party bundled web framework, [`Web.UI`](docs/WEB.md#9-webui) semantic components, `RequestContext`, typed `Forms`, ordered `ValidationErrors`, selected `OldInput`, session-bound CSRF, and flash lifecycle)
 
 4. **Developer Tools:**
@@ -464,6 +465,7 @@ See the [CLI guide](docs/CLI.md), [formatter guide](docs/FORMATTER.md),
 - [v0.14 multi-file web example](examples/v0.14/multi_file_web/README.md) — require(...), dependency-aware dev, static assets
 - [v1.4 realtime attendance](examples/v1.4/realtime_attendance/README.md) — Web, PostgreSQL, WebSocket, UUID v7, `Env.secret`, and Cron
 - [v1.5 Terminal demo](examples/v1.5/terminal_demo/README.md) — `Terminal.emit`, standard error, terminal detection, styled text, and pretty layout
+- [v1.7 standard-library completion](examples/v1.7/README.md) — trigonometry and gcd/lcm, strict ISO time text and instant arithmetic, and a Table join with statistics
 - [v1.6 Graphics and Turtle](examples/v1.6/graphics_turtle/README.md) — a Cartesian Canvas, shapes, a Turtle star and spiral, PNG/SVG export, and a regular-polygon lesson
 - [AhdDataStudio](tools/AhdDataStudio/README.md) — local MySQL + SQLite development UI
 - [v0.4 Library Demo](https://github.com/aliharundaldalli/ahdcode-library-demo) (separate beginner web app)
@@ -481,6 +483,37 @@ diagnostics and hover. The same VSIX targets VS Code and Antigravity. See its
 [installation guide](editors/vscode/README.md).
 
 ## Current limitations
+
+## What is new in v1.7.0 <a id="what-is-new-in-v170"></a>
+
+v1.7.0 is a **minor** release, **Standard Library Completion**. It strengthens
+six existing modules with additive functions and members; the core grammar,
+the type system, and every previously released function stay unchanged, and
+no dependency is added.
+
+- [`Math`](docs/MATH.md): `asin`, `acos`, `atan`, `atan2`, `sinh`, `cosh`,
+  `tanh`, `hypot`, `log2`, `cbrt`, `radians`, `degrees`, `gcd`, and `lcm`.
+  Angles stay plain Real values; there is no angle type and no `Math.pow`.
+- [`Time`](docs/TIME.md): `Time.parseISO` and `DateTime.toISO` for a strict
+  RFC 3339 subset (a `Z` or `±HH:MM` designator is required), instant
+  arithmetic with `DateTime.add` and `subtract`, and exact Duration `add`,
+  `subtract`, `negate`, and `abs`. There is still no named time-zone database.
+- [`Numeric`](docs/NUMERIC.md): `Vector.at`, `norm`, `outer`, and `cross`;
+  `Matrix.at`, `row`, `column`, `diagonal`, `norm` (Frobenius), `hadamard`,
+  and `matvec`. No broadcasting.
+- [`Statistics`](docs/STATISTICS.md): `covariance`, `sampleCovariance`,
+  `correlation` (Pearson), and `linearRegression` returning
+  `{"slope", "intercept"}`. No statistical test suite.
+- [`Data`](docs/DATA.md): `Table.concat` and `Table.innerJoin` with one shared
+  key or a left and right key. Inner join only, no missing values, and no
+  automatic column suffixes.
+- [`Security`](docs/SECURITY.md): `bcryptHash` and `bcryptVerify` from the
+  already pinned `golang.org/x/crypto`, for compatibility and migration. New
+  applications should prefer Argon2id.
+
+Every addition behaves identically compiled and in `ahdcode run` and the REPL,
+and editors complete, hover, and show signatures for each one. See the
+[v1.7 examples](examples/v1.7/README.md).
 
 ## What is new in v1.6.0 <a id="what-is-new-in-v160"></a>
 

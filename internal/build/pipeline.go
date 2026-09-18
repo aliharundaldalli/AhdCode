@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	backend "ahdcode/internal/backend/golang"
+	"ahdcode/internal/backend/golang/ahdruntime/bcryptvendor"
 	"ahdcode/internal/backend/golang/ahdruntime/codesvendor"
 	"ahdcode/internal/backend/golang/ahdruntime/mysqlvendor"
 	"ahdcode/internal/backend/golang/ahdruntime/postgresqlvendor"
@@ -225,6 +226,9 @@ func workspaceVendorTrees(program *backend.GeneratedProgram) []vendorTree {
 	}
 	if program != nil && program.RequiresPostgreSQL {
 		trees = append(trees, vendorTree{files: postgresqlvendor.Vendor, requires: postgresqlvendor.Requires, sum: postgresqlvendor.GoSum})
+	}
+	if program != nil && program.RequiresBcrypt {
+		trees = append(trees, vendorTree{files: bcryptvendor.Vendor, requires: bcryptvendor.Requires, sum: bcryptvendor.GoSum})
 	}
 	return trees
 }

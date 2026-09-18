@@ -1,4 +1,4 @@
-# AhdCode v1.6.0 Türkçe Öğrenci Rehberi
+# AhdCode v1.7.0 Türkçe Öğrenci Rehberi
 
 Bu rehber, **daha önce hiç programlama yapmamış birinin de takip edebilmesi** için hazırlanmıştır. Baştan sona sırayla okuyabilirsiniz; her bölümde önce ne yapmak istediğimizi görecek, sonra çalışan bir örnek yazacak, en son gerekli kuralları öğreneceksiniz.
 
@@ -84,6 +84,7 @@ verir.
 - [61. Hepsi bir arada: gerçek zamanlı yoklama uygulaması](#61-hepsi-bir-arada-gerçek-zamanlı-yoklama-uygulaması)
 - [62. Terminal: çıktı üzerinde daha fazla denetim](#62-terminal-çıktı-üzerinde-daha-fazla-denetim)
 - [63. Graphics: Canvas ve Turtle ile çizim](#63-graphics-canvas-ve-turtle-ile-çizim)
+- [64. Açılar, zaman damgaları ve birleştirilen tablolar](#64-açılar-zaman-damgaları-ve-birleştirilen-tablolar)
 
 ## 1. AhdCode nedir?
 
@@ -6909,3 +6910,83 @@ döner.)
 [Graphics modülü başvurusuna](GRAPHICS_TR.md) ve
 [`examples/v1.6/graphics_turtle`](../examples/v1.6/graphics_turtle/README_TR.md)
 örneğine bakın.
+
+## 64. Açılar, zaman damgaları ve birleştirilen tablolar
+
+Sürüm 1.7 birkaç gündelik aracı tamamlar. Hiçbiri yeni sözdizimi eklemez;
+hepsi sıradan fonksiyon ve üyelerdir.
+
+**Açılar.** `Math.sin`, `Math.cos` ve diğer trigonometrik fonksiyonlar radyan
+kullanır. `Math.radians` ve `Math.degrees` dönüştürür; `Math.atan2(y, x)`
+bir noktanın açısını verir, böylece noktanın düzlemin hangi çeyreğinde
+olduğunu düşünmeniz gerekmez:
+
+```ahd
+bring Math
+
+write(Math.degrees(Math.atan2(1.0, 1.0)))
+write(Math.degrees(Math.atan2(y: 1.0, x: -1.0)))
+write(Math.hypot(6, 8))
+write(Math.gcd(84, 126))
+```
+
+Beklenen çıktı:
+
+```text
+45.0
+135.0
+10.0
+42
+```
+
+**Zaman damgaları.** Programlar tarihleri `2026-09-18T13:30:00+03:00` gibi
+ISO 8601 metni olarak paylaşır. `Time.parseISO` tam olarak bu biçimi okur
+(sondaki `Z` veya `+03:00` zorunludur), `toISO()` onu yazar ve `add` bir anı
+bir `Duration` kadar ilerletir:
+
+```ahd
+bring Time
+
+lesson := Time.parseISO("2026-09-18T13:30:00+03:00")
+finish := lesson.add(Time.duration(40 * 60000))
+write(finish.toISO())
+write(finish.toUTC().toISO())
+```
+
+Beklenen çıktı:
+
+```text
+2026-09-18T14:10:00.000+03:00
+2026-09-18T11:10:00.000Z
+```
+
+**Birleştirilen tablolar.** Ortak bir sütunu olan iki Table `innerJoin` ile
+birleştirilebilir. Her öğrenci satırı aynı `id` değerine sahip her not
+satırıyla eşleşir; eşi olmayan satırlar dışarıda kalır:
+
+```ahd
+bring Data
+from Data bring Table
+
+students: Table := Data.fromCSV("id,name\n1,Ada\n2,Alan\n")
+grades: Table := Data.fromCSV("id,grade\n2,A\n1,B\n3,C\n")
+write(students.innerJoin(grades, "id").toCSV())
+```
+
+Beklenen çıktı:
+
+```text
+id,name,grade
+1,Ada,B
+2,Alan,A
+
+```
+
+**Kendiniz deneyin:** Çalışma saatleri ve sınav puanları gibi iki
+`List<Int>` üzerinde `Statistics.correlation` ve
+`Statistics.linearRegression` kullanın ve eğimin ne anlama geldiğini
+açıklayın.
+
+[Math](MATH_TR.md), [Time](TIME_TR.md), [Data](DATA_TR.md) ve
+[Statistics](STATISTICS_TR.md) başvurularına ve
+[`examples/v1.7`](../examples/v1.7/README_TR.md) örneğine bakın.

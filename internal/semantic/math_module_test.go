@@ -7,12 +7,16 @@ import (
 	"ahdcode/internal/types"
 )
 
-func TestMathStandardModuleHasTheExactV01Surface(t *testing.T) {
+func TestMathStandardModuleHasTheExactV17Surface(t *testing.T) {
 	mathModule := StandardModuleInterfaces()["Math"]
 	if mathModule == nil || mathModule.ModuleID != "builtin:Math" {
 		t.Fatalf("Math module = %#v", mathModule)
 	}
-	want := []string{"E", "PI", "ceil", "cos", "exp", "floor", "log", "log10", "random", "randomInt", "round", "seed", "sin", "sqrt", "tan"}
+	// v1.7 added the inverse and hyperbolic trigonometric functions, atan2,
+	// hypot, log2, cbrt, the angle conversions, gcd, and lcm; pow and the
+	// List aggregates stay out of Math.
+	want := []string{"E", "PI", "acos", "asin", "atan", "atan2", "cbrt", "ceil", "cos", "cosh", "degrees", "exp", "floor", "gcd", "hypot", "lcm",
+		"log", "log10", "log2", "radians", "random", "randomInt", "round", "seed", "sin", "sinh", "sqrt", "tan", "tanh"}
 	if !reflect.DeepEqual(mathModule.ExportNames, want) {
 		t.Fatalf("Math exports = %v, want %v", mathModule.ExportNames, want)
 	}

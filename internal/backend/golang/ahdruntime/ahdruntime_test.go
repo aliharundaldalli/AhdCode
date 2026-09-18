@@ -38,7 +38,7 @@ func init() {
 		AhdClassIndexError, AhdClassIOError, AhdClassKeyError, AhdClassNullError, AhdClassOverflowError, AhdClassValueError,
 		AhdClassLatexError, AhdClassFileError, AhdClassWordError, AhdClassJSONError, AhdClassXMLError, AhdClassEnvError,
 		AhdClassListsError, AhdClassKeyValueError, AhdClassPDFError, AhdClassArchiveError, AhdClassSQLiteError,
-		AhdClassHTTPError, AhdClassHTMLError, AhdClassSMTPError, AhdClassIdentityError,
+		AhdClassHTTPError, AhdClassHTMLError, AhdClassSMTPError, AhdClassIdentityError, AhdClassSecurityError,
 	} {
 		target := class
 		AhdRegisterError(target, func(message string) AhdInstance {

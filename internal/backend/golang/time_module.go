@@ -1,6 +1,7 @@
 package golang
 
 import (
+	"strconv"
 	"strings"
 
 	"ahdcode/internal/ir"
@@ -59,6 +60,12 @@ func (generator *generator) timeCall(value *ir.CallExpr) string {
 			fields[index] = argument(index)
 		}
 		return generator.dateTimeFrom("AhdTimeCivilOffset("+strings.Join(fields, ", ")+")", meta)
+	case "parseISO":
+		if len(value.Arguments) != 1 || value.Arguments[0].Value == nil {
+			generator.fail(CodeGenerationFailure, "Time.parseISO has a missing argument", meta.Span, "the IR call is malformed")
+			return "nil"
+		}
+		return generator.dateTimeFrom("AhdTimeParseISOChecked("+generator.value(value.Arguments[0].Value, ir.Type{Kind: ir.StringType}, false)+")", meta)
 	case "duration":
 		return generator.durationFrom(argument(0), meta)
 	case "between":
@@ -91,6 +98,12 @@ func (generator *generator) durationFrom(milliseconds string, meta ir.ExprBase) 
 		return generator.unsupported("a Duration value without its Class declaration", meta.Span)
 	}
 	return helper + "(" + milliseconds + ")"
+}
+
+// durationMillisecondsOf reads the Int milliseconds a Duration expression
+// holds, evaluating the expression once.
+func (generator *generator) durationMillisecondsOf(expression ir.Expr) string {
+	return "(" + generator.expr(expression) + ")." + generator.fieldName(ir.FieldID(string(timeDurationClass)+"::field::milliseconds")) + "_get()"
 }
 
 // instantOf rebuilds the instant a DateTime expression denotes from its
@@ -173,6 +186,13 @@ func (generator *generator) timeOperation(name string, value *ir.CallExpr) strin
 		}
 		return generator.instantOf(value.Arguments[0].Value)
 	}
+	argument := func(index int) ir.Expr {
+		if index >= len(value.Arguments) || value.Arguments[index].Value == nil {
+			generator.fail(CodeGenerationFailure, name+" has a missing argument", meta.Span, "the IR call is malformed")
+			return value.Callee
+		}
+		return value.Arguments[index].Value
+	}
 	integer := func(index int) string {
 		if index >= len(value.Arguments) || value.Arguments[index].Value == nil {
 			generator.fail(CodeGenerationFailure, name+" has a missing argument", meta.Span, "the IR call is malformed")
@@ -197,6 +217,17 @@ func (generator *generator) timeOperation(name string, value *ir.CallExpr) strin
 		return generator.dateTimeFrom("AhdTimeToOffset("+generator.instantOf(value.Callee)+", "+integer(0)+")", meta)
 	case "DateTime.toString":
 		return "AhdTimeCivilText(" + generator.civilOf(value.Callee) + ")"
+	case "DateTime.toISO":
+		return "AhdTimeFormatISOChecked(" + generator.instantOf(value.Callee) + ")"
+	case "DateTime.add", "DateTime.subtract":
+		return generator.dateTimeFrom("AhdTimeShiftChecked("+generator.instantOf(value.Callee)+", "+generator.durationMillisecondsOf(argument(0))+", "+
+			strconv.FormatBool(name == "DateTime.subtract")+")", meta)
+	case "Duration.add", "Duration.subtract":
+		return generator.durationFrom("AhdDurationArithmeticChecked("+strconv.Quote(strings.TrimPrefix(name, "Duration."))+", "+
+			generator.durationMillisecondsOf(value.Callee)+", "+generator.durationMillisecondsOf(argument(0))+")", meta)
+	case "Duration.negate", "Duration.abs":
+		return generator.durationFrom("AhdDurationArithmeticChecked("+strconv.Quote(strings.TrimPrefix(name, "Duration."))+", "+
+			generator.durationMillisecondsOf(value.Callee)+", 0)", meta)
 	case "Calendar.isLeapYear":
 		return "AhdCalendarIsLeapYear(" + integer(0) + ")"
 	case "Calendar.daysInMonth":

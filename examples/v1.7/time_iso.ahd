@@ -1,0 +1,38 @@
+// v1.7 Time: strict ISO 8601 text and instant arithmetic.
+bring Math
+bring Time
+
+departure := Time.parseISO("2026-09-18T22:45:00+03:00")
+flight := Time.duration(4 * 3600000 + 30 * 60000)
+arrival := departure.add(flight)
+write("departs  {departure.toISO()}")
+write("arrives  {arrival.toISO()} (Istanbul clock)")
+write("arrives  {arrival.toUTC().toISO()} (UTC)")
+write(
+    "same moment after a round trip: {Time.parseISO(arrival.toISO()).sameMoment(arrival)}"
+)
+// A reminder two hours before departure, and the time left.
+reminder := departure.subtract(duration: Time.duration(2 * 3600000))
+write("reminder {reminder.toISO()}")
+left := Time.between(reminder, departure)
+write(
+    "minutes between reminder and departure: {Math.floor(left.milliseconds / 60000)}"
+)
+write(
+    "a late reminder would be {left.negate().milliseconds} ms, abs {left.negate().abs().milliseconds} ms"
+)
+// Only the strict form is accepted.
+for text in [
+    "2026-09-18T22:45:00Z"
+    "2026-09-18T22:45:00.5-05:30"
+    "2026-09-18 22:45"
+    "18/09/2026"
+    "Europe/Istanbul"
+] {
+    attempt {
+        write("ok       {Time.parseISO(text).toISO()}")
+    }
+    except ValueError as error {
+        write("rejected {text}")
+    }
+}

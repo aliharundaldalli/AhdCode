@@ -66,6 +66,28 @@ func statisticsModuleInterface() *ModuleInterface {
 		statisticsSignature(types.Real, values(types.Int), types.Parameter{Name: "probability", Type: types.Real}),
 		statisticsSignature(types.Real, values(types.Real), types.Parameter{Name: "probability", Type: types.Real}),
 	))
+	// The two-List statistics accept every combination of Int and Real
+	// Lists; Int values are read as Real, exactly as mean reads them.
+	pairs := func(result types.Type) []*types.Signature {
+		var signatures []*types.Signature
+		for _, first := range []types.Type{types.Int, types.Real} {
+			for _, second := range []types.Type{types.Int, types.Real} {
+				signatures = append(signatures, statisticsSignature(result,
+					types.Parameter{Name: "first", Type: types.List{Element: first}},
+					types.Parameter{Name: "second", Type: types.List{Element: second}}))
+			}
+		}
+		return signatures
+	}
+	for _, name := range []string{"covariance", "sampleCovariance", "correlation"} {
+		addStandardExport(module, statisticsFunction(name, pairs(types.Real)...))
+	}
+	var regression []*types.Signature
+	for _, signature := range pairs(types.Pair{Key: types.String, Value: types.Real}) {
+		signature.Parameters[0].Name, signature.Parameters[1].Name = "x", "y"
+		regression = append(regression, signature)
+	}
+	addStandardExport(module, statisticsFunction("linearRegression", regression...))
 	sort.Strings(module.ExportNames)
 	return module
 }

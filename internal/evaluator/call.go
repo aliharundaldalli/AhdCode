@@ -6,6 +6,7 @@ import (
 	"strings"
 	"unicode"
 
+	"ahdcode/internal/backend/golang/ahdruntime"
 	"ahdcode/internal/ir"
 )
 
@@ -341,7 +342,7 @@ func (session *Session) core(name string, receiver any, arguments []any) any {
 	if strings.HasPrefix(name, "List.") {
 		return session.listOperation(strings.TrimPrefix(name, "List."), session.requireList(receiver), arguments)
 	}
-	if strings.HasPrefix(name, "DateTime.") || strings.HasPrefix(name, "Calendar.") {
+	if strings.HasPrefix(name, "DateTime.") || strings.HasPrefix(name, "Duration.") || strings.HasPrefix(name, "Calendar.") {
 		return session.timeOperation(name, receiver, arguments)
 	}
 	if strings.HasPrefix(name, "Regex.") {
@@ -618,6 +619,14 @@ func (session *Session) math(name string, arguments []any) any {
 		return math.Log10(argReal(0))
 	case "exp":
 		return session.realCheck(math.Exp(argReal(0)), "exp")
+	case "asin", "acos", "atan", "sinh", "cosh", "tanh", "log2", "cbrt", "radians", "degrees":
+		return session.fault(ahdruntime.AhdMathUnary(name, argReal(0)))
+	case "atan2", "hypot":
+		return session.fault(ahdruntime.AhdMathBinary(name, argReal(0), argReal(1)))
+	case "gcd":
+		return session.fault(ahdruntime.AhdMathGCD(arguments[0].(int64), arguments[1].(int64)))
+	case "lcm":
+		return session.fault(ahdruntime.AhdMathLCM(arguments[0].(int64), arguments[1].(int64)))
 	case "seed":
 		session.rngState = uint64(arguments[0].(int64))
 		return Nothing
@@ -628,6 +637,15 @@ func (session *Session) math(name string, arguments []any) any {
 	}
 	session.raise("Error", "unsupported Math operation "+name)
 	return nil
+}
+
+// fault raises a shared runtime helper's failure exactly as a compiled program
+// raises it, or passes the helper's value through.
+func (session *Session) fault(value any, fault *ahdruntime.AhdFault) any {
+	if fault != nil {
+		session.raise(fault.Class, fault.Message)
+	}
+	return value
 }
 
 func (session *Session) mathIntegral(name string, value float64) int64 {

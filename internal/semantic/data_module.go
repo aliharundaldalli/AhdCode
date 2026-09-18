@@ -31,6 +31,7 @@ var DataTableOperations = []string{
 	"head", "tail", "select", "drop", "rename", "reverse",
 	"filter", "sort", "transform", "derive",
 	"unique", "valueCounts", "groupBy", "pivotCount", "toCSV", "writeCSV",
+	"concat", "innerJoin",
 }
 
 // dataRow is the canonical row shape AhdCode source sees. Every cell is a
@@ -141,6 +142,7 @@ var dataOperationNames = map[string]TypeOperation{
 	"transform": DataTransform, "derive": DataDerive, "unique": DataUnique,
 	"valueCounts": DataValueCounts, "groupBy": DataGroupBy, "pivotCount": DataPivotCount,
 	"toCSV": DataToCSV, "writeCSV": DataWriteCSV,
+	"concat": DataConcat, "innerJoin": DataInnerJoin,
 }
 
 // dataOperationFor names the built-in member a Table instance publishes. Only

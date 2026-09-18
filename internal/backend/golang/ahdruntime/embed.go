@@ -168,3 +168,19 @@ var TerminalOtherSource string
 //
 //go:embed graphics.go
 var GraphicsSource string
+
+// FundamentalsSource is emitted as a separate generated Go file. It holds the
+// v1.7 standard-library fundamentals shared with the evaluator: the added Math
+// functions, strict ISO 8601 Time text and instant arithmetic, Vector and
+// Matrix accessors, two-list Statistics, and Table concat and innerJoin. It
+// uses only the standard library.
+//
+//go:embed fundamentals.go
+var FundamentalsSource string
+
+// BcryptSource is emitted only into a program that calls Security.bcryptHash
+// or Security.bcryptVerify. It imports the vendored golang.org/x/crypto/bcrypt
+// (see ahdruntime/bcryptvendor), the same way MySQLSource imports its driver.
+//
+//go:embed bcrypt.go
+var BcryptSource string
