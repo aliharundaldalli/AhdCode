@@ -136,6 +136,11 @@ func LowerCompilation(compilation module.CompilationResult) Result {
 					graphicsModule(ir.ModuleID(current.ID), current.Source.Name, current.Source.Path))
 				continue
 			}
+			if string(current.ID) == GUIModuleID {
+				result.Modules = append(result.Modules,
+					guiModule(ir.ModuleID(current.ID), current.Source.Name, current.Source.Path))
+				continue
+			}
 			if string(current.ID) == TerminalModuleID {
 				result.Modules = append(result.Modules,
 					terminalModule(ir.ModuleID(current.ID), current.Source.Name, current.Source.Path))

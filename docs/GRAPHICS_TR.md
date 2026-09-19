@@ -12,9 +12,12 @@ Turtle (kaplumbağa) kalemi gezdirir ve çizimi PNG ya da SVG olarak kaydeder.
 Graphics görsel programlama ve 2B çizim içindir: koordinatlar, açılar,
 geometri, dönüşümler, fraktallar ve bir matematik ya da programlama dersindeki
 kaplumbağa programları. **Bir oyun motoru ya da GUI (arayüz) kiti değildir.**
-Sprite, animasyon döngüsü, kare (frame) geri çağrıları, klavye ya da fare
-girdisi, ses, arayüz bileşenleri ya da 3B içermez ve bunlar onun için
-planlanmamıştır.
+Sprite, animasyon döngüsü, kare (frame) geri çağrıları, girdi yoklama, ses,
+arayüz bileşenleri ya da 3B içermez ve bunlar onun için planlanmamıştır.
+v1.8.0'dan itibaren bir Canvas tıklamaları ve tuş
+basışlarını bir callback'e bildirebilir; böylece bir Turtle ok tuşlarıyla
+yönlendirilebilir; bkz. [Tıklamalar ve tuş basışları](#tıklamalar-ve-tuş-basışları).
+Düğmeli ve metin alanlı pencereler için [GUI](GUI_TR.md) kullanın.
 
 ## Genel yüzey
 
@@ -49,6 +52,8 @@ canvas.rectangle(
 )                                                                    -> Nothing
 canvas.save(path: String)                                            -> Nothing
 canvas.wait()                                                        -> Nothing
+canvas.onClick(handler: (x: Real, y: Real) -> Nothing)               -> Nothing
+canvas.onKey(handler: (key: String) -> Nothing)                      -> Nothing
 canvas.close()                                                       -> Nothing
 canvas.isOpen()                                                      -> Bool
 canvas.turtle()                                                      -> Turtle
@@ -295,6 +300,73 @@ Her `Graphics.open` ayrı bir penceredir; aynı anda birkaç tane açık olabili
 birini kapatmak diğerlerini etkilemez. Program bittiğinde açık bıraktığı her
 pencere kapanır. Bir pencereyi ekranda tutmak için `canvas.wait()` kullanın.
 
+## Tıklamalar ve tuş basışları
+
+v1.8.0'dan itibaren bir Canvas iki tür olayı bir callback'e
+bildirir:
+
+```text
+canvas.onClick(handler: (x: Real, y: Real) -> Nothing)
+canvas.onKey(handler: (key: String) -> Nothing)
+```
+
+- `onClick`, tıklanan noktayı Canvas'ın kendi Kartezyen koordinatlarında alır:
+  `(0, 0)` merkezdir, `+x` sağa, `+y` yukarı. Yalnızca Canvas içindeki sol
+  düğme basışı sayılır.
+- `onKey`, Canvas penceresi odaktayken her tuş basışı için normalleştirilmiş
+  bir tuş adı alır: `ArrowUp`, `ArrowDown`, `ArrowLeft`, `ArrowRight`,
+  `Enter`, `Escape`, `Space`, `Tab`, `Backspace`, `Delete`, `Home`, `End`,
+  `PageUp`, `PageDown`, `A`–`Z` harfleri ve `0`–`9` rakamları
+  ([GUI](GUI_TR.md#tuş-adları) ile aynı adlar). Bir tuşu basılı tutmak onu
+  yinelemez ve tuş bırakma olayı yoktur.
+
+Callback'ler `canvas.wait()` içinde, birer birer ve sırayla, programın kendi
+yürütme yolunda çalışır; bir callback çizebilir, Turtle taşıyabilir,
+temizleyebilir veya kaydedebilir. `onClick` veya `onKey`'i yeniden kaydetmek
+önceki callback'in yerine geçer. Uzun bir callback sonraki olayın işlenmesini
+geciktirir. Bir callback hata fırlatırsa Canvas kapatılır ve hata `wait()`'ten
+değişmeden yayılır. Pencere kapandığında hâlâ bekleyen olaylar atılır.
+Callback kaydetmeyen bir program tam olarak eskisi gibi bekler.
+
+```ahd
+bring Graphics
+from Graphics bring (Canvas, Turtle)
+
+canvas: Canvas := Graphics.open(400, 400)
+pen: Turtle := canvas.turtle()
+
+step: Function := (key: String) -> Nothing {
+    pen: Global Turtle
+    state key {
+        condition "ArrowUp" {
+            pen.setHeading(90)
+        }
+        condition "ArrowDown" {
+            pen.setHeading(270)
+        }
+        condition "ArrowLeft" {
+            pen.setHeading(180)
+        }
+        condition "ArrowRight" {
+            pen.setHeading(0)
+        }
+        condition default {
+            return
+        }
+    }
+    pen.forward(20)
+}
+
+canvas.onKey(step)
+canvas.onClick(lambda [@pen] (x: Real, y: Real) -> pen.moveTo(x, y))
+canvas.wait()
+```
+
+Her ok tuşu basışı tam olarak bir 20 birimlik çizgi çizer; terminalden girdi
+okunmaz. Bkz. [`examples/v1.8/turtle_events`](../examples/v1.8/README_TR.md).
+Girdi yoklama (`mouseX`, `isKeyDown`), fare hareketi, sürükleme, tekerlek, çift
+tıklama veya kare döngüsü ve `Turtle.speed` hâlâ yoktur.
+
 ## Hatalar
 
 Eksik bir argüman, `Real` gereken yerde `String`, null olamayan bir parametreye
@@ -362,7 +434,8 @@ kapatılacak pencere olmadığından `wait()` hemen döner.
 ## v1.6.0'da olmayanlar
 
 Graphics'te bilerek sprite, sahne, çarpışma, fizik, animasyon ya da kare
-döngüsü (`update`, `draw`, `tick`, kare hızı), klavye ya da fare girdisi, ses,
-3B, gölgelendirici, arayüz bileşeni, metin çizimi ya da resim yükleme ve
-`Turtle.speed` yoktur. Çizgi, çember ve dikdörtgen çizer, temizler, kaydeder ve
+döngüsü (`update`, `draw`, `tick`, kare hızı), girdi yoklama (`mouseX`,
+`isKeyDown`), fare hareketi veya sürükleme olayları, ses, 3B, gölgelendirici,
+arayüz bileşeni, metin çizimi ya da resim yükleme ve `Turtle.speed` yoktur. Tek
+girdisi yukarıdaki tıklama ve tuş basışı callback'leridir. Çizgi, çember ve dikdörtgen çizer, temizler, kaydeder ve
 Turtle'ları yönlendirir.

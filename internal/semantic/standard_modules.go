@@ -39,6 +39,7 @@ func StandardModuleInterfaces() map[string]*ModuleInterface {
 		"PDF":        pdfModuleInterface(),
 		"Plot":       plotModuleInterface(),
 		"Graphics":   graphicsModuleInterface(),
+		"GUI":        guiModuleInterface(),
 		"PostgreSQL": postgresqlModuleInterface(),
 		"QR":         qrModuleInterface(),
 		"Regex":      regexModuleInterface(),

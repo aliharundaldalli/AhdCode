@@ -17,7 +17,10 @@ jackc/pgx with jackc/pgpassfile, jackc/pgservicefile, and jackc/puddle (MIT),
 coder/websocket (ISC), go-sqlite3 and its WASM component (MIT), gonum/plot
 (BSD), font and PDF dependencies, and the Graphics window helper's Ebitengine,
 purego, and hideconsole (Apache 2.0) with golang.org/x/image (BSD); see
-`THIRD_PARTY_NOTICES_GRAPHICS.md`. The PostgreSQL and WebSocket notices are
+`THIRD_PARTY_NOTICES_GRAPHICS.md`. The GUI window helper uses the same
+Ebitengine, purego, hideconsole, and golang.org/x/image versions, plus
+golang.org/x/text (BSD) and the Go fonts (BSD-style); see
+`THIRD_PARTY_NOTICES_GUI.md`. The PostgreSQL and WebSocket notices are
 `THIRD_PARTY_NOTICES_POSTGRESQL.md` and `THIRD_PARTY_NOTICES_WEBSOCKET.md`, and
 Security's bcrypt (golang.org/x/crypto, BSD) is described in
 `THIRD_PARTY_NOTICES_BCRYPT.md`. The unchanged MySQL source and license accompany this distribution

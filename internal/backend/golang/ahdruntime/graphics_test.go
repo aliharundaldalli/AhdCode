@@ -401,7 +401,7 @@ func TestGraphicsLifecycle(t *testing.T) {
 	record := graphicsCanvasRecord(canvas)
 	must(t, AhdGraphicsClose(canvas))
 	must(t, AhdGraphicsClose(canvas))
-	if record.process.ProcessState == nil {
+	if record.link.process.ProcessState == nil {
 		t.Fatalf("closed Canvas left its helper unreaped")
 	}
 }
@@ -428,7 +428,7 @@ func TestGraphicsHelperCrashBecomesGraphicsError(t *testing.T) {
 	}
 	script := filepath.Join(t.TempDir(), "crashing-helper")
 	// Acknowledges open, then exits: the next request finds it gone.
-	if err := os.WriteFile(script, []byte("#!/bin/sh\nread line\necho '{\"ok\":true}'\nexit 3\n"), 0o755); err != nil {
+	if err := os.WriteFile(script, []byte("#!/bin/sh\nread line\necho '{\"id\":1,\"ok\":true}'\nexit 3\n"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("AHDCODE_GRAPHICS_RUNTIME", script)
@@ -443,8 +443,8 @@ func TestGraphicsHelperCrashBecomesGraphicsError(t *testing.T) {
 		t.Fatalf("a crashed Canvas reports open")
 	}
 	must(t, AhdGraphicsClose(canvas))
-	if record.process.ProcessState == nil || record.process.ProcessState.ExitCode() != 3 {
-		t.Fatalf("crashed helper was not reaped: %v", record.process.ProcessState)
+	if record.link.process.ProcessState == nil || record.link.process.ProcessState.ExitCode() != 3 {
+		t.Fatalf("crashed helper was not reaped: %v", record.link.process.ProcessState)
 	}
 
 	silent := filepath.Join(t.TempDir(), "silent-helper")

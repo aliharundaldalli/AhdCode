@@ -83,7 +83,9 @@ ofsettir.
 Üyeler `before`, `after`, `sameMoment`, `timestamp`, `toUTC`, `toLocal`,
 `toOffset`, `toString`, `toISO`, `add` ve `subtract`'tir. Mevcut `toString()` çıktısı
 `YYYY-MM-DD HH:MM:SS` olarak kalır; milisaniye veya ofset eklemez.
-`str(value)` sıradan Class gösterimi olan `<DateTime>`'ı korur.
+`str(value)` ve `write(value)`, `DateTime(` ardından `toISO()` metni ve `)`
+gösterir (v1.8.0); bir Duration `Duration(1500 ms)` olarak
+görünür.
 
 `DateTime`, `CCompare` veya `CEqual` uygulamaz. Adlandırılmış an işlemlerini
 kullanın; sıradan `==` ve `same`, Class kimliği anlamını korur.

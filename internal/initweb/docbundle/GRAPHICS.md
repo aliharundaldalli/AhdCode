@@ -12,8 +12,11 @@ across it, and saves the drawing as PNG or SVG.
 Graphics is for visual programming and 2D drawing: coordinates, angles,
 geometry, transformations, fractals, and turtle programs in a mathematics or
 programming lesson. **It is not a game engine and not a GUI toolkit.** It has no
-sprites, animation loop, frame callbacks, keyboard or mouse input, sound,
-widgets, or 3D, and none of them is planned for it.
+sprites, animation loop, frame callbacks, input polling, sound, widgets, or 3D,
+and none of them is planned for it. Since v1.8.0 a Canvas can
+report clicks and key presses to a callback, so a Turtle can be steered with
+the arrow keys; see [Clicks and key presses](#clicks-and-key-presses). For
+windows with buttons and text fields, use [GUI](GUI.md).
 
 ## Public surface
 
@@ -48,6 +51,8 @@ canvas.rectangle(
 )                                                                    -> Nothing
 canvas.save(path: String)                                            -> Nothing
 canvas.wait()                                                        -> Nothing
+canvas.onClick(handler: (x: Real, y: Real) -> Nothing)               -> Nothing
+canvas.onKey(handler: (key: String) -> Nothing)                      -> Nothing
 canvas.close()                                                       -> Nothing
 canvas.isOpen()                                                      -> Bool
 canvas.turtle()                                                      -> Turtle
@@ -295,6 +300,73 @@ Each `Graphics.open` is its own window, so several can be open at once;
 closing one does not affect the others. When the program ends, every window it
 left open closes. Keep a window on screen with `canvas.wait()`.
 
+## Clicks and key presses
+
+Since v1.8.0, a Canvas reports two kinds of events to a
+callback:
+
+```text
+canvas.onClick(handler: (x: Real, y: Real) -> Nothing)
+canvas.onKey(handler: (key: String) -> Nothing)
+```
+
+- `onClick` receives the point that was clicked in the Canvas's own Cartesian
+  coordinates: `(0, 0)` is the center, `+x` right, `+y` up. Only a left-button
+  press inside the Canvas counts.
+- `onKey` receives one normalized key name per key press while the Canvas
+  window is focused: `ArrowUp`, `ArrowDown`, `ArrowLeft`, `ArrowRight`,
+  `Enter`, `Escape`, `Space`, `Tab`, `Backspace`, `Delete`, `Home`, `End`,
+  `PageUp`, `PageDown`, the letters `A`–`Z`, and the digits `0`–`9` (the same
+  names as [GUI](GUI.md#key-names)). Holding a key down does not repeat it, and
+  there is no key-up event.
+
+The callbacks run inside `canvas.wait()`, one at a time and in order, on the
+program's own path of execution; a callback may draw, move a Turtle, clear, or
+save. Registering `onClick` or `onKey` again replaces the previous callback. A
+long callback delays the handling of the next event. If a callback raises an
+error, the Canvas is closed and the error propagates unchanged out of
+`wait()`. Events still waiting when the window closes are discarded. A program
+that registers no callback waits exactly as before.
+
+```ahd
+bring Graphics
+from Graphics bring (Canvas, Turtle)
+
+canvas: Canvas := Graphics.open(400, 400)
+pen: Turtle := canvas.turtle()
+
+step: Function := (key: String) -> Nothing {
+    pen: Global Turtle
+    state key {
+        condition "ArrowUp" {
+            pen.setHeading(90)
+        }
+        condition "ArrowDown" {
+            pen.setHeading(270)
+        }
+        condition "ArrowLeft" {
+            pen.setHeading(180)
+        }
+        condition "ArrowRight" {
+            pen.setHeading(0)
+        }
+        condition default {
+            return
+        }
+    }
+    pen.forward(20)
+}
+
+canvas.onKey(step)
+canvas.onClick(lambda [@pen] (x: Real, y: Real) -> pen.moveTo(x, y))
+canvas.wait()
+```
+
+Each arrow key press draws exactly one 20-unit line; no terminal input is
+read. See `examples/v1.8/turtle_events`. There
+is still no input polling (`mouseX`, `isKeyDown`), mouse movement, drag, wheel,
+double-click, or frame loop, and no `Turtle.speed`.
+
 ## Errors
 
 Mistakes the compiler can see, such as a missing argument, a `String` where a
@@ -359,7 +431,8 @@ usual, and `wait()` returns at once because there is no window to close.
 ## Not in v1.6.0
 
 Graphics deliberately has no sprites, scenes, collision, physics, animation
-or frame loop (`update`, `draw`, `tick`, frame rates), keyboard or mouse input,
-audio, 3D, shaders, widgets, text drawing, or image loading, and no
-`Turtle.speed`. It draws lines, circles, and rectangles, clears, saves, and
+or frame loop (`update`, `draw`, `tick`, frame rates), input polling (`mouseX`,
+`isKeyDown`), mouse movement or drag events, audio, 3D, shaders, widgets, text
+drawing, or image loading, and no `Turtle.speed`. Its only input is the click
+and key-press callbacks above. It draws lines, circles, and rectangles, clears, saves, and
 steers Turtles.

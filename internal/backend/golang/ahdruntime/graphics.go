@@ -1,14 +1,11 @@
 package ahdruntime
 
 import (
-	"bufio"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"math"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -36,6 +33,12 @@ import (
 // Functions report a problem as a non-empty message; AhdGraphicsCheck turns it
 // into a GraphicsError in a compiled program, and the evaluator raises its own
 // GraphicsError from the same message.
+//
+// Since v1.8 a Canvas also reports clicks and key presses: Canvas.onClick and
+// Canvas.onKey register one callback each, and Canvas.wait runs them, one at a
+// time on the program's own goroutine, until the window is closed. The
+// transport, event routing, and queue bound live in helperlink.go, shared with
+// the GUI module.
 
 // AhdClassGraphicsError is the runtime descriptor of GraphicsError.
 var AhdClassGraphicsError = &AhdClass{Name: "GraphicsError", Parent: AhdClassError}
@@ -47,7 +50,7 @@ var AhdClassGraphicsError = &AhdClass{Name: "GraphicsError", Parent: AhdClassErr
 var AhdGraphicsRuntimeHint string
 
 const (
-	ahdGraphicsProtocolVersion = 1
+	ahdGraphicsProtocolVersion = 2
 	// AhdGraphicsMaxDimension bounds a Canvas side. A 4096x4096 Canvas is a
 	// 64 MiB image, the largest the helper will allocate for one export.
 	AhdGraphicsMaxDimension  = 4096
@@ -148,6 +151,18 @@ type ahdGraphicsRequest struct {
 	LineWidth float64           `json:"lineWidth,omitempty"`
 
 	Path string `json:"path,omitempty"`
+
+	Kind   string             `json:"kind,omitempty"`
+	Script []ahdGraphicsEvent `json:"script,omitempty"`
+}
+
+// ahdGraphicsEvent is one event line from the helper, and one scripted event
+// of a headless test Canvas.
+type ahdGraphicsEvent struct {
+	Event string  `json:"event"`
+	X     float64 `json:"x,omitempty"`
+	Y     float64 `json:"y,omitempty"`
+	Key   string  `json:"key,omitempty"`
 }
 
 type ahdGraphicsResponse struct {
@@ -157,23 +172,22 @@ type ahdGraphicsResponse struct {
 	Open   *bool  `json:"open,omitempty"`
 }
 
-type ahdGraphicsLine struct {
-	text []byte
-	err  error
-}
-
-// ahdGraphicsCanvas is one open Canvas: its helper process and its state.
+// ahdGraphicsCanvas is one open Canvas: its helper link and its state.
 // usable is false once the Canvas can no longer be drawn on; alive is false
-// once its helper process is gone.
+// once its helper process is gone. mu serializes requests; it is never held
+// while an event callback runs.
 type ahdGraphicsCanvas struct {
-	mu      sync.Mutex
-	process *exec.Cmd
-	input   io.WriteCloser
-	lines   chan ahdGraphicsLine
-	stop    chan struct{}
-	exited  chan struct{}
-	usable  bool
-	alive   bool
+	mu       sync.Mutex
+	link     *ahdHelperLink
+	usable   bool
+	alive    bool
+	headless bool
+	// The event callbacks; nil until registered. A second registration
+	// replaces the first.
+	onClick func(x, y float64)
+	onKey   func(key string)
+	// listening records the event kinds the helper was asked to report.
+	listening map[string]bool
 }
 
 // ahdGraphicsTurtle is one Turtle's complete state. Geometry happens here,
@@ -237,32 +251,26 @@ func AhdGraphicsOpen(width, height int64, title, background string) (int64, stri
 	if !ok {
 		return 0, ahdGraphicsColorProblem("background", background)
 	}
+	headless := os.Getenv("AHDCODE_GRAPHICS_HEADLESS") == "1"
+	var script []ahdGraphicsEvent
+	if text := os.Getenv("AHDCODE_GRAPHICS_HEADLESS_EVENTS"); headless && text != "" {
+		// Automated tests replay clicks and key presses on a headless Canvas.
+		if json.Unmarshal([]byte(text), &script) != nil {
+			return 0, "AHDCODE_GRAPHICS_HEADLESS_EVENTS is not a JSON list of events"
+		}
+	}
 	path, err := ahdGraphicsDiscoverRuntime()
 	if err != nil {
 		return 0, err.Error()
 	}
-	process := exec.Command(path)
-	input, err := process.StdinPipe()
+	link, err := ahdStartHelper(path, ahdGraphicsMaxResponseBytes)
 	if err != nil {
 		return 0, "could not start the Graphics window helper"
 	}
-	output, err := process.StdoutPipe()
-	if err != nil {
-		return 0, "could not start the Graphics window helper"
-	}
-	// The helper's standard error is never part of the protocol, and
-	// diagnostics from the window library are not program output.
-	process.Stderr = nil
-	if err := process.Start(); err != nil {
-		return 0, "could not start the Graphics window helper"
-	}
-	canvas := &ahdGraphicsCanvas{process: process, input: input, lines: make(chan ahdGraphicsLine),
-		stop: make(chan struct{}), exited: make(chan struct{}), usable: true, alive: true}
-	go canvas.read(output)
-
+	canvas := &ahdGraphicsCanvas{link: link, usable: true, alive: true, headless: headless, listening: map[string]bool{}}
 	_, problem := canvas.request(ahdGraphicsRequest{Op: "open", Version: ahdGraphicsProtocolVersion,
 		Width: int(width), Height: int(height), Title: title, Background: &color,
-		Headless: os.Getenv("AHDCODE_GRAPHICS_HEADLESS") == "1"}, ahdGraphicsOpenTimeout)
+		Headless: headless, Script: script}, ahdGraphicsOpenTimeout)
 	if problem != "" {
 		canvas.mu.Lock()
 		canvas.shutdown()
@@ -277,77 +285,26 @@ func AhdGraphicsOpen(width, height int64, title, background string) (int64, stri
 	return handle, ""
 }
 
-// read delivers the helper's response lines, then reaps the process when its
-// output ends, so no helper is ever left as a zombie.
-func (c *ahdGraphicsCanvas) read(output io.Reader) {
-	reader := bufio.NewReaderSize(output, 4096)
-	for {
-		var line []byte
-		var err error
-		for {
-			var chunk []byte
-			var isPrefix bool
-			chunk, isPrefix, err = reader.ReadLine()
-			line = append(line, chunk...)
-			if err != nil || !isPrefix || len(line) > ahdGraphicsMaxResponseBytes {
-				break
-			}
-		}
-		if err == nil && len(line) > ahdGraphicsMaxResponseBytes {
-			err = errors.New("response too large")
-		}
-		if err != nil {
-			_ = c.process.Wait()
-			close(c.exited)
-			// A closed channel tells every later request that the helper
-			// is gone.
-			close(c.lines)
-			return
-		}
-		// A response that arrives after its request gave up is dropped once
-		// the Canvas shuts down, so this goroutine always reaches the end
-		// of the stream and reaps the process.
-		select {
-		case c.lines <- ahdGraphicsLine{text: line}:
-		case <-c.stop:
-		}
-	}
-}
-
 // request sends one request and waits for its one response. The caller holds
 // c.mu, except during open, before the Canvas is shared.
 func (c *ahdGraphicsCanvas) request(value ahdGraphicsRequest, timeout time.Duration) (ahdGraphicsResponse, string) {
 	if !c.alive {
 		return ahdGraphicsResponse{}, ahdGraphicsClosedMessage
 	}
-	encoded, err := json.Marshal(value)
-	if err != nil {
-		return ahdGraphicsResponse{}, "could not encode a Graphics request"
-	}
-	if _, err := c.input.Write(append(encoded, '\n')); err != nil {
+	line, err := c.link.call(value, timeout)
+	switch {
+	case errors.Is(err, errAhdHelperSilent):
 		c.shutdown()
-		return ahdGraphicsResponse{}, ahdGraphicsStoppedMessage
-	}
-	var line ahdGraphicsLine
-	received := true
-	if timeout > 0 {
-		timer := time.NewTimer(timeout)
-		select {
-		case line, received = <-c.lines:
-			timer.Stop()
-		case <-timer.C:
-			c.shutdown()
-			return ahdGraphicsResponse{}, "the Graphics window helper stopped responding"
-		}
-	} else {
-		line, received = <-c.lines
-	}
-	if !received || line.err != nil {
+		return ahdGraphicsResponse{}, "the Graphics window helper stopped responding"
+	case errors.Is(err, errAhdHelperInvalid):
+		c.shutdown()
+		return ahdGraphicsResponse{}, "the Graphics window helper sent an invalid response"
+	case err != nil:
 		c.shutdown()
 		return ahdGraphicsResponse{}, ahdGraphicsStoppedMessage
 	}
 	var reply ahdGraphicsResponse
-	if json.Unmarshal(line.text, &reply) != nil {
+	if json.Unmarshal(line, &reply) != nil {
 		c.shutdown()
 		return ahdGraphicsResponse{}, "the Graphics window helper sent an invalid response"
 	}
@@ -370,14 +327,7 @@ func (c *ahdGraphicsCanvas) shutdown() {
 		return
 	}
 	c.usable, c.alive = false, false
-	close(c.stop)
-	_ = c.input.Close()
-	select {
-	case <-c.exited:
-	case <-time.After(ahdGraphicsCloseTimeout):
-		_ = c.process.Process.Kill()
-		<-c.exited
-	}
+	c.link.shutdown(ahdGraphicsCloseTimeout)
 }
 
 func ahdGraphicsCanvasOf(handle int64) (*ahdGraphicsCanvas, string) {
@@ -495,24 +445,142 @@ func AhdGraphicsSave(handle int64, path string) string {
 	return problem
 }
 
-// AhdGraphicsWait blocks until the Canvas window is closed by its user. On a
-// Canvas that is already closed it returns at once.
+// AhdGraphicsWait blocks until the Canvas window is closed by its user,
+// running the registered onClick and onKey callbacks one at a time, in order,
+// on the calling goroutine. On a Canvas that is already closed it returns at
+// once. A callback's own error closes the Canvas and propagates unchanged.
+// Events still queued when the window closes are discarded: their window is
+// gone.
 func AhdGraphicsWait(handle int64) string {
 	canvas, problem := ahdGraphicsCanvasOf(handle)
 	if problem != "" {
 		return ""
 	}
 	canvas.mu.Lock()
+	// A Canvas whose window is already gone, or that an earlier wait already
+	// finished, has nothing left to wait for.
+	if !canvas.alive || !canvas.usable {
+		canvas.mu.Unlock()
+		return ""
+	}
+	// Output written before wait must be visible while the window is open.
+	AhdFlush()
+	_, problem = canvas.request(ahdGraphicsRequest{Op: "wait"}, ahdGraphicsRequestTimeout)
+	canvas.mu.Unlock()
+	if problem != "" {
+		if problem == ahdGraphicsClosedMessage {
+			return ""
+		}
+		return problem
+	}
+	for {
+		line, kind := canvas.link.events.next(canvas.link.exited)
+		canvas.mu.Lock()
+		alive, onClick, onKey := canvas.alive, canvas.onClick, canvas.onKey
+		stale := !canvas.headless && canvas.link.events.closedPending()
+		switch kind {
+		case ahdEventClosed:
+			canvas.usable = false
+			canvas.mu.Unlock()
+			return ""
+		case ahdEventOverflow:
+			canvas.shutdown()
+			canvas.mu.Unlock()
+			return "the Canvas received more window events than the program handled"
+		case ahdEventExited:
+			canvas.mu.Unlock()
+			if !alive {
+				return ""
+			}
+			canvas.mu.Lock()
+			canvas.shutdown()
+			canvas.mu.Unlock()
+			return ahdGraphicsStoppedMessage
+		}
+		canvas.mu.Unlock()
+		if !alive {
+			return ""
+		}
+		if stale {
+			continue
+		}
+		var event ahdGraphicsEvent
+		if json.Unmarshal(line, &event) != nil {
+			canvas.mu.Lock()
+			canvas.shutdown()
+			canvas.mu.Unlock()
+			return "the Graphics window helper sent an invalid event"
+		}
+		switch {
+		case event.Event == "click" && onClick != nil:
+			ahdGraphicsDispatch(handle, func() { onClick(event.X, event.Y) })
+		case event.Event == "key" && onKey != nil:
+			ahdGraphicsDispatch(handle, func() { onKey(event.Key) })
+		}
+	}
+}
+
+// ahdGraphicsDispatch runs one callback. If it raises, the Canvas is closed
+// and its helper released, and the error propagates unchanged.
+func ahdGraphicsDispatch(handle int64, callback func()) {
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			AhdGraphicsClose(handle)
+			panic(recovered)
+		}
+	}()
+	callback()
+	// What a callback writes is visible at once, not when the window closes.
+	AhdFlush()
+}
+
+// ahdGraphicsListen stores one callback and asks the helper, once per kind,
+// to report that kind of event.
+func ahdGraphicsListen(handle int64, kind string, store func(c *ahdGraphicsCanvas)) string {
+	canvas, problem := ahdGraphicsCanvasOf(handle)
+	if problem != "" {
+		return problem
+	}
+	canvas.mu.Lock()
 	defer canvas.mu.Unlock()
-	if !canvas.alive {
+	if !canvas.usable {
+		return ahdGraphicsClosedMessage
+	}
+	store(canvas)
+	if canvas.listening[kind] {
 		return ""
 	}
-	_, problem = canvas.request(ahdGraphicsRequest{Op: "wait"}, 0)
-	canvas.usable = false
-	if problem == ahdGraphicsClosedMessage {
-		return ""
+	if _, problem := canvas.request(ahdGraphicsRequest{Op: "listen", Kind: kind}, ahdGraphicsRequestTimeout); problem != "" {
+		return problem
 	}
-	return problem
+	canvas.listening[kind] = true
+	return ""
+}
+
+// AhdGraphicsOnClick registers the Canvas click callback, replacing any
+// earlier one. It receives the Cartesian point that was clicked.
+func AhdGraphicsOnClick(handle int64, handler func(x, y float64)) string {
+	if handler == nil {
+		return "Canvas.onClick needs a Function"
+	}
+	return ahdGraphicsListen(handle, "click", func(c *ahdGraphicsCanvas) { c.onClick = handler })
+}
+
+// AhdGraphicsOnKey registers the Canvas key callback, replacing any earlier
+// one. It receives the normalized name of each key pressed.
+func AhdGraphicsOnKey(handle int64, handler func(key string)) string {
+	if handler == nil {
+		return "Canvas.onKey needs a Function"
+	}
+	return ahdGraphicsListen(handle, "key", func(c *ahdGraphicsCanvas) { c.onKey = handler })
+}
+
+func AhdGraphicsOnClickChecked(handle int64, handler func(x, y float64)) {
+	AhdGraphicsCheck(AhdGraphicsOnClick(handle, handler))
+}
+
+func AhdGraphicsOnKeyChecked(handle int64, handler func(key string)) {
+	AhdGraphicsCheck(AhdGraphicsOnKey(handle, handler))
 }
 
 // AhdGraphicsClose closes the Canvas window, ends its helper, and releases

@@ -1,0 +1,81 @@
+// A small ledger: GUI collects one entry, ordinary AhdCode validates it, and
+// the existing SQLite module stores it. GUI knows nothing about databases.
+bring GUI
+bring SQLite
+from GUI bring (Window, Container, Label, Button, TextInput, Checkbox)
+from SQLite bring (Database)
+
+db: Database := SQLite.open("ledger.db")
+db.execute(
+    "CREATE TABLE IF NOT EXISTS ledger (id INTEGER PRIMARY KEY, customer TEXT NOT NULL, amount REAL NOT NULL, paid INTEGER NOT NULL)"
+    []
+)
+
+window: Window := GUI.window(title: "Simple ledger", width: 460, height: 280)
+form: Container := window.column()
+form.label("Customer")
+customer: TextInput := form.textInput(placeholder: "e.g. Ayşe Yılmaz")
+form.label("Amount")
+amount: TextInput := form.textInput(placeholder: "e.g. 125.50")
+actions: Container := form.row(spacing: 12)
+paid: Checkbox := actions.checkbox("Paid")
+save: Button := actions.button("Save")
+status: Label := form.label("Enter a customer and an amount, then press Save.")
+
+report: Function := (message: String) -> Nothing {
+    status: Global Label
+    status.setText(message)
+    write(message)
+}
+
+saveEntry: Function := () -> Nothing {
+    db: Global Database
+    customer: Global TextInput
+    amount: Global TextInput
+    paid: Global Checkbox
+    name: Local := customer.text().trim()
+    if name == "" {
+        report("The customer name is required.")
+        return
+    }
+    value: Local := 0.0
+    attempt {
+        value = real(amount.text().trim())
+    }
+    except DomainError as error {
+        report("The amount must be a number such as 125.50.")
+        return
+    }
+    paidFlag: Local := 0
+    if paid.checked() {
+        paidFlag = 1
+    }
+    db.execute(
+        "INSERT INTO ledger (customer, amount, paid) VALUES (?, ?, ?)"
+        [
+            SQLite.fromString(name)
+            SQLite.fromReal(value)
+            SQLite.fromInt(paidFlag)
+        ]
+    )
+    total: Local := db.query(
+        "SELECT COUNT(*) AS n FROM ledger"
+        []
+    )[0]["n"].int()
+    report("Saved #{db.lastInsertId()}: {name}, {value} (entries: {total})")
+    customer.setText("")
+    amount.setText("")
+    paid.setChecked(false)
+}
+
+closeOnEscape: Function := (key: String) -> Nothing {
+    window: Global Window
+    if key == "Escape" {
+        window.close()
+    }
+}
+
+save.onClick(saveEntry)
+window.onKey(closeOnEscape)
+window.wait()
+db.close()

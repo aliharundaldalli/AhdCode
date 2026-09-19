@@ -73,7 +73,7 @@ one owned PATH block to `~/.profile`. Open a login shell or source that profile.
 
 The CLI embeds exact-version AhdDataStudio, first-party framework sources,
 starters, Bootstrap, and English project documentation. The package also includes
-private Go 1.27.0, `ahdsqlite`, `ahdnumeric`, `ahdplot`, `ahdgraphics`, and the pinned offline
+private Go 1.27.0, `ahdsqlite`, `ahdnumeric`, `ahdplot`, `ahdgraphics`, `ahdgui`, and the pinned offline
 Tectonic 0.17.0 engine plus its pinned resource bundle — 6,350,367 bytes since
 v1.3.0 added fancyhdr and lastpage to the v1.2.0 TikZ, nine TikZ libraries, and
 pgfornament. The uncompressed

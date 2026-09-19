@@ -63,7 +63,7 @@ ve kurulum onu sizin yerinize yüklemez. VS Code'da Eklentiler görünümünü a
 `vscode/ahdcode-<sürüm>.vsix` dosyasını gösterin. Antigravity IDE aynı işlemi
 sunar. Dosya gereken her şeyi taşır; npm veya ağ gerekmez.
 
-Paket; özel Go 1.27.0, `ahdsqlite`, `ahdnumeric`, `ahdplot`, `ahdgraphics`, çevrimdışı Tectonic
+Paket; özel Go 1.27.0, `ahdsqlite`, `ahdnumeric`, `ahdplot`, `ahdgraphics`, `ahdgui`, çevrimdışı Tectonic
 0.17.0 ve sabitlenmiş kaynak paketini içerir; paket, TikZ'i, dokuz TikZ
 kütüphanesini ve pgfornament'i ekleyen v1.2.0'ın üzerine fancyhdr ve lastpage'i
 ekleyen v1.3.0'dan beri 6.350.367 bayttır. CLI; sürüm-eş Studio,

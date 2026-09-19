@@ -4,6 +4,7 @@ import (
 	"math"
 	"math/bits"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -906,4 +907,93 @@ func AhdDataInnerJoinChecked(first, second AhdTable, leftKey, rightKey string) A
 	columns, rows, fault := AhdDataInnerJoin(leftColumns, leftRows, rightColumns, rightRows, leftKey, rightKey)
 	AhdRaiseFault(fault)
 	return ahdTableValue(columns, rows)
+}
+
+// ---- Canonical text of first-party value Classes ----
+//
+// str, write, and Terminal.pretty render these first-party values by their
+// public contents instead of the opaque <Class> text every other instance
+// uses. The rendering is explicit and type-directed: it never inspects an
+// arbitrary Class, and it reads the same public data the Class's own members
+// return. Each form mirrors the constructor that builds the value.
+
+// AhdRenderVector renders a Vector as Vector([1.0, 2.0]).
+func AhdRenderVector(values []float64) string {
+	return "Vector(" + ahdRenderReals(values) + ")"
+}
+
+// AhdRenderMatrix renders a Matrix as Matrix([[1.0, 2.0], [3.0, 4.0]]).
+func AhdRenderMatrix(rows [][]float64) string {
+	parts := make([]string, len(rows))
+	for i, row := range rows {
+		parts[i] = ahdRenderReals(row)
+	}
+	return "Matrix([" + strings.Join(parts, ", ") + "])"
+}
+
+func ahdRenderReals(values []float64) string {
+	parts := make([]string, len(values))
+	for i, value := range values {
+		parts[i] = ahdFormatReal(value)
+	}
+	return "[" + strings.Join(parts, ", ") + "]"
+}
+
+// AhdRenderDateTime renders a DateTime as DateTime(2026-09-18T13:30:00.000+03:00),
+// the toISO text. A historical offset with a seconds part, which toISO cannot
+// write, keeps its seconds as ±HH:MM:SS so the text never fails.
+func AhdRenderDateTime(value time.Time) string {
+	if text, fault := AhdTimeFormatISO(value); fault == nil {
+		return "DateTime(" + text + ")"
+	}
+	_, offset := value.Zone()
+	sign := "+"
+	if offset < 0 {
+		sign, offset = "-", -offset
+	}
+	return "DateTime(" + ahdPad(int64(value.Year()), 4) + "-" + ahdPad(int64(value.Month()), 2) + "-" + ahdPad(int64(value.Day()), 2) + "T" +
+		ahdPad(int64(value.Hour()), 2) + ":" + ahdPad(int64(value.Minute()), 2) + ":" + ahdPad(int64(value.Second()), 2) + "." +
+		ahdPad(int64(value.Nanosecond()/1e6), 3) + sign + ahdPad(int64(offset/3600), 2) + ":" + ahdPad(int64(offset%3600/60), 2) + ":" +
+		ahdPad(int64(offset%60), 2) + ")"
+}
+
+// AhdRenderDuration renders a Duration as Duration(1500 ms).
+func AhdRenderDuration(milliseconds int64) string {
+	return "Duration(" + strconv.FormatInt(milliseconds, 10) + " ms)"
+}
+
+// AhdRenderTable renders a Table as Table(["id", "name"], [["1", "Ada"]]),
+// the arguments of Data.fromRows.
+func AhdRenderTable(columns []string, rows [][]string) string {
+	quoted := func(values []string) string {
+		parts := make([]string, len(values))
+		for i, value := range values {
+			parts[i] = AhdStrQuoted(value)
+		}
+		return "[" + strings.Join(parts, ", ") + "]"
+	}
+	parts := make([]string, len(rows))
+	for i, row := range rows {
+		parts[i] = quoted(row)
+	}
+	return "Table(" + quoted(columns) + ", [" + strings.Join(parts, ", ") + "])"
+}
+
+// The Of forms adapt a generated program's field readings.
+
+func AhdRenderVectorOf(values *AhdList[float64]) string {
+	return AhdRenderVector(ahdNumericValues(AhdVector{Values: values}))
+}
+
+func AhdRenderMatrixOf(rows *AhdList[*AhdList[float64]]) string {
+	return AhdRenderMatrix(ahdNumericRows(AhdMatrix{Rows: rows}))
+}
+
+func AhdRenderDateTimeOf(value AhdCivilTime) string {
+	return AhdRenderDateTime(AhdTimeInstantCivil(value))
+}
+
+func AhdRenderTableOf(columns *AhdList[string], cells *AhdList[*AhdList[string]]) string {
+	names, rows := ahdTableOf(AhdTable{Columns: columns, Cells: cells})
+	return AhdRenderTable(names, rows)
 }

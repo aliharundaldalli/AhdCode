@@ -6,6 +6,7 @@ import (
 	"io"
 	"io/fs"
 	"os"
+	"sync"
 	"sync/atomic"
 	"time"
 )
@@ -26,9 +27,45 @@ type session struct {
 	closeRequested atomic.Bool
 	// windowGone is closed when the window no longer exists.
 	windowGone chan struct{}
+
+	// writeMu serializes the one output stream shared by responses, written
+	// by the protocol goroutine, and events, written by the window.
+	writeMu sync.Mutex
+	// listenClick and listenKey are set by listen requests; until then the
+	// window reports no input at all.
+	listenClick atomic.Bool
+	listenKey   atomic.Bool
+	// closedSent makes the closed event a one-time notice.
+	closedSent atomic.Bool
+	// script is the headless test Canvas's event list, replayed on wait.
+	script []event
+	// openID is the id of the open request, answered once the window is up.
+	openID int64
 }
 
 const closedMessage = "the Canvas is closed"
+
+// send writes one protocol line: a response or an event.
+func (s *session) send(value any) error {
+	s.writeMu.Lock()
+	defer s.writeMu.Unlock()
+	return writeLine(s.out, value)
+}
+
+// emit writes an event; a failed write means the program is gone, and the
+// window ends.
+func (s *session) emit(value event) {
+	if s.send(value) != nil {
+		s.closeRequested.Store(true)
+	}
+}
+
+// emitClosed tells the program, once, that the Canvas window is gone.
+func (s *session) emitClosed() {
+	if s.closedSent.CompareAndSwap(false, true) {
+		s.emit(event{Event: "closed"})
+	}
+}
 
 // serve answers requests until the runtime closes the pipe or sends close.
 func (s *session) serve() {
@@ -38,7 +75,7 @@ func (s *session) serve() {
 			if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
 				return
 			}
-			_ = writeResponse(s.out, response{Error: err.Error()})
+			_ = s.send(response{Error: err.Error()})
 			if errors.Is(err, errRequestTooLarge) {
 				// The rest of that line cannot be told apart from the next
 				// request, so the stream is not trusted any further.
@@ -47,8 +84,17 @@ func (s *session) serve() {
 			continue
 		}
 		reply, stop := s.handle(value)
-		if writeResponse(s.out, reply) != nil || stop {
+		reply.ID = value.ID
+		if s.send(reply) != nil || stop {
 			return
+		}
+		if value.Op == "wait" && s.headless {
+			// A headless Canvas has no window to close: it replays its test
+			// script, if any, and reports itself closed at once.
+			for _, scripted := range s.script {
+				s.emit(scripted)
+			}
+			s.emitClosed()
 		}
 	}
 }
@@ -62,10 +108,19 @@ func (s *session) handle(value request) (response, bool) {
 		s.requestClose()
 		return response{OK: true}, true
 	case "wait":
-		if !s.headless {
-			<-s.windowGone
+		// wait no longer blocks the protocol: the program keeps sending
+		// requests from its event callbacks and learns that the window is
+		// gone from the closed event.
+		return response{OK: true}, false
+	case "listen":
+		switch value.Kind {
+		case "click":
+			s.listenClick.Store(true)
+		case "key":
+			s.listenKey.Store(true)
+		default:
+			return response{Error: "unknown event kind " + value.Kind}, false
 		}
-		s.closed.Store(true)
 		return response{OK: true}, false
 	case "save":
 		if s.closed.Load() {

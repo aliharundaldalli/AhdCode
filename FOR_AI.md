@@ -158,6 +158,7 @@ From the repository root:
 go test ./...
 go install ./cmd/ahdcode ./cmd/ahdnumeric ./cmd/ahdplot ./cmd/ahdsqlite
 go -C cmd/ahdgraphics install .
+go -C cmd/ahdgui install .
 ahdcode_exe="$(go env GOPATH)/bin/ahdcode"
 "$ahdcode_exe" --version
 ```
@@ -272,6 +273,7 @@ From the repository root:
 go test ./...
 go install ./cmd/ahdcode ./cmd/ahdnumeric ./cmd/ahdplot ./cmd/ahdsqlite
 go -C cmd/ahdgraphics install .
+go -C cmd/ahdgui install .
 $AhdCodeExe = Join-Path (go env GOPATH) "bin\ahdcode.exe"
 & $AhdCodeExe --version
 ```
@@ -599,8 +601,27 @@ height)` takes the lower-left corner. Colors are the nine lower-case names
 (`black`, `white`, `red`, `green`, `blue`, `yellow`, `cyan`, `magenta`, `gray`)
 or `#RRGGBB`/`#RRGGBBAA`. Calls follow the all-positional-or-all-named rule.
 Graphics is not a game engine: do not invent `Turtle.speed`, `update`/`draw`
-loops, sprites, mouse or keyboard handlers, text, or images, and do not write
-`bring Turtle`. See [`docs/GRAPHICS.md`](docs/GRAPHICS.md).
+loops, sprites, text, or images, and do not write `bring Turtle`. From v1.8.0
+`canvas.onClick(handler)` takes a `(x: Real, y: Real) ->
+Nothing` Function (Cartesian coordinates) and `canvas.onKey(handler)` a
+`(key: String) -> Nothing` Function; they run during `canvas.wait()`. Do not
+invent `mouseX`, `isKeyDown`, key-up events, polling, frame loops,
+`Turtle.onclick`, or `Turtle.onkey`. See [`docs/GRAPHICS.md`](docs/GRAPHICS.md).
+
+For small desktop windows (v1.8.0) use `bring GUI`:
+`GUI.window(title, width, height)` returns a `Window`; `window.column()` or
+`window.row()` creates its single root `Container` (a second call raises
+`GUIError`); a Container adds `label(text)`, `button(text)`,
+`textInput(placeholder)`, `checkbox(text, checked)`, and nested `column`/`row`.
+Read and change widgets with `text()`/`setText`, `checked()`/`setChecked`;
+`button.onClick(handler)` takes a `() -> Nothing` Function and
+`window.onKey(handler)` a `(key: String) -> Nothing` Function; `window.wait()`
+runs the callbacks one at a time and returns when the window closes. A
+callback that needs a top-level binding declares it `name: Global Type`. A
+callback's error propagates out of `wait()` unchanged. There are no tables,
+list boxes, drop-downs, menus, dialogs, file pickers, scrolling, themes,
+threads, or async; do not invent them, and keep database or HTTP work in
+ordinary Functions the Button calls. See [`docs/GUI.md`](docs/GUI.md).
 
 v1.7.0 completes six existing modules; use these instead of hand-written
 helpers. `Math.asin`, `acos`, `atan`, `atan2(y, x)` (y first), `sinh`, `cosh`,

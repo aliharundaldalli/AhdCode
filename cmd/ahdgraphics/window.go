@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/hajimehoshi/ebiten/v2/inpututil"
 )
 
 // The window is only a view: it shows the image the rasterizer draws from
@@ -28,6 +29,7 @@ type window struct {
 	drawn      int
 	display    *image.RGBA
 	texture    *ebiten.Image
+	keys       []ebiten.Key
 }
 
 func (w *window) Update() error {
@@ -35,7 +37,35 @@ func (w *window) Update() error {
 	if w.session.closeRequested.Load() {
 		return ebiten.Termination
 	}
+	w.pollInput()
 	return nil
+}
+
+// pollInput reports the input a program listens for: one click event per
+// left-button press inside the Canvas, in Cartesian coordinates, and one key
+// event per key press (auto-repeat produces no further events). Nothing is
+// reported while the window is not focused.
+func (w *window) pollInput() {
+	s := w.session
+	if !ebiten.IsFocused() || s.closed.Load() {
+		return
+	}
+	if s.listenClick.Load() && inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft) {
+		m := s.model
+		px, py := ebiten.CursorPosition()
+		x, y := float64(px)/w.scale, float64(py)/w.scale
+		if x >= 0 && y >= 0 && x <= float64(m.width) && y <= float64(m.height) {
+			s.emit(event{Event: "click", X: x - float64(m.width)/2, Y: float64(m.height)/2 - y})
+		}
+	}
+	if s.listenKey.Load() {
+		w.keys = inpututil.AppendJustPressedKeys(w.keys[:0])
+		for _, key := range w.keys {
+			if name, known := keyNames[key]; known {
+				s.emit(event{Event: "key", Key: name})
+			}
+		}
+	}
 }
 
 func (w *window) Layout(int, int) (int, int) {
@@ -105,7 +135,7 @@ func runWindow(s *session) error {
 			return
 		}
 		started <- true
-		if writeResponse(s.out, response{OK: true}) != nil {
+		if s.send(response{ID: s.openID, OK: true}) != nil {
 			s.closeRequested.Store(true)
 			return
 		}
@@ -117,6 +147,7 @@ func runWindow(s *session) error {
 	err := runGame(w)
 	s.closed.Store(true)
 	close(s.windowGone)
+	s.emitClosed()
 	if !<-started {
 		// The window never appeared; report why instead of hanging the
 		// program's Graphics.open call.
@@ -124,7 +155,7 @@ func runWindow(s *session) error {
 		if err != nil {
 			message += ": no usable display was found"
 		}
-		_ = writeResponse(s.out, response{Error: message})
+		_ = s.send(response{ID: s.openID, Error: message})
 		return errors.New(message)
 	}
 	<-served

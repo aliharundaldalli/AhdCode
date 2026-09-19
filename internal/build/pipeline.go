@@ -376,6 +376,7 @@ func BuildProgram(entryPath, outputPath string) (string, Result) {
 	result.Program = configureNumericRuntime(result.Program)
 	result.Program = configureSQLiteRuntime(result.Program)
 	result.Program = configureGraphicsRuntime(result.Program)
+	result.Program = configureGUIRuntime(result.Program)
 	workspace, failures := NewWorkspace(result.Program)
 	if len(failures) != 0 {
 		result.Diagnostics = append(result.Diagnostics, failures...)
@@ -472,6 +473,7 @@ func RunProgramObserved(entryPath string, arguments []string, stdin io.Reader, s
 	result.Program = configureNumericRuntime(result.Program)
 	result.Program = configureSQLiteRuntime(result.Program)
 	result.Program = configureGraphicsRuntime(result.Program)
+	result.Program = configureGUIRuntime(result.Program)
 	executable, cleanup, failures := runExecutable(result.Program)
 	defer cleanup()
 	result.Diagnostics = append(result.Diagnostics, failures...)
@@ -603,6 +605,24 @@ func configureGraphicsRuntime(program *backend.GeneratedProgram) *backend.Genera
 	copyProgram := *program
 	copyProgram.Files = append([]backend.GeneratedFile(nil), program.Files...)
 	copyProgram.Files = append(copyProgram.Files, backend.GeneratedFile{Name: "ahdcode_graphics_runtime_hint.go", Content: "package main\n\nfunc init() { AhdGraphicsRuntimeHint = " + strconv.Quote(root) + " }\n"})
+	return &copyProgram
+}
+
+// configureGUIRuntime records the installed ahdgui helper's directory in
+// programs that use GUI, exactly like configureGraphicsRuntime. The runtime
+// still checks that the helper exists and raises GUIError if it is missing
+// when a Window is opened.
+func configureGUIRuntime(program *backend.GeneratedProgram) *backend.GeneratedProgram {
+	if program == nil || !program.RequiresGUI {
+		return program
+	}
+	root := findHelperRuntimeRoot("ahdgui", "AHDCODE_GUI_RUNTIME")
+	if root == "" {
+		return program
+	}
+	copyProgram := *program
+	copyProgram.Files = append([]backend.GeneratedFile(nil), program.Files...)
+	copyProgram.Files = append(copyProgram.Files, backend.GeneratedFile{Name: "ahdcode_gui_runtime_hint.go", Content: "package main\n\nfunc init() { AhdGUIRuntimeHint = " + strconv.Quote(root) + " }\n"})
 	return &copyProgram
 }
 

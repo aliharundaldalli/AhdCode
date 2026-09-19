@@ -464,6 +464,9 @@ func (generator *generator) renderFunc(value ir.Type, nullable, nested bool, spa
 		key, item := generator.goType(*value.Key, false), generator.goType(*value.Value, value.ValueNullable)
 		return "AhdStrPair[" + key + ", " + item + "](" + generator.renderFunc(*value.Key, false, true, span) + ", " + generator.renderFunc(*value.Value, value.ValueNullable, true, span) + ")"
 	case ir.ClassType:
+		if text, ok := generator.firstPartyText(value.Class); ok {
+			return text
+		}
 		return "AhdStrRefInstance[" + generator.interfaceName(value.Class) + "]"
 	default:
 		return generator.unsupported("canonical text for "+value.String(), span)
@@ -472,6 +475,39 @@ func (generator *generator) renderFunc(value ir.Type, nullable, nested bool, spa
 		return base
 	}
 	return "AhdStrNull[" + generator.plainType(value) + "](" + base + ")"
+}
+
+// firstPartyText renders the first-party value Classes by their public
+// contents, through the same runtime formatters the evaluator uses. It is
+// chosen by the exact compiler-supplied Class identity, so a user Class is
+// always rendered as <Name>.
+func (generator *generator) firstPartyText(class ir.ClassID) (string, bool) {
+	get := func(field ir.FieldID) string { return "value." + generator.fieldName(field) + "_get()" }
+	body := ""
+	switch class {
+	case numericVectorClass:
+		body = "AhdRenderVectorOf(" + get(numericVectorField) + ")"
+	case numericMatrixClass:
+		body = "AhdRenderMatrixOf(" + get(numericMatrixField) + ")"
+	case timeDurationClass:
+		body = "AhdRenderDuration(" + get(ir.FieldID(string(timeDurationClass)+"::field::milliseconds")) + ")"
+	case timeDateTimeClass:
+		names := []string{"Year", "Month", "Day", "Hour", "Minute", "Second", "Millisecond", "OffsetMinutes", "OffsetSeconds"}
+		fields := []string{"year", "month", "day", "hour", "minute", "second", "millisecond", "offsetMinutes", "offsetSeconds"}
+		parts := make([]string, len(names))
+		for index, name := range names {
+			parts[index] = name + ": " + get(ir.FieldID(string(timeDateTimeClass)+"::field::"+fields[index]))
+		}
+		body = "AhdRenderDateTimeOf(AhdCivilTime{" + strings.Join(parts, ", ") + "})"
+	case dataTableClass:
+		body = "AhdRenderTableOf(" + get(dataTableColumnsField) + ", " + get(dataTableCellsField) + ")"
+	default:
+		return "", false
+	}
+	if generator.classes[class] == nil {
+		return "", false
+	}
+	return "func(value " + generator.interfaceName(class) + ") string { if any(value) == nil { return \"null\" }; return " + body + " }", true
 }
 
 func (generator *generator) equalFunc(value ir.Type, nullable bool, span source.Span) string {
@@ -756,6 +792,9 @@ func (generator *generator) call(value *ir.CallExpr) string {
 	}
 	if strings.HasPrefix(string(value.Callable), graphicsModulePrefix) {
 		return generator.graphicsCall(value)
+	}
+	if strings.HasPrefix(string(value.Callable), guiModulePrefix) {
+		return generator.guiCall(value)
 	}
 	if strings.HasPrefix(string(value.Callable), numericModulePrefix) {
 		return generator.numericCall(value)
@@ -1087,6 +1126,9 @@ func (generator *generator) builtinCall(value *ir.CallExpr) string {
 		if strings.HasPrefix(name, "Canvas.") || strings.HasPrefix(name, "Turtle.") {
 			return generator.graphicsOperation(name, value)
 		}
+		if isGUIOperation(name) {
+			return generator.guiOperation(name, value)
+		}
 		if strings.HasPrefix(name, "Vector.") || strings.HasPrefix(name, "Matrix.") {
 			return generator.numericOperation(name, value)
 		}
@@ -1287,6 +1329,25 @@ func (generator *generator) adaptElementCallback(callback ir.Expr, paramType ir.
 	call := generator.expr(callback) + "(" + boxedArg + ")"
 	result := generator.coerce(call, ir.ExprBase{Type: resultType, NullState: ir.MaybeNull}, resultType, resultNullable)
 	return "func(" + arg + " " + paramGo + ") " + resultGo + " { return " + result + " }"
+}
+
+// adaptHandler turns an event callback of type (params...) -> Nothing into
+// the plain Go func the runtime stores. The callback expression is evaluated
+// once, when it is registered, like any other argument; the adapter only
+// boxes each argument the way a generated Function receives it.
+func (generator *generator) adaptHandler(callback ir.Expr, params ...ir.Type) string {
+	callbackType := generator.goType(callback.ExprMeta().Type, false)
+	function := generator.temporaryName()
+	declared := make([]string, len(params))
+	passed := make([]string, len(params))
+	for index, param := range params {
+		name := generator.temporaryName()
+		declared[index] = name + " " + generator.goType(param, false)
+		passed[index] = generator.coerce(name, ir.ExprBase{Type: param, NullState: ir.NonNull}, param, true)
+	}
+	signature := "func(" + strings.Join(declared, ", ") + ")"
+	return "func(" + function + " " + callbackType + ") " + signature + " { return " + signature + " { " +
+		function + "(" + strings.Join(passed, ", ") + ") } }(" + generator.expr(callback) + ")"
 }
 
 func nullStateFromBool(nullable bool) ir.NullState {

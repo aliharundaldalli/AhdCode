@@ -2866,6 +2866,15 @@ Varsayılan Class örnek gösterimi `<ClassName>`'dır. Örneğin, bir Student
 (disclosure) önler ve özyinelemeli nesne-grafiği gezinmesinden (traversal)
 kaçınır.
 
+Birinci taraf değer Class'ları istisnadır (v1.8.0):
+genel içeriklerini kendilerini oluşturan çağrının biçiminde gösterirler; bu
+yüzden `str`, `write`, interpolasyon ve `Terminal.pretty`
+`Vector([3.0, 4.0])`, `Matrix([[1.0, 2.0], [3.0, 4.0]])`,
+`DateTime(2026-09-18T13:30:00.000+03:00)`, `Duration(1500 ms)` ve
+`Table(["id", "name"], [["1", "Ada"]])` gösterir. Bu, yansıma (reflection)
+değil, bu beş standart kütüphane Class'ı için sabit bir kuraldır: kullanıcı
+Class'ı yine `<ClassName>` olarak yazdırılır.
+
 İsimlendirilmiş bir Function değeri şöyle gösterilir:
 
 ```text
@@ -3411,8 +3420,10 @@ YYYY-MM-DD HH:MM:SS
 ```
 
 Milisaniyeler, metin yerine `millisecond` özniteliği üzerinden okunur.
-`str(value)`, bir `DateTime`'ı `<DateTime>` olarak işler, çünkü §34.1
-kasıtlı olarak Class özniteliklerini yazdırmaz.
+`str(value)`, bir `DateTime`'ı `DateTime(` ardından `toISO()` metni ve `)`
+olarak işler; bu, §34.1'in sabit birinci taraf gösterimlerinden biridir (v1.8.0);
+saniye içeren tarihsel bir ofset `±HH:MM:SS` olarak
+yazılır.
 
 `DateTime`, `CCompare`'i (§47) uygulamaz, bu yüzden `<` ve `>` ona
 uygulanmaz. Sıralama `before` ve `after` ile yazılır. `DateTime`, `CEqual`'i
@@ -6791,6 +6802,97 @@ mesajlar ne parolayı ne hash'i içerir. `passwordHash`/`passwordVerify`
 (Argon2id) değişmemiştir ve hiçbir doğrulayıcı diğerinin biçimini kabul
 etmez. Bir bcrypt fonksiyonu çağıran yerel program vendor'lanmış, sabitlenmiş
 kaynağı çevrimdışı derler.
+
+## 83. GUI Standart Modülü (v1.8.0)
+
+`bring GUI`, derleyicinin sağladığı `builtin:GUI` modülüne çözülür; yerel bir
+`GUI.ahd` onu gölgeleyemez. Modül `GUI.window` fonksiyonunu, `Window`,
+`Container`, `Label`, `Button`, `TextInput` ve `Checkbox` Class'larını ve
+`Error`'dan türeyen `GUIError`'ı dışa aktarır. Hiçbir Class kurucu yayımlamaz.
+
+```text
+GUI.window(title: String := "AhdCode", width: Int := 800, height: Int := 600) -> Window
+
+Window.column(spacing: Int := 8, padding: Int := 12) -> Container
+Window.row(spacing: Int := 8, padding: Int := 12)    -> Container
+Window.onKey(handler: (String) -> Nothing) -> Nothing
+Window.wait() -> Nothing    Window.close() -> Nothing    Window.isOpen() -> Bool
+Window.setTitle(text: String) -> Nothing
+
+Container.column(spacing: Int := 8, padding: Int := 0) -> Container
+Container.row(spacing: Int := 8, padding: Int := 0)    -> Container
+Container.label(text: String) -> Label
+Container.button(text: String) -> Button
+Container.textInput(placeholder: String := "") -> TextInput
+Container.checkbox(text: String, checked: Bool := false) -> Checkbox
+
+Label.text() -> String       Label.setText(text: String) -> Nothing
+Button.text() -> String      Button.setText(text: String) -> Nothing
+Button.onClick(handler: () -> Nothing) -> Nothing
+TextInput.text() -> String   TextInput.setText(text: String) -> Nothing
+Checkbox.checked() -> Bool   Checkbox.setChecked(checked: Bool) -> Nothing
+```
+
+Üyeler parametre adlarını ve varsayılanlarını yayımlar ve bölüm 15.3'e uyar.
+Bir handler argümanı, türü tam olarak listelenen biçimde olan bir Function
+olmalıdır; değer döndüren bir Function dahil başka her argüman derleme
+zamanında reddedilir.
+
+`GUIError`; 1..4096 dışındaki genişlik veya yükseklikte, 256 karakterden uzun
+başlıkta, 4096 karakterden uzun metin veya yer tutucuda, 0..1000 dışındaki
+spacing veya padding değerinde, aynı Window'un ikinci kök Container'ında,
+kapalı bir Window üzerindeki her değişiklik, ekleme veya kayıtta ve eksik,
+başarısız ya da yanıt vermeyen yardımcıda fırlatılır. Değerler asla
+kırpılmaz. Bir Window'un en fazla bir kök Container'ı olur; diğer her
+Container bir Container içinde oluşturulur. Column çocuklarını yukarıdan
+aşağı, sola hizalı dizer; Row soldan sağa, dikeyde ortalı yerleştirir. Her
+bileşen doğal boyutunu korur ve pencere dışında kalan içerik kırpılır.
+
+`wait`, Window kapanana kadar onu gösterir ve sonra normal şekilde döner;
+`close` idempotenttir; Window herhangi bir taraftan kapandığında `isOpen`
+false olur. Window kapandıktan sonra `TextInput.text`, `Checkbox.checked`,
+`Label.text` ve `Button.text` son değerlerini döndürür. Aynı anda birden
+fazla Window açık olabilir ve bunlar birbirinden bağımsızdır.
+
+## 84. GUI Çalışma Zamanı ve Pencere Olayları (v1.8.0)
+
+`Button.onClick`, `Window.onKey` ve Graphics üyeleri
+`Canvas.onClick(handler: (Real, Real) -> Nothing)` ile
+`Canvas.onKey(handler: (String) -> Nothing)`, her olay ve nesne için en fazla
+bir geri çağırma kaydeder; yeniden kayıt öncekinin yerini alır ve kaldırma
+yoktur. Kapalı bir Window veya Canvas üzerinde kayıt sırasıyla `GUIError` veya
+`GraphicsError` fırlatır.
+
+Geri çağırmalar yalnızca sahibi olan Window veya Canvas'ın `wait` çağrısı
+içinde, birer birer, programın kendi yürütme yolunda ve yardımcının olayları
+bildirdiği sırayla çalışır. Bir geri çağırma çalışırken başka olay işlenmez;
+bu nedenle uzun bir geri çağırma penceresini bekletir. Bir geri çağırma,
+Turtle ile çizim dahil her GUI veya Graphics nesnesinin her üyesini
+çağırabilir. Bir geri çağırma hata fırlatırsa sahibi olan Window veya Canvas
+kapatılır ve Class'ı ile mesajı değişmeyen aynı hata `wait` dışına yayılır.
+Pencere kapandığında kuyrukta bekleyen olaylar atılır.
+
+Tuş olayları yalnızca tuşa basıldığında üretilir ve `ArrowUp`, `ArrowDown`,
+`ArrowLeft`, `ArrowRight`, `Enter`, `Escape`, `Space`, `Tab`, `Backspace`,
+`Delete`, `Home`, `End`, `PageUp`, `PageDown`, `A`..`Z` veya `0`..`9`
+adlarından birini taşır; diğer tuşlar bildirilmez. `Window.onKey`, bir
+TextInput'a yazılan tuşları da görür. Bir Canvas tıklaması, sol düğmeye
+basılan noktayı Canvas'ın Kartezyen koordinatlarında (bölüm 80) bildirir.
+Geri çağırması olmayan `Canvas.wait`, v1.6.0'daki gibi davranır.
+
+Her açık Window paketli `ahdgui` yardımcısının bir süreci, her Canvas ise bir
+`ahdgraphics` süreci tarafından çizilir. Program ve yardımcı sınırlı JSON
+satırları alışverişi yapar: her istek, yanıtının geri yansıttığı bir `id`
+taşır ve yardımcı ayrıca olay satırları gönderir. Çalışma zamanı yanıtları ve
+olayları ayrı yönlendirir ve pencere başına en fazla 1024 bekleyen olay
+tutar; bu sınırı aşan bir yardımcı pencereyi hatayla kapatır. `ahdgui`
+yardımcısı kabuk komutu çalıştırmaz, ağ erişimi yapmaz, dosya veya ortam
+dosyası okumaz, kendi yazı tipini gömülü taşır ve TextInput'a yazılan metni
+günlüğe yazmaz. Yardımcı; `AHDCODE_GUI_RUNTIME`, derleyicinin kaydettiği konum
+veya çalışan yürütülebilir dosyanın yanındaki kurulum üzerinden bulunur;
+`PATH` aranmaz. `AHDCODE_GUI_HEADLESS=1` her Window'u ekransız açar.
+Değerlendirici, `ahdcode run` ve yerel programlar bu çalışma zamanını
+paylaşır; `GUI` getirmeyen bir program önceki gibi davranır.
 
 ---
 

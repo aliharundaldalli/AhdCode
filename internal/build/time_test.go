@@ -160,7 +160,7 @@ func TestTimeStandardLibraryRunsAsNativeExecutables(t *testing.T) {
 		{
 			name:     "Time values participate in ordinary Class rules",
 			sources:  map[string]string{"main.ahd": timeImports + "a: DateTime := Time.dateTime(year: 2026, month: 1, day: 1)\nb: DateTime := a\nwrite(a same b)\nwrite(a == b)\nwrite(str(a))\n"},
-			expected: "true\ntrue\n<DateTime>\n",
+			expected: "true\ntrue\nDateTime(2026-01-01T00:00:00.000+03:00)\n",
 		},
 	}
 	runProgramCases(t, cases)

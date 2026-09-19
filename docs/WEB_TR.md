@@ -572,7 +572,7 @@ derler ve yeniden başlatır. `public/app.css`'i düzenlemek bunu yapmaz.
 `APP_PROTOCOL=https`'i de **reddeder**:
 
 ```
-✗ Local HTTPS is not available in AhdCode v1.7.0.
+✗ Local HTTPS is not available in AhdCode v1.8.0.
   ahdcode dev serves plaintext HTTP, so it cannot honour
   APP_PROTOCOL=https.
 

@@ -23,6 +23,31 @@ func (session *Session) graphicsCheck(problem string) {
 	}
 }
 
+// graphicsHandler reads the Function argument of an event registration.
+func (session *Session) graphicsHandler(arguments []any, member string) *FunctionValue {
+	if len(arguments) > 0 {
+		if function, ok := arguments[0].(*FunctionValue); ok && function != nil {
+			return function
+		}
+	}
+	session.raise("NullError", member+" needs a Function")
+	return nil
+}
+
+// invokeHandler runs one event callback, the same way a compiled program
+// calls its Go func: its result is discarded, its error propagates, and what
+// it writes is flushed at once.
+func (session *Session) invokeHandler(handler *FunctionValue, values ...any) {
+	arguments := make([]argumentValue, len(values))
+	for index, value := range values {
+		arguments[index] = argumentValue{value: value}
+	}
+	session.invoke(handler, arguments)
+	if flusher, ok := session.Output.(interface{ Flush() error }); ok {
+		_ = flusher.Flush()
+	}
+}
+
 func graphicsInstance(class ir.ClassID, field ir.FieldID, handle int64) *Instance {
 	return &Instance{Class: class, Fields: map[ir.FieldID]any{field: handle}}
 }
@@ -69,7 +94,19 @@ func (session *Session) graphicsOperation(name string, receiver any, arguments [
 			session.graphicsCheck(ahdruntime.AhdGraphicsRectangle(canvas, real(0, 0), real(1, 0), real(2, 0), real(3, 0), text(4, "black"), nullable(5), real(6, 1)))
 		case "Canvas.save":
 			session.graphicsCheck(ahdruntime.AhdGraphicsSave(canvas, text(0, "")))
+		case "Canvas.onClick":
+			handler := session.graphicsHandler(arguments, "Canvas.onClick")
+			session.graphicsCheck(ahdruntime.AhdGraphicsOnClick(canvas, func(x, y float64) {
+				session.invokeHandler(handler, x, y)
+			}))
+		case "Canvas.onKey":
+			handler := session.graphicsHandler(arguments, "Canvas.onKey")
+			session.graphicsCheck(ahdruntime.AhdGraphicsOnKey(canvas, func(key string) {
+				session.invokeHandler(handler, key)
+			}))
 		case "Canvas.wait":
+			// Output written before wait must be visible while the window is open.
+			session.flushOutput()
 			session.graphicsCheck(ahdruntime.AhdGraphicsWait(canvas))
 		case "Canvas.close":
 			session.graphicsCheck(ahdruntime.AhdGraphicsClose(canvas))

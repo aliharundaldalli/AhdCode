@@ -1,4 +1,4 @@
-# AhdCode v1.7.0 Türkçe Öğrenci Rehberi
+# AhdCode v1.8.0 Türkçe Öğrenci Rehberi
 
 Bu rehber, **daha önce hiç programlama yapmamış birinin de takip edebilmesi** için hazırlanmıştır. Baştan sona sırayla okuyabilirsiniz; her bölümde önce ne yapmak istediğimizi görecek, sonra çalışan bir örnek yazacak, en son gerekli kuralları öğreneceksiniz.
 
@@ -85,6 +85,7 @@ verir.
 - [62. Terminal: çıktı üzerinde daha fazla denetim](#62-terminal-çıktı-üzerinde-daha-fazla-denetim)
 - [63. Graphics: Canvas ve Turtle ile çizim](#63-graphics-canvas-ve-turtle-ile-çizim)
 - [64. Açılar, zaman damgaları ve birleştirilen tablolar](#64-açılar-zaman-damgaları-ve-birleştirilen-tablolar)
+- [65. Tepki veren pencereler: GUI formları ve Turtle tuşları](#65-tepki-veren-pencereler-gui-formları-ve-turtle-tuşları)
 
 ## 1. AhdCode nedir?
 
@@ -6990,3 +6991,119 @@ açıklayın.
 [Math](MATH_TR.md), [Time](TIME_TR.md), [Data](DATA_TR.md) ve
 [Statistics](STATISTICS_TR.md) başvurularına ve
 [`examples/v1.7`](../examples/v1.7/README_TR.md) örneğine bakın.
+
+## 65. Tepki veren pencereler: GUI formları ve Turtle tuşları
+
+Şimdiye kadar program `take()` ile sorup bir satır metin bekliyordu. Bir
+**geri çağırma** (callback) bunu tersine çevirir: pencereye bir Function
+verirsiniz, kullanıcı tıkladığında veya bir tuşa bastığında pencere onu
+çağırır.
+
+**Ok tuşlarıyla yönetilen Turtle.** `canvas.onKey`, kullanıcının bastığı her
+tuşun adıyla (`"ArrowUp"`, `"Escape"` gibi) bir Function çalıştırır:
+
+```ahd
+bring Graphics
+from Graphics bring (Canvas, Turtle)
+
+canvas: Canvas := Graphics.open(400, 400)
+pen: Turtle := canvas.turtle()
+
+step: Function := (key: String) -> Nothing {
+    pen: Global Turtle
+    state key {
+        condition "ArrowUp" {
+            pen.setHeading(90)
+        }
+        condition "ArrowDown" {
+            pen.setHeading(270)
+        }
+        condition "ArrowLeft" {
+            pen.setHeading(180)
+        }
+        condition "ArrowRight" {
+            pen.setHeading(0)
+        }
+        condition default {
+            return
+        }
+    }
+    pen.forward(20)
+}
+
+jump: Function := (x: Real, y: Real) -> Nothing {
+    pen: Global Turtle
+    pen.penUp()
+    pen.moveTo(x, y)
+    pen.penDown()
+}
+
+canvas.onKey(step)
+canvas.onClick(jump)
+canvas.wait()
+```
+
+Her ok tuşu kendi yönünde 20 birim çizer. Bir tıklama, `jump` Function'ını
+tıklanan noktayla, Turtle'ın kullandığı Kartezyen koordinatlarda çağırır:
+`(0, 0)` merkezdir ve `y` yukarı doğru artar. Geri çağırmalar
+`canvas.wait()` sırasında çalışır; pencereyi kapattığınızda `wait()` döner.
+
+**Küçük bir form.** `GUI` modülü bileşenleri olan bir pencere açar: **Label**
+metin gösterir, **TextInput** kullanıcının tek satır yazmasını sağlar,
+**Checkbox** açık ya da kapalıdır, **Button** tıklandığında bir Function
+çalıştırır. Bileşenler bir **column** (yukarıdan aşağı) veya bir **row**
+(soldan sağa) içine yerleştirilir:
+
+```ahd
+bring GUI
+from GUI bring (Window, Container, Label, Button, TextInput, Checkbox)
+
+window: Window := GUI.window(title: "Selamlayıcı", width: 360, height: 220)
+form: Container := window.column()
+form.label("Adınız")
+name: TextInput := form.textInput(placeholder: "ör. Ayşe")
+polite: Checkbox := form.checkbox("Kibar")
+greet: Button := form.button("Selamla")
+answer: Label := form.label("")
+
+sayHello: Function := () -> Nothing {
+    name: Global TextInput
+    polite: Global Checkbox
+    answer: Global Label
+    if polite.checked() {
+        answer.setText("Tünaydın, {name.text()}.")
+    }
+    else {
+        answer.setText("Merhaba {name.text()}!")
+    }
+}
+
+greet.onClick(sayHello)
+window.wait()
+write("Son yazılan ad: {name.text()}")
+```
+
+Bir ad yazıp **Selamla** düğmesine tıklayın; Label değişir. Pencereyi
+kapattıktan sonra `wait()` döner ve program yazılanı hâlâ okuyabilir.
+
+Üç kural geri çağırmaları basit tutar:
+
+- Geri çağırmanın biçimi program çalışmadan önce denetlenir: `onClick`
+  argümansız bir Function, `onKey` tek String alan bir Function ister ve
+  hiçbiri değer döndürmez.
+- Geri çağırmalar sırayla, birer birer çalışır. Biri çalışırken pencere
+  bekler; bu yüzden kısa tutun.
+- Bir geri çağırma hata fırlatırsa pencere kapanır ve hata `wait()` dışına
+  aynen çıkar; orada `attempt`/`except` ile yakalanabilir.
+
+GUI yalnızca girdi toplar. Button'ın bu girdiyle yaptığı iş (SQLite ile
+kaydetmek, dosyaya yazmak, HTTP çağırmak) sıradan AhdCode kodudur.
+
+**Kendiniz deneyin:** TextInput'u `name.setText("")` ile boşaltan ve Label'ı
+sıfırlayan ikinci bir "Temizle" Button'ı ekleyin. Sonra pencereye, tuş
+`"Escape"` olduğunda `window.close()` ile pencereyi kapatan bir `onKey`
+geri çağırması verin.
+
+Bkz. [GUI modülü başvurusu](GUI_TR.md),
+[Graphics başvurusu](GRAPHICS_TR.md#tıklamalar-ve-tuş-basışları) ve
+[`examples/v1.8`](../examples/v1.8/README_TR.md).

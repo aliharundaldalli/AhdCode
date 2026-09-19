@@ -12,21 +12,20 @@ AhdCode is an experimental statically checked general-purpose programming
 language focused on readable syntax, explicit intent, predictable semantics,
 and native compilation.
 
-This is **v1.7.0**. The language, toolchain, and Web framework are
+This is **v1.8.0**. The language, toolchain, and Web framework are
 feature-complete, and the core language surface described here is what 1.0
-committed to and 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, and 1.7 keep unchanged.
+committed to and 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, and 1.8 keep unchanged.
 
-v1.7.0 is a minor release, **Standard Library Completion**: it strengthens
-Math, Time, Numeric, Statistics, Data, and Security with inverse and
-hyperbolic trigonometry, gcd/lcm, strict ISO 8601 time text and instant
-arithmetic, Vector and Matrix accessors, covariance, correlation, and a simple
-linear regression, Table concat and inner join, and bcrypt compatibility —
-without altering the core grammar or the type system and without a new
-dependency. See [What is new in v1.7.0](#what-is-new-in-v170).
+v1.8.0 is a minor release, **GUI Foundations + Minimal Events**: it adds the
+`GUI` module for small desktop windows with Labels, Buttons, single-line
+TextInputs, and Checkboxes arranged in Columns and Rows, click and key
+callbacks for GUI windows and Graphics Canvases, and readable `str` and `write`
+output for Vector, Matrix, DateTime, Duration, and Table — without new syntax
+or a type-system change. See [What is new in v1.8.0](#what-is-new-in-v180).
 
 It ships as a self-contained platform package: the `ahdcode` CLI, a private
 Go 1.27.0 toolchain, AhdDataStudio, the `ahdsqlite`, `ahdnumeric`, `ahdplot`,
-and `ahdgraphics` helpers, an offline Tectonic LaTeX engine with its pinned resource
+`ahdgraphics`, and `ahdgui` helpers, an offline Tectonic LaTeX engine with its pinned resource
 bundle, the Web starters, and an exact-version English documentation bundle.
 See [Installation](INSTALLATION.md).
 
@@ -303,7 +302,7 @@ To maintain conceptual clarity, AhdCode's capabilities are organized into four d
    - Module resolution (`bring`, `from ... bring`) and compile-time local source composition ([`require(...)`](REQUIRE.md))
 
 2. **Standard Library (First-party Bundled Modules):**
-   - **Mathematics & Computation:** [`Math`](MATH.md), [`Bits`](BITS.md) (bitwise operations on `Int`), [`Regex`](REGEX.md), [`Statistics`](STATISTICS.md), [`Numeric`](NUMERIC.md), [`Plot`](PLOT.md), [`Graphics`](GRAPHICS.md) (Canvas windows and Turtle drawing)
+   - **Mathematics & Computation:** [`Math`](MATH.md), [`Bits`](BITS.md) (bitwise operations on `Int`), [`Regex`](REGEX.md), [`Statistics`](STATISTICS.md), [`Numeric`](NUMERIC.md), [`Plot`](PLOT.md), [`Graphics`](GRAPHICS.md) (Canvas windows and Turtle drawing), [`GUI`](GUI.md) (small desktop windows with click and key callbacks)
    - **Data & Collections:** [`Lists`](LISTS.md), [`KeyValue`](KEYVALUE.md), [`Characters`](CHARACTERS.md) (Unicode code points and classification), [`CSV`](CSV.md), [`Data`](DATA.md), [`JSON`](JSON.md), [`XML`](XML.md), [`UUID`](UUID.md) (RFC 9562 version 4 and time-ordered version 7 identifiers)
    - **Document Generation:** [`Word`](WORD.md), [`Excel`](EXCEL.md), [`PDF`](PDF.md), [`Latex`](LATEX.md), [`QR`](QR.md) (QR codes), [`Barcode`](BARCODE.md) (Code 128, EAN-13, UPC-A), [`Archive`](ARCHIVE.md)
    - **System & Environment:** [`Time`](TIME.md), [`Cron`](CRON.md) (bounded in-process scheduling), [`Path`](FILESYSTEM.md), [`File`](FILESYSTEM.md), [`Env`](ENV.md), [`Terminal`](TERMINAL.md) (v1.5.0: standard error, flushing, terminal detection and size, styled text, pretty layout)
@@ -332,11 +331,13 @@ AhdCode currently requires Go 1.26 or newer.
 cd AhdCode
 go install ./cmd/ahdcode ./cmd/ahdnumeric ./cmd/ahdplot ./cmd/ahdsqlite
 go -C cmd/ahdgraphics install .
+go -C cmd/ahdgui install .
 ```
 
-The commands above install the compiler and the local numeric, plot, SQLite, and
-Graphics window helpers. The Graphics helper is its own Go module, so it is
-installed with `go -C cmd/ahdgraphics install .`.
+The commands above install the compiler and the local numeric, plot, SQLite,
+Graphics window, and GUI window helpers. The Graphics and GUI helpers are their
+own Go modules, so they are installed with `go -C cmd/ahdgraphics install .` and
+`go -C cmd/ahdgui install .`.
 If you plan to use the `Latex` module **or** the `PDF` module's `.save()` (they
 share one offline renderer), you must also stage the offline Latex/Tectonic
 runtime bundle. `Archive` needs no such staging -- it is Go-standard-library
@@ -450,6 +451,7 @@ See the [CLI guide](CLI.md), [formatter guide](FORMATTER.md),
 - [UUID module](UUID.md)
 - [Terminal module](TERMINAL.md)
 - [Graphics module](GRAPHICS.md)
+- [GUI module](GUI.md)
 - [Understanding diagnostics](DIAGNOSTICS.md)
 - [Language server](LSP.md)
 - AI-assisted local setup
@@ -466,6 +468,7 @@ See the [CLI guide](CLI.md), [formatter guide](FORMATTER.md),
 - v1.4 realtime attendance — Web, PostgreSQL, WebSocket, UUID v7, `Env.secret`, and Cron
 - v1.5 Terminal demo — `Terminal.emit`, standard error, terminal detection, styled text, and pretty layout
 - v1.7 standard-library completion — trigonometry and gcd/lcm, strict ISO time text and instant arithmetic, and a Table join with statistics
+- v1.8 GUI and events — a small GUI ledger backed by SQLite and a Turtle driven by arrow keys and clicks
 - v1.6 Graphics and Turtle — a Cartesian Canvas, shapes, a Turtle star and spiral, PNG/SVG export, and a regular-polygon lesson
 - AhdDataStudio — local MySQL + SQLite development UI
 - [v0.4 Library Demo](https://github.com/aliharundaldalli/ahdcode-library-demo) (separate beginner web app)
@@ -483,6 +486,31 @@ diagnostics and hover. The same VSIX targets VS Code and Antigravity. See its
 installation guide.
 
 ## Current limitations
+
+## What is new in v1.8.0 <a id="what-is-new-in-v180"></a>
+
+v1.8.0 is a **minor** release, **GUI Foundations + Minimal Events**. It adds
+one standard module, two Graphics Canvas members, and readable output for five
+value Classes; the core grammar and the type system are unchanged.
+
+- [`GUI`](GUI.md): a new standard module for small desktop windows with a
+  Label, a Button, a single-line TextInput, and a Checkbox, arranged in Columns
+  and Rows, plus `Button.onClick` and `Window.onKey` callbacks. It is meant
+  for learning and small desktop applications such as forms, data-entry tools,
+  simple database front ends, and utilities; it is not a Tkinter-compatible
+  toolkit, a game engine, or a professional creative-application framework.
+  Each Window is drawn by the bundled `ahdgui` helper.
+- [`Graphics`](GRAPHICS.md): `Canvas.onClick` and `Canvas.onKey` run a
+  Function on a click (Cartesian coordinates) or a key press, so a Turtle can
+  be driven by the arrow keys without reading the terminal.
+- Callbacks run one at a time on the program's own path; their shapes are
+  checked at compile time, and a callback's error propagates out of `wait()`
+  unchanged.
+- `str`, `write`, and `Terminal.pretty` now show the contents of a Vector,
+  Matrix, DateTime, Duration, and Table, for example `Vector([3.0, 4.0])` and
+  `Duration(1500 ms)`, instead of only the Class name.
+
+See the v1.8 examples.
 
 ## What is new in v1.7.0 <a id="what-is-new-in-v170"></a>
 
@@ -714,6 +742,7 @@ cmd/ahdcode/         CLI entry point and command router
 cmd/ahdnumeric/      bundled advanced linear-algebra helper
 cmd/ahdplot/         bundled chart-rendering helper
 cmd/ahdgraphics/     bundled Graphics window helper (its own Go module)
+cmd/ahdgui/          bundled GUI window helper (its own Go module)
 cmd/ahdsqlite/       bundled CGO-free SQLite helper
 internal/            compiler frontend, backend, runtime, formatter, LSP, and REPL
 internal/framework/  bundled first-party Web framework source

@@ -12,13 +12,16 @@ import (
 )
 
 // The protocol between AhdCode's Graphics runtime and this helper is one JSON
-// object per line in each direction: the runtime writes a request to the
-// helper's standard input and reads exactly one response line from its
-// standard output. Standard error is never part of the protocol. The shape is
+// object per line in each direction. The runtime writes a request, carrying an
+// id, to the helper's standard input; the helper answers each request with
+// exactly one response line echoing that id. Besides responses, the helper
+// writes event lines ({"event": ...}, never with an id) for window clicks and
+// key presses the program listens for, and one "closed" event when the window
+// is gone. Standard error is never part of the protocol. The shape is
 // duplicated field for field in internal/backend/golang/ahdruntime/graphics.go,
 // which cannot import this module.
 const (
-	protocolVersion = 1
+	protocolVersion = 2
 
 	// maxRequestBytes bounds one request line. Every legitimate request is a
 	// few hundred bytes; a save path is the longest field.
@@ -29,6 +32,8 @@ const (
 	// maxCommands bounds the drawing commands kept since the last clear, so a
 	// runaway loop cannot exhaust memory. Each command is well under 100 bytes.
 	maxCommands = 1_000_000
+	// maxScriptEvents bounds the scripted events of a headless test Canvas.
+	maxScriptEvents = 64
 )
 
 // rgba is a validated, non-premultiplied color. It travels as a JSON array of
@@ -37,6 +42,7 @@ type rgba [4]uint8
 
 type request struct {
 	Op string `json:"op"`
+	ID int64  `json:"id,omitempty"`
 
 	Version    int    `json:"version,omitempty"`
 	Width      int    `json:"width,omitempty"`
@@ -62,9 +68,26 @@ type request struct {
 	LineWidth float64 `json:"lineWidth,omitempty"`
 
 	Path string `json:"path,omitempty"`
+
+	// Kind names the event a listen request turns on: "click" or "key".
+	Kind string `json:"kind,omitempty"`
+	// Script is the event list a headless Canvas replays when the program
+	// waits. It exists for automated tests without a display; a windowed
+	// Canvas rejects it.
+	Script []event `json:"script,omitempty"`
+}
+
+// event is one line the helper writes on its own: a click inside the Canvas
+// in Cartesian coordinates, a key press by its normalized name, or closed.
+type event struct {
+	Event string  `json:"event"`
+	X     float64 `json:"x,omitempty"`
+	Y     float64 `json:"y,omitempty"`
+	Key   string  `json:"key,omitempty"`
 }
 
 type response struct {
+	ID     int64  `json:"id,omitempty"`
 	OK     bool   `json:"ok"`
 	Error  string `json:"error,omitempty"`
 	Closed bool   `json:"closed,omitempty"`
@@ -103,6 +126,10 @@ func readRequest(reader *bufio.Reader) (request, error) {
 }
 
 func writeResponse(writer *bufio.Writer, value response) error {
+	return writeLine(writer, value)
+}
+
+func writeLine(writer *bufio.Writer, value any) error {
 	encoded, err := json.Marshal(value)
 	if err != nil {
 		return err
@@ -130,6 +157,20 @@ func validateOpen(value request) error {
 	}
 	if value.Background == nil {
 		return errors.New("open requires a background color")
+	}
+	if len(value.Script) > 0 && !value.Headless {
+		return errors.New("only a headless Canvas replays scripted events")
+	}
+	if len(value.Script) > maxScriptEvents {
+		return errors.New("too many scripted events")
+	}
+	for _, scripted := range value.Script {
+		switch {
+		case scripted.Event == "click" && finite(scripted.X, scripted.Y):
+		case scripted.Event == "key" && keyNameKnown(scripted.Key):
+		default:
+			return errors.New("invalid scripted event")
+		}
 	}
 	return nil
 }

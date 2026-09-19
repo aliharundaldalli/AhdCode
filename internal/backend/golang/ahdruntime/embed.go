@@ -184,3 +184,19 @@ var FundamentalsSource string
 //
 //go:embed bcrypt.go
 var BcryptSource string
+
+// HelperLinkSource is emitted as a separate generated Go file. It is the
+// standard-library-only transport to the bundled window helpers (ahdgraphics
+// and ahdgui): request/response lines, event routing, and the bounded event
+// queue that Canvas and Window callbacks are dispatched from.
+//
+//go:embed helperlink.go
+var HelperLinkSource string
+
+// GUISource is emitted as a separate generated Go file. It is the AhdCode
+// side of the GUI standard module: argument validation, widget handles and
+// values, callbacks, and the protocol client of the bundled ahdgui window
+// helper. It uses only the standard library.
+//
+//go:embed gui.go
+var GUISource string

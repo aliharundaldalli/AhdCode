@@ -230,6 +230,8 @@ func (session *Session) builtin(identity ir.CallableID, receiver any, arguments 
 		return session.uuidBuiltin(strings.TrimPrefix(name, "builtin:UUID::"), values(arguments))
 	case strings.HasPrefix(name, "builtin:Graphics::"):
 		return session.graphicsBuiltin(strings.TrimPrefix(name, "builtin:Graphics::"), values(arguments))
+	case strings.HasPrefix(name, "builtin:GUI::"):
+		return session.guiBuiltin(strings.TrimPrefix(name, "builtin:GUI::"), values(arguments))
 	case strings.HasPrefix(name, "builtin:Terminal::"):
 		return session.terminalBuiltin(strings.TrimPrefix(name, "builtin:Terminal::"), values(arguments))
 	case strings.HasPrefix(name, "builtin:PostgreSQL::"):
@@ -356,6 +358,9 @@ func (session *Session) core(name string, receiver any, arguments []any) any {
 	}
 	if strings.HasPrefix(name, "Canvas.") || strings.HasPrefix(name, "Turtle.") {
 		return session.graphicsOperation(name, receiver, arguments)
+	}
+	if isGUIOperation(name) {
+		return session.guiOperation(name, receiver, arguments)
 	}
 	if strings.HasPrefix(name, "Document.") {
 		return session.wordOperation(name, receiver, arguments)

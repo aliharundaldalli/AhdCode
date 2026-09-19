@@ -1,0 +1,58 @@
+// Arrow keys draw with the Turtle; a click moves it without drawing. This
+// replaces reading keys from the terminal: the Canvas window itself reports
+// the key presses and clicks, and no take() call is needed.
+bring Graphics
+from Graphics bring (Canvas, Turtle)
+
+canvas: Canvas := Graphics.open(500, 500, "Turtle events")
+canvas.line(-250, 0, 250, 0, "gray")
+canvas.line(0, -250, 0, 250, "gray")
+pen: Turtle := canvas.turtle()
+pen.setColor("blue")
+pen.setWidth(3)
+
+step: Function := (key: String) -> Nothing {
+    canvas: Global Canvas
+    pen: Global Turtle
+    state key {
+        condition "ArrowUp" {
+            pen.setHeading(90)
+        }
+        condition "ArrowDown" {
+            pen.setHeading(270)
+        }
+        condition "ArrowLeft" {
+            pen.setHeading(180)
+        }
+        condition "ArrowRight" {
+            pen.setHeading(0)
+        }
+        condition "S" {
+            canvas.save("turtle-events.png")
+            canvas.save("turtle-events.svg")
+            write("Saved turtle-events.png and turtle-events.svg")
+            return
+        }
+        condition default {
+            return
+        }
+    }
+    pen.forward(20)
+    write("{key}: ({pen.x()}, {pen.y()})")
+}
+
+jump: Function := (x: Real, y: Real) -> Nothing {
+    pen: Global Turtle
+    pen.penUp()
+    pen.moveTo(x, y)
+    pen.penDown()
+    write("Moved to ({x}, {y})")
+}
+
+canvas.onKey(step)
+canvas.onClick(jump)
+write(
+    "Arrow keys draw 20 units, a click moves the Turtle, S saves, closing the window ends."
+)
+canvas.wait()
+write("Window closed.")

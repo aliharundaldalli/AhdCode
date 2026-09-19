@@ -685,6 +685,9 @@ func (a *analyzer) analyzeCallWithCallee(call *ast.CallExpr, callee expressionIn
 			hint, supplied = graphicsConstructionHint(class.Symbol)
 		}
 		if !supplied {
+			hint, supplied = guiConstructionHint(class.Symbol)
+		}
+		if !supplied {
 			hint, supplied = numericConstructionHint(class.Symbol)
 		}
 		if !supplied {
@@ -818,6 +821,9 @@ func typeOperationFor(receiver types.Type, name string) (TypeOperation, bool) {
 			return operation, true
 		}
 		if operation, ok := graphicsOperationFor(receiver, name); ok {
+			return operation, true
+		}
+		if operation, ok := guiOperationFor(receiver, name); ok {
 			return operation, true
 		}
 		if operation, ok := wordOperationFor(receiver, name); ok {

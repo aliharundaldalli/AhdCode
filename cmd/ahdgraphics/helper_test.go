@@ -191,8 +191,13 @@ func TestModelLimitsCommands(t *testing.T) {
 }
 
 // protocolRun serves a headless session over in-memory pipes and returns
-// every response line.
+// every response line, and every event line in order.
 func protocolRun(t *testing.T, lines ...string) []response {
+	replies, _ := protocolRunEvents(t, lines...)
+	return replies
+}
+
+func protocolRunEvents(t *testing.T, lines ...string) ([]response, []event) {
 	t.Helper()
 	input := strings.NewReader(strings.Join(lines, "\n") + "\n")
 	var output bytes.Buffer
@@ -203,43 +208,56 @@ func protocolRun(t *testing.T, lines ...string) []response {
 		t.Fatal(err)
 	}
 	if err := validateOpen(first); err != nil {
-		_ = writeResponse(out, response{Error: err.Error()})
+		_ = writeResponse(out, response{ID: first.ID, Error: err.Error()})
 	} else {
 		s := &session{model: newModel(first.Title, first.Width, first.Height, *first.Background), in: in, out: out,
-			headless: true, windowGone: make(chan struct{})}
+			headless: true, windowGone: make(chan struct{}), script: first.Script}
 		close(s.windowGone)
-		_ = writeResponse(out, response{OK: true})
+		_ = s.send(response{ID: first.ID, OK: true})
 		s.serve()
 	}
 	var replies []response
+	var events []event
 	for _, line := range strings.Split(strings.TrimSpace(output.String()), "\n") {
+		if strings.HasPrefix(line, `{"event":`) {
+			var value event
+			if err := json.Unmarshal([]byte(line), &value); err != nil {
+				t.Fatalf("bad event line %q", line)
+			}
+			events = append(events, value)
+			continue
+		}
 		var reply response
 		if err := json.Unmarshal([]byte(line), &reply); err != nil {
 			t.Fatalf("bad response line %q", line)
 		}
 		replies = append(replies, reply)
 	}
-	return replies
+	return replies, events
 }
 
-const openLine = `{"op":"open","version":1,"width":100,"height":80,"title":"x","headless":true,"background":[255,255,255,255]}`
+const openLine = `{"op":"open","id":1,"version":2,"width":100,"height":80,"title":"x","headless":true,"background":[255,255,255,255]}`
 
 func TestProtocolLifecycle(t *testing.T) {
 	directory := t.TempDir()
 	path := filepath.Join(directory, "out.PNG")
-	replies := protocolRun(t, openLine,
-		`{"op":"line","x1":0,"y1":0,"x2":10,"y2":0,"color":[0,0,0,255],"lineWidth":1}`,
-		`{"op":"status"}`,
-		`{"op":"save","path":`+strings.ReplaceAll(`"`+path+`"`, `\`, `\\`)+`}`,
-		`{"op":"line","x1":0,"y1":0,"x2":10,"y2":0,"color":[0,0,0,255],"lineWidth":0}`,
+	replies, events := protocolRunEvents(t, openLine,
+		`{"op":"line","id":2,"x1":0,"y1":0,"x2":10,"y2":0,"color":[0,0,0,255],"lineWidth":1}`,
+		`{"op":"status","id":3}`,
+		`{"op":"save","id":4,"path":`+strings.ReplaceAll(`"`+path+`"`, `\`, `\\`)+`}`,
+		`{"op":"line","id":5,"x1":0,"y1":0,"x2":10,"y2":0,"color":[0,0,0,255],"lineWidth":0}`,
 		`{"op":"unknownField","bogus":1}`,
-		`{"op":"wait"}`,
-		`{"op":"status"}`,
-		`{"op":"circle","x":0,"y":0,"radius":1,"stroke":[0,0,0,255],"lineWidth":1}`,
-		`{"op":"close"}`,
-		`{"op":"status"}`)
-	if len(replies) != 10 {
+		`{"op":"wait","id":7}`,
+		`{"op":"status","id":8}`,
+		`{"op":"close","id":9}`,
+		`{"op":"status","id":10}`)
+	if len(replies) != 9 {
 		t.Fatalf("replies after close were served: %+v", replies)
+	}
+	for index, want := range []int64{1, 2, 3, 4, 5, 0, 7, 8, 9} {
+		if replies[index].ID != want {
+			t.Fatalf("reply %d carries id %d, want %d", index, replies[index].ID, want)
+		}
 	}
 	if !replies[0].OK || !replies[1].OK || !replies[2].OK || replies[2].Open == nil || !*replies[2].Open || !replies[3].OK {
 		t.Fatalf("open/draw/status/save: %+v", replies[:4])
@@ -247,26 +265,81 @@ func TestProtocolLifecycle(t *testing.T) {
 	if replies[4].OK || replies[5].OK {
 		t.Fatalf("invalid width or unknown field accepted: %+v", replies[4:6])
 	}
-	if !replies[6].OK || replies[7].Open == nil || *replies[7].Open {
-		t.Fatalf("wait/status after wait: %+v", replies[6:8])
+	if !replies[6].OK || !replies[8].OK {
+		t.Fatalf("wait/close: %+v", replies)
 	}
-	if replies[8].OK || !replies[8].Closed {
-		t.Fatalf("drawing after wait was accepted: %+v", replies[8])
-	}
-	if !replies[9].OK {
-		t.Fatalf("close: %+v", replies[9])
+	// A headless wait answers at once and then reports the Canvas closed.
+	if len(events) != 1 || events[0].Event != "closed" {
+		t.Fatalf("headless wait events: %+v", events)
 	}
 	if _, err := os.Stat(path); err != nil {
 		t.Fatalf("save did not write the PNG: %v", err)
 	}
 }
 
+func TestProtocolListenAndScriptReplay(t *testing.T) {
+	open := `{"op":"open","id":1,"version":2,"width":100,"height":80,"headless":true,"background":[255,255,255,255],` +
+		`"script":[{"event":"key","key":"ArrowUp"},{"event":"click","x":10.5,"y":-3},{"event":"key","key":"A"}]}`
+	replies, events := protocolRunEvents(t, open, `{"op":"listen","id":2,"kind":"click"}`, `{"op":"listen","id":3,"kind":"key"}`,
+		`{"op":"listen","id":4,"kind":"wheel"}`, `{"op":"wait","id":5}`, `{"op":"close","id":6}`)
+	if len(replies) != 6 || !replies[1].OK || !replies[2].OK || replies[3].OK || !replies[4].OK {
+		t.Fatalf("listen replies: %+v", replies)
+	}
+	want := []event{{Event: "key", Key: "ArrowUp"}, {Event: "click", X: 10.5, Y: -3}, {Event: "key", Key: "A"}, {Event: "closed"}}
+	if len(events) != len(want) {
+		t.Fatalf("events: %+v", events)
+	}
+	for index := range want {
+		if events[index] != want[index] {
+			t.Fatalf("event %d = %+v, want %+v", index, events[index], want[index])
+		}
+	}
+}
+
+func TestProtocolRejectsBadScripts(t *testing.T) {
+	for _, line := range []string{
+		`{"op":"open","version":2,"width":10,"height":10,"background":[0,0,0,255],"script":[{"event":"key","key":"ArrowUp"}]}`,
+		`{"op":"open","version":2,"width":10,"height":10,"headless":true,"background":[0,0,0,255],"script":[{"event":"key","key":"F13"}]}`,
+		`{"op":"open","version":2,"width":10,"height":10,"headless":true,"background":[0,0,0,255],"script":[{"event":"closed"}]}`,
+		`{"op":"open","version":2,"width":10,"height":10,"headless":true,"background":[0,0,0,255],"script":[{"event":"wheel"}]}`,
+	} {
+		replies := protocolRun(t, line)
+		if len(replies) != 1 || replies[0].OK {
+			t.Errorf("%s accepted: %+v", line, replies)
+		}
+	}
+}
+
+func TestKeyNamesAreTheDocumentedSet(t *testing.T) {
+	want := []string{"ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Enter", "Escape", "Space", "Tab", "Backspace",
+		"Delete", "Home", "End", "PageUp", "PageDown"}
+	for letter := 'A'; letter <= 'Z'; letter++ {
+		want = append(want, string(letter))
+	}
+	for digit := '0'; digit <= '9'; digit++ {
+		want = append(want, string(digit))
+	}
+	names := map[string]bool{}
+	for _, name := range keyNames {
+		names[name] = true
+	}
+	for _, name := range want {
+		if !names[name] {
+			t.Errorf("key %q is not reported", name)
+		}
+		delete(names, name)
+	}
+	if len(names) != 0 {
+		t.Errorf("undocumented key names: %v", names)
+	}
+}
+
 func TestProtocolRejectsBadOpen(t *testing.T) {
 	for _, line := range []string{
-		`{"op":"open","version":2,"width":100,"height":80,"background":[0,0,0,255]}`,
-		`{"op":"open","version":1,"width":0,"height":80,"background":[0,0,0,255]}`,
-		`{"op":"open","version":1,"width":5000,"height":80,"background":[0,0,0,255]}`,
-		`{"op":"open","version":1,"width":10,"height":10}`,
+		`{"op":"open","version":1,"width":100,"height":80,"background":[0,0,0,255]}`,
+		`{"op":"open","version":2,"width":0,"height":80,"background":[0,0,0,255]}`,
+		`{"op":"open","version":2,"width":5000,"height":80,"background":[0,0,0,255]}`,
+		`{"op":"open","version":2,"width":10,"height":10}`,
 		`{"op":"line"}`,
 	} {
 		replies := protocolRun(t, line)

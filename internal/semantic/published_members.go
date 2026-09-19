@@ -118,6 +118,9 @@ func publishedMember(operation TypeOperation) *Symbol {
 	if symbol, ok := graphicsMembers[operation]; ok {
 		return symbol
 	}
+	if symbol, ok := guiMembers[operation]; ok {
+		return symbol
+	}
 	return completionMembers[operation]
 }
 
@@ -139,6 +142,8 @@ func publishedMemberNames(identity *types.ClassSymbol) []string {
 		return NumericMatrixCompletionOperations
 	case identity.ModuleID == dataModuleID && identity.Name == "Table":
 		return DataTableCompletionOperations
+	case identity.ModuleID == guiModuleID:
+		return GUIOperations[identity.Name]
 	}
 	return nil
 }

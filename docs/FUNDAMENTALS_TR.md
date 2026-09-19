@@ -43,6 +43,15 @@ uygulamadıkça `<ClassName>` olarak yazdırır; uyguluyorsa `str` (ve bu yüzde
 aynı dönüşümü paylaşan `write` ile String interpolasyonu) onun yerine ona
 yönlendirilir (dispatch).
 
+Birinci taraf değer Class'ları istisnadır (v1.8.0):
+genel içeriklerini kendilerini oluşturan çağrının biçiminde gösterirler; bu
+yüzden `str`, `write`, interpolasyon ve `Terminal.pretty`
+`Vector([3.0, 4.0])`, `Matrix([[1.0, 2.0], [3.0, 4.0]])`,
+`DateTime(2026-09-18T13:30:00.000+03:00)`, `Duration(1500 ms)` ve
+`Table(["id", "name"], [["1", "Ada"]])` gösterir. Bu, yansıma (reflection)
+değil, bu beş standart kütüphane Class'ı için sabit bir kuraldır: kullanıcı
+Class'ı yine `<ClassName>` olarak yazdırılır.
+
 `clear`, mevcut koleksiyonu değiştirir, bu yüzden alias'lar bunu görür ve
 Constant koleksiyonlar bunu reddeder. Sayısal indirgemeler saf okumalardır
 (pure reads) ve null olmayan bir Constant List'i kabul eder.

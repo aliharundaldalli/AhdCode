@@ -569,7 +569,7 @@ Editing `public/app.css` does not.
 It also **refuses** `APP_PROTOCOL=https`:
 
 ```
-✗ Local HTTPS is not available in AhdCode v1.7.0.
+✗ Local HTTPS is not available in AhdCode v1.8.0.
   ahdcode dev serves plaintext HTTP, so it cannot honour
   APP_PROTOCOL=https.
 

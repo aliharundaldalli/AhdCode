@@ -2525,6 +2525,14 @@ The default Class instance representation is `<ClassName>`. For example, a Stude
 
 Attributes are not printed automatically. This prevents Confidential member disclosure and avoids recursive object-graph traversal.
 
+The first-party value Classes are the exception (v1.8.0): they
+render their public contents in the form of the call that builds them, so
+`str`, `write`, interpolation, and `Terminal.pretty` show `Vector([3.0, 4.0])`,
+`Matrix([[1.0, 2.0], [3.0, 4.0]])`, `DateTime(2026-09-18T13:30:00.000+03:00)`,
+`Duration(1500 ms)`, and `Table(["id", "name"], [["1", "Ada"]])`. This is a
+fixed rule for those five standard-library Classes, not reflection: a user
+Class still prints as `<ClassName>`.
+
 A named Function value is represented as:
 
 ```text
@@ -3033,8 +3041,10 @@ YYYY-MM-DD HH:MM:SS
 ```
 
 Milliseconds are read through the `millisecond` attribute rather than through
-the text. `str(value)` renders a `DateTime` as `<DateTime>`, because §34.1
-deliberately does not print Class attributes.
+the text. `str(value)` renders a `DateTime` as `DateTime(` followed by its
+`toISO()` text and `)`, one of the fixed first-party renderings of §34.1
+(v1.8.0); a historical offset with seconds is written as
+`±HH:MM:SS`.
 
 `DateTime` does not implement `CCompare` (§47), so `<` and `>` do not apply to
 it. Ordering is written with `before` and `after`. `DateTime` also does not
@@ -6326,6 +6336,97 @@ more than 72 UTF-8 bytes; nothing is truncated, and messages contain neither
 the password nor the hash. `passwordHash`/`passwordVerify` (Argon2id) are
 unchanged, and neither verifier accepts the other's format. A native program
 that calls a bcrypt function builds the vendored, pinned source offline.
+
+## 83. GUI Standard Module (v1.8.0)
+
+`bring GUI` resolves to the compiler-supplied module `builtin:GUI`; a local
+`GUI.ahd` cannot shadow it. It exports `GUI.window`, the Classes `Window`,
+`Container`, `Label`, `Button`, `TextInput`, and `Checkbox`, and `GUIError`,
+which derives from `Error`. None of the Classes publishes a constructor.
+
+```text
+GUI.window(title: String := "AhdCode", width: Int := 800, height: Int := 600) -> Window
+
+Window.column(spacing: Int := 8, padding: Int := 12) -> Container
+Window.row(spacing: Int := 8, padding: Int := 12)    -> Container
+Window.onKey(handler: (String) -> Nothing) -> Nothing
+Window.wait() -> Nothing    Window.close() -> Nothing    Window.isOpen() -> Bool
+Window.setTitle(text: String) -> Nothing
+
+Container.column(spacing: Int := 8, padding: Int := 0) -> Container
+Container.row(spacing: Int := 8, padding: Int := 0)    -> Container
+Container.label(text: String) -> Label
+Container.button(text: String) -> Button
+Container.textInput(placeholder: String := "") -> TextInput
+Container.checkbox(text: String, checked: Bool := false) -> Checkbox
+
+Label.text() -> String       Label.setText(text: String) -> Nothing
+Button.text() -> String      Button.setText(text: String) -> Nothing
+Button.onClick(handler: () -> Nothing) -> Nothing
+TextInput.text() -> String   TextInput.setText(text: String) -> Nothing
+Checkbox.checked() -> Bool   Checkbox.setChecked(checked: Bool) -> Nothing
+```
+
+The members publish parameter names and defaults and follow section 15.3. A
+handler argument must be a Function whose type is exactly the listed shape;
+any other argument, including a Function that returns a value, is rejected at
+compile time.
+
+`GUIError` is raised for a width or height outside 1..4096, a title longer than
+256 characters, a text or placeholder longer than 4096 characters, a spacing or
+padding outside 0..1000, a second root Container of the same Window, any
+change, addition, or registration on a closed Window, and a missing, failed, or
+unresponsive helper. Values are never clamped. A Window has at most one root
+Container; every other Container is created inside a Container. A Column stacks
+its children top to bottom aligned left, a Row places them left to right
+centered vertically; every widget keeps its natural size and content outside
+the window is clipped.
+
+`wait` shows the Window until it is closed and then returns normally; `close`
+is idempotent; `isOpen` is false once the Window closed by either side. After
+the Window closed, `TextInput.text`, `Checkbox.checked`, `Label.text`, and
+`Button.text` return their last values. Several Windows may be open at once
+and are independent.
+
+## 84. GUI Runtime and Window Events (v1.8.0)
+
+`Button.onClick`, `Window.onKey`, and the Graphics members
+`Canvas.onClick(handler: (Real, Real) -> Nothing)` and
+`Canvas.onKey(handler: (String) -> Nothing)` register at most one callback per
+event and object; registering again replaces the previous callback, and there
+is no removal. Registration on a closed Window or Canvas raises `GUIError` or
+`GraphicsError` respectively.
+
+Callbacks run only inside `wait` of the Window or Canvas that owns them, one at
+a time, on the program's own path of execution, in the order the helper
+reported the events. While a callback runs no other event is handled; a long
+callback therefore blocks its window. A callback may call any member of any
+GUI or Graphics object, including drawing with a Turtle. If a callback raises
+an error, the owning Window or Canvas is closed and the same error, with its
+Class and message unchanged, propagates out of `wait`. Events still queued when
+a window closes are discarded.
+
+Key events are key-down only and carry one of the names `ArrowUp`, `ArrowDown`,
+`ArrowLeft`, `ArrowRight`, `Enter`, `Escape`, `Space`, `Tab`, `Backspace`,
+`Delete`, `Home`, `End`, `PageUp`, `PageDown`, `A`..`Z`, or `0`..`9`; other keys
+are not reported. `Window.onKey` also sees keys typed into a TextInput. A
+Canvas click reports the left-button press point in the Canvas's Cartesian
+coordinates (section 80). `Canvas.wait` without callbacks behaves exactly as in
+v1.6.0.
+
+Each open Window is drawn by one process of the bundled `ahdgui` helper, and
+each Canvas by one `ahdgraphics` process. The program and a helper exchange
+bounded JSON lines: every request carries an `id` that its response echoes, and
+the helper additionally sends event lines. The runtime routes responses and
+events separately and keeps at most 1024 pending events per window; a helper
+that exceeds that bound closes the window with an error. The `ahdgui` helper
+executes no shell command, performs no network access, reads no files or
+environment files, embeds its own font, and does not log text typed into a
+TextInput. Helper discovery uses `AHDCODE_GUI_RUNTIME`, the location the
+compiler recorded, or the installation beside the running executable; `PATH`
+is not searched. `AHDCODE_GUI_HEADLESS=1` opens every Window without a display.
+The evaluator, `ahdcode run`, and native programs share this runtime, and a
+program that does not bring `GUI` behaves exactly as before.
 
 ---
 

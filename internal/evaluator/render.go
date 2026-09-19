@@ -4,6 +4,9 @@ import (
 	"math"
 	"strconv"
 	"strings"
+
+	"ahdcode/internal/backend/golang/ahdruntime"
+	"ahdcode/internal/ir"
 )
 
 type visit struct {
@@ -87,6 +90,9 @@ func (session *Session) render(value any, nested bool, seen map[visit]bool) stri
 	case *Instance:
 		if item == nil {
 			return "null"
+		}
+		if text, ok := session.renderFirstParty(item); ok {
+			return text
 		}
 		return "<" + className(item.Class) + ">"
 	case *FunctionValue:
@@ -328,4 +334,25 @@ func nonzeroSignificand(text string) bool {
 		}
 	}
 	return false
+}
+
+// renderFirstParty gives the first-party value Classes their public-content
+// text (Vector([1.0]), DateTime(...), Table([...], [...]), ...). It is chosen
+// by the exact compiler-supplied Class identity, never by inspecting fields
+// of an arbitrary Class, and it shares each formatter with native programs.
+func (session *Session) renderFirstParty(item *Instance) (string, bool) {
+	switch item.Class {
+	case evalVectorClass:
+		return ahdruntime.AhdRenderVector(session.vectorValues(item)), true
+	case evalMatrixClass:
+		return ahdruntime.AhdRenderMatrix(session.matrixRows(item)), true
+	case ir.ClassID("builtin:Time::class::DateTime"):
+		return ahdruntime.AhdRenderDateTime(session.instant(item)), true
+	case ir.ClassID("builtin:Time::class::Duration"):
+		return ahdruntime.AhdRenderDuration(session.durationMilliseconds(item)), true
+	case dataTableClassID:
+		table := session.tableOf(item)
+		return ahdruntime.AhdRenderTable(table.columns, table.cells), true
+	}
+	return "", false
 }

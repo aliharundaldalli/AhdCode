@@ -41,6 +41,7 @@ func Run(input io.Reader, output, errorOutput io.Writer, version string) int {
 	session.ErrorOutput = errorOutput
 	// A Canvas the session opened and left open closes when the REPL ends.
 	defer evaluator.CloseGraphics()
+	defer evaluator.CloseGUI()
 	committedSource := ""
 	pending := ""
 	fmt.Fprintln(output, version)

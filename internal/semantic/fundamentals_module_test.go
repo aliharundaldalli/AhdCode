@@ -165,7 +165,7 @@ func TestPublishedMemberGeneralizationKeepsGraphicsAndLegacyMembers(t *testing.T
 		identity *types.ClassSymbol
 		names    []string
 	}{
-		{graphicsCanvasClass, []string{"clear", "line", "circle", "rectangle", "save", "wait", "close", "isOpen", "turtle"}},
+		{graphicsCanvasClass, []string{"clear", "line", "circle", "rectangle", "save", "wait", "close", "isOpen", "turtle", "onClick", "onKey"}},
 		{graphicsTurtleClass, []string{"forward", "backward", "left", "right", "moveTo", "setHeading", "penUp", "penDown", "setColor", "setWidth", "home", "x", "y", "heading"}},
 	} {
 		members := BuiltinClassMembers(testCase.identity)

@@ -40,12 +40,14 @@ func main() {
 		out:        out,
 		headless:   first.Headless,
 		windowGone: make(chan struct{}),
+		script:     first.Script,
+		openID:     first.ID,
 	}
 	if s.headless {
 		// No window: the Canvas still records, clears, and saves drawings,
 		// and wait returns at once because there is no window to close.
 		close(s.windowGone)
-		if writeResponse(out, response{OK: true}) != nil {
+		if s.send(response{ID: first.ID, OK: true}) != nil {
 			os.Exit(1)
 		}
 		s.serve()

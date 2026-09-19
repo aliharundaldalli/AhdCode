@@ -40,6 +40,14 @@ that Class implements the `CStr` [Class Protocol Method](PROTOCOLS.md), in
 which case `str` (and therefore `write` and String interpolation, which share
 the same conversion) dispatch to it instead.
 
+The first-party value Classes are the exception (v1.8.0): they
+render their public contents in the form of the call that builds them, so
+`str`, `write`, interpolation, and `Terminal.pretty` show `Vector([3.0, 4.0])`,
+`Matrix([[1.0, 2.0], [3.0, 4.0]])`, `DateTime(2026-09-18T13:30:00.000+03:00)`,
+`Duration(1500 ms)`, and `Table(["id", "name"], [["1", "Ada"]])`. This is a
+fixed rule for those five standard-library Classes, not reflection: a user
+Class still prints as `<ClassName>`.
+
 `clear` mutates the existing collection, so aliases observe it and Constant
 collections reject it. The numeric reductions are pure reads and accept a
 non-null Constant List.

@@ -27,9 +27,12 @@ type GeneratedProgram struct {
 	// RequiresGraphics reports that the program uses Graphics, so the
 	// compiler records where the bundled ahdgraphics helper is installed.
 	RequiresGraphics bool
-	RequiresNumeric  bool
-	RequiresSQLite   bool
-	RequiresMySQL    bool
+	// RequiresGUI reports that the program uses GUI, so the compiler records
+	// where the bundled ahdgui helper is installed.
+	RequiresGUI     bool
+	RequiresNumeric bool
+	RequiresSQLite  bool
+	RequiresMySQL   bool
 	// RequiresCodes reports that the program uses QR or barcode encoding, so
 	// its workspace needs the vendored encoder source.
 	RequiresCodes bool
@@ -78,6 +81,8 @@ const (
 	graphicsRuntimeFileName        = "ahdcode_graphics_runtime.go"
 	bcryptRuntimeFileName          = "ahdcode_bcrypt_runtime.go"
 	fundamentalsRuntimeFileName    = "ahdcode_fundamentals_runtime.go"
+	helperLinkRuntimeFileName      = "ahdcode_helperlink_runtime.go"
+	guiRuntimeFileName             = "ahdcode_gui_runtime.go"
 )
 
 // storage describes the Go representation chosen for one IR symbol.
@@ -104,10 +109,12 @@ type generator struct {
 	usesLatex    bool
 	usesPlot     bool
 	usesGraphics bool
-	usesNumeric  bool
-	usesSQLite   bool
-	usesMySQL    bool
-	usesCodes    bool
+	// usesGUI is set by GUI.window and every GUI member.
+	usesGUI     bool
+	usesNumeric bool
+	usesSQLite  bool
+	usesMySQL   bool
+	usesCodes   bool
 	// usesWebSocket is set where a program creates an endpoint with
 	// HTTP.websocket, the only way a WebSocket route can exist.
 	usesWebSocket bool
@@ -241,6 +248,8 @@ func Generate(compilation *ir.Compilation) (*GeneratedProgram, []diagnostics.Dia
 		{terminalOtherRuntimeFileName, ahdruntime.TerminalOtherSource, "Terminal fallback"},
 		{graphicsRuntimeFileName, ahdruntime.GraphicsSource, "Graphics"},
 		{fundamentalsRuntimeFileName, ahdruntime.FundamentalsSource, "standard-library fundamentals"},
+		{helperLinkRuntimeFileName, ahdruntime.HelperLinkSource, "window helper link"},
+		{guiRuntimeFileName, ahdruntime.GUISource, "GUI"},
 	} {
 		formattedShared, err := format.Source([]byte(strings.Replace(shared.source, "package ahdruntime", "package main", 1)))
 		if err != nil {
@@ -298,7 +307,7 @@ func Generate(compilation *ir.Compilation) (*GeneratedProgram, []diagnostics.Dia
 		files = append(files, GeneratedFile{Name: bcryptRuntimeFileName, Content: string(bcryptRuntime)})
 	}
 	return &GeneratedProgram{Files: files,
-		RequiresLatex: generator.usesLatex, RequiresPlot: generator.usesPlot, RequiresGraphics: generator.usesGraphics, RequiresNumeric: generator.usesNumeric, RequiresSQLite: generator.usesSQLite, RequiresMySQL: generator.usesMySQL,
+		RequiresLatex: generator.usesLatex, RequiresPlot: generator.usesPlot, RequiresGraphics: generator.usesGraphics, RequiresGUI: generator.usesGUI, RequiresNumeric: generator.usesNumeric, RequiresSQLite: generator.usesSQLite, RequiresMySQL: generator.usesMySQL,
 		RequiresCodes: generator.usesCodes, RequiresWebSocket: generator.usesWebSocket, RequiresPostgreSQL: generator.usesPostgreSQL, RequiresBcrypt: generator.usesBcrypt}, generator.diagnostics
 }
 

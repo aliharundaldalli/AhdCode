@@ -26,6 +26,17 @@ func GraphicsTurtleIdentity() *types.ClassSymbol { return graphicsTurtleClass }
 func graphicsCanvasType() types.Type { return types.Class{Symbol: graphicsCanvasClass} }
 func graphicsTurtleType() types.Type { return types.Class{Symbol: graphicsTurtleClass} }
 
+// ClickHandlerType is the (x: Real, y: Real) -> Nothing shape of a Canvas
+// click callback; KeyHandlerType is the (key: String) -> Nothing shape of a
+// Canvas or Window key callback.
+func ClickHandlerType() types.Type {
+	return types.Function{Signature: &types.Signature{Parameters: []types.Parameter{{Name: "x", Type: types.Real}, {Name: "y", Type: types.Real}}, Return: types.Nothing}}
+}
+
+func KeyHandlerType() types.Type {
+	return types.Function{Signature: &types.Signature{Parameters: []types.Parameter{{Name: "key", Type: types.String}}, Return: types.Nothing}}
+}
+
 // The built-in members of Canvas and Turtle. Unlike the fixed-shape members
 // of other built-in Classes, these publish real parameter names and defaults,
 // so a call may be entirely positional or entirely named, exactly like a call
@@ -40,6 +51,8 @@ const (
 	GraphicsCanvasClose     TypeOperation = "Canvas.close"
 	GraphicsCanvasIsOpen    TypeOperation = "Canvas.isOpen"
 	GraphicsCanvasTurtle    TypeOperation = "Canvas.turtle"
+	GraphicsCanvasOnClick   TypeOperation = "Canvas.onClick"
+	GraphicsCanvasOnKey     TypeOperation = "Canvas.onKey"
 
 	GraphicsTurtleForward    TypeOperation = "Turtle.forward"
 	GraphicsTurtleBackward   TypeOperation = "Turtle.backward"
@@ -60,7 +73,7 @@ const (
 // GraphicsCanvasOperations and GraphicsTurtleOperations name the members
 // each Class publishes, so has/has not reports what a value really offers.
 var (
-	GraphicsCanvasOperations = []string{"clear", "line", "circle", "rectangle", "save", "wait", "close", "isOpen", "turtle"}
+	GraphicsCanvasOperations = []string{"clear", "line", "circle", "rectangle", "save", "wait", "close", "isOpen", "turtle", "onClick", "onKey"}
 	GraphicsTurtleOperations = []string{"forward", "backward", "left", "right", "moveTo", "setHeading",
 		"penUp", "penDown", "setColor", "setWidth", "home", "x", "y", "heading"}
 )
@@ -119,6 +132,10 @@ var graphicsMembers = func() map[TypeOperation]*Symbol {
 		GraphicsCanvasClose:  graphicsMember("close", types.Nothing),
 		GraphicsCanvasIsOpen: graphicsMember("isOpen", types.Bool),
 		GraphicsCanvasTurtle: graphicsMember("turtle", graphicsTurtleType()),
+		// v1.8: one callback per event kind, run by Canvas.wait. The handler
+		// shapes are checked statically like any Function argument.
+		GraphicsCanvasOnClick: graphicsMember("onClick", types.Nothing, graphicsRequired("handler", ClickHandlerType())),
+		GraphicsCanvasOnKey:   graphicsMember("onKey", types.Nothing, graphicsRequired("handler", KeyHandlerType())),
 
 		GraphicsTurtleForward:    graphicsMember("forward", types.Nothing, real("distance")),
 		GraphicsTurtleBackward:   graphicsMember("backward", types.Nothing, real("distance")),

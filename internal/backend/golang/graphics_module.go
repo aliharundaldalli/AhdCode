@@ -120,6 +120,17 @@ func (generator *generator) graphicsOperation(name string, value *ir.CallExpr) s
 			arguments.nullableText(5) + ", " + arguments.real(6, "1.0") + ")")
 	case "Canvas.save":
 		return check("AhdGraphicsSave(" + handle + ", " + arguments.text(0, `""`) + ")")
+	case "Canvas.onClick", "Canvas.onKey":
+		// The handler's static type is exactly (Real, Real) -> Nothing or
+		// (String) -> Nothing, which the generated code represents as the Go
+		// func type the runtime stores.
+		if len(value.Arguments) != 1 || value.Arguments[0].Value == nil {
+			return generator.unsupported(name+" with a malformed argument list", meta.Span)
+		}
+		if name == "Canvas.onClick" {
+			return "AhdGraphicsOnClickChecked(" + handle + ", " + generator.adaptHandler(value.Arguments[0].Value, ir.Type{Kind: ir.RealType}, ir.Type{Kind: ir.RealType}) + ")"
+		}
+		return "AhdGraphicsOnKeyChecked(" + handle + ", " + generator.adaptHandler(value.Arguments[0].Value, ir.Type{Kind: ir.StringType}) + ")"
 	case "Canvas.wait":
 		return check("AhdGraphicsWait(" + handle + ")")
 	case "Canvas.close":

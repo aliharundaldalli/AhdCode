@@ -1,4 +1,4 @@
-# AhdCode v1.7.0 English Student Guide
+# AhdCode v1.8.0 English Student Guide
 
 This guide is designed so that **even someone who has never programmed before** can follow along. You can read it in order from beginning to end; in each section, you will first see what we want to achieve, then write a working example, and finally learn the necessary rules.
 
@@ -84,6 +84,7 @@ says so and links to the reference page that lists every signature.
 - [62. Terminal: more control over output](#62-terminal-more-control-over-output)
 - [63. Graphics: drawing with a Canvas and a Turtle](#63-graphics-drawing-with-a-canvas-and-a-turtle)
 - [64. Angles, time stamps, and joined tables](#64-angles-time-stamps-and-joined-tables)
+- [65. Windows that react: GUI forms and Turtle keys](#65-windows-that-react-gui-forms-and-turtle-keys)
 
 ## 1. What is AhdCode?
 
@@ -6948,3 +6949,117 @@ study and test scores, and describe what the slope means.
 See [Math](MATH.md), [Time](TIME.md), [Data](DATA.md), and
 [Statistics](STATISTICS.md), and
 [`examples/v1.7`](../examples/v1.7/README.md).
+
+## 65. Windows that react: GUI forms and Turtle keys
+
+So far a program asked with `take()` and waited for a line of text. A
+**callback** turns that around: you give a Function to a window, and the
+window calls it whenever the user clicks or presses a key.
+
+**A Turtle steered by the arrow keys.** `canvas.onKey` runs a Function with
+the name of each key the user presses, such as `"ArrowUp"` or `"Escape"`:
+
+```ahd
+bring Graphics
+from Graphics bring (Canvas, Turtle)
+
+canvas: Canvas := Graphics.open(400, 400)
+pen: Turtle := canvas.turtle()
+
+step: Function := (key: String) -> Nothing {
+    pen: Global Turtle
+    state key {
+        condition "ArrowUp" {
+            pen.setHeading(90)
+        }
+        condition "ArrowDown" {
+            pen.setHeading(270)
+        }
+        condition "ArrowLeft" {
+            pen.setHeading(180)
+        }
+        condition "ArrowRight" {
+            pen.setHeading(0)
+        }
+        condition default {
+            return
+        }
+    }
+    pen.forward(20)
+}
+
+jump: Function := (x: Real, y: Real) -> Nothing {
+    pen: Global Turtle
+    pen.penUp()
+    pen.moveTo(x, y)
+    pen.penDown()
+}
+
+canvas.onKey(step)
+canvas.onClick(jump)
+canvas.wait()
+```
+
+Every arrow key draws 20 units in its direction. A click calls `jump` with
+the point you clicked, in the same Cartesian coordinates the Turtle uses:
+`(0, 0)` is the center and `y` grows upwards. The callbacks run during
+`canvas.wait()`, which returns when you close the window.
+
+**A small form.** The `GUI` module opens a window with widgets: a **Label**
+shows text, a **TextInput** lets the user type one line, a **Checkbox** is
+on or off, and a **Button** runs a Function when it is clicked. They are
+arranged in a **column** (top to bottom) or a **row** (left to right):
+
+```ahd
+bring GUI
+from GUI bring (Window, Container, Label, Button, TextInput, Checkbox)
+
+window: Window := GUI.window(title: "Greeter", width: 360, height: 220)
+form: Container := window.column()
+form.label("Your name")
+name: TextInput := form.textInput(placeholder: "e.g. Ayşe")
+polite: Checkbox := form.checkbox("Polite")
+greet: Button := form.button("Greet")
+answer: Label := form.label("")
+
+sayHello: Function := () -> Nothing {
+    name: Global TextInput
+    polite: Global Checkbox
+    answer: Global Label
+    if polite.checked() {
+        answer.setText("Good day, {name.text()}.")
+    }
+    else {
+        answer.setText("Hi {name.text()}!")
+    }
+}
+
+greet.onClick(sayHello)
+window.wait()
+write("Last name typed: {name.text()}")
+```
+
+Type a name, click **Greet**, and the Label changes. After you close the
+window, `wait()` returns and the program can still read what was typed.
+
+Three rules keep callbacks simple:
+
+- A callback's shape is checked before the program runs: `onClick` takes a
+  Function with no arguments, `onKey` a Function with one String, and neither
+  returns a value.
+- Callbacks run one at a time. While one runs, the window waits, so keep
+  them short.
+- If a callback raises an error, the window closes and the error comes out
+  of `wait()` unchanged, where `attempt`/`except` can catch it.
+
+GUI only collects input. What the Button does with it (saving it with
+SQLite, writing a file, calling HTTP) is ordinary AhdCode.
+
+**Try it yourself:** Add a second Button, "Clear", that empties the TextInput
+with `name.setText("")` and resets the Label. Then give the window an
+`onKey` callback that closes it with `window.close()` when the key is
+`"Escape"`.
+
+See the [GUI module reference](GUI.md), the
+[Graphics reference](GRAPHICS.md#clicks-and-key-presses), and
+[`examples/v1.8`](../examples/v1.8/README.md).

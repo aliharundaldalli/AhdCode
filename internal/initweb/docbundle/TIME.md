@@ -82,7 +82,9 @@ Monday=1 through Sunday=7. `offsetMinutes` is the value's offset east of UTC.
 Members are `before`, `after`, `sameMoment`, `timestamp`, `toUTC`, `toLocal`,
 `toOffset`, `toString`, `toISO`, `add`, and `subtract`. The existing `toString()` output remains
 `YYYY-MM-DD HH:MM:SS`; it deliberately does not append milliseconds or an
-offset. `str(value)` remains the ordinary Class rendering `<DateTime>`.
+offset. `str(value)` and `write(value)` show `DateTime(` followed by the
+`toISO()` text and `)` (v1.8.0), and a Duration shows as
+`Duration(1500 ms)`.
 
 `DateTime` does not implement `CCompare` or `CEqual`. Use the named instant
 operations; ordinary `==` and `same` retain Class identity semantics.

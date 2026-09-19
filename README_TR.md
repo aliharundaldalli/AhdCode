@@ -12,21 +12,21 @@ AhdCode; okunabilir sözdizimi, açık niyet (explicit intent), öngörülebilir
 anlambilim (semantics) ve yerel (native) derlemeye odaklanan, deneysel,
 statik olarak denetlenen genel amaçlı bir programlama dilidir.
 
-Bu, **v1.7.0**'dır. Dil, araç zinciri ve Web çatısı özellik olarak
+Bu, **v1.8.0**'dır. Dil, araç zinciri ve Web çatısı özellik olarak
 tamamlanmıştır; burada anlatılan çekirdek dil yüzeyi 1.0'ın taahhüt ettiği ve
-1.1, 1.2, 1.3, 1.4, 1.5, 1.6 ile 1.7'nin değiştirmeden koruduğu yüzeydir.
+1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7 ile 1.8'in değiştirmeden koruduğu yüzeydir.
 
-v1.7.0 bir ara (minor) sürümdür, **Standart Kütüphane Tamamlama**: Math, Time,
-Numeric, Statistics, Data ve Security modüllerini ters ve hiperbolik
-trigonometri, ebob/ekok, katı ISO 8601 zaman metni ve an aritmetiği, Vector ve
-Matrix erişimi, kovaryans, korelasyon ve basit doğrusal regresyon, Table
-concat ve inner join ile bcrypt uyumluluğuyla güçlendirir; çekirdek
-dilbilgisini ya da tip sistemini değiştirmez ve yeni bağımlılık eklemez. Bkz.
-[v1.7.0 ile gelenler](#v170-ile-gelenler).
+v1.8.0 bir ara (minor) sürümdür, **GUI Temelleri + Asgari Olaylar**: Column ve
+Row'larla yerleştirilen Label, Button, tek satırlık TextInput ve Checkbox
+bileşenleriyle küçük masaüstü pencereleri için `GUI` modülünü, GUI pencereleri
+ve Graphics Canvas'ları için tıklama ve tuş geri çağırmalarını ve Vector,
+Matrix, DateTime, Duration ile Table için okunabilir `str` ve `write` çıktısını
+ekler; yeni sözdizimi eklemez ve tip sistemini değiştirmez. Bkz.
+[v1.8.0 ile gelenler](#v180-ile-gelenler).
 
 Ürün, kendi kendine yeten bir platform paketi olarak dağıtılır: `ahdcode` CLI,
-özel Go 1.27.0 araç zinciri, AhdDataStudio, `ahdsqlite`, `ahdnumeric`, `ahdplot`
-ve `ahdgraphics` yardımcıları, sabitlenmiş kaynak paketiyle çevrimdışı Tectonic LaTeX
+özel Go 1.27.0 araç zinciri, AhdDataStudio, `ahdsqlite`, `ahdnumeric`, `ahdplot`,
+`ahdgraphics` ve `ahdgui` yardımcıları, sabitlenmiş kaynak paketiyle çevrimdışı Tectonic LaTeX
 motoru, Web starter'ları ve bu sürüme ait İngilizce belge paketi.
 Bkz. [Kurulum](docs/INSTALLATION_TR.md).
 
@@ -319,7 +319,7 @@ Kavramsal netliği korumak için AhdCode'un yetenekleri dört belirgin mimari ka
    - Modül çözümleme (`bring`, `from ... bring`) ve derleme zamanı yerel kaynak birleştirme ([`require(...)`](docs/REQUIRE_TR.md))
 
 2. **Standart Kütüphane (Birinci Taraf Gömülü Modüller):**
-   - **Matematik ve Hesaplama:** [`Math`](docs/MATH_TR.md), [`Bits`](docs/BITS_TR.md) (`Int` üzerinde bit işlemleri), [`Regex`](docs/REGEX_TR.md), [`Statistics`](docs/STATISTICS_TR.md), [`Numeric`](docs/NUMERIC_TR.md), [`Plot`](docs/PLOT_TR.md), [`Graphics`](docs/GRAPHICS_TR.md) (Canvas pencereleri ve Turtle ile çizim)
+   - **Matematik ve Hesaplama:** [`Math`](docs/MATH_TR.md), [`Bits`](docs/BITS_TR.md) (`Int` üzerinde bit işlemleri), [`Regex`](docs/REGEX_TR.md), [`Statistics`](docs/STATISTICS_TR.md), [`Numeric`](docs/NUMERIC_TR.md), [`Plot`](docs/PLOT_TR.md), [`Graphics`](docs/GRAPHICS_TR.md) (Canvas pencereleri ve Turtle ile çizim), [`GUI`](docs/GUI_TR.md) (tıklama ve tuş geri çağırmalı küçük masaüstü pencereleri)
    - **Veri ve Koleksiyonlar:** [`Lists`](docs/LISTS_TR.md), [`KeyValue`](docs/KEYVALUE_TR.md), [`Characters`](docs/CHARACTERS_TR.md) (Unicode kod noktaları ve sınıflandırma), [`CSV`](docs/CSV_TR.md), [`Data`](docs/DATA_TR.md), [`JSON`](docs/JSON_TR.md), [`XML`](docs/XML_TR.md), [`UUID`](docs/UUID_TR.md) (RFC 9562 sürüm 4 ve zamana göre sıralı sürüm 7 kimlikleri)
    - **Belge Üretimi:** [`Word`](docs/WORD_TR.md), [`Excel`](docs/EXCEL_TR.md), [`PDF`](docs/PDF_TR.md), [`Latex`](docs/LATEX_TR.md), [`QR`](docs/QR_TR.md) (QR kodları), [`Barcode`](docs/BARCODE_TR.md) (Code 128, EAN-13, UPC-A), [`Archive`](docs/ARCHIVE_TR.md)
    - **Sistem ve Ortam:** [`Time`](docs/TIME_TR.md), [`Cron`](docs/CRON_TR.md) (sınırlı, süreç içi zamanlama), [`Path`](docs/FILESYSTEM_TR.md), [`File`](docs/FILESYSTEM_TR.md), [`Env`](docs/ENV_TR.md), [`Terminal`](docs/TERMINAL_TR.md) (v1.5.0: standart hata, tampon boşaltma, terminal tespiti ve boyutu, biçimli metin, okunabilir düzen)
@@ -348,9 +348,10 @@ AhdCode şu anda Go 1.26 veya daha yeni bir sürüm gerektirir.
 cd AhdCode
 go install ./cmd/ahdcode ./cmd/ahdnumeric ./cmd/ahdplot ./cmd/ahdsqlite
 go -C cmd/ahdgraphics install .
+go -C cmd/ahdgui install .
 ```
 
-Yukarıdaki komut, derleyiciyi ve yerel numeric, plot ve SQLite yardımcılarını (helpers) kurar.
+Yukarıdaki komutlar derleyiciyi ve yerel numeric, plot, SQLite, Graphics pencere ve GUI pencere yardımcılarını (helpers) kurar. Graphics ve GUI yardımcıları kendi Go modülleri olduğundan `go -C cmd/ahdgraphics install .` ve `go -C cmd/ahdgui install .` ile kurulur.
 Eğer `Latex` modülünü **veya** `PDF` modülünün `.save()` metodunu kullanmayı
 planlıyorsanız (ikisi de aynı çevrimdışı render motorunu paylaşır),
 çevrimdışı (offline) Latex/Tectonic çalışma zamanını da hazırlamanız (stage)
@@ -467,6 +468,7 @@ bakın.
 - [UUID modülü](docs/UUID_TR.md)
 - [Terminal modülü](docs/TERMINAL_TR.md)
 - [Graphics modülü](docs/GRAPHICS_TR.md)
+- [GUI modülü](docs/GUI_TR.md)
 - [Tanılamaları anlama](docs/DIAGNOSTICS_TR.md)
 - [Dil sunucusu](docs/LSP_TR.md)
 - [Yapay zekâ destekli yerel kurulum](FOR_AI.md)
@@ -482,6 +484,7 @@ bakın.
 - [v1.4 gerçek zamanlı yoklama](examples/v1.4/realtime_attendance/README_TR.md) — Web, PostgreSQL, WebSocket, UUID v7, `Env.secret` ve Cron
 - [v1.5 Terminal tanıtımı](examples/v1.5/terminal_demo/README_TR.md) — `Terminal.emit`, standart hata, terminal tespiti, biçimli metin ve okunabilir düzen
 - [v1.7 standart kütüphane tamamlama](examples/v1.7/README_TR.md) — trigonometri ve ebob/ekok, katı ISO zaman metni ve an aritmetiği, istatistikli Table join
+- [v1.8 GUI ve olaylar](examples/v1.8/README_TR.md) — SQLite destekli küçük bir GUI defteri ve ok tuşları ile tıklamalarla yönetilen Turtle
 - [v1.6 Graphics ve Turtle](examples/v1.6/graphics_turtle/README_TR.md) — Kartezyen Canvas, şekiller, Turtle ile yıldız ve spiral, PNG/SVG kaydı ve düzgün çokgen dersi
 - [AhdDataStudio](tools/AhdDataStudio/README_TR.md) — yerel MySQL + SQLite geliştirme arayüzü
 - [v0.4 Kütüphane Demosu](https://github.com/aliharundaldalli/ahdcode-library-demo) (ayrı başlangıç web uygulaması)
@@ -500,6 +503,32 @@ VS Code hem de Antigravity'i hedefler.
 [Kurulum rehberine](editors/vscode/README_TR.md) bakın.
 
 ## Mevcut sınırlamalar
+
+## v1.8.0 ile gelenler <a id="v180-ile-gelenler"></a>
+
+v1.8.0 bir **ara (minor)** sürümdür, **GUI Temelleri + Asgari Olaylar**. Bir
+standart modül, iki Graphics Canvas üyesi ve beş değer Class'ı için okunabilir
+çıktı ekler; çekirdek dilbilgisi ve tip sistemi değişmez.
+
+- [`GUI`](docs/GUI_TR.md): küçük masaüstü pencereleri için yeni standart
+  modül. Label, Button, tek satırlık TextInput ve Checkbox bileşenleri Column
+  ve Row'larla yerleştirilir; `Button.onClick` ve `Window.onKey` geri
+  çağırmaları vardır. Öğrenme ve formlar, veri giriş araçları, basit
+  veritabanı ön yüzleri ve yardımcı araçlar gibi küçük masaüstü uygulamaları
+  içindir; Tkinter uyumlu bir araç takımı, oyun motoru veya profesyonel
+  yaratıcı uygulama çatısı değildir. Her Window'u paketli `ahdgui`
+  yardımcısı çizer.
+- [`Graphics`](docs/GRAPHICS_TR.md): `Canvas.onClick` ve `Canvas.onKey` bir
+  tıklamada (Kartezyen koordinatlarla) veya tuş basışında bir Function
+  çalıştırır; böylece Turtle, terminal okunmadan ok tuşlarıyla yönetilebilir.
+- Geri çağırmalar programın kendi akışında sırayla çalışır; biçimleri derleme
+  zamanında denetlenir ve bir geri çağırmanın hatası `wait()` dışına aynen
+  yayılır.
+- `str`, `write` ve `Terminal.pretty` artık Vector, Matrix, DateTime,
+  Duration ve Table değerlerinin içeriğini gösterir; örneğin
+  `Vector([3.0, 4.0])` ve `Duration(1500 ms)`. Yalnızca Class adı gösterilmez.
+
+Bkz. [v1.8 örnekleri](examples/v1.8/README_TR.md).
 
 ## v1.7.0 ile gelenler <a id="v170-ile-gelenler"></a>
 
@@ -738,6 +767,7 @@ cmd/ahdcode/         CLI giriş noktası ve komut yönlendirici
 cmd/ahdnumeric/      paketli ileri doğrusal-cebir yardımcısı
 cmd/ahdplot/         paketli grafik render yardımcısı
 cmd/ahdgraphics/     paketli Graphics pencere yardımcısı (kendi Go modülü)
+cmd/ahdgui/          paketli GUI pencere yardımcısı (kendi Go modülü)
 cmd/ahdsqlite/       paketli CGO'suz SQLite yardımcısı
 internal/            derleyici ön yüzü, arka yüzü, çalışma zamanı, biçimlendirici, LSP ve REPL
 internal/framework/  paketli birinci taraf Web çatısı kaynağı
