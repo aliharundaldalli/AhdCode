@@ -296,6 +296,8 @@ func (session *Session) plotBuiltin(name string, arguments []any) any {
 		session.plotRequireNonNegative(upper, "upperErrors")
 		return plotChartValue(plotChart{kind: "errorBar", errorX: x, errorY: y, errorLower: lower, errorUpper: upper,
 			width: plotDefaultWidth, height: plotDefaultHeight})
+	case "surface":
+		return session.plotSurfaceBuiltin(arguments)
 	case "subplots":
 		rows, columns := arguments[0].(int64), arguments[1].(int64)
 		if rows <= 0 || columns <= 0 {
@@ -442,11 +444,13 @@ func (session *Session) plotShowChart(receiver any) any {
 	session.plotCheck(ahdruntime.AhdPlotShowSizeProblem(chart.width, chart.height))
 	path := session.plotTempImagePath()
 	defer os.Remove(path)
-	session.plotRenderRequest(plotproto.Request{
+	request := plotproto.Request{
 		OutputPath: path, Width: int(chart.width), Height: int(chart.height),
 		Rows: 1, Columns: 1, Charts: []plotproto.ChartSpec{plotChartSpec(chart)},
-	})
-	session.plotCheck(ahdruntime.AhdPlotView(path, chart.title))
+	}
+	session.plotRenderRequest(request)
+	request.OutputPath = ""
+	session.plotCheck(ahdruntime.AhdPlotView(path, chart.title, request))
 	return Nothing
 }
 
@@ -465,8 +469,10 @@ func (session *Session) plotShowFigure(receiver any) any {
 	session.plotCheck(ahdruntime.AhdPlotShowSizeProblem(int64(width), int64(height)))
 	path := session.plotTempImagePath()
 	defer os.Remove(path)
-	session.plotRenderRequest(session.plotFigureRequest(rows, columns, charts, path, width, height))
-	session.plotCheck(ahdruntime.AhdPlotView(path, ""))
+	request := session.plotFigureRequest(rows, columns, charts, path, width, height)
+	session.plotRenderRequest(request)
+	request.OutputPath = ""
+	session.plotCheck(ahdruntime.AhdPlotView(path, "", request))
 	return Nothing
 }
 

@@ -201,6 +201,13 @@ var HelperLinkSource string
 //go:embed gui.go
 var GUISource string
 
+// GUIWidgetsSource is the v2.0 part of the GUI runtime: ListBox, Select,
+// TextArea, PasswordInput, TableView, change callbacks, resizable Windows,
+// and dialogs.
+//
+//go:embed gui_widgets.go
+var GUIWidgetsSource string
+
 // PlotViewSource is emitted as a separate generated Go file. It opens
 // AhdCode's own interactive Plot viewer for Chart.show and Figure.show.
 //

@@ -9,7 +9,9 @@
 // graph. It speaks only the line-based JSON protocol in protocol.go over
 // standard input and output. It runs no shell command, evaluates nothing,
 // reads no file or environment file, makes no network connection, and logs
-// nothing it is given: TextInput contents are the program's data.
+// nothing it is given: TextInput contents are the program's data. The same
+// executable also shows GUI's file and message dialogs (dialog.go), one
+// dialog per process.
 package main
 
 import (
@@ -29,6 +31,15 @@ func main() {
 			_ = writeLine(out, response{Error: err.Error()})
 		}
 		os.Exit(1)
+	}
+	if first.Op == "dialog" {
+		reply := runDialog(first)
+		reply.ID = first.ID
+		_ = writeLine(out, reply)
+		if !reply.OK {
+			os.Exit(1)
+		}
+		return
 	}
 	if err := validateOpen(first); err != nil {
 		_ = writeLine(out, response{ID: first.ID, Error: err.Error()})
@@ -59,6 +70,7 @@ func newSession(first request, in *bufio.Reader, out *bufio.Writer) *session {
 		openID:     first.ID,
 		windowGone: make(chan struct{}),
 		clicks:     map[int64]bool{},
+		changes:    map[int64]bool{},
 		script:     first.Script,
 	}
 }

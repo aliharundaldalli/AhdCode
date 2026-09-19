@@ -1,10 +1,8 @@
 package semantic
 
 import (
-	"fmt"
 	"sort"
 
-	"ahdcode/internal/syntax/ast"
 	"ahdcode/internal/types"
 )
 
@@ -16,7 +14,12 @@ var (
 	plotErrorClass  = &types.ClassSymbol{ModuleID: plotModuleID, Name: "PlotError", Parent: plotErrorParent}
 	plotChartClass  = &types.ClassSymbol{ModuleID: plotModuleID, Name: "Chart"}
 	plotFigureClass = &types.ClassSymbol{ModuleID: plotModuleID, Name: "Figure"}
+	// v2.0
+	plotSurfaceClass = &types.ClassSymbol{ModuleID: plotModuleID, Name: "Surface"}
 )
+
+// PlotSurfaceIdentity exposes the Surface identity to the lowering layer.
+func PlotSurfaceIdentity() *types.ClassSymbol { return plotSurfaceClass }
 
 // PlotErrorIdentity, PlotChartIdentity, and PlotFigureIdentity expose the
 // canonical identities to the lowering layer without coupling the public
@@ -31,6 +34,8 @@ func PlotFigureIdentity() *types.ClassSymbol { return plotFigureClass }
 var (
 	PlotChartOperations  = []string{"title", "xLabel", "yLabel", "legend", "size", "line", "scatter", "save", "show"}
 	PlotFigureOperations = []string{"save", "show"}
+	// PlotSurfaceOperations are a Surface's members (v2.0).
+	PlotSurfaceOperations = []string{"title", "xLabel", "yLabel", "zLabel", "size", "wireframe", "show", "save"}
 )
 
 func plotChartType() types.Type  { return types.Class{Symbol: plotChartClass} }
@@ -136,6 +141,27 @@ func plotModuleInterface() *ModuleInterface {
 	module.Classes[plotModuleID+"\x00Figure"] = figureSymbol
 	addStandardExport(module, figureSymbol)
 
+	surfaceSymbol := &Symbol{
+		Name: "Surface", Kind: ClassSymbol, Class: plotSurfaceClass,
+		Type: types.Class{Symbol: plotSurfaceClass, Reference: true}, ModuleRoot: true,
+		Builtin: true, InitialNull: NonNull, OriginModuleID: plotModuleID,
+		Members: make(map[string]*Symbol),
+	}
+	module.Classes[plotModuleID+"\x00Surface"] = surfaceSymbol
+	addStandardExport(module, surfaceSymbol)
+	// Plot.surface(x, y, z): x and y each List<Int>, List<Real>, or a
+	// Vector; z a Matrix of one row per y and one column per x.
+	var surfaceSignatures []*types.Signature
+	for _, x := range plotSurfaceAxes() {
+		for _, y := range plotSurfaceAxes() {
+			surfaceSignatures = append(surfaceSignatures, &types.Signature{
+				Parameters: []types.Parameter{{Name: "x", Type: x}, {Name: "y", Type: y}, {Name: "z", Type: numericMatrixType()}},
+				Return:     types.Class{Symbol: plotSurfaceClass},
+			})
+		}
+	}
+	addStandardExport(module, plotFunction("surface", surfaceSignatures...))
+
 	chart := plotChartType()
 	addStandardExport(module, plotFunction("new", &types.Signature{Return: chart}))
 	addStandardExport(module, plotFunction("line", plotNumericSignatures(chart, []string{"x", "y"})...))
@@ -194,6 +220,8 @@ func plotConstructionHint(identity *types.ClassSymbol) (string, bool) {
 			"Plot.box, or Plot.errorBar, or derive one from an existing Chart", true
 	case "Figure":
 		return "create a Figure with Plot.subplots", true
+	case "Surface":
+		return "create a Surface with Plot.surface(x, y, z)", true
 	default:
 		return "", false
 	}
@@ -215,6 +243,10 @@ func plotOperationFor(receiver types.Type, name string) (TypeOperation, bool) {
 	case "Figure":
 		operation, known := plotFigureOperationNames[name]
 		return operation, known
+	case "Surface":
+		operation := TypeOperation("Surface." + name)
+		_, known := plotMembers[operation]
+		return operation, known
 	default:
 		return "", false
 	}
@@ -230,103 +262,52 @@ var plotFigureOperationNames = map[string]TypeOperation{
 	"save": PlotFigureSave, "show": PlotFigureShow,
 }
 
-// plotSeriesOperation reports whether an operation is Chart.line or
-// Chart.scatter, which need the hand-written numeric-List-flexible check
-// below rather than the fixed-shape table.
-func plotSeriesOperation(operation TypeOperation) bool {
-	return operation == PlotChartLine || operation == PlotChartScatter
-}
-
-// plotOperationShape is the fixed call shape of one Chart or Figure member
-// whose arguments are plain, single-typed values.
-type plotOperationShape struct {
-	parameters []types.Type
-	result     types.Type
-	hint       string
-}
-
-func plotOperationShapes() map[TypeOperation]plotOperationShape {
+// plotMembers publishes every Chart and Figure member as an ordinary Symbol
+// with real parameter names, the way Canvas, Turtle, and GUI members do: the
+// compiler checks a call against it, lowering binds its arguments by name,
+// and the editor completes, hovers, and shows its signature from the same
+// metadata. Chart.line and Chart.scatter accept List<Int>, List<Real>, or a
+// Vector for x and y independently, as an ordinary overload set.
+var plotMembers = func() map[TypeOperation]*Symbol {
 	chart := plotChartType()
-	return map[TypeOperation]plotOperationShape{
-		PlotChartTitle:  {[]types.Type{types.String}, chart, "pass one String title"},
-		PlotChartXLabel: {[]types.Type{types.String}, chart, "pass one String x-axis label"},
-		PlotChartYLabel: {[]types.Type{types.String}, chart, "pass one String y-axis label"},
-		PlotChartLegend: {[]types.Type{types.Bool}, chart, "pass true or false"},
-		PlotChartSize:   {[]types.Type{types.Int, types.Int}, chart, "pass a positive Int width and height"},
-		PlotChartSave:   {[]types.Type{types.String}, types.Nothing, "pass a destination path ending in .png, .svg, or .pdf"},
-		PlotChartShow:   {[]types.Type{}, types.Nothing, "call show with no argument"},
-		PlotFigureSave:  {[]types.Type{types.String}, types.Nothing, "pass a destination path ending in .png, .svg, or .pdf"},
-		PlotFigureShow:  {[]types.Type{}, types.Nothing, "call show with no argument"},
+	surface := types.Type(types.Class{Symbol: plotSurfaceClass})
+	p := func(name string, typ types.Type) types.Parameter { return types.Parameter{Name: name, Type: typ} }
+	numeric := []types.Type{types.List{Element: types.Int}, types.List{Element: types.Real}, numericVectorType()}
+	series := func(name string) *Symbol {
+		var signatures []*types.Signature
+		for _, x := range numeric {
+			for _, y := range numeric {
+				signatures = append(signatures, &types.Signature{
+					Parameters: []types.Parameter{p("x", x), p("y", y), p("label", types.String)}, Return: chart})
+			}
+		}
+		return completionOverloads(plotModuleID, name, signatures...)
 	}
-}
+	return map[TypeOperation]*Symbol{
+		PlotChartTitle:   completionMember(plotModuleID, "title", chart, p("text", types.String)),
+		PlotChartXLabel:  completionMember(plotModuleID, "xLabel", chart, p("text", types.String)),
+		PlotChartYLabel:  completionMember(plotModuleID, "yLabel", chart, p("text", types.String)),
+		PlotChartLegend:  completionMember(plotModuleID, "legend", chart, p("enabled", types.Bool)),
+		PlotChartSize:    completionMember(plotModuleID, "size", chart, p("width", types.Int), p("height", types.Int)),
+		PlotChartLine:    series("line"),
+		PlotChartScatter: series("scatter"),
+		PlotChartSave:    completionMember(plotModuleID, "save", types.Nothing, p("path", types.String)),
+		PlotChartShow:    completionMember(plotModuleID, "show", types.Nothing),
+		PlotFigureSave:   completionMember(plotModuleID, "save", types.Nothing, p("path", types.String)),
+		PlotFigureShow:   completionMember(plotModuleID, "show", types.Nothing),
 
-// analyzePlotOperation checks one fixed-shape Chart or Figure member.
-func (a *analyzer) analyzePlotOperation(call *ast.CallExpr, operation TypeOperation, shape plotOperationShape, current *scope, flow flowState) expressionInfo {
-	result := expressionInfo{typeValue: shape.result, nullState: NonNull}
-	if len(call.Arguments) != len(shape.parameters) {
-		a.error(codeCallArguments, fmt.Sprintf("%s expects %d argument(s); received %d", operation, len(shape.parameters), len(call.Arguments)), call.Span(), shape.hint)
-		a.analyzeTypeOperationArguments(call, current, flow, nil)
-		return result
+		"Surface.title":     completionMember(plotModuleID, "title", surface, p("text", types.String)),
+		"Surface.xLabel":    completionMember(plotModuleID, "xLabel", surface, p("text", types.String)),
+		"Surface.yLabel":    completionMember(plotModuleID, "yLabel", surface, p("text", types.String)),
+		"Surface.zLabel":    completionMember(plotModuleID, "zLabel", surface, p("text", types.String)),
+		"Surface.size":      completionMember(plotModuleID, "size", surface, p("width", types.Int), p("height", types.Int)),
+		"Surface.wireframe": completionMember(plotModuleID, "wireframe", surface, p("enabled", types.Bool)),
+		"Surface.show":      completionMember(plotModuleID, "show", types.Nothing),
+		"Surface.save":      completionMember(plotModuleID, "save", types.Nothing, p("path", types.String)),
 	}
-	for index, expected := range shape.parameters {
-		argument := a.analyzeExpressionExpected(call.Arguments[index].Value, current, flow, expected)
-		if argument.invalid() {
-			continue
-		}
-		if argument.nullState != NonNull {
-			a.nullableError(string(operation), call.Arguments[index].Value, argument.nullState)
-			continue
-		}
-		if !types.Assignable(expected, argument.typeValue) {
-			a.typeMismatch(call.Arguments[index].Span(), expected, argument.typeValue, string(operation)+" argument")
-		}
-	}
-	return result
-}
+}()
 
-// analyzePlotSeriesOperation checks Chart.line(x, y, label) and
-// Chart.scatter(x, y, label). x and y each independently accept List<Int> or
-// List<Real>, matching the flexibility Plot.line/Plot.scatter get through
-// ordinary overload resolution -- a fixed single-shape table cannot express
-// that, so this mirrors Data's hand-written analyzeDataSort dual-shape check.
-func (a *analyzer) analyzePlotSeriesOperation(call *ast.CallExpr, operation TypeOperation, current *scope, flow flowState) expressionInfo {
-	result := expressionInfo{typeValue: plotChartType(), nullState: NonNull}
-	if len(call.Arguments) != 3 {
-		a.error(codeCallArguments, fmt.Sprintf("%s expects 3 argument(s); received %d", operation, len(call.Arguments)),
-			call.Span(), "pass an x List, a y List, and a String label")
-		a.analyzeTypeOperationArguments(call, current, flow, nil)
-		return result
-	}
-	a.requirePlotNumericList(call, 0, operation, current, flow)
-	a.requirePlotNumericList(call, 1, operation, current, flow)
-	label := a.analyzeExpressionExpected(call.Arguments[2].Value, current, flow, types.String)
-	if !label.invalid() {
-		if label.nullState != NonNull {
-			a.nullableError(string(operation), call.Arguments[2].Value, label.nullState)
-		} else if !types.Assignable(types.String, label.typeValue) {
-			a.typeMismatch(call.Arguments[2].Span(), types.String, label.typeValue, string(operation)+" label")
-		}
-	}
-	return result
-}
-
-// requirePlotNumericList checks that one argument is a NonNull List<Int> or
-// List<Real>. It underlies every Plot operation that accepts a numeric List
-// through a TypeOperation rather than through ordinary overload resolution.
-func (a *analyzer) requirePlotNumericList(call *ast.CallExpr, index int, operation TypeOperation, current *scope, flow flowState) {
-	reported := a.bag.Len()
-	info := a.analyzeExpression(call.Arguments[index].Value, current, flow)
-	if info.invalid() || a.bag.Len() != reported {
-		return
-	}
-	if info.nullState != NonNull {
-		a.nullableError(string(operation), call.Arguments[index].Value, info.nullState)
-		return
-	}
-	list, isList := info.typeValue.(types.List)
-	vector := types.Equal(info.typeValue, numericVectorType())
-	numeric := vector || (isList && list.Element != nil && (list.Element.Kind() == types.IntKind || list.Element.Kind() == types.RealKind))
-	if !numeric {
-		a.typeMismatch(call.Arguments[index].Span(), types.List{Element: types.Real}, info.typeValue, string(operation)+" argument")
-	}
+// plotSurfaceAxes are the types Plot.surface accepts for x and y.
+func plotSurfaceAxes() []types.Type {
+	return []types.Type{types.List{Element: types.Int}, types.List{Element: types.Real}, numericVectorType()}
 }

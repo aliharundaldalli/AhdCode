@@ -52,6 +52,14 @@ jobs:
           go -C cmd/ahdidentity vet ./...
           go -C cmd/ahdidentity test -count=1 -race ./...
 
+      - name: Application packaging structural tests
+        # `ahdcode package` (v2.0): exact package contents for Linux and
+        # Windows cross-packages (executable format, Windows icon resource,
+        # archives), the leak gate, and a packaged GUI program that must find
+        # only its own helper. They are also part of ./... above; this step
+        # names them in the log.
+        run: go test -count=1 -timeout 10m ./internal/packaging/
+
       - name: Run race tests
         # internal/build compiles many native programs under the race detector.
         # On GitHub runners that package can exceed Go's default 10m timeout.

@@ -15,6 +15,7 @@ Time, Regex, CSV, Data, and Statistics:
 bring Plot
 from Plot bring Chart
 from Plot bring Figure
+from Plot bring Surface
 from Plot bring PlotError
 ```
 
@@ -173,15 +174,20 @@ figure.show() -> Nothing
 
 `show()` opens the chart in AhdCode's own interactive viewer, a window named
 **AhdCode Plot** with the AhdCode icon. The chart is drawn exactly as
-`save()` would draw it, and the viewer lets you inspect it:
+`save()` would draw it, and the viewer lets you inspect it. From v2.0 a
+toolbar along the top of the window shows the controls:
 
-| Control | Action |
-| --- | --- |
-| Mouse wheel or trackpad scroll | Zoom in and out around the pointer |
-| Drag with the left button | Pan |
-| `Q` / `E` | Turn the view a quarter turn left / right |
-| `R` | Reset: no turn, whole chart fitted, centered |
-| `Escape` | Close the viewer |
+| Toolbar button | Keys and mouse | Action |
+| --- | --- | --- |
+| Save | — | Save the chart as PNG, SVG, or PDF (see below) |
+| Zoom Out / Zoom In | Mouse wheel or trackpad scroll | Zoom out and in (the wheel zooms around the pointer) |
+| — | Drag with the left button | Pan |
+| Rotate Left / Rotate Right | `Q` / `E` | Turn the view a quarter turn left / right |
+| Fit | `R` | Reset: no turn, whole chart fitted, centered |
+| — | `Escape` | Close the viewer |
+
+Each button shows its name when the pointer rests on it. The toolbar belongs
+to the viewer: it is not a GUI widget and programs cannot add to it.
 
 A small overlay shows the zoom and the turn, and a one-line hint of the
 controls appears for the first seconds. The viewer opens at the chart's size
@@ -196,6 +202,14 @@ change the `Chart` or `Figure`, its data or axes, or a file saved later:
 `chart.save("result.png")` after `show()` writes exactly what it would have
 written without it. There is no viewer API; `show()` has no parameters and
 the viewer has no menus, editing, or data picking.
+
+**Save** (v2.0) asks for a file name in the system's save dialog, offering
+PNG, SVG, and PDF; the extension chooses the format. The viewer does not
+screenshot its window: it runs the same renderer on the chart's own
+definition, so the file is byte for byte what `chart.save(path)` or
+`figure.save(path)` writes, however the view is zoomed or turned. Saving
+works after the program that called `show()` has ended. The result — or why
+it failed — appears beside the toolbar for a few seconds.
 
 `show()` returns as soon as the viewer window is open. The program continues
 and may call `show()` again; each call opens its own viewer, and a viewer
@@ -236,6 +250,90 @@ A `Figure`'s save/show size is derived deterministically from its grid
 dimensions (a fixed per-cell budget scaled by `rows` and `columns`); v0.1.14
 publishes no `Figure.size` method.
 
+## Surface
+
+> Added in v2.0.0.
+
+```ahd
+bring Plot
+bring Math
+bring Numeric
+from Plot bring Surface
+
+x: List<Real> := [-2.0, -1.0, 0.0, 1.0, 2.0]
+y: List<Real> := [-1.0, 0.0, 1.0]
+rows: List<List<Real>> := []
+for yValue in y {
+    row: Local List<Real> := []
+    for xValue in x {
+        row.add(xValue * xValue - yValue * yValue)
+    }
+    rows.add(row)
+}
+surface: Surface := Plot.surface(x, y, Numeric.matrix(rows)).title("Saddle").zLabel("height")
+surface.save("saddle.png")
+surface.show()
+```
+
+```text
+Plot.surface(x, y, z: Matrix) -> Surface
+
+Surface.title(text: String) -> Surface
+Surface.xLabel(text: String) -> Surface
+Surface.yLabel(text: String) -> Surface
+Surface.zLabel(text: String) -> Surface
+Surface.size(width: Int, height: Int) -> Surface
+Surface.wireframe(enabled: Bool) -> Surface
+Surface.save(path: String) -> Nothing
+Surface.show() -> Nothing
+```
+
+`Plot.surface` draws the height field `z` over a grid: `x` and `y` are each a
+`List<Int>`, a `List<Real>`, or a Numeric `Vector`, and `z` is a
+[Numeric](NUMERIC.md) `Matrix` with **one row per `y` value and one column
+per `x` value** — `z[j][i]` is the height at `(x[i], y[j])`.
+
+- `x` and `y` each hold 2 to 256 values, strictly increasing; the grid holds
+  at most 65,536 points. A mismatched Matrix, too few or too many values, or
+  unordered coordinates raise `PlotError`. Every value is finite (NaN and
+  infinity never reach an AhdCode program).
+- A Surface is immutable, like a Chart: `title`, the labels, `size`, and
+  `wireframe` return a new Surface. The axis labels default to `x`, `y`, and
+  `z`; the size defaults to 800 × 600 units and is at most 2000 on a side.
+- The surface is filled with one fixed height color scale (deep blue through
+  green to yellow) and shaded by one fixed light, so its shape reads at a
+  glance; `wireframe(true)` draws only its grid lines, colored by height. The
+  floor of the box, the axis names, and the range of each axis frame it.
+  There is no colormap, lighting, material, or camera setting.
+- `save(path)` writes a **PNG only**, at 4/3 pixels per unit (800 × 600 units
+  make 1067 × 800 pixels), drawn from the initial view; another extension is
+  a `PlotError`. It is deterministic: the same Surface always writes the same
+  bytes on the same computer. There is no SVG or PDF for a Surface, rather
+  than a vector file that merely wraps a picture.
+
+`show()` opens the Surface in the same viewer, in 3D:
+
+| Toolbar button | Keys and mouse | Action |
+| --- | --- | --- |
+| Save | — | Save the Surface's PNG, exactly as `save(path)` writes it |
+| Zoom Out / Zoom In | Mouse wheel | Zoom out and in |
+| — | Drag with the left button | Orbit around the surface |
+| — | Shift+drag, or drag with the right button | Pan |
+| Reset View | `R` | Back to the initial view |
+| — | `Escape` | Close the viewer |
+
+The view is an orthographic projection. It starts from a fixed angle with the
+whole surface in view; orbiting turns freely around the vertical axis and
+stops just short of straight up and straight down, so the view never flips;
+zoom ranges from 0.3× to 6×, and panning keeps the surface within reach.
+Like the Chart viewer, the camera belongs to the view only: it is not part of
+the Surface, there is no camera API, and saving always writes the initial
+view.
+
+This is small scientific 3D plotting, not a 3D engine: there are no meshes,
+imported models, textures, lighting or material settings, scene graph, or
+other 3D primitives, and no 3D scatter plot in v2.0.
+
 ## PlotError
 
 ```ahd
@@ -247,8 +345,9 @@ from Plot bring PlotError
 plot-specific runtime failure: mismatched `x`/`y` lengths, empty chart data,
 an invalid bin count, mismatched bar labels/values, mismatched error-bar
 data, negative error magnitudes, an unsupported output format, invalid
-subplot dimensions, more charts than subplot cells, a rendering failure, a
-temporary-file failure, and a viewer-open failure. A static type mismatch —
+subplot dimensions, more charts than subplot cells, an invalid Surface grid
+or size, a rendering failure, a temporary-file failure, and a viewer-open
+failure. A static type mismatch —
 passing a `List<String>` where a numeric List is expected — remains an
 ordinary compile-time diagnostic; `PlotError` is reserved for domain and
 runtime failures the type checker cannot rule out in advance.
@@ -267,18 +366,22 @@ write(values)  // [3, 1, 4, 1, 5]
 
 ## Rendering
 
-Plot renders with [Gonum](https://gonum.org)'s plotting library, out of
-process, through a small bundled renderer helper (`ahdplot`) shipped
-alongside the `ahdcode` toolchain. This keeps the implementation backend an
+Plot renders charts with [Gonum](https://gonum.org)'s plotting library, out
+of process, through a small bundled renderer helper (`ahdplot`) shipped
+alongside the `ahdcode` toolchain. A Surface is drawn by the viewer helper
+(`ahdplotview`) with its own small software projection, both on screen and
+for `Surface.save`; the viewer's Save button uses the GUI helper (`ahdgui`)
+for the save dialog. This keeps the implementation backend an
 internal detail: both the persistent evaluator and natively-compiled
 programs drive the same helper the same way, so `Plot.*` behaves identically
 whether run through the REPL or `ahdcode build`/`ahdcode run`.
 
 ## What Plot is not
 
-v0.1.14 supports exactly six chart families: line, scatter, bar, histogram,
-box, and error bar. There is no pie, heatmap, contour, violin, stem, polar,
-3D, candlestick, area, or surface chart, and no arbitrary custom plotter
-injection — these may be considered in a future release. There is no numeric
+Plot supports six 2D chart families — line, scatter, bar, histogram, box,
+and error bar — and, from v2.0, the 3D Surface. There is no pie, heatmap,
+contour, violin, stem, polar, 3D scatter, candlestick, or area chart, and no
+arbitrary custom plotter injection — these may be considered in a future
+release. There is no numeric
 scalar type beyond `Int`/`Real` widening (no `Numeric` type), no general GUI
 framework, and no secondary axes.

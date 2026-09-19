@@ -9,21 +9,24 @@
 [English](README.md) · [Türkçe]
 
 AhdCode; okunabilir sözdizimi, açık niyet (explicit intent), öngörülebilir
-anlambilim (semantics) ve yerel (native) derlemeye odaklanan, deneysel,
-statik olarak denetlenen genel amaçlı bir programlama dilidir.
+anlambilim (semantics) ve yerel (native) derlemeye odaklanan, bağımsız olarak
+geliştirilen, statik olarak denetlenen genel amaçlı bir programlama dilidir.
+Kendi araç zinciri, standart kütüphanesi, dil sunucusu, Web çatısı,
+veritabanı modülleri, GUI'si, Graphics'i, etkileşimli Plot görüntüleyicisi ve
+masaüstü uygulaması paketlemesiyle gelir. Küçük bir topluluk tarafından
+pratikte kullanılmaktadır; yaygın (mainstream) bir dil değildir.
 
-Bu, **v1.9.0**'dır. Dil, araç zinciri ve Web çatısı özellik olarak
+Bu, **v2.0.0**'dır. Dil, araç zinciri ve Web çatısı özellik olarak
 tamamlanmıştır; burada anlatılan çekirdek dil yüzeyi 1.0'ın taahhüt ettiği ve
-1.1'den 1.9'a kadarki sürümlerin değiştirmeden koruduğu yüzeydir.
+1.1'den 2.0'a kadarki sürümlerin değiştirmeden koruduğu yüzeydir.
 
-v1.9.0 bir ara (minor) sürümdür, **Masaüstü İnceltmeleri + Etkileşimli Plot**:
-`show()` bir Chart'ı veya Figure'ı AhdCode'un kendi etkileşimli
-görüntüleyicisinde yakınlaştırma, kaydırma, sıfırlama ve görünüm döndürme ile
-açar — bu etkileşimler yalnızca görüntüleyiciyi değiştirir, grafiği veya dışa
-aktarılan dosyaları asla değiştirmez —, GUI temel renkler ve etkinlik durumu
-kazanır ve AhdCode pencereleri AhdCode adını ve simgesini taşır; yeni
-sözdizimi eklemez ve tip sistemini değiştirmez. Bkz.
-[v1.9.0 ile gelenler](#v190-ile-gelenler).
+v2.0.0 bir ana (major) sürümdür, **Masaüstü Uygulamasının Tamamlanması**:
+birinci taraf masaüstü uygulaması temelini tamamlar — GUI'de ListBox, Select,
+TextArea, PasswordInput, TableView, iletişim kutuları, değişiklik
+callback'leri ve yeniden boyutlandırılabilir pencereler; Plot
+görüntüleyicisinde araç çubuğu ve 3B Surface çizimi; ve kendi başına çalışan
+masaüstü uygulamaları için `ahdcode package` — yeni sözdizimi eklemez ve tip
+sistemini değiştirmez. Bkz. [v2.0.0 ile gelenler](#v200-ile-gelenler).
 
 Ürün, kendi kendine yeten bir platform paketi olarak dağıtılır: `ahdcode` CLI,
 özel Go 1.27.0 araç zinciri, AhdDataStudio, `ahdsqlite`, `ahdnumeric`, `ahdplot`,
@@ -471,6 +474,7 @@ bakın.
 - [Terminal modülü](docs/TERMINAL_TR.md)
 - [Graphics modülü](docs/GRAPHICS_TR.md)
 - [GUI modülü](docs/GUI_TR.md)
+- [Masaüstü uygulaması paketleme](docs/PACKAGING_TR.md)
 - [Tanılamaları anlama](docs/DIAGNOSTICS_TR.md)
 - [Dil sunucusu](docs/LSP_TR.md)
 - [Yapay zekâ destekli yerel kurulum](FOR_AI.md)
@@ -486,6 +490,7 @@ bakın.
 - [v1.4 gerçek zamanlı yoklama](examples/v1.4/realtime_attendance/README_TR.md) — Web, PostgreSQL, WebSocket, UUID v7, `Env.secret` ve Cron
 - [v1.5 Terminal tanıtımı](examples/v1.5/terminal_demo/README_TR.md) — `Terminal.emit`, standart hata, terminal tespiti, biçimli metin ve okunabilir düzen
 - [v1.7 standart kütüphane tamamlama](examples/v1.7/README_TR.md) — trigonometri ve ebob/ekok, katı ISO zaman metni ve an aritmetiği, istatistikli Table join
+- [v2.0 masaüstü uygulamaları](examples/v2.0/README_TR.md) — TableView, iletişim kutuları ve CSV dışa aktarma içeren bir SQLite defteri; bir 3B Surface; ve paketlenecek küçük bir uygulama
 - [v1.9 GUI renkleri ve etkileşimli Plot](examples/v1.9/README_TR.md) — renkli ve devre dışı Kaydet düğmeli bir sipariş formu ile AhdCode'un kendi görüntüleyicisinde bir grafik
 - [v1.8 GUI ve olaylar](examples/v1.8/README_TR.md) — SQLite destekli küçük bir GUI defteri ve ok tuşları ile tıklamalarla yönetilen Turtle
 - [v1.6 Graphics ve Turtle](examples/v1.6/graphics_turtle/README_TR.md) — Kartezyen Canvas, şekiller, Turtle ile yıldız ve spiral, PNG/SVG kaydı ve düzgün çokgen dersi
@@ -506,6 +511,33 @@ VS Code hem de Antigravity'i hedefler.
 [Kurulum rehberine](editors/vscode/README_TR.md) bakın.
 
 ## Mevcut sınırlamalar
+
+## v2.0.0 ile gelenler <a id="v200-ile-gelenler"></a>
+
+v2.0.0 bir **ana** sürümdür, **Masaüstü Uygulamasının Tamamlanması**. Yeni
+sözdizimi veya tip sistemi değişikliği olmadan temel masaüstü yol haritasını
+kapatır; her v1.9 programı çalışmaya devam eder:
+
+- [`GUI`](docs/GUI_TR.md): ListBox, Select, TextArea, PasswordInput ve
+  kaydırma ile seçim içeren okuma odaklı bir TableView; metin alanları ve
+  Checkbox'lar için `onChange` ile seçim callback'leri; tablo ve listeleri
+  fazladan alanı kullanan yeniden boyutlandırılabilir pencereler; Shift+Tab;
+  ve yerel dosya, klasör, kaydetme, mesaj ve onay iletişim kutuları. Temel
+  GUI yol haritası tamamlanmıştır: sonraki eklemeler eksik platform temelleri
+  değil, kullanım odaklı bileşenlerdir.
+- [`Plot`](docs/PLOT_TR.md): görüntüleyici bir araç çubuğu kazanır — Save
+  (PNG, SVG, PDF; render aracı tarafından tam `save()` gibi yazılır), Zoom
+  Out, Zoom In, Rotate Left, Rotate Right ve Fit — ve `Plot.surface` bir
+  Numeric Matrix'ten 3B yüzey çizer; döndürme/kaydırma/yakınlaştırma
+  görüntüleyicisi, tel kafes kipi ve PNG dışa aktarma ile.
+- [`ahdcode package`](docs/PACKAGING_TR.md), bir programı masaüstü
+  uygulamasına dönüştürür — bir macOS `.app`'i ya da bir Windows veya Linux
+  klasörü ve arşivi — yalnızca gereken yardımcıları içerir ve AhdCode kurulu
+  olmadan çalışır.
+- Editörler her Chart ve Figure üyesini tamamlar, üzerine gelince gösterir ve
+  imzasını gösterir; v1.8 ve v1.9'daki bir boşluk giderilmiştir.
+
+Bkz. [v2.0 örnekleri](examples/v2.0/README_TR.md).
 
 ## v1.9.0 ile gelenler <a id="v190-ile-gelenler"></a>
 

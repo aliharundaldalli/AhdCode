@@ -16,6 +16,7 @@ ve Statistics gibi açıktır (explicit):
 bring Plot
 from Plot bring Chart
 from Plot bring Figure
+from Plot bring Surface
 from Plot bring PlotError
 ```
 
@@ -179,15 +180,21 @@ figure.show() -> Nothing
 
 `show()`, grafiği AhdCode'un kendi etkileşimli görüntüleyicisinde açar:
 **AhdCode Plot** adlı, AhdCode simgeli bir pencere. Grafik `save()` ile
-kaydedildiği hâliyle çizilir ve görüntüleyici onu incelemenizi sağlar:
+kaydedildiği hâliyle çizilir ve görüntüleyici onu incelemenizi sağlar.
+v2.0'dan itibaren pencerenin üstündeki bir araç çubuğu kontrolleri gösterir:
 
-| Kontrol | İşlem |
-| --- | --- |
-| Fare tekerleği veya trackpad kaydırma | İmlecin çevresinde yakınlaştırma/uzaklaştırma |
-| Sol tuşla sürükleme | Kaydırma (pan) |
-| `Q` / `E` | Görünümü sola / sağa çeyrek tur döndürme |
-| `R` | Sıfırlama: döndürme yok, grafik sığdırılmış, ortalanmış |
-| `Escape` | Görüntüleyiciyi kapatma |
+| Araç çubuğu düğmesi | Tuşlar ve fare | İşlem |
+| --- | --- | --- |
+| Save | — | Grafiği PNG, SVG veya PDF olarak kaydetme (aşağıya bakın) |
+| Zoom Out / Zoom In | Fare tekerleği veya trackpad kaydırma | Uzaklaştırma ve yakınlaştırma (tekerlek imlecin çevresinde) |
+| — | Sol tuşla sürükleme | Kaydırma (pan) |
+| Rotate Left / Rotate Right | `Q` / `E` | Görünümü sola / sağa çeyrek tur döndürme |
+| Fit | `R` | Sıfırlama: döndürme yok, grafik sığdırılmış, ortalanmış |
+| — | `Escape` | Görüntüleyiciyi kapatma |
+
+İmleç bir düğmenin üzerinde durduğunda düğmenin adı görünür. Araç çubuğu
+görüntüleyiciye aittir: bir GUI bileşeni değildir ve programlar ona bir şey
+ekleyemez.
 
 Küçük bir gösterge yakınlaştırmayı ve dönüşü gösterir; ilk saniyelerde
 kontrollerin tek satırlık bir özeti görünür. Görüntüleyici grafiğin
@@ -203,6 +210,15 @@ kaydedilen dosyayı asla değiştirmez: `show()` sonrasında
 `chart.save("result.png")`, `show()` hiç çağrılmamış gibi aynı dosyayı yazar.
 Görüntüleyici için bir API yoktur; `show()` parametre almaz ve
 görüntüleyicide menü, düzenleme veya veri seçimi yoktur.
+
+**Save** (v2.0), sistemin kaydetme iletişim kutusunda PNG, SVG ve PDF
+sunarak bir dosya adı sorar; biçimi uzantı belirler. Görüntüleyici kendi
+penceresinin ekran görüntüsünü almaz: aynı render aracını grafiğin kendi
+tanımıyla çalıştırır; böylece dosya, görünüm nasıl yakınlaştırılmış veya
+döndürülmüş olursa olsun `chart.save(path)` veya `figure.save(path)`'in
+yazdığıyla bayt bayt aynıdır. Kaydetme, `show()`'u çağıran program bittikten
+sonra da çalışır. Sonuç — ya da neden başarısız olduğu — birkaç saniye araç
+çubuğunun yanında görünür.
 
 `show()`, görüntüleyici penceresi açılır açılmaz döner. Program devam eder
 ve `show()`'u yeniden çağırabilir; her çağrı kendi görüntüleyicisini açar ve
@@ -245,6 +261,92 @@ Bir `Figure`'ın save/show boyutu, grid boyutlarından belirlenimci
 (deterministic) şekilde türetilir (rows ve columns ile ölçeklenen sabit bir
 hücre-başı bütçe); v0.1.14 bir `Figure.size` metodu yayımlamaz.
 
+## Surface
+
+> v2.0.0 ile eklendi.
+
+```ahd
+bring Plot
+bring Math
+bring Numeric
+from Plot bring Surface
+
+x: List<Real> := [-2.0, -1.0, 0.0, 1.0, 2.0]
+y: List<Real> := [-1.0, 0.0, 1.0]
+rows: List<List<Real>> := []
+for yValue in y {
+    row: Local List<Real> := []
+    for xValue in x {
+        row.add(xValue * xValue - yValue * yValue)
+    }
+    rows.add(row)
+}
+surface: Surface := Plot.surface(x, y, Numeric.matrix(rows)).title("Saddle").zLabel("height")
+surface.save("saddle.png")
+surface.show()
+```
+
+```text
+Plot.surface(x, y, z: Matrix) -> Surface
+
+Surface.title(text: String) -> Surface
+Surface.xLabel(text: String) -> Surface
+Surface.yLabel(text: String) -> Surface
+Surface.zLabel(text: String) -> Surface
+Surface.size(width: Int, height: Int) -> Surface
+Surface.wireframe(enabled: Bool) -> Surface
+Surface.save(path: String) -> Nothing
+Surface.show() -> Nothing
+```
+
+`Plot.surface`, `z` yükseklik alanını bir ızgara üzerinde çizer: `x` ve `y`
+her biri `List<Int>`, `List<Real>` veya bir Numeric `Vector`'dür; `z` ise
+**her `y` değeri için bir satır ve her `x` değeri için bir sütun** içeren bir
+[Numeric](NUMERIC_TR.md) `Matrix`'tir — `z[j][i]`, `(x[i], y[j])`
+noktasındaki yüksekliktir.
+
+- `x` ve `y` her biri kesin artan 2 ile 256 değer tutar; ızgara en fazla
+  65.536 nokta içerir. Uyuşmayan bir Matrix, çok az veya çok fazla değer ya da
+  sırasız koordinatlar `PlotError` fırlatır. Her değer sonludur (NaN ve
+  sonsuz hiçbir zaman bir AhdCode programına ulaşmaz).
+- Bir Surface, Chart gibi immutable'dır: `title`, etiketler, `size` ve
+  `wireframe` yeni bir Surface döndürür. Eksen etiketleri varsayılan olarak
+  `x`, `y` ve `z`'dir; boyut varsayılan olarak 800 × 600 birimdir ve bir
+  kenarda en fazla 2000'dir.
+- Yüzey sabit bir yükseklik renk ölçeğiyle (koyu maviden yeşile ve sarıya)
+  doldurulur ve biçimi bir bakışta okunsun diye sabit bir ışıkla
+  gölgelendirilir; `wireframe(true)` yalnızca yüksekliğe göre renklenen ızgara
+  çizgilerini çizer. Kutunun tabanı, eksen adları ve her eksenin aralığı onu
+  çerçeveler. Renk haritası, ışıklandırma, malzeme veya kamera ayarı yoktur.
+- `save(path)` **yalnızca PNG** yazar, birim başına 4/3 piksel (800 × 600
+  birim 1067 × 800 piksel eder), başlangıç görünümünden çizilir; başka bir
+  uzantı `PlotError`'dır. Belirlenimcidir: aynı Surface aynı bilgisayarda
+  hep aynı baytları yazar. Yalnızca bir resmi saran bir vektör dosyası
+  üretmek yerine, Surface için SVG veya PDF yoktur.
+
+`show()`, Surface'i aynı görüntüleyicide 3B olarak açar:
+
+| Araç çubuğu düğmesi | Tuşlar ve fare | İşlem |
+| --- | --- | --- |
+| Save | — | Surface'in PNG'sini tam `save(path)`'in yazdığı gibi kaydetme |
+| Zoom Out / Zoom In | Fare tekerleği | Uzaklaştırma ve yakınlaştırma |
+| — | Sol tuşla sürükleme | Yüzeyin çevresinde döndürme (orbit) |
+| — | Shift+sürükleme veya sağ tuşla sürükleme | Kaydırma (pan) |
+| Reset View | `R` | Başlangıç görünümüne dönme |
+| — | `Escape` | Görüntüleyiciyi kapatma |
+
+Görünüm ortografik bir izdüşümdür. Tüm yüzey görünür olacak şekilde sabit bir
+açıdan başlar; döndürme dikey eksen çevresinde serbesttir ve tam yukarıdan ve
+tam aşağıdan biraz önce durur, böylece görünüm hiç ters dönmez;
+yakınlaştırma 0,3× ile 6× arasındadır ve kaydırma yüzeyi erişilebilir
+tutar. Grafik görüntüleyicisinde olduğu gibi kamera yalnızca görünüme
+aittir: Surface'in parçası değildir, kamera API'si yoktur ve kaydetme her
+zaman başlangıç görünümünü yazar.
+
+Bu küçük bilimsel 3B çizimdir, bir 3B motoru değildir: ağ (mesh), içe
+aktarılan modeller, dokular, ışık veya malzeme ayarları, sahne grafiği ya da
+başka 3B ilkel nesneler yoktur ve v2.0'da 3B saçılım grafiği yoktur.
+
 ## PlotError
 
 ```ahd
@@ -257,7 +359,7 @@ zamanı hatası için onu fırlatır: eşleşmeyen `x`/`y` uzunlukları, boş gr
 verisi, geçersiz bir bin sayısı, eşleşmeyen bar etiketleri/değerleri,
 eşleşmeyen error-bar verisi, negatif hata büyüklükleri, desteklenmeyen bir
 çıktı biçimi, geçersiz subplot boyutları, subplot hücrelerinden daha fazla
-grafik, bir render hatası, bir geçici dosya hatası ve bir görüntüleyici-açma
+grafik, geçersiz bir Surface ızgarası veya boyutu, bir render hatası, bir geçici dosya hatası ve bir görüntüleyici-açma
 hatası. Statik bir tip uyuşmazlığı -- sayısal bir List beklenen yerde bir
 `List<String>` geçmek -- sıradan bir derleme-zamanı tanılaması olarak kalır;
 `PlotError`, tip denetleyicisinin önceden eleyemediği alan ve çalışma zamanı
@@ -285,13 +387,17 @@ uygulama arka ucunu dahili bir ayrıntı olarak tutar: hem kalıcı (persistent)
 evaluator hem de doğal olarak derlenmiş programlar aynı yardımcıyı aynı
 şekilde çalıştırır, böylece `Plot.*`, ister REPL ister
 `ahdcode build`/`ahdcode run` üzerinden çalıştırılsın aynı şekilde davranır.
+Bir Surface'i hem ekranda hem de `Surface.save` için görüntüleyici yardımcısı
+(`ahdplotview`) kendi küçük yazılım izdüşümüyle çizer; görüntüleyicinin Save
+düğmesi kaydetme iletişim kutusu için GUI yardımcısını (`ahdgui`) kullanır.
 
 ## Plot'un olmadığı şeyler
 
-v0.1.14 tam olarak altı grafik ailesini destekler: line, scatter, bar,
-histogram, box ve error bar. Pie, heatmap, contour, violin, stem, polar, 3D,
-candlestick, area veya surface grafiği yoktur ve keyfi özel plotter
-enjeksiyonu yoktur -- bunlar gelecekteki bir sürümde değerlendirilebilir.
+Plot altı 2B grafik ailesini — line, scatter, bar, histogram, box ve error
+bar — ve v2.0'dan itibaren 3B Surface'i destekler. Pie, heatmap, contour,
+violin, stem, polar, 3B saçılım, candlestick veya area grafiği yoktur ve
+keyfi özel plotter enjeksiyonu yoktur -- bunlar gelecekteki bir sürümde
+değerlendirilebilir.
 `Int`/`Real` genişletmesinin ötesinde sayısal bir skaler tip yoktur (bir
 `Numeric` tipi yoktur), genel bir GUI çerçevesi yoktur ve ikincil eksenler
 yoktur.

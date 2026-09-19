@@ -6960,6 +6960,122 @@ okumaz. `AHDCODE_PLOTVIEW_RUNTIME`, derleyicinin kaydettiği konum veya
 çalışan yürütülebilir dosyanın yanındaki kurulum üzerinden bulunur; `PATH`
 aranmaz.
 
+## 87. GUI'nin Tamamlanması (v2.0.0)
+
+Bölüm 83-85'teki GUI modülü, hiçbirinin kurucusu olmayan `PasswordInput`,
+`TextArea`, `Select`, `ListBox` ve `TableView` Sınıflarını ve şu üyeleri
+kazanır:
+
+```text
+Window.setResizable(resizable: Bool) -> Nothing      Window.isResizable() -> Bool
+Container.passwordInput(placeholder: String := "") -> PasswordInput
+Container.textArea(placeholder: String := "") -> TextArea
+Container.select(items: List<String>, selectedIndex: Int? := null) -> Select
+Container.listBox(items: List<String> := []) -> ListBox
+Container.table(columns: List<String>, rows: List<List<String>> := []) -> TableView
+TextInput.onChange, PasswordInput.onChange, TextArea.onChange(handler: (String) -> Nothing) -> Nothing
+Checkbox.onChange(handler: (Bool) -> Nothing) -> Nothing
+PasswordInput.text() -> String, setText(text: String) -> Nothing
+TextArea.text() -> String, setText(text: String) -> Nothing
+Select ve ListBox: items() -> List<String>, setItems(items: List<String>) -> Nothing,
+    selectedIndex() -> Int?, selectedText() -> String?, select(index: Int?) -> Nothing,
+    onChange(handler: (Int?, String?) -> Nothing) -> Nothing
+TableView: columns() -> List<String>, rows() -> List<List<String>>,
+    setRows(rows: List<List<String>>) -> Nothing, selectedRow() -> Int?,
+    selectRow(index: Int?) -> Nothing, onSelect(handler: (Int?) -> Nothing) -> Nothing
+```
+
+Beş yeni Sınıfta ayrıca bölüm 85'teki anlamıyla `setForeground`,
+`setBackground`, `setEnabled` ve `isEnabled` vardır. Bir Select'in veya
+ListBox'ın `onChange`'ine ya da `TableView.onSelect`'e verilen callback her
+parametresini boş bırakılabilir (`Int?`, `String?`) bildirmelidir; aksi
+hâlde çağrı bir derleme zamanı tanılamasıdır. Her callback biçimi statik
+olarak denetlenir.
+
+Seçim bir indeks veya `null`'dır. Girdilerin dışındaki bir indeks `GUIError`
+fırlatır; `setItems` ve `setRows` hâlâ var olan bir seçimi korur, olmayanı
+temizler. Değişiklik callback'lerini yalnızca kullanıcı eylemleri çağırır:
+`select`, `selectRow`, `setItems`, `setRows`, `setText` ve `setChecked`
+hiçbir zaman çağırmaz. Metin `onChange`'i her kullanıcı düzenlemesinde yeni
+metnin tamamıyla bir kez çalışır. Callback'ler bölüm 84'teki gibi sırayla
+çalışır.
+
+TableView hücreleri String'dir; her satırda sütun başına tam bir hücre
+bulunmalı ve en az bir sütun olmalıdır, aksi hâlde `GUIError`. Sınırlar:
+TextArea için 100.000 karakter, Select veya ListBox için 1024 karakterlik
+20.000 öğe, TableView için 64 sütun, 20.000 satır ve 1024 karakterlik 200.000
+hücre. Program `setResizable(true)` çağırmadıkça pencereler yeniden
+boyutlandırılamaz. TextArea, ListBox veya TableView ve bunları içeren her
+Container büyür: Column'un fazladan yüksekliği ve Row'un fazladan genişliği
+büyüyen çocukları arasında eşit paylaşılır, bu çocuklar ayrıca Container'ın
+çapraz eksenini doldurur; başka hiçbir bileşen esnemez ve hiçbir şey doğal
+boyutunun altına küçülmez. Tab ve Shift+Tab her etkin etkileşimli bileşeni
+oluşturulma sırasıyla dolaşır.
+
+Modül altı iletişim kutusu fonksiyonu kazanır:
+
+```text
+GUI.openFile(title: String := "Open File", extensions: List<String> := []) -> String?
+GUI.openFiles(title: String := "Open Files", extensions: List<String> := []) -> List<String>
+GUI.selectFolder(title: String := "Select Folder") -> String?
+GUI.saveFile(title: String := "Save File", suggestedName: String := "", extensions: List<String> := []) -> String?
+GUI.message(title: String, text: String) -> Nothing
+GUI.confirm(title: String, text: String) -> Bool
+```
+
+İptal edilen bir iletişim kutusu `null` (`openFiles` için boş bir List)
+döndürür ve hata değildir; `GUIError`, iletişim kutusunun gösterilemediği
+anlamına gelir. Döndürülen yollar mutlaktır. İletişim kutusu hiçbir zaman
+bir dosyayı okumaz, oluşturmaz veya değiştirmez. Uzantı harf ve rakamlardan
+oluşur (baştaki bir nokta yok sayılır); başka her şey `GUIError` fırlatır.
+GUI yardımcı protokolü sürüm 3'tür.
+
+## 88. Plot Görüntüleyici Araç Çubuğu (v2.0.0)
+
+Bölüm 86'daki görüntüleyici, korunan tuşlarına eşdeğer özel bir araç çubuğu
+gösterir — Save, Zoom Out, Zoom In, Rotate Left, Rotate Right ve Fit. Save
+bir kaydetme iletişim kutusunda yol sorar ve render aracını Chart'ın veya
+Figure'ın kendi render isteğiyle çalıştırır; böylece dosya, görünümden
+bağımsız olarak `save(path)`'in yazdığıyla aynıdır. Araç çubuğu GUI
+modülünün parçası değildir. Görüntüleyici okuyup sildiği tek bir görünüm
+dosyasıyla başlatılır; paketli `ahdplot` ve `ahdgui` yardımcılarını, o
+dosyada mutlak yollarıyla adlandırılmış olarak, yalnızca Save için çalıştırır.
+
+## 89. Plot Surface (v2.0.0)
+
+```text
+Plot.surface(x, y, z: Matrix) -> Surface
+Surface.title, xLabel, yLabel, zLabel(text: String) -> Surface
+Surface.size(width: Int, height: Int) -> Surface
+Surface.wireframe(enabled: Bool) -> Surface
+Surface.save(path: String) -> Nothing
+Surface.show() -> Nothing
+```
+
+`x` ve `y` her biri kesin artan 2 ile 256 değer içeren `List<Int>`,
+`List<Real>` veya `Vector`'dür; `z`'de her `y` değeri için bir satır ve her
+`x` değeri için bir sütun vardır. Başka her biçim `PlotError` fırlatır.
+`Surface` immutable'dır ve kurucusu yoktur. Boyut her kenarda 1 ile 2000
+birimdir (varsayılan 800 × 600); eksen etiketleri varsayılan olarak `x`, `y`
+ve `z`'dir. `save` yalnızca `.png` yolu kabul eder ve başlangıç görünümünü
+birim başına 4/3 piksel ile belirlenimci olarak yazar. `show`
+görüntüleyiciyi döndürme, kaydırma, yakınlaştırma (0,3× ile 6×), sıfırlama ve
+Save ile 3B olarak açar; ortografik kamerası hiçbir zaman Surface'in parçası
+değildir.
+
+## 90. Uygulama Paketleme (v2.0.0)
+
+`ahdcode package`, bir giriş modülünü bir uygulamaya derler — bir macOS
+`.app`'i ya da bir Windows veya Linux klasörü ve arşivi — bu uygulama
+programı, derlenmiş programın gerektirdiği paketli yardımcıları ve
+uygulamanın adını ve simgesini içerir; proje klasöründen hiçbir şey içermez.
+Böyle bir uygulamada çalışma zamanı her yardımcıyı yalnızca kendi
+yürütülebilir dosyasının yanında veya `runtime` klasöründe çözer; kurulum
+ipuçları, `AHDCODE_*_RUNTIME` ve `PATH` yok sayılır. Çalışma dizini kök
+klasör olarak başlatılan paketli bir program kullanıcının ana klasörüne
+geçer. Yardımcı pencereler uygulamanın adını ve simgesini gösterir.
+Paketleme dilin anlambilimini değiştirmez.
+
 ---
 
 # AhdCode v0.1 Çekirdek Spesifikasyonu Sonu

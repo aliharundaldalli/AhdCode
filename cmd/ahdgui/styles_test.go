@@ -278,7 +278,7 @@ func TestDisabledWidgetsAreFaded(t *testing.T) {
 }
 
 func TestProtocolColorsAndEnabled(t *testing.T) {
-	open := `{"op":"open","id":1,"version":2,"width":300,"height":200,"title":"t","headless":true}`
+	open := `{"op":"open","id":1,"version":3,"width":300,"height":200,"title":"t","headless":true}`
 	replies, _ := run(t, open,
 		`{"op":"add","id":2,"kind":"column"}`,
 		`{"op":"add","id":3,"parent":1,"kind":"button","text":"B"}`,

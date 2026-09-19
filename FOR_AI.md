@@ -620,10 +620,8 @@ Read and change widgets with `text()`/`setText`, `checked()`/`setChecked`;
 `window.onKey(handler)` a `(key: String) -> Nothing` Function; `window.wait()`
 runs the callbacks one at a time and returns when the window closes. A
 callback that needs a top-level binding declares it `name: Global Type`. A
-callback's error propagates out of `wait()` unchanged. There are no tables,
-list boxes, drop-downs, menus, dialogs, file pickers, scrolling, themes,
-threads, or async; do not invent them, and keep database or HTTP work in
-ordinary Functions the Button calls. See [`docs/GUI.md`](docs/GUI.md).
+callback's error propagates out of `wait()` unchanged. Keep database or HTTP
+work in ordinary Functions the callbacks call. See [`docs/GUI.md`](docs/GUI.md).
 
 Since v1.9.0: `window.setBackground(color)` and
 `container.setBackground(color)`; `setForeground(color)` and
@@ -636,6 +634,30 @@ Colors use the Graphics spellings only (nine lower-case names, `#RRGGBB`,
 (zoom, pan, Q/E quarter turns, R reset, Escape) and return once it is open;
 the viewer never changes the Chart, Figure, or a later `save()`. There is no
 zoom/pan/rotate API: do not invent `chart.zoom` or `chart.rotate`.
+
+v2.0.0 completes GUI: a Container also adds
+`passwordInput(placeholder)`, `textArea(placeholder)`,
+`select(items, selectedIndex: Int? := null)`, `listBox(items)`, and
+`table(columns, rows)` (the widget Class is `TableView`; cells are Strings,
+every row one cell per column). `onChange` exists on TextInput,
+PasswordInput, and TextArea (`(text: String) -> Nothing`) and Checkbox
+(`(checked: Bool) -> Nothing`); Select/ListBox `onChange` and
+`TableView.onSelect` receive `(index: Int?, text: String?)` and `(row: Int?)`
+and the lambda must declare those parameters nullable. Selections are
+`selectedIndex()`/`selectedText()`/`select(index or null)` and
+`selectedRow()`/`selectRow`/`setRows`; programmatic changes never call a
+callback. `window.setResizable(true)` makes a window resizable; tables, lists,
+and text areas take extra space. Dialogs: `GUI.openFile(title, extensions)`,
+`openFiles`, `selectFolder`, `saveFile(title, suggestedName, extensions)`
+return `String?` (null on cancel; `openFiles` an empty List), and
+`GUI.message(title, text)`/`GUI.confirm(title, text) -> Bool`; extensions are
+plain like `"csv"`, never `"*.csv"`. Do not invent tree views, tabs, menus,
+editable cells, sorting APIs, `setVisible`, radio buttons, themes, threads,
+or async. `Plot.surface(x, y, z: Matrix)` (z: one row per y, one column per
+x) returns an immutable `Surface` with `title`, `xLabel`, `yLabel`,
+`zLabel`, `size`, `wireframe`, `save` (PNG only), and `show`; there is no
+camera API, mesh, or 3D scatter. `ahdcode package app.ahd --name App` makes a
+self-contained desktop application; see [`docs/PACKAGING.md`](docs/PACKAGING.md).
 
 v1.7.0 completes six existing modules; use these instead of hand-written
 helpers. `Math.asin`, `acos`, `atan`, `atan2(y, x)` (y first), `sinh`, `cosh`,

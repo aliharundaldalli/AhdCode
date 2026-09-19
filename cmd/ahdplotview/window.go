@@ -5,6 +5,7 @@ import (
 	"image"
 	"io"
 	"math"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -16,11 +17,12 @@ import (
 
 // Controls: the mouse wheel or a trackpad zooms around the pointer, dragging
 // with the left button pans, Q and E turn the view a quarter turn counter-
-// clockwise and clockwise, R resets, and Escape closes.
+// clockwise and clockwise, R resets, and Escape closes. The toolbar's
+// buttons do the same, and Save saves the chart.
 const (
 	wheelStep = 1.15 // zoom factor per wheel notch
 	hintTime  = 6 * time.Second
-	hintText  = "Scroll: zoom · Drag: pan · Q/E: rotate · R: reset · Esc: close"
+	hintText  = "Scroll: zoom · Drag: pan · Q/E: rotate · R: fit · Esc: close"
 )
 
 var backgroundColor = [4]float32{0.93, 0.93, 0.93, 1}
@@ -43,6 +45,34 @@ type viewer struct {
 	hudLabel string
 	hudImage *ebiten.Image
 	hint     *ebiten.Image
+
+	spec   viewSpec
+	chrome *chrome
+}
+
+// perform runs a toolbar action.
+func (v *viewer) perform(action string) {
+	switch action {
+	case actionSave:
+		spec := v.spec
+		v.chrome.startSave(func() (string, error) {
+			path, err := chooseSavePath(spec.Dialog, "chart.png", []string{"png", "svg", "pdf"})
+			if err != nil || path == "" {
+				return "", err
+			}
+			return filepath.Base(path), saveChart(spec, path)
+		})
+	case actionZoomIn:
+		v.view.zoomAt(buttonZoom, v.view.windowW/2, v.view.windowH/2)
+	case actionZoomOut:
+		v.view.zoomAt(1/buttonZoom, v.view.windowW/2, v.view.windowH/2)
+	case actionRotateLeft:
+		v.view.rotate(1)
+	case actionRotateRight:
+		v.view.rotate(-1)
+	case actionFit:
+		v.view.reset()
+	}
 }
 
 func (v *viewer) Update() error {
@@ -56,10 +86,14 @@ func (v *viewer) Update() error {
 		return ebiten.Termination
 	}
 	x, y := v.cursor()
-	if _, dy := ebiten.Wheel(); dy != 0 && !math.IsNaN(dy) {
+	action, overToolbar := v.chrome.clicked(x, y)
+	v.perform(action)
+	// The view lies below the toolbar.
+	y -= toolbarHeight
+	if _, dy := ebiten.Wheel(); dy != 0 && !math.IsNaN(dy) && !overToolbar {
 		v.view.zoomAt(math.Pow(wheelStep, math.Max(-10, math.Min(10, dy))), x, y)
 	}
-	if inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft) {
+	if inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft) && !overToolbar {
 		v.dragging, v.lastX, v.lastY = true, x, y
 	}
 	if v.dragging {
@@ -93,7 +127,7 @@ func (v *viewer) Draw(screen *ebiten.Image) {
 	op.GeoM.Translate(-float64(v.imageW)/2, -float64(v.imageH)/2)
 	op.GeoM.Rotate(-float64(v.view.quarters) * math.Pi / 2)
 	op.GeoM.Scale(v.view.zoom, v.view.zoom)
-	op.GeoM.Translate(v.view.centerX, v.view.centerY)
+	op.GeoM.Translate(v.view.centerX, v.view.centerY+toolbarHeight)
 	op.GeoM.Scale(v.scale, v.scale)
 	if v.view.zoom*v.scale >= 2 {
 		op.Filter = ebiten.FilterNearest
@@ -102,6 +136,7 @@ func (v *viewer) Draw(screen *ebiten.Image) {
 	}
 	screen.DrawImage(v.chart, op)
 	v.drawHUD(screen)
+	v.chrome.draw(screen, v.scale)
 }
 
 // Layout works in device pixels, so the chart is drawn sharp on high-density
@@ -112,33 +147,31 @@ func (v *viewer) Layout(outsideWidth, outsideHeight int) (int, int) {
 		scale = 1
 	}
 	v.scale = scale
-	v.view.resize(outsideWidth, outsideHeight)
+	v.view.resize(outsideWidth, max(outsideHeight-toolbarHeight, 1))
 	return int(math.Ceil(float64(outsideWidth) * scale)), int(math.Ceil(float64(outsideHeight) * scale))
 }
 
 // runWindow shows the chart until the user closes the viewer. It answers the
 // handshake once the window's first frame runs, or with an error if no
 // window could be opened.
-func runWindow(img image.Image, title string, out io.Writer) error {
+func runWindow(img image.Image, spec viewSpec, out io.Writer) error {
 	bounds := img.Bounds()
 	boundW, boundH := 1400, 1000
 	if monitorW, monitorH := ebiten.Monitor().Size(); monitorW > 0 && monitorH > 0 {
 		boundW, boundH = monitorW*9/10, monitorH*9/10
 	}
-	windowW, windowH := initialWindow(bounds.Dx(), bounds.Dy(), boundW, boundH)
+	windowW, windowH := initialWindow(bounds.Dx(), bounds.Dy(), boundW, boundH-toolbarHeight)
 	answered := false
 	v := &viewer{imageW: bounds.Dx(), imageH: bounds.Dy(), view: newView(bounds.Dx(), bounds.Dy(), windowW, windowH),
-		scale: 1, started: time.Now(), hud: newHUD()}
+		scale: 1, started: time.Now(), hud: newHUD(), spec: spec}
+	v.chrome = newChrome(modeChart, v.hud)
+	title := spec.Title
 	v.ready = func() {
 		answered = true
 		answer(out, reply{Ready: true})
 	}
-	windowTitle := "AhdCode Plot"
-	if title != "" {
-		windowTitle += " — " + title
-	}
-	ebiten.SetWindowTitle(windowTitle)
-	ebiten.SetWindowSize(windowW, windowH)
+	ebiten.SetWindowTitle(windowTitle(title))
+	ebiten.SetWindowSize(windowW, windowH+toolbarHeight)
 	ebiten.SetWindowResizingMode(ebiten.WindowResizingModeEnabled)
 	ebiten.SetWindowSizeLimits(320, 240, -1, -1)
 	ebiten.SetRunnableOnUnfocused(true)
@@ -163,4 +196,14 @@ func runGame(v *viewer, img image.Image) (err error) {
 	}()
 	v.chart = ebiten.NewImageFromImage(img)
 	return ebiten.RunGame(v)
+}
+
+// windowTitle names the viewer after the application: AhdCode's own, or a
+// packaged application's.
+func windowTitle(title string) string {
+	name := ahdidentity.Name() + " Plot"
+	if title != "" {
+		name += " — " + title
+	}
+	return name
 }

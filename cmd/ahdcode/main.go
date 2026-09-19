@@ -21,6 +21,7 @@ import (
 	"ahdcode/internal/formatter"
 	"ahdcode/internal/initweb"
 	"ahdcode/internal/lsp"
+	"ahdcode/internal/packaging"
 	"ahdcode/internal/repl"
 	"ahdcode/internal/source"
 
@@ -37,6 +38,9 @@ usage:
   ahdcode databases add <file.db>            register a SQLite file with AhdDataStudio
   ahdcode databases remove <file.db>         forget a SQLite file (the file is kept)
   ahdcode build <entry.ahd> [-o <output>]    compile to a native executable
+  ahdcode package <entry.ahd> [--name <name>] [--output <folder>] [--icon <icon.png>]
+                  [--target <os-arch>] [--helpers <folder>] [--console]
+                                             make a self-contained desktop application
   ahdcode run   <entry.ahd> [-- <args>...]   compile and run
   ahdcode dev   <entry.ahd>                  watch, rebuild, and restart on save
   ahdcode stop  <app.dev|app.run>            gracefully stop a dev or run session
@@ -84,6 +88,8 @@ func runWithIO(arguments []string, input io.Reader, output, errorOutput io.Write
 		return runDatabases(arguments[1:], input, output, errorOutput)
 	case "build":
 		return runBuild(arguments[1:], output, errorOutput)
+	case "package":
+		return runPackage(arguments[1:], output, errorOutput)
 	case "run":
 		return runRun(arguments[1:], input, output, errorOutput)
 	case "dev":
@@ -192,6 +198,56 @@ func runBuild(arguments []string, outputWriter, errorOutput io.Writer) int {
 		return 1
 	}
 	fmt.Fprintln(outputWriter, path)
+	return 0
+}
+
+func runPackage(arguments []string, outputWriter, errorOutput io.Writer) int {
+	var options packaging.Options
+	values := map[string]*string{"--name": &options.Name, "--output": &options.Output, "-o": &options.Output,
+		"--icon": &options.Icon, "--target": &options.Target, "--helpers": &options.Helpers}
+	for index := 0; index < len(arguments); index++ {
+		argument := arguments[index]
+		if argument == "--console" {
+			options.Console = true
+			continue
+		}
+		if target, known := values[argument]; known {
+			if index+1 >= len(arguments) || arguments[index+1] == "" {
+				fmt.Fprintf(errorOutput, "ahdcode package: %s requires a value\n", argument)
+				return 2
+			}
+			index++
+			*target = arguments[index]
+			continue
+		}
+		if strings.HasPrefix(argument, "-") {
+			fmt.Fprintf(errorOutput, "ahdcode package: unknown flag %q\n", argument)
+			return 2
+		}
+		if options.Entry != "" {
+			fmt.Fprintln(errorOutput, "ahdcode package: exactly one entry module is expected")
+			return 2
+		}
+		options.Entry = argument
+	}
+	if options.Entry == "" {
+		fmt.Fprint(errorOutput, usage)
+		return 2
+	}
+	result := packaging.Package(options)
+	reportTo(errorOutput, build.Result{Diagnostics: result.Diagnostics, Files: result.Files})
+	if result.Application == "" {
+		return 1
+	}
+	fmt.Fprintf(outputWriter, "packaged %s for %s\n", result.Application, result.Target)
+	if result.Archive != "" {
+		fmt.Fprintf(outputWriter, "archive %s\n", result.Archive)
+	}
+	helpers := "none"
+	if len(result.Helpers) > 0 {
+		helpers = strings.Join(result.Helpers, ", ")
+	}
+	fmt.Fprintf(outputWriter, "helpers %s\n", helpers)
 	return 0
 }
 

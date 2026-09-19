@@ -28,13 +28,14 @@ type window struct {
 	readyOnce sync.Once
 	ready     chan struct{}
 
-	scale   float64
-	title   string
-	ticks   int
-	caret   bool
-	texture *ebiten.Image
-	keys    []ebiten.Key
-	chars   []rune
+	scale     float64
+	title     string
+	resizable bool
+	ticks     int
+	caret     bool
+	texture   *ebiten.Image
+	keys      []ebiten.Key
+	chars     []rune
 }
 
 func (w *window) Update() error {
@@ -55,6 +56,15 @@ func (w *window) Update() error {
 		ebiten.SetWindowTitle(title)
 		w.title = title
 	}
+	if resizable := m.isResizable(); resizable != w.resizable {
+		w.resizable = resizable
+		if resizable {
+			ebiten.SetWindowSizeLimits(160, 120, maxDimension, maxDimension)
+			ebiten.SetWindowResizingMode(ebiten.WindowResizingModeEnabled)
+		} else {
+			ebiten.SetWindowResizingMode(ebiten.WindowResizingModeDisabled)
+		}
+	}
 	w.ticks++
 	if w.ticks%caretBlinkTicks == 0 {
 		w.caret = !w.caret
@@ -67,6 +77,8 @@ func (w *window) Update() error {
 	}
 	w.pollMouse()
 	w.pollKeys()
+	// Every change the user made in this frame is reported once.
+	s.changed()
 	return nil
 }
 
@@ -76,15 +88,26 @@ func (w *window) pollMouse() {
 	x, y := int(math.Floor(float64(px)/w.scale)), int(math.Floor(float64(py)/w.scale))
 	if inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft) {
 		s.model.press(x, y)
+	} else if ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft) {
+		s.model.drag(x, y)
 	}
 	if inpututil.IsMouseButtonJustReleased(ebiten.MouseButtonLeft) {
 		s.clicked(s.model.release(x, y))
 	}
+	if dx, dy := ebiten.Wheel(); (dx != 0 || dy != 0) && !math.IsNaN(dx) && !math.IsNaN(dy) {
+		if ebiten.IsKeyPressed(ebiten.KeyShift) {
+			// Shift turns a mouse wheel sideways.
+			dx, dy = dy, 0
+		}
+		s.model.wheel(x, y, math.Max(-10, math.Min(10, dx)), math.Max(-10, math.Min(10, dy)))
+	}
 }
 
-// pollKeys edits the focused TextInput, moves the focus with Tab, activates
-// the focused Button with Enter or Space and the focused Checkbox with
-// Space, and reports each key press, once, to a program listening for keys.
+// pollKeys edits the focused text field, moves the focus with Tab and
+// Shift+Tab, activates the focused Button with Enter or Space, the focused
+// Checkbox with Space, and the focused Select with either, moves a list's
+// selection with the arrow and page keys, and reports each key press, once,
+// to a program listening for keys.
 func (w *window) pollKeys() {
 	s, m := w.session, w.session.model
 	w.keys = inpututil.AppendJustPressedKeys(w.keys[:0])
@@ -95,18 +118,33 @@ func (w *window) pollKeys() {
 		}
 		switch name {
 		case "Tab":
-			m.focusNext()
+			if ebiten.IsKeyPressed(ebiten.KeyShift) {
+				m.focusPrevious()
+			} else {
+				m.focusNext()
+			}
+		case "Escape":
+			m.escape()
 		case "Enter", "Space":
-			s.clicked(m.activateFocused(name == "Space"))
+			if name == "Enter" && m.focusedKind() == kindTextArea {
+				m.edit(name)
+			} else {
+				s.clicked(m.activateFocused(name == "Space"))
+			}
 		default:
-			m.edit(name)
+			if !m.navigate(name) {
+				m.edit(name)
+			}
 		}
 		s.pressedKey(name)
 	}
-	for _, key := range []ebiten.Key{ebiten.KeyBackspace, ebiten.KeyDelete, ebiten.KeyArrowLeft, ebiten.KeyArrowRight} {
+	for _, key := range []ebiten.Key{ebiten.KeyBackspace, ebiten.KeyDelete, ebiten.KeyArrowLeft, ebiten.KeyArrowRight,
+		ebiten.KeyArrowUp, ebiten.KeyArrowDown, ebiten.KeyPageUp, ebiten.KeyPageDown} {
 		held := inpututil.KeyPressDuration(key)
 		if held > repeatDelay && (held-repeatDelay)%repeatEvery == 0 {
-			m.edit(keyNames[key])
+			if !m.navigate(keyNames[key]) {
+				m.edit(keyNames[key])
+			}
 		}
 	}
 	w.chars = ebiten.AppendInputChars(w.chars[:0])
@@ -115,13 +153,19 @@ func (w *window) pollKeys() {
 	}
 }
 
-func (w *window) Layout(int, int) (int, int) {
+func (w *window) Layout(outsideWidth, outsideHeight int) (int, int) {
 	m := w.session.model
+	if m.isResizable() && outsideWidth > 0 && outsideHeight > 0 {
+		m.resize(outsideWidth, outsideHeight)
+	}
+	m.mu.Lock()
+	width, height := m.width, m.height
+	m.mu.Unlock()
 	scale := 1.0
 	if monitor := ebiten.Monitor(); monitor != nil && monitor.DeviceScaleFactor() > 0 {
 		scale = monitor.DeviceScaleFactor()
 	}
-	if math.Ceil(float64(m.width)*scale)*math.Ceil(float64(m.height)*scale) > maxDimension*maxDimension {
+	if math.Ceil(float64(width)*scale)*math.Ceil(float64(height)*scale) > maxDimension*maxDimension {
 		scale = 1
 	}
 	if scale != w.scale {
@@ -130,7 +174,7 @@ func (w *window) Layout(int, int) (int, int) {
 		m.dirty = true
 		m.mu.Unlock()
 	}
-	return int(math.Ceil(float64(m.width) * scale)), int(math.Ceil(float64(m.height) * scale))
+	return int(math.Ceil(float64(width) * scale)), int(math.Ceil(float64(height) * scale))
 }
 
 func (w *window) Draw(screen *ebiten.Image) {

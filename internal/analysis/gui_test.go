@@ -44,12 +44,15 @@ func TestCompletionOffersGUIModuleAndMembers(t *testing.T) {
 		want   []string
 		absent []string
 	}{
-		{"bring GUI\nGUI.", []string{"window", "Window", "Container", "Label", "Button", "TextInput", "Checkbox", "GUIError"}, []string{"alert", "fileDialog"}},
-		{"bring GUI\nw := GUI.window()\nw.", []string{"column", "row", "onKey", "wait", "close", "isOpen", "setTitle", "setBackground"}, []string{"onClick", "menu", "setForeground", "setEnabled", "setVisible", "setTheme", "resize"}},
-		{"bring GUI\nc := GUI.window().column()\nc.", []string{"column", "row", "label", "button", "textInput", "checkbox", "setBackground"}, []string{"table", "dropdown", "setForeground", "setEnabled", "setVisible"}},
+		{"bring GUI\nGUI.", []string{"window", "Window", "Container", "Label", "Button", "TextInput", "Checkbox", "GUIError",
+			"ListBox", "Select", "TextArea", "PasswordInput", "TableView", "openFile", "openFiles", "selectFolder", "saveFile", "message", "confirm"},
+			[]string{"alert", "fileDialog", "Table", "RadioGroup", "TreeView"}},
+		{"bring GUI\nw := GUI.window()\nw.", []string{"column", "row", "onKey", "wait", "close", "isOpen", "setTitle", "setBackground", "setResizable", "isResizable"}, []string{"onClick", "menu", "setForeground", "setEnabled", "setTheme", "resize"}},
+		{"bring GUI\nc := GUI.window().column()\nc.", []string{"column", "row", "label", "button", "textInput", "checkbox", "setBackground",
+			"passwordInput", "textArea", "listBox", "select", "table"}, []string{"dropdown", "tree", "setForeground", "setEnabled", "scrollColumn"}},
 		{"bring GUI\nb := GUI.window().column().button(\"x\")\nb.", []string{"text", "setText", "onClick", "setForeground", "setBackground", "setEnabled", "isEnabled"}, []string{"setVisible", "setFont", "setStyle"}},
-		{"bring GUI\ni := GUI.window().column().textInput()\ni.", []string{"text", "setText", "setForeground", "setBackground", "setEnabled", "isEnabled"}, []string{"onChange", "onKey", "setVisible"}},
-		{"bring GUI\nk := GUI.window().column().checkbox(\"x\")\nk.", []string{"checked", "setChecked", "setForeground", "setBackground", "setEnabled", "isEnabled"}, []string{"onChange", "setVisible"}},
+		{"bring GUI\ni := GUI.window().column().textInput()\ni.", []string{"text", "setText", "onChange", "setForeground", "setBackground", "setEnabled", "isEnabled"}, []string{"onKey", "setFont"}},
+		{"bring GUI\nk := GUI.window().column().checkbox(\"x\")\nk.", []string{"checked", "setChecked", "onChange", "setForeground", "setBackground", "setEnabled", "isEnabled"}, []string{"onClick", "setFont"}},
 		{"bring GUI\nl := GUI.window().column().label(\"x\")\nl.", []string{"text", "setText", "setForeground", "setBackground"}, []string{"onClick", "setEnabled", "isEnabled", "setVisible", "setFont"}},
 		{"bring Graphics\ncanvas := Graphics.open()\ncanvas.", []string{"onClick", "onKey", "wait", "turtle"}, []string{"mouseX", "isKeyDown"}},
 	} {

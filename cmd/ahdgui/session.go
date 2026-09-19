@@ -29,10 +29,16 @@ type session struct {
 	writeMu    sync.Mutex
 	closedSent atomic.Bool
 
-	// The events the program listens for: keys, and clicks on some Buttons.
+	// The events the program listens for: keys, clicks on some Buttons, and
+	// changes of some widgets.
 	listenKey atomic.Bool
 	clicksMu  sync.Mutex
 	clicks    map[int64]bool
+	changes   map[int64]bool
+
+	// sink, when set, receives the events instead of the output stream: a
+	// fallback dialog window handles its own clicks.
+	sink func(event)
 
 	// script is a headless test Window's input, replayed one event at a
 	// time: wait starts it and each next request continues it.
@@ -49,6 +55,10 @@ func (s *session) send(value any) error {
 }
 
 func (s *session) emit(value event) {
+	if s.sink != nil {
+		s.sink(value)
+		return
+	}
 	if s.send(value) != nil {
 		s.closeRequested.Store(true)
 	}
@@ -74,6 +84,31 @@ func (s *session) clicked(id int64) {
 	if id != 0 && s.listensToClick(id) {
 		s.emit(event{Event: "click", Widget: id})
 	}
+}
+
+func (s *session) listensToChange(id int64) bool {
+	s.clicksMu.Lock()
+	defer s.clicksMu.Unlock()
+	return s.changes[id]
+}
+
+// changed sends one change event for every widget the user changed that the
+// program listens to, with the widget's new reading, and reports whether it
+// sent any.
+func (s *session) changed() bool {
+	sent := false
+	for _, id := range s.model.takeChanges() {
+		if !s.listensToChange(id) {
+			continue
+		}
+		reading, ok := s.model.valueNow(id)
+		if !ok {
+			continue
+		}
+		s.emit(event{Event: "change", Widget: id, Text: reading.Text, Checked: reading.Checked, Selected: reading.Selected})
+		sent = true
+	}
+	return sent
 }
 
 // pressedKey reports a key press when the program listens for keys.
@@ -109,18 +144,31 @@ func (s *session) serve() {
 }
 
 // advance replays the headless script up to and including its next event.
-// Typing and toggling change the model silently; a click on a Button nobody
-// listens to, or a key when nobody listens for keys, produces nothing. When
-// the script is exhausted the Window reports itself closed.
+// Typing, toggling, and selecting change the model and send a change event
+// when the program listens for one; a click on a Button nobody listens to,
+// or a key when nobody listens for keys, produces nothing. When the script
+// is exhausted the Window reports itself closed.
 func (s *session) advance() {
 	for s.cursor < len(s.script) {
 		step := s.script[s.cursor]
 		s.cursor++
 		switch step.Event {
-		case "type":
-			_ = s.model.typeInto(step.Widget, step.Text)
-		case "toggle":
-			_ = s.model.toggle(step.Widget)
+		case "type", "toggle", "select":
+			switch step.Event {
+			case "type":
+				_ = s.model.typeInto(step.Widget, step.Text)
+			case "toggle":
+				_ = s.model.toggle(step.Widget)
+			default:
+				_ = s.model.choose(step.Widget, *step.Selected)
+			}
+			if s.changed() {
+				return
+			}
+		case "resize":
+			if s.model.isResizable() {
+				s.model.resize(step.Width, step.Height)
+			}
 		case "click":
 			// A disabled Button ignores the user, scripted or not.
 			if s.listensToClick(step.Widget) && s.model.enabled(step.Widget) {
@@ -151,19 +199,24 @@ func (s *session) handle(r request) (response, bool) {
 		// closed event.
 		return response{OK: true}, false
 	case "get":
-		text, checked, err := s.model.read(r.Widget)
+		text, checked, selected, err := s.model.readAll(r.Widget)
 		if err != nil {
 			return response{Error: err.Error()}, false
 		}
-		return response{OK: true, Text: &text, Checked: &checked}, false
+		return response{OK: true, Text: &text, Checked: &checked, Selected: &selected}, false
 	}
 	if s.closed.Load() {
 		return response{Error: closedMessage, Closed: true}, false
 	}
 	switch r.Op {
 	case "add":
-		checked := r.Checked != nil && *r.Checked
-		id, err := s.model.add(r.Parent, r.Kind, r.Text, r.Placeholder, checked, r.Spacing, r.Padding)
+		selected := -1
+		if r.Selected != nil {
+			selected = *r.Selected
+		}
+		id, err := s.model.addSpec(r.Parent, spec{kind: r.Kind, text: r.Text, placeholder: r.Placeholder,
+			checked: r.Checked != nil && *r.Checked, spacing: r.Spacing, padding: r.Padding,
+			items: r.Items, columns: r.Columns, rows: r.Rows, selected: selected})
 		if err != nil {
 			return response{Error: err.Error()}, false
 		}
@@ -175,8 +228,14 @@ func (s *session) handle(r request) (response, bool) {
 			err = s.model.setText(r.Widget, r.Text)
 		case r.Kind == "checked" && r.Checked != nil:
 			err = s.model.setChecked(r.Widget, *r.Checked)
+		case r.Kind == "items":
+			err = s.model.setItems(r.Widget, r.Items)
+		case r.Kind == "rows":
+			err = s.model.setRows(r.Widget, r.Rows)
+		case r.Kind == "selected" && r.Selected != nil:
+			err = s.model.selectIndex(r.Widget, *r.Selected)
 		default:
-			err = errors.New("set needs text or checked")
+			err = errors.New("set needs text, checked, items, rows, or selected")
 		}
 		if err != nil {
 			return response{Error: err.Error()}, false
@@ -199,6 +258,12 @@ func (s *session) handle(r request) (response, bool) {
 			return response{Error: err.Error()}, false
 		}
 		return response{OK: true}, false
+	case "resizable":
+		if r.Enabled == nil {
+			return response{Error: "resizable needs a value"}, false
+		}
+		s.model.setResizable(*r.Enabled)
+		return response{OK: true}, false
 	case "title":
 		if !validText(r.Text, maxTitleRunes) {
 			return response{Error: "invalid window title"}, false
@@ -215,6 +280,13 @@ func (s *session) handle(r request) (response, bool) {
 			}
 			s.clicksMu.Lock()
 			s.clicks[r.Widget] = true
+			s.clicksMu.Unlock()
+		case "change":
+			if _, _, err := s.model.read(r.Widget); err != nil {
+				return response{Error: err.Error()}, false
+			}
+			s.clicksMu.Lock()
+			s.changes[r.Widget] = true
 			s.clicksMu.Unlock()
 		default:
 			return response{Error: "unknown event kind " + r.Kind}, false

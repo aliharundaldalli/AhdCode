@@ -65,7 +65,8 @@ func TestPlotChartSeriesOperationRejectsStringList(t *testing.T) {
 chart: Chart := Plot.new()
 chart = chart.line(values, values, "a")
 `)
-	requireSemanticCode(t, result, codeTypeMismatch)
+	// Chart.line is an ordinary overload set, like Plot.line.
+	requireSemanticCode(t, result, codeNoMatchingOverload)
 }
 
 func TestPlotHistogramBinsMustBeInt(t *testing.T) {

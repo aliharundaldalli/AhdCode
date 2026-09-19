@@ -1,0 +1,235 @@
+// A small customer ledger: debts and payments per customer, kept in SQLite,
+// shown in a table with a running total, and exported to CSV through the
+// save dialog. It uses every ordinary v2.0 GUI control: TextInput, Select,
+// TextArea, ListBox, TableView, Checkbox, Buttons with enabled states,
+// change and selection callbacks, colors, dialogs, and a resizable Window.
+//
+// Run it with `ahdcode run main.ahd`, or package it with
+// `ahdcode package main.ahd --name Ledger`. The database file
+// ahdcode-ledger.db is created in the working folder (for a packaged
+// application opened from the Finder, the home folder).
+bring GUI
+bring SQLite
+bring CSV
+from GUI bring (Window, Container, Label, Button, TextInput, TextArea, Select, ListBox, TableView, Checkbox, GUIError)
+from SQLite bring (Database, SQLiteValue)
+
+db: Database := SQLite.open("ahdcode-ledger.db")
+db.execute("CREATE TABLE IF NOT EXISTS entries (id INTEGER PRIMARY KEY, customer TEXT NOT NULL, kind TEXT NOT NULL, amount REAL NOT NULL, note TEXT NOT NULL)")
+
+columns: List<String> := ["No", "Customer", "Entry", "Amount", "Note"]
+shownRows: List<List<String>> := []
+
+window: Window := GUI.window(title: "Ledger", width: 960, height: 640)
+window.setResizable(true)
+window.setBackground("#EEF2F7")
+root: Container := window.column(spacing: 10, padding: 14)
+
+header: Container := root.row(spacing: 8, padding: 8)
+header.setBackground("#1F4E79")
+heading: Label := header.label("Customer ledger")
+heading.setForeground("white")
+
+body: Container := root.row(spacing: 16)
+
+// The entry form.
+form: Container := body.column(spacing: 6)
+form.label("Customer")
+customer: TextInput := form.textInput(placeholder: "e.g. Ayşe Yılmaz")
+form.label("Entry")
+kind: Select := form.select(items: ["Debt", "Payment"], selectedIndex: 0)
+form.label("Amount")
+amount: TextInput := form.textInput(placeholder: "e.g. 250.50")
+form.label("Note")
+note: TextArea := form.textArea(placeholder: "Optional")
+add: Button := form.button("Add entry")
+add.setForeground("white")
+add.setBackground("#2E7D32")
+add.setEnabled(false)
+status: Label := form.label("Type a customer and an amount.")
+
+// The ledger.
+ledger: Container := body.column(spacing: 6)
+filters: Container := ledger.row(spacing: 12)
+filters.label("Customers")
+showAll: Checkbox := filters.checkbox("Show every customer", true)
+customers: ListBox := ledger.listBox()
+table: TableView := ledger.table(columns)
+totals: Container := ledger.row(spacing: 12)
+total: Label := totals.label("Balance: 0.0")
+total.setForeground("#1F4E79")
+actions: Container := ledger.row(spacing: 8)
+remove: Button := actions.button("Delete entry")
+remove.setEnabled(false)
+export: Button := actions.button("Export CSV…")
+
+// amountValue is the typed amount, or null when it is not a positive number.
+amountValue: Function := () -> Real? {
+    amount: Global TextInput
+    attempt {
+        value: Local Real := real(amount.text())
+        if value > 0.0 {
+            return value
+        }
+    } except DomainError as error {
+        return null
+    }
+    return null
+}
+
+validate: Function := () -> Nothing {
+    customer: Global TextInput
+    add: Global Button
+    amountValue: Global Function
+    ready: Local := customer.text().trim() != "" and amountValue() != null
+    add.setEnabled(ready)
+}
+
+refreshTable: Function := () -> Nothing {
+    db: Global Database
+    table: Global TableView
+    total: Global Label
+    remove: Global Button
+    showAll: Global Checkbox
+    customers: Global ListBox
+    shownRows: Global List<List<String>>
+    chosen: Local String? := customers.selectedText()
+    query: Local String := "SELECT id, customer, kind, amount, note FROM entries ORDER BY id"
+    parameters: Local List<SQLiteValue> := []
+    if not showAll.checked() and chosen != null {
+        query = "SELECT id, customer, kind, amount, note FROM entries WHERE customer = ? ORDER BY id"
+        parameters.add(SQLite.fromString(chosen))
+    }
+    rows: Local List<List<String>> := []
+    balance: Local Real := 0.0
+    for row in db.query(query, parameters) {
+        entry: Local String := row["kind"].string()
+        value: Local Real := row["amount"].real()
+        if entry == "Debt" {
+            balance = balance + value
+        }
+        else {
+            balance = balance - value
+        }
+        rows.add([str(row["id"].int()), row["customer"].string(), entry, str(value), row["note"].string()])
+    }
+    shownRows = rows
+    table.setRows(rows)
+    total.setText("Balance: {balance}")
+    if balance > 0.0 {
+        total.setForeground("#B71C1C")
+    }
+    else {
+        total.setForeground("#2E7D32")
+    }
+    remove.setEnabled(false)
+}
+
+refreshCustomers: Function := () -> Nothing {
+    db: Global Database
+    customers: Global ListBox
+    chosen: Local String? := customers.selectedText()
+    names: Local List<String> := []
+    for row in db.query("SELECT DISTINCT customer FROM entries ORDER BY customer") {
+        names.add(row["customer"].string())
+    }
+    customers.setItems(names)
+    if chosen != null {
+        position: Local Int := 0
+        for name in names {
+            if name == chosen {
+                customers.select(position)
+            }
+            position = position + 1
+        }
+    }
+}
+
+addEntry: Function := () -> Nothing {
+    db: Global Database
+    customer: Global TextInput
+    kind: Global Select
+    amount: Global TextInput
+    note: Global TextArea
+    status: Global Label
+    amountValue: Global Function
+    refreshCustomers: Global Function
+    refreshTable: Global Function
+    validate: Global Function
+    value: Local Real? := amountValue()
+    entry: Local String? := kind.selectedText()
+    if value == null or entry == null {
+        return
+    }
+    name: Local String := customer.text().trim()
+    db.execute("INSERT INTO entries (customer, kind, amount, note) VALUES (?, ?, ?, ?)",
+        [SQLite.fromString(name), SQLite.fromString(entry), SQLite.fromReal(value), SQLite.fromString(note.text())])
+    amount.setText("")
+    note.setText("")
+    status.setForeground("#2E7D32")
+    status.setText("Added {entry} of {value} for {name}.")
+    refreshCustomers()
+    refreshTable()
+    validate()
+}
+
+deleteEntry: Function := () -> Nothing {
+    db: Global Database
+    table: Global TableView
+    status: Global Label
+    shownRows: Global List<List<String>>
+    refreshCustomers: Global Function
+    refreshTable: Global Function
+    row: Local Int? := table.selectedRow()
+    if row == null {
+        return
+    }
+    entry: Local List<String> := shownRows[row]
+    if GUI.confirm("Delete entry", "Delete entry {entry[0]} ({entry[2]} of {entry[3]} for {entry[1]})?") {
+        db.execute("DELETE FROM entries WHERE id = ?", [SQLite.fromInt(int(entry[0]))])
+        status.setForeground("#1F4E79")
+        status.setText("Deleted entry {entry[0]}.")
+        refreshCustomers()
+        refreshTable()
+    }
+}
+
+exportRows: Function := () -> Nothing {
+    columns: Global List<String>
+    shownRows: Global List<List<String>>
+    status: Global Label
+    path: Local String? := GUI.saveFile(title: "Export the ledger", suggestedName: "ledger.csv", extensions: ["csv"])
+    if path == null {
+        status.setText("Export cancelled.")
+        return
+    }
+    rows: Local List<List<String>> := [columns]
+    for row in shownRows {
+        rows.add(row)
+    }
+    CSV.write(path, rows)
+    status.setForeground("#1F4E79")
+    status.setText("Exported {len(shownRows)} entries.")
+    GUI.message("Export", "Saved {len(shownRows)} entries to {path}.")
+}
+
+customer.onChange(lambda (text: String) -> validate())
+amount.onChange(lambda (text: String) -> validate())
+customers.onChange(lambda (index: Int?, text: String?) -> refreshTable())
+showAll.onChange(lambda (checked: Bool) -> refreshTable())
+table.onSelect(lambda [@remove] (row: Int?) -> remove.setEnabled(row != null))
+add.onClick(addEntry)
+remove.onClick(deleteEntry)
+export.onClick(exportRows)
+closeOnEscape: Function := (key: String) -> Nothing {
+    window: Global Window
+    if key == "Escape" {
+        window.close()
+    }
+}
+window.onKey(closeOnEscape)
+
+refreshCustomers()
+refreshTable()
+window.wait()
+db.close()

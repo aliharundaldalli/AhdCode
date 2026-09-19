@@ -83,6 +83,7 @@ const (
 	fundamentalsRuntimeFileName    = "ahdcode_fundamentals_runtime.go"
 	helperLinkRuntimeFileName      = "ahdcode_helperlink_runtime.go"
 	guiRuntimeFileName             = "ahdcode_gui_runtime.go"
+	guiWidgetsRuntimeFileName      = "ahdcode_gui_widgets_runtime.go"
 	plotViewRuntimeFileName        = "ahdcode_plotview_runtime.go"
 )
 
@@ -251,6 +252,7 @@ func Generate(compilation *ir.Compilation) (*GeneratedProgram, []diagnostics.Dia
 		{fundamentalsRuntimeFileName, ahdruntime.FundamentalsSource, "standard-library fundamentals"},
 		{helperLinkRuntimeFileName, ahdruntime.HelperLinkSource, "window helper link"},
 		{guiRuntimeFileName, ahdruntime.GUISource, "GUI"},
+		{guiWidgetsRuntimeFileName, ahdruntime.GUIWidgetsSource, "GUI widgets"},
 		{plotViewRuntimeFileName, ahdruntime.PlotViewSource, "Plot viewer"},
 	} {
 		formattedShared, err := format.Source([]byte(strings.Replace(shared.source, "package ahdruntime", "package main", 1)))
@@ -625,6 +627,7 @@ func (generator *generator) emitProgram() string {
 	generator.emitTimeHelpers(writer)
 	generator.emitDataHelpers(writer)
 	generator.emitPlotHelpers(writer)
+	generator.emitPlotSurfaceHelper(writer)
 	generator.emitNumericHelpers(writer)
 	generator.emitWordHelpers(writer)
 	generator.emitPDFHelpers(writer)

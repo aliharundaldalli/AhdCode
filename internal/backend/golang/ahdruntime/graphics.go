@@ -219,6 +219,12 @@ func ahdGraphicsDiscoverRuntime() (string, error) {
 	if runtime.GOOS == "windows" {
 		name = "ahdgraphics.exe"
 	}
+	if AhdPackagedApplication {
+		if path, ok := ahdPackagedHelper(name); ok {
+			return path, nil
+		}
+		return "", errors.New("the Graphics window helper (ahdgraphics) is missing from this application")
+	}
 	candidates := []string{os.Getenv("AHDCODE_GRAPHICS_RUNTIME")}
 	if AhdGraphicsRuntimeHint != "" {
 		candidates = append(candidates, filepath.Join(AhdGraphicsRuntimeHint, name))

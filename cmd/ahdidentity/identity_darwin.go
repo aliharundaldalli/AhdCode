@@ -20,9 +20,16 @@ import (
 // long-stable function (browsers use it to name their helper processes). It
 // is looked up with dlsym, so if a future macOS removes it the helper simply
 // keeps its file name. No cgo, Objective-C source, or bundle is involved.
+//
+// Inside a packaged application the bundle's Info.plist already names the
+// application and gives its Dock icon, so nothing is changed at run time and
+// the private function is never called.
 func applyPlatform() {
-	setDisplayName(Name)
-	setDockIcon(IconPNG())
+	if Packaged() {
+		return
+	}
+	setDisplayName(DefaultName)
+	setDockIcon(RoundedPNG(officialIcon(), 512))
 }
 
 func nsString(text string) objc.ID {

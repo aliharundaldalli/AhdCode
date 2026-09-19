@@ -81,7 +81,7 @@ func (v *viewer) drawHUD(screen *ebiten.Image) {
 			v.hint = v.hud.label(hintText, v.scale)
 		}
 		op := &ebiten.DrawImageOptions{}
-		op.GeoM.Translate((float64(bounds.Dx())-float64(v.hint.Bounds().Dx()))/2, margin)
+		op.GeoM.Translate((float64(bounds.Dx())-float64(v.hint.Bounds().Dx()))/2, margin+toolbarHeight*v.scale)
 		screen.DrawImage(v.hint, op)
 	} else if v.hint != nil {
 		v.hint.Deallocate()

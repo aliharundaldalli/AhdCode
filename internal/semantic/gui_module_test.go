@@ -22,7 +22,7 @@ func TestGUIModuleRegistered(t *testing.T) {
 	if module == nil || module.ModuleID != "builtin:GUI" {
 		t.Fatalf("GUI module = %#v", module)
 	}
-	want := "Button Checkbox Container GUIError Label TextInput Window window"
+	want := "Button Checkbox Container GUIError Label ListBox PasswordInput Select TableView TextArea TextInput Window confirm message openFile openFiles saveFile selectFolder window"
 	got := ""
 	for index, name := range module.ExportNames {
 		if index > 0 {

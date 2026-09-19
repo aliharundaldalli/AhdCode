@@ -3,6 +3,6 @@
 package ahdversion
 
 const (
-	Number  = "1.9.0"
-	Display = "AhdCode v1.9.0"
+	Number  = "2.0.0"
+	Display = "AhdCode v2.0.0"
 )

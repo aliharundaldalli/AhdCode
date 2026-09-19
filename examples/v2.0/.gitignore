@@ -1,0 +1,6 @@
+# Files the v2.0 examples generate when they run or are packaged.
+*.db
+*.png
+*.csv
+*.xlsx
+dist/

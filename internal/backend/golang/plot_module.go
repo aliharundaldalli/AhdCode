@@ -87,6 +87,8 @@ func (generator *generator) plotCall(value *ir.CallExpr) string {
 		return generator.plotChartFrom("AhdPlotErrorBar("+plotErrorRuntime+", "+numeric(0)+", "+numeric(1)+", "+numeric(2)+", "+numeric(3)+")", meta)
 	case "subplots":
 		return generator.plotSubplots(value, meta)
+	case "surface":
+		return generator.plotSurfaceCall(value, meta)
 	default:
 		return generator.unsupported("Plot function "+name, meta.Span)
 	}

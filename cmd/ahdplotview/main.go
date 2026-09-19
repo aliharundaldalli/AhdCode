@@ -1,19 +1,26 @@
-// Command ahdplotview is AhdCode's own interactive Plot viewer. Chart.show
-// and Figure.show render a PNG preview with the ahdplot renderer and start
-// this helper on it:
+// Command ahdplotview is AhdCode's own interactive Plot viewer. Chart.show,
+// Figure.show, and Surface.show start it on one view file, and Surface.save
+// uses it to render a Surface:
 //
-//	ahdplotview <preview.png> <title>
+//	ahdplotview <view.json>
 //
-// The viewer reads the preview completely and deletes it, checks it, opens
-// its window, and then writes exactly one line of JSON to standard output --
-// {"ready":true} or {"error":"..."} -- and closes standard output. The program
-// that called show() continues as soon as it reads that line; the viewer
-// stays open on its own until the user closes it.
+// The view file (see spec.go) is read completely and deleted at once. For a
+// Chart or Figure it names a PNG preview rendered by ahdplot, also read and
+// deleted, and carries the chart's canonical render request; for a Surface it
+// carries the Surface's data. The viewer checks everything, opens its window,
+// and then writes exactly one line of JSON to standard output --
+// {"ready":true} or {"error":"..."} -- and closes standard output. The
+// program that called show() continues as soon as it reads that line; the
+// viewer stays open on its own until the user closes it. In render mode it
+// writes the Surface's PNG and answers without opening a window.
 //
-// The viewer only shows the image. Zooming, panning, and turning change the
-// view, never the chart, its data, or a file saved later. It uses no
-// network, runs no command, loads no plug-in, and reads no file except the
-// preview it was given.
+// The viewer only shows the chart. Zooming, panning, turning, and orbiting
+// change the view, never the chart, its data, or a file saved later. Its
+// toolbar's Save asks the bundled ahdgui helper for a save dialog and, for a
+// Chart or Figure, runs the bundled ahdplot renderer on the chart's own
+// request, so a saved file is exactly what save() writes; both helpers are
+// named by absolute path in the view file. It uses no network, loads no
+// plug-in, and runs nothing else.
 package main
 
 import (
@@ -25,8 +32,6 @@ import (
 	"image/png"
 	"io"
 	"os"
-	"strings"
-	"unicode/utf8"
 )
 
 // Bounds on everything the viewer accepts.
@@ -62,24 +67,31 @@ func answer(out io.Writer, value reply) {
 }
 
 func run(args []string, out io.Writer) error {
-	if len(args) != 2 {
-		return errors.New("usage: ahdplotview <preview.png> <title>")
+	if len(args) != 1 {
+		return errors.New("usage: ahdplotview <view.json>")
 	}
-	path, title := args[0], args[1]
-	if path == "" || len(path) > maxPathBytes || strings.ContainsRune(path, 0) {
-		return errors.New("invalid preview path")
-	}
-	if !utf8.ValidString(title) || utf8.RuneCountInString(title) > maxTitleRunes || strings.ContainsRune(title, 0) {
-		return errors.New("invalid window title")
-	}
-	img, err := loadPreview(path)
+	spec, err := readSpec(args[0])
 	if err != nil {
 		return err
 	}
-	if os.Getenv("AHDCODE_PLOTVIEW_HEADLESS") == "1" {
-		return runHeadless(img, out)
+	headless := os.Getenv("AHDCODE_PLOTVIEW_HEADLESS") == "1"
+	switch spec.Mode {
+	case modeRender:
+		return renderSurfaceFile(spec, out)
+	case modeSurface:
+		if headless {
+			return runSurfaceHeadless(spec, out)
+		}
+		return runSurfaceWindow(spec, out)
 	}
-	return runWindow(img, title, out)
+	img, err := loadPreview(spec.Preview)
+	if err != nil {
+		return err
+	}
+	if headless {
+		return runHeadless(img, spec, out)
+	}
+	return runWindow(img, spec, out)
 }
 
 // loadPreview reads the preview into memory, deletes the file -- the viewer

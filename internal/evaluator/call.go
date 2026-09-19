@@ -356,6 +356,9 @@ func (session *Session) core(name string, receiver any, arguments []any) any {
 	if strings.HasPrefix(name, "Chart.") || strings.HasPrefix(name, "Figure.") {
 		return session.plotOperation(name, receiver, arguments)
 	}
+	if strings.HasPrefix(name, "Surface.") {
+		return session.plotSurfaceOperation(name, receiver, arguments)
+	}
 	if strings.HasPrefix(name, "Canvas.") || strings.HasPrefix(name, "Turtle.") {
 		return session.graphicsOperation(name, receiver, arguments)
 	}

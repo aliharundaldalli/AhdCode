@@ -311,12 +311,31 @@ func vendorModuleSections(content string) []string {
 // GOPROXY=off, and GOSUMDB=off, so it can never reach the network or the
 // local module cache even if the environment would otherwise permit it.
 func (workspace *Workspace) BuildExecutable(outputPath string) []diagnostics.Diagnostic {
+	return workspace.buildFor(outputPath, Target{}, nil)
+}
+
+// Target is a platform to build for; the zero Target is this computer.
+type Target struct {
+	OS   string
+	Arch string
+}
+
+// buildFor builds the workspace for a target, with extra linker flags.
+func (workspace *Workspace) buildFor(outputPath string, target Target, ldflags []string) []diagnostics.Diagnostic {
 	absolute, err := filepath.Abs(outputPath)
 	if err != nil {
 		return []diagnostics.Diagnostic{workspaceFailure("could not resolve the output path: " + err.Error())}
 	}
 	args := []string{"build", "-trimpath"}
+	if len(ldflags) > 0 {
+		args = append(args, "-ldflags="+strings.Join(ldflags, " "))
+	}
 	env := append(os.Environ(), "GOTOOLCHAIN=local")
+	if target.OS != "" {
+		// A packaged application is pure Go, so any supported target builds
+		// here without a C toolchain.
+		env = append(env, "GOOS="+target.OS, "GOARCH="+target.Arch, "CGO_ENABLED=0")
+	}
 	// A user GOROOT must not redirect a bundled executable into another Go installation.
 	if filepath.Base(filepath.Dir(filepath.Dir(workspace.toolchain))) == "go" {
 		env = append(env, "GOROOT="+filepath.Dir(filepath.Dir(workspace.toolchain)))
@@ -342,6 +361,33 @@ func (workspace *Workspace) BuildExecutable(outputPath string) []diagnostics.Dia
 		Message: "go build failed for the generated program:\n" + message,
 		Hint:    "this is a code generation defect; report the failing AhdCode program",
 	}}
+}
+
+// PackagedBuild describes the main executable of an application made by
+// `ahdcode package`.
+type PackagedBuild struct {
+	Target Target
+	// Files are extra generated files, such as the Windows icon resource.
+	Files []backend.GeneratedFile
+	// LinkerFlags are extra linker flags, such as the Windows GUI subsystem.
+	LinkerFlags []string
+}
+
+// BuildPackagedProgram compiles an already compiled program into a packaged
+// application's main executable. It records no installation hint: the
+// program finds its helpers only inside its own application.
+func BuildPackagedProgram(program *backend.GeneratedProgram, outputPath string, options PackagedBuild) []diagnostics.Diagnostic {
+	copyProgram := *program
+	copyProgram.Files = append([]backend.GeneratedFile(nil), program.Files...)
+	copyProgram.Files = append(copyProgram.Files, backend.GeneratedFile{Name: "ahdcode_packaged_application.go",
+		Content: "package main\n\nfunc init() { AhdPackagedStart() }\n"})
+	copyProgram.Files = append(copyProgram.Files, options.Files...)
+	workspace, failures := NewWorkspace(&copyProgram)
+	if len(failures) != 0 {
+		return failures
+	}
+	defer workspace.Close()
+	return workspace.buildFor(outputPath, options.Target, options.LinkerFlags)
 }
 
 // DefaultOutputPath is the conventional executable name for an entry module.

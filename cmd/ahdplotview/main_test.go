@@ -37,11 +37,47 @@ func handshake(t *testing.T, out *bytes.Buffer) reply {
 	return value
 }
 
-func TestArgumentsAreBounded(t *testing.T) {
-	for _, args := range [][]string{nil, {"only"}, {"a", "b", "c"}, {"", "t"}, {strings.Repeat("p", maxPathBytes+1), "t"},
-		{"x.png", strings.Repeat("t", maxTitleRunes+1)}, {"x.png", "bad\x00title"}, {"x.png", string([]byte{0xff})}} {
+// writeSpec writes a view file for a chart preview.
+func writeSpec(t *testing.T, spec viewSpec) string {
+	t.Helper()
+	encoded, err := json.Marshal(spec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(t.TempDir(), "view.json")
+	if err := os.WriteFile(path, encoded, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
+func chartSpec(t *testing.T, preview, title string) string {
+	return writeSpec(t, viewSpec{Version: specVersion, Mode: modeChart, Title: title, Preview: preview,
+		Request: json.RawMessage(`{"width":800,"height":600,"rows":1,"columns":1,"charts":[]}`)})
+}
+
+func TestArgumentsAndViewFilesAreBounded(t *testing.T) {
+	for _, args := range [][]string{nil, {"a", "b"}, {""}, {strings.Repeat("p", maxPathBytes+1)}, {filepath.Join(t.TempDir(), "missing.json")}} {
 		if run(args, &bytes.Buffer{}) == nil {
 			t.Fatalf("accepted %q", args)
+		}
+	}
+	preview := writePNG(t, 10, 10)
+	for _, spec := range []viewSpec{
+		{Version: 1, Mode: modeChart, Preview: preview, Request: json.RawMessage(`{}`)},
+		{Version: specVersion, Mode: "movie", Preview: preview},
+		{Version: specVersion, Mode: modeChart, Preview: preview},
+		{Version: specVersion, Mode: modeChart, Preview: preview, Request: json.RawMessage(`{}`), Title: strings.Repeat("t", maxTitleRunes+1)},
+		{Version: specVersion, Mode: modeChart, Preview: preview, Request: json.RawMessage(`{}`), Renderer: "relative/ahdplot"},
+		{Version: specVersion, Mode: modeSurface},
+		{Version: specVersion, Mode: modeRender, Surface: &surfaceSpec{X: []float64{0, 1}, Y: []float64{0, 1}, Z: [][]float64{{0, 0}, {0, 0}}, Width: 10, Height: 10}, Output: "out.png"},
+	} {
+		path := writeSpec(t, spec)
+		if run([]string{path}, &bytes.Buffer{}) == nil {
+			t.Fatalf("accepted %+v", spec)
+		}
+		if _, err := os.Stat(path); !os.IsNotExist(err) {
+			t.Fatalf("the view file %+v was left behind", spec)
 		}
 	}
 }
@@ -85,7 +121,7 @@ func TestHeadlessReplayReportsEveryStep(t *testing.T) {
 	t.Setenv("AHDCODE_PLOTVIEW_HEADLESS_SCRIPT", `[{"action":"zoom","factor":2,"x":600,"y":300},{"action":"pan","x":-50,"y":0},`+
 		`{"action":"rotateLeft"},{"action":"rotateRight"},{"action":"rotateRight"},{"action":"reset"},{"action":"close"},{"action":"zoom","factor":2}]`)
 	var out bytes.Buffer
-	if err := run([]string{writePNG(t, 1600, 1200), "Test"}, &out); err != nil {
+	if err := run([]string{chartSpec(t, writePNG(t, 1600, 1200), "Test")}, &out); err != nil {
 		t.Fatal(err)
 	}
 	if !handshake(t, &out).Ready {
@@ -106,7 +142,7 @@ func TestHeadlessReplayReportsEveryStep(t *testing.T) {
 		t.Fatalf("reset and close %+v", states[6:])
 	}
 	t.Setenv("AHDCODE_PLOTVIEW_HEADLESS_SCRIPT", `[{"action":"explode"}]`)
-	if run([]string{writePNG(t, 10, 10), ""}, &bytes.Buffer{}) == nil {
+	if run([]string{chartSpec(t, writePNG(t, 10, 10), "")}, &bytes.Buffer{}) == nil {
 		t.Fatal("an unknown headless action")
 	}
 }

@@ -1,4 +1,4 @@
-# AhdCode v1.9.0 English Student Guide
+# AhdCode v2.0.0 English Student Guide
 
 This guide is designed so that **even someone who has never programmed before** can follow along. You can read it in order from beginning to end; in each section, you will first see what we want to achieve, then write a working example, and finally learn the necessary rules.
 
@@ -86,6 +86,7 @@ says so and links to the reference page that lists every signature.
 - [64. Angles, time stamps, and joined tables](#64-angles-time-stamps-and-joined-tables)
 - [65. Windows that react: GUI forms and Turtle keys](#65-windows-that-react-gui-forms-and-turtle-keys)
 - [66. Colors, disabled buttons, and a chart you can explore](#66-colors-disabled-buttons-and-a-chart-you-can-explore)
+- [67. A desktop application: tables, dialogs, 3D charts, and packaging](#67-a-desktop-application-tables-dialogs-3d-charts-and-packaging)
 
 ## 1. What is AhdCode?
 
@@ -7137,3 +7138,118 @@ of your own data and find its highest point by zooming in.
 See the [GUI reference](GUI.md#colors), the
 [Plot reference](PLOT.md#show), and
 [`examples/v1.9`](../examples/v1.9/README.md).
+
+## 67. A desktop application: tables, dialogs, 3D charts, and packaging
+
+> Added in v2.0.0.
+
+v2.0 completes AhdCode's GUI for small desktop applications. This section
+builds a tiny ledger, exports it, draws a 3D surface, and turns the program
+into an application you can give to someone without AhdCode.
+
+**Step 1 — a table backed by SQLite.** A `TableView` shows rows of Strings.
+Store the data in SQLite and turn each row into Strings for the table:
+
+```ahd
+bring GUI
+bring SQLite
+from GUI bring (Window, Container, TextInput, Button, TableView)
+from SQLite bring (Database)
+
+db: Database := SQLite.open("ledger.db")
+db.execute("CREATE TABLE IF NOT EXISTS entries (id INTEGER PRIMARY KEY, name TEXT NOT NULL, amount REAL NOT NULL)")
+
+window: Window := GUI.window(title: "Ledger", width: 520, height: 420)
+window.setResizable(true)
+form: Container := window.column()
+name: TextInput := form.textInput(placeholder: "Customer")
+amount: TextInput := form.textInput(placeholder: "Amount")
+add: Button := form.button("Add")
+table: TableView := form.table(["No", "Customer", "Amount"])
+
+refresh: Function := () -> Nothing {
+    db: Global Database
+    table: Global TableView
+    rows: Local List<List<String>> := []
+    for row in db.query("SELECT id, name, amount FROM entries ORDER BY id") {
+        rows.add([str(row["id"].int()), row["name"].string(), str(row["amount"].real())])
+    }
+    table.setRows(rows)
+}
+
+addEntry: Function := () -> Nothing {
+    db: Global Database
+    name: Global TextInput
+    amount: Global TextInput
+    refresh: Global Function
+    db.execute("INSERT INTO entries (name, amount) VALUES (?, ?)",
+        [SQLite.fromString(name.text()), SQLite.fromReal(real(amount.text()))])
+    amount.setText("")
+    refresh()
+}
+
+add.onClick(addEntry)
+table.onSelect(lambda (row: Int?) -> write("selected {row}"))
+refresh()
+window.wait()
+```
+
+The window is resizable, and the table grows with it. `onSelect` receives
+`null` when no row is selected, so its parameter is `Int?`.
+
+**Step 2 — choose where to export.** `GUI.saveFile` asks the user for a path
+and returns `null` if they cancel; the program then writes the file itself:
+
+```ahd
+bring GUI
+bring CSV
+
+path: String? := GUI.saveFile(title: "Export", suggestedName: "ledger.csv", extensions: ["csv"])
+if path != null {
+    CSV.write(path, [["No", "Customer", "Amount"], ["1", "Ayşe", "250.5"]])
+    GUI.message("Export", "Saved to {path}.")
+}
+```
+
+**Step 3 — package it.** From a terminal:
+
+```sh
+ahdcode package ledger.ahd --name Ledger
+```
+
+`dist/Ledger.app` (on Windows and Linux, the `dist/Ledger` folder) holds your
+program and only the helpers it uses. Copy it anywhere and double-click it:
+it runs without AhdCode installed. Opened from the Finder, a relative path
+like `"ledger.db"` means a file in your home folder.
+
+**A 3D surface.** `Plot.surface` draws a height field from a Numeric Matrix
+with one row per `y` value and one column per `x` value:
+
+```ahd
+bring Plot
+bring Numeric
+
+x: List<Real> := [-1.0, -0.5, 0.0, 0.5, 1.0]
+y: List<Real> := [-1.0, 0.0, 1.0]
+rows: List<List<Real>> := []
+for b in y {
+    row: Local List<Real> := []
+    for a in x {
+        row.add(a * a - b * b)
+    }
+    rows.add(row)
+}
+surface := Plot.surface(x, y, Numeric.matrix(rows)).title("Saddle")
+surface.save("saddle.png")
+surface.show()
+```
+
+In the viewer, drag to orbit, Shift+drag to pan, scroll to zoom, and press R
+to reset. The toolbar's Save writes exactly the file `save` writes.
+
+**Try it yourself:** add a `Select` with "Debt" and "Payment" to the ledger
+and show the balance in a Label; then package it with your own icon using
+`--icon`.
+
+See the [GUI reference](GUI.md), the [Plot reference](PLOT.md#surface),
+[Packaging](PACKAGING.md), and [`examples/v2.0`](../examples/v2.0/README.md).

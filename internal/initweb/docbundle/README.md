@@ -8,20 +8,24 @@
 
 [English](README.md) · Türkçe
 
-AhdCode is an experimental statically checked general-purpose programming
-language focused on readable syntax, explicit intent, predictable semantics,
-and native compilation.
+AhdCode is an independently developed, statically checked, general-purpose
+programming language focused on readable syntax, explicit intent,
+predictable semantics, and native compilation. It comes with its own
+toolchain, standard library, language server, Web framework, database
+modules, GUI, Graphics, interactive Plot viewer, and desktop application
+packaging. It is used in practice by a small community; it is not a
+mainstream language.
 
-This is **v1.9.0**. The language, toolchain, and Web framework are
+This is **v2.0.0**. The language, toolchain, and Web framework are
 feature-complete, and the core language surface described here is what 1.0
-committed to and 1.1 through 1.9 keep unchanged.
+committed to and 1.1 through 2.0 keep unchanged.
 
-v1.9.0 is a minor release, **Desktop Polish + Interactive Plot**: `show()`
-opens a Chart or Figure in AhdCode's own interactive viewer with zoom, pan,
-reset, and view rotation — interactions that change only the viewer, never
-the chart or its exported files — the GUI gains basic colors and an enabled
-state, and AhdCode's windows carry the AhdCode name and icon, all without new
-syntax or a type-system change. See [What is new in v1.9.0](#what-is-new-in-v190).
+v2.0.0 is a major release, **Desktop Application Completion**: it completes
+the first-party desktop application foundation — ListBox, Select, TextArea,
+PasswordInput, TableView, dialogs, change callbacks, and resizable windows in
+GUI; a toolbar and 3D Surface plotting in the Plot viewer; and
+`ahdcode package` for self-contained desktop applications — all without new
+syntax or a type-system change. See [What is new in v2.0.0](#what-is-new-in-v200).
 
 It ships as a self-contained platform package: the `ahdcode` CLI, a private
 Go 1.27.0 toolchain, AhdDataStudio, the `ahdsqlite`, `ahdnumeric`, `ahdplot`,
@@ -453,6 +457,7 @@ See the [CLI guide](CLI.md), [formatter guide](FORMATTER.md),
 - [Terminal module](TERMINAL.md)
 - [Graphics module](GRAPHICS.md)
 - [GUI module](GUI.md)
+- [Packaging desktop applications](PACKAGING.md)
 - [Understanding diagnostics](DIAGNOSTICS.md)
 - [Language server](LSP.md)
 - AI-assisted local setup
@@ -469,6 +474,7 @@ See the [CLI guide](CLI.md), [formatter guide](FORMATTER.md),
 - v1.4 realtime attendance — Web, PostgreSQL, WebSocket, UUID v7, `Env.secret`, and Cron
 - v1.5 Terminal demo — `Terminal.emit`, standard error, terminal detection, styled text, and pretty layout
 - v1.7 standard-library completion — trigonometry and gcd/lcm, strict ISO time text and instant arithmetic, and a Table join with statistics
+- v2.0 desktop applications — a SQLite ledger with a TableView, dialogs, and CSV export; a 3D Surface; and a small application to package
 - v1.9 GUI colors and interactive Plot — an order form with colors and a disabled Save button, and a chart in AhdCode's own viewer
 - v1.8 GUI and events — a small GUI ledger backed by SQLite and a Turtle driven by arrow keys and clicks
 - v1.6 Graphics and Turtle — a Cartesian Canvas, shapes, a Turtle star and spiral, PNG/SVG export, and a regular-polygon lesson
@@ -488,6 +494,32 @@ diagnostics and hover. The same VSIX targets VS Code and Antigravity. See its
 installation guide.
 
 ## Current limitations
+
+## What is new in v2.0.0 <a id="what-is-new-in-v200"></a>
+
+v2.0.0 is a **major** release, **Desktop Application Completion**. It closes
+the foundational desktop roadmap without new syntax or a type-system change;
+every v1.9 program keeps working:
+
+- [`GUI`](GUI.md): ListBox, Select, TextArea, PasswordInput, and a
+  read-oriented TableView with scrolling and selection; `onChange` for text
+  fields and Checkboxes, and selection callbacks; resizable windows whose
+  tables and lists use the extra space; Shift+Tab; and native file, folder,
+  save, message, and confirmation dialogs. The foundational GUI roadmap is
+  complete: future additions are focused, use-case-driven widgets rather than
+  missing platform foundations.
+- [`Plot`](PLOT.md): the viewer gains a toolbar — Save (PNG, SVG, PDF,
+  written by the renderer exactly as `save()` writes), Zoom Out, Zoom In,
+  Rotate Left, Rotate Right, and Fit — and `Plot.surface` draws a 3D surface
+  from a Numeric Matrix, with an orbit/pan/zoom viewer, wireframe mode, and
+  PNG export.
+- [`ahdcode package`](PACKAGING.md) turns a program into a desktop
+  application — a macOS `.app`, or a Windows or Linux folder and archive —
+  that holds only the helpers it needs and runs without AhdCode installed.
+- Editors complete, hover, and show signatures for every Chart and Figure
+  member, fixing a gap from v1.8 and v1.9.
+
+See the v2.0 examples.
 
 ## What is new in v1.9.0 <a id="what-is-new-in-v190"></a>
 

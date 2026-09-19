@@ -1,6 +1,7 @@
 package semantic
 
 import (
+	"fmt"
 	"sort"
 
 	"ahdcode/internal/syntax/ast"
@@ -275,7 +276,39 @@ func (a *analyzer) analyzeGraphicsOperation(call *ast.CallExpr, member *ast.Memb
 		}
 	}
 	a.callArgumentsCompatible(call, callable, arguments, true)
+	a.requireNullableCallback(call, operation, arguments)
 	a.result.SelectedCallables[call] = callable
 	a.result.ResolvedSymbols[member] = symbol
-	return expressionInfo{typeValue: callable.Signature.Return, nullState: NonNull}
+	return expressionInfo{typeValue: callable.Signature.Return, nullState: callable.ReturnNull}
+}
+
+// requireNullableCallback checks that a selection callback declares its
+// Int? and String? parameters nullable, since the selection can be empty.
+func (a *analyzer) requireNullableCallback(call *ast.CallExpr, operation TypeOperation, arguments []expressionInfo) {
+	nullable, known := guiNullableCallbacks[operation]
+	if !known || len(call.Arguments) != 1 || arguments[0].invalid() {
+		return
+	}
+	provided := a.result.SelectedFunctionValues[call.Arguments[0].Value]
+	if provided == nil {
+		provided = concreteCallable(arguments[0])
+	}
+	if provided == nil || len(provided.ParameterNull) != len(nullable) {
+		return
+	}
+	for index, wanted := range nullable {
+		if wanted && provided.ParameterNull[index] == NonNull {
+			a.error(codeCallArguments,
+				fmt.Sprintf("%s calls its handler with null when nothing is selected; declare the handler's parameters nullable", operation),
+				call.Arguments[0].Span(), guiCallbackHint(operation))
+			return
+		}
+	}
+}
+
+func guiCallbackHint(operation TypeOperation) string {
+	if operation == "TableView.onSelect" {
+		return "write lambda (row: Int?) -> ..."
+	}
+	return "write lambda (index: Int?, text: String?) -> ..."
 }

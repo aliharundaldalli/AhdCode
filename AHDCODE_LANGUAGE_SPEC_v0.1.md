@@ -6491,6 +6491,116 @@ network, runs no command, and reads no file but its preview. It is found
 through `AHDCODE_PLOTVIEW_RUNTIME`, the location the compiler recorded, or
 the installation beside the running executable; `PATH` is not searched.
 
+## 87. GUI Completion (v2.0.0)
+
+The GUI module of sections 83 to 85 gains the Classes `PasswordInput`,
+`TextArea`, `Select`, `ListBox`, and `TableView`, none of which has a
+constructor, and these members:
+
+```text
+Window.setResizable(resizable: Bool) -> Nothing      Window.isResizable() -> Bool
+Container.passwordInput(placeholder: String := "") -> PasswordInput
+Container.textArea(placeholder: String := "") -> TextArea
+Container.select(items: List<String>, selectedIndex: Int? := null) -> Select
+Container.listBox(items: List<String> := []) -> ListBox
+Container.table(columns: List<String>, rows: List<List<String>> := []) -> TableView
+TextInput.onChange, PasswordInput.onChange, TextArea.onChange(handler: (String) -> Nothing) -> Nothing
+Checkbox.onChange(handler: (Bool) -> Nothing) -> Nothing
+PasswordInput.text() -> String, setText(text: String) -> Nothing
+TextArea.text() -> String, setText(text: String) -> Nothing
+Select and ListBox: items() -> List<String>, setItems(items: List<String>) -> Nothing,
+    selectedIndex() -> Int?, selectedText() -> String?, select(index: Int?) -> Nothing,
+    onChange(handler: (Int?, String?) -> Nothing) -> Nothing
+TableView: columns() -> List<String>, rows() -> List<List<String>>,
+    setRows(rows: List<List<String>>) -> Nothing, selectedRow() -> Int?,
+    selectRow(index: Int?) -> Nothing, onSelect(handler: (Int?) -> Nothing) -> Nothing
+```
+
+The five new Classes also have `setForeground`, `setBackground`,
+`setEnabled`, and `isEnabled` with the meaning of section 85. A callback
+passed to `onChange` of a Select or ListBox, or to `TableView.onSelect`, must
+declare every parameter nullable (`Int?`, `String?`); otherwise the call is a
+compile-time diagnostic. Every callback shape is checked statically.
+
+A selection is an index or `null`. An index outside the entries raises
+`GUIError`; `setItems` and `setRows` keep a selection that still exists and
+clear one that does not. Only user actions invoke change callbacks: `select`,
+`selectRow`, `setItems`, `setRows`, `setText`, and `setChecked` never do. A
+text `onChange` runs once per user edit with the whole new text. Callbacks
+run serially as in section 84.
+
+TableView cells are Strings; every row must have exactly one cell per
+column and there must be at least one column, else `GUIError`. The bounds are
+100,000 characters for a TextArea, 20,000 items of 1024 characters for a
+Select or ListBox, and 64 columns, 20,000 rows, and 200,000 cells of 1024
+characters for a TableView. Windows are not resizable unless the program
+calls `setResizable(true)`. A TextArea, ListBox, or TableView, and every
+Container holding one, grows: a Column's extra height and a Row's extra width
+are shared equally among its growing children, which also fill the
+Container's cross axis; no other widget stretches and nothing shrinks below
+its natural size. Tab and Shift+Tab visit every enabled interactive widget in
+creation order.
+
+The module gains six dialog functions:
+
+```text
+GUI.openFile(title: String := "Open File", extensions: List<String> := []) -> String?
+GUI.openFiles(title: String := "Open Files", extensions: List<String> := []) -> List<String>
+GUI.selectFolder(title: String := "Select Folder") -> String?
+GUI.saveFile(title: String := "Save File", suggestedName: String := "", extensions: List<String> := []) -> String?
+GUI.message(title: String, text: String) -> Nothing
+GUI.confirm(title: String, text: String) -> Bool
+```
+
+A cancelled dialog returns `null` (an empty List for `openFiles`) and is not
+an error; `GUIError` means the dialog could not be shown. Returned paths are
+absolute. A dialog never reads, creates, or changes a file. An extension is
+letters and digits (one leading dot is ignored); anything else raises
+`GUIError`. The GUI helper protocol is version 3.
+
+## 88. Plot Viewer Toolbar (v2.0.0)
+
+The viewer of section 86 shows a private toolbar — Save, Zoom Out, Zoom In,
+Rotate Left, Rotate Right, and Fit — equivalent to its keys, which remain.
+Save asks for a path in a save dialog and runs the renderer on the Chart's or
+Figure's own render request, so the file equals what `save(path)` writes
+regardless of the view. The toolbar is not part of the GUI module. The viewer
+is started with one view file that it reads and deletes; it runs the bundled
+`ahdplot` and `ahdgui` helpers, named by absolute path in that file, only for
+Save.
+
+## 89. Plot Surface (v2.0.0)
+
+```text
+Plot.surface(x, y, z: Matrix) -> Surface
+Surface.title, xLabel, yLabel, zLabel(text: String) -> Surface
+Surface.size(width: Int, height: Int) -> Surface
+Surface.wireframe(enabled: Bool) -> Surface
+Surface.save(path: String) -> Nothing
+Surface.show() -> Nothing
+```
+
+`x` and `y` are each `List<Int>`, `List<Real>`, or `Vector`, with 2 to 256
+strictly increasing values; `z` has one row per `y` value and one column per
+`x` value. Any other shape raises `PlotError`. `Surface` is immutable and has
+no constructor. The size is 1 to 2000 units on each side (default 800 × 600);
+the axis labels default to `x`, `y`, and `z`. `save` accepts only a `.png`
+path and writes the initial view deterministically at 4/3 pixels per unit.
+`show` opens the viewer in 3D with orbit, pan, zoom (0.3× to 6×), reset, and
+Save; its orthographic camera is never part of the Surface.
+
+## 90. Application Packaging (v2.0.0)
+
+`ahdcode package` compiles an entry module into an application — a macOS
+`.app`, or a Windows or Linux folder and archive — holding the program, the
+bundled helpers its compiled program requires, and the application's name and
+icon, and nothing from the project folder. In such an application the runtime
+resolves every helper only beside its own executable or in its `runtime`
+folder; installation hints, `AHDCODE_*_RUNTIME`, and `PATH` are ignored. A
+packaged program started with the root folder as its working directory
+changes to the user's home folder. Helper windows show the application's name
+and icon. Packaging changes no language semantics.
+
 ---
 
 # End of AhdCode v0.1 Core Specification

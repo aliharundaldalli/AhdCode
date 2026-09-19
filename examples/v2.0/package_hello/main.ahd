@@ -1,0 +1,23 @@
+// The smallest packaged desktop application: one window with a greeting.
+//
+//     ahdcode package main.ahd --name "Hello AhdCode"
+//
+// makes dist/Hello AhdCode.app on macOS (a folder and an archive on Windows
+// and Linux) that runs without AhdCode installed.
+bring GUI
+from GUI bring (Window, Container, Label, Button, TextInput)
+
+window: Window := GUI.window(title: "Hello AhdCode", width: 360, height: 180)
+form: Container := window.column(spacing: 10, padding: 16)
+form.label("What is your name?")
+name: TextInput := form.textInput(placeholder: "Your name")
+greet: Button := form.button("Greet")
+greeting: Label := form.label("")
+
+sayHello: Function := () -> Nothing {
+    name: Global TextInput
+    greeting: Global Label
+    greeting.setText("Merhaba, {name.text().trim()}!")
+}
+greet.onClick(sayHello)
+window.wait()

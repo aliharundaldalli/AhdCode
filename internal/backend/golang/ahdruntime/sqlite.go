@@ -83,6 +83,12 @@ func ahdSQLiteDiscoverRuntime() (string, error) {
 	if runtime.GOOS == "windows" {
 		name += ".exe"
 	}
+	if AhdPackagedApplication {
+		if path, ok := ahdPackagedHelper(name); ok {
+			return path, nil
+		}
+		return "", errors.New("the SQLite helper (ahdsqlite) is missing from this application")
+	}
 	var candidates []string
 	if custom := os.Getenv("AHDCODE_SQLITE_RUNTIME"); custom != "" {
 		candidates = append(candidates, custom, filepath.Join(custom, name))

@@ -14,6 +14,8 @@ ahdcode databases list
 ahdcode databases add <file.db>
 ahdcode databases remove <file.db>
 ahdcode build <entry.ahd> [-o <output>]
+ahdcode package <entry.ahd> [--name <name>] [--output <folder>] [--icon <icon.png>]
+                [--target <os-arch>] [--helpers <folder>] [--console]
 ahdcode run <entry.ahd> [-- <args>...]
 ahdcode dev <entry.ahd>
 ahdcode stop <app.dev|app.run>
@@ -33,6 +35,12 @@ ve AhdCode logosu gömülüdür: çevrimdışı, paket yöneticisi yok, üzerine
 yazma yok. Her starter bu sürüme ait `AHDCODE.md` ve İngilizce
 `Documents/AhdCode/` kopyasını da alır. Sonraki adım:
 `ahdcode dev app.ahd`.
+
+`package` (v2.0), bir giriş modülünden kendi başına çalışan bir masaüstü
+uygulaması yapar: derlenmiş programı ve yalnızca kullandığı AhdCode
+yardımcılarını içeren bir macOS `.app`'i ya da bir Windows veya Linux klasörü
+ve arşivi; böylece AhdCode kurulu olmadan çalışır. Bkz.
+[Paketleme](PACKAGING_TR.md).
 
 `run`, normal önyüz (frontend) ve Go arkayüzünden (backend) derler, ardından
 yerel (native) sonucu çalıştırır. Giriş dosyasından sonraki argümanlar

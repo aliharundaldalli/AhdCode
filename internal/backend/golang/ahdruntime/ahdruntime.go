@@ -989,9 +989,57 @@ func ahdLatexBundleURL(slashed string) string {
 	return (&url.URL{Scheme: "file", Path: slashed}).String()
 }
 
+// AhdPackagedApplication is true in an application made by `ahdcode
+// package`. Such an application finds its bundled helpers only beside its own
+// executable or in its runtime folder: never through an installation hint,
+// an environment override, PATH, or an AhdCode installation.
+var AhdPackagedApplication bool
+
+// AhdPackagedStart runs first in a packaged application. An application
+// opened from the macOS Finder starts in the root folder, where nothing can
+// be written; it starts in the user's home folder instead, so relative paths
+// such as "ledger.db" work as they do from a terminal.
+func AhdPackagedStart() {
+	AhdPackagedApplication = true
+	if directory, err := os.Getwd(); err == nil && directory == string(filepath.Separator) {
+		if home, err := os.UserHomeDir(); err == nil && home != "" {
+			_ = os.Chdir(home)
+		}
+	}
+}
+
+// ahdPackagedDirectories are where a packaged application's helpers live.
+func ahdPackagedDirectories() []string {
+	executable, err := os.Executable()
+	if err != nil {
+		return nil
+	}
+	if resolved, err := filepath.EvalSymlinks(executable); err == nil {
+		executable = resolved
+	}
+	bin := filepath.Dir(executable)
+	return []string{bin, filepath.Join(bin, "runtime")}
+}
+
+// ahdPackagedHelper finds one helper of a packaged application.
+func ahdPackagedHelper(name string) (string, bool) {
+	for _, directory := range ahdPackagedDirectories() {
+		candidate := filepath.Join(directory, name)
+		if info, err := os.Stat(candidate); err == nil && info.Mode().IsRegular() {
+			return candidate, true
+		}
+	}
+	return "", false
+}
+
 func ahdLatexRuntime() (string, string, error) {
 	roots := []string{os.Getenv("AHDCODE_LATEX_RUNTIME"), AhdLatexRuntimeHint}
-	if executable, err := os.Executable(); err == nil {
+	if AhdPackagedApplication {
+		roots = nil
+		for _, directory := range ahdPackagedDirectories() {
+			roots = append(roots, filepath.Join(directory, "latex"))
+		}
+	} else if executable, err := os.Executable(); err == nil {
 		bin := filepath.Dir(executable)
 		roots = append(roots,
 			filepath.Join(bin, "latex"),
@@ -4408,6 +4456,12 @@ func ahdPlotDiscoverRuntime() (string, error) {
 	if runtime.GOOS == "windows" {
 		name = "ahdplot.exe"
 	}
+	if AhdPackagedApplication {
+		if path, ok := ahdPackagedHelper(name); ok {
+			return path, nil
+		}
+		return "", fmt.Errorf("the Plot renderer helper (ahdplot) is missing from this application")
+	}
 	candidates := []string{os.Getenv("AHDCODE_PLOT_RUNTIME")}
 	if AhdPlotRuntimeHint != "" {
 		candidates = append(candidates, filepath.Join(AhdPlotRuntimeHint, name))
@@ -4634,11 +4688,13 @@ func AhdPlotChartShow(class *AhdClass, chart AhdChart) {
 	}
 	path := ahdPlotTempImagePath(class)
 	defer os.Remove(path)
-	ahdPlotRender(class, ahdPlotRequest{
+	request := ahdPlotRequest{
 		OutputPath: path, Width: int(chart.Width), Height: int(chart.Height),
 		Rows: 1, Columns: 1, Charts: []ahdPlotChartSpec{ahdPlotChartSpecOf(chart)},
-	})
-	if problem := AhdPlotView(path, chart.Title); problem != "" {
+	}
+	ahdPlotRender(class, request)
+	request.OutputPath = ""
+	if problem := AhdPlotView(path, chart.Title, request); problem != "" {
 		AhdRaiseClass(class, problem)
 	}
 }
@@ -4711,8 +4767,10 @@ func AhdPlotFigureShow(class *AhdClass, rows, columns int64, charts []AhdChart) 
 	}
 	path := ahdPlotTempImagePath(class)
 	defer os.Remove(path)
-	ahdPlotRender(class, ahdPlotFigureRequest(rows, columns, charts, path, int(width), int(height)))
-	if problem := AhdPlotView(path, ""); problem != "" {
+	request := ahdPlotFigureRequest(rows, columns, charts, path, int(width), int(height))
+	ahdPlotRender(class, request)
+	request.OutputPath = ""
+	if problem := AhdPlotView(path, "", request); problem != "" {
 		AhdRaiseClass(class, problem)
 	}
 }
@@ -4758,6 +4816,12 @@ func ahdNumericDiscoverRuntime() (string, error) {
 	name := "ahdnumeric"
 	if runtime.GOOS == "windows" {
 		name += ".exe"
+	}
+	if AhdPackagedApplication {
+		if path, ok := ahdPackagedHelper(name); ok {
+			return path, nil
+		}
+		return "", fmt.Errorf("the Numeric helper (ahdnumeric) is missing from this application")
 	}
 	var candidates []string
 	if custom := os.Getenv("AHDCODE_NUMERIC_RUNTIME"); custom != "" {

@@ -18,6 +18,12 @@ var (
 	guiButtonClass    = &types.ClassSymbol{ModuleID: guiModuleID, Name: "Button"}
 	guiTextInputClass = &types.ClassSymbol{ModuleID: guiModuleID, Name: "TextInput"}
 	guiCheckboxClass  = &types.ClassSymbol{ModuleID: guiModuleID, Name: "Checkbox"}
+	// v2.0
+	guiListBoxClass       = &types.ClassSymbol{ModuleID: guiModuleID, Name: "ListBox"}
+	guiSelectClass        = &types.ClassSymbol{ModuleID: guiModuleID, Name: "Select"}
+	guiTextAreaClass      = &types.ClassSymbol{ModuleID: guiModuleID, Name: "TextArea"}
+	guiPasswordInputClass = &types.ClassSymbol{ModuleID: guiModuleID, Name: "PasswordInput"}
+	guiTableViewClass     = &types.ClassSymbol{ModuleID: guiModuleID, Name: "TableView"}
 )
 
 // GUIErrorIdentity and the other identities expose the canonical GUI Classes
@@ -26,10 +32,12 @@ func GUIErrorIdentity() *types.ClassSymbol { return guiErrorClass }
 
 // GUIClassNames lists the GUI Classes that hold a runtime handle, in
 // declaration order.
-var GUIClassNames = []string{"Window", "Container", "Label", "Button", "TextInput", "Checkbox"}
+var GUIClassNames = []string{"Window", "Container", "Label", "Button", "TextInput", "Checkbox",
+	"ListBox", "Select", "TextArea", "PasswordInput", "TableView"}
 
 func guiClasses() []*types.ClassSymbol {
-	return []*types.ClassSymbol{guiWindowClass, guiContainerClass, guiLabelClass, guiButtonClass, guiTextInputClass, guiCheckboxClass}
+	return []*types.ClassSymbol{guiWindowClass, guiContainerClass, guiLabelClass, guiButtonClass, guiTextInputClass, guiCheckboxClass,
+		guiListBoxClass, guiSelectClass, guiTextAreaClass, guiPasswordInputClass, guiTableViewClass}
 }
 
 func guiType(class *types.ClassSymbol) types.Type { return types.Class{Symbol: class} }
@@ -39,16 +47,57 @@ func ClickCallbackType() types.Type {
 	return types.Function{Signature: &types.Signature{Return: types.Nothing}}
 }
 
+// TextChangeCallbackType is (text: String) -> Nothing, CheckChangeCallbackType
+// (checked: Bool) -> Nothing, SelectionCallbackType (index: Int?, text:
+// String?) -> Nothing, and RowCallbackType (row: Int?) -> Nothing. A Function
+// type does not spell nullability; guiNullableCallbacks below requires the
+// callback to declare the Int? and String? parameters nullable.
+func TextChangeCallbackType() types.Type {
+	return types.Function{Signature: &types.Signature{Parameters: []types.Parameter{{Name: "text", Type: types.String}}, Return: types.Nothing}}
+}
+
+func CheckChangeCallbackType() types.Type {
+	return types.Function{Signature: &types.Signature{Parameters: []types.Parameter{{Name: "checked", Type: types.Bool}}, Return: types.Nothing}}
+}
+
+func SelectionCallbackType() types.Type {
+	return types.Function{Signature: &types.Signature{Parameters: []types.Parameter{{Name: "index", Type: types.Int}, {Name: "text", Type: types.String}}, Return: types.Nothing}}
+}
+
+func RowCallbackType() types.Type {
+	return types.Function{Signature: &types.Signature{Parameters: []types.Parameter{{Name: "row", Type: types.Int}}, Return: types.Nothing}}
+}
+
+// guiNullableCallbacks names the members whose callback receives a null
+// selection, and which of its parameters are nullable: the callback must
+// declare exactly those parameters nullable, so a program always handles "no
+// selection".
+var guiNullableCallbacks = map[TypeOperation][]bool{
+	"ListBox.onChange":   {true, true},
+	"Select.onChange":    {true, true},
+	"TableView.onSelect": {true},
+}
+
 // The GUI members each Class publishes, so has/has not reports what a value
 // really offers. Every member publishes real parameter names and defaults:
 // a call is entirely positional or entirely named, like a module function.
 var GUIOperations = map[string][]string{
-	"Window":    {"column", "row", "onKey", "wait", "close", "isOpen", "setTitle", "setBackground"},
-	"Container": {"column", "row", "label", "button", "textInput", "checkbox", "setBackground"},
-	"Label":     {"text", "setText", "setForeground", "setBackground"},
-	"Button":    {"text", "setText", "onClick", "setForeground", "setBackground", "setEnabled", "isEnabled"},
-	"TextInput": {"text", "setText", "setForeground", "setBackground", "setEnabled", "isEnabled"},
-	"Checkbox":  {"checked", "setChecked", "setForeground", "setBackground", "setEnabled", "isEnabled"},
+	"Window": {"column", "row", "onKey", "wait", "close", "isOpen", "setTitle", "setBackground",
+		"setResizable", "isResizable"},
+	"Container": {"column", "row", "label", "button", "textInput", "checkbox", "setBackground",
+		"passwordInput", "textArea", "listBox", "select", "table"},
+	"Label":         {"text", "setText", "setForeground", "setBackground"},
+	"Button":        {"text", "setText", "onClick", "setForeground", "setBackground", "setEnabled", "isEnabled"},
+	"TextInput":     {"text", "setText", "onChange", "setForeground", "setBackground", "setEnabled", "isEnabled"},
+	"Checkbox":      {"checked", "setChecked", "onChange", "setForeground", "setBackground", "setEnabled", "isEnabled"},
+	"PasswordInput": {"text", "setText", "onChange", "setForeground", "setBackground", "setEnabled", "isEnabled"},
+	"TextArea":      {"text", "setText", "onChange", "setForeground", "setBackground", "setEnabled", "isEnabled"},
+	"ListBox": {"items", "setItems", "selectedIndex", "selectedText", "select", "onChange",
+		"setForeground", "setBackground", "setEnabled", "isEnabled"},
+	"Select": {"items", "setItems", "selectedIndex", "selectedText", "select", "onChange",
+		"setForeground", "setBackground", "setEnabled", "isEnabled"},
+	"TableView": {"columns", "rows", "setRows", "selectedRow", "selectRow", "onSelect",
+		"setForeground", "setBackground", "setEnabled", "isEnabled"},
 }
 
 func guiParameter(name string, typ types.Type, hasDefault bool) types.Parameter {
@@ -100,16 +149,66 @@ var guiMembers = func() map[TypeOperation]*Symbol {
 	}
 	// Colors take the Graphics spellings; only the interactive widgets can be
 	// disabled.
-	for _, class := range []string{"Label", "Button", "TextInput", "Checkbox"} {
+	for _, class := range []string{"Label", "Button", "TextInput", "Checkbox", "PasswordInput", "TextArea", "ListBox", "Select", "TableView"} {
 		members[TypeOperation(class+".setForeground")] = member(guiModuleID, "setForeground", types.Nothing, color)
 		members[TypeOperation(class+".setBackground")] = member(guiModuleID, "setBackground", types.Nothing, color)
 	}
-	for _, class := range []string{"Button", "TextInput", "Checkbox"} {
+	for _, class := range []string{"Button", "TextInput", "Checkbox", "PasswordInput", "TextArea", "ListBox", "Select", "TableView"} {
 		members[TypeOperation(class+".setEnabled")] = member(guiModuleID, "setEnabled", types.Nothing, enabled)
 		members[TypeOperation(class+".isEnabled")] = member(guiModuleID, "isEnabled", types.Bool)
 	}
+
+	// v2.0 widgets, change callbacks, and resizable Windows.
+	strings := types.List{Element: types.String}
+	rows := types.List{Element: strings}
+	placeholder := guiParameter("placeholder", types.String, true)
+	members["Window.setResizable"] = member(guiModuleID, "setResizable", types.Nothing, guiParameter("resizable", types.Bool, false))
+	members["Window.isResizable"] = member(guiModuleID, "isResizable", types.Bool)
+	members["Container.passwordInput"] = member(guiModuleID, "passwordInput", guiType(guiPasswordInputClass), placeholder)
+	members["Container.textArea"] = member(guiModuleID, "textArea", guiType(guiTextAreaClass), placeholder)
+	members["Container.listBox"] = member(guiModuleID, "listBox", guiType(guiListBoxClass), guiParameter("items", strings, true))
+	members["Container.select"] = nullableMember(member(guiModuleID, "select", guiType(guiSelectClass),
+		guiParameter("items", strings, false), guiParameter("selectedIndex", types.Int, true)), []bool{false, true}, false)
+	members["Container.table"] = member(guiModuleID, "table", guiType(guiTableViewClass),
+		guiParameter("columns", strings, false), guiParameter("rows", rows, true))
+	for _, class := range []string{"TextInput", "PasswordInput", "TextArea"} {
+		members[TypeOperation(class+".text")] = member(guiModuleID, "text", types.String)
+		members[TypeOperation(class+".setText")] = member(guiModuleID, "setText", types.Nothing, text)
+		members[TypeOperation(class+".onChange")] = member(guiModuleID, "onChange", types.Nothing, guiParameter("handler", TextChangeCallbackType(), false))
+	}
+	members["Checkbox.onChange"] = member(guiModuleID, "onChange", types.Nothing, guiParameter("handler", CheckChangeCallbackType(), false))
+	for _, class := range []string{"ListBox", "Select"} {
+		members[TypeOperation(class+".items")] = member(guiModuleID, "items", strings)
+		members[TypeOperation(class+".setItems")] = member(guiModuleID, "setItems", types.Nothing, guiParameter("items", strings, false))
+		members[TypeOperation(class+".selectedIndex")] = nullableMember(member(guiModuleID, "selectedIndex", types.Int), nil, true)
+		members[TypeOperation(class+".selectedText")] = nullableMember(member(guiModuleID, "selectedText", types.String), nil, true)
+		members[TypeOperation(class+".select")] = nullableMember(member(guiModuleID, "select", types.Nothing,
+			guiParameter("index", types.Int, false)), []bool{true}, false)
+		members[TypeOperation(class+".onChange")] = member(guiModuleID, "onChange", types.Nothing, guiParameter("handler", SelectionCallbackType(), false))
+	}
+	members["TableView.columns"] = member(guiModuleID, "columns", strings)
+	members["TableView.rows"] = member(guiModuleID, "rows", rows)
+	members["TableView.setRows"] = member(guiModuleID, "setRows", types.Nothing, guiParameter("rows", rows, false))
+	members["TableView.selectedRow"] = nullableMember(member(guiModuleID, "selectedRow", types.Int), nil, true)
+	members["TableView.selectRow"] = nullableMember(member(guiModuleID, "selectRow", types.Nothing,
+		guiParameter("index", types.Int, false)), []bool{true}, false)
+	members["TableView.onSelect"] = member(guiModuleID, "onSelect", types.Nothing, guiParameter("handler", RowCallbackType(), false))
 	return members
 }()
+
+// nullableMember marks which parameters of a published member accept null
+// and whether it returns a nullable value.
+func nullableMember(symbol *Symbol, parameters []bool, result bool) *Symbol {
+	for index, nullable := range parameters {
+		if nullable {
+			symbol.Callable.ParameterNull[index] = MaybeNull
+		}
+	}
+	if result {
+		symbol.Callable.ReturnNull = MaybeNull
+	}
+	return symbol
+}
 
 // guiOperationFor names the built-in member a GUI value publishes. Only the
 // compiler-supplied identities match.
@@ -138,7 +237,9 @@ func guiConstructionHint(identity *types.ClassSymbol) (string, bool) {
 		return "", false
 	}
 	return "create a " + identity.Name + " inside a Container, as in container." + map[string]string{
-		"Label": "label", "Button": "button", "TextInput": "textInput", "Checkbox": "checkbox"}[identity.Name] + "(...)", true
+		"Label": "label", "Button": "button", "TextInput": "textInput", "Checkbox": "checkbox",
+		"ListBox": "listBox", "Select": "select", "TextArea": "textArea", "PasswordInput": "passwordInput",
+		"TableView": "table"}[identity.Name] + "(...)", true
 }
 
 func guiModuleInterface() *ModuleInterface {
@@ -168,6 +269,26 @@ func guiModuleInterface() *ModuleInterface {
 		types.Parameter{Name: "title", Type: types.String, HasDefault: true},
 		types.Parameter{Name: "width", Type: types.Int, HasDefault: true},
 		types.Parameter{Name: "height", Type: types.Int, HasDefault: true}))
+
+	// v2.0 dialogs. A cancelled file dialog returns null (openFiles: an
+	// empty List); GUIError means the dialog could not be shown.
+	title := func() types.Parameter { return types.Parameter{Name: "title", Type: types.String, HasDefault: true} }
+	extensions := func() types.Parameter {
+		return types.Parameter{Name: "extensions", Type: types.List{Element: types.String}, HasDefault: true}
+	}
+	nullable := func(symbol *Symbol) *Symbol {
+		symbol.Callable.ReturnNull = MaybeNull
+		return symbol
+	}
+	addStandardExport(module, nullable(standardFunction(guiModuleID, "openFile", types.String, title(), extensions())))
+	addStandardExport(module, standardFunction(guiModuleID, "openFiles", types.List{Element: types.String}, title(), extensions()))
+	addStandardExport(module, nullable(standardFunction(guiModuleID, "selectFolder", types.String, title())))
+	addStandardExport(module, nullable(standardFunction(guiModuleID, "saveFile", types.String, title(),
+		types.Parameter{Name: "suggestedName", Type: types.String, HasDefault: true}, extensions())))
+	addStandardExport(module, standardFunction(guiModuleID, "message", types.Nothing,
+		types.Parameter{Name: "title", Type: types.String}, types.Parameter{Name: "text", Type: types.String}))
+	addStandardExport(module, standardFunction(guiModuleID, "confirm", types.Bool,
+		types.Parameter{Name: "title", Type: types.String}, types.Parameter{Name: "text", Type: types.String}))
 
 	sort.Strings(module.ExportNames)
 	return module

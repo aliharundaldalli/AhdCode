@@ -13,7 +13,22 @@ const (
 	plotChartClassID  = ir.ClassID(PlotModuleID + "::class::Chart")
 	plotFigureClassID = ir.ClassID(PlotModuleID + "::class::Figure")
 	plotErrorClassID  = ir.ClassID(PlotModuleID + "::class::PlotError")
+	// v2.0
+	plotSurfaceClassID = ir.ClassID(PlotModuleID + "::class::Surface")
 )
+
+// plotSurfaceFields is the Surface storage layout: the grid, as plain Lists
+// of Reals, and the presentation metadata. Every field is Hidden.
+func plotSurfaceFields() []ir.Field {
+	field := func(name string, typ ir.Type) ir.Field {
+		return ir.Field{ID: plotFieldID(plotSurfaceClassID, name), Name: name, Type: typ, NullState: ir.NonNull, Hidden: true}
+	}
+	return []ir.Field{
+		field("x", plotRealList()), field("y", plotRealList()), field("z", plotList(plotRealList())),
+		field("title", plotString()), field("xLabel", plotString()), field("yLabel", plotString()), field("zLabel", plotString()),
+		field("width", plotInt()), field("height", plotInt()), field("wireframe", plotBool()),
+	}
+}
 
 func plotString() ir.Type { return ir.Type{Kind: ir.StringType} }
 func plotInt() ir.Type    { return ir.Type{Kind: ir.IntType} }
@@ -107,6 +122,15 @@ func plotModule(id ir.ModuleID, name, path string) *ir.Module {
 	}
 	module.Classes = append(module.Classes, figureClass)
 	module.Functions = append(module.Functions, plotAllFieldsConstructor(figureClass))
+
+	surfaceClass := &ir.Class{
+		ID: plotSurfaceClassID, Symbol: ir.SymbolID(string(plotSurfaceClassID) + "::symbol"),
+		Name: "Surface", Operations: semantic.PlotSurfaceOperations,
+		Fields:      plotSurfaceFields(),
+		Constructor: plotAllFieldsConstructorID(plotSurfaceClassID),
+	}
+	module.Classes = append(module.Classes, surfaceClass)
+	module.Functions = append(module.Functions, plotAllFieldsConstructor(surfaceClass))
 
 	parentID := ir.ClassID("builtin:core::class::Error")
 	errorClass := &ir.Class{

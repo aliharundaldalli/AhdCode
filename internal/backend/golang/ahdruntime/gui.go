@@ -43,7 +43,7 @@ var AhdClassGUIError = &AhdClass{Name: "GUIError", Parent: AhdClassError}
 var AhdGUIRuntimeHint string
 
 const (
-	ahdGUIProtocolVersion = 2
+	ahdGUIProtocolVersion = 3
 	// AhdGUIMaxDimension bounds a Window's width and height.
 	AhdGUIMaxDimension  = 4096
 	ahdGUIMaxTitleRunes = 256
@@ -52,8 +52,8 @@ const (
 	// AhdGUIMaxSpacing bounds spacing and padding.
 	AhdGUIMaxSpacing = 1000
 	// ahdGUIMaxLineBytes bounds one helper line; the closed event carries
-	// every TextInput value, each at most AhdGUIMaxTextRunes characters.
-	ahdGUIMaxLineBytes    = 8 << 20
+	// every text field's value, each bounded below.
+	ahdGUIMaxLineBytes    = 32 << 20
 	ahdGUIOpenTimeout     = 30 * time.Second
 	ahdGUIRequestTimeout  = 60 * time.Second
 	ahdGUICloseTimeout    = 5 * time.Second
@@ -83,30 +83,46 @@ type ahdGUIRequest struct {
 	Part        string `json:"part,omitempty"`
 	Color       string `json:"color,omitempty"`
 	Enabled     *bool  `json:"enabled,omitempty"`
+
+	Items      []string        `json:"items,omitempty"`
+	Columns    []string        `json:"columns,omitempty"`
+	Rows       [][]string      `json:"rows,omitempty"`
+	Selected   *int            `json:"selected,omitempty"`
+	Name       string          `json:"name,omitempty"`
+	Extensions []string        `json:"extensions,omitempty"`
+	Answer     json.RawMessage `json:"answer,omitempty"`
 }
 
 type ahdGUIValue struct {
-	Widget  int64  `json:"widget"`
-	Text    string `json:"text,omitempty"`
-	Checked bool   `json:"checked,omitempty"`
+	Widget   int64  `json:"widget"`
+	Text     string `json:"text,omitempty"`
+	Checked  bool   `json:"checked,omitempty"`
+	Selected *int   `json:"selected,omitempty"`
 }
 
 type ahdGUIResponse struct {
-	OK      bool          `json:"ok"`
-	Error   string        `json:"error,omitempty"`
-	Closed  bool          `json:"closed,omitempty"`
-	Open    *bool         `json:"open,omitempty"`
-	Widget  int64         `json:"widget,omitempty"`
-	Text    *string       `json:"text,omitempty"`
-	Checked *bool         `json:"checked,omitempty"`
-	Values  []ahdGUIValue `json:"values,omitempty"`
+	OK        bool          `json:"ok"`
+	Error     string        `json:"error,omitempty"`
+	Closed    bool          `json:"closed,omitempty"`
+	Open      *bool         `json:"open,omitempty"`
+	Widget    int64         `json:"widget,omitempty"`
+	Text      *string       `json:"text,omitempty"`
+	Checked   *bool         `json:"checked,omitempty"`
+	Selected  *int          `json:"selected,omitempty"`
+	Values    []ahdGUIValue `json:"values,omitempty"`
+	Paths     []string      `json:"paths,omitempty"`
+	Cancelled bool          `json:"cancelled,omitempty"`
+	Confirmed *bool         `json:"confirmed,omitempty"`
 }
 
 type ahdGUIEvent struct {
-	Event  string        `json:"event"`
-	Widget int64         `json:"widget,omitempty"`
-	Key    string        `json:"key,omitempty"`
-	Values []ahdGUIValue `json:"values,omitempty"`
+	Event    string        `json:"event"`
+	Widget   int64         `json:"widget,omitempty"`
+	Key      string        `json:"key,omitempty"`
+	Text     string        `json:"text,omitempty"`
+	Checked  bool          `json:"checked,omitempty"`
+	Selected *int          `json:"selected,omitempty"`
+	Values   []ahdGUIValue `json:"values,omitempty"`
 }
 
 // ahdGUIWindow is one open Window. mu serializes requests; it is never held
@@ -120,22 +136,30 @@ type ahdGUIWindow struct {
 	root     bool
 	onKey    func(key string)
 	listened bool
-	// buttons are the Button click callbacks, by helper widget id.
+	// buttons are the Button click callbacks, by helper widget id, and
+	// changes the change and selection callbacks.
 	buttons map[int64]func()
-	// finals are the last TextInput and Checkbox readings the helper sent
-	// when the Window closed, so they stay readable afterwards.
+	changes map[int64]func(ahdGUIEvent)
+	// finals are the last readings of every widget the user can change,
+	// sent by the helper when the Window closed, so they stay readable
+	// afterwards.
 	finals map[int64]ahdGUIValue
+	// resizable records Window.setResizable.
+	resizable bool
 }
 
 // ahdGUIWidget is one widget: its Window, its helper id, and its kind.
-// Label and Button texts are kept here, because only the program changes
-// them.
+// Label and Button texts, ListBox and Select items, and TableView columns
+// and rows are kept here, because only the program changes them.
 type ahdGUIWidget struct {
 	window   int64
 	id       int64
 	kind     string
 	text     string
 	disabled bool
+	items    []string
+	columns  []string
+	rows     [][]string
 }
 
 var ahdGUI = struct {
@@ -154,6 +178,12 @@ func ahdGUIDiscoverRuntime() (string, error) {
 	name := "ahdgui"
 	if runtime.GOOS == "windows" {
 		name = "ahdgui.exe"
+	}
+	if AhdPackagedApplication {
+		if path, ok := ahdPackagedHelper(name); ok {
+			return path, nil
+		}
+		return "", errors.New("the GUI window helper (ahdgui) is missing from this application")
 	}
 	candidates := []string{os.Getenv("AHDCODE_GUI_RUNTIME")}
 	if AhdGUIRuntimeHint != "" {
@@ -210,7 +240,7 @@ func AhdGUIWindowOpen(title string, width, height int64) (int64, string) {
 		return 0, "could not start the GUI window helper"
 	}
 	window := &ahdGUIWindow{link: link, usable: true, alive: true, headless: headless,
-		buttons: map[int64]func(){}, finals: map[int64]ahdGUIValue{}}
+		buttons: map[int64]func(){}, changes: map[int64]func(ahdGUIEvent){}, finals: map[int64]ahdGUIValue{}}
 	if _, problem := window.request(ahdGUIRequest{Op: "open", Version: ahdGUIProtocolVersion, Width: int(width),
 		Height: int(height), Title: title, Headless: headless, Script: script}, ahdGUIOpenTimeout); problem != "" {
 		window.mu.Lock()
@@ -331,7 +361,8 @@ func ahdGUIAdd(windowHandle int64, parent int64, kind string, value ahdGUIReques
 	ahdGUI.Lock()
 	ahdGUI.next++
 	handle := ahdGUI.next
-	ahdGUI.widgets[handle] = &ahdGUIWidget{window: windowHandle, id: reply.Widget, kind: kind, text: value.Text}
+	ahdGUI.widgets[handle] = &ahdGUIWidget{window: windowHandle, id: reply.Widget, kind: kind, text: value.Text,
+		items: value.Items, columns: value.Columns, rows: value.Rows}
 	ahdGUI.Unlock()
 	return handle, ""
 }
@@ -378,7 +409,8 @@ func AhdGUIContainerLayout(container int64, kind string, spacing, padding int64)
 	return ahdGUIAdd(parent.window, parent.id, kind, ahdGUIRequest{Spacing: int(spacing), Padding: int(padding)})
 }
 
-// AhdGUIAddLeaf adds a Label, Button, TextInput, or Checkbox.
+// AhdGUIAddLeaf adds a Label, Button, TextInput, Checkbox, PasswordInput,
+// or TextArea.
 func AhdGUIAddLeaf(container int64, kind, text, placeholder string, checked bool) (int64, string) {
 	if !ahdGUIValidText(text, AhdGUIMaxTextRunes) {
 		return 0, ahdGUITextProblem(kind + " text")
@@ -397,15 +429,19 @@ func AhdGUIAddLeaf(container int64, kind, text, placeholder string, checked bool
 	return ahdGUIAdd(parent.window, parent.id, kind, value)
 }
 
-// AhdGUIText reads a Label's, Button's, or TextInput's text. A TextInput is
-// asked for its current text; after its Window closed, the last text is
-// returned.
+// ahdGUITextField reports whether a kind holds text the user edits.
+func ahdGUITextField(kind string) bool {
+	return kind == "textInput" || kind == "passwordInput" || kind == "textArea"
+}
+
+// AhdGUIText reads a widget's text. A text field is asked for its current
+// text; after its Window closed, the last text is returned.
 func AhdGUIText(handle int64) (string, string) {
 	widget, window, problem := ahdGUIWidgetOf(handle)
 	if problem != "" {
 		return "", problem
 	}
-	if widget.kind != "textInput" {
+	if !ahdGUITextField(widget.kind) {
 		return widget.text, ""
 	}
 	window.mu.Lock()
@@ -423,14 +459,20 @@ func AhdGUIText(handle int64) (string, string) {
 	return *reply.Text, ""
 }
 
-// AhdGUISetText changes a Label's, Button's, or TextInput's text.
+// AhdGUISetText changes a widget's text. A TextArea's line breaks are
+// normalized to "\n".
 func AhdGUISetText(handle int64, text string) string {
-	if !ahdGUIValidText(text, AhdGUIMaxTextRunes) {
-		return ahdGUITextProblem("text")
-	}
 	widget, window, problem := ahdGUIWidgetOf(handle)
 	if problem != "" {
 		return problem
+	}
+	if widget.kind == "textArea" {
+		text = ahdGUIAreaText(text)
+		if !ahdGUIValidText(text, AhdGUIMaxAreaRunes) {
+			return fmt.Sprintf("a TextArea holds text of at most %d characters", AhdGUIMaxAreaRunes)
+		}
+	} else if !ahdGUIValidText(text, AhdGUIMaxTextRunes) {
+		return ahdGUITextProblem("text")
 	}
 	window.mu.Lock()
 	defer window.mu.Unlock()
@@ -630,8 +672,8 @@ func AhdGUIOnKey(handle int64, handler func(key string)) string {
 	return ""
 }
 
-// AhdGUIWait blocks until the Window is closed by its user, running Button
-// and key callbacks one at a time, in order, on the calling goroutine. On a
+// AhdGUIWait blocks until the Window is closed by its user, running click,
+// change, selection, and key callbacks one at a time, in order, on the calling goroutine. On a
 // Window that is already closed it returns at once. A callback's own error
 // closes the Window and propagates unchanged. Events still queued when the
 // window closes are discarded: their window is gone.
@@ -693,6 +735,9 @@ func AhdGUIWait(handle int64) string {
 		case event.Event == "click" && window.buttons[event.Widget] != nil:
 			handler := window.buttons[event.Widget]
 			callback = handler
+		case event.Event == "change" && window.changes[event.Widget] != nil:
+			handler, changed := window.changes[event.Widget], event
+			callback = func() { handler(changed) }
 		case event.Event == "key" && window.onKey != nil:
 			handler, key := window.onKey, event.Key
 			callback = func() { handler(key) }

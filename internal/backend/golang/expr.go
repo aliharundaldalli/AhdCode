@@ -1123,6 +1123,9 @@ func (generator *generator) builtinCall(value *ir.CallExpr) string {
 		if strings.HasPrefix(name, "Chart.") || strings.HasPrefix(name, "Figure.") {
 			return generator.plotOperation(name, value)
 		}
+		if strings.HasPrefix(name, "Surface.") {
+			return generator.plotSurfaceOperation(name, value)
+		}
 		if strings.HasPrefix(name, "Canvas.") || strings.HasPrefix(name, "Turtle.") {
 			return generator.graphicsOperation(name, value)
 		}

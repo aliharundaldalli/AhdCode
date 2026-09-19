@@ -1075,12 +1075,6 @@ func (a *analyzer) analyzeTypeOperation(call *ast.CallExpr, member *ast.MemberEx
 	if dataCallbackOperation(operation) {
 		return a.analyzeDataCallbackOperation(call, operation, current, flow), true
 	}
-	if shape, isPlot := plotOperationShapes()[operation]; isPlot {
-		return a.analyzePlotOperation(call, operation, shape, current, flow), true
-	}
-	if plotSeriesOperation(operation) {
-		return a.analyzePlotSeriesOperation(call, operation, current, flow), true
-	}
 	if shape, isWord := wordOperationShapes()[operation]; isWord {
 		return a.analyzeWordOperation(call, operation, shape, current, flow), true
 	}
@@ -1164,12 +1158,6 @@ func typeOperationFailure(operation TypeOperation, receiver types.Type) expressi
 	if result, known := dataOperationResult(operation); known {
 		return expressionInfo{typeValue: result, nullState: NonNull}
 	}
-	if shape, known := plotOperationShapes()[operation]; known {
-		return expressionInfo{typeValue: shape.result, nullState: NonNull}
-	}
-	if plotSeriesOperation(operation) {
-		return expressionInfo{typeValue: plotChartType(), nullState: NonNull}
-	}
 	if shape, known := wordOperationShapes()[operation]; known {
 		return expressionInfo{typeValue: shape.result, nullState: NonNull}
 	}
@@ -1247,12 +1235,6 @@ func typeOperationHint(operation TypeOperation, receiver types.Type) string {
 	}
 	if dataCallbackOperation(operation) {
 		return dataCallbackHint(operation)
-	}
-	if shape, known := plotOperationShapes()[operation]; known {
-		return shape.hint
-	}
-	if plotSeriesOperation(operation) {
-		return "pass an x List, a y List, and a String label"
 	}
 	if shape, known := wordOperationShapes()[operation]; known {
 		return shape.hint

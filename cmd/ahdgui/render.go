@@ -5,6 +5,7 @@ import (
 	"image/color"
 	"image/draw"
 	"math"
+	"strings"
 	"sync"
 
 	"golang.org/x/image/font"
@@ -118,10 +119,15 @@ func render(f frame) *image.RGBA {
 	if m.background != nil {
 		fill(img, img.Bounds(), *m.background)
 	}
+	m.scale = s
 	m.layout()
 	face := faceAt(s)
 	for _, id := range m.order {
 		drawWidget(img, face, f, m.widgets[id])
+	}
+	if m.popup != 0 {
+		// An open Select list lies over every widget.
+		drawPopup(img, face, f, m.widgets[m.popup])
 	}
 	return img
 }
@@ -189,7 +195,7 @@ func drawWidget(img *image.RGBA, face font.Face, f frame, w *widget) {
 		outline(img, box, border, line)
 		width := font.MeasureString(face, string(w.text)).Ceil()
 		text(img, face, box, box.Min.X+(box.Dx()-width)/2, box, string(w.text), foreground)
-	case kindTextInput:
+	case kindTextInput, kindPassword:
 		fill(img, box, or(w.background, colorField))
 		border := colorBorder
 		if focused {
@@ -202,19 +208,32 @@ func drawWidget(img *image.RGBA, face font.Face, f frame, w *widget) {
 			text(img, face, inner, inner.Min.X, box, w.placeholder, colorMuted)
 			return
 		}
+		shown := w.text
+		if w.kind == kindPassword {
+			// A PasswordInput never draws its text: one dot per character.
+			shown = []rune(strings.Repeat(maskRune, len(w.text)))
+		}
 		// Keep the caret inside the field: scroll the text horizontally.
-		caretX := font.MeasureString(face, string(w.text[:w.caret])).Ceil()
+		caretX := font.MeasureString(face, string(shown[:w.caret])).Ceil()
 		if caretX-w.scroll > inner.Dx()-line {
 			w.scroll = caretX - inner.Dx() + line
 		}
 		if caretX < w.scroll {
 			w.scroll = caretX
 		}
-		text(img, face, inner, inner.Min.X-w.scroll, box, string(w.text), foreground)
+		text(img, face, inner, inner.Min.X-w.scroll, box, string(shown), foreground)
 		if focused && f.caretVisible {
 			x := inner.Min.X + caretX - w.scroll
 			fill(img, image.Rect(x, inner.Min.Y+2*line, x+line, inner.Max.Y-2*line).Intersect(inner), foreground)
 		}
+	case kindTextArea:
+		drawTextArea(img, face, f, w, box, line, focused, foreground)
+	case kindListBox:
+		drawListBox(img, face, f, w, box, line, focused, foreground)
+	case kindSelect:
+		drawSelect(img, face, f, w, box, line, focused, foreground)
+	case kindTable:
+		drawTable(img, face, f, w, box, line, focused, foreground)
 	case kindCheckbox:
 		if w.background != nil {
 			fill(img, box, *w.background)

@@ -14,6 +14,8 @@ ahdcode databases list
 ahdcode databases add <file.db>
 ahdcode databases remove <file.db>
 ahdcode build <entry.ahd> [-o <output>]
+ahdcode package <entry.ahd> [--name <name>] [--output <folder>] [--icon <icon.png>]
+                [--target <os-arch>] [--helpers <folder>] [--console]
 ahdcode run <entry.ahd> [-- <args>...]
 ahdcode dev <entry.ahd>
 ahdcode stop <app.dev|app.run>
@@ -33,6 +35,11 @@ the AhdCode logo are embedded: offline, no package manager, no overwrite.
 Every starter also receives `AHDCODE.md` and an English `Documents/AhdCode/`
 snapshot for this version. Those files are not runtime. Next:
 `ahdcode dev app.ahd`.
+
+`package` (v2.0) makes a self-contained desktop application from an entry
+module: a macOS `.app`, or a Windows or Linux folder and archive, holding the
+compiled program and only the AhdCode helpers it uses, so it runs without
+AhdCode installed. See [Packaging](PACKAGING.md).
 
 `run` compiles through the normal frontend and Go backend, then executes the
 native result. Arguments after the entry (optionally after `--`) are forwarded

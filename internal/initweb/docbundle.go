@@ -52,6 +52,7 @@ var documentationManifest = []string{
 	"MODULES.md",
 	"MYSQL.md",
 	"NUMERIC.md",
+	"PACKAGING.md",
 	"PDF.md",
 	"PLOT.md",
 	"POSTGRESQL.md",

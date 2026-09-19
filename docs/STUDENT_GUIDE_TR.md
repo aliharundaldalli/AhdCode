@@ -1,4 +1,4 @@
-# AhdCode v1.9.0 Türkçe Öğrenci Rehberi
+# AhdCode v2.0.0 Türkçe Öğrenci Rehberi
 
 Bu rehber, **daha önce hiç programlama yapmamış birinin de takip edebilmesi** için hazırlanmıştır. Baştan sona sırayla okuyabilirsiniz; her bölümde önce ne yapmak istediğimizi görecek, sonra çalışan bir örnek yazacak, en son gerekli kuralları öğreneceksiniz.
 
@@ -87,6 +87,7 @@ verir.
 - [64. Açılar, zaman damgaları ve birleştirilen tablolar](#64-açılar-zaman-damgaları-ve-birleştirilen-tablolar)
 - [65. Tepki veren pencereler: GUI formları ve Turtle tuşları](#65-tepki-veren-pencereler-gui-formları-ve-turtle-tuşları)
 - [66. Renkler, devre dışı düğmeler ve incelenebilir bir grafik](#66-renkler-devre-dışı-düğmeler-ve-incelenebilir-bir-grafik)
+- [67. Bir masaüstü uygulaması: tablolar, iletişim kutuları, 3B grafikler ve paketleme](#67-bir-masaüstü-uygulaması-tablolar-iletişim-kutuları-3b-grafikler-ve-paketleme)
 
 ## 1. AhdCode nedir?
 
@@ -7183,3 +7184,124 @@ noktasını bulun.
 Bkz. [GUI başvurusu](GUI_TR.md#renkler),
 [Plot başvurusu](PLOT_TR.md#show-gösterme) ve
 [`examples/v1.9`](../examples/v1.9/README_TR.md).
+
+## 67. Bir masaüstü uygulaması: tablolar, iletişim kutuları, 3B grafikler ve paketleme
+
+> v2.0.0 ile eklendi.
+
+v2.0, AhdCode'un GUI'sini küçük masaüstü uygulamaları için tamamlar. Bu
+bölümde küçük bir defter kurar, onu dışa aktarır, 3B bir yüzey çizer ve
+programı AhdCode'u olmayan birine verebileceğiniz bir uygulamaya
+dönüştürürsünüz.
+
+**Adım 1 — SQLite destekli bir tablo.** Bir `TableView` String satırları
+gösterir. Veriyi SQLite'ta saklayın ve her satırı tablo için String'lere
+çevirin:
+
+```ahd
+bring GUI
+bring SQLite
+from GUI bring (Window, Container, TextInput, Button, TableView)
+from SQLite bring (Database)
+
+db: Database := SQLite.open("ledger.db")
+db.execute("CREATE TABLE IF NOT EXISTS entries (id INTEGER PRIMARY KEY, name TEXT NOT NULL, amount REAL NOT NULL)")
+
+window: Window := GUI.window(title: "Ledger", width: 520, height: 420)
+window.setResizable(true)
+form: Container := window.column()
+name: TextInput := form.textInput(placeholder: "Customer")
+amount: TextInput := form.textInput(placeholder: "Amount")
+add: Button := form.button("Add")
+table: TableView := form.table(["No", "Customer", "Amount"])
+
+refresh: Function := () -> Nothing {
+    db: Global Database
+    table: Global TableView
+    rows: Local List<List<String>> := []
+    for row in db.query("SELECT id, name, amount FROM entries ORDER BY id") {
+        rows.add([str(row["id"].int()), row["name"].string(), str(row["amount"].real())])
+    }
+    table.setRows(rows)
+}
+
+addEntry: Function := () -> Nothing {
+    db: Global Database
+    name: Global TextInput
+    amount: Global TextInput
+    refresh: Global Function
+    db.execute("INSERT INTO entries (name, amount) VALUES (?, ?)",
+        [SQLite.fromString(name.text()), SQLite.fromReal(real(amount.text()))])
+    amount.setText("")
+    refresh()
+}
+
+add.onClick(addEntry)
+table.onSelect(lambda (row: Int?) -> write("selected {row}"))
+refresh()
+window.wait()
+```
+
+Pencere yeniden boyutlandırılabilir ve tablo onunla büyür. Hiçbir satır
+seçili değilken `onSelect` `null` alır; bu yüzden parametresi `Int?`'dir.
+
+**Adım 2 — nereye aktarılacağını seçmek.** `GUI.saveFile` kullanıcıdan bir
+yol ister ve iptal ederse `null` döndürür; dosyayı sonra program kendisi
+yazar:
+
+```ahd
+bring GUI
+bring CSV
+
+path: String? := GUI.saveFile(title: "Export", suggestedName: "ledger.csv", extensions: ["csv"])
+if path != null {
+    CSV.write(path, [["No", "Customer", "Amount"], ["1", "Ayşe", "250.5"]])
+    GUI.message("Export", "Saved to {path}.")
+}
+```
+
+**Adım 3 — paketlemek.** Bir terminalden:
+
+```sh
+ahdcode package ledger.ahd --name Ledger
+```
+
+`dist/Ledger.app` (Windows ve Linux'ta `dist/Ledger` klasörü) programınızı
+ve yalnızca kullandığı yardımcıları içerir. Onu herhangi bir yere kopyalayıp
+çift tıklayın: AhdCode kurulu olmadan çalışır. Finder'dan açıldığında
+`"ledger.db"` gibi göreli bir yol ana klasörünüzdeki bir dosya anlamına
+gelir.
+
+**3B bir yüzey.** `Plot.surface`, her `y` değeri için bir satır ve her `x`
+değeri için bir sütun içeren bir Numeric Matrix'ten bir yükseklik alanı
+çizer:
+
+```ahd
+bring Plot
+bring Numeric
+
+x: List<Real> := [-1.0, -0.5, 0.0, 0.5, 1.0]
+y: List<Real> := [-1.0, 0.0, 1.0]
+rows: List<List<Real>> := []
+for b in y {
+    row: Local List<Real> := []
+    for a in x {
+        row.add(a * a - b * b)
+    }
+    rows.add(row)
+}
+surface := Plot.surface(x, y, Numeric.matrix(rows)).title("Saddle")
+surface.save("saddle.png")
+surface.show()
+```
+
+Görüntüleyicide döndürmek için sürükleyin, kaydırmak için Shift+sürükleyin,
+yakınlaştırmak için tekerleği kullanın ve sıfırlamak için R'ye basın. Araç
+çubuğundaki Save, tam olarak `save`'in yazdığı dosyayı yazar.
+
+**Kendiniz deneyin:** deftere "Debt" ve "Payment" seçenekli bir `Select`
+ekleyin ve bakiyeyi bir Label'da gösterin; ardından `--icon` ile kendi
+simgenizle paketleyin.
+
+Bkz. [GUI başvurusu](GUI_TR.md), [Plot başvurusu](PLOT_TR.md#surface),
+[Paketleme](PACKAGING_TR.md) ve [`examples/v2.0`](../examples/v2.0/README_TR.md).
