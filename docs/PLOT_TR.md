@@ -220,6 +220,17 @@ yazdığıyla bayt bayt aynıdır. Kaydetme, `show()`'u çağıran program bitti
 sonra da çalışır. Sonuç — ya da neden başarısız olduğu — birkaç saniye araç
 çubuğunun yanında görünür.
 
+> **v2.0.0'da bilinen sorun.** Plot kullanan ama GUI kullanmayan bir programda
+> görüntüleyici, kaydetme iletişim kutusunu açan yardımcıyı bulamaz ve Save
+> "Save needs AhdCode's GUI helper (ahdgui), which is not installed" der.
+> Sonraki sürüme kadar programı çalıştırırken yardımcıyı gösterin:
+>
+> ```sh
+> AHDCODE_GUI_RUNTIME=~/Library/AhdCode/current/libexec/ahdcode/ahdgui ahdcode run chart.ahd
+> ```
+>
+> `chart.save(path)` ve paketlenmiş bir uygulama bundan etkilenmez.
+
 `show()`, görüntüleyici penceresi açılır açılmaz döner. Program devam eder
 ve `show()`'u yeniden çağırabilir; her çağrı kendi görüntüleyicisini açar ve
 bir görüntüleyici, program bittikten sonra bile siz kapatana kadar açık

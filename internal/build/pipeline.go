@@ -660,8 +660,12 @@ func configureGraphicsRuntime(program *backend.GeneratedProgram) *backend.Genera
 // programs that use GUI, exactly like configureGraphicsRuntime. The runtime
 // still checks that the helper exists and raises GUIError if it is missing
 // when a Window is opened.
+//
+// A program that uses Plot needs the same hint even when it opens no window
+// of its own: the Plot viewer's Save asks ahdgui for the save dialog, and a
+// program compiled to a temporary directory has no other way to find it.
 func configureGUIRuntime(program *backend.GeneratedProgram) *backend.GeneratedProgram {
-	if program == nil || !program.RequiresGUI {
+	if program == nil || (!program.RequiresGUI && !program.RequiresPlot) {
 		return program
 	}
 	root := findHelperRuntimeRoot("ahdgui", "AHDCODE_GUI_RUNTIME")
