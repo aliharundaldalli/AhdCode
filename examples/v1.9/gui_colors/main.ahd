@@ -1,0 +1,65 @@
+// A small order form with explicit colors and an enabled state: Save stays
+// disabled until a name is typed and the terms are accepted. Colors use the
+// same spellings as Graphics: nine names, #RRGGBB, or #RRGGBBAA.
+bring GUI
+from GUI bring (Window, Container, Label, Button, TextInput, Checkbox)
+
+window: Window := GUI.window(title: "Order form", width: 460, height: 300)
+window.setBackground("#EEF2F7")
+form: Container := window.column(spacing: 10, padding: 16)
+header: Container := form.row(spacing: 8, padding: 6)
+header.setBackground("#1F4E79")
+title: Label := header.label("New order")
+title.setForeground("white")
+form.label("Customer")
+customer: TextInput := form.textInput(placeholder: "e.g. Ayşe Yılmaz")
+customer.setForeground("#1B1B1B")
+customer.setBackground("#FFFBE6")
+terms: Checkbox := form.checkbox("I accept the terms")
+terms.setForeground("#1F4E79")
+actions: Container := form.row(spacing: 12)
+check: Button := actions.button("Check")
+save: Button := actions.button("Save")
+save.setForeground("white")
+save.setBackground("#2E7D32")
+save.setEnabled(false)
+status: Label := form.label("Type a name, accept the terms, then press Check.")
+
+checkForm: Function := () -> Nothing {
+    customer: Global TextInput
+    terms: Global Checkbox
+    save: Global Button
+    status: Global Label
+    ready: Local := customer.text().trim() != "" and terms.checked()
+    save.setEnabled(ready)
+    if ready {
+        status.setForeground("#2E7D32")
+        status.setText("Ready to save.")
+    }
+    else {
+        status.setForeground("red")
+        status.setText("A name and the accepted terms are required.")
+    }
+}
+
+saveOrder: Function := () -> Nothing {
+    customer: Global TextInput
+    save: Global Button
+    status: Global Label
+    status.setForeground("#1F4E79")
+    status.setText("Saved the order for {customer.text().trim()}.")
+    write("saved {customer.text().trim()}")
+    save.setEnabled(false)
+}
+
+closeOnEscape: Function := (key: String) -> Nothing {
+    window: Global Window
+    if key == "Escape" {
+        window.close()
+    }
+}
+
+check.onClick(checkForm)
+save.onClick(saveOrder)
+window.onKey(closeOnEscape)
+window.wait()

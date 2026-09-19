@@ -4719,14 +4719,12 @@ chart.show() -> Nothing
 figure.show() -> Nothing
 ```
 
-`show()` renders to a unique temporary PNG in an AhdCode-specific temporary
-area and opens it with the platform's standard image-opening mechanism
-(`open` on macOS, `xdg-open` on Linux, Windows' file-association
-mechanism), so inspecting a chart never requires manually saving and locating
-a file. The temporary image is not automatically deleted, since the
-external viewer keeps reading it after `show()` returns. `show()` requires a
-desktop session; a headless environment fails cleanly with `PlotError`
-rather than hanging.
+`show()` renders the chart exactly as `save()` would into a temporary PNG in
+an AhdCode-specific temporary area and opens it in AhdCode's own interactive
+viewer (section 86; before v1.9.0 the platform's image viewer opened it). The viewer deletes the preview once it has read it,
+and `show()` returns once the viewer window is open. `show()` requires a
+desktop session; without one, or without the bundled viewer, it raises
+`PlotError`.
 
 ### 56.7 Subplots
 
@@ -6427,6 +6425,71 @@ compiler recorded, or the installation beside the running executable; `PATH`
 is not searched. `AHDCODE_GUI_HEADLESS=1` opens every Window without a display.
 The evaluator, `ahdcode run`, and native programs share this runtime, and a
 program that does not bring `GUI` behaves exactly as before.
+
+## 85. GUI Colors, Enabled State, and Window Identity (v1.9.0)
+
+The GUI Classes of section 83 gain these members:
+
+```text
+Window.setBackground(color: String) -> Nothing
+Container.setBackground(color: String) -> Nothing
+Label.setForeground(color: String) -> Nothing      Label.setBackground(color: String) -> Nothing
+Button.setForeground(color: String) -> Nothing     Button.setBackground(color: String) -> Nothing
+TextInput.setForeground(color: String) -> Nothing  TextInput.setBackground(color: String) -> Nothing
+Checkbox.setForeground(color: String) -> Nothing   Checkbox.setBackground(color: String) -> Nothing
+Button.setEnabled(enabled: Bool) -> Nothing        Button.isEnabled() -> Bool
+TextInput.setEnabled(enabled: Bool) -> Nothing     TextInput.isEnabled() -> Bool
+Checkbox.setEnabled(enabled: Bool) -> Nothing      Checkbox.isEnabled() -> Bool
+```
+
+A color is exactly one of the Graphics spellings (section 80): `black`,
+`white`, `red`, `green`, `blue`, `yellow`, `cyan`, `magenta`, `gray`
+(case-sensitive), `#RRGGBB`, or `#RRGGBBAA`; any other text raises
+`GUIError` with the Graphics message. Setting a color replaces the previous
+one; unset colors keep the v1.8 look. Colors composite with "source over"
+alpha blending: the window starts opaque in its default color, the Window's
+background is painted over it, and every Container and widget is painted
+over its parent in creation order. A Label's and Checkbox's background fill
+its whole box; a Button's and TextInput's replace their default fill.
+
+Every Button, TextInput, and Checkbox starts enabled. A disabled widget
+ignores all user input — clicks, Enter and Space, typing, and the headless
+test script — cannot take the focus (Tab skips it; a focused widget that is
+disabled loses the focus), and is drawn faded. `setText`, `setChecked`,
+`text`, and `checked` keep working. `isEnabled` answers from the runtime,
+also after the Window closed; `setEnabled` and every color setter on a
+closed Window raise `GUIError`. There is no visibility API. The GUI helper
+protocol is version 2.
+
+The `ahdgui` and `ahdgraphics` helpers and the Plot viewer (section 86) show
+the AhdCode application identity: on Windows and Linux the AhdCode icon as
+the window icon, on macOS the name AhdCode in the menu bar and the AhdCode
+icon in the Dock. The macOS name is set at run time through LaunchServices;
+a system that refuses it keeps the helper's file name. The identity never
+applies to user programs.
+
+## 86. Interactive Plot Viewer (v1.9.0)
+
+`Chart.show` and `Figure.show` start the bundled `ahdplotview` helper on a
+PNG preview rendered by `ahdplot` exactly as `save()` renders it. The helper
+reads the preview completely, deletes it, and answers one JSON line; `show()`
+returns `Nothing` when the viewer answered ready and raises `PlotError`
+otherwise (viewer missing, no display, a malformed preview, or a timeout).
+No other application is started. A chart larger than 6144 units on a side
+raises `PlotError` before rendering; the viewer shows at most 8192 pixels on
+a side.
+
+The viewer changes only its view: the mouse wheel zooms around the pointer
+between a quarter of the fitted zoom and 1600%, dragging with the left button
+pans, Q and E turn the view a quarter turn counter-clockwise and clockwise,
+R resets to no turn, fitted, and centered, and Escape closes it. On an axis
+where the drawn image is smaller than the window it is centered; where it is
+larger, it always covers the window. The view state is never part of a Chart
+or Figure and never affects `save()`. The viewer outlives the call to
+`show()` and the program; each call opens its own viewer. The helper uses no
+network, runs no command, and reads no file but its preview. It is found
+through `AHDCODE_PLOTVIEW_RUNTIME`, the location the compiler recorded, or
+the installation beside the running executable; `PATH` is not searched.
 
 ---
 

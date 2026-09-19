@@ -24,6 +24,12 @@ flag := paid.checked()
 canvas := Graphics.open()
 canvas.onClick(lambda (x: Real, y: Real) -> write(x))
 canvas.onKey(lambda (key: String) -> write(key))
+window.setBackground("#F0F4F8")
+form.setBackground("white")
+status.setForeground("blue")
+save.setBackground(color: "#0066CC")
+save.setEnabled(false)
+active := save.isEnabled()
 `
 
 func TestCompletionOffersGUIModuleAndMembers(t *testing.T) {
@@ -39,12 +45,12 @@ func TestCompletionOffersGUIModuleAndMembers(t *testing.T) {
 		absent []string
 	}{
 		{"bring GUI\nGUI.", []string{"window", "Window", "Container", "Label", "Button", "TextInput", "Checkbox", "GUIError"}, []string{"alert", "fileDialog"}},
-		{"bring GUI\nw := GUI.window()\nw.", []string{"column", "row", "onKey", "wait", "close", "isOpen", "setTitle"}, []string{"onClick", "menu"}},
-		{"bring GUI\nc := GUI.window().column()\nc.", []string{"column", "row", "label", "button", "textInput", "checkbox"}, []string{"table", "dropdown"}},
-		{"bring GUI\nb := GUI.window().column().button(\"x\")\nb.", []string{"text", "setText", "onClick"}, nil},
-		{"bring GUI\ni := GUI.window().column().textInput()\ni.", []string{"text", "setText"}, []string{"onChange", "onKey"}},
-		{"bring GUI\nk := GUI.window().column().checkbox(\"x\")\nk.", []string{"checked", "setChecked"}, []string{"onChange"}},
-		{"bring GUI\nl := GUI.window().column().label(\"x\")\nl.", []string{"text", "setText"}, []string{"onClick"}},
+		{"bring GUI\nw := GUI.window()\nw.", []string{"column", "row", "onKey", "wait", "close", "isOpen", "setTitle", "setBackground"}, []string{"onClick", "menu", "setForeground", "setEnabled", "setVisible", "setTheme", "resize"}},
+		{"bring GUI\nc := GUI.window().column()\nc.", []string{"column", "row", "label", "button", "textInput", "checkbox", "setBackground"}, []string{"table", "dropdown", "setForeground", "setEnabled", "setVisible"}},
+		{"bring GUI\nb := GUI.window().column().button(\"x\")\nb.", []string{"text", "setText", "onClick", "setForeground", "setBackground", "setEnabled", "isEnabled"}, []string{"setVisible", "setFont", "setStyle"}},
+		{"bring GUI\ni := GUI.window().column().textInput()\ni.", []string{"text", "setText", "setForeground", "setBackground", "setEnabled", "isEnabled"}, []string{"onChange", "onKey", "setVisible"}},
+		{"bring GUI\nk := GUI.window().column().checkbox(\"x\")\nk.", []string{"checked", "setChecked", "setForeground", "setBackground", "setEnabled", "isEnabled"}, []string{"onChange", "setVisible"}},
+		{"bring GUI\nl := GUI.window().column().label(\"x\")\nl.", []string{"text", "setText", "setForeground", "setBackground"}, []string{"onClick", "setEnabled", "isEnabled", "setVisible", "setFont"}},
 		{"bring Graphics\ncanvas := Graphics.open()\ncanvas.", []string{"onClick", "onKey", "wait", "turtle"}, []string{"mouseX", "isKeyDown"}},
 	} {
 		store.Open(path, testCase.prefix+"\n")
@@ -77,6 +83,11 @@ func TestHoverAndSignatureHelpForGUI(t *testing.T) {
 		{"paid.checked", "checked: () -> Bool"},
 		{"canvas.onClick", "onClick: (handler: Function(Real, Real) -> Nothing) -> Nothing"},
 		{"canvas.onKey", "onKey: (handler: Function(String) -> Nothing) -> Nothing"},
+		{"window.setBackground", "setBackground: (color: String) -> Nothing"},
+		{"form.setBackground", "setBackground: (color: String) -> Nothing"},
+		{"status.setForeground", "setForeground: (color: String) -> Nothing"},
+		{"save.setEnabled", "setEnabled: (enabled: Bool) -> Nothing"},
+		{"save.isEnabled", "isEnabled: () -> Bool"},
 	} {
 		dot := strings.Index(testCase.target, ".")
 		hover, ok := store.Hover(path, offsetOf(t, guiSource, testCase.target)+dot+2)
@@ -90,6 +101,8 @@ func TestHoverAndSignatureHelpForGUI(t *testing.T) {
 		{"save.onClick(", "(handler: Function() -> Nothing) -> Nothing"},
 		{"window.onKey(", "(handler: Function(String) -> Nothing) -> Nothing"},
 		{"canvas.onClick(", "(handler: Function(Real, Real) -> Nothing) -> Nothing"},
+		{"save.setBackground(", "(color: String) -> Nothing"},
+		{"save.setEnabled(", "(enabled: Bool) -> Nothing"},
 	} {
 		help, ok := store.SignatureHelp(path, offsetOf(t, guiSource, testCase.call)+len(testCase.call))
 		if !ok || help.Label != testCase.want {

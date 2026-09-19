@@ -10,6 +10,7 @@ import (
 	"runtime"
 	"time"
 
+	"ahdcode/internal/backend/golang/ahdruntime"
 	"ahdcode/internal/ir"
 	"ahdcode/internal/plotproto"
 )
@@ -434,14 +435,18 @@ func (session *Session) plotSaveChart(receiver any, path string) any {
 	return Nothing
 }
 
+// plotShowChart renders the Chart exactly as save() would and opens it in
+// AhdCode's interactive viewer, through the same runtime native programs use.
 func (session *Session) plotShowChart(receiver any) any {
 	chart := session.chartOf(receiver)
+	session.plotCheck(ahdruntime.AhdPlotShowSizeProblem(chart.width, chart.height))
 	path := session.plotTempImagePath()
+	defer os.Remove(path)
 	session.plotRenderRequest(plotproto.Request{
 		OutputPath: path, Width: int(chart.width), Height: int(chart.height),
 		Rows: 1, Columns: 1, Charts: []plotproto.ChartSpec{plotChartSpec(chart)},
 	})
-	session.plotOpen(path)
+	session.plotCheck(ahdruntime.AhdPlotView(path, chart.title))
 	return Nothing
 }
 
@@ -453,12 +458,15 @@ func (session *Session) plotSaveFigure(receiver any, path string) any {
 	return Nothing
 }
 
+// plotShowFigure renders the Figure as one image and opens it in the viewer.
 func (session *Session) plotShowFigure(receiver any) any {
 	rows, columns, charts := session.figureOf(receiver)
-	path := session.plotTempImagePath()
 	width, height := plotFigureDefaultSize(rows, columns)
+	session.plotCheck(ahdruntime.AhdPlotShowSizeProblem(int64(width), int64(height)))
+	path := session.plotTempImagePath()
+	defer os.Remove(path)
 	session.plotRenderRequest(session.plotFigureRequest(rows, columns, charts, path, width, height))
-	session.plotOpen(path)
+	session.plotCheck(ahdruntime.AhdPlotView(path, ""))
 	return Nothing
 }
 
@@ -599,36 +607,9 @@ func (session *Session) plotRenderRequest(request plotproto.Request) {
 	}
 }
 
-func (session *Session) plotOpen(path string) {
-	if err := plotOpenViewer(path); err != nil {
-		session.raise("PlotError", "opening chart viewer: "+err.Error())
+// plotCheck raises a PlotError for a Plot runtime problem.
+func (session *Session) plotCheck(problem string) {
+	if problem != "" {
+		session.raise("PlotError", problem)
 	}
-}
-
-// plotOpenViewer opens an image with the platform's standard image-opening
-// mechanism, passing the path as an argument rather than through a shell
-// string. A short timeout keeps a headless environment (no handler
-// registered) from hanging.
-//
-// Windows deliberately does not go through "cmd /c start": cmd.exe re-scans
-// its whole command line for its own metacharacters (&, |, ^, %, and so on)
-// after argv-level quoting has already happened, so a path containing one of
-// those could be reinterpreted as shell syntax even though it arrived as a
-// single, properly quoted argument. rundll32's url.dll,FileProtocolHandler
-// entry point invokes the same file-association mechanism "start" uses,
-// without a cmd.exe shell in between -- the same technique common Go
-// "open in browser" helpers use for this exact reason.
-func plotOpenViewer(path string) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	var command *exec.Cmd
-	switch runtime.GOOS {
-	case "darwin":
-		command = exec.CommandContext(ctx, "open", path)
-	case "windows":
-		command = exec.CommandContext(ctx, "rundll32", "url.dll,FileProtocolHandler", path)
-	default:
-		command = exec.CommandContext(ctx, "xdg-open", path)
-	}
-	return command.Run()
 }

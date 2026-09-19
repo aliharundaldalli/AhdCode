@@ -97,6 +97,16 @@ func (generator *generator) guiOperation(name string, value *ir.CallExpr) string
 		return "AhdGUICheckedChecked(" + handle + ")"
 	case "Checkbox.setChecked":
 		return check("AhdGUISetChecked(" + handle + ", " + flag(0, "false") + ")")
+	case "Window.setBackground":
+		return check("AhdGUIWindowSetBackground(" + handle + ", " + arguments.text(0, `""`) + ")")
+	case "Container.setBackground", "Label.setBackground", "Button.setBackground", "TextInput.setBackground", "Checkbox.setBackground":
+		return check("AhdGUISetColor(" + handle + `, "background", ` + arguments.text(0, `""`) + ")")
+	case "Label.setForeground", "Button.setForeground", "TextInput.setForeground", "Checkbox.setForeground":
+		return check("AhdGUISetColor(" + handle + `, "foreground", ` + arguments.text(0, `""`) + ")")
+	case "Button.setEnabled", "TextInput.setEnabled", "Checkbox.setEnabled":
+		return check("AhdGUISetEnabled(" + handle + ", " + flag(0, "true") + ")")
+	case "Button.isEnabled", "TextInput.isEnabled", "Checkbox.isEnabled":
+		return "AhdGUIIsEnabledChecked(" + handle + ")"
 	}
 	return generator.unsupported("GUI operation "+name, meta.Span)
 }

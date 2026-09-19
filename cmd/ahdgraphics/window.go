@@ -6,6 +6,8 @@ import (
 	"math"
 	"sync"
 
+	"ahdidentity"
+
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 )
@@ -33,7 +35,11 @@ type window struct {
 }
 
 func (w *window) Update() error {
-	w.readyOnce.Do(func() { close(w.ready) })
+	w.readyOnce.Do(func() {
+		close(w.ready)
+		// The window is up: finish AhdCode's application identity.
+		ahdidentity.Apply()
+	})
 	if w.session.closeRequested.Load() {
 		return ebiten.Termination
 	}
@@ -122,6 +128,7 @@ func runWindow(s *session) error {
 	ebiten.SetWindowSize(m.width, m.height)
 	ebiten.SetWindowResizingMode(ebiten.WindowResizingModeDisabled)
 	ebiten.SetRunnableOnUnfocused(true)
+	ahdidentity.Prepare()
 	ebiten.SetTPS(30)
 
 	served := make(chan struct{})

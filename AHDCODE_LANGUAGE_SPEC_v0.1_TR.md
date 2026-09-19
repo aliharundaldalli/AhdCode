@@ -5172,15 +5172,13 @@ chart.show() -> Nothing
 figure.show() -> Nothing
 ```
 
-`show()`, AhdCode'a özgü bir geçici alanda benzersiz bir geçici PNG'ye
-render eder ve onu platformun standart görüntü açma mekanizmasıyla açar
-(macOS'ta `open`, Linux'ta `xdg-open`, Windows'ta dosya ilişkilendirme
-mekanizması);
-böylece bir grafiği incelemek asla elle kaydedip dosyayı bulmayı
-gerektirmez. Geçici görüntü otomatik olarak silinmez, çünkü harici
-görüntüleyici `show()` döndükten sonra da onu okumaya devam eder. `show()`
-bir masaüstü oturumu gerektirir; başsız (headless) bir ortam, askıda kalmak
-yerine temiz bir şekilde `PlotError` ile başarısız olur.
+`show()`, grafiği tam olarak `save()`'in yapacağı gibi AhdCode'a özgü bir
+geçici alandaki geçici bir PNG'ye render eder ve AhdCode'un kendi etkileşimli
+görüntüleyicisinde açar (bölüm 86; v1.9.0'dan önce platformun
+görüntüleyicisi açıyordu). Görüntüleyici
+önizlemeyi okuduktan sonra siler ve `show()`, görüntüleyici penceresi
+açılınca döner. `show()` bir masaüstü oturumu gerektirir; oturum ya da
+paketli görüntüleyici yoksa `PlotError` fırlatır.
 
 ### 56.7 Subplot'lar
 
@@ -6893,6 +6891,74 @@ veya çalışan yürütülebilir dosyanın yanındaki kurulum üzerinden bulunur
 `PATH` aranmaz. `AHDCODE_GUI_HEADLESS=1` her Window'u ekransız açar.
 Değerlendirici, `ahdcode run` ve yerel programlar bu çalışma zamanını
 paylaşır; `GUI` getirmeyen bir program önceki gibi davranır.
+
+## 85. GUI Renkleri, Etkinlik Durumu ve Pencere Kimliği (v1.9.0)
+
+Bölüm 83'ün GUI Class'ları şu üyeleri kazanır:
+
+```text
+Window.setBackground(color: String) -> Nothing
+Container.setBackground(color: String) -> Nothing
+Label.setForeground(color: String) -> Nothing      Label.setBackground(color: String) -> Nothing
+Button.setForeground(color: String) -> Nothing     Button.setBackground(color: String) -> Nothing
+TextInput.setForeground(color: String) -> Nothing  TextInput.setBackground(color: String) -> Nothing
+Checkbox.setForeground(color: String) -> Nothing   Checkbox.setBackground(color: String) -> Nothing
+Button.setEnabled(enabled: Bool) -> Nothing        Button.isEnabled() -> Bool
+TextInput.setEnabled(enabled: Bool) -> Nothing     TextInput.isEnabled() -> Bool
+Checkbox.setEnabled(enabled: Bool) -> Nothing      Checkbox.isEnabled() -> Bool
+```
+
+Bir renk, tam olarak Graphics yazımlarından biridir (bölüm 80): `black`,
+`white`, `red`, `green`, `blue`, `yellow`, `cyan`, `magenta`, `gray` (büyük/
+küçük harfe duyarlı), `#RRGGBB` veya `#RRGGBBAA`; başka her metin Graphics
+iletisiyle `GUIError` fırlatır. Bir rengi ayarlamak öncekinin yerine geçer;
+ayarlanmamış renkler v1.8 görünümünü korur. Renkler "source over" alfa
+karışımıyla birleşir: pencere varsayılan renginde opak başlar, Window'un arka
+planı bunun üzerine boyanır ve her Container ile bileşen oluşturulma
+sırasıyla üst öğesinin üzerine boyanır. Label ve Checkbox'ın arka planı tüm
+kutusunu doldurur; Button ve TextInput'unki varsayılan dolgunun yerine geçer.
+
+Her Button, TextInput ve Checkbox etkin başlar. Devre dışı bir bileşen tüm
+kullanıcı girdisini — tıklamalar, Enter ve Space, yazma ve başsız test
+betiği — yok sayar, odak alamaz (Tab onu atlar; odaktayken devre dışı
+bırakılan bileşen odağı kaybeder) ve soluk çizilir. `setText`,
+`setChecked`, `text` ve `checked` çalışmaya devam eder. `isEnabled` çalışma
+zamanından yanıt verir, Window kapandıktan sonra da; kapalı bir Window'da
+`setEnabled` ve her renk ayarlayıcı `GUIError` fırlatır. Görünürlük API'si
+yoktur. GUI yardımcı protokolü sürüm 2'dir.
+
+`ahdgui` ve `ahdgraphics` yardımcıları ile Plot görüntüleyicisi (bölüm 86)
+AhdCode uygulama kimliğini gösterir: Windows ve Linux'ta pencere simgesi
+olarak AhdCode simgesini, macOS'ta menü çubuğunda AhdCode adını ve Dock'ta
+AhdCode simgesini. macOS'taki ad çalışma zamanında LaunchServices üzerinden
+ayarlanır; bunu reddeden bir sistem yardımcının dosya adını korur. Kimlik
+kullanıcı programlarına hiçbir zaman uygulanmaz.
+
+## 86. Etkileşimli Plot Görüntüleyicisi (v1.9.0)
+
+`Chart.show` ve `Figure.show`, paketli `ahdplotview` yardımcısını `ahdplot`
+tarafından tam olarak `save()`'in render ettiği gibi render edilmiş bir PNG
+önizleme üzerinde başlatır. Yardımcı önizlemeyi tamamen okur, siler ve tek
+bir JSON satırıyla yanıt verir; `show()`, görüntüleyici hazır yanıtını
+verdiğinde `Nothing` döndürür, aksi hâlde (görüntüleyici eksik, ekran yok,
+bozuk önizleme veya zaman aşımı) `PlotError` fırlatır. Başka hiçbir
+uygulama başlatılmaz. Bir kenarı 6144 birimden büyük bir grafik render
+edilmeden önce `PlotError` fırlatır; görüntüleyici bir kenarda en fazla 8192
+piksel gösterir.
+
+Görüntüleyici yalnızca kendi görünümünü değiştirir: fare tekerleği imlecin
+çevresinde sığdırılmış yakınlaştırmanın dörtte biri ile %1600 arasında
+yakınlaştırır, sol tuşla sürüklemek kaydırır, Q ve E görünümü saat yönünün
+tersine ve saat yönünde çeyrek tur döndürür, R döndürmesiz, sığdırılmış ve
+ortalanmış görünüme sıfırlar, Escape kapatır. Çizilen görüntünün pencereden
+küçük olduğu eksende görüntü ortalanır; büyük olduğu eksende pencereyi her
+zaman kaplar. Görünüm durumu hiçbir zaman bir Chart'ın veya Figure'ın
+parçası değildir ve `save()`'i asla etkilemez. Görüntüleyici `show()`
+çağrısından ve programdan uzun yaşar; her çağrı kendi görüntüleyicisini
+açar. Yardımcı ağ kullanmaz, komut çalıştırmaz ve önizlemesi dışında dosya
+okumaz. `AHDCODE_PLOTVIEW_RUNTIME`, derleyicinin kaydettiği konum veya
+çalışan yürütülebilir dosyanın yanındaki kurulum üzerinden bulunur; `PATH`
+aranmaz.
 
 ---
 

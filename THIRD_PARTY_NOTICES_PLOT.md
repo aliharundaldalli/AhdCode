@@ -6,6 +6,10 @@ is statically linked and under which terms. Every license below is
 permissive; none imposes copyleft obligations on AhdCode or on programs
 compiled with it.
 
+`Chart.show` and `Figure.show` open the rendered chart in AhdCode's own
+interactive viewer, the bundled `ahdplotview` helper; its window library and
+font are listed in `THIRD_PARTY_NOTICES_GUI.md`.
+
 1. Gonum plot
    Project : https://github.com/gonum/plot
    License : BSD 3-Clause ("Copyright (c) 2013, The Gonum Authors. All

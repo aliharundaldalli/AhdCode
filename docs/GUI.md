@@ -72,6 +72,20 @@ TextInput.text() -> String          TextInput.setText(text: String) -> Nothing
 Checkbox.checked() -> Bool          Checkbox.setChecked(checked: Bool) -> Nothing
 ```
 
+Added in v1.9.0 (see [Colors](#colors) and [Enabled state](#enabled-state)):
+
+```text
+Window.setBackground(color: String) -> Nothing
+Container.setBackground(color: String) -> Nothing
+Label.setForeground(color: String)      Label.setBackground(color: String)
+Button.setForeground(color: String)     Button.setBackground(color: String)
+TextInput.setForeground(color: String)  TextInput.setBackground(color: String)
+Checkbox.setForeground(color: String)   Checkbox.setBackground(color: String)
+Button.setEnabled(enabled: Bool)        Button.isEnabled() -> Bool
+TextInput.setEnabled(enabled: Bool)     TextInput.isEnabled() -> Bool
+Checkbox.setEnabled(enabled: Bool)      Checkbox.isEnabled() -> Bool
+```
+
 `GUIError` derives from `Error`. None of the Classes has a constructor: a
 Window comes from `GUI.window`, a Container from `column` or `row`, and every
 widget from a Container. Every call is entirely positional or entirely named.
@@ -205,11 +219,77 @@ modifier API, or key-repeat setting.
 character. A program that reacts to letters in `onKey` should keep that in
 mind; Escape, the arrows, and Enter are the usual choices.
 
+## Colors
+
+> Added in v1.9.0.
+
+Colors are explicit, not a styling framework: a Window and a Container have a
+background, and a Label, Button, TextInput, and Checkbox have a foreground
+(their text) and a background.
+
+```ahd
+bring GUI
+from GUI bring (Window, Container, Label, Button)
+
+window: Window := GUI.window(title: "Colors", width: 360, height: 160)
+window.setBackground("#EEF2F7")
+form: Container := window.column(spacing: 10, padding: 16)
+title: Label := form.label("New order")
+title.setForeground("#1F4E79")
+save: Button := form.button("Save")
+save.setForeground("white")
+save.setBackground("#2E7D32")
+window.wait()
+```
+
+A color is spelled exactly as in [Graphics](GRAPHICS.md): one of the nine
+lower-case names `black`, `white`, `red`, `green`, `blue`, `yellow`, `cyan`,
+`magenta`, and `gray`, or `#RRGGBB`, or `#RRGGBBAA` (hex digits in either
+case). Anything else — `"Red"`, `"purple"`, `"#fff"`, an empty text — is a
+`GUIError`; no other color is substituted. Setting a color again replaces it.
+
+- Where no color is set, everything looks exactly as in v1.8.
+- A Button's own background replaces its gray fill; while it is held down it
+  is drawn 15% darker. A TextInput's background replaces its white field. A
+  Label's and a Checkbox's background fills its whole row box; the
+  Checkbox's square keeps its own look.
+- The placeholder of an empty TextInput stays gray, and focus outlines stay
+  blue.
+- `#RRGGBBAA` colors blend with normal "source over" compositing: the window
+  starts opaque in its default light gray, the Window's background is
+  painted over it, and every Container and widget is painted over its parent
+  in creation order. The window itself is never transparent.
+
+Changing a color on a closed Window is a `GUIError`.
+
+## Enabled state
+
+> Added in v1.9.0.
+
+A Button, TextInput, or Checkbox can be disabled. Every widget starts
+enabled; Labels and Containers have no enabled state.
+
+- A disabled Button cannot be clicked or activated with Enter or Space, so
+  its `onClick` callback does not run.
+- A disabled TextInput ignores typing and editing keys.
+- A disabled Checkbox cannot be toggled by a click or Space.
+- A disabled widget cannot take the focus: clicking it moves the focus
+  nowhere, Tab skips it, and a focused widget that is disabled loses the
+  focus.
+- The program can still change a disabled widget: `setText` and
+  `setChecked` work, and `text()` and `checked()` read it.
+- A disabled widget is drawn as usual and then faded toward the window's
+  default color.
+
+`isEnabled()` reports the state, also after the Window closed; `setEnabled`
+on a closed Window is a `GUIError`. There is no visibility, hide, or show
+API.
+
 ## Errors
 
 `GUIError` is raised for GUI problems: an invalid window size, spacing, or
-padding, a second root Container, changes to a closed Window, a missing or
-failed `ahdgui` helper, and a malformed helper response. It is never used for
+padding, an unsupported color, a second root Container, changes to a closed
+Window, a missing or failed `ahdgui` helper, and a malformed helper response. It is never used for
 an error raised by a callback.
 
 ## How it works
@@ -230,16 +310,19 @@ or next to itself in an AhdCode installation; `PATH` is never searched.
 
 ## Platform notes
 
-- macOS: live-tested on this release's development Mac. The menu bar shows
-  the helper's name, `ahdgui`, while a Window is focused.
+- macOS: live-tested on this release's development Mac. From v1.9.0 the menu
+  bar shows **AhdCode** and the Dock shows the AhdCode icon while a Window is
+  focused (v1.8.0 showed the helper's name, `ahdgui`).
+- Windows and Linux: from v1.9.0 the window uses the AhdCode icon where the
+  system shows window icons.
 - Windows and Linux: the helper is compiled for both; a Linux desktop needs an
   X11 display (XWayland counts) and the system's OpenGL libraries.
 - Automated tests: `AHDCODE_GUI_HEADLESS=1` opens every Window without a
   display.
 
-## Not in v1.8
+## Not in v1.8 and v1.9
 
-GUI v1.8 has no table or grid widget, list box, drop-down, radio buttons,
+GUI v1.8 and v1.9 have no table or grid widget, list box, drop-down, radio buttons,
 tabs, tree, menus, toolbars, status bars, multi-line text, password fields,
 images or icons, clipboard, drag and drop, file or folder pickers, dialogs,
 scrolling, resizable windows, themes, styles, fonts, animations, drawing

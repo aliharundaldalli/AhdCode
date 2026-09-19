@@ -83,6 +83,7 @@ const (
 	fundamentalsRuntimeFileName    = "ahdcode_fundamentals_runtime.go"
 	helperLinkRuntimeFileName      = "ahdcode_helperlink_runtime.go"
 	guiRuntimeFileName             = "ahdcode_gui_runtime.go"
+	plotViewRuntimeFileName        = "ahdcode_plotview_runtime.go"
 )
 
 // storage describes the Go representation chosen for one IR symbol.
@@ -250,6 +251,7 @@ func Generate(compilation *ir.Compilation) (*GeneratedProgram, []diagnostics.Dia
 		{fundamentalsRuntimeFileName, ahdruntime.FundamentalsSource, "standard-library fundamentals"},
 		{helperLinkRuntimeFileName, ahdruntime.HelperLinkSource, "window helper link"},
 		{guiRuntimeFileName, ahdruntime.GUISource, "GUI"},
+		{plotViewRuntimeFileName, ahdruntime.PlotViewSource, "Plot viewer"},
 	} {
 		formattedShared, err := format.Source([]byte(strings.Replace(shared.source, "package ahdruntime", "package main", 1)))
 		if err != nil {

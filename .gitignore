@@ -9,6 +9,8 @@ editors/vscode/node_modules/
 /ahdgui
 cmd/ahdgraphics/ahdgraphics
 cmd/ahdgui/ahdgui
+/ahdplotview
+cmd/ahdplotview/ahdplotview
 
 # Benchmark test files
 speed*

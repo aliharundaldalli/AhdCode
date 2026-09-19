@@ -122,7 +122,8 @@ func (s *session) advance() {
 		case "toggle":
 			_ = s.model.toggle(step.Widget)
 		case "click":
-			if s.listensToClick(step.Widget) {
+			// A disabled Button ignores the user, scripted or not.
+			if s.listensToClick(step.Widget) && s.model.enabled(step.Widget) {
 				s.clicked(step.Widget)
 				return
 			}
@@ -178,6 +179,23 @@ func (s *session) handle(r request) (response, bool) {
 			err = errors.New("set needs text or checked")
 		}
 		if err != nil {
+			return response{Error: err.Error()}, false
+		}
+		return response{OK: true}, false
+	case "color":
+		value, ok := parseColor(r.Color)
+		if !ok {
+			return response{Error: "invalid color " + r.Color}, false
+		}
+		if err := s.model.setColor(r.Widget, r.Part, value); err != nil {
+			return response{Error: err.Error()}, false
+		}
+		return response{OK: true}, false
+	case "enabled":
+		if r.Enabled == nil {
+			return response{Error: "enabled needs a value"}, false
+		}
+		if err := s.model.setEnabled(r.Widget, *r.Enabled); err != nil {
 			return response{Error: err.Error()}, false
 		}
 		return response{OK: true}, false

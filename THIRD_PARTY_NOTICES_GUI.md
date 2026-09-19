@@ -1,25 +1,32 @@
-# AhdCode — Third-party notices for the GUI standard module
+# AhdCode — Third-party notices for the GUI module and the Plot viewer
 
 The AhdCode `GUI` standard module draws its windows through the bundled
-`ahdgui` helper (`libexec/ahdcode/ahdgui`). The helper is a separate executable
-built from its own Go module, `cmd/ahdgui`, so none of the libraries below is
-linked into the `ahdcode` CLI, into its runtime, or into any program compiled
-with AhdCode; a compiled program only starts the installed helper. Every
-license below is permissive.
+`ahdgui` helper (`libexec/ahdcode/ahdgui`), and `Chart.show`/`Figure.show` of
+the Plot standard module open the bundled interactive viewer `ahdplotview`
+(`libexec/ahdcode/ahdplotview`). Each helper is a separate executable built
+from its own Go module, `cmd/ahdgui` and `cmd/ahdplotview`, so none of the
+libraries below is linked into the `ahdcode` CLI, into its runtime, or into any
+program compiled with AhdCode; a compiled program only starts an installed
+helper. Every license below is permissive.
 
-The versions are frozen in `cmd/ahdgui/go.mod` and `go.sum` and change only
-through a deliberate AhdCode commit. They are the same versions the Graphics
-helper uses (see `THIRD_PARTY_NOTICES_GRAPHICS.md`), plus `golang.org/x/text`.
-The helper is built without cgo; it downloads nothing at run time, needs no
-package manager, and downloads no fonts.
+The versions are frozen in each module's `go.mod` and `go.sum` and change only
+through a deliberate AhdCode commit. Both helpers use exactly the same modules
+and versions; they are the Graphics helper's (see
+`THIRD_PARTY_NOTICES_GRAPHICS.md`) plus `golang.org/x/text`. The helpers are
+built without cgo; they download nothing at run time, need no package manager,
+and download no fonts or icons. The AhdCode name and icon they show come from
+AhdCode's own `cmd/ahdidentity` module (the icon is
+`editors/vscode/images/ahdcode-icon.png`, embedded unchanged), which is covered
+by AhdCode's MIT license and is not a third-party component.
 
 1. Ebitengine v2.10.2 (`github.com/hajimehoshi/ebiten/v2`)
    Project : https://github.com/hajimehoshi/ebiten
    License : Apache License 2.0
    Use     : opens the window, reads the mouse and keyboard, and shows the
-             image `ahdgui` draws. The widgets, layout, and text editing are
-             AhdCode's own code; Ebitengine's sprite, audio, text, and game
-             features are not used. Ebitengine's own `NOTICE.md`, which
+             image `ahdgui` draws or the chart `ahdplotview` shows. The
+             widgets, layout, text editing, and viewer controls are AhdCode's
+             own code; Ebitengine's sprite, audio, text, and game features
+             are not used. Ebitengine's own `NOTICE.md`, which
              reproduces the licenses of the code it bundles (including GLFW
              under the zlib license), is included in the module license
              inventory beside its `LICENSE`.

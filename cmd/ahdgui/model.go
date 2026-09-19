@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"image/color"
 	"sync"
 	"unicode/utf8"
 )
@@ -46,14 +47,28 @@ type widget struct {
 	caret  int // TextInput caret position in runes
 	scroll int // TextInput horizontal scroll in logical pixels
 
+	// foreground and background are the program's colors; nil keeps the
+	// default look. disabled Buttons, TextInputs, and Checkboxes ignore the
+	// user and cannot take the focus.
+	foreground *color.NRGBA
+	background *color.NRGBA
+	disabled   bool
+
 	// Layout, in logical pixels, relative to the window's top-left.
 	x, y, w, h int
 }
 
 func (w *widget) container() bool { return w.kind == kindColumn || w.kind == kindRow }
 
-func (w *widget) focusable() bool {
+// interactive reports whether the widget can be enabled and disabled.
+func (w *widget) interactive() bool {
 	return w.kind == kindButton || w.kind == kindTextInput || w.kind == kindCheckbox
+}
+
+// focusable reports whether the widget can take the focus: an enabled
+// Button, TextInput, or Checkbox.
+func (w *widget) focusable() bool {
+	return w.interactive() && !w.disabled
 }
 
 // model is the whole window state. mu guards it: the protocol goroutine
@@ -71,6 +86,8 @@ type model struct {
 	pressed int64
 	dirty   bool
 	measure func(text string) int
+	// background is the Window's color; nil keeps the default.
+	background *color.NRGBA
 }
 
 func newModel(title string, width, height int, measure func(string) int) *model {
@@ -196,6 +213,77 @@ func (m *model) values() []value {
 	return result
 }
 
+// Color parts.
+const (
+	partForeground = "foreground"
+	partBackground = "background"
+)
+
+// setColor sets one color. Widget 0 is the Window, which has a background
+// only; a Container has a background only; every other widget has both.
+func (m *model) setColor(id int64, part string, value color.NRGBA) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if part != partForeground && part != partBackground {
+		return errors.New("unknown color part " + part)
+	}
+	if id == 0 {
+		if part != partBackground {
+			return errWrongKind
+		}
+		m.background = &value
+		m.dirty = true
+		return nil
+	}
+	target := m.widgets[id]
+	if target == nil {
+		return errNoWidget
+	}
+	if target.container() && part != partBackground {
+		return errWrongKind
+	}
+	if part == partForeground {
+		target.foreground = &value
+	} else {
+		target.background = &value
+	}
+	m.dirty = true
+	return nil
+}
+
+// setEnabled enables or disables a Button, TextInput, or Checkbox. A widget
+// that is disabled while it has the focus loses it.
+func (m *model) setEnabled(id int64, enabled bool) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	target := m.widgets[id]
+	if target == nil {
+		return errNoWidget
+	}
+	if !target.interactive() {
+		return errWrongKind
+	}
+	target.disabled = !enabled
+	if target.disabled {
+		if m.focus == id {
+			m.focus = 0
+		}
+		if m.pressed == id {
+			m.pressed = 0
+		}
+	}
+	m.dirty = true
+	return nil
+}
+
+// enabled reports whether a widget accepts user input.
+func (m *model) enabled(id int64) bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	target := m.widgets[id]
+	return target != nil && !target.disabled
+}
+
 func (m *model) setTitle(title string) {
 	m.mu.Lock()
 	m.title = title
@@ -287,11 +375,10 @@ func (m *model) press(x, y int) {
 	defer m.mu.Unlock()
 	m.layout()
 	id := m.hit(x, y)
-	m.pressed = id
+	m.pressed = 0
+	m.focus = 0
 	if id != 0 && m.widgets[id].focusable() {
-		m.focus = id
-	} else {
-		m.focus = 0
+		m.pressed, m.focus = id, id
 	}
 	m.dirty = true
 }
@@ -326,8 +413,8 @@ func (m *model) activate(id int64) int64 {
 	return 0
 }
 
-// focusNext moves the focus to the next Button, TextInput, or Checkbox in
-// creation order, wrapping around.
+// focusNext moves the focus to the next enabled Button, TextInput, or
+// Checkbox in creation order, wrapping around; disabled widgets are skipped.
 func (m *model) focusNext() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -354,7 +441,7 @@ func (m *model) activateFocused(space bool) int64 {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	target := m.widgets[m.focus]
-	if target == nil {
+	if target == nil || target.disabled {
 		return 0
 	}
 	switch {
@@ -369,7 +456,7 @@ func (m *model) activateFocused(space bool) int64 {
 // focusedInput is the focused TextInput, or nil. The caller holds m.mu.
 func (m *model) focusedInput() *widget {
 	target := m.widgets[m.focus]
-	if target == nil || target.kind != kindTextInput {
+	if target == nil || target.kind != kindTextInput || target.disabled {
 		return nil
 	}
 	return target
@@ -432,11 +519,15 @@ func (m *model) edit(key string) bool {
 func (m *model) typeInto(id int64, text string) error {
 	m.mu.Lock()
 	target := m.widgets[id]
-	m.mu.Unlock()
 	if target == nil || target.kind != kindTextInput {
+		m.mu.Unlock()
 		return errWrongKind
 	}
-	m.mu.Lock()
+	if target.disabled {
+		// A disabled TextInput ignores the user, scripted or not.
+		m.mu.Unlock()
+		return nil
+	}
 	previous := m.focus
 	m.focus = id
 	m.mu.Unlock()
@@ -455,6 +546,8 @@ func (m *model) toggle(id int64) error {
 	if target == nil || target.kind != kindCheckbox {
 		return errWrongKind
 	}
-	m.activate(id)
+	if !target.disabled {
+		m.activate(id)
+	}
 	return nil
 }

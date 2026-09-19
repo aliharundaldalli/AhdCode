@@ -18,10 +18,18 @@ def build(target,output,goos,arch,ldflags='-buildid=',module=None):
  print('Building',goos,arch,target,flush=True)
  run(['nice','-n','10','go','build','-trimpath','-ldflags='+ldflags,'-o',output,target],cwd=module or R,env=env)
  time.sleep(4)
-# The Graphics and GUI window helpers are their own Go modules, so their window
-# and rendering dependencies never enter the compiler's module graph.
+# The Graphics and GUI window helpers and the interactive Plot viewer are their
+# own Go modules, so their window and rendering dependencies never enter the
+# compiler's module graph. They share AhdCode's own cmd/ahdidentity module (the
+# AhdCode name and icon) through a local replace directive.
 GRAPHICS=R/'cmd/ahdgraphics'
 GUI=R/'cmd/ahdgui'
+PLOTVIEW=R/'cmd/ahdplotview'
+def first_party(m):
+ # A module replaced by a directory inside this repository is AhdCode's own
+ # code, covered by LICENSE, not a third-party dependency.
+ target=(m.get('Replace') or {}).get('Path','')
+ return target.startswith('../') or target.startswith('./')
 def helper_modules(module):
  raw=subprocess.check_output(['go','list','-m','-json','all'],cwd=module,text=True);decoder=json.JSONDecoder();found=[]
  while raw.strip():m,end=decoder.raw_decode(raw.lstrip());found.append(m);raw=raw.lstrip()[end:]
@@ -183,15 +191,16 @@ def main():
    target=payload/('bin' if name=='ahdcode' else 'libexec/ahdcode')/(name+suffix);build('./cmd/'+name,target,goos,arch)
   build('.',payload/'libexec/ahdcode'/('ahdgraphics'+suffix),goos,arch,module=GRAPHICS)
   build('.',payload/'libexec/ahdcode'/('ahdgui'+suffix),goos,arch,module=GUI)
+  build('.',payload/'libexec/ahdcode'/('ahdplotview'+suffix),goos,arch,module=PLOTVIEW)
   if goos=='windows':
    # The stable launcher lives beside the release it activates; setup copies it
    # to <root>\bin\ahdcode.exe, the one directory that goes on PATH.
    (payload/'launcher').mkdir();build('./tooling/distribution/windows/launcher',payload/'launcher/ahdcode.exe',goos,arch)
   seen={(m['Path'],m.get('Version')) for m in modules}
   helpers=[]
-  for module in [GRAPHICS,GUI]:
+  for module in [GRAPHICS,GUI,PLOTVIEW]:
    for m in helper_modules(module):
-    if (m['Path'],m.get('Version')) not in seen and not m.get('Main'):seen.add((m['Path'],m.get('Version')));helpers.append(m)
+    if (m['Path'],m.get('Version')) not in seen and not m.get('Main') and not first_party(m):seen.add((m['Path'],m.get('Version')));helpers.append(m)
   licenses(payload,modules+helpers)
   shutil.copytree(R/'internal/initweb/docbundle',payload/'docs')
   if a.vsix:
@@ -232,7 +241,7 @@ def main():
     extra=a.output/('AhdCode-'+version+'-'+label+'.zip');zip_tree(staging,extra,'AhdCode-'+version)
    else:
     with tarfile.open(artifact,'w:gz') as t:t.add(staging,arcname='AhdCode-'+version)
-  records.append({'filename':artifact.name,'size':artifact.stat().st_size,'sha256':sha(artifact),'platform':goos,'architecture':arch,'components':['CLI','Studio (embedded)','starters (embedded)','English docs','Go '+go['version'],'ahdsqlite','ahdnumeric','ahdplot','ahdgraphics','ahdgui','Tectonic '+latex['tectonic_version']+' offline']+(['VS Code extension '+vsix_version] if vsix_version else [])+(['graphical per-user setup','stable ahdcode.exe launcher'] if goos=='windows' else []),'notices':'payload/THIRD_PARTY_NOTICES.md'})
+  records.append({'filename':artifact.name,'size':artifact.stat().st_size,'sha256':sha(artifact),'platform':goos,'architecture':arch,'components':['CLI','Studio (embedded)','starters (embedded)','English docs','Go '+go['version'],'ahdsqlite','ahdnumeric','ahdplot','ahdgraphics','ahdgui','ahdplotview','Tectonic '+latex['tectonic_version']+' offline']+(['VS Code extension '+vsix_version] if vsix_version else [])+(['graphical per-user setup','stable ahdcode.exe launcher'] if goos=='windows' else []),'notices':'payload/THIRD_PARTY_NOTICES.md'})
   print('ARTIFACT',artifact,records[-1]['sha256'],flush=True)
   if extra is not None:
    companion=dict(records[-1]);companion['filename']=extra.name;companion['size']=extra.stat().st_size;companion['sha256']=sha(extra)

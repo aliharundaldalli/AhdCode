@@ -12,21 +12,22 @@ AhdCode; okunabilir sözdizimi, açık niyet (explicit intent), öngörülebilir
 anlambilim (semantics) ve yerel (native) derlemeye odaklanan, deneysel,
 statik olarak denetlenen genel amaçlı bir programlama dilidir.
 
-Bu, **v1.8.0**'dır. Dil, araç zinciri ve Web çatısı özellik olarak
+Bu, **v1.9.0**'dır. Dil, araç zinciri ve Web çatısı özellik olarak
 tamamlanmıştır; burada anlatılan çekirdek dil yüzeyi 1.0'ın taahhüt ettiği ve
-1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7 ile 1.8'in değiştirmeden koruduğu yüzeydir.
+1.1'den 1.9'a kadarki sürümlerin değiştirmeden koruduğu yüzeydir.
 
-v1.8.0 bir ara (minor) sürümdür, **GUI Temelleri + Asgari Olaylar**: Column ve
-Row'larla yerleştirilen Label, Button, tek satırlık TextInput ve Checkbox
-bileşenleriyle küçük masaüstü pencereleri için `GUI` modülünü, GUI pencereleri
-ve Graphics Canvas'ları için tıklama ve tuş geri çağırmalarını ve Vector,
-Matrix, DateTime, Duration ile Table için okunabilir `str` ve `write` çıktısını
-ekler; yeni sözdizimi eklemez ve tip sistemini değiştirmez. Bkz.
-[v1.8.0 ile gelenler](#v180-ile-gelenler).
+v1.9.0 bir ara (minor) sürümdür, **Masaüstü İnceltmeleri + Etkileşimli Plot**:
+`show()` bir Chart'ı veya Figure'ı AhdCode'un kendi etkileşimli
+görüntüleyicisinde yakınlaştırma, kaydırma, sıfırlama ve görünüm döndürme ile
+açar — bu etkileşimler yalnızca görüntüleyiciyi değiştirir, grafiği veya dışa
+aktarılan dosyaları asla değiştirmez —, GUI temel renkler ve etkinlik durumu
+kazanır ve AhdCode pencereleri AhdCode adını ve simgesini taşır; yeni
+sözdizimi eklemez ve tip sistemini değiştirmez. Bkz.
+[v1.9.0 ile gelenler](#v190-ile-gelenler).
 
 Ürün, kendi kendine yeten bir platform paketi olarak dağıtılır: `ahdcode` CLI,
 özel Go 1.27.0 araç zinciri, AhdDataStudio, `ahdsqlite`, `ahdnumeric`, `ahdplot`,
-`ahdgraphics` ve `ahdgui` yardımcıları, sabitlenmiş kaynak paketiyle çevrimdışı Tectonic LaTeX
+`ahdgraphics` ve `ahdgui` yardımcıları, etkileşimli Plot görüntüleyicisi `ahdplotview`, sabitlenmiş kaynak paketiyle çevrimdışı Tectonic LaTeX
 motoru, Web starter'ları ve bu sürüme ait İngilizce belge paketi.
 Bkz. [Kurulum](docs/INSTALLATION_TR.md).
 
@@ -349,9 +350,10 @@ cd AhdCode
 go install ./cmd/ahdcode ./cmd/ahdnumeric ./cmd/ahdplot ./cmd/ahdsqlite
 go -C cmd/ahdgraphics install .
 go -C cmd/ahdgui install .
+go -C cmd/ahdplotview install .
 ```
 
-Yukarıdaki komutlar derleyiciyi ve yerel numeric, plot, SQLite, Graphics pencere ve GUI pencere yardımcılarını (helpers) kurar. Graphics ve GUI yardımcıları kendi Go modülleri olduğundan `go -C cmd/ahdgraphics install .` ve `go -C cmd/ahdgui install .` ile kurulur.
+Yukarıdaki komutlar derleyiciyi ve yerel numeric, plot, SQLite, Graphics pencere ve GUI pencere yardımcılarını (helpers) ve etkileşimli Plot görüntüleyicisini kurar. Bu pencere yardımcıları kendi Go modülleri olduğundan `go -C cmd/ahdgraphics install .`, `go -C cmd/ahdgui install .` ve `go -C cmd/ahdplotview install .` ile kurulur.
 Eğer `Latex` modülünü **veya** `PDF` modülünün `.save()` metodunu kullanmayı
 planlıyorsanız (ikisi de aynı çevrimdışı render motorunu paylaşır),
 çevrimdışı (offline) Latex/Tectonic çalışma zamanını da hazırlamanız (stage)
@@ -484,6 +486,7 @@ bakın.
 - [v1.4 gerçek zamanlı yoklama](examples/v1.4/realtime_attendance/README_TR.md) — Web, PostgreSQL, WebSocket, UUID v7, `Env.secret` ve Cron
 - [v1.5 Terminal tanıtımı](examples/v1.5/terminal_demo/README_TR.md) — `Terminal.emit`, standart hata, terminal tespiti, biçimli metin ve okunabilir düzen
 - [v1.7 standart kütüphane tamamlama](examples/v1.7/README_TR.md) — trigonometri ve ebob/ekok, katı ISO zaman metni ve an aritmetiği, istatistikli Table join
+- [v1.9 GUI renkleri ve etkileşimli Plot](examples/v1.9/README_TR.md) — renkli ve devre dışı Kaydet düğmeli bir sipariş formu ile AhdCode'un kendi görüntüleyicisinde bir grafik
 - [v1.8 GUI ve olaylar](examples/v1.8/README_TR.md) — SQLite destekli küçük bir GUI defteri ve ok tuşları ile tıklamalarla yönetilen Turtle
 - [v1.6 Graphics ve Turtle](examples/v1.6/graphics_turtle/README_TR.md) — Kartezyen Canvas, şekiller, Turtle ile yıldız ve spiral, PNG/SVG kaydı ve düzgün çokgen dersi
 - [AhdDataStudio](tools/AhdDataStudio/README_TR.md) — yerel MySQL + SQLite geliştirme arayüzü
@@ -503,6 +506,35 @@ VS Code hem de Antigravity'i hedefler.
 [Kurulum rehberine](editors/vscode/README_TR.md) bakın.
 
 ## Mevcut sınırlamalar
+
+## v1.9.0 ile gelenler <a id="v190-ile-gelenler"></a>
+
+v1.9.0 bir **ara (minor)** sürümdür, **Masaüstü İnceltmeleri + Etkileşimli
+Plot**. `show()`'un bir grafiği sunma biçimini değiştirir, GUI'ye renkler ve
+etkinlik durumu ekler ve AhdCode'un kendi pencerelerini adlandırır; çekirdek
+dilbilgisi ve tip sistemi değişmez.
+
+- [`Plot`](docs/PLOT_TR.md): `chart.show()` ve `figure.show()`, işletim
+  sisteminin görüntüleyicisi yerine AhdCode'un kendi etkileşimli
+  görüntüleyicisini açar: imleç çevresinde yakınlaştırmak için kaydırın,
+  kaydırmak için sürükleyin, görünümü çeyrek tur döndürmek için Q/E,
+  sıfırlamak için R, kapatmak için Escape. Bu etkileşimler yalnızca
+  görüntüleyiciyi değiştirir; Chart'ı veya Figure'ı, verilerini ya da dışa
+  aktarılan PNG, SVG veya PDF dosyalarını değiştirmez. `save()` değişmez.
+- [`GUI`](docs/GUI_TR.md): temel renkler — Window ve Container'da
+  `setBackground`, Label, Button, TextInput ve Checkbox'ta
+  `setForeground`/`setBackground`; Graphics renkleri gibi yazılır — ve
+  Button, TextInput ve Checkbox için etkinlik durumu
+  (`setEnabled`/`isEnabled`). AhdCode GUI; formlar, yardımcı araçlar ve
+  eğitim amaçlı masaüstü uygulamaları için bilinçli olarak küçük bir araç
+  takımı olarak kalır.
+- GUI, Graphics ve Plot görüntüleyici pencereleri AhdCode adını ve simgesini
+  gösterir: macOS'ta menü çubuğunda **AhdCode**'u ve Dock'ta AhdCode
+  simgesini, Windows ve Linux'ta sistemin gösterdiği yerlerde pencere
+  simgesini. Bu, AhdCode'un kendi pencerelerini adlandırır; kullanıcı
+  programlarını paketlemez.
+
+Bkz. [v1.9 örnekleri](examples/v1.9/README_TR.md).
 
 ## v1.8.0 ile gelenler <a id="v180-ile-gelenler"></a>
 
@@ -768,6 +800,8 @@ cmd/ahdnumeric/      paketli ileri doğrusal-cebir yardımcısı
 cmd/ahdplot/         paketli grafik render yardımcısı
 cmd/ahdgraphics/     paketli Graphics pencere yardımcısı (kendi Go modülü)
 cmd/ahdgui/          paketli GUI pencere yardımcısı (kendi Go modülü)
+cmd/ahdplotview/     paketli etkileşimli Plot görüntüleyicisi (kendi Go modülü)
+cmd/ahdidentity/     pencere yardımcılarının ortak AhdCode adı ve simgesi
 cmd/ahdsqlite/       paketli CGO'suz SQLite yardımcısı
 internal/            derleyici ön yüzü, arka yüzü, çalışma zamanı, biçimlendirici, LSP ve REPL
 internal/framework/  paketli birinci taraf Web çatısı kaynağı

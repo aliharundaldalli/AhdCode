@@ -75,6 +75,20 @@ attempt {
 } except GUIError as error {
     write(error.message)
 }
+window.setBackground("#F0F4F8")
+form.setBackground(color: "white")
+status.setForeground("blue")
+status.setBackground("#FFFF0080")
+button.setForeground("white")
+button.setBackground("#0066CC")
+input.setForeground("black")
+input.setBackground("yellow")
+check.setForeground("red")
+check.setBackground("gray")
+button.setEnabled(false)
+input.setEnabled(enabled: false)
+check.setEnabled(true)
+enabled: Bool := button.isEnabled() and input.isEnabled() and check.isEnabled()
 window.close()
 `)
 	requireSemanticClean(t, result)
@@ -141,6 +155,25 @@ func TestGUIRejectsStaticMistakes(t *testing.T) {
 		`button.onClick(lambda () -> 1)`,
 		`window.onKey(lambda (key: String) -> key)`,
 		`canvas.onClick(lambda (x: Real, y: Real) -> x + y)`,
+		// v1.9 colors and enabled state: exact shapes, and only where they apply.
+		`window.setForeground("red")`,
+		`window.setEnabled(false)`,
+		`form.setForeground("red")`,
+		`form.setEnabled(false)`,
+		`status.setEnabled(false)`,
+		`status.isEnabled()`,
+		`button.setBackground(1)`,
+		`button.setBackground()`,
+		`button.setBackground("red", "blue")`,
+		`button.setEnabled("yes")`,
+		`button.setEnabled()`,
+		`count: Int := button.isEnabled()`,
+		`result: Int := button.setBackground("red")`,
+		`button.setVisible(false)`,
+		`button.setFont("x")`,
+		`button.setStyle("x")`,
+		`window.setTheme("dark")`,
+		`input.setPlaceholderColor("gray")`,
 	} {
 		requireSemanticFailure(t, analyzeWithStandardModules(t, guiPreamble+source+"\n"))
 	}

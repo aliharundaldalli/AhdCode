@@ -17,7 +17,8 @@ jackc/pgx with jackc/pgpassfile, jackc/pgservicefile, and jackc/puddle (MIT),
 coder/websocket (ISC), go-sqlite3 and its WASM component (MIT), gonum/plot
 (BSD), font and PDF dependencies, and the Graphics window helper's Ebitengine,
 purego, and hideconsole (Apache 2.0) with golang.org/x/image (BSD); see
-`THIRD_PARTY_NOTICES_GRAPHICS.md`. The GUI window helper uses the same
+`THIRD_PARTY_NOTICES_GRAPHICS.md`. The GUI window helper and the interactive Plot
+viewer (`ahdplotview`) use the same
 Ebitengine, purego, hideconsole, and golang.org/x/image versions, plus
 golang.org/x/text (BSD) and the Go fonts (BSD-style); see
 `THIRD_PARTY_NOTICES_GUI.md`. The PostgreSQL and WebSocket notices are

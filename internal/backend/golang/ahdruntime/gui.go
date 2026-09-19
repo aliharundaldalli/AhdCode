@@ -43,7 +43,7 @@ var AhdClassGUIError = &AhdClass{Name: "GUIError", Parent: AhdClassError}
 var AhdGUIRuntimeHint string
 
 const (
-	ahdGUIProtocolVersion = 1
+	ahdGUIProtocolVersion = 2
 	// AhdGUIMaxDimension bounds a Window's width and height.
 	AhdGUIMaxDimension  = 4096
 	ahdGUIMaxTitleRunes = 256
@@ -80,6 +80,9 @@ type ahdGUIRequest struct {
 	Checked     *bool  `json:"checked,omitempty"`
 	Spacing     int    `json:"spacing,omitempty"`
 	Padding     int    `json:"padding,omitempty"`
+	Part        string `json:"part,omitempty"`
+	Color       string `json:"color,omitempty"`
+	Enabled     *bool  `json:"enabled,omitempty"`
 }
 
 type ahdGUIValue struct {
@@ -128,10 +131,11 @@ type ahdGUIWindow struct {
 // Label and Button texts are kept here, because only the program changes
 // them.
 type ahdGUIWidget struct {
-	window int64
-	id     int64
-	kind   string
-	text   string
+	window   int64
+	id       int64
+	kind     string
+	text     string
+	disabled bool
 }
 
 var ahdGUI = struct {
@@ -496,6 +500,88 @@ func AhdGUISetTitle(handle int64, title string) string {
 	return problem
 }
 
+// ahdGUIColor reads a color exactly as Graphics does -- one of the nine
+// case-sensitive names, #RRGGBB, or #RRGGBBAA -- and returns the helper's
+// normalized #RRGGBBAA form.
+func ahdGUIColor(role, text string) (string, string) {
+	value, ok := AhdGraphicsParseColor(text)
+	if !ok {
+		return "", ahdGraphicsColorProblem(role, text)
+	}
+	return fmt.Sprintf("#%02X%02X%02X%02X", value[0], value[1], value[2], value[3]), ""
+}
+
+// AhdGUIWindowSetBackground colors the Window behind every Container.
+func AhdGUIWindowSetBackground(handle int64, color string) string {
+	normalized, problem := ahdGUIColor("background", color)
+	if problem != "" {
+		return problem
+	}
+	window, problem := ahdGUIWindowOf(handle)
+	if problem != "" {
+		return problem
+	}
+	window.mu.Lock()
+	defer window.mu.Unlock()
+	if !window.usable {
+		return ahdGUIClosedMessage
+	}
+	_, problem = window.request(ahdGUIRequest{Op: "color", Part: "background", Color: normalized}, ahdGUIRequestTimeout)
+	return problem
+}
+
+// AhdGUISetColor sets a Container's background, or a Label's, Button's,
+// TextInput's, or Checkbox's foreground or background.
+func AhdGUISetColor(handle int64, part, color string) string {
+	normalized, problem := ahdGUIColor(part, color)
+	if problem != "" {
+		return problem
+	}
+	widget, window, problem := ahdGUIWidgetOf(handle)
+	if problem != "" {
+		return problem
+	}
+	window.mu.Lock()
+	defer window.mu.Unlock()
+	if !window.usable {
+		return ahdGUIClosedMessage
+	}
+	_, problem = window.request(ahdGUIRequest{Op: "color", Widget: widget.id, Part: part, Color: normalized}, ahdGUIRequestTimeout)
+	return problem
+}
+
+// AhdGUISetEnabled enables or disables a Button, TextInput, or Checkbox.
+func AhdGUISetEnabled(handle int64, enabled bool) string {
+	widget, window, problem := ahdGUIWidgetOf(handle)
+	if problem != "" {
+		return problem
+	}
+	window.mu.Lock()
+	defer window.mu.Unlock()
+	if !window.usable {
+		return ahdGUIClosedMessage
+	}
+	if _, problem := window.request(ahdGUIRequest{Op: "enabled", Widget: widget.id, Enabled: &enabled}, ahdGUIRequestTimeout); problem != "" {
+		return problem
+	}
+	ahdGUI.Lock()
+	widget.disabled = !enabled
+	ahdGUI.Unlock()
+	return ""
+}
+
+// AhdGUIIsEnabled reports whether a widget accepts user input. It answers
+// from the runtime's own record, so it also works after the Window closed.
+func AhdGUIIsEnabled(handle int64) (bool, string) {
+	widget, _, problem := ahdGUIWidgetOf(handle)
+	if problem != "" {
+		return false, problem
+	}
+	ahdGUI.Lock()
+	defer ahdGUI.Unlock()
+	return !widget.disabled, ""
+}
+
 // AhdGUIOnClick registers a Button's click callback, replacing any earlier
 // one.
 func AhdGUIOnClick(handle int64, handler func()) string {
@@ -733,6 +819,24 @@ func AhdGUIAddLeafChecked(container int64, kind, text, placeholder string, check
 	handle, problem := AhdGUIAddLeaf(container, kind, text, placeholder, checked)
 	AhdGUICheck(problem)
 	return handle
+}
+
+func AhdGUIWindowSetBackgroundChecked(handle int64, color string) {
+	AhdGUICheck(AhdGUIWindowSetBackground(handle, color))
+}
+
+func AhdGUISetColorChecked(handle int64, part, color string) {
+	AhdGUICheck(AhdGUISetColor(handle, part, color))
+}
+
+func AhdGUISetEnabledChecked(handle int64, enabled bool) {
+	AhdGUICheck(AhdGUISetEnabled(handle, enabled))
+}
+
+func AhdGUIIsEnabledChecked(handle int64) bool {
+	enabled, problem := AhdGUIIsEnabled(handle)
+	AhdGUICheck(problem)
+	return enabled
 }
 
 func AhdGUITextChecked(handle int64) string {

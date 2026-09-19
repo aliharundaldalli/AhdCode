@@ -1,0 +1,4 @@
+# Files the example writes
+*.png
+*.svg
+*.pdf

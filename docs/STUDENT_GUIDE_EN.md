@@ -1,4 +1,4 @@
-# AhdCode v1.8.0 English Student Guide
+# AhdCode v1.9.0 English Student Guide
 
 This guide is designed so that **even someone who has never programmed before** can follow along. You can read it in order from beginning to end; in each section, you will first see what we want to achieve, then write a working example, and finally learn the necessary rules.
 
@@ -85,6 +85,7 @@ says so and links to the reference page that lists every signature.
 - [63. Graphics: drawing with a Canvas and a Turtle](#63-graphics-drawing-with-a-canvas-and-a-turtle)
 - [64. Angles, time stamps, and joined tables](#64-angles-time-stamps-and-joined-tables)
 - [65. Windows that react: GUI forms and Turtle keys](#65-windows-that-react-gui-forms-and-turtle-keys)
+- [66. Colors, disabled buttons, and a chart you can explore](#66-colors-disabled-buttons-and-a-chart-you-can-explore)
 
 ## 1. What is AhdCode?
 
@@ -7063,3 +7064,76 @@ with `name.setText("")` and resets the Label. Then give the window an
 See the [GUI module reference](GUI.md), the
 [Graphics reference](GRAPHICS.md#clicks-and-key-presses), and
 [`examples/v1.8`](../examples/v1.8/README.md).
+
+## 66. Colors, disabled buttons, and a chart you can explore
+
+**Colors.** GUI widgets can have colors, spelled exactly like Graphics
+colors: one of nine lower-case names such as `"blue"`, or `#RRGGBB`, or
+`#RRGGBBAA`. A Window and a Container have a background; a Label, Button,
+TextInput, and Checkbox have a foreground (the text) and a background.
+
+**Enabled state.** A Button, TextInput, or Checkbox can be switched off with
+`setEnabled(false)`: it then ignores the mouse and keyboard until
+`setEnabled(true)`. A common pattern is a Save button that stays disabled
+until the form is filled in:
+
+```ahd
+bring GUI
+from GUI bring (Window, Container, Label, Button, TextInput)
+
+window: Window := GUI.window(title: "Sign up", width: 360, height: 200)
+window.setBackground("#EEF2F7")
+form: Container := window.column(spacing: 10, padding: 16)
+name: TextInput := form.textInput(placeholder: "your name")
+check: Button := form.button("Check")
+save: Button := form.button("Save")
+save.setBackground("#2E7D32")
+save.setForeground("white")
+save.setEnabled(false)
+status: Label := form.label("")
+
+checkName: Function := () -> Nothing {
+    name: Global TextInput
+    save: Global Button
+    status: Global Label
+    ready: Local := name.text().trim() != ""
+    save.setEnabled(ready)
+    if ready {
+        status.setForeground("#2E7D32")
+        status.setText("Ready to save.")
+    }
+    else {
+        status.setForeground("red")
+        status.setText("Type your name first.")
+    }
+}
+
+check.onClick(checkName)
+window.wait()
+```
+
+A disabled widget looks faded, cannot be focused with Tab, and its callback
+does not run — but the program can still call `setText` on it.
+
+**Exploring a chart.** `chart.show()` now opens AhdCode's own viewer. Scroll
+to zoom where the pointer is, drag to move the chart, press Q or E to turn it
+a quarter turn, R to go back to the start, and Escape to close:
+
+```ahd
+bring Plot
+
+chart := Plot.line([1, 2, 3, 4], [2.0, 4.5, 3.5, 6.0]).title("Practice")
+chart.show()
+chart.save("practice.png")
+```
+
+Turning or zooming in the viewer is only for looking: the saved
+`practice.png` is the same chart as always.
+
+**Try it yourself:** Add a Checkbox "I agree" to the form and enable Save
+only when a name is typed and the box is ticked. Then show a scatter chart
+of your own data and find its highest point by zooming in.
+
+See the [GUI reference](GUI.md#colors), the
+[Plot reference](PLOT.md#show), and
+[`examples/v1.9`](../examples/v1.9/README.md).

@@ -377,6 +377,7 @@ func BuildProgram(entryPath, outputPath string) (string, Result) {
 	result.Program = configureSQLiteRuntime(result.Program)
 	result.Program = configureGraphicsRuntime(result.Program)
 	result.Program = configureGUIRuntime(result.Program)
+	result.Program = configurePlotViewRuntime(result.Program)
 	workspace, failures := NewWorkspace(result.Program)
 	if len(failures) != 0 {
 		result.Diagnostics = append(result.Diagnostics, failures...)
@@ -474,6 +475,7 @@ func RunProgramObserved(entryPath string, arguments []string, stdin io.Reader, s
 	result.Program = configureSQLiteRuntime(result.Program)
 	result.Program = configureGraphicsRuntime(result.Program)
 	result.Program = configureGUIRuntime(result.Program)
+	result.Program = configurePlotViewRuntime(result.Program)
 	executable, cleanup, failures := runExecutable(result.Program)
 	defer cleanup()
 	result.Diagnostics = append(result.Diagnostics, failures...)
@@ -623,6 +625,23 @@ func configureGUIRuntime(program *backend.GeneratedProgram) *backend.GeneratedPr
 	copyProgram := *program
 	copyProgram.Files = append([]backend.GeneratedFile(nil), program.Files...)
 	copyProgram.Files = append(copyProgram.Files, backend.GeneratedFile{Name: "ahdcode_gui_runtime_hint.go", Content: "package main\n\nfunc init() { AhdGUIRuntimeHint = " + strconv.Quote(root) + " }\n"})
+	return &copyProgram
+}
+
+// configurePlotViewRuntime records where the interactive Plot viewer
+// (ahdplotview) is installed, for a program that uses Plot, so Chart.show and
+// Figure.show find the viewer of the installation that compiled them.
+func configurePlotViewRuntime(program *backend.GeneratedProgram) *backend.GeneratedProgram {
+	if program == nil || !program.RequiresPlot {
+		return program
+	}
+	root := findHelperRuntimeRoot("ahdplotview", "AHDCODE_PLOTVIEW_RUNTIME")
+	if root == "" {
+		return program
+	}
+	copyProgram := *program
+	copyProgram.Files = append([]backend.GeneratedFile(nil), program.Files...)
+	copyProgram.Files = append(copyProgram.Files, backend.GeneratedFile{Name: "ahdcode_plotview_runtime_hint.go", Content: "package main\n\nfunc init() { AhdPlotViewRuntimeHint = " + strconv.Quote(root) + " }\n"})
 	return &copyProgram
 }
 

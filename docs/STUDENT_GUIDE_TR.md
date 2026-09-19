@@ -1,4 +1,4 @@
-# AhdCode v1.8.0 Türkçe Öğrenci Rehberi
+# AhdCode v1.9.0 Türkçe Öğrenci Rehberi
 
 Bu rehber, **daha önce hiç programlama yapmamış birinin de takip edebilmesi** için hazırlanmıştır. Baştan sona sırayla okuyabilirsiniz; her bölümde önce ne yapmak istediğimizi görecek, sonra çalışan bir örnek yazacak, en son gerekli kuralları öğreneceksiniz.
 
@@ -86,6 +86,7 @@ verir.
 - [63. Graphics: Canvas ve Turtle ile çizim](#63-graphics-canvas-ve-turtle-ile-çizim)
 - [64. Açılar, zaman damgaları ve birleştirilen tablolar](#64-açılar-zaman-damgaları-ve-birleştirilen-tablolar)
 - [65. Tepki veren pencereler: GUI formları ve Turtle tuşları](#65-tepki-veren-pencereler-gui-formları-ve-turtle-tuşları)
+- [66. Renkler, devre dışı düğmeler ve incelenebilir bir grafik](#66-renkler-devre-dışı-düğmeler-ve-incelenebilir-bir-grafik)
 
 ## 1. AhdCode nedir?
 
@@ -7107,3 +7108,78 @@ geri çağırması verin.
 Bkz. [GUI modülü başvurusu](GUI_TR.md),
 [Graphics başvurusu](GRAPHICS_TR.md#tıklamalar-ve-tuş-basışları) ve
 [`examples/v1.8`](../examples/v1.8/README_TR.md).
+
+## 66. Renkler, devre dışı düğmeler ve incelenebilir bir grafik
+
+**Renkler.** GUI bileşenlerinin renkleri olabilir; Graphics renkleri gibi
+yazılır: `"blue"` gibi dokuz küçük harfli addan biri, `#RRGGBB` veya
+`#RRGGBBAA`. Window ve Container'ın bir arka planı vardır; Label, Button,
+TextInput ve Checkbox'ın bir ön planı (metin) ve bir arka planı vardır.
+
+**Etkinlik durumu.** Bir Button, TextInput veya Checkbox
+`setEnabled(false)` ile kapatılabilir: bu durumda `setEnabled(true)`
+çağrılana kadar fareyi ve klavyeyi yok sayar. Sık kullanılan bir desen, form
+doldurulana kadar devre dışı kalan bir Kaydet düğmesidir:
+
+```ahd
+bring GUI
+from GUI bring (Window, Container, Label, Button, TextInput)
+
+window: Window := GUI.window(title: "Kayıt", width: 360, height: 200)
+window.setBackground("#EEF2F7")
+form: Container := window.column(spacing: 10, padding: 16)
+name: TextInput := form.textInput(placeholder: "adınız")
+check: Button := form.button("Kontrol et")
+save: Button := form.button("Kaydet")
+save.setBackground("#2E7D32")
+save.setForeground("white")
+save.setEnabled(false)
+status: Label := form.label("")
+
+checkName: Function := () -> Nothing {
+    name: Global TextInput
+    save: Global Button
+    status: Global Label
+    ready: Local := name.text().trim() != ""
+    save.setEnabled(ready)
+    if ready {
+        status.setForeground("#2E7D32")
+        status.setText("Kaydetmeye hazır.")
+    }
+    else {
+        status.setForeground("red")
+        status.setText("Önce adınızı yazın.")
+    }
+}
+
+check.onClick(checkName)
+window.wait()
+```
+
+Devre dışı bir bileşen soluk görünür, Tab ile odaklanamaz ve callback'i
+çalışmaz — ama program yine de onun `setText`'ini çağırabilir.
+
+**Bir grafiği incelemek.** `chart.show()` artık AhdCode'un kendi
+görüntüleyicisini açar. İmlecin olduğu yerde yakınlaştırmak için kaydırın,
+grafiği taşımak için sürükleyin, çeyrek tur döndürmek için Q veya E'ye,
+başa dönmek için R'ye, kapatmak için Escape'e basın:
+
+```ahd
+bring Plot
+
+chart := Plot.line([1, 2, 3, 4], [2.0, 4.5, 3.5, 6.0]).title("Alıştırma")
+chart.show()
+chart.save("practice.png")
+```
+
+Görüntüleyicide döndürmek veya yakınlaştırmak yalnızca bakmak içindir:
+kaydedilen `practice.png` her zamanki grafiğin aynısıdır.
+
+**Kendiniz deneyin:** Forma "Kabul ediyorum" Checkbox'ı ekleyin ve Kaydet'i
+yalnızca bir ad yazıldığında ve kutu işaretlendiğinde etkinleştirin. Sonra
+kendi verinizle bir scatter grafiği gösterin ve yakınlaştırarak en yüksek
+noktasını bulun.
+
+Bkz. [GUI başvurusu](GUI_TR.md#renkler),
+[Plot başvurusu](PLOT_TR.md#show-gösterme) ve
+[`examples/v1.9`](../examples/v1.9/README_TR.md).

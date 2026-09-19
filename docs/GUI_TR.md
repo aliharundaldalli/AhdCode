@@ -73,6 +73,21 @@ TextInput.text() -> String          TextInput.setText(text: String) -> Nothing
 Checkbox.checked() -> Bool          Checkbox.setChecked(checked: Bool) -> Nothing
 ```
 
+v1.9.0 ile eklendi (bkz. [Renkler](#renkler) ve
+[Etkinlik durumu](#etkinlik-durumu)):
+
+```text
+Window.setBackground(color: String) -> Nothing
+Container.setBackground(color: String) -> Nothing
+Label.setForeground(color: String)      Label.setBackground(color: String)
+Button.setForeground(color: String)     Button.setBackground(color: String)
+TextInput.setForeground(color: String)  TextInput.setBackground(color: String)
+Checkbox.setForeground(color: String)   Checkbox.setBackground(color: String)
+Button.setEnabled(enabled: Bool)        Button.isEnabled() -> Bool
+TextInput.setEnabled(enabled: Bool)     TextInput.isEnabled() -> Bool
+Checkbox.setEnabled(enabled: Bool)      Checkbox.isEnabled() -> Bool
+```
+
 `GUIError`, `Error`'dan türer. Sınıfların hiçbirinin kurucusu yoktur: Window
 `GUI.window`'dan, Container `column` veya `row`'dan ve her bileşen bir
 Container'dan gelir. Her çağrı ya tamamen konumsal ya da tamamen
@@ -209,11 +224,79 @@ veya tuş yineleme ayarı yoktur.
 harflere tepki veren bir program bunu hesaba katmalıdır; Escape, ok tuşları
 ve Enter olağan seçimlerdir.
 
+## Renkler
+
+> v1.9.0 ile eklendi.
+
+Renkler açıktır, bir stil çatısı değildir: Window ve Container'ın bir arka
+planı vardır; Label, Button, TextInput ve Checkbox'ın bir ön planı (metni) ve
+bir arka planı vardır.
+
+```ahd
+bring GUI
+from GUI bring (Window, Container, Label, Button)
+
+window: Window := GUI.window(title: "Renkler", width: 360, height: 160)
+window.setBackground("#EEF2F7")
+form: Container := window.column(spacing: 10, padding: 16)
+title: Label := form.label("Yeni sipariş")
+title.setForeground("#1F4E79")
+save: Button := form.button("Kaydet")
+save.setForeground("white")
+save.setBackground("#2E7D32")
+window.wait()
+```
+
+Bir renk tam olarak [Graphics](GRAPHICS_TR.md)'teki gibi yazılır: dokuz küçük
+harfli addan biri (`black`, `white`, `red`, `green`, `blue`, `yellow`,
+`cyan`, `magenta`, `gray`), `#RRGGBB` veya `#RRGGBBAA` (onaltılık rakamlar
+büyük ya da küçük harf olabilir). Başka her şey — `"Red"`, `"purple"`,
+`"#fff"`, boş metin — `GUIError`'dır; yerine başka bir renk konmaz. Bir rengi
+yeniden ayarlamak öncekinin yerine geçer.
+
+- Renk ayarlanmayan her şey v1.8'deki gibi görünür.
+- Button'ın kendi arka planı gri dolgusunun yerine geçer; basılı tutulurken
+  %15 daha koyu çizilir. TextInput'un arka planı beyaz alanının yerine geçer.
+  Label ve Checkbox'ın arka planı tüm satır kutusunu doldurur; Checkbox'ın
+  karesi kendi görünümünü korur.
+- Boş bir TextInput'un yer tutucusu gri kalır, odak çerçeveleri mavi kalır.
+- `#RRGGBBAA` renkleri olağan "source over" birleştirmesiyle karışır:
+  pencere varsayılan açık gri renginde opak başlar, Window'un arka planı
+  bunun üzerine boyanır ve her Container ile bileşen, oluşturulma sırasıyla
+  üst öğesinin üzerine boyanır. Pencerenin kendisi hiçbir zaman saydam
+  değildir.
+
+Kapalı bir Window'da renk değiştirmek `GUIError`'dır.
+
+## Etkinlik durumu
+
+> v1.9.0 ile eklendi.
+
+Bir Button, TextInput veya Checkbox devre dışı bırakılabilir. Her bileşen
+etkin başlar; Label ve Container'ların etkinlik durumu yoktur.
+
+- Devre dışı bir Button tıklanamaz ve Enter veya Space ile etkinleştirilemez;
+  bu yüzden `onClick` callback'i çalışmaz.
+- Devre dışı bir TextInput yazmayı ve düzenleme tuşlarını yok sayar.
+- Devre dışı bir Checkbox tıklama veya Space ile değiştirilemez.
+- Devre dışı bir bileşen odak alamaz: ona tıklamak odağı hiçbir yere
+  taşımaz, Tab onu atlar ve odaktayken devre dışı bırakılan bir bileşen
+  odağı kaybeder.
+- Program devre dışı bir bileşeni yine değiştirebilir: `setText` ve
+  `setChecked` çalışır, `text()` ve `checked()` onu okur.
+- Devre dışı bir bileşen normal çizilir ve ardından pencerenin varsayılan
+  rengine doğru soluklaştırılır.
+
+`isEnabled()` durumu bildirir, Window kapandıktan sonra da; kapalı bir
+Window'da `setEnabled` bir `GUIError`'dır. Görünürlük, gizleme veya gösterme
+API'si yoktur.
+
 ## Hatalar
 
 `GUIError` GUI sorunları için fırlatılır: geçersiz pencere boyutu, spacing
-veya padding, ikinci bir kök Container, kapalı bir Window'da değişiklik, eksik
-veya başarısız `ahdgui` yardımcısı ve bozuk yardımcı yanıtı. Bir callback'in
+veya padding, desteklenmeyen renk, ikinci bir kök Container, kapalı bir
+Window'da değişiklik, eksik veya başarısız `ahdgui` yardımcısı ve bozuk
+yardımcı yanıtı. Bir callback'in
 fırlattığı hata için hiçbir zaman kullanılmaz.
 
 ## Nasıl çalışır
@@ -235,15 +318,18 @@ AhdCode kurulumunda kendi yanında bulur; `PATH` hiçbir zaman aranmaz.
 
 ## Platform notları
 
-- macOS: bu sürümün geliştirme Mac'inde canlı olarak test edildi. Bir Window
-  odaktayken menü çubuğu yardımcının adını, `ahdgui`, gösterir.
+- macOS: bu sürümün geliştirme Mac'inde canlı olarak test edildi. v1.9.0'dan
+  itibaren bir Window odaktayken menü çubuğu **AhdCode**'u, Dock ise AhdCode
+  simgesini gösterir (v1.8.0 yardımcının adını, `ahdgui`, gösteriyordu).
+- Windows ve Linux: v1.9.0'dan itibaren pencere, sistemin pencere simgesi
+  gösterdiği yerlerde AhdCode simgesini kullanır.
 - Windows ve Linux: yardımcı her ikisi için de derlenir; Linux masaüstü bir
   X11 ekranı (XWayland da sayılır) ve sistemin OpenGL kitaplıklarını gerektirir.
 - Otomatik testler: `AHDCODE_GUI_HEADLESS=1` her Window'u ekran olmadan açar.
 
-## v1.8'de olmayanlar
+## v1.8 ve v1.9'da olmayanlar
 
-GUI v1.8'de tablo veya ızgara bileşeni, liste kutusu, açılır liste, radyo
+GUI v1.8 ve v1.9'da tablo veya ızgara bileşeni, liste kutusu, açılır liste, radyo
 düğmeleri, sekmeler, ağaç, menüler, araç çubukları, durum çubukları, çok
 satırlı metin, parola alanları, resim veya simgeler, pano, sürükle-bırak,
 dosya veya klasör seçiciler, iletişim kutuları, kaydırma, yeniden

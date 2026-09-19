@@ -43,12 +43,12 @@ func ClickCallbackType() types.Type {
 // really offers. Every member publishes real parameter names and defaults:
 // a call is entirely positional or entirely named, like a module function.
 var GUIOperations = map[string][]string{
-	"Window":    {"column", "row", "onKey", "wait", "close", "isOpen", "setTitle"},
-	"Container": {"column", "row", "label", "button", "textInput", "checkbox"},
-	"Label":     {"text", "setText"},
-	"Button":    {"text", "setText", "onClick"},
-	"TextInput": {"text", "setText"},
-	"Checkbox":  {"checked", "setChecked"},
+	"Window":    {"column", "row", "onKey", "wait", "close", "isOpen", "setTitle", "setBackground"},
+	"Container": {"column", "row", "label", "button", "textInput", "checkbox", "setBackground"},
+	"Label":     {"text", "setText", "setForeground", "setBackground"},
+	"Button":    {"text", "setText", "onClick", "setForeground", "setBackground", "setEnabled", "isEnabled"},
+	"TextInput": {"text", "setText", "setForeground", "setBackground", "setEnabled", "isEnabled"},
+	"Checkbox":  {"checked", "setChecked", "setForeground", "setBackground", "setEnabled", "isEnabled"},
 }
 
 func guiParameter(name string, typ types.Type, hasDefault bool) types.Parameter {
@@ -67,7 +67,9 @@ var guiMembers = func() map[TypeOperation]*Symbol {
 	member := func(module string, name string, result types.Type, parameters ...types.Parameter) *Symbol {
 		return completionMember(module, name, result, parameters...)
 	}
-	return map[TypeOperation]*Symbol{
+	color := guiParameter("color", types.String, false)
+	enabled := guiParameter("enabled", types.Bool, false)
+	members := map[TypeOperation]*Symbol{
 		"Window.column":   member(guiModuleID, "column", container, layout()...),
 		"Window.row":      member(guiModuleID, "row", container, layout()...),
 		"Window.onKey":    member(guiModuleID, "onKey", types.Nothing, guiParameter("handler", KeyHandlerType(), false)),
@@ -92,7 +94,21 @@ var guiMembers = func() map[TypeOperation]*Symbol {
 		"TextInput.setText":   member(guiModuleID, "setText", types.Nothing, text),
 		"Checkbox.checked":    member(guiModuleID, "checked", types.Bool),
 		"Checkbox.setChecked": member(guiModuleID, "setChecked", types.Nothing, guiParameter("checked", types.Bool, false)),
+
+		"Window.setBackground":    member(guiModuleID, "setBackground", types.Nothing, color),
+		"Container.setBackground": member(guiModuleID, "setBackground", types.Nothing, color),
 	}
+	// Colors take the Graphics spellings; only the interactive widgets can be
+	// disabled.
+	for _, class := range []string{"Label", "Button", "TextInput", "Checkbox"} {
+		members[TypeOperation(class+".setForeground")] = member(guiModuleID, "setForeground", types.Nothing, color)
+		members[TypeOperation(class+".setBackground")] = member(guiModuleID, "setBackground", types.Nothing, color)
+	}
+	for _, class := range []string{"Button", "TextInput", "Checkbox"} {
+		members[TypeOperation(class+".setEnabled")] = member(guiModuleID, "setEnabled", types.Nothing, enabled)
+		members[TypeOperation(class+".isEnabled")] = member(guiModuleID, "isEnabled", types.Bool)
+	}
+	return members
 }()
 
 // guiOperationFor names the built-in member a GUI value publishes. Only the

@@ -174,19 +174,48 @@ chart.show() -> Nothing
 figure.show() -> Nothing
 ```
 
-`show()`, benzersiz bir geçici PNG'ye render eder ve onu platformun standart
-görüntü açma mekanizmasıyla açar (macOS'ta `open`, Linux'ta `xdg-open`,
-Windows'ta dosya ilişkilendirme mekanizması); böylece bir grafiği incelemek asla elle
-kaydedip dosyayı bulmayı gerektirmez. Geçici görüntü, sistem geçici
-dizininin altındaki AhdCode'a özgü bir alanda yaşar; otomatik olarak
-silinmez, çünkü harici görüntüleyicinin `show()` döndükten sonra da onu
-okumaya devam etmesi gerekir.
+> v1.9.0'dan itibaren. Önceki sürümler grafiği işletim sisteminin
+> görüntüleyicisiyle açıyordu.
 
-`show()` bir masaüstü oturumu gerektirir. Başsız (headless) bir ortam (CI,
-görüntüsü olmayan bir konteyner, kayıtlı bir işleyicisi olmayan
-`xdg-open`) askıda kalmak yerine temiz bir şekilde `PlotError` ile
-başarısız olur -- her render/açma adımı kısa bir zaman aşımı altında
-çalışır.
+`show()`, grafiği AhdCode'un kendi etkileşimli görüntüleyicisinde açar:
+**AhdCode Plot** adlı, AhdCode simgeli bir pencere. Grafik `save()` ile
+kaydedildiği hâliyle çizilir ve görüntüleyici onu incelemenizi sağlar:
+
+| Kontrol | İşlem |
+| --- | --- |
+| Fare tekerleği veya trackpad kaydırma | İmlecin çevresinde yakınlaştırma/uzaklaştırma |
+| Sol tuşla sürükleme | Kaydırma (pan) |
+| `Q` / `E` | Görünümü sola / sağa çeyrek tur döndürme |
+| `R` | Sıfırlama: döndürme yok, grafik sığdırılmış, ortalanmış |
+| `Escape` | Görüntüleyiciyi kapatma |
+
+Küçük bir gösterge yakınlaştırmayı ve dönüşü gösterir; ilk saniyelerde
+kontrollerin tek satırlık bir özeti görünür. Görüntüleyici grafiğin
+boyutunda (ekrana sığacak şekilde) açılır ve yeniden boyutlandırılabilir.
+Yakınlaştırma, sığdırılmış boyutun dörtte birinden %1600'e kadardır;
+pencereden küçük bir grafik ortada kalır, yakınlaştırılmış bir grafik ise
+pencereyi her zaman kaplar, böylece asla kaybolmaz — `R` grafiğin tamamını
+geri getirir. Dönüşler yalnızca çeyrek turdur (0°, 90°, 180°, 270°).
+
+**Görüntüleyici yalnızca görünümü değiştirir.** Yakınlaştırma, kaydırma ve
+döndürme `Chart`'ı veya `Figure`'ı, verisini ya da eksenlerini ve sonradan
+kaydedilen dosyayı asla değiştirmez: `show()` sonrasında
+`chart.save("result.png")`, `show()` hiç çağrılmamış gibi aynı dosyayı yazar.
+Görüntüleyici için bir API yoktur; `show()` parametre almaz ve
+görüntüleyicide menü, düzenleme veya veri seçimi yoktur.
+
+`show()`, görüntüleyici penceresi açılır açılmaz döner. Program devam eder
+ve `show()`'u yeniden çağırabilir; her çağrı kendi görüntüleyicisini açar ve
+bir görüntüleyici, program bittikten sonra bile siz kapatana kadar açık
+kalır. `show()` grafiği sistem geçici dizininin AhdCode'a özgü bir alanında
+geçici bir PNG'ye render eder; görüntüleyici onu tamamen okur ve `show()`
+dönmeden önce siler, böylece önizleme dosyaları birikmez.
+
+Görüntüleyici açılamadığında `show()` `PlotError` fırlatır: paketli
+görüntüleyici eksiktir, bir ekran yoktur (CI, konteyner, uzak kabuk) ya da
+grafik bir kenarda 6144 birimden büyüktür (grafiği küçültün veya
+`save()` ile kaydedin). AhdCode hiçbir zaman başka bir uygulamaya geri
+dönmez.
 
 ## Subplot'lar
 

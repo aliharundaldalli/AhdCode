@@ -372,6 +372,7 @@ derleyicinin yanına kurulur:
 go install ./cmd/ahdcode ./cmd/ahdnumeric ./cmd/ahdplot ./cmd/ahdsqlite
 go -C cmd/ahdgraphics install .
 go -C cmd/ahdgui install .
+go -C cmd/ahdplotview install .
 ```
 
 İlk `SQLite.open`'da program bir yardımcı süreci başlatır ve onunla, tıpkı

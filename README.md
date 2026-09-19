@@ -12,20 +12,20 @@ AhdCode is an experimental statically checked general-purpose programming
 language focused on readable syntax, explicit intent, predictable semantics,
 and native compilation.
 
-This is **v1.8.0**. The language, toolchain, and Web framework are
+This is **v1.9.0**. The language, toolchain, and Web framework are
 feature-complete, and the core language surface described here is what 1.0
-committed to and 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, and 1.8 keep unchanged.
+committed to and 1.1 through 1.9 keep unchanged.
 
-v1.8.0 is a minor release, **GUI Foundations + Minimal Events**: it adds the
-`GUI` module for small desktop windows with Labels, Buttons, single-line
-TextInputs, and Checkboxes arranged in Columns and Rows, click and key
-callbacks for GUI windows and Graphics Canvases, and readable `str` and `write`
-output for Vector, Matrix, DateTime, Duration, and Table — without new syntax
-or a type-system change. See [What is new in v1.8.0](#what-is-new-in-v180).
+v1.9.0 is a minor release, **Desktop Polish + Interactive Plot**: `show()`
+opens a Chart or Figure in AhdCode's own interactive viewer with zoom, pan,
+reset, and view rotation — interactions that change only the viewer, never
+the chart or its exported files — the GUI gains basic colors and an enabled
+state, and AhdCode's windows carry the AhdCode name and icon, all without new
+syntax or a type-system change. See [What is new in v1.9.0](#what-is-new-in-v190).
 
 It ships as a self-contained platform package: the `ahdcode` CLI, a private
 Go 1.27.0 toolchain, AhdDataStudio, the `ahdsqlite`, `ahdnumeric`, `ahdplot`,
-`ahdgraphics`, and `ahdgui` helpers, an offline Tectonic LaTeX engine with its pinned resource
+`ahdgraphics`, and `ahdgui` helpers, the interactive Plot viewer `ahdplotview`, an offline Tectonic LaTeX engine with its pinned resource
 bundle, the Web starters, and an exact-version English documentation bundle.
 See [Installation](docs/INSTALLATION.md).
 
@@ -332,12 +332,13 @@ cd AhdCode
 go install ./cmd/ahdcode ./cmd/ahdnumeric ./cmd/ahdplot ./cmd/ahdsqlite
 go -C cmd/ahdgraphics install .
 go -C cmd/ahdgui install .
+go -C cmd/ahdplotview install .
 ```
 
 The commands above install the compiler and the local numeric, plot, SQLite,
-Graphics window, and GUI window helpers. The Graphics and GUI helpers are their
-own Go modules, so they are installed with `go -C cmd/ahdgraphics install .` and
-`go -C cmd/ahdgui install .`.
+Graphics window, and GUI window helpers, and the interactive Plot viewer. These window helpers are their own Go modules, so
+they are installed with `go -C cmd/ahdgraphics install .`,
+`go -C cmd/ahdgui install .`, and `go -C cmd/ahdplotview install .`.
 If you plan to use the `Latex` module **or** the `PDF` module's `.save()` (they
 share one offline renderer), you must also stage the offline Latex/Tectonic
 runtime bundle. `Archive` needs no such staging -- it is Go-standard-library
@@ -468,6 +469,7 @@ See the [CLI guide](docs/CLI.md), [formatter guide](docs/FORMATTER.md),
 - [v1.4 realtime attendance](examples/v1.4/realtime_attendance/README.md) — Web, PostgreSQL, WebSocket, UUID v7, `Env.secret`, and Cron
 - [v1.5 Terminal demo](examples/v1.5/terminal_demo/README.md) — `Terminal.emit`, standard error, terminal detection, styled text, and pretty layout
 - [v1.7 standard-library completion](examples/v1.7/README.md) — trigonometry and gcd/lcm, strict ISO time text and instant arithmetic, and a Table join with statistics
+- [v1.9 GUI colors and interactive Plot](examples/v1.9/README.md) — an order form with colors and a disabled Save button, and a chart in AhdCode's own viewer
 - [v1.8 GUI and events](examples/v1.8/README.md) — a small GUI ledger backed by SQLite and a Turtle driven by arrow keys and clicks
 - [v1.6 Graphics and Turtle](examples/v1.6/graphics_turtle/README.md) — a Cartesian Canvas, shapes, a Turtle star and spiral, PNG/SVG export, and a regular-polygon lesson
 - [AhdDataStudio](tools/AhdDataStudio/README.md) — local MySQL + SQLite development UI
@@ -486,6 +488,32 @@ diagnostics and hover. The same VSIX targets VS Code and Antigravity. See its
 [installation guide](editors/vscode/README.md).
 
 ## Current limitations
+
+## What is new in v1.9.0 <a id="what-is-new-in-v190"></a>
+
+v1.9.0 is a **minor** release, **Desktop Polish + Interactive Plot**. It
+changes how `show()` presents a chart, adds colors and an enabled state to
+the GUI, and names AhdCode's own windows; the core grammar and the type
+system are unchanged.
+
+- [`Plot`](docs/PLOT.md): `chart.show()` and `figure.show()` open AhdCode's
+  own interactive viewer instead of the operating system's image viewer:
+  scroll to zoom around the pointer, drag to pan, Q/E to turn the view a
+  quarter turn, R to reset, and Escape to close. These interactions change
+  only the viewer; they do not change the Chart or Figure, their data, or
+  exported PNG, SVG, or PDF files. `save()` is unchanged.
+- [`GUI`](docs/GUI.md): basic colors — `setBackground` on a Window and a
+  Container, and `setForeground`/`setBackground` on a Label, Button,
+  TextInput, and Checkbox, spelled like Graphics colors — and an enabled
+  state (`setEnabled`/`isEnabled`) for a Button, TextInput, and Checkbox.
+  AhdCode GUI remains a deliberately small toolkit for forms, utilities, and
+  educational desktop applications.
+- GUI, Graphics, and Plot viewer windows show the AhdCode name and icon: on
+  macOS **AhdCode** in the menu bar and the AhdCode icon in the Dock, on
+  Windows and Linux the window icon where the system shows one. This names
+  AhdCode's own windows; it does not package user programs.
+
+See the [v1.9 examples](examples/v1.9/README.md).
 
 ## What is new in v1.8.0 <a id="what-is-new-in-v180"></a>
 
@@ -743,6 +771,8 @@ cmd/ahdnumeric/      bundled advanced linear-algebra helper
 cmd/ahdplot/         bundled chart-rendering helper
 cmd/ahdgraphics/     bundled Graphics window helper (its own Go module)
 cmd/ahdgui/          bundled GUI window helper (its own Go module)
+cmd/ahdplotview/     bundled interactive Plot viewer (its own Go module)
+cmd/ahdidentity/     shared AhdCode window name and icon for the window helpers
 cmd/ahdsqlite/       bundled CGO-free SQLite helper
 internal/            compiler frontend, backend, runtime, formatter, LSP, and REPL
 internal/framework/  bundled first-party Web framework source

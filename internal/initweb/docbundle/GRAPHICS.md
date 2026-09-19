@@ -419,6 +419,10 @@ If the helper cannot be found, `Graphics.open` raises `GraphicsError`.
   front: when another app is active, or when Stage Manager is on, a new Canvas
   window may open behind it or in the Stage Manager strip. Click its icon in the
   Dock or its thumbnail to bring it forward.
+- **Application identity** (since v1.9.0): a Canvas window shows
+  the AhdCode name and icon — on macOS **AhdCode** in the menu bar and the
+  AhdCode icon in the Dock, on Windows and Linux the window icon where the
+  system shows one. Drawing, events, and saved files are unchanged.
 - **Windows**: needs Windows 10 or newer.
 - **Linux**: needs a desktop session with an X11 display (XWayland counts) and
   the system's OpenGL libraries. Without a display, `Graphics.open` raises

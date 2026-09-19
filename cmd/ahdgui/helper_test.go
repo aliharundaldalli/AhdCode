@@ -205,7 +205,7 @@ func run(t *testing.T, lines ...string) ([]response, []event) {
 }
 
 func TestProtocolScriptStepsOneEventAtATime(t *testing.T) {
-	open := `{"op":"open","id":1,"version":1,"width":300,"height":200,"title":"t","headless":true,"script":[` +
+	open := `{"op":"open","id":1,"version":2,"width":300,"height":200,"title":"t","headless":true,"script":[` +
 		`{"event":"type","widget":2,"text":"Ali"},{"event":"click","widget":3},{"event":"toggle","widget":4},` +
 		`{"event":"click","widget":4},{"event":"key","key":"Enter"},{"event":"click","widget":3}]}`
 	replies, events := run(t, open,
@@ -271,12 +271,12 @@ func TestProtocolScriptStepsOneEventAtATime(t *testing.T) {
 
 func TestProtocolRejectsBadInput(t *testing.T) {
 	for _, line := range []string{
-		`{"op":"open","version":2,"width":10,"height":10}`,
-		`{"op":"open","version":1,"width":0,"height":10}`,
-		`{"op":"open","version":1,"width":10,"height":5000}`,
-		`{"op":"open","version":1,"width":10,"height":10,"script":[{"event":"key","key":"A"}]}`,
-		`{"op":"open","version":1,"width":10,"height":10,"headless":true,"script":[{"event":"key","key":"F1"}]}`,
-		`{"op":"open","version":1,"width":10,"height":10,"headless":true,"script":[{"event":"closed"}]}`,
+		`{"op":"open","version":3,"width":10,"height":10}`,
+		`{"op":"open","version":2,"width":0,"height":10}`,
+		`{"op":"open","version":2,"width":10,"height":5000}`,
+		`{"op":"open","version":2,"width":10,"height":10,"script":[{"event":"key","key":"A"}]}`,
+		`{"op":"open","version":2,"width":10,"height":10,"headless":true,"script":[{"event":"key","key":"F1"}]}`,
+		`{"op":"open","version":2,"width":10,"height":10,"headless":true,"script":[{"event":"closed"}]}`,
 		`{"op":"add"}`,
 	} {
 		replies, _ := run(t, line)
@@ -284,7 +284,7 @@ func TestProtocolRejectsBadInput(t *testing.T) {
 			t.Errorf("%s accepted: %+v", line, replies)
 		}
 	}
-	open := `{"op":"open","id":1,"version":1,"width":100,"height":100,"headless":true}`
+	open := `{"op":"open","id":1,"version":2,"width":100,"height":100,"headless":true}`
 	huge := `{"op":"set","widget":1,"kind":"text","text":"` + strings.Repeat("a", maxRequestBytes) + `"}`
 	replies, _ := run(t, open, `{"op":"add","id":2,"kind":"column"}`, `{"op":"unknown","id":3}`, `{"op":"listen","id":4,"kind":"wheel"}`,
 		`{"op":"set","id":5,"widget":1,"kind":"text","text":"x"}`, `{"op":"set","id":6,"widget":9,"kind":"text","text":"x"}`, huge, `{"op":"status","id":7}`)

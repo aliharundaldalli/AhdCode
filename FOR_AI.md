@@ -159,6 +159,7 @@ go test ./...
 go install ./cmd/ahdcode ./cmd/ahdnumeric ./cmd/ahdplot ./cmd/ahdsqlite
 go -C cmd/ahdgraphics install .
 go -C cmd/ahdgui install .
+go -C cmd/ahdplotview install .
 ahdcode_exe="$(go env GOPATH)/bin/ahdcode"
 "$ahdcode_exe" --version
 ```
@@ -274,6 +275,7 @@ go test ./...
 go install ./cmd/ahdcode ./cmd/ahdnumeric ./cmd/ahdplot ./cmd/ahdsqlite
 go -C cmd/ahdgraphics install .
 go -C cmd/ahdgui install .
+go -C cmd/ahdplotview install .
 $AhdCodeExe = Join-Path (go env GOPATH) "bin\ahdcode.exe"
 & $AhdCodeExe --version
 ```
@@ -622,6 +624,18 @@ callback's error propagates out of `wait()` unchanged. There are no tables,
 list boxes, drop-downs, menus, dialogs, file pickers, scrolling, themes,
 threads, or async; do not invent them, and keep database or HTTP work in
 ordinary Functions the Button calls. See [`docs/GUI.md`](docs/GUI.md).
+
+Since v1.9.0: `window.setBackground(color)` and
+`container.setBackground(color)`; `setForeground(color)` and
+`setBackground(color)` on a Label, Button, TextInput, and Checkbox; and
+`setEnabled(enabled)`/`isEnabled()` on a Button, TextInput, and Checkbox.
+Colors use the Graphics spellings only (nine lower-case names, `#RRGGBB`,
+`#RRGGBBAA`); anything else raises `GUIError`. Do not invent `setFont`,
+`setStyle`, themes, `setVisible`, or `setEnabled` on a Label or Container.
+`chart.show()` and `figure.show()` open AhdCode's own interactive viewer
+(zoom, pan, Q/E quarter turns, R reset, Escape) and return once it is open;
+the viewer never changes the Chart, Figure, or a later `save()`. There is no
+zoom/pan/rotate API: do not invent `chart.zoom` or `chart.rotate`.
 
 v1.7.0 completes six existing modules; use these instead of hand-written
 helpers. `Math.asin`, `acos`, `atan`, `atan2(y, x)` (y first), `sinh`, `cosh`,

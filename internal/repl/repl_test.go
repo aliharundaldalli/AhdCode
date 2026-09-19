@@ -597,9 +597,9 @@ attempt { Plot.subplots(1, 1, [base, extended]) } except PlotError as error { wr
 
 // TestPlotRenderAndSaveParityInThePersistentREPL exercises real rendering
 // through the bundled ahdplot helper: PNG/SVG/PDF save, an unsupported
-// extension, and a subplot Figure. This is render/save parity, not the
-// show() viewer-launch path -- see PART Q/V, which explicitly keep the OS
-// image viewer out of automated coverage.
+// extension, and a subplot Figure. This is render/save parity; show() opens
+// AhdCode's own viewer and is covered headless in
+// internal/build/plot_view_test.go.
 func TestPlotRenderAndSaveParityInThePersistentREPL(t *testing.T) {
 	t.Setenv("AHDCODE_PLOT_RUNTIME", plotRuntimeForTest(t))
 	directory := t.TempDir()

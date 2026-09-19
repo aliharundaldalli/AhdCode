@@ -27,7 +27,36 @@ var (
 	colorButtonPress = color.RGBA{198, 198, 198, 255}
 	colorField       = color.RGBA{255, 255, 255, 255}
 	colorFocus       = color.RGBA{0, 110, 220, 255}
+	// colorDisabled fades a disabled widget: the default window color at 60%
+	// opacity, painted over the finished widget.
+	colorDisabled = color.NRGBA{242, 242, 242, 153}
 )
+
+// Colors a program sets are composited with normal "source over" alpha
+// blending. The window starts opaque in colorBackground, the Window's own
+// background is painted over it, and every Container and widget is then
+// painted in creation order -- a parent before its children -- so a
+// translucent color blends with whatever lies beneath it. The window itself
+// is never transparent.
+
+// or returns the program's color, or the default when none was set.
+func or(chosen *color.NRGBA, fallback color.RGBA) color.Color {
+	if chosen != nil {
+		return *chosen
+	}
+	return fallback
+}
+
+// pressedShade darkens a Button background while it is held down: the
+// default keeps its v1.8 pressed color, and a program's color is mixed 15%
+// toward black.
+func pressedShade(chosen *color.NRGBA) color.Color {
+	if chosen == nil {
+		return colorButtonPress
+	}
+	c := *chosen
+	return color.NRGBA{uint8(uint16(c.R) * 85 / 100), uint8(uint16(c.G) * 85 / 100), uint8(uint16(c.B) * 85 / 100), c.A}
+}
 
 var (
 	fontOnce   sync.Once
@@ -58,9 +87,20 @@ func faceAt(scale float64) font.Face {
 	return face
 }
 
-// measureText is a text's width in logical pixels.
+// measureScales are the display scales a text must fit at. Hinting makes a
+// larger face slightly wider than a scaled small one, so a width measured at
+// scale 1 alone clipped the last glyph on a high-density display.
+var measureScales = []float64{1, 1.5, 2, 3}
+
+// measureText is a text's width in logical pixels: the widest it renders at
+// any supported display scale, so layout is the same on every display and no
+// glyph is clipped.
 func measureText(text string) int {
-	return font.MeasureString(faceAt(1), text).Ceil()
+	width := 0
+	for _, scale := range measureScales {
+		width = max(width, int(math.Ceil(float64(font.MeasureString(faceAt(scale), text).Ceil())/scale)))
+	}
+	return width
 }
 
 // frame is what render draws: the model, laid out, and the caret phase.
@@ -75,6 +115,9 @@ func render(f frame) *image.RGBA {
 	m, s := f.model, f.scale
 	img := image.NewRGBA(image.Rect(0, 0, int(math.Ceil(float64(m.width)*s)), int(math.Ceil(float64(m.height)*s))))
 	draw.Draw(img, img.Bounds(), image.NewUniform(colorBackground), image.Point{}, draw.Src)
+	if m.background != nil {
+		fill(img, img.Bounds(), *m.background)
+	}
 	m.layout()
 	face := faceAt(s)
 	for _, id := range m.order {
@@ -118,13 +161,25 @@ func drawWidget(img *image.RGBA, face font.Face, f frame, w *widget) {
 	box := scaled(s, w.x, w.y, w.w, w.h)
 	line := max(1, int(math.Round(s)))
 	focused := m.focus == w.id
+	foreground := or(w.foreground, colorText)
+	if w.disabled {
+		// A disabled widget is drawn as usual and then faded.
+		defer fill(img, box, colorDisabled)
+	}
 	switch w.kind {
+	case kindColumn, kindRow:
+		if w.background != nil {
+			fill(img, box, *w.background)
+		}
 	case kindLabel:
-		text(img, face, box, box.Min.X, box, string(w.text), colorText)
+		if w.background != nil {
+			fill(img, box, *w.background)
+		}
+		text(img, face, box, box.Min.X, box, string(w.text), foreground)
 	case kindButton:
-		background := colorButton
+		background := or(w.background, colorButton)
 		if m.pressed == w.id {
-			background = colorButtonPress
+			background = pressedShade(w.background)
 		}
 		fill(img, box, background)
 		border := colorBorder
@@ -133,9 +188,9 @@ func drawWidget(img *image.RGBA, face font.Face, f frame, w *widget) {
 		}
 		outline(img, box, border, line)
 		width := font.MeasureString(face, string(w.text)).Ceil()
-		text(img, face, box, box.Min.X+(box.Dx()-width)/2, box, string(w.text), colorText)
+		text(img, face, box, box.Min.X+(box.Dx()-width)/2, box, string(w.text), foreground)
 	case kindTextInput:
-		fill(img, box, colorField)
+		fill(img, box, or(w.background, colorField))
 		border := colorBorder
 		if focused {
 			border = colorFocus
@@ -155,12 +210,15 @@ func drawWidget(img *image.RGBA, face font.Face, f frame, w *widget) {
 		if caretX < w.scroll {
 			w.scroll = caretX
 		}
-		text(img, face, inner, inner.Min.X-w.scroll, box, string(w.text), colorText)
+		text(img, face, inner, inner.Min.X-w.scroll, box, string(w.text), foreground)
 		if focused && f.caretVisible {
 			x := inner.Min.X + caretX - w.scroll
-			fill(img, image.Rect(x, inner.Min.Y+2*line, x+line, inner.Max.Y-2*line).Intersect(inner), colorText)
+			fill(img, image.Rect(x, inner.Min.Y+2*line, x+line, inner.Max.Y-2*line).Intersect(inner), foreground)
 		}
 	case kindCheckbox:
+		if w.background != nil {
+			fill(img, box, *w.background)
+		}
 		size := int(math.Round(checkboxBox * s))
 		square := image.Rect(box.Min.X, box.Min.Y+(box.Dy()-size)/2, box.Min.X+size, box.Min.Y+(box.Dy()-size)/2+size)
 		if w.checked {
@@ -178,7 +236,7 @@ func drawWidget(img *image.RGBA, face font.Face, f frame, w *widget) {
 			outline(img, square.Inset(-2*line), colorFocus, line)
 		}
 		x := square.Max.X + int(math.Round(checkboxGap*s))
-		text(img, face, box, x, box, string(w.text), colorText)
+		text(img, face, box, x, box, string(w.text), foreground)
 	}
 }
 

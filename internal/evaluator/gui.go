@@ -110,6 +110,18 @@ func (session *Session) guiOperation(name string, receiver any, arguments []any)
 		return value
 	case "Checkbox.setChecked":
 		session.guiCheck(ahdruntime.AhdGUISetChecked(handle, flag(0, false)))
+	case "Window.setBackground":
+		session.guiCheck(ahdruntime.AhdGUIWindowSetBackground(handle, text(0, "")))
+	case "Container.setBackground", "Label.setBackground", "Button.setBackground", "TextInput.setBackground", "Checkbox.setBackground":
+		session.guiCheck(ahdruntime.AhdGUISetColor(handle, "background", text(0, "")))
+	case "Label.setForeground", "Button.setForeground", "TextInput.setForeground", "Checkbox.setForeground":
+		session.guiCheck(ahdruntime.AhdGUISetColor(handle, "foreground", text(0, "")))
+	case "Button.setEnabled", "TextInput.setEnabled", "Checkbox.setEnabled":
+		session.guiCheck(ahdruntime.AhdGUISetEnabled(handle, flag(0, true)))
+	case "Button.isEnabled", "TextInput.isEnabled", "Checkbox.isEnabled":
+		enabled, problem := ahdruntime.AhdGUIIsEnabled(handle)
+		session.guiCheck(problem)
+		return enabled
 	default:
 		session.raise("Error", "unsupported GUI operation "+name)
 	}

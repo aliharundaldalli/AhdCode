@@ -46,5 +46,8 @@ license and notice texts, is recorded in `licenses/modules.json` and
 `licenses/modules/` of the distribution. The PNG and SVG writers and the
 drawing model are AhdCode's own code.
 
+The window shows the AhdCode name and icon from AhdCode's own
+`cmd/ahdidentity` module, which is first-party code under AhdCode's MIT license.
+
 On Linux the helper uses the X11 and OpenGL libraries of the user's own
 desktop system at run time; none of them is redistributed.

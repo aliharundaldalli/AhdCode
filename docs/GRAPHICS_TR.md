@@ -422,6 +422,11 @@ bulunamazsa `Graphics.open` `GraphicsError` fırlatır.
   Stage Manager açıkken yeni bir Canvas penceresi onun arkasında ya da Stage
   Manager şeridinde açılabilir. Öne getirmek için Dock'taki simgesine ya da
   küçük önizlemesine tıklayın.
+- **Uygulama kimliği** (v1.9.0'dan itibaren): bir Canvas
+  penceresi AhdCode adını ve simgesini gösterir — macOS'ta menü çubuğunda
+  **AhdCode**'u ve Dock'ta AhdCode simgesini, Windows ve Linux'ta sistemin
+  gösterdiği yerlerde pencere simgesini. Çizim, olaylar ve kaydedilen
+  dosyalar değişmez.
 - **Windows**: Windows 10 ya da daha yenisi gerekir.
 - **Linux**: X11 ekranı olan (XWayland da sayılır) bir masaüstü oturumu ve
   sistemin OpenGL kitaplıkları gerekir. Ekran yoksa `Graphics.open`

@@ -4390,7 +4390,8 @@ func ahdPlotChartSpecOf(chart AhdChart) ahdPlotChartSpec {
 }
 
 // ahdPlotTempDir is AhdCode's own temporary area for Plot render requests and
-// Chart.show/Figure.show preview images.
+// Chart.show/Figure.show preview images. Every preview is removed as soon as
+// the viewer has read it (or show() failed).
 func ahdPlotTempDir(class *AhdClass) string {
 	dir := filepath.Join(os.TempDir(), "ahdcode", "plot")
 	if err := os.MkdirAll(dir, 0o700); err != nil {
@@ -4473,35 +4474,6 @@ func ahdPlotRender(class *AhdClass, request ahdPlotRequest) {
 			message = runErr.Error()
 		}
 		AhdRaiseClass(class, "rendering chart: "+message)
-	}
-}
-
-// ahdPlotOpenViewer opens an image with the platform's standard
-// image-opening mechanism, passing the path as an argument rather than
-// through a shell string. A short timeout keeps a headless environment (no
-// handler registered) from hanging.
-//
-// Windows deliberately does not go through "cmd /c start": cmd.exe re-scans
-// its whole command line for its own metacharacters (&, |, ^, %, and so on)
-// after argv-level quoting has already happened, so a path containing one of
-// those could be reinterpreted as shell syntax even though it arrived as a
-// single, properly quoted argument. rundll32's url.dll,FileProtocolHandler
-// entry point invokes the same file-association mechanism "start" uses,
-// without a cmd.exe shell in between.
-func ahdPlotOpenViewer(class *AhdClass, path string) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	var command *exec.Cmd
-	switch runtime.GOOS {
-	case "darwin":
-		command = exec.CommandContext(ctx, "open", path)
-	case "windows":
-		command = exec.CommandContext(ctx, "rundll32", "url.dll,FileProtocolHandler", path)
-	default:
-		command = exec.CommandContext(ctx, "xdg-open", path)
-	}
-	if err := command.Run(); err != nil {
-		AhdRaiseClass(class, "opening chart viewer: "+err.Error())
 	}
 }
 
@@ -4654,13 +4626,21 @@ func AhdPlotChartSave(class *AhdClass, chart AhdChart, path string) {
 	})
 }
 
+// AhdPlotChartShow renders the Chart exactly as save() would and opens it in
+// AhdCode's interactive viewer (see plotview.go).
 func AhdPlotChartShow(class *AhdClass, chart AhdChart) {
+	if problem := AhdPlotShowSizeProblem(chart.Width, chart.Height); problem != "" {
+		AhdRaiseClass(class, problem)
+	}
 	path := ahdPlotTempImagePath(class)
+	defer os.Remove(path)
 	ahdPlotRender(class, ahdPlotRequest{
 		OutputPath: path, Width: int(chart.Width), Height: int(chart.Height),
 		Rows: 1, Columns: 1, Charts: []ahdPlotChartSpec{ahdPlotChartSpecOf(chart)},
 	})
-	ahdPlotOpenViewer(class, path)
+	if problem := AhdPlotView(path, chart.Title); problem != "" {
+		AhdRaiseClass(class, problem)
+	}
 }
 
 // AhdPlotSubplotsValidate checks Figure construction's domain rules (rows >
@@ -4722,11 +4702,19 @@ func AhdPlotFigureSave(class *AhdClass, rows, columns int64, charts []AhdChart, 
 	ahdPlotRender(class, ahdPlotFigureRequest(rows, columns, charts, path, int(width), int(height)))
 }
 
+// AhdPlotFigureShow renders the Figure as one image, exactly as save() would,
+// and opens it in AhdCode's interactive viewer.
 func AhdPlotFigureShow(class *AhdClass, rows, columns int64, charts []AhdChart) {
-	path := ahdPlotTempImagePath(class)
 	width, height := AhdPlotFigureDefaultSize(rows, columns)
+	if problem := AhdPlotShowSizeProblem(width, height); problem != "" {
+		AhdRaiseClass(class, problem)
+	}
+	path := ahdPlotTempImagePath(class)
+	defer os.Remove(path)
 	ahdPlotRender(class, ahdPlotFigureRequest(rows, columns, charts, path, int(width), int(height)))
-	ahdPlotOpenViewer(class, path)
+	if problem := AhdPlotView(path, ""); problem != "" {
+		AhdRaiseClass(class, problem)
+	}
 }
 
 // ---------------------------------------------------------------------------

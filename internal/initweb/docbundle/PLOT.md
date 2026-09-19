@@ -168,18 +168,46 @@ chart.show() -> Nothing
 figure.show() -> Nothing
 ```
 
-`show()` renders to a unique temporary PNG and opens it with the platform's
-standard image-opening mechanism (`open` on macOS, `xdg-open` on Linux,
-Windows' file-association mechanism), so inspecting a chart never requires
-manually saving and locating a file. The temporary image lives in an
-AhdCode-specific area under the system temporary directory; it is not
-automatically deleted, since the external viewer needs to keep reading it
-after `show()` returns.
+> Since v1.9.0. Earlier releases opened the chart with the operating system's
+> image viewer.
 
-`show()` requires a desktop session. A headless environment (CI, a container
-with no display, no `xdg-open`/no handler registered) fails cleanly with a
-`PlotError` rather than hanging — every render/open step runs under a short
-timeout.
+`show()` opens the chart in AhdCode's own interactive viewer, a window named
+**AhdCode Plot** with the AhdCode icon. The chart is drawn exactly as
+`save()` would draw it, and the viewer lets you inspect it:
+
+| Control | Action |
+| --- | --- |
+| Mouse wheel or trackpad scroll | Zoom in and out around the pointer |
+| Drag with the left button | Pan |
+| `Q` / `E` | Turn the view a quarter turn left / right |
+| `R` | Reset: no turn, whole chart fitted, centered |
+| `Escape` | Close the viewer |
+
+A small overlay shows the zoom and the turn, and a one-line hint of the
+controls appears for the first seconds. The viewer opens at the chart's size
+(within the screen) and can be resized. Zoom ranges from a quarter of the
+fitted size up to 1600%; a chart smaller than the window stays centered, and
+a zoomed chart always covers the window, so it can never be lost — `R`
+brings back the whole chart. Turns are quarter turns only (0°, 90°, 180°,
+270°).
+
+**The viewer changes only the view.** Zooming, panning, and turning never
+change the `Chart` or `Figure`, its data or axes, or a file saved later:
+`chart.save("result.png")` after `show()` writes exactly what it would have
+written without it. There is no viewer API; `show()` has no parameters and
+the viewer has no menus, editing, or data picking.
+
+`show()` returns as soon as the viewer window is open. The program continues
+and may call `show()` again; each call opens its own viewer, and a viewer
+stays open until you close it, even after the program ends. `show()` renders
+the chart to a temporary PNG in an AhdCode-specific area of the system
+temporary directory; the viewer reads it completely and deletes it before
+`show()` returns, so no preview files accumulate.
+
+`show()` raises `PlotError` when the viewer cannot open: the bundled viewer
+is missing, no display is available (CI, a container, a remote shell), or
+the chart is larger than 6144 units on a side (show the chart smaller, or
+`save()` it). AhdCode never falls back to another application.
 
 ## Subplots
 

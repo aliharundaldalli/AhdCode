@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"image/color"
 	"io"
 	"strings"
 	"unicode/utf8"
@@ -20,7 +21,7 @@ import (
 // the protocol. The shape is duplicated field for field in
 // internal/backend/golang/ahdruntime/gui.go, which cannot import this module.
 const (
-	protocolVersion = 1
+	protocolVersion = 2
 
 	// maxRequestBytes bounds one request line; the longest field is a text
 	// of at most maxTextRunes characters.
@@ -57,6 +58,12 @@ type request struct {
 	Checked     *bool  `json:"checked,omitempty"`
 	Spacing     int    `json:"spacing,omitempty"`
 	Padding     int    `json:"padding,omitempty"`
+
+	// Part and Color set one color: Part is foreground or background, and
+	// Color is always #RRGGBBAA, already normalized by the runtime.
+	Part    string `json:"part,omitempty"`
+	Color   string `json:"color,omitempty"`
+	Enabled *bool  `json:"enabled,omitempty"`
 }
 
 // value is one TextInput or Checkbox reading.
@@ -170,4 +177,36 @@ func validateOpen(first request) error {
 		}
 	}
 	return nil
+}
+
+// parseColor reads the runtime's normalized #RRGGBBAA form, a straight
+// (non-premultiplied) color. The runtime
+// accepts the nine names, #RRGGBB, and #RRGGBBAA and always sends the long
+// form; the helper checks again because it trusts no input.
+func parseColor(text string) (color.NRGBA, bool) {
+	if len(text) != 9 || text[0] != '#' {
+		return color.NRGBA{}, false
+	}
+	var channels [4]uint8
+	for index := range channels {
+		high, okHigh := hexDigit(text[1+2*index])
+		low, okLow := hexDigit(text[2+2*index])
+		if !okHigh || !okLow {
+			return color.NRGBA{}, false
+		}
+		channels[index] = high<<4 | low
+	}
+	return color.NRGBA{channels[0], channels[1], channels[2], channels[3]}, true
+}
+
+func hexDigit(character byte) (uint8, bool) {
+	switch {
+	case character >= '0' && character <= '9':
+		return character - '0', true
+	case character >= 'a' && character <= 'f':
+		return character - 'a' + 10, true
+	case character >= 'A' && character <= 'F':
+		return character - 'A' + 10, true
+	}
+	return 0, false
 }
