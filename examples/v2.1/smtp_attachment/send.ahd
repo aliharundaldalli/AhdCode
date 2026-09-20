@@ -1,0 +1,64 @@
+// Send a message with real files attached.
+//
+// Point this at a local test server. It will not guess a real mailbox, and
+// there are no credentials in this file: a password, if the server wants
+// one, comes from the environment through Env.secret.
+//
+//   export SMTP_HOST=127.0.0.1
+//   export SMTP_PORT=2525
+//   export SMTP_SECURITY=none
+//   export SMTP_FROM=sender@example.com
+//   export SMTP_TO=student@example.com
+//   ahdcode run send.ahd
+//
+// Attachments are new in v2.1. Each one names a local file; its bytes are
+// read when the message is sent and base64-encoded straight into the
+// connection, so a large file never becomes an AhdCode String.
+bring Env
+bring File
+bring QR
+from QR bring QRCode
+bring SMTP
+from SMTP bring SMTPClient
+from SMTP bring SMTPMessage
+from SMTP bring SMTPError
+
+host: String := Env.getOr("SMTP_HOST", "127.0.0.1")
+port: Int := int(Env.getOr("SMTP_PORT", "2525"))
+security: String := Env.getOr("SMTP_SECURITY", "none")
+fromAddress: String := Env.getOr("SMTP_FROM", "sender@example.com")
+toAddress: String := Env.getOr("SMTP_TO", "student@example.com")
+
+// Two files worth attaching: one text, one genuinely binary.
+File.writeText("summary.txt", "Ölçüm özeti\nToplam: 42\n")
+code: QRCode := QR.create("https://ahdcode.org")
+code.savePNG("chart.png", 256)
+
+client: SMTPClient := SMTP.client(host, port, security)
+// A username and password only when the environment supplies them, and
+// never over an unencrypted connection: AhdCode refuses that itself.
+user: String? := Env.get("SMTP_USER")
+password: String? := Env.secret("SMTP_PASSWORD")
+if user != null and password != null {
+    client = client.withPlainAuth(user, password)
+}
+
+message: SMTPMessage := SMTP.message(
+    fromAddress
+    [toAddress]
+    "Ölçüm raporu"
+)
+message = message.withText("Rapor ekte.")
+message = message.withHtml("<p>Rapor <strong>ekte</strong>.</p>")
+// The second argument is the name the recipient sees; the third is the
+// content type. Both are optional: an empty name uses the file's own.
+message = message.withAttachment("summary.txt", "Özet.txt", "text/plain; charset=utf-8")
+message = message.withAttachment("chart.png", "", "image/png")
+
+attempt {
+    client.send(message)
+    write("sent a text and HTML message with two attachments")
+} except SMTPError as error {
+    // A failure never names the password, whatever went wrong.
+    write(error.message)
+}

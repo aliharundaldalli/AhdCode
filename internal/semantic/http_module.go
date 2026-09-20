@@ -24,9 +24,15 @@ var (
 	httpClientRequestClass  = &types.ClassSymbol{ModuleID: httpModuleID, Name: "ClientRequest"}
 	httpClientResponseClass = &types.ClassSymbol{ModuleID: httpModuleID, Name: "ClientResponse"}
 	httpUploadedFileClass   = &types.ClassSymbol{ModuleID: httpModuleID, Name: "UploadedFile"}
+	// Binary-safe outbound downloads (v2.1.0).
+	httpClientFileResponseClass = &types.ClassSymbol{ModuleID: httpModuleID, Name: "ClientFileResponse"}
 	// WebSocket server support (v1.4.0).
 	httpWebSocketClass         = &types.ClassSymbol{ModuleID: httpModuleID, Name: "WebSocket"}
 	httpWebSocketEndpointClass = &types.ClassSymbol{ModuleID: httpModuleID, Name: "WebSocketEndpoint"}
+	// WebSocket client support (v2.1.0): immutable configuration, and one
+	// live connection the handshake produced.
+	httpWebSocketClientClass     = &types.ClassSymbol{ModuleID: httpModuleID, Name: "WebSocketClient"}
+	httpWebSocketConnectionClass = &types.ClassSymbol{ModuleID: httpModuleID, Name: "WebSocketConnection"}
 	// RequestContext is the bundled Web class. HTTP.contextHandler only
 	// adapts already-checked Functions; it does not own Web policy.
 	webRequestContextClass = &types.ClassSymbol{ModuleID: "framework:WebContext", Name: "RequestContext"}
@@ -52,9 +58,18 @@ func HTTPClientResponseIdentity() *types.ClassSymbol {
 func HTTPUploadedFileIdentity() *types.ClassSymbol {
 	return httpUploadedFileClass
 }
+func HTTPClientFileResponseIdentity() *types.ClassSymbol {
+	return httpClientFileResponseClass
+}
 func HTTPWebSocketIdentity() *types.ClassSymbol { return httpWebSocketClass }
 func HTTPWebSocketEndpointIdentity() *types.ClassSymbol {
 	return httpWebSocketEndpointClass
+}
+func HTTPWebSocketClientIdentity() *types.ClassSymbol {
+	return httpWebSocketClientClass
+}
+func HTTPWebSocketConnectionIdentity() *types.ClassSymbol {
+	return httpWebSocketConnectionClass
 }
 
 // HTTPServerOperations, HTTPRequestOperations, and HTTPResponseOperations
@@ -79,9 +94,26 @@ var HTTPResponseOperations = []string{"withHeader", "withCookie"}
 var HTTPCookieOperations = []string{"withPath", "withHttpOnly", "withSecure", "withSameSite", "withMaxAge"}
 var HTTPSessionStoreOperations = []string{"open", "commit"}
 var HTTPSessionOperations = []string{"get", "has", "set", "remove", "clear", "rotate", "destroy"}
-var HTTPClientOperations = []string{"send", "get", "post"}
-var HTTPClientRequestOperations = []string{"withHeader", "addHeader", "withBody"}
+var HTTPClientOperations = []string{"send", "get", "post", "download", "sendToFile"}
+var HTTPClientRequestOperations = []string{
+	"withHeader", "addHeader", "withBody", "withMultipartField", "withMultipartFile",
+}
 var HTTPClientResponseOperations = []string{"status", "body", "header", "headerAll", "url"}
+
+// HTTPClientFileResponseOperations is the v2.1.0 file-oriented response
+// surface. There is deliberately no body(): the payload went to the
+// destination file, and arbitrary bytes are never an AhdCode String.
+var HTTPClientFileResponseOperations = []string{"status", "header", "headerAll", "url", "size"}
+
+// The v2.1.0 WebSocket client: immutable configuration, then one live
+// connection. receive is synchronous; there is no callback, no background
+// event loop, and no automatic reconnect.
+var HTTPWebSocketClientOperations = []string{
+	"withHeader", "withTimeout", "withMaxMessageBytes", "connect",
+}
+var HTTPWebSocketConnectionOperations = []string{
+	"send", "receive", "close", "isOpen", "closeCode", "closeReason",
+}
 
 // HTTPUploadedFileOperations is the read-only v0.8.0 upload surface. There
 // is deliberately no bytes()/raw()/stream()/tempPath(): the payload stays
@@ -105,6 +137,9 @@ func httpClientResponseType() types.Type {
 }
 func httpUploadedFileType() types.Type {
 	return types.Class{Symbol: httpUploadedFileClass}
+}
+func httpClientFileResponseType() types.Type {
+	return types.Class{Symbol: httpClientFileResponseClass}
 }
 
 func httpHandlerType() types.Type {
@@ -136,6 +171,12 @@ func httpContextRouteHandlerType() types.Type {
 func httpWebSocketType() types.Type { return types.Class{Symbol: httpWebSocketClass} }
 func httpWebSocketEndpointType() types.Type {
 	return types.Class{Symbol: httpWebSocketEndpointClass}
+}
+func httpWebSocketClientType() types.Type {
+	return types.Class{Symbol: httpWebSocketClientClass}
+}
+func httpWebSocketConnectionType() types.Type {
+	return types.Class{Symbol: httpWebSocketConnectionClass}
 }
 
 // The four WebSocket callback shapes. The accept check returns Response?:
@@ -183,8 +224,10 @@ func httpModuleInterface() *ModuleInterface {
 		{"Cookie", httpCookieClass}, {"SessionStore", httpSessionStoreClass},
 		{"Session", httpSessionClass}, {"Client", httpClientClass},
 		{"ClientRequest", httpClientRequestClass}, {"ClientResponse", httpClientResponseClass},
+		{"ClientFileResponse", httpClientFileResponseClass},
 		{"UploadedFile", httpUploadedFileClass},
 		{"WebSocket", httpWebSocketClass}, {"WebSocketEndpoint", httpWebSocketEndpointClass},
+		{"WebSocketClient", httpWebSocketClientClass}, {"WebSocketConnection", httpWebSocketConnectionClass},
 	}
 	for _, entry := range classes {
 		symbol := &Symbol{
@@ -247,6 +290,10 @@ func httpModuleInterface() *ModuleInterface {
 	// registers it.
 	addStandardExport(module, standardFunction(httpModuleID, "websocket", httpWebSocketEndpointType(),
 		types.Parameter{Name: "onMessage", Type: webSocketMessageHandlerType()}))
+	// webSocketClient (v2.1.0) creates immutable client configuration. No
+	// network activity happens until WebSocketClient.connect.
+	addStandardExport(module, standardFunction(httpModuleID, "webSocketClient", httpWebSocketClientType(),
+		types.Parameter{Name: "url", Type: types.String}))
 	sort.Strings(module.ExportNames)
 	return module
 }
@@ -274,12 +321,18 @@ func httpConstructionHint(identity *types.ClassSymbol) (string, bool) {
 		return "create a ClientRequest with HTTP.clientRequest", true
 	case "ClientResponse":
 		return "ClientResponse values are produced by Client.send, Client.get, or Client.post", true
+	case "ClientFileResponse":
+		return "ClientFileResponse values are produced by Client.download or Client.sendToFile", true
 	case "UploadedFile":
 		return "UploadedFile values are produced by Request.file or Request.files", true
 	case "WebSocket":
 		return "WebSocket values are produced for each connection a WebSocketEndpoint accepts", true
 	case "WebSocketEndpoint":
 		return "create a WebSocketEndpoint with HTTP.websocket(onMessage)", true
+	case "WebSocketClient":
+		return "create a WebSocketClient with HTTP.webSocketClient(url)", true
+	case "WebSocketConnection":
+		return "WebSocketConnection values are produced by WebSocketClient.connect", true
 	}
 	return "", false
 }
@@ -340,9 +393,22 @@ func httpOperationShapes() map[TypeOperation]httpOperationShape {
 		HTTPClientGet:  {[]types.Type{types.String}, httpClientResponseType(), false, "pass one String URL"},
 		HTTPClientPost: {[]types.Type{types.String, types.String, types.String}, httpClientResponseType(), false, "pass a URL String, a body String, and optionally a Content-Type String"},
 
+		HTTPClientDownload:   {[]types.Type{types.String, types.String}, httpClientFileResponseType(), false, "pass a URL String and a destination path String"},
+		HTTPClientSendToFile: {[]types.Type{httpClientRequestType(), types.String}, httpClientFileResponseType(), false, "pass one ClientRequest and a destination path String"},
+
 		HTTPClientRequestWithHeader: {[]types.Type{types.String, types.String}, httpClientRequestType(), false, "pass a header name String and a header value String"},
 		HTTPClientRequestAddHeader:  {[]types.Type{types.String, types.String}, httpClientRequestType(), false, "pass a header name String and a header value String"},
 		HTTPClientRequestWithBody:   {[]types.Type{types.String}, httpClientRequestType(), false, "pass one String body"},
+		HTTPClientRequestWithMultipartField: {[]types.Type{types.String, types.String}, httpClientRequestType(), false,
+			"pass a multipart field name String and its value String"},
+		HTTPClientRequestWithMultipartFile: {[]types.Type{types.String, types.String, types.String, types.String}, httpClientRequestType(), false,
+			"pass a multipart field name String, a local file path String, and optionally a presentation file name String and a content type String"},
+
+		HTTPClientFileResponseStatus:    {none, types.Int, false, "call status with no argument"},
+		HTTPClientFileResponseHeader:    {[]types.Type{types.String}, types.String, true, "pass one String header name"},
+		HTTPClientFileResponseHeaderAll: {[]types.Type{types.String}, strings, false, "pass one String header name"},
+		HTTPClientFileResponseURL:       {none, types.String, false, "call url with no argument"},
+		HTTPClientFileResponseSize:      {none, types.Int, false, "call size with no argument"},
 
 		HTTPClientResponseStatus:    {none, types.Int, false, "call status with no argument"},
 		HTTPClientResponseBody:      {none, types.String, false, "call body with no argument"},
@@ -373,6 +439,18 @@ func httpOperationShapes() map[TypeOperation]httpOperationShape {
 		HTTPWebSocketSend:   {[]types.Type{types.String}, types.Bool, false, "pass one String message"},
 		HTTPWebSocketClose:  {[]types.Type{types.Int, types.String}, types.Nothing, false, "optionally pass a close code Int and a reason String"},
 		HTTPWebSocketIsOpen: {none, types.Bool, false, "call isOpen with no argument"},
+
+		HTTPWebSocketClientWithHeader:          {[]types.Type{types.String, types.String}, httpWebSocketClientType(), false, "pass a handshake header name String and a header value String"},
+		HTTPWebSocketClientWithTimeout:         {[]types.Type{types.Int}, httpWebSocketClientType(), false, "pass the handshake timeout in seconds as Int"},
+		HTTPWebSocketClientWithMaxMessageBytes: {[]types.Type{types.Int}, httpWebSocketClientType(), false, "pass the largest accepted message in bytes as Int"},
+		HTTPWebSocketClientConnect:             {none, httpWebSocketConnectionType(), false, "call connect with no argument"},
+
+		HTTPWebSocketConnectionSend:        {[]types.Type{types.String}, types.Bool, false, "pass one String message"},
+		HTTPWebSocketConnectionReceive:     {[]types.Type{types.Int}, types.String, true, "optionally pass a timeout in seconds as Int; 0 waits until a message or a close"},
+		HTTPWebSocketConnectionClose:       {[]types.Type{types.Int, types.String}, types.Nothing, false, "optionally pass a close code Int and a reason String"},
+		HTTPWebSocketConnectionIsOpen:      {none, types.Bool, false, "call isOpen with no argument"},
+		HTTPWebSocketConnectionCloseCode:   {none, types.Int, true, "call closeCode with no argument"},
+		HTTPWebSocketConnectionCloseReason: {none, types.String, false, "call closeReason with no argument"},
 	}
 }
 
@@ -403,15 +481,25 @@ var httpOperationNames = map[string]map[string]TypeOperation{
 		"remove": HTTPSessionRemove, "clear": HTTPSessionClear,
 		"rotate": HTTPSessionRotate, "destroy": HTTPSessionDestroy,
 	},
-	"Client": {"send": HTTPClientSend, "get": HTTPClientGet, "post": HTTPClientPost},
+	"Client": {
+		"send": HTTPClientSend, "get": HTTPClientGet, "post": HTTPClientPost,
+		"download": HTTPClientDownload, "sendToFile": HTTPClientSendToFile,
+	},
 	"ClientRequest": {
 		"withHeader": HTTPClientRequestWithHeader, "addHeader": HTTPClientRequestAddHeader,
-		"withBody": HTTPClientRequestWithBody,
+		"withBody":           HTTPClientRequestWithBody,
+		"withMultipartField": HTTPClientRequestWithMultipartField,
+		"withMultipartFile":  HTTPClientRequestWithMultipartFile,
 	},
 	"ClientResponse": {
 		"status": HTTPClientResponseStatus, "body": HTTPClientResponseBody,
 		"header": HTTPClientResponseHeader, "headerAll": HTTPClientResponseHeaderAll,
 		"url": HTTPClientResponseURL,
+	},
+	"ClientFileResponse": {
+		"status": HTTPClientFileResponseStatus, "header": HTTPClientFileResponseHeader,
+		"headerAll": HTTPClientFileResponseHeaderAll, "url": HTTPClientFileResponseURL,
+		"size": HTTPClientFileResponseSize,
 	},
 	"UploadedFile": {
 		"originalName":        HTTPUploadedFileOriginalName,
@@ -429,12 +517,28 @@ var httpOperationNames = map[string]map[string]TypeOperation{
 		"withMaxQueuedMessages": HTTPWebSocketEndpointWithMaxQueuedMessages,
 		"withMaxConnections":    HTTPWebSocketEndpointWithMaxConnections,
 	},
+	"WebSocketClient": {
+		"withHeader": HTTPWebSocketClientWithHeader, "withTimeout": HTTPWebSocketClientWithTimeout,
+		"withMaxMessageBytes": HTTPWebSocketClientWithMaxMessageBytes,
+		"connect":             HTTPWebSocketClientConnect,
+	},
+	"WebSocketConnection": {
+		"send": HTTPWebSocketConnectionSend, "receive": HTTPWebSocketConnectionReceive,
+		"close": HTTPWebSocketConnectionClose, "isOpen": HTTPWebSocketConnectionIsOpen,
+		"closeCode": HTTPWebSocketConnectionCloseCode, "closeReason": HTTPWebSocketConnectionCloseReason,
+	},
 }
 
 // httpOptionalTrailingArguments lists the operations whose trailing arguments
-// may be omitted, and how many: Client.post's content type, and
-// WebSocket.close's code and reason.
-var httpOptionalTrailingArguments = map[TypeOperation]int{HTTPClientPost: 1, HTTPWebSocketClose: 2}
+// may be omitted, and how many: Client.post's content type,
+// withMultipartFile's presentation name and content type, the receive
+// timeout, and both close codes and reasons.
+var httpOptionalTrailingArguments = map[TypeOperation]int{
+	HTTPClientPost: 1, HTTPWebSocketClose: 2,
+	HTTPClientRequestWithMultipartFile: 2,
+	HTTPWebSocketConnectionReceive:     1,
+	HTTPWebSocketConnectionClose:       2,
+}
 
 func httpOperationFor(receiver types.Type, name string) (TypeOperation, bool) {
 	class, ok := receiver.(types.Class)

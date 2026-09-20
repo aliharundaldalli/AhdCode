@@ -1,0 +1,55 @@
+// A local service that receives a binary file and hands it back.
+//
+// Start it first, then run client.ahd in another terminal. Stop it later
+// with: ahdcode kill server.run
+//
+// Nothing here is new in v2.1: receiving a multipart upload and serving a
+// file are the v0.8 and v0.9 server APIs. The new part is the client.
+bring Path
+bring File
+bring HTTP
+from HTTP bring Server
+from HTTP bring Request
+from HTTP bring Response
+from HTTP bring UploadedFile
+
+// Where an upload is kept until the client asks for it back. One stored
+// path at a time is all this example needs.
+stored: Pair<String, String> := {}
+
+receive: Function := (request: Request) -> Response {
+    stored: Global Pair<String, String>
+    title: Local String? := request.form("title")
+    upload: Local UploadedFile? := request.file("file")
+    if upload == null {
+        return HTTP.text("no file was uploaded", 400)
+    }
+    File.createDir("received")
+    // save() writes the bytes under a name it chooses; the browser-supplied
+    // name is display metadata and never reaches the filesystem.
+    path: Local String := upload.save("received")
+    stored["path"] = path
+    stored["type"] = upload.detectedContentType()
+    heading: Local String := "untitled"
+    if title != null {
+        heading = title
+    }
+    write("received " + upload.originalName() + " as " + Path.base(path) + " (" + str(upload.size()) + " bytes)")
+    // The client compares this against what it downloads back.
+    return HTTP.text(heading + "\n" + str(upload.size()) + "\n")
+}
+
+send: Function := (request: Request) -> Response {
+    stored: Global Pair<String, String>
+    if "path" not in stored {
+        return HTTP.text("nothing has been uploaded yet", 404)
+    }
+    // HTTP.file streams the file from disk; its bytes never become a String.
+    return HTTP.file(stored["path"], stored["type"])
+}
+
+app: Server := HTTP.server("127.0.0.1", 8137, 8388608)
+app.post("/upload", receive)
+app.get("/file", send)
+write("file transfer service on http://127.0.0.1:8137")
+app.start()

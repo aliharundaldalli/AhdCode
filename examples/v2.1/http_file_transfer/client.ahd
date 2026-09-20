@@ -1,0 +1,62 @@
+// Upload a binary file over HTTP and download a binary answer back.
+//
+// Start server.ahd first, then: ahdcode run client.ahd
+//
+// Both directions are new in v2.1. A PNG is not text, so neither the upload
+// nor the download passes through an AhdCode String: the file's bytes are
+// streamed from disk into the request, and the response body is streamed
+// straight into a file.
+bring QR
+from QR bring QRCode
+bring File
+bring HTTP
+from HTTP bring Client
+from HTTP bring ClientRequest
+from HTTP bring ClientResponse
+from HTTP bring ClientFileResponse
+from HTTP bring HTTPError
+
+base: String := "http://127.0.0.1:8137"
+
+// Something genuinely binary to send: a QR code PNG.
+code: QRCode := QR.create("https://ahdcode.org")
+code.savePNG("qr.png", 256)
+write("made qr.png")
+
+client: Client := HTTP.client(timeoutSeconds: 10)
+
+attempt {
+    // withMultipartField adds an ordinary form field; withMultipartFile
+    // names a local file to stream. The request stays immutable: each call
+    // returns a new one.
+    upload: Local ClientRequest := HTTP.clientRequest("POST", base + "/upload")
+    withTitle: Local ClientRequest := upload.withMultipartField("title", "a QR code")
+    // The third argument is the name the server is told; the fourth is the
+    // content type. Both are optional.
+    withFile: Local ClientRequest := withTitle.withMultipartFile("file", "qr.png", "qr.png", "image/png")
+    answer: Local ClientResponse := client.send(withFile)
+    if answer.status() != 200 {
+        write("upload failed with " + str(answer.status()))
+    } else {
+        lines: Local List<String> := answer.body().trim().split("\n")
+        write("server stored " + lines[1] + " bytes")
+
+        // download writes the response body to the path and returns only
+        // metadata: there is no body() to read the bytes from.
+        fetched: Local ClientFileResponse := client.download(base + "/file", "returned.png")
+        write("status " + str(fetched.status()))
+        write("wrote returned.png, " + str(fetched.size()) + " bytes")
+        contentType: Local String? := fetched.header("Content-Type")
+        if contentType != null {
+            write("content type " + contentType)
+        }
+        if str(fetched.size()) == lines[1] {
+            write("round trip complete: the file came back the same size it went out")
+        } else {
+            write("round trip mismatch")
+        }
+    }
+}
+except HTTPError as error {
+    write("transfer failed: " + error.message)
+}

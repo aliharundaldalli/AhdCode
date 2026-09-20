@@ -280,3 +280,97 @@ func ahdWebSocketLogFailure(recovered any) {
 	}
 	fmt.Fprintf(os.Stderr, "ahdcode: WebSocket handler panic: %v\n", recovered)
 }
+
+// --- the client connection (v2.1.0) ---
+//
+// The client half of websocket_client.go: the opening handshake, and the one
+// live connection behind a WebSocketConnection. Everything that names the
+// vendored library lives here, so a program that uses no WebSocket at all
+// still compiles without it.
+
+func init() {
+	ahdWebSocketClientDialer = ahdWebSocketClientDial
+}
+
+// ahdWebSocketClientConn implements ahdWebSocketClientLink over one vendored
+// connection. Only the reader goroutine calls read; write, shutdown, and drop
+// may be called from the program's goroutine at the same time, which the
+// library allows.
+type ahdWebSocketClientConn struct {
+	conn  *websocket.Conn
+	limit int64
+}
+
+// ahdWebSocketClientTransport is the transport every handshake goes through.
+// It is a variable only so the runtime's own tests can point a wss:// fixture
+// at their certificate authority, the same way the ping interval is a
+// variable so they can shorten it. Nothing in AhdCode can reach it: its
+// default is the standard transport, which verifies the certificate and the
+// host name against the system roots, and there is no insecure mode.
+var ahdWebSocketClientTransport http.RoundTripper = http.DefaultTransport
+
+// ahdWebSocketClientDial performs the opening handshake.
+func ahdWebSocketClientDial(config ahdWebSocketClientConfig) (ahdWebSocketClientLink, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(config.timeoutSeconds)*time.Second)
+	defer cancel()
+	header := make(http.Header)
+	for _, pair := range config.headers {
+		header.Set(pair.Name, pair.Value)
+	}
+	conn, response, err := websocket.Dial(ctx, config.url, &websocket.DialOptions{
+		HTTPClient:      &http.Client{Transport: ahdWebSocketClientTransport},
+		HTTPHeader:      header,
+		CompressionMode: websocket.CompressionDisabled,
+	})
+	if response != nil && response.Body != nil {
+		_ = response.Body.Close()
+	}
+	if err != nil {
+		return nil, err
+	}
+	// One byte past the limit is allowed through so an oversize message is
+	// recognized by AhdCode and answered with its own 1009, exactly as the
+	// server half does.
+	conn.SetReadLimit(config.maxMessageBytes + 1)
+	return &ahdWebSocketClientConn{conn: conn, limit: config.maxMessageBytes}, nil
+}
+
+// read blocks for the next message. A control frame, a ping, and a pong are
+// handled inside the library; only a data message or the end of the
+// connection comes back here.
+func (link *ahdWebSocketClientConn) read() (ahdWebSocketClientFrame, bool) {
+	messageType, reader, err := link.conn.Reader(context.Background())
+	if err != nil {
+		code, reason := ahdWebSocketPeerClose(err)
+		return ahdWebSocketClientFrame{closed: true, code: code, reason: reason}, true
+	}
+	payload, err := io.ReadAll(io.LimitReader(reader, link.limit+1))
+	if err != nil {
+		code, reason := ahdWebSocketPeerClose(err)
+		return ahdWebSocketClientFrame{closed: true, code: code, reason: reason}, true
+	}
+	if int64(len(payload)) > link.limit {
+		return ahdWebSocketClientFrame{oversize: true}, false
+	}
+	if messageType != websocket.MessageText {
+		return ahdWebSocketClientFrame{binary: true}, false
+	}
+	if !utf8.Valid(payload) {
+		return ahdWebSocketClientFrame{invalidUTF8: true}, false
+	}
+	return ahdWebSocketClientFrame{text: string(payload)}, false
+}
+
+func (link *ahdWebSocketClientConn) write(text string, timeout time.Duration) error {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	return link.conn.Write(ctx, websocket.MessageText, []byte(text))
+}
+
+func (link *ahdWebSocketClientConn) shutdown(code int64, reason string) {
+	_ = link.conn.Close(websocket.StatusCode(code), reason)
+}
+
+func (link *ahdWebSocketClientConn) drop() {
+	_ = link.conn.CloseNow()
+}

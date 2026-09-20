@@ -45,10 +45,19 @@ dosya için ikili-güvenli yanıtlar sağlayan `HTTP.file` ve `HTTP.download`
 ekler. Sunucu `Request`/`Response` ile giden `ClientRequest`/`ClientResponse`
 ayrı türlerdir. v1.4.0, aynı `Server` üzerinde WebSocket sunucu uç noktaları
 ekler; bkz. [WebSocket](WEBSOCKET_TR.md).
-Middleware, yönlendirici DSL'si, multipart, yol parametresi, kimlik
+v2.1, dosya aktarımının giden yarısını ekler: `Client.download` ve
+`Client.sendToFile` bir yanıt gövdesini doğrudan dosyaya yazar,
+`ClientRequest.withMultipartField` ve `withMultipartFile` ise bir
+`multipart/form-data` gövdesi gönderir.
+
+Böylece multipart iki yönde de desteklenir ve her zaman bayt türüyle değil
+dosyalarla: **gelen** dosya yüklemeleri `Request.file` / `Request.files`
+ile ulaşır (v0.8.0), **giden** dosya yüklemeleri ise `withMultipartFile`
+tarafından diskten akıtılır (v2.1). Düşük seviyeli HTTP her ikisinde de açık
+ve tür güvenlidir: middleware, yönlendirici DSL'si, yol parametresi, kimlik
 doğrulama çerçevesi veya yapay zeka satıcı modülü yoktur. Uygulama, AhdCode
 çalışma zamanının içindeki Go `net/http` paketini kullanır; ayrı bir HTTP,
-çerez, oturum veya istemci yardımcı süreci yoktur.
+çerez, oturum, istemci veya yükleme yardımcı süreci yoktur.
 
 ## Genel yüzey
 
@@ -75,6 +84,7 @@ HTTP.client(
     followRedirects: Bool := true
 ) -> Client
 HTTP.clientRequest(method: String, url: String) -> ClientRequest
+HTTP.webSocketClient(url: String) -> WebSocketClient
 HTTP.contextHandler(
     store: SessionStore
     opener: Function(Request, SessionStore) -> RequestContext
@@ -140,10 +150,19 @@ Client.post(
     body: String
     contentType: String := "text/plain; charset=utf-8"
 ) -> ClientResponse
+Client.download(url: String, path: String)              -> ClientFileResponse
+Client.sendToFile(request: ClientRequest, path: String) -> ClientFileResponse
 
 ClientRequest.withHeader(name: String, value: String) -> ClientRequest
 ClientRequest.addHeader(name: String, value: String)  -> ClientRequest
 ClientRequest.withBody(body: String)                  -> ClientRequest
+ClientRequest.withMultipartField(name: String, value: String) -> ClientRequest
+ClientRequest.withMultipartFile(
+    name: String
+    path: String
+    fileName: String := ""
+    contentType: String := "application/octet-stream"
+) -> ClientRequest
 
 ClientResponse.status()              -> Int
 ClientResponse.body()                -> String
@@ -151,13 +170,21 @@ ClientResponse.header(name: String)  -> String?
 ClientResponse.headerAll(name: String) -> List<String>
 ClientResponse.url()                 -> String
 
+ClientFileResponse.status()              -> Int
+ClientFileResponse.header(name: String)  -> String?
+ClientFileResponse.headerAll(name: String) -> List<String>
+ClientFileResponse.url()                 -> String
+ClientFileResponse.size()                -> Int
+
 HTTPError  (Error'dan türer)
 ```
 
-`Server`, `Request`, `Response`, `Cookie`, `SessionStore`, `Session`, `Client`,
-`ClientRequest` ve `ClientResponse` opak yerleşik Sınıflardır. Atlanan
-`HTTP.sessions` argümanları `ahd_session`, `86400`, `false` ve `"Lax"`'tır.
-Atlanan `HTTP.client` argümanları `30`, `8388608` ve `true`'dur.
+`Server`, `Request`, `Response`, `Cookie`, `SessionStore`, `Session`,
+`Client`, `ClientRequest`, `ClientResponse` ve `ClientFileResponse` opak
+yerleşik Sınıflardır. Atlanan `HTTP.sessions` argümanları `ahd_session`,
+`86400`, `false` ve `"Lax"`'tır. Atlanan `HTTP.client` argümanları `30`,
+`8388608` ve `true`'dur. Atlanan `withMultipartFile` argümanları `""`
+(yolun kendi taban adı) ve `application/octet-stream`'dir.
 
 `HTTP.contextHandler`, `Web.routes` tarafından kullanılan v0.17 kayıt
 adaptörüdür. Oturumu kendisi sonlandırmaz ve genel bir middleware zinciri
@@ -418,7 +445,8 @@ UTF-8 olmayan bir gövde için `HTTPError` fırlatır. Bu nedenle ikili bir
 multipart gövdesi `body()` ile okunamaz -- bu bilinçlidir. Yüklemeler için
 `file`/`files`, multipart metin alanları için `form`/`formAll` kullanın.
 
-v0.8.0'da giden multipart yoktur: `ClientRequest` bir dosya ekleyemez.
+v0.8.0'da giden multipart yoktu. v2.1 bunu ekler: bkz.
+[Giden multipart ve dosya yükleme](#giden-multipart-ve-dosya-yükleme).
 
 ## Yanıt
 
@@ -543,6 +571,131 @@ yoktur. `http://` localhost için desteklenir.
 yönlendirme izler. **HTTPS → HTTP yönlendirmesi reddedilir.** Konak veya
 port değişince `Authorization` ve `Cookie` iletilmez.
 
+### İkili-güvenli indirmeler
+
+`ClientResponse.body()` bir `String`'dir, yani metin taşır. PNG, ZIP veya
+PDF metin değildir; rastgele baytları bir `String`'e zorlamak onları ya
+bozar ya da hata fırlatır. v2.1 bunun yerine dosya odaklı ikinci bir yanıt
+yolu ekler:
+
+```text
+Client.download(url: String, path: String)              -> ClientFileResponse
+Client.sendToFile(request: ClientRequest, path: String) -> ClientFileResponse
+```
+
+`download(url, path)`, gövdesi `path` dosyasına yazılan bir GET'tir.
+`sendToFile(request, path)` aynısını herhangi bir `ClientRequest` için
+yapar; böylece bir indirme kendi başlıklarını, yöntemini veya gövdesini
+taşıyabilir.
+
+İkisi de opak bir `ClientFileResponse` döndürür ve bu türün bilinçli olarak
+**`body()`'si yoktur**: yük, adını verdiğiniz dosyadadır.
+
+```ahd
+client: Client := HTTP.client(timeoutSeconds: 30)
+answer: ClientFileResponse := client.download("https://example.com/report.pdf", "report.pdf")
+write(str(answer.status()))
+write(str(answer.size()) + " bayt yazıldı")
+```
+
+`size()`, hedefe gerçekten yazılan bayt sayısıdır; bir `Content-Length`
+iddiası değildir. `status()`, `header`, `headerAll` ve `url`, bir
+`ClientResponse` üzerindeki davranışlarının aynısını gösterir.
+
+Gövde akıtılır: bağlantıdan dosyaya parça parça gider ve hiçbir zaman
+bütünüyle bellekte tutulmaz.
+
+**Durum kodu yine bir yanıttır, başarısızlık değil.** `download` modülün
+mevcut felsefesini sürdürür: `404` ve `500` geçerli HTTP yanıtlarıdır, o
+durumla bir `ClientFileResponse` döner ve sunucunun gönderdiği gövde —
+genellikle bir hata sayfası — dosyaya yazılır. Dosyaya güvenmeden önce
+`status()` değerine bakın. Yalnızca taşıma, TLS, sınır veya dosya sistemi
+hataları `HTTPError` fırlatır.
+
+**Başarısız bir indirme hedefe asla zarar vermez.** Baytlar önce hedefin
+yanındaki geçici bir dosyaya gider; hedef ancak aktarım tamamlandığında
+değiştirilir. Kesilen bir istek, `maxResponseBytes` sınırını aşan bir yanıt
+veya bir dosya sistemi hatası `HTTPError` fırlatır, geçici dosyayı siler ve
+o yoldaki mevcut dosyayı olduğu gibi bırakır.
+
+`maxResponseBytes`, akıtılan bir yanıtı tamponlanan bir yanıtı sınırladığı
+gibi sınırlar: akıtılan, sınırsız demek değildir. Üst dizin önceden var
+olmalıdır — AhdCode, programın istemediği bir dizini oluşturmaz — ve
+kendisi dizin olan bir hedef `HTTPError` fırlatır. Göreli bir yol,
+AhdCode'daki her yol gibi süreç çalışma dizinine göre çözülür.
+
+### Giden multipart ve dosya yükleme
+
+Bir `ClientRequest`, multipart parçaları taşıdığında `multipart/form-data`
+gövdesi gönderir:
+
+```text
+ClientRequest.withMultipartField(name: String, value: String) -> ClientRequest
+ClientRequest.withMultipartFile(
+    name: String
+    path: String
+    fileName: String := ""
+    contentType: String := "application/octet-stream"
+) -> ClientRequest
+```
+
+İkisi de **yeni** bir `ClientRequest` döndürür; her `with*` gibi özgün
+istek değişmez. Parçalar eklendikleri sırayla gönderilir ve bir alan adı,
+bir HTML formunun aynı onay kutusu adını yinelemesi gibi yinelenebilir.
+
+```ahd
+upload: ClientRequest := HTTP.clientRequest("POST", "https://example.com/upload")
+withTitle: ClientRequest := upload.withMultipartField("title", "Ölçüm raporu")
+withFile: ClientRequest := withTitle.withMultipartFile("file", "report.pdf", "", "application/pdf")
+answer: ClientResponse := client.send(withFile)
+```
+
+`withMultipartFile` içinde `path`, okunacak yerel dosyadır; `fileName` ise
+**yalnızca sunum verisidir** — sunucuya bildirilen ad. Boş bir `fileName`,
+yolun kendi taban adını kullanır. Her iki durumda da ad düz bir taban adına
+indirgenir; böylece `../../etc/passwd` gibi bir ad `passwd` olarak gider ve
+asla bir yol gibi davranamaz. `contentType` geçerli bir ortam türü olmalıdır.
+
+Dosyanın baytları hiçbir zaman AhdCode `String`'ine dönüşmez. Bağlantı
+boşaldıkça diskten doğrudan akıtılırlar; böylece çalışma zamanının tuttuğu
+her tampondan çok daha büyük bir dosya yüklenmeden gönderilir.
+
+**Multipart bir isteğin gövdesi AhdCode'a aittir.** Bir istek ya `withBody`
+ya da multipart parçaları kullanır, ikisini birden değil; `Content-Type` ve
+sınır (boundary) AhdCode'undur:
+
+- zaten multipart parçaları olan bir istekte `withBody` `HTTPError` fırlatır
+- zaten gövdesi olan bir istekte `withMultipartField` / `withMultipartFile`
+  `HTTPError` fırlatır
+- multipart parçaları olan bir isteğe `Content-Type` koymak ya da zaten
+  `Content-Type` koyan bir isteğe parça eklemek `HTTPError` fırlatır
+
+Hiçbir şey sessizce ezilmez: belirsiz bir istek reddedilir.
+
+Gövdenin uzunluğu dosyalar okunmadan bilinemediği için multipart bir istek
+parçalı (chunked) gönderilir. `307` veya `308` yönlendirmesi, aynı
+dosyaları yeniden açıp aynı sınırı yeniden yazarak isteği tekrarlar; böylece
+tekrarlanan gövde tam olarak `Content-Type` başlığının tarif ettiğidir. Bu
+arada okunamaz hale gelen bir dosya, boş gövde göndermek yerine isteği
+başarısız kılar.
+
+Her dosya parçası istek başlamadan önce denetlenir: her yol okunabilir bir
+düzenli dosya olmalıdır; eksik bir dosya, bir dizin ya da düzenli olmayan
+bir şey, ağa hiçbir şey ulaşmadan `HTTPError` fırlatır.
+
+Üst veri sınırlıdır, böylece istek istek olarak kalır: en fazla 64 metin
+alanı ve 32 dosya, en fazla 256 baytlık alan adı, en fazla 255 baytlık
+sunum dosya adı, en fazla 255 baytlık içerik türü ve en fazla 1 MiB'lık alan
+değeri (büyük bir değer dosya parçasına aittir). Dosya *içeriği* akıtılır ve
+yalnızca tüm dosya parçaları için, gövde gönderilmeden önce ölçülen 2 GiB'lık
+toplam yükleme sınırıyla sınırlanır. Bu sınır sıradan her yüklemenin çok
+ötesindedir ve yine de kaçak bir programı sınırlar; bir bellek sınırı
+değildir.
+
+Alan adları ve dosya adları CR, LF, tırnak ya da NUL baytı içeriyorsa
+reddedilir; böylece programın geçirdiği hiçbir şey parça başlığı
+enjekte edemez.
+
 ## Hatalar ve sınırlama
 
 `HTTPError`, `Error`'dan türer. İşleyici herhangi bir Error fırlatırsa istemci
@@ -574,10 +727,12 @@ Bytes tipine ya da veritabanı BLOB'una dönüşmez; yüklenen bir belgeyi hiçb
 yalnızca uygulamanın adlandırdığı tek bir yolu sunar; bunlar bir statik
 dosya kökü, URL-yol eşlemesi, dizin tarayıcı, medya akış çerçevesi, önbellek/
 ETag çerçevesi ya da ilerleme API'si değildir ve parçalı/sürdürülebilir
-yükleme yoktur. Giden istemcinin çerez kavanozu,
-ikili gövde, akış API'si, SSE, WebSocket, multipart, dosya yükleme, otomatik
-yeniden deneme, OAuth, özel CA, istemci sertifikası, güvensiz TLS baypası,
-vekil API'si veya yapay zeka satıcı modülü yoktur. HTTP/2 veya HTTP/3 API'si,
+yükleme yoktur. Giden istemci multipart dosya yüklemeleri gönderir ve
+indirmeleri dosyaya yazar (v2.1); ancak çerez kavanozu, ikili gövde veya
+genel bayt tipi, okuyucu/yazıcı akış API'si, SSE, otomatik yeniden deneme,
+OAuth, özel CA, istemci sertifikası, güvensiz TLS baypası, vekil API'si
+veya yapay zeka satıcı modülü yoktur. WebSocket istemcisi ayrı bir tür
+çiftidir ve [WebSocket](WEBSOCKET_TR.md) belgesinde anlatılır. HTTP/2 veya HTTP/3 API'si,
 veritabanı oturumu, kimlik doğrulama çerçevesi, CSRF, middleware, yol
 parametreleri, joker, regex yolları, ters vekil, sıkıştırma API'si veya
 önbellekleme yoktur. `server.static` (v0.14), tek bir açık kök altındaki

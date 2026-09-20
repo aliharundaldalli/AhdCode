@@ -40,6 +40,14 @@ var SQLiteSource string
 //go:embed http.go
 var HTTPSource string
 
+// HTTPFilesSource is emitted as a separate generated Go file beside
+// HTTPSource. It holds the v2.1.0 binary-safe outbound file transfer:
+// Client.download, Client.sendToFile, and outbound multipart/form-data. Like
+// http.go it is standard library only, so it joins every generated program.
+//
+//go:embed http_files.go
+var HTTPFilesSource string
+
 //go:embed html.go
 var HTMLSource string
 
@@ -80,8 +88,16 @@ var UUIDSource string
 //go:embed websocket.go
 var WebSocketSource string
 
+// WebSocketClientSource is emitted as a separate generated Go file beside
+// WebSocketSource. It holds the standard-library-only part of the v2.1.0
+// WebSocket client: the immutable configuration, the connection registry,
+// and the synchronous receive, so the members always compile.
+//
+//go:embed websocket_client.go
+var WebSocketClientSource string
+
 // WebSocketConnSource is emitted only into a program that creates a WebSocket
-// endpoint. It imports the vendored github.com/coder/websocket (see
+// endpoint or a WebSocket client. It imports the vendored github.com/coder/websocket (see
 // ahdruntime/websocketvendor), the same way MySQLSource imports its driver.
 //
 //go:embed websocket_conn.go

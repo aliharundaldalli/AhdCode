@@ -7,8 +7,8 @@ on:
     branches: [ main ]
 
 jobs:
-  ci:
-    name: CI
+  core:
+    name: Core tests and static checks
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -30,41 +30,6 @@ jobs:
       - name: Run vet
         run: go vet ./...
 
-      - name: Test and vet the Graphics window helper
-        # cmd/ahdgraphics is its own Go module, so the root ./... patterns do
-        # not reach it. Its tests are headless and need no display.
-        run: |
-          go -C cmd/ahdgraphics vet ./...
-          go -C cmd/ahdgraphics test -count=1 -race ./...
-
-      - name: Test and vet the GUI window helper
-        # cmd/ahdgui is its own Go module as well; its tests are headless too.
-        run: |
-          go -C cmd/ahdgui vet ./...
-          go -C cmd/ahdgui test -count=1 -race ./...
-
-      - name: Test and vet the Plot viewer and the shared window identity
-        # cmd/ahdplotview and cmd/ahdidentity are their own Go modules too;
-        # the viewer's tests run headless.
-        run: |
-          go -C cmd/ahdplotview vet ./...
-          go -C cmd/ahdplotview test -count=1 -race ./...
-          go -C cmd/ahdidentity vet ./...
-          go -C cmd/ahdidentity test -count=1 -race ./...
-
-      - name: Application packaging structural tests
-        # `ahdcode package` (v2.0): exact package contents for Linux and
-        # Windows cross-packages (executable format, Windows icon resource,
-        # archives), the leak gate, and a packaged GUI program that must find
-        # only its own helper. They are also part of ./... above; this step
-        # names them in the log.
-        run: go test -count=1 -timeout 10m ./internal/packaging/
-
-      - name: Run race tests
-        # internal/build compiles many native programs under the race detector.
-        # On GitHub runners that package can exceed Go's default 10m timeout.
-        run: go test -race -count=1 -timeout 25m -parallel 2 ./...
-
       - name: Check formatting (gofmt)
         run: |
           unformatted=$(gofmt -l .)
@@ -76,6 +41,47 @@ jobs:
 
       - name: Check git diff
         run: git diff --check
+
+  nested:
+    name: Nested helper modules
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        module: [cmd/ahdgraphics, cmd/ahdgui, cmd/ahdplotview, cmd/ahdidentity]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+      - name: Vet and test helper module
+        run: |
+          go -C ${{ matrix.module }} vet ./...
+          go -C ${{ matrix.module }} test -count=1 -race -timeout 15m ./...
+
+  targeted-race:
+    name: Targeted race coverage
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+      - name: Race-test concurrent runtime and build parity surfaces
+        # The core job already executes every package, including the expensive
+        # native build suite. Broad -race ./... recompiles that suite without
+        # adding useful coverage. These packages contain the mutable runtime
+        # registries, network readers, and evaluator/native parity that the race
+        # detector can materially exercise.
+        run: |
+          go test -race -count=1 -timeout 25m ./internal/backend/golang/ahdruntime/ ./internal/evaluator/
+          go test -race -count=1 -timeout 25m -run 'WebSocket|HTTP|SMTP|V210' ./internal/build/
 
   postgresql:
     # The PostgreSQL integration suite needs a live server, so it runs here

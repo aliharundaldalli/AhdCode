@@ -119,6 +119,11 @@ func (session *Session) smtpOperation(name string, receiver any, args []any) any
 		return session.smtpMessage(ahdruntime.AhdSMTPMessageWithHtml(class,
 			session.smtpDataOf(receiver, evaluatorSMTPMessageClass, evaluatorSMTPMessageField, "SMTPMessage"),
 			args[0].(string)))
+	case "SMTPMessage.withAttachment":
+		return session.smtpMessage(ahdruntime.AhdSMTPMessageWithAttachment(class,
+			session.smtpDataOf(receiver, evaluatorSMTPMessageClass, evaluatorSMTPMessageField, "SMTPMessage"),
+			args[0].(string), session.smtpStringArg(args, 1, ""),
+			session.smtpStringArg(args, 2, "application/octet-stream")))
 	}
 	session.raise("Error", "unsupported SMTP operation "+name)
 	return nil

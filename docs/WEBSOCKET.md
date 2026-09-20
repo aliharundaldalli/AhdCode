@@ -7,12 +7,16 @@
 AhdCode v1.4.0 adds WebSocket **server** endpoints to the [HTTP](HTTP.md)
 module, with a small pass-through in [Web](WEB.md). An endpoint lives on the
 same `Server` as your routes, shares its handler mutex and lifecycle, and
-exchanges text messages with browsers and other clients. There is no
-WebSocket client in v1.4.0.
+exchanges text messages with browsers and other clients.
+
+v2.1 adds the other end: a synchronous WebSocket **client**, so an AhdCode
+program can connect to a service instead of only serving one. It is a
+separate pair of types and changes nothing about the server; see
+[The client](#the-client).
 
 The protocol is implemented by `github.com/coder/websocket` v1.8.15, vendored
-into AhdCode. Only a program that creates an endpoint receives it, and the
-build stays offline.
+into AhdCode. Only a program that creates an endpoint or a client receives
+it, and the build stays offline either way.
 
 ## Public surface
 
@@ -36,6 +40,24 @@ WebSocket.isOpen()                                       -> Bool
 
 Web.websocket(onMessage: Function(WebSocket, String) -> Nothing) -> WebSocketEndpoint
 App.websocket(path: String, endpoint: WebSocketEndpoint)         -> Nothing
+```
+
+The client (v2.1):
+
+```text
+HTTP.webSocketClient(url: String) -> WebSocketClient
+
+WebSocketClient.withHeader(name: String, value: String) -> WebSocketClient
+WebSocketClient.withTimeout(seconds: Int)               -> WebSocketClient
+WebSocketClient.withMaxMessageBytes(bytes: Int)         -> WebSocketClient
+WebSocketClient.connect()                               -> WebSocketConnection
+
+WebSocketConnection.send(text: String)                             -> Bool
+WebSocketConnection.receive(timeoutSeconds: Int := 0)              -> String?
+WebSocketConnection.close(code: Int := 1000, reason: String := "") -> Nothing
+WebSocketConnection.isOpen()                                       -> Bool
+WebSocketConnection.closeCode()                                    -> Int?
+WebSocketConnection.closeReason()                                  -> String
 ```
 
 `Web` re-exports `WebSocket` and `WebSocketEndpoint`. A `WebSocketEndpoint`
@@ -297,12 +319,132 @@ Caddy's `reverse_proxy` passes WebSocket upgrades through without extra
 settings. Keep any proxy idle timeout above the 30-second ping interval. When
 the proxy terminates TLS, browsers connect with `wss://` to the proxy.
 
+## The client
+
+v2.1 lets an AhdCode program be the other end of a WebSocket connection.
+
+The client is deliberately **not** the server's `WebSocket` value. A
+`WebSocketClient` is immutable configuration with no socket behind it, and a
+`WebSocketConnection` is one live connection that `connect()` produced.
+Keeping them apart means a program can never call `receive` on something
+that was never dialled, and the compiler says so.
+
+```ahd
+bring HTTP
+from HTTP bring (WebSocketClient, WebSocketConnection, HTTPError)
+
+socket: WebSocketClient := HTTP.webSocketClient("ws://127.0.0.1:8138/live")
+authorized: WebSocketClient := socket.withHeader("Authorization", "Bearer token")
+live: WebSocketConnection := authorized.withTimeout(5).connect()
+
+if live.send("merhaba") {
+    reply: String? := live.receive(5)
+    if reply != null {
+        write(reply)
+    }
+}
+live.close()
+```
+
+### Connecting
+
+`HTTP.webSocketClient(url)` performs no network activity: it validates the
+URL and stores the configuration. Each `with…` returns a new
+`WebSocketClient`, exactly as `WebSocketEndpoint` does. Only `connect()`
+opens a connection, and it raises `HTTPError` when it cannot.
+
+The URL must be `ws://` or `wss://`. `http://` and `https://` are refused
+rather than quietly rewritten, so a program says which protocol it means, as
+are `file:`, fragments, userinfo, and malformed URLs.
+
+`withTimeout(seconds)` bounds the opening handshake, and each later `send`.
+The default is 30 seconds. `withMaxMessageBytes(bytes)` bounds one incoming
+message; the default is `65536` and the range `1..16777216`, the same as the
+server endpoint's, so both ends of one connection are configured the same
+way.
+
+`withHeader` sets a handshake header such as `Authorization`. Setting a
+header that is already present replaces it, exactly as
+`ClientRequest.withHeader` does, so repeating a call never sends it twice.
+Headers the protocol owns — `Connection`, `Upgrade`, `Host`,
+`Content-Length`, and every `Sec-WebSocket-*` — are refused: setting one
+would either be ignored or break the upgrade. CR and LF in a header value
+are refused as everywhere else.
+
+### Receiving
+
+`receive` is synchronous. There is no callback, no background event bus, and
+no async API: a program asks for the next message and waits.
+
+```text
+receive()                  waits until a message arrives or the peer closes
+receive(timeoutSeconds)    waits at most that many seconds
+```
+
+- a text message returns that `String`
+- a normal close by the peer returns `null`; `closeCode()` and
+  `closeReason()` then describe it
+- a lost connection, a protocol problem, or an **expired timeout** raises
+  `HTTPError`
+
+A timeout raises rather than returning `null`, so a program can always tell
+"nothing arrived yet" from "the peer closed". The connection stays open
+after a timeout and a later `receive` still picks the message up.
+
+Messages arrive in the order the peer sent them. The next frame is read only
+after the previous message was taken, so a slow program slows its peer
+instead of growing a queue.
+
+### Sending and closing
+
+`send(text)` sends one complete UTF-8 text message. It returns `false` when
+the connection is already closed or closing, and raises `HTTPError` when the
+write itself fails — a lost connection is never reported as a delivered
+message. There is no hidden retry and no automatic reconnect: reconnecting
+is the program's decision, written in the program.
+
+`close(code, reason)` follows the server's close-code policy: `1000`,
+`1001`, `1008`, `1011`, or `3000..4999`, with a reason of at most 123 bytes
+of UTF-8. Closing an already closed connection does nothing.
+
+`closeCode()` is `null` while the connection is open, then the code that
+ended it: the one this program sent when it closed, the peer's otherwise, or
+`1006` when the connection was lost. `closeReason()` is the matching reason,
+or `""`.
+
+### Text only
+
+The client is text-only, like the server. An incoming binary message closes
+the connection with `1003` and raises `HTTPError`; an incoming message past
+`maxMessageBytes` closes with `1009` and raises; a text message that is not
+valid UTF-8 closes with `1007` and raises. `send` accepts only a `String`.
+There is no `Bytes` type and no binary frame API.
+
+### TLS
+
+`wss://` verifies the certificate and the host name against the system
+roots, exactly as the HTTP client's `https://` does. There is no
+`insecureSkipVerify`, custom CA, or client certificate API, and an
+untrusted, self-signed, or expired certificate raises `HTTPError`.
+
+A failure never names a handshake header: the message says what stage
+failed, not what the request carried, so an `Authorization` value cannot
+reach a log through it. WebSocket has no HTTP redirect policy, so no
+credential is ever forwarded to another host.
+
+### Ping, pong, and keepalive
+
+Control frames are handled inside the vendored library. There is no public
+ping, pong, or heartbeat API on the client, and none is needed.
+
 ## Non-goals
 
-Not in v1.4.0: a WebSocket client, binary messages, subprotocols,
-compression, endpoints on `RouteSet` / `RouteGroup`, a graceful `1001` on
-shutdown, automatic reconnection, and a publish/subscribe or event bus layer.
+Still absent, on both ends: binary messages, subprotocols, compression,
+endpoints on `RouteSet` / `RouteGroup`, a graceful `1001` on shutdown,
+automatic reconnection, and a publish/subscribe or event bus layer. The
+client adds no callbacks, no background event loop, and no connection pool.
 
 See also: [`examples/v0.1/72_websocket_echo.ahd`](../examples/v0.1/72_websocket_echo.ahd) ·
 [`examples/v1.4/realtime_attendance`](../examples/v1.4/realtime_attendance/README.md) ·
+[`examples/v2.1/websocket_client`](../examples/v2.1/websocket_client/) ·
 [HTTP](HTTP.md) · [Web](WEB.md).

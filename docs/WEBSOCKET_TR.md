@@ -8,11 +8,16 @@ AhdCode v1.4.0, [HTTP](HTTP_TR.md) modülüne WebSocket **sunucu** uç noktalar�
 ekler; [Web](WEB_TR.md) de bunları küçük bir geçişle sunar. Bir uç nokta
 rotalarınızla aynı `Server` üzerinde yaşar, onun işleyici kilidini ve yaşam
 döngüsünü paylaşır ve tarayıcılarla ya da diğer istemcilerle metin mesajları
-alışverişi yapar. v1.4.0'da WebSocket istemcisi yoktur.
+alışverişi yapar.
+
+v2.1 diğer ucu ekler: eşzamanlı bir WebSocket **istemcisi**. Böylece bir
+AhdCode programı yalnızca hizmet vermekle kalmaz, bir servise bağlanabilir
+de. Ayrı bir tür çiftidir ve sunucu tarafında hiçbir şeyi değiştirmez; bkz.
+[İstemci](#istemci).
 
 Protokolü AhdCode'a gömülü `github.com/coder/websocket` v1.8.15 uygular.
-Yalnızca uç nokta oluşturan bir program bu kodu alır ve derleme çevrimdışı
-kalır.
+Yalnızca uç nokta ya da istemci oluşturan bir program bu kodu alır ve
+derleme her iki durumda da çevrimdışı kalır.
 
 ## Genel arayüz
 
@@ -36,6 +41,24 @@ WebSocket.isOpen()                                       -> Bool
 
 Web.websocket(onMessage: Function(WebSocket, String) -> Nothing) -> WebSocketEndpoint
 App.websocket(path: String, endpoint: WebSocketEndpoint)         -> Nothing
+```
+
+İstemci (v2.1):
+
+```text
+HTTP.webSocketClient(url: String) -> WebSocketClient
+
+WebSocketClient.withHeader(name: String, value: String) -> WebSocketClient
+WebSocketClient.withTimeout(seconds: Int)               -> WebSocketClient
+WebSocketClient.withMaxMessageBytes(bytes: Int)         -> WebSocketClient
+WebSocketClient.connect()                               -> WebSocketConnection
+
+WebSocketConnection.send(text: String)                             -> Bool
+WebSocketConnection.receive(timeoutSeconds: Int := 0)              -> String?
+WebSocketConnection.close(code: Int := 1000, reason: String := "") -> Nothing
+WebSocketConnection.isOpen()                                       -> Bool
+WebSocketConnection.closeCode()                                    -> Int?
+WebSocketConnection.closeReason()                                  -> String
 ```
 
 `Web`, `WebSocket` ve `WebSocketEndpoint` türlerini yeniden dışa aktarır. Bir
@@ -302,13 +325,136 @@ geçirir. Vekilin boşta kalma zaman aşımını 30 saniyelik ping aralığını
 üzerinde tutun. TLS vekilde sonlanıyorsa tarayıcılar vekile `wss://` ile
 bağlanır.
 
+## İstemci
+
+v2.1, bir AhdCode programının bir WebSocket bağlantısının diğer ucu
+olmasına izin verir.
+
+İstemci bilinçli olarak sunucunun `WebSocket` değeri **değildir**. Bir
+`WebSocketClient` arkasında soket olmayan, değiştirilemez bir
+yapılandırmadır; bir `WebSocketConnection` ise `connect()`'in ürettiği tek
+bir canlı bağlantıdır. İkisini ayrı tutmak, bir programın hiç çevrilmemiş
+bir şey üzerinde `receive` çağırmasını imkânsız kılar ve derleyici bunu
+söyler.
+
+```ahd
+bring HTTP
+from HTTP bring (WebSocketClient, WebSocketConnection, HTTPError)
+
+socket: WebSocketClient := HTTP.webSocketClient("ws://127.0.0.1:8138/live")
+authorized: WebSocketClient := socket.withHeader("Authorization", "Bearer token")
+live: WebSocketConnection := authorized.withTimeout(5).connect()
+
+if live.send("merhaba") {
+    reply: String? := live.receive(5)
+    if reply != null {
+        write(reply)
+    }
+}
+live.close()
+```
+
+### Bağlanma
+
+`HTTP.webSocketClient(url)` hiçbir ağ işlemi yapmaz: URL'yi doğrular ve
+yapılandırmayı saklar. Her `with…`, tıpkı `WebSocketEndpoint` gibi yeni bir
+`WebSocketClient` döndürür. Yalnızca `connect()` bağlantı açar ve
+açamadığında `HTTPError` fırlatır.
+
+URL `ws://` ya da `wss://` olmalıdır. `http://` ve `https://` sessizce
+dönüştürülmek yerine reddedilir; böylece program hangi protokolü
+kastettiğini söyler. `file:`, parça (fragment), userinfo ve bozuk URL'ler de
+reddedilir.
+
+`withTimeout(seconds)` açılış el sıkışmasını ve sonraki her `send` işlemini
+sınırlar; varsayılanı 30 saniyedir. `withMaxMessageBytes(bytes)` gelen tek
+bir mesajı sınırlar; varsayılanı `65536`, aralığı `1..16777216`'dır — sunucu
+uç noktasıyla aynı, böylece bir bağlantının iki ucu aynı şekilde
+yapılandırılır.
+
+`withHeader`, `Authorization` gibi bir el sıkışma başlığı koyar. Zaten var
+olan bir başlığı koymak, tıpkı `ClientRequest.withHeader` gibi onu
+değiştirir; çağrıyı yinelemek başlığı iki kez göndermez. Protokolün sahip
+olduğu başlıklar — `Connection`, `Upgrade`, `Host`, `Content-Length` ve her
+`Sec-WebSocket-*` — reddedilir: bunlardan birini koymak ya yok sayılır ya da
+yükseltmeyi bozar. Başlık değerindeki CR ve LF, her yerde olduğu gibi
+reddedilir.
+
+### Alma
+
+`receive` eşzamanlıdır. Geri çağrı, arka plan olay veri yolu ya da async bir
+API yoktur: program sıradaki mesajı ister ve bekler.
+
+```text
+receive()                  bir mesaj gelene ya da karşı taraf kapatana kadar bekler
+receive(timeoutSeconds)    en çok o kadar saniye bekler
+```
+
+- bir metin mesajı o `String`'i döndürür
+- karşı tarafın normal kapatması `null` döndürür; `closeCode()` ve
+  `closeReason()` bunu anlatır
+- kopan bir bağlantı, bir protokol sorunu ya da **dolan bir zaman aşımı**
+  `HTTPError` fırlatır
+
+Zaman aşımı `null` döndürmek yerine hata fırlatır; böylece bir program
+"henüz bir şey gelmedi" ile "karşı taraf kapattı" durumlarını her zaman ayırt
+edebilir. Bağlantı zaman aşımından sonra açık kalır ve sonraki bir `receive`
+mesajı yine alır.
+
+Mesajlar, karşı tarafın gönderdiği sırayla gelir. Sonraki çerçeve ancak
+önceki mesaj alındıktan sonra okunur; böylece yavaş bir program kuyruk
+büyütmek yerine karşı tarafı yavaşlatır.
+
+### Gönderme ve kapatma
+
+`send(text)` tam bir UTF-8 metin mesajı gönderir. Bağlantı zaten kapalı ya
+da kapanıyorsa `false` döndürür; yazmanın kendisi başarısız olursa
+`HTTPError` fırlatır — kopan bir bağlantı asla teslim edilmiş bir mesaj gibi
+bildirilmez. Gizli bir yeniden deneme ve otomatik yeniden bağlanma yoktur:
+yeniden bağlanmak programın kararıdır ve programda yazılır.
+
+`close(code, reason)` sunucunun kapanış kodu politikasını izler: `1000`,
+`1001`, `1008`, `1011` ya da `3000..4999` ve en çok 123 baytlık UTF-8 bir
+neden. Zaten kapalı bir bağlantıyı kapatmak hiçbir şey yapmaz.
+
+`closeCode()`, bağlantı açıkken `null`'dur; sonra onu sonlandıran koddur: bu
+program kapattıysa gönderdiği kod, aksi hâlde karşı tarafınki ya da bağlantı
+koptuysa `1006`. `closeReason()` ona karşılık gelen nedendir ya da `""`.
+
+### Yalnızca metin
+
+İstemci de sunucu gibi yalnızca metin taşır. Gelen ikili bir mesaj bağlantıyı
+`1003` ile kapatır ve `HTTPError` fırlatır; `maxMessageBytes` sınırını aşan
+bir mesaj `1009` ile kapatır ve fırlatır; geçerli UTF-8 olmayan bir metin
+mesajı `1007` ile kapatır ve fırlatır. `send` yalnızca `String` kabul eder.
+`Bytes` tipi ve ikili çerçeve API'si yoktur.
+
+### TLS
+
+`wss://`, sertifikayı ve konak adını sistem kökleriyle doğrular; tıpkı HTTP
+istemcisinin `https://` yaptığı gibi. `insecureSkipVerify`, özel CA ya da
+istemci sertifikası API'si yoktur; güvenilmeyen, kendinden imzalı ya da
+süresi dolmuş bir sertifika `HTTPError` fırlatır.
+
+Bir hata hiçbir zaman el sıkışma başlığını adlandırmaz: ileti hangi aşamanın
+başarısız olduğunu söyler, isteğin ne taşıdığını değil; böylece bir
+`Authorization` değeri günlüğe düşemez. WebSocket'in HTTP yönlendirme
+politikası yoktur, bu yüzden hiçbir kimlik bilgisi başka bir konağa
+iletilmez.
+
+### Ping, pong ve canlı tutma
+
+Denetim çerçeveleri gömülü kütüphanenin içinde işlenir. İstemcide genel bir
+ping, pong ya da kalp atışı API'si yoktur ve gerekmez.
+
 ## Hedef dışı olanlar
 
-v1.4.0'da olmayanlar: WebSocket istemcisi, ikili mesajlar, alt protokoller,
-sıkıştırma, `RouteSet` / `RouteGroup` üzerinde uç noktalar, kapanışta nazik bir
-`1001`, otomatik yeniden bağlanma ve yayınla/abone ol ya da olay veri yolu
-katmanı.
+İki uçta da hâlâ yok: ikili mesajlar, alt protokoller, sıkıştırma,
+`RouteSet` / `RouteGroup` üzerinde uç noktalar, kapanışta nazik bir `1001`,
+otomatik yeniden bağlanma ve yayınla/abone ol ya da olay veri yolu katmanı.
+İstemci; geri çağrı, arka plan olay döngüsü ya da bağlantı havuzu eklemez.
 
 Ayrıca bakın: [`examples/v0.1/72_websocket_echo.ahd`](../examples/v0.1/72_websocket_echo.ahd) ·
 [`examples/v1.4/realtime_attendance`](../examples/v1.4/realtime_attendance/README_TR.md) ·
+[`examples/v2.1/websocket_client`](../examples/v2.1/websocket_client/) ·
 [HTTP](HTTP_TR.md) · [Web](WEB_TR.md).

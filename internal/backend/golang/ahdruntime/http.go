@@ -1857,6 +1857,14 @@ type ahdHTTPClientRequestData struct {
 	URL     string              `json:"url"`
 	Headers []ahdHTTPHeaderPair `json:"headers"`
 	Body    string              `json:"body"`
+	// HasBody records that withBody was called, even with an empty String, so
+	// an explicit body can be told apart from no body at all when a request
+	// also tries to configure multipart parts (v2.1.0).
+	HasBody bool `json:"hasBody,omitempty"`
+	// Multipart is the outbound multipart/form-data configuration (v2.1.0).
+	// A file part carries its local path; the bytes are streamed at send time
+	// and never enter this snapshot. See http_files.go.
+	Multipart []ahdHTTPMultipartPart `json:"multipart,omitempty"`
 }
 
 type ahdHTTPClientResponseData struct {
@@ -1943,6 +1951,7 @@ func AhdHTTPClientRequest(class *AhdClass, method, rawURL string) string {
 func AhdHTTPClientRequestWithHeader(class *AhdClass, data, name, value string) string {
 	ahdHTTPRequireClientHeader(class, name, value)
 	request := ahdHTTPDecodeClientRequest(class, data)
+	ahdHTTPRequireContentTypeFree(class, request, name)
 	canonical := textproto.CanonicalMIMEHeaderKey(name)
 	replaced := false
 	headers := make([]ahdHTTPHeaderPair, 0, len(request.Headers)+1)
@@ -1966,13 +1975,16 @@ func AhdHTTPClientRequestWithHeader(class *AhdClass, data, name, value string) s
 func AhdHTTPClientRequestAddHeader(class *AhdClass, data, name, value string) string {
 	ahdHTTPRequireClientHeader(class, name, value)
 	request := ahdHTTPDecodeClientRequest(class, data)
+	ahdHTTPRequireContentTypeFree(class, request, name)
 	request.Headers = append(append([]ahdHTTPHeaderPair(nil), request.Headers...), ahdHTTPHeaderPair{Name: name, Value: value})
 	return ahdHTTPEncodeClientRequest(class, request)
 }
 
 func AhdHTTPClientRequestWithBody(class *AhdClass, data, body string) string {
 	request := ahdHTTPDecodeClientRequest(class, data)
+	ahdHTTPRequireBodyFree(class, request)
 	request.Body = body
+	request.HasBody = true
 	return ahdHTTPEncodeClientRequest(class, request)
 }
 
@@ -1980,23 +1992,7 @@ func AhdHTTPClientSend(class *AhdClass, handle, requestData string) string {
 	state := ahdHTTPLookupClient(class, handle)
 	request := ahdHTTPDecodeClientRequest(class, requestData)
 	ahdHTTPRequireClientURL(class, request.URL)
-	var body io.Reader
-	if request.Body != "" || request.Method == "POST" || request.Method == "PUT" || request.Method == "PATCH" {
-		body = io.NopCloser(strings.NewReader(request.Body))
-	}
-	httpRequest, err := http.NewRequest(request.Method, request.URL, body)
-	if err != nil {
-		ahdHTTPRaiseClientFailure(class, err)
-	}
-	httpRequest.GetBody = nil
-	if body != nil {
-		httpRequest.ContentLength = int64(len(request.Body))
-	}
-	httpRequest.Header = make(http.Header)
-	for _, header := range request.Headers {
-		httpRequest.Header.Add(header.Name, header.Value)
-	}
-	httpRequest.Header.Del("Content-Length")
+	httpRequest, _ := ahdHTTPBuildClientRequest(class, request)
 	response, err := state.http.Do(httpRequest)
 	if err != nil {
 		ahdHTTPRaiseClientFailure(class, err)

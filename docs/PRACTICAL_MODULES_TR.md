@@ -928,7 +928,40 @@ Jetonu kaynak dosyaya yazmayın. `withHeader` aynı adlı başlığı değiştir
 `addHeader` aynı ada ikinci değer ekler. İstek değiştirilemez olduğu için
 her iki metot da yeni `ClientRequest` döndürür.
 
-### 7.5 Güvenli istemci kontrol listesi
+### 7.5 String değil, dosya
+
+`body()` bir `String`'dir, yani metin taşır. PDF, PNG ya da ZIP metin
+değildir ve v2.1 bunlara iki yönde de kendi yolunu verir. İkili hiçbir şey
+`String`'e dönüşmez.
+
+Bir dosyayı **almak** için yanıtı doğrudan diske yazın:
+
+```ahd
+from HTTP bring ClientFileResponse
+
+fetched: ClientFileResponse := client.download("https://example.com/report.pdf", "report.pdf")
+write(str(fetched.status()) + " " + str(fetched.size()) + " bayt")
+```
+
+Bir `ClientFileResponse`; `status`, `header`, `headerAll`, `url` ve `size`
+bildirir ve `body()`'si yoktur — yük, adını verdiğiniz dosyadadır. `404`
+hâlâ bir yanıttır: hata sayfası dosyaya yazılır, bu yüzden önce `status()`
+değerine bakın. Başarısız bir aktarım, var olan bir dosyaya dokunmaz.
+
+Bir dosyayı **göndermek** için gövde yerine multipart parçaları ekleyin:
+
+```ahd
+request: ClientRequest := HTTP.clientRequest("POST", "https://example.com/upload")
+titled: ClientRequest := request.withMultipartField("title", "Rapor")
+withFile: ClientRequest := titled.withMultipartFile("file", "report.pdf", "", "application/pdf")
+answer: ClientResponse := client.send(withFile)
+```
+
+Bir istek ya `withBody` ya da multipart parçaları kullanır, ikisini birden
+değil; `Content-Type` ve sınırı AhdCode koyar. İkisini karıştırmak, belirsiz
+bir şey göndermek yerine `HTTPError` fırlatır.
+
+### 7.6 Güvenli istemci kontrol listesi
 
 - Dış isteğe mutlaka makul bir zaman aşımı verin.
 - Başarılı gövdeyi ayrıştırmadan önce durum kodunu kontrol edin.
@@ -942,10 +975,13 @@ her iki metot da yeni `ClientRequest` döndürür.
 
 Bir HTTPS sayfasını 5 saniyelik istemciyle alın. Durum kodunu ve son URL'yi
 yazdırın; yalnızca 2xx durumunda gövdeyi işleyin. Ulaşılamayan bir host ve 404
-yolu deneyerek iki hata kanalının farklı olduğunu gözlemleyin.
+yolu deneyerek iki hata kanalının farklı olduğunu gözlemleyin. Ardından
+[`examples/v2.1/http_file_transfer`](../examples/v2.1/http_file_transfer/)
+örneğini çalıştırın ve bir dosyayı, hiç `String`'e dönüşmeden bir yükleme ve
+bir indirme boyunca izleyin.
 
-Sunucu, çerez, oturum, yükleme ve istemci sınırları için
-[HTTP referansına](HTTP_TR.md) bakın.
+Sunucu, çerez, oturum, yükleme, indirme, giden multipart ve istemci
+sınırları için [HTTP referansına](HTTP_TR.md) bakın.
 
 ## 8. HTML: güvenli sayfa kurmak ve belge ayrıştırmak
 

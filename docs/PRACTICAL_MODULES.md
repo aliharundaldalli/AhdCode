@@ -46,6 +46,9 @@ CSV text ──> CSV records ──> Data Table ──> numeric List
 
 HTTPS URL ──> HTTP ClientResponse.body() ──> HTML.parse ──> selected data
 
+local file ──> HTTP multipart upload ──> HTTP download ──> local file
+                                                       └─> SMTP attachment
+
 text + table + figure ──> Word (.docx) or Latex (.pdf)
 ```
 
@@ -922,7 +925,40 @@ Do not put the token in source code. `withHeader` replaces the value for that
 name, while `addHeader` appends another value. Both return a new immutable
 ClientRequest.
 
-### 7.5 Safe client checklist
+### 7.5 Files, not Strings
+
+`body()` is a `String`, so it carries text. A PDF, a PNG, or a ZIP is not
+text, and v2.1 gives those their own path in both directions. Nothing binary
+ever becomes a `String`.
+
+To **receive** a file, write the response straight to disk:
+
+```ahd
+from HTTP bring ClientFileResponse
+
+fetched: ClientFileResponse := client.download("https://example.com/report.pdf", "report.pdf")
+write(str(fetched.status()) + " " + str(fetched.size()) + " bytes")
+```
+
+A `ClientFileResponse` reports `status`, `header`, `headerAll`, `url`, and
+`size`, and has no `body()` — the payload is in the file you named. A `404`
+is still a response: its error page is written to the file, so check
+`status()` first. A failed transfer leaves an existing file untouched.
+
+To **send** one, add multipart parts instead of a body:
+
+```ahd
+request: ClientRequest := HTTP.clientRequest("POST", "https://example.com/upload")
+titled: ClientRequest := request.withMultipartField("title", "Rapor")
+withFile: ClientRequest := titled.withMultipartFile("file", "report.pdf", "", "application/pdf")
+answer: ClientResponse := client.send(withFile)
+```
+
+A request uses either `withBody` or multipart parts, never both, and AhdCode
+sets the `Content-Type` and boundary; mixing them raises `HTTPError` rather
+than sending something ambiguous.
+
+### 7.6 Safe client checklist
 
 - Use a reasonable timeout for every external request.
 - Check status before parsing a success body.
@@ -936,10 +972,13 @@ ClientRequest.
 
 Fetch an HTTPS page with a five-second Client. Print its status and final URL,
 and process the body only for a 2xx response. Try an unreachable host and a
-404 path to observe the two different failure channels.
+404 path to observe the two different failure channels. Then run
+[`examples/v2.1/http_file_transfer`](../examples/v2.1/http_file_transfer/)
+and follow one file through an upload and a download without it ever
+becoming a `String`.
 
-See the [HTTP reference](HTTP.md) for Server, cookies, sessions, uploads, and
-all Client limits.
+See the [HTTP reference](HTTP.md) for Server, cookies, sessions, uploads,
+downloads, outbound multipart, and all Client limits.
 
 ## 8. HTML: build safe pages and parse documents
 

@@ -44,10 +44,19 @@ a program can call external HTTP and HTTPS APIs. v0.9.1 adds `HTTP.file` and
 `HTTP.download`, binary-safe responses for a file already on disk. Server `Request`/`Response`
 and outbound `ClientRequest`/`ClientResponse` are distinct types. v1.4.0 adds
 WebSocket server endpoints on the same `Server`; see [WebSocket](WEBSOCKET.md).
-There is no middleware, router DSL, multipart, path parameters, authentication
-framework, or AI vendor module. The implementation uses Go's `net/http` inside
-the AhdCode runtime; there is no companion HTTP, cookie, session, or client
-helper process.
+v2.1 adds the outbound half of file transfer: `Client.download` and
+`Client.sendToFile` write a response body straight to a file, and
+`ClientRequest.withMultipartField` / `withMultipartFile` send a
+`multipart/form-data` body.
+
+Multipart is therefore supported in both directions, and always as files
+rather than as a byte type: **inbound** file uploads arrive through
+`Request.file` / `Request.files` (v0.8.0), and **outbound** file uploads are
+streamed from disk by `withMultipartFile` (v2.1). Low-level HTTP stays
+explicit and typed in both: there is no middleware, router DSL, path
+parameters, authentication framework, or AI vendor module. The
+implementation uses Go's `net/http` inside the AhdCode runtime; there is no
+companion HTTP, cookie, session, client, or upload helper process.
 
 ## Public surface
 
@@ -74,6 +83,7 @@ HTTP.client(
     followRedirects: Bool := true
 ) -> Client
 HTTP.clientRequest(method: String, url: String) -> ClientRequest
+HTTP.webSocketClient(url: String) -> WebSocketClient
 HTTP.contextHandler(
     store: SessionStore
     opener: Function(Request, SessionStore) -> RequestContext
@@ -139,10 +149,19 @@ Client.post(
     body: String
     contentType: String := "text/plain; charset=utf-8"
 ) -> ClientResponse
+Client.download(url: String, path: String)                  -> ClientFileResponse
+Client.sendToFile(request: ClientRequest, path: String)     -> ClientFileResponse
 
 ClientRequest.withHeader(name: String, value: String) -> ClientRequest
 ClientRequest.addHeader(name: String, value: String)  -> ClientRequest
 ClientRequest.withBody(body: String)                  -> ClientRequest
+ClientRequest.withMultipartField(name: String, value: String) -> ClientRequest
+ClientRequest.withMultipartFile(
+    name: String
+    path: String
+    fileName: String := ""
+    contentType: String := "application/octet-stream"
+) -> ClientRequest
 
 ClientResponse.status()              -> Int
 ClientResponse.body()                -> String
@@ -150,19 +169,26 @@ ClientResponse.header(name: String)  -> String?
 ClientResponse.headerAll(name: String) -> List<String>
 ClientResponse.url()                 -> String
 
+ClientFileResponse.status()              -> Int
+ClientFileResponse.header(name: String)  -> String?
+ClientFileResponse.headerAll(name: String) -> List<String>
+ClientFileResponse.url()                 -> String
+ClientFileResponse.size()                -> Int
+
 HTTPError  (derives from Error)
 ```
 
 `Server`, `Request`, `Response`, `Cookie`, `SessionStore`, `Session`, `Client`,
-`ClientRequest`, and `ClientResponse` are opaque built-in Classes: they cannot
-be constructed with `Server()`, `Client()`, or the other type names, have no
-public attributes, and are obtained only from the functions above. All
-arguments are positional. Omitted `maxBodyBytes` is `1048576`. Omitted
+`ClientRequest`, `ClientResponse`, and `ClientFileResponse` are opaque
+built-in Classes: they cannot be constructed with `Server()`, `Client()`, or
+the other type names, have no public attributes, and are obtained only from
+the functions above. All arguments are positional. Omitted `maxBodyBytes` is `1048576`. Omitted
 `HTTP.text` / `HTTP.html` status is `200`. Omitted redirect status is `303`.
 Omitted `HTTP.deleteCookie` path is `"/"`. Omitted `HTTP.sessions` arguments
 are `ahd_session`, `86400`, `false`, and `"Lax"`. Omitted `HTTP.client`
 arguments are `30`, `8388608`, and `true`. Omitted `Client.post` content type
-is `text/plain; charset=utf-8`.
+is `text/plain; charset=utf-8`. Omitted `withMultipartFile` arguments are
+`""` (the path's own basename) and `application/octet-stream`.
 
 `HTTP.contextHandler` is the v0.17 registration adapter used by
 `Web.routes`. It opens one `RequestContext` through `opener` and runs
@@ -431,7 +457,8 @@ raises `HTTPError` for a body that is not valid UTF-8. A binary multipart body
 is therefore not readable through `body()` -- that is deliberate. Use
 `file`/`files` for uploads and `form`/`formAll` for multipart text fields.
 
-There is no outbound multipart in v0.8.0: `ClientRequest` cannot attach a file.
+v0.8.0 had no outbound multipart. v2.1 adds it: see
+[Outbound multipart and file upload](#outbound-multipart-and-file-upload).
 
 ## Response
 
@@ -663,8 +690,11 @@ Send credentials with headers, not embedded userinfo.
 
 `withHeader` replaces that header name case-insensitively. `addHeader`
 appends another value. `withBody` replaces the String body. The original
-request is unchanged. There is no binary body, automatic JSON, form encoding,
-or multipart. Applications use the existing JSON module when they need JSON.
+request is unchanged. There is no binary body, automatic JSON, or form
+encoding; applications use the existing JSON module when they need JSON. A
+`multipart/form-data` body is built with `withMultipartField` and
+`withMultipartFile` instead of `withBody`, and is described
+[below](#outbound-multipart-and-file-upload).
 
 Header names and values are validated. CR, LF, invalid names, `Content-Length`,
 and `Host` raise `HTTPError`. `Authorization`, `Content-Type`, `Accept`, and
@@ -690,6 +720,130 @@ code. `body()` is the UTF-8 String. `header(name)` is the first value or
 `url()` is the final response URL after redirects. There is no public stream
 and no cookie jar.
 
+### Binary-safe downloads
+
+`ClientResponse.body()` is a `String`, so it carries text. A PNG, a ZIP, or
+a PDF is not text, and forcing arbitrary bytes through a `String` would
+either corrupt them or raise. v2.1 adds a second, file-oriented response
+path instead:
+
+```text
+Client.download(url: String, path: String)              -> ClientFileResponse
+Client.sendToFile(request: ClientRequest, path: String) -> ClientFileResponse
+```
+
+`download(url, path)` is a GET whose body is written to `path`.
+`sendToFile(request, path)` does the same for any `ClientRequest`, so a
+download can carry headers, a method, or a body of its own.
+
+Both return a `ClientFileResponse`, which is opaque and deliberately has
+**no `body()`**: the payload is in the file you named.
+
+```ahd
+client: Client := HTTP.client(timeoutSeconds: 30)
+answer: ClientFileResponse := client.download("https://example.com/report.pdf", "report.pdf")
+write(str(answer.status()))
+write(str(answer.size()) + " bytes written")
+```
+
+`size()` is the number of bytes actually written to the destination, not a
+`Content-Length` claim. `status()`, `header`, `headerAll`, and `url` behave
+exactly as they do on a `ClientResponse`.
+
+The body is streamed: it goes from the connection to the file a chunk at a
+time and is never held whole in memory.
+
+**A status is still a response, not a failure.** `download` follows the
+module's existing philosophy: `404` and `500` are valid HTTP responses, so
+they return a `ClientFileResponse` with that status, and the body the server
+sent -- an error page, typically -- is written to the file. Check `status()`
+before trusting the file. Only a transport, TLS, limit, or filesystem
+failure raises `HTTPError`.
+
+**A failed download never damages the destination.** The bytes go to a
+temporary file beside the destination first, and the destination is replaced
+only once the transfer is complete. An interrupted request, a response past
+`maxResponseBytes`, or a filesystem failure raises `HTTPError`, removes the
+temporary file, and leaves any existing file at that path exactly as it was.
+
+`maxResponseBytes` bounds a streamed response exactly as it bounds a
+buffered one: streamed does not mean unlimited. The parent directory must
+already exist -- AhdCode does not create directories a program did not ask
+for -- and a destination that is itself a directory raises `HTTPError`. A
+relative path resolves against the process working directory, like every
+other path in AhdCode.
+
+### Outbound multipart and file upload
+
+A `ClientRequest` sends a `multipart/form-data` body when it carries
+multipart parts:
+
+```text
+ClientRequest.withMultipartField(name: String, value: String) -> ClientRequest
+ClientRequest.withMultipartFile(
+    name: String
+    path: String
+    fileName: String := ""
+    contentType: String := "application/octet-stream"
+) -> ClientRequest
+```
+
+Both return a **new** `ClientRequest`; the original is unchanged, like every
+other `with*`. Parts are sent in the order they were added, and a field name
+may repeat, the way an HTML form repeats a checkbox name.
+
+```ahd
+upload: ClientRequest := HTTP.clientRequest("POST", "https://example.com/upload")
+withTitle: ClientRequest := upload.withMultipartField("title", "Ölçüm raporu")
+withFile: ClientRequest := withTitle.withMultipartFile("file", "report.pdf", "", "application/pdf")
+answer: ClientResponse := client.send(withFile)
+```
+
+In `withMultipartFile`, `path` is the local file that is read, and
+`fileName` is **presentation metadata only** -- the name the server is told.
+An empty `fileName` uses the path's own basename. Either way the name is
+reduced to a plain basename, so a name like `../../etc/passwd` travels as
+`passwd` and can never act as a path. `contentType` must be a valid media
+type.
+
+The file's bytes never become an AhdCode `String`. They are streamed from
+disk into the connection as it drains, so a file far larger than any buffer
+the runtime holds is sent without being loaded.
+
+**AhdCode owns the body of a multipart request.** A request uses either
+`withBody` or multipart parts, never both, and its `Content-Type` and
+boundary are AhdCode's:
+
+- `withBody` on a request that already has multipart parts raises `HTTPError`
+- `withMultipartField` / `withMultipartFile` on a request that already has a
+  body raises `HTTPError`
+- setting `Content-Type` on a request with multipart parts, or adding a part
+  to a request that already sets `Content-Type`, raises `HTTPError`
+
+Nothing is silently overwritten: an ambiguous request is refused instead.
+
+Because the body's length is not known before the files are read, a
+multipart request is sent chunked. A `307` or `308` redirect replays it by
+reopening the same files and rewriting the same boundary, so the replayed
+body is exactly the one the `Content-Type` header describes; a file that has
+become unreadable in the meantime fails the request rather than sending an
+empty body.
+
+Every file part is checked before the request starts: each path must be a
+readable regular file, and a missing file, a directory, or something that is
+not a regular file raises `HTTPError` before anything reaches the network.
+
+Metadata is bounded so a request stays a request: at most 64 text fields and
+32 files, a field name of at most 256 bytes, a presentation filename of at
+most 255, a content type of at most 255, and a field value of at most 1 MiB
+(a large value belongs in a file part). File *content* is streamed and is
+bounded only by a total upload cap of 2 GiB across all file parts, measured
+before the body is sent. That cap is far past any ordinary upload and still
+keeps a runaway program bounded; it is not a memory bound.
+
+Field names and filenames are rejected if they contain CR, LF, a quote, or a
+NUL byte, so nothing a program passes can inject a part header.
+
 ### HTTPS and HTTP
 
 HTTPS uses the platform/system trusted roots. Certificate chain and hostname
@@ -713,10 +867,13 @@ an uploaded document. `HTTP.file`/`HTTP.download` (v0.9.1) serve one
 application-named path each; they are not a static-files root, a
 URL-to-path mapping, a directory browser, a media-streaming framework, a
 cache/ETag framework, or a progress API, and there is no chunked/resumable
-upload. The outbound client has no
-cookie jar, binary body, streaming API, SSE, WebSocket, multipart, file
-upload, automatic retries, OAuth, custom CA, client certificates, insecure TLS
-bypass, proxy API, or AI/OpenAI/Anthropic/Gemini module. There is no HTTP/2
+upload. The outbound client sends
+multipart file uploads and writes downloads to files (v2.1), but it has no
+cookie jar, no binary body or public byte type, no reader/writer stream API,
+no SSE, no automatic retries, no OAuth, no custom CA, no client
+certificates, no insecure TLS bypass, no proxy API, and no
+AI/OpenAI/Anthropic/Gemini module. Its WebSocket client is a separate pair
+of types documented in [WebSocket](WEBSOCKET.md). There is no HTTP/2
 or HTTP/3 API, database-backed sessions, authentication framework, CSRF,
 middleware, path parameters, wildcards, regex routes, reverse proxy,
 compression API, or caching. `server.static` (v0.14) serves local files

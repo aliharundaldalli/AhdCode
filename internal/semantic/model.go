@@ -537,6 +537,42 @@ const (
 	HTTPWebSocketClose                         TypeOperation = "WebSocket.close"
 	HTTPWebSocketIsOpen                        TypeOperation = "WebSocket.isOpen"
 
+	// Binary-safe outbound downloads (v2.1.0). The response body is streamed
+	// straight to a file, so arbitrary bytes never pass through an AhdCode
+	// String. ClientFileResponse is the file-oriented counterpart of
+	// ClientResponse and deliberately publishes no body().
+	HTTPClientDownload   TypeOperation = "Client.download"
+	HTTPClientSendToFile TypeOperation = "Client.sendToFile"
+
+	HTTPClientFileResponseStatus    TypeOperation = "ClientFileResponse.status"
+	HTTPClientFileResponseHeader    TypeOperation = "ClientFileResponse.header"
+	HTTPClientFileResponseHeaderAll TypeOperation = "ClientFileResponse.headerAll"
+	HTTPClientFileResponseURL       TypeOperation = "ClientFileResponse.url"
+	// HTTPClientFileResponseSize is the number of bytes written to the
+	// destination, not a Content-Length claim.
+	HTTPClientFileResponseSize TypeOperation = "ClientFileResponse.size"
+
+	// Outbound multipart/form-data (v2.1.0). A file part names a local path;
+	// its bytes are streamed at send time and never become a String.
+	HTTPClientRequestWithMultipartField TypeOperation = "ClientRequest.withMultipartField"
+	HTTPClientRequestWithMultipartFile  TypeOperation = "ClientRequest.withMultipartFile"
+
+	// The WebSocket client (v2.1.0). WebSocketClient is immutable
+	// configuration; connect performs the handshake and returns one live
+	// WebSocketConnection. The two are separate types so a configuration can
+	// never be mistaken for an open connection.
+	HTTPWebSocketClientWithHeader          TypeOperation = "WebSocketClient.withHeader"
+	HTTPWebSocketClientWithTimeout         TypeOperation = "WebSocketClient.withTimeout"
+	HTTPWebSocketClientWithMaxMessageBytes TypeOperation = "WebSocketClient.withMaxMessageBytes"
+	HTTPWebSocketClientConnect             TypeOperation = "WebSocketClient.connect"
+
+	HTTPWebSocketConnectionSend        TypeOperation = "WebSocketConnection.send"
+	HTTPWebSocketConnectionReceive     TypeOperation = "WebSocketConnection.receive"
+	HTTPWebSocketConnectionClose       TypeOperation = "WebSocketConnection.close"
+	HTTPWebSocketConnectionIsOpen      TypeOperation = "WebSocketConnection.isOpen"
+	HTTPWebSocketConnectionCloseCode   TypeOperation = "WebSocketConnection.closeCode"
+	HTTPWebSocketConnectionCloseReason TypeOperation = "WebSocketConnection.closeReason"
+
 	// The PostgreSQL standard module (v1.4.0).
 	PostgreSQLDatabasePing        TypeOperation = "PostgreSQLDatabase.ping"
 	PostgreSQLDatabaseExecute     TypeOperation = "PostgreSQLDatabase.execute"
@@ -609,6 +645,10 @@ const (
 	SMTPMessageWithReplyTo  TypeOperation = "SMTPMessage.withReplyTo"
 	SMTPMessageWithText     TypeOperation = "SMTPMessage.withText"
 	SMTPMessageWithHtml     TypeOperation = "SMTPMessage.withHtml"
+	// SMTPMessageWithAttachment (v2.1.0) names a local file. Its bytes are
+	// base64-encoded straight from disk into the DATA stream and never become
+	// an AhdCode String.
+	SMTPMessageWithAttachment TypeOperation = "SMTPMessage.withAttachment"
 
 	// Cron (v1.2.0) is bounded in-process scheduling. Scheduler is a mutable
 	// handle: add registers a validated job, run blocks the calling program

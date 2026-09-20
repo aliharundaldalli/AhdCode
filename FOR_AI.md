@@ -49,9 +49,14 @@ cd AhdCode
 
 ## Released distribution and its signing state
 
-This section describes how AhdCode v1.0.0 is *distributed*. The rest of this
+This section describes how AhdCode is *distributed*. The rest of this
 document is about building from source. Keep the two apart: a user who wants to
 install AhdCode should download a release artifact, not clone this repository.
+
+Which release is current changes over time, so do not quote a version number
+from this document. Read the current one from the repository's
+`internal/ahdversion` package, or from the latest GitHub Release, and say
+that one.
 
 Prefer the official GitHub Release for
 `https://github.com/aliharundaldalli/AhdCode`. Never direct a user to a
@@ -61,11 +66,13 @@ integrity when it matters.
 
 ### macOS
 
-The public macOS target is **Apple Silicon (arm64)** only. There is no Intel
-build in v1.0.0; do not tell a user otherwise unless a future release actually
-ships one.
+The public macOS target is **Apple Silicon (arm64)** only. No release has
+shipped an Intel build; do not tell a user otherwise unless the release they
+are installing actually has one. Check the release's own asset list rather
+than assuming.
 
-`AhdCode-1.0.0-macos-arm64.pkg` is the recommended installer. It is signed with
+The `.pkg` installer (`AhdCode-<version>-macos-arm64.pkg`) is the
+recommended one. It is signed with
 a Developer ID certificate and notarized by Apple, and the notarization ticket
 is stapled to the file, so it installs on a normal Mac with no security prompt
 even when it arrives by download or AirDrop. Gatekeeper reports
@@ -82,7 +89,7 @@ administrator password.
 
 ### Windows
 
-The v1.0.0 Windows installer is **not Authenticode code-signed**. Windows
+The Windows installer is **not Authenticode code-signed**. Windows
 SmartScreen may therefore show an unknown-publisher or low-reputation warning.
 State this plainly and accurately:
 
@@ -164,8 +171,11 @@ ahdcode_exe="$(go env GOPATH)/bin/ahdcode"
 "$ahdcode_exe" --version
 ```
 
-The expected current result is `AhdCode v0.9.0`. Using the explicit
-`$ahdcode_exe` path proves which binary was tested. If the user wants the
+Confirm that the freshly built executable reports the version of the
+checkout you built it from: its output must match the `Display` constant in
+`internal/ahdversion`. Do not compare it against a version quoted in this
+document. Using the explicit `$ahdcode_exe` path proves which binary was
+tested. If the user wants the
 short `ahdcode` command and that directory is not already on `PATH`, explain
 the temporary or persistent options and obtain permission before editing a
 shell profile. For a temporary current-shell setting only:
@@ -280,8 +290,10 @@ $AhdCodeExe = Join-Path (go env GOPATH) "bin\ahdcode.exe"
 & $AhdCodeExe --version
 ```
 
-The expected current result is `AhdCode v0.9.0`. The explicit executable path
-avoids accidentally testing an older global installation. If the Go binary
+Confirm that the freshly built executable reports the version of the
+checkout you built it from: its output must match the `Display` constant in
+`internal/ahdversion`. The explicit executable path avoids accidentally
+testing an older global installation. If the Go binary
 directory is not on `PATH`, explain the choice before changing anything. A
 temporary current-PowerShell-process change is:
 
@@ -361,7 +373,7 @@ the collection it is given, and it returns a new one.
 `String`, `Int`, or `Bool` and never null, and one `Pair` has one value type.
 There is no `Any`, no `dynamic`, no `Dictionary`, and no `Map`.
 
-**AhdCode v0.3.0 has no `Tuple` and no Python-style `zip`.** Do not reach for
+**AhdCode has no `Tuple` and no Python-style `zip`.** Do not reach for
 `Lists.zip`, `Lists.unzip`, `dict(...)`, `tuple(...)`, or a `Function<T>`
 generic spelling — none of them exist. `Lists` and `KeyValue` operations are
 type-directed: the compiler computes each call's exact result type from the
@@ -433,8 +445,30 @@ attacker-supplied display metadata, and `save` is what decides the path.
 Never branch on the filename extension or on `declaredContentType()` — those
 are claims. `detectedContentType()` sniffs the bytes, and it is content
 sniffing, not malware scanning. An unsaved upload is deleted when its request
-ends, so persist it inside the handler. Outbound multipart does not exist:
-there is no `ClientRequest.withFile`. See [`docs/HTTP.md`](docs/HTTP.md).
+ends, so persist it inside the handler. See [`docs/HTTP.md`](docs/HTTP.md).
+
+**Binary travels file to file, never through a String.** From v2.1 the
+outbound client moves files in both directions and still has no byte type.
+Send one with `ClientRequest.withMultipartField(name, value)` and
+`withMultipartFile(name, path, fileName := "", contentType := "application/octet-stream")`;
+receive one with `Client.download(url, path)` or
+`Client.sendToFile(request, path)`, which return a `ClientFileResponse` with
+`status`/`header`/`headerAll`/`url`/`size` and deliberately **no `body()`**
+— the payload is in the file. Do not reach for `Bytes`, a stream, a reader,
+or base64 round-tripping; none of them exist. A request uses either
+`withBody` or multipart parts, never both, and AhdCode owns a multipart
+request's `Content-Type` and boundary, so setting it yourself raises
+`HTTPError`. Like `save`, `fileName` is display metadata, not a path. A
+non-2xx status is still a response: `download` writes the server's error
+page to the file and reports the status, so check `status()` before trusting
+the file. A failed download leaves any existing file at that path untouched.
+
+Mail follows the same rule: `SMTPMessage.withAttachment(path, fileName := "", contentType := "application/octet-stream")`
+names a local file that is read and base64-encoded when the message is
+sent. There is no attachment-from-String and no inline-image API. A message
+with no attachment still produces exactly the MIME it always did; with
+attachments it becomes `multipart/mixed` around the same body. See
+[`docs/SMTP.md`](docs/SMTP.md).
 
 **`HTML.parse` is a parser, not a browser.** `HTML.parse(source: String) ->
 HTMLDocument` takes no URL and makes no network request; getting a page and
@@ -556,17 +590,27 @@ only `PostgreSQL.connect` arguments choose the server. Read the password with
 secrets — and `Identity.id()` is a different, unchanged identifier with no
 conversion between them. See [`docs/UUID.md`](docs/UUID.md).
 
-**WebSocket support is server-side, text-only, and serialized.**
+**WebSocket support is text-only and serialized.** The server:
 `HTTP.websocket(onMessage)` with `withOpen`/`withClose`/`withAccept` and
 `Server.websocket` or `App.websocket` register an endpoint; there is no
-WebSocket client, no binary message, and no registration on `RouteSet`.
-Callbacks hold the same mutex as HTTP handlers, so keep them short and keep
-the socket registry in an ordinary `Pair<String, WebSocket>` removed in
-`onClose`. `send` never blocks and returns `false` when it cannot queue.
-Authenticate in `withAccept` before the upgrade; keep the same-origin default
-unless the user names exact origins. Do not add goroutines, channels, or an
-event-bus layer, and do not promise automatic reconnection — the browser page
-reconnects itself. See [`docs/WEBSOCKET.md`](docs/WEBSOCKET.md).
+binary message and no registration on `RouteSet`. Callbacks hold the same
+mutex as HTTP handlers, so keep them short and keep the socket registry in
+an ordinary `Pair<String, WebSocket>` removed in `onClose`. `send` never
+blocks and returns `false` when it cannot queue. Authenticate in
+`withAccept` before the upgrade; keep the same-origin default unless the
+user names exact origins.
+
+From v2.1 there is also a **client**, and it is a different pair of types:
+`HTTP.webSocketClient(url)` returns an immutable `WebSocketClient`
+(`withHeader`, `withTimeout`, `withMaxMessageBytes`), and `connect()`
+returns one live `WebSocketConnection` (`send`, `receive`, `close`,
+`isOpen`, `closeCode`, `closeReason`). `receive` is **synchronous**: a text
+message returns a `String`, a normal peer close returns `null`, and a lost
+connection, a protocol problem, or an expired timeout raises `HTTPError`.
+The URL must be `ws://` or `wss://`. Do not add goroutines, channels, a
+callback API, or an event-bus layer, and do not promise automatic
+reconnection — nothing reconnects by itself on either end. See
+[`docs/WEBSOCKET.md`](docs/WEBSOCKET.md).
 
 **Read deployment secrets with `Env.secret(name)`.** It returns `NAME`, or the
 contents of the file named by `NAME_FILE`, or `null`; both set is an

@@ -55,7 +55,9 @@ const (
 	archiveRuntimeFileName       = "ahdcode_archive_runtime.go"
 	sqliteRuntimeFileName        = "ahdcode_sqlite_runtime.go"
 	httpRuntimeFileName          = "ahdcode_http_runtime.go"
+	httpFilesRuntimeFileName     = "ahdcode_http_files_runtime.go"
 	websocketRuntimeFileName     = "ahdcode_websocket_runtime.go"
+	websocketClientRuntimeFile   = "ahdcode_websocket_client_runtime.go"
 	websocketConnRuntimeFileName = "ahdcode_websocket_conn_runtime.go"
 	htmlRuntimeFileName          = "ahdcode_html_runtime.go"
 	smtpRuntimeFileName          = "ahdcode_smtp_runtime.go"
@@ -241,6 +243,8 @@ func Generate(compilation *ir.Compilation) (*GeneratedProgram, []diagnostics.Dia
 		{Name: cronRuntimeFileName, Content: string(cronRuntime)},
 	}
 	for _, shared := range []struct{ name, source, label string }{
+		{httpFilesRuntimeFileName, ahdruntime.HTTPFilesSource, "HTTP file transfer"},
+		{websocketClientRuntimeFile, ahdruntime.WebSocketClientSource, "WebSocket client"},
 		{svgRuntimeFileName, ahdruntime.SVGSource, "SVG"},
 		{documentRuntimeFileName, ahdruntime.DocumentSource, "document"},
 		{terminalRuntimeFileName, ahdruntime.TerminalSource, "Terminal"},

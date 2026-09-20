@@ -114,7 +114,10 @@ func TestWebSocketValuesAreNotConstructedDirectly(t *testing.T) {
 	}
 }
 
-// The frozen v1.4.0 surface: no client, no binary, no hub.
+// The frozen server surface. v1.4.0 froze it with no client at all; v2.1
+// added one as its own pair of types (WebSocketClient and
+// WebSocketConnection, checked in http_websocket_client_test.go) and changed
+// nothing here. There is still no hub, no broadcast, and no binary frame.
 func TestWebSocketSurfaceIsExactlyTheFrozenOne(t *testing.T) {
 	if strings.Join(HTTPWebSocketOperations, ",") != "id,send,close,isOpen" {
 		t.Fatalf("WebSocket operations = %v", HTTPWebSocketOperations)
@@ -124,9 +127,13 @@ func TestWebSocketSurfaceIsExactlyTheFrozenOne(t *testing.T) {
 		t.Fatalf("WebSocketEndpoint operations = %v", HTTPWebSocketEndpointOperations)
 	}
 	module := StandardModuleInterfaces()["HTTP"]
-	for _, name := range []string{"websocketClient", "dial", "websocketHub", "broadcast"} {
+	for _, name := range []string{"websocketClient", "dial", "websocketHub", "broadcast", "websocketBinary"} {
 		if module.Exports[name] != nil {
 			t.Fatalf("HTTP must not export %q", name)
 		}
+	}
+	// The one client entry point v2.1 added, spelled exactly this way.
+	if module.Exports["webSocketClient"] == nil {
+		t.Fatal("HTTP must export webSocketClient")
 	}
 }

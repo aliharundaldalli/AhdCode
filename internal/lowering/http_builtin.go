@@ -18,10 +18,15 @@ const (
 	httpClientRequestClassID  = ir.ClassID(HTTPModuleID + "::class::ClientRequest")
 	httpClientResponseClassID = ir.ClassID(HTTPModuleID + "::class::ClientResponse")
 	httpUploadedFileClassID   = ir.ClassID(HTTPModuleID + "::class::UploadedFile")
-	httpErrorClassID          = ir.ClassID(HTTPModuleID + "::class::HTTPError")
+	// Binary-safe outbound downloads (v2.1.0).
+	httpClientFileResponseClassID = ir.ClassID(HTTPModuleID + "::class::ClientFileResponse")
+	httpErrorClassID              = ir.ClassID(HTTPModuleID + "::class::HTTPError")
 	// WebSocket server support (v1.4.0).
 	httpWebSocketClassID         = ir.ClassID(HTTPModuleID + "::class::WebSocket")
 	httpWebSocketEndpointClassID = ir.ClassID(HTTPModuleID + "::class::WebSocketEndpoint")
+	// WebSocket client support (v2.1.0).
+	httpWebSocketClientClassID     = ir.ClassID(HTTPModuleID + "::class::WebSocketClient")
+	httpWebSocketConnectionClassID = ir.ClassID(HTTPModuleID + "::class::WebSocketConnection")
 )
 
 var (
@@ -35,10 +40,17 @@ var (
 	HTTPClientRequestDataFieldID  = ir.FieldID(string(httpClientRequestClassID) + "::field::data")
 	HTTPClientResponseDataFieldID = ir.FieldID(string(httpClientResponseClassID) + "::field::data")
 	HTTPUploadedFileDataFieldID   = ir.FieldID(string(httpUploadedFileClassID) + "::field::data")
+	// A ClientFileResponse holds its response metadata; the bytes are in the
+	// destination file the caller named.
+	HTTPClientFileResponseDataFieldID = ir.FieldID(string(httpClientFileResponseClassID) + "::field::data")
 	// A WebSocket holds its connection identifier; a WebSocketEndpoint holds
 	// the handle of its runtime configuration, which carries the callbacks.
 	HTTPWebSocketDataFieldID           = ir.FieldID(string(httpWebSocketClassID) + "::field::data")
 	HTTPWebSocketEndpointHandleFieldID = ir.FieldID(string(httpWebSocketEndpointClassID) + "::field::handle")
+	// A WebSocketClient holds the handle of its immutable configuration; a
+	// WebSocketConnection holds the handle of one live connection.
+	HTTPWebSocketClientHandleFieldID     = ir.FieldID(string(httpWebSocketClientClassID) + "::field::handle")
+	HTTPWebSocketConnectionHandleFieldID = ir.FieldID(string(httpWebSocketConnectionClassID) + "::field::handle")
 )
 
 func httpModule(id ir.ModuleID, name, path string) *ir.Module {
@@ -59,9 +71,12 @@ func httpModule(id ir.ModuleID, name, path string) *ir.Module {
 		{httpClientClassID, "Client", HTTPClientHandleFieldID, "handle", semantic.HTTPClientOperations},
 		{httpClientRequestClassID, "ClientRequest", HTTPClientRequestDataFieldID, "data", semantic.HTTPClientRequestOperations},
 		{httpClientResponseClassID, "ClientResponse", HTTPClientResponseDataFieldID, "data", semantic.HTTPClientResponseOperations},
+		{httpClientFileResponseClassID, "ClientFileResponse", HTTPClientFileResponseDataFieldID, "data", semantic.HTTPClientFileResponseOperations},
 		{httpUploadedFileClassID, "UploadedFile", HTTPUploadedFileDataFieldID, "data", semantic.HTTPUploadedFileOperations},
 		{httpWebSocketClassID, "WebSocket", HTTPWebSocketDataFieldID, "data", semantic.HTTPWebSocketOperations},
 		{httpWebSocketEndpointClassID, "WebSocketEndpoint", HTTPWebSocketEndpointHandleFieldID, "handle", semantic.HTTPWebSocketEndpointOperations},
+		{httpWebSocketClientClassID, "WebSocketClient", HTTPWebSocketClientHandleFieldID, "handle", semantic.HTTPWebSocketClientOperations},
+		{httpWebSocketConnectionClassID, "WebSocketConnection", HTTPWebSocketConnectionHandleFieldID, "handle", semantic.HTTPWebSocketConnectionOperations},
 	}
 	for _, spec := range specs {
 		field := ir.Field{ID: spec.field, Name: spec.fieldName, Type: ir.Type{Kind: ir.StringType}, NullState: ir.NonNull, Hidden: true}
