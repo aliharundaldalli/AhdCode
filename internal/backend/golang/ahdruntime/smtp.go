@@ -1,11 +1,12 @@
 package ahdruntime
 
 import (
-	"bytes"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"io"
 	"mime"
 	"mime/multipart"
 	"mime/quotedprintable"
@@ -14,6 +15,7 @@ import (
 	"net/smtp"
 	"net/textproto"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -26,6 +28,20 @@ const (
 	// ahdSMTPMaxTimeoutSeconds is the largest whole-second timeout that still
 	// fits in a time.Duration after conversion to nanoseconds.
 	ahdSMTPMaxTimeoutSeconds = 9223372036
+	// Attachment limits (v2.1.0). They are AhdCode's own deterministic
+	// bounds, not a guess at a provider's: a message that fits these may
+	// still be refused by a server, and the refusal is reported as it is for
+	// any other rejected message. Thirty-two attachments and a quarter of a
+	// gibibyte in total are far past ordinary mail and still bounded.
+	ahdSMTPMaxAttachments      = 32
+	ahdSMTPMaxAttachmentBytes  = int64(128) << 20
+	ahdSMTPMaxAttachmentsBytes = int64(256) << 20
+	// ahdSMTPMaxAttachmentNameBytes and ahdSMTPMaxAttachmentTypeBytes bound
+	// the two pieces of metadata that go into a part header.
+	ahdSMTPMaxAttachmentNameBytes = 255
+	ahdSMTPMaxAttachmentTypeBytes = 255
+	// ahdSMTPBase64LineBytes is the base64 line length RFC 2045 asks for.
+	ahdSMTPBase64LineBytes = 76
 )
 
 type ahdSMTPClientConfig struct {
@@ -49,6 +65,18 @@ type ahdSMTPMessageData struct {
 	HTML    string   `json:"html"`
 	HasText bool     `json:"hasText"`
 	HasHTML bool     `json:"hasHTML"`
+	// Attachments (v2.1.0) name local files. Their bytes are read at send
+	// time and base64-encoded straight into the DATA stream; nothing here
+	// ever holds a file's content.
+	Attachments []ahdSMTPAttachment `json:"attachments,omitempty"`
+}
+
+// ahdSMTPAttachment is one configured attachment: where to read it from, the
+// filename the recipient sees, and the media type it is declared as.
+type ahdSMTPAttachment struct {
+	Path        string `json:"path"`
+	FileName    string `json:"fileName"`
+	ContentType string `json:"contentType"`
 }
 
 type ahdSMTPMailbox struct {
@@ -144,6 +172,61 @@ func AhdSMTPMessageWithHtml(class *AhdClass, data, body string) string {
 	return ahdSMTPEncodeMessage(class, message)
 }
 
+// AhdSMTPMessageWithAttachment is
+// SMTPMessage.withAttachment(path, fileName, contentType). Each call appends
+// one attachment and returns a new SMTPMessage, so an SMTPMessage stays
+// immutable and attachments keep the order they were added in.
+//
+// The file is not read here. It is opened when the message is sent, so a
+// configured message holds a path, never a payload.
+func AhdSMTPMessageWithAttachment(class *AhdClass, data, path, fileName, contentType string) string {
+	message := ahdSMTPDecodeMessage(class, data)
+	if strings.TrimSpace(path) == "" {
+		ahdSMTPRaise(class, "SMTP attachment path must not be empty", "")
+	}
+	if strings.IndexByte(path, 0) >= 0 {
+		ahdSMTPRaise(class, "SMTP attachment path must not contain a NUL byte", "")
+	}
+	if len(message.Attachments)+1 > ahdSMTPMaxAttachments {
+		ahdSMTPRaise(class, "SMTP message has too many attachments", "")
+	}
+	presented := ahdSMTPAttachmentName(class, path, fileName)
+	if contentType == "" {
+		contentType = "application/octet-stream"
+	}
+	if len(contentType) > ahdSMTPMaxAttachmentTypeBytes {
+		ahdSMTPRaise(class, "SMTP attachment content type is too long", "")
+	}
+	if ahdSMTPHasCRLF(contentType) || strings.IndexByte(contentType, 0) >= 0 {
+		ahdSMTPRaise(class, "SMTP attachment content type must not contain a line break", "")
+	}
+	if _, _, err := mime.ParseMediaType(contentType); err != nil {
+		ahdSMTPRaise(class, "SMTP attachment content type is not a valid media type", "")
+	}
+	message.Attachments = append(append([]ahdSMTPAttachment(nil), message.Attachments...),
+		ahdSMTPAttachment{Path: path, FileName: presented, ContentType: contentType})
+	return ahdSMTPEncodeMessage(class, message)
+}
+
+// ahdSMTPAttachmentName resolves the filename the recipient sees. An empty
+// fileName takes the path's basename; either way the result is reduced to a
+// plain basename by the same rule an inbound upload's filename is, so nothing
+// a caller passes travels as a path component in a part header.
+func ahdSMTPAttachmentName(class *AhdClass, path, fileName string) string {
+	raw := fileName
+	if strings.TrimSpace(raw) == "" {
+		raw = filepath.Base(path)
+	}
+	safe, err := ahdHTTPUploadSafeName(raw)
+	if err != nil {
+		ahdSMTPRaise(class, "SMTP attachment file name is not valid", "")
+	}
+	if len(safe) > ahdSMTPMaxAttachmentNameBytes {
+		ahdSMTPRaise(class, "SMTP attachment file name is too long", "")
+	}
+	return safe
+}
+
 func AhdSMTPClientSend(class *AhdClass, handle, messageData string) {
 	config := ahdSMTPLookupClient(class, handle)
 	message := ahdSMTPDecodeMessage(class, messageData)
@@ -156,6 +239,7 @@ func AhdSMTPClientSend(class *AhdClass, handle, messageData string) {
 	if len(envelope) == 0 {
 		ahdSMTPRaise(class, "SMTP message has no recipients", config.Password)
 	}
+	ahdSMTPCheckAttachments(class, parsed.attachments, config.Password)
 	ahdSMTPDeliver(class, config, parsed, envelope)
 }
 
@@ -221,6 +305,8 @@ func ahdSMTPMaterialize(class *AhdClass, message ahdSMTPMessageData) (ahdSMTPMes
 		html:    message.HTML,
 		hasText: message.HasText,
 		hasHTML: message.HasHTML,
+
+		attachments: message.Attachments,
 	}
 	var envelope []string
 	for _, raw := range message.To {
@@ -246,16 +332,17 @@ func ahdSMTPMaterialize(class *AhdClass, message ahdSMTPMessageData) (ahdSMTPMes
 }
 
 type ahdSMTPMessageParsed struct {
-	from    ahdSMTPMailbox
-	to      []ahdSMTPMailbox
-	cc      []ahdSMTPMailbox
-	bcc     []ahdSMTPMailbox
-	replyTo *ahdSMTPMailbox
-	subject string
-	text    string
-	html    string
-	hasText bool
-	hasHTML bool
+	from        ahdSMTPMailbox
+	to          []ahdSMTPMailbox
+	cc          []ahdSMTPMailbox
+	bcc         []ahdSMTPMailbox
+	replyTo     *ahdSMTPMailbox
+	subject     string
+	text        string
+	html        string
+	hasText     bool
+	hasHTML     bool
+	attachments []ahdSMTPAttachment
 }
 
 func ahdSMTPParseMailbox(class *AhdClass, raw, field string) ahdSMTPMailbox {
@@ -395,8 +482,7 @@ func ahdSMTPDeliver(class *AhdClass, config ahdSMTPClientConfig, parsed ahdSMTPM
 	if err != nil {
 		ahdSMTPRaiseMapped(class, err, "data", config.Password)
 	}
-	payload := ahdSMTPBuildMIME(parsed)
-	if _, err := writer.Write(payload); err != nil {
+	if err := ahdSMTPWriteMIME(writer, parsed); err != nil {
 		_ = writer.Close()
 		ahdSMTPRaiseMapped(class, err, "data", config.Password)
 	}
@@ -439,13 +525,64 @@ func ahdSMTPTlsConfig(class *AhdClass, host, password string) *tls.Config {
 	}
 }
 
-func ahdSMTPBuildMIME(parsed ahdSMTPMessageParsed) []byte {
-	var buf bytes.Buffer
+// ahdSMTPCheckAttachments verifies every attachment before the connection is
+// opened: each path must be a readable regular file, each file must stay
+// within ahdSMTPMaxAttachmentBytes, and their total within
+// ahdSMTPMaxAttachmentsBytes. Failing here means nothing was sent, which is a
+// far clearer failure than a message that dies in the middle of DATA.
+func ahdSMTPCheckAttachments(class *AhdClass, attachments []ahdSMTPAttachment, password string) {
+	if len(attachments) > ahdSMTPMaxAttachments {
+		ahdSMTPRaise(class, "SMTP message has too many attachments", password)
+	}
+	var total int64
+	for _, attachment := range attachments {
+		info, err := os.Stat(attachment.Path)
+		if err != nil {
+			if os.IsNotExist(err) {
+				ahdSMTPRaise(class, "SMTP attachment file does not exist", password)
+			}
+			ahdSMTPRaise(class, "SMTP attachment file could not be read", password)
+		}
+		if info.IsDir() {
+			ahdSMTPRaise(class, "SMTP attachment path is a directory", password)
+		}
+		if !info.Mode().IsRegular() {
+			ahdSMTPRaise(class, "SMTP attachment path is not a regular file", password)
+		}
+		if info.Size() > ahdSMTPMaxAttachmentBytes {
+			ahdSMTPRaise(class, "SMTP attachment is larger than 128 MiB", password)
+		}
+		total += info.Size()
+		if total > ahdSMTPMaxAttachmentsBytes {
+			ahdSMTPRaise(class, "SMTP attachments are larger than 256 MiB in total", password)
+		}
+		file, err := os.Open(attachment.Path)
+		if err != nil {
+			ahdSMTPRaise(class, "SMTP attachment file could not be opened", password)
+		}
+		_ = file.Close()
+	}
+}
+
+// ahdSMTPWriteMIME writes the whole message to the DATA writer, incrementally.
+// A message without attachments produces exactly the bytes AhdCode has
+// produced since v0.9.0; attachments add a multipart/mixed wrapper around
+// that same body and are base64-encoded straight from disk, so a 100 MB file
+// never becomes a 100 MB buffer.
+//
+// The four shapes are:
+//
+//	text only                 text/plain
+//	HTML only                 text/html
+//	text and HTML             multipart/alternative
+//	any of those + files      multipart/mixed { the above, attachments... }
+func ahdSMTPWriteMIME(sink io.Writer, parsed ahdSMTPMessageParsed) error {
+	var failure error
 	writeHeader := func(name, value string) {
-		buf.WriteString(name)
-		buf.WriteString(": ")
-		buf.WriteString(value)
-		buf.WriteString("\r\n")
+		if failure != nil {
+			return
+		}
+		_, failure = io.WriteString(sink, name+": "+value+"\r\n")
 	}
 	writeHeader("Date", time.Now().Format(time.RFC1123Z))
 	writeHeader("From", parsed.from.header)
@@ -460,29 +597,207 @@ func ahdSMTPBuildMIME(parsed ahdSMTPMessageParsed) []byte {
 	}
 	writeHeader("Subject", mime.QEncoding.Encode("utf-8", parsed.subject))
 	writeHeader("MIME-Version", "1.0")
+	if failure != nil {
+		return failure
+	}
 
+	if len(parsed.attachments) == 0 {
+		return ahdSMTPWriteBody(sink, parsed, writeHeader, &failure)
+	}
+
+	// A multipart.Writer writes nothing until its first part, so its boundary
+	// can be named in the Content-Type header before any part exists.
+	mixed := multipart.NewWriter(sink)
+	writeHeader("Content-Type", "multipart/mixed; boundary="+mixed.Boundary())
+	if failure != nil {
+		return failure
+	}
+	if _, err := io.WriteString(sink, "\r\n"); err != nil {
+		return err
+	}
+	if err := ahdSMTPWriteBodyPart(mixed, parsed); err != nil {
+		return err
+	}
+	for _, attachment := range parsed.attachments {
+		if err := ahdSMTPWriteAttachment(mixed, attachment); err != nil {
+			return err
+		}
+	}
+	return mixed.Close()
+}
+
+// ahdSMTPWriteBody writes a message with no attachments: the body is the
+// message, so its Content-Type is a top-level header.
+func ahdSMTPWriteBody(sink io.Writer, parsed ahdSMTPMessageParsed, writeHeader func(string, string), failure *error) error {
 	switch {
 	case parsed.hasText && parsed.hasHTML:
-		var body bytes.Buffer
-		mp := multipart.NewWriter(&body)
-		ahdSMTPWritePart(mp, "text/plain; charset=utf-8", parsed.text)
-		ahdSMTPWritePart(mp, "text/html; charset=utf-8", parsed.html)
-		_ = mp.Close()
-		writeHeader("Content-Type", "multipart/alternative; boundary="+mp.Boundary())
-		buf.WriteString("\r\n")
-		buf.Write(body.Bytes())
+		alternative := multipart.NewWriter(sink)
+		writeHeader("Content-Type", "multipart/alternative; boundary="+alternative.Boundary())
+		if *failure != nil {
+			return *failure
+		}
+		if _, err := io.WriteString(sink, "\r\n"); err != nil {
+			return err
+		}
+		if err := ahdSMTPWriteTextPart(alternative, "text/plain; charset=utf-8", parsed.text); err != nil {
+			return err
+		}
+		if err := ahdSMTPWriteTextPart(alternative, "text/html; charset=utf-8", parsed.html); err != nil {
+			return err
+		}
+		return alternative.Close()
 	case parsed.hasHTML:
 		writeHeader("Content-Type", "text/html; charset=utf-8")
 		writeHeader("Content-Transfer-Encoding", "quoted-printable")
-		buf.WriteString("\r\n")
-		buf.Write(ahdSMTPQuotedPrintable(parsed.html))
+		if *failure != nil {
+			return *failure
+		}
+		if _, err := io.WriteString(sink, "\r\n"); err != nil {
+			return err
+		}
+		return ahdSMTPWriteQuotedPrintable(sink, parsed.html)
 	default:
 		writeHeader("Content-Type", "text/plain; charset=utf-8")
 		writeHeader("Content-Transfer-Encoding", "quoted-printable")
-		buf.WriteString("\r\n")
-		buf.Write(ahdSMTPQuotedPrintable(parsed.text))
+		if *failure != nil {
+			return *failure
+		}
+		if _, err := io.WriteString(sink, "\r\n"); err != nil {
+			return err
+		}
+		return ahdSMTPWriteQuotedPrintable(sink, parsed.text)
 	}
-	return buf.Bytes()
+}
+
+// ahdSMTPWriteBodyPart writes the same body as one part of a
+// multipart/mixed. A message with both a text and an HTML body keeps its
+// multipart/alternative, nested inside the mixed part rather than flattened
+// beside the attachments.
+func ahdSMTPWriteBodyPart(mixed *multipart.Writer, parsed ahdSMTPMessageParsed) error {
+	if parsed.hasText && parsed.hasHTML {
+		// A throwaway writer is the standard library's only way to ask for a
+		// fresh random boundary; nothing is ever written to it.
+		boundary := multipart.NewWriter(io.Discard).Boundary()
+		header := make(textproto.MIMEHeader)
+		header.Set("Content-Type", "multipart/alternative; boundary="+boundary)
+		part, err := mixed.CreatePart(header)
+		if err != nil {
+			return err
+		}
+		alternative := multipart.NewWriter(part)
+		if err := alternative.SetBoundary(boundary); err != nil {
+			return err
+		}
+		if err := ahdSMTPWriteTextPart(alternative, "text/plain; charset=utf-8", parsed.text); err != nil {
+			return err
+		}
+		if err := ahdSMTPWriteTextPart(alternative, "text/html; charset=utf-8", parsed.html); err != nil {
+			return err
+		}
+		return alternative.Close()
+	}
+	contentType, body := "text/plain; charset=utf-8", parsed.text
+	if parsed.hasHTML {
+		contentType, body = "text/html; charset=utf-8", parsed.html
+	}
+	return ahdSMTPWriteTextPart(mixed, contentType, body)
+}
+
+func ahdSMTPWriteTextPart(writer *multipart.Writer, contentType, body string) error {
+	header := make(textproto.MIMEHeader)
+	header.Set("Content-Type", contentType)
+	header.Set("Content-Transfer-Encoding", "quoted-printable")
+	part, err := writer.CreatePart(header)
+	if err != nil {
+		return err
+	}
+	return ahdSMTPWriteQuotedPrintable(part, body)
+}
+
+// ahdSMTPWriteAttachment streams one file into the message. The bytes go
+// file -> base64 -> line wrapper -> DATA writer, so only a small buffer
+// exists at any moment and nothing ever becomes an AhdCode String.
+func ahdSMTPWriteAttachment(mixed *multipart.Writer, attachment ahdSMTPAttachment) error {
+	header := make(textproto.MIMEHeader)
+	header.Set("Content-Type", attachment.ContentType)
+	header.Set("Content-Transfer-Encoding", "base64")
+	header.Set("Content-Disposition", ahdSMTPDisposition(attachment.FileName))
+	part, err := mixed.CreatePart(header)
+	if err != nil {
+		return err
+	}
+	file, err := os.Open(attachment.Path)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = file.Close() }()
+	wrapper := &ahdSMTPLineWriter{sink: part, width: ahdSMTPBase64LineBytes}
+	encoder := base64.NewEncoder(base64.StdEncoding, wrapper)
+	if _, err := io.Copy(encoder, file); err != nil {
+		_ = encoder.Close()
+		return err
+	}
+	if err := encoder.Close(); err != nil {
+		return err
+	}
+	return wrapper.finish()
+}
+
+// ahdSMTPDisposition writes the Content-Disposition header. An ASCII name
+// that needs no escaping becomes a plain quoted string; anything else uses
+// the RFC 2231 encoded form, which is how a non-ASCII filename survives
+// intact. The name is already a basename with no CR, LF, or NUL, so this
+// cannot produce a header that spans a line.
+func ahdSMTPDisposition(name string) string {
+	formatted := mime.FormatMediaType("attachment", map[string]string{"filename": name})
+	if formatted == "" {
+		return "attachment"
+	}
+	return formatted
+}
+
+// ahdSMTPLineWriter breaks a base64 stream into CRLF-terminated lines of at
+// most width characters, as RFC 2045 asks, without holding the whole encoded
+// payload.
+type ahdSMTPLineWriter struct {
+	sink   io.Writer
+	width  int
+	filled int
+}
+
+func (writer *ahdSMTPLineWriter) Write(data []byte) (int, error) {
+	written := 0
+	for len(data) > 0 {
+		room := writer.width - writer.filled
+		chunk := data
+		if len(chunk) > room {
+			chunk = chunk[:room]
+		}
+		count, err := writer.sink.Write(chunk)
+		written += count
+		writer.filled += count
+		if err != nil {
+			return written, err
+		}
+		data = data[len(chunk):]
+		if writer.filled == writer.width {
+			if _, err := io.WriteString(writer.sink, "\r\n"); err != nil {
+				return written, err
+			}
+			writer.filled = 0
+		}
+	}
+	return written, nil
+}
+
+// finish ends a partly filled last line.
+func (writer *ahdSMTPLineWriter) finish() error {
+	if writer.filled == 0 {
+		return nil
+	}
+	writer.filled = 0
+	_, err := io.WriteString(writer.sink, "\r\n")
+	return err
 }
 
 func ahdSMTPFormatList(boxes []ahdSMTPMailbox) string {
@@ -493,23 +808,15 @@ func ahdSMTPFormatList(boxes []ahdSMTPMailbox) string {
 	return strings.Join(parts, ", ")
 }
 
-func ahdSMTPWritePart(mp *multipart.Writer, contentType, body string) {
-	header := make(textproto.MIMEHeader)
-	header.Set("Content-Type", contentType)
-	header.Set("Content-Transfer-Encoding", "quoted-printable")
-	part, err := mp.CreatePart(header)
-	if err != nil {
-		return
+// ahdSMTPWriteQuotedPrintable encodes one body straight into the message.
+// The bytes it produces are exactly what the buffered v0.9.0 path produced.
+func ahdSMTPWriteQuotedPrintable(sink io.Writer, body string) error {
+	writer := quotedprintable.NewWriter(sink)
+	if _, err := writer.Write([]byte(ahdSMTPCRLF(body))); err != nil {
+		_ = writer.Close()
+		return err
 	}
-	_, _ = part.Write(ahdSMTPQuotedPrintable(body))
-}
-
-func ahdSMTPQuotedPrintable(body string) []byte {
-	var buf bytes.Buffer
-	writer := quotedprintable.NewWriter(&buf)
-	_, _ = writer.Write([]byte(ahdSMTPCRLF(body)))
-	_ = writer.Close()
-	return buf.Bytes()
+	return writer.Close()
 }
 
 func ahdSMTPCRLF(text string) string {

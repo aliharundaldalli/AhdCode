@@ -159,7 +159,7 @@ func TestGeneratedProgramCarriesRuntime(t *testing.T) {
 	for _, file := range program.Files {
 		names = append(names, file.Name)
 	}
-	if strings.Join(names, ",") != programFileName+","+runtimeFileName+","+excelRuntimeFileName+","+pdfRuntimeFileName+","+archiveRuntimeFileName+","+sqliteRuntimeFileName+","+httpRuntimeFileName+","+websocketRuntimeFileName+","+htmlRuntimeFileName+","+smtpRuntimeFileName+","+securityRuntimeFileName+","+identityRuntimeFileName+","+uuidRuntimeFileName+","+bitsRuntimeFileName+","+charactersRuntimeFile+","+cronRuntimeFileName+","+svgRuntimeFileName+","+documentRuntimeFileName+
+	if strings.Join(names, ",") != programFileName+","+runtimeFileName+","+excelRuntimeFileName+","+pdfRuntimeFileName+","+archiveRuntimeFileName+","+sqliteRuntimeFileName+","+httpRuntimeFileName+","+websocketRuntimeFileName+","+htmlRuntimeFileName+","+smtpRuntimeFileName+","+securityRuntimeFileName+","+identityRuntimeFileName+","+uuidRuntimeFileName+","+bitsRuntimeFileName+","+charactersRuntimeFile+","+cronRuntimeFileName+","+httpFilesRuntimeFileName+","+websocketClientRuntimeFile+","+svgRuntimeFileName+","+documentRuntimeFileName+
 		","+terminalRuntimeFileName+","+terminalDarwinRuntimeFileName+","+terminalLinuxRuntimeFileName+","+terminalWindowsRuntimeFileName+","+terminalOtherRuntimeFileName+","+graphicsRuntimeFileName+","+fundamentalsRuntimeFileName+","+helperLinkRuntimeFileName+","+guiRuntimeFileName+","+guiWidgetsRuntimeFileName+","+plotViewRuntimeFileName {
 		t.Fatalf("unexpected generated files %v", names)
 	}

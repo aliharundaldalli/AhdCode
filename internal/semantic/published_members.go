@@ -156,3 +156,108 @@ func publishedMemberNames(identity *types.ClassSymbol) []string {
 	}
 	return nil
 }
+
+// --- built-in members that publish no parameter names (v2.1.0) ---
+//
+// HTTP and SMTP members are called positionally: they are built-in type
+// operations, and the analyzer refuses a named argument for them. That call
+// shape is unchanged, but an editor still needs to know the members exist
+// and what they take, so each one is turned into a Symbol here from the very
+// same operation shapes the compiler checks calls against. There is no
+// second list of member names anywhere: the names come from the module's
+// published Operations, and the signatures from its shapes.
+//
+// These Symbols are deliberately not reachable through publishedMember, so
+// TypeOperationBindsArguments stays false for them and neither the analyzer
+// nor lowering changes how their arguments bind.
+
+// positionalMember builds one member Symbol whose parameters have no names.
+// optional is how many trailing parameters may be omitted.
+func positionalMember(module, name string, result types.Type, resultNullable bool, parameters []types.Type, optional int) *Symbol {
+	signature := &types.Signature{Return: result}
+	for index, parameterType := range parameters {
+		signature.Parameters = append(signature.Parameters, types.Parameter{
+			Type: parameterType, HasDefault: optional > 0 && index >= len(parameters)-optional,
+		})
+	}
+	returnNull := NonNull
+	if resultNullable {
+		returnNull = MaybeNull
+	}
+	return &Symbol{
+		Name: name, Kind: FunctionSymbol, Type: types.Function{Signature: signature},
+		Builtin: true, InitialNull: NonNull, OriginModuleID: module,
+		Callable: &Callable{
+			Signature: signature, ParameterNull: nonNullParameters(len(parameters)), ReturnNull: returnNull,
+		},
+	}
+}
+
+// positionalMembers is every HTTP and SMTP member, built once from the same
+// maps the analyzer uses.
+var positionalMembers = func() map[TypeOperation]*Symbol {
+	members := map[TypeOperation]*Symbol{}
+	for className, operations := range httpOperationNames {
+		for name, operation := range operations {
+			shape, known := httpOperationShapes()[operation]
+			if !known {
+				continue
+			}
+			_ = className
+			members[operation] = positionalMember(httpModuleID, name, shape.result, shape.resultNullable,
+				shape.parameters, httpOptionalTrailingArguments[operation])
+		}
+	}
+	for className, operations := range smtpOperationNames {
+		for name, operation := range operations {
+			shape, known := smtpOperationShapes()[operation]
+			if !known {
+				continue
+			}
+			_ = className
+			members[operation] = positionalMember(smtpModuleID, name, shape.result, false,
+				shape.parameters, smtpOptionalTrailingArguments[operation])
+		}
+	}
+	return members
+}()
+
+// completionMemberFor returns the Symbol an editor should show for one
+// built-in member: a member with published parameter names first, then a
+// positional one.
+func completionMemberFor(operation TypeOperation) *Symbol {
+	if symbol := publishedMember(operation); symbol != nil {
+		return symbol
+	}
+	return positionalMembers[operation]
+}
+
+// positionalMemberNames lists the members of one HTTP or SMTP Class, in the
+// order the module publishes them.
+func positionalMemberNames(identity *types.ClassSymbol) []string {
+	switch identity.ModuleID {
+	case httpModuleID:
+		return httpClassOperations[identity.Name]
+	case smtpModuleID:
+		return smtpClassOperations[identity.Name]
+	}
+	return nil
+}
+
+// httpClassOperations and smtpClassOperations name each Class's members in
+// documentation order, reusing the very lists lowering builds its IR Classes
+// from, so an editor can never show a member the compiler does not have.
+var httpClassOperations = map[string][]string{
+	"Server": HTTPServerOperations, "Request": HTTPRequestOperations,
+	"Response": HTTPResponseOperations, "Cookie": HTTPCookieOperations,
+	"SessionStore": HTTPSessionStoreOperations, "Session": HTTPSessionOperations,
+	"Client": HTTPClientOperations, "ClientRequest": HTTPClientRequestOperations,
+	"ClientResponse": HTTPClientResponseOperations, "ClientFileResponse": HTTPClientFileResponseOperations,
+	"UploadedFile": HTTPUploadedFileOperations,
+	"WebSocket":    HTTPWebSocketOperations, "WebSocketEndpoint": HTTPWebSocketEndpointOperations,
+	"WebSocketClient": HTTPWebSocketClientOperations, "WebSocketConnection": HTTPWebSocketConnectionOperations,
+}
+
+var smtpClassOperations = map[string][]string{
+	"SMTPClient": SMTPClientOperations, "SMTPMessage": SMTPMessageOperations,
+}

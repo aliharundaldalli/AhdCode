@@ -64,9 +64,12 @@ modüllerine yalnızca çatı kaynağından erişilebilir.
 kayıtlıdır (compiler-registered) ve aynı içe aktarım biçimlerini kullanır.
 Yerel bir dosya, aynı isimdeki standart bir modülün yerini alamaz (shadow
 edemez). `HTTP` hem gelen sunucu (`Server` / `Request` / `Response`, çerezler,
-oturumlar, WebSocket uç noktaları) hem de giden `Client` / `ClientRequest` / `ClientResponse`
-yüzeyidir. `SMTP` yalnızca gönderim yapan postadır (`SMTPClient` /
-`SMTPMessage`). Ayrıca sıradan isim uzayı takma adı (namespace alias) biçimini de
+oturumlar, WebSocket uç noktaları) hem de giden `Client` / `ClientRequest` /
+`ClientResponse` yüzeyidir; v2.1 buna ikili-güvenli dosya aktarımını
+(`Client.download`, `ClientRequest.withMultipartFile`, `ClientFileResponse`)
+ve bir WebSocket istemcisini (`WebSocketClient` / `WebSocketConnection`)
+ekler. `SMTP` yalnızca gönderim yapan postadır (`SMTPClient` /
+`SMTPMessage`); v2.1'den itibaren dosya ekleriyle. Ayrıca sıradan isim uzayı takma adı (namespace alias) biçimini de
 kullanabilirler:
 
 ```ahd

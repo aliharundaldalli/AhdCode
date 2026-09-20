@@ -16,9 +16,10 @@ from SMTP bring SMTPError
 
 `SMTP` is a send-only mail transport and message-composition primitive. It is
 not a newsletter framework, not an inbox, not a mailbox client, not a
-background queue, and not a provider-specific API. There is no IMAP, POP3,
-attachment support, or mail helper executable. The implementation uses Go's
-`net/smtp`, `crypto/tls`, and MIME libraries inside the AhdCode runtime.
+background queue, and not a provider-specific API. v2.1 adds file
+attachments; there is still no IMAP, POP3, or mail helper executable. The
+implementation uses Go's `net/smtp`, `crypto/tls`, and MIME libraries inside
+the AhdCode runtime.
 
 ## Public surface
 
@@ -44,6 +45,11 @@ SMTPMessage.withBcc(recipients: List<String>) -> SMTPMessage
 SMTPMessage.withReplyTo(address: String) -> SMTPMessage
 SMTPMessage.withText(body: String) -> SMTPMessage
 SMTPMessage.withHtml(body: String) -> SMTPMessage
+SMTPMessage.withAttachment(
+    path: String
+    fileName: String := ""
+    contentType: String := "application/octet-stream"
+) -> SMTPMessage
 ```
 
 Failures use `SMTPError`. Direct construction of `SMTPClient` or `SMTPMessage`
@@ -177,7 +183,61 @@ Date is generated automatically at send time. There is no public Date or
 Message-ID API in v0.9. Message-ID is omitted rather than inventing a weak
 identity scheme.
 
-Attachments are out of scope.
+## Attachments
+
+v2.1 attaches real files. Each `withAttachment` call appends one attachment
+and returns a **new** `SMTPMessage`, so a message stays immutable and
+attachments keep the order they were added in:
+
+```ahd
+message: SMTPMessage := SMTP.message("sender@example.com", ["student@example.com"], "Ölçüm raporu")
+message = message.withText("Rapor ekte.")
+message = message.withAttachment("report.pdf", "", "application/pdf")
+message = message.withAttachment("chart.png", "Grafik.png", "image/png")
+```
+
+`path` is the local file that is read. `fileName` is **presentation
+metadata only** — the name the recipient sees; an empty one uses the path's
+own basename, and either way the name is reduced to a plain basename, so
+nothing a caller passes can travel as a path. `contentType` must be a valid
+media type.
+
+The file is not read when it is configured: a configured message holds a
+path, never a payload. The bytes are read when the message is sent and
+base64-encoded straight into the connection, so a large attachment never
+becomes an AhdCode `String` and never sits in memory whole.
+
+### Structure
+
+A message with no attachment produces exactly the MIME it produced in
+v0.9.0. With attachments, that same body is wrapped:
+
+```text
+text only                 multipart/mixed { text/plain,      attachments… }
+HTML only                 multipart/mixed { text/html,       attachments… }
+text and HTML             multipart/mixed { multipart/alternative { text/plain, text/html },
+                                            attachments… }
+```
+
+The `multipart/alternative` is nested inside the mixed part, not flattened
+beside the attachments, so a mail client still picks one body to show. Every
+attachment is `Content-Transfer-Encoding: base64` with
+`Content-Disposition: attachment`, wrapped at 76 characters with canonical
+CRLF. A non-ASCII filename uses the RFC 2231 encoded form, so it survives
+intact. Bcc stays hidden from DATA exactly as before.
+
+### Limits
+
+Every attachment is checked before the connection is opened: each path must
+be a readable regular file, and a missing file, a directory, or something
+that is not a regular file raises `SMTPError` before anything is sent.
+
+AhdCode's own deterministic bounds are at most 32 attachments, 128 MiB for
+one attachment, and 256 MiB in total. They are not a guess at any provider's
+limits: a message that fits them may still be refused by a server, and that
+refusal is reported like any other rejected message.
+
+A failure never names the password, whatever the attachment path is.
 
 ## Command flow
 
@@ -198,6 +258,9 @@ immutable configuration, not a shared session.
 
 ## Out of scope
 
-IMAP, POP3, mailbox reading, attachments, AUTH LOGIN / CRAM-MD5 / XOAUTH2,
-DKIM/SPF/DMARC, provider modules, mail queues, retries, templates, bounce
-processing, and tracking are not part of v0.9.
+IMAP, POP3, mailbox reading, AUTH LOGIN / CRAM-MD5 / XOAUTH2, DKIM/SPF/DMARC,
+provider modules, mail queues, retries, templates, bounce processing, and
+tracking are still not part of the module. Inline images with `Content-ID`,
+`multipart/related`, and a public Date or Message-ID API are not either.
+
+See also: `examples/v2.1/smtp_attachment`.

@@ -29,7 +29,9 @@ func SMTPMessageIdentity() *types.ClassSymbol { return smtpMessageClass }
 // publishes through built-in type operations, so has/has not reports the real
 // surface and the IR Class agrees with the frontend.
 var SMTPClientOperations = []string{"withPlainAuth", "send"}
-var SMTPMessageOperations = []string{"withCc", "withBcc", "withReplyTo", "withText", "withHtml"}
+var SMTPMessageOperations = []string{
+	"withCc", "withBcc", "withReplyTo", "withText", "withHtml", "withAttachment",
+}
 
 func smtpClientType() types.Type  { return types.Class{Symbol: smtpClientClass} }
 func smtpMessageType() types.Type { return types.Class{Symbol: smtpMessageClass} }
@@ -99,8 +101,15 @@ func smtpOperationShapes() map[TypeOperation]smtpOperationShape {
 		SMTPMessageWithReplyTo:  {[]types.Type{types.String}, smtpMessageType(), "pass one mailbox String"},
 		SMTPMessageWithText:     {[]types.Type{types.String}, smtpMessageType(), "pass one String text body"},
 		SMTPMessageWithHtml:     {[]types.Type{types.String}, smtpMessageType(), "pass one String HTML body"},
+		SMTPMessageWithAttachment: {[]types.Type{types.String, types.String, types.String}, smtpMessageType(),
+			"pass a local file path String, and optionally a presentation file name String and a content type String"},
 	}
 }
+
+// smtpOptionalTrailingArguments lists the operations whose trailing arguments
+// may be omitted, and how many: withAttachment's presentation file name and
+// content type.
+var smtpOptionalTrailingArguments = map[TypeOperation]int{SMTPMessageWithAttachment: 2}
 
 var smtpOperationNames = map[string]map[string]TypeOperation{
 	"SMTPClient": {
@@ -109,7 +118,7 @@ var smtpOperationNames = map[string]map[string]TypeOperation{
 	"SMTPMessage": {
 		"withCc": SMTPMessageWithCc, "withBcc": SMTPMessageWithBcc,
 		"withReplyTo": SMTPMessageWithReplyTo, "withText": SMTPMessageWithText,
-		"withHtml": SMTPMessageWithHtml,
+		"withHtml": SMTPMessageWithHtml, "withAttachment": SMTPMessageWithAttachment,
 	},
 }
 
@@ -124,8 +133,14 @@ func smtpOperationFor(receiver types.Type, name string) (TypeOperation, bool) {
 
 func (a *analyzer) analyzeSMTPOperation(call *ast.CallExpr, operation TypeOperation, shape smtpOperationShape, current *scope, flow flowState) expressionInfo {
 	result := expressionInfo{typeValue: shape.result, nullState: NonNull}
-	if len(call.Arguments) != len(shape.parameters) {
-		a.error(codeCallArguments, fmt.Sprintf("%s expects %d argument(s); received %d", operation, len(shape.parameters), len(call.Arguments)), call.Span(), shape.hint)
+	optional := smtpOptionalTrailingArguments[operation]
+	minimum := len(shape.parameters) - optional
+	if len(call.Arguments) < minimum || len(call.Arguments) > len(shape.parameters) {
+		expected := fmt.Sprintf("%d", len(shape.parameters))
+		if optional > 0 {
+			expected = fmt.Sprintf("%d to %d", minimum, len(shape.parameters))
+		}
+		a.error(codeCallArguments, fmt.Sprintf("%s expects %s argument(s); received %d", operation, expected, len(call.Arguments)), call.Span(), shape.hint)
 		a.analyzeTypeOperationArguments(call, current, flow, nil)
 		return result
 	}
@@ -145,7 +160,7 @@ func (a *analyzer) analyzeSMTPOperation(call *ast.CallExpr, operation TypeOperat
 	}
 	parameters := make([]types.Parameter, len(shape.parameters))
 	for index, expected := range shape.parameters {
-		parameters[index] = types.Parameter{Type: expected}
+		parameters[index] = types.Parameter{Type: expected, HasDefault: optional > 0 && index >= len(shape.parameters)-optional}
 	}
 	a.result.SelectedCallables[call] = &Callable{
 		Signature:  &types.Signature{Parameters: parameters, Return: shape.result},

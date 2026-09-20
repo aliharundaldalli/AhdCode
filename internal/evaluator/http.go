@@ -16,24 +16,32 @@ const (
 	evaluatorHTTPClientRequestClass  = ir.ClassID("builtin:HTTP::class::ClientRequest")
 	evaluatorHTTPClientResponseClass = ir.ClassID("builtin:HTTP::class::ClientResponse")
 	evaluatorHTTPUploadedFileClass   = ir.ClassID("builtin:HTTP::class::UploadedFile")
+	// Binary-safe outbound downloads (v2.1.0).
+	evaluatorHTTPClientFileResponseClass = ir.ClassID("builtin:HTTP::class::ClientFileResponse")
 	// WebSocket server support (v1.4.0).
 	evaluatorHTTPWebSocketClass         = ir.ClassID("builtin:HTTP::class::WebSocket")
 	evaluatorHTTPWebSocketEndpointClass = ir.ClassID("builtin:HTTP::class::WebSocketEndpoint")
+	// WebSocket client support (v2.1.0).
+	evaluatorHTTPWebSocketClientClass     = ir.ClassID("builtin:HTTP::class::WebSocketClient")
+	evaluatorHTTPWebSocketConnectionClass = ir.ClassID("builtin:HTTP::class::WebSocketConnection")
 )
 
 var (
-	evaluatorHTTPServerField            = ir.FieldID("builtin:HTTP::class::Server::field::handle")
-	evaluatorHTTPRequestField           = ir.FieldID("builtin:HTTP::class::Request::field::data")
-	evaluatorHTTPResponseField          = ir.FieldID("builtin:HTTP::class::Response::field::data")
-	evaluatorHTTPCookieField            = ir.FieldID("builtin:HTTP::class::Cookie::field::data")
-	evaluatorHTTPSessionStoreField      = ir.FieldID("builtin:HTTP::class::SessionStore::field::handle")
-	evaluatorHTTPSessionField           = ir.FieldID("builtin:HTTP::class::Session::field::data")
-	evaluatorHTTPClientField            = ir.FieldID("builtin:HTTP::class::Client::field::handle")
-	evaluatorHTTPClientRequestField     = ir.FieldID("builtin:HTTP::class::ClientRequest::field::data")
-	evaluatorHTTPClientResponseField    = ir.FieldID("builtin:HTTP::class::ClientResponse::field::data")
-	evaluatorHTTPUploadedFileField      = ir.FieldID("builtin:HTTP::class::UploadedFile::field::data")
-	evaluatorHTTPWebSocketField         = ir.FieldID("builtin:HTTP::class::WebSocket::field::data")
-	evaluatorHTTPWebSocketEndpointField = ir.FieldID("builtin:HTTP::class::WebSocketEndpoint::field::handle")
+	evaluatorHTTPServerField              = ir.FieldID("builtin:HTTP::class::Server::field::handle")
+	evaluatorHTTPRequestField             = ir.FieldID("builtin:HTTP::class::Request::field::data")
+	evaluatorHTTPResponseField            = ir.FieldID("builtin:HTTP::class::Response::field::data")
+	evaluatorHTTPCookieField              = ir.FieldID("builtin:HTTP::class::Cookie::field::data")
+	evaluatorHTTPSessionStoreField        = ir.FieldID("builtin:HTTP::class::SessionStore::field::handle")
+	evaluatorHTTPSessionField             = ir.FieldID("builtin:HTTP::class::Session::field::data")
+	evaluatorHTTPClientField              = ir.FieldID("builtin:HTTP::class::Client::field::handle")
+	evaluatorHTTPClientRequestField       = ir.FieldID("builtin:HTTP::class::ClientRequest::field::data")
+	evaluatorHTTPClientResponseField      = ir.FieldID("builtin:HTTP::class::ClientResponse::field::data")
+	evaluatorHTTPUploadedFileField        = ir.FieldID("builtin:HTTP::class::UploadedFile::field::data")
+	evaluatorHTTPClientFileResponseField  = ir.FieldID("builtin:HTTP::class::ClientFileResponse::field::data")
+	evaluatorHTTPWebSocketField           = ir.FieldID("builtin:HTTP::class::WebSocket::field::data")
+	evaluatorHTTPWebSocketEndpointField   = ir.FieldID("builtin:HTTP::class::WebSocketEndpoint::field::handle")
+	evaluatorHTTPWebSocketClientField     = ir.FieldID("builtin:HTTP::class::WebSocketClient::field::handle")
+	evaluatorHTTPWebSocketConnectionField = ir.FieldID("builtin:HTTP::class::WebSocketConnection::field::handle")
 )
 
 func (session *Session) httpServer(handle string) *Instance {
@@ -70,6 +78,18 @@ func (session *Session) httpClientRequest(data string) *Instance {
 
 func (session *Session) httpClientResponse(data string) *Instance {
 	return &Instance{Class: evaluatorHTTPClientResponseClass, Fields: map[ir.FieldID]any{evaluatorHTTPClientResponseField: data}}
+}
+
+func (session *Session) httpClientFileResponse(data string) *Instance {
+	return &Instance{Class: evaluatorHTTPClientFileResponseClass, Fields: map[ir.FieldID]any{evaluatorHTTPClientFileResponseField: data}}
+}
+
+func (session *Session) httpWebSocketClient(handle string) *Instance {
+	return &Instance{Class: evaluatorHTTPWebSocketClientClass, Fields: map[ir.FieldID]any{evaluatorHTTPWebSocketClientField: handle}}
+}
+
+func (session *Session) httpWebSocketConnection(handle string) *Instance {
+	return &Instance{Class: evaluatorHTTPWebSocketConnectionClass, Fields: map[ir.FieldID]any{evaluatorHTTPWebSocketConnectionField: handle}}
 }
 
 func (session *Session) httpUploadedFile(data string) *Instance {
@@ -201,6 +221,8 @@ func (session *Session) httpBuiltin(name string, args []any) any {
 		return session.httpContextHandler(args)
 	case "websocket":
 		return session.httpWebSocketEndpoint(ahdruntime.AhdHTTPWebSocket(class, session.webSocketMessageHandler(args[0])))
+	case "webSocketClient":
+		return session.httpWebSocketClient(ahdruntime.AhdHTTPWebSocketClient(class, args[0].(string)))
 	}
 	session.raise("Error", "unsupported HTTP function "+name)
 	return nil
@@ -373,6 +395,67 @@ func (session *Session) httpOperation(name string, receiver any, args []any) any
 	case "ClientRequest.withBody":
 		return session.httpClientRequest(ahdruntime.AhdHTTPClientRequestWithBody(class,
 			session.httpDataOf(receiver, evaluatorHTTPClientRequestClass, evaluatorHTTPClientRequestField, "ClientRequest"), arg(0)))
+	case "ClientRequest.withMultipartField":
+		return session.httpClientRequest(ahdruntime.AhdHTTPClientRequestWithMultipartField(class,
+			session.httpDataOf(receiver, evaluatorHTTPClientRequestClass, evaluatorHTTPClientRequestField, "ClientRequest"), arg(0), arg(1)))
+	case "ClientRequest.withMultipartFile":
+		return session.httpClientRequest(ahdruntime.AhdHTTPClientRequestWithMultipartFile(class,
+			session.httpDataOf(receiver, evaluatorHTTPClientRequestClass, evaluatorHTTPClientRequestField, "ClientRequest"),
+			arg(0), arg(1), session.httpStringArg(args, 2, ""), session.httpStringArg(args, 3, "application/octet-stream")))
+	case "Client.download":
+		return session.httpClientFileResponse(ahdruntime.AhdHTTPClientDownload(class,
+			session.httpDataOf(receiver, evaluatorHTTPClientClass, evaluatorHTTPClientField, "Client"), arg(0), arg(1)))
+	case "Client.sendToFile":
+		return session.httpClientFileResponse(ahdruntime.AhdHTTPClientSendToFile(class,
+			session.httpDataOf(receiver, evaluatorHTTPClientClass, evaluatorHTTPClientField, "Client"),
+			session.httpDataOf(args[0], evaluatorHTTPClientRequestClass, evaluatorHTTPClientRequestField, "ClientRequest"), arg(1)))
+	case "ClientFileResponse.status":
+		return ahdruntime.AhdHTTPClientFileResponseStatus(session.httpDataOf(receiver, evaluatorHTTPClientFileResponseClass, evaluatorHTTPClientFileResponseField, "ClientFileResponse"))
+	case "ClientFileResponse.header":
+		return session.httpOptional(ahdruntime.AhdHTTPClientFileResponseHeader(class,
+			session.httpDataOf(receiver, evaluatorHTTPClientFileResponseClass, evaluatorHTTPClientFileResponseField, "ClientFileResponse"), arg(0)))
+	case "ClientFileResponse.headerAll":
+		return session.httpStringList(ahdruntime.AhdHTTPClientFileResponseHeaderAll(class,
+			session.httpDataOf(receiver, evaluatorHTTPClientFileResponseClass, evaluatorHTTPClientFileResponseField, "ClientFileResponse"), arg(0)))
+	case "ClientFileResponse.url":
+		return ahdruntime.AhdHTTPClientFileResponseURL(class,
+			session.httpDataOf(receiver, evaluatorHTTPClientFileResponseClass, evaluatorHTTPClientFileResponseField, "ClientFileResponse"))
+	case "ClientFileResponse.size":
+		return ahdruntime.AhdHTTPClientFileResponseSize(class,
+			session.httpDataOf(receiver, evaluatorHTTPClientFileResponseClass, evaluatorHTTPClientFileResponseField, "ClientFileResponse"))
+	case "WebSocketClient.withHeader":
+		return session.httpWebSocketClient(ahdruntime.AhdWebSocketClientWithHeader(class,
+			session.httpDataOf(receiver, evaluatorHTTPWebSocketClientClass, evaluatorHTTPWebSocketClientField, "WebSocketClient"), arg(0), arg(1)))
+	case "WebSocketClient.withTimeout":
+		return session.httpWebSocketClient(ahdruntime.AhdWebSocketClientWithTimeout(class,
+			session.httpDataOf(receiver, evaluatorHTTPWebSocketClientClass, evaluatorHTTPWebSocketClientField, "WebSocketClient"), args[0].(int64)))
+	case "WebSocketClient.withMaxMessageBytes":
+		return session.httpWebSocketClient(ahdruntime.AhdWebSocketClientWithMaxMessageBytes(class,
+			session.httpDataOf(receiver, evaluatorHTTPWebSocketClientClass, evaluatorHTTPWebSocketClientField, "WebSocketClient"), args[0].(int64)))
+	case "WebSocketClient.connect":
+		return session.httpWebSocketConnection(ahdruntime.AhdWebSocketClientConnect(class,
+			session.httpDataOf(receiver, evaluatorHTTPWebSocketClientClass, evaluatorHTTPWebSocketClientField, "WebSocketClient")))
+	case "WebSocketConnection.send":
+		return ahdruntime.AhdWebSocketConnectionSend(class,
+			session.httpDataOf(receiver, evaluatorHTTPWebSocketConnectionClass, evaluatorHTTPWebSocketConnectionField, "WebSocketConnection"), arg(0))
+	case "WebSocketConnection.receive":
+		return session.httpOptional(ahdruntime.AhdWebSocketConnectionReceive(class,
+			session.httpDataOf(receiver, evaluatorHTTPWebSocketConnectionClass, evaluatorHTTPWebSocketConnectionField, "WebSocketConnection"),
+			session.httpIntArg(args, 0, 0)))
+	case "WebSocketConnection.close":
+		ahdruntime.AhdWebSocketConnectionClose(class,
+			session.httpDataOf(receiver, evaluatorHTTPWebSocketConnectionClass, evaluatorHTTPWebSocketConnectionField, "WebSocketConnection"),
+			session.httpIntArg(args, 0, 1000), session.httpStringArg(args, 1, ""))
+		return Nothing
+	case "WebSocketConnection.isOpen":
+		return ahdruntime.AhdWebSocketConnectionIsOpen(class,
+			session.httpDataOf(receiver, evaluatorHTTPWebSocketConnectionClass, evaluatorHTTPWebSocketConnectionField, "WebSocketConnection"))
+	case "WebSocketConnection.closeCode":
+		return session.httpOptionalInt(ahdruntime.AhdWebSocketConnectionCloseCode(class,
+			session.httpDataOf(receiver, evaluatorHTTPWebSocketConnectionClass, evaluatorHTTPWebSocketConnectionField, "WebSocketConnection")))
+	case "WebSocketConnection.closeReason":
+		return ahdruntime.AhdWebSocketConnectionCloseReason(class,
+			session.httpDataOf(receiver, evaluatorHTTPWebSocketConnectionClass, evaluatorHTTPWebSocketConnectionField, "WebSocketConnection"))
 	case "ClientResponse.status":
 		return ahdruntime.AhdHTTPClientResponseStatus(session.httpDataOf(receiver, evaluatorHTTPClientResponseClass, evaluatorHTTPClientResponseField, "ClientResponse"))
 	case "ClientResponse.body":
@@ -448,6 +531,13 @@ func (session *Session) httpOperation(name string, receiver any, args []any) any
 }
 
 func (session *Session) httpOptional(value *string) any {
+	if value == nil {
+		return nil
+	}
+	return *value
+}
+
+func (session *Session) httpOptionalInt(value *int64) any {
 	if value == nil {
 		return nil
 	}

@@ -211,6 +211,23 @@ definition, so the file is byte for byte what `chart.save(path)` or
 works after the program that called `show()` has ended. The result — or why
 it failed — appears beside the toolbar for a few seconds.
 
+> **Fixed after v2.0.0.** In v2.0.0, a program that uses Plot but not GUI
+> did not find the helper that opens the save dialog, and Save reported
+> "Save needs AhdCode's GUI helper (ahdgui), which is not installed". The
+> compiler recorded the helper's location only for a program that used GUI
+> itself, so a Plot-only program compiled into a temporary directory had no
+> other way to find it. `chart.save(path)` and a packaged application were
+> never affected.
+>
+> It is fixed in the repository and in v2.1: the location is now recorded
+> for a program that uses GUI **or** Plot, and Save needs no environment
+> variable. If you are running the published v2.0.0 release, name the
+> helper when you run the program until you upgrade:
+>
+> ```sh
+> AHDCODE_GUI_RUNTIME=~/Library/AhdCode/current/libexec/ahdcode/ahdgui ahdcode run chart.ahd
+> ```
+
 `show()` returns as soon as the viewer window is open. The program continues
 and may call `show()` again; each call opens its own viewer, and a viewer
 stays open until you close it, even after the program ends. `show()` renders

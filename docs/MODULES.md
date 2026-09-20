@@ -60,9 +60,12 @@ modules are reachable from framework source alone.
 `Math`, `Time`, `Cron`, `Latex`, `Word`, `Excel`, `PDF`, `QR`, `Barcode`, `Archive`, `Path`, `File`, `Regex`, `Characters`, `CSV`, `Data`, `Statistics`, `Plot`, `Graphics`, `GUI`, `Numeric`, `JSON`, `SQLite`, `PostgreSQL`, `HTTP`, `HTML`, `SMTP`, `XML`, `Env`, `Lists`, `KeyValue`, `Security`, `Identity`, `UUID`, `Terminal`, and `Bits` are compiler-registered and use
 these same import forms. A local file cannot shadow a standard module of the
 same name. `HTTP` is both the inbound server (`Server` / `Request` /
-`Response`, cookies, sessions, WebSocket endpoints) and the outbound `Client` / `ClientRequest` /
-`ClientResponse` surface. `SMTP` is send-only mail (`SMTPClient` /
-`SMTPMessage`). They can also use the ordinary namespace alias form:
+`Response`, cookies, sessions, WebSocket endpoints) and the outbound
+`Client` / `ClientRequest` / `ClientResponse` surface, which v2.1 extends
+with binary-safe file transfer (`Client.download`,
+`ClientRequest.withMultipartFile`, `ClientFileResponse`) and a WebSocket
+client (`WebSocketClient` / `WebSocketConnection`). `SMTP` is send-only mail
+(`SMTPClient` / `SMTPMessage`), with file attachments from v2.1. They can also use the ordinary namespace alias form:
 
 ```ahd
 bring File as F

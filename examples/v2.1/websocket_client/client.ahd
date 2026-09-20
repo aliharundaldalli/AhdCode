@@ -1,0 +1,66 @@
+// Talk to a WebSocket service from AhdCode.
+//
+// Start server.ahd first, then: ahdcode run client.ahd
+//
+// The client is new in v2.1. A WebSocketClient is immutable configuration
+// with no socket behind it; connect() performs the handshake and returns one
+// live WebSocketConnection. receive() is synchronous: the program asks for
+// the next message and waits. There is no callback and no reconnect.
+bring JSON
+from JSON bring JSONValue
+bring HTTP
+from HTTP bring WebSocketClient
+from HTTP bring WebSocketConnection
+from HTTP bring HTTPError
+
+attempt {
+    // Configuration first. Each with* returns a new WebSocketClient.
+    socket: Local WebSocketClient := HTTP.webSocketClient("ws://127.0.0.1:8138/live")
+    authorized: Local WebSocketClient := socket.withHeader("Authorization", "Bearer example-token")
+    configured: Local WebSocketClient := authorized.withTimeout(5).withMaxMessageBytes(4096)
+
+    // Only connect() touches the network.
+    live: Local WebSocketConnection := configured.connect()
+    write("connected")
+
+    // The server greets every connection.
+    greeting: Local String? := live.receive(5)
+    if greeting != null {
+        write("server said: " + greeting)
+    }
+
+    for question in ["merhaba", "AhdCode", "üçüncü soru"] {
+        if live.send(question) {
+            reply: Local String? := live.receive(5)
+            if reply == null {
+                write("the server closed while answering")
+            } else {
+                // The reply is a JSON String like any other text message.
+                parsed: Local JSONValue := JSON.parse(reply)
+                letters: Local JSONValue? := parsed.get("letters")
+                if letters != null {
+                    write(question + " has " + str(letters.int()) + " letters")
+                }
+            }
+        }
+    }
+
+    // Asking the server to close: receive returns null, and the close
+    // metadata says how it ended.
+    live.send("bye")
+    ending: Local String? := live.receive(5)
+    if ending == null {
+        code: Local Int? := live.closeCode()
+        if code != null {
+            write("closed with " + str(code) + " " + live.closeReason())
+        }
+    }
+    if live.isOpen() {
+        // Nothing reconnects by itself, so closing is the program's job.
+        live.close(1000, "done")
+    }
+    write("finished")
+}
+except HTTPError as error {
+    write("the conversation failed: " + error.message)
+}

@@ -16,10 +16,10 @@ from SMTP bring SMTPError
 
 `SMTP` yalnızca gönderim yapan bir posta taşıması ve ileti bileşim
 ilkelidir. Bülten çerçevesi, gelen kutusu, mailbox istemcisi, arka plan
-kuyruğu veya sağlayıcıya özel bir API değildir. IMAP, POP3, ek (attachment)
-desteği veya bir posta yardımcı çalıştırılabilir dosyası yoktur. Uygulama,
-AhdCode çalışma zamanının içindeki Go `net/smtp`, `crypto/tls` ve MIME
-kütüphanelerini kullanır.
+kuyruğu veya sağlayıcıya özel bir API değildir. v2.1 dosya eklerini ekler;
+IMAP, POP3 ya da bir posta yardımcı çalıştırılabilir dosyası hâlâ yoktur.
+Uygulama, AhdCode çalışma zamanının içindeki Go `net/smtp`, `crypto/tls` ve
+MIME kütüphanelerini kullanır.
 
 ## Genel yüzey
 
@@ -45,6 +45,11 @@ SMTPMessage.withBcc(recipients: List<String>) -> SMTPMessage
 SMTPMessage.withReplyTo(address: String) -> SMTPMessage
 SMTPMessage.withText(body: String) -> SMTPMessage
 SMTPMessage.withHtml(body: String) -> SMTPMessage
+SMTPMessage.withAttachment(
+    path: String
+    fileName: String := ""
+    contentType: String := "application/octet-stream"
+) -> SMTPMessage
 ```
 
 Başarısızlıklar `SMTPError` kullanır. `SMTPClient` veya `SMTPMessage` doğrudan
@@ -147,7 +152,62 @@ temizlemez. Verilen HTML kasıtlı posta işaretlemesidir.
 Date gönderim anında üretilir. v0.9'da genel Date veya Message-ID API'si
 yoktur. Message-ID, zayıf bir kimlik uydurmak yerine atlanır.
 
-Ekler kapsam dışıdır.
+## Ekler
+
+v2.1 gerçek dosyaları ekler. Her `withAttachment` çağrısı bir ek ekler ve
+**yeni** bir `SMTPMessage` döndürür; böylece ileti değiştirilemez kalır ve
+ekler eklendikleri sırayı korur:
+
+```ahd
+message: SMTPMessage := SMTP.message("sender@example.com", ["student@example.com"], "Ölçüm raporu")
+message = message.withText("Rapor ekte.")
+message = message.withAttachment("report.pdf", "", "application/pdf")
+message = message.withAttachment("chart.png", "Grafik.png", "image/png")
+```
+
+`path`, okunacak yerel dosyadır. `fileName` **yalnızca sunum verisidir** —
+alıcının gördüğü ad; boş bırakılırsa yolun kendi taban adı kullanılır ve her
+iki durumda da ad düz bir taban adına indirgenir, böylece çağıranın
+geçirdiği hiçbir şey yol gibi davranamaz. `contentType` geçerli bir ortam
+türü olmalıdır.
+
+Dosya yapılandırma anında okunmaz: yapılandırılmış bir ileti yol tutar, yük
+değil. Baytlar ileti gönderilirken okunur ve doğrudan bağlantıya base64 ile
+kodlanır; böylece büyük bir ek asla AhdCode `String`'ine dönüşmez ve
+bütünüyle bellekte durmaz.
+
+### Yapı
+
+Eksiz bir ileti, v0.9.0'da ürettiği MIME'ın tam olarak aynısını üretir.
+Ekler varken aynı gövde sarmalanır:
+
+```text
+yalnızca metin      multipart/mixed { text/plain,      ekler… }
+yalnızca HTML       multipart/mixed { text/html,       ekler… }
+metin ve HTML       multipart/mixed { multipart/alternative { text/plain, text/html },
+                                      ekler… }
+```
+
+`multipart/alternative`, eklerin yanına düzleştirilmez; mixed parçanın
+içinde iç içe kalır, böylece bir posta istemcisi hâlâ gösterilecek tek bir
+gövde seçer. Her ek `Content-Transfer-Encoding: base64` ve
+`Content-Disposition: attachment` taşır, 76 karakterde kanonik CRLF ile
+sarılır. ASCII olmayan bir dosya adı RFC 2231 kodlu biçimi kullanır ve
+olduğu gibi ulaşır. Bcc, eskisi gibi DATA'da görünmez.
+
+### Sınırlar
+
+Her ek bağlantı açılmadan önce denetlenir: her yol okunabilir bir düzenli
+dosya olmalıdır; eksik bir dosya, bir dizin ya da düzenli olmayan bir şey,
+hiçbir şey gönderilmeden `SMTPError` fırlatır.
+
+AhdCode'un kendi belirlenimci sınırları: en fazla 32 ek, tek ek için 128
+MiB ve toplamda 256 MiB. Bunlar herhangi bir sağlayıcının sınırlarına dair
+bir tahmin değildir: bu sınırlara uyan bir ileti yine de bir sunucu
+tarafından reddedilebilir ve bu reddediliş, reddedilen her ileti gibi
+bildirilir.
+
+Bir hata, ek yolu ne olursa olsun, parolayı asla adlandırmaz.
 
 ## Komut akışı
 
@@ -163,6 +223,10 @@ bağlantılar kullanır.
 
 ## Kapsam dışı
 
-IMAP, POP3, ekler, AUTH LOGIN / CRAM-MD5 / XOAUTH2, DKIM/SPF/DMARC, sağlayıcı
-modülleri, kuyruklar, yeniden denemeler, şablonlar ve izleme v0.9'un parçası
-değildir.
+IMAP, POP3, posta kutusu okuma, AUTH LOGIN / CRAM-MD5 / XOAUTH2,
+DKIM/SPF/DMARC, sağlayıcı modülleri, kuyruklar, yeniden denemeler, şablonlar
+ve izleme hâlâ modülün parçası değildir. `Content-ID` ile satır içi
+görseller, `multipart/related` ve genel bir Date ya da Message-ID API'si de
+yoktur.
+
+Ayrıca bakın: [`examples/v2.1/smtp_attachment`](../examples/v2.1/smtp_attachment/README_TR.md).

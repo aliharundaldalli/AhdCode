@@ -16,9 +16,9 @@ veritabanı modülleri, GUI'si, Graphics'i, etkileşimli Plot görüntüleyicisi
 masaüstü uygulaması paketlemesiyle gelir. Küçük bir topluluk tarafından
 pratikte kullanılmaktadır; yaygın (mainstream) bir dil değildir.
 
-Bu, **v2.0.0**'dır. Dil, araç zinciri ve Web çatısı özellik olarak
-tamamlanmıştır; burada anlatılan çekirdek dil yüzeyi 1.0'ın taahhüt ettiği ve
-1.1'den 2.0'a kadarki sürümlerin değiştirmeden koruduğu yüzeydir.
+Bu, **v2.1.0**, **Uygulama G/Ç ve Ağ Tamamlanması** sürümüdür. Dil, araç
+zinciri ve Web çatısı özellik olarak tamamlanmıştır; burada anlatılan çekirdek
+dil yüzeyi değişmemiştir.
 
 v2.0.0 bir ana (major) sürümdür, **Masaüstü Uygulamasının Tamamlanması**:
 birinci taraf masaüstü uygulaması temelini tamamlar — GUI'de ListBox, Select,
@@ -27,6 +27,10 @@ callback'leri ve yeniden boyutlandırılabilir pencereler; Plot
 görüntüleyicisinde araç çubuğu ve 3B Surface çizimi; ve kendi başına çalışan
 masaüstü uygulamaları için `ahdcode package` — yeni sözdizimi eklemez ve tip
 sistemini değiştirmez. Bkz. [v2.0.0 ile gelenler](#v200-ile-gelenler).
+
+v2.1.0 ikili güvenli giden indirmeler, giden multipart yüklemeler, SMTP
+ekleri, WebSocket istemcisi ekler ve v2.0 Plot Save çalışma zamanı bulma
+gerilemesini düzeltir. Bkz. [v2.1.0 ile gelenler](#v210-ile-gelenler).
 
 Ürün, kendi kendine yeten bir platform paketi olarak dağıtılır: `ahdcode` CLI,
 özel Go 1.27.0 araç zinciri, AhdDataStudio, `ahdsqlite`, `ahdnumeric`, `ahdplot`,
@@ -491,6 +495,7 @@ bakın.
 - [v1.5 Terminal tanıtımı](examples/v1.5/terminal_demo/README_TR.md) — `Terminal.emit`, standart hata, terminal tespiti, biçimli metin ve okunabilir düzen
 - [v1.7 standart kütüphane tamamlama](examples/v1.7/README_TR.md) — trigonometri ve ebob/ekok, katı ISO zaman metni ve an aritmetiği, istatistikli Table join
 - [v2.0 masaüstü uygulamaları](examples/v2.0/README_TR.md) — TableView, iletişim kutuları ve CSV dışa aktarma içeren bir SQLite defteri; bir 3B Surface; ve paketlenecek küçük bir uygulama
+- [v2.1 uygulama G/Ç ve ağ](examples/v2.1/README_TR.md) — HTTP üzerinden ikili bir dosya turu, bir WebSocket istemci/sunucu çifti ve ekli posta
 - [v1.9 GUI renkleri ve etkileşimli Plot](examples/v1.9/README_TR.md) — renkli ve devre dışı Kaydet düğmeli bir sipariş formu ile AhdCode'un kendi görüntüleyicisinde bir grafik
 - [v1.8 GUI ve olaylar](examples/v1.8/README_TR.md) — SQLite destekli küçük bir GUI defteri ve ok tuşları ile tıklamalarla yönetilen Turtle
 - [v1.6 Graphics ve Turtle](examples/v1.6/graphics_turtle/README_TR.md) — Kartezyen Canvas, şekiller, Turtle ile yıldız ve spiral, PNG/SVG kaydı ve düzgün çokgen dersi
@@ -511,6 +516,34 @@ VS Code hem de Antigravity'i hedefler.
 [Kurulum rehberine](editors/vscode/README_TR.md) bakın.
 
 ## Mevcut sınırlamalar
+
+## v2.1.0 ile gelenler <a id="v210-ile-gelenler"></a>
+
+v2.0 masaüstü uygulaması temelini tamamladı. v2.1, **Uygulama G/Ç ve Ağ
+Tamamlanması**, CLI, Web ve masaüstü programlarının paylaştığı pratik dosya
+ve ağ boşluklarını kapatır. Yeni sözdizimi, tip sistemi değişikliği ya da
+bayt tipi eklemez: ikili veri opak kalır ve dosyadan dosyaya taşınır.
+
+- [`HTTP`](docs/HTTP_TR.md): `Client.download(url, path)` ve
+  `Client.sendToFile(request, path)` bir yanıt gövdesini doğrudan dosyaya
+  akıtır ve bir `ClientFileResponse` döndürür — durum, başlıklar, son URL ve
+  yazılan bayt sayısı; `body()` yoktur, çünkü yük dosyadadır. Başarısız bir
+  aktarım hedefe asla zarar vermez.
+- [`HTTP`](docs/HTTP_TR.md): `ClientRequest.withMultipartField` ve
+  `withMultipartFile` bir `multipart/form-data` gövdesi gönderir ve her
+  dosyayı diskten akıtır. Giden multipart, v0.8'in eklediği gelen
+  yüklemelerle çifti tamamlar.
+- [`WebSocket`](docs/WEBSOCKET_TR.md): eşzamanlı bir istemci —
+  `HTTP.webSocketClient(url)` yapılandırır, `connect()` bir
+  `WebSocketConnection` açar ve `receive()` sıradaki mesajı bekler. Geri
+  çağrı, arka plan olay döngüsü ya da yeniden bağlanma yoktur.
+- [`SMTP`](docs/SMTP_TR.md): `SMTPMessage.withAttachment(path, fileName, contentType)`
+  gerçek dosyaları, doğrudan diskten base64 ile kodlayarak ekler. Eksiz bir
+  ileti her zamanki MIME'ın tam olarak aynısını üretir.
+- v2.0 Plot görüntüleyicisinin Save'i, Plot kullanan ama GUI kullanmayan bir
+  program için düzeltildi; hiçbir ortam değişkenine ihtiyaç duymaz.
+
+Bkz. [v2.1 örnekleri](examples/v2.1/README_TR.md).
 
 ## v2.0.0 ile gelenler <a id="v200-ile-gelenler"></a>
 

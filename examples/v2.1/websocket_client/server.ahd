@@ -1,0 +1,58 @@
+// A WebSocket service an AhdCode program can talk to.
+//
+// Start it first, then run client.ahd in another terminal. Stop it later
+// with: ahdcode kill server.run
+//
+// This is the v1.4 server API unchanged: an endpoint with one onMessage
+// callback, registered on an ordinary Server. Only the client is new.
+bring JSON
+from JSON bring JSONValue
+bring HTTP
+from HTTP bring Server
+from HTTP bring Request
+from HTTP bring Response
+from HTTP bring WebSocket
+from HTTP bring WebSocketEndpoint
+
+// A connection is only accepted with the shared token, so the example shows
+// a handshake header being used for something.
+accept: Function := (request: Request) -> Response? {
+    if request.header("Authorization") != "Bearer example-token" {
+        return HTTP.text("a token is required", 401)
+    }
+    return null
+}
+
+opened: Function := (socket: WebSocket, request: Request) -> Nothing {
+    write("a client connected")
+    socket.send("welcome")
+}
+
+// Every message comes back as a JSON object, so the client has something
+// worth parsing rather than an echo.
+answer: Function := (socket: WebSocket, text: String) -> Nothing {
+    if text == "bye" {
+        socket.close(1000, "asked to close")
+        return
+    }
+    reply: Local JSONValue := JSON.object({
+        "question": JSON.fromString(text)
+        "letters": JSON.fromInt(len(text))
+    })
+    socket.send(JSON.stringify(reply))
+}
+
+closed: Function := (socket: WebSocket, code: Int, reason: String) -> Nothing {
+    write("a client left with " + str(code) + " " + reason)
+}
+
+endpoint: WebSocketEndpoint := HTTP.websocket(answer)
+endpoint = endpoint.withAccept(accept)
+endpoint = endpoint.withOpen(opened)
+endpoint = endpoint.withClose(closed)
+endpoint = endpoint.withMaxMessageBytes(4096)
+
+app: Server := HTTP.server("127.0.0.1", 8138)
+app.websocket("/live", endpoint)
+write("WebSocket service on ws://127.0.0.1:8138/live")
+app.start()

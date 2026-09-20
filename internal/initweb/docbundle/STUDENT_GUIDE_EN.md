@@ -1,4 +1,4 @@
-# AhdCode v2.0.0 English Student Guide
+# AhdCode v2.1.0 English Student Guide
 
 This guide is designed so that **even someone who has never programmed before** can follow along. You can read it in order from beginning to end; in each section, you will first see what we want to achieve, then write a working example, and finally learn the necessary rules.
 
@@ -87,6 +87,7 @@ says so and links to the reference page that lists every signature.
 - [65. Windows that react: GUI forms and Turtle keys](#65-windows-that-react-gui-forms-and-turtle-keys)
 - [66. Colors, disabled buttons, and a chart you can explore](#66-colors-disabled-buttons-and-a-chart-you-can-explore)
 - [67. A desktop application: tables, dialogs, 3D charts, and packaging](#67-a-desktop-application-tables-dialogs-3d-charts-and-packaging)
+- [68. Moving files: upload, download, attach, and notify](#68-moving-files-upload-download-attach-and-notify)
 
 ## 1. What is AhdCode?
 
@@ -7253,3 +7254,131 @@ and show the balance in a Label; then package it with your own icon using
 
 See the [GUI reference](GUI.md), the [Plot reference](PLOT.md#surface),
 [Packaging](PACKAGING.md), and `examples/v2.0`.
+
+
+## 68. Moving files: upload, download, attach, and notify
+
+> Added in v2.1.0.
+
+Until now a program could *serve* files and *receive* them, but the outbound
+client could only carry text. v2.1 finishes the picture. A PDF is not text,
+so AhdCode does not pretend it is: binary travels **file to file**, and
+there is still no `Bytes` type to learn.
+
+This section builds one small workflow: make a document, upload it to a
+local service, download the binary answer, and email the result — then adds
+a live notification over WebSocket.
+
+**Step 1 — make something to send.** Any file will do. A QR code PNG is a
+real binary file and needs nothing installed:
+
+```ahd
+bring QR
+from QR bring QRCode
+
+code: QRCode := QR.create("https://ahdcode.org")
+code.savePNG("poster.png", 512)
+```
+
+**Step 2 — upload it.** A `multipart/form-data` request is an ordinary
+`ClientRequest` with parts added. `withMultipartField` adds a text field and
+`withMultipartFile` adds a file. Both return a **new** request, like every
+other `with…`:
+
+```ahd
+bring HTTP
+from HTTP bring (Client, ClientRequest, ClientResponse, ClientFileResponse, HTTPError)
+
+client: Client := HTTP.client(timeoutSeconds: 30)
+request: ClientRequest := HTTP.clientRequest("POST", "http://127.0.0.1:8137/upload")
+titled: ClientRequest := request.withMultipartField("title", "Poster")
+withFile: ClientRequest := titled.withMultipartFile("file", "poster.png", "", "image/png")
+answer: ClientResponse := client.send(withFile)
+write(str(answer.status()))
+```
+
+The PNG is never read into a String: its bytes are streamed from disk into
+the connection as the server drains it. The third argument is only the name
+the server is told, and the fourth is the content type; both may be left
+out.
+
+One rule to remember: a request uses **either** `withBody` **or** multipart
+parts, never both, and AhdCode sets the `Content-Type` for you. Mixing them
+raises `HTTPError` instead of quietly sending the wrong thing.
+
+**Step 3 — download the answer.** `download` writes the response body
+straight to a file and gives you back only the facts about it:
+
+```ahd
+fetched: ClientFileResponse := client.download("http://127.0.0.1:8137/file", "answer.png")
+write(str(fetched.status()))
+write(str(fetched.size()) + " bytes written")
+```
+
+A `ClientFileResponse` has `status()`, `header(name)`, `headerAll(name)`,
+`url()`, and `size()` — and deliberately **no `body()`**, because the
+payload is in `answer.png`.
+
+Two things to expect. A `404` is still a response, not a crash: the server's
+error page is written to the file and `status()` says `404`, so check it
+before trusting what you downloaded. And a failed download never damages
+what was already there — the bytes go to a temporary file first, and your
+existing file survives untouched.
+
+**Step 4 — email it.** `withAttachment` names a local file; its bytes are
+read when the message is sent:
+
+```ahd
+bring Env
+bring SMTP
+from SMTP bring (SMTPClient, SMTPMessage, SMTPError)
+
+mail: SMTPClient := SMTP.client(Env.getOr("SMTP_HOST", "127.0.0.1"), int(Env.getOr("SMTP_PORT", "2525")), "none")
+message: SMTPMessage := SMTP.message("sender@example.com", ["student@example.com"], "Poster ready")
+message = message.withText("The poster is attached.")
+message = message.withAttachment("answer.png", "Poster.png", "image/png")
+
+attempt {
+    mail.send(message)
+    write("sent")
+} except SMTPError as error {
+    write(error.message)
+}
+```
+
+Keep credentials out of the file. Read a password with `Env.secret("SMTP_PASSWORD")`
+and pass it to `withPlainAuth` only when it is there; AhdCode refuses to
+authenticate over an unencrypted connection anyway. See
+[Reading secrets from files](#58-reading-secrets-from-files).
+
+**Step 5 — notify someone live.** v2.1 also lets a program be a WebSocket
+*client*, not only a server. The configuration and the connection are
+different types on purpose, so you cannot read from something you never
+connected:
+
+```ahd
+from HTTP bring (WebSocketClient, WebSocketConnection)
+
+socket: WebSocketClient := HTTP.webSocketClient("ws://127.0.0.1:8138/live")
+live: WebSocketConnection := socket.withTimeout(5).connect()
+live.send("poster ready")
+reply: String? := live.receive(5)
+if reply != null {
+    write(reply)
+}
+live.close()
+```
+
+`receive` waits. It returns the next message as a `String`, or `null` when
+the other side closed normally — and then `closeCode()` and `closeReason()`
+tell you how. A timeout raises `HTTPError` and leaves the connection open,
+so you can always tell "nothing yet" from "they hung up". Nothing reconnects
+by itself; if you want that, write the loop.
+
+**Try it yourself:** run
+`examples/v2.1/http_file_transfer`,
+then change the client to upload two files in one request and print each
+response header.
+
+See the [HTTP reference](HTTP.md), the [WebSocket reference](WEBSOCKET.md),
+the [SMTP reference](SMTP.md), and `examples/v2.1`.

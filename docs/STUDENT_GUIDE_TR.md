@@ -1,4 +1,4 @@
-# AhdCode v2.0.0 Türkçe Öğrenci Rehberi
+# AhdCode v2.1.0 Türkçe Öğrenci Rehberi
 
 Bu rehber, **daha önce hiç programlama yapmamış birinin de takip edebilmesi** için hazırlanmıştır. Baştan sona sırayla okuyabilirsiniz; her bölümde önce ne yapmak istediğimizi görecek, sonra çalışan bir örnek yazacak, en son gerekli kuralları öğreneceksiniz.
 
@@ -88,6 +88,7 @@ verir.
 - [65. Tepki veren pencereler: GUI formları ve Turtle tuşları](#65-tepki-veren-pencereler-gui-formları-ve-turtle-tuşları)
 - [66. Renkler, devre dışı düğmeler ve incelenebilir bir grafik](#66-renkler-devre-dışı-düğmeler-ve-incelenebilir-bir-grafik)
 - [67. Bir masaüstü uygulaması: tablolar, iletişim kutuları, 3B grafikler ve paketleme](#67-bir-masaüstü-uygulaması-tablolar-iletişim-kutuları-3b-grafikler-ve-paketleme)
+- [68. Dosya taşımak: yükleme, indirme, ekleme ve bildirme](#68-dosya-taşımak-yükleme-indirme-ekleme-ve-bildirme)
 
 ## 1. AhdCode nedir?
 
@@ -7305,3 +7306,132 @@ simgenizle paketleyin.
 
 Bkz. [GUI başvurusu](GUI_TR.md), [Plot başvurusu](PLOT_TR.md#surface),
 [Paketleme](PACKAGING_TR.md) ve [`examples/v2.0`](../examples/v2.0/README_TR.md).
+
+
+## 68. Dosya taşımak: yükleme, indirme, ekleme ve bildirme
+
+> v2.1.0'da eklendi.
+
+Şimdiye kadar bir program dosya *sunabiliyor* ve *alabiliyordu*, ama giden
+istemci yalnızca metin taşıyabiliyordu. v2.1 tabloyu tamamlar. PDF metin
+değildir ve AhdCode öyleymiş gibi yapmaz: ikili veri **dosyadan dosyaya**
+taşınır ve öğrenilecek bir `Bytes` tipi yine yoktur.
+
+Bu bölüm küçük bir iş akışı kurar: bir belge üret, yerel bir servise yükle,
+ikili yanıtı indir ve sonucu e-postayla gönder — sonra da WebSocket
+üzerinden canlı bir bildirim ekle.
+
+**Adım 1 — gönderecek bir şey üretin.** Herhangi bir dosya olur. Bir QR kodu
+PNG'si gerçek bir ikili dosyadır ve hiçbir kurulum gerektirmez:
+
+```ahd
+bring QR
+from QR bring QRCode
+
+code: QRCode := QR.create("https://ahdcode.org")
+code.savePNG("poster.png", 512)
+```
+
+**Adım 2 — yükleyin.** Bir `multipart/form-data` isteği, parçalar eklenmiş
+sıradan bir `ClientRequest`'tir. `withMultipartField` bir metin alanı,
+`withMultipartFile` bir dosya ekler. İkisi de her `with…` gibi **yeni** bir
+istek döndürür:
+
+```ahd
+bring HTTP
+from HTTP bring (Client, ClientRequest, ClientResponse, ClientFileResponse, HTTPError)
+
+client: Client := HTTP.client(timeoutSeconds: 30)
+request: ClientRequest := HTTP.clientRequest("POST", "http://127.0.0.1:8137/upload")
+titled: ClientRequest := request.withMultipartField("title", "Poster")
+withFile: ClientRequest := titled.withMultipartFile("file", "poster.png", "", "image/png")
+answer: ClientResponse := client.send(withFile)
+write(str(answer.status()))
+```
+
+PNG hiçbir zaman bir String'e okunmaz: sunucu bağlantıyı boşalttıkça
+baytları diskten doğrudan akıtılır. Üçüncü argüman yalnızca sunucuya
+bildirilen addır, dördüncüsü içerik türüdür; ikisi de atlanabilir.
+
+Akılda tutulacak tek kural: bir istek **ya** `withBody` **ya da** multipart
+parçaları kullanır, ikisini birden değil; `Content-Type`'ı AhdCode koyar.
+İkisini karıştırmak, sessizce yanlış şeyi göndermek yerine `HTTPError`
+fırlatır.
+
+**Adım 3 — yanıtı indirin.** `download`, yanıt gövdesini doğrudan bir
+dosyaya yazar ve size yalnızca onunla ilgili bilgileri verir:
+
+```ahd
+fetched: ClientFileResponse := client.download("http://127.0.0.1:8137/file", "answer.png")
+write(str(fetched.status()))
+write(str(fetched.size()) + " bayt yazıldı")
+```
+
+Bir `ClientFileResponse`'un `status()`, `header(name)`, `headerAll(name)`,
+`url()` ve `size()` üyeleri vardır — ve bilinçli olarak **`body()`'si
+yoktur**, çünkü yük `answer.png` dosyasındadır.
+
+Beklenecek iki şey. `404` hâlâ bir yanıttır, çökme değil: sunucunun hata
+sayfası dosyaya yazılır ve `status()` `404` der; bu yüzden indirdiğinize
+güvenmeden önce duruma bakın. Başarısız bir indirme de önceden orada olana
+asla zarar vermez — baytlar önce geçici bir dosyaya gider ve mevcut
+dosyanız dokunulmadan kalır.
+
+**Adım 4 — e-postayla gönderin.** `withAttachment` yerel bir dosyayı
+adlandırır; baytları ileti gönderilirken okunur:
+
+```ahd
+bring Env
+bring SMTP
+from SMTP bring (SMTPClient, SMTPMessage, SMTPError)
+
+mail: SMTPClient := SMTP.client(Env.getOr("SMTP_HOST", "127.0.0.1"), int(Env.getOr("SMTP_PORT", "2525")), "none")
+message: SMTPMessage := SMTP.message("sender@example.com", ["student@example.com"], "Poster hazır")
+message = message.withText("Poster ekte.")
+message = message.withAttachment("answer.png", "Poster.png", "image/png")
+
+attempt {
+    mail.send(message)
+    write("gönderildi")
+} except SMTPError as error {
+    write(error.message)
+}
+```
+
+Kimlik bilgilerini dosyanın dışında tutun. Bir parolayı
+`Env.secret("SMTP_PASSWORD")` ile okuyun ve yalnızca varsa `withPlainAuth`'a
+verin; AhdCode zaten şifrelenmemiş bir bağlantıda kimlik doğrulamayı
+reddeder. Bkz. [Dosyalardan gizli bilgi okuma](#58-dosyalardan-gizli-bilgi-okuma).
+
+**Adım 5 — birine canlı bildirin.** v2.1 ayrıca bir programın yalnızca
+sunucu değil, WebSocket *istemcisi* olmasına da izin verir. Yapılandırma ile
+bağlantı bilinçli olarak farklı türlerdir; böylece hiç bağlanmadığınız bir
+şeyden okuyamazsınız:
+
+```ahd
+from HTTP bring (WebSocketClient, WebSocketConnection)
+
+socket: WebSocketClient := HTTP.webSocketClient("ws://127.0.0.1:8138/live")
+live: WebSocketConnection := socket.withTimeout(5).connect()
+live.send("poster hazır")
+reply: String? := live.receive(5)
+if reply != null {
+    write(reply)
+}
+live.close()
+```
+
+`receive` bekler. Sıradaki mesajı `String` olarak döndürür ya da karşı taraf
+normal kapattıysa `null` döndürür — ve o zaman `closeCode()` ile
+`closeReason()` nasıl olduğunu söyler. Zaman aşımı `HTTPError` fırlatır ve
+bağlantıyı açık bırakır; böylece "henüz bir şey yok" ile "kapattılar"
+durumlarını her zaman ayırt edebilirsiniz. Hiçbir şey kendiliğinden yeniden
+bağlanmaz; istiyorsanız döngüyü siz yazın.
+
+**Kendiniz deneyin:**
+[`examples/v2.1/http_file_transfer`](../examples/v2.1/http_file_transfer/)
+örneğini çalıştırın, sonra istemciyi tek bir istekte iki dosya yükleyecek
+şekilde değiştirin ve her yanıt başlığını yazdırın.
+
+Bkz. [HTTP başvurusu](HTTP_TR.md), [WebSocket başvurusu](WEBSOCKET_TR.md),
+[SMTP başvurusu](SMTP_TR.md) ve [`examples/v2.1`](../examples/v2.1/README_TR.md).

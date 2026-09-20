@@ -1044,6 +1044,12 @@ func (a *analyzer) analyzeTypeOperation(call *ast.CallExpr, member *ast.MemberEx
 	if TypeOperationBindsArguments(operation) {
 		return a.analyzeGraphicsOperation(call, member, operation, current, flow), true
 	}
+	// A member that publishes no parameter names still resolves to a Symbol,
+	// so hover on it renders the same signature the compiler checked the call
+	// against. Its arguments still bind positionally.
+	if symbol := completionMemberFor(operation); symbol != nil {
+		a.result.ResolvedSymbols[member] = symbol
+	}
 	for _, argument := range call.Arguments {
 		if argument.Name != "" {
 			// A built-in type operation publishes no parameter names, which is

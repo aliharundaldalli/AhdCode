@@ -215,9 +215,12 @@ func BuiltinClassMembers(identity *types.ClassSymbol) []*Symbol {
 		return nil
 	}
 	names := publishedMemberNames(identity)
+	if len(names) == 0 {
+		names = positionalMemberNames(identity)
+	}
 	members := make([]*Symbol, 0, len(names))
 	for _, name := range names {
-		members = append(members, publishedMember(TypeOperation(identity.Name+"."+name)))
+		members = append(members, completionMemberFor(TypeOperation(identity.Name+"."+name)))
 	}
 	return members
 }

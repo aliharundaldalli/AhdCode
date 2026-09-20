@@ -16,9 +16,9 @@ modules, GUI, Graphics, interactive Plot viewer, and desktop application
 packaging. It is used in practice by a small community; it is not a
 mainstream language.
 
-This is **v2.0.0**. The language, toolchain, and Web framework are
-feature-complete, and the core language surface described here is what 1.0
-committed to and 1.1 through 2.0 keep unchanged.
+This is **v2.1.0**, **Application I/O & Network Completion**. The language,
+toolchain, and Web framework remain feature-complete, and the core language
+surface described here is unchanged.
 
 v2.0.0 is a major release, **Desktop Application Completion**: it completes
 the first-party desktop application foundation — ListBox, Select, TextArea,
@@ -26,6 +26,10 @@ PasswordInput, TableView, dialogs, change callbacks, and resizable windows in
 GUI; a toolbar and 3D Surface plotting in the Plot viewer; and
 `ahdcode package` for self-contained desktop applications — all without new
 syntax or a type-system change. See [What is new in v2.0.0](#what-is-new-in-v200).
+
+v2.1.0 adds binary-safe outbound downloads, outbound multipart uploads, SMTP
+attachments, a WebSocket client, and fixes the v2.0 Plot Save runtime
+discovery regression. See [What is new in v2.1.0](#what-is-new-in-v210).
 
 It ships as a self-contained platform package: the `ahdcode` CLI, a private
 Go 1.27.0 toolchain, AhdDataStudio, the `ahdsqlite`, `ahdnumeric`, `ahdplot`,
@@ -475,6 +479,7 @@ See the [CLI guide](docs/CLI.md), [formatter guide](docs/FORMATTER.md),
 - [v1.5 Terminal demo](examples/v1.5/terminal_demo/README.md) — `Terminal.emit`, standard error, terminal detection, styled text, and pretty layout
 - [v1.7 standard-library completion](examples/v1.7/README.md) — trigonometry and gcd/lcm, strict ISO time text and instant arithmetic, and a Table join with statistics
 - [v2.0 desktop applications](examples/v2.0/README.md) — a SQLite ledger with a TableView, dialogs, and CSV export; a 3D Surface; and a small application to package
+- [v2.1 application I/O and network](examples/v2.1/README.md) — a binary file round trip over HTTP, a WebSocket client and server pair, and mail with attachments
 - [v1.9 GUI colors and interactive Plot](examples/v1.9/README.md) — an order form with colors and a disabled Save button, and a chart in AhdCode's own viewer
 - [v1.8 GUI and events](examples/v1.8/README.md) — a small GUI ledger backed by SQLite and a Turtle driven by arrow keys and clicks
 - [v1.6 Graphics and Turtle](examples/v1.6/graphics_turtle/README.md) — a Cartesian Canvas, shapes, a Turtle star and spiral, PNG/SVG export, and a regular-polygon lesson
@@ -494,6 +499,35 @@ diagnostics and hover. The same VSIX targets VS Code and Antigravity. See its
 [installation guide](editors/vscode/README.md).
 
 ## Current limitations
+
+## What is new in v2.1.0 <a id="what-is-new-in-v210"></a>
+
+v2.0 completed the desktop application foundation. v2.1, **Application I/O
+and Network Completion**, closes the remaining practical file and network
+gaps that CLI, Web, and desktop programs share. It adds no syntax, no
+type-system change, and no byte type: binary data stays opaque and travels
+file to file.
+
+- [`HTTP`](docs/HTTP.md): `Client.download(url, path)` and
+  `Client.sendToFile(request, path)` stream a response body straight to a
+  file and return a `ClientFileResponse` — status, headers, final URL, and
+  the number of bytes written, with no `body()` because the payload is in
+  the file. A failed transfer never damages the destination.
+- [`HTTP`](docs/HTTP.md): `ClientRequest.withMultipartField` and
+  `withMultipartFile` send a `multipart/form-data` body, streaming each file
+  from disk. Outbound multipart completes the pair with the inbound uploads
+  v0.8 added.
+- [`WebSocket`](docs/WEBSOCKET.md): a synchronous client —
+  `HTTP.webSocketClient(url)` configures it, `connect()` opens one
+  `WebSocketConnection`, and `receive()` waits for the next message. No
+  callbacks, no background event loop, no reconnect.
+- [`SMTP`](docs/SMTP.md): `SMTPMessage.withAttachment(path, fileName, contentType)`
+  attaches real files, base64-encoded straight from disk. A message without
+  attachments produces exactly the MIME it always did.
+- The v2.0 Plot viewer's Save is fixed for a program that uses Plot but not
+  GUI; it needs no environment variable.
+
+See the [v2.1 examples](examples/v2.1/README.md).
 
 ## What is new in v2.0.0 <a id="what-is-new-in-v200"></a>
 

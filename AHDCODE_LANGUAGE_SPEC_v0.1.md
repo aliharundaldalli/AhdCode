@@ -6027,7 +6027,7 @@ password. The client is `github.com/jackc/pgx/v5` v5.11.0, vendored so a
 PostgreSQL program builds offline; a program that does not use PostgreSQL does
 not receive it.
 
-## 77. WebSocket Server Endpoints in HTTP (v1.4.0)
+## 77. WebSocket in HTTP: Server Endpoints (v1.4.0) and Client (v2.1)
 
 ```text
 HTTP.websocket(onMessage: Function(WebSocket, String) -> Nothing) -> WebSocketEndpoint
@@ -6079,9 +6079,27 @@ the handshake. The server pings every 30 seconds and treats a missing pong
 after 30 more as lost; a lost connection or stalled write reports `1006`,
 which is never sent. An error raised by `onOpen` or `onMessage` is written to
 stderr and closes the socket with `1011`; `onClose` still runs. Compression,
-subprotocols, binary messages, and a WebSocket client are not provided. The
-protocol implementation is `github.com/coder/websocket` v1.8.15, vendored; a
-program that creates no endpoint does not receive it.
+subprotocols, and binary messages are not provided.
+
+v2.1 adds a synchronous WebSocket client as two further Classes.
+`HTTP.webSocketClient(url)` produces an immutable `WebSocketClient` whose
+`withHeader`, `withTimeout`, and `withMaxMessageBytes` each return a new
+one; `connect()` performs the opening handshake and produces one live
+`WebSocketConnection`. The URL must be `ws://` or `wss://`; `wss://`
+verifies the certificate and host name against the system roots with no
+insecure mode. `send(text)` sends one complete UTF-8 text message and
+returns `false` when the connection is already closed or closing; a write
+failure raises `HTTPError`. `receive(timeoutSeconds := 0)` is synchronous:
+it returns the next text message, `null` when the peer closed normally, and
+raises `HTTPError` on a lost connection, a protocol problem, or an expired
+timeout, which leaves the connection open. Incoming messages are text only,
+with the same `1003`, `1007`, and `1009` rules as the server. `close`
+follows the server's close-code policy; `isOpen`, `closeCode`, and
+`closeReason` report the connection's end, with `1006` for a lost
+connection. Nothing reconnects automatically and there is no callback or
+event-bus layer on either end. The protocol implementation is
+`github.com/coder/websocket` v1.8.15, vendored; a program that creates
+neither an endpoint nor a client does not receive it.
 
 ## 78. Terminal Standard Module (v1.5.0)
 

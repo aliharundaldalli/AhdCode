@@ -30,12 +30,20 @@ var (
 	httpClientResponseDataField = ir.FieldID("builtin:HTTP::class::ClientResponse::field::data")
 	httpUploadedFileClass       = ir.ClassID("builtin:HTTP::class::UploadedFile")
 	httpUploadedFileDataField   = ir.FieldID("builtin:HTTP::class::UploadedFile::field::data")
-	webRequestContextClass      = ir.ClassID("framework:WebContext::class::RequestContext")
+	// Binary-safe outbound downloads (v2.1.0).
+	httpClientFileResponseClass     = ir.ClassID("builtin:HTTP::class::ClientFileResponse")
+	httpClientFileResponseDataField = ir.FieldID("builtin:HTTP::class::ClientFileResponse::field::data")
+	webRequestContextClass          = ir.ClassID("framework:WebContext::class::RequestContext")
 	// WebSocket server support (v1.4.0).
 	httpWebSocketClass               = ir.ClassID("builtin:HTTP::class::WebSocket")
 	httpWebSocketDataField           = ir.FieldID("builtin:HTTP::class::WebSocket::field::data")
 	httpWebSocketEndpointClass       = ir.ClassID("builtin:HTTP::class::WebSocketEndpoint")
 	httpWebSocketEndpointHandleField = ir.FieldID("builtin:HTTP::class::WebSocketEndpoint::field::handle")
+	// WebSocket client support (v2.1.0).
+	httpWebSocketClientClass           = ir.ClassID("builtin:HTTP::class::WebSocketClient")
+	httpWebSocketClientHandleField     = ir.FieldID("builtin:HTTP::class::WebSocketClient::field::handle")
+	httpWebSocketConnectionClass       = ir.ClassID("builtin:HTTP::class::WebSocketConnection")
+	httpWebSocketConnectionHandleField = ir.FieldID("builtin:HTTP::class::WebSocketConnection::field::handle")
 )
 
 func (generator *generator) httpCall(value *ir.CallExpr) string {
@@ -105,6 +113,12 @@ func (generator *generator) httpCall(value *ir.CallExpr) string {
 		}
 		return generator.httpValueFrom(httpWebSocketEndpointClass, "AhdHTTPWebSocket("+errorClass+", "+
 			generator.webSocketCallback(value.Arguments[0].Value, "message", meta)+")", meta)
+	case "webSocketClient":
+		// The client needs the same vendored connection runtime the server
+		// does, so using it alone is enough to bring it in (v2.1.0).
+		generator.usesWebSocket = true
+		return generator.httpValueFrom(httpWebSocketClientClass, "AhdHTTPWebSocketClient("+errorClass+", "+
+			text(0, `""`)+")", meta)
 	default:
 		return generator.unsupported("HTTP function "+name, meta.Span)
 	}
@@ -233,6 +247,38 @@ func (generator *generator) httpOperation(name string, value *ir.CallExpr) strin
 	case "ClientRequest.withBody":
 		return generator.httpValueFrom(httpClientRequestClass, "AhdHTTPClientRequestWithBody("+errorClass+", "+
 			generator.httpDataOf(httpClientRequestClass, httpClientRequestDataField, value.Callee)+", "+text(0)+")", meta)
+	case "Client.download":
+		return generator.httpValueFrom(httpClientFileResponseClass, "AhdHTTPClientDownload("+errorClass+", "+
+			generator.httpDataOf(httpClientClass, httpClientHandleField, value.Callee)+", "+text(0)+", "+text(1)+")", meta)
+	case "Client.sendToFile":
+		return generator.httpValueFrom(httpClientFileResponseClass, "AhdHTTPClientSendToFile("+errorClass+", "+
+			generator.httpDataOf(httpClientClass, httpClientHandleField, value.Callee)+", "+
+			generator.httpDataOf(httpClientRequestClass, httpClientRequestDataField, value.Arguments[0].Value)+", "+text(1)+")", meta)
+	case "ClientRequest.withMultipartField":
+		return generator.httpValueFrom(httpClientRequestClass, "AhdHTTPClientRequestWithMultipartField("+errorClass+", "+
+			generator.httpDataOf(httpClientRequestClass, httpClientRequestDataField, value.Callee)+", "+text(0)+", "+text(1)+")", meta)
+	case "ClientRequest.withMultipartFile":
+		fileName := `""`
+		if len(value.Arguments) > 2 && value.Arguments[2].Value != nil && !value.Arguments[2].UsesDefault {
+			fileName = text(2)
+		}
+		contentType := `"application/octet-stream"`
+		if len(value.Arguments) > 3 && value.Arguments[3].Value != nil && !value.Arguments[3].UsesDefault {
+			contentType = text(3)
+		}
+		return generator.httpValueFrom(httpClientRequestClass, "AhdHTTPClientRequestWithMultipartFile("+errorClass+", "+
+			generator.httpDataOf(httpClientRequestClass, httpClientRequestDataField, value.Callee)+", "+
+			text(0)+", "+text(1)+", "+fileName+", "+contentType+")", meta)
+	case "ClientFileResponse.status":
+		return "AhdHTTPClientFileResponseStatus(" + generator.httpDataOf(httpClientFileResponseClass, httpClientFileResponseDataField, value.Callee) + ")"
+	case "ClientFileResponse.header":
+		return "AhdHTTPClientFileResponseHeader(" + errorClass + ", " + generator.httpDataOf(httpClientFileResponseClass, httpClientFileResponseDataField, value.Callee) + ", " + text(0) + ")"
+	case "ClientFileResponse.headerAll":
+		return "AhdHTTPClientFileResponseHeaderAll(" + errorClass + ", " + generator.httpDataOf(httpClientFileResponseClass, httpClientFileResponseDataField, value.Callee) + ", " + text(0) + ")"
+	case "ClientFileResponse.url":
+		return "AhdHTTPClientFileResponseURL(" + errorClass + ", " + generator.httpDataOf(httpClientFileResponseClass, httpClientFileResponseDataField, value.Callee) + ")"
+	case "ClientFileResponse.size":
+		return "AhdHTTPClientFileResponseSize(" + errorClass + ", " + generator.httpDataOf(httpClientFileResponseClass, httpClientFileResponseDataField, value.Callee) + ")"
 	case "ClientResponse.status":
 		return "AhdHTTPClientResponseStatus(" + generator.httpDataOf(httpClientResponseClass, httpClientResponseDataField, value.Callee) + ")"
 	case "ClientResponse.body":
@@ -297,6 +343,48 @@ func (generator *generator) httpOperation(name string, value *ir.CallExpr) strin
 		return "AhdWebSocketClose(" + errorClass + ", " + generator.httpDataOf(httpWebSocketClass, httpWebSocketDataField, value.Callee) + ", " + code + ", " + reason + ")"
 	case "WebSocket.isOpen":
 		return "AhdWebSocketIsOpen(" + generator.httpDataOf(httpWebSocketClass, httpWebSocketDataField, value.Callee) + ")"
+	case "WebSocketClient.withHeader":
+		return generator.httpValueFrom(httpWebSocketClientClass, "AhdWebSocketClientWithHeader("+errorClass+", "+
+			generator.httpDataOf(httpWebSocketClientClass, httpWebSocketClientHandleField, value.Callee)+", "+text(0)+", "+text(1)+")", meta)
+	case "WebSocketClient.withTimeout":
+		return generator.httpValueFrom(httpWebSocketClientClass, "AhdWebSocketClientWithTimeout("+errorClass+", "+
+			generator.httpDataOf(httpWebSocketClientClass, httpWebSocketClientHandleField, value.Callee)+", "+integer(0)+")", meta)
+	case "WebSocketClient.withMaxMessageBytes":
+		return generator.httpValueFrom(httpWebSocketClientClass, "AhdWebSocketClientWithMaxMessageBytes("+errorClass+", "+
+			generator.httpDataOf(httpWebSocketClientClass, httpWebSocketClientHandleField, value.Callee)+", "+integer(0)+")", meta)
+	case "WebSocketClient.connect":
+		return generator.httpValueFrom(httpWebSocketConnectionClass, "AhdWebSocketClientConnect("+errorClass+", "+
+			generator.httpDataOf(httpWebSocketClientClass, httpWebSocketClientHandleField, value.Callee)+")", meta)
+	case "WebSocketConnection.send":
+		return "AhdWebSocketConnectionSend(" + errorClass + ", " +
+			generator.httpDataOf(httpWebSocketConnectionClass, httpWebSocketConnectionHandleField, value.Callee) + ", " + text(0) + ")"
+	case "WebSocketConnection.receive":
+		timeout := "int64(0)"
+		if len(value.Arguments) > 0 && value.Arguments[0].Value != nil && !value.Arguments[0].UsesDefault {
+			timeout = integer(0)
+		}
+		return "AhdWebSocketConnectionReceive(" + errorClass + ", " +
+			generator.httpDataOf(httpWebSocketConnectionClass, httpWebSocketConnectionHandleField, value.Callee) + ", " + timeout + ")"
+	case "WebSocketConnection.close":
+		code := "int64(1000)"
+		if len(value.Arguments) > 0 && value.Arguments[0].Value != nil && !value.Arguments[0].UsesDefault {
+			code = integer(0)
+		}
+		reason := `""`
+		if len(value.Arguments) > 1 && value.Arguments[1].Value != nil && !value.Arguments[1].UsesDefault {
+			reason = text(1)
+		}
+		return "AhdWebSocketConnectionClose(" + errorClass + ", " +
+			generator.httpDataOf(httpWebSocketConnectionClass, httpWebSocketConnectionHandleField, value.Callee) + ", " + code + ", " + reason + ")"
+	case "WebSocketConnection.isOpen":
+		return "AhdWebSocketConnectionIsOpen(" + errorClass + ", " +
+			generator.httpDataOf(httpWebSocketConnectionClass, httpWebSocketConnectionHandleField, value.Callee) + ")"
+	case "WebSocketConnection.closeCode":
+		return "AhdWebSocketConnectionCloseCode(" + errorClass + ", " +
+			generator.httpDataOf(httpWebSocketConnectionClass, httpWebSocketConnectionHandleField, value.Callee) + ")"
+	case "WebSocketConnection.closeReason":
+		return "AhdWebSocketConnectionCloseReason(" + errorClass + ", " +
+			generator.httpDataOf(httpWebSocketConnectionClass, httpWebSocketConnectionHandleField, value.Callee) + ")"
 	default:
 		return generator.unsupported("HTTP operation "+name, meta.Span)
 	}
@@ -445,7 +533,9 @@ func (generator *generator) emitHTTPHelpers(writer *emitter) {
 		httpServerClass, httpRequestClass, httpResponseClass,
 		httpCookieClass, httpSessionStoreClass, httpSessionClass,
 		httpClientClass, httpClientRequestClass, httpClientResponseClass,
-		httpUploadedFileClass, httpWebSocketClass, httpWebSocketEndpointClass,
+		httpUploadedFileClass, httpClientFileResponseClass,
+		httpWebSocketClass, httpWebSocketEndpointClass,
+		httpWebSocketClientClass, httpWebSocketConnectionClass,
 	} {
 		name, known := generator.timeHelpers[class]
 		if !known {

@@ -155,9 +155,9 @@ func TestHTTPModuleInterfaceExportsExactSurface(t *testing.T) {
 		t.Fatalf("HTTP is not a registered builtin module: %#v", module)
 	}
 	wantExports := []string{
-		"Client", "ClientRequest", "ClientResponse", "Cookie", "HTTPError", "Request", "Response",
-		"Server", "Session", "SessionStore", "UploadedFile", "WebSocket", "WebSocketEndpoint",
-		"client", "clientRequest", "contextHandler", "cookie", "deleteCookie", "download", "file", "html", "redirect", "response", "server", "sessions", "text", "websocket",
+		"Client", "ClientFileResponse", "ClientRequest", "ClientResponse", "Cookie", "HTTPError", "Request", "Response",
+		"Server", "Session", "SessionStore", "UploadedFile", "WebSocket", "WebSocketClient", "WebSocketConnection", "WebSocketEndpoint",
+		"client", "clientRequest", "contextHandler", "cookie", "deleteCookie", "download", "file", "html", "redirect", "response", "server", "sessions", "text", "webSocketClient", "websocket",
 	}
 	if strings.Join(module.ExportNames, ",") != strings.Join(wantExports, ",") {
 		t.Fatalf("HTTP exports %v; want %v", module.ExportNames, wantExports)

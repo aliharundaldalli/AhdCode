@@ -80,6 +80,18 @@ func (generator *generator) smtpOperation(name string, value *ir.CallExpr) strin
 		return generator.smtpValueFrom(smtpMessageClass, "AhdSMTPMessageWithHtml("+errorClass+", "+
 			generator.smtpDataOf(smtpMessageClass, smtpMessageDataField, value.Callee)+", "+
 			text(0)+")", meta)
+	case "SMTPMessage.withAttachment":
+		fileName := `""`
+		if len(value.Arguments) > 1 && value.Arguments[1].Value != nil && !value.Arguments[1].UsesDefault {
+			fileName = text(1)
+		}
+		contentType := `"application/octet-stream"`
+		if len(value.Arguments) > 2 && value.Arguments[2].Value != nil && !value.Arguments[2].UsesDefault {
+			contentType = text(2)
+		}
+		return generator.smtpValueFrom(smtpMessageClass, "AhdSMTPMessageWithAttachment("+errorClass+", "+
+			generator.smtpDataOf(smtpMessageClass, smtpMessageDataField, value.Callee)+", "+
+			text(0)+", "+fileName+", "+contentType+")", meta)
 	default:
 		return generator.unsupported("SMTP operation "+name, meta.Span)
 	}

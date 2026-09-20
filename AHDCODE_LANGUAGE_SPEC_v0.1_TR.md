@@ -6489,7 +6489,7 @@ PostgreSQL programının çevrimdışı derlenmesi için gömülü olan
 `github.com/jackc/pgx/v5` v5.11.0'dır; PostgreSQL kullanmayan bir program onu
 almaz.
 
-## 77. HTTP'de WebSocket Sunucu Uç Noktaları (v1.4.0)
+## 77. HTTP'de WebSocket: Sunucu Uç Noktaları (v1.4.0) ve İstemci (v2.1)
 
 ```text
 HTTP.websocket(onMessage: Function(WebSocket, String) -> Nothing) -> WebSocketEndpoint
@@ -6540,10 +6540,28 @@ ve el sıkışma için en fazla beş saniye bekler. Sunucu 30 saniyede bir ping 
 ve 30 saniye daha pong gelmezse bağlantıyı kopmuş sayar; kopan bağlantı ya da
 takılan yazma, ağda asla gönderilmeyen `1006`'yı bildirir. `onOpen` ya da
 `onMessage` içinde oluşan bir hata stderr'e yazılır ve soketi `1011` ile
-kapatır; `onClose` yine çalışır. Sıkıştırma, alt protokoller, ikili mesajlar ve
-WebSocket istemcisi sağlanmaz. Protokol uygulaması gömülü
-`github.com/coder/websocket` v1.8.15'tir; uç nokta oluşturmayan bir program onu
-almaz.
+kapatır; `onClose` yine çalışır. Sıkıştırma, alt protokoller ve ikili
+mesajlar sağlanmaz.
+
+v2.1, eşzamanlı bir WebSocket istemcisini iki Sınıf daha olarak ekler.
+`HTTP.webSocketClient(url)`, `withHeader`, `withTimeout` ve
+`withMaxMessageBytes` çağrılarının her biri yenisini döndüren, değiştirilemez
+bir `WebSocketClient` üretir; `connect()` açılış el sıkışmasını yapar ve tek
+bir canlı `WebSocketConnection` üretir. URL `ws://` ya da `wss://` olmalıdır;
+`wss://`, sertifikayı ve konak adını sistem kökleriyle doğrular ve güvensiz
+bir kip yoktur. `send(text)` tam bir UTF-8 metin mesajı gönderir ve bağlantı
+zaten kapalı ya da kapanıyorsa `false` döndürür; yazma hatası `HTTPError`
+fırlatır. `receive(timeoutSeconds := 0)` eşzamanlıdır: sıradaki metin
+mesajını döndürür, karşı taraf normal kapattıysa `null` döndürür; kopan bir
+bağlantıda, bir protokol sorununda ya da dolan bir zaman aşımında `HTTPError`
+fırlatır — zaman aşımı bağlantıyı açık bırakır. Gelen mesajlar yalnızca
+metindir ve sunucuyla aynı `1003`, `1007` ve `1009` kurallarına uyar.
+`close` sunucunun kapanış kodu politikasını izler; `isOpen`, `closeCode` ve
+`closeReason` bağlantının nasıl bittiğini bildirir ve kopan bir bağlantı
+için `1006` verir. Hiçbir şey kendiliğinden yeniden bağlanmaz ve iki uçta da
+geri çağrı ya da olay veri yolu katmanı yoktur. Protokol uygulaması gömülü
+`github.com/coder/websocket` v1.8.15'tir; ne uç nokta ne de istemci
+oluşturan bir program onu almaz.
 
 ## 78. Terminal Standart Modülü (v1.5.0)
 
