@@ -33,6 +33,12 @@ kullandığı ve aynı nedenle kullandığı disiplinin aynısı.
 Plot.line(x, y)                              -> Chart
 Plot.scatter(x, y)                           -> Chart
 Plot.bar(labels: List<String>, values)       -> Chart
+Plot.pie(labels: List<String>, values)       -> Chart
+Plot.heatmap(
+    xLabels: List<String>
+    yLabels: List<String>
+    values: Matrix
+) -> Chart
 Plot.histogram(values, bins: Int)            -> Chart
 Plot.box(values)                             -> Chart
 Plot.errorBar(x, y, lowerErrors, upperErrors) -> Chart
@@ -40,9 +46,12 @@ Plot.new()                                   -> Chart
 Plot.subplots(rows: Int, columns: Int, charts: List<Chart>) -> Figure
 ```
 
-Tek bir grafik — line, scatter, bar, histogram, box veya error bar — bir
-`Chart` üretir. Çoklu-grafik kompozisyonu bir `Figure` üretir (bkz.
-[Subplot'lar](#subplotlar)).
+Tek bir grafik — line, scatter, bar, pie, heatmap, histogram, box veya error
+bar — bir `Chart` üretir. Çoklu-grafik kompozisyonu bir `Figure` üretir
+(bkz. [Subplot'lar](#subplotlar)).
+
+`Plot.pie` ve `Plot.heatmap` v2.2'de eklendi; ikisi de aşağıda
+[Pasta](#pasta) ve [Isı haritası](#isı-haritası) bölümlerinde anlatılır.
 
 ## Katı sayısal girdi, String zorlaması (coercion) yok
 
@@ -116,6 +125,14 @@ chart = chart.yLabel("Value")
 `size`, PNG için çıktı boyutlarını piksel cinsinden, SVG/PDF için ise
 eşdeğer sayfa boyutunu ayarlar; hem `width` hem `height` pozitif olmalıdır.
 Bir Chart'ın varsayılan boyutu 800x600'dür.
+
+`legend` v2.2'nin iki grafiği dışında her grafik ailesi için varsayılan
+olarak kapalıdır: bir [pastanın](#pasta) kategori anahtarı ve bir
+[ısı haritasının](#isı-haritası) renk ölçeği, program kapatmadıkça açıktır;
+çünkü ikisi de anahtarı olmadan okunamaz.
+
+Bir [pastanın](#pasta) Kartezyen ekseni yoktur; bu yüzden `xLabel` ve
+`yLabel` bir pastada sessizce yok sayılmak yerine `PlotError` fırlatır.
 
 ## Birden çok seri
 
@@ -250,6 +267,117 @@ grafik bir kenarda 6144 birimden büyüktür (grafiği küçültün veya
 `save()` ile kaydedin). AhdCode hiçbir zaman başka bir uygulamaya geri
 dönmez.
 
+## Pasta
+
+> v2.2'de eklendi.
+
+`Plot.pie(labels, values)`, verilen sırayla, saat on iki yönünden saat
+yönünde kategori başına bir dilim çizer:
+
+```ahd
+chart := Plot.pie(
+    ["Analiz", "Cebir", "Geometri", "İstatistik", "Programlama"],
+    [84, 81, 88, 83, 95]
+)
+chart = chart.title("3. Yıl ders dağılımı")
+chart.show()
+```
+
+`labels` ve `values` aynı uzunlukta olmalı ve boş olmamalıdır. `values`,
+diğer her sayısal Plot argümanı gibi `List<Int>` ya da `List<Real>`'dir. Her
+değer **sonlu ve negatif olmayan** bir sayı olmalı ve **en az biri sıfırdan
+büyük** olmalıdır — yalnızca sıfırlardan oluşan bir pastanın çizilecek
+şekli yoktur ve `PlotError` fırlatır. Pozitif değerler arasındaki bir sıfır
+sıradan veridir: o kategorinin dilimi olmaz, gösterge yine de onu adlandırır.
+
+Pasta bir `Chart`'tır; `title`, `legend`, `size`, `save` ve `show` üzerinde
+tam olarak bir çubuk grafikteki gibi çalışır.
+
+**Gösterge varsayılan olarak açıktır.** Dilimler renkle ayırt edilir ve bir
+renk, yanındaki ad olmadan bir şey ifade etmez; bu yüzden `Plot.pie`
+anahtarı sizin için açar. `chart.legend(false)` onu gizler.
+
+**Bir pastanın ekseni yoktur.** Bir pastada `chart.xLabel(...)` ve
+`chart.yLabel(...)` `PlotError` fırlatır:
+
+```ahd
+attempt {
+    Plot.pie(["A", "B"], [1, 2]).xLabel("kategori")
+}
+except PlotError as error {
+    write(error.message)
+}
+```
+
+Bu bilinçlidir: çağrıyı sessizce yok saymak, grafikle ilgili bir yanlış
+anlamayı gizlerdi.
+
+Toplamın yüzde beşinden büyük her dilim, payını tam sayı yüzde olarak
+taşır. Renkler, on iki tonluk tek bir sabit kategorik paletten gelir ve
+daha çok dilimli bir pastada sırayla yeniden kullanılır; v2.2'de palet
+argümanı yoktur, bu yüzden aynı veri her zaman aynı resmi çizer. Bir pasta
+en fazla 64 dilim çizer.
+
+Bir pasta, diğer her Chart gibi PNG, SVG ve PDF'e kaydedilir ve `show()`
+onu sıradan [görüntüleyicide](#show-gösterme) açar.
+
+## Isı haritası
+
+> v2.2'de eklendi.
+
+`Plot.heatmap(xLabels, yLabels, values)`, rengi sayıları taşıyan etiketli
+bir ızgara çizer:
+
+```ahd
+scores := Numeric.matrix([
+    [72.0, 78.0, 84.0]
+    [68.0, 75.0, 81.0]
+    [80.0, 82.0, 88.0]
+    [65.0, 74.0, 83.0]
+    [85.0, 91.0, 95.0]
+])
+
+chart := Plot.heatmap(
+    ["1. Yıl", "2. Yıl", "3. Yıl"]
+    ["Analiz", "Cebir", "Geometri", "İstatistik", "Programlama"]
+    scores
+)
+chart = chart.title("Öğrenci performansı")
+chart = chart.xLabel("Akademik yıl")
+chart = chart.yLabel("Ders")
+chart.show()
+```
+
+**Şekil kuralı: y etiketi başına bir satır, x etiketi başına bir sütun.**
+`values[row][column]` hücresi `yLabels[row]` ve `xLabels[column]`'a aittir —
+yukarıdaki örnekte aşağı doğru beş ders, yana doğru üç yıl. Başka bir
+şekildeki Matrix, hem sahip olduğu şekli hem etiketlerin gerektirdiğini
+adlandıran bir `PlotError` fırlatır.
+
+`values` bir [`Numeric`](NUMERIC_TR.md) `Matrix`'tir, yani hücreleri zaten
+`Real`'dir; iç içe bir `List<List<Real>>` yayımlanmış argüman değildir ve bir
+programın birini kurma yolu `Numeric.matrix(rows)`'tur. Negatif hücreler
+geçerlidir; her hücresi eşit bir ızgara da geçerlidir. NaN ya da sonsuz bir
+hücre çizilemez ve `PlotError` fırlatır.
+
+Etiket listelerinin hiçbiri boş olamaz. Bir ısı haritasının her ekseninde en
+fazla 256 etiket ve toplamda en fazla 65.536 hücre bulunur.
+
+Kategoriler tam olarak verilen sırayla, soldan sağa ve aşağıdan yukarıya,
+her hücrenin merkezinde bir tick ile çizilir.
+
+**Renk ölçeği sabittir ve göstergesi varsayılan olarak açıktır.** Ölçek
+koyudan parlağa gider — Moreland'in kara cisim ölçeği; parlaklığı tekdüze
+arttığı için gri tonlamada ve yaygın renk körlüklerinde de okunur — ve
+ızgaranın yanındaki çubuk her rengin ne anlama geldiğini gösterir.
+`chart.legend(false)` çubuğu gizler; hücreler aynı renkleri korur. v2.2'de
+colormap, en küçük ya da en büyük değer argümanı yoktur: ölçek her zaman
+veriyi kaplar.
+
+Isı haritası bir `Chart`'tır; `title`, `xLabel`, `yLabel`, `legend`, `size`,
+`save` ve `show` üzerinde çalışır, PNG, SVG ve PDF'e kaydedilir ve bir
+[Figure](#subplotlar)'ın hücresi olabilir.
+
 ## Subplot'lar
 
 ```ahd
@@ -312,6 +440,8 @@ Surface.yLabel(text: String) -> Surface
 Surface.zLabel(text: String) -> Surface
 Surface.size(width: Int, height: Int) -> Surface
 Surface.wireframe(enabled: Bool) -> Surface
+Surface.xCategories(labels: List<String>) -> Surface
+Surface.yCategories(labels: List<String>) -> Surface
 Surface.save(path: String) -> Nothing
 Surface.show() -> Nothing
 ```
@@ -362,7 +492,49 @@ zaman başlangıç görünümünü yazar.
 
 Bu küçük bilimsel 3B çizimdir, bir 3B motoru değildir: ağ (mesh), içe
 aktarılan modeller, dokular, ışık veya malzeme ayarları, sahne grafiği ya da
-başka 3B ilkel nesneler yoktur ve v2.0'da 3B saçılım grafiği yoktur.
+başka 3B ilkel nesneler yoktur ve 3B saçılım grafiği yoktur.
+
+### Koordinatları adlandırmak
+
+> v2.2'de eklendi.
+
+Bir Surface'in x ve y'si sayıdır; bu, iki değişkenli bir fonksiyon için
+doğru, bir kategori ızgarası için yanlıştır: beş ders ve üç yıl üzerindeki
+bir yüzey `1`–`5` ve `1`–`3` diye etiketlenir ve başlığının sayıların ne
+anlama geldiğini açıklaması gerekir. `xCategories` ve `yCategories` o
+koordinatlara ad verir:
+
+```ahd
+surface := Plot.surface([1, 2, 3], [1, 2, 3, 4, 5], scores)
+surface = surface.xCategories(["1. Yıl", "2. Yıl", "3. Yıl"])
+surface = surface.yCategories(["Analiz", "Cebir", "Geometri", "İstatistik", "Programlama"])
+surface = surface.xLabel("Akademik yıl").yLabel("Ders").zLabel("Not")
+surface.show()
+```
+
+**Yalnızca sunumdur.** Geometri değişmez: koordinatlar değerlerini ve
+aralıklarını korur, Matrix değişmez ve çizilen şekil, onlarsız çizilenin tam
+olarak aynısıdır. Yalnızca her eksenin yanındaki metin değişir.
+
+**`xLabel` ve `yLabel` eksenleri adlandırmaya devam eder.**
+`xLabel("Akademik yıl")` eksenin başlığıdır; `xCategories(["1. Yıl", …])` ise
+eksen üzerindeki noktaların etiketleridir. İkisi, bilinçli olarak ayrı
+şeyler için bilinçli olarak ayrı adlardır.
+
+**Koordinat başına tam olarak bir etiket** olmalıdır. Başka uzunluktaki bir
+liste, ekseni yanlış etiketlemek yerine `PlotError` fırlatır. Etiketler
+yinelenebilir ve sıraları koordinatların sırasıdır.
+
+Sekize kadar kategorinin hepsi, her biri kendi koordinatının yanında
+çizilir; bundan sonrasında yalnızca ilk ve son çizilir, çünkü fazlası üst
+üste binerdi — ki bu da sayısal bir eksenin her zaman gösterdiğidir,
+sayılar yerine sözcüklerle.
+
+Hiç kategori verilmezse eksen, ilk ve son değerini sayı olarak göstererek
+v2.2'den önceki hâlinde kalır.
+
+Kategoriler hem `show()` hem `save()` içinde çalışır. `Surface.save` yine
+**yalnızca PNG** yazar.
 
 ## PlotError
 
@@ -377,7 +549,12 @@ verisi, geçersiz bir bin sayısı, eşleşmeyen bar etiketleri/değerleri,
 eşleşmeyen error-bar verisi, negatif hata büyüklükleri, desteklenmeyen bir
 çıktı biçimi, geçersiz subplot boyutları, subplot hücrelerinden daha fazla
 grafik, geçersiz bir Surface ızgarası veya boyutu, bir render hatası, bir geçici dosya hatası ve bir görüntüleyici-açma
-hatası. Statik bir tip uyuşmazlığı -- sayısal bir List beklenen yerde bir
+hatası. v2.2 şunları ekler: eşleşmeyen pasta etiketleri/değerleri, boş pasta
+verisi, negatif ya da sonlu olmayan bir pasta değeri, yalnızca sıfırlardan
+oluşan bir pasta, bir pastada `xLabel` ya da `yLabel`, boş ısı haritası
+etiketleri, etiketleriyle şekli uyuşmayan bir ısı haritası Matrix'i, sonlu
+olmayan bir ısı haritası hücresi ve koordinatlarıyla uzunluğu uyuşmayan bir
+Surface kategori listesi. Statik bir tip uyuşmazlığı -- sayısal bir List beklenen yerde bir
 `List<String>` geçmek -- sıradan bir derleme-zamanı tanılaması olarak kalır;
 `PlotError`, tip denetleyicisinin önceden eleyemediği alan ve çalışma zamanı
 hataları için ayrılmıştır.
@@ -410,11 +587,13 @@ düğmesi kaydetme iletişim kutusu için GUI yardımcısını (`ahdgui`) kullan
 
 ## Plot'un olmadığı şeyler
 
-Plot altı 2B grafik ailesini — line, scatter, bar, histogram, box ve error
-bar — ve v2.0'dan itibaren 3B Surface'i destekler. Pie, heatmap, contour,
-violin, stem, polar, 3B saçılım, candlestick veya area grafiği yoktur ve
+Plot sekiz 2B grafik ailesini — line, scatter, bar, pie, heatmap,
+histogram, box ve error bar — ve v2.0'dan itibaren 3B Surface'i destekler.
+Contour, violin, stem, polar, 3B saçılım, candlestick ya da area grafiği,
+donut ya da patlatılmış pasta, ısı haritası açıklamaları ya da kümeleme ve
 keyfi özel plotter enjeksiyonu yoktur -- bunlar gelecekteki bir sürümde
-değerlendirilebilir.
+değerlendirilebilir. Renk sabittir: palet ya da colormap argümanı, tema ve
+yazı tipi API'si yoktur. Eksenler de sabittir: biçimlendirici geri çağrıları,
+keyfi tick yerleşimi, genel bir Axis nesnesi ve ikincil eksenler yoktur.
 `Int`/`Real` genişletmesinin ötesinde sayısal bir skaler tip yoktur (bir
-`Numeric` tipi yoktur), genel bir GUI çerçevesi yoktur ve ikincil eksenler
-yoktur.
+`Numeric` tipi yoktur) ve genel bir GUI çerçevesi yoktur.

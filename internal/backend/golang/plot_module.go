@@ -30,6 +30,8 @@ var plotFields = []string{
 	"histogramValues", "histogramBins",
 	"boxValues",
 	"errorX", "errorY", "errorLower", "errorUpper",
+	"pieLabels", "pieValues",
+	"heatmapXLabels", "heatmapYLabels", "heatmapValues",
 	"title", "xLabel", "yLabel", "legend", "width", "height",
 }
 
@@ -79,6 +81,11 @@ func (generator *generator) plotCall(value *ir.CallExpr) string {
 		return generator.plotChartFrom("AhdPlotScatter("+plotErrorRuntime+", "+numeric(0)+", "+numeric(1)+")", meta)
 	case "bar":
 		return generator.plotChartFrom("AhdPlotBar("+plotErrorRuntime+", "+list(0)+", "+numeric(1)+")", meta)
+	case "pie":
+		return generator.plotChartFrom("AhdPlotPie("+plotErrorRuntime+", "+list(0)+", "+numeric(1)+")", meta)
+	case "heatmap":
+		return generator.plotChartFrom("AhdPlotHeatmap("+plotErrorRuntime+", "+list(0)+", "+list(1)+", "+
+			generator.numericMatrixOf(value.Arguments[2].Value)+")", meta)
 	case "histogram":
 		return generator.plotChartFrom("AhdPlotHistogram("+plotErrorRuntime+", "+numeric(0)+", "+integer(1)+")", meta)
 	case "box":
@@ -248,6 +255,16 @@ func plotChartInterchangeField(name string) string {
 		return "ErrorLower"
 	case "errorUpper":
 		return "ErrorUpper"
+	case "pieLabels":
+		return "PieLabels"
+	case "pieValues":
+		return "PieValues"
+	case "heatmapXLabels":
+		return "HeatmapXLabels"
+	case "heatmapYLabels":
+		return "HeatmapYLabels"
+	case "heatmapValues":
+		return "HeatmapValues"
 	case "title":
 		return "Title"
 	case "xLabel":
@@ -301,10 +318,10 @@ func (generator *generator) plotOperation(name string, value *ir.CallExpr) strin
 		return generator.plotChartFrom("AhdPlotChartTitle("+chart+", "+text(0)+")", meta)
 	case "Chart.xLabel":
 		chart := generator.plotChartOf(value.Callee)
-		return generator.plotChartFrom("AhdPlotChartXLabel("+chart+", "+text(0)+")", meta)
+		return generator.plotChartFrom("AhdPlotChartXLabel("+plotErrorRuntime+", "+chart+", "+text(0)+")", meta)
 	case "Chart.yLabel":
 		chart := generator.plotChartOf(value.Callee)
-		return generator.plotChartFrom("AhdPlotChartYLabel("+chart+", "+text(0)+")", meta)
+		return generator.plotChartFrom("AhdPlotChartYLabel("+plotErrorRuntime+", "+chart+", "+text(0)+")", meta)
 	case "Chart.legend":
 		chart := generator.plotChartOf(value.Callee)
 		return generator.plotChartFrom("AhdPlotChartLegend("+chart+", "+boolean(0)+")", meta)
@@ -366,4 +383,14 @@ func (generator *generator) plotFigureOperation(value *ir.CallExpr, path string,
 	return "func(figure " + generator.interfaceName(plotFigureClass) + ") { " +
 		"AhdPlotFigureSave(" + plotErrorRuntime + ", " + rowsField + ", " + columnsField + ", " + converted + ", " + path + ") " +
 		"}(" + receiver + ")"
+}
+
+// plotStringListValue renders one List<String> argument.
+func (generator *generator) plotStringListValue(value *ir.CallExpr, index int, meta ir.ExprBase) string {
+	if index >= len(value.Arguments) || value.Arguments[index].Value == nil {
+		generator.fail(CodeGenerationFailure, "a Plot call has a missing List<String> argument", meta.Span,
+			"the IR call is malformed")
+		return "nil"
+	}
+	return generator.expr(value.Arguments[index].Value)
 }

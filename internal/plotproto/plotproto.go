@@ -30,7 +30,7 @@ type Request struct {
 // blank rather than rendered.
 type ChartSpec struct {
 	Present bool   `json:"present"`
-	Kind    string `json:"kind"` // "line-scatter" | "bar" | "histogram" | "box" | "errorBar" | "empty"
+	Kind    string `json:"kind"` // "line-scatter" | "bar" | "histogram" | "box" | "errorBar" | "pie" | "heatmap" | "empty"
 
 	Title  string `json:"title,omitempty"`
 	XLabel string `json:"x_label,omitempty"`
@@ -51,7 +51,33 @@ type ChartSpec struct {
 	ErrorY     []float64 `json:"error_y,omitempty"`
 	ErrorLower []float64 `json:"error_lower,omitempty"`
 	ErrorUpper []float64 `json:"error_upper,omitempty"`
+
+	// kind == "pie" (v2.2). One slice per label, in the order given; Legend
+	// shows the category key.
+	PieLabels []string  `json:"pie_labels,omitempty"`
+	PieValues []float64 `json:"pie_values,omitempty"`
+
+	// kind == "heatmap" (v2.2). HeatmapValues is row-major: one row per y
+	// label and one column per x label, so values[row][column] is the cell
+	// at yLabels[row] and xLabels[column]. Legend shows the colour scale.
+	HeatmapXLabels []string    `json:"heatmap_x_labels,omitempty"`
+	HeatmapYLabels []string    `json:"heatmap_y_labels,omitempty"`
+	HeatmapValues  [][]float64 `json:"heatmap_values,omitempty"`
 }
+
+// The bounds ahdplot enforces on a request, whatever produced it. AhdCode
+// itself checks the same rules before sending, but the helper is a separate
+// executable that reads JSON from a file and trusts none of it.
+const (
+	// MaxPieSlices keeps a pie readable and its category palette distinct.
+	MaxPieSlices = 64
+	// MaxHeatmapLabels and MaxHeatmapCells match the Surface grid bound: a
+	// 256 x 256 grid is already far past what a labelled chart can show.
+	MaxHeatmapLabels = 256
+	MaxHeatmapCells  = 65536
+	// MaxLabelRunes bounds one category label.
+	MaxLabelRunes = 200
+)
 
 // SeriesSpec is one line or scatter series on a line-scatter Chart.
 type SeriesSpec struct {

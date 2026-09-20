@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"math"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -43,6 +45,11 @@ var (
 	plotFieldErrorY          = ir.FieldID(string(plotChartClassID) + "::field::errorY")
 	plotFieldErrorLower      = ir.FieldID(string(plotChartClassID) + "::field::errorLower")
 	plotFieldErrorUpper      = ir.FieldID(string(plotChartClassID) + "::field::errorUpper")
+	plotFieldPieLabels       = ir.FieldID(string(plotChartClassID) + "::field::pieLabels")
+	plotFieldPieValues       = ir.FieldID(string(plotChartClassID) + "::field::pieValues")
+	plotFieldHeatmapXLabels  = ir.FieldID(string(plotChartClassID) + "::field::heatmapXLabels")
+	plotFieldHeatmapYLabels  = ir.FieldID(string(plotChartClassID) + "::field::heatmapYLabels")
+	plotFieldHeatmapValues   = ir.FieldID(string(plotChartClassID) + "::field::heatmapValues")
 	plotFieldTitle           = ir.FieldID(string(plotChartClassID) + "::field::title")
 	plotFieldXLabel          = ir.FieldID(string(plotChartClassID) + "::field::xLabel")
 	plotFieldYLabel          = ir.FieldID(string(plotChartClassID) + "::field::yLabel")
@@ -82,6 +89,12 @@ type plotChart struct {
 
 	errorX, errorY, errorLower, errorUpper []float64
 
+	pieLabels []string
+	pieValues []float64
+
+	heatmapXLabels, heatmapYLabels []string
+	heatmapValues                  [][]float64
+
 	title, xLabel, yLabel string
 	legend                bool
 	width, height         int64
@@ -107,6 +120,11 @@ func (session *Session) chartOf(value any) plotChart {
 		errorY:          plotRealsFromField(field(plotFieldErrorY)),
 		errorLower:      plotRealsFromField(field(plotFieldErrorLower)),
 		errorUpper:      plotRealsFromField(field(plotFieldErrorUpper)),
+		pieLabels:       plotStringsFromField(field(plotFieldPieLabels)),
+		pieValues:       plotRealsFromField(field(plotFieldPieValues)),
+		heatmapXLabels:  plotStringsFromField(field(plotFieldHeatmapXLabels)),
+		heatmapYLabels:  plotStringsFromField(field(plotFieldHeatmapYLabels)),
+		heatmapValues:   plotRealGridFromField(field(plotFieldHeatmapValues)),
 		title:           field(plotFieldTitle).(string),
 		xLabel:          field(plotFieldXLabel).(string),
 		yLabel:          field(plotFieldYLabel).(string),
@@ -133,6 +151,11 @@ func plotChartValue(chart plotChart) *Instance {
 		plotFieldErrorY:          plotRealsToField(chart.errorY),
 		plotFieldErrorLower:      plotRealsToField(chart.errorLower),
 		plotFieldErrorUpper:      plotRealsToField(chart.errorUpper),
+		plotFieldPieLabels:       plotStringsToField(chart.pieLabels),
+		plotFieldPieValues:       plotRealsToField(chart.pieValues),
+		plotFieldHeatmapXLabels:  plotStringsToField(chart.heatmapXLabels),
+		plotFieldHeatmapYLabels:  plotStringsToField(chart.heatmapYLabels),
+		plotFieldHeatmapValues:   plotRealGridToField(chart.heatmapValues),
 		plotFieldTitle:           chart.title,
 		plotFieldXLabel:          chart.xLabel,
 		plotFieldYLabel:          chart.yLabel,
@@ -269,6 +292,10 @@ func (session *Session) plotBuiltin(name string, arguments []any) any {
 		session.plotRequireNonEmpty(len(values), "bar chart data")
 		return plotChartValue(plotChart{kind: "bar", barLabels: labels, barValues: values,
 			width: plotDefaultWidth, height: plotDefaultHeight})
+	case "pie":
+		return session.plotPieBuiltin(arguments)
+	case "heatmap":
+		return session.plotHeatmapBuiltin(arguments)
 	case "histogram":
 		values := session.plotNumbers(arguments[0])
 		bins := arguments[1].(int64)
@@ -370,10 +397,12 @@ func (session *Session) plotOperation(name string, receiver any, arguments []any
 		return plotChartValue(chart)
 	case "Chart.xLabel":
 		chart := session.chartOf(receiver)
+		session.plotRequireAxes(chart, "xLabel")
 		chart.xLabel = arguments[0].(string)
 		return plotChartValue(chart)
 	case "Chart.yLabel":
 		chart := session.chartOf(receiver)
+		session.plotRequireAxes(chart, "yLabel")
 		chart.yLabel = arguments[0].(string)
 		return plotChartValue(chart)
 	case "Chart.legend":
@@ -515,6 +544,11 @@ func plotChartSpec(chart plotChart) plotproto.ChartSpec {
 		spec.BoxValues = chart.boxValues
 	case "errorBar":
 		spec.ErrorX, spec.ErrorY, spec.ErrorLower, spec.ErrorUpper = chart.errorX, chart.errorY, chart.errorLower, chart.errorUpper
+	case "pie":
+		spec.PieLabels, spec.PieValues = chart.pieLabels, chart.pieValues
+	case "heatmap":
+		spec.HeatmapXLabels, spec.HeatmapYLabels = chart.heatmapXLabels, chart.heatmapYLabels
+		spec.HeatmapValues = chart.heatmapValues
 	}
 	return spec
 }
@@ -617,5 +651,78 @@ func (session *Session) plotRenderRequest(request plotproto.Request) {
 func (session *Session) plotCheck(problem string) {
 	if problem != "" {
 		session.raise("PlotError", problem)
+	}
+}
+
+// plotPieBuiltin is Plot.pie(labels, values), checked exactly as the
+// compiled runtime checks it.
+func (session *Session) plotPieBuiltin(arguments []any) any {
+	labels := session.plotStrings(arguments[0])
+	values := session.plotNumbers(arguments[1])
+	if len(labels) != len(values) {
+		session.raise("PlotError", "pie labels and values must have the same length")
+	}
+	session.plotRequireNonEmpty(len(values), "pie chart data")
+	if len(values) > ahdruntime.AhdPlotMaxPieSlices {
+		session.raise("PlotError", fmt.Sprintf("a pie chart draws at most %d slices; got %d",
+			ahdruntime.AhdPlotMaxPieSlices, len(values)))
+	}
+	session.plotRequireNonNegative(values, "pie values")
+	positive := false
+	for _, value := range values {
+		if math.IsNaN(value) || math.IsInf(value, 0) {
+			session.raise("PlotError", "pie values must be finite")
+		}
+		if value > 0 {
+			positive = true
+		}
+	}
+	if !positive {
+		session.raise("PlotError", "a pie chart needs at least one value greater than zero")
+	}
+	// A pie's legend is on by default: its colours mean nothing without the
+	// category names beside them.
+	return plotChartValue(plotChart{kind: "pie", pieLabels: labels, pieValues: values,
+		legend: true, width: plotDefaultWidth, height: plotDefaultHeight})
+}
+
+// plotHeatmapBuiltin is Plot.heatmap(xLabels, yLabels, values).
+func (session *Session) plotHeatmapBuiltin(arguments []any) any {
+	xLabels := session.plotStrings(arguments[0])
+	yLabels := session.plotStrings(arguments[1])
+	values := session.matrixRows(arguments[2])
+	session.plotRequireNonEmpty(len(xLabels), "heatmap x labels")
+	session.plotRequireNonEmpty(len(yLabels), "heatmap y labels")
+	if len(xLabels) > ahdruntime.AhdPlotMaxHeatmapLabels || len(yLabels) > ahdruntime.AhdPlotMaxHeatmapLabels {
+		session.raise("PlotError", fmt.Sprintf("a heatmap has at most %d labels on each axis; got %d and %d",
+			ahdruntime.AhdPlotMaxHeatmapLabels, len(xLabels), len(yLabels)))
+	}
+	if len(xLabels)*len(yLabels) > ahdruntime.AhdPlotMaxHeatmapCells {
+		session.raise("PlotError", fmt.Sprintf("a heatmap draws at most %d cells; got %d",
+			ahdruntime.AhdPlotMaxHeatmapCells, len(xLabels)*len(yLabels)))
+	}
+	if len(values) != len(yLabels) {
+		session.raise("PlotError", fmt.Sprintf("the values Matrix has %d rows; a heatmap needs one row per y label (%d)",
+			len(values), len(yLabels)))
+	}
+	for _, row := range values {
+		if len(row) != len(xLabels) {
+			session.raise("PlotError", fmt.Sprintf("the values Matrix has %d columns; a heatmap needs one column per x label (%d)",
+				len(row), len(xLabels)))
+		}
+		for _, value := range row {
+			if math.IsNaN(value) || math.IsInf(value, 0) {
+				session.raise("PlotError", "heatmap values must be finite; NaN and Infinity cannot be drawn")
+			}
+		}
+	}
+	return plotChartValue(plotChart{kind: "heatmap", heatmapXLabels: xLabels, heatmapYLabels: yLabels,
+		heatmapValues: values, legend: true, width: plotDefaultWidth, height: plotDefaultHeight})
+}
+
+// plotRequireAxes refuses an axis title on a chart that has no axes.
+func (session *Session) plotRequireAxes(chart plotChart, member string) {
+	if chart.kind == "pie" {
+		session.raise("PlotError", "a pie chart has no x or y axis, so "+member+" cannot be set on one")
 	}
 }

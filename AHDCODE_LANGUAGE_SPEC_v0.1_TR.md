@@ -5218,14 +5218,42 @@ dosya hatası ve bir görüntüleyici-açma hatası. Statik bir tip uyuşmazlı�
 sıradan bir derleme-zamanı tanılaması olarak kalır; `PlotError` yalnızca
 tip denetleyicisinin önceden eleyemediği şeyleri kapsar.
 
-### 56.9 Bu sürümde olmayanlar
+### 56.9 Pasta, ısı haritası ve adlandırılmış Surface koordinatları (v2.2)
 
-v0.1.15 tam olarak altı grafik ailesini destekler: line, scatter, bar,
-histogram, box ve error bar. Pie, heatmap, contour, violin, stem, polar,
-3D, candlestick, area veya surface grafiği yoktur ve keyfi özel plotter
-enjeksiyonu yoktur. Plot, mevcut `List<Int>`/`List<Real>` girdilerine ek olarak
-§57'deki `Vector` overload'larını kabul eder. Genel bir GUI çerçevesi ve
-ikincil eksenler yoktur.
+`Plot.pie(labels: List<String>, values: List<Int>|List<Real>) -> Chart`,
+verilen sırayla kategori başına bir dilim çizer. Etiketler ve değerler aynı
+uzunluktadır ve boş değildir; her değer sonlu ve negatif olmayan bir
+sayıdır ve en az biri sıfırdan büyüktür; sıfır değerli bir kategori
+dilimsiz çizilir. Pasta bir `Chart`'tır, göstergesi varsayılan olarak
+açıktır ve Kartezyen ekseni yoktur: üzerinde `xLabel` ve `yLabel`
+`PlotError` fırlatır.
+
+`Plot.heatmap(xLabels: List<String>, yLabels: List<String>, values: Matrix) -> Chart`
+etiketli bir ızgara çizer. Matrix, y etiketi başına bir satır ve x etiketi
+başına bir sütun taşır; yani `values[row][column]`, `yLabels[row]` ve
+`xLabels[column]` hücresidir; başka bir şekil `PlotError` fırlatır. Etiket
+listelerinin hiçbiri boş değildir, hiçbir hücre NaN ya da sonsuz değildir ve
+göstergesi varsayılan olarak açık olan renk ölçeği her zaman veriyi kaplar.
+Colormap, en küçük ya da en büyük değer argümanı yoktur.
+
+`Surface.xCategories(labels: List<String>) -> Surface` ve
+`Surface.yCategories(labels: List<String>) -> Surface` bir Surface'in
+koordinatlarını adlandırır. Yalnızca sunumdur: koordinatlar, aralıkları ve
+Matrix değişmez; `xLabel`/`yLabel` eksen başlığı olarak kalır. Koordinat
+başına tam olarak bir etiket vardır; başka bir sayı `PlotError` fırlatır.
+Surface değiştirilemez kalır, bu yüzden her biri yenisini döndürür.
+
+### 56.10 Bu sürümde olmayanlar
+
+Plot sekiz grafik ailesini destekler: line, scatter, bar, pie, heatmap,
+histogram, box ve error bar; ayrıca Surface. Contour, violin, stem, polar,
+3B scatter, candlestick ya da area grafiği, donut ya da patlatılmış pasta,
+ısı haritası açıklamaları ya da kümeleme ve keyfi özel plotter enjeksiyonu
+yoktur. Plot, mevcut `List<Int>`/`List<Real>` girdilerine ek olarak
+§57'deki `Vector` overload'larını kabul eder. Renk ve eksen sunumu sabittir:
+palet ya da colormap argümanı, tema, yazı tipi API'si, tick biçimlendirici,
+keyfi tick yerleşimi ve genel bir Axis nesnesi yoktur. Genel bir GUI
+çerçevesi ve ikincil eksenler yoktur.
 
 ## 57. Complex Skalerleri ve Numeric Standart Modülü (v0.1.15)
 

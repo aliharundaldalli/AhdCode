@@ -1,0 +1,1023 @@
+bring GUI
+bring Plot
+bring Statistics
+bring Numeric
+bring Math
+from GUI bring (Window, Container, Label, Button, TextInput, Select, TableView, Checkbox, GUIError)
+from Plot bring (Chart, Surface, PlotError)
+from Numeric bring (Matrix)
+
+// ---------------------------------------------------------------------------
+// Student Performance Explorer / Öğrenci Performans Gezgini
+// ---------------------------------------------------------------------------
+
+window: Window := GUI.window(title: "Öğrenci Performans Gezgini", width: 1080, height: 750)
+window.setResizable(true)
+window.setBackground("#F1F5F9")
+root: Container := window.column(spacing: 6, padding: 10)
+
+// Active language: "TR" or "EN"
+activeLang: String := "TR"
+
+// Header
+header: Container := root.row(spacing: 8, padding: 6)
+header.setBackground("#1E293B")
+heading: Label := header.label("Öğrenci Performans Gezgini")
+heading.setForeground("white")
+subheading: Label := header.label("— Akademik Başarı ve İstatistiksel Analiz")
+subheading.setForeground("#94A3B8")
+
+langLabel: Label := header.label("Dil / Lang:")
+langLabel.setForeground("#CBD5E1")
+langSelect: Select := header.select(items: ["Türkçe", "English"], selectedIndex: 0)
+
+// Student Name & Status Card
+topCard: Container := root.row(spacing: 10, padding: 6)
+topCard.setBackground("#E2E8F0")
+namePrompt: Label := topCard.label("Öğrenci Adı:")
+namePrompt.setForeground("#0F172A")
+studentInput: TextInput := topCard.textInput(placeholder: "Örn: Ayşe Yılmaz")
+statusPrompt: Label := topCard.label("Durum:")
+statusPrompt.setForeground("#475569")
+status: Label := topCard.label("Lütfen öğrenci adını ve 15 ders notunu giriniz.")
+status.setForeground("#B71C1C")
+
+// Grades Grid
+gridCard: Container := root.column(spacing: 4, padding: 6)
+gridCard.setBackground("#FFFFFF")
+gridTitle: Label := gridCard.label("Ders Notları (Geçerli Aralık: 0 - 100)")
+gridTitle.setForeground("#1E293B")
+
+gridRow: Container := gridCard.row(spacing: 12)
+
+// Course Names Column
+coursesCol: Container := gridRow.column(spacing: 4)
+lblH0: Label := coursesCol.label("Ders")
+lblH0.setForeground("#475569")
+lblC1: Label := coursesCol.label("1. Analiz")
+lblC2: Label := coursesCol.label("2. Cebir")
+lblC3: Label := coursesCol.label("3. Geometri")
+lblC4: Label := coursesCol.label("4. İstatistik")
+lblC5: Label := coursesCol.label("5. Programlama")
+
+// Year 1 Column
+y1Col: Container := gridRow.column(spacing: 4)
+lblH1: Label := y1Col.label("1. Yıl Notu")
+lblH1.setForeground("#475569")
+in_analysis_1: TextInput := y1Col.textInput(placeholder: "0-100")
+in_algebra_1: TextInput := y1Col.textInput(placeholder: "0-100")
+in_geometry_1: TextInput := y1Col.textInput(placeholder: "0-100")
+in_statistics_1: TextInput := y1Col.textInput(placeholder: "0-100")
+in_programming_1: TextInput := y1Col.textInput(placeholder: "0-100")
+
+// Year 2 Column
+y2Col: Container := gridRow.column(spacing: 4)
+lblH2: Label := y2Col.label("2. Yıl Notu")
+lblH2.setForeground("#475569")
+in_analysis_2: TextInput := y2Col.textInput(placeholder: "0-100")
+in_algebra_2: TextInput := y2Col.textInput(placeholder: "0-100")
+in_geometry_2: TextInput := y2Col.textInput(placeholder: "0-100")
+in_statistics_2: TextInput := y2Col.textInput(placeholder: "0-100")
+in_programming_2: TextInput := y2Col.textInput(placeholder: "0-100")
+
+// Year 3 Column
+y3Col: Container := gridRow.column(spacing: 4)
+lblH3: Label := y3Col.label("3. Yıl Notu")
+lblH3.setForeground("#475569")
+in_analysis_3: TextInput := y3Col.textInput(placeholder: "0-100")
+in_algebra_3: TextInput := y3Col.textInput(placeholder: "0-100")
+in_geometry_3: TextInput := y3Col.textInput(placeholder: "0-100")
+in_statistics_3: TextInput := y3Col.textInput(placeholder: "0-100")
+in_programming_3: TextInput := y3Col.textInput(placeholder: "0-100")
+
+// Bottom Section: Summary Table + Visualizations
+bottomRow: Container := root.row(spacing: 16)
+
+// TableView Summary (Bilingual Header: Course / Ders, Y1, Y2, Y3, Avg / Ort.)
+tableCol: Container := bottomRow.column(spacing: 4)
+tblHeading: Label := tableCol.label("Performans Özet Tablosu")
+tblHeading.setForeground("#1E293B")
+columns: List<String> := ["Ders / Course", "1. Yıl / Y1", "2. Yıl / Y2", "3. Yıl / Y3", "Ortalama / Avg"]
+table: TableView := tableCol.table(columns)
+
+// Controls & Plots
+controlsCol: Container := bottomRow.column(spacing: 6)
+ctrlHeading: Label := controlsCol.label("Grafik ve Görselleştirmeler")
+ctrlHeading.setForeground("#1E293B")
+
+metricSelect: Select := controlsCol.select(
+    items: ["Analiz", "Cebir", "Geometri", "İstatistik", "Programlama", "Genel yıllık ortalama"],
+    selectedIndex: 0
+)
+
+chartTypeSelect: Select := controlsCol.select(
+    items: ["Çizgi (Line)", "Dağılım (Scatter)", "Çubuk (Bar)"],
+    selectedIndex: 0
+)
+
+// The pie shows one year at a time, so it needs its own year choice.
+yearSelect: Select := controlsCol.select(
+    items: ["1. Yıl", "2. Yıl", "3. Yıl"],
+    selectedIndex: 0
+)
+
+btnSelectedChart: Button := controlsCol.button("Seçili grafiği aç")
+btnSelectedChart.setBackground("#1F4E79")
+btnSelectedChart.setForeground("white")
+btnSelectedChart.setEnabled(false)
+
+btnRow1: Container := controlsCol.row(spacing: 6)
+btnHistogram: Button := btnRow1.button("Histogram aç")
+btnHistogram.setBackground("#2E7D32")
+btnHistogram.setForeground("white")
+btnHistogram.setEnabled(false)
+
+btnBoxPlot: Button := btnRow1.button("Kutu grafiği aç")
+btnBoxPlot.setBackground("#475569")
+btnBoxPlot.setForeground("white")
+btnBoxPlot.setEnabled(false)
+
+btnRow2: Container := controlsCol.row(spacing: 6)
+btnErrorBar: Button := btnRow2.button("Yıllık hata çubuğu aç")
+btnErrorBar.setBackground("#D97706")
+btnErrorBar.setForeground("white")
+btnErrorBar.setEnabled(false)
+
+btnSurface: Button := btnRow2.button("3B performans yüzeyi aç")
+btnSurface.setBackground("#7C3AED")
+btnSurface.setForeground("white")
+btnSurface.setEnabled(false)
+
+btnRow3: Container := controlsCol.row(spacing: 6)
+btnPie: Button := btnRow3.button("Seçili yılın pasta grafiği")
+btnPie.setBackground("#B45309")
+btnPie.setForeground("white")
+btnPie.setEnabled(false)
+
+btnHeatmap: Button := btnRow3.button("Performans ısı haritası")
+btnHeatmap.setBackground("#0F766E")
+btnHeatmap.setForeground("white")
+btnHeatmap.setEnabled(false)
+
+wireframeCheck: Checkbox := controlsCol.checkbox("Tel kafes / Surface wireframe", false)
+
+// ---------------------------------------------------------------------------
+// Language Switching Logic
+// ---------------------------------------------------------------------------
+
+applyLanguage: Function := () -> Nothing {
+    activeLang: Global String
+    window: Global Window
+    heading: Global Label
+    subheading: Global Label
+    namePrompt: Global Label
+    statusPrompt: Global Label
+    gridTitle: Global Label
+    lblH0: Global Label
+    lblC1: Global Label
+    lblC2: Global Label
+    lblC3: Global Label
+    lblC4: Global Label
+    lblC5: Global Label
+    lblH1: Global Label
+    lblH2: Global Label
+    lblH3: Global Label
+    tblHeading: Global Label
+    ctrlHeading: Global Label
+    btnSelectedChart: Global Button
+    btnHistogram: Global Button
+    btnBoxPlot: Global Button
+    btnErrorBar: Global Button
+    btnSurface: Global Button
+    btnPie: Global Button
+    btnHeatmap: Global Button
+    metricSelect: Global Select
+    chartTypeSelect: Global Select
+    yearSelect: Global Select
+    handleUpdate: Global Function
+
+    if activeLang == "TR" {
+        window.setTitle("Öğrenci Performans Gezgini")
+        heading.setText("Öğrenci Performans Gezgini")
+        subheading.setText("— Akademik Başarı ve İstatistiksel Analiz")
+        namePrompt.setText("Öğrenci Adı:")
+        statusPrompt.setText("Durum:")
+        gridTitle.setText("Ders Notları (Geçerli Aralık: 0 - 100)")
+        lblH0.setText("Ders")
+        lblC1.setText("1. Analiz")
+        lblC2.setText("2. Cebir")
+        lblC3.setText("3. Geometri")
+        lblC4.setText("4. İstatistik")
+        lblC5.setText("5. Programlama")
+        lblH1.setText("1. Yıl Notu")
+        lblH2.setText("2. Yıl Notu")
+        lblH3.setText("3. Yıl Notu")
+        tblHeading.setText("Performans Özet Tablosu")
+        ctrlHeading.setText("Grafik ve Görselleştirmeler")
+        btnSelectedChart.setText("Seçili grafiği aç")
+        btnHistogram.setText("Histogram aç")
+        btnBoxPlot.setText("Kutu grafiği aç")
+        btnErrorBar.setText("Yıllık hata çubuğu aç")
+        btnSurface.setText("3B performans yüzeyi aç")
+        btnPie.setText("Seçili yılın pasta grafiği")
+        btnHeatmap.setText("Performans ısı haritası")
+
+        metricSelect.setItems(["Analiz", "Cebir", "Geometri", "İstatistik", "Programlama", "Genel yıllık ortalama"])
+        metricSelect.select(0)
+        chartTypeSelect.setItems(["Çizgi (Line)", "Dağılım (Scatter)", "Çubuk (Bar)"])
+        chartTypeSelect.select(0)
+        yearSelect.setItems(["1. Yıl", "2. Yıl", "3. Yıl"])
+        yearSelect.select(0)
+    }
+    else {
+        window.setTitle("Student Performance Explorer")
+        heading.setText("Student Performance Explorer")
+        subheading.setText("— Academic Progress & Statistical Visualizer")
+        namePrompt.setText("Student Name:")
+        statusPrompt.setText("Status:")
+        gridTitle.setText("Course Grades (Range: 0 to 100)")
+        lblH0.setText("Course")
+        lblC1.setText("1. Analysis")
+        lblC2.setText("2. Algebra")
+        lblC3.setText("3. Geometry")
+        lblC4.setText("4. Statistics")
+        lblC5.setText("5. Programming")
+        lblH1.setText("Year 1 Grade")
+        lblH2.setText("Year 2 Grade")
+        lblH3.setText("Year 3 Grade")
+        tblHeading.setText("Performance Summary Table")
+        ctrlHeading.setText("Visualizations & Plots")
+        btnSelectedChart.setText("Open selected chart")
+        btnHistogram.setText("Open histogram")
+        btnBoxPlot.setText("Open box plot")
+        btnErrorBar.setText("Open yearly error-bar chart")
+        btnSurface.setText("Open performance surface")
+        btnPie.setText("Open selected-year pie chart")
+        btnHeatmap.setText("Open performance heatmap")
+
+        metricSelect.setItems(["Analysis", "Algebra", "Geometry", "Statistics", "Programming", "Overall yearly average"])
+        metricSelect.select(0)
+        chartTypeSelect.setItems(["Line", "Scatter", "Bar"])
+        chartTypeSelect.select(0)
+        yearSelect.setItems(["Year 1", "Year 2", "Year 3"])
+        yearSelect.select(0)
+    }
+    handleUpdate()
+}
+
+onLanguageChange: Function := (index: Int?, text: String?) -> Nothing {
+    activeLang: Global String
+    applyLanguage: Global Function
+    if text == "English" {
+        activeLang = "EN"
+    }
+    else {
+        activeLang = "TR"
+    }
+    applyLanguage()
+}
+
+// ---------------------------------------------------------------------------
+// Grade Parsing & Validation Logic
+// ---------------------------------------------------------------------------
+
+parseGrade: Function := (raw: String) -> Real? {
+    t: Local String := raw.trim()
+    if t == "" {
+        return null
+    }
+    attempt {
+        val: Local Real := real(t)
+        if val >= 0.0 and val <= 100.0 {
+            return val
+        }
+    } except Error as error {
+        return null
+    }
+    return null
+}
+
+fieldCheck: Function := (raw: String, courseNameTR: String, courseNameEN: String, yearNum: Int) -> String? {
+    activeLang: Global String
+    t: Local String := raw.trim()
+    cName: Local String := courseNameTR
+    if activeLang != "TR" {
+        cName = courseNameEN
+    }
+    if t == "" {
+        if activeLang == "TR" {
+            return "{cName} {yearNum}. Yıl gereklidir."
+        }
+        return "{cName} Year {yearNum} is required."
+    }
+    attempt {
+        val: Local Real := real(t)
+        if val < 0.0 or val > 100.0 {
+            if activeLang == "TR" {
+                return "{cName} {yearNum}. Yıl 0-100 arasında olmalıdır (girilen: {t})."
+            }
+            return "{cName} Year {yearNum} must be 0-100 (got: {t})."
+        }
+        return null
+    } except Error as error {
+        if activeLang == "TR" {
+            return "{cName} {yearNum}. Yıl sayı olmalıdır (girilen: {t})."
+        }
+        return "{cName} Year {yearNum} must be a number (got: {t})."
+    }
+    return null
+}
+
+handleUpdate: Function := () -> Nothing {
+    activeLang: Global String
+    studentInput: Global TextInput
+    table: Global TableView
+    status: Global Label
+    btnSelectedChart: Global Button
+    btnHistogram: Global Button
+    btnBoxPlot: Global Button
+    btnErrorBar: Global Button
+    btnSurface: Global Button
+    btnPie: Global Button
+    btnHeatmap: Global Button
+
+    in_analysis_1: Global TextInput
+    in_algebra_1: Global TextInput
+    in_geometry_1: Global TextInput
+    in_statistics_1: Global TextInput
+    in_programming_1: Global TextInput
+
+    in_analysis_2: Global TextInput
+    in_algebra_2: Global TextInput
+    in_geometry_2: Global TextInput
+    in_statistics_2: Global TextInput
+    in_programming_2: Global TextInput
+
+    in_analysis_3: Global TextInput
+    in_algebra_3: Global TextInput
+    in_geometry_3: Global TextInput
+    in_statistics_3: Global TextInput
+    in_programming_3: Global TextInput
+
+    parseGrade: Global Function
+    fieldCheck: Global Function
+
+    // Parse all 15 inputs
+    v_an1: Local Real? := parseGrade(in_analysis_1.text())
+    v_an2: Local Real? := parseGrade(in_analysis_2.text())
+    v_an3: Local Real? := parseGrade(in_analysis_3.text())
+
+    v_al1: Local Real? := parseGrade(in_algebra_1.text())
+    v_al2: Local Real? := parseGrade(in_algebra_2.text())
+    v_al3: Local Real? := parseGrade(in_algebra_3.text())
+
+    v_ge1: Local Real? := parseGrade(in_geometry_1.text())
+    v_ge2: Local Real? := parseGrade(in_geometry_2.text())
+    v_ge3: Local Real? := parseGrade(in_geometry_3.text())
+
+    v_st1: Local Real? := parseGrade(in_statistics_1.text())
+    v_st2: Local Real? := parseGrade(in_statistics_2.text())
+    v_st3: Local Real? := parseGrade(in_statistics_3.text())
+
+    v_pr1: Local Real? := parseGrade(in_programming_1.text())
+    v_pr2: Local Real? := parseGrade(in_programming_2.text())
+    v_pr3: Local Real? := parseGrade(in_programming_3.text())
+
+    // Update TableView
+    rows: Local List<List<String>> := []
+
+    // Analysis
+    avg_an: Local String := "-"
+    if v_an1 != null and v_an2 != null and v_an3 != null {
+        avg_an = str(Math.round((v_an1 + v_an2 + v_an3) / 3.0, 1))
+    }
+    nameAn: Local String := "Analiz"
+    if activeLang != "TR" {
+        nameAn = "Analysis"
+    }
+    rows.add([nameAn, in_analysis_1.text().trim(), in_analysis_2.text().trim(), in_analysis_3.text().trim(), avg_an])
+
+    // Algebra
+    avg_al: Local String := "-"
+    if v_al1 != null and v_al2 != null and v_al3 != null {
+        avg_al = str(Math.round((v_al1 + v_al2 + v_al3) / 3.0, 1))
+    }
+    nameAl: Local String := "Cebir"
+    if activeLang != "TR" {
+        nameAl = "Algebra"
+    }
+    rows.add([nameAl, in_algebra_1.text().trim(), in_algebra_2.text().trim(), in_algebra_3.text().trim(), avg_al])
+
+    // Geometry
+    avg_ge: Local String := "-"
+    if v_ge1 != null and v_ge2 != null and v_ge3 != null {
+        avg_ge = str(Math.round((v_ge1 + v_ge2 + v_ge3) / 3.0, 1))
+    }
+    nameGe: Local String := "Geometri"
+    if activeLang != "TR" {
+        nameGe = "Geometry"
+    }
+    rows.add([nameGe, in_geometry_1.text().trim(), in_geometry_2.text().trim(), in_geometry_3.text().trim(), avg_ge])
+
+    // Statistics
+    avg_st: Local String := "-"
+    if v_st1 != null and v_st2 != null and v_st3 != null {
+        avg_st = str(Math.round((v_st1 + v_st2 + v_st3) / 3.0, 1))
+    }
+    nameSt: Local String := "İstatistik"
+    if activeLang != "TR" {
+        nameSt = "Statistics"
+    }
+    rows.add([nameSt, in_statistics_1.text().trim(), in_statistics_2.text().trim(), in_statistics_3.text().trim(), avg_st])
+
+    // Programming
+    avg_pr: Local String := "-"
+    if v_pr1 != null and v_pr2 != null and v_pr3 != null {
+        avg_pr = str(Math.round((v_pr1 + v_pr2 + v_pr3) / 3.0, 1))
+    }
+    namePr: Local String := "Programlama"
+    if activeLang != "TR" {
+        namePr = "Programming"
+    }
+    rows.add([namePr, in_programming_1.text().trim(), in_programming_2.text().trim(), in_programming_3.text().trim(), avg_pr])
+
+    // Yearly Average row
+    avg_y1: Local String := "-"
+    if v_an1 != null and v_al1 != null and v_ge1 != null and v_st1 != null and v_pr1 != null {
+        avg_y1 = str(Math.round((v_an1 + v_al1 + v_ge1 + v_st1 + v_pr1) / 5.0, 1))
+    }
+    avg_y2: Local String := "-"
+    if v_an2 != null and v_al2 != null and v_ge2 != null and v_st2 != null and v_pr2 != null {
+        avg_y2 = str(Math.round((v_an2 + v_al2 + v_ge2 + v_st2 + v_pr2) / 5.0, 1))
+    }
+    avg_y3: Local String := "-"
+    if v_an3 != null and v_al3 != null and v_ge3 != null and v_st3 != null and v_pr3 != null {
+        avg_y3 = str(Math.round((v_an3 + v_al3 + v_ge3 + v_st3 + v_pr3) / 5.0, 1))
+    }
+    avg_all: Local String := "-"
+    if avg_an != "-" and avg_al != "-" and avg_ge != "-" and avg_st != "-" and avg_pr != "-" {
+        tot: Local Real := (real(avg_an) + real(avg_al) + real(avg_ge) + real(avg_st) + real(avg_pr)) / 5.0
+        avg_all = str(Math.round(tot, 1))
+    }
+    nameAvg: Local String := "Yıllık Ortalama"
+    if activeLang != "TR" {
+        nameAvg = "Yearly Average"
+    }
+    rows.add([nameAvg, avg_y1, avg_y2, avg_y3, avg_all])
+
+    table.setRows(rows)
+
+    // Check student name
+    name: Local String := studentInput.text().trim()
+    firstProblem: Local String? := null
+    if name == "" {
+        if activeLang == "TR" {
+            firstProblem = "Lütfen öğrenci adını giriniz."
+        }
+        else {
+            firstProblem = "Please enter student name."
+        }
+    }
+
+    // Check all 15 fields
+    if firstProblem == null { firstProblem = fieldCheck(in_analysis_1.text(), "Analiz", "Analysis", 1) }
+    if firstProblem == null { firstProblem = fieldCheck(in_analysis_2.text(), "Analiz", "Analysis", 2) }
+    if firstProblem == null { firstProblem = fieldCheck(in_analysis_3.text(), "Analiz", "Analysis", 3) }
+
+    if firstProblem == null { firstProblem = fieldCheck(in_algebra_1.text(), "Cebir", "Algebra", 1) }
+    if firstProblem == null { firstProblem = fieldCheck(in_algebra_2.text(), "Cebir", "Algebra", 2) }
+    if firstProblem == null { firstProblem = fieldCheck(in_algebra_3.text(), "Cebir", "Algebra", 3) }
+
+    if firstProblem == null { firstProblem = fieldCheck(in_geometry_1.text(), "Geometri", "Geometry", 1) }
+    if firstProblem == null { firstProblem = fieldCheck(in_geometry_2.text(), "Geometri", "Geometry", 2) }
+    if firstProblem == null { firstProblem = fieldCheck(in_geometry_3.text(), "Geometri", "Geometry", 3) }
+
+    if firstProblem == null { firstProblem = fieldCheck(in_statistics_1.text(), "İstatistik", "Statistics", 1) }
+    if firstProblem == null { firstProblem = fieldCheck(in_statistics_2.text(), "İstatistik", "Statistics", 2) }
+    if firstProblem == null { firstProblem = fieldCheck(in_statistics_3.text(), "İstatistik", "Statistics", 3) }
+
+    if firstProblem == null { firstProblem = fieldCheck(in_programming_1.text(), "Programlama", "Programming", 1) }
+    if firstProblem == null { firstProblem = fieldCheck(in_programming_2.text(), "Programlama", "Programming", 2) }
+    if firstProblem == null { firstProblem = fieldCheck(in_programming_3.text(), "Programlama", "Programming", 3) }
+
+    isValid: Local Bool := firstProblem == null
+
+    btnSelectedChart.setEnabled(isValid)
+    btnHistogram.setEnabled(isValid)
+    btnBoxPlot.setEnabled(isValid)
+    btnErrorBar.setEnabled(isValid)
+    btnSurface.setEnabled(isValid)
+    btnPie.setEnabled(isValid)
+    btnHeatmap.setEnabled(isValid)
+
+    if isValid {
+        status.setForeground("#2E7D32")
+        if activeLang == "TR" {
+            status.setText("Tüm 15 not geçerli. Grafikler açılabilir.")
+        }
+        else {
+            status.setText("All 15 grades valid. Ready to open plots.")
+        }
+    }
+    else {
+        status.setForeground("#B71C1C")
+        if firstProblem != null {
+            status.setText(firstProblem)
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Plot Actions
+// ---------------------------------------------------------------------------
+
+openSelectedChart: Function := () -> Nothing {
+    activeLang: Global String
+    studentInput: Global TextInput
+    metricSelect: Global Select
+    chartTypeSelect: Global Select
+
+    in_analysis_1: Global TextInput
+    in_algebra_1: Global TextInput
+    in_geometry_1: Global TextInput
+    in_statistics_1: Global TextInput
+    in_programming_1: Global TextInput
+
+    in_analysis_2: Global TextInput
+    in_algebra_2: Global TextInput
+    in_geometry_2: Global TextInput
+    in_statistics_2: Global TextInput
+    in_programming_2: Global TextInput
+
+    in_analysis_3: Global TextInput
+    in_algebra_3: Global TextInput
+    in_geometry_3: Global TextInput
+    in_statistics_3: Global TextInput
+    in_programming_3: Global TextInput
+
+    name: Local String := studentInput.text().trim()
+    metricIndex: Local Int? := metricSelect.selectedIndex()
+    typeIndex: Local Int? := chartTypeSelect.selectedIndex()
+
+    if metricIndex == null or typeIndex == null {
+        return
+    }
+
+    y: Local List<Real> := []
+    labelTitle: Local String := ""
+
+    if metricIndex == 0 {
+        labelTitle = "Analiz"
+        if activeLang != "TR" {
+            labelTitle = "Analysis"
+        }
+        y = [real(in_analysis_1.text().trim()), real(in_analysis_2.text().trim()), real(in_analysis_3.text().trim())]
+    }
+    else if metricIndex == 1 {
+        labelTitle = "Cebir"
+        if activeLang != "TR" {
+            labelTitle = "Algebra"
+        }
+        y = [real(in_algebra_1.text().trim()), real(in_algebra_2.text().trim()), real(in_algebra_3.text().trim())]
+    }
+    else if metricIndex == 2 {
+        labelTitle = "Geometri"
+        if activeLang != "TR" {
+            labelTitle = "Geometry"
+        }
+        y = [real(in_geometry_1.text().trim()), real(in_geometry_2.text().trim()), real(in_geometry_3.text().trim())]
+    }
+    else if metricIndex == 3 {
+        labelTitle = "İstatistik"
+        if activeLang != "TR" {
+            labelTitle = "Statistics"
+        }
+        y = [real(in_statistics_1.text().trim()), real(in_statistics_2.text().trim()), real(in_statistics_3.text().trim())]
+    }
+    else if metricIndex == 4 {
+        labelTitle = "Programlama"
+        if activeLang != "TR" {
+            labelTitle = "Programming"
+        }
+        y = [real(in_programming_1.text().trim()), real(in_programming_2.text().trim()), real(in_programming_3.text().trim())]
+    }
+    else {
+        // Overall yearly average
+        labelTitle = "Genel Yıllık Ortalama"
+        if activeLang != "TR" {
+            labelTitle = "Overall Yearly Average"
+        }
+        y1: Local Real := (real(in_analysis_1.text().trim()) + real(in_algebra_1.text().trim()) + real(in_geometry_1.text().trim()) + real(in_statistics_1.text().trim()) + real(in_programming_1.text().trim())) / 5.0
+        y2: Local Real := (real(in_analysis_2.text().trim()) + real(in_algebra_2.text().trim()) + real(in_geometry_2.text().trim()) + real(in_statistics_2.text().trim()) + real(in_programming_2.text().trim())) / 5.0
+        y3: Local Real := (real(in_analysis_3.text().trim()) + real(in_algebra_3.text().trim()) + real(in_geometry_3.text().trim()) + real(in_statistics_3.text().trim()) + real(in_programming_3.text().trim())) / 5.0
+        y = [y1, y2, y3]
+    }
+
+    chartTitle: Local String := "{labelTitle} ({name})"
+    xLabelText: Local String := "Yıl"
+    if activeLang != "TR" {
+        xLabelText = "Year"
+    }
+    yLabelText: Local String := "Not"
+    if activeLang != "TR" {
+        yLabelText = "Grade"
+    }
+
+    if typeIndex == 0 {
+        // Line
+        chart: Local Chart := Plot.line([1, 2, 3], y).title(chartTitle).xLabel(xLabelText).yLabel(yLabelText)
+        chart.show()
+    }
+    else if typeIndex == 1 {
+        // Scatter
+        chart: Local Chart := Plot.scatter([1, 2, 3], y).title(chartTitle).xLabel(xLabelText).yLabel(yLabelText)
+        chart.show()
+    }
+    else {
+        // Bar
+        yearLabels: Local List<String> := ["1. Yıl", "2. Yıl", "3. Yıl"]
+        if activeLang != "TR" {
+            yearLabels = ["Year 1", "Year 2", "Year 3"]
+        }
+        chart: Local Chart := Plot.bar(yearLabels, y).title(chartTitle).xLabel(xLabelText).yLabel(yLabelText)
+        chart.show()
+    }
+}
+
+openHistogram: Function := () -> Nothing {
+    activeLang: Global String
+    studentInput: Global TextInput
+    in_analysis_1: Global TextInput
+    in_algebra_1: Global TextInput
+    in_geometry_1: Global TextInput
+    in_statistics_1: Global TextInput
+    in_programming_1: Global TextInput
+    in_analysis_2: Global TextInput
+    in_algebra_2: Global TextInput
+    in_geometry_2: Global TextInput
+    in_statistics_2: Global TextInput
+    in_programming_2: Global TextInput
+    in_analysis_3: Global TextInput
+    in_algebra_3: Global TextInput
+    in_geometry_3: Global TextInput
+    in_statistics_3: Global TextInput
+    in_programming_3: Global TextInput
+
+    name: Local String := studentInput.text().trim()
+    allGrades: Local List<Real> := [
+        real(in_analysis_1.text().trim()), real(in_analysis_2.text().trim()), real(in_analysis_3.text().trim()),
+        real(in_algebra_1.text().trim()), real(in_algebra_2.text().trim()), real(in_algebra_3.text().trim()),
+        real(in_geometry_1.text().trim()), real(in_geometry_2.text().trim()), real(in_geometry_3.text().trim()),
+        real(in_statistics_1.text().trim()), real(in_statistics_2.text().trim()), real(in_statistics_3.text().trim()),
+        real(in_programming_1.text().trim()), real(in_programming_2.text().trim()), real(in_programming_3.text().trim())
+    ]
+    hTitle: Local String := "Not Dağılımı Histogramı (15 Not) - {name}"
+    if activeLang != "TR" {
+        hTitle = "Grade Distribution (15 Grades) - {name}"
+    }
+    xLabelText: Local String := "Not Aralığı"
+    if activeLang != "TR" {
+        xLabelText = "Grade Range"
+    }
+    yLabelText: Local String := "Frekans"
+    if activeLang != "TR" {
+        yLabelText = "Count"
+    }
+
+    chart: Local Chart := Plot.histogram(allGrades, 5).title(hTitle).xLabel(xLabelText).yLabel(yLabelText)
+    chart.show()
+}
+
+openBoxPlot: Function := () -> Nothing {
+    activeLang: Global String
+    studentInput: Global TextInput
+    in_analysis_1: Global TextInput
+    in_algebra_1: Global TextInput
+    in_geometry_1: Global TextInput
+    in_statistics_1: Global TextInput
+    in_programming_1: Global TextInput
+    in_analysis_2: Global TextInput
+    in_algebra_2: Global TextInput
+    in_geometry_2: Global TextInput
+    in_statistics_2: Global TextInput
+    in_programming_2: Global TextInput
+    in_analysis_3: Global TextInput
+    in_algebra_3: Global TextInput
+    in_geometry_3: Global TextInput
+    in_statistics_3: Global TextInput
+    in_programming_3: Global TextInput
+
+    name: Local String := studentInput.text().trim()
+    allGrades: Local List<Real> := [
+        real(in_analysis_1.text().trim()), real(in_analysis_2.text().trim()), real(in_analysis_3.text().trim()),
+        real(in_algebra_1.text().trim()), real(in_algebra_2.text().trim()), real(in_algebra_3.text().trim()),
+        real(in_geometry_1.text().trim()), real(in_geometry_2.text().trim()), real(in_geometry_3.text().trim()),
+        real(in_statistics_1.text().trim()), real(in_statistics_2.text().trim()), real(in_statistics_3.text().trim()),
+        real(in_programming_1.text().trim()), real(in_programming_2.text().trim()), real(in_programming_3.text().trim())
+    ]
+    bTitle: Local String := "Not Dağılımı Kutu Grafiği - {name}"
+    if activeLang != "TR" {
+        bTitle = "Grade Dispersion Box Plot - {name}"
+    }
+    yLabelText: Local String := "Not"
+    if activeLang != "TR" {
+        yLabelText = "Grade"
+    }
+
+    chart: Local Chart := Plot.box(allGrades).title(bTitle).yLabel(yLabelText)
+    chart.show()
+}
+
+openErrorBar: Function := () -> Nothing {
+    activeLang: Global String
+    studentInput: Global TextInput
+    in_analysis_1: Global TextInput
+    in_algebra_1: Global TextInput
+    in_geometry_1: Global TextInput
+    in_statistics_1: Global TextInput
+    in_programming_1: Global TextInput
+    in_analysis_2: Global TextInput
+    in_algebra_2: Global TextInput
+    in_geometry_2: Global TextInput
+    in_statistics_2: Global TextInput
+    in_programming_2: Global TextInput
+    in_analysis_3: Global TextInput
+    in_algebra_3: Global TextInput
+    in_geometry_3: Global TextInput
+    in_statistics_3: Global TextInput
+    in_programming_3: Global TextInput
+
+    name: Local String := studentInput.text().trim()
+
+    y1: Local List<Real> := [
+        real(in_analysis_1.text().trim()), real(in_algebra_1.text().trim()), real(in_geometry_1.text().trim()),
+        real(in_statistics_1.text().trim()), real(in_programming_1.text().trim())
+    ]
+    y2: Local List<Real> := [
+        real(in_analysis_2.text().trim()), real(in_algebra_2.text().trim()), real(in_geometry_2.text().trim()),
+        real(in_statistics_2.text().trim()), real(in_programming_2.text().trim())
+    ]
+    y3: Local List<Real> := [
+        real(in_analysis_3.text().trim()), real(in_algebra_3.text().trim()), real(in_geometry_3.text().trim()),
+        real(in_statistics_3.text().trim()), real(in_programming_3.text().trim())
+    ]
+
+    m1: Local Real := Statistics.mean(y1)
+    s1: Local Real := Statistics.sampleStdDev(y1)
+
+    m2: Local Real := Statistics.mean(y2)
+    s2: Local Real := Statistics.sampleStdDev(y2)
+
+    m3: Local Real := Statistics.mean(y3)
+    s3: Local Real := Statistics.sampleStdDev(y3)
+
+    eTitle: Local String := "Yıllık Ortalama ve Örneklem Standart Sapması - {name}"
+    if activeLang != "TR" {
+        eTitle = "Yearly Mean & Spread (Sample StdDev) - {name}"
+    }
+    xLabelText: Local String := "Yıl"
+    if activeLang != "TR" {
+        xLabelText = "Year"
+    }
+    yLabelText: Local String := "Not"
+    if activeLang != "TR" {
+        yLabelText = "Grade"
+    }
+
+    chart: Local Chart := Plot.errorBar(
+        [1.0, 2.0, 3.0],
+        [m1, m2, m3],
+        [s1, s2, s3],
+        [s1, s2, s3]
+    ).title(eTitle).xLabel(xLabelText).yLabel(yLabelText)
+
+    chart.show()
+}
+
+// courseNames and yearNames are the labels the v2.2 charts show. They are
+// the same five courses and three years the grid collects, in the same
+// order, so a chart reads exactly like the table above it.
+courseNames: Function := () -> List<String> {
+    activeLang: Global String
+    if activeLang == "TR" {
+        return ["Analiz", "Cebir", "Geometri", "İstatistik", "Programlama"]
+    }
+    return ["Analysis", "Algebra", "Geometry", "Statistics", "Programming"]
+}
+
+yearNames: Function := () -> List<String> {
+    activeLang: Global String
+    if activeLang == "TR" {
+        return ["1. Yıl", "2. Yıl", "3. Yıl"]
+    }
+    return ["Year 1", "Year 2", "Year 3"]
+}
+
+// gradeMatrix is the 5 x 3 grid the heatmap and the surface both draw: one
+// row per course, one column per year.
+gradeMatrix: Function := () -> List<List<Real>> {
+    in_analysis_1: Global TextInput
+    in_algebra_1: Global TextInput
+    in_geometry_1: Global TextInput
+    in_statistics_1: Global TextInput
+    in_programming_1: Global TextInput
+    in_analysis_2: Global TextInput
+    in_algebra_2: Global TextInput
+    in_geometry_2: Global TextInput
+    in_statistics_2: Global TextInput
+    in_programming_2: Global TextInput
+    in_analysis_3: Global TextInput
+    in_algebra_3: Global TextInput
+    in_geometry_3: Global TextInput
+    in_statistics_3: Global TextInput
+    in_programming_3: Global TextInput
+
+    return [
+        [real(in_analysis_1.text().trim()), real(in_analysis_2.text().trim()), real(in_analysis_3.text().trim())],
+        [real(in_algebra_1.text().trim()), real(in_algebra_2.text().trim()), real(in_algebra_3.text().trim())],
+        [real(in_geometry_1.text().trim()), real(in_geometry_2.text().trim()), real(in_geometry_3.text().trim())],
+        [real(in_statistics_1.text().trim()), real(in_statistics_2.text().trim()), real(in_statistics_3.text().trim())],
+        [real(in_programming_1.text().trim()), real(in_programming_2.text().trim()), real(in_programming_3.text().trim())]
+    ]
+}
+
+// openPie shows the five course grades of one year as slices, which is the
+// question "how did this year break down by course" the other charts do not
+// answer.
+openPie: Function := () -> Nothing {
+    activeLang: Global String
+    studentInput: Global TextInput
+    yearSelect: Global Select
+    courseNames: Global Function
+    yearNames: Global Function
+    gradeMatrix: Global Function
+
+    name: Local String := studentInput.text().trim()
+    yearIndex: Local Int? := yearSelect.selectedIndex()
+    if yearIndex == null {
+        return
+    }
+    year: Local Int := yearIndex
+    grid: Local List<List<Real>> := gradeMatrix()
+    years: Local List<String> := yearNames()
+
+    // One slice per course, for the chosen year: column `year` of the grid.
+    yearGrades: Local List<Real> := []
+    for row in grid {
+        yearGrades.add(row[year])
+    }
+
+    yearName: Local String := years[year]
+    pTitle: Local String := "{yearName} ders dağılımı - {name}"
+    if activeLang != "TR" {
+        pTitle = "{yearName} course distribution - {name}"
+    }
+
+    // A pie has no axes, so it is given no xLabel or yLabel: its legend,
+    // which is on by default, names the courses.
+    chart: Local Chart := Plot.pie(courseNames(), yearGrades).title(pTitle)
+    chart.show()
+}
+
+// openHeatmap shows all fifteen grades at once: course by year, with the
+// colour scale standing in for the numbers.
+openHeatmap: Function := () -> Nothing {
+    activeLang: Global String
+    studentInput: Global TextInput
+    courseNames: Global Function
+    yearNames: Global Function
+    gradeMatrix: Global Function
+
+    name: Local String := studentInput.text().trim()
+    hTitle: Local String := "Performans ısı haritası - {name}"
+    if activeLang != "TR" {
+        hTitle = "Performance heatmap - {name}"
+    }
+    xLabelText: Local String := "Akademik yıl"
+    if activeLang != "TR" {
+        xLabelText = "Academic year"
+    }
+    yLabelText: Local String := "Ders"
+    if activeLang != "TR" {
+        yLabelText = "Course"
+    }
+
+    // The Matrix is row per y label and column per x label: five courses
+    // down, three years across.
+    chart: Local Chart := Plot.heatmap(yearNames(), courseNames(), Numeric.matrix(gradeMatrix()))
+    chart = chart.title(hTitle).xLabel(xLabelText).yLabel(yLabelText)
+    chart.show()
+}
+
+openSurface: Function := () -> Nothing {
+    activeLang: Global String
+    studentInput: Global TextInput
+    wireframeCheck: Global Checkbox
+    courseNames: Global Function
+    yearNames: Global Function
+    gradeMatrix: Global Function
+    in_analysis_1: Global TextInput
+    in_algebra_1: Global TextInput
+    in_geometry_1: Global TextInput
+    in_statistics_1: Global TextInput
+    in_programming_1: Global TextInput
+    in_analysis_2: Global TextInput
+    in_algebra_2: Global TextInput
+    in_geometry_2: Global TextInput
+    in_statistics_2: Global TextInput
+    in_programming_2: Global TextInput
+    in_analysis_3: Global TextInput
+    in_algebra_3: Global TextInput
+    in_geometry_3: Global TextInput
+    in_statistics_3: Global TextInput
+    in_programming_3: Global TextInput
+
+    name: Local String := studentInput.text().trim()
+
+    matrixRows: Local List<List<Real>> := gradeMatrix()
+
+    x: Local List<Real> := [1.0, 2.0, 3.0]
+    y: Local List<Real> := [1.0, 2.0, 3.0, 4.0, 5.0]
+
+    sTitle: Local String := "3B Performans Yüzeyi - {name}"
+    if activeLang != "TR" {
+        sTitle = "Performance Surface - {name}"
+    }
+    xLabelText: Local String := "Akademik yıl"
+    if activeLang != "TR" {
+        xLabelText = "Academic year"
+    }
+    yLabelText: Local String := "Ders"
+    if activeLang != "TR" {
+        yLabelText = "Course"
+    }
+    zLabelText: Local String := "Not"
+    if activeLang != "TR" {
+        zLabelText = "Grade"
+    }
+
+    surface: Local Surface := Plot.surface(x, y, Numeric.matrix(matrixRows))
+    // The geometry is still 1..3 and 1..5; the names only replace what the
+    // axes show, so the courses read as courses instead of as numbers.
+    surface = surface.xCategories(yearNames()).yCategories(courseNames())
+    surface = surface.title(sTitle).xLabel(xLabelText).yLabel(yLabelText).zLabel(zLabelText)
+
+    if wireframeCheck.checked() {
+        surface = surface.wireframe(true)
+    }
+
+    surface.show()
+}
+
+// ---------------------------------------------------------------------------
+// Wiring Callbacks
+// ---------------------------------------------------------------------------
+
+studentInput.onChange(lambda (text: String) -> handleUpdate())
+
+in_analysis_1.onChange(lambda (text: String) -> handleUpdate())
+in_analysis_2.onChange(lambda (text: String) -> handleUpdate())
+in_analysis_3.onChange(lambda (text: String) -> handleUpdate())
+
+in_algebra_1.onChange(lambda (text: String) -> handleUpdate())
+in_algebra_2.onChange(lambda (text: String) -> handleUpdate())
+in_algebra_3.onChange(lambda (text: String) -> handleUpdate())
+
+in_geometry_1.onChange(lambda (text: String) -> handleUpdate())
+in_geometry_2.onChange(lambda (text: String) -> handleUpdate())
+in_geometry_3.onChange(lambda (text: String) -> handleUpdate())
+
+in_statistics_1.onChange(lambda (text: String) -> handleUpdate())
+in_statistics_2.onChange(lambda (text: String) -> handleUpdate())
+in_statistics_3.onChange(lambda (text: String) -> handleUpdate())
+
+in_programming_1.onChange(lambda (text: String) -> handleUpdate())
+in_programming_2.onChange(lambda (text: String) -> handleUpdate())
+in_programming_3.onChange(lambda (text: String) -> handleUpdate())
+
+langSelect.onChange(onLanguageChange)
+metricSelect.onChange(lambda (index: Int?, text: String?) -> handleUpdate())
+chartTypeSelect.onChange(lambda (index: Int?, text: String?) -> handleUpdate())
+yearSelect.onChange(lambda (index: Int?, text: String?) -> handleUpdate())
+wireframeCheck.onChange(lambda (checked: Bool) -> handleUpdate())
+
+btnSelectedChart.onClick(openSelectedChart)
+btnHistogram.onClick(openHistogram)
+btnBoxPlot.onClick(openBoxPlot)
+btnErrorBar.onClick(openErrorBar)
+btnSurface.onClick(openSurface)
+btnPie.onClick(openPie)
+btnHeatmap.onClick(openHeatmap)
+
+closeOnEscape: Function := (key: String) -> Nothing {
+    window: Global Window
+    if key == "Escape" {
+        window.close()
+    }
+}
+window.onKey(closeOnEscape)
+
+// Initial state
+handleUpdate()
+
+window.wait()

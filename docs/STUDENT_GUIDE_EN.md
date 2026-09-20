@@ -88,6 +88,7 @@ says so and links to the reference page that lists every signature.
 - [66. Colors, disabled buttons, and a chart you can explore](#66-colors-disabled-buttons-and-a-chart-you-can-explore)
 - [67. A desktop application: tables, dialogs, 3D charts, and packaging](#67-a-desktop-application-tables-dialogs-3d-charts-and-packaging)
 - [68. Moving files: upload, download, attach, and notify](#68-moving-files-upload-download-attach-and-notify)
+- [69. One dataset, three pictures: pie, heatmap, and named axes](#69-one-dataset-three-pictures-pie-heatmap-and-named-axes)
 
 ## 1. What is AhdCode?
 
@@ -7382,3 +7383,81 @@ response header.
 
 See the [HTTP reference](HTTP.md), the [WebSocket reference](WEBSOCKET.md),
 the [SMTP reference](SMTP.md), and [`examples/v2.1`](../examples/v2.1/README.md).
+
+
+## 69. One dataset, three pictures: pie, heatmap, and named axes
+
+> Added in v2.2.0.
+
+Suppose a student has five courses and three years of grades — fifteen
+numbers. A line chart shows one course over time. A bar chart compares
+courses in one year. Neither shows the whole grid, and neither says how one
+year divided between its courses. v2.2 adds the two charts that do, and
+lets a 3D surface say what its axes mean.
+
+**The data.** GUI collects it, Numeric holds it. The Matrix is one row per
+course and one column per year:
+
+```ahd
+bring Numeric
+from Numeric bring Matrix
+
+courses: List<String> := ["Analysis", "Algebra", "Geometry", "Statistics", "Programming"]
+years: List<String> := ["Year 1", "Year 2", "Year 3"]
+grades: Matrix := Numeric.matrix([
+    [72.0, 78.0, 84.0]
+    [68.0, 75.0, 81.0]
+    [80.0, 82.0, 88.0]
+    [65.0, 74.0, 83.0]
+    [85.0, 91.0, 95.0]
+])
+```
+
+**A pie for one year.** It answers "how did Year 3 divide between the five
+courses":
+
+```ahd
+pie: Chart := Plot.pie(courses, [84, 81, 88, 83, 95])
+pie = pie.title("Year 3 course distribution")
+pie.show()
+```
+
+The legend is already on — the colours mean nothing without it — and each
+slice carries its share. A pie has no axes, so do not give it `xLabel` or
+`yLabel`; doing so raises `PlotError` rather than being ignored.
+
+**A heatmap for all fifteen.** One picture instead of a table:
+
+```ahd
+heat: Chart := Plot.heatmap(years, courses, grades)
+heat = heat.title("Student performance").xLabel("Academic year").yLabel("Course")
+heat.show()
+```
+
+Remember which way round the Matrix goes: **one row per y label, one column
+per x label**. Here that is five courses down and three years across, which
+is exactly how the Matrix above was written. The colour bar beside the grid
+is the legend, and it is on by default.
+
+**A surface that names its own axes.** Before v2.2 the same grid drawn as a
+3D surface was labelled `1` to `5` and `1` to `3`, and the title had to
+explain the numbers. Now it does not:
+
+```ahd
+surface: Surface := Plot.surface([1, 2, 3], [1, 2, 3, 4, 5], grades)
+surface = surface.xCategories(years).yCategories(courses)
+surface = surface.xLabel("Academic year").yLabel("Course").zLabel("Grade")
+surface.show()
+```
+
+`xLabel` names the axis; `xCategories` names the points along it. The
+geometry does not change — the coordinates keep their values and spacing —
+only the text does. There must be exactly one label per coordinate.
+
+**Try it yourself:** run
+[`examples/v2.2/student_performance`](../examples/v2.2/student_performance/README.md),
+type the grades above, and open the pie for each of the three years in turn.
+Then open the heatmap and ask yourself which picture answered your question
+faster.
+
+See the [Plot reference](PLOT.md) for the full chart surface.

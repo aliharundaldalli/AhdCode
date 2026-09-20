@@ -36,16 +36,21 @@ const (
 
 // surfaceSpec is the Surface as the program sends it.
 type surfaceSpec struct {
-	X         []float64   `json:"x"`
-	Y         []float64   `json:"y"`
-	Z         [][]float64 `json:"z"`
-	Title     string      `json:"title"`
-	XLabel    string      `json:"x_label"`
-	YLabel    string      `json:"y_label"`
-	ZLabel    string      `json:"z_label"`
-	Width     int         `json:"width"`
-	Height    int         `json:"height"`
-	Wireframe bool        `json:"wireframe"`
+	X []float64   `json:"x"`
+	Y []float64   `json:"y"`
+	Z [][]float64 `json:"z"`
+	// XCategories and YCategories are presentation labels (v2.2): one per x
+	// or y coordinate, shown instead of that coordinate's number. Empty
+	// means the axis shows its numbers, exactly as before v2.2.
+	XCategories []string `json:"x_categories,omitempty"`
+	YCategories []string `json:"y_categories,omitempty"`
+	Title       string   `json:"title"`
+	XLabel      string   `json:"x_label"`
+	YLabel      string   `json:"y_label"`
+	ZLabel      string   `json:"z_label"`
+	Width       int      `json:"width"`
+	Height      int      `json:"height"`
+	Wireframe   bool     `json:"wireframe"`
 }
 
 func finite(value float64) bool { return !math.IsNaN(value) && !math.IsInf(value, 0) }
@@ -87,6 +92,25 @@ func (s surfaceSpec) validate() error {
 	for _, text := range []string{s.Title, s.XLabel, s.YLabel, s.ZLabel} {
 		if !utf8.ValidString(text) || utf8.RuneCountInString(text) > maxTitleRunes {
 			return errors.New("invalid Surface text")
+		}
+	}
+	// Categories are optional, but when present there is exactly one per
+	// coordinate; anything else would mislabel the axis.
+	for _, categories := range []struct {
+		labels      []string
+		coordinates int
+		axis        string
+	}{{s.XCategories, len(s.X), "x"}, {s.YCategories, len(s.Y), "y"}} {
+		if len(categories.labels) == 0 {
+			continue
+		}
+		if len(categories.labels) != categories.coordinates {
+			return fmt.Errorf("a Surface needs one %s category per %s value", categories.axis, categories.axis)
+		}
+		for _, text := range categories.labels {
+			if !utf8.ValidString(text) || utf8.RuneCountInString(text) > maxTitleRunes {
+				return errors.New("invalid Surface category")
+			}
 		}
 	}
 	return nil
@@ -359,12 +383,25 @@ func (r surfaceRenderer) render(s surfaceSpec, c camera, width, height int, text
 		drawText(img, labelFace, text, x, y, 0.5, ink)
 	}
 	outside := 1.22
-	label(s.XLabel, point{0, -outside, -zHalf})
-	label(formatNumber(s.X[0]), point{-1, -outside + 0.1, -zHalf})
-	label(formatNumber(s.X[len(s.X)-1]), point{1, -outside + 0.1, -zHalf})
-	label(s.YLabel, point{outside, 0, -zHalf})
-	label(formatNumber(s.Y[0]), point{outside - 0.1, -1, -zHalf})
-	label(formatNumber(s.Y[len(s.Y)-1]), point{outside - 0.1, 1, -zHalf})
+	// Named categories sit where a numeric axis showed only its two ends,
+	// so the axis title steps further out to clear the row of names, and
+	// the names themselves step back from the corner the two edges share.
+	xTicks, yTicks := axisTicks(s.X, s.XCategories), axisTicks(s.Y, s.YCategories)
+	xTitle, yTitle := outside, outside
+	if len(xTicks) > 2 {
+		xTitle = outside + 0.34
+	}
+	if len(yTicks) > 2 {
+		yTitle = outside + 0.34
+	}
+	label(s.XLabel, point{0, -xTitle, -zHalf})
+	for _, tick := range xTicks {
+		label(tick.text, point{tick.at, -outside + 0.1, -zHalf})
+	}
+	label(s.YLabel, point{yTitle, 0, -zHalf})
+	for _, tick := range yTicks {
+		label(tick.text, point{outside - 0.1, tick.at, -zHalf})
+	}
 	gap := 8 * textScale
 	ascent := float64(labelFace.Metrics().Ascent.Ceil())
 	// The lowest value sits just above the floor, clear of the floor's own
@@ -373,6 +410,48 @@ func (r surfaceRenderer) render(s surfaceSpec, c camera, width, height int, text
 	drawText(img, labelFace, formatNumber(highZ), axisTopX-gap, axisTopY+ascent/2, 1, ink)
 	drawText(img, labelFace, s.ZLabel, (axisBottomX+axisTopX)/2-gap, (axisBottomY+axisTopY)/2+ascent/2, 1, ink)
 	return img
+}
+
+// axisTick is one label beside a floor edge: its text, and where it sits on
+// that edge in the drawing's -1..1 coordinates.
+type axisTick struct {
+	at   float64
+	text string
+}
+
+// maxDrawnCategories is how many category labels fit along one floor edge
+// before they would run into each other. Past it only the two ends are
+// named, which is what a numeric axis has always shown.
+const maxDrawnCategories = 8
+
+// axisTicks chooses the labels for one axis. Without categories it is the
+// first and last coordinate as numbers, exactly as before v2.2. With a
+// short list of categories every one is drawn, in place, which is the whole
+// point of naming them: a five-course axis reads as five courses.
+func axisTicks(coordinates []float64, categories []string) []axisTick {
+	if len(categories) != len(coordinates) || len(coordinates) == 0 {
+		return []axisTick{
+			{-1, formatNumber(coordinates[0])},
+			{1, formatNumber(coordinates[len(coordinates)-1])},
+		}
+	}
+	if len(categories) > maxDrawnCategories {
+		return []axisTick{{-1, categories[0]}, {1, categories[len(categories)-1]}}
+	}
+	// The names are drawn across a slightly shorter span than the surface
+	// itself, so the first and last of them step back from the corner the
+	// two floor edges share instead of colliding there.
+	const span = 0.88
+	ticks := make([]axisTick, len(categories))
+	low, high := coordinates[0], coordinates[len(coordinates)-1]
+	for index, text := range categories {
+		at := -span
+		if high > low {
+			at = (2*(coordinates[index]-low)/(high-low) - 1) * span
+		}
+		ticks[index] = axisTick{at: at, text: text}
+	}
+	return ticks
 }
 
 // formatNumber shows an axis bound briefly.

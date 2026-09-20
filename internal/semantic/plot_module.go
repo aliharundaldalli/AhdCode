@@ -35,7 +35,10 @@ var (
 	PlotChartOperations  = []string{"title", "xLabel", "yLabel", "legend", "size", "line", "scatter", "save", "show"}
 	PlotFigureOperations = []string{"save", "show"}
 	// PlotSurfaceOperations are a Surface's members (v2.0).
-	PlotSurfaceOperations = []string{"title", "xLabel", "yLabel", "zLabel", "size", "wireframe", "show", "save"}
+	PlotSurfaceOperations = []string{
+		"title", "xLabel", "yLabel", "zLabel", "size", "wireframe",
+		"xCategories", "yCategories", "show", "save",
+	}
 )
 
 func plotChartType() types.Type  { return types.Class{Symbol: plotChartClass} }
@@ -172,6 +175,15 @@ func plotModuleInterface() *ModuleInterface {
 		symbol.OverloadSet.Candidates = append(symbol.OverloadSet.Candidates, callable)
 	}
 	addStandardExport(module, plotBarFunction())
+	addStandardExport(module, plotPieFunction())
+	addStandardExport(module, plotFunction("heatmap", &types.Signature{
+		Parameters: []types.Parameter{
+			{Name: "xLabels", Type: types.List{Element: types.String}},
+			{Name: "yLabels", Type: types.List{Element: types.String}},
+			{Name: "values", Type: numericMatrixType()},
+		},
+		Return: chart,
+	}))
 	addStandardExport(module, plotFunction("histogram", plotNumericSignatures(chart, []string{"values"},
 		types.Parameter{Name: "bins", Type: types.Int})...))
 	addStandardExport(module, plotFunction("box", plotNumericSignatures(chart, []string{"values"})...))
@@ -207,6 +219,23 @@ func plotBarFunction() *Symbol {
 	return plotFunction("bar", signatures...)
 }
 
+// plotPieFunction publishes Plot.pie(labels: List<String>, values:
+// List<Int|Real>) -> Chart, built the same way Plot.bar is so labels comes
+// first in the published signature.
+func plotPieFunction() *Symbol {
+	var signatures []*types.Signature
+	for _, element := range plotNumericElements {
+		signatures = append(signatures, &types.Signature{
+			Parameters: []types.Parameter{
+				{Name: "labels", Type: types.List{Element: types.String}},
+				{Name: "values", Type: types.List{Element: element}},
+			},
+			Return: plotChartType(),
+		})
+	}
+	return plotFunction("pie", signatures...)
+}
+
 // plotConstructionHint names the Plot functions and Chart members that
 // produce a Chart or Figure, so direct construction has an actionable
 // message instead of a generic missing-constructor diagnostic.
@@ -216,8 +245,9 @@ func plotConstructionHint(identity *types.ClassSymbol) (string, bool) {
 	}
 	switch identity.Name {
 	case "Chart":
-		return "create a Chart with Plot.new, Plot.line, Plot.scatter, Plot.bar, Plot.histogram, " +
-			"Plot.box, or Plot.errorBar, or derive one from an existing Chart", true
+		return "create a Chart with Plot.new, Plot.line, Plot.scatter, Plot.bar, Plot.pie, " +
+			"Plot.heatmap, Plot.histogram, Plot.box, or Plot.errorBar, or derive one from an " +
+			"existing Chart", true
 	case "Figure":
 		return "create a Figure with Plot.subplots", true
 	case "Surface":
@@ -302,8 +332,14 @@ var plotMembers = func() map[TypeOperation]*Symbol {
 		"Surface.zLabel":    completionMember(plotModuleID, "zLabel", surface, p("text", types.String)),
 		"Surface.size":      completionMember(plotModuleID, "size", surface, p("width", types.Int), p("height", types.Int)),
 		"Surface.wireframe": completionMember(plotModuleID, "wireframe", surface, p("enabled", types.Bool)),
-		"Surface.show":      completionMember(plotModuleID, "show", types.Nothing),
-		"Surface.save":      completionMember(plotModuleID, "save", types.Nothing, p("path", types.String)),
+		// Presentation labels (v2.2): one per x or y coordinate. The axis
+		// titles stay xLabel and yLabel.
+		"Surface.xCategories": completionMember(plotModuleID, "xCategories", surface,
+			p("labels", types.List{Element: types.String})),
+		"Surface.yCategories": completionMember(plotModuleID, "yCategories", surface,
+			p("labels", types.List{Element: types.String})),
+		"Surface.show": completionMember(plotModuleID, "show", types.Nothing),
+		"Surface.save": completionMember(plotModuleID, "save", types.Nothing, p("path", types.String)),
 	}
 }()
 

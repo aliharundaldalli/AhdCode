@@ -362,9 +362,38 @@ chart.save("scores.png")
 | How do two numeric variables move together? | `Plot.scatter` |
 | What is the shape of one numeric distribution? | `Plot.histogram` |
 | How do group distributions compare? | `Plot.box` |
+| How does one whole break into parts? | `Plot.pie` |
+| Where are the high and low cells of a labelled grid? | `Plot.heatmap` |
 
 Line and scatter charts require equally sized x/y inputs. Empty data, invalid
 bin counts, and mismatched lengths raise `PlotError`.
+
+A pie answers a different question from a bar chart: a bar compares
+categories, a pie shows how they divide one total. Give it the labels and
+the values, and leave its legend on — that is the key to the colours:
+
+```ahd
+chart := Plot.pie(["Analysis", "Algebra", "Geometry"], [84, 81, 88])
+chart = chart.title("Course distribution")
+chart.save("courses.png")
+```
+
+Values must be finite and non-negative and at least one must be above zero.
+A pie has no axes, so `xLabel` and `yLabel` raise `PlotError` on one.
+
+A heatmap replaces reading a table of numbers with seeing them. Its Matrix
+is **one row per y label and one column per x label**:
+
+```ahd
+bring Numeric
+grid := Numeric.matrix([[72.0, 78.0], [68.0, 75.0], [80.0, 82.0]])
+chart := Plot.heatmap(["Year 1", "Year 2"], ["Analysis", "Algebra", "Geometry"], grid)
+chart = chart.title("Grades").xLabel("Year").yLabel("Course")
+chart.save("grades.png")
+```
+
+Both are ordinary Charts: `title`, `legend`, `size`, `save` to PNG/SVG/PDF,
+`show`, and a cell in a `Plot.subplots` Figure all work on them.
 
 ### 3.3 Statistics summarizes; Plot shows shape
 

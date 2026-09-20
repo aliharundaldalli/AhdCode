@@ -214,31 +214,48 @@ const (
 	AhdPlotSurfaceMaxSide = 2000
 )
 
+// Pie and heatmap bounds (v2.2). The heatmap's label bound is the Surface
+// grid bound on purpose: both are labelled grids, and one number is easier
+// to remember than two. They are mirrored in internal/plotproto, which the
+// renderer helper checks for itself.
+const (
+	AhdPlotMaxPieSlices     = 64
+	AhdPlotMaxHeatmapLabels = AhdPlotSurfaceMaxGrid
+	AhdPlotMaxHeatmapCells  = 65536
+)
+
 // AhdSurface is the runtime interchange shape of a Surface value.
 type AhdSurface struct {
-	X, Y      *AhdList[float64]
-	Z         *AhdList[*AhdList[float64]]
-	Title     string
-	XLabel    string
-	YLabel    string
-	ZLabel    string
-	Width     int64
-	Height    int64
-	Wireframe bool
+	X, Y *AhdList[float64]
+	Z    *AhdList[*AhdList[float64]]
+	// XCategories and YCategories are presentation labels (v2.2): one per x
+	// or y coordinate, shown instead of that coordinate's number. Empty
+	// means the axis shows its numbers, exactly as it did before v2.2.
+	XCategories *AhdList[string]
+	YCategories *AhdList[string]
+	Title       string
+	XLabel      string
+	YLabel      string
+	ZLabel      string
+	Width       int64
+	Height      int64
+	Wireframe   bool
 }
 
 // ahdPlotSurfaceSpec is the Surface in the view file.
 type ahdPlotSurfaceSpec struct {
-	X         []float64   `json:"x"`
-	Y         []float64   `json:"y"`
-	Z         [][]float64 `json:"z"`
-	Title     string      `json:"title"`
-	XLabel    string      `json:"x_label"`
-	YLabel    string      `json:"y_label"`
-	ZLabel    string      `json:"z_label"`
-	Width     int         `json:"width"`
-	Height    int         `json:"height"`
-	Wireframe bool        `json:"wireframe"`
+	X           []float64   `json:"x"`
+	Y           []float64   `json:"y"`
+	Z           [][]float64 `json:"z"`
+	XCategories []string    `json:"x_categories,omitempty"`
+	YCategories []string    `json:"y_categories,omitempty"`
+	Title       string      `json:"title"`
+	XLabel      string      `json:"x_label"`
+	YLabel      string      `json:"y_label"`
+	ZLabel      string      `json:"z_label"`
+	Width       int         `json:"width"`
+	Height      int         `json:"height"`
+	Wireframe   bool        `json:"wireframe"`
 }
 
 func ahdPlotFinite(value float64) bool { return !math.IsNaN(value) && !math.IsInf(value, 0) }
@@ -332,8 +349,43 @@ func AhdPlotSurfaceSize(class *AhdClass, s AhdSurface, width, height int64) AhdS
 
 func ahdPlotSurfaceSpecOf(s AhdSurface) *ahdPlotSurfaceSpec {
 	return &ahdPlotSurfaceSpec{X: ahdPlotFloats(s.X), Y: ahdPlotFloats(s.Y), Z: ahdPlotRealRows(s.Z),
+		XCategories: ahdPlotStrings(s.XCategories), YCategories: ahdPlotStrings(s.YCategories),
 		Title: s.Title, XLabel: s.XLabel, YLabel: s.YLabel, ZLabel: s.ZLabel,
 		Width: int(s.Width), Height: int(s.Height), Wireframe: s.Wireframe}
+}
+
+// AhdPlotSurfaceXCategories and AhdPlotSurfaceYCategories set the labels
+// shown beside each x or y coordinate. They are presentation only: the
+// geometry, the Matrix, and the axis titles are untouched, and a Surface
+// stays immutable, so each returns a new one.
+func AhdPlotSurfaceXCategories(class *AhdClass, s AhdSurface, labels *AhdList[string]) AhdSurface {
+	s.XCategories = ahdPlotCategories(class, labels, ahdPlotFloats(s.X), "x")
+	return s
+}
+
+func AhdPlotSurfaceYCategories(class *AhdClass, s AhdSurface, labels *AhdList[string]) AhdSurface {
+	s.YCategories = ahdPlotCategories(class, labels, ahdPlotFloats(s.Y), "y")
+	return s
+}
+
+// ahdPlotCategories checks one category list against the coordinates it
+// labels. There must be exactly one label per coordinate: a list that does
+// not line up would silently mislabel the axis.
+func ahdPlotCategories(class *AhdClass, labels *AhdList[string], coordinates []float64, axis string) *AhdList[string] {
+	texts := ahdPlotStrings(labels)
+	if len(texts) != len(coordinates) {
+		AhdRaiseClass(class, fmt.Sprintf("%sCategories needs one label per %s value; got %d labels for %d values",
+			axis, axis, len(texts), len(coordinates)))
+	}
+	for _, text := range texts {
+		if !utf8.ValidString(text) || strings.ContainsRune(text, 0) {
+			AhdRaiseClass(class, "a category label must be text without a NUL byte")
+		}
+		if utf8.RuneCountInString(text) > ahdPlotViewMaxName {
+			AhdRaiseClass(class, fmt.Sprintf("a category label is at most %d characters", ahdPlotViewMaxName))
+		}
+	}
+	return AhdNewList(texts...)
 }
 
 // AhdPlotSurfaceSaveSpec saves a Surface's canonical PNG through the viewer's
@@ -370,7 +422,9 @@ func AhdPlotSurfaceShow(class *AhdClass, s AhdSurface) {
 
 // AhdPlotSurfaceData builds a Surface's view data from plain values, for the
 // evaluator.
-func AhdPlotSurfaceData(x, y []float64, z [][]float64, title, xLabel, yLabel, zLabel string, width, height int64, wireframe bool) *ahdPlotSurfaceSpec {
-	return &ahdPlotSurfaceSpec{X: x, Y: y, Z: z, Title: title, XLabel: xLabel, YLabel: yLabel, ZLabel: zLabel,
+func AhdPlotSurfaceData(x, y []float64, z [][]float64, xCategories, yCategories []string, title, xLabel, yLabel, zLabel string, width, height int64, wireframe bool) *ahdPlotSurfaceSpec {
+	return &ahdPlotSurfaceSpec{X: x, Y: y, Z: z,
+		XCategories: xCategories, YCategories: yCategories,
+		Title: title, XLabel: xLabel, YLabel: yLabel, ZLabel: zLabel,
 		Width: int(width), Height: int(height), Wireframe: wireframe}
 }

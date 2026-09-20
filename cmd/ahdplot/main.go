@@ -77,14 +77,18 @@ func render(request plotproto.Request) error {
 		if !chart.Present {
 			return fmt.Errorf("chart is empty: nothing to render")
 		}
-		p, err := buildPlot(chart)
+		p, bar, err := buildPlot(chart)
 		if err != nil {
 			return err
 		}
-		if err := p.Save(width, height, request.OutputPath); err != nil {
-			return fmt.Errorf("saving %s: %w", format, err)
+		if bar == nil {
+			// The path every chart before v2.2 takes, unchanged.
+			if err := p.Save(width, height, request.OutputPath); err != nil {
+				return fmt.Errorf("saving %s: %w", format, err)
+			}
+			return nil
 		}
-		return nil
+		return saveWithColorBar(p, bar, request.OutputPath, format, width, height)
 	}
 
 	return renderGrid(request, format, width, height)
@@ -95,8 +99,10 @@ func render(request plotproto.Request) error {
 // plotters, matching the documented "blank remaining cells" subplot policy.
 func renderGrid(request plotproto.Request, format string, width, height vg.Length) error {
 	plots := make([][]*plot.Plot, request.Rows)
+	bars := make([][]*plot.Plot, request.Rows)
 	for row := 0; row < request.Rows; row++ {
 		plots[row] = make([]*plot.Plot, request.Columns)
+		bars[row] = make([]*plot.Plot, request.Columns)
 		for column := 0; column < request.Columns; column++ {
 			spec := request.Charts[row*request.Columns+column]
 			if !spec.Present {
@@ -104,11 +110,11 @@ func renderGrid(request plotproto.Request, format string, width, height vg.Lengt
 				plots[row][column].HideAxes()
 				continue
 			}
-			p, err := buildPlot(spec)
+			p, bar, err := buildPlot(spec)
 			if err != nil {
 				return err
 			}
-			plots[row][column] = p
+			plots[row][column], bars[row][column] = p, bar
 		}
 	}
 
@@ -125,7 +131,14 @@ func renderGrid(request plotproto.Request, format string, width, height vg.Lengt
 	aligned := plot.Align(plots, tiles, canvas)
 	for row := 0; row < request.Rows; row++ {
 		for column := 0; column < request.Columns; column++ {
-			plots[row][column].Draw(aligned[row][column])
+			cell := aligned[row][column]
+			if bar := bars[row][column]; bar != nil {
+				grid, scale := splitForColorBar(cell)
+				plots[row][column].Draw(grid)
+				bar.Draw(scale)
+				continue
+			}
+			plots[row][column].Draw(cell)
 		}
 	}
 
@@ -173,7 +186,10 @@ func hasSuffix(path, suffix string) bool {
 	return true
 }
 
-func buildPlot(spec plotproto.ChartSpec) (*plot.Plot, error) {
+// buildPlot turns one chart spec into its plot. A heatmap with its legend
+// on also produces a second plot -- the colour scale -- which the caller
+// draws in a strip beside the first; every other chart returns nil for it.
+func buildPlot(spec plotproto.ChartSpec) (*plot.Plot, *plot.Plot, error) {
 	p := plot.New()
 	p.Title.Text = spec.Title
 	p.X.Label.Text = spec.XLabel
@@ -185,28 +201,59 @@ func buildPlot(spec plotproto.ChartSpec) (*plot.Plot, error) {
 		// added yet.
 	case "line-scatter":
 		if err := addSeries(p, spec); err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 	case "bar":
 		if err := addBar(p, spec); err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 	case "histogram":
 		if err := addHistogram(p, spec); err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 	case "box":
 		if err := addBox(p, spec); err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 	case "errorBar":
 		if err := addErrorBar(p, spec); err != nil {
-			return nil, err
+			return nil, nil, err
 		}
+	case "pie":
+		if err := addPie(p, spec); err != nil {
+			return nil, nil, err
+		}
+	case "heatmap":
+		bar, err := addHeatmap(p, spec)
+		if err != nil {
+			return nil, nil, err
+		}
+		return p, bar, nil
 	default:
-		return nil, fmt.Errorf("unsupported chart kind %q", spec.Kind)
+		return nil, nil, fmt.Errorf("unsupported chart kind %q", spec.Kind)
 	}
-	return p, nil
+	return p, nil, nil
+}
+
+// saveWithColorBar writes one chart that carries a colour scale: the chart
+// fills the canvas except for the strip the scale occupies.
+func saveWithColorBar(p, bar *plot.Plot, path, format string, width, height vg.Length) error {
+	canvasWriter, err := draw.NewFormattedCanvas(width, height, format)
+	if err != nil {
+		return fmt.Errorf("preparing %s canvas: %w", format, err)
+	}
+	main, scale := splitForColorBar(draw.New(canvasWriter))
+	p.Draw(main)
+	bar.Draw(scale)
+	file, err := os.Create(path)
+	if err != nil {
+		return fmt.Errorf("creating output file: %w", err)
+	}
+	defer file.Close()
+	if _, err := canvasWriter.WriteTo(file); err != nil {
+		return fmt.Errorf("writing %s: %w", format, err)
+	}
+	return nil
 }
 
 func toXYs(x, y []float64) plotter.XYs {

@@ -422,6 +422,12 @@ const (
 	PlotFigureSave   TypeOperation = "Figure.save"
 	PlotFigureShow   TypeOperation = "Figure.show"
 
+	// Surface presentation labels (v2.2). They replace the numbers shown
+	// beside each x or y coordinate; the geometry and the axis titles
+	// (Surface.xLabel / Surface.yLabel) are untouched.
+	PlotSurfaceXCategories TypeOperation = "Surface.xCategories"
+	PlotSurfaceYCategories TypeOperation = "Surface.yCategories"
+
 	// The JSON standard module's JSONValue members. JSONValue is a closed,
 	// immutable recursive value; every accessor below raises JSONError if the
 	// receiver's kind does not match, except JSONValueGet, whose absence of a

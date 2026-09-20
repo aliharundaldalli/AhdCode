@@ -89,6 +89,7 @@ verir.
 - [66. Renkler, devre dışı düğmeler ve incelenebilir bir grafik](#66-renkler-devre-dışı-düğmeler-ve-incelenebilir-bir-grafik)
 - [67. Bir masaüstü uygulaması: tablolar, iletişim kutuları, 3B grafikler ve paketleme](#67-bir-masaüstü-uygulaması-tablolar-iletişim-kutuları-3b-grafikler-ve-paketleme)
 - [68. Dosya taşımak: yükleme, indirme, ekleme ve bildirme](#68-dosya-taşımak-yükleme-indirme-ekleme-ve-bildirme)
+- [69. Tek veri kümesi, üç resim: pasta, ısı haritası ve adlandırılmış eksenler](#69-tek-veri-kümesi-üç-resim-pasta-ısı-haritası-ve-adlandırılmış-eksenler)
 
 ## 1. AhdCode nedir?
 
@@ -7435,3 +7436,83 @@ bağlanmaz; istiyorsanız döngüyü siz yazın.
 
 Bkz. [HTTP başvurusu](HTTP_TR.md), [WebSocket başvurusu](WEBSOCKET_TR.md),
 [SMTP başvurusu](SMTP_TR.md) ve [`examples/v2.1`](../examples/v2.1/README_TR.md).
+
+
+## 69. Tek veri kümesi, üç resim: pasta, ısı haritası ve adlandırılmış eksenler
+
+> v2.2.0'da eklendi.
+
+Bir öğrencinin beş dersi ve üç yıllık notları olsun — on beş sayı. Çizgi
+grafiği bir dersi zaman içinde gösterir. Çubuk grafiği bir yıldaki dersleri
+karşılaştırır. Hiçbiri ızgaranın tamamını göstermez ve hiçbiri bir yılın
+dersleri arasında nasıl bölündüğünü söylemez. v2.2, bunu yapan iki grafiği
+ekler ve bir 3B yüzeyin eksenlerinin ne anlama geldiğini söylemesine izin
+verir.
+
+**Veri.** GUI toplar, Numeric tutar. Matrix, ders başına bir satır ve yıl
+başına bir sütundur:
+
+```ahd
+bring Numeric
+from Numeric bring Matrix
+
+courses: List<String> := ["Analiz", "Cebir", "Geometri", "İstatistik", "Programlama"]
+years: List<String> := ["1. Yıl", "2. Yıl", "3. Yıl"]
+grades: Matrix := Numeric.matrix([
+    [72.0, 78.0, 84.0]
+    [68.0, 75.0, 81.0]
+    [80.0, 82.0, 88.0]
+    [65.0, 74.0, 83.0]
+    [85.0, 91.0, 95.0]
+])
+```
+
+**Bir yıl için pasta.** "3. Yıl beş ders arasında nasıl bölündü" sorusunu
+yanıtlar:
+
+```ahd
+pie: Chart := Plot.pie(courses, [84, 81, 88, 83, 95])
+pie = pie.title("3. Yıl ders dağılımı")
+pie.show()
+```
+
+Gösterge zaten açıktır — renkler onsuz bir anlam ifade etmez — ve her dilim
+payını taşır. Pastanın ekseni yoktur; bu yüzden ona `xLabel` ya da `yLabel`
+vermeyin: vermek, yok sayılmak yerine `PlotError` fırlatır.
+
+**On beşinin tamamı için ısı haritası.** Tablo yerine tek bir resim:
+
+```ahd
+heat: Chart := Plot.heatmap(years, courses, grades)
+heat = heat.title("Öğrenci performansı").xLabel("Akademik yıl").yLabel("Ders")
+heat.show()
+```
+
+Matrix'in hangi yöne baktığını unutmayın: **y etiketi başına bir satır, x
+etiketi başına bir sütun**. Burada bu, aşağı doğru beş ders ve yana doğru üç
+yıl demektir; yukarıdaki Matrix tam olarak böyle yazılmıştı. Izgaranın
+yanındaki renk çubuğu göstergedir ve varsayılan olarak açıktır.
+
+**Kendi eksenlerini adlandıran bir yüzey.** v2.2'den önce aynı ızgara 3B
+yüzey olarak çizildiğinde `1`–`5` ve `1`–`3` diye etiketlenirdi ve başlığın
+sayıları açıklaması gerekirdi. Artık gerekmiyor:
+
+```ahd
+surface: Surface := Plot.surface([1, 2, 3], [1, 2, 3, 4, 5], grades)
+surface = surface.xCategories(years).yCategories(courses)
+surface = surface.xLabel("Akademik yıl").yLabel("Ders").zLabel("Not")
+surface.show()
+```
+
+`xLabel` ekseni adlandırır; `xCategories` eksen üzerindeki noktaları
+adlandırır. Geometri değişmez — koordinatlar değerlerini ve aralıklarını
+korur — yalnızca metin değişir. Koordinat başına tam olarak bir etiket
+olmalıdır.
+
+**Kendiniz deneyin:**
+[`examples/v2.2/student_performance`](../examples/v2.2/student_performance/README_TR.md)
+örneğini çalıştırın, yukarıdaki notları yazın ve üç yılın her biri için
+pastayı sırayla açın. Sonra ısı haritasını açın ve sorunuzu hangi resmin
+daha hızlı yanıtladığını kendinize sorun.
+
+Grafik yüzeyinin tamamı için [Plot başvurusuna](PLOT_TR.md) bakın.

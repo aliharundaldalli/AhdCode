@@ -16,9 +16,10 @@ veritabanı modülleri, GUI'si, Graphics'i, etkileşimli Plot görüntüleyicisi
 masaüstü uygulaması paketlemesiyle gelir. Küçük bir topluluk tarafından
 pratikte kullanılmaktadır; yaygın (mainstream) bir dil değildir.
 
-Bu, **v2.1.0**, **Uygulama G/Ç ve Ağ Tamamlanması** sürümüdür. Dil, araç
-zinciri ve Web çatısı özellik olarak tamamlanmıştır; burada anlatılan çekirdek
-dil yüzeyi değişmemiştir.
+Bu, **v2.2.0**, **Plot'un Tamamlanması** sürümüdür. Pasta grafikleri, ısı
+haritaları, kategorik Surface eksenleri ve Öğrenci Performans Gezgini artık
+yayımlanmıştır. Bu sürüm yeni sözdizimi, tip sistemi değişikliği veya bağımlılık
+eklemez.
 
 v2.0.0 bir ana (major) sürümdür, **Masaüstü Uygulamasının Tamamlanması**:
 birinci taraf masaüstü uygulaması temelini tamamlar — GUI'de ListBox, Select,
@@ -496,6 +497,7 @@ bakın.
 - [v1.7 standart kütüphane tamamlama](examples/v1.7/README_TR.md) — trigonometri ve ebob/ekok, katı ISO zaman metni ve an aritmetiği, istatistikli Table join
 - [v2.0 masaüstü uygulamaları](examples/v2.0/README_TR.md) — TableView, iletişim kutuları ve CSV dışa aktarma içeren bir SQLite defteri; bir 3B Surface; ve paketlenecek küçük bir uygulama
 - [v2.1 uygulama G/Ç ve ağ](examples/v2.1/README_TR.md) — HTTP üzerinden ikili bir dosya turu, bir WebSocket istemci/sunucu çifti ve ekli posta
+- [v2.2 öğrenci performansı](examples/v2.2/student_performance/README_TR.md) — aynı notları çizgi, çubuk, histogram, kutu, hata çubuğu, pasta, ısı haritası ve 3B yüzey olarak gösteren tek bir masaüstü uygulaması
 - [v1.9 GUI renkleri ve etkileşimli Plot](examples/v1.9/README_TR.md) — renkli ve devre dışı Kaydet düğmeli bir sipariş formu ile AhdCode'un kendi görüntüleyicisinde bir grafik
 - [v1.8 GUI ve olaylar](examples/v1.8/README_TR.md) — SQLite destekli küçük bir GUI defteri ve ok tuşları ile tıklamalarla yönetilen Turtle
 - [v1.6 Graphics ve Turtle](examples/v1.6/graphics_turtle/README_TR.md) — Kartezyen Canvas, şekiller, Turtle ile yıldız ve spiral, PNG/SVG kaydı ve düzgün çokgen dersi
@@ -516,6 +518,33 @@ VS Code hem de Antigravity'i hedefler.
 [Kurulum rehberine](editors/vscode/README_TR.md) bakın.
 
 ## Mevcut sınırlamalar
+
+## v2.2 ile gelenler <a id="v22-ile-gelenler"></a>
+
+v2.2.0, **Plot'un Tamamlanması**, bilinçli olarak küçük bir görselleştirme
+sürümüdür. AhdCode'un kendi GUI ve Plot modüllerini birlikte kullanırken
+ortaya çıkan boşlukları kapatır; yeni sözdizimi ve tip sistemi değişikliği
+eklemez.
+
+- [`Plot.pie(labels, values)`](docs/PLOT_TR.md#pasta): verilen sırayla
+  kategori başına bir dilim; kategori göstergesi varsayılan olarak açıktır
+  ve her dilimin üzerinde payı yazar. Pastanın ekseni yoktur; bu yüzden
+  üzerinde `xLabel` ve `yLabel` sessizce yok sayılmak yerine `PlotError`
+  fırlatır.
+- [`Plot.heatmap(xLabels, yLabels, values)`](docs/PLOT_TR.md#isı-haritası):
+  rengi sayıları taşıyan etiketli bir ızgara ve bir renk ölçeği göstergesi.
+  Matrix, y etiketi başına bir satır ve x etiketi başına bir sütundur.
+- [`Surface.xCategories` ve `Surface.yCategories`](docs/PLOT_TR.md#koordinatları-adlandırmak):
+  bir Surface'in x ve y koordinatlarına ad verir; böylece dersler ve
+  yıllardan oluşan bir ızgara `1`–`5` diye etiketlenmekten kurtulur.
+  Yalnızca sunumdur — geometri değişmez ve `xLabel`/`yLabel` eksen başlığı
+  olarak kalır.
+
+Yeni grafiklerin ikisi de sıradan `Chart` değerleridir: `title`, `legend`,
+`size`, PNG/SVG/PDF'e `save`, etkileşimli görüntüleyicide `show` ve bir
+`Plot.subplots` Figure'ında bir hücre alırlar.
+
+Bkz. [v2.2 örneği](examples/v2.2/student_performance/README_TR.md).
 
 ## v2.1.0 ile gelenler <a id="v210-ile-gelenler"></a>
 
