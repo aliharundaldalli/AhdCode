@@ -141,9 +141,12 @@ func TestCrossPackagesForWindowsAndLinux(t *testing.T) {
 			windows := strings.HasPrefix(testCase.target, "windows")
 			output := t.TempDir()
 			entry := project(t, guiSQLiteProgram)
-			if result := Package(Options{Entry: entry, Name: "Ledger", Output: output, Target: testCase.target}); result.Application != "" ||
-				!strings.Contains(result.Diagnostics[0].Message, "needs --helpers") {
-				t.Fatalf("cross-packaging without helpers: %+v", result)
+			withoutHelpers := Package(Options{Entry: entry, Name: "Ledger", Output: output, Target: testCase.target})
+			if withoutHelpers.Application != "" || len(withoutHelpers.Diagnostics) == 0 {
+				t.Fatalf("cross-packaging without helpers: %+v", withoutHelpers)
+			}
+			if testCase.target != HostTarget() && !strings.Contains(withoutHelpers.Diagnostics[0].Message, "needs --helpers") {
+				t.Fatalf("cross-packaging without helpers did not require an explicit helper folder: %+v", withoutHelpers)
 			}
 			result := Package(Options{Entry: entry, Name: "Ledger", Output: output, Target: testCase.target, Helpers: fakeHelpers(t, windows)})
 			if result.Application == "" {
