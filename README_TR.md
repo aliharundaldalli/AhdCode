@@ -16,10 +16,11 @@ veritabanı modülleri, GUI'si, Graphics'i, etkileşimli Plot görüntüleyicisi
 masaüstü uygulaması paketlemesiyle gelir. Küçük bir topluluk tarafından
 pratikte kullanılmaktadır; yaygın (mainstream) bir dil değildir.
 
-Bu, **v2.2.0**, **Plot'un Tamamlanması** sürümüdür. Pasta grafikleri, ısı
-haritaları, kategorik Surface eksenleri ve Öğrenci Performans Gezgini artık
-yayımlanmıştır. Bu sürüm yeni sözdizimi, tip sistemi değişikliği veya bağımlılık
-eklemez.
+Bu, **v2.3.0**, **Dil Ergonomisi ve Plot Cilası** sürümüdür. Açık isimli
+Function `uses` capture'ları, capture-aware derleyici ve LSP araçları,
+workspace referans/rename, mevcut Surface görünümünü kaydeden Save ve
+Plot/Surface etiketleri için sınırlı matematiksel metin ekler. Önceki
+**Plot'un Tamamlanması** sürümü olan v2.2.0 da kullanılabilir durumdadır.
 
 v2.0.0 bir ana (major) sürümdür, **Masaüstü Uygulamasının Tamamlanması**:
 birinci taraf masaüstü uygulaması temelini tamamlar — GUI'de ListBox, Select,
@@ -498,6 +499,7 @@ bakın.
 - [v2.0 masaüstü uygulamaları](examples/v2.0/README_TR.md) — TableView, iletişim kutuları ve CSV dışa aktarma içeren bir SQLite defteri; bir 3B Surface; ve paketlenecek küçük bir uygulama
 - [v2.1 uygulama G/Ç ve ağ](examples/v2.1/README_TR.md) — HTTP üzerinden ikili bir dosya turu, bir WebSocket istemci/sunucu çifti ve ekli posta
 - [v2.2 öğrenci performansı](examples/v2.2/student_performance/README_TR.md) — aynı notları çizgi, çubuk, histogram, kutu, hata çubuğu, pasta, ısı haritası ve 3B yüzey olarak gösteren tek bir masaüstü uygulaması
+- [v2.3 örnekleri](examples/v2.3/README_TR.md) — isimli Function `uses` capture'ları ve Plot/Surface matematik etiketleri
 - [v1.9 GUI renkleri ve etkileşimli Plot](examples/v1.9/README_TR.md) — renkli ve devre dışı Kaydet düğmeli bir sipariş formu ile AhdCode'un kendi görüntüleyicisinde bir grafik
 - [v1.8 GUI ve olaylar](examples/v1.8/README_TR.md) — SQLite destekli küçük bir GUI defteri ve ok tuşları ile tıklamalarla yönetilen Turtle
 - [v1.6 Graphics ve Turtle](examples/v1.6/graphics_turtle/README_TR.md) — Kartezyen Canvas, şekiller, Turtle ile yıldız ve spiral, PNG/SVG kaydı ve düzgün çokgen dersi
@@ -518,6 +520,29 @@ VS Code hem de Antigravity'i hedefler.
 [Kurulum rehberine](editors/vscode/README_TR.md) bakın.
 
 ## Mevcut sınırlamalar
+
+## v2.3.0 ile gelenler <a id="v23-ile-gelenler"></a>
+
+v2.3.0, **Dil Ergonomisi ve Plot Cilası**, odaklanmış bir dil ve
+görselleştirme sürümüdür:
+
+- yürütülebilir blok içindeki isimli Function'lar, lambda capture modeliyle
+  aynı `#` lexical ve `@` module capture'larını açık `uses` listesiyle
+  bildirebilir;
+- derleyici, biçimlendirici, tanılamalar ve dil sunucusu capture'ları
+  completion, definition, hover, references, rename, semantic token ve eksik
+  capture quick fix düzeylerinde tanır;
+- referans ve rename, arka plan indeksi olmadan, derleyici kaynaklı sınırlı
+  çalışma alanı görüntülerinde ve içe aktarılan dosyalarda çalışır;
+- Plot Surface görüntüleyicisindeki Save mevcut görünür kamera görünümünü
+  kaydeder; programatik `Surface.save(path)` kanonik ve belirlenimci kalır;
+- Plot ve Surface etiketleri mevcut çevrimdışı math-text yolu üzerinden
+  bütün String'i saran `$...$` matematiğini kabul eder. Karışık zengin metin,
+  animasyon ve genel 3B kamera/sahne API'si kapsam dışıdır.
+
+[v2.3 örneklerine](examples/v2.3/README_TR.md),
+[Fonksiyonlar](docs/FUNCTIONS_TR.md), [LSP](docs/LSP_TR.md) ve
+[Plot](docs/PLOT_TR.md) referanslarına bakın.
 
 ## v2.2 ile gelenler <a id="v22-ile-gelenler"></a>
 
@@ -884,7 +909,7 @@ AES-256-GCM.
 
 AhdCode v1.0.0 ilk kararlı sürümdür. Aşağıdaki dışarıda bırakmalar bilinçli tasarım kararlarıdır; sonraki bir sürümü bekleyen eksikler değildir.
 
-Dil içinde AhdCode; kasıtlı olarak blok/deyim lambda'larını, keyfi/örtük değişken closure'ları, genel kullanıcı-tanımlı operatör aşırı yüklemesini (on sabit Class Protocol Method dışında), çoklu dönüş değerlerini/tuple'ları, reflection'ı, trait/interface'leri ve çoklu kalıtımı hariç tutar. Araçlarda ise AhdCode harici bir paket yöneticisi veya uzak kayıt defteri yerine derleme zamanı yerel kaynak birleştirmesi ([`require(...)`](docs/REQUIRE_TR.md)) ve paketli çevrimdışı modülleri kullanır. Dil sunucusu referans bulma ve yeniden adlandırma işlemleri arka plan çalışma alanı indeksi yerine derleme grafiği içinde çalışır. Bkz. [spesifikasyonun desteklenmeyen özellik listesi](AHDCODE_LANGUAGE_SPEC_v0.1_TR.md#40-desteklenmeyen-v01-özellikleri).
+Dil içinde AhdCode; kasıtlı olarak blok/deyim lambda'larını, keyfi/örtük değişken closure'larını, genel kullanıcı-tanımlı operatör aşırı yüklemesini (on sabit Class Protocol Method dışında), çoklu dönüş değerlerini/tuple'ları, reflection'ı, trait/interface'leri ve çoklu kalıtımı hariç tutar. Araçlarda ise AhdCode harici bir paket yöneticisi veya uzak kayıt defteri yerine derleme zamanı yerel kaynak birleştirmesi ([`require(...)`](docs/REQUIRE_TR.md)) ve paketli çevrimdışı modülleri kullanır. Dil sunucusu referans bulma ve yeniden adlandırma, derleyici tarafından çözümlenen, sınırlı sayıdaki isteğe bağlı çalışma alanı görüntüsüyle çalışır; arka planda sürekli bir indeks başlatmaz. Bkz. [spesifikasyonun desteklenmeyen özellik listesi](AHDCODE_LANGUAGE_SPEC_v0.1_TR.md#40-desteklenmeyen-v01-özellikleri).
 
 ## Depo haritası
 
@@ -913,6 +938,7 @@ examples/v0.12/      MySQL çekiliş örneği (katılım kodu ve kazanan ilanı)
 examples/v0.14/      require(...) ve statik varlıklarla çok dosyalı web uygulaması
 examples/v0.15/      Matematik Portalı dogfood uygulaması
 examples/v0.16/      formlar, doğrulama, CSRF ve flash iş akışı
+examples/v2.3/       v2.3 sürüm örnekleri
 tools/AhdDataStudio/ birinci taraf yerel MySQL + SQLite geliştirme arayüzü
 AHDCODE_LANGUAGE_SPEC_v0.1.md
                      yetkili çekirdek dil sözleşmesi

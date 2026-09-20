@@ -17,12 +17,22 @@ package plotproto
 // (row-major, length rows*columns), rendered together into one image at
 // OutputPath. A single Chart.save/Chart.show is the degenerate 1x1 case.
 type Request struct {
+	Mode       string      `json:"mode,omitempty"` // empty for charts, "math" for one math-text image
 	OutputPath string      `json:"output_path"`
 	Width      int         `json:"width"`
 	Height     int         `json:"height"`
 	Rows       int         `json:"rows"`
 	Columns    int         `json:"columns"`
 	Charts     []ChartSpec `json:"charts"`
+	Math       *MathSpec   `json:"math,omitempty"`
+}
+
+// MathSpec is the narrow helper protocol used by the Surface viewer for one
+// cached math label. It is intentionally an image request so the viewer does
+// not need Gonum or another plotting dependency.
+type MathSpec struct {
+	Formula  string  `json:"formula"`
+	FontSize float64 `json:"font_size"`
 }
 
 // ChartSpec is the rendering-relevant content of one Chart. Present is false

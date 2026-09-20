@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"image/png"
 	"math"
 	"os"
@@ -146,11 +147,13 @@ func TestSurfaceHeadlessCameraSaveAndRenderMode(t *testing.T) {
 	surface := gridSurface(12, saddle)
 	directory := t.TempDir()
 	saved := filepath.Join(directory, "view.png")
+	savedAgain := filepath.Join(directory, "view-again.png")
+	resetSaved := filepath.Join(directory, "reset.png")
 	report := filepath.Join(directory, "report.json")
 	t.Setenv("AHDCODE_PLOTVIEW_HEADLESS", "1")
 	t.Setenv("AHDCODE_PLOTVIEW_HEADLESS_REPORT", report)
 	script, _ := json.Marshal([]action{{Action: "orbit", X: 30, Y: 200}, {Action: "zoom", Factor: 2}, {Action: "pan", X: 10, Y: -5},
-		{Action: "save", Path: saved}, {Action: "reset"}, {Action: "save", Path: filepath.Join(directory, "view.svg")}, {Action: "close"}})
+		{Action: "save", Path: saved}, {Action: "save", Path: savedAgain}, {Action: "reset"}, {Action: "save", Path: resetSaved}, {Action: "close"}})
 	t.Setenv("AHDCODE_PLOTVIEW_HEADLESS_SCRIPT", string(script))
 	var out bytes.Buffer
 	if err := run([]string{writeSpec(t, viewSpec{Version: specVersion, Mode: modeSurface, Surface: &surface})}, &out); err != nil {
@@ -158,26 +161,38 @@ func TestSurfaceHeadlessCameraSaveAndRenderMode(t *testing.T) {
 	}
 	var states []state
 	data, _ := os.ReadFile(report)
-	if json.Unmarshal(data, &states) != nil || len(states) != 8 {
+	if json.Unmarshal(data, &states) != nil || len(states) != 9 {
 		t.Fatalf("report %s", data)
 	}
 	if states[1].Elevation != maxElevation || states[2].Zoom != 2 || states[3].PanX != 10 {
 		t.Fatalf("camera %+v", states[1:4])
 	}
-	if states[4].Saved != saved || states[5].Zoom != 1 || states[5].Elevation != initialElevation || states[6].Error == "" || !states[7].Closed {
+	if states[4].Saved != saved || states[5].Saved != savedAgain || states[6].Zoom != 1 || states[6].Elevation != initialElevation || states[7].Saved != resetSaved || !states[8].Closed {
 		t.Fatalf("save and reset %+v", states[4:])
 	}
-	// Saving from a turned view writes exactly the canonical image, which is
-	// what render mode (Surface.save) writes.
+	// Saving twice from the same turned view is deterministic, and the saved
+	// pixels include the current camera rather than the canonical camera.
+	fromView, _ := os.ReadFile(saved)
+	fromViewAgain, _ := os.ReadFile(savedAgain)
+	if len(fromView) == 0 || !bytes.Equal(fromView, fromViewAgain) {
+		t.Fatal("the same turned Surface view was not deterministic")
+	}
+	viewConfig, err := png.DecodeConfig(bytes.NewReader(fromView))
+	if err != nil || viewConfig.Width != 800 || viewConfig.Height != 600 {
+		t.Fatalf("turned view dimensions = %+v, err=%v", viewConfig, err)
+	}
 	rendered := filepath.Join(directory, "render.png")
 	out.Reset()
 	if err := run([]string{writeSpec(t, viewSpec{Version: specVersion, Mode: modeRender, Surface: &surface, Output: rendered})}, &out); err != nil {
 		t.Fatal(err)
 	}
-	fromView, _ := os.ReadFile(saved)
 	fromRender, _ := os.ReadFile(rendered)
-	if len(fromView) == 0 || !bytes.Equal(fromView, fromRender) {
-		t.Fatal("a save from the viewer differs from Surface.save")
+	if len(fromRender) == 0 || bytes.Equal(fromView, fromRender) {
+		t.Fatal("a turned viewer save unexpectedly equals canonical Surface.save")
+	}
+	canonicalConfig, err := png.DecodeConfig(bytes.NewReader(fromRender))
+	if err != nil || canonicalConfig.Width != 400 || canonicalConfig.Height != 300 {
+		t.Fatalf("canonical dimensions = %+v, err=%v", canonicalConfig, err)
 	}
 }
 
@@ -200,5 +215,106 @@ func TestToolbarButtons(t *testing.T) {
 	}
 	if buttonAt(chart, 2, toolbarHeight/2) != -1 || buttonAt(chart, 20, toolbarHeight+5) != -1 || buttonAt(surface, 200, 20) != -1 {
 		t.Fatal("a miss hit a button")
+	}
+}
+
+func TestSurfaceSaveStateABCD(t *testing.T) {
+	surface := gridSurface(12, saddle)
+	surface.Title = "$f(x,y)=x^2-y^2$"
+	surface.XLabel = "$x$"
+	surface.YLabel = "$y$"
+	surface.ZLabel = "$z$"
+	surface.XCategories = make([]string, 12)
+	surface.YCategories = make([]string, 12)
+	for i := 0; i < 12; i++ {
+		surface.XCategories[i] = fmt.Sprintf("C%d", i)
+		surface.YCategories[i] = fmt.Sprintf("R%d", i)
+	}
+
+	dir := t.TempDir()
+	saveA := filepath.Join(dir, "stateA.png")
+	saveA2 := filepath.Join(dir, "stateA2.png")
+	saveB := filepath.Join(dir, "stateB.png")
+	saveB2 := filepath.Join(dir, "stateB2.png")
+	saveC := filepath.Join(dir, "stateC.png")
+	saveC2 := filepath.Join(dir, "stateC2.png")
+	saveD := filepath.Join(dir, "stateD.png")
+	saveD2 := filepath.Join(dir, "stateD2.png")
+
+	report := filepath.Join(dir, "report.json")
+	t.Setenv("AHDCODE_PLOTVIEW_HEADLESS", "1")
+	t.Setenv("AHDCODE_PLOTVIEW_HEADLESS_REPORT", report)
+
+	script, _ := json.Marshal([]action{
+		{Action: "save", Path: saveA},
+		{Action: "save", Path: saveA2},
+		{Action: "orbit", X: 30, Y: 45},
+		{Action: "save", Path: saveB},
+		{Action: "save", Path: saveB2},
+		{Action: "zoom", Factor: 1.5},
+		{Action: "save", Path: saveC},
+		{Action: "save", Path: saveC2},
+		{Action: "pan", X: 20, Y: -15},
+		{Action: "save", Path: saveD},
+		{Action: "save", Path: saveD2},
+		{Action: "close"},
+	})
+	t.Setenv("AHDCODE_PLOTVIEW_HEADLESS_SCRIPT", string(script))
+	var out bytes.Buffer
+	if err := run([]string{writeSpec(t, viewSpec{Version: specVersion, Mode: modeSurface, Surface: &surface})}, &out); err != nil {
+		t.Fatal(err)
+	}
+
+	bytesA, _ := os.ReadFile(saveA)
+	bytesA2, _ := os.ReadFile(saveA2)
+	bytesB, _ := os.ReadFile(saveB)
+	bytesB2, _ := os.ReadFile(saveB2)
+	bytesC, _ := os.ReadFile(saveC)
+	bytesC2, _ := os.ReadFile(saveC2)
+	bytesD, _ := os.ReadFile(saveD)
+	bytesD2, _ := os.ReadFile(saveD2)
+
+	// Determinism
+	if !bytes.Equal(bytesA, bytesA2) {
+		t.Fatal("State A repeated is not deterministic")
+	}
+	if !bytes.Equal(bytesB, bytesB2) {
+		t.Fatal("State B repeated is not deterministic")
+	}
+	if !bytes.Equal(bytesC, bytesC2) {
+		t.Fatal("State C repeated is not deterministic")
+	}
+	if !bytes.Equal(bytesD, bytesD2) {
+		t.Fatal("State D repeated is not deterministic")
+	}
+
+	// Distinctness
+	if bytes.Equal(bytesA, bytesB) {
+		t.Fatal("State A == State B (rotation should change image)")
+	}
+	if bytes.Equal(bytesB, bytesC) {
+		t.Fatal("State B == State C (zoom should change image)")
+	}
+	if bytes.Equal(bytesC, bytesD) {
+		t.Fatal("State C == State D (pan should change image)")
+	}
+
+	// Canonical programmatic save is unaffected
+	rendered := filepath.Join(dir, "canonical.png")
+	out.Reset()
+	if err := run([]string{writeSpec(t, viewSpec{Version: specVersion, Mode: modeRender, Surface: &surface, Output: rendered})}, &out); err != nil {
+		t.Fatal(err)
+	}
+	bytesRender, _ := os.ReadFile(rendered)
+	if len(bytesRender) == 0 {
+		t.Fatal("canonical render failed")
+	}
+	cfg, err := png.DecodeConfig(bytes.NewReader(bytesRender))
+	if err != nil || cfg.Width != 400 || cfg.Height != 300 {
+		t.Fatalf("canonical render cfg = %+v, err=%v", cfg, err)
+	}
+	cfgA, err := png.DecodeConfig(bytes.NewReader(bytesA))
+	if err != nil || cfgA.Width != 800 || cfgA.Height != 600 {
+		t.Fatalf("viewer save cfg = %+v, err=%v", cfgA, err)
 	}
 }

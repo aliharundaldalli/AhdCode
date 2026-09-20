@@ -1,4 +1,4 @@
-# AhdCode v2.1.0 English Student Guide
+# AhdCode Student Guide (v2.3 development)
 
 This guide is designed so that **even someone who has never programmed before** can follow along. You can read it in order from beginning to end; in each section, you will first see what we want to achieve, then write a working example, and finally learn the necessary rules.
 
@@ -17,6 +17,11 @@ page for its complete signatures, errors, and boundary conditions.
 This guide teaches; it is not a reference manual and not a changelog. Where a
 module has more to it than a beginner needs on the first pass, the section
 says so and links to the reference page that lists every signature.
+
+The public/runtime baseline remains v2.2.0. The v2.3 development line adds an
+advanced named-Function `uses` capture form and current-view Surface Save; use
+the focused [Functions](FUNCTIONS.md) and [Plot](PLOT.md) references when you
+need those features.
 
 ## Table of Contents
 - [1. What is AhdCode?](#1-what-is-ahdcode)

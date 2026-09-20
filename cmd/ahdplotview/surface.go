@@ -268,6 +268,7 @@ var light = func() [3]float64 {
 // surfaceRenderer draws Surfaces with one font face per pixel scale.
 type surfaceRenderer struct {
 	face func(size float64) font.Face
+	math *surfaceMathCache
 }
 
 // render draws the Surface into a new image of the given pixel size, with
@@ -279,7 +280,7 @@ func (r surfaceRenderer) render(s surfaceSpec, c camera, width, height int, text
 	titleFace := r.face(16 * textScale)
 	if s.Title != "" {
 		top = float64(titleFace.Metrics().Height.Ceil()) + 12*textScale
-		drawText(img, titleFace, s.Title, float64(width)/2, 8*textScale+float64(titleFace.Metrics().Ascent.Ceil()), 0.5, color.RGBA{20, 20, 20, 255})
+		r.drawText(img, titleFace, s.Title, float64(width)/2, 8*textScale+float64(titleFace.Metrics().Ascent.Ceil()), 0.5, color.RGBA{20, 20, 20, 255}, 16*textScale)
 	}
 	grid, lowZ, highZ := s.normalized()
 	p := newProjection(c, float64(width), float64(height), top)
@@ -380,7 +381,7 @@ func (r surfaceRenderer) render(s surfaceSpec, c camera, width, height int, text
 	ink := color.RGBA{40, 40, 40, 255}
 	label := func(text string, q point) {
 		x, y, _ := p.at(q)
-		drawText(img, labelFace, text, x, y, 0.5, ink)
+		r.drawText(img, labelFace, text, x, y, 0.5, ink, 12*textScale)
 	}
 	outside := 1.22
 	// Named categories sit where a numeric axis showed only its two ends,
@@ -408,7 +409,7 @@ func (r surfaceRenderer) render(s surfaceSpec, c camera, width, height int, text
 	// range labels at the same corner.
 	drawText(img, labelFace, formatNumber(lowZ), axisBottomX-gap, axisBottomY-ascent*0.6, 1, ink)
 	drawText(img, labelFace, formatNumber(highZ), axisTopX-gap, axisTopY+ascent/2, 1, ink)
-	drawText(img, labelFace, s.ZLabel, (axisBottomX+axisTopX)/2-gap, (axisBottomY+axisTopY)/2+ascent/2, 1, ink)
+	r.drawText(img, labelFace, s.ZLabel, (axisBottomX+axisTopX)/2-gap, (axisBottomY+axisTopY)/2+ascent/2, 1, ink, 12*textScale)
 	return img
 }
 
@@ -469,6 +470,19 @@ func drawText(img *image.RGBA, face font.Face, text string, x, y, anchor float64
 	drawer := font.Drawer{Dst: img, Src: image.NewUniform(c), Face: face,
 		Dot: fixed.P(int(math.Round(x-anchor*float64(width))), int(math.Round(y)))}
 	drawer.DrawString(text)
+}
+
+func (r surfaceRenderer) drawText(img *image.RGBA, face font.Face, text string, x, y, anchor float64, c color.Color, size float64) {
+	if r.math != nil {
+		if rendered, ok := r.math.image(text, size, c); ok {
+			width, height := rendered.Bounds().Dx(), rendered.Bounds().Dy()
+			left := int(math.Round(x - anchor*float64(width)))
+			top := int(math.Round(y - 0.75*float64(height)))
+			draw.Draw(img, image.Rect(left, top, left+width, top+height), rendered, image.Point{}, draw.Over)
+			return
+		}
+	}
+	drawText(img, face, text, x, y, anchor, c)
 }
 
 // fillTriangle paints a triangle's pixels whose centers lie inside it.

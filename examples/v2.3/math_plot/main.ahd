@@ -1,0 +1,34 @@
+// v2.3.0: ordinary labels and whole-string $...$ math labels.
+bring Plot
+bring Numeric
+from Plot bring Chart
+from Plot bring Surface
+
+x: List<Real> := [-2.0, -1.0, 0.0, 1.0, 2.0]
+y: List<Real> := [0.0, 1.0, 4.0, 9.0, 16.0]
+
+chart: Chart := Plot.line(x, y)
+chart = chart.title("Ordinary text stays ordinary")
+chart = chart.xLabel("$x$").yLabel("$f(x)=x^2$")
+chart = chart.line(x, y, "$f(x)=x^2$").legend(true)
+chart.save("math-line.png")
+chart.save("math-line.svg")
+
+pie: Chart := Plot.pie(["$\\alpha$", "Normal"], [2.0, 3.0])
+pie = pie.title("$\\sigma^2$")
+pie.save("math-pie.png")
+
+rows: List<List<Real>> := []
+for yValue in x {
+    row: Local List<Real> := []
+    for xValue in x {
+        row.add(xValue * xValue + yValue * yValue)
+    }
+    rows.add(row)
+}
+surface: Surface := Plot.surface(x, x, Numeric.matrix(rows))
+surface = surface.title("Surface: $f(x,y)=x^2+y^2$").zLabel("$f(x,y)$")
+surface = surface.xLabel("$x$").yLabel("$y$")
+surface = surface.xCategories(["$x_0$", "$x_1$", "$x_2$", "$x_3$", "$x_4$"])
+surface = surface.yCategories(["Origin", "Low", "Mid", "High", "Top"])
+surface.save("math-surface.png")

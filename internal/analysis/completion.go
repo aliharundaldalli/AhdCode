@@ -67,6 +67,9 @@ func (store *Store) Completion(path string, offset int) []CompletionItem {
 	if len(ancestors) == 0 {
 		return nil
 	}
+	if items, inside := store.captureCompletions(cached, entryModule, canonical, offset, ancestors); inside {
+		return items
+	}
 	innermost := ancestors[len(ancestors)-1]
 
 	if bring, ok := innermost.(*ast.BringStmt); ok {
@@ -76,6 +79,80 @@ func (store *Store) Completion(path string, offset int) []CompletionItem {
 		return store.memberCompletions(cached, entryModule, member, ancestors)
 	}
 	return store.scopeCompletions(cached, entryPath, entryModule, ancestors, offset)
+}
+
+// captureCompletions handles the intentionally small `uses [#...]` and
+// `uses [@...]` contexts. The candidate bindings still come from the
+// compiler's structural scope facts and module symbols; this is only a
+// cursor-context adapter, not a second resolver.
+func (store *Store) captureCompletions(cached *entry, entryModule *module.Module, path string, offset int, ancestors []ast.Node) ([]CompletionItem, bool) {
+	text := cached.result.Text[path]
+	if offset < 0 || offset > len(text) {
+		return nil, false
+	}
+	prefix := text[:offset]
+	uses := strings.LastIndex(prefix, "uses")
+	if uses < 0 {
+		return nil, false
+	}
+	open := strings.Index(prefix[uses+len("uses"):], "[")
+	if open < 0 {
+		return nil, false
+	}
+	open += uses + len("uses")
+	if close := strings.LastIndex(prefix, "]"); close > open {
+		return nil, false
+	}
+	if strings.Index(prefix[open+1:], "{") >= 0 {
+		return nil, false
+	}
+	functionIndex := -1
+	for index, node := range ancestors {
+		if _, ok := node.(*ast.FunctionDecl); ok {
+			functionIndex = index
+		}
+	}
+	if functionIndex < 0 {
+		return nil, false
+	}
+	fragment := strings.TrimSpace(prefix[open+1:])
+	fragment = fragment[strings.LastIndex(fragment, ",")+1:]
+	fragment = strings.TrimSpace(fragment)
+	kind := byte(0)
+	if len(fragment) > 0 && (fragment[0] == '#' || fragment[0] == '@') {
+		kind = fragment[0]
+		fragment = fragment[1:]
+	}
+	if kind == 0 {
+		return nil, true
+	}
+	seen := make(map[string]bool)
+	var items []CompletionItem
+	add := func(symbol *semantic.Symbol) {
+		if symbol == nil || symbol.Builtin || symbol.Name == "" || seen[symbol.Name] || !strings.HasPrefix(symbol.Name, fragment) {
+			return
+		}
+		seen[symbol.Name] = true
+		items = append(items, CompletionItem{Label: symbol.Name, Detail: renderHover(symbol)})
+	}
+	if kind == '@' {
+		for _, symbol := range entryModule.Semantic.Symbols {
+			if symbol != nil && symbol.ModuleRoot && symbol.Kind != semantic.ClassSymbol && symbol.Kind != semantic.FunctionSymbol && symbol.Kind != semantic.NamespaceSymbol {
+				add(symbol)
+			}
+		}
+	} else {
+		outerAncestors := ancestors[:functionIndex]
+		for _, item := range enclosingScopeNodes(outerAncestors, offset, entryModule) {
+			for _, symbol := range entryModule.Semantic.Symbols {
+				if symbol != nil && symbol.Name == item.Label {
+					add(symbol)
+				}
+			}
+		}
+	}
+	sort.Slice(items, func(i, j int) bool { return items[i].Label < items[j].Label })
+	return items, true
 }
 
 // bringCompletions completes a `bring <module>`, `from <module>`, or

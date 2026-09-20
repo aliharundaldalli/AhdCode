@@ -72,6 +72,9 @@ func (store *Store) Definition(path string, offset int) (Location, bool) {
 // declaration symbol" consistent regardless of which one ResolvedSymbols
 // happened to hand back.
 func (e *entry) declarationSymbol(symbol *semantic.Symbol) *semantic.Symbol {
+	if symbol != nil && symbol.CaptureOf != nil {
+		return e.declarationSymbol(symbol.CaptureOf)
+	}
 	if symbol.Span.FileID == 0 {
 		owner := e.modules[module.ModuleID(symbol.OriginModuleID)]
 		if owner == nil {

@@ -134,6 +134,31 @@ olarak kapalıdır: bir [pastanın](#pasta) kategori anahtarı ve bir
 Bir [pastanın](#pasta) Kartezyen ekseni yoktur; bu yüzden `xLabel` ve
 `yLabel` bir pastada sessizce yok sayılmak yerine `PlotError` fırlatır.
 
+## Matematiksel metin (v2.3.0)
+
+Mevcut metin API'leri küçük bir math seçeneği sunar. İçeriğinin tamamı eşleşen
+`$...$` ile çevrili olan String, AhdCode'un mevcut çevrimdışı Plot math-text
+yolunda çizilir:
+
+```ahd
+chart = chart.title("$f(x)=x^2+3x+2$").xLabel("$x$").yLabel("$\\sigma^2$")
+chart = chart.line(x, y, "$f(x)$").legend(true)
+```
+
+Aynı kural Chart başlığı/eksenleri, seri açıklamaları, pasta legend etiketleri,
+bar kategorileri, heatmap kategorileri ve Surface başlık/eksen/z etiketleri ile
+`xCategories`/`yCategories` için geçerlidir. `"Cost $100"` gibi sıradan
+String'ler sıradan metin kalır. `"Variance is $\\sigma^2$"` gibi karışık zengin
+metinler v2.3.0'da parçalara ayrılmaz; ileride ele alınabilir.
+
+Bozuk matematik Plot hatası olarak bildirilir. Doğrulama ve Surface etiket
+görselleri sınırlı cache kullanır; ağ, JavaScript, shell çalıştırma veya ikinci
+bir TeX motoru eklenmez. Plot etiketleri Gonum'un iç math-text renderer'ını ve
+projenin çevrimdışı Unicode/plain fallback'ini kullanır; gömülü Tectonic yalnızca
+tam belge LaTeX/PDF yolu içindir. Chart SVG/PDF çıktısı mevcut vektör-capable
+canvas yolunu korur; viewer raster yolu Retina ölçeği için saydam etiket
+görsellerini cache'ler.
+
 ## Birden çok seri
 
 `chart.line(x, y, label)` ve `chart.scatter(x, y, label)`, bir Chart'a bir
@@ -475,7 +500,7 @@ noktasındaki yüksekliktir.
 
 | Araç çubuğu düğmesi | Tuşlar ve fare | İşlem |
 | --- | --- | --- |
-| Save | — | Surface'in PNG'sini tam `save(path)`'in yazdığı gibi kaydetme |
+| Save | — | Görüntüleyicideki mevcut kamera görünümünü PNG olarak kaydetme |
 | Zoom Out / Zoom In | Fare tekerleği | Uzaklaştırma ve yakınlaştırma |
 | — | Sol tuşla sürükleme | Yüzeyin çevresinde döndürme (orbit) |
 | — | Shift+sürükleme veya sağ tuşla sürükleme | Kaydırma (pan) |
@@ -486,9 +511,10 @@ Görünüm ortografik bir izdüşümdür. Tüm yüzey görünür olacak şekilde
 açıdan başlar; döndürme dikey eksen çevresinde serbesttir ve tam yukarıdan ve
 tam aşağıdan biraz önce durur, böylece görünüm hiç ters dönmez;
 yakınlaştırma 0,3× ile 6× arasındadır ve kaydırma yüzeyi erişilebilir
-tutar. Grafik görüntüleyicisinde olduğu gibi kamera yalnızca görünüme
-aittir: Surface'in parçası değildir, kamera API'si yoktur ve kaydetme her
-zaman başlangıç görünümünü yazar.
+tutar. Kamera yalnızca görüntüleyici görünümüne aittir: Surface'in parçası
+değildir, kamera API'si yoktur. Görüntüleyicideki **Save**, o anki orbit,
+eğim, zoom ve pan görünümünü kaydeder; programatik `Surface.save(path)` ise
+her zaman başlangıç görünümünü yazar.
 
 Bu küçük bilimsel 3B çizimdir, bir 3B motoru değildir: ağ (mesh), içe
 aktarılan modeller, dokular, ışık veya malzeme ayarları, sahne grafiği ya da

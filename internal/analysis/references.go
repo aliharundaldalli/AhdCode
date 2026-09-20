@@ -8,11 +8,10 @@ import (
 	"ahdcode/internal/syntax/ast"
 )
 
-// References finds every use of the symbol at the given byte offset,
-// scoped honestly to the current compile graph -- the clicked document plus
-// everything it transitively imports -- rather than a full workspace-wide
-// index, which no part of this tooling builds. When includeDeclaration is
-// true, the declaration site itself is included alongside its uses.
+// References finds every use of the compiler-resolved symbol at the given
+// byte offset across the initialized workspace. Each candidate is resolved by
+// the real compiler first; the workspace scan only joins independent
+// snapshots by their source declaration identity.
 //
 // It reports nil when the cursor is not on a resolvable, non-builtin
 // symbol.
@@ -38,40 +37,45 @@ func (store *Store) References(path string, offset int, includeDeclaration bool)
 	if declaration == nil {
 		return nil
 	}
-	targets := cached.equivalentSymbols(declaration)
-	isDeclarationOccurrence := declarationOccurrencePredicate(declaration)
+	targetIdentity := declarationIdentity(cached, declaration)
+	if targetIdentity == "" {
+		return nil
+	}
 
-	seen := make(map[Location]bool)
+	seen := make(map[string]bool)
 	var out []Location
 
-	for _, candidateModule := range cached.modules {
-		if candidateModule == nil {
-			continue
-		}
-		modulePath, ok := cached.fileToPath[candidateModule.File.ID]
-		if !ok {
-			continue
-		}
-		for useNode, useSymbol := range candidateModule.Semantic.ResolvedSymbols {
-			if !isAnyOf(useSymbol, targets) {
+	for _, snapshot := range store.workspaceEntries(canonical) {
+		for _, candidateModule := range snapshot.modules {
+			if candidateModule == nil {
 				continue
 			}
-			if isDeclarationOccurrence(useNode) {
+			modulePath, ok := snapshot.fileToPath[candidateModule.File.ID]
+			if !ok {
 				continue
 			}
-			location := Location{Path: modulePath, Span: useNode.Span()}
-			if !seen[location] {
-				seen[location] = true
-				out = append(out, location)
-			}
-		}
-	}
-	if includeDeclaration {
-		if declarationPath, ok := cached.fileToPath[declaration.Span.FileID]; ok {
-			location := Location{Path: declarationPath, Span: declaration.Span}
-			if !seen[location] {
-				seen[location] = true
-				out = append(out, location)
+			for useNode, useSymbol := range candidateModule.Semantic.ResolvedSymbols {
+				resolved := snapshot.declarationSymbol(useSymbol)
+				if declarationIdentity(snapshot, resolved) != targetIdentity {
+					continue
+				}
+				if declarationOccurrencePredicate(resolved)(useNode) {
+					if includeDeclaration {
+						location := Location{Path: modulePath, Span: resolved.Span}
+						key := locationKey(location)
+						if !seen[key] {
+							seen[key] = true
+							out = append(out, location)
+						}
+					}
+					continue
+				}
+				location := Location{Path: modulePath, Span: useNode.Span()}
+				key := locationKey(location)
+				if !seen[key] {
+					seen[key] = true
+					out = append(out, location)
+				}
 			}
 		}
 	}
@@ -82,6 +86,10 @@ func (store *Store) References(path string, offset int, includeDeclaration bool)
 		return out[i].Span.Start.Offset < out[j].Span.Start.Offset
 	})
 	return out
+}
+
+func locationKey(location Location) string {
+	return location.Path + "\x00" + itoa(location.Span.Start.Offset) + "\x00" + itoa(location.Span.End.Offset)
 }
 
 // declarationOccurrencePredicate returns a function identifying which
@@ -110,15 +118,6 @@ func declarationOccurrencePredicate(declaration *semantic.Symbol) func(ast.Node)
 		}
 		return node.Span() == declaration.Span
 	}
-}
-
-func isAnyOf(symbol *semantic.Symbol, targets []*semantic.Symbol) bool {
-	for _, target := range targets {
-		if symbol == target {
-			return true
-		}
-	}
-	return false
 }
 
 // equivalentSymbols lists every Symbol pointer that represents the same

@@ -1,11 +1,13 @@
 package analysis
 
 import (
+	"fmt"
 	"strings"
 
 	"ahdcode/internal/diagnostics"
 	"ahdcode/internal/semantic"
 	"ahdcode/internal/source"
+	"ahdcode/internal/syntax/ast"
 )
 
 // CodeAction is one deterministic quick fix tied to a compiler diagnostic.
@@ -18,6 +20,8 @@ const (
 	codeMissingLocal         = "SEM006"
 	codeScopeModifier        = "SEM005"
 	codeInvalidControlSyntax = "PAR009"
+	codeMissingCapture       = "SEM043"
+	codeHiddenGlobal         = "SEM007"
 )
 
 // CodeActions returns quick fixes available at offset in path.
@@ -43,7 +47,7 @@ func (store *Store) CodeActions(path string, offset int) []CodeAction {
 			if !containsOffsetInFile(item.Span, offset, fileID) {
 				continue
 			}
-			if action, ok := quickFixForDiagnostic(ownerPath, text, item); ok {
+			if action, ok := quickFixForDiagnostic(ownerPath, text, item, cached); ok {
 				actions = append(actions, action)
 			}
 		}
@@ -51,8 +55,14 @@ func (store *Store) CodeActions(path string, offset int) []CodeAction {
 	return actions
 }
 
-func quickFixForDiagnostic(path, text string, item diagnostics.Diagnostic) (CodeAction, bool) {
+func quickFixForDiagnostic(path, text string, item diagnostics.Diagnostic, cached *entry) (CodeAction, bool) {
 	switch item.Code {
+	case codeMissingCapture:
+		return missingCaptureFix(path, text, item, cached, '#')
+	case codeHiddenGlobal:
+		if strings.Contains(item.Message, "requires an explicit Global") {
+			return missingCaptureFix(path, text, item, cached, '@')
+		}
 	case codeMissingLocal:
 		return missingLocalFix(path, text, item)
 	case codeInvalidControlSyntax:
@@ -63,6 +73,69 @@ func quickFixForDiagnostic(path, text string, item diagnostics.Diagnostic) (Code
 		return unresolvedImportFix(path, text, item)
 	}
 	return CodeAction{}, false
+}
+
+func missingCaptureFix(path, text string, item diagnostics.Diagnostic, cached *entry, sigil byte) (CodeAction, bool) {
+	name := quotedDiagnosticName(item.Message)
+	if name == "" || cached == nil || cached.entryModule() == nil {
+		return CodeAction{}, false
+	}
+	ancestors := ancestorsAtOffset(cached.entryModule().Parsed.Program, item.Span.Start.Offset, cached.fileIDFor(path))
+	var function *ast.FunctionDecl
+	for _, node := range ancestors {
+		if candidate, ok := node.(*ast.FunctionDecl); ok {
+			function = candidate
+		} else if _, ok := node.(*ast.LambdaExpr); ok {
+			function = nil
+		}
+	}
+	if function == nil || function.Body == nil {
+		return CodeAction{}, false
+	}
+	bodyStart := function.Body.Span().Start.Offset
+	if bodyStart < 0 || bodyStart > len(text) {
+		return CodeAction{}, false
+	}
+	itemText := string([]byte{sigil}) + name
+	header := text[function.Span().Start.Offset:bodyStart]
+	uses := strings.LastIndex(header, "uses")
+	if uses >= 0 {
+		openRelative := strings.Index(header[uses+len("uses"):], "[")
+		if openRelative >= 0 {
+			open := function.Span().Start.Offset + uses + len("uses") + openRelative
+			closeRelative := strings.Index(header[uses+len("uses")+openRelative+1:], "]")
+			if closeRelative >= 0 {
+				close := open + 1 + closeRelative
+				inside := text[open+1 : close]
+				if strings.Contains(inside, itemText) || strings.Contains(inside, string([]byte{sigil})+name) {
+					return CodeAction{}, false
+				}
+				insert := itemText
+				if strings.TrimSpace(inside) != "" {
+					insert = ", " + itemText
+				}
+				return CodeAction{Title: fmt.Sprintf("Add '%s' to uses list", itemText), Edits: []TextEdit{{
+					Path: path, Span: source.Span{FileID: item.Span.FileID, Start: source.Position{Offset: close}, End: source.Position{Offset: close}}, NewText: insert,
+				}}}, true
+			}
+		}
+	}
+	return CodeAction{Title: fmt.Sprintf("Add '%s' to uses list", itemText), Edits: []TextEdit{{
+		Path: path, Span: source.Span{FileID: item.Span.FileID, Start: source.Position{Offset: bodyStart}, End: source.Position{Offset: bodyStart}}, NewText: "uses [" + itemText + "]\n",
+	}}}, true
+}
+
+func quotedDiagnosticName(message string) string {
+	start := strings.Index(message, "\"")
+	if start < 0 {
+		return ""
+	}
+	rest := message[start+1:]
+	end := strings.Index(rest, "\"")
+	if end < 0 {
+		return ""
+	}
+	return rest[:end]
 }
 
 func missingLocalFix(path, text string, item diagnostics.Diagnostic) (CodeAction, bool) {

@@ -116,7 +116,11 @@ type Symbol struct {
 	// list. The lambda sees the enclosing binding's value; it does not gain
 	// ownership of the outer variable, so the name cannot be reassigned from
 	// inside the lambda.
-	Captured       bool
+	Captured bool
+	// CaptureOf points from a callable-local capture binding back to the
+	// compiler symbol it names. Tooling uses the same semantic relationship
+	// for definition, references, and rename; it is not a runtime environment.
+	CaptureOf      *Symbol
 	Alias          *Symbol
 	Callable       *Callable
 	OverloadSet    *OverloadSet

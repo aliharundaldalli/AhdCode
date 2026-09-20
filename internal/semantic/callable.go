@@ -20,7 +20,7 @@ func (a *analyzer) analyzeClass(declaration *ast.ClassDecl) {
 	for _, member := range declaration.Members {
 		if function, ok := member.(*ast.FunctionDecl); ok {
 			a.validateOverride(function, class)
-			a.analyzeFunction(function, class)
+			a.analyzeFunction(function, class, a.module, a.flow)
 		}
 	}
 }
@@ -55,19 +55,26 @@ func callableSignaturesEqual(left, right *Callable) bool {
 	return types.Equal(types.Function{Signature: left.Signature}, types.Function{Signature: right.Signature})
 }
 
-func (a *analyzer) analyzeFunction(declaration *ast.FunctionDecl, class *Symbol) {
+func (a *analyzer) analyzeFunction(declaration *ast.FunctionDecl, class *Symbol, enclosing *scope, enclosingFlow flowState) {
 	callable := a.functionNodes[declaration]
 	owner := a.functionOwner[declaration]
 	if callable == nil || owner == nil {
 		return
 	}
-	functionScope := newScope(a.module, callableScope)
+	if enclosing == nil {
+		enclosing = a.module
+	}
+	functionScope := newScope(enclosing, callableScope)
 	context := &callableContext{kind: functionCallable, symbol: owner, callable: callable, returnType: callable.Signature.Return, class: class}
 	functionScope.callable = context
 	if class != nil {
 		a.installClassImplicitBindings(functionScope, class)
 	}
-	flow := a.flow.clone()
+	flow := enclosingFlow.clone()
+	// Named Functions and lambdas share the explicit dependency model. A
+	// Function's `uses [@name]` entry installs the same live Global alias that
+	// an ordinary Global declaration would install; `#name` is a value capture.
+	a.analyzeCallableCaptures(declaration.Captures, declaration.Parameters, "Function", enclosing, functionScope, enclosingFlow, flow, callable)
 	for index := range declaration.Parameters {
 		parameter := &declaration.Parameters[index]
 		if hasModifier(parameter.Modifiers, ast.ModifierLocal) || hasModifier(parameter.Modifiers, ast.ModifierGlobal) || hasModifier(parameter.Modifiers, ast.ModifierConstant) {

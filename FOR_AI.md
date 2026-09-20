@@ -718,6 +718,20 @@ coordinate; `xLabel`/`yLabel` remain the axis titles. Do not reach for a
 colormap, palette, theme, donut, exploded slice, heatmap annotation, tick
 formatter, or Axis object — none exist. See [`docs/PLOT.md`](docs/PLOT.md).
 
+**v2.3.0: named Function captures and Plot math text.** A named
+Function inside an executable block may declare explicit dependencies after
+its return type with `uses [#enclosingLocal, @moduleBinding]`. This reuses
+the lambda capture model: captures are explicit, by value for lexical locals,
+and never inferred. Missing captures are compiler diagnostics; do not invent
+implicit closures or dynamic environments. `$...$` labels in Plot and Surface
+use Gonum's internal math-text renderer with the project's offline
+Unicode/plain fallback only when the whole String is math text; ordinary and
+mixed Strings stay ordinary text. Surface viewer Save writes the current
+orbit/tilt/zoom/pan view, while programmatic
+`Surface.save(path)` remains the deterministic canonical view. See
+[`docs/FUNCTIONS.md`](docs/FUNCTIONS.md), [`docs/LSP.md`](docs/LSP.md), and
+[`docs/PLOT.md`](docs/PLOT.md).
+
 v1.7.0 completes six existing modules; use these instead of hand-written
 helpers. `Math.asin`, `acos`, `atan`, `atan2(y, x)` (y first), `sinh`, `cosh`,
 `tanh`, `hypot`, `log2`, `cbrt`, `radians`, `degrees`, `gcd`, and `lcm`; there

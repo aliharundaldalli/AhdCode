@@ -150,6 +150,12 @@ func (c *semanticTokenCollector) collectFunctionDecl(decl *ast.FunctionDecl, res
 		}
 		c.addDeclName(decl.Span(), decl.Name, tokenType, 0)
 	}
+	for index := range decl.Captures {
+		capture := &decl.Captures[index]
+		if symbol, ok := resolved[capture]; ok && symbol != nil {
+			c.collectSymbolNode(capture, symbol, false)
+		}
+	}
 	for index := range decl.Parameters {
 		parameter := &decl.Parameters[index]
 		if symbol, ok := resolved[parameter]; ok && symbol != nil {
@@ -219,6 +225,8 @@ func (c *semanticTokenCollector) collectSymbolNode(node ast.Node, symbol *semant
 		c.addDeclName(typed.Span(), typed.Name, tokenType, modifiers)
 	case *ast.MemberExpr:
 		c.addSpan(memberNameSpan(typed), tokenType, modifiers)
+	case *ast.CaptureRef:
+		c.addSpan(captureNameSpan(typed), tokenType, modifiers)
 	default:
 		c.addSpan(symbol.Span, tokenType, modifiers)
 	}
@@ -277,6 +285,14 @@ func (c *semanticTokenCollector) collectExpr(expression ast.Expr, resolved map[a
 		}
 	case *ast.MemberExpr:
 		c.collectExpr(node.Object, resolved)
+	case *ast.LambdaExpr:
+		for index := range node.Captures {
+			capture := &node.Captures[index]
+			if symbol, ok := resolved[capture]; ok && symbol != nil {
+				c.collectSymbolNode(capture, symbol, false)
+			}
+		}
+		c.collectExpr(node.Body, resolved)
 	case *ast.BinaryExpr:
 		c.collectExpr(node.Left, resolved)
 		c.collectExpr(node.Right, resolved)

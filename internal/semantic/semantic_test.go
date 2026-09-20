@@ -190,6 +190,31 @@ write(full(1) == short(1))`)
 	requireSemanticClean(t, result)
 }
 
+func TestNamedFunctionUsesSharesLambdaCaptureRules(t *testing.T) {
+	_, clean := analyzeText(t, `moduleValue: Int := 3
+outer: Function := () -> Int {
+    localValue: Local Int := 7
+    read: Function := () -> Int uses [#localValue] { return localValue }
+    return read()
+}
+answer: Function := () -> Int uses [@moduleValue] { return moduleValue }`)
+	requireSemanticClean(t, clean)
+
+	_, missing := analyzeText(t, `outer: Function := () -> Int {
+    localValue: Local Int := 7
+    read: Function := () -> Int { return localValue }
+    return read()
+}`)
+	requireSemanticCode(t, missing, codeMissingCapture)
+
+	_, duplicate := analyzeText(t, `outer: Function := () -> Int {
+    localValue: Local Int := 7
+    read: Function := () -> Int uses [#localValue, Local localValue] { return localValue }
+    return read()
+}`)
+	requireSemanticCode(t, duplicate, codeInvalidCapture)
+}
+
 func TestUndefinedMutationTargetsReportUnknownName(t *testing.T) {
 	for _, text := range []string{
 		"missing = 1",

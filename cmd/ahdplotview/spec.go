@@ -7,8 +7,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"image"
 	"image/png"
 	"io"
+	"math"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -203,11 +205,53 @@ func saveChart(spec viewSpec, path string) error {
 // Surface.save's bytes. It is written beside the destination and renamed, so
 // a failed save never leaves half a file.
 func saveSurface(surface surfaceSpec, path string) error {
+	return saveSurfaceWithHelper(surface, path, "")
+}
+
+func saveSurfaceWithHelper(surface surfaceSpec, path, helper string) error {
+	renderer := newSurfaceRendererWithHelper(helper)
+	if err := renderer.prepare(surface, 2*pixelsPerUnit); err != nil {
+		return err
+	}
+	return savePNG(renderer.renderCanonical(surface), path)
+}
+
+// saveSurfaceView writes the exact viewport image currently shown by the
+// viewer. The toolbar is outside this image; camera and device scale are the
+// same values used by surfaceViewer.Draw.
+func saveSurfaceView(surface surfaceSpec, view camera, width, height int, scale float64, path string) error {
+	return saveSurfaceViewWithHelper(surface, view, width, height, scale, "", path)
+}
+
+func saveSurfaceViewWithHelper(surface surfaceSpec, view camera, width, height int, scale float64, helper, path string) error {
+	if scale <= 0 || math.IsNaN(scale) || math.IsInf(scale, 0) {
+		scale = 1
+	}
+	if width <= 0 || height <= 0 {
+		return errors.New("a Surface view has no drawable viewport")
+	}
+	pixelsW := int(math.Ceil(float64(width) * scale))
+	pixelsH := int(math.Ceil(float64(height) * scale))
+	if pixelsW <= 0 || pixelsH <= 0 {
+		return errors.New("a Surface view has no drawable viewport")
+	}
+	renderer := newSurfaceRendererWithHelper(helper)
+	return saveSurfaceViewWithRenderer(renderer, surface, view, pixelsW, pixelsH, scale, path)
+}
+
+func saveSurfaceViewWithRenderer(renderer surfaceRenderer, surface surfaceSpec, view camera, pixelsW, pixelsH int, scale float64, path string) error {
+	if err := renderer.prepare(surface, scale); err != nil {
+		return err
+	}
+	return savePNG(renderer.render(surface, view, pixelsW, pixelsH, scale), path)
+}
+
+func savePNG(rendered image.Image, path string) error {
 	if !strings.EqualFold(filepath.Ext(path), ".png") {
 		return errors.New("a Surface is saved as .png")
 	}
 	var buffer bytes.Buffer
-	if err := png.Encode(&buffer, newSurfaceRenderer().renderCanonical(surface)); err != nil {
+	if err := png.Encode(&buffer, rendered); err != nil {
 		return errors.New("the Surface could not be encoded")
 	}
 	temporary, err := os.CreateTemp(filepath.Dir(path), ".ahdcode-surface-*.png")
@@ -233,7 +277,7 @@ func saveSurface(surface surfaceSpec, path string) error {
 
 // renderSurfaceFile is render mode: Surface.save without a window.
 func renderSurfaceFile(spec viewSpec, out io.Writer) error {
-	if err := saveSurface(*spec.Surface, spec.Output); err != nil {
+	if err := saveSurfaceWithHelper(*spec.Surface, spec.Output, spec.Renderer); err != nil {
 		return err
 	}
 	answer(out, reply{Ready: true})

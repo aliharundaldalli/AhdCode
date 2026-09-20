@@ -73,6 +73,10 @@ func runSurfaceHeadless(spec viewSpec, out io.Writer) error {
 	if err != nil {
 		return err
 	}
+	renderer := newSurfaceRendererWithHelper(spec.Renderer)
+	if err := renderer.prepare(*spec.Surface, 1); err != nil {
+		return err
+	}
 	c := initialCamera()
 	shot := func(after string, closed bool) state {
 		return state{After: after, Zoom: c.zoom, Azimuth: c.azimuth, Elevation: c.elevation, PanX: c.panX, PanY: c.panY, Closed: closed}
@@ -90,7 +94,7 @@ func runSurfaceHeadless(spec viewSpec, out io.Writer) error {
 		case "reset":
 			c = initialCamera()
 		case "save":
-			if err := saveSurface(*spec.Surface, step.Path); err != nil {
+			if err := saveSurfaceViewWithRenderer(renderer, *spec.Surface, c, 800, 600, 1, step.Path); err != nil {
 				problem = err.Error()
 			} else {
 				saved = step.Path

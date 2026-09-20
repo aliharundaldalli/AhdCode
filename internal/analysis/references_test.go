@@ -124,3 +124,40 @@ func TestReferencesOnBuiltinReportsNil(t *testing.T) {
 		t.Fatalf("expected nil references for a builtin, got %#v", locations)
 	}
 }
+
+func TestReferencesScanWorkspaceEntriesUsingCompilerIdentity(t *testing.T) {
+	directory := t.TempDir()
+	mainPath := filepath.Join(directory, "main.ahd")
+	helperPath := filepath.Join(directory, "Helper.ahd")
+	consumerPath := filepath.Join(directory, "Consumer.ahd")
+	if err := os.WriteFile(helperPath, []byte("answer: Int := 42\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(consumerPath, []byte("from Helper bring answer\nwrite(answer)\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	mainText := "from Helper bring answer\nwrite(answer)\n"
+	store := NewStore()
+	store.Open(mainPath, mainText)
+	locations := store.References(mainPath, offsetOf(t, mainText, "write(answer)")+len("write("), true)
+	if len(locations) != 5 {
+		t.Fatalf("workspace references = %#v, want declaration plus import and use in each consumer", locations)
+	}
+	if got := len(offsetsIn(locations, canonicalPath(consumerPath))); got != 2 {
+		t.Fatalf("workspace references in Consumer.ahd = %d, want 2", got)
+	}
+}
+
+func TestReferencesIncludeNamedFunctionCapture(t *testing.T) {
+	text := "value: Local Int := 7\n" +
+		"read: Function := () -> Int uses [#value] { return value }\n" +
+		"write(read())\n"
+	directory := t.TempDir()
+	path := filepath.Join(directory, "main.ahd")
+	store := NewStore()
+	store.Open(path, text)
+	locations := store.References(path, offsetOf(t, text, "#value")+1, true)
+	if len(locations) != 3 {
+		t.Fatalf("capture references = %#v, want declaration, capture, and body use", locations)
+	}
+}

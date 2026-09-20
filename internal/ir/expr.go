@@ -55,6 +55,11 @@ type FunctionValueExpr struct {
 	ExprBase
 	Symbol   SymbolID
 	Callable CallableID
+	// UseStorage marks a reference to a local named Function binding. The
+	// declaration's initializer uses the same semantic symbol to identify the
+	// callable, but must still construct the adapter/closure rather than read
+	// the not-yet-initialized local slot.
+	UseStorage bool
 	// Captures are the values bound into a capturing lambda's closure, in the
 	// callable's leading-parameter order. They are evaluated once where the
 	// lambda value is created, so the closure holds the captured values rather

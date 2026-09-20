@@ -262,3 +262,26 @@ func TestCompletionOnUnopenedDocumentReportsNil(t *testing.T) {
 		t.Fatalf("expected nil completions for an unopened document, got %#v", items)
 	}
 }
+
+func TestCompletionInsideNamedFunctionUses(t *testing.T) {
+	directory := t.TempDir()
+	path := filepath.Join(directory, "main.ahd")
+	localText := "outer: Function := () -> Nothing {\n" +
+		"    localValue: Local Int := 1\n" +
+		"    read: Function := () -> Nothing uses [#] { write(localValue) }\n" +
+		"}\n"
+	store := NewStore()
+	store.Open(path, localText)
+	items := store.Completion(path, offsetOf(t, localText, "uses [#")+len("uses [#"))
+	if !hasLabel(items, "localValue") {
+		t.Fatalf("expected enclosing local in # capture completion, got %#v", items)
+	}
+
+	globalText := "moduleValue: Int := 1\n" +
+		"read: Function := () -> Nothing uses [@] { write(moduleValue) }\n"
+	store.Open(path, globalText)
+	items = store.Completion(path, offsetOf(t, globalText, "uses [@")+len("uses [@"))
+	if !hasLabel(items, "moduleValue") {
+		t.Fatalf("expected module binding in @ capture completion, got %#v", items)
+	}
+}

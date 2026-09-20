@@ -138,7 +138,7 @@ func (p *parser) parsePrefix() ast.Expr {
 
 func (p *parser) parseLambda() ast.Expr {
 	start := p.advance().Span.Start
-	captures, malformed := p.parseCaptureList()
+	captures, malformed := p.parseCaptureListFor("lambda")
 	parameters := p.parseParameterList(false)
 	p.skipNewlines()
 	p.expect(token.Arrow, "expected -> after lambda parameters")
@@ -168,6 +168,10 @@ func (p *parser) parseLambda() ast.Expr {
 // was found, so the caller can suppress the lambda entirely rather than let a
 // body reference to the undeclared name cascade into a second diagnostic.
 func (p *parser) parseCaptureList() ([]ast.CaptureRef, bool) {
+	return p.parseCaptureListFor("lambda")
+}
+
+func (p *parser) parseCaptureListFor(label string) ([]ast.CaptureRef, bool) {
 	if !p.check(token.LeftBracket) {
 		return nil, false
 	}
@@ -177,18 +181,18 @@ func (p *parser) parseCaptureList() ([]ast.CaptureRef, bool) {
 	malformed := false
 	for !p.atListTerminator(token.RightBracket) {
 		before := p.index
-		capture, ok := p.parseLambdaDependency()
+		capture, ok := p.parseCaptureDependency(label)
 		if !ok {
 			malformed = true
 			break
 		}
 		captures = append(captures, capture)
-		if !p.finishListItem(before, token.RightBracket, "expected comma or newline between lambda dependencies", "separate same-line dependencies with commas") {
+		if !p.finishListItem(before, token.RightBracket, "expected comma or newline between "+label+" dependencies", "separate same-line dependencies with commas") {
 			break
 		}
 	}
 	p.skipNewlines()
-	p.expect(token.RightBracket, "expected ] to close the lambda dependency list")
+	p.expect(token.RightBracket, "expected ] to close the "+label+" dependency list")
 	return captures, malformed
 }
 
@@ -199,6 +203,10 @@ func (p *parser) parseCaptureList() ([]ast.CaptureRef, bool) {
 // entry it consumes the remaining tokens up to the closing `]` so the caller
 // does not also report a mismatched-bracket diagnostic.
 func (p *parser) parseLambdaDependency() (ast.CaptureRef, bool) {
+	return p.parseCaptureDependency("lambda")
+}
+
+func (p *parser) parseCaptureDependency(label string) (ast.CaptureRef, bool) {
 	start := p.current().Span.Start
 	var kind ast.CaptureKind
 	var nameMessage string
@@ -216,8 +224,12 @@ func (p *parser) parseLambdaDependency() (ast.CaptureRef, bool) {
 		p.advance()
 		kind, nameMessage = ast.GlobalCapture, "expected a binding name after 'Global'"
 	default:
-		p.errorCurrent(codeInvalidLambdaSyntax, "lambda dependency must state whether it is Local or Global",
-			"prefix the name with # for a Local capture or @ for a Global dependency, or write Local/Global out in full, as in lambda [#minimum, @Maximum] (...)")
+		code := codeInvalidLambdaSyntax
+		if label != "lambda" {
+			code = codeInvalidDeclarationScope
+		}
+		p.errorCurrent(code, label+" dependency must state whether it is Local or Global",
+			"prefix the name with # for a Local capture or @ for a Global dependency, or write Local/Global out in full")
 		for !p.check(token.RightBracket) && !p.atEnd() {
 			p.advance()
 		}

@@ -5,8 +5,8 @@
 [README'ye dön](../README_TR.md) · [Sınıflar](CLASSES_TR.md)
 
 Function'lar modül kökündeki (module root) isimlendirilmiş bildirimlerdir;
-metotlar bir Class içindeki isimlendirilmiş bildirimlerdir. İç içe Function
-bildirimleri desteklenmez. Lambda, mevcut `Function` türünde isimsiz bir değer
+metotlar bir Class içindeki isimlendirilmiş bildirimlerdir. v2.3.0 ile
+ile yürütülebilir blok içinde de named Function tanımlanabilir. Lambda, mevcut `Function` türünde isimsiz bir değer
 oluşturan, yalnızca ifade içeren kısa yazımdır; yeni bir tür veya ikinci bir
 çağrılabilir sistem değildir.
 
@@ -156,6 +156,33 @@ strong: Local Table := table.filter(
     lambda [#minimum] (row: Pair<String, String>) -> int(row["score"]) >= minimum
 )
 ```
+
+## Named Function `uses` (v2.3.0)
+
+Named Function'lar, expression lambda'ların aynı açık bağımlılık modelini
+kullanır. İsteğe bağlı liste dönüş türünden sonra, gövdeden önce gelir:
+
+```ahd
+makeChecker: Function := () -> Function uses [@activeLang] {
+    minimum: Local Int := 70
+    check: Function := (score: Int) -> Bool uses [#minimum, @activeLang] {
+        return score >= minimum
+    }
+    return check
+}
+```
+
+`#name`, kapsayan lexical bağlamdaki değeri değer olarak yakalar. `@name`,
+modül/global bağımlılığını belirtir ve canlı modül değerini okur. Liste tür
+yazmaz; capture hiçbir zaman otomatik çıkarılmaz. Eksik bağımlılık compiler
+hatasıdır; editör gerekli `#name` veya `@name` değerini ekleyen quick fix
+önerir. Tekrarlı, çözülemeyen, yanlış türde, parametreyle veya yerel adla
+çakışan girdiler reddedilir.
+
+İç içe named Function'lar her lexical derinlikte çalışır ve saklanabilir,
+döndürülebilir veya callback'e aktarılabilir. Bu ikinci bir closure modeli
+değildir: lowering ve runtime lambda capture modelini yeniden kullanır. Eski
+`name: Global Type` bildirimi mevcut kodla uyumludur.
 
 ## Dönüş davranışı
 

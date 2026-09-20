@@ -60,6 +60,9 @@ func run() error {
 }
 
 func render(request plotproto.Request) error {
+	if request.Mode == "math" {
+		return renderMath(request)
+	}
 	if request.Rows <= 0 || request.Columns <= 0 {
 		return fmt.Errorf("invalid grid dimensions %dx%d", request.Rows, request.Columns)
 	}
@@ -190,6 +193,9 @@ func hasSuffix(path, suffix string) bool {
 // on also produces a second plot -- the colour scale -- which the caller
 // draws in a strip beside the first; every other chart returns nil for it.
 func buildPlot(spec plotproto.ChartSpec) (*plot.Plot, *plot.Plot, error) {
+	if err := validateChartMath(spec, plotTextHandler()); err != nil {
+		return nil, nil, err
+	}
 	p := plot.New()
 	p.Title.Text = spec.Title
 	p.X.Label.Text = spec.XLabel
@@ -233,6 +239,21 @@ func buildPlot(spec plotproto.ChartSpec) (*plot.Plot, *plot.Plot, error) {
 		return nil, nil, fmt.Errorf("unsupported chart kind %q", spec.Kind)
 	}
 	return p, nil, nil
+}
+
+var sharedMathTextHandler *mathTextHandler
+
+func plotTextHandler() *mathTextHandler {
+	if sharedMathTextHandler == nil {
+		sharedMathTextHandler = newMathTextHandler()
+	}
+	return sharedMathTextHandler
+}
+
+func init() {
+	// Every Plot text site (axes, title, legend, and categorical ticks) reads
+	// this one handler from Gonum's existing style defaults.
+	plot.DefaultTextHandler = plotTextHandler()
 }
 
 // saveWithColorBar writes one chart that carries a colour scale: the chart

@@ -70,6 +70,8 @@ Run these complete programs while working through the guide:
   [read/write round trip](../examples/v0.1/54_excel_roundtrip.ahd)
 - [HTTPS client examples](../examples/v0.6/README.md)
 - [HTML parsing and scraping examples](../examples/v0.7/README.md)
+- [v2.3 named Function captures](../examples/v2.3/uses/README.md) and
+  [Plot/Surface mathematical labels](../examples/v2.3/math_plot/README.md)
 
 ## 1. CSV: transport a text table safely
 

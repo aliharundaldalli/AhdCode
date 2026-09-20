@@ -13,6 +13,10 @@
 **Dosya uzantısı:** `.ahd`<br>
 **Kapsam:** Çekirdek dil dilbilgisi (grammar), statik tür sistemi ve yürütme anlambilimi (semantics). Bu spesifikasyon, v0.1 önyükleme (bootstrap) çekirdek tasarımı olarak başlamış ve 1.0 öncesinde (ör. bildirim çıkarımı, açık `T?`, yalnızca-ifade lambda'lar ve Class Protocol Methods) normatif revizyonlar almıştır. Artık çekirdek dili v1.0.0'da yayımlandığı hâliyle anlatır. Standart kütüphane modülleri (`Math`, `Regex`, `Data`, `Time`, vb.), birinci taraf çalışma zamanı servisleri (`HTTP`, `SQLite`, `MySQL`, `SMTP`) ve üst düzey uygulama çatıları (`Web`), çekirdek dilbilgisini değiştirmeden bu temel anlambilim üzerine kurulur ve `docs/` altındaki özel belgelerinde belgelenir.
 
+**v2.3.0 sürüm notu:** v2.3.0 sürümü, §15'te anlatılan iç içe isimli
+Function'lar ile açık `uses [#local, @module]` bağımlılık cümlesini Function
+bildirim yüzeyine ekler. Public ve runtime dil sürümü v2.3.0'dır.
+
 ---
 
 ## 1. Tasarım Felsefesi
@@ -96,7 +100,7 @@ true false null
 Int Real String Bool Nothing
 List Pair Function lambda Overload Override
 Class Attributes Constant Local Global Confidential
-Object Error
+Object Error uses
 ```
 
 Aşağıdakiler bağlamsal anahtar kelimelerdir:
@@ -1874,9 +1878,11 @@ square: Function := (
 }
 ```
 
-Sıradan bir Function bildirimi yalnızca modül kökünde görünebilir. Bir
-metot Function bildirimi Class üye kapsamında görünebilir. Çalıştırılabilir
-bloklar yeni Function bildirimleri içeremez.
+Sıradan bir Function bildirimi modül kökünde görünebilir. Bir metot Function
+bildirimi Class üye kapsamında görünebilir. v2.3.0 ile
+çalıştırılabilir blok içinde isimli Function bildirimi de yapılabilir. İç içe
+bildirim normal bir Function değeridir ve lambda ile aynı açık capture
+kurallarını kullanır.
 
 Mevcut, isimlendirilmiş bir Function değeri hâlâ bir Local Function
 bağlamasında saklanabilir:
@@ -1885,8 +1891,33 @@ bağlamasında saklanabilir:
 operation: Local Function := add
 ```
 
-v0.1'de iç içe geçmiş bir Function bildirimi yoktur. İfade lambda'ları §50'de
-belirtilir ve bu bildirim sözdizimini değiştirmez.
+v0.1 temelinde iç içe Function bildirimi yoktu. v2.3.0 uzantısı
+Function türünü veya çağrı sözdizimini değiştirmez; dönüş türü ile gövde
+arasına isteğe bağlı `uses` cümlesi ekler:
+
+```ahd
+makeChecker: Function := () -> Function
+uses [@activeLang]
+{
+    minimum: Local Int := 10
+    check: Function := (value: Int) -> Bool
+    uses [#minimum, @activeLang]
+    {
+        return value >= minimum
+    }
+    return check
+}
+```
+
+`#name`, üstteki callable kapsamındaki bir binding'e çözülmeli ve Function
+değeri oluşturulurken değerini capture etmelidir. `@name` modül kökündeki bir
+value binding'e çözülmelidir. Türler tekrar yazılmaz; sıra korunur ve eksik,
+çift, çözümsüz veya yanlış kapsamlı bağımlılıklar derleme hatasıdır. `uses`
+listesinde olmayan bir dış binding okuması da derleme hatasıdır. Wildcard veya
+örtük capture yoktur.
+
+İfade lambda'ları §50'de belirtilmiştir ve aynı capture gösterimini ve
+kurallarını kullanır.
 
 ### 15.1 Dönüş davranışı
 
@@ -4546,11 +4577,14 @@ kalır. Function'lar, Class'lar, ad alanları ve içe aktarımlar mevcut görün
 kurallarını korur ve hiçbir bağımlılık-listesi girdisine ihtiyaç duymaz;
 modül bağlamaları için mevcut açık `Global` kuralı yalnızca ifade lambda
 olduğu için zayıflatılmaz -- bu aynı kural, sadece kısaca yazılmıştır.
+Çalıştırılabilir blokta tanımlanan isimli Function'lar da aynı `uses` listesini
+ve aynı capture gösterimini kullanır.
 
 ### 50.5 Uygulama ve araçlar
 
 `lambda` ayrılmış bir anahtar kelimedir ve gerçek bir `LambdaExpr` AST düğümüne
-ayrıştırılır. Semantik denetleyici, her Function değeri için kullanılan aynı
+ayrıştırılır. `uses`, isimli Function bağımlılığının ayrılmış anahtar
+kelimesidir. Semantik denetleyici, her Function değeri için kullanılan aynı
 somut çağrılabilir imzayı üretir. Lowering, sıradan tiplenmiş bir Function IR
 çağrılabiliri ve `FunctionValueExpr` üretir; böylece yerel Go backend'i ve
 kalıcı değerlendirici mevcut Function adaptörlerini ve çağrı yollarını yeniden
@@ -7080,12 +7114,13 @@ GUI yardımcı protokolü sürüm 3'tür.
 
 Bölüm 86'daki görüntüleyici, korunan tuşlarına eşdeğer özel bir araç çubuğu
 gösterir — Save, Zoom Out, Zoom In, Rotate Left, Rotate Right ve Fit. Save
-bir kaydetme iletişim kutusunda yol sorar ve render aracını Chart'ın veya
-Figure'ın kendi render isteğiyle çalıştırır; böylece dosya, görünümden
-bağımsız olarak `save(path)`'in yazdığıyla aynıdır. Araç çubuğu GUI
-modülünün parçası değildir. Görüntüleyici okuyup sildiği tek bir görünüm
-dosyasıyla başlatılır; paketli `ahdplot` ve `ahdgui` yardımcılarını, o
-dosyada mutlak yollarıyla adlandırılmış olarak, yalnızca Save için çalıştırır.
+bir kaydetme iletişim kutusunda yol sorar ve Chart'ın veya Figure'ın kendi
+render isteğini çalıştırır; böylece dosya görünümden bağımsız olarak
+`save(path)` ile aynıdır. Surface Save (v2.3.0) o anki görünür
+orbit, eğim, zoom ve pan görünümünü render eder. Araç çubuğu GUI modülünün
+parçası değildir. Görüntüleyici okuyup sildiği tek bir görünüm dosyasıyla
+başlatılır; paketli `ahdplot` ve `ahdgui` yardımcılarını yalnızca Save için
+çalıştırır.
 
 ## 89. Plot Surface (v2.0.0)
 
@@ -7107,7 +7142,10 @@ ve `z`'dir. `save` yalnızca `.png` yolu kabul eder ve başlangıç görünümü
 birim başına 4/3 piksel ile belirlenimci olarak yazar. `show`
 görüntüleyiciyi döndürme, kaydırma, yakınlaştırma (0,3× ile 6×), sıfırlama ve
 Save ile 3B olarak açar; ortografik kamerası hiçbir zaman Surface'in parçası
-değildir.
+değildir. Görüntüleyici Surface Save'i o anki görünümü kaydeder; programatik
+`Surface.save(path)` belirlenimci başlangıç görünümünü yazmayı sürdürür.
+Bütün String'i saran `$...$` etiketler mevcut çevrimdışı Plot metin yoluyla
+matematiksel metin olabilir; karışık zengin metin ve animasyon kapsam dışıdır.
 
 ## 90. Uygulama Paketleme (v2.0.0)
 
