@@ -141,3 +141,54 @@ func TestQuickFixSEM029ImportSymbol(t *testing.T) {
 		wantAfter,
 	)
 }
+
+func TestQuickFixSEM043AddsNamedFunctionCapture(t *testing.T) {
+	directory := t.TempDir()
+	path := filepath.Join(directory, "main.ahd")
+	before := "outer: Function := () -> Nothing {\n" +
+		"    value: Local Int := 7\n" +
+		"    read: Function := () -> Int {\n" +
+		"        return value\n" +
+		"    }\n" +
+		"}\n"
+	wantAfter := "outer: Function := () -> Nothing {\n" +
+		"    value: Local Int := 7\n" +
+		"    read: Function := () -> Int uses [#value]\n" +
+		"{\n" +
+		"        return value\n" +
+		"    }\n" +
+		"}\n"
+	assertQuickFixRegression(t, "SEM043", path, before, "SEM043", offsetOf(t, before, "return value")+len("return "),
+		"Add '#value' to uses list", wantAfter)
+}
+
+func TestQuickFixSEM043ExtendsExistingUses(t *testing.T) {
+	directory := t.TempDir()
+	path := filepath.Join(directory, "main.ahd")
+	before := "outer: Function := () -> Nothing {\n" +
+		"    first: Local Int := 1\n    second: Local Int := 2\n" +
+		"    read: Function := () -> Int uses [#first] { return second }\n}\n"
+	wantAfter := "outer: Function := () -> Nothing {\n" +
+		"    first: Local Int := 1\n    second: Local Int := 2\n" +
+		"    read: Function := () -> Int uses [#first, #second] { return second }\n}\n"
+	assertQuickFixRegression(t, "SEM043 existing uses", path, before, "SEM043", offsetOf(t, before, "return second")+len("return "),
+		"Add '#second' to uses list", wantAfter)
+}
+
+func TestQuickFixSEM007AddsNamedFunctionGlobalCapture(t *testing.T) {
+	directory := t.TempDir()
+	path := filepath.Join(directory, "main.ahd")
+	before := "total: Int := 10\nread: Function := () -> Int {\n    return total\n}\n"
+	wantAfter := "total: Int := 10\nread: Function := () -> Int uses [@total]\n{\n    return total\n}\n"
+	assertQuickFixRegression(t, "SEM007 new uses", path, before, codeHiddenGlobal, offsetOf(t, before, "return total")+len("return "),
+		"Add '@total' to uses list", wantAfter)
+}
+
+func TestQuickFixSEM007ExtendsExistingUses(t *testing.T) {
+	directory := t.TempDir()
+	path := filepath.Join(directory, "main.ahd")
+	before := "total: Int := 10\nouter: Function := () -> Nothing {\n    localVal: Local Int := 1\n    read: Function := () -> Int uses [#localVal] { return total }\n}\n"
+	wantAfter := "total: Int := 10\nouter: Function := () -> Nothing {\n    localVal: Local Int := 1\n    read: Function := () -> Int uses [#localVal, @total] { return total }\n}\n"
+	assertQuickFixRegression(t, "SEM007 existing uses", path, before, codeHiddenGlobal, offsetOf(t, before, "return total")+len("return "),
+		"Add '@total' to uses list", wantAfter)
+}

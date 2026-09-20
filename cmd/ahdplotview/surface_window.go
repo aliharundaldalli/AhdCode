@@ -51,14 +51,14 @@ type surfaceViewer struct {
 func (v *surfaceViewer) perform(action string) {
 	switch action {
 	case actionSave:
-		surface := *v.spec.Surface
 		dialog := v.spec.Dialog
 		v.chrome.startSave(func() (string, error) {
 			path, err := chooseSavePath(dialog, "surface.png", []string{"png"})
 			if err != nil || path == "" {
 				return "", err
 			}
-			return filepath.Base(path), saveSurface(surface, path)
+			return filepath.Base(path), saveSurfaceViewWithRenderer(v.renderer, *v.spec.Surface, v.camera,
+				int(math.Ceil(float64(v.width)*v.scale)), int(math.Ceil(float64(v.height)*v.scale)), v.scale, path)
 		})
 	case actionZoomIn:
 		v.camera.zoomBy(buttonZoom)
@@ -166,7 +166,11 @@ func runSurfaceWindow(spec viewSpec, out io.Writer) error {
 	windowW, windowH := initialWindow(width, height, boundW, boundH-toolbarHeight)
 	h := newHUD()
 	answered := false
-	v := &surfaceViewer{spec: spec, camera: initialCamera(), renderer: newSurfaceRenderer(), scale: 1,
+	renderer := newSurfaceRendererWithHelper(spec.Renderer)
+	if err := renderer.prepare(*spec.Surface, 1); err != nil {
+		return err
+	}
+	v := &surfaceViewer{spec: spec, camera: initialCamera(), renderer: renderer, scale: 1,
 		width: windowW, height: windowH, started: time.Now(), dirty: true, hud: h, chrome: newChrome(modeSurface, h)}
 	v.ready = func() {
 		answered = true

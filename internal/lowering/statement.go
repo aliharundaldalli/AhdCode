@@ -33,6 +33,28 @@ func (lowerer *moduleLowerer) lowerStatement(statement ast.Stmt) ir.Statement {
 		return &ir.ExprStmt{StmtBase: ir.StmtBase{Span: value.Span()}, Value: lowerer.lowerExpr(value.Expression)}
 	case *ast.VariableDecl:
 		return lowerer.lowerVariable(value)
+	case *ast.FunctionDecl:
+		// A Function declared inside a callable is a local constant whose
+		// implementation is lifted into the module's IR function list. Its
+		// value site supplies any explicit captures.
+		symbol := lowerer.semantic.ResolvedSymbols[value]
+		if symbol == nil || symbol.ModuleRoot {
+			return nil
+		}
+		function := lowerer.lowerFunction(value, nil)
+		if function != nil {
+			lowerer.functions = append(lowerer.functions, function)
+		}
+		callable := callableForDeclaration(symbol, value)
+		if callable == nil {
+			return nil
+		}
+		base := ir.ExprBase{Span: value.Span(), Type: lowerType(symbol.Type), NullState: ir.NonNull}
+		var captures []ir.Expr
+		for _, capture := range callable.Captures {
+			captures = append(captures, &ir.LoadExpr{ExprBase: ir.ExprBase{Span: value.Span(), Type: lowerType(capture.Outer.Type), NullState: lowerNull(capture.Inner.InitialNull)}, Symbol: lowerer.compilation.registry.symbolID(lowerer.module, capture.Outer)})
+		}
+		return &ir.BindingStmt{StmtBase: ir.StmtBase{Span: value.Span()}, Symbol: lowerer.compilation.registry.symbolID(lowerer.module, symbol), Name: symbol.Name, Type: base.Type, NullState: ir.NonNull, Constant: true, Storage: ir.LocalStorage, Initializer: &ir.FunctionValueExpr{ExprBase: base, Symbol: lowerer.compilation.registry.symbolID(lowerer.module, symbol), Callable: lowerer.compilation.registry.callableID(lowerer.module, symbol, callable, false), Captures: captures}}
 	case *ast.AssignmentStmt:
 		target := lowerer.lowerTarget(value.Target)
 		if value.Operator == "=" {
@@ -116,7 +138,7 @@ func (lowerer *moduleLowerer) lowerStatement(statement ast.Stmt) ir.Statement {
 		return &ir.ContinueStmt{StmtBase: ir.StmtBase{Span: value.Span()}}
 	case *ast.BringStmt:
 		return nil
-	case *ast.FunctionDecl, *ast.ClassDecl, *ast.StructureDecl:
+	case *ast.ClassDecl, *ast.StructureDecl:
 		lowerer.compilation.error(CodeUnsupportedNode, fmt.Sprintf("nested declaration %T reached lowering", statement), statement.Span())
 	}
 	return nil

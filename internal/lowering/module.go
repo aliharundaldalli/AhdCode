@@ -10,6 +10,7 @@ import (
 )
 
 func (lowerer *moduleLowerer) lowerModule() *ir.Module {
+	lowerer.functions = nil
 	result := &ir.Module{ID: ir.ModuleID(lowerer.module.ID), Name: lowerer.module.Source.Name, SourcePath: lowerer.module.Source.Path}
 	for _, dependency := range lowerer.module.Dependencies {
 		result.Dependencies = append(result.Dependencies, ir.ModuleID(dependency))
@@ -48,6 +49,7 @@ func (lowerer *moduleLowerer) lowerModule() *ir.Module {
 			}
 		}
 	}
+	result.Functions = append(result.Functions, lowerer.functions...)
 	sort.Slice(result.Globals, func(i, j int) bool { return result.Globals[i].ID < result.Globals[j].ID })
 	sort.Slice(result.Functions, func(i, j int) bool { return result.Functions[i].ID < result.Functions[j].ID })
 	sort.Slice(result.Classes, func(i, j int) bool { return result.Classes[i].ID < result.Classes[j].ID })
@@ -162,6 +164,17 @@ func (lowerer *moduleLowerer) lowerFunction(declaration *ast.FunctionDecl, owner
 	}
 	previousReturn, previousReceiver, previousOwner := lowerer.currentReturn, lowerer.currentReceiver, lowerer.currentOwner
 	lowerer.currentReturn, lowerer.currentReceiver, lowerer.currentOwner = function.Signature.Return, function.Receiver, function.Owner
+	function.Captures = len(callable.Captures)
+	for _, capture := range callable.Captures {
+		id := lowerer.compilation.registry.symbolID(lowerer.module, capture.Inner)
+		if id == "" {
+			id = ir.SymbolID(string(callableID) + "::capture::" + capture.Name)
+		}
+		function.Parameters = append(function.Parameters, ir.Parameter{
+			Span: capture.Inner.Span, ID: id, Name: capture.Name,
+			Type: lowerType(capture.Inner.Type), NullState: lowerNull(capture.Inner.InitialNull),
+		})
+	}
 	for index := range declaration.Parameters {
 		parameter := &declaration.Parameters[index]
 		if index >= len(callable.Signature.Parameters) {

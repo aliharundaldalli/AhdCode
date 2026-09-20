@@ -29,7 +29,7 @@ aracılığıyla — doğrudan gelir. Standart modül üyeleri asla elle listele
 bunlar derleyicinin `bring`'i çözümlemek için kullandığı
 `StandardModuleInterfaces()`'ten gelir.
 
-## Yetenekler (v0.2.2)
+## Yetenekler (v0.2.2 temeli, v2.3.0 iyileştirmeleri)
 
 Pratik günlük AhdCode LSP özellik seti v0.2.2 ile **tamamlanmıştır**.
 `initialize` yanıtı yalnızca aşağıdakileri duyurur (artımlı senkronizasyon,
@@ -39,24 +39,35 @@ yok).
 - **Belge senkronizasyonu** — tam (full) belge senkronizasyonu; artımlı
   derleyici yok.
 - **Tanılamalar**, **Hover**, **Tanıma git**, **Belge sembolleri**,
-  **Signature help**, **Referans bulma** (geçerli **derleme grafiği** ile
-  sınırlı; workspace genelinde indeks değil).
+  **Signature help**, **Referans bulma** (başlatılmış workspace içindeki
+  `.ahd` girişleri ve import grafikleri; kimlik compiler bildirim yolu/konumu
+  ile belirlenir, metin araması değildir).
 - **Completion** — modül adları, `from ... bring` dışa aktarımları,
   namespace/Class üyeleri (**erişim-farkında Confidential üyeler**: yalnızca
   derleyici erişilebilir dediğinde önerilir), kapsamdaki yereller,
   otomatik import ve ölçülü anahtar kelimeler.
-- **Rename** — Definition/References ile aynı semantik kimlik; derleme
-  grafiği kapsamında.
+- **Rename** — Definition/References ile aynı semantik kimlik; workspace
+  genelinde import adları, lambda capture'ları ve named Function `uses`
+  girdileri de güncellenir.
 - **Semantic Tokens** — derleyici/AST olgularından; UTF-16 doğru konumlar.
 - **Inlay Hints** — çıkarılan türler ve ölçülü parametre-adı ipuçları.
 - **Code Actions** — yalnızca yapılandırılmış tanılama kodlarına bağlı
   quick fix'ler: `SEM006` (eksik `Local`), `PAR009` (geçersiz `for`
-  bağlaması `Local`), export-bulunamadı import tanılamaları.
+  bağlaması `Local`), `SEM043`/named Function `SEM007` (eksik `#name` veya
+  `@name` değerini `uses` listesine ekleme), export-bulunamadı import
+  tanılamaları.
 - **Belge biçimlendirme** — mevcut biçimlendirici kütüphanesi bellek-içi;
   diske yazmaz, shell-out yok.
 - **Workspace Symbols** — workspace kökleri ve giriş dizininde isteğe bağlı
   tarama; kalıcı indeks yok.
 - **Folding Range** ve **Selection Range** — AST destekli.
+
+Named Function capture'ları editörün tamamında compiler gerçekleri olarak
+işlenir: `#` sonrasında completion kapsayan lexical binding'leri, `@`
+sonrasında modül-kök değerlerini sunar; hover static türü ve capture kaynağını
+gösterir; definition asıl bildirime gider; semantic token'lar mevcut binding
+renk sınıflandırmasını kullanır. Eksik capture compiler tanısı olmaya devam
+eder; quick fix kullanıcı seçerse uygulanır.
 
 Sunucu **kaydedilmemiş editör metnini** analiz eder; açık belgeyi yalnızca
 derlemek için diske geri yazmaz.
@@ -76,6 +87,11 @@ Kullanıcı modülleri `initialize`'dan gelen workspace kökleri ile giriş
 belgesinin dizinindeki kardeş `.ahd` dosyalarının sınırlı taramasıyla
 bulunur. Sabit sembol kataloğu, arka plan izleyici veya kalıcı veritabanı
 yoktur. Aynı ad iki modülde varsa completion ayrı girişler gösterir.
+
+Referans ve rename sorguları, istek sırasında sınırlı bir in-memory taramadır.
+Açık buffer disk dosyasına üstün gelir; ihtiyaç olduğunda açık olmayan
+workspace `.ahd` girişleri compiler ile yeniden derlenir. Kalıcı indeks,
+SQLite veritabanı, arka plan daemon'ı veya watcher yoktur.
 
 ## Bilerek uygulanmayanlar
 

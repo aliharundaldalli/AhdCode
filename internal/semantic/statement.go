@@ -69,7 +69,11 @@ func (a *analyzer) analyzeStatement(statement ast.Stmt, current *scope, flow flo
 		// no-op rather than an error; the file's own requires simply do not
 		// compose in that path.
 	case *ast.FunctionDecl:
-		a.analyzeFunction(value, current.callableClass())
+		// Class members are analyzed by analyzeClass with their owner. A
+		// Function declaration encountered here is a local declaration, so it
+		// must not accidentally become a method merely because it appears in a
+		// class method body.
+		a.analyzeFunction(value, nil, current, flow)
 	case *ast.ClassDecl:
 		a.analyzeClass(value)
 	case *ast.StructureDecl:
@@ -658,6 +662,7 @@ func (a *analyzer) analyzeBlock(block *ast.Block, parent *scope, flow flowState,
 		return statementOutcome{flow: flow}
 	}
 	current := newScope(parent, blockScope)
+	a.predeclareBlockFunctions(block, current)
 	for name, symbol := range bindings {
 		current.symbols[name] = symbol
 		flow[symbol] = symbol.InitialNull

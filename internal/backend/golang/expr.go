@@ -68,8 +68,10 @@ func (generator *generator) expr(expression ir.Expr) string {
 	case *ir.FunctionValueExpr:
 		// A Function-typed binding resolves to its storage slot; a declared
 		// callable resolves to its uniform Function value adapter.
-		if current, known := generator.slots[value.Symbol]; known {
-			return current.name
+		if value.UseStorage {
+			if current, known := generator.slots[value.Symbol]; known {
+				return current.name
+			}
 		}
 		if strings.HasPrefix(string(value.Callable), "builtin:Math::") {
 			return generator.mathFunctionValue(value)
@@ -877,6 +879,31 @@ func (generator *generator) call(value *ir.CallExpr) string {
 			return generator.unsupported("a method call with no generated callable", meta.Span)
 		}
 		return generator.methodCall(generator.expr(method.Object), method.Direct, function, generator.arguments(function, value.Arguments, meta.Span))
+	}
+	// A local named Function is represented by a Function value binding even
+	// though its concrete CallableID remains attached for validation and type
+	// metadata. Its call must therefore stay indirect.
+	if value.Callee != nil {
+		signature := value.Callee.ExprMeta().Type.Signature
+		if signature == nil {
+			return generator.unsupported("an indirect call without a concrete signature", meta.Span)
+		}
+		parts := make([]string, 0, len(value.Arguments))
+		for index, argument := range value.Arguments {
+			if argument.UsesDefault || argument.Value == nil {
+				return generator.unsupported("a default argument in an indirect call", meta.Span)
+			}
+			target := ir.Type{Kind: ir.InvalidType}
+			if index < len(signature.Parameters) {
+				target = signature.Parameters[index].Type
+			}
+			parts = append(parts, generator.value(argument.Value, target, true))
+		}
+		call := generator.expr(value.Callee) + "(" + strings.Join(parts, ", ") + ")"
+		if signature.Return.Kind == ir.NothingType {
+			return call
+		}
+		return generator.coerce(call, ir.ExprBase{Type: signature.Return, NullState: ir.MaybeNull}, meta.Type, naturalNullable(value))
 	}
 	if function := generator.functions[value.Callable]; function != nil {
 		return generator.callableName(function) + "(" + strings.Join(generator.arguments(function, value.Arguments, meta.Span), ", ") + ")"

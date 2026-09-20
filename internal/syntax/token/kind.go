@@ -64,6 +64,7 @@ const (
 	KeywordConstant
 	KeywordLocal
 	KeywordGlobal
+	KeywordUses
 	KeywordConfidential
 	KeywordObject
 	KeywordError
@@ -122,7 +123,7 @@ var names = [...]string{
 	KeywordNothing: "Nothing", KeywordList: "List", KeywordPair: "Pair",
 	KeywordFunction: "Function", KeywordLambda: "lambda", KeywordOverload: "Overload", KeywordOverride: "Override",
 	KeywordClass: "Class", KeywordAttributes: "Attributes", KeywordConstant: "Constant",
-	KeywordLocal: "Local", KeywordGlobal: "Global", KeywordConfidential: "Confidential",
+	KeywordLocal: "Local", KeywordGlobal: "Global", KeywordUses: "uses", KeywordConfidential: "Confidential",
 	KeywordObject: "Object", KeywordError: "Error", Colon: ":", Declare: ":=", Assign: "=",
 	Arrow: "->", Plus: "+", Minus: "-", Star: "*", Slash: "/", Percent: "%", Caret: "^",
 	PlusAssign: "+=", MinusAssign: "-=", StarAssign: "*=", SlashAssign: "/=",

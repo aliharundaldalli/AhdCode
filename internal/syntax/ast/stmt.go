@@ -192,7 +192,10 @@ type FunctionDecl struct {
 	Flavor     FunctionFlavor
 	Parameters []Parameter
 	ReturnType *TypeRef
-	Body       *Block
+	// Captures is the explicit `uses [...]` dependency list for a named
+	// Function. It uses the same CaptureRef model as lambda dependencies.
+	Captures []CaptureRef
+	Body     *Block
 }
 
 func (*FunctionDecl) statementNode() {}

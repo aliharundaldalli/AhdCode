@@ -163,12 +163,27 @@ func (store *Store) set(path, text string) Result {
 	store.documents[canonical] = text
 	store.mutex.Unlock()
 
+	compiledEntry := store.compileEntry(canonical)
+	if compiledEntry == nil {
+		return Result{EntryPath: canonical, Diagnostics: map[string][]diagnostics.Diagnostic{}, Text: map[string]string{canonical: text}}
+	}
+	result := compiledEntry.result
+	store.mutex.Lock()
+	store.entries[canonical] = compiledEntry
+	store.mutex.Unlock()
+	return result
+}
+
+// compileEntry builds one compiler-authoritative snapshot without publishing
+// it. Workspace queries use the same path for unopened sibling files, while
+// open overlays continue to be supplied by overlay.Load.
+func (store *Store) compileEntry(path string) *entry {
+	canonical := canonicalPath(path)
 	compiler := module.NewCompiler(overlay{store: store}, overlay{store: store})
 	compilePath := store.discoverRequireEntry(canonical)
 	compiled := compiler.Compile(compilePath)
 	if compilePath != canonical && !compilationContains(compiled, canonical) {
 		compiled = compiler.Compile(canonical)
-		compilePath = canonical
 	}
 
 	grouped := make(map[string][]diagnostics.Diagnostic)
@@ -183,16 +198,12 @@ func (store *Store) set(path, text string) Result {
 		grouped[owner] = append(grouped[owner], item.Diagnostic)
 	}
 
-	result := Result{EntryPath: canonical, Diagnostics: grouped, Text: texts}
-	store.mutex.Lock()
-	store.entries[canonical] = &entry{
-		result:     result,
+	return &entry{
+		result:     Result{EntryPath: canonical, Diagnostics: grouped, Text: texts},
 		entryModID: compiled.Entry,
 		modules:    compiled.Modules,
 		fileToPath: fileToPath,
 	}
-	store.mutex.Unlock()
-	return result
 }
 
 func indexCompiledFiles(

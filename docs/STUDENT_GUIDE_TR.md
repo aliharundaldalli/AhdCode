@@ -1,4 +1,4 @@
-# AhdCode v2.1.0 Türkçe Öğrenci Rehberi
+# AhdCode Öğrenci Rehberi (v2.3 geliştirme)
 
 Bu rehber, **daha önce hiç programlama yapmamış birinin de takip edebilmesi** için hazırlanmıştır. Baştan sona sırayla okuyabilirsiniz; her bölümde önce ne yapmak istediğimizi görecek, sonra çalışan bir örnek yazacak, en son gerekli kuralları öğreneceksiniz.
 
@@ -13,6 +13,11 @@ belgesine geçin. Orada modüller `CSV → Data → Statistics/Plot → Excel/Wo
 `HTTPS → HTML` iş akışları içinde, kontrol noktaları ve görevlerle anlatılır.
 Tek tek bütün imzalar ve sınır koşulları ise her modülün kendi referans
 belgesindedir.
+
+Public/runtime temeli v2.2.0 olarak kalır. v2.3 geliştirme hattı ileri düzey
+isimli Function `uses` capture sözdizimi ve mevcut görünümü kaydeden Surface
+Save ekler; bu özellikler gerektiğinde [Fonksiyonlar](FUNCTIONS_TR.md) ve
+[Plot](PLOT_TR.md) referanslarından izlenmelidir.
 
 Bu rehber öğretir; bir referans kılavuzu ya da değişiklik günlüğü değildir. Bir
 modülün, yeni başlayan birinin ilk okumada ihtiyaç duyduğundan fazlası varsa,

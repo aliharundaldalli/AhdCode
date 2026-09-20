@@ -278,9 +278,13 @@ func dependencyOrder(compilation module.CompilationResult) []*module.Module {
 }
 
 type moduleLowerer struct {
-	compilation     *compilationLowerer
-	module          *module.Module
-	semantic        semantic.Result
+	compilation *compilationLowerer
+	module      *module.Module
+	semantic    semantic.Result
+	// functions collects lifted local named Functions encountered while
+	// lowering an enclosing callable. They are ordinary IR functions with
+	// leading capture parameters, just like lambdas.
+	functions       []*ir.Function
 	currentReturn   ir.Type
 	currentReceiver ir.SymbolID
 	currentOwner    ir.ClassID

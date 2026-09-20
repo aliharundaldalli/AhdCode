@@ -1,0 +1,16 @@
+// v2.3.0: named Function uses the same explicit capture model as lambda.
+activeLang: String := "TR"
+
+makeChecker: Function := (value: Int) -> Bool uses [@activeLang] {
+    minimum: Local Int := 10
+    isLarge: Local Function := lambda [#minimum] (value: Int) -> value >= minimum
+    check: Function := (value: Int) -> Bool uses [#minimum, @activeLang] {
+        if activeLang == "TR" {
+            return value >= minimum
+        }
+        return value >= minimum
+    }
+    return check(value)
+}
+
+write(makeChecker(12))

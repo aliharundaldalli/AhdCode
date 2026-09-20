@@ -162,7 +162,11 @@ func children(node ast.Node) []ast.Node {
 	case *ast.RequireStmt:
 		return nil
 	case *ast.FunctionDecl:
-		out := parameterNodes(n.Parameters)
+		out := make([]ast.Node, 0, len(n.Captures)+len(n.Parameters)+2)
+		for index := range n.Captures {
+			out = append(out, &n.Captures[index])
+		}
+		out = append(out, parameterNodes(n.Parameters)...)
 		out = append(out, typeRefNodes(n.ReturnType)...)
 		return append(out, blockNodes(n.Body)...)
 	case *ast.ClassDecl:

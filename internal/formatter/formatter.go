@@ -499,8 +499,13 @@ func (b *builder) functionDecl(f *ast.FunctionDecl) doc {
 	parameters := b.parameterGroup(f.Parameters)
 	arrow := b.leaf()
 	returnType := b.typeRef(f.ReturnType)
+	uses := text("")
+	if b.current().Kind == token.KeywordUses {
+		keyword := b.leaf()
+		uses = concat(text(" "), keyword, text(" "), b.captureGroup(f.Captures))
+	}
 	body := b.block(f.Body)
-	return concat(head, text(" "), declare, text(" "), parameters, text(" "), arrow, text(" "), returnType, text(" "), body)
+	return concat(head, text(" "), declare, text(" "), parameters, text(" "), arrow, text(" "), returnType, uses, text(" "), body)
 }
 
 func (b *builder) classDecl(c *ast.ClassDecl) doc {

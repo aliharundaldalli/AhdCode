@@ -96,6 +96,23 @@ func TestLambdaDependencyListFormatting(t *testing.T) {
 	}
 }
 
+func TestNamedFunctionUsesFormattingAndIdempotence(t *testing.T) {
+	input := "buildChart:Function:=(values:List<Real>)->Chart uses [#chartTitle,#xLabelText,@activeLang]{return values}\n"
+	formatted := formatText(t, input)
+	for _, wanted := range []string{
+		"buildChart: Function := (",
+		") -> Chart uses [#chartTitle, #xLabelText, @activeLang] {",
+		"return values",
+	} {
+		if !strings.Contains(formatted, wanted) {
+			t.Fatalf("formatted named Function lacks %q:\n%s", wanted, formatted)
+		}
+	}
+	if twice := formatText(t, formatted); twice != formatted {
+		t.Fatalf("named Function uses formatting is not idempotent:\nfirst:\n%s\nsecond:\n%s", formatted, twice)
+	}
+}
+
 func TestFormatterPreservesUpToOneBlankLineBetweenStatements(t *testing.T) {
 	input := "a: Int := 1\n\n\n\nb: Int := 2\nc: Int := 3\n"
 	want := "a: Int := 1\n\nb: Int := 2\nc: Int := 3\n"

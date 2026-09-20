@@ -66,6 +66,8 @@ Atölyeyi okurken aşağıdaki tam programları da çalıştırabilirsiniz:
   [okuma/yazma turu](../examples/v0.1/54_excel_roundtrip.ahd)
 - [HTTPS istemci örnekleri](../examples/v0.6/README_TR.md)
 - [HTML ayrıştırma ve kazıma örnekleri](../examples/v0.7/README_TR.md)
+- [v2.3 isimli Function capture'ları](../examples/v2.3/uses/README_TR.md) ve
+  [Plot/Surface matematik etiketleri](../examples/v2.3/math_plot/README_TR.md)
 
 ## 1. CSV: metin tablosunu güvenle taşımak
 

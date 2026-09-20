@@ -298,10 +298,14 @@ func (a *analyzer) analyzeIdentifier(identifier *ast.IdentifierExpr, current *sc
 	// that is still an ordinary enclosing lexical binding, and a lambda gains
 	// no privilege a Function lacks just because a Global declaration sits
 	// somewhere between it and the module.
-	if current.callable != nil && current.callable.kind == lambdaCallable && owner != a.module && owner.callable != current.callable && isLexicalCapture(symbol.Kind) {
-		a.error(codeMissingCapture, fmt.Sprintf("local %q is not a lambda dependency", identifier.Name), identifier.Span(),
-			fmt.Sprintf("add #%s (or Local %s) to the lambda dependency list, or pass the %s as a parameter",
-				identifier.Name, identifier.Name, captureTypeText(symbol)))
+	if current.callable != nil && (current.callable.kind == lambdaCallable || current.callable.kind == functionCallable) && owner != a.module && owner.callable != current.callable && isLexicalCapture(symbol.Kind) {
+		label := "lambda"
+		if current.callable.kind == functionCallable {
+			label = "Function"
+		}
+		a.error(codeMissingCapture, fmt.Sprintf("local %q is not a %s dependency", identifier.Name, label), identifier.Span(),
+			fmt.Sprintf("add #%s (or Local %s) to the %s dependency list, or pass the %s as a parameter",
+				identifier.Name, identifier.Name, label, captureTypeText(symbol)))
 	}
 	// Global governs module state. A module-root Function, Class, or namespace
 	// declaration is a callable or type declaration rather than a binding, so
@@ -313,7 +317,8 @@ func (a *analyzer) analyzeIdentifier(identifier *ast.IdentifierExpr, current *sc
 			a.error(codeHiddenGlobal, fmt.Sprintf("module binding %q requires an explicit Global dependency", identifier.Name), identifier.Span(),
 				fmt.Sprintf("add @%s (or Global %s) to the lambda dependency list", identifier.Name, identifier.Name))
 		} else {
-			a.error(codeHiddenGlobal, fmt.Sprintf("module binding %q requires an explicit Global declaration", identifier.Name), identifier.Span(), fmt.Sprintf("add %s: Global %s in this callable", identifier.Name, types.Display(symbol.Type)))
+			a.error(codeHiddenGlobal, fmt.Sprintf("module binding %q requires an explicit Global declaration", identifier.Name), identifier.Span(),
+				fmt.Sprintf("add @%s to uses list, or declare %s: Global %s in this callable", identifier.Name, identifier.Name, types.Display(symbol.Type)))
 		}
 	}
 	typeValue := symbol.Type

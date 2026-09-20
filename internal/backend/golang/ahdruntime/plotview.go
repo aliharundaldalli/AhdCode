@@ -398,14 +398,15 @@ func AhdPlotSurfaceSaveSpec(spec *ahdPlotSurfaceSpec, path, directory string) st
 	if err != nil {
 		return "invalid save path"
 	}
-	return ahdPlotViewRun(directory, ahdPlotViewSpec{Version: 2, Mode: "render", Surface: spec, Output: absolute})
+	renderer, _ := ahdPlotViewHelpers()
+	return ahdPlotViewRun(directory, ahdPlotViewSpec{Version: 2, Mode: "render", Renderer: renderer, Surface: spec, Output: absolute})
 }
 
 // AhdPlotSurfaceShowSpec opens a Surface in the viewer.
 func AhdPlotSurfaceShowSpec(spec *ahdPlotSurfaceSpec, directory string) string {
-	_, dialog := ahdPlotViewHelpers()
+	renderer, dialog := ahdPlotViewHelpers()
 	return ahdPlotViewRun(directory, ahdPlotViewSpec{Version: 2, Mode: "surface", Title: ahdPlotViewTitle(spec.Title),
-		Dialog: dialog, Surface: spec})
+		Renderer: renderer, Dialog: dialog, Surface: spec})
 }
 
 func AhdPlotSurfaceSave(class *AhdClass, s AhdSurface, path string) {

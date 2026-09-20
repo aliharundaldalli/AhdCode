@@ -30,7 +30,7 @@ A standard module's exported members (`Math.PI`, `Excel.read`, and so on) are
 never hand-listed for the editor: they come from the same
 `StandardModuleInterfaces()` the compiler itself resolves `bring` against.
 
-## Capabilities (v0.2.2)
+## Capabilities (v0.2.2 foundation, v2.3.0 improvements)
 
 The practical everyday AhdCode LSP feature set is **complete** as of v0.2.2.
 The `initialize` response advertises exactly what exists below and nothing
@@ -52,10 +52,10 @@ call/type hierarchy, no debugger).
   declarations and Class members as children.
 - **Signature Help** (`textDocument/signatureHelp`) -- active call
   signature with parameter tracking.
-- **Find References** (`textDocument/references`) -- every use of the
-  symbol at the cursor, scoped to the **current compile graph** (the open
-  entry document plus everything it transitively imports). This is not a
-  workspace-wide index.
+- **Find References** (`textDocument/references`) -- every compiler-resolved
+  use of the symbol at the cursor across the initialized workspace's `.ahd`
+  entries and their imported graphs. Independent snapshots are joined by
+  declaration path/span, never by same-spelling text search.
 - **Completion** (`textDocument/completion`) -- module names after
   `bring`/`from`; exported names after `from <module> bring`; namespace or
   Class members after `.` (including **access-aware Confidential members**:
@@ -65,8 +65,10 @@ call/type hierarchy, no debugger).
   and a restrained keyword set.
 - **Rename** (`textDocument/prepareRename`, `textDocument/rename`) --
   semantic-symbol renames using the same identity as Definition and
-  References, scoped to the compile graph. Invalid identifiers, keywords,
-  literals, operators, builtins, and unresolved symbols are rejected.
+  References, across workspace entries and imported graphs. Import names,
+  lambda captures, and named-Function `uses [#name, @name]` occurrences are
+  included; invalid identifiers, keywords, literals, operators, builtins, and
+  unresolved symbols are rejected.
   `prepareRename` validates new names with the real lexer rules.
 - **Semantic Tokens** (`textDocument/semanticTokens/full`) -- highlighting
   from compiler/AST facts (namespace, type, function, method, parameter,
@@ -78,6 +80,8 @@ call/type hierarchy, no debugger).
 - **Code Actions** (`textDocument/codeAction`) -- conservative quick fixes
   only, each tied to a structured compiler diagnostic:
   - `SEM006` -- add missing `Local` in a nested executable scope
+  - `SEM043`/named-Function `SEM007` -- add the missing `#name` or `@name` to
+    a `uses` list, creating the list when needed
   - `PAR009` (for-loop binding message) -- remove invalid `Local` from a
     `for` iteration binding
   - export-not-found import diagnostics -- import the missing symbol when
@@ -93,6 +97,14 @@ call/type hierarchy, no debugger).
   control-flow blocks, and similar AST-backed spans.
 - **Selection Range** (`textDocument/selectionRange`) -- progressive
   expansion through AST ancestors.
+
+Named-Function captures are compiler facts throughout the editor surface:
+completion after `#` offers enclosing lexical bindings, completion after `@`
+offers module-root value bindings, hover shows the static type and capture
+origin, definition returns the original declaration, and semantic tokens use
+the existing variable/binding classification. A missing capture remains a
+compiler diagnostic; a quick fix is an opt-in editor action, not an automatic
+rewrite.
 
 The server analyzes **unsaved editor text**. It never writes an open
 document's buffer back to its file on disk merely to compile it. An imported
@@ -116,6 +128,11 @@ roots (from LSP `initialize`) plus the entry document's directory for sibling
 is no hard-coded symbol registry, no background watcher, and no persistent
 database. When two modules export the same name, completion shows distinct
 entries with module details rather than silently picking one.
+
+Workspace references and rename are an on-demand bounded in-memory scan. Open
+buffers always take precedence over disk files, and the compiler is rerun for
+unopened workspace `.ahd` entries when a query needs them. There is no
+persistent index, SQLite database, background daemon, or asynchronous watcher.
 
 ## Not implemented (by design)
 

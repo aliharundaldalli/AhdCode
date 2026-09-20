@@ -309,6 +309,17 @@ func (a *analyzer) predeclareFunctions(program *ast.Program) {
 	}
 }
 
+func (a *analyzer) predeclareBlockFunctions(block *ast.Block, current *scope) {
+	if block == nil || current == nil {
+		return
+	}
+	for _, statement := range block.Statements {
+		if declaration, ok := statement.(*ast.FunctionDecl); ok {
+			a.registerFunction(declaration, current, nil)
+		}
+	}
+}
+
 // predeclareClassMembers visits Class declarations parent-before-child so a
 // subclass structure can expand SuperClass.attributes from a constructor that
 // is already complete.
@@ -371,7 +382,7 @@ func (a *analyzer) registerFunction(declaration *ast.FunctionDecl, targetScope *
 	symbol := &Symbol{
 		Name: declaration.Name, Kind: FunctionSymbol, Type: types.Function{Signature: callable.Signature},
 		Span: declaration.Span(), Declaration: declaration, Callable: callable,
-		ModuleRoot: owner == nil, InitialNull: NonNull,
+		ModuleRoot: owner == nil && targetScope == a.module, InitialNull: NonNull,
 		Constant: true, Confidential: hasModifier(declaration.Modifiers, ast.ModifierConfidential),
 		OriginModuleID: a.environment.ModuleID,
 	}

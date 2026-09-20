@@ -7,6 +7,11 @@
 **File extension:** `.ahd`<br>
 **Scope:** Core language grammar, static type system, and execution semantics. The specification originated as the v0.1 bootstrap core design and received normative revisions before 1.0 (e.g. declaration inference, explicit `T?`, expression-only lambdas, and Class Protocol Methods). It now describes the core language as released in v1.0.0. Standard library modules (`Math`, `Regex`, `Data`, `Time`, etc.), first-party runtime services (`HTTP`, `SQLite`, `MySQL`, `SMTP`), and higher-level application frameworks (`Web`) build on top of these core semantics without altering core grammar, and are documented in their dedicated guides in `docs/`.
 
+**v2.3.0 release note:** The v2.3.0 release extends the Function declaration
+surface with nested named Functions and the explicit `uses [#local, @module]`
+dependency clause described in §15. The public and runtime language version is
+v2.3.0.
+
 ---
 
 ## 1. Design Philosophy
@@ -85,7 +90,7 @@ true false null
 Int Real String Bool Nothing
 List Pair Function lambda Overload Override
 Class Attributes Constant Local Global Confidential
-Object Error
+Object Error uses
 ```
 
 The following are contextual keywords:
@@ -1641,7 +1646,7 @@ square: Function := (
 }
 ```
 
-An ordinary Function declaration may appear only at module root. A method Function declaration may appear in Class member scope. Executable blocks may not contain new Function declarations.
+An ordinary Function declaration may appear at module root. A method Function declaration may appear in Class member scope. Since v2.3.0, an executable block may also contain a named Function declaration. A nested declaration is a normal Function value and follows the same explicit capture rules as a lambda.
 
 An existing named Function value may still be stored in a Local Function binding:
 
@@ -1649,8 +1654,33 @@ An existing named Function value may still be stored in a Local Function binding
 operation: Local Function := add
 ```
 
-v0.1 has no nested Function declaration. Expression lambdas are specified in
-§50 and do not change this declaration syntax.
+The v0.1 baseline had no nested Function declaration. The v2.3.0 extension
+does not change the Function type or call syntax; it adds an optional
+`uses` clause between the return type and the body:
+
+```ahd
+makeChecker: Function := () -> Function
+uses [@activeLang]
+{
+    minimum: Local Int := 10
+    check: Function := (value: Int) -> Bool
+    uses [#minimum, @activeLang]
+    {
+        return value >= minimum
+    }
+    return check
+}
+```
+
+`#name` must resolve to a binding in an enclosing callable scope and captures
+its value when the Function value is created. `@name` must resolve to a
+module-root value binding. Types are not repeated, captures are ordered, and
+the compiler rejects missing, duplicate, unresolved, or wrongly scoped
+dependencies. A body read that is not listed in `uses` is a compile-time
+error. The clause is explicit: there is no wildcard or inferred capture form.
+
+Expression lambdas are specified in §50 and use the same capture
+representation and rules.
 
 ### 15.1 Return behavior
 
@@ -4099,7 +4129,9 @@ v0.1.13 replaces that restriction with an explicit dependency list (§54): an
 enclosing Function parameter or `Local` may be read when the lambda lists it
 as `#name`/`Local name`, and a module binding may be read when the lambda
 lists it as `@name`/`Global name`, mirroring the explicit `Global` declaration
-an ordinary Function already needs. Reading either kind of binding without
+an ordinary Function already needs. Named Functions declared in an executable
+block use the same `uses` list and the same capture representation. Reading
+either kind of binding without
 listing it remains a semantic error. Functions, Classes, namespaces, and
 imports retain the existing visibility rules and need no dependency-list entry
 at all; the existing explicit `Global` rule for module bindings is not
@@ -4108,9 +4140,10 @@ spelled compactly.
 
 ### 50.5 Implementation and tools
 
-`lambda` is a reserved keyword and parses to a real `LambdaExpr` AST node. The
-semantic checker produces the same concrete callable signature used for every
-Function value. Lowering emits an ordinary typed Function IR callable and a
+`lambda` is a reserved keyword and parses to a real `LambdaExpr` AST node.
+`uses` is the reserved named-Function dependency keyword. The semantic checker
+produces the same concrete callable signature used for every Function value.
+Lowering emits an ordinary typed Function IR callable and a
 `FunctionValueExpr`; the native Go backend and persistent evaluator therefore
 reuse their existing Function adapters and invocation paths. No source rewrite
 or runtime Lambda identity exists, and `id()` is not extended to Functions.
@@ -6609,10 +6642,11 @@ The viewer of section 86 shows a private toolbar — Save, Zoom Out, Zoom In,
 Rotate Left, Rotate Right, and Fit — equivalent to its keys, which remain.
 Save asks for a path in a save dialog and runs the renderer on the Chart's or
 Figure's own render request, so the file equals what `save(path)` writes
-regardless of the view. The toolbar is not part of the GUI module. The viewer
-is started with one view file that it reads and deletes; it runs the bundled
-`ahdplot` and `ahdgui` helpers, named by absolute path in that file, only for
-Save.
+regardless of the view. Surface Save (v2.3.0) instead renders the
+current visible orbit, tilt, zoom, and pan view. The toolbar is not part of the
+GUI module. The viewer is started with one view file that it reads and deletes;
+it runs the bundled `ahdplot` and `ahdgui` helpers, named by absolute path in
+that file, only for Save.
 
 ## 89. Plot Surface (v2.0.0)
 
@@ -6632,7 +6666,11 @@ no constructor. The size is 1 to 2000 units on each side (default 800 × 600);
 the axis labels default to `x`, `y`, and `z`. `save` accepts only a `.png`
 path and writes the initial view deterministically at 4/3 pixels per unit.
 `show` opens the viewer in 3D with orbit, pan, zoom (0.3× to 6×), reset, and
-Save; its orthographic camera is never part of the Surface.
+Save; its orthographic camera is never part of the Surface. Surface Save in
+the viewer records that current view; programmatic `Surface.save(path)` keeps
+writing the deterministic initial view. Labels may use whole-string `$...$`
+mathematical text through the existing offline Plot text path; mixed rich text
+and animation are not part of this scope.
 
 ## 90. Application Packaging (v2.0.0)
 

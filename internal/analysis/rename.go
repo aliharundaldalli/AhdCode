@@ -2,6 +2,7 @@ package analysis
 
 import (
 	"sort"
+	"strings"
 
 	"ahdcode/internal/lexer"
 	"ahdcode/internal/semantic"
@@ -53,12 +54,14 @@ func (store *Store) Rename(path string, offset int, newName string) ([]TextEdit,
 	if declaration == nil {
 		return nil, false
 	}
-	targets := cached.equivalentSymbols(declaration)
-	isDeclarationOccurrence := declarationOccurrencePredicate(declaration)
+	targetIdentity := declarationIdentity(cached, declaration)
+	if targetIdentity == "" {
+		return nil, false
+	}
 
 	type occurrence struct {
-		path string
-		span source.Span
+		path       string
+		start, end int
 	}
 	seen := make(map[occurrence]bool)
 	var edits []TextEdit
@@ -68,34 +71,54 @@ func (store *Store) Rename(path string, offset int, newName string) ([]TextEdit,
 		if nameSpan.Empty() {
 			return
 		}
-		key := occurrence{path: modulePath, span: nameSpan}
+		key := occurrence{path: modulePath, start: nameSpan.Start.Offset, end: nameSpan.End.Offset}
 		if seen[key] {
 			return
 		}
 		seen[key] = true
 		edits = append(edits, TextEdit{Path: modulePath, Span: nameSpan, NewText: newName})
 	}
+	addEditSpan := func(modulePath string, span source.Span) {
+		if span.Empty() {
+			return
+		}
+		key := occurrence{path: modulePath, start: span.Start.Offset, end: span.End.Offset}
+		if seen[key] {
+			return
+		}
+		seen[key] = true
+		edits = append(edits, TextEdit{Path: modulePath, Span: span, NewText: newName})
+	}
 
-	for _, candidateModule := range cached.modules {
-		if candidateModule == nil {
-			continue
-		}
-		modulePath, ok := cached.fileToPath[candidateModule.File.ID]
-		if !ok {
-			continue
-		}
-		for useNode, useSymbol := range candidateModule.Semantic.ResolvedSymbols {
-			if !isAnyOf(useSymbol, targets) {
+	for _, snapshot := range store.workspaceEntries(canonical) {
+		for _, candidateModule := range snapshot.modules {
+			if candidateModule == nil {
 				continue
 			}
-			if isDeclarationOccurrence(useNode) {
-				addEdit(modulePath, useNode)
+			modulePath, ok := snapshot.fileToPath[candidateModule.File.ID]
+			if !ok {
 				continue
 			}
-			if identifier, ok := useNode.(*ast.IdentifierExpr); ok {
-				addEdit(modulePath, identifier)
-			} else if member, ok := useNode.(*ast.MemberExpr); ok && member.Name == declaration.Name {
-				addEdit(modulePath, member)
+			for useNode, useSymbol := range candidateModule.Semantic.ResolvedSymbols {
+				resolved := snapshot.declarationSymbol(useSymbol)
+				if declarationIdentity(snapshot, resolved) != targetIdentity {
+					continue
+				}
+				if declarationOccurrencePredicate(resolved)(useNode) {
+					addEdit(modulePath, useNode)
+					continue
+				}
+				if bring, ok := useNode.(*ast.BringStmt); ok && !bring.Namespace {
+					if span, found := bringImportNameSpan(snapshot.result.Text[modulePath], bring, declaration.Name); found {
+						addEditSpan(modulePath, span)
+					}
+				} else if identifier, ok := useNode.(*ast.IdentifierExpr); ok {
+					addEdit(modulePath, identifier)
+				} else if capture, ok := useNode.(*ast.CaptureRef); ok {
+					addEdit(modulePath, capture)
+				} else if member, ok := useNode.(*ast.MemberExpr); ok && member.Name == declaration.Name {
+					addEdit(modulePath, member)
+				}
 			}
 		}
 	}
@@ -119,6 +142,37 @@ func (store *Store) Rename(path string, offset int, newName string) ([]TextEdit,
 		return edits[i].Span.Start.Offset < edits[j].Span.Start.Offset
 	})
 	return edits, true
+}
+
+func bringImportNameSpan(text string, bring *ast.BringStmt, name string) (source.Span, bool) {
+	if bring == nil || name == "" || bring.Span().Start.Offset < 0 || bring.Span().End.Offset > len(text) {
+		return source.Span{}, false
+	}
+	start, end := bring.Span().Start.Offset, bring.Span().End.Offset
+	segment := text[start:end]
+	marker := strings.LastIndex(segment, "bring")
+	if marker < 0 {
+		return source.Span{}, false
+	}
+	segment = segment[marker+len("bring"):]
+	base := start + marker + len("bring")
+	for cursor := 0; cursor+len(name) <= len(segment); cursor++ {
+		if !strings.HasPrefix(segment[cursor:], name) {
+			continue
+		}
+		beforeOK := cursor == 0 || !isIdentifierByte(segment[cursor-1])
+		after := cursor + len(name)
+		afterOK := after == len(segment) || !isIdentifierByte(segment[after])
+		if beforeOK && afterOK {
+			return source.Span{FileID: bring.Span().FileID,
+				Start: source.Position{Offset: base + cursor}, End: source.Position{Offset: base + after}}, true
+		}
+	}
+	return source.Span{}, false
+}
+
+func isIdentifierByte(value byte) bool {
+	return value == '_' || value >= 'a' && value <= 'z' || value >= 'A' && value <= 'Z' || value >= '0' && value <= '9'
 }
 
 func (store *Store) renameTarget(path string, offset int) (*semantic.Symbol, source.Span, bool) {
@@ -147,6 +201,12 @@ func (store *Store) renameTarget(path string, offset int) (*semantic.Symbol, sou
 			return symbol, memberNameSpan(typed), true
 		}
 		return nil, source.Span{}, false
+	case *ast.CaptureRef:
+		symbol, ok := entryModule.Semantic.ResolvedSymbols[typed]
+		if ok && symbol != nil && !symbol.Builtin {
+			return symbol, captureNameSpan(typed), true
+		}
+		return nil, source.Span{}, false
 	default:
 		if symbol, ok := entryModule.Semantic.ResolvedSymbols[node]; ok && symbol != nil && !symbol.Builtin {
 			return symbol, renameNameSpan(node, symbol.Span), true
@@ -161,12 +221,24 @@ func renameNameSpan(node ast.Node, fallback source.Span) source.Span {
 		return typed.Span()
 	case *ast.MemberExpr:
 		return memberNameSpan(typed)
+	case *ast.CaptureRef:
+		return captureNameSpan(typed)
 	case *ast.VariableDecl:
 		if identifier, ok := typed.Target.(*ast.IdentifierExpr); ok {
 			return identifier.Span()
 		}
 	}
 	return fallback
+}
+
+func captureNameSpan(capture *ast.CaptureRef) source.Span {
+	span := capture.Span()
+	nameBytes := len(capture.Name)
+	start := span.End.Offset - nameBytes
+	if start < span.Start.Offset {
+		start = span.Start.Offset
+	}
+	return source.Span{FileID: span.FileID, Start: source.Position{Offset: start}, End: span.End}
 }
 
 func memberNameSpan(member *ast.MemberExpr) source.Span {

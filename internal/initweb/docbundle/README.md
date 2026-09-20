@@ -16,9 +16,11 @@ modules, GUI, Graphics, interactive Plot viewer, and desktop application
 packaging. It is used in practice by a small community; it is not a
 mainstream language.
 
-This is **v2.2.0**, **Plot Completeness**. Pie charts, heatmaps, categorical
-Surface axes, and the Student Performance Explorer are now released. The
-release adds no syntax, type-system change, or dependency.
+This is **v2.3.0**, **Language Ergonomics & Plot Polish**. It adds explicit
+named-Function `uses` captures, capture-aware compiler and LSP tooling,
+workspace references/rename, current-view Surface Save, and bounded
+mathematical text for Plot and Surface labels. v2.2.0, **Plot Completeness**,
+remains available as the previous release.
 
 v2.0.0 is a major release, **Desktop Application Completion**: it completes
 the first-party desktop application foundation — ListBox, Select, TextArea,
@@ -481,6 +483,7 @@ See the [CLI guide](CLI.md), [formatter guide](FORMATTER.md),
 - v2.0 desktop applications — a SQLite ledger with a TableView, dialogs, and CSV export; a 3D Surface; and a small application to package
 - v2.1 application I/O and network — a binary file round trip over HTTP, a WebSocket client and server pair, and mail with attachments
 - v2.2 student performance — one desktop application that shows the same grades as a line, bar, histogram, box, error bar, pie, heatmap, and 3D surface
+- v2.3 examples — explicit named-Function `uses` captures and Plot/Surface mathematical labels
 - v1.9 GUI colors and interactive Plot — an order form with colors and a disabled Save button, and a chart in AhdCode's own viewer
 - v1.8 GUI and events — a small GUI ledger backed by SQLite and a Turtle driven by arrow keys and clicks
 - v1.6 Graphics and Turtle — a Cartesian Canvas, shapes, a Turtle star and spiral, PNG/SVG export, and a regular-polygon lesson
@@ -500,6 +503,29 @@ diagnostics and hover. The same VSIX targets VS Code and Antigravity. See its
 installation guide.
 
 ## Current limitations
+
+## What is new in v2.3.0 <a id="what-is-new-in-v23"></a>
+
+v2.3.0, **Language Ergonomics & Plot Polish**, is a focused language and
+visualization release:
+
+- named Functions inside executable blocks can declare explicit `uses`
+  dependencies with `#` lexical captures and `@` module captures, using the
+  same model as lambda captures;
+- the compiler, formatter, diagnostics, and language server understand those
+  captures, including completion, definition, hover, references, rename,
+  semantic tokens, and missing-capture quick fixes;
+- references and rename can inspect bounded compiler-authoritative workspace
+  snapshots, including imported files, without a background index;
+- the Plot Surface viewer's Save records the current visible camera view,
+  while programmatic `Surface.save(path)` remains canonical and deterministic;
+- Plot and Surface labels accept whole-string `$...$` mathematical text through
+  the existing offline math-text path. Mixed rich text, animation, and a
+  general-purpose 3D camera/scene API remain out of scope.
+
+See the v2.3 examples,
+[Functions](FUNCTIONS.md), [LSP](LSP.md), and
+[Plot](PLOT.md) references.
 
 ## What is new in v2.2 <a id="what-is-new-in-v22"></a>
 
@@ -852,7 +878,7 @@ knob: SHA-2 for digests, HMAC-SHA256 for MACs, RSASSA-PKCS1-v1_5 over SHA-256
 
 AhdCode v1.0.0 is the first stable release. The exclusions below are deliberate design decisions, not gaps awaiting a later version.
 
-Within the language, AhdCode intentionally excludes block/statement lambdas, arbitrary/implicit mutable closures, general user-defined operator overloading (outside the ten fixed Class Protocol Methods), multiple return values/tuples, reflection, traits/interfaces, and multiple inheritance. In tooling, AhdCode uses compile-time local source composition ([`require(...)`](REQUIRE.md)) and bundled offline modules rather than an external package manager or remote registry. Language server references and rename operate within the compile graph rather than an asynchronous background workspace index. See the [specification's unsupported-feature list](AHDCODE_LANGUAGE_SPEC_v0.1.md#40-unsupported-v01-features).
+Within the language, AhdCode intentionally excludes block/statement lambdas, arbitrary/implicit mutable closures, general user-defined operator overloading (outside the ten fixed Class Protocol Methods), multiple return values/tuples, reflection, traits/interfaces, and multiple inheritance. In tooling, AhdCode uses compile-time local source composition ([`require(...)`](REQUIRE.md)) and bundled offline modules rather than an external package manager or remote registry. Language server references and rename use compiler-authoritative, bounded on-demand workspace snapshots; they do not start an asynchronous background index. See the [specification's unsupported-feature list](AHDCODE_LANGUAGE_SPEC_v0.1.md#40-unsupported-v01-features).
 
 ## Repository map
 
@@ -881,6 +907,7 @@ examples/v0.12/      MySQL raffle demo (join codes and announced winner)
 examples/v0.14/      multi-file web app with require(...) and static assets
 examples/v0.15/      Math Portal dogfood application
 examples/v0.16/      forms, validation, CSRF, and flash workflow
+examples/v2.3/       v2.3 release examples
 tools/AhdDataStudio/ first-party local MySQL + SQLite development UI
 AHDCODE_LANGUAGE_SPEC_v0.1.md
                      authoritative core language specification

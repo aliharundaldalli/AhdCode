@@ -183,7 +183,12 @@ func (lowerer *moduleLowerer) lowerIdentifier(identifier *ast.IdentifierExpr, ba
 			callable = symbol.Callable
 		}
 		if callable != nil {
-			return &ir.FunctionValueExpr{ExprBase: base, Symbol: lowerer.compilation.registry.symbolID(lowerer.module, symbol), Callable: lowerer.compilation.registry.callableID(lowerer.module, symbol, callable, false)}
+			var captures []ir.Expr
+			for _, capture := range callable.Captures {
+				captures = append(captures, &ir.LoadExpr{ExprBase: ir.ExprBase{Span: identifier.Span(), Type: lowerType(capture.Outer.Type), NullState: lowerNull(capture.Inner.InitialNull)}, Symbol: lowerer.compilation.registry.symbolID(lowerer.module, capture.Outer)})
+			}
+			useStorage := symbol.Kind != semantic.FunctionSymbol || (!symbol.ModuleRoot && symbol.OwnerClass == nil)
+			return &ir.FunctionValueExpr{ExprBase: base, Symbol: lowerer.compilation.registry.symbolID(lowerer.module, symbol), Callable: lowerer.compilation.registry.callableID(lowerer.module, symbol, callable, false), UseStorage: useStorage, Captures: captures}
 		}
 	}
 	return &ir.LoadExpr{ExprBase: base, Symbol: lowerer.compilation.registry.symbolID(lowerer.module, symbol)}
@@ -655,7 +660,12 @@ func (lowerer *moduleLowerer) lowerCall(call *ast.CallExpr, base ir.ExprBase) ir
 		callableID = ir.CallableID("builtin:core::" + symbol.Name)
 	}
 	var callee ir.Expr
-	if symbol == nil || (symbol.Kind != semantic.FunctionSymbol && symbol.Kind != semantic.BuiltinSymbol) {
+	localFunction := symbol != nil && symbol.Kind == semantic.FunctionSymbol && !symbol.ModuleRoot && symbol.OwnerClass == nil
+	if localFunction {
+		// A nested named Function is a local closure value. Keep the call
+		// indirect so its explicit captures are supplied by the binding site.
+		callee = lowerer.lowerExpr(call.Callee)
+	} else if symbol == nil || (symbol.Kind != semantic.FunctionSymbol && symbol.Kind != semantic.BuiltinSymbol) {
 		callee = lowerer.lowerExpr(call.Callee)
 	} else if _, method := call.Callee.(*ast.MemberExpr); method && symbol.OwnerClass != nil {
 		callee = lowerer.lowerExpr(call.Callee)

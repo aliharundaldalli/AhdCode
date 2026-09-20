@@ -42,30 +42,36 @@ import (
 // installed so a dependency that collides with a parameter is reported
 // against the dependency that caused it.
 func (a *analyzer) analyzeLambdaCaptures(lambda *ast.LambdaExpr, current, lambdaScope *scope, flow, lambdaFlow flowState, callable *Callable) {
-	parameterNames := make(map[string]bool, len(lambda.Parameters))
-	for index := range lambda.Parameters {
-		parameterNames[lambda.Parameters[index].Name] = true
+	a.analyzeCallableCaptures(lambda.Captures, lambda.Parameters, "lambda", current, lambdaScope, flow, lambdaFlow, callable)
+}
+
+// analyzeCallableCaptures is shared by lambdas and named Functions. Both
+// forms use the same explicit Local snapshot / Global alias model.
+func (a *analyzer) analyzeCallableCaptures(captures []ast.CaptureRef, parameters []ast.Parameter, label string, current, callableScope *scope, flow, callableFlow flowState, callable *Callable) {
+	parameterNames := make(map[string]bool, len(parameters))
+	for index := range parameters {
+		parameterNames[parameters[index].Name] = true
 	}
-	seen := make(map[string]bool, len(lambda.Captures))
-	for index := range lambda.Captures {
-		capture := &lambda.Captures[index]
+	seen := make(map[string]bool, len(captures))
+	for index := range captures {
+		capture := &captures[index]
 		if seen[capture.Name] {
-			a.error(codeInvalidCapture, fmt.Sprintf("%q is already listed as a lambda dependency", capture.Name),
+			a.error(codeInvalidCapture, fmt.Sprintf("%q is already listed as a %s dependency", capture.Name, label),
 				capture.Span(), "list each dependency once; #name/Local name and @name/Global name are alternate spellings of the same dependency")
 			continue
 		}
 		seen[capture.Name] = true
 		if parameterNames[capture.Name] {
 			a.error(codeInvalidCapture,
-				fmt.Sprintf("dependency %q collides with a lambda parameter", capture.Name),
-				capture.Span(), "rename the parameter or the dependency; a lambda cannot bind one name twice")
+				fmt.Sprintf("dependency %q collides with a %s parameter", capture.Name, label),
+				capture.Span(), "rename the parameter or the dependency; a callable cannot bind one name twice")
 			continue
 		}
 		switch capture.Kind {
 		case ast.LocalCapture:
-			a.resolveLocalCapture(capture, current, lambdaScope, flow, lambdaFlow, callable)
+			a.resolveLocalCapture(capture, current, callableScope, flow, callableFlow, callable, label)
 		case ast.GlobalCapture:
-			a.resolveGlobalDependency(capture, current, lambdaScope, flow, lambdaFlow, callable)
+			a.resolveGlobalDependency(capture, current, callableScope, flow, callableFlow, callable, label)
 		}
 	}
 }
@@ -76,22 +82,22 @@ func (a *analyzer) analyzeLambdaCaptures(lambda *ast.LambdaExpr, current, lambda
 // naming an actual module binding) is still installed under its real kind
 // after the diagnostic, so a body reference to the same name does not also
 // report a separate "missing dependency" error.
-func (a *analyzer) resolveLocalCapture(capture *ast.CaptureRef, current, lambdaScope *scope, flow, lambdaFlow flowState, callable *Callable) {
+func (a *analyzer) resolveLocalCapture(capture *ast.CaptureRef, current, callableScope *scope, flow, callableFlow flowState, callable *Callable, label string) {
 	outer, owner := current.lookup(capture.Name)
 	if outer == nil {
-		a.error(codeUnknownCapture, fmt.Sprintf("unknown lambda dependency %q", capture.Name),
-			capture.Span(), "capture a binding that is visible where the lambda is written")
+		a.error(codeUnknownCapture, fmt.Sprintf("unknown %s dependency %q", label, capture.Name),
+			capture.Span(), "capture a binding that is visible where the callable is written")
 		return
 	}
 	if owner == a.module {
 		if outer.Builtin || outer.Kind == ClassSymbol || outer.Kind == FunctionSymbol || outer.Kind == NamespaceSymbol {
-			a.error(codeInvalidCapture, fmt.Sprintf("%q is reached directly and does not need a lambda dependency", capture.Name),
-				capture.Span(), fmt.Sprintf("remove %q from the lambda dependency list", capture.Name))
+			a.error(codeInvalidCapture, fmt.Sprintf("%q is reached directly and does not need a %s dependency", capture.Name, label),
+				capture.Span(), fmt.Sprintf("remove %q from the %s dependency list", capture.Name, label))
 			return
 		}
 		a.error(codeInvalidCapture, fmt.Sprintf("%q is a module binding, not a local one", capture.Name),
-			capture.Span(), fmt.Sprintf("write @%s or Global %s in the lambda dependency list", capture.Name, capture.Name))
-		a.installGlobalAlias(capture, outer, lambdaScope, flow, lambdaFlow)
+			capture.Span(), fmt.Sprintf("write @%s or Global %s in the %s dependency list", capture.Name, capture.Name, label))
+		a.installGlobalAlias(capture, outer, callableScope, flow, callableFlow)
 		return
 	}
 	if !capturableSymbol(outer, owner, a.module) {
@@ -100,7 +106,7 @@ func (a *analyzer) resolveLocalCapture(capture *ast.CaptureRef, current, lambdaS
 			capture.Span(), captureRejectionHint(outer, owner, a.module))
 		return
 	}
-	a.installLocalCapture(capture, outer, lambdaScope, flow, lambdaFlow, callable)
+	a.installLocalCapture(capture, outer, callableScope, flow, callableFlow, callable)
 }
 
 // resolveGlobalDependency resolves one `@name`/`Global name` entry: it must
@@ -111,27 +117,27 @@ func (a *analyzer) resolveLocalCapture(capture *ast.CaptureRef, current, lambdaS
 // closure snapshot. A dependency written with the wrong sigil (`@name` naming
 // an actual enclosing local) is still installed under its real kind after the
 // diagnostic, for the same no-cascade reason as resolveLocalCapture.
-func (a *analyzer) resolveGlobalDependency(capture *ast.CaptureRef, current, lambdaScope *scope, flow, lambdaFlow flowState, callable *Callable) {
+func (a *analyzer) resolveGlobalDependency(capture *ast.CaptureRef, current, callableScope *scope, flow, callableFlow flowState, callable *Callable, label string) {
 	if moduleSymbol, ok := a.module.local(capture.Name); ok {
 		if moduleSymbol.Builtin || moduleSymbol.Kind == ClassSymbol || moduleSymbol.Kind == FunctionSymbol || moduleSymbol.Kind == NamespaceSymbol {
 			a.error(codeInvalidCapture,
 				fmt.Sprintf("%q is reached directly and does not need a Global dependency", capture.Name),
-				capture.Span(), fmt.Sprintf("remove %q from the lambda dependency list", capture.Name))
+				capture.Span(), fmt.Sprintf("remove %q from the %s dependency list", capture.Name, label))
 			return
 		}
-		a.installGlobalAlias(capture, moduleSymbol, lambdaScope, flow, lambdaFlow)
+		a.installGlobalAlias(capture, moduleSymbol, callableScope, flow, callableFlow)
 		return
 	}
 	if outer, owner := current.lookup(capture.Name); outer != nil && owner != a.module && isLexicalCapture(outer.Kind) {
 		a.error(codeInvalidCapture, fmt.Sprintf("%q is a local binding, not a module binding", capture.Name),
-			capture.Span(), fmt.Sprintf("write #%s or Local %s in the lambda dependency list", capture.Name, capture.Name))
+			capture.Span(), fmt.Sprintf("write #%s or Local %s in the %s dependency list", capture.Name, capture.Name, label))
 		if capturableSymbol(outer, owner, a.module) {
-			a.installLocalCapture(capture, outer, lambdaScope, flow, lambdaFlow, callable)
+			a.installLocalCapture(capture, outer, callableScope, flow, callableFlow, callable)
 		}
 		return
 	}
 	a.error(codeUnknownCapture, fmt.Sprintf("no module-root value binding named %q", capture.Name),
-		capture.Span(), "declare the module binding before this callable, or remove it from the lambda dependency list")
+		capture.Span(), "declare the module binding before this callable, or remove it from the dependency list")
 }
 
 // installLocalCapture records one resolved Local capture: a read-only binding
@@ -147,7 +153,8 @@ func (a *analyzer) installLocalCapture(capture *ast.CaptureRef, outer *Symbol, l
 		// A capture reads the enclosing binding's value. Rebinding it from
 		// inside the lambda would suggest ownership of the outer variable,
 		// which explicit capture deliberately does not grant.
-		Captured: true,
+		Captured:  true,
+		CaptureOf: outer,
 	}
 	lambdaScope.symbols[capture.Name] = inner
 	lambdaFlow[inner] = inner.InitialNull
@@ -165,6 +172,7 @@ func (a *analyzer) installGlobalAlias(capture *ast.CaptureRef, moduleSymbol *Sym
 		Name: capture.Name, Kind: BindingSymbol, Type: moduleSymbol.Type,
 		Span: capture.Span(), Declaration: capture, Constant: moduleSymbol.Constant,
 		InitialNull: flow.state(moduleSymbol), Alias: moduleSymbol, DeclaredNullable: moduleSymbol.DeclaredNullable,
+		CaptureOf: moduleSymbol,
 	}
 	lambdaScope.symbols[capture.Name] = alias
 	lambdaFlow[alias] = flow.state(moduleSymbol)
@@ -188,7 +196,7 @@ func capturableSymbol(symbol *Symbol, owner, module *scope) bool {
 
 func captureRejectionHint(symbol *Symbol, owner, module *scope) string {
 	if owner == module || symbol.ModuleRoot || symbol.Builtin {
-		return fmt.Sprintf("%q is reachable by ordinary lookup, so remove it from the lambda dependency list", symbol.Name)
+		return fmt.Sprintf("%q is reachable by ordinary lookup, so remove it from the dependency list", symbol.Name)
 	}
 	if symbol.Alias != nil {
 		return fmt.Sprintf("%q is itself a Global alias; write @%s (or Global %s) to reach the module binding directly", symbol.Name, symbol.Name, symbol.Name)

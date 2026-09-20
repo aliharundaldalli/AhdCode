@@ -70,6 +70,8 @@ Run these complete programs while working through the guide:
   read/write round trip
 - HTTPS client examples
 - HTML parsing and scraping examples
+- v2.3 named Function captures and
+  Plot/Surface mathematical labels
 
 ## 1. CSV: transport a text table safely
 

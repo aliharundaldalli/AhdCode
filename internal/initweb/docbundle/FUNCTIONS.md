@@ -5,7 +5,8 @@
 [Back to README](README.md) · [Classes](CLASSES.md)
 
 Functions are named declarations at module root; methods are named declarations
-inside a Class. Nested Function declarations remain unsupported. A lambda is
+inside a Class. Since v2.3.0, a named Function may also be
+declared inside an executable block. A lambda is
 an expression-only shorthand that creates an anonymous value of the existing
 `Function` type; it is not a new type or a second callable system.
 
@@ -151,6 +152,34 @@ strong: Local Table := table.filter(
     lambda [#minimum] (row: Pair<String, String>) -> int(row["score"]) >= minimum
 )
 ```
+
+## Named Function `uses` (v2.3.0)
+
+Named Functions use the same explicit dependency model as expression lambdas.
+The optional list comes after the return type and before the body:
+
+```ahd
+makeChecker: Function := () -> Function uses [@activeLang] {
+    minimum: Local Int := 70
+    check: Function := (score: Int) -> Bool uses [#minimum, @activeLang] {
+        return score >= minimum
+    }
+    return check
+}
+```
+
+`#name` captures an enclosing lexical binding by value. `@name` declares a
+module/global dependency and observes the live module binding. The list never
+contains a type, and captures are never inferred. A missing dependency is a
+compiler error; the editor offers a quick fix to add the required `#name` or
+`@name`. Duplicate, unresolved, wrong-kind, parameter-conflicting, and
+local-conflicting entries are rejected.
+
+Nested named Functions work at any lexical depth and remain ordinary typed
+Function values that can be stored, returned, or passed to callbacks. This is
+not a second closure model: lowering and runtime behavior reuse lambda
+captures. The old `name: Global Type` declaration remains valid for existing
+code.
 
 ## Return behavior
 

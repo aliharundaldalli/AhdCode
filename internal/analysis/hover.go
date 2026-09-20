@@ -56,5 +56,11 @@ func renderHover(symbol *semantic.Symbol) string {
 	if symbol.Constant {
 		prefix = "Constant "
 	}
-	return prefix + symbol.Name + ": " + types.Display(symbol.Type)
+	suffix := ""
+	if symbol.Captured {
+		suffix = " (captured from an enclosing scope)"
+	} else if symbol.CaptureOf != nil {
+		suffix = " (module/global capture)"
+	}
+	return prefix + symbol.Name + ": " + types.Display(symbol.Type) + suffix
 }

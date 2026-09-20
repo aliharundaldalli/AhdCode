@@ -52,6 +52,28 @@ write(values)
 	}
 }
 
+func TestNamedFunctionsSupportExplicitCapturesThroughNestedDepth(t *testing.T) {
+	directory := writeSources(t, map[string]string{"main.ahd": `outer: Function := () -> Int {
+	value: Local Int := 7
+    middle: Function := () -> Int uses [#value] {
+        inner: Function := () -> Int uses [#value] {
+            return value + 1
+        }
+        return inner()
+    }
+    return middle()
+}
+write(outer())
+`})
+	stdout, stderr, code := buildAndRun(t, filepath.Join(directory, "main.ahd"), "")
+	if code != 0 || stderr != "" {
+		t.Fatalf("exit=%d stderr=%q", code, stderr)
+	}
+	if stdout != "8\n" {
+		t.Fatalf("stdout=%q, want %q", stdout, "8\n")
+	}
+}
+
 func TestInvalidLambdasFailBeforeNativeGeneration(t *testing.T) {
 	tests := map[string]string{
 		"wrong argument": `f := lambda (x: Int) -> x ^ 2

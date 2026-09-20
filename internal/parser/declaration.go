@@ -298,9 +298,6 @@ func (p *parser) looksLikeFunctionSignature() bool {
 }
 
 func (p *parser) parseFunctionDecl(start source.Position, name string, modifiers []ast.Modifier, flavor ast.FunctionFlavor, scope scopeKind) ast.Stmt {
-	if scope == scopeBlock {
-		p.errorSpan(codeInvalidDeclarationScope, "Function declarations are not allowed in executable blocks", positionSpan(p.file.ID, start), "move the Function declaration to module root or Class member scope")
-	}
 	if flavor == ast.FunctionOverride && scope != scopeClass {
 		p.errorSpan(codeInvalidDeclarationScope, "Override Function requires Class member scope", positionSpan(p.file.ID, start), "declare Override Function inside a derived Class")
 	}
@@ -310,10 +307,21 @@ func (p *parser) parseFunctionDecl(start source.Position, name string, modifiers
 	p.skipNewlines()
 	returnType := p.parseTypeRef()
 	p.skipNewlines()
+	var captures []ast.CaptureRef
+	if p.match(token.KeywordUses) {
+		p.skipNewlines()
+		var malformed bool
+		captures, malformed = p.parseCaptureListFor("Function")
+		if malformed {
+			// The dependency parser has already recovered through the closing
+			// bracket; keep parsing the body so later diagnostics remain local.
+		}
+		p.skipNewlines()
+	}
 	body := p.parseBlock()
 	return &ast.FunctionDecl{
 		Base: p.base(start, body.Span().End), Name: name, Modifiers: modifiers,
-		Flavor: flavor, Parameters: parameters, ReturnType: returnType, Body: body,
+		Flavor: flavor, Parameters: parameters, ReturnType: returnType, Captures: captures, Body: body,
 	}
 }
 

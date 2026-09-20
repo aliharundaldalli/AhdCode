@@ -130,6 +130,32 @@ its key.
 A [pie](#pie) has no Cartesian axes, so `xLabel` and `yLabel` raise
 `PlotError` on one rather than being quietly dropped.
 
+## Mathematical text (v2.3.0)
+
+Existing text APIs accept a small whole-string math opt-in. A String whose
+complete contents are enclosed by matching `$...$` is rendered through
+AhdCode's existing offline Plot math-text path:
+
+```ahd
+chart = chart.title("$f(x)=x^2+3x+2$").xLabel("$x$").yLabel("$\\sigma^2$")
+chart = chart.line(x, y, "$f(x)$").legend(true)
+```
+
+The same rule applies to Chart titles and axes, line/scatter legend labels,
+pie labels and legends, bar categories, heatmap categories, and Surface
+titles, axis labels, z labels, and `xCategories`/`yCategories`. Ordinary
+strings, including `"Cost $100"`, remain ordinary text. v2.3.0 does not split
+mixed rich text such as `"Variance is $\\sigma^2$"`; that is future work.
+
+Malformed math is reported as a Plot error and does not silently produce an
+empty label. Formula validation and rendered Surface labels are bounded and
+cached; no JavaScript, network, shell execution, or second TeX engine is
+used. Chart SVG/PDF output keeps the existing vector-capable text canvas. Plot
+labels use Gonum's internal math-text renderer with the project's offline
+Unicode/plain fallback; the bundled Tectonic engine remains the full-document
+LaTeX/PDF path and is not used for Plot labels. The lightweight viewer raster
+path caches transparent label images for Retina-sized rendering.
+
 ## Multiple series
 
 `chart.line(x, y, label)` and `chart.scatter(x, y, label)` add one more
@@ -462,7 +488,7 @@ per `x` value** — `z[j][i]` is the height at `(x[i], y[j])`.
 
 | Toolbar button | Keys and mouse | Action |
 | --- | --- | --- |
-| Save | — | Save the Surface's PNG, exactly as `save(path)` writes it |
+| Save | — | Save the current visible Surface viewport as PNG |
 | Zoom Out / Zoom In | Mouse wheel | Zoom out and in |
 | — | Drag with the left button | Orbit around the surface |
 | — | Shift+drag, or drag with the right button | Pan |
@@ -474,8 +500,10 @@ whole surface in view; orbiting turns freely around the vertical axis and
 stops just short of straight up and straight down, so the view never flips;
 zoom ranges from 0.3× to 6×, and panning keeps the surface within reach.
 Like the Chart viewer, the camera belongs to the view only: it is not part of
-the Surface, there is no camera API, and saving always writes the initial
-view.
+the Surface and there is no camera API. The viewer's Save includes the current
+orbit, tilt, zoom, pan, wireframe, axes, category labels, and math labels; it
+does not include the toolbar. Programmatic `Surface.save(path)` remains the
+canonical deterministic initial view and is independent of any viewer state.
 
 This is small scientific 3D plotting, not a 3D engine: there are no meshes,
 imported models, textures, lighting or material settings, scene graph, or
