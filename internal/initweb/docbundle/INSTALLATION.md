@@ -1,7 +1,6 @@
 # Installation, upgrade, and removal
 
-Download the package for your operating system from the AhdCode release you
-want to install. File names below use `<version>` for that release's number.
+Download the AhdCode v2.2.0 package for your operating system.
 Every package is self-contained: it carries the compiler, a private Go
 toolchain, AhdDataStudio, the SQLite, numeric and plot helpers, an offline
 LaTeX engine, the project starters, and the English documentation.
@@ -11,13 +10,13 @@ LaTeX engine, the project starters, and the English documentation.
 The macOS package targets Apple Silicon Macs — M1, M2, M3, M4 and later arm64
 models. There is no Intel build.
 
-Double-click `AhdCode-<version>-macos-arm64.pkg` and follow the installer. The
+Double-click `AhdCode-2.2.0-macos-arm64.pkg` and follow the installer. The
 package is signed with a Developer ID and notarized by Apple, so it opens
 normally; no security workaround is needed. It installs for your account only,
 asks for no administrator password, and writes nothing outside your home
 folder.
 
-Files go under `~/Library/AhdCode/versions/<version>`. `current` selects the
+Files go under `~/Library/AhdCode/versions/2.2.0`. `current` selects the
 active version and `~/Library/AhdCode/bin/ahdcode` is the stable command. That
 one folder is added to your PATH.
 
@@ -25,14 +24,14 @@ Then open a **new** Terminal and run `ahdcode --version`. A terminal that was
 already open keeps the environment it started with; a new one picks up the
 change immediately.
 
-`AhdCode-<version>-macos-arm64.zip` is an alternate download that bundles the same
+`AhdCode-2.2.0-macos-arm64.zip` is an alternate download that bundles the same
 package together with the VS Code extension. A `.dmg` with the same payload is
 also published for anyone who prefers a disk image; the `.pkg` is the
 recommended installer.
 
 ## Windows x64
 
-Double-click `AhdCode-<version>-windows-x64.exe` in File Explorer. Setup is a small
+Double-click `AhdCode-2.2.0-windows-x64.exe` in File Explorer. Setup is a small
 graphical per-user program: it shows what it will install, unpacks and checks
 its embedded payload with a progress window, and finishes with a confirmation.
 No console, no terminal, and no typed commands are involved.
@@ -42,7 +41,7 @@ unknown-publisher warning. Choose **More info** and then **Run anyway** to
 continue. The published SHA-256 checksums let you confirm you have the official
 file.
 
-Files go under `%LOCALAPPDATA%\AhdCode\versions\<version>`. The stable command
+Files go under `%LOCALAPPDATA%\AhdCode\versions\2.2.0`. The stable command
 is `%LOCALAPPDATA%\AhdCode\bin\ahdcode.exe`, and only that one folder is added
 to your user PATH — once, on first installation. Administrator rights, Git, and
 a system Go installation are not required, and an uninstall entry is registered
@@ -50,23 +49,23 @@ in Windows Installed Apps.
 
 Then open a **new** PowerShell or Command Prompt and run `ahdcode --version`.
 
-`AhdCode-<version>-windows-x64.exe --silent` installs with no windows at all, for
+`AhdCode-2.2.0-windows-x64.exe --silent` installs with no windows at all, for
 scripted deployment. Because setup is a graphical program, run it from a script
 as `Start-Process -Wait` if you need to block until it finishes.
-`AhdCode-<version>-windows-x64.zip` bundles the same installer with the VS Code
+`AhdCode-2.2.0-windows-x64.zip` bundles the same installer with the VS Code
 extension.
 
 ## Linux x64
 
-Extract `AhdCode-<version>-linux-x64.tar.gz` and run:
+Extract `AhdCode-2.2.0-linux-x64.tar.gz` and run:
 
 ```sh
-tar -xzf AhdCode-<version>-linux-x64.tar.gz
-cd AhdCode-<version>
+tar -xzf AhdCode-2.2.0-linux-x64.tar.gz
+cd AhdCode-2.2.0
 sh install.sh --setup-path
 ```
 
-Files live under `~/.local/share/ahdcode/versions/<version>`. The installer adds
+Files live under `~/.local/share/ahdcode/versions/2.2.0`. The installer adds
 one owned PATH block to `~/.profile`. Open a login shell or source that profile.
 
 ## What is included
@@ -89,7 +88,7 @@ root, next to a short `README.txt`. AhdCode does not need it, and setup never
 installs it for you.
 
 In VS Code, open the Extensions view, open its `...` menu, choose **Install
-from VSIX...**, and select `vscode/ahdcode-<version>.vsix` from the
+from VSIX...**, and select `vscode/ahdcode-0.2.3.vsix` from the
 installation root. Google Antigravity IDE offers the same operation. The file
 carries everything it needs; no npm and no network are involved. The same
 `.vsix` is published beside the platform artifacts as a standalone download.

@@ -4321,6 +4321,14 @@ type AhdChart struct {
 
 	ErrorX, ErrorY, ErrorLower, ErrorUpper *AhdList[float64]
 
+	// v2.2 pie and heatmap storage.
+	PieLabels *AhdList[string]
+	PieValues *AhdList[float64]
+
+	HeatmapXLabels *AhdList[string]
+	HeatmapYLabels *AhdList[string]
+	HeatmapValues  *AhdList[*AhdList[float64]]
+
 	Title, XLabel, YLabel string
 	Legend                bool
 	Width, Height         int64
@@ -4358,6 +4366,13 @@ type ahdPlotChartSpec struct {
 	ErrorY     []float64 `json:"error_y,omitempty"`
 	ErrorLower []float64 `json:"error_lower,omitempty"`
 	ErrorUpper []float64 `json:"error_upper,omitempty"`
+
+	PieLabels []string  `json:"pie_labels,omitempty"`
+	PieValues []float64 `json:"pie_values,omitempty"`
+
+	HeatmapXLabels []string    `json:"heatmap_x_labels,omitempty"`
+	HeatmapYLabels []string    `json:"heatmap_y_labels,omitempty"`
+	HeatmapValues  [][]float64 `json:"heatmap_values,omitempty"`
 }
 
 type ahdPlotRequest struct {
@@ -4433,6 +4448,12 @@ func ahdPlotChartSpecOf(chart AhdChart) ahdPlotChartSpec {
 		spec.ErrorY = ahdPlotFloats(chart.ErrorY)
 		spec.ErrorLower = ahdPlotFloats(chart.ErrorLower)
 		spec.ErrorUpper = ahdPlotFloats(chart.ErrorUpper)
+	case "pie":
+		spec.PieLabels, spec.PieValues = ahdPlotStrings(chart.PieLabels), ahdPlotFloats(chart.PieValues)
+	case "heatmap":
+		spec.HeatmapXLabels = ahdPlotStrings(chart.HeatmapXLabels)
+		spec.HeatmapYLabels = ahdPlotStrings(chart.HeatmapYLabels)
+		spec.HeatmapValues = ahdPlotFloatGrid(chart.HeatmapValues)
 	}
 	return spec
 }
@@ -4607,6 +4628,80 @@ func AhdPlotBar(class *AhdClass, labels *AhdList[string], values *AhdList[float6
 	return AhdChart{Kind: "bar", BarLabels: AhdNewList(ls...), BarValues: AhdNewList(vs...), Width: 800, Height: 600}
 }
 
+// AhdPlotPie is Plot.pie(labels, values). A pie is a Chart like any other:
+// it keeps its own storage, and title, legend, size, save, and show all
+// work on it. Its legend is on by default, because the slice colours mean
+// nothing without their category names.
+func AhdPlotPie(class *AhdClass, labels *AhdList[string], values *AhdList[float64]) AhdChart {
+	ls, vs := ahdPlotStrings(labels), ahdPlotFloats(values)
+	if len(ls) != len(vs) {
+		AhdRaiseClass(class, "pie labels and values must have the same length")
+	}
+	ahdPlotRequireNonEmpty(class, len(vs), "pie chart data")
+	if len(vs) > AhdPlotMaxPieSlices {
+		AhdRaiseClass(class, fmt.Sprintf("a pie chart draws at most %d slices; got %d", AhdPlotMaxPieSlices, len(vs)))
+	}
+	ahdPlotRequireNonNegative(class, vs, "pie values")
+	positive := false
+	for _, value := range vs {
+		if !ahdPlotFinite(value) {
+			AhdRaiseClass(class, "pie values must be finite")
+		}
+		if value > 0 {
+			positive = true
+		}
+	}
+	if !positive {
+		AhdRaiseClass(class, "a pie chart needs at least one value greater than zero")
+	}
+	return AhdChart{
+		Kind: "pie", PieLabels: AhdNewList(ls...), PieValues: AhdNewList(vs...),
+		Legend: true, Width: 800, Height: 600,
+	}
+}
+
+// AhdPlotHeatmap is Plot.heatmap(xLabels, yLabels, values). The Matrix is
+// row-major against the labels: one row per y label, one column per x
+// label, so values[row][column] is the cell at yLabels[row] and
+// xLabels[column]. Its legend -- the colour scale -- is on by default.
+func AhdPlotHeatmap(class *AhdClass, xLabels, yLabels *AhdList[string], values AhdMatrix) AhdChart {
+	xs, ys := ahdPlotStrings(xLabels), ahdPlotStrings(yLabels)
+	grid := ahdPlotFloatGrid(values.Rows)
+	ahdPlotRequireNonEmpty(class, len(xs), "heatmap x labels")
+	ahdPlotRequireNonEmpty(class, len(ys), "heatmap y labels")
+	if len(xs) > AhdPlotMaxHeatmapLabels || len(ys) > AhdPlotMaxHeatmapLabels {
+		AhdRaiseClass(class, fmt.Sprintf("a heatmap has at most %d labels on each axis; got %d and %d",
+			AhdPlotMaxHeatmapLabels, len(xs), len(ys)))
+	}
+	if len(xs)*len(ys) > AhdPlotMaxHeatmapCells {
+		AhdRaiseClass(class, fmt.Sprintf("a heatmap draws at most %d cells; got %d",
+			AhdPlotMaxHeatmapCells, len(xs)*len(ys)))
+	}
+	if len(grid) != len(ys) {
+		AhdRaiseClass(class, fmt.Sprintf("the values Matrix has %d rows; a heatmap needs one row per y label (%d)",
+			len(grid), len(ys)))
+	}
+	for _, row := range grid {
+		if len(row) != len(xs) {
+			AhdRaiseClass(class, fmt.Sprintf("the values Matrix has %d columns; a heatmap needs one column per x label (%d)",
+				len(row), len(xs)))
+		}
+		for _, value := range row {
+			if !ahdPlotFinite(value) {
+				AhdRaiseClass(class, "heatmap values must be finite; NaN and Infinity cannot be drawn")
+			}
+		}
+	}
+	rows := make([]*AhdList[float64], len(grid))
+	for index, row := range grid {
+		rows[index] = AhdNewList(row...)
+	}
+	return AhdChart{
+		Kind: "heatmap", HeatmapXLabels: AhdNewList(xs...), HeatmapYLabels: AhdNewList(ys...),
+		HeatmapValues: AhdNewList(rows...), Legend: true, Width: 800, Height: 600,
+	}
+}
+
 func AhdPlotHistogram(class *AhdClass, values *AhdList[float64], bins int64) AhdChart {
 	vs := ahdPlotFloats(values)
 	if bins <= 0 {
@@ -4636,9 +4731,29 @@ func AhdPlotErrorBar(class *AhdClass, x, y, lower, upper *AhdList[float64]) AhdC
 	}
 }
 
-func AhdPlotChartTitle(chart AhdChart, text string) AhdChart  { chart.Title = text; return chart }
-func AhdPlotChartXLabel(chart AhdChart, text string) AhdChart { chart.XLabel = text; return chart }
-func AhdPlotChartYLabel(chart AhdChart, text string) AhdChart { chart.YLabel = text; return chart }
+func AhdPlotChartTitle(chart AhdChart, text string) AhdChart { chart.Title = text; return chart }
+
+// AhdPlotChartXLabel and AhdPlotChartYLabel name an axis. A pie has none,
+// so naming one is refused rather than quietly ignored: a program that
+// writes it has misunderstood the chart, and saying so is more useful than
+// dropping the call.
+func AhdPlotChartXLabel(class *AhdClass, chart AhdChart, text string) AhdChart {
+	ahdPlotRequireAxes(class, chart, "xLabel")
+	chart.XLabel = text
+	return chart
+}
+
+func AhdPlotChartYLabel(class *AhdClass, chart AhdChart, text string) AhdChart {
+	ahdPlotRequireAxes(class, chart, "yLabel")
+	chart.YLabel = text
+	return chart
+}
+
+func ahdPlotRequireAxes(class *AhdClass, chart AhdChart, member string) {
+	if chart.Kind == "pie" {
+		AhdRaiseClass(class, "a pie chart has no x or y axis, so "+member+" cannot be set on one")
+	}
+}
 func AhdPlotChartLegend(chart AhdChart, enabled bool) AhdChart {
 	chart.Legend = enabled
 	return chart

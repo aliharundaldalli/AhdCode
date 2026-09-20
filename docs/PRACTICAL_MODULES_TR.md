@@ -360,9 +360,40 @@ chart.save("puanlar.png")
 | İki sayısal değişken birlikte nasıl hareket ediyor? | `Plot.scatter` |
 | Tek bir sayısal dağılımın şekli ne? | `Plot.histogram` |
 | Grupların dağılımları nasıl karşılaştırılıyor? | `Plot.box` |
+| Bir bütün parçalara nasıl ayrılıyor? | `Plot.pie` |
+| Etiketli bir ızgarada yüksek ve düşük hücreler nerede? | `Plot.heatmap` |
 
 Çizgi ve scatter grafiğinde x/y uzunlukları eşit olmalıdır. Boş veri, geçersiz
 bin sayısı veya uyuşmayan uzunluklar `PlotError` üretir.
+
+Pasta grafiği, çubuk grafiğinden farklı bir soruyu yanıtlar: çubuk
+kategorileri karşılaştırır, pasta ise onların tek bir bütünü nasıl
+böldüğünü gösterir. Etiketleri ve değerleri verin ve göstergesini açık
+bırakın — renklerin anahtarı odur:
+
+```ahd
+chart := Plot.pie(["Analiz", "Cebir", "Geometri"], [84, 81, 88])
+chart = chart.title("Ders dağılımı")
+chart.save("dersler.png")
+```
+
+Değerler sonlu ve negatif olmayan sayılar olmalı, en az biri sıfırdan büyük
+olmalıdır. Pastanın ekseni yoktur; bu yüzden üzerinde `xLabel` ve `yLabel`
+`PlotError` fırlatır.
+
+Isı haritası, sayı tablosu okumanın yerine onları görmeyi koyar. Matrix'i
+**y etiketi başına bir satır, x etiketi başına bir sütundur**:
+
+```ahd
+bring Numeric
+grid := Numeric.matrix([[72.0, 78.0], [68.0, 75.0], [80.0, 82.0]])
+chart := Plot.heatmap(["1. Yıl", "2. Yıl"], ["Analiz", "Cebir", "Geometri"], grid)
+chart = chart.title("Notlar").xLabel("Yıl").yLabel("Ders")
+chart.save("notlar.png")
+```
+
+İkisi de sıradan Chart'lardır: `title`, `legend`, `size`, PNG/SVG/PDF'e
+`save`, `show` ve bir `Plot.subplots` Figure'ında bir hücre hepsi çalışır.
 
 ### 3.3 Statistics ile özet, Plot ile şekil
 

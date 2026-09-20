@@ -703,6 +703,21 @@ x) returns an immutable `Surface` with `title`, `xLabel`, `yLabel`,
 camera API, mesh, or 3D scatter. `ahdcode package app.ahd --name App` makes a
 self-contained desktop application; see [`docs/PACKAGING.md`](docs/PACKAGING.md).
 
+**A category is a label, not a number (v2.2).** `Plot.pie(labels, values)`
+draws one slice per category: values are `List<Int>` or `List<Real>`, all
+finite and non-negative, and at least one above zero. Its legend is on by
+default, and it has **no axes** — `xLabel`/`yLabel` on a pie raise
+`PlotError`, so do not set them. `Plot.heatmap(xLabels, yLabels, values: Matrix)`
+draws a labelled grid; the Matrix is **one row per y label and one column
+per x label**, so `values[row][column]` is the cell at `yLabels[row]` and
+`xLabels[column]`, and a nested `List<List<Real>>` is not the argument — use
+`Numeric.matrix(rows)`. Its colour-scale legend is on by default too. For a
+Surface over categories, keep the numeric geometry and name the coordinates
+with `xCategories(labels)` / `yCategories(labels)`, one label per
+coordinate; `xLabel`/`yLabel` remain the axis titles. Do not reach for a
+colormap, palette, theme, donut, exploded slice, heatmap annotation, tick
+formatter, or Axis object — none exist. See [`docs/PLOT.md`](docs/PLOT.md).
+
 v1.7.0 completes six existing modules; use these instead of hand-written
 helpers. `Math.asin`, `acos`, `atan`, `atan2(y, x)` (y first), `sinh`, `cosh`,
 `tanh`, `hypot`, `log2`, `cbrt`, `radians`, `degrees`, `gcd`, and `lcm`; there

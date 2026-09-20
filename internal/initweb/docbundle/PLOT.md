@@ -32,6 +32,12 @@ Statistics uses, and for the same reason.
 Plot.line(x, y)                              -> Chart
 Plot.scatter(x, y)                           -> Chart
 Plot.bar(labels: List<String>, values)       -> Chart
+Plot.pie(labels: List<String>, values)       -> Chart
+Plot.heatmap(
+    xLabels: List<String>
+    yLabels: List<String>
+    values: Matrix
+) -> Chart
 Plot.histogram(values, bins: Int)            -> Chart
 Plot.box(values)                             -> Chart
 Plot.errorBar(x, y, lowerErrors, upperErrors) -> Chart
@@ -39,9 +45,12 @@ Plot.new()                                   -> Chart
 Plot.subplots(rows: Int, columns: Int, charts: List<Chart>) -> Figure
 ```
 
-A single chart — line, scatter, bar, histogram, box, or error bar — produces
-a `Chart`. A multi-chart composition produces a `Figure` (see
+A single chart — line, scatter, bar, pie, heatmap, histogram, box, or error
+bar — produces a `Chart`. A multi-chart composition produces a `Figure` (see
 [Subplots](#subplots)).
+
+`Plot.pie` and `Plot.heatmap` were added in v2.2; both are described in
+[Pie](#pie) and [Heatmap](#heatmap) below.
 
 ## Strict numeric input, no String coercion
 
@@ -112,6 +121,14 @@ chart = chart.yLabel("Value")
 `size` sets the output dimensions in pixels for PNG, or the equivalent page
 size for SVG/PDF; both `width` and `height` must be positive. A Chart's
 default size is 800x600.
+
+`legend` is off by default for every chart family except the two v2.2 ones:
+a [pie](#pie)'s category key and a [heatmap](#heatmap)'s colour scale are on
+unless a program turns them off, because neither chart can be read without
+its key.
+
+A [pie](#pie) has no Cartesian axes, so `xLabel` and `yLabel` raise
+`PlotError` on one rather than being quietly dropped.
 
 ## Multiple series
 
@@ -240,6 +257,117 @@ is missing, no display is available (CI, a container, a remote shell), or
 the chart is larger than 6144 units on a side (show the chart smaller, or
 `save()` it). AhdCode never falls back to another application.
 
+## Pie
+
+> Added in v2.2.
+
+`Plot.pie(labels, values)` draws one slice per category, in the order given,
+clockwise from twelve o'clock:
+
+```ahd
+chart := Plot.pie(
+    ["Analysis", "Algebra", "Geometry", "Statistics", "Programming"],
+    [84, 81, 88, 83, 95]
+)
+chart = chart.title("Year 3 course distribution")
+chart.show()
+```
+
+`labels` and `values` must have the same length and must not be empty.
+`values` is `List<Int>` or `List<Real>` like every other numeric Plot
+argument. Every value must be **finite and non-negative**, and **at least
+one must be greater than zero** — a pie of nothing but zeroes has no shape
+to draw, and raises `PlotError`. A zero among positive values is ordinary
+data: that category simply has no wedge, and the legend still names it.
+
+A pie is a `Chart`, so `title`, `legend`, `size`, `save`, and `show` all work
+on it exactly as they do on a bar chart.
+
+**The legend is on by default.** The slices are told apart by colour, and a
+colour means nothing without the name beside it, so `Plot.pie` turns the key
+on for you. `chart.legend(false)` hides it.
+
+**A pie has no axes.** `chart.xLabel(...)` and `chart.yLabel(...)` on a pie
+raise `PlotError`:
+
+```ahd
+attempt {
+    Plot.pie(["A", "B"], [1, 2]).xLabel("category")
+}
+except PlotError as error {
+    write(error.message)   // a pie chart has no x or y axis, so xLabel cannot be set on one
+}
+```
+
+That is deliberate: silently ignoring the call would hide a misunderstanding
+about the chart.
+
+Each slice larger than five percent of the total carries its share as a
+whole-number percentage. The colours come from one fixed categorical palette
+of twelve hues, reused in order for a pie with more slices; there is no
+palette argument in v2.2, so the same data always draws the same picture.
+A pie draws at most 64 slices.
+
+A pie saves to PNG, SVG, and PDF like any other Chart, and `show()` opens it
+in the ordinary [viewer](#show).
+
+## Heatmap
+
+> Added in v2.2.
+
+`Plot.heatmap(xLabels, yLabels, values)` draws a labelled grid whose colour
+carries the numbers:
+
+```ahd
+scores := Numeric.matrix([
+    [72.0, 78.0, 84.0]
+    [68.0, 75.0, 81.0]
+    [80.0, 82.0, 88.0]
+    [65.0, 74.0, 83.0]
+    [85.0, 91.0, 95.0]
+])
+
+chart := Plot.heatmap(
+    ["Year 1", "Year 2", "Year 3"]
+    ["Analysis", "Algebra", "Geometry", "Statistics", "Programming"]
+    scores
+)
+chart = chart.title("Student performance")
+chart = chart.xLabel("Academic year")
+chart = chart.yLabel("Course")
+chart.show()
+```
+
+**The shape rule is one row per y label and one column per x label.** The
+cell `values[row][column]` belongs to `yLabels[row]` and `xLabels[column]` —
+in the example above, five courses down and three years across. A Matrix of
+any other shape raises `PlotError` naming both the shape it has and the one
+the labels need.
+
+`values` is a [`Numeric`](NUMERIC.md) `Matrix`, so its cells are already
+`Real`; a nested `List<List<Real>>` is not the published argument, and
+`Numeric.matrix(rows)` is how a program builds one. Negative cells are
+valid, and a grid in which every cell is equal is valid too. A cell that is
+NaN or infinite cannot be drawn and raises `PlotError`.
+
+Neither label list may be empty. A heatmap has at most 256 labels on each
+axis and at most 65,536 cells.
+
+Categories are drawn in exactly the order given, left to right and bottom to
+top, with one tick at the centre of each cell.
+
+**The colour scale is fixed and its legend is on by default.** The scale runs
+from dark to bright — Moreland's black-body scale, whose luminance rises
+monotonically, so it still reads in greyscale and for the common
+colour-vision deficiencies — and the bar beside the grid shows what each
+colour means. `chart.legend(false)` hides the bar; the cells keep the same
+colours. There is no colormap, minimum, or maximum argument in v2.2: the
+scale always spans the data.
+
+A heatmap is a `Chart`, so `title`, `xLabel`, `yLabel`, `legend`, `size`,
+`save`, and `show` all work on it, it saves to PNG, SVG, and PDF, and it can
+be one cell of a [Figure](#subplots).
+
 ## Subplots
 
 ```ahd
@@ -301,6 +429,8 @@ Surface.yLabel(text: String) -> Surface
 Surface.zLabel(text: String) -> Surface
 Surface.size(width: Int, height: Int) -> Surface
 Surface.wireframe(enabled: Bool) -> Surface
+Surface.xCategories(labels: List<String>) -> Surface
+Surface.yCategories(labels: List<String>) -> Surface
 Surface.save(path: String) -> Nothing
 Surface.show() -> Nothing
 ```
@@ -349,7 +479,49 @@ view.
 
 This is small scientific 3D plotting, not a 3D engine: there are no meshes,
 imported models, textures, lighting or material settings, scene graph, or
-other 3D primitives, and no 3D scatter plot in v2.0.
+other 3D primitives, and no 3D scatter plot.
+
+### Naming the coordinates
+
+> Added in v2.2.
+
+A Surface's x and y are numbers, which is right for a function of two
+variables and wrong for a grid of categories: a surface over five courses
+and three years ends up labelled `1` to `5` and `1` to `3`, and its title
+has to explain what the numbers meant. `xCategories` and `yCategories` give
+those coordinates names:
+
+```ahd
+surface := Plot.surface([1, 2, 3], [1, 2, 3, 4, 5], scores)
+surface = surface.xCategories(["Year 1", "Year 2", "Year 3"])
+surface = surface.yCategories(["Analysis", "Algebra", "Geometry", "Statistics", "Programming"])
+surface = surface.xLabel("Academic year").yLabel("Course").zLabel("Grade")
+surface.show()
+```
+
+**They are presentation only.** The geometry is untouched: the coordinates
+keep their values and their spacing, the Matrix is unchanged, and the shape
+drawn is exactly the shape that was drawn without them. Only the text beside
+each axis changes.
+
+**`xLabel` and `yLabel` still name the axis.** `xLabel("Academic year")` is
+the axis's title; `xCategories(["Year 1", …])` are the labels of the points
+along it. The two are deliberately separate names for deliberately separate
+things.
+
+There must be **exactly one label per coordinate**. A list of any other
+length raises `PlotError` rather than labelling the axis wrongly. Labels may
+repeat, and their order is the coordinates' order.
+
+Up to eight categories are all drawn, each beside its own coordinate; past
+that only the first and last are, because more would overlap — which is what
+a numeric axis has always shown, in words instead of numbers.
+
+Supplying no categories leaves the axis exactly as it was before v2.2,
+showing its first and last value as numbers.
+
+Categories work in both `show()` and `save()`. `Surface.save` still writes
+**PNG only**.
 
 ## PlotError
 
@@ -364,7 +536,11 @@ an invalid bin count, mismatched bar labels/values, mismatched error-bar
 data, negative error magnitudes, an unsupported output format, invalid
 subplot dimensions, more charts than subplot cells, an invalid Surface grid
 or size, a rendering failure, a temporary-file failure, and a viewer-open
-failure. A static type mismatch —
+failure. v2.2 adds: mismatched pie labels/values, empty pie data, a negative
+or non-finite pie value, a pie of nothing but zeroes, `xLabel` or `yLabel`
+on a pie, empty heatmap labels, a heatmap Matrix whose shape does not match
+its labels, a non-finite heatmap cell, and a Surface category list whose
+length does not match its coordinates. A static type mismatch —
 passing a `List<String>` where a numeric List is expected — remains an
 ordinary compile-time diagnostic; `PlotError` is reserved for domain and
 runtime failures the type checker cannot rule out in advance.
@@ -395,10 +571,13 @@ whether run through the REPL or `ahdcode build`/`ahdcode run`.
 
 ## What Plot is not
 
-Plot supports six 2D chart families — line, scatter, bar, histogram, box,
-and error bar — and, from v2.0, the 3D Surface. There is no pie, heatmap,
-contour, violin, stem, polar, 3D scatter, candlestick, or area chart, and no
+Plot supports eight 2D chart families — line, scatter, bar, pie, heatmap,
+histogram, box, and error bar — and, from v2.0, the 3D Surface. There is no
+contour, violin, stem, polar, 3D scatter, candlestick, or area chart, no
+donut or exploded pie, no heatmap annotations or clustering, and no
 arbitrary custom plotter injection — these may be considered in a future
-release. There is no numeric
-scalar type beyond `Int`/`Real` widening (no `Numeric` type), no general GUI
-framework, and no secondary axes.
+release. Colour is fixed: there is no palette or colormap argument, no
+theme, and no font API. Axes are fixed too: no formatter callbacks, no
+arbitrary tick placement, no general Axis object, and no secondary axes.
+There is no numeric scalar type beyond `Int`/`Real` widening (no `Numeric`
+type) and no general GUI framework.

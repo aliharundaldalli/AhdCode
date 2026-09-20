@@ -20,6 +20,7 @@ var plotSurfaceFields = []struct{ field, runtime string }{
 	{"x", "X"}, {"y", "Y"}, {"z", "Z"},
 	{"title", "Title"}, {"xLabel", "XLabel"}, {"yLabel", "YLabel"}, {"zLabel", "ZLabel"},
 	{"width", "Width"}, {"height", "Height"}, {"wireframe", "Wireframe"},
+	{"xCategories", "XCategories"}, {"yCategories", "YCategories"},
 }
 
 func plotSurfaceFieldID(name string) ir.FieldID {
@@ -109,6 +110,13 @@ func (generator *generator) plotSurfaceOperation(name string, value *ir.CallExpr
 			argument(0, ir.IntType, "int64(0)")+", "+argument(1, ir.IntType, "int64(0)")+")", meta)
 	case "Surface.wireframe":
 		return generator.plotSurfaceFrom("AhdPlotSurfaceWireframe("+surface+", "+argument(0, ir.BoolType, "false")+")", meta)
+	case "Surface.xCategories", "Surface.yCategories":
+		setter := "AhdPlotSurfaceXCategories"
+		if name == "Surface.yCategories" {
+			setter = "AhdPlotSurfaceYCategories"
+		}
+		return generator.plotSurfaceFrom(setter+"("+plotErrorRuntime+", "+surface+", "+
+			generator.plotStringListValue(value, 0, meta)+")", meta)
 	case "Surface.save":
 		return "AhdPlotSurfaceSave(" + plotErrorRuntime + ", " + surface + ", " + argument(0, ir.StringType, `""`) + ")"
 	case "Surface.show":

@@ -27,6 +27,8 @@ func plotSurfaceFields() []ir.Field {
 		field("x", plotRealList()), field("y", plotRealList()), field("z", plotList(plotRealList())),
 		field("title", plotString()), field("xLabel", plotString()), field("yLabel", plotString()), field("zLabel", plotString()),
 		field("width", plotInt()), field("height", plotInt()), field("wireframe", plotBool()),
+		// v2.2 presentation labels. Empty means the axis shows its numbers.
+		field("xCategories", plotStringList()), field("yCategories", plotStringList()),
 	}
 }
 
@@ -72,6 +74,15 @@ func plotChartFields() []ir.Field {
 		{ID: plotFieldID(plotChartClassID, "errorY"), Name: "errorY", Type: plotRealList(), NullState: ir.NonNull, Hidden: true},
 		{ID: plotFieldID(plotChartClassID, "errorLower"), Name: "errorLower", Type: plotRealList(), NullState: ir.NonNull, Hidden: true},
 		{ID: plotFieldID(plotChartClassID, "errorUpper"), Name: "errorUpper", Type: plotRealList(), NullState: ir.NonNull, Hidden: true},
+
+		// v2.2 pie and heatmap storage, in the same explicit, typed shape
+		// every other family uses.
+		{ID: plotFieldID(plotChartClassID, "pieLabels"), Name: "pieLabels", Type: plotStringList(), NullState: ir.NonNull, Hidden: true},
+		{ID: plotFieldID(plotChartClassID, "pieValues"), Name: "pieValues", Type: plotRealList(), NullState: ir.NonNull, Hidden: true},
+
+		{ID: plotFieldID(plotChartClassID, "heatmapXLabels"), Name: "heatmapXLabels", Type: plotStringList(), NullState: ir.NonNull, Hidden: true},
+		{ID: plotFieldID(plotChartClassID, "heatmapYLabels"), Name: "heatmapYLabels", Type: plotStringList(), NullState: ir.NonNull, Hidden: true},
+		{ID: plotFieldID(plotChartClassID, "heatmapValues"), Name: "heatmapValues", Type: plotList(plotRealList()), NullState: ir.NonNull, Hidden: true},
 
 		{ID: plotFieldID(plotChartClassID, "title"), Name: "title", Type: plotString(), NullState: ir.NonNull, Hidden: true},
 		{ID: plotFieldID(plotChartClassID, "xLabel"), Name: "xLabel", Type: plotString(), NullState: ir.NonNull, Hidden: true},

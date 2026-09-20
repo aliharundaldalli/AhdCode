@@ -4762,14 +4762,41 @@ rendering failure, a temporary-file failure, and a viewer-open failure. A
 static type mismatch remains an ordinary compile-time diagnostic;
 `PlotError` covers only what the type checker cannot rule out in advance.
 
-### 56.9 Not in this version
+### 56.9 Pie, heatmap, and named Surface coordinates (v2.2)
 
-v0.1.15 supports exactly six chart families: line, scatter, bar, histogram,
-box, and error bar. There is no pie, heatmap, contour, violin, stem, polar,
-3D, candlestick, area, or surface chart, and no arbitrary custom plotter
-injection. Plot accepts both its existing `List<Int>`/`List<Real>` inputs and
-the additive `Vector` overloads described in §57. There is no general GUI
-framework and there are no secondary axes.
+`Plot.pie(labels: List<String>, values: List<Int>|List<Real>) -> Chart`
+draws one slice per category, in the order given. Labels and values have the
+same length and are not empty; every value is finite and non-negative and at
+least one is greater than zero; a zero-valued category is drawn as no wedge.
+A pie is a `Chart`, its legend is on by default, and it has no Cartesian
+axes: `xLabel` and `yLabel` on one raise `PlotError`.
+
+`Plot.heatmap(xLabels: List<String>, yLabels: List<String>, values: Matrix) -> Chart`
+draws a labelled grid. The Matrix has one row per y label and one column per
+x label, so `values[row][column]` is the cell at `yLabels[row]` and
+`xLabels[column]`; any other shape raises `PlotError`. Neither label list is
+empty, no cell is NaN or infinite, and the colour scale, whose legend is on
+by default, always spans the data. There is no colormap, minimum, or maximum
+argument.
+
+`Surface.xCategories(labels: List<String>) -> Surface` and
+`Surface.yCategories(labels: List<String>) -> Surface` name a Surface's
+coordinates. They are presentation only: the coordinates, their spacing, and
+the Matrix are unchanged, and `xLabel`/`yLabel` remain the axis titles. There
+is exactly one label per coordinate; any other count raises `PlotError`. A
+Surface stays immutable, so each returns a new one.
+
+### 56.10 Not in this version
+
+Plot supports eight chart families: line, scatter, bar, pie, heatmap,
+histogram, box, and error bar, plus the Surface. There is no contour,
+violin, stem, polar, 3D scatter, candlestick, or area chart, no donut or
+exploded pie, no heatmap annotation or clustering, and no arbitrary custom
+plotter injection. Plot accepts both its existing `List<Int>`/`List<Real>`
+inputs and the additive `Vector` overloads described in §57. Colour and axis
+presentation are fixed: no palette or colormap argument, no theme, no font
+API, no tick formatter, no arbitrary tick placement, and no general Axis
+object. There is no general GUI framework and there are no secondary axes.
 
 ## 57. Complex Scalars and Numeric Standard Module (v0.1.15)
 

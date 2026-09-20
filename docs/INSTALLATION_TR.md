@@ -1,7 +1,6 @@
 # Kurulum, yükseltme ve kaldırma
 
-İşletim sisteminize uygun paketi kurmak istediğiniz AhdCode sürümünden indirin;
-aşağıdaki dosya adlarında `<sürüm>` o sürümün numarasıdır. Her paket
+İşletim sisteminize uygun AhdCode v2.2.0 paketini indirin. Her paket
 kendi kendine yeterlidir: derleyici, özel Go araç zinciri, AhdDataStudio,
 SQLite/numeric/plot yardımcıları, çevrimdışı LaTeX motoru, proje starter'ları
 ve İngilizce belgeler paketin içindedir.
@@ -11,12 +10,12 @@ ve İngilizce belgeler paketin içindedir.
 macOS paketi Apple Silicon Mac'leri hedefler — M1, M2, M3, M4 ve sonraki
 arm64 modeller. Intel sürümü yoktur.
 
-`AhdCode-<sürüm>-macos-arm64.pkg` dosyasına çift tıklayıp kurulumu izleyin. Paket
+`AhdCode-2.2.0-macos-arm64.pkg` dosyasına çift tıklayıp kurulumu izleyin. Paket
 Developer ID ile imzalı ve Apple tarafından noter onaylıdır; normal biçimde
 açılır, hiçbir güvenlik atlatması gerekmez. Yalnızca sizin hesabınıza kurar,
 yönetici şifresi istemez ve ev dizininizin dışına hiçbir şey yazmaz.
 
-Dosyalar `~/Library/AhdCode/versions/<sürüm>` altına kurulur. `current` etkin
+Dosyalar `~/Library/AhdCode/versions/2.2.0` altına kurulur. `current` etkin
 sürümü seçer, sabit komut `~/Library/AhdCode/bin/ahdcode`'dur. PATH'e yalnızca
 bu tek dizin eklenir.
 
@@ -24,13 +23,13 @@ Ardından **yeni** bir Terminal açıp `ahdcode --version` çalıştırın. Zate
 olan bir terminal başlatıldığı ortamı korur; yeni açılan değişikliği hemen
 görür.
 
-`AhdCode-<sürüm>-macos-arm64.zip`, aynı paketi VS Code eklentisiyle birlikte
+`AhdCode-2.2.0-macos-arm64.zip`, aynı paketi VS Code eklentisiyle birlikte
 sunan alternatif bir indirmedir. Disk imajı tercih edenler için aynı içeriğe
 sahip bir `.dmg` de yayımlanır; önerilen kurulum biçimi `.pkg`'dir.
 
 ## Windows x64
 
-`AhdCode-<sürüm>-windows-x64.exe` dosyasına Dosya Gezgini'nde çift tıklayın.
+`AhdCode-2.2.0-windows-x64.exe` dosyasına Dosya Gezgini'nde çift tıklayın.
 Kurulum küçük bir grafik programdır: ne kuracağını gösterir, gömülü paketi
 ilerleme penceresiyle açıp doğrular ve bir onay penceresiyle biter. Konsol,
 terminal veya komut yazmak gerekmez.
@@ -40,7 +39,7 @@ Kurulum programı şu an kod imzalı değildir; bu nedenle Windows SmartScreen
 çalıştır** ile devam edin. Yayımlanan SHA-256 özetleriyle dosyanın resmî
 olduğunu doğrulayabilirsiniz.
 
-Dosyalar `%LOCALAPPDATA%\AhdCode\versions\<sürüm>` altına kurulur. Sabit komut
+Dosyalar `%LOCALAPPDATA%\AhdCode\versions\2.2.0` altına kurulur. Sabit komut
 `%LOCALAPPDATA%\AhdCode\bin\ahdcode.exe`'dir ve kullanıcı PATH'ine yalnızca bu
 tek dizin, yalnızca ilk kurulumda eklenir. Yönetici izni, Git veya sistem Go
 kurulumu gerekmez; kaldırma kaydı Installed Apps içine yazılır.
@@ -48,11 +47,11 @@ kurulumu gerekmez; kaldırma kaydı Installed Apps içine yazılır.
 Ardından **yeni** bir PowerShell veya Komut İstemi açıp `ahdcode --version`
 çalıştırın.
 
-`AhdCode-<sürüm>-windows-x64.exe --silent` hiçbir pencere açmadan kurar.
-`AhdCode-<sürüm>-windows-x64.zip` aynı kurulumu VS Code eklentisiyle birlikte
+`AhdCode-2.2.0-windows-x64.exe --silent` hiçbir pencere açmadan kurar.
+`AhdCode-2.2.0-windows-x64.zip` aynı kurulumu VS Code eklentisiyle birlikte
 sunar.
 
-Linux x64: `AhdCode-<sürüm>-linux-x64.tar.gz` arşivini açın ve
+Linux x64: `AhdCode-2.2.0-linux-x64.tar.gz` arşivini açın ve
 `sh install.sh --setup-path` çalıştırın. Kök `~/.local/share/ahdcode` dizinidir;
 PATH bloğu `~/.profile` dosyasına eklenir.
 
@@ -60,7 +59,7 @@ VS Code eklentisi: her pakette kurulum kökü altındaki `vscode/` klasöründe 
 `.vsix` dosyası ve kısa bir `README.txt` bulunur. AhdCode için gerekli değildir
 ve kurulum onu sizin yerinize yüklemez. VS Code'da Eklentiler görünümünü açın,
 `...` menüsünden **Install from VSIX...** seçin ve kurulum kökündeki
-`vscode/ahdcode-<sürüm>.vsix` dosyasını gösterin. Antigravity IDE aynı işlemi
+`vscode/ahdcode-0.2.3.vsix` dosyasını gösterin. Antigravity IDE aynı işlemi
 sunar. Dosya gereken her şeyi taşır; npm veya ağ gerekmez.
 
 Paket; özel Go 1.27.0, `ahdsqlite`, `ahdnumeric`, `ahdplot`, `ahdgraphics`, `ahdgui`, `ahdplotview`, çevrimdışı Tectonic

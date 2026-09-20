@@ -16,9 +16,9 @@ modules, GUI, Graphics, interactive Plot viewer, and desktop application
 packaging. It is used in practice by a small community; it is not a
 mainstream language.
 
-This is **v2.1.0**, **Application I/O & Network Completion**. The language,
-toolchain, and Web framework remain feature-complete, and the core language
-surface described here is unchanged.
+This is **v2.2.0**, **Plot Completeness**. Pie charts, heatmaps, categorical
+Surface axes, and the Student Performance Explorer are now released. The
+release adds no syntax, type-system change, or dependency.
 
 v2.0.0 is a major release, **Desktop Application Completion**: it completes
 the first-party desktop application foundation — ListBox, Select, TextArea,
@@ -480,6 +480,7 @@ See the [CLI guide](CLI.md), [formatter guide](FORMATTER.md),
 - v1.7 standard-library completion — trigonometry and gcd/lcm, strict ISO time text and instant arithmetic, and a Table join with statistics
 - v2.0 desktop applications — a SQLite ledger with a TableView, dialogs, and CSV export; a 3D Surface; and a small application to package
 - v2.1 application I/O and network — a binary file round trip over HTTP, a WebSocket client and server pair, and mail with attachments
+- v2.2 student performance — one desktop application that shows the same grades as a line, bar, histogram, box, error bar, pie, heatmap, and 3D surface
 - v1.9 GUI colors and interactive Plot — an order form with colors and a disabled Save button, and a chart in AhdCode's own viewer
 - v1.8 GUI and events — a small GUI ledger backed by SQLite and a Turtle driven by arrow keys and clicks
 - v1.6 Graphics and Turtle — a Cartesian Canvas, shapes, a Turtle star and spiral, PNG/SVG export, and a regular-polygon lesson
@@ -499,6 +500,30 @@ diagnostics and hover. The same VSIX targets VS Code and Antigravity. See its
 installation guide.
 
 ## Current limitations
+
+## What is new in v2.2 <a id="what-is-new-in-v22"></a>
+
+v2.2.0, **Plot Completeness**, is a deliberately small visualization release.
+It closes the gaps that showed up while using AhdCode's own GUI and Plot
+together, and adds no syntax and no type-system change.
+
+- [`Plot.pie(labels, values)`](PLOT.md#pie): one slice per category, in
+  the order given, with its category legend on by default and its share
+  written on each slice. A pie has no axes, so `xLabel` and `yLabel` on one
+  raise `PlotError` instead of being quietly dropped.
+- [`Plot.heatmap(xLabels, yLabels, values)`](PLOT.md#heatmap): a
+  labelled grid whose colour carries the numbers, with a colour-scale
+  legend. The Matrix is one row per y label and one column per x label.
+- [`Surface.xCategories` and `Surface.yCategories`](PLOT.md#naming-the-coordinates):
+  names for a Surface's x and y coordinates, so a grid of courses and years
+  stops being labelled `1` to `5`. They are presentation only — the geometry
+  is untouched, and `xLabel`/`yLabel` remain the axis titles.
+
+Both new charts are ordinary `Chart` values: they take `title`, `legend`,
+`size`, `save` to PNG, SVG, and PDF, `show` in the interactive viewer, and a
+place in a `Plot.subplots` Figure.
+
+See the v2.2 example.
 
 ## What is new in v2.1.0 <a id="what-is-new-in-v210"></a>
 
