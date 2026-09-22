@@ -2025,6 +2025,21 @@ func (a *analyzer) analyzeMemberOf(member *ast.MemberExpr, object expressionInfo
 		}
 		return expressionInfo{typeValue: typeValue, nullState: resolved.InitialNull, symbol: resolved}
 	}
+	// Plot.LineStyle, Plot.Marker, and Plot.LegendPosition are compiler-supplied nominal value
+	// classes. Their constants use ordinary member lookup on the Class
+	// reference, while every other Class reference remains non-member-accessible
+	// as before.
+	if class, ok := object.typeValue.(types.Class); ok && class.Reference &&
+		class.Symbol != nil && class.Symbol.ModuleID == plotModuleID &&
+		(class.Symbol.Name == "LineStyle" || class.Symbol.Name == "Marker" || class.Symbol.Name == "LegendPosition") {
+		resolved := a.lookupMember(a.classSymbolFor(class.Symbol), member.Name)
+		if resolved == nil {
+			a.error(codeInvalidMember, fmt.Sprintf("Class %s has no member %q", class.Symbol.Name, member.Name), member.Span(), "use one of the published style values")
+			return expressionInfo{typeValue: types.Invalid, nullState: MaybeNull}
+		}
+		a.result.ResolvedSymbols[member] = resolved
+		return expressionInfo{typeValue: resolved.Type, nullState: resolved.InitialNull, symbol: resolved, constant: resolved.ConstValue}
+	}
 	if object.nullState != NonNull {
 		a.nullableError("member access", member.Object, object.nullState)
 	}

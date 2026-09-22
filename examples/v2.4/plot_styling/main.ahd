@@ -1,0 +1,26 @@
+// v2.4.0: typed line styles, markers, legend placement, widths, and sizes.
+bring Plot
+from Plot bring (Chart, LineStyle, Marker, LegendPosition)
+
+x: List<Real> := [0.0, 1.0, 2.0, 3.0, 4.0]
+solidY: List<Real> := [0.0, 1.0, 1.5, 2.5, 3.0]
+dashedY: List<Real> := [0.0, 0.5, 1.0, 1.5, 2.0]
+
+chart: Chart := Plot.new()
+chart = chart.line(x, solidY, "solid")
+chart = chart.lineStyle(LineStyle.solid).lineWidth(1.0)
+chart = chart.line(x, dashedY, "dashed")
+chart = chart.lineStyle(LineStyle.dashed).lineWidth(2.0)
+chart = chart.line(x, [3.0, 2.5, 2.0, 1.5, 1.0], "dotted")
+chart = chart.lineStyle(LineStyle.dotted).marker(Marker.circle).markerSize(6.0)
+chart = chart.line(x, [1.0, 1.5, 2.0, 2.5, 3.0], "dash-dot")
+chart = chart.lineStyle(LineStyle.dashDot).marker(Marker.diamond).markerSize(8.0)
+chart = chart.legend(true).legendPosition(LegendPosition.topRight).title("Line style gallery")
+chart.save("line-styles.png")
+
+scatter: Chart := Plot.scatter(x, solidY)
+scatter = scatter.marker(Marker.square).markerSize(9.0)
+scatter = scatter.title("Marker gallery").legend(true).legendPosition(LegendPosition.bottomLeft)
+scatter = scatter.scatter(x, dashedY, "cross")
+scatter = scatter.marker(Marker.cross).markerSize(7.0)
+scatter.save("markers.png")

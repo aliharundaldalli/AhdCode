@@ -107,6 +107,7 @@ chart.title(text: String)   -> Chart
 chart.xLabel(text: String)  -> Chart
 chart.yLabel(text: String)  -> Chart
 chart.legend(enabled: Bool) -> Chart
+chart.legendPosition(position: LegendPosition) -> Chart
 chart.size(width: Int, height: Int) -> Chart
 ```
 
@@ -131,14 +132,59 @@ olarak kapalıdır: bir [pastanın](#pasta) kategori anahtarı ve bir
 [ısı haritasının](#isı-haritası) renk ölçeği, program kapatmadıkça açıktır;
 çünkü ikisi de anahtarı olmadan okunamaz.
 
+Legend açık olduğunda v2.4.0 varsayılan olarak onu grafik kenarlarından küçük
+bir iç boşlukla `topRight` konumuna yerleştirir. Başka bir köşe gerekiyorsa
+güçlü tipli konumlardan birini seçin:
+
+```text
+LegendPosition.topRight | LegendPosition.topLeft
+LegendPosition.bottomRight | LegendPosition.bottomLeft
+```
+
+Örneğin: `chart = chart.legend(true).legendPosition(LegendPosition.topLeft)`.
+Çizici, matematiksel etiketlerin kenara yapışmaması için girişler arasına ve
+çizgi/marker örneği ile metin arasına da boşluk koyar.
+
 Bir [pastanın](#pasta) Kartezyen ekseni yoktur; bu yüzden `xLabel` ve
 `yLabel` bir pastada sessizce yok sayılmak yerine `PlotError` fırlatır.
 
-## Matematiksel metin (v2.3.0)
+## Plot stili (v2.4.0)
 
-Mevcut metin API'leri küçük bir math seçeneği sunar. İçeriğinin tamamı eşleşen
-`$...$` ile çevrili olan String, AhdCode'un mevcut çevrimdışı Plot math-text
-yolunda çizilir:
+Line ve scatter serilerinin küçük, güçlü tipli bir stil API'si vardır. Stil
+değerleri rastgele String değildir:
+
+```text
+LineStyle.solid | LineStyle.dashed | LineStyle.dotted | LineStyle.dashDot
+Marker.none | Marker.circle | Marker.square | Marker.triangle | Marker.diamond | Marker.cross
+
+chart.lineStyle(style: LineStyle) -> Chart
+chart.lineWidth(width: Real)    -> Chart
+chart.marker(shape: Marker)     -> Chart
+chart.markerSize(size: Real)    -> Chart
+```
+
+Bu metotlar saftır ve zincirlenebilir. Bir line solid ve markersız başlar;
+scatter v2.3'teki daire görünümünü korur. Genişlik ve marker boyutu sonlu,
+pozitif çizim değerleridir; line'a özel seçeneği yalnızca scatter olan bir
+Chart'a (veya tersi) uygulamak çalışma zamanında `PlotError` üretir. Legend,
+serinin aynı line ve marker birleşimini kullandığından anahtar gerçeği korur:
+
+```ahd
+from Plot bring (Chart, LineStyle, Marker, LegendPosition)
+
+chart: Chart := Plot.line(x, y)
+chart = chart.lineStyle(LineStyle.dashDot)
+    .lineWidth(2.0)
+    .marker(Marker.diamond)
+    .markerSize(7.0)
+chart = chart.legend(true).legendPosition(LegendPosition.topLeft)
+```
+
+## Matematiksel metin (v2.4.0)
+
+Mevcut metin API'leri bütün String için math seçeneği sunar. İçeriğinin tamamı
+eşleşen `$...$` ile çevrili olan String, pakete gömülü çevrimdışı Tectonic
+motoruyla çizilir:
 
 ```ahd
 chart = chart.title("$f(x)=x^2+3x+2$").xLabel("$x$").yLabel("$\\sigma^2$")
@@ -149,15 +195,23 @@ Aynı kural Chart başlığı/eksenleri, seri açıklamaları, pasta legend etik
 bar kategorileri, heatmap kategorileri ve Surface başlık/eksen/z etiketleri ile
 `xCategories`/`yCategories` için geçerlidir. `"Cost $100"` gibi sıradan
 String'ler sıradan metin kalır. `"Variance is $\\sigma^2$"` gibi karışık zengin
-metinler v2.3.0'da parçalara ayrılmaz; ileride ele alınabilir.
+metinler v2.4.0 sürümünde parçalara ayrılmaz; ileride ele alınabilir.
 
-Bozuk matematik Plot hatası olarak bildirilir. Doğrulama ve Surface etiket
-görselleri sınırlı cache kullanır; ağ, JavaScript, shell çalıştırma veya ikinci
-bir TeX motoru eklenmez. Plot etiketleri Gonum'un iç math-text renderer'ını ve
-projenin çevrimdışı Unicode/plain fallback'ini kullanır; gömülü Tectonic yalnızca
-tam belge LaTeX/PDF yolu içindir. Chart SVG/PDF çıktısı mevcut vektör-capable
-canvas yolunu korur; viewer raster yolu Retina ölçeği için saydam etiket
-görsellerini cache'ler.
+Bozuk veya zararlı TeX, Plot hatası olarak bildirilir; ham TeX'e veya Unicode
+yaklaşımına sessiz fallback yapılmaz. Parçalar sınırlıdır, kontrollü komut
+listesine göre doğrulanır, izole geçici dizinde yalnızca paketteki çevrimdışı
+bundle ile çalıştırılır; dosya, shell, belge, ağ ve paket yükleme komutları
+reddedilir. Plot ve Surface aynı sınırlı eşzamanlı renderer cache'ini paylaşır;
+Surface her frame'de yeniden Tectonic başlatmaz.
+
+PNG, SVG ve PDF aynı Tectonic çıktısını kullanır. Süreç içi PDF rasterizer,
+sabitlenmiş bundle'ın ürettiği gömülü Type-1C outline'larını ve özel
+code→glyph eşlemesini doğrudan kullanır; `SystemFonts()` çağırmaz, makinenin
+font dizinlerini okumaz, harici PDF süreci veya ağ başlatmaz. Gömülü bir glyph
+eksikse sessizce başka fonta geçmek yerine Plot hatası üretir. Grafiğin geri
+kalanı vector capable kalır; matematik etiketleri SVG/PDF içine saydam raster
+görseller olarak gömülür. `\int`, `\frac`, `\sum`, alt/üst indisler ve `\sqrt`
+aynı display-style-aware yoldan doğru biçimde çizilir.
 
 ## Birden çok seri
 

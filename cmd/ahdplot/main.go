@@ -17,6 +17,8 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"image/color"
+	"math"
 	"os"
 
 	"ahdcode/internal/plotproto"
@@ -85,8 +87,7 @@ func render(request plotproto.Request) error {
 			return err
 		}
 		if bar == nil {
-			// The path every chart before v2.2 takes, unchanged.
-			if err := p.Save(width, height, request.OutputPath); err != nil {
+			if err := savePlot(p, request.OutputPath, format, width, height); err != nil {
 				return fmt.Errorf("saving %s: %w", format, err)
 			}
 			return nil
@@ -137,11 +138,17 @@ func renderGrid(request plotproto.Request, format string, width, height vg.Lengt
 			cell := aligned[row][column]
 			if bar := bars[row][column]; bar != nil {
 				grid, scale := splitForColorBar(cell)
+				da := plots[row][column].DataCanvas(grid)
+				plotTextHandler().titleShiftX = da.Center().X - grid.Center().X
 				plots[row][column].Draw(grid)
+				plotTextHandler().titleShiftX = 0
 				bar.Draw(scale)
 				continue
 			}
+			da := plots[row][column].DataCanvas(cell)
+			plotTextHandler().titleShiftX = da.Center().X - cell.Center().X
 			plots[row][column].Draw(cell)
+			plotTextHandler().titleShiftX = 0
 		}
 	}
 
@@ -196,7 +203,11 @@ func buildPlot(spec plotproto.ChartSpec) (*plot.Plot, *plot.Plot, error) {
 	if err := validateChartMath(spec, plotTextHandler()); err != nil {
 		return nil, nil, err
 	}
+	if err := validateLegendPosition(spec.LegendPosition); err != nil {
+		return nil, nil, err
+	}
 	p := plot.New()
+	configurePlotLayout(p, spec)
 	p.Title.Text = spec.Title
 	p.X.Label.Text = spec.XLabel
 	p.Y.Label.Text = spec.YLabel
@@ -241,6 +252,52 @@ func buildPlot(spec plotproto.ChartSpec) (*plot.Plot, *plot.Plot, error) {
 	return p, nil, nil
 }
 
+const defaultLegendPosition = "topRight"
+
+func validateLegendPosition(position string) error {
+	if position == "" {
+		return nil
+	}
+	switch position {
+	case "topRight", "topLeft", "bottomRight", "bottomLeft":
+		return nil
+	default:
+		return fmt.Errorf("unknown legend position %q", position)
+	}
+}
+
+// configurePlotLayout keeps labels and the legend away from the chart edges.
+// Gonum's default legend is bottom-right with zero offsets, which is a poor
+// default for mathematical labels and dense academic plots.
+func configurePlotLayout(p *plot.Plot, spec plotproto.ChartSpec) {
+	p.Title.Padding = vg.Points(16)
+	p.X.Label.Padding = vg.Points(12)
+	p.Y.Label.Padding = vg.Points(8)
+	if !spec.Legend {
+		return
+	}
+	position := spec.LegendPosition
+	if position == "" {
+		position = defaultLegendPosition
+	}
+	p.Legend.Padding = vg.Points(5)
+	p.Legend.ThumbnailWidth = vg.Points(24)
+	switch position {
+	case "topLeft":
+		p.Legend.Top, p.Legend.Left = true, true
+		p.Legend.XOffs, p.Legend.YOffs = vg.Points(10), vg.Points(-10)
+	case "bottomRight":
+		p.Legend.Top, p.Legend.Left = false, false
+		p.Legend.XOffs, p.Legend.YOffs = vg.Points(-10), vg.Points(10)
+	case "bottomLeft":
+		p.Legend.Top, p.Legend.Left = false, true
+		p.Legend.XOffs, p.Legend.YOffs = vg.Points(10), vg.Points(10)
+	default: // topRight is the v2.4 default.
+		p.Legend.Top, p.Legend.Left = true, false
+		p.Legend.XOffs, p.Legend.YOffs = vg.Points(-10), vg.Points(-10)
+	}
+}
+
 var sharedMathTextHandler *mathTextHandler
 
 func plotTextHandler() *mathTextHandler {
@@ -263,8 +320,17 @@ func saveWithColorBar(p, bar *plot.Plot, path, format string, width, height vg.L
 	if err != nil {
 		return fmt.Errorf("preparing %s canvas: %w", format, err)
 	}
-	main, scale := splitForColorBar(draw.New(canvasWriter))
+	dc := draw.New(canvasWriter)
+	marginL := vg.Points(24)
+	marginR := vg.Points(24)
+	marginB := vg.Points(24)
+	marginT := vg.Points(24)
+	cropped := draw.Crop(dc, marginL, -marginR, marginB, -marginT)
+	main, scale := splitForColorBar(cropped)
+	da := p.DataCanvas(main)
+	plotTextHandler().titleShiftX = da.Center().X - main.Center().X
 	p.Draw(main)
+	plotTextHandler().titleShiftX = 0
 	bar.Draw(scale)
 	file, err := os.Create(path)
 	if err != nil {
@@ -277,6 +343,90 @@ func saveWithColorBar(p, bar *plot.Plot, path, format string, width, height vg.L
 	return nil
 }
 
+func savePlot(p *plot.Plot, path, format string, width, height vg.Length) error {
+	canvasWriter, err := draw.NewFormattedCanvas(width, height, format)
+	if err != nil {
+		return fmt.Errorf("preparing %s canvas: %w", format, err)
+	}
+	dc := draw.New(canvasWriter)
+	marginL := vg.Points(24)
+	marginR := vg.Points(24)
+	marginB := vg.Points(24)
+	marginT := vg.Points(24)
+	cropped := draw.Crop(dc, marginL, -marginR, marginB, -marginT)
+	da := p.DataCanvas(cropped)
+	plotTextHandler().titleShiftX = da.Center().X - cropped.Center().X
+	p.Draw(cropped)
+	plotTextHandler().titleShiftX = 0
+	file, err := os.Create(path)
+	if err != nil {
+		return fmt.Errorf("creating output file: %w", err)
+	}
+	defer file.Close()
+	if _, err := canvasWriter.WriteTo(file); err != nil {
+		return fmt.Errorf("writing %s: %w", format, err)
+	}
+	return nil
+}
+
+type legendBackground struct {
+	width  vg.Length
+	height vg.Length
+}
+
+func (lb legendBackground) Plot(c draw.Canvas, plt *plot.Plot) {
+	if lb.width <= 0 || lb.height <= 0 {
+		return
+	}
+	pad := vg.Points(6)
+	var minX, maxX, minY, maxY vg.Length
+	if plt.Legend.Left {
+		minX = c.Min.X + plt.Legend.XOffs - pad
+		maxX = minX + lb.width + pad*2
+	} else {
+		maxX = c.Max.X + plt.Legend.XOffs + pad
+		minX = maxX - lb.width - pad*2
+	}
+	if plt.Legend.Top {
+		maxY = c.Max.Y + plt.Legend.YOffs + pad
+		minY = maxY - lb.height - pad*2
+	} else {
+		minY = c.Min.Y + plt.Legend.YOffs - pad
+		maxY = minY + lb.height + pad*2
+	}
+	pts := []vg.Point{
+		{X: minX, Y: minY},
+		{X: maxX, Y: minY},
+		{X: maxX, Y: maxY},
+		{X: minX, Y: maxY},
+	}
+	c.FillPolygon(color.White, pts)
+	c.StrokeLines(draw.LineStyle{
+		Color: color.RGBA{R: 215, G: 215, B: 215, A: 255},
+		Width: vg.Points(0.5),
+	}, append(pts, pts[0]))
+}
+
+func addLegendBackground(p *plot.Plot, spec plotproto.ChartSpec) {
+	var maxLabelW vg.Length
+	count := 0
+	for _, s := range spec.Series {
+		if s.Label != "" {
+			count++
+			w := p.Legend.TextStyle.Width(s.Label)
+			if w > maxLabelW {
+				maxLabelW = w
+			}
+		}
+	}
+	if count == 0 {
+		return
+	}
+	totalW := p.Legend.ThumbnailWidth + maxLabelW + vg.Points(22)
+	totalH := vg.Points(18)*vg.Length(count) + vg.Points(8)
+	p.Add(legendBackground{width: totalW, height: totalH})
+}
+
 func toXYs(x, y []float64) plotter.XYs {
 	points := make(plotter.XYs, len(x))
 	for i := range x {
@@ -287,6 +437,9 @@ func toXYs(x, y []float64) plotter.XYs {
 
 func addSeries(p *plot.Plot, spec plotproto.ChartSpec) error {
 	for _, series := range spec.Series {
+		if err := validateSeriesStyle(series); err != nil {
+			return err
+		}
 		points := toXYs(series.X, series.Y)
 		switch series.Kind {
 		case "line":
@@ -294,14 +447,30 @@ func addSeries(p *plot.Plot, spec plotproto.ChartSpec) error {
 			if err != nil {
 				return fmt.Errorf("building line series: %w", err)
 			}
+			line.LineStyle = seriesLineStyle(series)
 			p.Add(line)
+			var marker *plotter.Scatter
+			if marker = seriesScatter(points, series); marker != nil {
+				p.Add(marker)
+			}
 			if spec.Legend && series.Label != "" {
-				p.Legend.Add(series.Label, line)
+				if marker != nil {
+					p.Legend.Add(series.Label, line, marker)
+				} else {
+					p.Legend.Add(series.Label, line)
+				}
 			}
 		case "scatter":
 			scatter, err := plotter.NewScatter(points)
 			if err != nil {
 				return fmt.Errorf("building scatter series: %w", err)
+			}
+			if marker := seriesMarkerStyle(series); marker != nil {
+				scatter.GlyphStyle = *marker
+			} else {
+				// Marker.none is a valid explicit choice; a scatter without a
+				// glyph should not silently revert to Gonum's default glyph.
+				scatter.GlyphStyle.Shape = nil
 			}
 			p.Add(scatter)
 			if spec.Legend && series.Label != "" {
@@ -311,7 +480,159 @@ func addSeries(p *plot.Plot, spec plotproto.ChartSpec) error {
 			return fmt.Errorf("unsupported series kind %q", series.Kind)
 		}
 	}
+	if spec.Legend {
+		addLegendBackground(p, spec)
+	}
+	p.Add(plotFrame{})
+	applyAxisPadding(p)
 	return nil
+}
+
+type plotFrame struct{}
+
+func (plotFrame) Plot(c draw.Canvas, plt *plot.Plot) {
+	pts := []vg.Point{
+		{X: c.Min.X, Y: c.Max.Y},
+		{X: c.Max.X, Y: c.Max.Y},
+		{X: c.Max.X, Y: c.Min.Y},
+	}
+	c.StrokeLines(draw.LineStyle{
+		Color: color.RGBA{R: 200, G: 200, B: 200, A: 255},
+		Width: vg.Points(0.5),
+	}, pts)
+}
+
+func applyAxisPadding(p *plot.Plot) {
+	if p.X.Max > p.X.Min {
+		spanX := p.X.Max - p.X.Min
+		padX := spanX * 0.04
+		p.X.Min -= padX
+		p.X.Max += padX
+	}
+	if p.Y.Max > p.Y.Min {
+		spanY := p.Y.Max - p.Y.Min
+		padY := spanY * 0.04
+		p.Y.Min -= padY
+		p.Y.Max += padY
+	}
+}
+
+func validateSeriesStyle(series plotproto.SeriesSpec) error {
+	if series.Kind != "line" && series.Kind != "scatter" {
+		return fmt.Errorf("unsupported series kind %q", series.Kind)
+	}
+	lineStyle := series.LineStyle
+	if lineStyle == "" {
+		lineStyle = "solid"
+	}
+	if lineStyle != "solid" && lineStyle != "dashed" && lineStyle != "dotted" && lineStyle != "dashDot" {
+		return fmt.Errorf("unknown line style %q", series.LineStyle)
+	}
+	if series.Kind != "line" && lineStyle != "solid" {
+		return fmt.Errorf("line style applies only to line series")
+	}
+	if series.LineWidth != 0 && (math.IsNaN(series.LineWidth) || math.IsInf(series.LineWidth, 0) || series.LineWidth <= 0 || series.LineWidth > 32) {
+		return fmt.Errorf("line width must be finite and between 0 and 32")
+	}
+	marker := series.Marker
+	if marker == "" {
+		if series.Kind == "scatter" {
+			marker = "circle"
+		} else {
+			marker = "none"
+		}
+	}
+	if marker != "none" && marker != "circle" && marker != "square" && marker != "triangle" && marker != "diamond" && marker != "cross" {
+		return fmt.Errorf("unknown marker %q", series.Marker)
+	}
+	if series.MarkerSize != 0 && (math.IsNaN(series.MarkerSize) || math.IsInf(series.MarkerSize, 0) || series.MarkerSize <= 0 || series.MarkerSize > 64) {
+		return fmt.Errorf("marker size must be finite and between 0 and 64")
+	}
+	return nil
+}
+
+func seriesLineStyle(series plotproto.SeriesSpec) draw.LineStyle {
+	width := series.LineWidth
+	if width <= 0 {
+		width = 1
+	}
+	style := draw.LineStyle{Color: plotter.DefaultLineStyle.Color, Width: vg.Points(width)}
+	switch series.LineStyle {
+	case "dashed":
+		style.Dashes = []vg.Length{vg.Points(6), vg.Points(4)}
+	case "dotted":
+		style.Dashes = []vg.Length{vg.Points(1), vg.Points(3)}
+	case "dashDot":
+		style.Dashes = []vg.Length{vg.Points(6), vg.Points(3), vg.Points(1), vg.Points(3)}
+	}
+	return style
+}
+
+func seriesScatter(points plotter.XYs, series plotproto.SeriesSpec) *plotter.Scatter {
+	return seriesMarkerPlotter(points, series)
+}
+
+func seriesMarkerPlotter(points plotter.XYs, series plotproto.SeriesSpec) *plotter.Scatter {
+	style := seriesMarkerStyle(series)
+	if style == nil {
+		return nil
+	}
+	scatter, err := plotter.NewScatter(points)
+	if err != nil {
+		return nil
+	}
+	scatter.GlyphStyle = *style
+	return scatter
+}
+
+func seriesMarkerStyle(series plotproto.SeriesSpec) *draw.GlyphStyle {
+	marker := series.Marker
+	if marker == "" {
+		if series.Kind == "scatter" {
+			marker = "circle"
+		} else {
+			marker = "none"
+		}
+	}
+	if marker == "none" {
+		return nil
+	}
+	size := series.MarkerSize
+	if size <= 0 {
+		size = 5
+	}
+	var shape draw.GlyphDrawer
+	switch marker {
+	case "circle":
+		// RingGlyph is Gonum's v2.3 scatter default: keeping it here makes
+		// an unstylised Scatter byte-for-byte comparable in appearance.
+		shape = draw.RingGlyph{}
+	case "square":
+		shape = draw.SquareGlyph{}
+	case "triangle":
+		shape = draw.TriangleGlyph{}
+	case "diamond":
+		shape = diamondGlyph{}
+	case "cross":
+		shape = draw.CrossGlyph{}
+	default:
+		return nil
+	}
+	return &draw.GlyphStyle{Color: plotter.DefaultGlyphStyle.Color, Radius: vg.Points(size / 2), Shape: shape}
+}
+
+type diamondGlyph struct{}
+
+func (diamondGlyph) DrawGlyph(c *draw.Canvas, style draw.GlyphStyle, point vg.Point) {
+	radius := style.Radius
+	path := make(vg.Path, 0, 5)
+	path.Move(vg.Point{X: point.X, Y: point.Y + radius})
+	path.Line(vg.Point{X: point.X + radius, Y: point.Y})
+	path.Line(vg.Point{X: point.X, Y: point.Y - radius})
+	path.Line(vg.Point{X: point.X - radius, Y: point.Y})
+	path.Close()
+	c.SetLineStyle(draw.LineStyle{Color: style.Color, Width: vg.Points(0.5)})
+	c.Stroke(path)
 }
 
 func addBar(p *plot.Plot, spec plotproto.ChartSpec) error {

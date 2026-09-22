@@ -40,4 +40,4 @@ $result = [UIntPtr]::Zero
 [void][Win32.AhdCodeEnv]::SendMessageTimeout([IntPtr]0xffff, 0x1A, [IntPtr]::Zero, 'Environment', 2, 5000, [ref]$result)
 
 Write-Host 'AhdCode removed. User projects, databases, registry data and caches were preserved.'
-Write-Host 'Open a new terminal for the PATH change to take effect.'
+Write-Host 'Open a new terminal or restart your IDE for the PATH change to take effect.'

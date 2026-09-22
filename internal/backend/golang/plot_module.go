@@ -26,13 +26,14 @@ const plotErrorRuntime = "AhdClassPlotError"
 var plotFields = []string{
 	"kind",
 	"seriesKinds", "seriesLabels", "seriesX", "seriesY",
+	"seriesLineStyles", "seriesLineWidths", "seriesMarkers", "seriesMarkerSizes",
 	"barLabels", "barValues",
 	"histogramValues", "histogramBins",
 	"boxValues",
 	"errorX", "errorY", "errorLower", "errorUpper",
 	"pieLabels", "pieValues",
 	"heatmapXLabels", "heatmapYLabels", "heatmapValues",
-	"title", "xLabel", "yLabel", "legend", "width", "height",
+	"title", "xLabel", "yLabel", "legend", "legendPosition", "width", "height",
 }
 
 func plotFieldID(name string) ir.FieldID {
@@ -237,6 +238,14 @@ func plotChartInterchangeField(name string) string {
 		return "SeriesX"
 	case "seriesY":
 		return "SeriesY"
+	case "seriesLineStyles":
+		return "SeriesLineStyles"
+	case "seriesLineWidths":
+		return "SeriesLineWidths"
+	case "seriesMarkers":
+		return "SeriesMarkers"
+	case "seriesMarkerSizes":
+		return "SeriesMarkerSizes"
 	case "barLabels":
 		return "BarLabels"
 	case "barValues":
@@ -273,6 +282,8 @@ func plotChartInterchangeField(name string) string {
 		return "YLabel"
 	case "legend":
 		return "Legend"
+	case "legendPosition":
+		return "LegendPosition"
 	case "width":
 		return "Width"
 	case "height":
@@ -325,9 +336,24 @@ func (generator *generator) plotOperation(name string, value *ir.CallExpr) strin
 	case "Chart.legend":
 		chart := generator.plotChartOf(value.Callee)
 		return generator.plotChartFrom("AhdPlotChartLegend("+chart+", "+boolean(0)+")", meta)
+	case "Chart.legendPosition":
+		chart := generator.plotChartOf(value.Callee)
+		return generator.plotChartFrom("AhdPlotChartLegendPosition("+plotErrorRuntime+", "+chart+", "+generator.value(value.Arguments[0].Value, ir.Type{Kind: ir.StringType}, false)+")", meta)
 	case "Chart.size":
 		chart := generator.plotChartOf(value.Callee)
 		return generator.plotChartFrom("AhdPlotChartSize("+plotErrorRuntime+", "+chart+", "+integer(0)+", "+integer(1)+")", meta)
+	case "Chart.lineStyle":
+		chart := generator.plotChartOf(value.Callee)
+		return generator.plotChartFrom("AhdPlotChartLineStyle("+plotErrorRuntime+", "+chart+", "+generator.value(value.Arguments[0].Value, ir.Type{Kind: ir.StringType}, false)+")", meta)
+	case "Chart.lineWidth":
+		chart := generator.plotChartOf(value.Callee)
+		return generator.plotChartFrom("AhdPlotChartLineWidth("+plotErrorRuntime+", "+chart+", "+generator.value(value.Arguments[0].Value, ir.Type{Kind: ir.RealType}, false)+")", meta)
+	case "Chart.marker":
+		chart := generator.plotChartOf(value.Callee)
+		return generator.plotChartFrom("AhdPlotChartMarker("+plotErrorRuntime+", "+chart+", "+generator.value(value.Arguments[0].Value, ir.Type{Kind: ir.StringType}, false)+")", meta)
+	case "Chart.markerSize":
+		chart := generator.plotChartOf(value.Callee)
+		return generator.plotChartFrom("AhdPlotChartMarkerSize("+plotErrorRuntime+", "+chart+", "+generator.value(value.Arguments[0].Value, ir.Type{Kind: ir.RealType}, false)+")", meta)
 	case "Chart.line", "Chart.scatter":
 		return generator.plotAddSeries(name, value, meta)
 	case "Chart.save":

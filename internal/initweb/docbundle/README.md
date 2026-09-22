@@ -16,11 +16,12 @@ modules, GUI, Graphics, interactive Plot viewer, and desktop application
 packaging. It is used in practice by a small community; it is not a
 mainstream language.
 
-This is **v2.3.0**, **Language Ergonomics & Plot Polish**. It adds explicit
-named-Function `uses` captures, capture-aware compiler and LSP tooling,
-workspace references/rename, current-view Surface Save, and bounded
-mathematical text for Plot and Surface labels. v2.2.0, **Plot Completeness**,
-remains available as the previous release.
+This is **v2.4.0**, **Mathematical Rendering & Plot Styling**. It adds
+bundled offline Tectonic labels with exact embedded TeX glyph rendering,
+typed line and marker styling, configurable legend positions and improved
+math layout, current-view Surface Save, and automatic Windows user-PATH
+registration. v2.3.0, **Language Ergonomics & Plot Polish**, remains available
+as the previous release.
 
 v2.0.0 is a major release, **Desktop Application Completion**: it completes
 the first-party desktop application foundation — ListBox, Select, TextArea,
@@ -484,6 +485,7 @@ See the [CLI guide](CLI.md), [formatter guide](FORMATTER.md),
 - v2.1 application I/O and network — a binary file round trip over HTTP, a WebSocket client and server pair, and mail with attachments
 - v2.2 student performance — one desktop application that shows the same grades as a line, bar, histogram, box, error bar, pie, heatmap, and 3D surface
 - v2.3 examples — explicit named-Function `uses` captures and Plot/Surface mathematical labels
+- v2.4 examples — embedded Tectonic math glyphs, plot styling, legend positions, and Surface labels
 - v1.9 GUI colors and interactive Plot — an order form with colors and a disabled Save button, and a chart in AhdCode's own viewer
 - v1.8 GUI and events — a small GUI ledger backed by SQLite and a Turtle driven by arrow keys and clicks
 - v1.6 Graphics and Turtle — a Cartesian Canvas, shapes, a Turtle star and spiral, PNG/SVG export, and a regular-polygon lesson
@@ -503,6 +505,27 @@ diagnostics and hover. The same VSIX targets VS Code and Antigravity. See its
 installation guide.
 
 ## Current limitations
+
+## What is new in v2.4.0 <a id="what-is-new-in-v240"></a>
+
+v2.4.0, **Mathematical Rendering & Plot Styling**, completes the Plot and
+Surface presentation work introduced in v2.3.0:
+
+- Plot and Surface math labels use the bundled offline Tectonic engine and
+  exact embedded Type-1C glyph programs, with no host-font substitution;
+- typed `LineStyle`, `Marker`, `lineWidth`, `markerSize`, and `LegendPosition`
+  values make plot styling explicit and keep legends aligned with series;
+- legend insets and math-text baseline/layout handling keep formulas away from
+  chart edges and avoid clipping across PNG, SVG, and PDF output;
+- the interactive Surface viewer's Save exports the current visible view while
+  programmatic `Surface.save(path)` remains canonical;
+- the Windows installer adds the per-user AhdCode bin directory to PATH once
+  and broadcasts the environment update.
+
+Math mode remains whole-string `$...$`; mixed rich text is not supported.
+
+See the v2.4 examples,
+[Plot](PLOT.md), and [Installation](INSTALLATION.md) references.
 
 ## What is new in v2.3.0 <a id="what-is-new-in-v23"></a>
 

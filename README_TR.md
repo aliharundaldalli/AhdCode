@@ -16,11 +16,13 @@ veritabanı modülleri, GUI'si, Graphics'i, etkileşimli Plot görüntüleyicisi
 masaüstü uygulaması paketlemesiyle gelir. Küçük bir topluluk tarafından
 pratikte kullanılmaktadır; yaygın (mainstream) bir dil değildir.
 
-Bu, **v2.3.0**, **Dil Ergonomisi ve Plot Cilası** sürümüdür. Açık isimli
-Function `uses` capture'ları, capture-aware derleyici ve LSP araçları,
-workspace referans/rename, mevcut Surface görünümünü kaydeden Save ve
-Plot/Surface etiketleri için sınırlı matematiksel metin ekler. Önceki
-**Plot'un Tamamlanması** sürümü olan v2.2.0 da kullanılabilir durumdadır.
+Bu, **v2.4.0**, **Matematiksel Rasterizasyon ve Plot Stili** sürümüdür.
+Paketli çevrimdışı Tectonic ile gömülü TeX glyph'lerinin aslına uygun
+çizimini, tipli çizgi ve marker stillerini, yapılandırılabilir legend
+konumlarını, iyileştirilmiş matematik düzenini, mevcut Surface görünümünü
+kaydeden Save'i ve Windows kullanıcı PATH kaydını ekler. Önceki
+**Dil Ergonomisi ve Plot Cilası** sürümü olan v2.3.0 da kullanılabilir
+durumdadır.
 
 v2.0.0 bir ana (major) sürümdür, **Masaüstü Uygulamasının Tamamlanması**:
 birinci taraf masaüstü uygulaması temelini tamamlar — GUI'de ListBox, Select,
@@ -500,6 +502,7 @@ bakın.
 - [v2.1 uygulama G/Ç ve ağ](examples/v2.1/README_TR.md) — HTTP üzerinden ikili bir dosya turu, bir WebSocket istemci/sunucu çifti ve ekli posta
 - [v2.2 öğrenci performansı](examples/v2.2/student_performance/README_TR.md) — aynı notları çizgi, çubuk, histogram, kutu, hata çubuğu, pasta, ısı haritası ve 3B yüzey olarak gösteren tek bir masaüstü uygulaması
 - [v2.3 örnekleri](examples/v2.3/README_TR.md) — isimli Function `uses` capture'ları ve Plot/Surface matematik etiketleri
+- [v2.4 örnekleri](examples/v2.4/README_TR.md) — gömülü Tectonic matematik glyph'leri, Plot stilleri, legend konumları ve Surface etiketleri
 - [v1.9 GUI renkleri ve etkileşimli Plot](examples/v1.9/README_TR.md) — renkli ve devre dışı Kaydet düğmeli bir sipariş formu ile AhdCode'un kendi görüntüleyicisinde bir grafik
 - [v1.8 GUI ve olaylar](examples/v1.8/README_TR.md) — SQLite destekli küçük bir GUI defteri ve ok tuşları ile tıklamalarla yönetilen Turtle
 - [v1.6 Graphics ve Turtle](examples/v1.6/graphics_turtle/README_TR.md) — Kartezyen Canvas, şekiller, Turtle ile yıldız ve spiral, PNG/SVG kaydı ve düzgün çokgen dersi
@@ -520,6 +523,30 @@ VS Code hem de Antigravity'i hedefler.
 [Kurulum rehberine](editors/vscode/README_TR.md) bakın.
 
 ## Mevcut sınırlamalar
+
+## v2.4.0 ile gelenler <a id="v24-ile-gelenler"></a>
+
+v2.4.0, **Matematiksel Rasterizasyon ve Plot Stili**, v2.3.0 ile başlayan
+Plot ve Surface sunum çalışmalarını tamamlar:
+
+- Plot ve Surface matematik etiketleri paketli çevrimdışı Tectonic motorunu
+  ve gömülü Type-1C glyph programlarını kullanır; host font substitution
+  yapılmaz;
+- tipli `LineStyle`, `Marker`, `lineWidth`, `markerSize` ve `LegendPosition`
+  değerleri Plot stilini açık hale getirir ve legend'ları serilerle hizalar;
+- legend inset'leri ve matematik metni baseline/düzen işlemesi formülleri
+  grafik kenarlarından uzak tutar ve PNG, SVG, PDF çıktılarında clipping'i
+  önler;
+- etkileşimli Surface görüntüleyicisindeki Save mevcut görünür görünümü
+  kaydeder; programatik `Surface.save(path)` kanonik kalır;
+- Windows kurulum programı kullanıcıya ait AhdCode bin dizinini PATH'e bir
+  kez ekler ve ortam güncellemesini yayınlar.
+
+Matematik modu bütün String'i saran `$...$` biçimindedir; karışık zengin metin
+desteklenmez.
+
+[v2.4 örneklerine](examples/v2.4/README_TR.md), [Plot](docs/PLOT_TR.md) ve
+[Kurulum](docs/INSTALLATION_TR.md) referanslarına bakın.
 
 ## v2.3.0 ile gelenler <a id="v23-ile-gelenler"></a>
 

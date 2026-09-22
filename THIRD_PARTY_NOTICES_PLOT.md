@@ -15,7 +15,8 @@ font are listed in `THIRD_PARTY_NOTICES_GUI.md`.
    License : BSD 3-Clause ("Copyright (c) 2013, The Gonum Authors. All
              rights reserved.")
 
-2. go-latex/latex (Gonum plot's LaTeX-style label typesetting)
+2. go-latex/latex (Gonum plot's font and text support; not the authority for
+   AhdCode's `$...$` math labels)
    Project : https://codeberg.org/go-latex/latex
    License : BSD 3-Clause
 
@@ -48,6 +49,22 @@ font are listed in `THIRD_PARTY_NOTICES_GUI.md`.
    package)
    Project : https://pkg.go.dev/golang.org/x/image
    License : BSD 3-Clause (same terms as the Go project itself)
+
+9. SalvioniDigitalSolutions/gopdf (pure-Go, in-process rasterisation of the
+   bounded local Tectonic PDF; AhdCode carries a small local MIT-licensed fork
+   that resolves a simple CFF program's embedded custom encoding directly so
+   Tectonic math uses its own glyph outlines rather than host-font substitutes)
+   Project : https://github.com/SalvioniDigitalSolutions/gopdf
+   License : MIT
+
+10. pdfcpu and supporting PDF/image packages
+    Projects : https://github.com/pdfcpu/pdfcpu,
+               https://github.com/ajroetker/pdf,
+               https://github.com/ajroetker/go-jpeg2000,
+               https://github.com/hhrutter/tiff
+    License : Their permissive upstream licenses are copied into the packaged
+              `licenses/modules/` inventory. They remain transitive chart/PDF
+              dependencies; no PDF is accepted from a user as executable input.
 
 Full upstream license texts accompany each module under
 `$GOPATH/pkg/mod/<module>@<version>/LICENSE` for a local build, and are

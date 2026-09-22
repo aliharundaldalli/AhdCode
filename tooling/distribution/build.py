@@ -42,6 +42,8 @@ def licenses(payload,modules):
  shutil.copytree(R/'internal/backend/golang/ahdruntime/codesvendor/vendor',dest/'codes-source')
  (dest/'bootstrap').mkdir();shutil.copy2(R/'internal/initweb/templates/vendor/bootstrap/LICENSE',dest/'bootstrap/LICENSE')
  shutil.copy2(R/'tooling/latex/resources.json',dest/'latex-resources.json')
+ (dest/'modules'/'SalvioniDigitalSolutions_gopdf-local').mkdir(parents=True,exist_ok=True)
+ shutil.copy2(R/'third_party/gopdf/LICENSE',dest/'modules'/'SalvioniDigitalSolutions_gopdf-local'/'LICENSE')
  inventory=[]
  for mod in modules:
   if mod.get('Main'):continue

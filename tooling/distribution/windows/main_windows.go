@@ -127,7 +127,7 @@ func runGraphical() {
 }
 
 func successMessage() string {
-	return "Installation complete.\n\nOpen a new terminal and run:\n\n    ahdcode --version"
+	return "Installation complete.\n\nAhdCode was added to your user PATH.\n\nOpen a new terminal, or restart your IDE, before running:\n\n    ahdcode --version"
 }
 
 // friendly turns the failures a user can actually hit into plain language and

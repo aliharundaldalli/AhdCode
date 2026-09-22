@@ -11,9 +11,12 @@ const plotModuleID = "builtin:Plot"
 var (
 	plotErrorParent = &types.ClassSymbol{ModuleID: "builtin:core", Name: "Error",
 		Parent: &types.ClassSymbol{ModuleID: "builtin:core", Name: "Object"}}
-	plotErrorClass  = &types.ClassSymbol{ModuleID: plotModuleID, Name: "PlotError", Parent: plotErrorParent}
-	plotChartClass  = &types.ClassSymbol{ModuleID: plotModuleID, Name: "Chart"}
-	plotFigureClass = &types.ClassSymbol{ModuleID: plotModuleID, Name: "Figure"}
+	plotErrorClass          = &types.ClassSymbol{ModuleID: plotModuleID, Name: "PlotError", Parent: plotErrorParent}
+	plotChartClass          = &types.ClassSymbol{ModuleID: plotModuleID, Name: "Chart"}
+	plotFigureClass         = &types.ClassSymbol{ModuleID: plotModuleID, Name: "Figure"}
+	plotLineStyleClass      = &types.ClassSymbol{ModuleID: plotModuleID, Name: "LineStyle"}
+	plotMarkerClass         = &types.ClassSymbol{ModuleID: plotModuleID, Name: "Marker"}
+	plotLegendPositionClass = &types.ClassSymbol{ModuleID: plotModuleID, Name: "LegendPosition"}
 	// v2.0
 	plotSurfaceClass = &types.ClassSymbol{ModuleID: plotModuleID, Name: "Surface"}
 )
@@ -32,7 +35,7 @@ func PlotFigureIdentity() *types.ClassSymbol { return plotFigureClass }
 // publishes through built-in type operations, so has/has not reports what a
 // Chart or Figure value really offers.
 var (
-	PlotChartOperations  = []string{"title", "xLabel", "yLabel", "legend", "size", "line", "scatter", "save", "show"}
+	PlotChartOperations  = []string{"title", "xLabel", "yLabel", "legend", "legendPosition", "size", "lineStyle", "lineWidth", "marker", "markerSize", "line", "scatter", "save", "show"}
 	PlotFigureOperations = []string{"save", "show"}
 	// PlotSurfaceOperations are a Surface's members (v2.0).
 	PlotSurfaceOperations = []string{
@@ -40,6 +43,48 @@ var (
 		"xCategories", "yCategories", "show", "save",
 	}
 )
+
+const (
+	plotLineStyleSolid    = "solid"
+	plotLineStyleDashed   = "dashed"
+	plotLineStyleDotted   = "dotted"
+	plotLineStyleDashDot  = "dashDot"
+	plotMarkerNone        = "none"
+	plotMarkerCircle      = "circle"
+	plotMarkerSquare      = "square"
+	plotMarkerTriangle    = "triangle"
+	plotMarkerDiamond     = "diamond"
+	plotMarkerCross       = "cross"
+	plotLegendTopRight    = "topRight"
+	plotLegendTopLeft     = "topLeft"
+	plotLegendBottomRight = "bottomRight"
+	plotLegendBottomLeft  = "bottomLeft"
+)
+
+func PlotLineStyleIdentity() *types.ClassSymbol      { return plotLineStyleClass }
+func PlotMarkerIdentity() *types.ClassSymbol         { return plotMarkerClass }
+func PlotLegendPositionIdentity() *types.ClassSymbol { return plotLegendPositionClass }
+
+// plotStyleValueClass publishes a nominal value type whose members are the
+// only source-level values accepted by the Chart style operations. The
+// compiler lowers each member to its canonical renderer token at the Plot
+// boundary; callers still cannot pass an arbitrary String.
+func plotStyleValueClass(identity *types.ClassSymbol, names []string) *Symbol {
+	symbol := &Symbol{
+		Name: identity.Name, Kind: ClassSymbol, Class: identity,
+		Type: types.Class{Symbol: identity, Reference: true}, ModuleRoot: true,
+		Builtin: true, InitialNull: NonNull, OriginModuleID: plotModuleID,
+		Members: make(map[string]*Symbol, len(names)),
+	}
+	for _, name := range names {
+		symbol.Members[name] = &Symbol{
+			Name: name, Kind: MemberSymbol, Type: types.Class{Symbol: identity},
+			Constant: true, Builtin: true, InitialNull: NonNull,
+			OwnerClass: identity, OriginModuleID: plotModuleID, BuiltinLiteral: name,
+		}
+	}
+	return symbol
+}
 
 func plotChartType() types.Type  { return types.Class{Symbol: plotChartClass} }
 func plotFigureType() types.Type { return types.Class{Symbol: plotFigureClass} }
@@ -134,6 +179,19 @@ func plotModuleInterface() *ModuleInterface {
 	}
 	module.Classes[plotModuleID+"\x00Chart"] = chartSymbol
 	addStandardExport(module, chartSymbol)
+
+	lineStyleSymbol := plotStyleValueClass(plotLineStyleClass,
+		[]string{plotLineStyleSolid, plotLineStyleDashed, plotLineStyleDotted, plotLineStyleDashDot})
+	module.Classes[plotModuleID+"\x00LineStyle"] = lineStyleSymbol
+	addStandardExport(module, lineStyleSymbol)
+	markerSymbol := plotStyleValueClass(plotMarkerClass,
+		[]string{plotMarkerNone, plotMarkerCircle, plotMarkerSquare, plotMarkerTriangle, plotMarkerDiamond, plotMarkerCross})
+	module.Classes[plotModuleID+"\x00Marker"] = markerSymbol
+	addStandardExport(module, markerSymbol)
+	legendPositionSymbol := plotStyleValueClass(plotLegendPositionClass,
+		[]string{plotLegendTopRight, plotLegendTopLeft, plotLegendBottomRight, plotLegendBottomLeft})
+	module.Classes[plotModuleID+"\x00LegendPosition"] = legendPositionSymbol
+	addStandardExport(module, legendPositionSymbol)
 
 	figureSymbol := &Symbol{
 		Name: "Figure", Kind: ClassSymbol, Class: plotFigureClass,
@@ -284,7 +342,10 @@ func plotOperationFor(receiver types.Type, name string) (TypeOperation, bool) {
 
 var plotChartOperationNames = map[string]TypeOperation{
 	"title": PlotChartTitle, "xLabel": PlotChartXLabel, "yLabel": PlotChartYLabel,
-	"legend": PlotChartLegend, "size": PlotChartSize, "line": PlotChartLine,
+	"legend": PlotChartLegend, "size": PlotChartSize, "lineStyle": PlotChartLineStyle,
+	"legendPosition": PlotChartLegendPosition,
+	"lineWidth":      PlotChartLineWidth, "marker": PlotChartMarker, "markerSize": PlotChartMarkerSize,
+	"line":    PlotChartLine,
 	"scatter": PlotChartScatter, "save": PlotChartSave, "show": PlotChartShow,
 }
 
@@ -314,17 +375,22 @@ var plotMembers = func() map[TypeOperation]*Symbol {
 		return completionOverloads(plotModuleID, name, signatures...)
 	}
 	return map[TypeOperation]*Symbol{
-		PlotChartTitle:   completionMember(plotModuleID, "title", chart, p("text", types.String)),
-		PlotChartXLabel:  completionMember(plotModuleID, "xLabel", chart, p("text", types.String)),
-		PlotChartYLabel:  completionMember(plotModuleID, "yLabel", chart, p("text", types.String)),
-		PlotChartLegend:  completionMember(plotModuleID, "legend", chart, p("enabled", types.Bool)),
-		PlotChartSize:    completionMember(plotModuleID, "size", chart, p("width", types.Int), p("height", types.Int)),
-		PlotChartLine:    series("line"),
-		PlotChartScatter: series("scatter"),
-		PlotChartSave:    completionMember(plotModuleID, "save", types.Nothing, p("path", types.String)),
-		PlotChartShow:    completionMember(plotModuleID, "show", types.Nothing),
-		PlotFigureSave:   completionMember(plotModuleID, "save", types.Nothing, p("path", types.String)),
-		PlotFigureShow:   completionMember(plotModuleID, "show", types.Nothing),
+		PlotChartTitle:          completionMember(plotModuleID, "title", chart, p("text", types.String)),
+		PlotChartXLabel:         completionMember(plotModuleID, "xLabel", chart, p("text", types.String)),
+		PlotChartYLabel:         completionMember(plotModuleID, "yLabel", chart, p("text", types.String)),
+		PlotChartLegend:         completionMember(plotModuleID, "legend", chart, p("enabled", types.Bool)),
+		PlotChartLegendPosition: completionMember(plotModuleID, "legendPosition", chart, p("position", types.Class{Symbol: plotLegendPositionClass})),
+		PlotChartSize:           completionMember(plotModuleID, "size", chart, p("width", types.Int), p("height", types.Int)),
+		PlotChartLineStyle:      completionMember(plotModuleID, "lineStyle", chart, p("style", types.Class{Symbol: plotLineStyleClass})),
+		PlotChartLineWidth:      completionMember(plotModuleID, "lineWidth", chart, p("width", types.Real)),
+		PlotChartMarker:         completionMember(plotModuleID, "marker", chart, p("shape", types.Class{Symbol: plotMarkerClass})),
+		PlotChartMarkerSize:     completionMember(plotModuleID, "markerSize", chart, p("size", types.Real)),
+		PlotChartLine:           series("line"),
+		PlotChartScatter:        series("scatter"),
+		PlotChartSave:           completionMember(plotModuleID, "save", types.Nothing, p("path", types.String)),
+		PlotChartShow:           completionMember(plotModuleID, "show", types.Nothing),
+		PlotFigureSave:          completionMember(plotModuleID, "save", types.Nothing, p("path", types.String)),
+		PlotFigureShow:          completionMember(plotModuleID, "show", types.Nothing),
 
 		"Surface.title":     completionMember(plotModuleID, "title", surface, p("text", types.String)),
 		"Surface.xLabel":    completionMember(plotModuleID, "xLabel", surface, p("text", types.String)),

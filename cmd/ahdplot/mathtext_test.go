@@ -5,10 +5,20 @@ import (
 	"path/filepath"
 	"testing"
 
+	"ahdcode/cmd/ahdplotmath"
 	"ahdcode/internal/plotproto"
+	"gonum.org/v1/plot/font"
 )
 
+func requireMathRuntime(t *testing.T) {
+	t.Helper()
+	if plotmath.DiscoverLatexRoot(os.Args[0]) == "" {
+		t.Skip("bundled offline Tectonic runtime is not present in this source checkout")
+	}
+}
+
 func TestWholeStringMathTextRendersAcrossPlotLabels(t *testing.T) {
+	requireMathRuntime(t)
 	output := filepath.Join(t.TempDir(), "math.png")
 	err := render(plotproto.Request{
 		OutputPath: output, Width: 640, Height: 480, Rows: 1, Columns: 1,
@@ -37,6 +47,7 @@ func TestInvalidWholeStringMathTextIsAnError(t *testing.T) {
 }
 
 func TestMathTextAcceptsSurfaceStyleLabels(t *testing.T) {
+	requireMathRuntime(t)
 	output := filepath.Join(t.TempDir(), "surface-label.png")
 	if err := renderMath(plotproto.Request{
 		Mode: "math", OutputPath: output,
@@ -62,7 +73,22 @@ func TestMathTextIsWholeStringOptIn(t *testing.T) {
 	}
 }
 
+func TestMathTextBoxReservesBaselineDepth(t *testing.T) {
+	requireMathRuntime(t)
+	handler := newMathTextHandler()
+	fnt := font.Font{Typeface: "Liberation", Variant: "Serif", Size: 12}
+	width, height, depth := handler.Box("$x^2$", fnt)
+	if width <= 0 || height <= 0 || depth <= 0 {
+		t.Fatalf("math box = width %.2f height %.2f depth %.2f; want positive metrics", width, height, depth)
+	}
+	plainWidth, plainHeight, plainDepth := handler.Box("x", fnt)
+	if plainWidth <= 0 || plainHeight <= 0 || plainDepth <= 0 {
+		t.Fatalf("plain box = width %.2f height %.2f depth %.2f; want positive metrics", plainWidth, plainHeight, plainDepth)
+	}
+}
+
 func TestMathFormulaQAFormatsAndQuality(t *testing.T) {
+	requireMathRuntime(t)
 	formulas := []string{
 		"$x^2$",
 		"$f(x)=x^2+3x+2$",

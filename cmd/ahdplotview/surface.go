@@ -280,7 +280,17 @@ func (r surfaceRenderer) render(s surfaceSpec, c camera, width, height int, text
 	titleFace := r.face(16 * textScale)
 	if s.Title != "" {
 		top = float64(titleFace.Metrics().Height.Ceil()) + 12*textScale
-		r.drawText(img, titleFace, s.Title, float64(width)/2, 8*textScale+float64(titleFace.Metrics().Ascent.Ceil()), 0.5, color.RGBA{20, 20, 20, 255}, 16*textScale)
+		titleY := 8*textScale + float64(titleFace.Metrics().Ascent.Ceil())
+		if isSurfaceMath(s.Title) && r.math != nil {
+			if rendered, ok := r.math.image(s.Title, 16*textScale, color.Black); ok {
+				renderedH := float64(rendered.Bounds().Dy())
+				if renderedH+12*textScale > top {
+					top = renderedH + 12*textScale
+				}
+				titleY = math.Max(titleY, renderedH*0.75+4*textScale)
+			}
+		}
+		r.drawText(img, titleFace, s.Title, float64(width)/2, titleY, 0.5, color.RGBA{20, 20, 20, 255}, 16*textScale)
 	}
 	grid, lowZ, highZ := s.normalized()
 	p := newProjection(c, float64(width), float64(height), top)
@@ -478,7 +488,15 @@ func (r surfaceRenderer) drawText(img *image.RGBA, face font.Face, text string, 
 			width, height := rendered.Bounds().Dx(), rendered.Bounds().Dy()
 			left := int(math.Round(x - anchor*float64(width)))
 			top := int(math.Round(y - 0.75*float64(height)))
+			if top < 0 {
+				top = 0
+			}
 			draw.Draw(img, image.Rect(left, top, left+width, top+height), rendered, image.Point{}, draw.Over)
+			return
+		}
+		if isSurfaceMath(text) {
+			// prepare is called before rendering and reports the actionable
+			// PlotError. Never draw a failed math fragment as raw TeX.
 			return
 		}
 	}

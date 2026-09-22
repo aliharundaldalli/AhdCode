@@ -9,6 +9,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"ahdcode/cmd/ahdplotmath"
 )
 
 func gridSurface(n int, f func(x, y float64) float64) surfaceSpec {
@@ -219,6 +221,9 @@ func TestToolbarButtons(t *testing.T) {
 }
 
 func TestSurfaceSaveStateABCD(t *testing.T) {
+	if plotmath.DiscoverLatexRoot("") == "" {
+		t.Skip("bundled offline Tectonic runtime is not present in this source checkout")
+	}
 	surface := gridSurface(12, saddle)
 	surface.Title = "$f(x,y)=x^2-y^2$"
 	surface.XLabel = "$x$"

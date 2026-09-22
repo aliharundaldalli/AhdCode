@@ -31,31 +31,36 @@ const (
 )
 
 var (
-	plotFieldKind            = ir.FieldID(string(plotChartClassID) + "::field::kind")
-	plotFieldSeriesKinds     = ir.FieldID(string(plotChartClassID) + "::field::seriesKinds")
-	plotFieldSeriesLabels    = ir.FieldID(string(plotChartClassID) + "::field::seriesLabels")
-	plotFieldSeriesX         = ir.FieldID(string(plotChartClassID) + "::field::seriesX")
-	plotFieldSeriesY         = ir.FieldID(string(plotChartClassID) + "::field::seriesY")
-	plotFieldBarLabels       = ir.FieldID(string(plotChartClassID) + "::field::barLabels")
-	plotFieldBarValues       = ir.FieldID(string(plotChartClassID) + "::field::barValues")
-	plotFieldHistogramValues = ir.FieldID(string(plotChartClassID) + "::field::histogramValues")
-	plotFieldHistogramBins   = ir.FieldID(string(plotChartClassID) + "::field::histogramBins")
-	plotFieldBoxValues       = ir.FieldID(string(plotChartClassID) + "::field::boxValues")
-	plotFieldErrorX          = ir.FieldID(string(plotChartClassID) + "::field::errorX")
-	plotFieldErrorY          = ir.FieldID(string(plotChartClassID) + "::field::errorY")
-	plotFieldErrorLower      = ir.FieldID(string(plotChartClassID) + "::field::errorLower")
-	plotFieldErrorUpper      = ir.FieldID(string(plotChartClassID) + "::field::errorUpper")
-	plotFieldPieLabels       = ir.FieldID(string(plotChartClassID) + "::field::pieLabels")
-	plotFieldPieValues       = ir.FieldID(string(plotChartClassID) + "::field::pieValues")
-	plotFieldHeatmapXLabels  = ir.FieldID(string(plotChartClassID) + "::field::heatmapXLabels")
-	plotFieldHeatmapYLabels  = ir.FieldID(string(plotChartClassID) + "::field::heatmapYLabels")
-	plotFieldHeatmapValues   = ir.FieldID(string(plotChartClassID) + "::field::heatmapValues")
-	plotFieldTitle           = ir.FieldID(string(plotChartClassID) + "::field::title")
-	plotFieldXLabel          = ir.FieldID(string(plotChartClassID) + "::field::xLabel")
-	plotFieldYLabel          = ir.FieldID(string(plotChartClassID) + "::field::yLabel")
-	plotFieldLegend          = ir.FieldID(string(plotChartClassID) + "::field::legend")
-	plotFieldWidth           = ir.FieldID(string(plotChartClassID) + "::field::width")
-	plotFieldHeight          = ir.FieldID(string(plotChartClassID) + "::field::height")
+	plotFieldKind              = ir.FieldID(string(plotChartClassID) + "::field::kind")
+	plotFieldSeriesKinds       = ir.FieldID(string(plotChartClassID) + "::field::seriesKinds")
+	plotFieldSeriesLabels      = ir.FieldID(string(plotChartClassID) + "::field::seriesLabels")
+	plotFieldSeriesX           = ir.FieldID(string(plotChartClassID) + "::field::seriesX")
+	plotFieldSeriesY           = ir.FieldID(string(plotChartClassID) + "::field::seriesY")
+	plotFieldSeriesLineStyles  = ir.FieldID(string(plotChartClassID) + "::field::seriesLineStyles")
+	plotFieldSeriesLineWidths  = ir.FieldID(string(plotChartClassID) + "::field::seriesLineWidths")
+	plotFieldSeriesMarkers     = ir.FieldID(string(plotChartClassID) + "::field::seriesMarkers")
+	plotFieldSeriesMarkerSizes = ir.FieldID(string(plotChartClassID) + "::field::seriesMarkerSizes")
+	plotFieldBarLabels         = ir.FieldID(string(plotChartClassID) + "::field::barLabels")
+	plotFieldBarValues         = ir.FieldID(string(plotChartClassID) + "::field::barValues")
+	plotFieldHistogramValues   = ir.FieldID(string(plotChartClassID) + "::field::histogramValues")
+	plotFieldHistogramBins     = ir.FieldID(string(plotChartClassID) + "::field::histogramBins")
+	plotFieldBoxValues         = ir.FieldID(string(plotChartClassID) + "::field::boxValues")
+	plotFieldErrorX            = ir.FieldID(string(plotChartClassID) + "::field::errorX")
+	plotFieldErrorY            = ir.FieldID(string(plotChartClassID) + "::field::errorY")
+	plotFieldErrorLower        = ir.FieldID(string(plotChartClassID) + "::field::errorLower")
+	plotFieldErrorUpper        = ir.FieldID(string(plotChartClassID) + "::field::errorUpper")
+	plotFieldPieLabels         = ir.FieldID(string(plotChartClassID) + "::field::pieLabels")
+	plotFieldPieValues         = ir.FieldID(string(plotChartClassID) + "::field::pieValues")
+	plotFieldHeatmapXLabels    = ir.FieldID(string(plotChartClassID) + "::field::heatmapXLabels")
+	plotFieldHeatmapYLabels    = ir.FieldID(string(plotChartClassID) + "::field::heatmapYLabels")
+	plotFieldHeatmapValues     = ir.FieldID(string(plotChartClassID) + "::field::heatmapValues")
+	plotFieldTitle             = ir.FieldID(string(plotChartClassID) + "::field::title")
+	plotFieldXLabel            = ir.FieldID(string(plotChartClassID) + "::field::xLabel")
+	plotFieldYLabel            = ir.FieldID(string(plotChartClassID) + "::field::yLabel")
+	plotFieldLegend            = ir.FieldID(string(plotChartClassID) + "::field::legend")
+	plotFieldLegendPosition    = ir.FieldID(string(plotChartClassID) + "::field::legendPosition")
+	plotFieldWidth             = ir.FieldID(string(plotChartClassID) + "::field::width")
+	plotFieldHeight            = ir.FieldID(string(plotChartClassID) + "::field::height")
 
 	plotFigureFieldRows    = ir.FieldID(string(plotFigureClassID) + "::field::rows")
 	plotFigureFieldColumns = ir.FieldID(string(plotFigureClassID) + "::field::columns")
@@ -74,10 +79,14 @@ const (
 type plotChart struct {
 	kind string
 
-	seriesKinds  []string
-	seriesLabels []string
-	seriesX      [][]float64
-	seriesY      [][]float64
+	seriesKinds       []string
+	seriesLabels      []string
+	seriesX           [][]float64
+	seriesY           [][]float64
+	seriesLineStyles  []string
+	seriesLineWidths  []float64
+	seriesMarkers     []string
+	seriesMarkerSizes []float64
 
 	barLabels []string
 	barValues []float64
@@ -97,6 +106,7 @@ type plotChart struct {
 
 	title, xLabel, yLabel string
 	legend                bool
+	legendPosition        string
 	width, height         int64
 }
 
@@ -106,62 +116,72 @@ func (session *Session) chartOf(value any) plotChart {
 	instance := session.requireInstance(value)
 	field := func(id ir.FieldID) any { return instance.Fields[id] }
 	return plotChart{
-		kind:            field(plotFieldKind).(string),
-		seriesKinds:     plotStringsFromField(field(plotFieldSeriesKinds)),
-		seriesLabels:    plotStringsFromField(field(plotFieldSeriesLabels)),
-		seriesX:         plotRealGridFromField(field(plotFieldSeriesX)),
-		seriesY:         plotRealGridFromField(field(plotFieldSeriesY)),
-		barLabels:       plotStringsFromField(field(plotFieldBarLabels)),
-		barValues:       plotRealsFromField(field(plotFieldBarValues)),
-		histogramValues: plotRealsFromField(field(plotFieldHistogramValues)),
-		histogramBins:   field(plotFieldHistogramBins).(int64),
-		boxValues:       plotRealsFromField(field(plotFieldBoxValues)),
-		errorX:          plotRealsFromField(field(plotFieldErrorX)),
-		errorY:          plotRealsFromField(field(plotFieldErrorY)),
-		errorLower:      plotRealsFromField(field(plotFieldErrorLower)),
-		errorUpper:      plotRealsFromField(field(plotFieldErrorUpper)),
-		pieLabels:       plotStringsFromField(field(plotFieldPieLabels)),
-		pieValues:       plotRealsFromField(field(plotFieldPieValues)),
-		heatmapXLabels:  plotStringsFromField(field(plotFieldHeatmapXLabels)),
-		heatmapYLabels:  plotStringsFromField(field(plotFieldHeatmapYLabels)),
-		heatmapValues:   plotRealGridFromField(field(plotFieldHeatmapValues)),
-		title:           field(plotFieldTitle).(string),
-		xLabel:          field(plotFieldXLabel).(string),
-		yLabel:          field(plotFieldYLabel).(string),
-		legend:          field(plotFieldLegend).(bool),
-		width:           field(plotFieldWidth).(int64),
-		height:          field(plotFieldHeight).(int64),
+		kind:              field(plotFieldKind).(string),
+		seriesKinds:       plotStringsFromField(field(plotFieldSeriesKinds)),
+		seriesLabels:      plotStringsFromField(field(plotFieldSeriesLabels)),
+		seriesX:           plotRealGridFromField(field(plotFieldSeriesX)),
+		seriesY:           plotRealGridFromField(field(plotFieldSeriesY)),
+		seriesLineStyles:  plotStringsFromField(field(plotFieldSeriesLineStyles)),
+		seriesLineWidths:  plotRealsFromField(field(plotFieldSeriesLineWidths)),
+		seriesMarkers:     plotStringsFromField(field(plotFieldSeriesMarkers)),
+		seriesMarkerSizes: plotRealsFromField(field(plotFieldSeriesMarkerSizes)),
+		barLabels:         plotStringsFromField(field(plotFieldBarLabels)),
+		barValues:         plotRealsFromField(field(plotFieldBarValues)),
+		histogramValues:   plotRealsFromField(field(plotFieldHistogramValues)),
+		histogramBins:     field(plotFieldHistogramBins).(int64),
+		boxValues:         plotRealsFromField(field(plotFieldBoxValues)),
+		errorX:            plotRealsFromField(field(plotFieldErrorX)),
+		errorY:            plotRealsFromField(field(plotFieldErrorY)),
+		errorLower:        plotRealsFromField(field(plotFieldErrorLower)),
+		errorUpper:        plotRealsFromField(field(plotFieldErrorUpper)),
+		pieLabels:         plotStringsFromField(field(plotFieldPieLabels)),
+		pieValues:         plotRealsFromField(field(plotFieldPieValues)),
+		heatmapXLabels:    plotStringsFromField(field(plotFieldHeatmapXLabels)),
+		heatmapYLabels:    plotStringsFromField(field(plotFieldHeatmapYLabels)),
+		heatmapValues:     plotRealGridFromField(field(plotFieldHeatmapValues)),
+		title:             field(plotFieldTitle).(string),
+		xLabel:            field(plotFieldXLabel).(string),
+		yLabel:            field(plotFieldYLabel).(string),
+		legend:            field(plotFieldLegend).(bool),
+		legendPosition:    field(plotFieldLegendPosition).(string),
+		width:             field(plotFieldWidth).(int64),
+		height:            field(plotFieldHeight).(int64),
 	}
 }
 
 // plotChartValue materializes a validated chart as a new Chart instance.
 func plotChartValue(chart plotChart) *Instance {
 	return &Instance{Class: plotChartClassID, Fields: map[ir.FieldID]any{
-		plotFieldKind:            chart.kind,
-		plotFieldSeriesKinds:     plotStringsToField(chart.seriesKinds),
-		plotFieldSeriesLabels:    plotStringsToField(chart.seriesLabels),
-		plotFieldSeriesX:         plotRealGridToField(chart.seriesX),
-		plotFieldSeriesY:         plotRealGridToField(chart.seriesY),
-		plotFieldBarLabels:       plotStringsToField(chart.barLabels),
-		plotFieldBarValues:       plotRealsToField(chart.barValues),
-		plotFieldHistogramValues: plotRealsToField(chart.histogramValues),
-		plotFieldHistogramBins:   chart.histogramBins,
-		plotFieldBoxValues:       plotRealsToField(chart.boxValues),
-		plotFieldErrorX:          plotRealsToField(chart.errorX),
-		plotFieldErrorY:          plotRealsToField(chart.errorY),
-		plotFieldErrorLower:      plotRealsToField(chart.errorLower),
-		plotFieldErrorUpper:      plotRealsToField(chart.errorUpper),
-		plotFieldPieLabels:       plotStringsToField(chart.pieLabels),
-		plotFieldPieValues:       plotRealsToField(chart.pieValues),
-		plotFieldHeatmapXLabels:  plotStringsToField(chart.heatmapXLabels),
-		plotFieldHeatmapYLabels:  plotStringsToField(chart.heatmapYLabels),
-		plotFieldHeatmapValues:   plotRealGridToField(chart.heatmapValues),
-		plotFieldTitle:           chart.title,
-		plotFieldXLabel:          chart.xLabel,
-		plotFieldYLabel:          chart.yLabel,
-		plotFieldLegend:          chart.legend,
-		plotFieldWidth:           chart.width,
-		plotFieldHeight:          chart.height,
+		plotFieldKind:              chart.kind,
+		plotFieldSeriesKinds:       plotStringsToField(chart.seriesKinds),
+		plotFieldSeriesLabels:      plotStringsToField(chart.seriesLabels),
+		plotFieldSeriesX:           plotRealGridToField(chart.seriesX),
+		plotFieldSeriesY:           plotRealGridToField(chart.seriesY),
+		plotFieldSeriesLineStyles:  plotStringsToField(chart.seriesLineStyles),
+		plotFieldSeriesLineWidths:  plotRealsToField(chart.seriesLineWidths),
+		plotFieldSeriesMarkers:     plotStringsToField(chart.seriesMarkers),
+		plotFieldSeriesMarkerSizes: plotRealsToField(chart.seriesMarkerSizes),
+		plotFieldBarLabels:         plotStringsToField(chart.barLabels),
+		plotFieldBarValues:         plotRealsToField(chart.barValues),
+		plotFieldHistogramValues:   plotRealsToField(chart.histogramValues),
+		plotFieldHistogramBins:     chart.histogramBins,
+		plotFieldBoxValues:         plotRealsToField(chart.boxValues),
+		plotFieldErrorX:            plotRealsToField(chart.errorX),
+		plotFieldErrorY:            plotRealsToField(chart.errorY),
+		plotFieldErrorLower:        plotRealsToField(chart.errorLower),
+		plotFieldErrorUpper:        plotRealsToField(chart.errorUpper),
+		plotFieldPieLabels:         plotStringsToField(chart.pieLabels),
+		plotFieldPieValues:         plotRealsToField(chart.pieValues),
+		plotFieldHeatmapXLabels:    plotStringsToField(chart.heatmapXLabels),
+		plotFieldHeatmapYLabels:    plotStringsToField(chart.heatmapYLabels),
+		plotFieldHeatmapValues:     plotRealGridToField(chart.heatmapValues),
+		plotFieldTitle:             chart.title,
+		plotFieldXLabel:            chart.xLabel,
+		plotFieldYLabel:            chart.yLabel,
+		plotFieldLegend:            chart.legend,
+		plotFieldLegendPosition:    chart.legendPosition,
+		plotFieldWidth:             chart.width,
+		plotFieldHeight:            chart.height,
 	}}
 }
 
@@ -278,7 +298,7 @@ func (session *Session) plotRequireNonNegative(values []float64, what string) {
 func (session *Session) plotBuiltin(name string, arguments []any) any {
 	switch name {
 	case "new":
-		return plotChartValue(plotChart{kind: "empty", width: plotDefaultWidth, height: plotDefaultHeight})
+		return plotChartValue(plotChart{kind: "empty", legendPosition: "topRight", width: plotDefaultWidth, height: plotDefaultHeight})
 	case "line":
 		return session.plotNewSeries("line", arguments)
 	case "scatter":
@@ -290,7 +310,7 @@ func (session *Session) plotBuiltin(name string, arguments []any) any {
 			session.raise("PlotError", "bar labels and values must have the same length")
 		}
 		session.plotRequireNonEmpty(len(values), "bar chart data")
-		return plotChartValue(plotChart{kind: "bar", barLabels: labels, barValues: values,
+		return plotChartValue(plotChart{kind: "bar", barLabels: labels, barValues: values, legendPosition: "topRight",
 			width: plotDefaultWidth, height: plotDefaultHeight})
 	case "pie":
 		return session.plotPieBuiltin(arguments)
@@ -303,12 +323,12 @@ func (session *Session) plotBuiltin(name string, arguments []any) any {
 			session.raise("PlotError", "histogram bin count must be positive")
 		}
 		session.plotRequireNonEmpty(len(values), "histogram data")
-		return plotChartValue(plotChart{kind: "histogram", histogramValues: values, histogramBins: bins,
+		return plotChartValue(plotChart{kind: "histogram", histogramValues: values, histogramBins: bins, legendPosition: "topRight",
 			width: plotDefaultWidth, height: plotDefaultHeight})
 	case "box":
 		values := session.plotNumbers(arguments[0])
 		session.plotRequireNonEmpty(len(values), "box plot data")
-		return plotChartValue(plotChart{kind: "box", boxValues: values,
+		return plotChartValue(plotChart{kind: "box", boxValues: values, legendPosition: "topRight",
 			width: plotDefaultWidth, height: plotDefaultHeight})
 	case "errorBar":
 		x := session.plotNumbers(arguments[0])
@@ -321,7 +341,7 @@ func (session *Session) plotBuiltin(name string, arguments []any) any {
 		session.plotRequireNonEmpty(len(x), "errorBar data")
 		session.plotRequireNonNegative(lower, "lowerErrors")
 		session.plotRequireNonNegative(upper, "upperErrors")
-		return plotChartValue(plotChart{kind: "errorBar", errorX: x, errorY: y, errorLower: lower, errorUpper: upper,
+		return plotChartValue(plotChart{kind: "errorBar", errorX: x, errorY: y, errorLower: lower, errorUpper: upper, legendPosition: "topRight",
 			width: plotDefaultWidth, height: plotDefaultHeight})
 	case "surface":
 		return session.plotSurfaceBuiltin(arguments)
@@ -353,8 +373,62 @@ func (session *Session) plotNewSeries(kind string, arguments []any) any {
 	session.plotRequireNonEmpty(len(x), kind+" chart data")
 	return plotChartValue(plotChart{
 		kind: "line-scatter", seriesKinds: []string{kind}, seriesLabels: []string{""},
-		seriesX: [][]float64{x}, seriesY: [][]float64{y}, width: plotDefaultWidth, height: plotDefaultHeight,
+		seriesX: [][]float64{x}, seriesY: [][]float64{y},
+		seriesLineStyles: []string{"solid"}, seriesLineWidths: []float64{1},
+		seriesMarkers: []string{plotDefaultMarker(kind)}, seriesMarkerSizes: []float64{5},
+		legendPosition: "topRight",
+		width:          plotDefaultWidth, height: plotDefaultHeight,
 	})
+}
+
+func plotDefaultMarker(kind string) string {
+	if kind == "scatter" {
+		return "circle"
+	}
+	return "none"
+}
+
+func plotLineStyleValue(value string) bool {
+	return value == "solid" || value == "dashed" || value == "dotted" || value == "dashDot"
+}
+
+func plotMarkerValue(value string) bool {
+	return value == "none" || value == "circle" || value == "square" || value == "triangle" || value == "diamond" || value == "cross"
+}
+
+func plotLegendPositionValue(value string) bool {
+	return value == "topRight" || value == "topLeft" || value == "bottomRight" || value == "bottomLeft"
+}
+
+func plotSeriesStrings(values []string, count int, fallback string) []string {
+	result := append([]string(nil), values...)
+	for len(result) < count {
+		result = append(result, fallback)
+	}
+	return result
+}
+
+func plotSeriesMarkers(values, kinds []string) []string {
+	result := append([]string(nil), values...)
+	for len(result) < len(kinds) {
+		result = append(result, plotDefaultMarker(kinds[len(result)]))
+	}
+	return result
+}
+
+func plotSeriesFloats(values []float64, count int, fallback float64) []float64 {
+	result := append([]float64(nil), values...)
+	for len(result) < count {
+		result = append(result, fallback)
+	}
+	return result
+}
+
+func (session *Session) plotLastSeriesIndex(chart plotChart, operation string) int {
+	if chart.kind != "line-scatter" || len(chart.seriesKinds) == 0 {
+		session.raise("PlotError", operation+" requires a line or scatter series")
+	}
+	return len(chart.seriesKinds) - 1
 }
 
 // plotFigureValue materializes a validated Figure. charts is stored exactly
@@ -409,6 +483,14 @@ func (session *Session) plotOperation(name string, receiver any, arguments []any
 		chart := session.chartOf(receiver)
 		chart.legend = arguments[0].(bool)
 		return plotChartValue(chart)
+	case "Chart.legendPosition":
+		chart := session.chartOf(receiver)
+		position := arguments[0].(string)
+		if !plotLegendPositionValue(position) {
+			session.raise("PlotError", "unknown legend position "+position)
+		}
+		chart.legendPosition = position
+		return plotChartValue(chart)
 	case "Chart.size":
 		chart := session.chartOf(receiver)
 		width, height := arguments[0].(int64), arguments[1].(int64)
@@ -416,6 +498,52 @@ func (session *Session) plotOperation(name string, receiver any, arguments []any
 			session.raise("PlotError", "chart size must be positive")
 		}
 		chart.width, chart.height = width, height
+		return plotChartValue(chart)
+	case "Chart.lineStyle":
+		chart := session.chartOf(receiver)
+		index := session.plotLastSeriesIndex(chart, "lineStyle")
+		if chart.seriesKinds[index] != "line" {
+			session.raise("PlotError", "lineStyle applies only to line series")
+		}
+		style := arguments[0].(string)
+		if !plotLineStyleValue(style) {
+			session.raise("PlotError", "unknown line style "+style)
+		}
+		chart.seriesLineStyles = plotSeriesStrings(chart.seriesLineStyles, len(chart.seriesKinds), "solid")
+		chart.seriesLineStyles[index] = style
+		return plotChartValue(chart)
+	case "Chart.lineWidth":
+		chart := session.chartOf(receiver)
+		index := session.plotLastSeriesIndex(chart, "lineWidth")
+		if chart.seriesKinds[index] != "line" {
+			session.raise("PlotError", "lineWidth applies only to line series")
+		}
+		width := arguments[0].(float64)
+		if math.IsNaN(width) || math.IsInf(width, 0) || width <= 0 || width > 32 {
+			session.raise("PlotError", "line width must be finite and between 0 and 32")
+		}
+		chart.seriesLineWidths = plotSeriesFloats(chart.seriesLineWidths, len(chart.seriesKinds), 1)
+		chart.seriesLineWidths[index] = width
+		return plotChartValue(chart)
+	case "Chart.marker":
+		chart := session.chartOf(receiver)
+		index := session.plotLastSeriesIndex(chart, "marker")
+		marker := arguments[0].(string)
+		if !plotMarkerValue(marker) {
+			session.raise("PlotError", "unknown marker "+marker)
+		}
+		chart.seriesMarkers = plotSeriesMarkers(chart.seriesMarkers, chart.seriesKinds)
+		chart.seriesMarkers[index] = marker
+		return plotChartValue(chart)
+	case "Chart.markerSize":
+		chart := session.chartOf(receiver)
+		index := session.plotLastSeriesIndex(chart, "markerSize")
+		size := arguments[0].(float64)
+		if math.IsNaN(size) || math.IsInf(size, 0) || size <= 0 || size > 64 {
+			session.raise("PlotError", "marker size must be finite and between 0 and 64")
+		}
+		chart.seriesMarkerSizes = plotSeriesFloats(chart.seriesMarkerSizes, len(chart.seriesKinds), 5)
+		chart.seriesMarkerSizes[index] = size
 		return plotChartValue(chart)
 	case "Chart.line", "Chart.scatter":
 		return session.plotAddSeries(name, receiver, arguments)
@@ -453,6 +581,10 @@ func (session *Session) plotAddSeries(name string, receiver any, arguments []any
 	chart.seriesLabels = append(append([]string(nil), chart.seriesLabels...), label)
 	chart.seriesX = append(append([][]float64(nil), chart.seriesX...), x)
 	chart.seriesY = append(append([][]float64(nil), chart.seriesY...), y)
+	chart.seriesLineStyles = append(append([]string(nil), chart.seriesLineStyles...), "solid")
+	chart.seriesLineWidths = append(append([]float64(nil), chart.seriesLineWidths...), 1)
+	chart.seriesMarkers = append(append([]string(nil), chart.seriesMarkers...), plotDefaultMarker(kind))
+	chart.seriesMarkerSizes = append(append([]float64(nil), chart.seriesMarkerSizes...), 5)
 	return plotChartValue(chart)
 }
 
@@ -527,6 +659,7 @@ func plotChartSpec(chart plotChart) plotproto.ChartSpec {
 	spec := plotproto.ChartSpec{
 		Present: true, Kind: chart.kind,
 		Title: chart.title, XLabel: chart.xLabel, YLabel: chart.yLabel, Legend: chart.legend,
+		LegendPosition: chart.legendPosition,
 	}
 	switch chart.kind {
 	case "line-scatter":
@@ -534,6 +667,10 @@ func plotChartSpec(chart plotChart) plotproto.ChartSpec {
 			spec.Series = append(spec.Series, plotproto.SeriesSpec{
 				Kind: chart.seriesKinds[index], Label: chart.seriesLabels[index],
 				X: chart.seriesX[index], Y: chart.seriesY[index],
+				LineStyle:  plotSeriesStringAt(chart.seriesLineStyles, index, "solid"),
+				LineWidth:  plotSeriesFloatAt(chart.seriesLineWidths, index, 1),
+				Marker:     plotSeriesStringAt(chart.seriesMarkers, index, plotDefaultMarker(chart.seriesKinds[index])),
+				MarkerSize: plotSeriesFloatAt(chart.seriesMarkerSizes, index, 5),
 			})
 		}
 	case "bar":
@@ -551,6 +688,20 @@ func plotChartSpec(chart plotChart) plotproto.ChartSpec {
 		spec.HeatmapValues = chart.heatmapValues
 	}
 	return spec
+}
+
+func plotSeriesStringAt(values []string, index int, fallback string) string {
+	if index >= 0 && index < len(values) && values[index] != "" {
+		return values[index]
+	}
+	return fallback
+}
+
+func plotSeriesFloatAt(values []float64, index int, fallback float64) float64 {
+	if index >= 0 && index < len(values) && values[index] > 0 {
+		return values[index]
+	}
+	return fallback
 }
 
 // plotTempDir is AhdCode's own temporary area for Chart.show/Figure.show
@@ -683,7 +834,7 @@ func (session *Session) plotPieBuiltin(arguments []any) any {
 	// A pie's legend is on by default: its colours mean nothing without the
 	// category names beside them.
 	return plotChartValue(plotChart{kind: "pie", pieLabels: labels, pieValues: values,
-		legend: true, width: plotDefaultWidth, height: plotDefaultHeight})
+		legend: true, legendPosition: "topRight", width: plotDefaultWidth, height: plotDefaultHeight})
 }
 
 // plotHeatmapBuiltin is Plot.heatmap(xLabels, yLabels, values).
@@ -717,7 +868,7 @@ func (session *Session) plotHeatmapBuiltin(arguments []any) any {
 		}
 	}
 	return plotChartValue(plotChart{kind: "heatmap", heatmapXLabels: xLabels, heatmapYLabels: yLabels,
-		heatmapValues: values, legend: true, width: plotDefaultWidth, height: plotDefaultHeight})
+		heatmapValues: values, legend: true, legendPosition: "topRight", width: plotDefaultWidth, height: plotDefaultHeight})
 }
 
 // plotRequireAxes refuses an axis title on a chart that has no axes.

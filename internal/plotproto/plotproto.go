@@ -46,6 +46,10 @@ type ChartSpec struct {
 	XLabel string `json:"x_label,omitempty"`
 	YLabel string `json:"y_label,omitempty"`
 	Legend bool   `json:"legend,omitempty"`
+	// LegendPosition is one of topRight, topLeft, bottomRight, or
+	// bottomLeft. Empty keeps the renderer's sensible topRight default for
+	// requests produced by older clients.
+	LegendPosition string `json:"legend_position,omitempty"`
 
 	Series []SeriesSpec `json:"series,omitempty"` // kind == "line-scatter"
 
@@ -91,10 +95,14 @@ const (
 
 // SeriesSpec is one line or scatter series on a line-scatter Chart.
 type SeriesSpec struct {
-	Kind  string    `json:"kind"` // "line" | "scatter"
-	Label string    `json:"label,omitempty"`
-	X     []float64 `json:"x"`
-	Y     []float64 `json:"y"`
+	Kind       string    `json:"kind"` // "line" | "scatter"
+	Label      string    `json:"label,omitempty"`
+	X          []float64 `json:"x"`
+	Y          []float64 `json:"y"`
+	LineStyle  string    `json:"line_style,omitempty"`
+	LineWidth  float64   `json:"line_width,omitempty"`
+	Marker     string    `json:"marker,omitempty"`
+	MarkerSize float64   `json:"marker_size,omitempty"`
 }
 
 // Response is ahdplot's sole stdout output: one line of JSON.

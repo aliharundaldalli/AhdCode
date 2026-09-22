@@ -1,3 +1,5 @@
+github.com/SalvioniDigitalSolutions/gopdf v0.0.0-20260819123034-adfb3bf86a60 h1:CHOYHHJX2kuJ11N/7uqGvTH55eQ14AoWicUdAM9Cxb0=
+github.com/SalvioniDigitalSolutions/gopdf v0.0.0-20260819123034-adfb3bf86a60/go.mod h1:avv9LMMkO0KIK0waqid03Pd1pJw1Qz2c+9w32USC8fQ=
 github.com/ebitengine/gomobile v0.0.0-20260820040257-d11f821a26a6 h1:Tnc3YtzxhgsvNdNrER9wWkGJbyjOwyUuzjUY5rZK72k=
 github.com/ebitengine/gomobile v0.0.0-20260820040257-d11f821a26a6/go.mod h1:gwnFEwdzWZpNehgwkeK4756Ez58f58bXz6bgEAq+xqk=
 github.com/ebitengine/hideconsole v1.0.0 h1:5J4U0kXF+pv/DhiXt5/lTz0eO5ogJ1iXb8Yj1yReDqE=

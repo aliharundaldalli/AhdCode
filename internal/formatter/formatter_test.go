@@ -48,6 +48,35 @@ active:true
 	}
 }
 
+func TestPlotV240StyleChainFormattingIsIdempotent(t *testing.T) {
+	input := `bring Plot
+	from Plot bring (Chart, LineStyle, Marker, LegendPosition)
+x:List<Real>:=[1.0,2.0,3.0]
+y:List<Real> :=[3.0,2.0,1.0]
+chart:Chart:=Plot.line(x,y).lineStyle(LineStyle.dashed).lineWidth(2.0).marker(Marker.circle).markerSize(5.0).legendPosition(LegendPosition.topLeft).title("$u_h(x)$").xLabel("$x$").yLabel("$u(x)$")
+`
+	formatted := formatText(t, input)
+	for _, wanted := range []string{
+		".lineStyle(",
+		"LineStyle.dashed",
+		".lineWidth(",
+		".marker(",
+		"Marker.circle",
+		".markerSize(",
+		"5.0",
+		".legendPosition(",
+		"LegendPosition.topLeft",
+		`.title("$u_h(x)$")`,
+	} {
+		if !strings.Contains(formatted, wanted) {
+			t.Fatalf("formatted chain lacks %q:\n%s", wanted, formatted)
+		}
+	}
+	if twice := formatText(t, formatted); twice != formatted {
+		t.Fatalf("Plot v2.4 style chain is not idempotent:\nfirst:\n%s\nsecond:\n%s", formatted, twice)
+	}
+}
+
 func TestLambdaFormattingAndIdempotence(t *testing.T) {
 	input := "short:=lambda(x:Int)->x>0\nlong:=lambda(first:Int,second:Int,description:String,flag:Bool)->first+second>0 and description!=\"\" and flag\n"
 	formatted := formatText(t, input)

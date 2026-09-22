@@ -113,14 +113,13 @@ func TestPlotV220ConstructionHintNamesPieAndHeatmap(t *testing.T) {
 	}
 }
 
-// The v2.2 surface is exactly this and no more.
+// The v2.2 Surface surface stays exactly this; v2.4 adds only the small
+// strongly typed Chart styling surface.
 func TestPlotV220SurfaceIsExactlyTheIntendedOne(t *testing.T) {
 	if got := strings.Join(PlotSurfaceOperations, ","); got != "title,xLabel,yLabel,zLabel,size,wireframe,xCategories,yCategories,show,save" {
 		t.Fatalf("Surface operations = %s", got)
 	}
-	// Chart gained no member: a pie and a heatmap are Charts, configured by
-	// the members a Chart already had.
-	if got := strings.Join(PlotChartOperations, ","); got != "title,xLabel,yLabel,legend,size,line,scatter,save,show" {
+	if got := strings.Join(PlotChartOperations, ","); got != "title,xLabel,yLabel,legend,legendPosition,size,lineStyle,lineWidth,marker,markerSize,line,scatter,save,show" {
 		t.Fatalf("Chart operations = %s", got)
 	}
 	module := StandardModuleInterfaces()["Plot"]

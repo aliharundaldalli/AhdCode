@@ -412,11 +412,16 @@ const (
 	// The Plot standard module's Chart and Figure members. Every Chart
 	// operation is pure: it returns a new Chart and leaves the receiver
 	// untouched, matching the Table convention.
-	PlotChartTitle  TypeOperation = "Chart.title"
-	PlotChartXLabel TypeOperation = "Chart.xLabel"
-	PlotChartYLabel TypeOperation = "Chart.yLabel"
-	PlotChartLegend TypeOperation = "Chart.legend"
-	PlotChartSize   TypeOperation = "Chart.size"
+	PlotChartTitle          TypeOperation = "Chart.title"
+	PlotChartXLabel         TypeOperation = "Chart.xLabel"
+	PlotChartYLabel         TypeOperation = "Chart.yLabel"
+	PlotChartLegend         TypeOperation = "Chart.legend"
+	PlotChartLegendPosition TypeOperation = "Chart.legendPosition"
+	PlotChartSize           TypeOperation = "Chart.size"
+	PlotChartLineStyle      TypeOperation = "Chart.lineStyle"
+	PlotChartLineWidth      TypeOperation = "Chart.lineWidth"
+	PlotChartMarker         TypeOperation = "Chart.marker"
+	PlotChartMarkerSize     TypeOperation = "Chart.markerSize"
 	// PlotChartLine and PlotChartScatter append one more series to a Chart
 	// that is either empty (Plot.new()) or already a line/scatter composite.
 	PlotChartLine    TypeOperation = "Chart.line"

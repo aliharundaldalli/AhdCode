@@ -78,6 +78,9 @@ var (
 	AhdClassDataError           = &AhdClass{Name: "DataError", Parent: AhdClassError}
 	AhdClassStatisticsError     = &AhdClass{Name: "StatisticsError", Parent: AhdClassError}
 	AhdClassPlotError           = &AhdClass{Name: "PlotError", Parent: AhdClassError}
+	AhdClassLineStyle           = &AhdClass{Name: "LineStyle"}
+	AhdClassMarker              = &AhdClass{Name: "Marker"}
+	AhdClassLegendPosition      = &AhdClass{Name: "LegendPosition"}
 	AhdClassNumericError        = &AhdClass{Name: "NumericError", Parent: AhdClassError}
 	AhdClassWordError           = &AhdClass{Name: "WordError", Parent: AhdClassError}
 	AhdClassExcelError          = &AhdClass{Name: "ExcelError", Parent: AhdClassError}
@@ -4306,10 +4309,14 @@ var AhdPlotRuntimeHint string
 type AhdChart struct {
 	Kind string
 
-	SeriesKinds  *AhdList[string]
-	SeriesLabels *AhdList[string]
-	SeriesX      *AhdList[*AhdList[float64]]
-	SeriesY      *AhdList[*AhdList[float64]]
+	SeriesKinds       *AhdList[string]
+	SeriesLabels      *AhdList[string]
+	SeriesX           *AhdList[*AhdList[float64]]
+	SeriesY           *AhdList[*AhdList[float64]]
+	SeriesLineStyles  *AhdList[string]
+	SeriesLineWidths  *AhdList[float64]
+	SeriesMarkers     *AhdList[string]
+	SeriesMarkerSizes *AhdList[float64]
 
 	BarLabels *AhdList[string]
 	BarValues *AhdList[float64]
@@ -4331,26 +4338,32 @@ type AhdChart struct {
 
 	Title, XLabel, YLabel string
 	Legend                bool
+	LegendPosition        string
 	Width, Height         int64
 }
 
 // The wire protocol structs below mirror internal/plotproto field-for-field;
 // see that package's doc comment for why this file cannot import it instead.
 type ahdPlotSeriesSpec struct {
-	Kind  string    `json:"kind"`
-	Label string    `json:"label,omitempty"`
-	X     []float64 `json:"x"`
-	Y     []float64 `json:"y"`
+	Kind       string    `json:"kind"`
+	Label      string    `json:"label,omitempty"`
+	X          []float64 `json:"x"`
+	Y          []float64 `json:"y"`
+	LineStyle  string    `json:"line_style,omitempty"`
+	LineWidth  float64   `json:"line_width,omitempty"`
+	Marker     string    `json:"marker,omitempty"`
+	MarkerSize float64   `json:"marker_size,omitempty"`
 }
 
 type ahdPlotChartSpec struct {
 	Present bool   `json:"present"`
 	Kind    string `json:"kind"`
 
-	Title  string `json:"title,omitempty"`
-	XLabel string `json:"x_label,omitempty"`
-	YLabel string `json:"y_label,omitempty"`
-	Legend bool   `json:"legend,omitempty"`
+	Title          string `json:"title,omitempty"`
+	XLabel         string `json:"x_label,omitempty"`
+	YLabel         string `json:"y_label,omitempty"`
+	Legend         bool   `json:"legend,omitempty"`
+	LegendPosition string `json:"legend_position,omitempty"`
 
 	Series []ahdPlotSeriesSpec `json:"series,omitempty"`
 
@@ -4425,15 +4438,21 @@ func ahdPlotFloatListSlice(list *AhdList[*AhdList[float64]]) []*AhdList[float64]
 func ahdPlotChartSpecOf(chart AhdChart) ahdPlotChartSpec {
 	spec := ahdPlotChartSpec{
 		Present: true, Kind: chart.Kind,
-		Title: chart.Title, XLabel: chart.XLabel, YLabel: chart.YLabel, Legend: chart.Legend,
+		Title: chart.Title, XLabel: chart.XLabel, YLabel: chart.YLabel, Legend: chart.Legend, LegendPosition: chart.LegendPosition,
 	}
 	switch chart.Kind {
 	case "line-scatter":
 		kinds, labels := ahdPlotStrings(chart.SeriesKinds), ahdPlotStrings(chart.SeriesLabels)
 		xs, ys := ahdPlotFloatGrid(chart.SeriesX), ahdPlotFloatGrid(chart.SeriesY)
+		lineStyles, lineWidths := ahdPlotStrings(chart.SeriesLineStyles), ahdPlotFloats(chart.SeriesLineWidths)
+		markers, markerSizes := ahdPlotStrings(chart.SeriesMarkers), ahdPlotFloats(chart.SeriesMarkerSizes)
 		for index := range kinds {
 			spec.Series = append(spec.Series, ahdPlotSeriesSpec{
 				Kind: kinds[index], Label: labels[index], X: xs[index], Y: ys[index],
+				LineStyle:  ahdPlotSeriesString(lineStyles, index, "solid"),
+				LineWidth:  ahdPlotSeriesFloat(lineWidths, index, 1),
+				Marker:     ahdPlotSeriesString(markers, index, defaultAhdPlotMarker(kinds[index])),
+				MarkerSize: ahdPlotSeriesFloat(markerSizes, index, 5),
 			})
 		}
 	case "bar":
@@ -4456,6 +4475,27 @@ func ahdPlotChartSpecOf(chart AhdChart) ahdPlotChartSpec {
 		spec.HeatmapValues = ahdPlotFloatGrid(chart.HeatmapValues)
 	}
 	return spec
+}
+
+func ahdPlotSeriesString(values []string, index int, fallback string) string {
+	if index >= 0 && index < len(values) && values[index] != "" {
+		return values[index]
+	}
+	return fallback
+}
+
+func ahdPlotSeriesFloat(values []float64, index int, fallback float64) float64 {
+	if index >= 0 && index < len(values) && values[index] > 0 {
+		return values[index]
+	}
+	return fallback
+}
+
+func defaultAhdPlotMarker(kind string) string {
+	if kind == "scatter" {
+		return "circle"
+	}
+	return "none"
 }
 
 // ahdPlotTempDir is AhdCode's own temporary area for Plot render requests and
@@ -4595,7 +4635,7 @@ func AhdPlotWidenList(values *AhdList[int64]) *AhdList[float64] {
 // AhdPlotNew is Plot.new(): an empty Chart, ready for Chart.line/Chart.scatter
 // to build up a multi-series composite.
 func AhdPlotNew() AhdChart {
-	return AhdChart{Kind: "empty", Width: 800, Height: 600}
+	return AhdChart{Kind: "empty", LegendPosition: "topRight", Width: 800, Height: 600}
 }
 
 func AhdPlotLine(class *AhdClass, x, y *AhdList[float64]) AhdChart {
@@ -4615,7 +4655,9 @@ func ahdPlotNewSeries(class *AhdClass, kind string, x, y *AhdList[float64]) AhdC
 	return AhdChart{
 		Kind: "line-scatter", SeriesKinds: AhdNewList(kind), SeriesLabels: AhdNewList(""),
 		SeriesX: AhdNewList(AhdNewList(xs...)), SeriesY: AhdNewList(AhdNewList(ys...)),
-		Width: 800, Height: 600,
+		SeriesLineStyles: AhdNewList("solid"), SeriesLineWidths: AhdNewList(float64(1)),
+		SeriesMarkers: AhdNewList(defaultAhdPlotMarker(kind)), SeriesMarkerSizes: AhdNewList(float64(5)),
+		LegendPosition: "topRight", Width: 800, Height: 600,
 	}
 }
 
@@ -4625,7 +4667,7 @@ func AhdPlotBar(class *AhdClass, labels *AhdList[string], values *AhdList[float6
 		AhdRaiseClass(class, "bar labels and values must have the same length")
 	}
 	ahdPlotRequireNonEmpty(class, len(vs), "bar chart data")
-	return AhdChart{Kind: "bar", BarLabels: AhdNewList(ls...), BarValues: AhdNewList(vs...), Width: 800, Height: 600}
+	return AhdChart{Kind: "bar", BarLabels: AhdNewList(ls...), BarValues: AhdNewList(vs...), LegendPosition: "topRight", Width: 800, Height: 600}
 }
 
 // AhdPlotPie is Plot.pie(labels, values). A pie is a Chart like any other:
@@ -4656,7 +4698,7 @@ func AhdPlotPie(class *AhdClass, labels *AhdList[string], values *AhdList[float6
 	}
 	return AhdChart{
 		Kind: "pie", PieLabels: AhdNewList(ls...), PieValues: AhdNewList(vs...),
-		Legend: true, Width: 800, Height: 600,
+		Legend: true, LegendPosition: "topRight", Width: 800, Height: 600,
 	}
 }
 
@@ -4698,7 +4740,7 @@ func AhdPlotHeatmap(class *AhdClass, xLabels, yLabels *AhdList[string], values A
 	}
 	return AhdChart{
 		Kind: "heatmap", HeatmapXLabels: AhdNewList(xs...), HeatmapYLabels: AhdNewList(ys...),
-		HeatmapValues: AhdNewList(rows...), Legend: true, Width: 800, Height: 600,
+		HeatmapValues: AhdNewList(rows...), Legend: true, LegendPosition: "topRight", Width: 800, Height: 600,
 	}
 }
 
@@ -4708,13 +4750,13 @@ func AhdPlotHistogram(class *AhdClass, values *AhdList[float64], bins int64) Ahd
 		AhdRaiseClass(class, "histogram bin count must be positive")
 	}
 	ahdPlotRequireNonEmpty(class, len(vs), "histogram data")
-	return AhdChart{Kind: "histogram", HistogramValues: AhdNewList(vs...), HistogramBins: bins, Width: 800, Height: 600}
+	return AhdChart{Kind: "histogram", HistogramValues: AhdNewList(vs...), HistogramBins: bins, LegendPosition: "topRight", Width: 800, Height: 600}
 }
 
 func AhdPlotBox(class *AhdClass, values *AhdList[float64]) AhdChart {
 	vs := ahdPlotFloats(values)
 	ahdPlotRequireNonEmpty(class, len(vs), "box plot data")
-	return AhdChart{Kind: "box", BoxValues: AhdNewList(vs...), Width: 800, Height: 600}
+	return AhdChart{Kind: "box", BoxValues: AhdNewList(vs...), LegendPosition: "topRight", Width: 800, Height: 600}
 }
 
 func AhdPlotErrorBar(class *AhdClass, x, y, lower, upper *AhdList[float64]) AhdChart {
@@ -4727,7 +4769,7 @@ func AhdPlotErrorBar(class *AhdClass, x, y, lower, upper *AhdList[float64]) AhdC
 	ahdPlotRequireNonNegative(class, ups, "upperErrors")
 	return AhdChart{
 		Kind: "errorBar", ErrorX: AhdNewList(xs...), ErrorY: AhdNewList(ys...),
-		ErrorLower: AhdNewList(los...), ErrorUpper: AhdNewList(ups...), Width: 800, Height: 600,
+		ErrorLower: AhdNewList(los...), ErrorUpper: AhdNewList(ups...), LegendPosition: "topRight", Width: 800, Height: 600,
 	}
 }
 
@@ -4759,6 +4801,14 @@ func AhdPlotChartLegend(chart AhdChart, enabled bool) AhdChart {
 	return chart
 }
 
+func AhdPlotChartLegendPosition(class *AhdClass, chart AhdChart, position string) AhdChart {
+	if position != "topRight" && position != "topLeft" && position != "bottomRight" && position != "bottomLeft" {
+		AhdRaiseClass(class, "unknown legend position "+position)
+	}
+	chart.LegendPosition = position
+	return chart
+}
+
 func AhdPlotChartSize(class *AhdClass, chart AhdChart, width, height int64) AhdChart {
 	if width <= 0 || height <= 0 {
 		AhdRaiseClass(class, "chart size must be positive")
@@ -4785,6 +4835,83 @@ func AhdPlotChartAddSeries(class *AhdClass, chart AhdChart, kind string, x, y *A
 	chart.SeriesLabels = AhdNewList(append(ahdPlotStrings(chart.SeriesLabels), label)...)
 	chart.SeriesX = AhdNewList(append(ahdPlotFloatListSlice(chart.SeriesX), AhdNewList(xs...))...)
 	chart.SeriesY = AhdNewList(append(ahdPlotFloatListSlice(chart.SeriesY), AhdNewList(ys...))...)
+	chart.SeriesLineStyles = AhdNewList(append(ahdPlotStrings(chart.SeriesLineStyles), "solid")...)
+	chart.SeriesLineWidths = AhdNewList(append(ahdPlotFloats(chart.SeriesLineWidths), float64(1))...)
+	chart.SeriesMarkers = AhdNewList(append(ahdPlotStrings(chart.SeriesMarkers), defaultAhdPlotMarker(kind))...)
+	chart.SeriesMarkerSizes = AhdNewList(append(ahdPlotFloats(chart.SeriesMarkerSizes), float64(5))...)
+	return chart
+}
+
+func ahdPlotLastSeriesIndex(class *AhdClass, chart AhdChart, operation string) int {
+	if chart.Kind != "line-scatter" || len(ahdPlotStrings(chart.SeriesKinds)) == 0 {
+		AhdRaiseClass(class, operation+" requires a line or scatter series")
+	}
+	return len(ahdPlotStrings(chart.SeriesKinds)) - 1
+}
+
+func AhdPlotChartLineStyle(class *AhdClass, chart AhdChart, style string) AhdChart {
+	index := ahdPlotLastSeriesIndex(class, chart, "lineStyle")
+	kinds := ahdPlotStrings(chart.SeriesKinds)
+	if kinds[index] != "line" {
+		AhdRaiseClass(class, "lineStyle applies only to line series")
+	}
+	if style != "solid" && style != "dashed" && style != "dotted" && style != "dashDot" {
+		AhdRaiseClass(class, "unknown line style "+style)
+	}
+	values := ahdPlotStrings(chart.SeriesLineStyles)
+	for len(values) < len(kinds) {
+		values = append(values, "solid")
+	}
+	values[index] = style
+	chart.SeriesLineStyles = AhdNewList(values...)
+	return chart
+}
+
+func AhdPlotChartLineWidth(class *AhdClass, chart AhdChart, width float64) AhdChart {
+	index := ahdPlotLastSeriesIndex(class, chart, "lineWidth")
+	kinds := ahdPlotStrings(chart.SeriesKinds)
+	if kinds[index] != "line" {
+		AhdRaiseClass(class, "lineWidth applies only to line series")
+	}
+	if !ahdPlotFinite(width) || width <= 0 || width > 32 {
+		AhdRaiseClass(class, "line width must be finite and between 0 and 32")
+	}
+	values := ahdPlotFloats(chart.SeriesLineWidths)
+	for len(values) < len(kinds) {
+		values = append(values, float64(1))
+	}
+	values[index] = width
+	chart.SeriesLineWidths = AhdNewList(values...)
+	return chart
+}
+
+func AhdPlotChartMarker(class *AhdClass, chart AhdChart, marker string) AhdChart {
+	index := ahdPlotLastSeriesIndex(class, chart, "marker")
+	if marker != "none" && marker != "circle" && marker != "square" && marker != "triangle" && marker != "diamond" && marker != "cross" {
+		AhdRaiseClass(class, "unknown marker "+marker)
+	}
+	kinds := ahdPlotStrings(chart.SeriesKinds)
+	values := ahdPlotStrings(chart.SeriesMarkers)
+	for len(values) < len(kinds) {
+		values = append(values, defaultAhdPlotMarker(kinds[len(values)]))
+	}
+	values[index] = marker
+	chart.SeriesMarkers = AhdNewList(values...)
+	return chart
+}
+
+func AhdPlotChartMarkerSize(class *AhdClass, chart AhdChart, size float64) AhdChart {
+	index := ahdPlotLastSeriesIndex(class, chart, "markerSize")
+	if !ahdPlotFinite(size) || size <= 0 || size > 64 {
+		AhdRaiseClass(class, "marker size must be finite and between 0 and 64")
+	}
+	kinds := ahdPlotStrings(chart.SeriesKinds)
+	values := ahdPlotFloats(chart.SeriesMarkerSizes)
+	for len(values) < len(kinds) {
+		values = append(values, float64(5))
+	}
+	values[index] = size
+	chart.SeriesMarkerSizes = AhdNewList(values...)
 	return chart
 }
 

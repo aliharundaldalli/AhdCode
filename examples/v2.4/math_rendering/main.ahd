@@ -1,0 +1,36 @@
+// v2.4.0: whole-string math labels are rendered by bundled offline Tectonic.
+bring Numeric
+bring Plot
+from Plot bring (Chart, Surface)
+
+x: List<Real> := [-2.0, -1.0, 0.0, 1.0, 2.0]
+y: List<Real> := [4.0, 1.0, 0.0, 1.0, 4.0]
+
+formula: Chart := Plot.line(x, y)
+formula = formula.title("$f(x)=x^2$")
+formula = formula.xLabel("$x_i$").yLabel("$f(x)$")
+formula = formula.line(x, y, "$\\alpha+\\beta=\\sigma^2$")
+formula = formula.legend(true)
+formula.save("math-rendering.png")
+formula.save("math-rendering.svg")
+formula.save("math-rendering.pdf")
+
+gallery: Chart := Plot.bar(
+    [r"$\sum_{i=1}^{n} x_i$", r"$\int_a^b f(x)\,dx$", r"$\frac{1}{2}$", r"$\sqrt{x}$"],
+    [1.0, 2.0, 3.0, 4.0]
+)
+gallery = gallery.title("Tectonic Formula Gallery")
+gallery.save("formula-gallery.png")
+
+rows: List<List<Real>> := []
+for yValue in x {
+    row: Local List<Real> := []
+    for xValue in x {
+        row.add(xValue * xValue + yValue * yValue)
+    }
+    rows.add(row)
+}
+surface: Surface := Plot.surface(x, x, Numeric.matrix(rows))
+surface = surface.title("$z=x^2+y^2$").xLabel("$x$").yLabel("$y$").zLabel("$z$")
+surface = surface.xCategories(["$x_0$", "$x_1$", "$x_2$", "$x_3$", "$x_4$"])
+surface.save("math-surface.png")

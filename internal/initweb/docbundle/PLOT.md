@@ -104,6 +104,7 @@ chart.title(text: String)   -> Chart
 chart.xLabel(text: String)  -> Chart
 chart.yLabel(text: String)  -> Chart
 chart.legend(enabled: Bool) -> Chart
+chart.legendPosition(position: LegendPosition) -> Chart
 chart.size(width: Int, height: Int) -> Chart
 ```
 
@@ -127,14 +128,59 @@ a [pie](#pie)'s category key and a [heatmap](#heatmap)'s colour scale are on
 unless a program turns them off, because neither chart can be read without
 its key.
 
+When a legend is enabled, v2.4.0 places it at `topRight` by default with a
+small inset from the chart edges. Use the typed positions below when another
+corner reads better:
+
+```text
+LegendPosition.topRight | LegendPosition.topLeft
+LegendPosition.bottomRight | LegendPosition.bottomLeft
+```
+
+For example, `chart = chart.legend(true).legendPosition(LegendPosition.topLeft)`.
+The renderer also keeps entry spacing and the line/marker thumbnail separated
+from mathematical labels so formulas do not touch the chart border.
+
 A [pie](#pie) has no Cartesian axes, so `xLabel` and `yLabel` raise
 `PlotError` on one rather than being quietly dropped.
 
-## Mathematical text (v2.3.0)
+## Plot styling (v2.4.0)
 
-Existing text APIs accept a small whole-string math opt-in. A String whose
-complete contents are enclosed by matching `$...$` is rendered through
-AhdCode's existing offline Plot math-text path:
+Line and scatter series have a small, strongly typed style API. The style
+values are not arbitrary strings:
+
+```text
+LineStyle.solid | LineStyle.dashed | LineStyle.dotted | LineStyle.dashDot
+Marker.none | Marker.circle | Marker.square | Marker.triangle | Marker.diamond | Marker.cross
+
+chart.lineStyle(style: LineStyle) -> Chart
+chart.lineWidth(width: Real)    -> Chart
+chart.marker(shape: Marker)     -> Chart
+chart.markerSize(size: Real)    -> Chart
+```
+
+These methods are pure and chainable. A line starts solid with no marker;
+scatter keeps its v2.3 circle appearance. Width and marker size are positive
+finite drawing values, and applying a line-only option to a scatter-only Chart
+(or vice versa) raises `PlotError` at runtime. The legend uses the same line
+and marker combination as the series, so the key remains truthful:
+
+```ahd
+from Plot bring (Chart, LineStyle, Marker, LegendPosition)
+
+chart: Chart := Plot.line(x, y)
+chart = chart.lineStyle(LineStyle.dashDot)
+    .lineWidth(2.0)
+    .marker(Marker.diamond)
+    .markerSize(7.0)
+chart = chart.legend(true).legendPosition(LegendPosition.topLeft)
+```
+
+## Mathematical text (v2.4.0)
+
+Existing text APIs accept a whole-string math opt-in. A String whose complete
+contents are enclosed by matching `$...$` is rendered by the bundled offline
+Tectonic engine:
 
 ```ahd
 chart = chart.title("$f(x)=x^2+3x+2$").xLabel("$x$").yLabel("$\\sigma^2$")
@@ -144,17 +190,25 @@ chart = chart.line(x, y, "$f(x)$").legend(true)
 The same rule applies to Chart titles and axes, line/scatter legend labels,
 pie labels and legends, bar categories, heatmap categories, and Surface
 titles, axis labels, z labels, and `xCategories`/`yCategories`. Ordinary
-strings, including `"Cost $100"`, remain ordinary text. v2.3.0 does not split
+strings, including `"Cost $100"`, remain ordinary text. v2.4.0 does not split
 mixed rich text such as `"Variance is $\\sigma^2$"`; that is future work.
 
-Malformed math is reported as a Plot error and does not silently produce an
-empty label. Formula validation and rendered Surface labels are bounded and
-cached; no JavaScript, network, shell execution, or second TeX engine is
-used. Chart SVG/PDF output keeps the existing vector-capable text canvas. Plot
-labels use Gonum's internal math-text renderer with the project's offline
-Unicode/plain fallback; the bundled Tectonic engine remains the full-document
-LaTeX/PDF path and is not used for Plot labels. The lightweight viewer raster
-path caches transparent label images for Retina-sized rendering.
+Malformed or hostile TeX is reported as a Plot error and never falls back to
+raw TeX or Unicode approximation. Fragments are bounded, validated against a
+controlled command set, compiled in an isolated temporary directory, and run
+with the packaged offline bundle only; file, shell, document, network, and
+package-loading commands are rejected. Plot and Surface share one bounded
+concurrent renderer cache, so a Surface frame does not start Tectonic again.
+
+The same Tectonic result is used for PNG, SVG, and PDF. The in-process PDF
+rasterizer consumes the embedded Type-1C outlines and custom code-to-glyph
+encoding emitted by the pinned bundle; it never calls `SystemFonts()`, reads
+host font directories, starts an external PDF process, or uses the network.
+Missing embedded glyphs are a hard Plot error rather than a silent substitute.
+The surrounding chart remains vector-capable; math labels are transparent
+raster images embedded in SVG/PDF, which is the documented output trade-off.
+`\int`, `\frac`, `\sum`, subscripts, superscripts, and `\sqrt` are rendered by
+the same display-style-aware path.
 
 ## Multiple series
 

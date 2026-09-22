@@ -11,6 +11,10 @@ cmd/ahdgraphics/ahdgraphics
 cmd/ahdgui/ahdgui
 /ahdplotview
 cmd/ahdplotview/ahdplotview
+/V*_QA_HANDOFF.md
+/V*_GEMINI_ACCEPTANCE.md
+/V*_VISUAL_ACCEPTANCE.md
+/V*_RELEASE_REPORT.md
 
 # Benchmark test files
 speed*

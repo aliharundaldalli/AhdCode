@@ -10,9 +10,12 @@ import (
 const PlotModuleID = "builtin:Plot"
 
 const (
-	plotChartClassID  = ir.ClassID(PlotModuleID + "::class::Chart")
-	plotFigureClassID = ir.ClassID(PlotModuleID + "::class::Figure")
-	plotErrorClassID  = ir.ClassID(PlotModuleID + "::class::PlotError")
+	plotChartClassID          = ir.ClassID(PlotModuleID + "::class::Chart")
+	plotFigureClassID         = ir.ClassID(PlotModuleID + "::class::Figure")
+	plotErrorClassID          = ir.ClassID(PlotModuleID + "::class::PlotError")
+	plotLineStyleClassID      = ir.ClassID(PlotModuleID + "::class::LineStyle")
+	plotMarkerClassID         = ir.ClassID(PlotModuleID + "::class::Marker")
+	plotLegendPositionClassID = ir.ClassID(PlotModuleID + "::class::LegendPosition")
 	// v2.0
 	plotSurfaceClassID = ir.ClassID(PlotModuleID + "::class::Surface")
 )
@@ -61,6 +64,10 @@ func plotChartFields() []ir.Field {
 		{ID: plotFieldID(plotChartClassID, "seriesLabels"), Name: "seriesLabels", Type: plotStringList(), NullState: ir.NonNull, Hidden: true},
 		{ID: plotFieldID(plotChartClassID, "seriesX"), Name: "seriesX", Type: seriesX, NullState: ir.NonNull, Hidden: true},
 		{ID: plotFieldID(plotChartClassID, "seriesY"), Name: "seriesY", Type: seriesY, NullState: ir.NonNull, Hidden: true},
+		{ID: plotFieldID(plotChartClassID, "seriesLineStyles"), Name: "seriesLineStyles", Type: plotStringList(), NullState: ir.NonNull, Hidden: true},
+		{ID: plotFieldID(plotChartClassID, "seriesLineWidths"), Name: "seriesLineWidths", Type: plotRealList(), NullState: ir.NonNull, Hidden: true},
+		{ID: plotFieldID(plotChartClassID, "seriesMarkers"), Name: "seriesMarkers", Type: plotStringList(), NullState: ir.NonNull, Hidden: true},
+		{ID: plotFieldID(plotChartClassID, "seriesMarkerSizes"), Name: "seriesMarkerSizes", Type: plotRealList(), NullState: ir.NonNull, Hidden: true},
 
 		{ID: plotFieldID(plotChartClassID, "barLabels"), Name: "barLabels", Type: plotStringList(), NullState: ir.NonNull, Hidden: true},
 		{ID: plotFieldID(plotChartClassID, "barValues"), Name: "barValues", Type: plotRealList(), NullState: ir.NonNull, Hidden: true},
@@ -88,6 +95,7 @@ func plotChartFields() []ir.Field {
 		{ID: plotFieldID(plotChartClassID, "xLabel"), Name: "xLabel", Type: plotString(), NullState: ir.NonNull, Hidden: true},
 		{ID: plotFieldID(plotChartClassID, "yLabel"), Name: "yLabel", Type: plotString(), NullState: ir.NonNull, Hidden: true},
 		{ID: plotFieldID(plotChartClassID, "legend"), Name: "legend", Type: plotBool(), NullState: ir.NonNull, Hidden: true},
+		{ID: plotFieldID(plotChartClassID, "legendPosition"), Name: "legendPosition", Type: plotString(), NullState: ir.NonNull, Hidden: true},
 		{ID: plotFieldID(plotChartClassID, "width"), Name: "width", Type: plotInt(), NullState: ir.NonNull, Hidden: true},
 		{ID: plotFieldID(plotChartClassID, "height"), Name: "height", Type: plotInt(), NullState: ir.NonNull, Hidden: true},
 	}
@@ -122,6 +130,15 @@ func plotModule(id ir.ModuleID, name, path string) *ir.Module {
 		Fields:      plotChartFields(),
 		Constructor: plotAllFieldsConstructorID(plotChartClassID),
 	}
+	styleClasses := []*ir.Class{
+		{ID: plotLineStyleClassID, Symbol: ir.SymbolID(string(plotLineStyleClassID) + "::symbol"), Name: "LineStyle", Builtin: true, Constructor: plotStyleConstructorID(plotLineStyleClassID)},
+		{ID: plotMarkerClassID, Symbol: ir.SymbolID(string(plotMarkerClassID) + "::symbol"), Name: "Marker", Builtin: true, Constructor: plotStyleConstructorID(plotMarkerClassID)},
+		{ID: plotLegendPositionClassID, Symbol: ir.SymbolID(string(plotLegendPositionClassID) + "::symbol"), Name: "LegendPosition", Builtin: true, Constructor: plotStyleConstructorID(plotLegendPositionClassID)},
+	}
+	module.Classes = append(module.Classes, styleClasses...)
+	for _, styleClass := range styleClasses {
+		module.Functions = append(module.Functions, plotStyleConstructor(styleClass))
+	}
 	module.Classes = append(module.Classes, chartClass)
 	module.Functions = append(module.Functions, plotAllFieldsConstructor(chartClass))
 
@@ -154,6 +171,19 @@ func plotModule(id ir.ModuleID, name, path string) *ir.Module {
 	module.Functions = append(module.Functions, builtinConstructor(errorClass, parent))
 
 	return module
+}
+
+func plotStyleConstructorID(class ir.ClassID) ir.CallableID {
+	return ir.CallableID(string(class) + "::constructor::()->Nothing")
+}
+
+func plotStyleConstructor(class *ir.Class) *ir.Function {
+	return &ir.Function{
+		ID: class.Constructor, Symbol: class.Symbol, Name: class.Name,
+		Kind: ir.ConstructorFunction, Owner: class.ID,
+		Receiver:  ir.SymbolID(string(class.Constructor) + "::receiver"),
+		Signature: ir.Signature{Return: ir.Type{Kind: ir.NothingType}}, ReturnNull: ir.NonNull,
+	}
 }
 
 func plotAllFieldsConstructorID(class ir.ClassID) ir.CallableID {

@@ -22,7 +22,12 @@ chart = chart.title("Growth")
 chart = chart.xLabel("t")
 chart = chart.yLabel("v")
 chart = chart.legend(true)
+chart = chart.legendPosition(Plot.LegendPosition.topRight)
 chart = chart.size(800, 600)
+chart = chart.lineStyle(Plot.LineStyle.dashed)
+chart = chart.lineWidth(2.0)
+chart = chart.marker(Plot.Marker.circle)
+chart = chart.markerSize(6.0)
 chart = chart.line(x, y, "line")
 chart = chart.scatter(x, y, "points")
 chart.save("chart.png")
@@ -66,17 +71,22 @@ func TestHoverAndSignatureHelpForEveryChartAndFigureMember(t *testing.T) {
 	store := NewStore()
 	store.Open(path, plotMemberSource)
 	hovers := map[string]string{
-		"chart.title":   "title: (text: String) -> Chart",
-		"chart.xLabel":  "xLabel: (text: String) -> Chart",
-		"chart.yLabel":  "yLabel: (text: String) -> Chart",
-		"chart.legend":  "legend: (enabled: Bool) -> Chart",
-		"chart.size":    "size: (width: Int, height: Int) -> Chart",
-		"chart.save":    "save: (path: String) -> Nothing",
-		"chart.show":    "show: () -> Nothing",
-		"figure.save":   "save: (path: String) -> Nothing",
-		"figure.show":   "show: () -> Nothing",
-		"chart.line":    "line",
-		"chart.scatter": "scatter",
+		"chart.title":          "title: (text: String) -> Chart",
+		"chart.xLabel":         "xLabel: (text: String) -> Chart",
+		"chart.yLabel":         "yLabel: (text: String) -> Chart",
+		"chart.legend":         "legend: (enabled: Bool) -> Chart",
+		"chart.legendPosition": "legendPosition: (position: LegendPosition) -> Chart",
+		"chart.size":           "size: (width: Int, height: Int) -> Chart",
+		"chart.lineStyle":      "lineStyle: (style: LineStyle) -> Chart",
+		"chart.lineWidth":      "lineWidth: (width: Real) -> Chart",
+		"chart.marker":         "marker: (shape: Marker) -> Chart",
+		"chart.markerSize":     "markerSize: (size: Real) -> Chart",
+		"chart.save":           "save: (path: String) -> Nothing",
+		"chart.show":           "show: () -> Nothing",
+		"figure.save":          "save: (path: String) -> Nothing",
+		"figure.show":          "show: () -> Nothing",
+		"chart.line":           "line",
+		"chart.scatter":        "scatter",
 	}
 	checked := 0
 	for _, pair := range []struct {

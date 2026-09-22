@@ -738,6 +738,11 @@ func (lowerer *moduleLowerer) lowerMember(member *ast.MemberExpr, base ir.ExprBa
 		}
 		return &ir.LoadExpr{ExprBase: base, Symbol: lowerer.compilation.registry.symbolID(lowerer.module, resolved)}
 	}
+	if objectSymbol := lowerer.semantic.ResolvedSymbols[member.Object]; objectSymbol != nil && objectSymbol.Kind == semantic.ClassSymbol {
+		if literal := lowerBuiltinLiteral(resolved, base); literal != nil {
+			return literal
+		}
+	}
 	object := lowerer.lowerExpr(member.Object)
 	if resolved.Kind == semantic.FunctionSymbol {
 		callable := resolved.Callable
@@ -760,6 +765,10 @@ func lowerBuiltinLiteral(symbol *semantic.Symbol, base ir.ExprBase) ir.Expr {
 	case ir.BoolType:
 		kind = ir.BoolLiteral
 	case ir.StringType:
+		kind = ir.StringLiteral
+	case ir.ClassType:
+		// Compiler-supplied nominal value constants (currently Plot style
+		// values) carry a canonical scalar token at the renderer boundary.
 		kind = ir.StringLiteral
 	}
 	return &ir.LiteralExpr{ExprBase: base, Kind: kind, Value: symbol.BuiltinLiteral}

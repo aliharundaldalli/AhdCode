@@ -1,6 +1,6 @@
 # Kurulum, yükseltme ve kaldırma
 
-İşletim sisteminize uygun AhdCode v2.3.0 paketini indirin. Her paket
+İşletim sisteminize uygun AhdCode v2.4.0 paketini indirin. Her paket
 kendi kendine yeterlidir: derleyici, özel Go araç zinciri, AhdDataStudio,
 SQLite/numeric/plot yardımcıları, çevrimdışı LaTeX motoru, proje starter'ları
 ve İngilizce belgeler paketin içindedir.
@@ -10,12 +10,12 @@ ve İngilizce belgeler paketin içindedir.
 macOS paketi Apple Silicon Mac'leri hedefler — M1, M2, M3, M4 ve sonraki
 arm64 modeller. Intel sürümü yoktur.
 
-`AhdCode-2.3.0-macos-arm64.pkg` dosyasına çift tıklayıp kurulumu izleyin. Paket
+`AhdCode-2.4.0-macos-arm64.pkg` dosyasına çift tıklayıp kurulumu izleyin. Paket
 Developer ID ile imzalı ve Apple tarafından noter onaylıdır; normal biçimde
 açılır, hiçbir güvenlik atlatması gerekmez. Yalnızca sizin hesabınıza kurar,
 yönetici şifresi istemez ve ev dizininizin dışına hiçbir şey yazmaz.
 
-Dosyalar `~/Library/AhdCode/versions/2.3.0` altına kurulur. `current` etkin
+Dosyalar `~/Library/AhdCode/versions/2.4.0` altına kurulur. `current` etkin
 sürümü seçer, sabit komut `~/Library/AhdCode/bin/ahdcode`'dur. PATH'e yalnızca
 bu tek dizin eklenir.
 
@@ -23,13 +23,13 @@ Ardından **yeni** bir Terminal açıp `ahdcode --version` çalıştırın. Zate
 olan bir terminal başlatıldığı ortamı korur; yeni açılan değişikliği hemen
 görür.
 
-`AhdCode-2.3.0-macos-arm64.zip`, aynı paketi VS Code eklentisiyle birlikte
+`AhdCode-2.4.0-macos-arm64.zip`, aynı paketi VS Code eklentisiyle birlikte
 sunan alternatif bir indirmedir. Disk imajı tercih edenler için aynı içeriğe
 sahip bir `.dmg` de yayımlanır; önerilen kurulum biçimi `.pkg`'dir.
 
 ## Windows x64
 
-`AhdCode-2.3.0-windows-x64.exe` dosyasına Dosya Gezgini'nde çift tıklayın.
+`AhdCode-2.4.0-windows-x64.exe` dosyasına Dosya Gezgini'nde çift tıklayın.
 Kurulum küçük bir grafik programdır: ne kuracağını gösterir, gömülü paketi
 ilerleme penceresiyle açıp doğrular ve bir onay penceresiyle biter. Konsol,
 terminal veya komut yazmak gerekmez.
@@ -39,19 +39,28 @@ Kurulum programı şu an kod imzalı değildir; bu nedenle Windows SmartScreen
 çalıştır** ile devam edin. Yayımlanan SHA-256 özetleriyle dosyanın resmî
 olduğunu doğrulayabilirsiniz.
 
-Dosyalar `%LOCALAPPDATA%\AhdCode\versions\2.3.0` altına kurulur. Sabit komut
+Dosyalar `%LOCALAPPDATA%\AhdCode\versions\2.4.0` altına kurulur. Sabit komut
 `%LOCALAPPDATA%\AhdCode\bin\ahdcode.exe`'dir ve kullanıcı PATH'ine yalnızca bu
 tek dizin, yalnızca ilk kurulumda eklenir. Yönetici izni, Git veya sistem Go
 kurulumu gerekmez; kaldırma kaydı Installed Apps içine yazılır.
 
 Ardından **yeni** bir PowerShell veya Komut İstemi açıp `ahdcode --version`
 çalıştırın.
+Kurulum, kullanıcı ortam değişikliğini yayınlar; ancak zaten açık terminaller
+ve IDE'ler başladıkları ortamı korur. Entegre terminalden denemeden önce bu
+programları yeniden başlatın. Yeni bir kabukta sabit başlatıcının bulunduğunu
+`where.exe ahdcode` ile doğrulayabilirsiniz.
 
-`AhdCode-2.3.0-windows-x64.exe --silent` hiçbir pencere açmadan kurar.
-`AhdCode-2.3.0-windows-x64.zip` aynı kurulumu VS Code eklentisiyle birlikte
+Onarım veya yükseltme güvenlidir: kurulum programını yeniden çalıştırmak mevcut
+PATH girdilerini aynen korur ve eşdeğer tek bir AhdCode girdisi bırakır.
+Kaldırma yalnızca eşdeğer `%LOCALAPPDATA%\AhdCode\bin` girdilerini kaldırır,
+diğer PATH girdilerine ve makine PATH'ine dokunmaz.
+
+`AhdCode-2.4.0-windows-x64.exe --silent` hiçbir pencere açmadan kurar.
+`AhdCode-2.4.0-windows-x64.zip` aynı kurulumu VS Code eklentisiyle birlikte
 sunar.
 
-Linux x64: `AhdCode-2.3.0-linux-x64.tar.gz` arşivini açın ve
+Linux x64: `AhdCode-2.4.0-linux-x64.tar.gz` arşivini açın ve
 `sh install.sh --setup-path` çalıştırın. Kök `~/.local/share/ahdcode` dizinidir;
 PATH bloğu `~/.profile` dosyasına eklenir.
 
