@@ -11,10 +11,11 @@ The macOS package targets Apple Silicon Macs — M1, M2, M3, M4 and later arm64
 models. There is no Intel build.
 
 Double-click `AhdCode-2.4.0-macos-arm64.pkg` and follow the installer. The
-package is signed with a Developer ID and notarized by Apple, so it opens
-normally; no security workaround is needed. It installs for your account only,
-asks for no administrator password, and writes nothing outside your home
-folder.
+published `.pkg` is the recommended installer. It installs for your account
+only, asks for no administrator password, and writes nothing outside your home
+folder. If macOS presents a security notice, first verify the downloaded file
+against the published SHA-256 checksum; do not disable or bypass system
+protections.
 
 Files go under `~/Library/AhdCode/versions/2.4.0`. `current` selects the
 active version and `~/Library/AhdCode/bin/ahdcode` is the stable command. That
@@ -36,10 +37,12 @@ graphical per-user program: it shows what it will install, unpacks and checks
 its embedded payload with a progress window, and finishes with a confirmation.
 No console, no terminal, and no typed commands are involved.
 
-The installer is not currently code-signed, so Windows SmartScreen may show an
-unknown-publisher warning. Choose **More info** and then **Run anyway** to
-continue. The published SHA-256 checksums let you confirm you have the official
-file.
+The v2.4.0 installer was live-smoke-tested on Windows after publication. That
+result does not imply an Authenticode signature: this release's installer is
+not Authenticode-signed, so Windows SmartScreen may show an unknown-publisher
+warning. Verify the file against the published SHA-256 checksum before using
+the system-provided **More info → Run anyway** path, and do not disable Windows
+security protections.
 
 Files go under `%LOCALAPPDATA%\AhdCode\versions\2.4.0`. The stable command
 is `%LOCALAPPDATA%\AhdCode\bin\ahdcode.exe`, and only that one folder is added
@@ -61,8 +64,6 @@ unrelated PATH entries; it does not edit the machine PATH.
 `AhdCode-2.4.0-windows-x64.exe --silent` installs with no windows at all, for
 scripted deployment. Because setup is a graphical program, run it from a script
 as `Start-Process -Wait` if you need to block until it finishes.
-`AhdCode-2.4.0-windows-x64.zip` bundles the same installer with the VS Code
-extension.
 
 ## Linux x64
 

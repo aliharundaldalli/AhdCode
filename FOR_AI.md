@@ -7,8 +7,9 @@ specification. The official repository is:
 https://github.com/aliharundaldalli/AhdCode
 ```
 
-Support in this guide is limited to native macOS and native Windows. Do not
-substitute WSL instructions for Windows, and do not infer Linux steps.
+Release setup guidance covers the published native macOS arm64, Windows x64,
+and Linux x64 artifacts. Do not substitute WSL instructions for native Windows
+steps.
 
 ## Safety contract
 
@@ -71,18 +72,12 @@ shipped an Intel build; do not tell a user otherwise unless the release they
 are installing actually has one. Check the release's own asset list rather
 than assuming.
 
-The `.pkg` installer (`AhdCode-<version>-macos-arm64.pkg`) is the
-recommended one. It is signed with
-a Developer ID certificate and notarized by Apple, and the notarization ticket
-is stapled to the file, so it installs on a normal Mac with no security prompt
-even when it arrives by download or AirDrop. Gatekeeper reports
-`source=Notarized Developer ID`.
-
-Because the package is notarized, **do not** tell a user to strip the quarantine
-attribute, run `xattr`, use Control-click → Open, or otherwise work around
-Gatekeeper. Those were release-candidate testing workarounds. If a signed
-release artifact is genuinely refused, that is a signal to investigate, not to
-bypass.
+The `.pkg` installer (`AhdCode-<version>-macos-arm64.pkg`) is the recommended
+one. Use the release's published checksum when provenance matters. **Do not**
+tell a user to strip the quarantine attribute, run `xattr`, use Control-click →
+Open, or otherwise work around macOS security. If the official package is
+refused, investigate the artifact and system report rather than bypassing the
+protection.
 
 The package installs per-user into `~/Library/AhdCode` and needs no
 administrator password.
@@ -92,6 +87,9 @@ administrator password.
 The Windows installer is **not Authenticode code-signed**. Windows
 SmartScreen may therefore show an unknown-publisher or low-reputation warning.
 State this plainly and accurately:
+
+- The v2.4.0 installer completed a user-run live smoke test on Windows after
+  publication. Do not generalize that result to every Windows configuration.
 
 - Never claim the Windows installer is signed. It is not.
 - This is a distribution-signing limitation. It is not evidence that the

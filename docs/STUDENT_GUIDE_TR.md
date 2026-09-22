@@ -1,4 +1,4 @@
-# AhdCode Öğrenci Rehberi (v2.3 geliştirme)
+# AhdCode Öğrenci Rehberi (v2.4)
 
 Bu rehber, **daha önce hiç programlama yapmamış birinin de takip edebilmesi** için hazırlanmıştır. Baştan sona sırayla okuyabilirsiniz; her bölümde önce ne yapmak istediğimizi görecek, sonra çalışan bir örnek yazacak, en son gerekli kuralları öğreneceksiniz.
 
@@ -14,10 +14,12 @@ belgesine geçin. Orada modüller `CSV → Data → Statistics/Plot → Excel/Wo
 Tek tek bütün imzalar ve sınır koşulları ise her modülün kendi referans
 belgesindedir.
 
-Public/runtime temeli v2.2.0 olarak kalır. v2.3 geliştirme hattı ileri düzey
-isimli Function `uses` capture sözdizimi ve mevcut görünümü kaydeden Surface
-Save ekler; bu özellikler gerektiğinde [Fonksiyonlar](FUNCTIONS_TR.md) ve
-[Plot](PLOT_TR.md) referanslarından izlenmelidir.
+Public/runtime temeli v2.4.0'dır. İsimli Function `uses` capture sözdizimi
+kararlı dilin parçasıdır; v2.4 çevrimdışı matematik çizimini, tipli plot
+stillerini, yapılandırılabilir legend konumlarını ve mevcut görünümü kaydeden
+Surface Save'i ekler. Bu özellikler gerektiğinde
+[Fonksiyonlar](FUNCTIONS_TR.md) ve [Plot](PLOT_TR.md) referanslarından
+izlenmelidir.
 
 Bu rehber öğretir; bir referans kılavuzu ya da değişiklik günlüğü değildir. Bir
 modülün, yeni başlayan birinin ilk okumada ihtiyaç duyduğundan fazlası varsa,
@@ -114,10 +116,10 @@ Merhaba!
 
 AhdCode, programı çalıştırmadan önce yazdığınız kodu kontrol eder. Örneğin bir metni sayı gibi kullanmaya çalışırsanız veya `null` olabilecek bir değeri kontrol etmeden kullanırsanız, mümkün olduğunda hatayı daha program başlamadan söyler. Ama başlangıçta bunun ayrıntılarını düşünmeniz gerekmiyor; ilerleyen bölümlerde örneklerle göreceğiz.
 
-AhdCode v1.0.0 ilk kararlı sürümdür. Güncel sürüm olan v1.2.0;
-[Cron](CRON_TR.md) ile zamanlama, [Characters](CHARACTERS_TR.md) ile Unicode
-karakter araçları ve [Latex](LATEX_TR.md) için TikZ vektör grafikleri ekler; bu
-rehber onlara ihtiyaç duymaz, başvuru sayfaları onları anlatır.
+AhdCode v1.0.0 ilk kararlı sürümdü. Güncel sürüm v2.4.0'dır. Önceki sürümlerde
+eklenen dil ve modül çalışmalarının yanında en yeni Plot/Surface matematik
+çizimi ve stil güncellemelerini de içerir. Bu rehber kararlı temeli öğretir;
+her modülün başvuru sayfası güncel API'nin tamamını belgeler.
 
 Onunla küçük komut satırı programları yazabilir veya bunları yerel executable uygulamalara derleyebilirsiniz; veriyi yerel bir SQLite veritabanında ya da bir MySQL sunucusunda tutabilirsiniz; birinci taraf `Web` çatısıyla eksiksiz bir web uygulaması kurabilirsiniz — sayfalar, yerleşimler, formlar, doğrulama, CSRF, flash mesajları, oturumlar ve dosya yüklemeleri; dış HTTP ve HTTPS API'leri çağırabilir, HTML ayrıştırabilir, SMTP ile e-posta gönderebilir, `Security` ile parola hashleyip güvenli belirteç üretebilir ve dil sunucusunu (`ahdcode lsp`) VS Code gibi bir editörden kullanabilirsiniz.
 
@@ -7274,10 +7276,11 @@ ahdcode package ledger.ahd --name Ledger
 ```
 
 `dist/Ledger.app` (Windows ve Linux'ta `dist/Ledger` klasörü) programınızı
-ve yalnızca kullandığı yardımcıları içerir. Onu herhangi bir yere kopyalayıp
-çift tıklayın: AhdCode kurulu olmadan çalışır. Finder'dan açıldığında
-`"ledger.db"` gibi göreli bir yol ana klasörünüzdeki bir dosya anlamına
-gelir.
+ve yalnızca kullandığı yardımcıları içerir; hedef bilgisayarda ayrıca AhdCode
+kurulması gerekmez. Üretilen paketi dağıtmadan önce hedef işletim sisteminde
+test edin; bir hedef için derlemek ve paketlemek, uygulamayı o sistemde
+çalıştırmanın yerini tutmaz. Finder'dan açıldığında `"ledger.db"` gibi göreli
+bir yol ana klasörünüzdeki bir dosya anlamına gelir.
 
 **3B bir yüzey.** `Plot.surface`, her `y` değeri için bir satır ve her `x`
 değeri için bir sütun içeren bir Numeric Matrix'ten bir yükseklik alanı
@@ -7304,7 +7307,8 @@ surface.show()
 
 Görüntüleyicide döndürmek için sürükleyin, kaydırmak için Shift+sürükleyin,
 yakınlaştırmak için tekerleği kullanın ve sıfırlamak için R'ye basın. Araç
-çubuğundaki Save, tam olarak `save`'in yazdığı dosyayı yazar.
+çubuğundaki Save o anki döndürülmüş, kaydırılmış ve yakınlaştırılmış görünümü
+dışa aktarır; yukarıdaki programatik `save` kanonik yönelimi korur.
 
 **Kendiniz deneyin:** deftere "Debt" ve "Payment" seçenekli bir `Select`
 ekleyin ve bakiyeyi bir Label'da gösterin; ardından `--icon` ile kendi

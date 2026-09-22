@@ -1,4 +1,4 @@
-# AhdCode Student Guide (v2.3 development)
+# AhdCode Student Guide (v2.4)
 
 This guide is designed so that **even someone who has never programmed before** can follow along. You can read it in order from beginning to end; in each section, you will first see what we want to achieve, then write a working example, and finally learn the necessary rules.
 
@@ -18,10 +18,11 @@ This guide teaches; it is not a reference manual and not a changelog. Where a
 module has more to it than a beginner needs on the first pass, the section
 says so and links to the reference page that lists every signature.
 
-The public/runtime baseline remains v2.2.0. The v2.3 development line adds an
-advanced named-Function `uses` capture form and current-view Surface Save; use
-the focused [Functions](FUNCTIONS.md) and [Plot](PLOT.md) references when you
-need those features.
+The public/runtime baseline is v2.4.0. Named-Function `uses` captures are part
+of the stable language, and v2.4 adds offline math rendering, typed plot
+styles, configurable legend positions, and current-view Surface Save. Use the
+focused [Functions](FUNCTIONS.md) and [Plot](PLOT.md) references when you need
+those features.
 
 ## Table of Contents
 - [1. What is AhdCode?](#1-what-is-ahdcode)
@@ -113,10 +114,11 @@ Hello!
 
 AhdCode checks the code you wrote before running the program. For example, if you try to use text like a number, or if you use a value that could be `null` without checking it, it will tell you the error before the program even starts, whenever possible. But you don't need to think about these details at the beginning; we'll see examples in later sections.
 
-AhdCode v1.0.0 is the first stable release. The current release, v1.2.0, adds
-scheduling with [Cron](CRON.md), Unicode character tools with
-[Characters](CHARACTERS.md), and TikZ vector graphics for [Latex](LATEX.md);
-this guide does not need them, and their reference pages explain them.
+AhdCode v1.0.0 was the first stable release. The current release is v2.4.0.
+It includes the language and module work introduced across the earlier
+releases, plus the latest Plot/Surface math rendering and styling updates. This
+guide teaches the stable foundation; each module's reference page documents
+its complete current API.
 
 With it you can write small command-line programs or compile them into native executables; keep data in a local SQLite database or a MySQL server; build a complete web application with the first-party `Web` framework -- pages, layouts, forms, validation, CSRF, flash messages, sessions, and file uploads; call external HTTP and HTTPS APIs; parse HTML; send mail through SMTP; hash passwords and generate secure tokens with `Security`; and use the language server (`ahdcode lsp`) from an editor such as VS Code.
 
@@ -7225,9 +7227,11 @@ ahdcode package ledger.ahd --name Ledger
 ```
 
 `dist/Ledger.app` (on Windows and Linux, the `dist/Ledger` folder) holds your
-program and only the helpers it uses. Copy it anywhere and double-click it:
-it runs without AhdCode installed. Opened from the Finder, a relative path
-like `"ledger.db"` means a file in your home folder.
+program and only the helpers it uses, so the target machine does not need a
+separate AhdCode installation. Test the generated package on its target
+operating system before distributing it; compiling and packaging for a target
+is not a substitute for running that application there. Opened from the
+Finder, a relative path like `"ledger.db"` means a file in your home folder.
 
 **A 3D surface.** `Plot.surface` draws a height field from a Numeric Matrix
 with one row per `y` value and one column per `x` value:
@@ -7252,7 +7256,8 @@ surface.show()
 ```
 
 In the viewer, drag to orbit, Shift+drag to pan, scroll to zoom, and press R
-to reset. The toolbar's Save writes exactly the file `save` writes.
+to reset. The toolbar's Save exports the current rotated, panned, and zoomed
+view; the programmatic `save` call above keeps the canonical orientation.
 
 **Try it yourself:** add a `Select` with "Debt" and "Payment" to the ledger
 and show the balance in a Label; then package it with your own icon using

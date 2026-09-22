@@ -11,9 +11,10 @@ macOS paketi Apple Silicon Mac'leri hedefler — M1, M2, M3, M4 ve sonraki
 arm64 modeller. Intel sürümü yoktur.
 
 `AhdCode-2.4.0-macos-arm64.pkg` dosyasına çift tıklayıp kurulumu izleyin. Paket
-Developer ID ile imzalı ve Apple tarafından noter onaylıdır; normal biçimde
-açılır, hiçbir güvenlik atlatması gerekmez. Yalnızca sizin hesabınıza kurar,
-yönetici şifresi istemez ve ev dizininizin dışına hiçbir şey yazmaz.
+yayımlanan önerilen kurulum biçimidir. Yalnızca sizin hesabınıza kurar,
+yönetici şifresi istemez ve ev dizininizin dışına hiçbir şey yazmaz. macOS bir
+güvenlik bildirimi gösterirse önce indirilen dosyayı yayımlanan SHA-256 değeriyle
+doğrulayın; sistem korumalarını kapatmayın veya atlatmayın.
 
 Dosyalar `~/Library/AhdCode/versions/2.4.0` altına kurulur. `current` etkin
 sürümü seçer, sabit komut `~/Library/AhdCode/bin/ahdcode`'dur. PATH'e yalnızca
@@ -34,10 +35,12 @@ Kurulum küçük bir grafik programdır: ne kuracağını gösterir, gömülü p
 ilerleme penceresiyle açıp doğrular ve bir onay penceresiyle biter. Konsol,
 terminal veya komut yazmak gerekmez.
 
-Kurulum programı şu an kod imzalı değildir; bu nedenle Windows SmartScreen
-"yayıncı bilinmiyor" uyarısı gösterebilir. **Daha fazla bilgi → Yine de
-çalıştır** ile devam edin. Yayımlanan SHA-256 özetleriyle dosyanın resmî
-olduğunu doğrulayabilirsiniz.
+v2.4.0 kurulum programı yayımdan sonra Windows üzerinde canlı smoke testinden
+geçmiştir. Bu sonuç Authenticode imzası olduğu anlamına gelmez: bu sürümün
+kurulum programı Authenticode imzalı değildir ve Windows SmartScreen “yayıncı
+bilinmiyor” uyarısı gösterebilir. Sistemin **Daha fazla bilgi → Yine de
+çalıştır** yolunu kullanmadan önce dosyayı yayımlanan SHA-256 değeriyle
+doğrulayın; Windows güvenlik korumalarını kapatmayın.
 
 Dosyalar `%LOCALAPPDATA%\AhdCode\versions\2.4.0` altına kurulur. Sabit komut
 `%LOCALAPPDATA%\AhdCode\bin\ahdcode.exe`'dir ve kullanıcı PATH'ine yalnızca bu
@@ -57,8 +60,6 @@ Kaldırma yalnızca eşdeğer `%LOCALAPPDATA%\AhdCode\bin` girdilerini kaldırı
 diğer PATH girdilerine ve makine PATH'ine dokunmaz.
 
 `AhdCode-2.4.0-windows-x64.exe --silent` hiçbir pencere açmadan kurar.
-`AhdCode-2.4.0-windows-x64.zip` aynı kurulumu VS Code eklentisiyle birlikte
-sunar.
 
 Linux x64: `AhdCode-2.4.0-linux-x64.tar.gz` arşivini açın ve
 `sh install.sh --setup-path` çalıştırın. Kök `~/.local/share/ahdcode` dizinidir;
