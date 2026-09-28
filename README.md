@@ -16,12 +16,13 @@ modules, GUI, Graphics, interactive Plot viewer, and desktop application
 packaging. It is used in practice by a small community; it is not a
 mainstream language.
 
-This is **v2.4.0**, **Mathematical Rendering & Plot Styling**. It adds
-bundled offline Tectonic labels with exact embedded TeX glyph rendering,
-typed line and marker styling, configurable legend positions and improved
-math layout, current-view Surface Save, and automatic Windows user-PATH
-registration. v2.3.0, **Language Ergonomics & Plot Polish**, remains available
-as the previous release.
+This is **v2.5.0**, **Deployment & Systems Primitives**. It adds safe
+ZIP/TAR/TAR.GZ listing and extraction, File deployment primitives (binary
+copy, atomic write and move, symbolic links, permissions, a link-safe walk),
+the shell-free `Process` module, and consistent SQLite backups with
+`backupTo`. See [What is new in v2.5.0](#what-is-new-in-v250). v2.4.0,
+**Mathematical Rendering & Plot Styling**, remains available as the previous
+release.
 
 v2.0.0 is a major release, **Desktop Application Completion**: it completes
 the first-party desktop application foundation — ListBox, Select, TextArea,
@@ -267,8 +268,8 @@ for name in names {
   renderer `Latex` uses, plus semantic `PDF.fromWord`/`PDF.fromExcel`
   conversion of another module's own typed document.
 - The [Archive module](docs/ARCHIVE.md) packages files into real ZIP, TAR,
-  and TAR.GZ archives offline, creation-only, using nothing beyond the Go
-  standard library.
+  and TAR.GZ archives offline, using nothing beyond the Go standard library,
+  and safely lists and extracts ZIP, TAR, and TAR.GZ archives.
 - [Lists](docs/LISTS.md) and [KeyValue](docs/KEYVALUE.md) add pure structural
   transformations of `List` and `Pair` — `chunk`, `flatten`, `transpose`,
   `unique`, `valueCounts`, `groupBy`, and `keys`, `values`, `combine`, `with`,
@@ -316,7 +317,7 @@ To maintain conceptual clarity, AhdCode's capabilities are organized into four d
    - **Mathematics & Computation:** [`Math`](docs/MATH.md), [`Bits`](docs/BITS.md) (bitwise operations on `Int`), [`Regex`](docs/REGEX.md), [`Statistics`](docs/STATISTICS.md), [`Numeric`](docs/NUMERIC.md), [`Plot`](docs/PLOT.md), [`Graphics`](docs/GRAPHICS.md) (Canvas windows and Turtle drawing), [`GUI`](docs/GUI.md) (small desktop windows with click and key callbacks)
    - **Data & Collections:** [`Lists`](docs/LISTS.md), [`KeyValue`](docs/KEYVALUE.md), [`Characters`](docs/CHARACTERS.md) (Unicode code points and classification), [`CSV`](docs/CSV.md), [`Data`](docs/DATA.md), [`JSON`](docs/JSON.md), [`XML`](docs/XML.md), [`UUID`](docs/UUID.md) (RFC 9562 version 4 and time-ordered version 7 identifiers)
    - **Document Generation:** [`Word`](docs/WORD.md), [`Excel`](docs/EXCEL.md), [`PDF`](docs/PDF.md), [`Latex`](docs/LATEX.md), [`QR`](docs/QR.md) (QR codes), [`Barcode`](docs/BARCODE.md) (Code 128, EAN-13, UPC-A), [`Archive`](docs/ARCHIVE.md)
-   - **System & Environment:** [`Time`](docs/TIME.md), [`Cron`](docs/CRON.md) (bounded in-process scheduling), [`Path`](docs/FILESYSTEM.md), [`File`](docs/FILESYSTEM.md), [`Env`](docs/ENV.md), [`Terminal`](docs/TERMINAL.md) (v1.5.0: standard error, flushing, terminal detection and size, styled text, pretty layout)
+   - **System & Environment:** [`Time`](docs/TIME.md), [`Cron`](docs/CRON.md) (bounded in-process scheduling), [`Path`](docs/FILESYSTEM.md), [`File`](docs/FILESYSTEM.md), [`Env`](docs/ENV.md), [`Terminal`](docs/TERMINAL.md) (v1.5.0: standard error, flushing, terminal detection and size, styled text, pretty layout), [`Process`](docs/PROCESS.md) (run one program with an argument list, never through a shell; bounded time and output)
 
 3. **First-Party Runtime / Framework Modules:**
    - **Network, Server & Storage Primitives:** [`HTTP`](docs/HTTP.md) (in-memory server, request/response, cookies, sessions, static file server, [WebSocket endpoints](docs/WEBSOCKET.md), client), [`HTML`](docs/HTML.md) (semantic builder, parser, selector engine), [`Security`](docs/SECURITY.md) (Argon2id hashing, bcrypt compatibility, secure tokens, constant-time comparison, SHA-2 digests, HMAC, encodings, RS256 signatures, AES-256-GCM), [`SQLite`](docs/SQLITE.md) (local typed database bridge), [`MySQL`](docs/MYSQL.md) (network database with connection pool and transactions), [`PostgreSQL`](docs/POSTGRESQL.md) (network database with connection pool and transactions), [`SMTP`](docs/SMTP.md) (send-only mail client)
@@ -462,6 +463,7 @@ See the [CLI guide](docs/CLI.md), [formatter guide](docs/FORMATTER.md),
 - [KeyValue module](docs/KEYVALUE.md)
 - [UUID module](docs/UUID.md)
 - [Terminal module](docs/TERMINAL.md)
+- [Process module](docs/PROCESS.md)
 - [Graphics module](docs/GRAPHICS.md)
 - [GUI module](docs/GUI.md)
 - [Packaging desktop applications](docs/PACKAGING.md)
@@ -505,6 +507,35 @@ diagnostics and hover. The same VSIX targets VS Code and Antigravity. See its
 [installation guide](editors/vscode/README.md).
 
 ## Current limitations
+
+## What is new in v2.5.0 <a id="what-is-new-in-v250"></a>
+
+v2.5.0, **Deployment & Systems Primitives**, gives AhdCode programs the
+general-purpose building blocks of a deployment worker, without a shell and
+without Python:
+
+- **[Archive](docs/ARCHIVE.md)** — `Archive.list` and a safe-by-default
+  `Archive.extract` for ZIP, TAR, and TAR.GZ: traversal, absolute, drive, and
+  UNC paths, links, and archive bombs are rejected; extraction is bounded
+  (`maxFiles`, `maxBytes`) and all-or-nothing into a new directory.
+- **[File](docs/FILESYSTEM.md)** — `File.copy` (binary, never overwrites),
+  `File.atomicWrite`, `File.atomicMove` (rename only, never copies),
+  `File.symlink`/`readLink`/`isSymlink`, permissions as an octal String
+  (`File.setPermissions(path, "0755")`), and `File.walk`, which never follows
+  symbolic links.
+- **[Process](docs/PROCESS.md)** (new module) — `Process.run(command, args)`
+  starts an executable directly with a `List<String>` of arguments, never
+  through a shell, with a finite timeout and output budget; a non-zero exit is
+  a result, launch failures are `ProcessError`.
+- **[SQLite](docs/SQLITE.md)** — `db.backupTo(path)` writes a consistent,
+  integrity-checked snapshot of a live database with SQLite's online backup
+  API.
+
+`Process` is now a standard module name: a local `Process.ahd` is no longer
+what `bring Process` loads. v2.5.0 is a lightweight release: it ships as
+command-line binaries. New macOS and Windows installer packages return in
+v2.7 (Distribution & Installer Polish), after v2.6 (DNS & TLS Inspection).
+Examples: [`examples/v2.5`](examples/v2.5/README.md).
 
 ## What is new in v2.4.0 <a id="what-is-new-in-v240"></a>
 

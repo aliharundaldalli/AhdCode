@@ -2607,8 +2607,9 @@ sizing, page layout, and error details.
 ## 30. Archive module
 
 `Archive` packages files into real, deterministic `.zip`, `.tar`, or
-`.tar.gz` archives -- creation-only, and it needs no renderer or extra setup
-at all, since it only uses the Go standard library:
+`.tar.gz` archives -- and, since v2.5.0, safely lists and extracts them. It
+needs no renderer or extra setup at all, since it only uses the Go standard
+library:
 
 ```ahd
 bring Archive
@@ -2631,8 +2632,11 @@ calls. The output extension must match (`.zip` / `.tar` / `.tar.gz`).
 The key in `files` is the path *inside* the archive; the value is the source
 file's path on disk. Unsafe entry paths (like `../secret`) and symlink
 sources are rejected with an `ArchiveError` rather than silently skipped.
-There is no extraction, listing, or read API — `Archive` only
-creates archives. See the [Archive module reference](ARCHIVE.md).
+Reading goes the other way: `Archive.list("submission.zip")` returns the
+entries, and `Archive.extract("submission.zip", "unpacked")` safely unpacks
+them into a new folder -- it refuses `../` paths, links, and oversized
+archives, and never overwrites an existing folder. See the
+[Archive module reference](ARCHIVE.md).
 
 ### Putting it together
 

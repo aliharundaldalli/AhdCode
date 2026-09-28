@@ -57,6 +57,7 @@ var documentationManifest = []string{
 	"PLOT.md",
 	"POSTGRESQL.md",
 	"PRACTICAL_MODULES.md",
+	"PROCESS.md",
 	"PROTOCOLS.md",
 	"QR.md",
 	"REGEX.md",

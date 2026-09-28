@@ -28,7 +28,12 @@ func SQLiteValueIdentity() *types.ClassSymbol    { return sqliteValueClass }
 // SQLiteDatabaseOperations and SQLiteValueOperations name the members each
 // Class publishes through built-in type operations, so has/has not reports the
 // real surface and the lowering layer's IR Class agrees with the frontend.
-var SQLiteDatabaseOperations = []string{"execute", "query", "lastInsertId", "begin", "commit", "rollback", "close"}
+var SQLiteDatabaseOperations = []string{"execute", "query", "lastInsertId", "begin", "commit", "rollback", "close", "backupTo"}
+
+// SQLiteDatabaseBackupTo (v2.5.0) writes a consistent snapshot of the open
+// database with SQLite's online backup API.
+const SQLiteDatabaseBackupTo TypeOperation = "Database.backupTo"
+
 var SQLiteValueOperations = []string{"kind", "isNull", "int", "real", "string"}
 
 func sqliteDatabaseType() types.Type { return types.Class{Symbol: sqliteDatabaseClass} }
@@ -109,6 +114,7 @@ func sqliteOperationShapes() map[TypeOperation]sqliteOperationShape {
 		SQLiteDatabaseCommit:       {none, 0, types.Nothing, "call commit with no argument"},
 		SQLiteDatabaseRollback:     {none, 0, types.Nothing, "call rollback with no argument"},
 		SQLiteDatabaseClose:        {none, 0, types.Nothing, "call close with no argument"},
+		SQLiteDatabaseBackupTo:     {[]types.Type{types.String}, 0, types.Nothing, "pass the backup file path as one String"},
 
 		SQLiteValueKind:   {none, 0, types.String, "call kind with no argument"},
 		SQLiteValueIsNull: {none, 0, types.Bool, "call isNull with no argument"},
@@ -120,7 +126,8 @@ func sqliteOperationShapes() map[TypeOperation]sqliteOperationShape {
 
 var sqliteOperationNames = map[string]map[string]TypeOperation{
 	"Database": {"execute": SQLiteDatabaseExecute, "query": SQLiteDatabaseQuery, "lastInsertId": SQLiteDatabaseLastInsertID,
-		"begin": SQLiteDatabaseBegin, "commit": SQLiteDatabaseCommit, "rollback": SQLiteDatabaseRollback, "close": SQLiteDatabaseClose},
+		"begin": SQLiteDatabaseBegin, "commit": SQLiteDatabaseCommit, "rollback": SQLiteDatabaseRollback, "close": SQLiteDatabaseClose,
+		"backupTo": SQLiteDatabaseBackupTo},
 	"SQLiteValue": {"kind": SQLiteValueKind, "isNull": SQLiteValueIsNull, "int": SQLiteValueInt,
 		"real": SQLiteValueReal, "string": SQLiteValueString},
 }

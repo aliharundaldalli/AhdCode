@@ -1,0 +1,49 @@
+// v2.5.0: list an archive, extract it safely, and see unsafe archives refused.
+bring Archive
+bring File
+bring UUID
+from Archive bring (ArchiveEntry, ArchiveError)
+// A fresh folder per run: Archive.extract never writes into an existing one.
+work := "run-" + UUID.v4().string()
+File.createDir(work + "/source")
+File.writeText(work + "/source/index.html", "<h1>Merhaba</h1>")
+File.writeText(work + "/source/app.json", r'{"version": 42}')
+Archive.zip(
+    work + "/release.zip"
+    {
+        "public/index.html": work + "/source/index.html"
+        "config/app.json": work + "/source/app.json"
+    }
+)
+// 1. Inspect before trusting: list writes nothing.
+entries: List<ArchiveEntry> := Archive.list(work + "/release.zip")
+for entry in entries {
+    write(entry.kind() + "  " + str(entry.size()) + "  " + entry.path())
+}
+// 2. Extract into a new directory, with explicit bounds.
+Archive.extract(
+    archive: work + "/release.zip"
+    destination: work + "/staging"
+    maxFiles: 100
+    maxBytes: 10485760
+)
+write(File.readText(work + "/staging/public/index.html"))
+// 3. The destination must be new; nothing existing is merged or overwritten.
+attempt {
+    Archive.extract(work + "/release.zip", work + "/staging")
+}
+except ArchiveError as error {
+    write(error.message)
+}
+// 4. Bounds are enforced before anything is written.
+attempt {
+    Archive.extract(
+        archive: work + "/release.zip"
+        destination: work + "/tiny"
+        maxFiles: 1
+    )
+}
+except ArchiveError as error {
+    write(error.message)
+}
+write("tiny exists: " + str(File.exists(work + "/tiny")))

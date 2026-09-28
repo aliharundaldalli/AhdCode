@@ -16,13 +16,13 @@ veritabanı modülleri, GUI'si, Graphics'i, etkileşimli Plot görüntüleyicisi
 masaüstü uygulaması paketlemesiyle gelir. Küçük bir topluluk tarafından
 pratikte kullanılmaktadır; yaygın (mainstream) bir dil değildir.
 
-Bu, **v2.4.0**, **Matematiksel Rasterizasyon ve Plot Stili** sürümüdür.
-Paketli çevrimdışı Tectonic ile gömülü TeX glyph'lerinin aslına uygun
-çizimini, tipli çizgi ve marker stillerini, yapılandırılabilir legend
-konumlarını, iyileştirilmiş matematik düzenini, mevcut Surface görünümünü
-kaydeden Save'i ve Windows kullanıcı PATH kaydını ekler. Önceki
-**Dil Ergonomisi ve Plot Cilası** sürümü olan v2.3.0 da kullanılabilir
-durumdadır.
+Bu, **v2.5.0**, **Dağıtım ve Sistem Temel İşlemleri** sürümüdür. Güvenli
+ZIP/TAR/TAR.GZ listeleme ve çıkarma, File dağıtım temel işlemleri (ikili
+kopyalama, atomik yazma ve taşıma, sembolik bağlantılar, izinler,
+bağlantılara karşı güvenli gezinme), kabuk kullanmayan `Process` modülü ve
+`backupTo` ile tutarlı SQLite yedekleri ekler. Bkz.
+[v2.5.0 ile gelenler](#v25-ile-gelenler). Önceki **Matematiksel
+Rasterizasyon ve Plot Stili** sürümü olan v2.4.0 da kullanılabilir durumdadır.
 
 v2.0.0 bir ana (major) sürümdür, **Masaüstü Uygulamasının Tamamlanması**:
 birinci taraf masaüstü uygulaması temelini tamamlar — GUI'de ListBox, Select,
@@ -284,7 +284,7 @@ for name in names {
   `PDF.fromWord`/`PDF.fromExcel` sağlar.
 - [Archive modülü](docs/ARCHIVE_TR.md), dosyaları yalnızca Go standart
   kütüphanesini kullanarak çevrimdışı gerçek ZIP, TAR ve TAR.GZ arşivlerine
-  paketler, yalnızca oluşturma amaçlıdır.
+  paketler; ZIP, TAR ve TAR.GZ arşivlerini güvenli biçimde listeler ve çıkarır.
 - [Lists](docs/LISTS_TR.md) ve [KeyValue](docs/KEYVALUE_TR.md), `List` ve
   `Pair` üzerinde saf yapısal dönüşümler ekler — `chunk`, `flatten`,
   `transpose`, `unique`, `valueCounts`, `groupBy` ve `keys`, `values`,
@@ -334,7 +334,7 @@ Kavramsal netliği korumak için AhdCode'un yetenekleri dört belirgin mimari ka
    - **Matematik ve Hesaplama:** [`Math`](docs/MATH_TR.md), [`Bits`](docs/BITS_TR.md) (`Int` üzerinde bit işlemleri), [`Regex`](docs/REGEX_TR.md), [`Statistics`](docs/STATISTICS_TR.md), [`Numeric`](docs/NUMERIC_TR.md), [`Plot`](docs/PLOT_TR.md), [`Graphics`](docs/GRAPHICS_TR.md) (Canvas pencereleri ve Turtle ile çizim), [`GUI`](docs/GUI_TR.md) (tıklama ve tuş geri çağırmalı küçük masaüstü pencereleri)
    - **Veri ve Koleksiyonlar:** [`Lists`](docs/LISTS_TR.md), [`KeyValue`](docs/KEYVALUE_TR.md), [`Characters`](docs/CHARACTERS_TR.md) (Unicode kod noktaları ve sınıflandırma), [`CSV`](docs/CSV_TR.md), [`Data`](docs/DATA_TR.md), [`JSON`](docs/JSON_TR.md), [`XML`](docs/XML_TR.md), [`UUID`](docs/UUID_TR.md) (RFC 9562 sürüm 4 ve zamana göre sıralı sürüm 7 kimlikleri)
    - **Belge Üretimi:** [`Word`](docs/WORD_TR.md), [`Excel`](docs/EXCEL_TR.md), [`PDF`](docs/PDF_TR.md), [`Latex`](docs/LATEX_TR.md), [`QR`](docs/QR_TR.md) (QR kodları), [`Barcode`](docs/BARCODE_TR.md) (Code 128, EAN-13, UPC-A), [`Archive`](docs/ARCHIVE_TR.md)
-   - **Sistem ve Ortam:** [`Time`](docs/TIME_TR.md), [`Cron`](docs/CRON_TR.md) (sınırlı, süreç içi zamanlama), [`Path`](docs/FILESYSTEM_TR.md), [`File`](docs/FILESYSTEM_TR.md), [`Env`](docs/ENV_TR.md), [`Terminal`](docs/TERMINAL_TR.md) (v1.5.0: standart hata, tampon boşaltma, terminal tespiti ve boyutu, biçimli metin, okunabilir düzen)
+   - **Sistem ve Ortam:** [`Time`](docs/TIME_TR.md), [`Cron`](docs/CRON_TR.md) (sınırlı, süreç içi zamanlama), [`Path`](docs/FILESYSTEM_TR.md), [`File`](docs/FILESYSTEM_TR.md), [`Env`](docs/ENV_TR.md), [`Terminal`](docs/TERMINAL_TR.md) (v1.5.0: standart hata, tampon boşaltma, terminal tespiti ve boyutu, biçimli metin, okunabilir düzen), [`Process`](docs/PROCESS_TR.md) (bir programı argüman listesiyle, asla kabuk üzerinden değil, sınırlı süre ve çıktıyla çalıştırır)
 
 3. **Birinci Taraf Çalışma Zamanı / Çatı Modülleri:**
    - **Ağ, Sunucu ve Depolama İlkelleri:** [`HTTP`](docs/HTTP_TR.md) (bellek içi sunucu, istek/yanıt, çerezler, oturumlar, statik dosya sunucusu, [WebSocket uç noktaları](docs/WEBSOCKET_TR.md), client), [`HTML`](docs/HTML_TR.md) (anlamsal kurucu, ayrıştırıcı, seçici motoru), [`Security`](docs/SECURITY_TR.md) (Argon2id özetleme, bcrypt uyumluluğu, güvenli token'lar, sabit zamanlı karşılaştırma, SHA-2 özetleri, HMAC, kodlamalar, RS256 imzaları, AES-256-GCM), [`SQLite`](docs/SQLITE_TR.md) (yerel tipli veritabanı köprüsü), [`MySQL`](docs/MYSQL_TR.md) (bağlantı havuzu ve işlemlerle ağ veritabanı), [`PostgreSQL`](docs/POSTGRESQL_TR.md) (bağlantı havuzu ve işlemlerle ağ veritabanı), [`SMTP`](docs/SMTP_TR.md) (yalnızca gönderim yapan posta istemcisi)
@@ -480,6 +480,7 @@ bakın.
 - [KeyValue modülü](docs/KEYVALUE_TR.md)
 - [UUID modülü](docs/UUID_TR.md)
 - [Terminal modülü](docs/TERMINAL_TR.md)
+- [Process modülü](docs/PROCESS_TR.md)
 - [Graphics modülü](docs/GRAPHICS_TR.md)
 - [GUI modülü](docs/GUI_TR.md)
 - [Masaüstü uygulaması paketleme](docs/PACKAGING_TR.md)
@@ -523,6 +524,35 @@ VS Code hem de Antigravity'i hedefler.
 [Kurulum rehberine](editors/vscode/README_TR.md) bakın.
 
 ## Mevcut sınırlamalar
+
+## v2.5.0 ile gelenler <a id="v25-ile-gelenler"></a>
+
+v2.5.0, **Dağıtım ve Sistem Temel İşlemleri**, AhdCode programlarına bir
+dağıtım işçisinin genel amaçlı yapı taşlarını kabuk ve Python olmadan verir:
+
+- **[Archive](docs/ARCHIVE_TR.md)** — ZIP, TAR ve TAR.GZ için `Archive.list` ve
+  varsayılan olarak güvenli `Archive.extract`: yol kaçışı, mutlak, sürücü ve
+  UNC yolları, bağlantılar ve arşiv bombaları reddedilir; çıkarma sınırlıdır
+  (`maxFiles`, `maxBytes`) ve yeni bir dizine ya hep ya hiç biçiminde yapılır.
+- **[File](docs/FILESYSTEM_TR.md)** — `File.copy` (ikili, asla üzerine
+  yazmaz), `File.atomicWrite`, `File.atomicMove` (yalnızca yeniden adlandırır,
+  asla kopyalamaz), `File.symlink`/`readLink`/`isSymlink`, sekizlik String
+  olarak izinler (`File.setPermissions(path, "0755")`) ve sembolik
+  bağlantıları asla izlemeyen `File.walk`.
+- **[Process](docs/PROCESS_TR.md)** (yeni modül) — `Process.run(command, args)`
+  bir programı `List<String>` argümanlarla doğrudan, asla kabuk üzerinden
+  değil, sonlu bir zaman aşımı ve çıktı bütçesiyle başlatır; sıfır olmayan
+  çıkış bir sonuçtur, başlatma hataları `ProcessError`'dır.
+- **[SQLite](docs/SQLITE_TR.md)** — `db.backupTo(path)`, SQLite'ın çevrimiçi
+  yedekleme API'siyle canlı bir veritabanının tutarlı, bütünlüğü denetlenmiş
+  bir anlık görüntüsünü yazar.
+
+`Process` artık bir standart modül adıdır: yerel bir `Process.ahd` artık
+`bring Process`'in yüklediği şey değildir. v2.5.0 hafif bir sürümdür: komut
+satırı ikili dosyaları olarak dağıtılır. Yeni macOS ve Windows kurulum
+paketleri, v2.6'dan (DNS ve TLS İnceleme) sonra v2.7 (Dağıtım ve Kurulum
+Cilası) ile geri dönecektir. Örnekler:
+[`examples/v2.5`](examples/v2.5/README_TR.md).
 
 ## v2.4.0 ile gelenler <a id="v24-ile-gelenler"></a>
 

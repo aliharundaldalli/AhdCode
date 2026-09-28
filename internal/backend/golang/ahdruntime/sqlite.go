@@ -423,6 +423,31 @@ func SQLiteRollback(handle string) error {
 	return err
 }
 
+// SQLiteBackup writes a consistent snapshot of the open Database to path
+// with SQLite's online backup API (never a file copy), so it is correct while
+// the database is in use, including in WAL mode. path must not exist yet; the
+// snapshot is published there only after it passed PRAGMA integrity_check,
+// so a failure never leaves a valid-looking partial backup. A relative path is
+// resolved against the current working directory here, once.
+func SQLiteBackup(handle, path string) error {
+	if path == "" {
+		return errors.New("the backup path is empty")
+	}
+	if path == ":memory:" {
+		return errors.New("the backup path must be a file path, not \":memory:\"")
+	}
+	absolute, err := filepath.Abs(path)
+	if err != nil {
+		return fmt.Errorf("could not resolve the backup path %q: %v", path, err)
+	}
+	database, err := sqliteHandle(handle)
+	if err != nil {
+		return err
+	}
+	_, err = ahdSQLiteSession.call(ahdSQLiteRequest{Operation: "backup", Database: database, Path: absolute})
+	return err
+}
+
 // SQLiteClose releases the connection. Closing twice succeeds; closing while
 // a transaction is active fails so nothing is ever committed or discarded
 // implicitly.
@@ -512,3 +537,7 @@ func AhdSQLiteBegin(class *AhdClass, handle string)    { ahdSQLiteRaise(class, S
 func AhdSQLiteCommit(class *AhdClass, handle string)   { ahdSQLiteRaise(class, SQLiteCommit(handle)) }
 func AhdSQLiteRollback(class *AhdClass, handle string) { ahdSQLiteRaise(class, SQLiteRollback(handle)) }
 func AhdSQLiteClose(class *AhdClass, handle string)    { ahdSQLiteRaise(class, SQLiteClose(handle)) }
+
+func AhdSQLiteBackup(class *AhdClass, handle, path string) {
+	ahdSQLiteRaise(class, SQLiteBackup(handle, path))
+}

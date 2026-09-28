@@ -36,6 +36,9 @@ const (
 	OperationCommit       = "commit"
 	OperationRollback     = "rollback"
 	OperationClose        = "close"
+	// OperationBackup (v2.5.0) writes a consistent snapshot of the Database
+	// to Path with SQLite's online backup API.
+	OperationBackup = "backup"
 )
 
 // Request is one client instruction.

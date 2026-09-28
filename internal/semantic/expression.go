@@ -738,6 +738,9 @@ func (a *analyzer) analyzeCallWithCallee(call *ast.CallExpr, callee expressionIn
 			hint, supplied = uuidConstructionHint(class.Symbol)
 		}
 		if !supplied {
+			hint, supplied = systemsConstructionHint(class.Symbol)
+		}
+		if !supplied {
 			hint, supplied = postgresqlConstructionHint(class.Symbol)
 		}
 		if supplied {
@@ -871,6 +874,9 @@ func typeOperationFor(receiver types.Type, name string) (TypeOperation, bool) {
 			return operation, true
 		}
 		if operation, ok := postgresqlOperationFor(receiver, name); ok {
+			return operation, true
+		}
+		if operation, ok := systemsOperationFor(receiver, name); ok {
 			return operation, true
 		}
 		return dataOperationFor(receiver, name)

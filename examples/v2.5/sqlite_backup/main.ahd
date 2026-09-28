@@ -1,0 +1,36 @@
+// v2.5.0: a consistent backup of a live SQLite database.
+bring File
+bring SQLite
+bring UUID
+from SQLite bring (Database, SQLiteError)
+
+work := "run-" + UUID.v4().string()
+File.createDir(work + "/backups")
+
+db: Database := SQLite.open(work + "/panel.db")
+db.execute("PRAGMA journal_mode=WAL")
+db.execute("CREATE TABLE apps (name TEXT NOT NULL)")
+db.execute("INSERT INTO apps (name) VALUES ('ata'), ('panel')")
+// The database stays open and in use; the backup is a consistent snapshot.
+db.backupTo(work + "/backups/panel-1.db")
+db.execute("INSERT INTO apps (name) VALUES ('after-backup')")
+// Backups never overwrite.
+attempt {
+    db.backupTo(work + "/backups/panel-1.db")
+}
+except SQLiteError as error {
+    write(error.message)
+}
+
+snapshot: Database := SQLite.open(work + "/backups/panel-1.db")
+rows := snapshot.query("SELECT count(*) AS n FROM apps")
+write("rows in backup: " + str(rows[0]["n"].int()))
+check := snapshot.query("PRAGMA integrity_check")
+write("integrity: " + check[0]["integrity_check"].string())
+write(
+    "live rows: " + str(
+        db.query("SELECT count(*) AS n FROM apps")[0]["n"].int()
+    )
+)
+snapshot.close()
+db.close()

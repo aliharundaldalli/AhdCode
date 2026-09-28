@@ -11,12 +11,17 @@
 package main
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"math"
+	"net/url"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -119,6 +124,8 @@ func (engine *server) handle(request sqliteproto.Request) (response sqliteproto.
 			return failure(errors.New("no transaction is active; there is nothing to roll back"))
 		}
 		return failure(entry.conn.Exec("ROLLBACK"))
+	case sqliteproto.OperationBackup:
+		return failure(entry.backup(request.Path))
 	case sqliteproto.OperationClose:
 		if !entry.conn.GetAutocommit() {
 			return failure(errors.New("the Database still has an active transaction; call commit() or rollback() before close()"))
@@ -271,6 +278,136 @@ func (entry *database) query(sql string, parameters []sqliteproto.Value) sqlitep
 		return failure(err)
 	}
 	return sqliteproto.Response{Columns: columns, Rows: rows}
+}
+
+// sqliteFileURI turns an absolute filesystem path into the file: URI the
+// backup API opens its destination with, percent-encoding every character
+// SQLite would otherwise read as URI syntax ('?', '#', '%').
+func sqliteFileURI(path string) string {
+	slashed := filepath.ToSlash(path)
+	if !strings.HasPrefix(slashed, "/") {
+		slashed = "/" + slashed // Windows: C:/dir/file -> /C:/dir/file
+	}
+	return (&url.URL{Scheme: "file", Path: slashed}).String()
+}
+
+// backup writes a consistent snapshot of this connection's main database to
+// path using SQLite's online backup API: the whole copy runs under one read
+// transaction, so concurrent writers (including WAL-mode writers in other
+// processes) never produce a torn snapshot. The snapshot is built in a
+// temporary file beside path, switched to rollback-journal mode so it is one
+// self-contained file, verified with PRAGMA integrity_check, and only then
+// published under path, which must not exist. Any failure removes the
+// temporary file, so no valid-looking partial backup is left behind.
+func (entry *database) backup(path string) error {
+	if !entry.conn.GetAutocommit() {
+		return errors.New("a transaction is active; call commit() or rollback() before backupTo()")
+	}
+	if path == "" || !filepath.IsAbs(path) {
+		return errors.New("the backup path must be a file path")
+	}
+	if _, err := os.Lstat(path); err == nil {
+		return errors.New("the backup destination already exists; backupTo never overwrites")
+	} else if !errors.Is(err, fs.ErrNotExist) {
+		return fmt.Errorf("cannot inspect the backup destination: %s", pathReason(err))
+	}
+	directory := filepath.Dir(path)
+	if info, err := os.Stat(directory); err != nil {
+		return fmt.Errorf("the backup directory is not usable: %s", pathReason(err))
+	} else if !info.IsDir() {
+		return errors.New("the backup directory is not a directory")
+	}
+	var random [8]byte
+	if _, err := rand.Read(random[:]); err != nil {
+		return err
+	}
+	temporary := filepath.Join(directory, "."+filepath.Base(path)+".ahdbackup-"+hex.EncodeToString(random[:]))
+	published := false
+	defer func() {
+		if !published {
+			for _, suffix := range []string{"", "-journal", "-wal", "-shm"} {
+				_ = os.Remove(temporary + suffix)
+			}
+		}
+	}()
+	if err := entry.conn.Backup("main", sqliteFileURI(temporary)); err != nil {
+		return fmt.Errorf("backup failed: %s", failure(err).Error)
+	}
+	if err := verifyBackup(temporary); err != nil {
+		return err
+	}
+	if err := publishNoReplace(temporary, path); err != nil {
+		if errors.Is(err, fs.ErrExist) {
+			return errors.New("the backup destination already exists; backupTo never overwrites")
+		}
+		return fmt.Errorf("cannot publish the backup: %s", pathReason(err))
+	}
+	published = true
+	return nil
+}
+
+// verifyBackup makes the finished snapshot a single self-contained file and
+// checks it with SQLite's own integrity check.
+func verifyBackup(path string) error {
+	conn, err := sqlite3.OpenFlags(path, sqlite3.OPEN_READWRITE)
+	if err != nil {
+		return fmt.Errorf("cannot reopen the backup: %s", failure(err).Error)
+	}
+	defer conn.Close()
+	if err := conn.Exec("PRAGMA journal_mode=DELETE"); err != nil {
+		return fmt.Errorf("cannot finalize the backup: %s", failure(err).Error)
+	}
+	stmt, _, err := conn.Prepare("PRAGMA integrity_check")
+	if err != nil {
+		return fmt.Errorf("cannot verify the backup: %s", failure(err).Error)
+	}
+	defer stmt.Close()
+	result := ""
+	if stmt.Step() {
+		result = stmt.ColumnText(0)
+	}
+	if err := stmt.Err(); err != nil {
+		return fmt.Errorf("cannot verify the backup: %s", failure(err).Error)
+	}
+	if result != "ok" {
+		return fmt.Errorf("the backup failed SQLite's integrity check: %s", result)
+	}
+	return nil
+}
+
+// publishNoReplace gives the finished file its final name only if that name
+// is still free: a hard link is the atomic "create if absent" step; a
+// filesystem without hard links falls back to a checked rename.
+func publishNoReplace(temporary, final string) error {
+	err := os.Link(temporary, final)
+	if err == nil {
+		return os.Remove(temporary)
+	}
+	if errors.Is(err, fs.ErrExist) {
+		return err
+	}
+	if _, statErr := os.Lstat(final); statErr == nil {
+		return fs.ErrExist
+	}
+	return os.Rename(temporary, final)
+}
+
+func pathReason(err error) string {
+	switch {
+	case errors.Is(err, fs.ErrNotExist):
+		return "no such file or directory"
+	case errors.Is(err, fs.ErrPermission):
+		return "permission denied"
+	}
+	var pathError *fs.PathError
+	if errors.As(err, &pathError) {
+		return pathError.Err.Error()
+	}
+	var linkError *os.LinkError
+	if errors.As(err, &linkError) {
+		return linkError.Err.Error()
+	}
+	return err.Error()
 }
 
 // failure turns a Go error into a response. The driver formats SQLite errors

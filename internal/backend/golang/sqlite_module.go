@@ -140,6 +140,8 @@ func (generator *generator) sqliteOperation(name string, value *ir.CallExpr) str
 		return "AhdSQLiteCommit(" + errorClass + ", " + generator.sqliteDataOf(sqliteDatabaseClass, value.Callee) + ")"
 	case "Database.rollback":
 		return "AhdSQLiteRollback(" + errorClass + ", " + generator.sqliteDataOf(sqliteDatabaseClass, value.Callee) + ")"
+	case "Database.backupTo":
+		return "AhdSQLiteBackup(" + errorClass + ", " + generator.sqliteDataOf(sqliteDatabaseClass, value.Callee) + ", " + text(0) + ")"
 	case "Database.close":
 		return "AhdSQLiteClose(" + errorClass + ", " + generator.sqliteDataOf(sqliteDatabaseClass, value.Callee) + ")"
 

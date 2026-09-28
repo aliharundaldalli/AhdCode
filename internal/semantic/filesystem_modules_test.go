@@ -9,7 +9,9 @@ import (
 
 func TestFilesystemStandardModulesExposeExactSurface(t *testing.T) {
 	modules := StandardModuleInterfaces()
-	fileWant := []string{"FileError", "append", "createDir", "delete", "exists", "list", "readText", "writeText"}
+	// v2.5.0 adds the deployment primitives and FileEntry.
+	fileWant := []string{"FileEntry", "FileError", "append", "atomicMove", "atomicWrite", "copy", "createDir", "delete", "exists",
+		"isSymlink", "list", "permissions", "readLink", "readText", "setPermissions", "symlink", "walk", "writeText"}
 	pathWant := []string{"base", "dir", "ext", "join"}
 	if !reflect.DeepEqual(modules["File"].ExportNames, fileWant) {
 		t.Fatalf("File exports = %v", modules["File"].ExportNames)

@@ -17,6 +17,9 @@ const archiveModulePrefix = "builtin:Archive::"
 func (generator *generator) archiveCall(value *ir.CallExpr) string {
 	meta := value.ExprMeta()
 	name := strings.TrimPrefix(string(value.Callable), archiveModulePrefix)
+	if rendered, handled := generator.archiveReadingCall(name, value); handled {
+		return rendered
+	}
 	text := func(index int) string {
 		if index >= len(value.Arguments) || value.Arguments[index].Value == nil {
 			return `""`

@@ -36,6 +36,7 @@ Database.begin()                                                  -> Nothing
 Database.commit()                                                 -> Nothing
 Database.rollback()                                               -> Nothing
 Database.close()                                                  -> Nothing
+Database.backupTo(path: String)                                   -> Nothing   // v2.5.0
 
 SQLiteValue.kind()    -> String     // "Null", "Int", "Real", or "String"
 SQLiteValue.isNull()  -> Bool
@@ -260,6 +261,48 @@ Semantics:
 - Outside `begin()`/`commit()`, each statement is its own auto-committed
   transaction.
 
+## Consistent backups: backupTo (v2.5.0)
+
+```ahd
+db: Database := SQLite.open("panel.db")
+db.backupTo("backups/panel-2026-09-28.db")
+```
+
+`backupTo` writes a **consistent snapshot** of the open database to a new
+file using SQLite's own online backup API — the same mechanism as Python's
+`sqlite3.Connection.backup` and the `sqlite3` CLI's `.backup`. It is correct
+while the database is in use: the whole copy runs under one read
+transaction, so writes by other connections or other processes (including in
+WAL mode) never produce a torn backup, and uncommitted changes of other
+connections are not included. The program does not need to stop, and nothing
+shells out to `sqlite3`.
+
+**`backupTo` is not `File.copy`.** Copying a live database file can capture
+a half-written page set, and in WAL mode the newest committed data may still
+live only in the `-wal` file; a plain file copy of such a database is not a
+reliable backup.
+
+The contract:
+
+- `path` must not exist: `backupTo` never overwrites (use a new, dated name
+  per backup). Its directory must exist; it is not created.
+- The snapshot is built in a temporary file beside `path`, switched to the
+  ordinary rollback journal so it is **one self-contained file** (no `-wal`
+  or `-shm` companions), checked with `PRAGMA integrity_check`, and only
+  then published under `path`. On any failure the temporary file is removed,
+  so a failed backup never leaves a valid-looking partial database.
+- The source stays open and usable. An in-memory (`:memory:`) database can be
+  backed up to a file too.
+- `backupTo` refuses to run while this `Database` has an active transaction
+  (`commit()` or `rollback()` first), because the snapshot would otherwise
+  include this connection's own uncommitted changes.
+- A relative path resolves against the working directory, like `SQLite.open`.
+  The path is a plain filename: `?`, `#`, and `%` are ordinary characters.
+
+Failures raise `SQLiteError`, for example
+`the backup destination already exists; backupTo never overwrites` or
+`the backup directory is not usable: no such file or directory`.
+
 ## Connection model and close
 
 Each `Database` is exactly one logical SQLite connection; there is no hidden
@@ -279,7 +322,7 @@ same.execute("SELECT 1")     // SQLiteError: the Database is closed
 `close()` behavior:
 
 - `close()` releases the connection. Afterwards `execute`, `query`,
-  `lastInsertId`, `begin`, `commit`, and `rollback` on that `Database` (and
+  `lastInsertId`, `begin`, `commit`, `rollback`, and `backupTo` on that `Database` (and
   on every alias) raise `SQLiteError` with the message
   `the Database is closed`.
 - `close()` is idempotent: closing an already closed `Database` succeeds.

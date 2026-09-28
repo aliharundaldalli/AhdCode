@@ -15,6 +15,9 @@ var fileErrorClass = ir.ClassID("builtin:File::class::FileError")
 
 func (generator *generator) fileCall(value *ir.CallExpr) string {
 	name := strings.TrimPrefix(string(value.Callable), fileModulePrefix)
+	if rendered, handled := generator.fileDeploymentCall(name, value); handled {
+		return rendered
+	}
 	arguments := generator.standardStringArguments(value)
 	if arguments == nil {
 		return "nil"

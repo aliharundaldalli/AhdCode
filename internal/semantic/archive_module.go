@@ -1,6 +1,8 @@
 package semantic
 
 import (
+	"sort"
+
 	"ahdcode/internal/types"
 )
 
@@ -16,9 +18,9 @@ var archiveErrorClass = &types.ClassSymbol{
 // to lowering without coupling the public module interface to a backend.
 func ArchiveErrorIdentity() *types.ClassSymbol { return archiveErrorClass }
 
-// Archive is creation-only in v0.1.20: no extraction, listing, or archive
-// object model. Each function takes a destination path and a Pair mapping an
-// in-archive member path (key) to a source filesystem path (value).
+// Archive creates ZIP/TAR/TAR.GZ archives from a Pair mapping an in-archive
+// member path (key) to a source filesystem path (value). Since v2.5.0 it also
+// lists archives and safely extracts ZIP, TAR, and TAR.GZ (systems_modules.go).
 func archiveModuleInterface() *ModuleInterface {
 	module := standardInterface(archiveModuleID, "Archive")
 
@@ -37,5 +39,7 @@ func archiveModuleInterface() *ModuleInterface {
 			types.Parameter{Name: "output", Type: types.String}, entries))
 	}
 
+	addArchiveReading(module)
+	sort.Strings(module.ExportNames)
 	return module
 }

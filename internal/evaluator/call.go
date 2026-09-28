@@ -234,6 +234,8 @@ func (session *Session) builtin(identity ir.CallableID, receiver any, arguments 
 		return session.guiBuiltin(strings.TrimPrefix(name, "builtin:GUI::"), values(arguments))
 	case strings.HasPrefix(name, "builtin:Terminal::"):
 		return session.terminalBuiltin(strings.TrimPrefix(name, "builtin:Terminal::"), values(arguments))
+	case strings.HasPrefix(name, "builtin:Process::"):
+		return session.processBuiltin(strings.TrimPrefix(name, "builtin:Process::"), values(arguments))
 	case strings.HasPrefix(name, "builtin:PostgreSQL::"):
 		return session.postgresqlBuiltin(strings.TrimPrefix(name, "builtin:PostgreSQL::"), values(arguments))
 	}
@@ -414,6 +416,9 @@ func (session *Session) core(name string, receiver any, arguments []any) any {
 	}
 	if strings.HasPrefix(name, "UUIDValue.") {
 		return session.uuidOperation(name, receiver, arguments)
+	}
+	if isSystemsOperation(name) {
+		return session.systemsOperation(name, receiver)
 	}
 	session.raise("Error", "unsupported Fundamentals operation "+name)
 	return nil

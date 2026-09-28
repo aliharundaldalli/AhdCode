@@ -1,0 +1,31 @@
+// v2.5.0: run programs with an argument list -- never through a shell.
+// Unix commands are used (/bin/echo, /bin/ls); see README for Windows.
+bring File
+bring Process
+from Process bring (ProcessResult, ProcessError)
+// Shell syntax inside an argument is plain text: nothing is executed.
+echo: ProcessResult := Process.run(
+    command: "/bin/echo"
+    args: ["hello, world", "; touch SHOULD_NOT_EXIST", "$(whoami)"]
+    timeoutSeconds: 5
+    maxOutputBytes: 4096
+)
+write("exit " + str(echo.exitCode()) + ": " + echo.stdout())
+write("shell ran: " + str(File.exists("SHOULD_NOT_EXIST")))
+// A non-zero exit is a result, not an error; stderr is kept separately.
+listing: ProcessResult := Process.run("/bin/ls", ["no-such-file-v250"])
+write("ls exit code: " + str(listing.exitCode()))
+write("ls stderr is empty: " + str(listing.stderr() == ""))
+// Launch failures, timeouts, and output overflow are ProcessErrors.
+attempt {
+    Process.run("no-such-program-v250")
+}
+except ProcessError as error {
+    write(error.message)
+}
+attempt {
+    Process.run(command: "/bin/sleep", args: ["10"], timeoutSeconds: 1)
+}
+except ProcessError as error {
+    write(error.message)
+}

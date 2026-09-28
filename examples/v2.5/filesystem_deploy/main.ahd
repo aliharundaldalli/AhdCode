@@ -1,0 +1,46 @@
+// v2.5.0: stage a release, inspect it, set permissions, and switch the live
+// "current" link atomically -- the core of a deployment worker.
+bring File
+bring UUID
+from File bring (FileEntry, FileError)
+
+work := "run-" + UUID.v4().string()
+File.createDir(work + "/releases/41/bin")
+File.writeText(work + "/releases/41/bin/server", "old build")
+File.createDir(work + "/staging/bin")
+File.writeText(work + "/staging/bin/server", "new build")
+// Binary-safe copy; it never overwrites.
+File.copy(work + "/staging/bin/server", work + "/staging/bin/server.previous")
+attempt {
+    File.copy(
+        work + "/staging/bin/server"
+        work + "/staging/bin/server.previous"
+    )
+}
+except FileError as error {
+    write(error.message)
+}
+// Replace a config file in one step: readers never see half a file.
+File.atomicWrite(work + "/staging/config.json", r'{"port": 8080}')
+// Permissions are an octal String; a mistyped mode is refused.
+File.setPermissions(work + "/staging/bin/server", "0750")
+write("server mode: " + File.permissions(work + "/staging/bin/server"))
+attempt {
+    File.setPermissions(work + "/staging/bin/server", "755x")
+}
+except FileError as error {
+    write(error.message)
+}
+// Staging becomes release 42 with one rename (never a copy).
+File.atomicMove(work + "/staging", work + "/releases/42")
+// Walk the release; symbolic links are reported, never followed.
+entries: List<FileEntry> := File.walk(work + "/releases/42")
+for entry in entries {
+    write(entry.kind() + "  " + entry.relativePath())
+}
+// Point "current" at 41, then switch to 42 atomically.
+File.symlink(target: "releases/41", link: work + "/current")
+File.symlink(target: "releases/42", link: work + "/current.next")
+File.atomicMove(source: work + "/current.next", destination: work + "/current")
+write("current -> " + File.readLink(work + "/current"))
+write("live build: " + File.readText(work + "/current/bin/server"))

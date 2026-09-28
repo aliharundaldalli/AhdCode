@@ -160,7 +160,8 @@ func TestGeneratedProgramCarriesRuntime(t *testing.T) {
 		names = append(names, file.Name)
 	}
 	if strings.Join(names, ",") != programFileName+","+runtimeFileName+","+excelRuntimeFileName+","+pdfRuntimeFileName+","+archiveRuntimeFileName+","+sqliteRuntimeFileName+","+httpRuntimeFileName+","+websocketRuntimeFileName+","+htmlRuntimeFileName+","+smtpRuntimeFileName+","+securityRuntimeFileName+","+identityRuntimeFileName+","+uuidRuntimeFileName+","+bitsRuntimeFileName+","+charactersRuntimeFile+","+cronRuntimeFileName+","+httpFilesRuntimeFileName+","+websocketClientRuntimeFile+","+svgRuntimeFileName+","+documentRuntimeFileName+
-		","+terminalRuntimeFileName+","+terminalDarwinRuntimeFileName+","+terminalLinuxRuntimeFileName+","+terminalWindowsRuntimeFileName+","+terminalOtherRuntimeFileName+","+graphicsRuntimeFileName+","+fundamentalsRuntimeFileName+","+helperLinkRuntimeFileName+","+guiRuntimeFileName+","+guiWidgetsRuntimeFileName+","+plotViewRuntimeFileName {
+		","+terminalRuntimeFileName+","+terminalDarwinRuntimeFileName+","+terminalLinuxRuntimeFileName+","+terminalWindowsRuntimeFileName+","+terminalOtherRuntimeFileName+","+graphicsRuntimeFileName+","+fundamentalsRuntimeFileName+","+helperLinkRuntimeFileName+","+guiRuntimeFileName+","+guiWidgetsRuntimeFileName+","+plotViewRuntimeFileName+
+		","+archiveReadRuntimeFileName+","+filesystemRuntimeFileName+","+processRuntimeFileName+","+processUnixRuntimeFileName+","+processWindowsRuntimeFileName {
 		t.Fatalf("unexpected generated files %v", names)
 	}
 	// The bcrypt runtime imports vendored x/crypto, so a program that does

@@ -242,6 +242,10 @@ func (session *Session) errorClass(name string) ir.ClassID {
 		return "builtin:Regex::class::RegexError"
 	case "CSVError":
 		return "builtin:CSV::class::CSVError"
+	case "ArchiveError":
+		return "builtin:Archive::class::ArchiveError"
+	case "ProcessError":
+		return "builtin:Process::class::ProcessError"
 	}
 	return preferred
 }
@@ -250,7 +254,8 @@ func knownBuiltinErrorParent(class ir.ClassID) ir.ClassID {
 	switch class {
 	case "builtin:File::class::FileError":
 		return "builtin:core::class::IOError"
-	case "builtin:Latex::class::LatexError", "builtin:Regex::class::RegexError", "builtin:CSV::class::CSVError":
+	case "builtin:Latex::class::LatexError", "builtin:Regex::class::RegexError", "builtin:CSV::class::CSVError",
+		"builtin:Archive::class::ArchiveError", "builtin:Process::class::ProcessError":
 		return "builtin:core::class::Error"
 	default:
 		return ""

@@ -211,6 +211,11 @@ func LowerCompilation(compilation module.CompilationResult) Result {
 					identityModule(ir.ModuleID(current.ID), current.Source.Name, current.Source.Path))
 				continue
 			}
+			if string(current.ID) == ProcessModuleID {
+				result.Modules = append(result.Modules,
+					processModule(ir.ModuleID(current.ID), current.Source.Name, current.Source.Path))
+				continue
+			}
 			if string(current.ID) == UUIDModuleID {
 				result.Modules = append(result.Modules,
 					uuidModule(ir.ModuleID(current.ID), current.Source.Name, current.Source.Path))

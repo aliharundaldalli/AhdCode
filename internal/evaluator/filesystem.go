@@ -25,6 +25,9 @@ func (session *Session) fileError(operation, path string, err error) {
 }
 
 func (session *Session) fileBuiltin(name string, arguments []any) any {
+	if result, handled := session.fileDeploymentBuiltin(name, arguments); handled {
+		return result
+	}
 	path := arguments[0].(string)
 	resolved := session.sessionPath(path)
 	switch name {

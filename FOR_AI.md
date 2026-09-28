@@ -509,12 +509,32 @@ for `Latex.pdf(..., "tex")`, that call already writes the sibling `.tex` file
 with the exact source bytes; do not also call `File.writeText` to write the
 same source a second time.
 
-**Archive is creation-only.** `Archive.zip/tar/tarGzip(output, entries)` takes
+**Archive creates, lists, and safely extracts.** `Archive.zip/tar/tarGzip(output, entries)` takes
 a `Pair<String, String>` where the key is the destination path *inside* the
-archive and the value is the *source filesystem path*. Never invent
-`Archive.extract`, `Archive.open`, or any read/listing API — none exists, and
-none is planned. Do not shell out to `zip`/`tar`/`unzip` from AhdCode-adjacent
-tooling when `Archive` already covers the packaging need.
+archive and the value is the *source filesystem path*. Since v2.5.0,
+`Archive.list(archive)` returns `List<ArchiveEntry>` (`path()`, `kind()`,
+`size()`) and `Archive.extract(archive, destination, maxFiles, maxBytes)`
+safely extracts ZIP/TAR/TAR.GZ into a destination that must not exist yet.
+There is no unsafe extraction mode, no `allowSymlinks`, and no `Archive.open`;
+never invent them. Do not shell out to `zip`/`tar`/`unzip` from
+AhdCode-adjacent tooling when `Archive` already covers the need.
+
+**Process never uses a shell.** `Process.run(command, args, timeoutSeconds,
+maxOutputBytes)` runs one executable with a `List<String>` of arguments and
+returns a `ProcessResult` (`exitCode()`, `stdout()`, `stderr()`). Never build
+a command line String, never call `/bin/sh -c` or `cmd.exe /C` through it,
+and prefer absolute executable paths. A non-zero exit is a result; launch
+failure, timeout, and output overflow raise `ProcessError`. Privileged
+programs must apply their own allowlist before calling it.
+
+**File deployment primitives (v2.5.0).** `File.copy` (binary, never
+overwrites), `File.atomicWrite`, `File.atomicMove` (rename only, never
+copies), `File.symlink(target, link)` (same order as `ln -s`),
+`File.readLink`, `File.isSymlink`, `File.walk` (never follows links), and
+permissions as an **octal String**: `File.setPermissions(path, "0755")`,
+`File.permissions(path) -> "0755"`. Never pass permissions as an Int.
+`SQLite` backups use `db.backupTo(path)`, never `File.copy` of a live
+database file.
 
 **`PDF.fromWord`/`PDF.fromExcel` are semantic exports, not Office print
 emulation.** They convert another module's own typed document directly (no

@@ -32,7 +32,7 @@ func TestSQLiteModuleLowersItsClassesAndOperations(t *testing.T) {
 	if database == nil || len(database.Fields) != 1 || database.Fields[0].ID != SQLiteDatabaseHandleFieldID || !database.Fields[0].Hidden {
 		t.Fatalf("Database lowered without its single hidden handle field: %#v", database)
 	}
-	if len(database.Operations) != 7 {
+	if len(database.Operations) != 8 { // v2.5.0 adds backupTo
 		t.Fatalf("Database publishes %v", database.Operations)
 	}
 	value := classes[sqliteValueClassID]

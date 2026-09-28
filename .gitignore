@@ -21,3 +21,6 @@ speed*
 benchmark_*
 run_benchmarks.py
 results.json
+
+# v2.5 examples write their scratch output into fresh run-<uuid>/ folders
+/examples/v2.5/**/run-*/

@@ -178,6 +178,7 @@ structural transformation layer over `List` and `Pair`; Excel adds typed,
 immutable XLSX workbooks; PDF builds immutable documents and renders them
 offline to real `.pdf` files (sharing Latex's staged Tectonic renderer), with
 semantic `PDF.fromWord`/`PDF.fromExcel` conversion; Archive packages files
-into real ZIP/TAR/TAR.GZ archives, creation-only, using nothing beyond the Go
-standard library. See [Time](TIME.md), [CSV](CSV.md), [Data](DATA.md), [Statistics](STATISTICS.md), [Plot](PLOT.md), [Numeric](NUMERIC.md), [Word](WORD.md), [Excel](EXCEL.md), [PDF](PDF.md), [Archive](ARCHIVE.md), [JSON](JSON.md), [SQLite](SQLITE.md), [HTTP](HTTP.md), [HTML](HTML.md), [SMTP](SMTP.md), [XML](XML.md), [Env](ENV.md), [Lists](LISTS.md), [KeyValue](KEYVALUE.md), and the
+into real ZIP/TAR/TAR.GZ archives and safely lists and extracts them, using
+nothing beyond the Go standard library; Process runs one program with an
+argument list, never through a shell. See [Time](TIME.md), [CSV](CSV.md), [Data](DATA.md), [Statistics](STATISTICS.md), [Plot](PLOT.md), [Numeric](NUMERIC.md), [Word](WORD.md), [Excel](EXCEL.md), [PDF](PDF.md), [Archive](ARCHIVE.md), [Process](PROCESS.md), [JSON](JSON.md), [SQLite](SQLITE.md), [HTTP](HTTP.md), [HTML](HTML.md), [SMTP](SMTP.md), [XML](XML.md), [Env](ENV.md), [Lists](LISTS.md), [KeyValue](KEYVALUE.md), and the
 [diagnostics guide](DIAGNOSTICS.md).

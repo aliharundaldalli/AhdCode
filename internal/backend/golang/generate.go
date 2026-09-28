@@ -87,6 +87,13 @@ const (
 	guiRuntimeFileName             = "ahdcode_gui_runtime.go"
 	guiWidgetsRuntimeFileName      = "ahdcode_gui_widgets_runtime.go"
 	plotViewRuntimeFileName        = "ahdcode_plotview_runtime.go"
+	// v2.5.0 systems primitives. The Process runtime has one portable file
+	// and one per platform family; each carries its own build constraint.
+	archiveReadRuntimeFileName    = "ahdcode_archive_read_runtime.go"
+	filesystemRuntimeFileName     = "ahdcode_filesystem_runtime.go"
+	processRuntimeFileName        = "ahdcode_process_runtime.go"
+	processUnixRuntimeFileName    = "ahdcode_process_runtime_unix.go"
+	processWindowsRuntimeFileName = "ahdcode_process_runtime_windows.go"
 )
 
 // storage describes the Go representation chosen for one IR symbol.
@@ -258,6 +265,11 @@ func Generate(compilation *ir.Compilation) (*GeneratedProgram, []diagnostics.Dia
 		{guiRuntimeFileName, ahdruntime.GUISource, "GUI"},
 		{guiWidgetsRuntimeFileName, ahdruntime.GUIWidgetsSource, "GUI widgets"},
 		{plotViewRuntimeFileName, ahdruntime.PlotViewSource, "Plot viewer"},
+		{archiveReadRuntimeFileName, ahdruntime.ArchiveReadSource, "Archive reading"},
+		{filesystemRuntimeFileName, ahdruntime.FilesystemSource, "File deployment"},
+		{processRuntimeFileName, ahdruntime.ProcessSource, "Process"},
+		{processUnixRuntimeFileName, ahdruntime.ProcessUnixSource, "Process Unix"},
+		{processWindowsRuntimeFileName, ahdruntime.ProcessWindowsSource, "Process Windows"},
 	} {
 		formattedShared, err := format.Source([]byte(strings.Replace(shared.source, "package ahdruntime", "package main", 1)))
 		if err != nil {

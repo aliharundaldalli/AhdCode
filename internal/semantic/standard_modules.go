@@ -41,6 +41,7 @@ func StandardModuleInterfaces() map[string]*ModuleInterface {
 		"Graphics":   graphicsModuleInterface(),
 		"GUI":        guiModuleInterface(),
 		"PostgreSQL": postgresqlModuleInterface(),
+		"Process":    processModuleInterface(),
 		"QR":         qrModuleInterface(),
 		"Regex":      regexModuleInterface(),
 		"Security":   securityModuleInterface(),

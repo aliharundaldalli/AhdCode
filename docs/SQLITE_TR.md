@@ -37,6 +37,7 @@ Database.begin()                                                  -> Nothing
 Database.commit()                                                 -> Nothing
 Database.rollback()                                               -> Nothing
 Database.close()                                                  -> Nothing
+Database.backupTo(path: String)                                   -> Nothing   // v2.5.0
 
 SQLiteValue.kind()    -> String     // "Null", "Int", "Real" veya "String"
 SQLiteValue.isNull()  -> Bool
@@ -264,6 +265,50 @@ Anlambilim:
 - `begin()`/`commit()` dışında her ifade kendi başına otomatik kalıcılaşan bir
   işlemdir.
 
+## Tutarlı yedekler: backupTo (v2.5.0)
+
+```ahd
+db: Database := SQLite.open("panel.db")
+db.backupTo("backups/panel-2026-09-28.db")
+```
+
+`backupTo`, açık veritabanının **tutarlı bir anlık görüntüsünü**, SQLite'ın
+kendi çevrimiçi yedekleme API'siyle yeni bir dosyaya yazar — Python'daki
+`sqlite3.Connection.backup` ve `sqlite3` CLI'daki `.backup` ile aynı
+mekanizma. Veritabanı kullanılırken de doğrudur: kopyanın tamamı tek bir okuma
+işlemi (read transaction) altında yürür; böylece başka bağlantıların ya da
+başka süreçlerin yazmaları (WAL kipinde dahil) asla yırtık bir yedek
+üretmez ve diğer bağlantıların commit edilmemiş değişiklikleri yedeğe girmez.
+Programın durması gerekmez ve hiçbir şey `sqlite3`'e kabuk üzerinden
+başvurmaz.
+
+**`backupTo`, `File.copy` değildir.** Canlı bir veritabanı dosyasını
+kopyalamak yarım yazılmış sayfaları yakalayabilir; WAL kipinde en yeni commit
+edilmiş veri hâlâ yalnızca `-wal` dosyasında olabilir. Böyle bir veritabanının
+düz dosya kopyası güvenilir bir yedek değildir.
+
+Sözleşme:
+
+- `path` mevcut olmamalıdır: `backupTo` asla üzerine yazmaz (her yedek için
+  yeni, tarihli bir ad kullanın). Dizini mevcut olmalıdır; oluşturulmaz.
+- Anlık görüntü `path`'in yanındaki geçici bir dosyada oluşturulur, **tek ve
+  kendi kendine yeten bir dosya** olsun diye (yanında `-wal` ya da `-shm`
+  olmadan) sıradan geri alma günlüğüne geçirilir, `PRAGMA integrity_check`
+  ile denetlenir ve ancak ondan sonra `path` adıyla yayımlanır. Her hatada
+  geçici dosya silinir; başarısız bir yedek asla geçerli görünen yarım bir
+  veritabanı bırakmaz.
+- Kaynak açık ve kullanılabilir kalır. Bellek içi (`:memory:`) bir veritabanı
+  da bir dosyaya yedeklenebilir.
+- Bu `Database`'in etkin bir işlemi varken `backupTo` çalışmayı reddeder
+  (önce `commit()` ya da `rollback()`); aksi halde anlık görüntü bu
+  bağlantının kendi commit edilmemiş değişikliklerini içerirdi.
+- Göreli bir yol, `SQLite.open` gibi çalışma dizinine göre çözülür. Yol düz
+  bir dosya adıdır: `?`, `#` ve `%` sıradan karakterlerdir.
+
+Hatalar `SQLiteError` fırlatır; örneğin
+`the backup destination already exists; backupTo never overwrites` ya da
+`the backup directory is not usable: no such file or directory`.
+
 ## Bağlantı modeli ve close
 
 Her `Database` tam olarak bir mantıksal SQLite bağlantısıdır; gizli bir havuz
@@ -283,8 +328,8 @@ ayni.execute("SELECT 1")     // SQLiteError: the Database is closed
 `close()` davranışı:
 
 - `close()` bağlantıyı serbest bırakır. Sonrasında o `Database` (ve her takma
-  adı) üzerindeki `execute`, `query`, `lastInsertId`, `begin`, `commit` ve
-  `rollback`, `the Database is closed` iletisiyle `SQLiteError` fırlatır.
+  adı) üzerindeki `execute`, `query`, `lastInsertId`, `begin`, `commit`,
+  `rollback` ve `backupTo`, `the Database is closed` iletisiyle `SQLiteError` fırlatır.
 - `close()` idempotenttir: zaten kapalı bir `Database`'i kapatmak başarılıdır.
 - Etkin bir işlem varken `close()` `SQLiteError` fırlatır ve işlemi olduğu
   gibi bırakır. Hiçbir şey örtük olarak kalıcılaşmaz ya da atılmaz; önce

@@ -43,6 +43,7 @@ func fileModuleInterface() *ModuleInterface {
 	addStandardExport(module, standardFunction(fileModuleID, "delete", types.Nothing, stringParameter("path")))
 	addStandardExport(module, standardFunction(fileModuleID, "createDir", types.Nothing, stringParameter("path")))
 	addStandardExport(module, standardFunction(fileModuleID, "list", types.List{Element: types.String}, stringParameter("path")))
+	addFileDeployment(module)
 	sort.Strings(module.ExportNames)
 	return module
 }

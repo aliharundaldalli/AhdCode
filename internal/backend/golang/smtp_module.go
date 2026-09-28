@@ -135,9 +135,11 @@ func (generator *generator) smtpHelper(class ir.ClassID) (string, bool) {
 // Class actually used. Cron's Scheduler shares that representation, so the
 // same loop emits it, as do the QR module's QRCode and the Barcode module's
 // BarcodeCode, whose hidden String holds the validated symbol, and the UUID
-// module's UUIDValue, whose hidden String holds the canonical text.
+// module's UUIDValue, whose hidden String holds the canonical text. The
+// v2.5.0 ArchiveEntry, FileEntry, and ProcessResult values share it too.
 func (generator *generator) emitSMTPHelpers(writer *emitter) {
-	for _, class := range []ir.ClassID{smtpClientClass, smtpMessageClass, cronSchedulerClass, qrCodeClass, barcodeCodeClass, uuidValueClass} {
+	for _, class := range []ir.ClassID{smtpClientClass, smtpMessageClass, cronSchedulerClass, qrCodeClass, barcodeCodeClass, uuidValueClass,
+		archiveEntryClass, fileEntryClass, processResultClass} {
 		name, known := generator.timeHelpers[class]
 		if !known {
 			continue

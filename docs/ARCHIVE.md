@@ -4,21 +4,23 @@
 
 [Back to README](../README.md) · [Modules](MODULES.md) · [PDF](PDF.md)
 
-Archive packages files into real ZIP, TAR, and TAR.GZ archives, offline,
+Archive packages files into real ZIP, TAR, and TAR.GZ archives and, since
+v2.5.0, lists and **safely extracts** ZIP, TAR, and TAR.GZ archives — offline,
 using only the Go standard library (`archive/zip`, `archive/tar`,
 `compress/gzip`). Import it explicitly:
 
 ```ahd
 bring Archive
-from Archive bring ArchiveError
+from Archive bring (ArchiveEntry, ArchiveError)
 ```
 
 The canonical module identity is `builtin:Archive`; a sibling `Archive.ahd`
 cannot shadow it.
 
-Archive is **creation-only**: there is no extraction, listing, or archive
-object model. `Archive.extract`, `Archive.open`, and similar do not exist and
-will not be added to this module — see [Not in this version](#not-in-this-version).
+Extraction is **safe by default and has no unsafe variant**: path traversal,
+absolute and drive paths, links, and archive bombs are rejected, and a failed
+extraction leaves nothing behind. See
+[Listing and safe extraction](#listing-and-safe-extraction-v250).
 
 ## Surface
 
@@ -26,6 +28,14 @@ will not be added to this module — see [Not in this version](#not-in-this-vers
 Archive.zip(output: String, entries: Pair<String, String>)     -> Nothing
 Archive.tar(output: String, entries: Pair<String, String>)     -> Nothing
 Archive.tarGzip(output: String, entries: Pair<String, String>) -> Nothing
+
+Archive.list(archive: String, maxFiles: Int = 10000)            -> List<ArchiveEntry>
+Archive.extract(archive: String, destination: String,
+                maxFiles: Int = 10000, maxBytes: Int = 1073741824) -> Nothing
+
+ArchiveEntry.path() -> String   // the name exactly as stored in the archive
+ArchiveEntry.kind() -> String   // "file", "directory", "symlink", "hardlink", or "other"
+ArchiveEntry.size() -> Int      // uncompressed bytes; 0 for non-files
 
 ArchiveError
 ```
@@ -155,8 +165,116 @@ except ArchiveError as error {
 Static argument count and type mistakes remain compiler diagnostics; they do
 not become runtime `ArchiveError` values.
 
+## Listing and safe extraction (v2.5.0)
+
+`Archive.list` and `Archive.extract` read ZIP, TAR, and TAR.GZ. The format is
+recognized from the file's **content** (its signature), never from its name,
+so `release.bin` that is really a ZIP works and a renamed text file is
+refused with `unsupported archive format`.
+
+### Listing
+
+```ahd
+entries: List<ArchiveEntry> := Archive.list("release.zip")
+for entry in entries {
+    write(entry.path() + " " + entry.kind() + " " + str(entry.size()))
+}
+```
+
+`list` writes nothing and reports every entry **as stored**, in archive order
+— including symbolic links, hard links, and unsafe names such as
+`../evil` — so a program can inspect an upload before deciding anything.
+`ArchiveEntry` is an opaque value: it cannot be constructed directly and is
+obtained only from `Archive.list`. At most `maxFiles` entries are accepted.
+
+### Extracting
+
+```ahd
+Archive.extract(
+    archive: "uploads/release-42.zip",
+    destination: "releases/42",
+    maxFiles: 5000,
+    maxBytes: 1073741824
+)
+```
+
+The contract:
+
+- **The destination must not exist**; its parent directory must. `extract`
+  only ever creates a new directory. It never merges into, overwrites, or
+  deletes existing content — extracting twice to the same destination raises
+  `ArchiveError`.
+- **All or nothing.** Entries are written into a private staging directory
+  beside the destination (`.<name>.ahdextract-…`), which is renamed to the
+  destination only after every entry succeeded. On any failure the staging
+  directory — created by this call — is removed, so a failed extraction never
+  leaves a half-written release that looks successful.
+- **Every entry path is validated before anything is written.** Rejected:
+  empty names, NUL bytes, absolute paths (`/etc/x`), UNC paths
+  (`//server/share`), drive paths (`C:/x`, `C:x`), any backslash (so
+  `..\evil` and mixed `a/..\..\x` cannot slip through), any colon, and any
+  `..` segment (`../x`, `a/../../x`). `.` segments and a leading `./` are
+  harmless and accepted, as tar tools commonly write them. After joining, the
+  target is re-checked with a real relative-path computation against the
+  staging directory — never by string-prefix comparison, so a sibling such as
+  `releases/42-evil` cannot pass as "inside" `releases/42`. On Windows, names
+  that end in a dot or space or name a reserved device (`CON`, `NUL`, …) are
+  also rejected.
+- **Links are rejected, never followed or converted.** Symbolic-link and
+  hard-link entries, and device, FIFO, and sparse entries, make the whole
+  extraction fail. There is no `allowSymlinks` option and no unsafe variant.
+  Because nothing extracted can be a link, no entry can redirect a later write
+  outside the destination; each parent directory is additionally resolved and
+  re-checked before a file is created.
+- **Bounded.** `maxFiles` limits the number of entries (files and
+  directories); `maxBytes` limits the total uncompressed size. Both are
+  checked first against the archive's metadata — an absurd declared size is
+  refused before any byte is written — and then again while streaming,
+  because metadata can lie: an entry that produces more bytes than it
+  declared, or a TAR.GZ stream that expands beyond its allowance, fails the
+  extraction. Size accumulation is overflow-safe.
+- Files are created with mode `0644`, or `0755` when the archive marks the
+  entry executable; directories get `0755` (both before the process umask).
+  setuid, setgid, and sticky bits are never applied, and archived owners are
+  ignored. Adjust afterwards with `File.setPermissions`.
+- A TAR PAX global header (the `pax_global_header` record `git archive`
+  writes) is archive metadata, not an entry: it is neither listed nor
+  written.
+- Encrypted ZIP entries are refused. Duplicate file entries (including names
+  that collide on a case-insensitive filesystem) are refused; a repeated
+  directory entry is harmless.
+- Reading a ZIP loads its central directory (the entry index) into memory, in
+  proportion to the archive's size. Bound the size of untrusted uploads before
+  listing or extracting them.
+
+| Bound | Default | Allowed range |
+|---|---|---|
+| `maxFiles` | 10 000 | 1 – 1 000 000 |
+| `maxBytes` | 1 073 741 824 (1 GiB) | 1 – 68 719 476 736 (64 GiB) |
+
+A value outside the range raises `ArchiveError`; extraction is never
+unbounded.
+
+### Errors
+
+Every failure is an `ArchiveError` whose message names the operation and the
+archive, then one stable reason, for example:
+
+```text
+extract "evil.zip" failed: unsafe entry path "../escaped.txt": the path escapes the destination
+extract "links.tar.gz" failed: entry "current" is a symbolic link; safe extraction rejects links
+extract "big.zip" failed: file-count limit exceeded: the archive has more than 5000 entries (maxFiles)
+extract "bomb.zip" failed: byte limit exceeded: the archive declares more than 1073741824 uncompressed bytes (maxBytes)
+extract "notes.txt" failed: unsupported archive format; expected ZIP, TAR, or TAR.GZ
+extract "broken.tar.gz" failed: malformed archive: invalid header
+extract "release.zip" failed: destination "releases/42" already exists; Archive.extract only creates a new directory
+```
+
+Raw Go error text is never exposed.
+
 ## Not in this version
 
-Archive extraction, archive listing, an archive object model, RAR, 7z,
-BZIP2, XZ, a standalone Compress module, encrypted/password-protected
-archives, and directory-source recursion are not part of v0.1.20.
+RAR, 7z, BZIP2, XZ, a standalone Compress module, encrypted or
+password-protected archives, an archive object model with random access,
+extraction that preserves links or ownership, an unsafe extraction mode, and
+directory-source recursion for creation are not part of AhdCode.

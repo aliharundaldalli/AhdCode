@@ -229,3 +229,24 @@ var GUIWidgetsSource string
 //
 //go:embed plotview.go
 var PlotViewSource string
+
+// The v2.5.0 systems primitives are emitted as separate generated Go files,
+// each depending only on the Go standard library. ArchiveReadSource lists and
+// safely extracts archives, FilesystemSource holds the File deployment
+// primitives, and ProcessSource runs executables without a shell; its
+// platform files carry build constraints so only one is compiled.
+//
+//go:embed archive_read.go
+var ArchiveReadSource string
+
+//go:embed filesystem.go
+var FilesystemSource string
+
+//go:embed process.go
+var ProcessSource string
+
+//go:embed process_unix.go
+var ProcessUnixSource string
+
+//go:embed process_windows.go
+var ProcessWindowsSource string

@@ -2632,9 +2632,9 @@ bölümüne bakın. Görsel boyutlandırma, sayfa düzeni ve hata ayrıntıları
 ## 30. Archive modülü
 
 `Archive`, dosyaları gerçek, deterministik `.zip`, `.tar` veya `.tar.gz`
-arşivlerine paketler — yalnızca oluşturma amaçlıdır ve hiçbir render motoru
-veya ek kuruluma ihtiyaç duymaz, çünkü yalnızca Go standart kütüphanesini
-kullanır:
+arşivlerine paketler — ve v2.5.0'dan beri onları güvenli biçimde listeler ve
+çıkarır. Hiçbir render motoru veya ek kuruluma ihtiyaç duymaz, çünkü yalnızca
+Go standart kütüphanesini kullanır:
 
 ```ahd
 bring Archive
@@ -2655,8 +2655,10 @@ write(File.exists("teslim.zip"))
 `files` içindeki anahtar arşivin *içindeki* yoldur; değer ise diskteki
 kaynak dosyanın yoludur. Güvensiz giriş yolları (`../secret` gibi) ve
 symlink kaynakları, sessizce atlanmak yerine bir `ArchiveError` ile
-reddedilir. Çıkarma (extraction), listeleme veya okuma API'si
-yoktur — `Archive` yalnızca arşiv oluşturur. `zip`, `tar` ve `tarGzip`
+reddedilir. Okuma ters yönde çalışır: `Archive.list("teslim.zip")` girdileri
+döndürür, `Archive.extract("teslim.zip", "acilan")` ise onları güvenli
+biçimde yeni bir klasöre açar — `../` yollarını, bağlantıları ve aşırı büyük
+arşivleri reddeder ve mevcut bir klasörün üzerine asla yazmaz. `zip`, `tar` ve `tarGzip`
 üç oluşturma çağrısıdır; çıktı uzantısı eşleşmelidir (`.zip` / `.tar` /
 `.tar.gz`). Ayrıntılar için [Archive modül
 referansına](ARCHIVE_TR.md) bakın.

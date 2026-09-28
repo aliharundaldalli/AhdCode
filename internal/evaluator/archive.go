@@ -23,6 +23,9 @@ import (
 )
 
 func (s *Session) archiveBuiltin(name string, args []any) any {
+	if result, handled := s.archiveReadingBuiltin(name, args); handled {
+		return result
+	}
 	switch name {
 	case "zip", "tar", "tarGzip":
 		output := args[0].(string)

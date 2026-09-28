@@ -217,6 +217,7 @@ func TestSQLiteOperationShapesMatchFrozenAPI(t *testing.T) {
 		SQLiteDatabaseCommit:       {nil, 0, types.Nothing},
 		SQLiteDatabaseRollback:     {nil, 0, types.Nothing},
 		SQLiteDatabaseClose:        {nil, 0, types.Nothing},
+		SQLiteDatabaseBackupTo:     {[]types.Type{types.String}, 0, types.Nothing},
 		SQLiteValueKind:            {nil, 0, types.String},
 		SQLiteValueIsNull:          {nil, 0, types.Bool},
 		SQLiteValueInt:             {nil, 0, types.Int},
@@ -240,7 +241,7 @@ func TestSQLiteOperationShapesMatchFrozenAPI(t *testing.T) {
 			}
 		}
 	}
-	if len(SQLiteDatabaseOperations) != 7 || len(SQLiteValueOperations) != 5 {
+	if len(SQLiteDatabaseOperations) != 8 || len(SQLiteValueOperations) != 5 { // v2.5.0 adds backupTo
 		t.Fatalf("published operation names drifted: %v %v", SQLiteDatabaseOperations, SQLiteValueOperations)
 	}
 }

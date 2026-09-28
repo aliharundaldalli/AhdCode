@@ -873,6 +873,9 @@ func (generator *generator) call(value *ir.CallExpr) string {
 	if strings.HasPrefix(string(value.Callable), postgresqlModulePrefix) {
 		return generator.postgresqlCall(value)
 	}
+	if strings.HasPrefix(string(value.Callable), processModulePrefix) {
+		return generator.processCall(value)
+	}
 	if method, ok := value.Callee.(*ir.MemberExpr); ok && method.Kind == ir.MethodMember {
 		function := generator.functions[method.Callable]
 		if function == nil {
@@ -1211,6 +1214,9 @@ func (generator *generator) builtinCall(value *ir.CallExpr) string {
 		}
 		if strings.HasPrefix(name, "UUIDValue.") {
 			return generator.uuidOperation(name, value)
+		}
+		if isSystemsOperation(name) {
+			return generator.systemsOperation(name, value)
 		}
 		return generator.unsupported("Fundamentals function "+name, meta.Span)
 	}

@@ -124,6 +124,9 @@ func publishedMember(operation TypeOperation) *Symbol {
 	if symbol, ok := plotMembers[operation]; ok {
 		return symbol
 	}
+	if symbol, ok := systemsMembers[operation]; ok {
+		return symbol
+	}
 	return completionMembers[operation]
 }
 
@@ -153,6 +156,8 @@ func publishedMemberNames(identity *types.ClassSymbol) []string {
 		return PlotSurfaceOperations
 	case identity.ModuleID == guiModuleID:
 		return GUIOperations[identity.Name]
+	case systemsIdentity(identity):
+		return systemsMemberNames(identity)
 	}
 	return nil
 }
@@ -208,6 +213,16 @@ var positionalMembers = func() map[TypeOperation]*Symbol {
 				shape.parameters, httpOptionalTrailingArguments[operation])
 		}
 	}
+	for _, operations := range sqliteOperationNames {
+		for name, operation := range operations {
+			shape, known := sqliteOperationShapes()[operation]
+			if !known {
+				continue
+			}
+			members[operation] = positionalMember(sqliteModuleID, name, shape.result, false,
+				shape.parameters, shape.optional)
+		}
+	}
 	for className, operations := range smtpOperationNames {
 		for name, operation := range operations {
 			shape, known := smtpOperationShapes()[operation]
@@ -240,6 +255,13 @@ func positionalMemberNames(identity *types.ClassSymbol) []string {
 		return httpClassOperations[identity.Name]
 	case smtpModuleID:
 		return smtpClassOperations[identity.Name]
+	case sqliteModuleID:
+		switch identity.Name {
+		case "Database":
+			return SQLiteDatabaseOperations
+		case "SQLiteValue":
+			return SQLiteValueOperations
+		}
 	}
 	return nil
 }

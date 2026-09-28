@@ -122,6 +122,17 @@ func (session *Session) sqliteOperation(name string, receiver any, args []any) a
 	case "Database.rollback":
 		session.sqliteCheck(ahdruntime.SQLiteRollback(session.sqliteHandleOf(receiver)))
 		return Nothing
+	case "Database.backupTo":
+		written := args[0].(string)
+		resolved := written
+		if written != "" && written != ":memory:" {
+			// Resolved against the session directory, like SQLite.open.
+			resolved = session.sessionPath(written)
+		}
+		if err := ahdruntime.SQLiteBackup(session.sqliteHandleOf(receiver), resolved); err != nil {
+			session.raise("SQLiteError", err.Error())
+		}
+		return Nothing
 	case "Database.close":
 		session.sqliteCheck(ahdruntime.SQLiteClose(session.sqliteHandleOf(receiver)))
 		return Nothing

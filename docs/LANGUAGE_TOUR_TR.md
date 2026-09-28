@@ -178,6 +178,8 @@ katmanıdır; Excel tipli, değiştirilemez XLSX çalışma kitapları ekler; PD
 değiştirilemez belgeler oluşturur ve bunları çevrimdışı gerçek `.pdf`
 dosyalarına render eder (Latex'in konuşlandırılmış Tectonic render motorunu
 paylaşarak), `PDF.fromWord`/`PDF.fromExcel` anlamsal dönüşümüyle birlikte;
-Archive ise dosyaları yalnızca Go standart kütüphanesini kullanarak, yalnızca
-oluşturma amaçlı, gerçek ZIP/TAR/TAR.GZ arşivlerine paketler. Ayrıca
-[Time](TIME_TR.md), [CSV](CSV_TR.md), [Data](DATA_TR.md), [Statistics](STATISTICS_TR.md), [Plot](PLOT_TR.md), [Numeric](NUMERIC_TR.md), [Word](WORD_TR.md), [Excel](EXCEL_TR.md), [PDF](PDF_TR.md), [Archive](ARCHIVE_TR.md), [JSON](JSON_TR.md), [SQLite](SQLITE_TR.md), [HTTP](HTTP_TR.md), [HTML](HTML_TR.md), [SMTP](SMTP_TR.md), [XML](XML_TR.md), [Env](ENV_TR.md), [Lists](LISTS_TR.md), [KeyValue](KEYVALUE_TR.md) ve [tanılama rehberine](DIAGNOSTICS_TR.md) bakın.
+Archive ise dosyaları yalnızca Go standart kütüphanesini kullanarak gerçek
+ZIP/TAR/TAR.GZ arşivlerine paketler ve onları güvenli biçimde listeler ve
+çıkarır; Process bir programı argüman listesiyle, asla kabuk üzerinden değil
+çalıştırır. Ayrıca
+[Time](TIME_TR.md), [CSV](CSV_TR.md), [Data](DATA_TR.md), [Statistics](STATISTICS_TR.md), [Plot](PLOT_TR.md), [Numeric](NUMERIC_TR.md), [Word](WORD_TR.md), [Excel](EXCEL_TR.md), [PDF](PDF_TR.md), [Archive](ARCHIVE_TR.md), [Process](PROCESS_TR.md), [JSON](JSON_TR.md), [SQLite](SQLITE_TR.md), [HTTP](HTTP_TR.md), [HTML](HTML_TR.md), [SMTP](SMTP_TR.md), [XML](XML_TR.md), [Env](ENV_TR.md), [Lists](LISTS_TR.md), [KeyValue](KEYVALUE_TR.md) ve [tanılama rehberine](DIAGNOSTICS_TR.md) bakın.

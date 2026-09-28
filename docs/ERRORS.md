@@ -37,6 +37,8 @@ Common built-in errors include:
 | `CSVError` | malformed CSV, invalid delimiter, or invalid record/header shape; derives from `Error` |
 | `UUIDError` | malformed UUID text, or no random source or valid clock for a new UUID; derives from `Error` |
 | `PostgreSQLError` | PostgreSQL connection, query, execution, transaction, or value-kind failure; derives from `Error` |
+| `ArchiveError` | unsafe, malformed, unsupported, or over-limit archive, or an archive creation/extraction failure; derives from `Error` |
+| `ProcessError` | `Process.run` could not start the program, timed out, or exceeded its output budget (a non-zero exit is a result, not an error); derives from `Error` |
 | `KeyError` | missing Pair key |
 | `NullError` | runtime null safety boundary |
 | `ConstantError` | mutation through a deep-frozen reference |
