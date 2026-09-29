@@ -876,6 +876,12 @@ func (generator *generator) call(value *ir.CallExpr) string {
 	if strings.HasPrefix(string(value.Callable), processModulePrefix) {
 		return generator.processCall(value)
 	}
+	if strings.HasPrefix(string(value.Callable), diskModulePrefix) {
+		return generator.diskCall(value)
+	}
+	if strings.HasPrefix(string(value.Callable), serviceModulePrefix) {
+		return generator.serviceCall(value)
+	}
 	if strings.HasPrefix(string(value.Callable), dnsModulePrefix) {
 		return generator.dnsCall(value)
 	}
@@ -1226,6 +1232,9 @@ func (generator *generator) builtinCall(value *ir.CallExpr) string {
 		}
 		if isNetworkOperation(name) {
 			return generator.networkOperation(name, value)
+		}
+		if isInspectionOperation(name) {
+			return generator.inspectionOperation(name, value)
 		}
 		return generator.unsupported("Fundamentals function "+name, meta.Span)
 	}

@@ -211,6 +211,16 @@ func LowerCompilation(compilation module.CompilationResult) Result {
 					identityModule(ir.ModuleID(current.ID), current.Source.Name, current.Source.Path))
 				continue
 			}
+			if string(current.ID) == DiskModuleID {
+				result.Modules = append(result.Modules,
+					diskModule(ir.ModuleID(current.ID), current.Source.Name, current.Source.Path))
+				continue
+			}
+			if string(current.ID) == ServiceModuleID {
+				result.Modules = append(result.Modules,
+					serviceModule(ir.ModuleID(current.ID), current.Source.Name, current.Source.Path))
+				continue
+			}
 			if string(current.ID) == DNSModuleID {
 				result.Modules = append(result.Modules,
 					dnsModule(ir.ModuleID(current.ID), current.Source.Name, current.Source.Path))

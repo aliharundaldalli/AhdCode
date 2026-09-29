@@ -1,6 +1,6 @@
 # Installation, upgrade, and removal
 
-Download the AhdCode v2.4.0 package for your operating system.
+Download the AhdCode v2.7.0 package for your operating system.
 Every package is self-contained: it carries the compiler, a private Go
 toolchain, AhdDataStudio, the SQLite, numeric and plot helpers, an offline
 LaTeX engine, the project starters, and the English documentation.
@@ -10,14 +10,15 @@ LaTeX engine, the project starters, and the English documentation.
 The macOS package targets Apple Silicon Macs — M1, M2, M3, M4 and later arm64
 models. There is no Intel build.
 
-Double-click `AhdCode-2.4.0-macos-arm64.pkg` and follow the installer. The
-published `.pkg` is the recommended installer. It installs for your account
-only, asks for no administrator password, and writes nothing outside your home
-folder. If macOS presents a security notice, first verify the downloaded file
-against the published SHA-256 checksum; do not disable or bypass system
-protections.
+Double-click `AhdCode-2.7.0-macos-arm64.pkg` and follow the installer. The
+published `.pkg` is the recommended installer. It is signed with a Developer ID
+and notarized by Apple, with the notarization ticket stapled, so Gatekeeper
+accepts it without a warning. It installs for your account only, asks for no
+administrator password, and writes nothing outside your home folder. Verify the
+download against the published SHA-256 checksum, and never disable or bypass
+system protections.
 
-Files go under `~/Library/AhdCode/versions/2.4.0`. `current` selects the
+Files go under `~/Library/AhdCode/versions/2.7.0`. `current` selects the
 active version and `~/Library/AhdCode/bin/ahdcode` is the stable command. That
 one folder is added to your PATH.
 
@@ -25,26 +26,24 @@ Then open a **new** Terminal and run `ahdcode --version`. A terminal that was
 already open keeps the environment it started with; a new one picks up the
 change immediately.
 
-`AhdCode-2.4.0-macos-arm64.zip` is an alternate download that bundles the same
-package together with the VS Code extension. A `.dmg` with the same payload is
-also published for anyone who prefers a disk image; the `.pkg` is the
-recommended installer.
+`AhdCode-2.7.0-macos-arm64.dmg` is a signed and notarized disk image with the
+same payload for anyone who prefers one: open it and run `Install.command`
+(which runs `install.sh --setup-path`). The `.pkg` is the recommended
+installer.
 
 ## Windows x64
 
-Double-click `AhdCode-2.4.0-windows-x64.exe` in File Explorer. Setup is a small
+Double-click `AhdCode-2.7.0-windows-x64.exe` in File Explorer. Setup is a small
 graphical per-user program: it shows what it will install, unpacks and checks
 its embedded payload with a progress window, and finishes with a confirmation.
 No console, no terminal, and no typed commands are involved.
 
-The v2.4.0 installer was live-smoke-tested on Windows after publication. That
-result does not imply an Authenticode signature: this release's installer is
-not Authenticode-signed, so Windows SmartScreen may show an unknown-publisher
-warning. Verify the file against the published SHA-256 checksum before using
+This release's installer is not Authenticode-signed, so Windows SmartScreen
+may show an unknown-publisher warning. Verify the file against the published SHA-256 checksum before using
 the system-provided **More info → Run anyway** path, and do not disable Windows
 security protections.
 
-Files go under `%LOCALAPPDATA%\AhdCode\versions\2.4.0`. The stable command
+Files go under `%LOCALAPPDATA%\AhdCode\versions\2.7.0`. The stable command
 is `%LOCALAPPDATA%\AhdCode\bin\ahdcode.exe`, and only that one folder is added
 to your user PATH — once, on first installation. Administrator rights, Git, and
 a system Go installation are not required, and an uninstall entry is registered
@@ -61,21 +60,27 @@ entries exactly as they are and leaves one equivalent AhdCode entry. Uninstall
 removes only equivalent `%LOCALAPPDATA%\AhdCode\bin` entries and preserves
 unrelated PATH entries; it does not edit the machine PATH.
 
-`AhdCode-2.4.0-windows-x64.exe --silent` installs with no windows at all, for
+`AhdCode-2.7.0-windows-x64.exe --silent` installs with no windows at all, for
 scripted deployment. Because setup is a graphical program, run it from a script
 as `Start-Process -Wait` if you need to block until it finishes.
 
-## Linux x64
+## Linux (x86-64 and arm64)
 
-Extract `AhdCode-2.4.0-linux-x64.tar.gz` and run:
+Choose the package for your processor — `uname -m` prints `x86_64` for
+`amd64` and `aarch64` for `arm64`:
+
+- `AhdCode-v2.7.0-linux-amd64.tar.gz` — 64-bit Intel/AMD
+- `AhdCode-v2.7.0-linux-arm64.tar.gz` — 64-bit ARM (for example Ampere,
+  AWS Graviton, Raspberry Pi 4/5 with a 64-bit OS)
 
 ```sh
-tar -xzf AhdCode-2.4.0-linux-x64.tar.gz
-cd AhdCode-2.4.0
+tar -xzf AhdCode-v2.7.0-linux-amd64.tar.gz
+cd AhdCode-2.7.0
 sh install.sh --setup-path
 ```
 
-Files live under `~/.local/share/ahdcode/versions/2.4.0`. The installer adds
+The installer checks that the package runs on this machine before it
+installs anything. Files live under `~/.local/share/ahdcode/versions/2.7.0`. The installer adds
 one owned PATH block to `~/.profile`. Open a login shell or source that profile.
 
 ## What is included
@@ -100,8 +105,7 @@ installs it for you.
 In VS Code, open the Extensions view, open its `...` menu, choose **Install
 from VSIX...**, and select `vscode/ahdcode-0.2.3.vsix` from the
 installation root. Google Antigravity IDE offers the same operation. The file
-carries everything it needs; no npm and no network are involved. The same
-`.vsix` is published beside the platform artifacts as a standalone download.
+carries everything it needs; no npm and no network are involved.
 
 ## First application
 

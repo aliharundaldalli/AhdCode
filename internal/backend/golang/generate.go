@@ -95,6 +95,12 @@ const (
 	processUnixRuntimeFileName    = "ahdcode_process_runtime_unix.go"
 	processWindowsRuntimeFileName = "ahdcode_process_runtime_windows.go"
 	networkRuntimeFileName        = "ahdcode_network_runtime.go"
+	systemRuntimeFileName         = "ahdcode_system_runtime.go"
+	diskUnixRuntimeFileName       = "ahdcode_disk_runtime_unix.go"
+	diskDarwinRuntimeFileName     = "ahdcode_disk_runtime_darwin.go"
+	diskLinuxRuntimeFileName      = "ahdcode_disk_runtime_linux.go"
+	diskWindowsRuntimeFileName    = "ahdcode_disk_runtime_windows.go"
+	diskOtherRuntimeFileName      = "ahdcode_disk_runtime_other.go"
 )
 
 // storage describes the Go representation chosen for one IR symbol.
@@ -272,6 +278,12 @@ func Generate(compilation *ir.Compilation) (*GeneratedProgram, []diagnostics.Dia
 		{processUnixRuntimeFileName, ahdruntime.ProcessUnixSource, "Process Unix"},
 		{processWindowsRuntimeFileName, ahdruntime.ProcessWindowsSource, "Process Windows"},
 		{networkRuntimeFileName, ahdruntime.NetworkSource, "DNS and TLS"},
+		{systemRuntimeFileName, ahdruntime.SystemSource, "Disk and Service"},
+		{diskUnixRuntimeFileName, ahdruntime.DiskUnixSource, "Disk Unix"},
+		{diskDarwinRuntimeFileName, ahdruntime.DiskDarwinSource, "Disk macOS"},
+		{diskLinuxRuntimeFileName, ahdruntime.DiskLinuxSource, "Disk Linux"},
+		{diskWindowsRuntimeFileName, ahdruntime.DiskWindowsSource, "Disk Windows"},
+		{diskOtherRuntimeFileName, ahdruntime.DiskOtherSource, "Disk fallback"},
 	} {
 		formattedShared, err := format.Source([]byte(strings.Replace(shared.source, "package ahdruntime", "package main", 1)))
 		if err != nil {

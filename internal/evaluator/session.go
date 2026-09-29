@@ -250,6 +250,10 @@ func (session *Session) errorClass(name string) ir.ClassID {
 		return "builtin:DNS::class::DNSError"
 	case "TLSError":
 		return "builtin:TLS::class::TLSError"
+	case "DiskError":
+		return "builtin:Disk::class::DiskError"
+	case "ServiceError":
+		return "builtin:Service::class::ServiceError"
 	}
 	return preferred
 }
@@ -260,7 +264,8 @@ func knownBuiltinErrorParent(class ir.ClassID) ir.ClassID {
 		return "builtin:core::class::IOError"
 	case "builtin:Latex::class::LatexError", "builtin:Regex::class::RegexError", "builtin:CSV::class::CSVError",
 		"builtin:Archive::class::ArchiveError", "builtin:Process::class::ProcessError",
-		"builtin:DNS::class::DNSError", "builtin:TLS::class::TLSError":
+		"builtin:DNS::class::DNSError", "builtin:TLS::class::TLSError",
+		"builtin:Disk::class::DiskError", "builtin:Service::class::ServiceError":
 		return "builtin:core::class::Error"
 	default:
 		return ""

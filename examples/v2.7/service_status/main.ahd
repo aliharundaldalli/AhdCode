@@ -1,0 +1,25 @@
+// v2.7.0: read the state of Linux systemd services. Read-only: nothing is
+// started or stopped. On macOS and Windows every call raises ServiceError.
+bring Service
+from Service bring (ServiceInfo, ServiceError)
+for name in [
+    "systemd-journald.service"
+    "ssh.service"
+    "no-such-unit-v270.service"
+    "bad name; id"
+] {
+    attempt {
+        unit: Local ServiceInfo := Service.status(name)
+        write(
+            unit.name() + ": " + unit.activeState() + " (" + unit.subState() + ")" + ", running=" + str(
+                unit.running()
+            ) + ", enabled=" + str(unit.enabled())
+        )
+        if unit.activeState() != "active" {
+            write("  report: " + unit.name() + " is not active")
+        }
+    }
+    except ServiceError as failure {
+        write(failure.message)
+    }
+}

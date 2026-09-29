@@ -234,6 +234,10 @@ func (session *Session) builtin(identity ir.CallableID, receiver any, arguments 
 		return session.guiBuiltin(strings.TrimPrefix(name, "builtin:GUI::"), values(arguments))
 	case strings.HasPrefix(name, "builtin:Terminal::"):
 		return session.terminalBuiltin(strings.TrimPrefix(name, "builtin:Terminal::"), values(arguments))
+	case strings.HasPrefix(name, "builtin:Disk::"):
+		return session.diskBuiltin(strings.TrimPrefix(name, "builtin:Disk::"), values(arguments))
+	case strings.HasPrefix(name, "builtin:Service::"):
+		return session.serviceBuiltin(strings.TrimPrefix(name, "builtin:Service::"), values(arguments))
 	case strings.HasPrefix(name, "builtin:DNS::"):
 		return session.dnsBuiltin(strings.TrimPrefix(name, "builtin:DNS::"), values(arguments))
 	case strings.HasPrefix(name, "builtin:TLS::"):
@@ -426,6 +430,9 @@ func (session *Session) core(name string, receiver any, arguments []any) any {
 	}
 	if isNetworkOperation(name) {
 		return session.networkOperation(name, receiver)
+	}
+	if isInspectionOperation(name) {
+		return session.inspectionOperation(name, receiver)
 	}
 	session.raise("Error", "unsupported Fundamentals operation "+name)
 	return nil

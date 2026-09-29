@@ -43,6 +43,8 @@ Yaygın yerleşik (built-in) hatalar şunları içerir:
 | `ProcessError` | `Process.run` programı başlatamadı, zaman aşımına uğradı ya da çıktı bütçesini aştı (sıfır olmayan çıkış kodu hata değil, sonuçtur); `Error`'dan türer |
 | `DNSError` | `DNS.lookup`'ta geçersiz ana makine adı, bulunamayan ana makine, çözümleyici hatası ya da zaman aşımı; `Error`'dan türer |
 | `TLSError` | `TLS.inspect` bir sertifika elde edemedi (geçersiz girdi, reddedilen bağlantı, zaman aşımı, TLS değil); geçersiz bir sertifika hata değil, sonuçtur; `Error`'dan türer |
+| `DiskError` | `Disk.inspect` bir dosya sistemini okuyamadı (boş ya da eksik yol, izin reddi, bilgi alınamıyor); `Error`'dan türer |
+| `ServiceError` | `Service.status` başarısız oldu (geçersiz ad, servis bulunamadı, systemd yok, izin reddi, zaman aşımı, desteklenmeyen platform); `Error`'dan türer |
 | `KeyError` | eksik Pair anahtarı |
 | `NullError` | çalışma zamanı null güvenliği sınırı |
 | `ConstantError` | derin dondurulmuş (deep-frozen) bir referans üzerinden değişiklik |

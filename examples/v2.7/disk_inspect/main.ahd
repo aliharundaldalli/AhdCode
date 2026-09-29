@@ -1,0 +1,24 @@
+// v2.7.0: read the capacity of the filesystem that holds a path.
+// Safe on any system: it only reads, and it never runs df or a shell.
+bring Disk
+bring Math
+from Disk bring (DiskInfo, DiskError)
+disk: DiskInfo := Disk.inspect(".")
+gigabyte := 1000000000
+write("path: " + disk.path())
+write("total: " + str(Math.floor(disk.totalBytes() / gigabyte)) + " GB")
+write("available: " + str(Math.floor(disk.availableBytes() / gigabyte)) + " GB")
+write("used: " + str(Math.round(disk.usedPercent(), 1)) + "%")
+// The threshold is this program's policy, not the module's.
+if disk.usedPercent() > 90.0 {
+    write("warning: the disk is almost full")
+}
+else {
+    write("disk usage is fine")
+}
+attempt {
+    Disk.inspect("no/such/directory")
+}
+except DiskError as failure {
+    write(failure.message)
+}

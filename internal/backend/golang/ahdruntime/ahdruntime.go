@@ -109,6 +109,8 @@ var (
 	AhdClassProcessError        = &AhdClass{Name: "ProcessError", Parent: AhdClassError}
 	AhdClassDNSError            = &AhdClass{Name: "DNSError", Parent: AhdClassError}
 	AhdClassTLSError            = &AhdClass{Name: "TLSError", Parent: AhdClassError}
+	AhdClassDiskError           = &AhdClass{Name: "DiskError", Parent: AhdClassError}
+	AhdClassServiceError        = &AhdClass{Name: "ServiceError", Parent: AhdClassError}
 )
 
 // AhdInstance is every AhdCode Class instance. The generated interface of each

@@ -16,13 +16,13 @@ veritabanı modülleri, GUI'si, Graphics'i, etkileşimli Plot görüntüleyicisi
 masaüstü uygulaması paketlemesiyle gelir. Küçük bir topluluk tarafından
 pratikte kullanılmaktadır; yaygın (mainstream) bir dil değildir.
 
-Bu, **v2.6.0**, **DNS ve TLS İnceleme** sürümüdür. Sınırlı ve tipli
-`DNS.lookup` adres çözümlemesi ile açık ana makine adı ve sistem kökü
-doğrulamalı `TLS.inspect` sertifika incelemesi ekler. v2.6.0 yalnızca kaynak
-kodu olarak yayımlanır; eksiksiz platform paketleri ve kurulum programları
-v2.7, **Dağıtım ve Kurulum Cilası** ile geri döner. Bkz.
-[v2.6.0 ile gelenler](#v26-ile-gelenler). Önceki **Dağıtım ve Sistem Temel
-İşlemleri** sürümü olan v2.5.0 da kullanılabilir durumdadır.
+Bu, **v2.7.0**, **Sistem İnceleme ve Dağıtım Cilası** sürümüdür. Salt okunur
+`Disk.inspect` dosya sistemi kapasitesi ve `Service.status` Linux systemd
+inceleme modüllerini ekler ve eksiksiz platform paketlerini geri getirir:
+imzalı ve noterlenmiş macOS kurulum paketi, Windows kurulum programı ve hem
+x86-64 hem arm64 için Linux paketleri. Bkz.
+[v2.7.0 ile gelenler](#v27-ile-gelenler). Önceki **DNS ve TLS İnceleme**
+sürümü olan v2.6.0 da kullanılabilir durumdadır.
 
 v2.0.0 bir ana (major) sürümdür, **Masaüstü Uygulamasının Tamamlanması**:
 birinci taraf masaüstü uygulaması temelini tamamlar — GUI'de ListBox, Select,
@@ -334,7 +334,7 @@ Kavramsal netliği korumak için AhdCode'un yetenekleri dört belirgin mimari ka
    - **Matematik ve Hesaplama:** [`Math`](docs/MATH_TR.md), [`Bits`](docs/BITS_TR.md) (`Int` üzerinde bit işlemleri), [`Regex`](docs/REGEX_TR.md), [`Statistics`](docs/STATISTICS_TR.md), [`Numeric`](docs/NUMERIC_TR.md), [`Plot`](docs/PLOT_TR.md), [`Graphics`](docs/GRAPHICS_TR.md) (Canvas pencereleri ve Turtle ile çizim), [`GUI`](docs/GUI_TR.md) (tıklama ve tuş geri çağırmalı küçük masaüstü pencereleri)
    - **Veri ve Koleksiyonlar:** [`Lists`](docs/LISTS_TR.md), [`KeyValue`](docs/KEYVALUE_TR.md), [`Characters`](docs/CHARACTERS_TR.md) (Unicode kod noktaları ve sınıflandırma), [`CSV`](docs/CSV_TR.md), [`Data`](docs/DATA_TR.md), [`JSON`](docs/JSON_TR.md), [`XML`](docs/XML_TR.md), [`UUID`](docs/UUID_TR.md) (RFC 9562 sürüm 4 ve zamana göre sıralı sürüm 7 kimlikleri)
    - **Belge Üretimi:** [`Word`](docs/WORD_TR.md), [`Excel`](docs/EXCEL_TR.md), [`PDF`](docs/PDF_TR.md), [`Latex`](docs/LATEX_TR.md), [`QR`](docs/QR_TR.md) (QR kodları), [`Barcode`](docs/BARCODE_TR.md) (Code 128, EAN-13, UPC-A), [`Archive`](docs/ARCHIVE_TR.md)
-   - **Sistem ve Ortam:** [`Time`](docs/TIME_TR.md), [`Cron`](docs/CRON_TR.md) (sınırlı, süreç içi zamanlama), [`Path`](docs/FILESYSTEM_TR.md), [`File`](docs/FILESYSTEM_TR.md), [`Env`](docs/ENV_TR.md), [`Terminal`](docs/TERMINAL_TR.md) (v1.5.0: standart hata, tampon boşaltma, terminal tespiti ve boyutu, biçimli metin, okunabilir düzen), [`Process`](docs/PROCESS_TR.md) (bir programı argüman listesiyle, asla kabuk üzerinden değil, sınırlı süre ve çıktıyla çalıştırır), [`DNS`](docs/DNS_TR.md) ve [`TLS`](docs/TLS_TR.md) (sınırlı adres sorgusu ve sertifika incelemesi)
+   - **Sistem ve Ortam:** [`Time`](docs/TIME_TR.md), [`Cron`](docs/CRON_TR.md) (sınırlı, süreç içi zamanlama), [`Path`](docs/FILESYSTEM_TR.md), [`File`](docs/FILESYSTEM_TR.md), [`Env`](docs/ENV_TR.md), [`Terminal`](docs/TERMINAL_TR.md) (v1.5.0: standart hata, tampon boşaltma, terminal tespiti ve boyutu, biçimli metin, okunabilir düzen), [`Process`](docs/PROCESS_TR.md) (bir programı argüman listesiyle, asla kabuk üzerinden değil, sınırlı süre ve çıktıyla çalıştırır), [`DNS`](docs/DNS_TR.md) ve [`TLS`](docs/TLS_TR.md) (sınırlı adres sorgusu ve sertifika incelemesi), [`Disk`](docs/DISK_TR.md) ve [`Service`](docs/SERVICE_TR.md) (salt okunur dosya sistemi kapasitesi ve Linux systemd servis durumu)
 
 3. **Birinci Taraf Çalışma Zamanı / Çatı Modülleri:**
    - **Ağ, Sunucu ve Depolama İlkelleri:** [`HTTP`](docs/HTTP_TR.md) (bellek içi sunucu, istek/yanıt, çerezler, oturumlar, statik dosya sunucusu, [WebSocket uç noktaları](docs/WEBSOCKET_TR.md), client), [`HTML`](docs/HTML_TR.md) (anlamsal kurucu, ayrıştırıcı, seçici motoru), [`Security`](docs/SECURITY_TR.md) (Argon2id özetleme, bcrypt uyumluluğu, güvenli token'lar, sabit zamanlı karşılaştırma, SHA-2 özetleri, HMAC, kodlamalar, RS256 imzaları, AES-256-GCM), [`SQLite`](docs/SQLITE_TR.md) (yerel tipli veritabanı köprüsü), [`MySQL`](docs/MYSQL_TR.md) (bağlantı havuzu ve işlemlerle ağ veritabanı), [`PostgreSQL`](docs/POSTGRESQL_TR.md) (bağlantı havuzu ve işlemlerle ağ veritabanı), [`SMTP`](docs/SMTP_TR.md) (yalnızca gönderim yapan posta istemcisi)
@@ -483,6 +483,8 @@ bakın.
 - [Process modülü](docs/PROCESS_TR.md)
 - [DNS modülü](docs/DNS_TR.md)
 - [TLS modülü](docs/TLS_TR.md)
+- [Disk modülü](docs/DISK_TR.md)
+- [Service modülü](docs/SERVICE_TR.md)
 - [Graphics modülü](docs/GRAPHICS_TR.md)
 - [GUI modülü](docs/GUI_TR.md)
 - [Masaüstü uygulaması paketleme](docs/PACKAGING_TR.md)
@@ -526,6 +528,33 @@ VS Code hem de Antigravity'i hedefler.
 [Kurulum rehberine](editors/vscode/README_TR.md) bakın.
 
 ## Mevcut sınırlamalar
+
+## v2.7.0 ile gelenler <a id="v27-ile-gelenler"></a>
+
+v2.7.0, **Sistem İnceleme ve Dağıtım Cilası**, bir sunucu işçisinin
+ihtiyaç duyduğu salt okunur inceleme temel işlemlerini tamamlar ve her
+platform için kurulabilir paketleri geri getirir:
+
+- **[Disk](docs/DISK_TR.md)** (yeni modül) — `Disk.inspect(path)`, mevcut bir
+  yolu içeren dosya sistemi için `totalBytes()`, `usedBytes()`, `freeBytes()`,
+  `availableBytes()` ve `usedPercent()` içeren bir `DiskInfo` döndürür;
+  değerler işletim sisteminin kendi API'siyle okunur (`df` yok, kabuk yok).
+  Hatalar `DiskError`'dır.
+- **[Service](docs/SERVICE_TR.md)** (yeni modül) — `Service.status(name)`, bir
+  Linux systemd birimi için `name()`, `activeState()`, `subState()`,
+  `running()` ve `enabled()` içeren bir `ServiceInfo` döndürür; değerler
+  kabuk olmadan, makinenin okuyabileceği `systemctl show` özelliklerinden
+  okunur. Tasarım gereği salt okunurdur (start/stop/restart yoktur) ve
+  systemd'li Linux dışındaki platformlarda `ServiceError` fırlatır.
+- **Dağıtım** — imzalı ve noterlenmiş macOS kurulum paketi ve disk imajı,
+  kullanıcı başına kurulan Windows kurulum programı ve **x86-64 (amd64)** ile
+  bu sürümde yeni olan **arm64** için Linux paketleri. Her paket kendi
+  yardımcı programlarını, özel Go araç zincirini ve çevrimdışı LaTeX motorunu
+  taşır; bkz. [Kurulum](docs/INSTALLATION_TR.md).
+
+`Disk` ve `Service` artık standart modül adlarıdır: yerel bir `Disk.ahd` ya da
+`Service.ahd` artık `bring Disk` / `bring Service`'in yüklediği şey değildir.
+Örnekler: [`examples/v2.7`](examples/v2.7/README_TR.md).
 
 ## v2.6.0 ile gelenler <a id="v26-ile-gelenler"></a>
 

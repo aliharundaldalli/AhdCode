@@ -139,7 +139,8 @@ func (generator *generator) smtpHelper(class ir.ClassID) (string, bool) {
 // v2.5.0 ArchiveEntry, FileEntry, and ProcessResult values share it too.
 func (generator *generator) emitSMTPHelpers(writer *emitter) {
 	for _, class := range []ir.ClassID{smtpClientClass, smtpMessageClass, cronSchedulerClass, qrCodeClass, barcodeCodeClass, uuidValueClass,
-		archiveEntryClass, fileEntryClass, processResultClass, dnsResultClass, tlsInfoClass} {
+		archiveEntryClass, fileEntryClass, processResultClass, dnsResultClass, tlsInfoClass,
+		diskInfoClass, serviceInfoClass} {
 		name, known := generator.timeHelpers[class]
 		if !known {
 			continue

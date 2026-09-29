@@ -48,3 +48,30 @@ func dnsModule(id ir.ModuleID, name, path string) *ir.Module {
 func tlsModule(id ir.ModuleID, name, path string) *ir.Module {
 	return networkModule(id, name, path, tlsInfoClassID, "TLSInfo", TLSInfoDataFieldID, semantic.TLSInfoOperations, tlsErrorClassID, "TLSError")
 }
+
+// DiskModuleID and ServiceModuleID are the compiler-supplied identities of the
+// v2.7.0 read-only system-inspection modules.
+const (
+	DiskModuleID    = "builtin:Disk"
+	ServiceModuleID = "builtin:Service"
+)
+
+const (
+	diskInfoClassID     = ir.ClassID(DiskModuleID + "::class::DiskInfo")
+	diskErrorClassID    = ir.ClassID(DiskModuleID + "::class::DiskError")
+	serviceInfoClassID  = ir.ClassID(ServiceModuleID + "::class::ServiceInfo")
+	serviceErrorClassID = ir.ClassID(ServiceModuleID + "::class::ServiceError")
+)
+
+var (
+	DiskInfoDataFieldID    = ir.FieldID(string(diskInfoClassID) + "::field::data")
+	ServiceInfoDataFieldID = ir.FieldID(string(serviceInfoClassID) + "::field::data")
+)
+
+func diskModule(id ir.ModuleID, name, path string) *ir.Module {
+	return networkModule(id, name, path, diskInfoClassID, "DiskInfo", DiskInfoDataFieldID, semantic.DiskInfoOperations, diskErrorClassID, "DiskError")
+}
+
+func serviceModule(id ir.ModuleID, name, path string) *ir.Module {
+	return networkModule(id, name, path, serviceInfoClassID, "ServiceInfo", ServiceInfoDataFieldID, semantic.ServiceInfoOperations, serviceErrorClassID, "ServiceError")
+}

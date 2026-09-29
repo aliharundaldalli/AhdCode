@@ -256,3 +256,25 @@ var ProcessWindowsSource string
 //
 //go:embed network.go
 var NetworkSource string
+
+// SystemSource (v2.7.0) holds Disk.inspect and Service.status. The disk
+// readings are platform files with build constraints, so only the one for the
+// target is compiled.
+//
+//go:embed system.go
+var SystemSource string
+
+//go:embed disk_unix.go
+var DiskUnixSource string
+
+//go:embed disk_darwin.go
+var DiskDarwinSource string
+
+//go:embed disk_linux.go
+var DiskLinuxSource string
+
+//go:embed disk_windows.go
+var DiskWindowsSource string
+
+//go:embed disk_other.go
+var DiskOtherSource string

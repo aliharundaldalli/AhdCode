@@ -41,6 +41,8 @@ Common built-in errors include:
 | `ProcessError` | `Process.run` could not start the program, timed out, or exceeded its output budget (a non-zero exit is a result, not an error); derives from `Error` |
 | `DNSError` | invalid host, host not found, resolver failure, or timeout in `DNS.lookup`; derives from `Error` |
 | `TLSError` | `TLS.inspect` could not obtain a certificate (invalid input, connection refused, timeout, not TLS); an invalid certificate is a result, not an error; derives from `Error` |
+| `DiskError` | `Disk.inspect` could not read a filesystem (empty or missing path, permission denied, information unavailable); derives from `Error` |
+| `ServiceError` | `Service.status` failed (invalid name, service not found, systemd unavailable, permission denied, timeout, unsupported platform); derives from `Error` |
 | `KeyError` | missing Pair key |
 | `NullError` | runtime null safety boundary |
 | `ConstantError` | mutation through a deep-frozen reference |

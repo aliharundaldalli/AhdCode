@@ -527,6 +527,17 @@ and prefer absolute executable paths. A non-zero exit is a result; launch
 failure, timeout, and output overflow raise `ProcessError`. Privileged
 programs must apply their own allowlist before calling it.
 
+**Disk and Service inspection (v2.7.0), read-only.** `Disk.inspect(path)`
+returns a `DiskInfo` (`path()`, `totalBytes()`, `usedBytes()`, `freeBytes()`,
+`availableBytes()`, `usedPercent()`) for the filesystem containing an existing
+path. `Service.status(name)` returns a `ServiceInfo` (`name()`,
+`activeState()` — never `state()`, which is a reserved word — `subState()`,
+`running()`, `enabled()`) for a Linux systemd unit; on other platforms it raises
+`ServiceError`. There is no `Service.start/stop/restart/enable/disable`: change
+services only through `Process.run` with the worker's own allowlist. Never shell
+out to `df` or `systemctl status`, and never pass untrusted request input to
+either function.
+
 **DNS and TLS inspection (v2.6.0).** `DNS.lookup(host, timeoutSeconds)`
 returns a `DNSResult` (`host()`, `addresses()`, `ipv4()`, `ipv6()`; sorted,
 IPv4 first) and resolves addresses only — never invent MX/TXT/CNAME lookups

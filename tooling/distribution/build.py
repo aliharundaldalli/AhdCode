@@ -178,7 +178,7 @@ def main():
  vsix_version=check_vsix(a.vsix) if a.vsix else None
  bundle=a.latex_runtime/'ahdcode-latex.ttb';check_bundle(bundle,latex['bundle'])
  a.output.mkdir(parents=True,exist_ok=True);records=[]
- for goos,arch,label in [('darwin','arm64','macos-arm64'),('windows','amd64','windows-x64'),('linux','amd64','linux-x64')]:
+ for goos,arch,label in [('darwin','arm64','macos-arm64'),('windows','amd64','windows-x64'),('linux','amd64','linux-x64'),('linux','arm64','linux-arm64')]:
   if a.platform not in ['all',goos]:continue
   extra=None
   staging=a.output/('stage-'+label);staging.mkdir();payload=staging/'payload';(payload/'bin').mkdir(parents=True);(payload/'libexec/ahdcode').mkdir(parents=True)

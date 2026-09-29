@@ -16,13 +16,12 @@ modules, GUI, Graphics, interactive Plot viewer, and desktop application
 packaging. It is used in practice by a small community; it is not a
 mainstream language.
 
-This is **v2.6.0**, **DNS & TLS Inspection**. It adds bounded, typed
-`DNS.lookup` address resolution and `TLS.inspect` certificate inspection with
-explicit hostname and system-root verification. v2.6.0 is a source-only
-release; complete platform packaging and installers return in v2.7,
-**Distribution & Installer Polish**. See
-[What is new in v2.6.0](#what-is-new-in-v260). v2.5.0, **Deployment & Systems
-Primitives**, remains available as the previous release.
+This is **v2.7.0**, **System Inspection & Distribution Polish**. It adds the
+read-only `Disk.inspect` filesystem-capacity and `Service.status` Linux
+systemd-inspection modules, and restores full platform packages: a signed and
+notarized macOS installer, the Windows installer, and Linux packages for both
+x86-64 and arm64. See [What is new in v2.7.0](#what-is-new-in-v270). v2.6.0,
+**DNS & TLS Inspection**, remains available as the previous release.
 
 v2.0.0 is a major release, **Desktop Application Completion**: it completes
 the first-party desktop application foundation — ListBox, Select, TextArea,
@@ -317,7 +316,7 @@ To maintain conceptual clarity, AhdCode's capabilities are organized into four d
    - **Mathematics & Computation:** [`Math`](docs/MATH.md), [`Bits`](docs/BITS.md) (bitwise operations on `Int`), [`Regex`](docs/REGEX.md), [`Statistics`](docs/STATISTICS.md), [`Numeric`](docs/NUMERIC.md), [`Plot`](docs/PLOT.md), [`Graphics`](docs/GRAPHICS.md) (Canvas windows and Turtle drawing), [`GUI`](docs/GUI.md) (small desktop windows with click and key callbacks)
    - **Data & Collections:** [`Lists`](docs/LISTS.md), [`KeyValue`](docs/KEYVALUE.md), [`Characters`](docs/CHARACTERS.md) (Unicode code points and classification), [`CSV`](docs/CSV.md), [`Data`](docs/DATA.md), [`JSON`](docs/JSON.md), [`XML`](docs/XML.md), [`UUID`](docs/UUID.md) (RFC 9562 version 4 and time-ordered version 7 identifiers)
    - **Document Generation:** [`Word`](docs/WORD.md), [`Excel`](docs/EXCEL.md), [`PDF`](docs/PDF.md), [`Latex`](docs/LATEX.md), [`QR`](docs/QR.md) (QR codes), [`Barcode`](docs/BARCODE.md) (Code 128, EAN-13, UPC-A), [`Archive`](docs/ARCHIVE.md)
-   - **System & Environment:** [`Time`](docs/TIME.md), [`Cron`](docs/CRON.md) (bounded in-process scheduling), [`Path`](docs/FILESYSTEM.md), [`File`](docs/FILESYSTEM.md), [`Env`](docs/ENV.md), [`Terminal`](docs/TERMINAL.md) (v1.5.0: standard error, flushing, terminal detection and size, styled text, pretty layout), [`Process`](docs/PROCESS.md) (run one program with an argument list, never through a shell; bounded time and output), [`DNS`](docs/DNS.md) and [`TLS`](docs/TLS.md) (bounded address lookup and certificate inspection)
+   - **System & Environment:** [`Time`](docs/TIME.md), [`Cron`](docs/CRON.md) (bounded in-process scheduling), [`Path`](docs/FILESYSTEM.md), [`File`](docs/FILESYSTEM.md), [`Env`](docs/ENV.md), [`Terminal`](docs/TERMINAL.md) (v1.5.0: standard error, flushing, terminal detection and size, styled text, pretty layout), [`Process`](docs/PROCESS.md) (run one program with an argument list, never through a shell; bounded time and output), [`DNS`](docs/DNS.md) and [`TLS`](docs/TLS.md) (bounded address lookup and certificate inspection), [`Disk`](docs/DISK.md) and [`Service`](docs/SERVICE.md) (read-only filesystem capacity and Linux systemd service status)
 
 3. **First-Party Runtime / Framework Modules:**
    - **Network, Server & Storage Primitives:** [`HTTP`](docs/HTTP.md) (in-memory server, request/response, cookies, sessions, static file server, [WebSocket endpoints](docs/WEBSOCKET.md), client), [`HTML`](docs/HTML.md) (semantic builder, parser, selector engine), [`Security`](docs/SECURITY.md) (Argon2id hashing, bcrypt compatibility, secure tokens, constant-time comparison, SHA-2 digests, HMAC, encodings, RS256 signatures, AES-256-GCM), [`SQLite`](docs/SQLITE.md) (local typed database bridge), [`MySQL`](docs/MYSQL.md) (network database with connection pool and transactions), [`PostgreSQL`](docs/POSTGRESQL.md) (network database with connection pool and transactions), [`SMTP`](docs/SMTP.md) (send-only mail client)
@@ -466,6 +465,8 @@ See the [CLI guide](docs/CLI.md), [formatter guide](docs/FORMATTER.md),
 - [Process module](docs/PROCESS.md)
 - [DNS module](docs/DNS.md)
 - [TLS module](docs/TLS.md)
+- [Disk module](docs/DISK.md)
+- [Service module](docs/SERVICE.md)
 - [Graphics module](docs/GRAPHICS.md)
 - [GUI module](docs/GUI.md)
 - [Packaging desktop applications](docs/PACKAGING.md)
@@ -509,6 +510,33 @@ diagnostics and hover. The same VSIX targets VS Code and Antigravity. See its
 [installation guide](editors/vscode/README.md).
 
 ## Current limitations
+
+## What is new in v2.7.0 <a id="what-is-new-in-v270"></a>
+
+v2.7.0, **System Inspection & Distribution Polish**, completes the
+read-only inspection primitives a server worker needs and brings back
+installable packages for every platform:
+
+- **[Disk](docs/DISK.md)** (new module) — `Disk.inspect(path)` returns a
+  `DiskInfo` with `totalBytes()`, `usedBytes()`, `freeBytes()`,
+  `availableBytes()`, and `usedPercent()` for the filesystem that contains an
+  existing path, read with the operating system's own API (no `df`, no
+  shell). Failures are `DiskError`.
+- **[Service](docs/SERVICE.md)** (new module) — `Service.status(name)`
+  returns a `ServiceInfo` with `name()`, `activeState()`, `subState()`,
+  `running()`, and `enabled()` for a Linux systemd unit, read from
+  machine-readable `systemctl show` properties without a shell. It is
+  read-only by design (there is no start/stop/restart) and raises
+  `ServiceError` on platforms other than Linux with systemd.
+- **Distribution** — a signed and notarized macOS installer package and disk
+  image, the per-user Windows installer, and Linux packages for **x86-64
+  (amd64)** and, new in this release, **arm64**. Each package carries its own
+  helpers, private Go toolchain, and offline LaTeX engine; see
+  [Installation](docs/INSTALLATION.md).
+
+`Disk` and `Service` are now standard module names: a local `Disk.ahd` or
+`Service.ahd` is no longer what `bring Disk` / `bring Service` loads.
+Examples: [`examples/v2.7`](examples/v2.7/README.md).
 
 ## What is new in v2.6.0 <a id="what-is-new-in-v260"></a>
 
