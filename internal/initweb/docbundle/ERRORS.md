@@ -39,6 +39,8 @@ Common built-in errors include:
 | `PostgreSQLError` | PostgreSQL connection, query, execution, transaction, or value-kind failure; derives from `Error` |
 | `ArchiveError` | unsafe, malformed, unsupported, or over-limit archive, or an archive creation/extraction failure; derives from `Error` |
 | `ProcessError` | `Process.run` could not start the program, timed out, or exceeded its output budget (a non-zero exit is a result, not an error); derives from `Error` |
+| `DNSError` | invalid host, host not found, resolver failure, or timeout in `DNS.lookup`; derives from `Error` |
+| `TLSError` | `TLS.inspect` could not obtain a certificate (invalid input, connection refused, timeout, not TLS); an invalid certificate is a result, not an error; derives from `Error` |
 | `KeyError` | missing Pair key |
 | `NullError` | runtime null safety boundary |
 | `ConstantError` | mutation through a deep-frozen reference |

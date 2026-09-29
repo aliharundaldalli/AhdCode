@@ -801,6 +801,11 @@ type Environment struct {
 	// facade and a Request reached through HTTP are the same type, not two
 	// structurally similar ones.
 	ReExportImports bool
+	// ImplicitModules are standard modules whose Classes an imported module's
+	// values use (v2.6.0: TLS dates are Time DateTime values). Their Classes
+	// are registered so members resolve, but no name is bound: the program's
+	// namespace stays exactly what its bring statements say.
+	ImplicitModules []*ModuleInterface
 }
 
 // Result is a side-table semantic model; Analyze never mutates the AST.

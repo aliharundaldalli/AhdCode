@@ -16,13 +16,13 @@ modules, GUI, Graphics, interactive Plot viewer, and desktop application
 packaging. It is used in practice by a small community; it is not a
 mainstream language.
 
-This is **v2.5.0**, **Deployment & Systems Primitives**. It adds safe
-ZIP/TAR/TAR.GZ listing and extraction, File deployment primitives (binary
-copy, atomic write and move, symbolic links, permissions, a link-safe walk),
-the shell-free `Process` module, and consistent SQLite backups with
-`backupTo`. See [What is new in v2.5.0](#what-is-new-in-v250). v2.4.0,
-**Mathematical Rendering & Plot Styling**, remains available as the previous
-release.
+This is **v2.6.0**, **DNS & TLS Inspection**. It adds bounded, typed
+`DNS.lookup` address resolution and `TLS.inspect` certificate inspection with
+explicit hostname and system-root verification. v2.6.0 is a source-only
+release; complete platform packaging and installers return in v2.7,
+**Distribution & Installer Polish**. See
+[What is new in v2.6.0](#what-is-new-in-v260). v2.5.0, **Deployment & Systems
+Primitives**, remains available as the previous release.
 
 v2.0.0 is a major release, **Desktop Application Completion**: it completes
 the first-party desktop application foundation — ListBox, Select, TextArea,
@@ -317,7 +317,7 @@ To maintain conceptual clarity, AhdCode's capabilities are organized into four d
    - **Mathematics & Computation:** [`Math`](docs/MATH.md), [`Bits`](docs/BITS.md) (bitwise operations on `Int`), [`Regex`](docs/REGEX.md), [`Statistics`](docs/STATISTICS.md), [`Numeric`](docs/NUMERIC.md), [`Plot`](docs/PLOT.md), [`Graphics`](docs/GRAPHICS.md) (Canvas windows and Turtle drawing), [`GUI`](docs/GUI.md) (small desktop windows with click and key callbacks)
    - **Data & Collections:** [`Lists`](docs/LISTS.md), [`KeyValue`](docs/KEYVALUE.md), [`Characters`](docs/CHARACTERS.md) (Unicode code points and classification), [`CSV`](docs/CSV.md), [`Data`](docs/DATA.md), [`JSON`](docs/JSON.md), [`XML`](docs/XML.md), [`UUID`](docs/UUID.md) (RFC 9562 version 4 and time-ordered version 7 identifiers)
    - **Document Generation:** [`Word`](docs/WORD.md), [`Excel`](docs/EXCEL.md), [`PDF`](docs/PDF.md), [`Latex`](docs/LATEX.md), [`QR`](docs/QR.md) (QR codes), [`Barcode`](docs/BARCODE.md) (Code 128, EAN-13, UPC-A), [`Archive`](docs/ARCHIVE.md)
-   - **System & Environment:** [`Time`](docs/TIME.md), [`Cron`](docs/CRON.md) (bounded in-process scheduling), [`Path`](docs/FILESYSTEM.md), [`File`](docs/FILESYSTEM.md), [`Env`](docs/ENV.md), [`Terminal`](docs/TERMINAL.md) (v1.5.0: standard error, flushing, terminal detection and size, styled text, pretty layout), [`Process`](docs/PROCESS.md) (run one program with an argument list, never through a shell; bounded time and output)
+   - **System & Environment:** [`Time`](docs/TIME.md), [`Cron`](docs/CRON.md) (bounded in-process scheduling), [`Path`](docs/FILESYSTEM.md), [`File`](docs/FILESYSTEM.md), [`Env`](docs/ENV.md), [`Terminal`](docs/TERMINAL.md) (v1.5.0: standard error, flushing, terminal detection and size, styled text, pretty layout), [`Process`](docs/PROCESS.md) (run one program with an argument list, never through a shell; bounded time and output), [`DNS`](docs/DNS.md) and [`TLS`](docs/TLS.md) (bounded address lookup and certificate inspection)
 
 3. **First-Party Runtime / Framework Modules:**
    - **Network, Server & Storage Primitives:** [`HTTP`](docs/HTTP.md) (in-memory server, request/response, cookies, sessions, static file server, [WebSocket endpoints](docs/WEBSOCKET.md), client), [`HTML`](docs/HTML.md) (semantic builder, parser, selector engine), [`Security`](docs/SECURITY.md) (Argon2id hashing, bcrypt compatibility, secure tokens, constant-time comparison, SHA-2 digests, HMAC, encodings, RS256 signatures, AES-256-GCM), [`SQLite`](docs/SQLITE.md) (local typed database bridge), [`MySQL`](docs/MYSQL.md) (network database with connection pool and transactions), [`PostgreSQL`](docs/POSTGRESQL.md) (network database with connection pool and transactions), [`SMTP`](docs/SMTP.md) (send-only mail client)
@@ -464,6 +464,8 @@ See the [CLI guide](docs/CLI.md), [formatter guide](docs/FORMATTER.md),
 - [UUID module](docs/UUID.md)
 - [Terminal module](docs/TERMINAL.md)
 - [Process module](docs/PROCESS.md)
+- [DNS module](docs/DNS.md)
+- [TLS module](docs/TLS.md)
 - [Graphics module](docs/GRAPHICS.md)
 - [GUI module](docs/GUI.md)
 - [Packaging desktop applications](docs/PACKAGING.md)
@@ -507,6 +509,34 @@ diagnostics and hover. The same VSIX targets VS Code and Antigravity. See its
 [installation guide](editors/vscode/README.md).
 
 ## Current limitations
+
+## What is new in v2.6.0 <a id="what-is-new-in-v260"></a>
+
+v2.6.0, **DNS & TLS Inspection**, lets an AhdCode worker check where a domain
+points and what certificate it serves — with bounded timeouts, no shell, and
+no external tools:
+
+- **[DNS](docs/DNS.md)** (new module) — `DNS.lookup(host, timeoutSeconds)`
+  returns a `DNSResult` with `host()`, `addresses()`, `ipv4()`, and `ipv6()`.
+  Addresses come from the operating system's resolver, deduplicated and
+  sorted (IPv4 first, then IPv6), so results are deterministic. Malformed
+  input (URLs, `host:port`, shell-like text) is refused before any network
+  work; failures are `DNSError`.
+- **[TLS](docs/TLS.md)** (new module) — `TLS.inspect(host, port,
+  timeoutSeconds)` returns a `TLSInfo`: `valid()` and `verificationStatus()`
+  from an explicit verification against the system trust roots and the
+  requested hostname, plus `subject()`, `issuer()`, `dnsNames()`,
+  `notBefore()`/`notAfter()` as `DateTime`, `protocol()`, and `cipherSuite()`.
+  Expired, not-yet-valid, hostname-mismatched, and untrusted certificates are
+  reported with their metadata and `valid() == false` — never accepted.
+  Connection failures are `TLSError`.
+
+`DNS` and `TLS` are now standard module names: a local `DNS.ahd` or `TLS.ahd`
+is no longer what `bring DNS` / `bring TLS` loads. Both are documented for a
+dedicated worker that inspects allowlisted domains, never for raw web input.
+v2.6.0 is a source-only release (GitHub's source archives); complete platform
+packaging and installers return in v2.7, **Distribution & Installer Polish**.
+Examples: [`examples/v2.6`](examples/v2.6/README.md).
 
 ## What is new in v2.5.0 <a id="what-is-new-in-v250"></a>
 

@@ -1,0 +1,22 @@
+// v2.6.0: resolve a host name's addresses, bounded by a timeout.
+// Requires network access (it looks up example.com).
+bring DNS
+from DNS bring (DNSResult, DNSError)
+found: DNSResult := DNS.lookup(host: "example.com", timeoutSeconds: 5)
+write("host: " + found.host())
+write("IPv4: " + str(found.ipv4()))
+write("IPv6: " + str(found.ipv6()))
+// IP literals need no network, and malformed input is refused up front.
+write("literal: " + str(DNS.lookup("127.0.0.1").addresses()))
+for candidate in [
+    "https://example.com/path"
+    "example.com:443"
+    "example.com;touch X"
+] {
+    attempt {
+        DNS.lookup(candidate)
+    }
+    except DNSError as failure {
+        write(failure.message)
+    }
+}

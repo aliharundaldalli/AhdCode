@@ -76,7 +76,8 @@ var systemsMembers = map[TypeOperation]*Symbol{
 }
 
 func systemsIdentity(identity *types.ClassSymbol) bool {
-	return identity == archiveEntryClass || identity == fileEntryClass || identity == processResultClass
+	return identity == archiveEntryClass || identity == fileEntryClass || identity == processResultClass ||
+		identity == dnsResultClass || identity == tlsInfoClass
 }
 
 // systemsOperationFor names the member an ArchiveEntry, FileEntry, or
@@ -100,6 +101,10 @@ func systemsMemberNames(identity *types.ClassSymbol) []string {
 		return FileEntryOperations
 	case processResultClass:
 		return ProcessResultOperations
+	case dnsResultClass:
+		return DNSResultOperations
+	case tlsInfoClass:
+		return TLSInfoOperations
 	}
 	return nil
 }
@@ -112,6 +117,10 @@ func systemsConstructionHint(identity *types.ClassSymbol) (string, bool) {
 		return "list a directory tree with File.walk(path)", true
 	case processResultClass:
 		return "run a program with Process.run(command, args)", true
+	case dnsResultClass:
+		return "resolve a host with DNS.lookup(host)", true
+	case tlsInfoClass:
+		return "inspect a TLS endpoint with TLS.inspect(host)", true
 	}
 	return "", false
 }

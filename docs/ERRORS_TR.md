@@ -41,6 +41,8 @@ Yaygın yerleşik (built-in) hatalar şunları içerir:
 | `PostgreSQLError` | PostgreSQL bağlantı, sorgu, çalıştırma, işlem ya da değer türü hatası; `Error`'dan türer |
 | `ArchiveError` | güvensiz, bozuk, desteklenmeyen ya da sınırı aşan arşiv veya bir arşiv oluşturma/çıkarma hatası; `Error`'dan türer |
 | `ProcessError` | `Process.run` programı başlatamadı, zaman aşımına uğradı ya da çıktı bütçesini aştı (sıfır olmayan çıkış kodu hata değil, sonuçtur); `Error`'dan türer |
+| `DNSError` | `DNS.lookup`'ta geçersiz ana makine adı, bulunamayan ana makine, çözümleyici hatası ya da zaman aşımı; `Error`'dan türer |
+| `TLSError` | `TLS.inspect` bir sertifika elde edemedi (geçersiz girdi, reddedilen bağlantı, zaman aşımı, TLS değil); geçersiz bir sertifika hata değil, sonuçtur; `Error`'dan türer |
 | `KeyError` | eksik Pair anahtarı |
 | `NullError` | çalışma zamanı null güvenliği sınırı |
 | `ConstantError` | derin dondurulmuş (deep-frozen) bir referans üzerinden değişiklik |

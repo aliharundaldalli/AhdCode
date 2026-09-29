@@ -527,6 +527,18 @@ and prefer absolute executable paths. A non-zero exit is a result; launch
 failure, timeout, and output overflow raise `ProcessError`. Privileged
 programs must apply their own allowlist before calling it.
 
+**DNS and TLS inspection (v2.6.0).** `DNS.lookup(host, timeoutSeconds)`
+returns a `DNSResult` (`host()`, `addresses()`, `ipv4()`, `ipv6()`; sorted,
+IPv4 first) and resolves addresses only — never invent MX/TXT/CNAME lookups
+or DNS changes. `TLS.inspect(host, port, timeoutSeconds)` returns a `TLSInfo`
+(`valid()`, `verificationStatus()`, `subject()`, `issuer()`, `dnsNames()`,
+`notBefore()`/`notAfter()` as UTC `DateTime`, `protocol()`, `cipherSuite()`).
+An invalid certificate is a result with `valid() == false`, not an error;
+`TLSError` means no certificate was obtained. There is no insecure option and
+no certificate issuance. Pass host names, never URLs or `host:port`, and never
+pass untrusted request input directly — inspect only allowlisted domains in a
+worker.
+
 **File deployment primitives (v2.5.0).** `File.copy` (binary, never
 overwrites), `File.atomicWrite`, `File.atomicMove` (rename only, never
 copies), `File.symlink(target, link)` (same order as `ln -s`),

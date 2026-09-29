@@ -1,0 +1,36 @@
+// v2.6.0: inspect a TLS endpoint's certificate and apply your own expiry
+// policy. Requires network access (it connects to example.com:443).
+bring Math
+bring TLS
+bring Time
+from TLS bring (TLSInfo, TLSError)
+info: TLSInfo := TLS.inspect(host: "example.com", port: 443, timeoutSeconds: 10)
+write("valid: " + str(info.valid()) + " (" + info.verificationStatus() + ")")
+write("subject: " + info.subject())
+write("issuer: " + info.issuer())
+write("names: " + str(info.dnsNames()))
+write("protocol: " + info.protocol() + ", " + info.cipherSuite())
+write("expires: " + info.notAfter().toISO())
+// The policy is the application's, not the module's.
+days := Math.floor(
+    Time.between(Time.utc(), info.notAfter()).milliseconds / 86400000
+)
+if not info.valid() {
+    write("problem: " + info.verificationStatus())
+}
+else if days <= 7 {
+    write("renew now: " + str(days) + " days left")
+}
+else if days <= 30 {
+    write("renew soon: " + str(days) + " days left")
+}
+else {
+    write("fine: " + str(days) + " days left")
+}
+// A port with no TLS service is an error, not an invalid certificate.
+attempt {
+    TLS.inspect(host: "127.0.0.1", port: 9, timeoutSeconds: 2)
+}
+except TLSError as failure {
+    write(failure.message)
+}

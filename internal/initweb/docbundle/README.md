@@ -16,13 +16,13 @@ modules, GUI, Graphics, interactive Plot viewer, and desktop application
 packaging. It is used in practice by a small community; it is not a
 mainstream language.
 
-This is **v2.5.0**, **Deployment & Systems Primitives**. It adds safe
-ZIP/TAR/TAR.GZ listing and extraction, File deployment primitives (binary
-copy, atomic write and move, symbolic links, permissions, a link-safe walk),
-the shell-free `Process` module, and consistent SQLite backups with
-`backupTo`. See [What is new in v2.5.0](#what-is-new-in-v250). v2.4.0,
-**Mathematical Rendering & Plot Styling**, remains available as the previous
-release.
+This is **v2.6.0**, **DNS & TLS Inspection**. It adds bounded, typed
+`DNS.lookup` address resolution and `TLS.inspect` certificate inspection with
+explicit hostname and system-root verification. v2.6.0 is a source-only
+release; complete platform packaging and installers return in v2.7,
+**Distribution & Installer Polish**. See
+[What is new in v2.6.0](#what-is-new-in-v260). v2.5.0, **Deployment & Systems
+Primitives**, remains available as the previous release.
 
 v2.0.0 is a major release, **Desktop Application Completion**: it completes
 the first-party desktop application foundation — ListBox, Select, TextArea,
@@ -317,7 +317,7 @@ To maintain conceptual clarity, AhdCode's capabilities are organized into four d
    - **Mathematics & Computation:** [`Math`](MATH.md), [`Bits`](BITS.md) (bitwise operations on `Int`), [`Regex`](REGEX.md), [`Statistics`](STATISTICS.md), [`Numeric`](NUMERIC.md), [`Plot`](PLOT.md), [`Graphics`](GRAPHICS.md) (Canvas windows and Turtle drawing), [`GUI`](GUI.md) (small desktop windows with click and key callbacks)
    - **Data & Collections:** [`Lists`](LISTS.md), [`KeyValue`](KEYVALUE.md), [`Characters`](CHARACTERS.md) (Unicode code points and classification), [`CSV`](CSV.md), [`Data`](DATA.md), [`JSON`](JSON.md), [`XML`](XML.md), [`UUID`](UUID.md) (RFC 9562 version 4 and time-ordered version 7 identifiers)
    - **Document Generation:** [`Word`](WORD.md), [`Excel`](EXCEL.md), [`PDF`](PDF.md), [`Latex`](LATEX.md), [`QR`](QR.md) (QR codes), [`Barcode`](BARCODE.md) (Code 128, EAN-13, UPC-A), [`Archive`](ARCHIVE.md)
-   - **System & Environment:** [`Time`](TIME.md), [`Cron`](CRON.md) (bounded in-process scheduling), [`Path`](FILESYSTEM.md), [`File`](FILESYSTEM.md), [`Env`](ENV.md), [`Terminal`](TERMINAL.md) (v1.5.0: standard error, flushing, terminal detection and size, styled text, pretty layout), [`Process`](PROCESS.md) (run one program with an argument list, never through a shell; bounded time and output)
+   - **System & Environment:** [`Time`](TIME.md), [`Cron`](CRON.md) (bounded in-process scheduling), [`Path`](FILESYSTEM.md), [`File`](FILESYSTEM.md), [`Env`](ENV.md), [`Terminal`](TERMINAL.md) (v1.5.0: standard error, flushing, terminal detection and size, styled text, pretty layout), [`Process`](PROCESS.md) (run one program with an argument list, never through a shell; bounded time and output), [`DNS`](DNS.md) and [`TLS`](TLS.md) (bounded address lookup and certificate inspection)
 
 3. **First-Party Runtime / Framework Modules:**
    - **Network, Server & Storage Primitives:** [`HTTP`](HTTP.md) (in-memory server, request/response, cookies, sessions, static file server, [WebSocket endpoints](WEBSOCKET.md), client), [`HTML`](HTML.md) (semantic builder, parser, selector engine), [`Security`](SECURITY.md) (Argon2id hashing, bcrypt compatibility, secure tokens, constant-time comparison, SHA-2 digests, HMAC, encodings, RS256 signatures, AES-256-GCM), [`SQLite`](SQLITE.md) (local typed database bridge), [`MySQL`](MYSQL.md) (network database with connection pool and transactions), [`PostgreSQL`](POSTGRESQL.md) (network database with connection pool and transactions), [`SMTP`](SMTP.md) (send-only mail client)
@@ -464,6 +464,8 @@ See the [CLI guide](CLI.md), [formatter guide](FORMATTER.md),
 - [UUID module](UUID.md)
 - [Terminal module](TERMINAL.md)
 - [Process module](PROCESS.md)
+- [DNS module](DNS.md)
+- [TLS module](TLS.md)
 - [Graphics module](GRAPHICS.md)
 - [GUI module](GUI.md)
 - [Packaging desktop applications](PACKAGING.md)
@@ -507,6 +509,34 @@ diagnostics and hover. The same VSIX targets VS Code and Antigravity. See its
 installation guide.
 
 ## Current limitations
+
+## What is new in v2.6.0 <a id="what-is-new-in-v260"></a>
+
+v2.6.0, **DNS & TLS Inspection**, lets an AhdCode worker check where a domain
+points and what certificate it serves — with bounded timeouts, no shell, and
+no external tools:
+
+- **[DNS](DNS.md)** (new module) — `DNS.lookup(host, timeoutSeconds)`
+  returns a `DNSResult` with `host()`, `addresses()`, `ipv4()`, and `ipv6()`.
+  Addresses come from the operating system's resolver, deduplicated and
+  sorted (IPv4 first, then IPv6), so results are deterministic. Malformed
+  input (URLs, `host:port`, shell-like text) is refused before any network
+  work; failures are `DNSError`.
+- **[TLS](TLS.md)** (new module) — `TLS.inspect(host, port,
+  timeoutSeconds)` returns a `TLSInfo`: `valid()` and `verificationStatus()`
+  from an explicit verification against the system trust roots and the
+  requested hostname, plus `subject()`, `issuer()`, `dnsNames()`,
+  `notBefore()`/`notAfter()` as `DateTime`, `protocol()`, and `cipherSuite()`.
+  Expired, not-yet-valid, hostname-mismatched, and untrusted certificates are
+  reported with their metadata and `valid() == false` — never accepted.
+  Connection failures are `TLSError`.
+
+`DNS` and `TLS` are now standard module names: a local `DNS.ahd` or `TLS.ahd`
+is no longer what `bring DNS` / `bring TLS` loads. Both are documented for a
+dedicated worker that inspects allowlisted domains, never for raw web input.
+v2.6.0 is a source-only release (GitHub's source archives); complete platform
+packaging and installers return in v2.7, **Distribution & Installer Polish**.
+Examples: `examples/v2.6`.
 
 ## What is new in v2.5.0 <a id="what-is-new-in-v250"></a>
 

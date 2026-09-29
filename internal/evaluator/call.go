@@ -234,6 +234,10 @@ func (session *Session) builtin(identity ir.CallableID, receiver any, arguments 
 		return session.guiBuiltin(strings.TrimPrefix(name, "builtin:GUI::"), values(arguments))
 	case strings.HasPrefix(name, "builtin:Terminal::"):
 		return session.terminalBuiltin(strings.TrimPrefix(name, "builtin:Terminal::"), values(arguments))
+	case strings.HasPrefix(name, "builtin:DNS::"):
+		return session.dnsBuiltin(strings.TrimPrefix(name, "builtin:DNS::"), values(arguments))
+	case strings.HasPrefix(name, "builtin:TLS::"):
+		return session.tlsBuiltin(strings.TrimPrefix(name, "builtin:TLS::"), values(arguments))
 	case strings.HasPrefix(name, "builtin:Process::"):
 		return session.processBuiltin(strings.TrimPrefix(name, "builtin:Process::"), values(arguments))
 	case strings.HasPrefix(name, "builtin:PostgreSQL::"):
@@ -419,6 +423,9 @@ func (session *Session) core(name string, receiver any, arguments []any) any {
 	}
 	if isSystemsOperation(name) {
 		return session.systemsOperation(name, receiver)
+	}
+	if isNetworkOperation(name) {
+		return session.networkOperation(name, receiver)
 	}
 	session.raise("Error", "unsupported Fundamentals operation "+name)
 	return nil

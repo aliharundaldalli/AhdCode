@@ -250,3 +250,9 @@ var ProcessUnixSource string
 
 //go:embed process_windows.go
 var ProcessWindowsSource string
+
+// NetworkSource (v2.6.0) holds DNS.lookup and TLS.inspect. It depends only on
+// the Go standard library (net, crypto/tls, crypto/x509).
+//
+//go:embed network.go
+var NetworkSource string

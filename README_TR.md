@@ -16,13 +16,13 @@ veritabanı modülleri, GUI'si, Graphics'i, etkileşimli Plot görüntüleyicisi
 masaüstü uygulaması paketlemesiyle gelir. Küçük bir topluluk tarafından
 pratikte kullanılmaktadır; yaygın (mainstream) bir dil değildir.
 
-Bu, **v2.5.0**, **Dağıtım ve Sistem Temel İşlemleri** sürümüdür. Güvenli
-ZIP/TAR/TAR.GZ listeleme ve çıkarma, File dağıtım temel işlemleri (ikili
-kopyalama, atomik yazma ve taşıma, sembolik bağlantılar, izinler,
-bağlantılara karşı güvenli gezinme), kabuk kullanmayan `Process` modülü ve
-`backupTo` ile tutarlı SQLite yedekleri ekler. Bkz.
-[v2.5.0 ile gelenler](#v25-ile-gelenler). Önceki **Matematiksel
-Rasterizasyon ve Plot Stili** sürümü olan v2.4.0 da kullanılabilir durumdadır.
+Bu, **v2.6.0**, **DNS ve TLS İnceleme** sürümüdür. Sınırlı ve tipli
+`DNS.lookup` adres çözümlemesi ile açık ana makine adı ve sistem kökü
+doğrulamalı `TLS.inspect` sertifika incelemesi ekler. v2.6.0 yalnızca kaynak
+kodu olarak yayımlanır; eksiksiz platform paketleri ve kurulum programları
+v2.7, **Dağıtım ve Kurulum Cilası** ile geri döner. Bkz.
+[v2.6.0 ile gelenler](#v26-ile-gelenler). Önceki **Dağıtım ve Sistem Temel
+İşlemleri** sürümü olan v2.5.0 da kullanılabilir durumdadır.
 
 v2.0.0 bir ana (major) sürümdür, **Masaüstü Uygulamasının Tamamlanması**:
 birinci taraf masaüstü uygulaması temelini tamamlar — GUI'de ListBox, Select,
@@ -334,7 +334,7 @@ Kavramsal netliği korumak için AhdCode'un yetenekleri dört belirgin mimari ka
    - **Matematik ve Hesaplama:** [`Math`](docs/MATH_TR.md), [`Bits`](docs/BITS_TR.md) (`Int` üzerinde bit işlemleri), [`Regex`](docs/REGEX_TR.md), [`Statistics`](docs/STATISTICS_TR.md), [`Numeric`](docs/NUMERIC_TR.md), [`Plot`](docs/PLOT_TR.md), [`Graphics`](docs/GRAPHICS_TR.md) (Canvas pencereleri ve Turtle ile çizim), [`GUI`](docs/GUI_TR.md) (tıklama ve tuş geri çağırmalı küçük masaüstü pencereleri)
    - **Veri ve Koleksiyonlar:** [`Lists`](docs/LISTS_TR.md), [`KeyValue`](docs/KEYVALUE_TR.md), [`Characters`](docs/CHARACTERS_TR.md) (Unicode kod noktaları ve sınıflandırma), [`CSV`](docs/CSV_TR.md), [`Data`](docs/DATA_TR.md), [`JSON`](docs/JSON_TR.md), [`XML`](docs/XML_TR.md), [`UUID`](docs/UUID_TR.md) (RFC 9562 sürüm 4 ve zamana göre sıralı sürüm 7 kimlikleri)
    - **Belge Üretimi:** [`Word`](docs/WORD_TR.md), [`Excel`](docs/EXCEL_TR.md), [`PDF`](docs/PDF_TR.md), [`Latex`](docs/LATEX_TR.md), [`QR`](docs/QR_TR.md) (QR kodları), [`Barcode`](docs/BARCODE_TR.md) (Code 128, EAN-13, UPC-A), [`Archive`](docs/ARCHIVE_TR.md)
-   - **Sistem ve Ortam:** [`Time`](docs/TIME_TR.md), [`Cron`](docs/CRON_TR.md) (sınırlı, süreç içi zamanlama), [`Path`](docs/FILESYSTEM_TR.md), [`File`](docs/FILESYSTEM_TR.md), [`Env`](docs/ENV_TR.md), [`Terminal`](docs/TERMINAL_TR.md) (v1.5.0: standart hata, tampon boşaltma, terminal tespiti ve boyutu, biçimli metin, okunabilir düzen), [`Process`](docs/PROCESS_TR.md) (bir programı argüman listesiyle, asla kabuk üzerinden değil, sınırlı süre ve çıktıyla çalıştırır)
+   - **Sistem ve Ortam:** [`Time`](docs/TIME_TR.md), [`Cron`](docs/CRON_TR.md) (sınırlı, süreç içi zamanlama), [`Path`](docs/FILESYSTEM_TR.md), [`File`](docs/FILESYSTEM_TR.md), [`Env`](docs/ENV_TR.md), [`Terminal`](docs/TERMINAL_TR.md) (v1.5.0: standart hata, tampon boşaltma, terminal tespiti ve boyutu, biçimli metin, okunabilir düzen), [`Process`](docs/PROCESS_TR.md) (bir programı argüman listesiyle, asla kabuk üzerinden değil, sınırlı süre ve çıktıyla çalıştırır), [`DNS`](docs/DNS_TR.md) ve [`TLS`](docs/TLS_TR.md) (sınırlı adres sorgusu ve sertifika incelemesi)
 
 3. **Birinci Taraf Çalışma Zamanı / Çatı Modülleri:**
    - **Ağ, Sunucu ve Depolama İlkelleri:** [`HTTP`](docs/HTTP_TR.md) (bellek içi sunucu, istek/yanıt, çerezler, oturumlar, statik dosya sunucusu, [WebSocket uç noktaları](docs/WEBSOCKET_TR.md), client), [`HTML`](docs/HTML_TR.md) (anlamsal kurucu, ayrıştırıcı, seçici motoru), [`Security`](docs/SECURITY_TR.md) (Argon2id özetleme, bcrypt uyumluluğu, güvenli token'lar, sabit zamanlı karşılaştırma, SHA-2 özetleri, HMAC, kodlamalar, RS256 imzaları, AES-256-GCM), [`SQLite`](docs/SQLITE_TR.md) (yerel tipli veritabanı köprüsü), [`MySQL`](docs/MYSQL_TR.md) (bağlantı havuzu ve işlemlerle ağ veritabanı), [`PostgreSQL`](docs/POSTGRESQL_TR.md) (bağlantı havuzu ve işlemlerle ağ veritabanı), [`SMTP`](docs/SMTP_TR.md) (yalnızca gönderim yapan posta istemcisi)
@@ -481,6 +481,8 @@ bakın.
 - [UUID modülü](docs/UUID_TR.md)
 - [Terminal modülü](docs/TERMINAL_TR.md)
 - [Process modülü](docs/PROCESS_TR.md)
+- [DNS modülü](docs/DNS_TR.md)
+- [TLS modülü](docs/TLS_TR.md)
 - [Graphics modülü](docs/GRAPHICS_TR.md)
 - [GUI modülü](docs/GUI_TR.md)
 - [Masaüstü uygulaması paketleme](docs/PACKAGING_TR.md)
@@ -524,6 +526,35 @@ VS Code hem de Antigravity'i hedefler.
 [Kurulum rehberine](editors/vscode/README_TR.md) bakın.
 
 ## Mevcut sınırlamalar
+
+## v2.6.0 ile gelenler <a id="v26-ile-gelenler"></a>
+
+v2.6.0, **DNS ve TLS İnceleme**, bir AhdCode işçisinin bir alan adının nereyi
+gösterdiğini ve hangi sertifikayı sunduğunu denetlemesini sağlar — sınırlı
+zaman aşımlarıyla, kabuk ve harici araç olmadan:
+
+- **[DNS](docs/DNS_TR.md)** (yeni modül) — `DNS.lookup(host, timeoutSeconds)`
+  `host()`, `addresses()`, `ipv4()` ve `ipv6()` içeren bir `DNSResult` döndürür.
+  Adresler işletim sisteminin çözümleyicisinden gelir, tekilleştirilir ve
+  sıralanır (önce IPv4, sonra IPv6); böylece sonuçlar belirlenimcidir. Bozuk
+  girdi (URL'ler, `host:port`, kabuk benzeri metin) herhangi bir ağ işinden
+  önce reddedilir; hatalar `DNSError`'dır.
+- **[TLS](docs/TLS_TR.md)** (yeni modül) — `TLS.inspect(host, port,
+  timeoutSeconds)` bir `TLSInfo` döndürür: sistem güven köklerine ve istenen
+  ana makine adına karşı yapılan açık bir doğrulamadan `valid()` ve
+  `verificationStatus()`; ayrıca `subject()`, `issuer()`, `dnsNames()`,
+  `DateTime` olarak `notBefore()`/`notAfter()`, `protocol()` ve
+  `cipherSuite()`. Süresi dolmuş, henüz geçerli olmayan, adı uyuşmayan ve
+  güvenilmeyen sertifikalar üst verileriyle ve `valid() == false` olarak
+  bildirilir — asla kabul edilmez. Bağlantı hataları `TLSError`'dır.
+
+`DNS` ve `TLS` artık standart modül adlarıdır: yerel bir `DNS.ahd` ya da
+`TLS.ahd` artık `bring DNS` / `bring TLS`'in yüklediği şey değildir. İkisi de
+ham web girdisi için değil, izin listesindeki alan adlarını inceleyen özel bir
+işçi için belgelenmiştir. v2.6.0 yalnızca kaynak kodu olarak yayımlanır
+(GitHub'ın kaynak arşivleri); eksiksiz platform paketleri ve kurulum
+programları v2.7, **Dağıtım ve Kurulum Cilası** ile geri döner. Örnekler:
+[`examples/v2.6`](examples/v2.6/README_TR.md).
 
 ## v2.5.0 ile gelenler <a id="v25-ile-gelenler"></a>
 

@@ -2,6 +2,7 @@ package module
 
 import (
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -145,6 +146,31 @@ func (compiler *Compiler) analyze(identity SourceIdentity, requester ModuleID, i
 			}
 		}
 	}
+	// A standard module whose values carry another standard module's Class
+	// (TLSInfo.notAfter() returns a Time DateTime) needs that module in the
+	// compilation so the Class exists in the IR. It becomes a dependency only;
+	// it is not imported, so the program's namespace is unchanged.
+	broughtNames := make([]string, 0, len(environment.Imports))
+	for name := range environment.Imports {
+		broughtNames = append(broughtNames, name)
+	}
+	sort.Strings(broughtNames)
+	for _, name := range broughtNames {
+		for _, implicit := range implicitStandardDependencies[environment.Imports[name].Name] {
+			implicitIdentity, err := compiler.resolveDependency(identity, implicit)
+			if err != nil || !implicitIdentity.Builtin {
+				continue
+			}
+			dependency := compiler.analyze(implicitIdentity, identity.ID, source.Span{})
+			if dependency.State == Resolved && dependency.Interface != nil {
+				environment.ImplicitModules = append(environment.ImplicitModules, dependency.Interface)
+			}
+			if !seenDependencies[dependency.ID] {
+				seenDependencies[dependency.ID] = true
+				module.Dependencies = append(module.Dependencies, dependency.ID)
+			}
+		}
+	}
 	if module.State == Failed {
 		return module
 	}
@@ -160,6 +186,10 @@ func (compiler *Compiler) analyze(identity SourceIdentity, requester ModuleID, i
 	module.State = Resolved
 	return module
 }
+
+// implicitStandardDependencies lists the standard modules whose Classes another
+// standard module's values use (v2.6.0: TLS's certificate dates are DateTime).
+var implicitStandardDependencies = map[string][]string{"TLS": {"Time"}}
 
 func (compiler *Compiler) resolveDependency(importer SourceIdentity, name string) (SourceIdentity, error) {
 	if interfaceValue := compiler.Builtins[name]; interfaceValue != nil {

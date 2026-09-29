@@ -161,7 +161,7 @@ func TestGeneratedProgramCarriesRuntime(t *testing.T) {
 	}
 	if strings.Join(names, ",") != programFileName+","+runtimeFileName+","+excelRuntimeFileName+","+pdfRuntimeFileName+","+archiveRuntimeFileName+","+sqliteRuntimeFileName+","+httpRuntimeFileName+","+websocketRuntimeFileName+","+htmlRuntimeFileName+","+smtpRuntimeFileName+","+securityRuntimeFileName+","+identityRuntimeFileName+","+uuidRuntimeFileName+","+bitsRuntimeFileName+","+charactersRuntimeFile+","+cronRuntimeFileName+","+httpFilesRuntimeFileName+","+websocketClientRuntimeFile+","+svgRuntimeFileName+","+documentRuntimeFileName+
 		","+terminalRuntimeFileName+","+terminalDarwinRuntimeFileName+","+terminalLinuxRuntimeFileName+","+terminalWindowsRuntimeFileName+","+terminalOtherRuntimeFileName+","+graphicsRuntimeFileName+","+fundamentalsRuntimeFileName+","+helperLinkRuntimeFileName+","+guiRuntimeFileName+","+guiWidgetsRuntimeFileName+","+plotViewRuntimeFileName+
-		","+archiveReadRuntimeFileName+","+filesystemRuntimeFileName+","+processRuntimeFileName+","+processUnixRuntimeFileName+","+processWindowsRuntimeFileName {
+		","+archiveReadRuntimeFileName+","+filesystemRuntimeFileName+","+processRuntimeFileName+","+processUnixRuntimeFileName+","+processWindowsRuntimeFileName+","+networkRuntimeFileName {
 		t.Fatalf("unexpected generated files %v", names)
 	}
 	// The bcrypt runtime imports vendored x/crypto, so a program that does

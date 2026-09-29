@@ -211,6 +211,16 @@ func LowerCompilation(compilation module.CompilationResult) Result {
 					identityModule(ir.ModuleID(current.ID), current.Source.Name, current.Source.Path))
 				continue
 			}
+			if string(current.ID) == DNSModuleID {
+				result.Modules = append(result.Modules,
+					dnsModule(ir.ModuleID(current.ID), current.Source.Name, current.Source.Path))
+				continue
+			}
+			if string(current.ID) == TLSModuleID {
+				result.Modules = append(result.Modules,
+					tlsModule(ir.ModuleID(current.ID), current.Source.Name, current.Source.Path))
+				continue
+			}
 			if string(current.ID) == ProcessModuleID {
 				result.Modules = append(result.Modules,
 					processModule(ir.ModuleID(current.ID), current.Source.Name, current.Source.Path))

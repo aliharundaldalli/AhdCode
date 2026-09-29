@@ -13,6 +13,9 @@ import (
 // scope. Resolution and source loading deliberately remain outside semantic.
 func (a *analyzer) installImports(program *ast.Program) {
 	localNames := moduleDeclarationNames(program)
+	for _, implicit := range a.environment.ImplicitModules {
+		a.registerInterfaceClasses(implicit)
+	}
 	for _, statement := range program.Statements {
 		bring, ok := statement.(*ast.BringStmt)
 		if !ok {
