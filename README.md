@@ -433,7 +433,8 @@ See the [CLI guide](docs/CLI.md), [formatter guide](docs/FORMATTER.md),
 - [Fundamentals](docs/FUNDAMENTALS.md)
 - [String API](docs/STRING_API.md)
 - [List API](docs/LIST_API.md)
-- [Math module](docs/MATH.md)
+- [Math module](docs/MATH.md) — start of the mathematics path:
+  Math → [Numeric](docs/NUMERIC.md) → [Statistics](docs/STATISTICS.md) → [Plot](docs/PLOT.md)
 - [Time module](docs/TIME.md)
 - [Latex module](docs/LATEX.md)
 - [Word module](docs/WORD.md)

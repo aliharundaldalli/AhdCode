@@ -79,7 +79,18 @@ F.writeText("note.txt", "hello")
 
 Tipli yüzeyleri ve yakalanabilir alan hataları için [Time](TIME_TR.md),
 [Cron](CRON_TR.md), [Characters](CHARACTERS_TR.md), [Bits](BITS_TR.md), [Latex](LATEX_TR.md),
-[CSV](CSV_TR.md), [Data](DATA_TR.md), [Statistics](STATISTICS_TR.md), [Plot](PLOT_TR.md), [Graphics](GRAPHICS_TR.md), [GUI](GUI_TR.md), [Numeric](NUMERIC_TR.md), [Word](WORD_TR.md), [Excel](EXCEL_TR.md), [PDF](PDF_TR.md), [QR](QR_TR.md), [Barcode](BARCODE_TR.md), [Archive](ARCHIVE_TR.md), [JSON](JSON_TR.md), [SQLite](SQLITE_TR.md), [PostgreSQL](POSTGRESQL_TR.md), [HTTP](HTTP_TR.md), [WebSocket](WEBSOCKET_TR.md), [HTML](HTML_TR.md), [SMTP](SMTP_TR.md), [XML](XML_TR.md), [Env](ENV_TR.md), [Lists](LISTS_TR.md), [KeyValue](KEYVALUE_TR.md), [UUID](UUID_TR.md), [Terminal](TERMINAL_TR.md), [Process](PROCESS_TR.md), [DNS](DNS_TR.md), [TLS](TLS_TR.md), [Disk](DISK_TR.md), [Service](SERVICE_TR.md) ve diğer modül referanslarına bakın.
+[CSV](CSV_TR.md), [Data](DATA_TR.md), [Statistics](STATISTICS_TR.md), [Plot](PLOT_TR.md), [Graphics](GRAPHICS_TR.md), [GUI](GUI_TR.md), [Numeric](NUMERIC_TR.md), [Word](WORD_TR.md), [Excel](EXCEL_TR.md), [PDF](PDF_TR.md), [QR](QR_TR.md), [Barcode](BARCODE_TR.md), [Archive](ARCHIVE_TR.md), [JSON](JSON_TR.md), [SQLite](SQLITE_TR.md), [PostgreSQL](POSTGRESQL_TR.md), [HTTP](HTTP_TR.md), [WebSocket](WEBSOCKET_TR.md), [HTML](HTML_TR.md), [SMTP](SMTP_TR.md), [XML](XML_TR.md), [Env](ENV_TR.md), [Lists](LISTS_TR.md), [KeyValue](KEYVALUE_TR.md), [UUID](UUID_TR.md), [Terminal](TERMINAL_TR.md), [Process](PROCESS_TR.md), [DNS](DNS_TR.md), [TLS](TLS_TR.md), [Disk](DISK_TR.md), [Service](SERVICE_TR.md), [Identity](IDENTITY_TR.md) ve diğer modül referanslarına bakın.
+
+CSV, Data, Plot, Excel, Word, Latex, HTTP(S) ve HTML'i birbirinden kopuk API'ler
+yerine birbirine bağlı öğrenci projeleri olarak öğrenmek için
+[Pratik Modül Atölyeleri](PRACTICAL_MODULES_TR.md)'ni kullanın.
+
+Matematik için dört referansı bu sırayla okuyun; her biri öncekinin üzerine
+kurulur ama onu zorunlu kılmaz:
+[Math](MATH_TR.md) (tek sayılar: kökler, logaritmalar, trigonometri, yuvarlama) →
+[Numeric](NUMERIC_TR.md) (vektörler, matrisler, doğrusal sistemler, karmaşık sayılar) →
+[Statistics](STATISTICS_TR.md) (veriyi betimlemek) →
+[Plot](PLOT_TR.md) (fonksiyonları ve verileri TeX etiketleriyle çizmek).
 
 CSV, Data, Plot, Excel, Word, Latex, HTTP(S) ve HTML'i tek tek API olarak
 değil, birbirine bağlanan öğrenci projeleri içinde öğrenmek için

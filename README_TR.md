@@ -451,7 +451,8 @@ bakın.
 - [Temel İşlevler](docs/FUNDAMENTALS_TR.md)
 - [String API](docs/STRING_API_TR.md)
 - [List API](docs/LIST_API_TR.md)
-- [Math modülü](docs/MATH_TR.md)
+- [Math modülü](docs/MATH_TR.md) — matematik yolunun başı:
+  Math → [Numeric](docs/NUMERIC_TR.md) → [Statistics](docs/STATISTICS_TR.md) → [Plot](docs/PLOT_TR.md)
 - [Time modülü](docs/TIME_TR.md)
 - [Latex modülü](docs/LATEX_TR.md)
 - [Word modülü](docs/WORD_TR.md)
@@ -673,7 +674,7 @@ eklemez.
   ve her dilimin üzerinde payı yazar. Pastanın ekseni yoktur; bu yüzden
   üzerinde `xLabel` ve `yLabel` sessizce yok sayılmak yerine `PlotError`
   fırlatır.
-- [`Plot.heatmap(xLabels, yLabels, values)`](docs/PLOT_TR.md#isı-haritası):
+- [`Plot.heatmap(xLabels, yLabels, values)`](docs/PLOT_TR.md#heatmap-ısı-haritası):
   rengi sayıları taşıyan etiketli bir ızgara ve bir renk ölçeği göstergesi.
   Matrix, y etiketi başına bir satır ve x etiketi başına bir sütundur.
 - [`Surface.xCategories` ve `Surface.yCategories`](docs/PLOT_TR.md#koordinatları-adlandırmak):

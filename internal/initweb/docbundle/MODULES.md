@@ -79,6 +79,13 @@ To learn CSV, Data, Plot, Excel, Word, Latex, HTTP(S), and HTML as connected
 student projects rather than isolated APIs, use the
 [Practical Module Workshops](PRACTICAL_MODULES.md).
 
+For mathematics, read the four references in this order; each builds on the
+previous one without requiring it:
+[Math](MATH.md) (single numbers: roots, logarithms, trigonometry, rounding) →
+[Numeric](NUMERIC.md) (vectors, matrices, linear systems, complex numbers) →
+[Statistics](STATISTICS.md) (describing data) →
+[Plot](PLOT.md) (drawing functions and data, with TeX labels).
+
 `Lists` and `KeyValue` are the structural transformation layer over the core
 `List` and `Pair` types. Their operations are *type-directed*: the compiler
 computes each call's exact result type from the argument types written at that

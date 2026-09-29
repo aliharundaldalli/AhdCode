@@ -254,15 +254,14 @@ clean: Table := students.transform(
     lambda (value: String) -> value.trim().capitalize()
 )
 
-labelled: Table := clean.derive(
-    "durum"
-    lambda (row: Pair<String, String>) -> {
-        if int(row["puan"]) >= 80 {
-            return "gecti"
-        }
-        return "destek gerekli"
+durumBul: Function := (row: Pair<String, String>) -> String {
+    if int(row["puan"]) >= 80 {
+        return "gecti"
     }
-)
+    return "destek gerekli"
+}
+
+labelled: Table := clean.derive("durum", durumBul)
 ```
 
 Fonksiyon `String` döndürmelidir. `return 80` tablo hücresine sessizce

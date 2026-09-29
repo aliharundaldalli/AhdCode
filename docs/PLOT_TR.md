@@ -4,6 +4,8 @@
 
 [README'ye dön](../README_TR.md) · [Statistics](STATISTICS_TR.md) · [Modüller](MODULES_TR.md)
 
+**Matematik yolu:** [Math](MATH_TR.md) → [Numeric](NUMERIC_TR.md) → [Statistics](STATISTICS_TR.md) → **Plot**
+
 İlk kez öğreniyorsanız Data'dan sayısal liste üretme, grafik türü seçme ve
 aynı grafiği Word/Latex raporuna gömme akışını gösteren
 [Plot atölyesini](PRACTICAL_MODULES_TR.md#3-plot-veriyi-okunabilir-bir-grafiğe-dönüştürmek)
@@ -26,6 +28,95 @@ alamaz (shadow edemez). Her argüman `NonNull`'dır.
 Plot, Data'ya bağımlı **değildir**. Bir `Table` hücresi bir `String`'dir, bu
 yüzden bir program bir sütunu çizmeden önce açıkça dönüştürür — Statistics'in
 kullandığı ve aynı nedenle kullandığı disiplinin aynısı.
+
+## Bu sayfada
+
+- Başlarken: [bir fonksiyon çizmek](#hızlı-başlangıç-bir-fonksiyon-çizmek),
+  [veri noktalarını çizmek](#hızlı-başlangıç-veri-noktalarını-çizmek)
+- Grafikler: [grafik türleri](#grafik-türleri), [sayısal girdi](#katı-sayısal-girdi-string-zorlaması-coercion-yok),
+  [boş veri](#boş-veri), [başlık, etiket, legend, boyut](#grafik-meta-verisi),
+  [stil](#plot-stili), [birden çok seri](#birden-çok-seri)
+- [Matematiksel metin](#matematiksel-metin)
+- Çıktı: [save](#save-kaydetme) (PNG, SVG, PDF), [show](#show-gösterme) (etkileşimli görüntüleyici)
+- Diğer grafikler: [pasta](#pasta), [ısı haritası](#heatmap-ısı-haritası), [subplot'lar](#subplotlar),
+  [Surface (3B)](#surface)
+- Başvuru: [PlotError](#ploterror), [girdi asla değiştirilmez](#girdi-asla-değiştirilmez),
+  [render](#render-işleme), [Plot'un olmadığı şeyler](#plotun-olmadığı-şeyler)
+
+## Hızlı başlangıç: bir fonksiyon çizmek
+
+`y = f(x)` çizmek için x'i [`Numeric.linspace`](NUMERIC_TR.md#vektör-oluşturma)
+ile örnekleyin, her örnek için y'yi hesaplayın ve ikisini `Plot.line`'a verin.
+Daha çok örnek daha düzgün bir eğri verir; çoğu fonksiyon için yüz kadarı
+yeterlidir.
+
+```ahd
+bring Numeric
+bring Plot
+
+x := Numeric.linspace(-3.0, 3.0, 121)
+y := Numeric.vector(x.values().map(lambda (value: Real) -> value ^ 2 - 2))
+chart := Plot.line(x, y)
+chart = chart.title(r'$f(x)=x^{2}-2$').xLabel("$x$").yLabel("$f(x)$")
+chart.save("parabola.png")
+chart.save("parabola.svg")
+chart.save("parabola.pdf")
+write("saved parabola.png, parabola.svg, parabola.pdf")
+```
+
+```text
+saved parabola.png, parabola.svg, parabola.pdf
+```
+
+- Bir Chart değişmezdir: `title`, `xLabel` ve diğer metotlar yeni bir Chart
+  döndürür; bu yüzden sonuç yeniden `chart`'a atanır. Bir metot zinciri tek
+  satırda kalmalıdır; birkaç satırda yapılandırmak için her satırda yeniden
+  atayın.
+- Tamamı `$...$` arasında yazılan bir etiket matematik olarak dizilir (bkz.
+  [Matematiksel metin](#matematiksel-metin)). Başlık `r'...'` ham String'i
+  kullanır, çünkü sıradan bir String'deki `{2}`
+  [String interpolasyonu](#ahdcode-stringlerinde-tex) olarak okunurdu.
+- `save`, biçimi uzantıdan seçer. Grafiği etkileşimli
+  [görüntüleyicide](#show-gösterme) açmak için bunun yerine `chart.show()`
+  kullanın.
+
+Math fonksiyonları da aynı biçimde kullanılır: `bring Math` ile
+`lambda (value: Real) -> Math.sin(value)` bir sinüs eğrisi çizer.
+
+## Hızlı başlangıç: veri noktalarını çizmek
+
+Ölçülmüş veri için noktaları `Plot.scatter` ile çizin. Bir Chart birden çok
+seri tutabilir; `chart.line` ve `chart.scatter` her biri bir legend
+etiketiyle bir seri ekler. Bu örnek ölçümleri,
+[`Statistics.linearRegression`](STATISTICS_TR.md#veri-çiftleri-kovaryans-korelasyon-ve-uydurulan-doğru)
+ile uydurulan doğruyla birlikte çizer:
+
+```ahd
+bring Plot
+bring Statistics
+from Plot bring (Chart, LegendPosition)
+
+hours: List<Int> := [1, 2, 3, 4, 5]
+scores: List<Real> := [52.0, 57.5, 61.0, 68.5, 71.0]
+fit := Statistics.linearRegression(x: hours, y: scores)
+fitted: List<Real> := hours.map(lambda [@fit] (hour: Int) -> fit["slope"] * hour + fit["intercept"])
+
+chart: Chart := Plot.new()
+chart = chart.scatter(hours, scores, "measured")
+chart = chart.line(hours, fitted, "least-squares line")
+chart = chart.title("Study time and score").xLabel("hours").yLabel("score")
+chart = chart.legend(true).legendPosition(LegendPosition.topLeft)
+chart.save("fit.png")
+write("saved fit.png")
+```
+
+```text
+saved fit.png
+```
+
+`x` ve `y`'nin her biri bir `List<Int>`, bir `List<Real>` ya da bir Numeric
+`Vector` olabilir. Tek bir List'in dağılımı için [`Plot.histogram` ya da
+`Plot.box`](#grafik-türleri) kullanın.
 
 ## Grafik türleri
 
@@ -50,8 +141,7 @@ Tek bir grafik — line, scatter, bar, pie, heatmap, histogram, box veya error
 bar — bir `Chart` üretir. Çoklu-grafik kompozisyonu bir `Figure` üretir
 (bkz. [Subplot'lar](#subplotlar)).
 
-`Plot.pie` ve `Plot.heatmap` v2.2'de eklendi; ikisi de aşağıda
-[Pasta](#pasta) ve [Isı haritası](#isı-haritası) bölümlerinde anlatılır.
+[Pasta](#pasta) ve [Isı haritası](#heatmap-ısı-haritası) aşağıda anlatılır.
 
 ## Katı sayısal girdi, String zorlaması (coercion) yok
 
@@ -129,7 +219,7 @@ Bir Chart'ın varsayılan boyutu 800x600'dür.
 
 `legend` v2.2'nin iki grafiği dışında her grafik ailesi için varsayılan
 olarak kapalıdır: bir [pastanın](#pasta) kategori anahtarı ve bir
-[ısı haritasının](#isı-haritası) renk ölçeği, program kapatmadıkça açıktır;
+[ısı haritasının](#heatmap-ısı-haritası) renk ölçeği, program kapatmadıkça açıktır;
 çünkü ikisi de anahtarı olmadan okunamaz.
 
 Legend açık olduğunda v2.4.0 varsayılan olarak onu grafik kenarlarından küçük
@@ -148,7 +238,7 @@ LegendPosition.bottomRight | LegendPosition.bottomLeft
 Bir [pastanın](#pasta) Kartezyen ekseni yoktur; bu yüzden `xLabel` ve
 `yLabel` bir pastada sessizce yok sayılmak yerine `PlotError` fırlatır.
 
-## Plot stili (v2.4.0)
+## Plot stili
 
 Line ve scatter serilerinin küçük, güçlü tipli bir stil API'si vardır. Stil
 değerleri rastgele String değildir:
@@ -170,48 +260,95 @@ Chart'a (veya tersi) uygulamak çalışma zamanında `PlotError` üretir. Legend
 serinin aynı line ve marker birleşimini kullandığından anahtar gerçeği korur:
 
 ```ahd
+bring Plot
 from Plot bring (Chart, LineStyle, Marker, LegendPosition)
 
-chart: Chart := Plot.line(x, y)
-chart = chart.lineStyle(LineStyle.dashDot)
-    .lineWidth(2.0)
-    .marker(Marker.diamond)
-    .markerSize(7.0)
+x: List<Int> := [1, 2, 3, 4]
+y: List<Real> := [2.0, 5.0, 4.0, 8.0]
+chart: Chart := Plot.new().line(x, y, "measurement")
+chart = chart.lineStyle(LineStyle.dashDot).lineWidth(2.0)
+chart = chart.marker(Marker.diamond).markerSize(7.0)
 chart = chart.legend(true).legendPosition(LegendPosition.topLeft)
+chart.save("styled.png")
 ```
 
-## Matematiksel metin (v2.4.0)
+## Matematiksel metin
 
-Mevcut metin API'leri bütün String için math seçeneği sunar. İçeriğinin tamamı
-eşleşen `$...$` ile çevrili olan String, pakete gömülü çevrimdışı Tectonic
-motoruyla çizilir:
+**Tüm** içeriği tek bir `$...$` çifti arasında olan bir metin argümanı, pakete
+gömülü çevrimdışı Tectonic (TeX) motoruyla matematik olarak dizilir:
 
 ```ahd
-chart = chart.title("$f(x)=x^2+3x+2$").xLabel("$x$").yLabel("$\\sigma^2$")
-chart = chart.line(x, y, "$f(x)$").legend(true)
+bring Plot
+
+x: List<Int> := [0, 1, 2, 3]
+y: List<Int> := [2, 6, 12, 20]
+chart := Plot.new().line(x, y, "$f(x)$")
+chart = chart.title(r'$f(x)=x^{2}+3x+2$').xLabel("$x$").yLabel("$y$")
+chart = chart.legend(true)
+chart.save("math.png")
+write("saved math.png")
 ```
 
-Aynı kural Chart başlığı/eksenleri, seri açıklamaları, pasta legend etiketleri,
-bar kategorileri, heatmap kategorileri ve Surface başlık/eksen/z etiketleri ile
-`xCategories`/`yCategories` için geçerlidir. `"Cost $100"` gibi sıradan
-String'ler sıradan metin kalır. `"Variance is $\\sigma^2$"` gibi karışık zengin
-metinler v2.4.0 sürümünde parçalara ayrılmaz; ileride ele alınabilir.
+```text
+saved math.png
+```
 
-Bozuk veya zararlı TeX, Plot hatası olarak bildirilir; ham TeX'e veya Unicode
-yaklaşımına sessiz fallback yapılmaz. Parçalar sınırlıdır, kontrollü komut
-listesine göre doğrulanır, izole geçici dizinde yalnızca paketteki çevrimdışı
-bundle ile çalıştırılır; dosya, shell, belge, ağ ve paket yükleme komutları
-reddedilir. Plot ve Surface aynı sınırlı eşzamanlı renderer cache'ini paylaşır;
-Surface her frame'de yeniden Tectonic başlatmaz.
+**Nerede çalışır.** Chart başlıkları ve eksen etiketleri; line ve scatter
+legend etiketleri; pasta etiketleri ve legend'ları; bar kategorileri; ısı
+haritası kategorileri; Surface başlıkları, eksen etiketleri, z etiketleri ve
+`xCategories`/`yCategories`.
 
-PNG, SVG ve PDF aynı Tectonic çıktısını kullanır. Süreç içi PDF rasterizer,
-sabitlenmiş bundle'ın ürettiği gömülü Type-1C outline'larını ve özel
-code→glyph eşlemesini doğrudan kullanır; `SystemFonts()` çağırmaz, makinenin
-font dizinlerini okumaz, harici PDF süreci veya ağ başlatmaz. Gömülü bir glyph
-eksikse sessizce başka fonta geçmek yerine Plot hatası üretir. Grafiğin geri
-kalanı vector capable kalır; matematik etiketleri SVG/PDF içine saydam raster
-görseller olarak gömülür. `\int`, `\frac`, `\sum`, alt/üst indisler ve `\sqrt`
-aynı display-style-aware yoldan doğru biçimde çizilir.
+**Bütün String kuralı.** Yalnızca `$` ile başlayıp eşleşen `$` ile biten bir
+String matematiktir:
+
+| Metin | Sonuç |
+|---|---|
+| `"$\\sigma^2$"` | dizilmiş σ² |
+| `"Cost $100"` | sıradan metin |
+| `"Variance is $\\sigma^2$"` | sıradan metin; dolar işaretleri ve ters bölü olduğu gibi görünür |
+
+Tek bir String içinde karışık metin ve matematik **desteklenmez**: parçalara
+ayrılmaz, reddedilmez de; yalnızca sıradan metin olarak çizilir. Bunun yerine
+etiketin tamamını matematik olarak yazın; sözcükleri `\mathrm{...}` ile,
+boşluğu `\ ` ile yazın: `r'$\mathrm{Varyans}\ \sigma^{2}$'`. (`\text{...}`
+paketli fontlarla kullanılamaz ve `PlotError` verir.)
+
+### AhdCode String'lerinde TeX
+
+TeX `\` ve `{}` kullanır ve ikisinin de sıradan bir AhdCode String'inde bir
+anlamı vardır: `\` bir kaçış dizisi başlatır, `{...}` ise interpolasyondur.
+`"$x^{2}$"` içinde `{2}`, `2` ile değiştirilir; `"$\\frac{a}{b}$"` ise `a` ve
+`b` değişkenlerini okumaya çalışır. TeX'i ikisinin de özel olmadığı bir **ham
+String** içinde yazın:
+
+```ahd
+write(r'$\frac{a}{b}$')
+write("$x^{2}$")
+```
+
+```text
+$\frac{a}{b}$
+$x^2$
+```
+
+Sıradan bir String'de `\\` tek bir ters bölü, `\{`/`\}` ise düz süslü parantez
+verir: `"$e^\{i\\pi\}$"`, `r'$e^{i\pi}$'` ile aynıdır.
+
+**Desteklenen TeX.** Kesirler (`\frac`), kökler (`\sqrt`), toplamlar,
+integraller, alt ve üst indisler, Yunan harfleri ve diğer sıradan matematik
+kipi komutları display style ile çizilir. Bir parçanın boyutu sınırlıdır,
+kontrollü bir komut kümesine göre denetlenir ve yalnızca paketli çevrimdışı
+bundle ile izole bir geçici dizinde derlenir; dosya, shell, belge, ağ ve paket
+yükleme komutları reddedilir. Bozuk ya da reddedilen TeX `PlotError` verir;
+Plot hiçbir zaman ham TeX'e ya da bir Unicode yaklaşımına geri düşmez. Plot ve
+Surface sınırlı tek bir renderer cache'ini paylaşır; aynı etiket iki kez
+derlenmez.
+
+**Çıktı biçimleri.** PNG, SVG ve PDF aynı Tectonic sonucunu kullanır. SVG ve
+PDF'de grafik vektör olarak kalır, her matematik etiketi ise saydam, yüksek
+çözünürlüklü bir görsel olarak gömülür. Glyph'ler yalnızca bundle'a gömülü
+fontlardan gelir — makinenin font dizinlerinden, harici bir PDF sürecinden ya
+da ağdan asla — ve eksik bir glyph sessiz bir yedek yerine `PlotError`'dır.
 
 ## Birden çok seri
 
@@ -243,9 +380,15 @@ chart.save(path: String) -> Nothing
 figure.save(path: String) -> Nothing
 ```
 
-Çıktı biçimi dosya uzantısından çıkarılır. Desteklenen biçimler PNG
-(`.png`), SVG (`.svg`) ve PDF'dir (`.pdf`); başka herhangi bir şey
-`PlotError` fırlatır:
+Çıktı biçimi dosya uzantısından çıkarılır:
+
+| Çıktı | Chart / Figure | Surface |
+|---|---|---|
+| `.png` | raster görsel | raster görsel (tek biçim) |
+| `.svg` | vektör; matematik etiketleri görsel olarak gömülü | yok |
+| `.pdf` | vektör; matematik etiketleri görsel olarak gömülü | yok |
+
+Başka her uzantı `PlotError` fırlatır:
 
 ```ahd
 chart.save("result.png")
@@ -316,23 +459,6 @@ yazdığıyla bayt bayt aynıdır. Kaydetme, `show()`'u çağıran program bitti
 sonra da çalışır. Sonuç — ya da neden başarısız olduğu — birkaç saniye araç
 çubuğunun yanında görünür.
 
-> **v2.0.0'dan sonra düzeltildi.** v2.0.0'da, Plot kullanan ama GUI
-> kullanmayan bir program kaydetme iletişim kutusunu açan yardımcıyı
-> bulamıyor ve Save "Save needs AhdCode's GUI helper (ahdgui), which is not
-> installed" diyordu. Derleyici yardımcının yerini yalnızca GUI'yi kendisi
-> kullanan bir program için kaydediyordu; geçici bir dizine derlenen
-> Plot-only bir programın onu bulmasının başka yolu yoktu.
-> `chart.save(path)` ve paketlenmiş bir uygulama hiçbir zaman etkilenmedi.
->
-> Depoda ve v2.1'de düzeltilmiştir: yer artık GUI **veya** Plot kullanan bir
-> program için kaydedilir ve Save hiçbir ortam değişkenine ihtiyaç duymaz.
-> Yayımlanmış v2.0.0 sürümünü çalıştırıyorsanız, yükseltene kadar programı
-> çalıştırırken yardımcıyı gösterin:
->
-> ```sh
-> AHDCODE_GUI_RUNTIME=~/Library/AhdCode/current/libexec/ahdcode/ahdgui ahdcode run chart.ahd
-> ```
-
 `show()`, görüntüleyici penceresi açılır açılmaz döner. Program devam eder
 ve `show()`'u yeniden çağırabilir; her çağrı kendi görüntüleyicisini açar ve
 bir görüntüleyici, program bittikten sonra bile siz kapatana kadar açık
@@ -400,7 +526,7 @@ en fazla 64 dilim çizer.
 Bir pasta, diğer her Chart gibi PNG, SVG ve PDF'e kaydedilir ve `show()`
 onu sıradan [görüntüleyicide](#show-gösterme) açar.
 
-## Isı haritası
+## Heatmap (ısı haritası)
 
 > v2.2'de eklendi.
 
@@ -483,7 +609,7 @@ subplot" durumu yoktur.
 
 Bir `Figure`'ın save/show boyutu, grid boyutlarından belirlenimci
 (deterministic) şekilde türetilir (rows ve columns ile ölçeklenen sabit bir
-hücre-başı bütçe); v0.1.14 bir `Figure.size` metodu yayımlamaz.
+hücre-başı bütçe); `Figure.size` metodu yoktur.
 
 ## Surface
 
@@ -675,5 +801,9 @@ keyfi özel plotter enjeksiyonu yoktur -- bunlar gelecekteki bir sürümde
 değerlendirilebilir. Renk sabittir: palet ya da colormap argümanı, tema ve
 yazı tipi API'si yoktur. Eksenler de sabittir: biçimlendirici geri çağrıları,
 keyfi tick yerleşimi, genel bir Axis nesnesi ve ikincil eksenler yoktur.
-`Int`/`Real` genişletmesinin ötesinde sayısal bir skaler tip yoktur (bir
-`Numeric` tipi yoktur) ve genel bir GUI çerçevesi yoktur.
+Plot genel bir GUI çerçevesi değildir; pencereler ve denetimler için
+[GUI](GUI_TR.md) sayfasına bakın.
+
+**İlgili:** çizdiğiniz fonksiyonlar için [Math](MATH_TR.md), örnek noktalar ve
+Surface ızgaraları için [Numeric](NUMERIC_TR.md), çizdiğiniz veriyi özetlemek
+için [Statistics](STATISTICS_TR.md).

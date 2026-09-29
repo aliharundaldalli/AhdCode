@@ -256,15 +256,14 @@ clean: Table := students.transform(
     lambda (value: String) -> value.trim().capitalize()
 )
 
-labelled: Table := clean.derive(
-    "status"
-    lambda (row: Pair<String, String>) -> {
-        if int(row["score"]) >= 80 {
-            return "passed"
-        }
-        return "support needed"
+statusFor: Function := (row: Pair<String, String>) -> String {
+    if int(row["score"]) >= 80 {
+        return "passed"
     }
-)
+    return "support needed"
+}
+
+labelled: Table := clean.derive("status", statusFor)
 ```
 
 The callback must return `String`. A numeric result is not silently converted;

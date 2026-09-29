@@ -4,6 +4,8 @@
 
 [Back to README](../README.md) · [Statistics](STATISTICS.md) · [Modules](MODULES.md)
 
+**Mathematics path:** [Math](MATH.md) → [Numeric](NUMERIC.md) → [Statistics](STATISTICS.md) → **Plot**
+
 If you are learning this module, start with the [Plot workshop](PRACTICAL_MODULES.md#3-plot-turn-data-into-a-readable-chart)
 for Data conversion, chart choice, quality checks, and embedding one figure in
 Word and Latex; use this page as the full chart reference.
@@ -25,6 +27,92 @@ it. Every argument is `NonNull`.
 Plot does **not** depend on Data. A `Table` cell is a `String`, so a program
 converts explicitly before plotting a column — the same discipline
 Statistics uses, and for the same reason.
+
+## Contents
+
+- Getting started: [plotting a function](#quick-start-plotting-a-function),
+  [plotting data points](#quick-start-plotting-data-points)
+- Charts: [chart types](#chart-types), [numeric input](#strict-numeric-input-no-string-coercion),
+  [empty data](#empty-data), [titles, labels, legend, size](#chart-metadata),
+  [styling](#plot-styling), [multiple series](#multiple-series)
+- [Mathematical text](#mathematical-text)
+- Output: [save](#save) (PNG, SVG, PDF), [show](#show) (interactive viewer)
+- More charts: [pie](#pie), [heatmap](#heatmap), [subplots](#subplots),
+  [Surface (3D)](#surface)
+- Reference: [PlotError](#ploterror), [input is never modified](#input-is-never-modified),
+  [rendering](#rendering), [what Plot is not](#what-plot-is-not)
+
+## Quick start: plotting a function
+
+To draw `y = f(x)`, sample x with
+[`Numeric.linspace`](NUMERIC.md#creating-vectors), compute y for every sample,
+and pass both to `Plot.line`. More samples give a smoother curve; about a
+hundred are enough for most functions.
+
+```ahd
+bring Numeric
+bring Plot
+
+x := Numeric.linspace(-3.0, 3.0, 121)
+y := Numeric.vector(x.values().map(lambda (value: Real) -> value ^ 2 - 2))
+chart := Plot.line(x, y)
+chart = chart.title(r'$f(x)=x^{2}-2$').xLabel("$x$").yLabel("$f(x)$")
+chart.save("parabola.png")
+chart.save("parabola.svg")
+chart.save("parabola.pdf")
+write("saved parabola.png, parabola.svg, parabola.pdf")
+```
+
+```text
+saved parabola.png, parabola.svg, parabola.pdf
+```
+
+- A Chart is immutable: `title`, `xLabel`, and the other methods return a new
+  Chart, so the result is assigned back to `chart`. A method chain must stay
+  on one line; to configure over several lines, reassign on each line.
+- A label written entirely between `$...$` is typeset as mathematics (see
+  [Mathematical text](#mathematical-text)). The title uses a raw string
+  `r'...'` because `{2}` in an ordinary string would be read as
+  [String interpolation](#tex-inside-ahdcode-strings).
+- `save` picks the format from the extension. Use `chart.show()` instead to
+  open the chart in the interactive [viewer](#show).
+
+Use Math functions the same way: `lambda (value: Real) -> Math.sin(value)`
+with `bring Math` draws a sine curve.
+
+## Quick start: plotting data points
+
+For measured data, use `Plot.scatter` for the points. A Chart can hold several
+series; `chart.line` and `chart.scatter` add one each, with a legend label.
+This example draws measurements together with the line fitted by
+[`Statistics.linearRegression`](STATISTICS.md#two-lists-covariance-correlation-and-a-fitted-line):
+
+```ahd
+bring Plot
+bring Statistics
+from Plot bring (Chart, LegendPosition)
+
+hours: List<Int> := [1, 2, 3, 4, 5]
+scores: List<Real> := [52.0, 57.5, 61.0, 68.5, 71.0]
+fit := Statistics.linearRegression(x: hours, y: scores)
+fitted: List<Real> := hours.map(lambda [@fit] (hour: Int) -> fit["slope"] * hour + fit["intercept"])
+
+chart: Chart := Plot.new()
+chart = chart.scatter(hours, scores, "measured")
+chart = chart.line(hours, fitted, "least-squares line")
+chart = chart.title("Study time and score").xLabel("hours").yLabel("score")
+chart = chart.legend(true).legendPosition(LegendPosition.topLeft)
+chart.save("fit.png")
+write("saved fit.png")
+```
+
+```text
+saved fit.png
+```
+
+`x` and `y` may each be a `List<Int>`, a `List<Real>`, or a Numeric `Vector`.
+For the distribution of a single List, use [`Plot.histogram` or
+`Plot.box`](#chart-types).
 
 ## Chart types
 
@@ -49,8 +137,7 @@ A single chart — line, scatter, bar, pie, heatmap, histogram, box, or error
 bar — produces a `Chart`. A multi-chart composition produces a `Figure` (see
 [Subplots](#subplots)).
 
-`Plot.pie` and `Plot.heatmap` were added in v2.2; both are described in
-[Pie](#pie) and [Heatmap](#heatmap) below.
+[Pie](#pie) and [Heatmap](#heatmap) are described below.
 
 ## Strict numeric input, no String coercion
 
@@ -144,7 +231,7 @@ from mathematical labels so formulas do not touch the chart border.
 A [pie](#pie) has no Cartesian axes, so `xLabel` and `yLabel` raise
 `PlotError` on one rather than being quietly dropped.
 
-## Plot styling (v2.4.0)
+## Plot styling
 
 Line and scatter series have a small, strongly typed style API. The style
 values are not arbitrary strings:
@@ -166,49 +253,94 @@ finite drawing values, and applying a line-only option to a scatter-only Chart
 and marker combination as the series, so the key remains truthful:
 
 ```ahd
+bring Plot
 from Plot bring (Chart, LineStyle, Marker, LegendPosition)
 
-chart: Chart := Plot.line(x, y)
-chart = chart.lineStyle(LineStyle.dashDot)
-    .lineWidth(2.0)
-    .marker(Marker.diamond)
-    .markerSize(7.0)
+x: List<Int> := [1, 2, 3, 4]
+y: List<Real> := [2.0, 5.0, 4.0, 8.0]
+chart: Chart := Plot.new().line(x, y, "measurement")
+chart = chart.lineStyle(LineStyle.dashDot).lineWidth(2.0)
+chart = chart.marker(Marker.diamond).markerSize(7.0)
 chart = chart.legend(true).legendPosition(LegendPosition.topLeft)
+chart.save("styled.png")
 ```
 
-## Mathematical text (v2.4.0)
+## Mathematical text
 
-Existing text APIs accept a whole-string math opt-in. A String whose complete
-contents are enclosed by matching `$...$` is rendered by the bundled offline
-Tectonic engine:
+A text argument whose **entire** contents are enclosed in one pair of `$...$`
+is typeset as mathematics by the bundled offline Tectonic (TeX) engine:
 
 ```ahd
-chart = chart.title("$f(x)=x^2+3x+2$").xLabel("$x$").yLabel("$\\sigma^2$")
-chart = chart.line(x, y, "$f(x)$").legend(true)
+bring Plot
+
+x: List<Int> := [0, 1, 2, 3]
+y: List<Int> := [2, 6, 12, 20]
+chart := Plot.new().line(x, y, "$f(x)$")
+chart = chart.title(r'$f(x)=x^{2}+3x+2$').xLabel("$x$").yLabel("$y$")
+chart = chart.legend(true)
+chart.save("math.png")
+write("saved math.png")
 ```
 
-The same rule applies to Chart titles and axes, line/scatter legend labels,
-pie labels and legends, bar categories, heatmap categories, and Surface
-titles, axis labels, z labels, and `xCategories`/`yCategories`. Ordinary
-strings, including `"Cost $100"`, remain ordinary text. v2.4.0 does not split
-mixed rich text such as `"Variance is $\\sigma^2$"`; that is future work.
+```text
+saved math.png
+```
 
-Malformed or hostile TeX is reported as a Plot error and never falls back to
-raw TeX or Unicode approximation. Fragments are bounded, validated against a
-controlled command set, compiled in an isolated temporary directory, and run
-with the packaged offline bundle only; file, shell, document, network, and
-package-loading commands are rejected. Plot and Surface share one bounded
-concurrent renderer cache, so a Surface frame does not start Tectonic again.
+**Where it works.** Chart titles and axis labels; line and scatter legend
+labels; pie labels and legends; bar categories; heatmap categories; and
+Surface titles, axis labels, z labels, and `xCategories`/`yCategories`.
 
-The same Tectonic result is used for PNG, SVG, and PDF. The in-process PDF
-rasterizer consumes the embedded Type-1C outlines and custom code-to-glyph
-encoding emitted by the pinned bundle; it never calls `SystemFonts()`, reads
-host font directories, starts an external PDF process, or uses the network.
-Missing embedded glyphs are a hard Plot error rather than a silent substitute.
-The surrounding chart remains vector-capable; math labels are transparent
-raster images embedded in SVG/PDF, which is the documented output trade-off.
-`\int`, `\frac`, `\sum`, subscripts, superscripts, and `\sqrt` are rendered by
-the same display-style-aware path.
+**The whole-string rule.** Only a String that begins with `$` and ends with the
+matching `$` is mathematics:
+
+| Text | Result |
+|---|---|
+| `"$\\sigma^2$"` | typeset σ² |
+| `"Cost $100"` | ordinary text |
+| `"Variance is $\\sigma^2$"` | ordinary text, shown literally with the dollar signs and backslash |
+
+Mixed text and mathematics in one String is **not supported**: it is neither
+split nor rejected, just drawn as ordinary text. Write the whole label as
+mathematics instead, writing words with `\mathrm{...}` and a space as `\ `:
+`r'$\mathrm{Variance}\ \sigma^{2}$'`. (`\text{...}` is not available with the
+bundled fonts and raises `PlotError`.)
+
+### TeX inside AhdCode strings
+
+TeX uses `\` and `{}`, and both mean something in an ordinary AhdCode String:
+`\` starts an escape and `{...}` is interpolation. In `"$x^{2}$"` the `{2}` is
+replaced by `2`, and `"$\\frac{a}{b}$"` would try to read variables `a` and
+`b`. Write TeX in a **raw string**, where neither is special:
+
+```ahd
+write(r'$\frac{a}{b}$')
+write("$x^{2}$")
+```
+
+```text
+$\frac{a}{b}$
+$x^2$
+```
+
+In an ordinary String, `\\` gives one backslash and `\{`/`\}` give literal
+braces: `"$e^\{i\\pi\}$"` is the same as `r'$e^{i\pi}$'`.
+
+**Supported TeX.** Fractions (`\frac`), roots (`\sqrt`), sums, integrals,
+subscripts and superscripts, Greek letters, and the other ordinary math-mode
+commands are rendered in display style. A fragment is bounded in size,
+checked against a controlled command set, and compiled in an isolated
+temporary directory with the packaged offline bundle only; file, shell,
+document, network, and package-loading commands are rejected. Malformed or
+rejected TeX raises `PlotError`; Plot never falls back to showing raw TeX or a
+Unicode approximation. Plot and Surface share one bounded renderer cache, so
+the same label is not compiled twice.
+
+**Output formats.** The same Tectonic result is used for PNG, SVG, and PDF.
+In SVG and PDF the chart stays vector graphics, while each mathematical label
+is embedded as a transparent high-resolution image. Glyphs come only from the
+fonts embedded in the bundle — never from host font directories, an external
+PDF process, or the network — and a missing glyph is a `PlotError` rather than
+a silent substitute.
 
 ## Multiple series
 
@@ -239,9 +371,15 @@ chart.save(path: String) -> Nothing
 figure.save(path: String) -> Nothing
 ```
 
-The output format is inferred from the file extension. Supported formats are
-PNG (`.png`), SVG (`.svg`), and PDF (`.pdf`); anything else raises
-`PlotError`:
+The output format is inferred from the file extension:
+
+| Output | Chart / Figure | Surface |
+|---|---|---|
+| `.png` | raster image | raster image (the only format) |
+| `.svg` | vector; math labels embedded as images | not available |
+| `.pdf` | vector; math labels embedded as images | not available |
+
+Any other extension raises `PlotError`:
 
 ```ahd
 chart.save("result.png")
@@ -307,23 +445,6 @@ definition, so the file is byte for byte what `chart.save(path)` or
 `figure.save(path)` writes, however the view is zoomed or turned. Saving
 works after the program that called `show()` has ended. The result — or why
 it failed — appears beside the toolbar for a few seconds.
-
-> **Fixed after v2.0.0.** In v2.0.0, a program that uses Plot but not GUI
-> did not find the helper that opens the save dialog, and Save reported
-> "Save needs AhdCode's GUI helper (ahdgui), which is not installed". The
-> compiler recorded the helper's location only for a program that used GUI
-> itself, so a Plot-only program compiled into a temporary directory had no
-> other way to find it. `chart.save(path)` and a packaged application were
-> never affected.
->
-> It is fixed in the repository and in v2.1: the location is now recorded
-> for a program that uses GUI **or** Plot, and Save needs no environment
-> variable. If you are running the published v2.0.0 release, name the
-> helper when you run the program until you upgrade:
->
-> ```sh
-> AHDCODE_GUI_RUNTIME=~/Library/AhdCode/current/libexec/ahdcode/ahdgui ahdcode run chart.ahd
-> ```
 
 `show()` returns as soon as the viewer window is open. The program continues
 and may call `show()` again; each call opens its own viewer, and a viewer
@@ -472,8 +593,8 @@ exact count. A `Figure` is an explicit, immutable value produced by
 `Plot.subplots` — there is no mutable global "current subplot" state.
 
 A `Figure`'s save/show size is derived deterministically from its grid
-dimensions (a fixed per-cell budget scaled by `rows` and `columns`); v0.1.14
-publishes no `Figure.size` method.
+dimensions (a fixed per-cell budget scaled by `rows` and `columns`); there is
+no `Figure.size` method.
 
 ## Surface
 
@@ -661,5 +782,9 @@ arbitrary custom plotter injection — these may be considered in a future
 release. Colour is fixed: there is no palette or colormap argument, no
 theme, and no font API. Axes are fixed too: no formatter callbacks, no
 arbitrary tick placement, no general Axis object, and no secondary axes.
-There is no numeric scalar type beyond `Int`/`Real` widening (no `Numeric`
-type) and no general GUI framework.
+Plot is not a general GUI framework; see [GUI](GUI.md) for windows and
+controls.
+
+**Related:** [Math](MATH.md) for the functions you plot,
+[Numeric](NUMERIC.md) for sample points and Surface grids, and
+[Statistics](STATISTICS.md) for summarizing the data you draw.
