@@ -1,4 +1,4 @@
-# AhdCode Öğrenci Rehberi (v2.4)
+# AhdCode Öğrenci Rehberi (v2.7)
 
 Bu rehber, **daha önce hiç programlama yapmamış birinin de takip edebilmesi** için hazırlanmıştır. Baştan sona sırayla okuyabilirsiniz; her bölümde önce ne yapmak istediğimizi görecek, sonra çalışan bir örnek yazacak, en son gerekli kuralları öğreneceksiniz.
 
@@ -14,12 +14,11 @@ belgesine geçin. Orada modüller `CSV → Data → Statistics/Plot → Excel/Wo
 Tek tek bütün imzalar ve sınır koşulları ise her modülün kendi referans
 belgesindedir.
 
-Public/runtime temeli v2.4.0'dır. İsimli Function `uses` capture sözdizimi
-kararlı dilin parçasıdır; v2.4 çevrimdışı matematik çizimini, tipli plot
-stillerini, yapılandırılabilir legend konumlarını ve mevcut görünümü kaydeden
-Surface Save'i ekler. Bu özellikler gerektiğinde
-[Fonksiyonlar](FUNCTIONS_TR.md) ve [Plot](PLOT_TR.md) referanslarından
-izlenmelidir.
+Bu rehber v2.7.0 genel sürümünü temel alır. İsimli Function `uses` capture
+sözdizimi kararlı dilin parçasıdır. 70–72. bölümler v2.3–v2.4 matematik
+çizimini ve stillerini, v2.5 güvenli dosya ve süreç işlemlerini, v2.6–v2.7
+salt okunur ağ ve sistem inceleme modüllerini tanıtır. Bağlantı verilen
+modül başvuruları API'lerin tamamını ve platform sınırlarını açıklar.
 
 Bu rehber öğretir; bir referans kılavuzu ya da değişiklik günlüğü değildir. Bir
 modülün, yeni başlayan birinin ilk okumada ihtiyaç duyduğundan fazlası varsa,
@@ -97,6 +96,9 @@ verir.
 - [67. Bir masaüstü uygulaması: tablolar, iletişim kutuları, 3B grafikler ve paketleme](#67-bir-masaüstü-uygulaması-tablolar-iletişim-kutuları-3b-grafikler-ve-paketleme)
 - [68. Dosya taşımak: yükleme, indirme, ekleme ve bildirme](#68-dosya-taşımak-yükleme-indirme-ekleme-ve-bildirme)
 - [69. Tek veri kümesi, üç resim: pasta, ısı haritası ve adlandırılmış eksenler](#69-tek-veri-kümesi-üç-resim-pasta-ısı-haritası-ve-adlandırılmış-eksenler)
+- [70. Matematiksel etiketler ve grafik stilleri](#70-matematiksel-etiketler-ve-grafik-stilleri)
+- [71. Bir sürümü güvenle hazırlamak](#71-bir-sürümü-güvenle-hazırlamak)
+- [72. Yayındaki servisi incelemek](#72-yayındaki-servisi-incelemek)
 
 ## 1. AhdCode nedir?
 
@@ -116,10 +118,9 @@ Merhaba!
 
 AhdCode, programı çalıştırmadan önce yazdığınız kodu kontrol eder. Örneğin bir metni sayı gibi kullanmaya çalışırsanız veya `null` olabilecek bir değeri kontrol etmeden kullanırsanız, mümkün olduğunda hatayı daha program başlamadan söyler. Ama başlangıçta bunun ayrıntılarını düşünmeniz gerekmiyor; ilerleyen bölümlerde örneklerle göreceğiz.
 
-AhdCode v1.0.0 ilk kararlı sürümdü. Güncel sürüm v2.4.0'dır. Önceki sürümlerde
-eklenen dil ve modül çalışmalarının yanında en yeni Plot/Surface matematik
-çizimi ve stil güncellemelerini de içerir. Bu rehber kararlı temeli öğretir;
-her modülün başvuru sayfası güncel API'nin tamamını belgeler.
+AhdCode v1.0.0 ilk kararlı sürümdü. Güncel sürüm v2.7.0'dır. Bu rehber
+kararlı temeli öğretir ve yeni modüller için ilk alıştırmayı verir; her
+modülün başvuru sayfası API'sinin tamamını belgeler.
 
 Onunla küçük komut satırı programları yazabilir veya bunları yerel executable uygulamalara derleyebilirsiniz; veriyi yerel bir SQLite veritabanında ya da bir MySQL sunucusunda tutabilirsiniz; birinci taraf `Web` çatısıyla eksiksiz bir web uygulaması kurabilirsiniz — sayfalar, yerleşimler, formlar, doğrulama, CSRF, flash mesajları, oturumlar ve dosya yüklemeleri; dış HTTP ve HTTPS API'leri çağırabilir, HTML ayrıştırabilir, SMTP ile e-posta gönderebilir, `Security` ile parola hashleyip güvenli belirteç üretebilir ve dil sunucusunu (`ahdcode lsp`) VS Code gibi bir editörden kullanabilirsiniz.
 
@@ -7527,3 +7528,129 @@ pastayı sırayla açın. Sonra ısı haritasını açın ve sorunuzu hangi resm
 daha hızlı yanıtladığını kendinize sorun.
 
 Grafik yüzeyinin tamamı için [Plot başvurusuna](PLOT_TR.md) bakın.
+
+## 70. Matematiksel etiketler ve grafik stilleri
+
+> v2.3.0–v2.4.0 arasında eklendi.
+
+Önceki bölümde soruya uygun grafiği seçtik. Şimdi çizgiye ve etiketlere anlam
+verelim. Tamamı `$...$` içine alınmış bir etiket, AhdCode ile gelen çevrimdışı
+motor tarafından matematik olarak dizilir. TeX komutlarında ters bölü ve
+süslü parantezlerin anlamı korunsun diye ham String (`r'...'`) kullanın:
+
+```ahd
+bring Plot
+from Plot bring (Chart, LineStyle, Marker, LegendPosition)
+
+chart: Chart := Plot.new().line([0, 1, 2, 3], [0, 1, 4, 9], r'$f(x)=x^{2}$')
+chart = chart.title("Kare fonksiyonu").xLabel("$x$").yLabel(r'$f(x)$')
+chart = chart.lineStyle(LineStyle.dashed).lineWidth(2.0)
+chart = chart.marker(Marker.circle).markerSize(6.0)
+chart = chart.legend(true).legendPosition(LegendPosition.topLeft)
+chart.save("kareler.png")
+```
+
+Etiketin tamamı matematik olmalıdır: `"Alan $x^2$"` sıradan metin olarak
+kalır. Paketli TeX motoru çevrimdışı çalışır; sistemde ayrıca TeX kurulu
+olması gerekmez. `Surface.save(path)` standart bir PNG üretirken etkileşimli
+görüntüleyicideki Save düğmesi ekranda görünen açıyı dışa aktarır. Geçerli
+stiller, biçimler ve matematik sözdizimi için [Plot](PLOT_TR.md) ve
+[Latex](LATEX_TR.md) başvurularına bakın.
+
+**Kendiniz deneyin:** İşaretçiyi `Marker.diamond` yapıp yeniden kaydedin;
+iki görseli karşılaştırın. Göstergedeki simge de seriyle birlikte değişmelidir.
+
+## 71. Bir sürümü güvenle hazırlamak
+
+> v2.5.0'da eklendi.
+
+Dağıtım bir arşivle başlayabilir, ama arşiv içindeki dosya adı da güvenilmeyen
+girdidir. `Archive.list` dosya yazmadan içerikleri gösterir;
+`Archive.extract` yalnızca **yeni** bir hedefe açar ve dosya sayısı ile bayt
+sınırlarını uygular. Hedefin dışına kaçan yolları ve bağlantıları reddeder:
+
+```ahd
+bring Archive
+from Archive bring ArchiveEntry
+
+entries: List<ArchiveEntry> := Archive.list("release.zip")
+for entry in entries {
+    write(entry.kind() + " " + entry.path())
+}
+Archive.extract(
+    archive: "release.zip"
+    destination: "yeni-hazirlik"
+    maxFiles: 100
+    maxBytes: 10485760
+)
+```
+
+Sonraki adım için [File](FILESYSTEM_TR.md) modülünde ikili veriyi koruyan
+`copy`, metin yazan `atomicWrite`, `atomicMove`, izin ve sembolik bağlantı
+işlemleri vardır. `atomicMove` aynı dosya sisteminde yeniden adlandırır;
+farklı dosya sistemine sessizce kopyalamaz. İşletim sistemi aracı gerekiyorsa
+[Process](PROCESS_TR.md), çalıştırılabilir dosyayı ayrı argüman listesiyle
+başlatır, bitmesini bekler ve çıkış kodunu döndürür. Kabuk sözdizimini
+yorumlamaz:
+
+```ahd
+bring Process
+from Process bring ProcessResult
+
+result: ProcessResult := Process.run(
+    command: "/bin/echo"
+    args: ["sürüm hazır"]
+    timeoutSeconds: 5
+)
+write(str(result.exitCode()) + ": " + result.stdout())
+```
+
+Ayrıcalıklı bir işçide bilinen mutlak program yolunu ve doğrulanmış
+argümanları kullanın; web girdisini doğrudan komut olarak aktarmayın.
+`Process.run` eşzamanlıdır. Canlı bir SQLite veritabanı için dosyayı
+kopyalamak yerine `db.backupTo("yeni-yedek.db")` kullanın: tutarlı bir anlık
+görüntü üretir ve var olan yedeğin üzerine yazmaz. Bkz.
+[SQLite](SQLITE_TR.md) ve [v2.5 örnekleri](../examples/v2.5/README_TR.md).
+
+**Kendiniz deneyin:** Güvenli arşiv örneğini çalıştırıp `maxFiles` değerini
+`1` yapın. Başarısız çıkarma işleminin yarım bir hedef bırakmadığını görün.
+
+## 72. Yayındaki servisi incelemek
+
+> v2.6.0–v2.7.0 arasında eklendi.
+
+Dağıtımdan sonra tek bir başarılı HTTP isteğini bütün sağlık denetimi
+saymak yerine ayrı sorular sorun:
+
+- [DNS](DNS_TR.md) alan adını IP adreslerine çözer. URL değil, ana makine adı
+  alır; `DNS.lookup("example.com")` sınırlı süreli sorgu yapar.
+- [TLS](TLS_TR.md) sunucuya bağlanıp sertifika doğrulamasını ve bitiş tarihini
+  bildirir. `TLS.inspect("example.com")` varsayılan olarak 443 portunu
+  kullanır; bağlantı hatası `TLSError` fırlatır, geçersiz bir sertifika ise
+  `valid() == false` ve sertifika bilgileriyle dönebilir.
+- [Disk](DISK_TR.md) var olan bir yolu içeren dosya sistemini raporlar.
+  Programın kullanıcısının yazabileceği alan için `availableBytes()`
+  kullanın; `freeBytes()` ayrılmış alanı da içerir.
+- [Service](SERVICE_TR.md) Linux systemd biriminin durumunu salt okunur
+  biçimde bildirir. macOS ve Windows'ta `ServiceError` fırlatır. Etkin bir
+  tek seferlik birimde `running() == false` olabilir.
+
+Taşınabilir disk denetimi için ağ veya harici komut gerekmez:
+
+```ahd
+bring Disk
+from Disk bring DiskInfo
+
+disk: DiskInfo := Disk.inspect(".")
+write(str(disk.usedPercent()) + "% dolu")
+write(str(disk.availableBytes()) + " bayt bu kullanıcıya açık")
+```
+
+Ağ ve sistem denetimleri için [v2.6](../examples/v2.6/README_TR.md) ve
+[v2.7](../examples/v2.7/README_TR.md) örneklerini izleyin. DNS ve TLS ağ
+erişimi, Service ise systemd'li Linux gerektirir. Modüller olguları bildirir;
+uyarı eşiğine ve yapılacak işleme programınız karar verir.
+
+**Kendiniz deneyin:** Projenizi içeren dosya sistemini inceleyip
+`freeBytes()` ile `availableBytes()` değerlerini karşılaştırın. Linux'ta
+bildiğiniz bir servisin `activeState()` ve `running()` değerlerine de bakın.

@@ -1,4 +1,4 @@
-# AhdCode Student Guide (v2.4)
+# AhdCode Student Guide (v2.7)
 
 This guide is designed so that **even someone who has never programmed before** can follow along. You can read it in order from beginning to end; in each section, you will first see what we want to achieve, then write a working example, and finally learn the necessary rules.
 
@@ -18,11 +18,11 @@ This guide teaches; it is not a reference manual and not a changelog. Where a
 module has more to it than a beginner needs on the first pass, the section
 says so and links to the reference page that lists every signature.
 
-The public/runtime baseline is v2.4.0. Named-Function `uses` captures are part
-of the stable language, and v2.4 adds offline math rendering, typed plot
-styles, configurable legend positions, and current-view Surface Save. Use the
-focused [Functions](FUNCTIONS.md) and [Plot](PLOT.md) references when you need
-those features.
+This guide targets the v2.7.0 public release. Named-Function `uses` captures
+are part of the stable language. Sections 70–72 introduce the mathematical
+rendering and styling from v2.3–v2.4, the safe file and process operations from
+v2.5, and the read-only network and system inspection modules from v2.6–v2.7.
+The linked module references give their complete APIs and platform limits.
 
 ## Table of Contents
 - [1. What is AhdCode?](#1-what-is-ahdcode)
@@ -95,6 +95,9 @@ those features.
 - [67. A desktop application: tables, dialogs, 3D charts, and packaging](#67-a-desktop-application-tables-dialogs-3d-charts-and-packaging)
 - [68. Moving files: upload, download, attach, and notify](#68-moving-files-upload-download-attach-and-notify)
 - [69. One dataset, three pictures: pie, heatmap, and named axes](#69-one-dataset-three-pictures-pie-heatmap-and-named-axes)
+- [70. Mathematical labels and plot styles](#70-mathematical-labels-and-plot-styles)
+- [71. Safely preparing a release](#71-safely-preparing-a-release)
+- [72. Inspecting a deployed service](#72-inspecting-a-deployed-service)
 
 ## 1. What is AhdCode?
 
@@ -114,11 +117,9 @@ Hello!
 
 AhdCode checks the code you wrote before running the program. For example, if you try to use text like a number, or if you use a value that could be `null` without checking it, it will tell you the error before the program even starts, whenever possible. But you don't need to think about these details at the beginning; we'll see examples in later sections.
 
-AhdCode v1.0.0 was the first stable release. The current release is v2.4.0.
-It includes the language and module work introduced across the earlier
-releases, plus the latest Plot/Surface math rendering and styling updates. This
-guide teaches the stable foundation; each module's reference page documents
-its complete current API.
+AhdCode v1.0.0 was the first stable release. The current release is v2.7.0.
+This guide teaches the stable foundation and gives a first exercise for the
+newer modules; each module's reference page documents its complete API.
 
 With it you can write small command-line programs or compile them into native executables; keep data in a local SQLite database or a MySQL server; build a complete web application with the first-party `Web` framework -- pages, layouts, forms, validation, CSRF, flash messages, sessions, and file uploads; call external HTTP and HTTPS APIs; parse HTML; send mail through SMTP; hash passwords and generate secure tokens with `Security`; and use the language server (`ahdcode lsp`) from an editor such as VS Code.
 
@@ -7475,3 +7476,127 @@ Then open the heatmap and ask yourself which picture answered your question
 faster.
 
 See the [Plot reference](PLOT.md) for the full chart surface.
+
+## 70. Mathematical labels and plot styles
+
+> Added across v2.3.0–v2.4.0.
+
+Section 69 chose a chart that fits the question. Now give its line and labels
+meaning. A complete label surrounded by `$...$` is rendered as mathematics
+by the offline engine included with AhdCode. Use a raw string (`r'...'`) for
+TeX commands so backslashes and braces keep their TeX meaning:
+
+```ahd
+bring Plot
+from Plot bring (Chart, LineStyle, Marker, LegendPosition)
+
+chart: Chart := Plot.new().line([0, 1, 2, 3], [0, 1, 4, 9], r'$f(x)=x^{2}$')
+chart = chart.title("Square function").xLabel("$x$").yLabel(r'$f(x)$')
+chart = chart.lineStyle(LineStyle.dashed).lineWidth(2.0)
+chart = chart.marker(Marker.circle).markerSize(6.0)
+chart = chart.legend(true).legendPosition(LegendPosition.topLeft)
+chart.save("squares.png")
+```
+
+The entire label must be mathematical: `"Area $x^2$"` stays ordinary text.
+The packaged TeX engine works offline; no system TeX installation is needed.
+`Surface.save(path)` creates a canonical PNG, while the interactive viewer's
+Save button exports the view currently on screen. For valid styles, formats,
+and math syntax, see [Plot](PLOT.md) and [Latex](LATEX.md).
+
+**Try it yourself:** Change the marker to `Marker.diamond`, save again, and
+compare the two images. The legend symbol should change with the series.
+
+## 71. Safely preparing a release
+
+> Added in v2.5.0.
+
+Deployment starts with an archive, but a filename inside an archive is still
+untrusted input. `Archive.list` lets you inspect it without writing files;
+`Archive.extract` accepts only a **new** destination and enforces file-count
+and byte limits. It rejects paths that escape the destination and links:
+
+```ahd
+bring Archive
+from Archive bring ArchiveEntry
+
+entries: List<ArchiveEntry> := Archive.list("release.zip")
+for entry in entries {
+    write(entry.kind() + " " + entry.path())
+}
+Archive.extract(
+    archive: "release.zip"
+    destination: "staging-new"
+    maxFiles: 100
+    maxBytes: 10485760
+)
+```
+
+For the next step, [File](FILESYSTEM.md) has binary-safe `copy`, text-only
+`atomicWrite`, `atomicMove`, permissions, and symbolic-link operations.
+`atomicMove` renames within a filesystem; it never silently copies across
+filesystems. If an operating-system tool is necessary, [Process](PROCESS.md)
+runs an executable with a separate argument list, waits for it, and returns
+its exit code. It does not interpret shell syntax:
+
+```ahd
+bring Process
+from Process bring ProcessResult
+
+result: ProcessResult := Process.run(
+    command: "/bin/echo"
+    args: ["release ready"]
+    timeoutSeconds: 5
+)
+write(str(result.exitCode()) + ": " + result.stdout())
+```
+
+Use a known absolute executable and validated arguments in a privileged
+worker; do not pass arbitrary web input as commands. `Process.run` is
+synchronous. For a live SQLite database, use `db.backupTo("new-backup.db")`
+instead of copying the database file: it makes a consistent snapshot and
+refuses to overwrite an existing backup. See [SQLite](SQLITE.md) and the
+[v2.5 examples](../examples/v2.5/README.md).
+
+**Try it yourself:** Run the safe archive example, then change `maxFiles` to
+`1`. Notice that the failed extraction leaves no partial destination.
+
+## 72. Inspecting a deployed service
+
+> Added across v2.6.0–v2.7.0.
+
+After deployment, ask separate questions rather than treating one successful
+HTTP request as a complete health check:
+
+- [DNS](DNS.md) resolves a host to its IP addresses. It accepts a host name,
+  not a URL; `DNS.lookup("example.com")` performs a bounded lookup.
+- [TLS](TLS.md) connects to a host and reports certificate verification and
+  expiry. `TLS.inspect("example.com")` uses port 443 by default; a connection
+  error raises `TLSError`, while an invalid certificate can still return
+  metadata with `valid() == false`.
+- [Disk](DISK.md) reports the filesystem containing an existing path. Use
+  `availableBytes()` to ask how many bytes this program's user may still
+  write; `freeBytes()` includes reserved space.
+- [Service](SERVICE.md) reads a Linux systemd unit's state. It is read-only,
+  and raises `ServiceError` on macOS and Windows. An active one-shot unit can
+  have `running() == false`.
+
+The portable disk check needs no network or external command:
+
+```ahd
+bring Disk
+from Disk bring DiskInfo
+
+disk: DiskInfo := Disk.inspect(".")
+write(str(disk.usedPercent()) + "% used")
+write(str(disk.availableBytes()) + " bytes available to this user")
+```
+
+For network and system checks, work through the [v2.6](../examples/v2.6/README.md)
+and [v2.7](../examples/v2.7/README.md) examples. DNS and TLS require network
+access; Service requires Linux with systemd. These modules report facts; your
+program decides the warning threshold and what action to take.
+
+**Try it yourself:** Inspect the filesystem containing your project and
+compare `freeBytes()` with `availableBytes()`. On Linux, also inspect a known
+service and compare `activeState()` with `running()`.
