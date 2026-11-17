@@ -236,7 +236,7 @@ func protocolRunEvents(t *testing.T, lines ...string) ([]response, []event) {
 	return replies, events
 }
 
-const openLine = `{"op":"open","id":1,"version":2,"width":100,"height":80,"title":"x","headless":true,"background":[255,255,255,255]}`
+const openLine = `{"op":"open","id":1,"version":3,"width":100,"height":80,"title":"x","headless":true,"background":[255,255,255,255]}`
 
 func TestProtocolLifecycle(t *testing.T) {
 	directory := t.TempDir()
@@ -278,7 +278,7 @@ func TestProtocolLifecycle(t *testing.T) {
 }
 
 func TestProtocolListenAndScriptReplay(t *testing.T) {
-	open := `{"op":"open","id":1,"version":2,"width":100,"height":80,"headless":true,"background":[255,255,255,255],` +
+	open := `{"op":"open","id":1,"version":3,"width":100,"height":80,"headless":true,"background":[255,255,255,255],` +
 		`"script":[{"event":"key","key":"ArrowUp"},{"event":"click","x":10.5,"y":-3},{"event":"key","key":"A"}]}`
 	replies, events := protocolRunEvents(t, open, `{"op":"listen","id":2,"kind":"click"}`, `{"op":"listen","id":3,"kind":"key"}`,
 		`{"op":"listen","id":4,"kind":"wheel"}`, `{"op":"wait","id":5}`, `{"op":"close","id":6}`)
@@ -298,10 +298,10 @@ func TestProtocolListenAndScriptReplay(t *testing.T) {
 
 func TestProtocolRejectsBadScripts(t *testing.T) {
 	for _, line := range []string{
-		`{"op":"open","version":2,"width":10,"height":10,"background":[0,0,0,255],"script":[{"event":"key","key":"ArrowUp"}]}`,
-		`{"op":"open","version":2,"width":10,"height":10,"headless":true,"background":[0,0,0,255],"script":[{"event":"key","key":"F13"}]}`,
-		`{"op":"open","version":2,"width":10,"height":10,"headless":true,"background":[0,0,0,255],"script":[{"event":"closed"}]}`,
-		`{"op":"open","version":2,"width":10,"height":10,"headless":true,"background":[0,0,0,255],"script":[{"event":"wheel"}]}`,
+		`{"op":"open","version":3,"width":10,"height":10,"background":[0,0,0,255],"script":[{"event":"key","key":"ArrowUp"}]}`,
+		`{"op":"open","version":3,"width":10,"height":10,"headless":true,"background":[0,0,0,255],"script":[{"event":"key","key":"F13"}]}`,
+		`{"op":"open","version":3,"width":10,"height":10,"headless":true,"background":[0,0,0,255],"script":[{"event":"closed"}]}`,
+		`{"op":"open","version":3,"width":10,"height":10,"headless":true,"background":[0,0,0,255],"script":[{"event":"wheel"}]}`,
 	} {
 		replies := protocolRun(t, line)
 		if len(replies) != 1 || replies[0].OK {
@@ -337,9 +337,9 @@ func TestKeyNamesAreTheDocumentedSet(t *testing.T) {
 func TestProtocolRejectsBadOpen(t *testing.T) {
 	for _, line := range []string{
 		`{"op":"open","version":1,"width":100,"height":80,"background":[0,0,0,255]}`,
-		`{"op":"open","version":2,"width":0,"height":80,"background":[0,0,0,255]}`,
-		`{"op":"open","version":2,"width":5000,"height":80,"background":[0,0,0,255]}`,
-		`{"op":"open","version":2,"width":10,"height":10}`,
+		`{"op":"open","version":3,"width":0,"height":80,"background":[0,0,0,255]}`,
+		`{"op":"open","version":3,"width":5000,"height":80,"background":[0,0,0,255]}`,
+		`{"op":"open","version":3,"width":10,"height":10}`,
 		`{"op":"line"}`,
 	} {
 		replies := protocolRun(t, line)

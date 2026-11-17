@@ -10,6 +10,7 @@ import (
 	"ahdcode/internal/parser"
 	"ahdcode/internal/semantic"
 	"ahdcode/internal/source"
+	"ahdcode/internal/syntax/token"
 )
 
 func formatText(t *testing.T, text string) string {
@@ -392,5 +393,71 @@ func TestFormatterKeepsRequirePathOnOneLine(t *testing.T) {
 	}
 	if !strings.Contains(long, "require(\""+longPath+"\")") {
 		t.Fatalf("require path was rewritten:\n%s", long)
+	}
+}
+
+// A uses list on its own line, with the brace on the next, is valid source.
+// v2.7.0 rewrote such a Function into text that no longer parsed.
+func TestFunctionHeaderSpreadOverLinesKeepsEveryToken(t *testing.T) {
+	input := "a: Int := 1\nb: Int := 2\n" +
+		"f: Function := ()\n->\nNothing // why\nuses\n[@a, @b]\n{\n    a += b\n    if a > 2 or b < 1 {\n        b = -b\n    }\n    write(\"{a}\")\n}\nf()\n"
+	want := "a: Int := 1\nb: Int := 2\n// why\n" +
+		"f: Function := () -> Nothing uses [@a, @b] {\n    a += b\n    if a > 2 or b < 1 {\n        b = -b\n    }\n    write(\"{a}\")\n}\nf()\n"
+	formatted := formatText(t, input)
+	if formatted != want {
+		t.Fatalf("formatted:\n%s\nwant:\n%s", formatted, want)
+	}
+	if twice := formatText(t, formatted); twice != formatted {
+		t.Fatalf("not idempotent:\n%s", twice)
+	}
+}
+
+func TestContentCheckNoticesLostTokensAndComments(t *testing.T) {
+	lex := func(text string) []token.Token { return lexer.Lex(source.NewFile(1, "t.ahd", text)).Tokens }
+	base := lex("x: Int := 5 // five\nwrite(x, 1)\n")
+	for name, text := range map[string]string{
+		"same":         "x: Int := 5 // five\nwrite(x, 1)\n",
+		"reflowed":     "x: Int := 5 // five\nwrite(\n    x\n    1\n)\n",
+		"moved":        "// five\nx: Int := 5\nwrite(x, 1)\n",
+		"lost token":   "x: Int := 5 // five\nwrite(x)\n",
+		"lost comment": "x: Int := 5\nwrite(x, 1)\n",
+		"new token":    "x: Int := 5 // five\nwrite(x, 1, 1)\n",
+	} {
+		want := name == "same" || name == "reflowed" || name == "moved"
+		if got := sameContent(base, lex(text)); got != want {
+			t.Errorf("%s: sameContent = %v, want %v", name, got, want)
+		}
+	}
+}
+
+// A newline the parser skips, or a line comment in that gap, is still the
+// same program. Formatting it must not report FMT001.
+func TestMultilineExpressionsFormatWithoutLosingTokens(t *testing.T) {
+	input := `f := lambda (x: Int)
+    -> x + 1
+f2 := lambda (x: Int) -> // keep
+    x + 1
+draw(name:
+    1)
+draw(name: // named
+    2)
+point := {"x":
+    1
+"y": 2}
+value := a + // note
+    b
+grouped := ( // inside
+    a)
+item := values[1: // end
+    2]
+`
+	formatted := formatText(t, input)
+	for _, fragment := range []string{"// keep", "// named", "// note", "// inside", "// end", "x + 1", "\"y\": 2"} {
+		if !strings.Contains(formatted, fragment) {
+			t.Fatalf("formatted text lost %q:\n%s", fragment, formatted)
+		}
+	}
+	if twice := formatText(t, formatted); twice != formatted {
+		t.Fatalf("not idempotent:\nfirst:\n%s\nsecond:\n%s", formatted, twice)
 	}
 }

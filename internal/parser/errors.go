@@ -15,4 +15,5 @@ const (
 	codeInvalidLambdaSyntax     = "PAR012"
 	codeLeadingDotContinuation  = "PAR013"
 	codeInvalidRequireArgument  = "PAR014"
+	codeReservedKeywordName     = "PAR015"
 )

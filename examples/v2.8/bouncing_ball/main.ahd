@@ -1,0 +1,75 @@
+// A ball that bounces off the four walls. A timer redraws the Canvas about
+// sixty times a second; each tick is shown as one complete frame.
+// Space pauses and resumes, S saves a picture, Escape ends.
+bring Graphics
+from Graphics bring (Canvas)
+
+canvas: Canvas := Graphics.open(480, 320, "Bouncing ball")
+
+radius: Constant := 20.0
+x: Real := 0.0
+y: Real := 0.0
+speedX: Real := 4.0
+speedY: Real := 3.0
+bounces: Int := 0
+timer: Int := 0
+running: Bool := false
+
+frame: Function := () -> Nothing uses [
+    @canvas
+    @radius
+    @x
+    @y
+    @speedX
+    @speedY
+    @bounces
+] {
+    x += speedX
+    y += speedY
+    if x > 240 - radius or x < -240 + radius {
+        speedX = -speedX
+        bounces += 1
+    }
+    if y > 160 - radius or y < -160 + radius {
+        speedY = -speedY
+        bounces += 1
+    }
+    canvas.clear("#102030")
+    canvas.circle(x, y, radius, "white", "#ffa500", 2)
+    canvas.text(-230, 135, "Bounces: {bounces}", "white", 18)
+}
+
+start: Function := () -> Nothing uses [@canvas, @timer, @running] {
+    timer = canvas.every(16, frame)
+    running = true
+}
+
+pressed: Function := (
+    key: String
+) -> Nothing uses [@canvas, @timer, @running, @bounces] {
+    if key == "Space" {
+        if running {
+            canvas.cancel(timer)
+            running = false
+            write("Paused after {bounces} bounces.")
+        }
+        else {
+            start()
+            write("Resumed.")
+        }
+    }
+    if key == "S" {
+        canvas.save("bouncing-ball.png")
+        write("Saved bouncing-ball.png")
+    }
+    if key == "Escape" {
+        canvas.close()
+    }
+}
+
+write("Space pauses, S saves, Escape ends.")
+frame()
+start()
+canvas.onKey(pressed)
+canvas.wait()
+write("The ball bounced {bounces} times.")

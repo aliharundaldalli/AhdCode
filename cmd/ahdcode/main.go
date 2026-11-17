@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -47,7 +48,7 @@ usage:
   ahdcode kill  [--force] <app.dev|app.run>  forcibly stop a dev or run session
   ahdcode local status                       show local routes and the local router
   ahdcode local hosts [apply|remove]         manage AhdCode's block in the hosts file
-  ahdcode format [--check] <file.ahd>        canonicalize source in place
+  ahdcode format [--check] <file.ahd|folder>...  canonicalize sources in place
   ahdcode lsp                                start the language server (stdio)
   ahdcode --help                             show this help
   ahdcode --version                          print the compiler version
@@ -443,7 +444,7 @@ func format(item diagnostics.Diagnostic, files map[source.FileID]source.File) st
 
 func runFormat(arguments []string, output, errorOutput io.Writer) int {
 	check := false
-	path := ""
+	var targets []string
 	for _, argument := range arguments {
 		switch argument {
 		case "--check":
@@ -453,17 +454,63 @@ func runFormat(arguments []string, output, errorOutput io.Writer) int {
 				fmt.Fprintf(errorOutput, "ahdcode format: unknown flag %q\n", argument)
 				return 2
 			}
-			if path != "" {
-				fmt.Fprintln(errorOutput, "ahdcode format: exactly one source file is expected")
-				return 2
-			}
-			path = argument
+			targets = append(targets, argument)
 		}
 	}
-	if path == "" {
-		fmt.Fprintln(errorOutput, "ahdcode format: one source file is required")
+	if len(targets) == 0 {
+		fmt.Fprintln(errorOutput, "ahdcode format: a source file or a folder is required")
 		return 2
 	}
+	// Every target is formatted even after one fails, so a single run lists
+	// every file that needs attention.
+	status := 0
+	for _, target := range targets {
+		paths, err := formatTargets(target)
+		if err != nil {
+			fmt.Fprintf(errorOutput, "ahdcode format: could not read %s: %v\n", target, err)
+			status = 1
+			continue
+		}
+		for _, path := range paths {
+			if formatFile(path, check, errorOutput) != 0 {
+				status = 1
+			}
+		}
+	}
+	return status
+}
+
+// formatTargets expands one command-line target: a file stands for itself and
+// a folder for every .ahd file below it, in a stable order. Hidden folders
+// hold tool state rather than sources and are skipped.
+func formatTargets(target string) ([]string, error) {
+	info, err := os.Stat(target)
+	if err != nil {
+		return nil, err
+	}
+	if !info.IsDir() {
+		return []string{target}, nil
+	}
+	var paths []string
+	err = filepath.WalkDir(target, func(path string, entry fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() {
+			if path != target && strings.HasPrefix(entry.Name(), ".") {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if strings.HasSuffix(entry.Name(), ".ahd") {
+			paths = append(paths, path)
+		}
+		return nil
+	})
+	return paths, err
+}
+
+func formatFile(path string, check bool, errorOutput io.Writer) int {
 	content, err := os.ReadFile(path)
 	if err != nil {
 		fmt.Fprintf(errorOutput, "ahdcode format: could not read %s: %v\n", path, err)

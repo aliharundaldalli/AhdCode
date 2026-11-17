@@ -1,6 +1,6 @@
 # AhdCode Language Specification v0.1
 
-**Status:** Normative language specification for AhdCode v1.0.0<br>
+**Status:** Normative language specification for AhdCode; core language as released in v1.0.0, with the later revisions listed below, through v2.8.0<br>
 **Historical note:** Historical filename retained for compatibility<br>
 **Clarification revision:** 2026-09-07; normative core specification as released in v1.0.0<br>
 **Primary implementation target:** Go<br>
@@ -9,8 +9,15 @@
 
 **v2.3.0 release note:** The v2.3.0 release extends the Function declaration
 surface with nested named Functions and the explicit `uses [#local, @module]`
-dependency clause described in §15. The public and runtime language version is
-v2.3.0.
+dependency clause described in §15.
+
+**v2.8.0 revision note:** v2.8.0 adds no syntax. It records that a `uses`
+entry is the other spelling of a `Global` declaration (§9.3), states the
+inferred declaration with a modifier (§8.1), states how module constants are initialized (§10.1), tightens diagnostic recovery
+(§93) and the formatter contract (§3.3, §94), and extends Graphics (§92).
+Standard modules added between v2.1 and v2.7 are indexed in §91. The version
+in the title and the file name is historical; this document is the current
+specification.
 
 ---
 
@@ -207,7 +214,9 @@ The formatter should prefer:
 - consistent indentation;
 - one statement per line.
 
-Formatting must not change program semantics.
+Formatting must not change program semantics. Since v2.8.0 this is a checked
+guarantee: the formatter emits exactly the tokens and comments it read and
+refuses to write a file otherwise (§94).
 
 ---
 
@@ -907,6 +916,11 @@ no underlying type; write `value: User? := null`. Scope intent remains
 explicit: a nested inferred declaration is `name: Local := "Ali"`, while a
 bare nested `name := "Ali"` remains invalid under §9.
 
+A modifier may stand where the type would: `limit: Constant := 20.0` declares
+a `Constant Real`, and `step: Local Constant := 2` a nested `Constant Int`.
+Only the value type is inferred; the modifier applies exactly as it does on an
+explicitly typed declaration (§10, §10.1).
+
 ### 8.2 Reassignment
 
 An existing binding uses:
@@ -1027,6 +1041,24 @@ increase: Function := (
 
 No hidden global capture is allowed.
 
+A Function that declares its dependencies with a `uses` clause (§15) names a
+module-root binding as `@name` there instead:
+
+```ahd
+increase: Function := () -> Nothing uses [@counter] {
+    counter++
+}
+```
+
+The two spellings install the same alias of the same module binding: the same
+type, the same nullability, the same `Constant` protection, and the same live
+value, so an assignment through either is visible to every reader. They differ
+only in that a `Global` declaration may restate the type, which the compiler
+then checks against the binding. `uses` is available on module-root Functions,
+methods, and nested Functions alike. Neither spelling is implicit: a
+module-root binding that is neither declared `Global` nor listed in `uses` is
+not visible inside a callable.
+
 `Global` refers specifically to a module-root binding from inside a function, method, or structure body. It is not used for an enclosing Local binding within the same callable. Code executing in a module-level control-flow block may access module-root bindings directly and does not declare them `Global`.
 
 ### 9.4 Shadowing
@@ -1092,6 +1124,10 @@ It may contain only:
 Function calls, mutable binding references, member or index access, List/Pair/Class construction, and interpolation are not constant expressions.
 
 A cycle in the dependency graph of Constant initializers is a compile-time error.
+
+A Constant whose type is inferred (§8.1) is held to this section exactly as one whose type is written out. A reference to a Constant declared later in the same module is resolved before the check.
+
+A module initializes constants by these rules. An initializer that refers only to other constants runs after those constants and before the module's other statements; the resolved value is the value the program observes. An initializer that reads a mutable binding stays where it is written, after that binding. An initializer that calls a function also stays where it is written: the call is not treated as side-effect free, and the function declaration is not a value initialization the constant waits for. A use before the constant can be initialized under these rules is a compile-time error (`SEM010`). A cycle is a compile-time error (`SEM010`). Neither runs as a zero value.
 
 This definition is normative wherever the language requires compile-time knowledge. Power typing does not depend on constant-expression evaluation.
 
@@ -4208,6 +4244,8 @@ missing part. Lambda blocks remain rejected as expression-lambda syntax.
 Runtime domain failures remain AhdCode Errors (`RegexError`, `ValueError`,
 `CSVError`, or `FileError`) and must not expose Go panics or stack traces.
 
+§93 states the recovery rules added in v2.8.0.
+
 ---
 
 ## 53. Data Standard Module (v0.1.12)
@@ -6305,6 +6343,7 @@ standard input and output; its standard error is not part of the protocol.
 The helper keeps the drawing list, shows it in a window, and derives PNG
 (one pixel per unit) and SVG output from that same list. It executes no shell
 command, performs no network access, and writes only the path `save` names.
+The v2.8.0 members of Canvas are specified in §92.
 A program's open Canvases close when the program ends. The helper is found
 through `AHDCODE_GRAPHICS_RUNTIME`, the location the compiler recorded, or the
 installation beside the running executable; `PATH` is not searched.
@@ -6686,4 +6725,150 @@ and icon. Packaging changes no language semantics.
 
 ---
 
-# End of AhdCode v0.1 Core Specification
+## 91. Standard Modules Added in v2.1–v2.7
+
+These releases added no syntax and no type-system rule. Each module below is a
+compiler-supplied `builtin:` module that a local file of the same name cannot
+shadow, raises only its own `Error` subclass for run-time failures, starts no
+shell, and is specified in its guide under `docs/`, which is normative for its
+surface.
+
+| Release | Module | Surface | Guide |
+|---|---|---|---|
+| v2.1 | `HTTP` | `Client.download`, `Client.sendToFile` returning `ClientFileResponse`; `ClientRequest.withMultipartField`, `withMultipartFile`; `HTTP.webSocketClient` (§77) | `docs/HTTP.md`, `docs/WEBSOCKET.md` |
+| v2.1 | `SMTP` | `SMTPMessage.withAttachment(path, fileName, contentType)` | `docs/SMTP.md` |
+| v2.2 | `Plot` | `Plot.pie`, `Plot.heatmap`, `Surface.xCategories`, `Surface.yCategories` (§56.9) | `docs/PLOT.md` |
+| v2.4 | `Plot` | typed `LineStyle`, `Marker`, `LegendPosition`; `lineWidth`, `markerSize`; whole-string `$...$` math labels | `docs/PLOT.md` |
+| v2.5 | `Archive` | `Archive.list`, bounded all-or-nothing `Archive.extract` | `docs/ARCHIVE.md` |
+| v2.5 | `File` | `copy`, `atomicWrite`, `atomicMove`, `symlink`, `readLink`, `isSymlink`, `setPermissions`, `walk` | `docs/FILESYSTEM.md` |
+| v2.5 | `Process` | `Process.run(command, args)` with a timeout and an output budget; `ProcessError` | `docs/PROCESS.md` |
+| v2.5 | `SQLite` | `db.backupTo(path)` | `docs/SQLITE.md` |
+| v2.6 | `DNS` | `DNS.lookup(host, timeoutSeconds) -> DNSResult`; `DNSError` | `docs/DNS.md` |
+| v2.6 | `TLS` | `TLS.inspect(host, port, timeoutSeconds) -> TLSInfo`; `TLSError` | `docs/TLS.md` |
+| v2.7 | `Disk` | `Disk.inspect(path) -> DiskInfo`; `DiskError` | `docs/DISK.md` |
+| v2.7 | `Service` | `Service.status(name) -> ServiceInfo`; `ServiceError` | `docs/SERVICE.md` |
+
+The one language-surface change in this range is the v2.3.0 `uses` clause of
+§15, which §9.3 relates to `Global`.
+
+## 92. Graphics Shapes, Text, Images, Pointer Events, and Timers (v2.8.0)
+
+Canvas gains the members below. They follow every rule of §80: published
+parameter names and defaults, calls entirely positional or entirely named,
+`Int` widening to `Real`, Cartesian coordinates, the same colors, and
+`GraphicsError` on a closed Canvas.
+
+```text
+Canvas.ellipse(x: Real, y: Real, radiusX: Real, radiusY: Real, stroke: String := "black",
+               fill: String? := null, width: Real := 1.0)                         -> Nothing
+Canvas.polygon(points: List<Real>, stroke: String := "black",
+               fill: String? := null, width: Real := 1.0)                         -> Nothing
+Canvas.polygon(points: List<Int>, stroke: String := "black",
+               fill: String? := null, width: Real := 1.0)                         -> Nothing
+Canvas.arc(x: Real, y: Real, radius: Real, start: Real, end: Real,
+           color: String := "black", width: Real := 1.0)                          -> Nothing
+Canvas.text(x: Real, y: Real, text: String, color: String := "black",
+            size: Real := 16.0, align: String := "left")                          -> Nothing
+Canvas.image(path: String, x: Real, y: Real,
+             width: Real := 0.0, height: Real := 0.0)                             -> Nothing
+Canvas.onMove(handler: (x: Real, y: Real) -> Nothing)                             -> Nothing
+Canvas.onDrag(handler: (x: Real, y: Real) -> Nothing)                             -> Nothing
+Canvas.every(milliseconds: Int, handler: () -> Nothing)                           -> Int
+Canvas.cancel(timer: Int)                                                         -> Nothing
+Canvas.batch(handler: () -> Nothing)                                              -> Nothing
+```
+
+`polygon` is the one overloaded member: `points` is a flat list
+`x0, y0, x1, y1, ...` of `Real` or of `Int`, with 3 to 2000 vertices and an even
+count of numbers; the outline is closed, and a self-intersecting polygon fills
+every region its outline encloses (non-zero winding). `ellipse` requires radii
+of 0 or greater and draws nothing when one is 0. `arc` measures `start` and
+`end` in degrees counterclockwise from `+x`, runs counterclockwise when
+`end > start` and clockwise otherwise, is clamped to one full turn, and has
+round ends and no fill.
+
+`text` draws one line, at most 1000 characters and without a line break, in
+the single bundled typeface. `(x, y)` lies on the baseline; `align` is `left`,
+`center`, or `right` and places the text's start, middle, or end at `x`; `size`
+is the font height in Canvas units, greater than 0 and at most 2000. PNG and
+SVG output draw the same glyph outlines, so no output depends on an installed
+font.
+
+`image` draws a PNG or JPEG file with its lower-left corner at `(x, y)`.
+Width and height of 0 mean the natural size; exactly one of them given keeps
+the aspect ratio; both given stretch. A relative path resolves against the
+working directory.
+
+`onMove` reports the pointer position while no button is held. `onDrag`
+reports it while a left-button press that began inside the Canvas continues,
+including after the pointer leaves, so a coordinate may lie outside. A press
+that began outside is not a drag. The press itself is a click, not a drag.
+Both are reported at most once per tick, and the window ticks 60 times a
+second, in Canvas coordinates. `every` registers a repeating timer and returns its identifier;
+the interval is 1 millisecond to one day and a Canvas holds at most 64 timers.
+`cancel` stops a timer and ignores an identifier that names none. Move, drag,
+and timer callbacks obey the event rules of §84: they run only inside
+`Canvas.wait`, one at a time, in arrival order, on the program's own path of
+execution, and an error raised by one closes the Canvas and propagates out of
+`wait`. Pending move positions are replaced by the newest; drag positions and
+timer turns are not replaced, and a timer whose callback outlasts its interval
+skips the turns it missed.
+
+Everything a timer callback draws is presented as one frame. `batch(handler)`
+gives the same guarantee to any code: the window keeps its last complete
+picture until `handler` returns, also when it raises. Batches nest.
+
+Under `AHDCODE_GRAPHICS_HEADLESS=1` a Canvas has no clock and its timers do
+not run. The helper additionally reads the image files a program draws; §81
+is otherwise unchanged.
+
+## 93. One Mistake, One Diagnostic (v2.8.0)
+
+This section extends §52. Diagnostic messages and hints are written in
+English; established codes keep their meaning.
+
+- A source line reports at most its first syntax diagnostic.
+- After a lexical error, no parser diagnostic located after it is reported.
+- A module with a lexical or syntax error is not type-checked, so no semantic
+  diagnostic is derived from a construct the parser could not read.
+- `PAR015` reports a reserved keyword of §2.1 used where a name is declared or
+  bound: once per keyword per file, at its first such use, with a suggested
+  identifier. Later uses of that keyword as an operand are read as the name.
+- A typed declaration written with `=` reports `PAR002` once and is read as a
+  declaration.
+- A block whose `{` begins the next line reports `PAR002` once at the end of
+  the introducing line and is then read as that block. A Function header is
+  exempt: §15 allows a line break before `->`, the return type, `uses`, its
+  list, and `{`.
+- A block whose `{` is missing reports no second diagnostic for its `}`.
+- A statement that begins with a declaration or output keyword of another
+  language carries the AhdCode spelling in its hint.
+
+`name: Constant := value` is the inferred declaration of §8.1 with that
+modifier. It is valid at module root and, as `name: Local Constant := value`,
+in a nested scope; versions before v2.8.0 rejected the module-root form with
+an internal `IR002` diagnostic.
+
+## 94. Tooling Guarantees (v2.8.0)
+
+`ahdcode format [--check] <target>...` accepts any number of files and
+folders. A folder denotes every `.ahd` file beneath it, excluding folders
+whose name begins with `.`. Every target is processed; the exit status is 1
+when any file is invalid or, under `--check`, not canonical.
+
+The formatter must emit exactly the tokens and comments of its input,
+changing only separators (newlines and commas), spacing, and the order of
+declaration modifiers. An implementation that cannot do so for a file reports
+`FMT001` and leaves the file unchanged. The canonical Function header is one
+line; a comment written inside a header line break moves above the
+declaration.
+
+Program output written before a call that serves for the rest of the program
+(`Server.start`) is delivered before the call blocks, and every line written
+afterwards is delivered when it is written, whether standard output is a
+terminal, a file, or a pipe. `take`, `Canvas.wait`, `Window.wait`, and
+`Scheduler.run` already delivered pending output before blocking.
+
+---
+
+# End of the AhdCode Core Specification

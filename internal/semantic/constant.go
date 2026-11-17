@@ -84,6 +84,11 @@ func (a *analyzer) evaluateConstantWithStack(expression ast.Expr, stack map[*Sym
 		if symbol == nil {
 			symbol, _ = a.module.local(value.Name)
 		}
+		seen := map[*Symbol]bool{}
+		for symbol != nil && symbol.Alias != nil && !seen[symbol] {
+			seen[symbol] = true
+			symbol = symbol.Alias
+		}
 		if symbol == nil || !symbol.Constant {
 			return nil, constNotExpression
 		}

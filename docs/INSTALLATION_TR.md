@@ -1,6 +1,8 @@
 # Kurulum, yükseltme ve kaldırma
 
-İşletim sisteminize uygun AhdCode v2.7.0 paketini indirin. Her paket
+İşletim sisteminize uygun AhdCode v2.7.0 paketini indirin. v2.7.0 en güncel
+kurulabilir sürümdür. v2.8.0 ile v2.11.0 arası kaynak sürümleridir; git
+etiketleri bu paketlerin yerine geçmez. Yeni kurulum paketleri v3.0'da döner. Her paket
 kendi kendine yeterlidir: derleyici, özel Go araç zinciri, AhdDataStudio,
 SQLite/numeric/plot yardımcıları, çevrimdışı LaTeX motoru, proje starter'ları
 ve İngilizce belgeler paketin içindedir.

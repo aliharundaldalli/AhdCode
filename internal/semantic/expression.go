@@ -290,6 +290,16 @@ func (a *analyzer) analyzeIdentifier(identifier *ast.IdentifierExpr, current *sc
 			identifier.Span(), fmt.Sprintf("add bring %s (or the matching from ... bring form) to this file", module))
 		return expressionInfo{typeValue: types.Invalid, nullState: MaybeNull}
 	}
+	// A module Constant written without a type is predeclared before its
+	// initializer is known. A use that appears earlier analyzes that
+	// initializer now, so the use and the declaration share one type and one
+	// constant-expression check. A uses/Global alias points at that constant;
+	// resolve the constant, not the alias.
+	canonical := symbol
+	if canonical.Alias != nil {
+		canonical = canonical.Alias
+	}
+	a.resolveForwardConstant(canonical, identifier.Span())
 	// A lambda reads an enclosing binding only when it lists that name. The
 	// listed names already resolve inside the lambda's own scope, so reaching
 	// this with a lexical binding from an outer callable means the dependency
@@ -330,6 +340,9 @@ func (a *analyzer) analyzeIdentifier(identifier *ast.IdentifierExpr, current *sc
 		typeValue = types.Invalid
 	}
 	constant := symbol.ConstValue
+	if constant == nil && symbol.Alias != nil {
+		constant = symbol.Alias.ConstValue
+	}
 	return expressionInfo{typeValue: typeValue, nullState: flow.state(symbol), symbol: symbol, constant: constant}
 }
 

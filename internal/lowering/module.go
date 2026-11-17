@@ -21,15 +21,21 @@ func (lowerer *moduleLowerer) lowerModule() *ir.Module {
 			result.Functions = append(result.Functions, function)
 		}
 	}
+	var initialization []moduleInitItem
 	for _, statement := range lowerer.module.Parsed.Program.Statements {
 		switch value := statement.(type) {
 		case *ast.VariableDecl:
-			// A module-root binding declares storage, and initializes it where
-			// it is written, so module-level effects keep source order.
+			// A module-root binding declares storage where it is written.
+			// Pure constants are later scheduled by dependency; every other
+			// initializer keeps its source position.
 			if symbol := lowerer.semantic.ResolvedSymbols[value]; symbol != nil && symbol.ModuleRoot && symbol.Alias == nil {
 				result.Globals = append(result.Globals, lowerer.lowerGlobal(value, symbol))
-				if initialization := lowerer.lowerGlobalInitialization(value, symbol); initialization != nil {
-					result.Init.Statements = append(result.Init.Statements, initialization)
+				if lowered := lowerer.lowerGlobalInitialization(value, symbol); lowered != nil {
+					item := moduleInitItem{statement: lowered}
+					if symbol.Constant {
+						item.constant = symbol
+					}
+					initialization = append(initialization, item)
 				}
 			}
 		case *ast.FunctionDecl:
@@ -45,10 +51,11 @@ func (lowerer *moduleLowerer) lowerModule() *ir.Module {
 		case *ast.BringStmt:
 		default:
 			if lowered := lowerer.lowerStatement(statement); lowered != nil {
-				result.Init.Statements = append(result.Init.Statements, lowered)
+				initialization = append(initialization, moduleInitItem{statement: lowered})
 			}
 		}
 	}
+	result.Init.Statements = lowerer.scheduleModuleInit(initialization)
 	result.Functions = append(result.Functions, lowerer.functions...)
 	sort.Slice(result.Globals, func(i, j int) bool { return result.Globals[i].ID < result.Globals[j].ID })
 	sort.Slice(result.Functions, func(i, j int) bool { return result.Functions[i].ID < result.Functions[j].ID })

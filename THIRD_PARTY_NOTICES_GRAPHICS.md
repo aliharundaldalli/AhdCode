@@ -36,15 +36,26 @@ downloads nothing at run time and needs no package manager.
    License : BSD 3-Clause (with the Go PATENTS grant)
 
 5. Go extended libraries: `golang.org/x/image` v0.45.0 (the anti-aliased
-   rasterizer behind the window image and PNG export), `golang.org/x/sync`,
-   and `golang.org/x/sys`
-   Project : https://go.googlesource.com/image, /sync, /sys
+   rasterizer behind the window image and PNG export, the image scaler, and
+   the font reader), `golang.org/x/text` v0.41.0 (required by the font
+   reader), `golang.org/x/sync`, and `golang.org/x/sys`
+   Project : https://go.googlesource.com/image, /text, /sync, /sys
    License : BSD 3-Clause (with the Go PATENTS grant)
+
+6. Go Regular font (`golang.org/x/image/font/gofont/goregular`), the typeface
+   of `Canvas.text` since v2.8.0
+   Project : https://go.dev/blog/go-fonts
+   Authors : Bigelow & Holmes
+   License : the Go fonts license, BSD 3-Clause, as distributed with
+             `golang.org/x/image`
+   Use     : embedded in `ahdgraphics`; text is drawn from its glyph
+             outlines, in the window, in PNG files, and as paths in SVG files.
 
 The exact module list linked into each platform's helper, with the complete
 license and notice texts, is recorded in `licenses/modules.json` and
 `licenses/modules/` of the distribution. The PNG and SVG writers and the
-drawing model are AhdCode's own code.
+drawing model are AhdCode's own code. PNG and JPEG files drawn with
+`Canvas.image` are decoded by the Go standard library.
 
 The window shows the AhdCode name and icon from AhdCode's own
 `cmd/ahdidentity` module, which is first-party code under AhdCode's MIT license.

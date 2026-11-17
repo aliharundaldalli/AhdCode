@@ -1,0 +1,34 @@
+// The v2.8 shapes on one page: text, a polygon, an ellipse, an arc, and an
+// image. The page is saved first, then drawn again inside itself as an image.
+bring Graphics
+bring Math
+from Graphics bring (Canvas)
+
+canvas: Canvas := Graphics.open(480, 360, "Shapes and text", "#f8f8f8")
+
+canvas.text(0, 140, "AhdCode Graphics", "blue", 30, "center")
+canvas.text(-220, -165, "left")
+canvas.text(x: 220, y: -165, text: "right", align: "right")
+// A polygon takes its corners as one flat list: x0, y0, x1, y1, ...
+canvas.polygon([-200, -40, -100, -40, -150, 50], "black", "yellow", 2)
+// A five-pointed star, its corners computed on a circle.
+star: List<Real> := []
+corner := 0
+while corner < 5 {
+    angle: Local Real := Math.radians(90.0 + corner * 144.0)
+    star.add(60 * Math.cos(angle))
+    star.add(10 + 60 * Math.sin(angle))
+    corner += 1
+}
+canvas.polygon(star, "red", "#ff000040", 2)
+
+canvas.ellipse(150, 10, 60, 30, "green", "#00ff0040", 3)
+// Angles are in degrees, counterclockwise from the positive x axis.
+canvas.arc(150, 10, 45, 200, 340, "black", 4)
+
+canvas.save("shapes.png")
+canvas.save("shapes.svg")
+canvas.image("shapes.png", -80, -150, 160)
+canvas.save("shapes-with-image.png")
+write("Saved shapes.png, shapes.svg and shapes-with-image.png")
+canvas.wait()

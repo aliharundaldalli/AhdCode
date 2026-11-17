@@ -26,6 +26,13 @@ type parser struct {
 	// rejected leading-dot continuation, so the statement list can mark the
 	// receiver it continued as malformed.
 	recoveredDotContinuation bool
+	// reservedNames records each reserved keyword the program used as a name,
+	// with the offset of the PAR015 that explained it (see reserved.go).
+	reservedNames map[token.Kind]int
+	echoLines     map[int]bool
+	// unopenedBraces counts the { tokens skipped during error recovery whose
+	// } is still ahead (see synchronize).
+	unopenedBraces int
 }
 
 // Parse builds a syntax-only typed AST. It performs no name or type resolution.
@@ -37,7 +44,7 @@ func Parse(file source.File, tokens []token.Token) Result {
 	}
 	p := &parser{file: file, tokens: owned}
 	program := p.parseProgram()
-	return Result{Program: program, Tokens: owned, Diagnostics: p.bag.Items()}
+	return Result{Program: program, Tokens: owned, Diagnostics: firstErrorPerLine(p.withoutReservedNameEchoes(p.bag.Items()))}
 }
 
 func (p *parser) parseProgram() *ast.Program {
@@ -51,7 +58,14 @@ func (p *parser) parseStatementList(scope scopeKind, terminator token.Kind) []as
 	var statements []ast.Stmt
 	p.skipNewlines()
 	for !p.check(terminator) && !p.atEnd() {
+		if p.check(token.RightBrace) && terminator != token.RightBrace && p.unopenedBraces > 0 {
+			p.unopenedBraces--
+			p.advance()
+			p.skipNewlines()
+			continue
+		}
 		before := p.index
+		errorsBefore := p.bag.Len()
 		p.recoveredDotContinuation = false
 		statement := p.parseStatement(scope)
 		if statement != nil {
@@ -76,7 +90,16 @@ func (p *parser) parseStatementList(scope scopeKind, terminator token.Kind) []as
 		if p.check(terminator) || p.atEnd() {
 			break
 		}
-		p.errorCurrent(codeExpectedSeparator, "expected newline between statements", "place each independent statement on its own line")
+		// A statement that already reported its own syntax error is skipped
+		// to the end of its line without a second diagnostic about the
+		// leftover tokens: they are the same mistake.
+		if p.bag.Len() == errorsBefore {
+			hint := "place each independent statement on its own line"
+			if foreign, known := foreignStatementHint(statement); known {
+				hint = foreign
+			}
+			p.errorCurrent(codeExpectedSeparator, "expected newline between statements", hint)
+		}
 		p.synchronize(terminator)
 		p.skipNewlines()
 	}
@@ -105,6 +128,7 @@ func invalidateTruncatedReceiver(statements []ast.Stmt) {
 }
 
 func (p *parser) parseStatement(scope scopeKind) ast.Stmt {
+	p.reservedStatementName()
 	switch p.current().Kind {
 	case token.KeywordIf:
 		return p.parseIf()
@@ -312,13 +336,29 @@ func (p *parser) requireSameLineRHS(operator token.Token) bool {
 	return true
 }
 
+// synchronize skips the rest of a broken statement's line. A { skipped there
+// opened a block the parser never entered, so its } will arrive later with
+// nothing to close; unopenedBraces remembers it so that } is not reported as a
+// second error.
 func (p *parser) synchronize(terminator token.Kind) {
-	for !p.atEnd() && !p.check(terminator) && !p.check(token.Newline) {
-		if p.current().Kind == token.RightBrace {
-			return
+	depth := 0
+	for !p.atEnd() && !p.check(token.Newline) {
+		switch p.current().Kind {
+		case token.LeftBrace:
+			depth++
+		case token.RightBrace:
+			if depth == 0 {
+				return
+			}
+			depth--
+		default:
+			if depth == 0 && p.check(terminator) {
+				return
+			}
 		}
 		p.advance()
 	}
+	p.unopenedBraces += depth
 }
 
 func spanStart(node ast.Node) source.Position { return node.Span().Start }

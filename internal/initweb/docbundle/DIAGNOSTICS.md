@@ -108,3 +108,70 @@ Incomplete initializers, assignments, binary operands, indexes, calls, lists,
 pairs, and lambda bodies use construct-aware messages where the parser can
 identify the missing piece. Closing-delimiter diagnostics name the expected
 `)`, `]`, or `}` and point at the recovery location.
+
+## One mistake, one diagnostic
+
+Since v2.8.0 the compiler reports one diagnostic for one mistake, so the first
+message on the screen is the one to fix:
+
+- A line reports only its first syntax error.
+- After an error the lexer reports, such as an unclosed string, nothing later
+  in the file is reported until that one is fixed.
+- Type checking runs only on a file that parses, so a syntax error is never
+  followed by errors about names it left undeclared.
+- A statement that already reported an error does not also report the missing
+  end of its line, and a block whose `{` is missing does not also report its
+  `}`.
+
+12. A reserved keyword cannot be a name (`PAR015`). It is reported once, where
+it is first used as a name, with a suggestion:
+
+```text
+error [PAR015] main.ahd:1:1
+'not' is a reserved keyword in AhdCode
+  1 | not: Int := 70
+    | ^^^
+  hint: choose a different identifier, such as 'score'
+```
+
+13. A declaration introduces its name with `:=`. A lone `=` only changes a
+name that already exists.
+
+```ahd
+# invalid: PAR002
+count: Int = 5
+
+# corrected
+count: Int := 5
+```
+
+14. A block opens on the line that introduces it.
+
+```ahd
+# invalid: PAR002
+if ready
+{
+    write("go")
+}
+
+# corrected
+if ready {
+    write("go")
+}
+```
+
+A Function is the one exception: its `uses [...]` list and its `{` may each
+start a new line, and `ahdcode format` joins them into one header.
+
+15. A statement written the way another language writes it (`function`, `def`,
+`var`, `let`, `print`, `elif`, and similar) is answered with the AhdCode
+spelling in the hint.
+
+16. A declaration with a modifier and no type takes the type of its value:
+`limit: Constant := 20.0` is a `Constant Real`. Before v2.8.0 this spelling
+failed with an internal `IR002` diagnostic.
+
+`FMT001` is not a mistake in a program. `ahdcode format` checks that the
+layout it produced has exactly the tokens and comments of the source; if it
+does not, the formatter reports `FMT001` and leaves the file unchanged
+instead of writing a damaged one. Please report the file.

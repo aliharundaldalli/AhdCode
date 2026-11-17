@@ -134,7 +134,20 @@ type Symbol struct {
 	// attribute that parameter initializes. A Local structure parameter has a
 	// nil entry. Inherited entries come from the parent construction contract.
 	ConstructorAttributes []*Symbol
-	ConstValue            *constantValue
+	// ConstantDependencies are the same-module Constant bindings this
+	// initializer reads, in first-seen order. A function declaration is not
+	// one of them: it is not a value the constant waits to initialize.
+	ConstantDependencies []*Symbol
+	// ConstantMutables are the module bindings this initializer reads that
+	// are not constants. The initializer stays where it is written.
+	ConstantMutables []*Symbol
+	// ConstantEffects is true when the initializer calls a function. The call
+	// is not assumed to be side-effect free and is not reordered.
+	ConstantEffects bool
+	// ConstantAnchored is true when the initializer reads a mutable binding
+	// or calls a function, so it is not part of the pure constant prefix.
+	ConstantAnchored bool
+	ConstValue       *constantValue
 	// BuiltinLiteral is the canonical source-independent scalar representation
 	// of a compiler-supplied Constant. It lets lowering materialize standard
 	// module constants without inventing filesystem-backed storage.

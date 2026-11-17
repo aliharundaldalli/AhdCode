@@ -135,7 +135,7 @@ func (p *parser) parseDeclaration(start source.Position, target ast.Expr, scope 
 		}
 	}
 
-	declareToken := p.expect(token.Declare, "expected := in declaration")
+	declareToken := p.expectDeclare()
 	lineBroken := p.requireSameLineRHS(declareToken)
 
 	if name == "structure" && typeRef.Name == "Attributes" && p.check(token.LeftParen) {
@@ -375,7 +375,7 @@ func (p *parser) parseParameterList(allowInherited bool) []ast.Parameter {
 			end := p.advance().Span.End
 			parameters = append(parameters, ast.Parameter{Base: p.base(start, end), InheritedAttributes: true})
 		} else {
-			name := p.expect(token.Identifier, "expected parameter name")
+			name := p.expectName("expected parameter name")
 			p.expect(token.Colon, "expected : after parameter name")
 			modifiers, flavor := p.parseDeclarationModifiers()
 			if flavor != ast.FunctionBase {
@@ -410,4 +410,17 @@ func (p *parser) parseParameterList(allowInherited bool) []ast.Parameter {
 	}
 	p.expect(token.RightParen, "expected ) to close the parameter list")
 	return parameters
+}
+
+// expectDeclare reads the := of a typed declaration. A lone = there is the
+// usual slip, so it is named precisely and read as the := that was meant.
+func (p *parser) expectDeclare() token.Token {
+	if p.check(token.Assign) {
+		p.errorCurrent(codeExpectedToken, "expected := in declaration",
+			"a declaration introduces its name with :=; = only changes a name that already exists")
+		item := p.advance()
+		item.Kind = token.Declare
+		return item
+	}
+	return p.expect(token.Declare, "expected := in declaration")
 }

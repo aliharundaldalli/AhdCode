@@ -159,9 +159,27 @@ def sign_payload(root, identity):
   if result.returncode!=0: raise SystemExit('signature did not verify: %s\n%s' % (target,result.stderr.strip()))
  print('Signed and verified',len(targets),'Mach-O files',flush=True)
 
+def source_only_release(version):
+ """v2.8.0 through v2.11.x, and a 3.0 beta, ship as source. v2.7.0 installers
+ stay as already published. Full desktop packages return at v3.0."""
+ head=version.split('-')[0]
+ parts=head.split('.')
+ if len(parts)<2: return False
+ try: major,minor=int(parts[0]),int(parts[1])
+ except ValueError: return False
+ if major==2 and minor>=8: return True
+ return major==3 and minor==0 and 'beta' in version.lower()
+
 def main():
- ap=argparse.ArgumentParser();ap.add_argument('--downloads',type=pathlib.Path,required=True);ap.add_argument('--latex-runtime',type=pathlib.Path,required=True);ap.add_argument('--modules',type=pathlib.Path,required=True);ap.add_argument('--output',type=pathlib.Path,required=True);ap.add_argument('--sign-app',default='',help='Developer ID Application identity for the packaged binaries');ap.add_argument('--vsix',type=pathlib.Path,help='the .vsix from tooling/distribution/build_vsix.py');ap.add_argument('--without-vsix',action='store_true',help='deliberately ship no editor extension');ap.add_argument('--platform',choices=['darwin','windows','linux','all'],default='all');ap.add_argument('--leak-forbid-file',type=pathlib.Path,action='append',default=[],help='a developer-local file whose exact contents must not appear in any artifact');ap.add_argument('--leak-forbid-env-values',type=pathlib.Path,action='append',default=[],help='a developer .env file whose specific values must not appear in any artifact');ap.add_argument('--allow-dirty-tree',action='store_true',help='development only: build from a tree with uncommitted, untracked, or ignored files; never for a release');a=ap.parse_args()
  version=__import__('re').search(r'Number\s*=\s*"([^"]+)"',(R/'internal/ahdversion/version.go').read_text())[1]
+ if source_only_release(version): raise SystemExit(
+  'v'+version+' is a source-only release until v3.0.\n'
+  'Tag the source and publish a GitHub Release of that source.\n'
+  'Do not build a DMG, PKG, Windows installer, or Linux archive, and do not sign or notarize.\n'
+  'The v2.7.0 installers stay on their existing GitHub Release and are not rebuilt or retagged.\n'
+  'A v3.0 beta may ship only the developer and mobile test packages it needs, not this desktop set.\n'
+  'Full desktop and mobile distribution returns at v3.0.')
+ ap=argparse.ArgumentParser();ap.add_argument('--downloads',type=pathlib.Path,required=True);ap.add_argument('--latex-runtime',type=pathlib.Path,required=True);ap.add_argument('--modules',type=pathlib.Path,required=True);ap.add_argument('--output',type=pathlib.Path,required=True);ap.add_argument('--sign-app',default='',help='Developer ID Application identity for the packaged binaries');ap.add_argument('--vsix',type=pathlib.Path,help='the .vsix from tooling/distribution/build_vsix.py');ap.add_argument('--without-vsix',action='store_true',help='deliberately ship no editor extension');ap.add_argument('--platform',choices=['darwin','windows','linux','all'],default='all');ap.add_argument('--leak-forbid-file',type=pathlib.Path,action='append',default=[],help='a developer-local file whose exact contents must not appear in any artifact');ap.add_argument('--leak-forbid-env-values',type=pathlib.Path,action='append',default=[],help='a developer .env file whose specific values must not appear in any artifact');ap.add_argument('--allow-dirty-tree',action='store_true',help='development only: build from a tree with uncommitted, untracked, or ignored files; never for a release');a=ap.parse_args()
  commit=subprocess.check_output(['git','rev-parse','HEAD'],cwd=R,text=True).strip()
  # The CLI embeds tools/AhdDataStudio (go:embed all:), the starter templates, and
  # the docbundle verbatim, so any untracked or ignored file in the tree ships

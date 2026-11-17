@@ -120,6 +120,51 @@ func (generator *generator) graphicsOperation(name string, value *ir.CallExpr) s
 			arguments.nullableText(5) + ", " + arguments.real(6, "1.0") + ")")
 	case "Canvas.save":
 		return check("AhdGraphicsSave(" + handle + ", " + arguments.text(0, `""`) + ")")
+	case "Canvas.ellipse":
+		return check("AhdGraphicsEllipse(" + handle + ", " + arguments.real(0, "0") + ", " + arguments.real(1, "0") + ", " +
+			arguments.real(2, "0") + ", " + arguments.real(3, "0") + ", " + arguments.text(4, `"black"`) + ", " +
+			arguments.nullableText(5) + ", " + arguments.real(6, "1.0") + ")")
+	case "Canvas.polygon":
+		if !arguments.present(0) {
+			return generator.unsupported(name+" with a malformed argument list", meta.Span)
+		}
+		// The points arrive as List<Real> or List<Int>, whichever overload
+		// the frontend selected; the runtime takes one flat []float64.
+		points := generator.plotNumericListValue(value.Arguments[0].Value, meta) + ".Snapshot()"
+		return check("AhdGraphicsPolygon(" + handle + ", " + points + ", " + arguments.text(1, `"black"`) + ", " +
+			arguments.nullableText(2) + ", " + arguments.real(3, "1.0") + ")")
+	case "Canvas.arc":
+		return check("AhdGraphicsArc(" + handle + ", " + arguments.real(0, "0") + ", " + arguments.real(1, "0") + ", " +
+			arguments.real(2, "0") + ", " + arguments.real(3, "0") + ", " + arguments.real(4, "0") + ", " +
+			arguments.text(5, `"black"`) + ", " + arguments.real(6, "1.0") + ")")
+	case "Canvas.text":
+		return check("AhdGraphicsText(" + handle + ", " + arguments.real(0, "0") + ", " + arguments.real(1, "0") + ", " +
+			arguments.text(2, `""`) + ", " + arguments.text(3, `"black"`) + ", " + arguments.real(4, "16.0") + ", " +
+			arguments.text(5, `"left"`) + ")")
+	case "Canvas.image":
+		return check("AhdGraphicsImage(" + handle + ", " + arguments.text(0, `""`) + ", " + arguments.real(1, "0") + ", " +
+			arguments.real(2, "0") + ", " + arguments.real(3, "0") + ", " + arguments.real(4, "0") + ")")
+	case "Canvas.onMove", "Canvas.onDrag":
+		if len(value.Arguments) != 1 || value.Arguments[0].Value == nil {
+			return generator.unsupported(name+" with a malformed argument list", meta.Span)
+		}
+		runtime := "AhdGraphicsOnMoveChecked("
+		if name == "Canvas.onDrag" {
+			runtime = "AhdGraphicsOnDragChecked("
+		}
+		return runtime + handle + ", " + generator.adaptHandler(value.Arguments[0].Value, ir.Type{Kind: ir.RealType}, ir.Type{Kind: ir.RealType}) + ")"
+	case "Canvas.every":
+		if len(value.Arguments) != 2 || value.Arguments[1].Value == nil {
+			return generator.unsupported(name+" with a malformed argument list", meta.Span)
+		}
+		return "AhdGraphicsEveryChecked(" + handle + ", " + arguments.integer(0, "int64(0)") + ", " + generator.adaptHandler(value.Arguments[1].Value) + ")"
+	case "Canvas.cancel":
+		return check("AhdGraphicsCancel(" + handle + ", " + arguments.integer(0, "int64(0)") + ")")
+	case "Canvas.batch":
+		if len(value.Arguments) != 1 || value.Arguments[0].Value == nil {
+			return generator.unsupported(name+" with a malformed argument list", meta.Span)
+		}
+		return "AhdGraphicsBatchChecked(" + handle + ", " + generator.adaptHandler(value.Arguments[0].Value) + ")"
 	case "Canvas.onClick", "Canvas.onKey":
 		// The handler's static type is exactly (Real, Real) -> Nothing or
 		// (String) -> Nothing, which the generated code represents as the Go

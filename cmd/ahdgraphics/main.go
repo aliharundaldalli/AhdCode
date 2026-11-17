@@ -9,7 +9,8 @@
 // module's dependency graph. It speaks only the line-based JSON protocol in
 // protocol.go over standard input and output. It runs no shell command,
 // evaluates nothing, reads no environment file, and makes no network
-// connection; the only file it writes is the path a save request names.
+// connection. The only file it writes is the path a save request names, and
+// the only files it reads are the PNG and JPEG images an image request names.
 package main
 
 import (

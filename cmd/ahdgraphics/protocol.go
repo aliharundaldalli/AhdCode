@@ -21,11 +21,11 @@ import (
 // duplicated field for field in internal/backend/golang/ahdruntime/graphics.go,
 // which cannot import this module.
 const (
-	protocolVersion = 2
+	protocolVersion = 3
 
-	// maxRequestBytes bounds one request line. Every legitimate request is a
-	// few hundred bytes; a save path is the longest field.
-	maxRequestBytes = 16 << 10
+	// maxRequestBytes bounds one request line. Most requests are a few
+	// hundred bytes; a polygon with maxPolygonPoints vertices is the longest.
+	maxRequestBytes = 128 << 10
 	maxDimension    = 4096
 	maxTitleRunes   = 256
 	maxPathBytes    = 4096
@@ -34,6 +34,15 @@ const (
 	maxCommands = 1_000_000
 	// maxScriptEvents bounds the scripted events of a headless test Canvas.
 	maxScriptEvents = 64
+	// A polygon has between 3 and 2000 vertices.
+	minPolygonPoints = 3
+	maxPolygonPoints = 2000
+	// maxTextRunes bounds one line of drawn text, and maxTextSize its font
+	// size in Canvas units.
+	maxTextRunes = 1000
+	maxTextSize  = 2000
+	// maxImageSide bounds the drawn width and height of an image.
+	maxImageSide = 4 * maxDimension
 )
 
 // rgba is a validated, non-premultiplied color. It travels as a JSON array of
@@ -69,7 +78,20 @@ type request struct {
 
 	Path string `json:"path,omitempty"`
 
-	// Kind names the event a listen request turns on: "click" or "key".
+	// The fields of the v2.8 shapes: an ellipse's radii, a polygon's
+	// vertices as x0, y0, x1, y1, ..., an arc's angles in degrees, and one
+	// line of text with its font size and horizontal alignment.
+	RX     float64   `json:"rx,omitempty"`
+	RY     float64   `json:"ry,omitempty"`
+	Points []float64 `json:"points,omitempty"`
+	Start  float64   `json:"start,omitempty"`
+	End    float64   `json:"end,omitempty"`
+	Text   string    `json:"text,omitempty"`
+	Size   float64   `json:"size,omitempty"`
+	Align  string    `json:"align,omitempty"`
+
+	// Kind names the event a listen request turns on: "click", "key",
+	// "move", or "drag".
 	Kind string `json:"kind,omitempty"`
 	// Script is the event list a headless Canvas replays when the program
 	// waits. It exists for automated tests without a display; a windowed
@@ -77,8 +99,10 @@ type request struct {
 	Script []event `json:"script,omitempty"`
 }
 
-// event is one line the helper writes on its own: a click inside the Canvas
-// in Cartesian coordinates, a key press by its normalized name, or closed.
+// event is one line the helper writes on its own: a click, pointer move, or
+// drag inside the Canvas in Cartesian coordinates, a key press by its
+// normalized name, or closed. A headless test Canvas may also script "tick",
+// which the runtime answers by running the program's timers once.
 type event struct {
 	Event string  `json:"event"`
 	X     float64 `json:"x,omitempty"`
@@ -166,7 +190,8 @@ func validateOpen(value request) error {
 	}
 	for _, scripted := range value.Script {
 		switch {
-		case scripted.Event == "click" && finite(scripted.X, scripted.Y):
+		case (scripted.Event == "click" || scripted.Event == "move" || scripted.Event == "drag") && finite(scripted.X, scripted.Y):
+		case scripted.Event == "tick":
 		case scripted.Event == "key" && keyNameKnown(scripted.Key):
 		default:
 			return errors.New("invalid scripted event")
@@ -182,4 +207,21 @@ func finite(values ...float64) bool {
 		}
 	}
 	return true
+}
+
+// validText accepts one line of printable text.
+func validText(text string) bool {
+	if !utf8.ValidString(text) || utf8.RuneCountInString(text) > maxTextRunes {
+		return false
+	}
+	for _, character := range text {
+		if character < 0x20 || character == 0x7f {
+			return false
+		}
+	}
+	return true
+}
+
+func validAlign(align string) bool {
+	return align == "left" || align == "center" || align == "right"
 }

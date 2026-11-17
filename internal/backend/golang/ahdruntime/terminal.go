@@ -38,7 +38,7 @@ func AhdTerminalEmit(parts *AhdList[string], separator, ending string) {
 	if parts != nil {
 		items = parts.items
 	}
-	_, _ = ahdOut.WriteString(AhdTerminalJoin(items, separator, ending))
+	ahdWriteLocked(AhdTerminalJoin(items, separator, ending))
 }
 
 // AhdTerminalError implements Terminal.error. Pending standard output is
@@ -52,7 +52,10 @@ func AhdTerminalError(text, ending string) {
 // AhdTerminalFlush implements Terminal.flush. Standard error is unbuffered, so
 // the buffered standard output is the only thing with pending text.
 func AhdTerminalFlush(class *AhdClass) {
-	if err := ahdOut.Flush(); err != nil {
+	ahdOutMu.Lock()
+	err := ahdOut.Flush()
+	ahdOutMu.Unlock()
+	if err != nil {
 		AhdRaiseClass(class, "standard output could not be flushed")
 	}
 }
@@ -262,6 +265,5 @@ func AhdTerminalPrettyPair[K comparable, V any](renderKey func(K) string, render
 // AhdTerminalPretty writes one laid-out value and a line break through the
 // buffered standard output write uses.
 func AhdTerminalPretty(text string) {
-	_, _ = ahdOut.WriteString(text)
-	_ = ahdOut.WriteByte('\n')
+	ahdWriteLocked(text + "\n")
 }

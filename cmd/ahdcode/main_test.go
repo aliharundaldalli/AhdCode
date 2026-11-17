@@ -333,3 +333,80 @@ func TestIsInteractiveRejectsNonTerminals(t *testing.T) {
 		t.Fatal("a buffer must not be treated as a terminal")
 	}
 }
+
+// format takes several files and folders. A folder stands for every .ahd file
+// below it; one invalid file does not stop the others from being formatted.
+func TestFormatFoldersAndSeveralFiles(t *testing.T) {
+	root := t.TempDir()
+	files := map[string]string{
+		"a.ahd":             "x:Int:=1\n",
+		"sub/b.ahd":         "y:Int:=2\n",
+		"sub/deep/c.ahd":    "z: Int := 3\n",
+		"sub/broken.ahd":    "x: Int := )\n",
+		"sub/notes.txt":     "x:Int:=1\n",
+		".hidden/d.ahd":     "w:Int:=4\n",
+		"single/alone.ahd":  "v:Int:=5\n",
+		"single/second.ahd": "u:Int:=6\n",
+	}
+	for name, text := range files {
+		path := filepath.Join(root, filepath.FromSlash(name))
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(text), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	read := func(name string) string {
+		content, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(name)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return string(content)
+	}
+
+	var out, errors bytes.Buffer
+	arguments := []string{"format", "--check", filepath.Join(root, "a.ahd"), filepath.Join(root, "sub")}
+	if code := runWithIO(arguments, bytes.NewBuffer(nil), &out, &errors); code != 1 {
+		t.Fatalf("--check exit = %d", code)
+	}
+	for _, want := range []string{"a.ahd is not canonically formatted", "b.ahd is not canonically formatted", "broken.ahd"} {
+		if !strings.Contains(errors.String(), want) {
+			t.Fatalf("--check output lacks %q:\n%s", want, errors.String())
+		}
+	}
+	if strings.Contains(errors.String(), "c.ahd") || read("a.ahd") != "x:Int:=1\n" {
+		t.Fatalf("--check reported a canonical file or wrote one:\n%s", errors.String())
+	}
+
+	errors.Reset()
+	arguments = []string{"format", filepath.Join(root, "a.ahd"), filepath.Join(root, "sub"), filepath.Join(root, "single", "alone.ahd")}
+	if code := runWithIO(arguments, bytes.NewBuffer(nil), &out, &errors); code != 1 {
+		t.Fatalf("format with one invalid file exit = %d, stderr = %q", code, errors.String())
+	}
+	for name, want := range map[string]string{
+		"a.ahd": "x: Int := 1\n", "sub/b.ahd": "y: Int := 2\n", "sub/deep/c.ahd": "z: Int := 3\n",
+		"sub/broken.ahd": "x: Int := )\n", "sub/notes.txt": "x:Int:=1\n", "single/alone.ahd": "v: Int := 5\n",
+		"single/second.ahd": "u:Int:=6\n",
+	} {
+		if got := read(name); got != want {
+			t.Fatalf("%s = %q, want %q", name, got, want)
+		}
+	}
+
+	errors.Reset()
+	if code := runWithIO([]string{"format", root}, bytes.NewBuffer(nil), &out, &errors); code != 1 {
+		t.Fatalf("format of the root exit = %d", code)
+	}
+	if read(".hidden/d.ahd") != "w:Int:=4\n" || read("single/second.ahd") != "u: Int := 6\n" {
+		t.Fatal("a hidden folder was formatted, or a visible one was skipped")
+	}
+	errors.Reset()
+	if code := runWithIO([]string{"format", filepath.Join(root, "absent")}, bytes.NewBuffer(nil), &out, &errors); code != 1 ||
+		!strings.Contains(errors.String(), "could not read") {
+		t.Fatalf("missing target: exit %d, %q", code, errors.String())
+	}
+	if code := runWithIO([]string{"format", "--check"}, bytes.NewBuffer(nil), &out, &errors); code != 2 {
+		t.Fatalf("format without a target exit = %d", code)
+	}
+}

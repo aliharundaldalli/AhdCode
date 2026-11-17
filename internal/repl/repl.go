@@ -29,6 +29,11 @@ const (
 
 // Run starts a session and returns when input reaches EOF. Frontend validation
 // sees aggregate source for static context, while only new IR spans execute.
+// A forward Constant is resolved like a file when the whole dependency is in
+// the submission being compiled. A name that has not been submitted yet is
+// still unknown: earlier submissions are not replayed, so a constant that
+// was already committed is not initialized again. `ahdcode run` compiles one
+// program and initializes that constant graph before the other statements.
 func Run(input io.Reader, output, errorOutput io.Writer, version string) int {
 	directory, err := os.Getwd()
 	if err != nil {

@@ -6,17 +6,24 @@
 
 `Graphics`, AhdCode v1.6.0 ile gelen, derleyicinin kaydettiği `builtin:Graphics`
 modülüdür. Bir pencere içinde 2B bir Canvas (tuval) açar; üzerine matematiksel
-(Kartezyen) koordinatlarda çizgi, çember ve dikdörtgen çizer, üzerinde bir
-Turtle (kaplumbağa) kalemi gezdirir ve çizimi PNG ya da SVG olarak kaydeder.
+(Kartezyen) koordinatlarda çizgi, çember, dikdörtgen, elips, çokgen, yay, metin
+ve resim çizer, üzerinde bir Turtle (kaplumbağa) kalemi gezdirir ve çizimi PNG
+ya da SVG olarak kaydeder.
 
 Graphics görsel programlama ve 2B çizim içindir: koordinatlar, açılar,
 geometri, dönüşümler, fraktallar ve bir matematik ya da programlama dersindeki
 kaplumbağa programları. **Bir oyun motoru ya da GUI (arayüz) kiti değildir.**
-Sprite, animasyon döngüsü, kare (frame) geri çağrıları, girdi yoklama, ses,
-arayüz bileşenleri ya da 3B içermez ve bunlar onun için planlanmamıştır.
+Sprite, sahne, çarpışma, fizik, girdi yoklama, ses, arayüz bileşenleri ya da 3B
+içermez ve bunlar onun için planlanmamıştır.
 v1.8.0'dan itibaren bir Canvas tıklamaları ve tuş
 basışlarını bir callback'e bildirebilir; böylece bir Turtle ok tuşlarıyla
 yönlendirilebilir; bkz. [Tıklamalar ve tuş basışları](#tıklamalar-ve-tuş-basışları).
+v2.8.0'dan itibaren metin, çokgen, elips, yay ve resim de çizer, işaretçinin
+hareketini ve sürüklemeyi bildirir ve zamanlayıcı çalıştırır; hareketli bir
+resim ya da fareyle yapılan bir çizim için bu kadarı yeter. Bkz.
+[Metin](#metin), [Resimler](#resimler),
+[İşaretçi hareketi ve sürükleme](#i̇şaretçi-hareketi-ve-sürükleme) ve
+[Zamanlayıcılar ve animasyon](#zamanlayıcılar-ve-animasyon).
 Düğmeli ve metin alanlı pencereler için [GUI](GUI_TR.md) kullanın.
 
 ## Genel yüzey
@@ -50,10 +57,43 @@ canvas.rectangle(
     fill: String? := null
     lineWidth: Real := 1.0
 )                                                                    -> Nothing
+canvas.ellipse(
+    x: Real, y: Real, radiusX: Real, radiusY: Real
+    stroke: String := "black"
+    fill: String? := null
+    width: Real := 1.0
+)                                                                    -> Nothing
+canvas.polygon(
+    points: List<Real>            // x0, y0, x1, y1, ...; List<Int> de olur
+    stroke: String := "black"
+    fill: String? := null
+    width: Real := 1.0
+)                                                                    -> Nothing
+canvas.arc(
+    x: Real, y: Real, radius: Real, start: Real, end: Real
+    color: String := "black"
+    width: Real := 1.0
+)                                                                    -> Nothing
+canvas.text(
+    x: Real, y: Real, text: String
+    color: String := "black"
+    size: Real := 16.0
+    align: String := "left"
+)                                                                    -> Nothing
+canvas.image(
+    path: String, x: Real, y: Real
+    width: Real := 0.0
+    height: Real := 0.0
+)                                                                    -> Nothing
+canvas.batch(handler: () -> Nothing)                                 -> Nothing
 canvas.save(path: String)                                            -> Nothing
 canvas.wait()                                                        -> Nothing
 canvas.onClick(handler: (x: Real, y: Real) -> Nothing)               -> Nothing
 canvas.onKey(handler: (key: String) -> Nothing)                      -> Nothing
+canvas.onMove(handler: (x: Real, y: Real) -> Nothing)                -> Nothing
+canvas.onDrag(handler: (x: Real, y: Real) -> Nothing)                -> Nothing
+canvas.every(milliseconds: Int, handler: () -> Nothing)              -> Int
+canvas.cancel(timer: Int)                                            -> Nothing
 canvas.close()                                                       -> Nothing
 canvas.isOpen()                                                      -> Bool
 canvas.turtle()                                                      -> Turtle
@@ -188,11 +228,87 @@ daha büyük olmalıdır ve yarıçapı 0 olan bir çember hiçbir şey çizmez.
 dikdörtgen hiçbir şey çizmez. `stroke`, `fill` ve `lineWidth` çemberin `stroke`,
 `fill` ve `width` değerleri gibi çalışır.
 
+`canvas.ellipse(x, y, radiusX, radiusY)` (v2.8.0'dan itibaren) `(x, y)`
+çevresine yatay ve dikey yarıçapı olan bir elips çizer. İkisi de 0 ya da daha
+büyük olmalıdır; yarıçaplarından biri sıfır olan elips hiçbir şey çizmez.
+`stroke`, `fill` ve `width` çemberdeki gibi çalışır.
+
+`canvas.polygon(points)` (v2.8.0'dan itibaren) köşelerinden geçen kapalı bir
+şekil çizer. `points`, koordinatların tek bir düz listesidir:
+`[x0, y0, x1, y1, ...]`; `Real` ya da `Int` listesi olabilir. Bir üçgen altı
+sayıdır. Son köşe ilk köşeye bağlanır. Bir çokgenin 3 ile 2000 arasında köşesi
+olmalıdır; tek sayıda sayı `GraphicsError` fırlatır. `stroke`, `fill` ve
+`width` çemberdeki gibi çalışır. Beş köşeli bir yıldız gibi kendini kesen bir
+çokgende çevrenin içine aldığı her bölge doldurulur.
+
+`canvas.arc(x, y, radius, start, end)` (v2.8.0'dan itibaren) `(x, y)`
+çevresindeki bir çemberin çevresinden bir parça çizer. `start` ve `end`,
+matematikteki ve Turtle yönündeki gibi pozitif x ekseninden saat yönünün
+tersine ölçülen derece cinsinden açılardır: 0 sağ, 90 yukarıdır. `end`,
+`start`'tan büyükse yay saat yönünün tersine, küçükse saat yönünde ilerler ve
+hiçbir zaman bir tam turu geçmez. Yayın uçları yuvarlaktır ve dolgusu yoktur.
+`radius` 0 ya da daha büyük olmalıdır.
+
 Bir şeklin hem dolgusu hem çevresi varsa önce dolgu, üzerine çevre çizilir.
 Sonra çizilenler öncekilerin üstünü örter.
 
+```ahd
+bring Graphics
+
+canvas := Graphics.open(400, 300)
+canvas.text(0, 100, "Üçgen", "blue", 28, "center")
+canvas.polygon([-100, -80, 100, -80, 0, 60], "black", "yellow", 2)
+canvas.ellipse(0, -110, 120, 15, "gray")
+canvas.arc(0, -80, 40, 0, 180, "red", 3)
+canvas.save("ucgen.png")
+canvas.wait()
+```
+
 `canvas.clear(color)` bütün çizimleri siler ve `color`'ı yeni arka plan yapar.
 Pencereyi kapatmaz, hiçbir Turtle'ı hareket ettirmez ya da değiştirmez.
+
+## Metin
+
+`canvas.text(x, y, text)` (v2.8.0'dan itibaren) tek satır metin yazar. `(x, y)`
+taban çizgisinin, yani harflerin üzerinde durduğu çizginin üstündedir: harfler
+`y`'nin üstüne yükselir, yalnızca `g` ve `p` gibi harflerin kuyrukları altına
+iner.
+
+- `align`, metni `x` çevresinde yerleştirir: `"left"` (varsayılan) metni orada
+  başlatır, `"center"` orada ortalar, `"right"` orada bitirir. Başka bir değer
+  `GraphicsError` fırlatır.
+- `size`, yazı tipinin Canvas birimi cinsinden yüksekliğidir; 0'dan büyük ve
+  en çok 2000 olmalıdır.
+- `color` herhangi bir Graphics rengidir.
+
+Metin en çok 1000 karakterlik tek bir satırdır: satır sonu `GraphicsError`
+fırlatır; ikinci satırı, boyutun yaklaşık 1,2 katı kadar aşağıya ikinci bir
+çağrıyla yazın. Boş metin hiçbir şey çizmez.
+
+Her Canvas aynı paketli yazı tipini (Go Regular) kullanır; böylece bir çizim her
+bilgisayarda aynı görünür. Yazı tipi Türkçe harfler dahil Latin harflerini,
+Yunan ve Kiril harflerini içerir; içermediği bir karakter boş bir kutu olarak
+çizilir. SVG dosyasında metin, ana hattı olarak kaydedilir; dosyanın tam
+görünmesi için yazı tipine gerek kalmaz ve özgün metin etiket olarak taşınır.
+
+## Resimler
+
+`canvas.image(path, x, y)` (v2.8.0'dan itibaren) bir PNG ya da JPEG dosyasını,
+dikdörtgendeki gibi sol alt köşesi `(x, y)` olacak biçimde çizer. Göreli yol,
+programın çalıştığı klasöre göredir.
+
+- `width` ve `height` verilmezse resim kendi boyutunda, piksel başına bir
+  Canvas birimiyle çizilir.
+- Biri verilirse diğeri, resmin oranı korunacak biçimde hesaplanır.
+- İkisi de verilirse resim tam o boyuta gerilir.
+
+Bir dosya yalnızca ilk çizildiğinde okunur; onu yeniden çizmek, örneğin bir
+animasyonun her karesinde, ek bir maliyet getirmez. Bir resim dosyası en çok
+64 MB, bir kenarı en çok 8192 piksel ve toplamı en çok 32 milyon piksel
+olabilir. Bulunmayan bir dosya, PNG ya
+da JPEG olmayan bir dosya ya da negatif bir boyut `GraphicsError` fırlatır.
+Saydamlığı olan bir PNG saydamlığını korur. SVG dosyasında resim dosyanın
+içinde saklanır.
 
 ## Kaydetmek
 
@@ -288,8 +404,9 @@ arasında olmalıdır, başlık en çok 256 karakterdir.
   `wait()` döndükten sonra ya da kullanıcı pencereyi kapattıktan sonra
   `false`'tur.
 
-Kapanmış bir Canvas'ta çizim (`clear`, `line`, `circle`, `rectangle`, `save` ve
-kalemi aşağıdaki bir Turtle hareketi) `GraphicsError` fırlatır. Kapanmış bir
+Kapanmış bir Canvas'ta çizim (`clear`, `line`, `circle`, `rectangle`, diğer
+şekiller, `text`, `image`, `save` ve kalemi aşağıdaki bir Turtle hareketi) ile
+`every` ve `batch` `GraphicsError` fırlatır. Kapanmış bir
 Canvas kendiliğinden yeniden açılmaz; yerine yenisini açın. `wait()` döndükten
 ya da kullanıcı pencereyi kapattıktan sonra kalemi yukarıdaki bir Turtle yine de
 hareket edebilir ve dönebilir. `canvas.close()` Canvas'ı ve verdiği her Turtle'ı
@@ -364,8 +481,117 @@ canvas.wait()
 
 Her ok tuşu basışı tam olarak bir 20 birimlik çizgi çizer; terminalden girdi
 okunmaz. Bkz. [`examples/v1.8/turtle_events`](../examples/v1.8/README_TR.md).
-Girdi yoklama (`mouseX`, `isKeyDown`), fare hareketi, sürükleme, tekerlek, çift
-tıklama veya kare döngüsü ve `Turtle.speed` hâlâ yoktur.
+Girdi yoklama (`mouseX`, `isKeyDown`), tekerlek, çift tıklama ve `Turtle.speed`
+hâlâ yoktur.
+
+## İşaretçi hareketi ve sürükleme
+
+v2.8.0'dan itibaren bir Canvas işaretçinin nereye gittiğini de bildirir:
+
+```text
+canvas.onMove(handler: (x: Real, y: Real) -> Nothing)
+canvas.onDrag(handler: (x: Real, y: Real) -> Nothing)
+```
+
+- `onMove`, işaretçi hiçbir düğme basılı değilken Canvas üzerinde hareket
+  ettiğinde konumunu alır.
+- `onDrag`, işaretçi Canvas'ın içinde başlayan bir sol düğme basışından sonra
+  hareket ettiğinde konumunu alır. Sürükleme, işaretçi dışarı çıksa da
+  bildirilmeye devam eder; bu yüzden konum Canvas'ın dışında olabilir. Dışarıda
+  başlayan bir basış, işaretçi içeri girince sürüklemeye dönüşmez. Basışın
+  kendisi bir tıklamadır, sürükleme değildir.
+
+İkisi de Canvas'ın Kartezyen koordinatlarını kullanır ve
+[Tıklamalar ve tuş basışları](#tıklamalar-ve-tuş-basışları) bölümündeki bütün
+kurallara uyar: `canvas.wait()` içinde, birer birer çalışırlar ve yeniden
+kaydetmek önceki callback'in yerini alır. Bir konum, tick başına en çok bir kez
+bildirilir ve pencere saniyede 60 kez tick atar. Sürüklemeyi başlatan basış bir tıklamadır; bu yüzden bir
+çizginin başladığı yer `onClick`'tir. Hareket callback'i işaretçiden yavaşsa
+henüz ulaşmadığı konumların yerini en yenisi alır; bir sürüklemenin noktaları
+hiçbir zaman atılmaz.
+
+```ahd
+bring Graphics
+from Graphics bring (Canvas)
+
+canvas: Canvas := Graphics.open(600, 400)
+lastX: Real := 0.0
+lastY: Real := 0.0
+
+start: Function := (x: Real, y: Real) -> Nothing uses [@lastX, @lastY] {
+    lastX = x
+    lastY = y
+}
+
+draw: Function := (x: Real, y: Real) -> Nothing uses [@canvas, @lastX, @lastY] {
+    canvas.line(lastX, lastY, x, y, "blue", 3)
+    lastX = x
+    lastY = y
+}
+
+canvas.onClick(start)
+canvas.onDrag(draw)
+canvas.wait()
+```
+
+Bkz. [`examples/v2.8/free_drawing`](../examples/v2.8/README_TR.md).
+
+## Zamanlayıcılar ve animasyon
+
+v2.8.0'dan itibaren bir Canvas bir Function'ı tekrar tekrar çağırabilir:
+
+```text
+canvas.every(milliseconds: Int, handler: () -> Nothing) -> Int
+canvas.cancel(timer: Int)
+canvas.batch(handler: () -> Nothing)
+```
+
+`canvas.every(milliseconds, handler)` bir zamanlayıcı başlatır ve numarasını
+döndürür. Program `canvas.wait()` içindeyken `handler` her `milliseconds`'ta
+bir kez çalışır; 16, saniyede yaklaşık altmış kez demektir. Aralık 1 milisaniye
+ile bir gün arasında olmalıdır. Zamanlayıcı callback'leri diğer bütün
+callback'ler gibi çalışır: birer birer, tıklamalar ve tuşlarla sırayla,
+programın kendi yürütme yolunda; bu yüzden kilitleme gerektirmezler. Aralığından
+uzun süren bir callback yalnızca daha seyrek çalışır; kaçan turlar telafi
+edilmez. `canvas.cancel(timer)` bir zamanlayıcıyı durdurur; kendi callback'inin
+içinden de çağrılabilir ve çalışmayan bir zamanlayıcıyı iptal etmek hiçbir şey
+yapmaz. Bir Canvas aynı anda en çok 64 zamanlayıcı çalıştırır; Canvas'ı
+kapatmak hepsini durdurur.
+
+Her zamanlayıcı callback'i bir karedir: çizdiği her şey, callback döndüğünde
+birlikte görünür. Alışılmış animasyonu, yani temizleyip yeniden çizmeyi
+titremesiz yapan budur:
+
+```ahd
+bring Graphics
+from Graphics bring (Canvas)
+
+canvas: Canvas := Graphics.open(400, 300)
+x: Real := -180.0
+speed: Real := 4.0
+
+frame: Function := () -> Nothing uses [@canvas, @x, @speed] {
+    x += speed
+    if x > 180 or x < -180 {
+        speed = -speed
+    }
+    canvas.clear("white")
+    canvas.circle(x, 0, 20, "black", "red")
+}
+
+canvas.every(16, frame)
+canvas.wait()
+```
+
+`canvas.batch(handler)` aynı güvenceyi başka her koda verir: `handler`
+çalışırken pencere son tamamlanmış resmini göstermeyi sürdürür ve `handler`
+döndüğünde sonucu bir kerede gösterir. Bir tıklama ya da tuş callback'inde çok
+şekilden oluşan bir yeniden çizim için kullanın. Batch'ler iç içe olabilir;
+içindeki bir hata da yayılmadan önce resmi serbest bırakır.
+
+Temizlenen bir Canvas önceki çizimlerini unutur; bu yüzden her karede temizleyen
+bir animasyon pencere açık kaldığı sürece çalışabilir. Bkz.
+[`examples/v2.8/bouncing_ball`](../examples/v2.8/README_TR.md).
 
 ## Hatalar
 
@@ -379,6 +605,11 @@ fırlatır:
 - 0'dan büyük olmayan bir çizgi kalınlığı, çember çevre kalınlığı ya da Turtle
   kalınlığı;
 - negatif bir yarıçap, genişlik ya da yükseklik;
+- 3'ten az ya da 2000'den çok köşeli bir çokgen ya da tek sayıda sayı;
+- satır sonu içeren, 1000 karakterden uzun, boyutu 0..2000 dışında ya da
+  `align` değeri bilinmeyen bir metin;
+- bulunmayan, fazla büyük ya da PNG ya da JPEG olmayan bir resim dosyası;
+- 1 milisaniye..bir gün dışında bir zamanlayıcı aralığı ya da 65. zamanlayıcı;
 - desteklenmeyen uzantılı bir kayıt yolu ya da yazılamayan bir dosya;
 - kapanmış bir Canvas'a çizim ya da Canvas'ı `close()` ile kapatılmış bir
   Turtle'ı kullanmak;
@@ -405,8 +636,8 @@ Açık her Canvas'ı, AhdCode'un onun için başlattığı ve standart girdi ile
 üzerinden konuştuğu küçük bir paketli program olan `ahdgraphics` çizer.
 AhdCode her argümanı kendisi doğrular ve bütün Turtle geometrisini kendisi
 hesaplar; `ahdgraphics` yalnızca çizim listesini tutar, pencerede gösterir ve
-PNG ile SVG dosyalarını yazar. Kabuk komutu çalıştırmaz, `save` dışında dosyaya
-dokunmaz ve ağ kullanmaz.
+PNG ile SVG dosyalarını yazar. Kabuk komutu çalıştırmaz, `save` dışında dosya
+yazmaz, programın çizdiği resimler dışında dosya okumaz ve ağ kullanmaz.
 
 `ahdcode run`, yerel derlemeler ve REPL aynı gerçekleştirmeyi kullanır.
 `ahdcode build` ile derlenen bir program, kurulu `ahdgraphics`'in yerini kaydeder;
@@ -434,13 +665,14 @@ bulunamazsa `Graphics.open` `GraphicsError` fırlatır.
 
 `AHDCODE_GRAPHICS_HEADLESS=1`, otomatik testler ve ekranı olmayan sunucular için
 her Canvas'ı pencere olmadan açar: çizim ve `save` her zamanki gibi çalışır;
-kapatılacak pencere olmadığından `wait()` hemen döner.
+kapatılacak pencere olmadığından `wait()` hemen döner. Penceresiz bir
+Canvas'ın saati yoktur; bu yüzden zamanlayıcıları çalışmaz.
 
-## v1.6.0'da olmayanlar
+## Graphics'te olmayanlar
 
-Graphics'te bilerek sprite, sahne, çarpışma, fizik, animasyon ya da kare
-döngüsü (`update`, `draw`, `tick`, kare hızı), girdi yoklama (`mouseX`,
-`isKeyDown`), fare hareketi veya sürükleme olayları, ses, 3B, gölgelendirici,
-arayüz bileşeni, metin çizimi ya da resim yükleme ve `Turtle.speed` yoktur. Tek
-girdisi yukarıdaki tıklama ve tuş basışı callback'leridir. Çizgi, çember ve dikdörtgen çizer, temizler, kaydeder ve
-Turtle'ları yönlendirir.
+Graphics'te bilerek sprite, sahne, çarpışma, fizik, girdi yoklama (`mouseX`,
+`isKeyDown`), tekerlek ya da çift tıklama olayları, ses, 3B, gölgelendirici,
+arayüz bileşeni, seçilebilir yazı tipi, çok satırlı ya da döndürülmüş metin,
+resim döndürme ya da kırpma ve `Turtle.speed` yoktur. Girdisi yukarıdaki
+tıklama, tuş, hareket ve sürükleme callback'leri, tek saati de
+`canvas.every`'dir.

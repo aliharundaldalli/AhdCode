@@ -16,6 +16,26 @@ Dosyayı değiştirmeden biçimlendirmeyi kontrol edin:
 ahdcode format --check program.ahd
 ```
 
+v2.8.0'dan itibaren `format` istenen sayıda dosya ve klasör alır. Bir klasör,
+altındaki bütün `.ahd` dosyaları demektir; adı nokta ile başlayan klasörler
+atlanır. Biri başarısız olsa da bütün hedefler işlenir; herhangi bir dosya
+geçersizse ya da `--check` ile kanonik değilse çıkış kodu 1'dir:
+
+```bash
+ahdcode format src tests main.ahd
+ahdcode format --check .
+```
+
+Bir Function başlığı kaynakta satırlara yayılabilir: `->`, dönüş türü,
+`uses [...]` ya da `{` yeni birer satırda başlayabilir. Kanonik başlık tek
+satırdır; böyle bir satır arasına yazılmış yorum bildirimin üstüne taşınır.
+(v2.7.0 ve öncesi böyle bir Function'ı geçersiz kaynağa çeviriyordu; bu
+biçimde yazılmış dosyaları biçimlendirmeden önce güncelleyin.)
+
+Formatter, yazmadan önce düzeninin kaynaktaki belirteç ve yorumların tam olarak
+aynısını taşıdığını denetler. Taşımıyorsa `FMT001` bildirir ve dosyayı
+değiştirmeden bırakır.
+
 Formatter, AST-farkındadır (AST-aware). Yorumları, string kaçış
 karakterlerini (escapes), interpolasyonu ve tam çok satırlı string içeriğini
 korur; geri kalan her şey için tek bir kanonik (standart) düzeni işler:

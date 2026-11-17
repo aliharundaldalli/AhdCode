@@ -6,7 +6,7 @@
 > Uygulama açısından iki belge aynı kuralları açıklar; metinsel bir çeviri
 > uyuşmazlığı oluşursa İngilizce ana spesifikasyon esas alınır.
 
-**Durum:** AhdCode v1.0.0 için normatif dil spesifikasyonu<br>
+**Durum:** AhdCode için normatif dil spesifikasyonu; v1.0.0'da yayımlanan çekirdek dil ve aşağıda listelenen sonraki revizyonlar, v2.8.0 dahil<br>
 **Tarihsel not:** Uyumluluk için tarihsel dosya adı korunmuştur<br>
 **Açıklama revizyonu:** 2026-09-07; v1.0.0'da yayımlanan hâliyle normatif çekirdek spesifikasyon<br>
 **Birincil uygulama hedefi:** Go<br>
@@ -15,7 +15,14 @@
 
 **v2.3.0 sürüm notu:** v2.3.0 sürümü, §15'te anlatılan iç içe isimli
 Function'lar ile açık `uses [#local, @module]` bağımlılık cümlesini Function
-bildirim yüzeyine ekler. Public ve runtime dil sürümü v2.3.0'dır.
+bildirim yüzeyine ekler.
+
+**v2.8.0 revizyon notu:** v2.8.0 sözdizimi eklemez. Bir `uses` girdisinin bir
+`Global` bildiriminin diğer yazımı olduğunu kaydeder (§9.3), niteleyicili
+çıkarımlı bildirimi belirtir (§8.1), modül sabitlerinin nasıl başlatıldığını yazar (§10.1), tanılama toparlamasını (§93) ve formatter
+sözleşmesini (§3.3, §94) sıkılaştırır ve Graphics'i genişletir (§92). v2.1 ile
+v2.7 arasında eklenen standart modüller §91'de dizinlenmiştir. Başlıktaki ve
+dosya adındaki sürüm tarihseldir; bu belge güncel spesifikasyondur.
 
 ---
 
@@ -237,7 +244,10 @@ Formatter şunları tercih etmelidir:
 - tutarlı girinti (indentation);
 - satır başına bir ifade.
 
-Biçimlendirme, program anlambilimini (semantics) değiştirmemelidir.
+Biçimlendirme, program anlambilimini (semantics) değiştirmemelidir. v2.8.0'dan
+itibaren bu, denetlenen bir güvencedir: formatter okuduğu belirteç ve
+yorumların tam olarak aynısını üretir ve aksi hâlde dosyayı yazmayı reddeder
+(§94).
 
 ---
 
@@ -1052,6 +1062,11 @@ niyeti (scope intent) açık kalır: iç içe geçmiş, çıkarımlı bir bildir
 `name: Local := "Ali"`'dir, yalın, iç içe geçmiş bir `name := "Ali"` ise
 §9 altında geçersiz kalır.
 
+Türün yerinde bir niteleyici durabilir: `limit: Constant := 20.0` bir
+`Constant Real`, `step: Local Constant := 2` ise iç içe bir `Constant Int`
+bildirir. Yalnızca değerin türü çıkarılır; niteleyici, türü açıkça yazılmış bir
+bildirimde olduğu gibi uygulanır (§10, §10.1).
+
 ### 8.2 Yeniden atama
 
 Mevcut bir bağlama şunu kullanır:
@@ -1193,6 +1208,24 @@ increase: Function := (
 
 Hiçbir gizli global yakalamaya (capture) izin verilmez.
 
+Bağımlılıklarını bir `uses` cümlesiyle (§15) bildiren bir Function, modül
+kökündeki bir bağlamayı bunun yerine orada `@name` olarak adlandırır:
+
+```ahd
+increase: Function := () -> Nothing uses [@counter] {
+    counter++
+}
+```
+
+İki yazım, aynı modül bağlamasının aynı takma adını kurar: aynı tür, aynı
+null olabilirlik, aynı `Constant` koruması ve aynı canlı değer; birinden
+yapılan atama her okuyana görünür. Tek fark, bir `Global` bildiriminin türü
+yeniden yazabilmesi ve derleyicinin bunu bağlamayla karşılaştırmasıdır.
+`uses`, modül kökündeki Function'larda, metotlarda ve iç içe Function'larda
+kullanılabilir. İki yazım da örtük değildir: `Global` olarak bildirilmemiş ve
+`uses` içinde listelenmemiş bir modül kökü bağlaması bir çağrılabilirin içinde
+görünmez.
+
 `Global`, özellikle bir fonksiyon, metot veya structure gövdesi içinden
 bir modül-kökü bağlamasına atıfta bulunur. Aynı çağrılabilir içindeki
 çevreleyen bir Local bağlama için kullanılmaz. Modül seviyesindeki bir
@@ -1271,6 +1304,10 @@ değildir.
 
 Constant başlangıç değerlerinin bağımlılık grafiğindeki bir döngü, bir
 derleme zamanı hatasıdır.
+
+Türü çıkarılan bir Constant (§8.1), türü yazılmış bir Constant ile bu bölümün aynı kurallarına tabidir. Aynı modülde daha sonra bildirilen bir Constant'a başvuru, denetimden önce çözülür.
+
+Bir modül sabitleri şu kurallarla başlatır. Yalnızca başka sabitlere başvuran bir başlangıç, o sabitlerden sonra ve modülün diğer deyimlerinden önce çalışır; çözülen değer, programın gözlemlediği değerdir. Değiştirilebilir bir bağlamayı okuyan başlangıç, yazıldığı yerde, o bağlamadan sonra kalır. Fonksiyon çağıran bir başlangıç da yazıldığı yerde kalır: çağrı yan etkisiz sayılmaz ve fonksiyon bildirimi, sabitin beklediği bir değer başlatması değildir. Bu kurallarla sabit başlatılamadan yapılan kullanım derleme zamanı hatasıdır (`SEM010`). Döngü derleme zamanı hatasıdır (`SEM010`). İkisi de sıfır değer olarak çalışmaz.
 
 Bu tanım, dilin derleme zamanı bilgisi gerektirdiği her yerde normatiftir.
 Üs alma (power) tiplemesi, sabit-anlatım değerlendirmesine bağlı değildir.
@@ -4649,6 +4686,8 @@ Lambda blokları reddedilmeye devam eder. Çalışma zamanı alan hataları AhdC
 Error'larıdır (`RegexError`, `ValueError`, `CSVError`, `FileError`); Go panic
 veya stack trace göstermemelidir.
 
+v2.8.0'da eklenen toparlama kuralları §93'te belirtilmiştir.
+
 ---
 
 ## 53. Data Standart Modülü (v0.1.12)
@@ -6770,7 +6809,8 @@ ile yerel programlar tarafından paylaşılır. Açık her Canvas'ı, paketli
 üzerinden sınırlı JSON satırlarıyla ulaşılır, standart hatası protokolün parçası
 değildir. Yardımcı çizim listesini tutar, bir pencerede gösterir ve PNG (birim
 başına bir piksel) ile SVG çıktısını aynı listeden üretir. Kabuk komutu
-çalıştırmaz, ağa erişmez ve yalnızca `save`'in verdiği yola yazar. Bir programın
+çalıştırmaz, ağa erişmez ve yalnızca `save`'in verdiği yola yazar. Canvas'ın
+v2.8.0 üyeleri §92'de belirtilmiştir. Bir programın
 açık Canvas'ları program bittiğinde kapanır. Yardımcı
 `AHDCODE_GRAPHICS_RUNTIME` ile, derleyicinin kaydettiği konumla ya da çalışan
 programın yanındaki kurulumla bulunur; `PATH` aranmaz.
@@ -7162,4 +7202,154 @@ Paketleme dilin anlambilimini değiştirmez.
 
 ---
 
-# AhdCode v0.1 Çekirdek Spesifikasyonu Sonu
+## 91. v2.1–v2.7 Sürümlerinde Eklenen Standart Modüller
+
+Bu sürümler sözdizimi ya da tür sistemi kuralı eklememiştir. Aşağıdaki her
+modül, aynı adlı yerel bir dosyanın gölgeleyemeyeceği, derleyicinin sağladığı
+bir `builtin:` modülüdür; çalışma zamanı hataları için yalnızca kendi `Error`
+alt sınıfını fırlatır, kabuk başlatmaz ve yüzeyi için normatif olan `docs/`
+altındaki kılavuzunda belirtilmiştir.
+
+| Sürüm | Modül | Yüzey | Kılavuz |
+|---|---|---|---|
+| v2.1 | `HTTP` | `ClientFileResponse` döndüren `Client.download`, `Client.sendToFile`; `ClientRequest.withMultipartField`, `withMultipartFile`; `HTTP.webSocketClient` (§77) | `docs/HTTP_TR.md`, `docs/WEBSOCKET_TR.md` |
+| v2.1 | `SMTP` | `SMTPMessage.withAttachment(path, fileName, contentType)` | `docs/SMTP_TR.md` |
+| v2.2 | `Plot` | `Plot.pie`, `Plot.heatmap`, `Surface.xCategories`, `Surface.yCategories` (§56.9) | `docs/PLOT_TR.md` |
+| v2.4 | `Plot` | türlü `LineStyle`, `Marker`, `LegendPosition`; `lineWidth`, `markerSize`; tüm-string `$...$` matematik etiketleri | `docs/PLOT_TR.md` |
+| v2.5 | `Archive` | `Archive.list`, sınırlı ve ya-hep-ya-hiç `Archive.extract` | `docs/ARCHIVE_TR.md` |
+| v2.5 | `File` | `copy`, `atomicWrite`, `atomicMove`, `symlink`, `readLink`, `isSymlink`, `setPermissions`, `walk` | `docs/FILESYSTEM_TR.md` |
+| v2.5 | `Process` | zaman aşımı ve çıktı bütçesi olan `Process.run(command, args)`; `ProcessError` | `docs/PROCESS_TR.md` |
+| v2.5 | `SQLite` | `db.backupTo(path)` | `docs/SQLITE_TR.md` |
+| v2.6 | `DNS` | `DNS.lookup(host, timeoutSeconds) -> DNSResult`; `DNSError` | `docs/DNS_TR.md` |
+| v2.6 | `TLS` | `TLS.inspect(host, port, timeoutSeconds) -> TLSInfo`; `TLSError` | `docs/TLS_TR.md` |
+| v2.7 | `Disk` | `Disk.inspect(path) -> DiskInfo`; `DiskError` | `docs/DISK_TR.md` |
+| v2.7 | `Service` | `Service.status(name) -> ServiceInfo`; `ServiceError` | `docs/SERVICE_TR.md` |
+
+Bu aralıktaki tek dil yüzeyi değişikliği, §15'teki v2.3.0 `uses` cümlesidir;
+§9.3 onu `Global` ile ilişkilendirir.
+
+## 92. Graphics Şekilleri, Metin, Resimler, İşaretçi Olayları ve Zamanlayıcılar (v2.8.0)
+
+Canvas aşağıdaki üyeleri kazanır. Hepsi §80'in bütün kurallarına uyar:
+yayımlanmış parametre adları ve varsayılanlar, tamamen konumsal ya da tamamen
+adlandırılmış çağrılar, `Int`'in `Real`'e genişlemesi, Kartezyen koordinatlar,
+aynı renkler ve kapalı bir Canvas'ta `GraphicsError`.
+
+```text
+Canvas.ellipse(x: Real, y: Real, radiusX: Real, radiusY: Real, stroke: String := "black",
+               fill: String? := null, width: Real := 1.0)                         -> Nothing
+Canvas.polygon(points: List<Real>, stroke: String := "black",
+               fill: String? := null, width: Real := 1.0)                         -> Nothing
+Canvas.polygon(points: List<Int>, stroke: String := "black",
+               fill: String? := null, width: Real := 1.0)                         -> Nothing
+Canvas.arc(x: Real, y: Real, radius: Real, start: Real, end: Real,
+           color: String := "black", width: Real := 1.0)                          -> Nothing
+Canvas.text(x: Real, y: Real, text: String, color: String := "black",
+            size: Real := 16.0, align: String := "left")                          -> Nothing
+Canvas.image(path: String, x: Real, y: Real,
+             width: Real := 0.0, height: Real := 0.0)                             -> Nothing
+Canvas.onMove(handler: (x: Real, y: Real) -> Nothing)                             -> Nothing
+Canvas.onDrag(handler: (x: Real, y: Real) -> Nothing)                             -> Nothing
+Canvas.every(milliseconds: Int, handler: () -> Nothing)                           -> Int
+Canvas.cancel(timer: Int)                                                         -> Nothing
+Canvas.batch(handler: () -> Nothing)                                              -> Nothing
+```
+
+`polygon` aşırı yüklenmiş tek üyedir: `points`, `Real` ya da `Int` türünde düz
+bir `x0, y0, x1, y1, ...` listesidir; 3 ile 2000 arasında köşe ve çift sayıda
+sayı içerir. Çevre kapatılır; kendini kesen bir çokgen, çevresinin içine aldığı
+her bölgeyi doldurur (sıfır olmayan sarım). `ellipse`, 0 ya da daha büyük
+yarıçap ister ve biri 0 olduğunda hiçbir şey çizmez. `arc`, `start` ve `end`
+açılarını `+x`'ten saat yönünün tersine derece olarak ölçer; `end > start` ise
+saat yönünün tersine, değilse saat yönünde ilerler, bir tam turla sınırlanır,
+uçları yuvarlaktır ve dolgusu yoktur.
+
+`text`, paketli tek yazı tipiyle en çok 1000 karakterlik, satır sonu içermeyen
+tek bir satır çizer. `(x, y)` taban çizgisinin üzerindedir; `align`, `left`,
+`center` ya da `right` değerini alır ve metnin başını, ortasını ya da sonunu
+`x`'e yerleştirir; `size`, Canvas birimi cinsinden yazı tipi yüksekliğidir,
+0'dan büyük ve en çok 2000'dir. PNG ve SVG çıktısı aynı glif ana hatlarını
+çizer; hiçbir çıktı kurulu bir yazı tipine bağlı değildir.
+
+`image`, bir PNG ya da JPEG dosyasını sol alt köşesi `(x, y)` olacak biçimde
+çizer. 0 genişlik ve yükseklik doğal boyut demektir; yalnızca biri verilirse
+en-boy oranı korunur; ikisi de verilirse resim gerilir. Göreli yol, çalışma
+dizinine göre çözülür.
+
+`onMove`, hiçbir düğme basılı değilken işaretçi konumunu bildirir. `onDrag`,
+Canvas'ın içinde başlayan bir sol düğme basışı sürdüğü sürece bildirir; işaretçi
+dışarı çıksa da sürer, bu yüzden bir koordinat dışarıda olabilir. Dışarıda
+başlayan bir basış sürükleme değildir. Basışın kendisi bir tıklamadır, sürükleme
+değildir. İkisi de tick başına en çok bir kez bildirilir ve pencere saniyede 60
+kez tick atar; koordinatlar Canvas koordinatlarıdır. `every`, yinelenen bir zamanlayıcı kaydeder ve
+kimliğini döndürür; aralık 1 milisaniye ile bir gün arasındadır ve bir Canvas
+en çok 64 zamanlayıcı tutar. `cancel` bir zamanlayıcıyı durdurur ve hiçbir
+zamanlayıcıyı adlandırmayan bir kimliği yok sayar. Hareket, sürükleme ve
+zamanlayıcı callback'leri §84'ün olay kurallarına uyar: yalnızca `Canvas.wait`
+içinde, birer birer, geliş sırasıyla, programın kendi yürütme yolunda
+çalışırlar; birinin fırlattığı hata Canvas'ı kapatır ve `wait`'ten dışarı
+yayılır. Bekleyen hareket konumlarının yerini en yenisi alır; sürükleme
+konumları ve zamanlayıcı turları değiştirilmez; callback'i aralığından uzun
+süren bir zamanlayıcı kaçırdığı turları atlar.
+
+Bir zamanlayıcı callback'inin çizdiği her şey tek bir kare olarak sunulur.
+`batch(handler)` aynı güvenceyi her koda verir: pencere, `handler` dönene
+kadar, hata fırlatsa bile, son tamamlanmış resmini korur. Batch'ler iç içe
+olabilir.
+
+`AHDCODE_GRAPHICS_HEADLESS=1` altında bir Canvas'ın saati yoktur ve
+zamanlayıcıları çalışmaz. Yardımcı ayrıca programın çizdiği resim dosyalarını
+okur; §81 bunun dışında değişmemiştir.
+
+## 93. Bir Hata, Bir Tanılama (v2.8.0)
+
+Bu bölüm §52'yi genişletir. Tanılama mesajları ve ipuçları İngilizce yazılır;
+yerleşik kodlar anlamlarını korur.
+
+- Bir kaynak satırı en çok ilk sözdizimi tanılamasını bildirir.
+- Sözcüksel bir hatadan sonra, ondan sonra konumlanan hiçbir ayrıştırıcı
+  tanılaması bildirilmez.
+- Sözcüksel ya da sözdizimsel hatası olan bir modülde tür denetimi yapılmaz;
+  böylece ayrıştırıcının okuyamadığı bir yapıdan anlamsal tanılama türetilmez.
+- `PAR015`, §2.1'deki ayrılmış bir sözcüğün bir adın bildirildiği ya da
+  bağlandığı yerde kullanılmasını bildirir: dosya başına her sözcük için bir
+  kez, bu tür ilk kullanımda, önerilen bir tanımlayıcıyla. O sözcüğün sonraki
+  işlenen kullanımları ad olarak okunur.
+- `=` ile yazılmış türlü bir bildirim `PAR002`'yi bir kez bildirir ve bildirim
+  olarak okunur.
+- `{` işareti sonraki satırda başlayan bir blok, başlatan satırın sonunda
+  `PAR002`'yi bir kez bildirir ve sonra o blok olarak okunur. Function başlığı
+  bunun dışındadır: §15, `->`, dönüş türü, `uses`, listesi ve `{` öncesinde
+  satır sonuna izin verir.
+- `{` işareti eksik olan bir blok, `}` için ikinci bir tanılama bildirmez.
+- Başka bir dilin bildirim ya da çıktı sözcüğüyle başlayan bir deyim,
+  ipucunda AhdCode yazımını taşır.
+
+`name: Constant := value`, §8.1'deki çıkarımlı bildirimin o niteleyiciyle
+yazılmış hâlidir. Modül kökünde ve `name: Local Constant := value` olarak iç
+içe bir kapsamda geçerlidir; v2.8.0 öncesi sürümler modül kökündeki biçimi
+dahili bir `IR002` tanılamasıyla reddediyordu.
+
+## 94. Araç Güvenceleri (v2.8.0)
+
+`ahdcode format [--check] <hedef>...` istenen sayıda dosya ve klasör kabul
+eder. Bir klasör, adı `.` ile başlayan klasörler dışında altındaki her `.ahd`
+dosyasını belirtir. Her hedef işlenir; herhangi bir dosya geçersizse ya da
+`--check` altında kanonik değilse çıkış durumu 1'dir.
+
+Formatter, girdisindeki belirteç ve yorumların tam olarak aynısını üretmeli;
+yalnızca ayırıcıları (satır sonu ve virgül), boşlukları ve bildirim
+niteleyicilerinin sırasını değiştirmelidir. Bunu bir dosya için yapamayan bir
+uygulama `FMT001` bildirir ve dosyayı değiştirmeden bırakır. Kanonik Function
+başlığı tek satırdır; başlıktaki bir satır arasına yazılmış yorum bildirimin
+üstüne taşınır.
+
+Programın geri kalanı boyunca hizmet veren bir çağrıdan (`Server.start`) önce
+yazılan program çıktısı, çağrı engellemeden önce teslim edilir; sonrasında
+yazılan her satır da, standart çıktı bir terminal, dosya ya da boru olsun,
+yazıldığı anda teslim edilir. `take`, `Canvas.wait`, `Window.wait` ve
+`Scheduler.run` bekleyen çıktıyı engellemeden önce zaten teslim ediyordu.
+
+---
+
+# AhdCode Çekirdek Spesifikasyonu Sonu

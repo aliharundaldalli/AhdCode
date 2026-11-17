@@ -165,7 +165,8 @@ func TestPublishedMemberGeneralizationKeepsGraphicsAndLegacyMembers(t *testing.T
 		identity *types.ClassSymbol
 		names    []string
 	}{
-		{graphicsCanvasClass, []string{"clear", "line", "circle", "rectangle", "save", "wait", "close", "isOpen", "turtle", "onClick", "onKey"}},
+		{graphicsCanvasClass, []string{"clear", "line", "circle", "rectangle", "save", "wait", "close", "isOpen", "turtle", "onClick", "onKey",
+			"ellipse", "polygon", "arc", "text", "image", "onMove", "onDrag", "every", "cancel", "batch"}},
 		{graphicsTurtleClass, []string{"forward", "backward", "left", "right", "moveTo", "setHeading", "penUp", "penDown", "setColor", "setWidth", "home", "x", "y", "heading"}},
 	} {
 		members := BuiltinClassMembers(testCase.identity)
@@ -177,7 +178,9 @@ func TestPublishedMemberGeneralizationKeepsGraphicsAndLegacyMembers(t *testing.T
 			if members[index] == nil || members[index].Name != name || members[index] != graphicsMembers[operation] {
 				t.Fatalf("%s member %d = %v, want the v1.6 Symbol %q", testCase.identity.Name, index, members[index], name)
 			}
-			if members[index].OverloadSet != nil || !TypeOperationBindsArguments(operation) {
+			// Canvas.polygon alone is overloaded, on the element type of its points.
+			overloaded := operation == GraphicsCanvasPolygon
+			if (members[index].OverloadSet != nil) != overloaded || !TypeOperationBindsArguments(operation) {
 				t.Fatalf("%s.%s changed shape", testCase.identity.Name, name)
 			}
 		}

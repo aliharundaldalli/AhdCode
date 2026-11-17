@@ -94,8 +94,12 @@ func (compiler *Compiler) analyze(identity SourceIdentity, requester ModuleID, i
 	lexed := lexer.Lex(module.File)
 	module.Parsed = parser.Parse(module.File, lexed.Tokens)
 	compiler.appendFrontendDiagnostics(identity.ID, lexed.Diagnostics)
-	compiler.appendFrontendDiagnostics(identity.ID, module.Parsed.Diagnostics)
+	// A lexical error (an unclosed string, a stray character) leaves the
+	// parser with a damaged token stream, so syntax errors from that point on
+	// only repeat it. Those before it are independent and stay.
+	compiler.appendFrontendDiagnostics(identity.ID, beforeFirstError(module.Parsed.Diagnostics, lexed.Diagnostics))
 	frontendFailed := hasErrors(lexed.Diagnostics) || module.Parsed.HasErrors()
+	syntaxFailed := frontendFailed
 
 	// require(...) is local source composition, resolved before the bring
 	// graph below: by the time brings are collected, every required file's
@@ -177,7 +181,13 @@ func (compiler *Compiler) analyze(identity SourceIdentity, requester ModuleID, i
 
 	module.AnalyzeCount++
 	module.Semantic = semantic.AnalyzeWithEnvironment(module.Parsed, environment)
-	compiler.appendSemanticDiagnostics(identity.ID, module.Parsed.Program, module.Semantic.Diagnostics, dependencyTargets)
+	// A file that does not parse is analyzed, so the editor still gets
+	// symbols and the interface of what did parse, but its semantic errors
+	// are not reported: unknown names and wrong argument counts in a
+	// half-parsed file follow from the syntax error already shown.
+	if !syntaxFailed {
+		compiler.appendSemanticDiagnostics(identity.ID, module.Parsed.Program, module.Semantic.Diagnostics, dependencyTargets)
+	}
 	if frontendFailed || dependencyFailed || module.Semantic.HasErrors() {
 		module.State = Failed
 		return module
@@ -295,4 +305,25 @@ func hasErrors(items []diagnostics.Diagnostic) bool {
 		}
 	}
 	return false
+}
+
+// beforeFirstError keeps the diagnostics that start before the first error
+// of an earlier stage, or all of them when that stage reported none.
+func beforeFirstError(items, earlier []diagnostics.Diagnostic) []diagnostics.Diagnostic {
+	first := -1
+	for _, item := range earlier {
+		if item.Severity == diagnostics.SeverityError && (first < 0 || item.Span.Start.Offset < first) {
+			first = item.Span.Start.Offset
+		}
+	}
+	if first < 0 {
+		return items
+	}
+	var kept []diagnostics.Diagnostic
+	for _, item := range items {
+		if item.Span.Start.Offset < first {
+			kept = append(kept, item)
+		}
+	}
+	return kept
 }

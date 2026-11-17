@@ -1,0 +1,72 @@
+// Free drawing: hold the mouse button and move to draw. A click starts a new
+// stroke, C clears the page, S saves it, Escape ends.
+bring Graphics
+from Graphics bring (Canvas)
+
+canvas: Canvas := Graphics.open(600, 400, "Free drawing")
+
+lastX: Real := 0.0
+lastY: Real := 0.0
+drawing: Bool := false
+segments: Int := 0
+
+page: Function := () -> Nothing uses [@canvas] {
+    canvas.clear("white")
+    canvas.text(
+        0
+        175
+        "Drag to draw - C clears - S saves - Escape ends"
+        "gray"
+        14
+        "center"
+    )
+}
+// A click is the start of a stroke: the next drag continues from here.
+clicked: Function := (
+    x: Real
+    y: Real
+) -> Nothing uses [@lastX, @lastY, @drawing] {
+    lastX = x
+    lastY = y
+    drawing = true
+}
+
+dragged: Function := (
+    x: Real
+    y: Real
+) -> Nothing uses [@canvas, @lastX, @lastY, @drawing, @segments] {
+    if drawing {
+        canvas.line(lastX, lastY, x, y, "blue", 3)
+        segments += 1
+    }
+    lastX = x
+    lastY = y
+    drawing = true
+}
+// Moving without the button held ends the stroke.
+moved: Function := (x: Real, y: Real) -> Nothing uses [@drawing] {
+    drawing = false
+}
+
+pressed: Function := (key: String) -> Nothing uses [@canvas, @segments] {
+    if key == "C" {
+        page()
+        segments = 0
+        write("Cleared.")
+    }
+    if key == "S" {
+        canvas.save("drawing.png")
+        write("Saved drawing.png with {segments} segments.")
+    }
+    if key == "Escape" {
+        canvas.close()
+    }
+}
+
+page()
+canvas.onClick(clicked)
+canvas.onDrag(dragged)
+canvas.onMove(moved)
+canvas.onKey(pressed)
+canvas.wait()
+write("Done.")

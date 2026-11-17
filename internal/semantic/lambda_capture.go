@@ -119,6 +119,7 @@ func (a *analyzer) resolveLocalCapture(capture *ast.CaptureRef, current, callabl
 // diagnostic, for the same no-cascade reason as resolveLocalCapture.
 func (a *analyzer) resolveGlobalDependency(capture *ast.CaptureRef, current, callableScope *scope, flow, callableFlow flowState, callable *Callable, label string) {
 	if moduleSymbol, ok := a.module.local(capture.Name); ok {
+		a.resolveForwardConstant(moduleSymbol, capture.Span())
 		if moduleSymbol.Builtin || moduleSymbol.Kind == ClassSymbol || moduleSymbol.Kind == FunctionSymbol || moduleSymbol.Kind == NamespaceSymbol {
 			a.error(codeInvalidCapture,
 				fmt.Sprintf("%q is reached directly and does not need a Global dependency", capture.Name),

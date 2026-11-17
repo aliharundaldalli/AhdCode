@@ -16,12 +16,11 @@ modules, GUI, Graphics, interactive Plot viewer, and desktop application
 packaging. It is used in practice by a small community; it is not a
 mainstream language.
 
-This is **v2.7.0**, **System Inspection & Distribution Polish**. It adds the
-read-only `Disk.inspect` filesystem-capacity and `Service.status` Linux
-systemd-inspection modules, and restores full platform packages: a signed and
-notarized macOS installer, the Windows installer, and Linux packages for both
-x86-64 and arm64. See [What is new in v2.7.0](#what-is-new-in-v270). v2.6.0,
-**DNS & TLS Inspection**, remains available as the previous release.
+This is **v2.8.0**, **Graphics Completion & First-Error Experience**. It is a
+source release: a git tag and a GitHub Release of the source, with no new
+installer. The signed installers stay at v2.7.0 until v3.0. It adds no syntax.
+See [What is new in v2.8.0](#what-is-new-in-v280). v2.7.0, **System Inspection
+& Distribution Polish**, remains the latest installable release.
 
 v2.0.0 is a major release, **Desktop Application Completion**: it completes
 the first-party desktop application foundation — ListBox, Select, TextArea,
@@ -510,7 +509,40 @@ the editor title play button, Command Palette, or `F6`, and connects to the
 diagnostics and hover. The same VSIX targets VS Code and Antigravity. See its
 [installation guide](editors/vscode/README.md).
 
-## Current limitations
+## What is new in v2.8.0 <a id="what-is-new-in-v280"></a>
+
+v2.8.0, **Graphics Completion & First-Error Experience**, is a source release.
+Install it from the git tag or from GitHub's source archives. It adds no
+syntax and no installer. The signed installers stay at v2.7.0 until v3.0.
+
+- **[Graphics](docs/GRAPHICS.md)** — `Canvas.text`, `polygon`, `ellipse`,
+  `arc`, and `image`; pointer callbacks `onMove` and `onDrag`; timers with
+  `every` and `cancel`, each tick shown as one complete frame; and `batch`
+  for a flicker-free redraw anywhere else. Text is drawn from a bundled
+  typeface, identically in the window, PNG, and SVG.
+- **[Diagnostics](docs/DIAGNOSTICS.md)** — one mistake, one diagnostic: a
+  reserved keyword used as a name is a single `PAR015` with a suggested
+  identifier, a line reports only its first syntax error, and a file that
+  does not parse is not type-checked. `count: Int = 5`, a `{` on its own
+  line, and statements spelled as in another language each get one message
+  with the fix in the hint.
+- **Language** — `limit: Constant := 20.0` infers its type at module root
+  and follows the same constant-expression rules as a typed Constant. A
+  pure constant graph is initialized in dependency order before the
+  module's other statements. An initializer that reads a mutable binding or
+  calls a function stays where it is written. A use before that point, and
+  a cycle, are `SEM010`. A module function is not a value the constant
+  waits to initialize.
+- **[Formatter](docs/FORMATTER.md)** — `ahdcode format` takes folders and
+  several files. A Function whose `uses [...]` or `{` starts a new line is
+  formatted correctly; v2.7.0 destroyed such a file. The formatter now
+  verifies that it kept every token and comment before it writes.
+- **Output** — what a program writes before `Server.start()`, and from its
+  handlers afterwards, reaches a file or a pipe immediately.
+- **[Specification](AHDCODE_LANGUAGE_SPEC_v0.1.md)** — brought up to date
+  through v2.8.0 (§9.3, §8.1, §91–§94).
+
+Examples: [`examples/v2.8`](examples/v2.8/README.md).
 
 ## What is new in v2.7.0 <a id="what-is-new-in-v270"></a>
 

@@ -35,6 +35,8 @@ type session struct {
 	// window reports no input at all.
 	listenClick atomic.Bool
 	listenKey   atomic.Bool
+	listenMove  atomic.Bool
+	listenDrag  atomic.Bool
 	// closedSent makes the closed event a one-time notice.
 	closedSent atomic.Bool
 	// script is the headless test Canvas's event list, replayed on wait.
@@ -118,6 +120,10 @@ func (s *session) handle(value request) (response, bool) {
 			s.listenClick.Store(true)
 		case "key":
 			s.listenKey.Store(true)
+		case "move":
+			s.listenMove.Store(true)
+		case "drag":
+			s.listenDrag.Store(true)
 		default:
 			return response{Error: "unknown event kind " + value.Kind}, false
 		}
@@ -130,7 +136,7 @@ func (s *session) handle(value request) (response, bool) {
 			return response{Error: err.Error()}, false
 		}
 		return response{OK: true}, false
-	case "clear", "line", "circle", "rectangle":
+	case "clear", "line", "circle", "rectangle", "ellipse", "polygon", "arc", "text", "image", "hold", "release":
 		if s.closed.Load() {
 			return response{Error: closedMessage, Closed: true}, false
 		}

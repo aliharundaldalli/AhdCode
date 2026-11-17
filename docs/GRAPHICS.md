@@ -5,18 +5,24 @@
 [Back to README](../README.md) · [Modules](MODULES.md) · [Plot](PLOT.md) · [Math](MATH.md)
 
 `Graphics` is the compiler-registered `builtin:Graphics` module added in
-AhdCode v1.6.0. It opens a window with a 2D Canvas, draws lines, circles, and
-rectangles on it in mathematical (Cartesian) coordinates, moves a Turtle pen
-across it, and saves the drawing as PNG or SVG.
+AhdCode v1.6.0. It opens a window with a 2D Canvas, draws lines, circles,
+rectangles, ellipses, polygons, arcs, text, and images on it in mathematical
+(Cartesian) coordinates, moves a Turtle pen across it, and saves the drawing as
+PNG or SVG.
 
 Graphics is for visual programming and 2D drawing: coordinates, angles,
 geometry, transformations, fractals, and turtle programs in a mathematics or
 programming lesson. **It is not a game engine and not a GUI toolkit.** It has no
-sprites, animation loop, frame callbacks, input polling, sound, widgets, or 3D,
-and none of them is planned for it. Since v1.8.0 a Canvas can
+sprites, scenes, collision, physics, input polling, sound, widgets, or 3D, and
+none of them is planned for it. Since v1.8.0 a Canvas can
 report clicks and key presses to a callback, so a Turtle can be steered with
-the arrow keys; see [Clicks and key presses](#clicks-and-key-presses). For
-windows with buttons and text fields, use [GUI](GUI.md).
+the arrow keys; see [Clicks and key presses](#clicks-and-key-presses). Since
+v2.8.0 it also draws text, polygons, ellipses, arcs, and images, reports
+pointer movement and dragging, and runs timers, which is enough for a moving
+picture or a drawing made with the mouse; see [Text](#text),
+[Images](#images), [Pointer movement and dragging](#pointer-movement-and-dragging),
+and [Timers and animation](#timers-and-animation). For windows with buttons
+and text fields, use [GUI](GUI.md).
 
 ## Public surface
 
@@ -49,10 +55,43 @@ canvas.rectangle(
     fill: String? := null
     lineWidth: Real := 1.0
 )                                                                    -> Nothing
+canvas.ellipse(
+    x: Real, y: Real, radiusX: Real, radiusY: Real
+    stroke: String := "black"
+    fill: String? := null
+    width: Real := 1.0
+)                                                                    -> Nothing
+canvas.polygon(
+    points: List<Real>            // x0, y0, x1, y1, ...; List<Int> too
+    stroke: String := "black"
+    fill: String? := null
+    width: Real := 1.0
+)                                                                    -> Nothing
+canvas.arc(
+    x: Real, y: Real, radius: Real, start: Real, end: Real
+    color: String := "black"
+    width: Real := 1.0
+)                                                                    -> Nothing
+canvas.text(
+    x: Real, y: Real, text: String
+    color: String := "black"
+    size: Real := 16.0
+    align: String := "left"
+)                                                                    -> Nothing
+canvas.image(
+    path: String, x: Real, y: Real
+    width: Real := 0.0
+    height: Real := 0.0
+)                                                                    -> Nothing
+canvas.batch(handler: () -> Nothing)                                 -> Nothing
 canvas.save(path: String)                                            -> Nothing
 canvas.wait()                                                        -> Nothing
 canvas.onClick(handler: (x: Real, y: Real) -> Nothing)               -> Nothing
 canvas.onKey(handler: (key: String) -> Nothing)                      -> Nothing
+canvas.onMove(handler: (x: Real, y: Real) -> Nothing)                -> Nothing
+canvas.onDrag(handler: (x: Real, y: Real) -> Nothing)                -> Nothing
+canvas.every(milliseconds: Int, handler: () -> Nothing)              -> Int
+canvas.cancel(timer: Int)                                            -> Nothing
 canvas.close()                                                       -> Nothing
 canvas.isOpen()                                                      -> Bool
 canvas.turtle()                                                      -> Turtle
@@ -187,12 +226,84 @@ corner. `width` and `height` must be 0 or greater, and a rectangle with a zero
 side draws nothing. `stroke`, `fill`, and `lineWidth` work like the circle's
 `stroke`, `fill`, and `width`.
 
+`canvas.ellipse(x, y, radiusX, radiusY)` (since v2.8.0) draws an ellipse
+around `(x, y)` with a horizontal and a vertical radius. Both must be 0 or
+greater, and an ellipse with a zero radius draws nothing. `stroke`, `fill`, and
+`width` work like the circle's.
+
+`canvas.polygon(points)` (since v2.8.0) draws a closed shape through its
+corners. `points` is one flat List of coordinates, `[x0, y0, x1, y1, ...]`, of
+`Real` or of `Int`: a triangle is six numbers. The last corner is joined back
+to the first. A polygon needs between 3 and 2000 corners, and an odd count of
+numbers raises `GraphicsError`. `stroke`, `fill`, and `width` work like the
+circle's. Where a polygon crosses itself, as a five-pointed star does, every
+part the outline encloses is filled.
+
+`canvas.arc(x, y, radius, start, end)` (since v2.8.0) draws part of a circle's
+outline around `(x, y)`. `start` and `end` are angles in degrees, measured
+counterclockwise from the positive x axis, as in mathematics and as a Turtle's
+heading: 0 is right, 90 is up. The arc runs counterclockwise when `end` is
+greater than `start` and clockwise when it is smaller, and never more than one
+full turn. An arc has round ends and no fill. `radius` must be 0 or greater.
+
 When a shape has both, the fill is drawn first and the outline over it. Later
 drawings cover earlier ones.
+
+```ahd
+bring Graphics
+
+canvas := Graphics.open(400, 300)
+canvas.text(0, 100, "Triangle", "blue", 28, "center")
+canvas.polygon([-100, -80, 100, -80, 0, 60], "black", "yellow", 2)
+canvas.ellipse(0, -110, 120, 15, "gray")
+canvas.arc(0, -80, 40, 0, 180, "red", 3)
+canvas.save("triangle.png")
+canvas.wait()
+```
 
 `canvas.clear(color)` removes every drawing and makes `color` the new
 background. It does not close the window, and it does not move or change any
 Turtle.
+
+## Text
+
+`canvas.text(x, y, text)` (since v2.8.0) writes one line of text. `(x, y)` is
+on the baseline, the line the letters stand on, so letters rise above `y` and
+only the tails of letters such as `g` and `p` reach below it.
+
+- `align` places the text around `x`: `"left"` (the default) starts it there,
+  `"center"` centers it there, and `"right"` ends it there. Any other value
+  raises `GraphicsError`.
+- `size` is the height of the font in Canvas units; it must be greater than 0
+  and at most 2000.
+- `color` is any Graphics color.
+
+The text is a single line of at most 1000 characters: a line break raises
+`GraphicsError`, so write a second line with a second call, lower by about
+1.2 times the size. An empty text draws nothing.
+
+Every Canvas uses the same bundled font (Go Regular), so a drawing looks the
+same on every computer. It covers Latin letters, the Turkish letters among
+them, and Greek and Cyrillic; a character it lacks is drawn as an empty box.
+In an SVG file the text is saved as its outline, so the file needs no font to
+display exactly, and it carries the original text as a label.
+
+## Images
+
+`canvas.image(path, x, y)` (since v2.8.0) draws a PNG or JPEG file with its
+lower-left corner at `(x, y)`, like a rectangle. A relative path is relative to
+the folder the program runs in.
+
+- With no `width` and `height`, the image is drawn at its own size, one pixel
+  per Canvas unit.
+- With one of them, the other follows so the image keeps its proportions.
+- With both, the image is stretched to exactly that size.
+
+A file is read once, the first time it is drawn; drawing it again, for example
+in every frame of an animation, costs nothing more. An image file may be at
+most 64 MB, 8192 pixels on a side, and 32 million pixels in all. A missing file, a file that is not a PNG
+or JPEG image, or a negative size raises `GraphicsError`. A PNG with
+transparency keeps it. In an SVG file the image is stored inside the file.
 
 ## Saving
 
@@ -288,8 +399,9 @@ the title at most 256 characters.
 - `canvas.isOpen()` is `true` while the Canvas can be drawn on, and `false`
   after `close()`, after `wait()` returns, or after the user closed the window.
 
-On a closed Canvas, drawing (`clear`, `line`, `circle`, `rectangle`, `save`,
-and a Turtle move with its pen down) raises `GraphicsError`. A closed Canvas is
+On a closed Canvas, drawing (`clear`, `line`, `circle`, `rectangle`, the other
+shapes, `text`, `image`, `save`, and a Turtle move with its pen down) and
+`every` and `batch` raise `GraphicsError`. A closed Canvas is
 never reopened by itself; open a new one instead. After `wait()` returns, or
 after the user closed the window, a Turtle whose pen is up may still move and
 turn. `canvas.close()` releases the Canvas and every Turtle it gave out: after
@@ -364,8 +476,115 @@ canvas.wait()
 
 Each arrow key press draws exactly one 20-unit line; no terminal input is
 read. See [`examples/v1.8/turtle_events`](../examples/v1.8/README.md). There
-is still no input polling (`mouseX`, `isKeyDown`), mouse movement, drag, wheel,
-double-click, or frame loop, and no `Turtle.speed`.
+is still no input polling (`mouseX`, `isKeyDown`), wheel, or double-click, and
+no `Turtle.speed`.
+
+## Pointer movement and dragging
+
+Since v2.8.0, a Canvas also reports where the pointer goes:
+
+```text
+canvas.onMove(handler: (x: Real, y: Real) -> Nothing)
+canvas.onDrag(handler: (x: Real, y: Real) -> Nothing)
+```
+
+- `onMove` receives the pointer's position when it moves over the Canvas with
+  no button held.
+- `onDrag` receives it when the pointer moves after a left-button press that
+  began inside the Canvas. The drag keeps reporting after the pointer leaves,
+  so a position may lie outside. A press that began outside does not become a
+  drag when the pointer enters, and the press itself is a click, not a drag.
+
+Both use the Canvas's Cartesian coordinates and follow every rule of
+[Clicks and key presses](#clicks-and-key-presses): they run inside
+`canvas.wait()`, one at a time, and registering again replaces the callback.
+A position is reported at most once per tick, and the window ticks 60 times a
+second. The press that begins a
+drag is a click, so `onClick` is where a stroke starts. If a move callback is
+slower than the pointer, the positions it has not reached yet are replaced by
+the newest one; the points of a drag are never dropped.
+
+```ahd
+bring Graphics
+from Graphics bring (Canvas)
+
+canvas: Canvas := Graphics.open(600, 400)
+lastX: Real := 0.0
+lastY: Real := 0.0
+
+start: Function := (x: Real, y: Real) -> Nothing uses [@lastX, @lastY] {
+    lastX = x
+    lastY = y
+}
+
+draw: Function := (x: Real, y: Real) -> Nothing uses [@canvas, @lastX, @lastY] {
+    canvas.line(lastX, lastY, x, y, "blue", 3)
+    lastX = x
+    lastY = y
+}
+
+canvas.onClick(start)
+canvas.onDrag(draw)
+canvas.wait()
+```
+
+See [`examples/v2.8/free_drawing`](../examples/v2.8/README.md).
+
+## Timers and animation
+
+Since v2.8.0, a Canvas can call a Function again and again:
+
+```text
+canvas.every(milliseconds: Int, handler: () -> Nothing) -> Int
+canvas.cancel(timer: Int)
+canvas.batch(handler: () -> Nothing)
+```
+
+`canvas.every(milliseconds, handler)` starts a timer and returns its number.
+While the program is in `canvas.wait()`, `handler` runs once every
+`milliseconds`; 16 is about sixty times a second. The interval must be between
+1 millisecond and one day. Timer callbacks run like every other callback: one
+at a time, in order with clicks and keys, on the program's own path of
+execution, so they need no locking. A callback that takes longer than its
+interval simply runs less often; missed turns are not made up.
+`canvas.cancel(timer)` stops a timer, also from inside its own callback, and
+cancelling a timer that is not running does nothing. A Canvas runs at most 64
+timers at a time, and closing it stops them all.
+
+Each timer callback is one frame: everything it draws appears together when it
+returns. That is what makes the usual animation, clear and draw again, free of
+flicker:
+
+```ahd
+bring Graphics
+from Graphics bring (Canvas)
+
+canvas: Canvas := Graphics.open(400, 300)
+x: Real := -180.0
+speed: Real := 4.0
+
+frame: Function := () -> Nothing uses [@canvas, @x, @speed] {
+    x += speed
+    if x > 180 or x < -180 {
+        speed = -speed
+    }
+    canvas.clear("white")
+    canvas.circle(x, 0, 20, "black", "red")
+}
+
+canvas.every(16, frame)
+canvas.wait()
+```
+
+`canvas.batch(handler)` gives any other code the same guarantee: the window
+keeps showing its last complete picture while `handler` runs and shows the
+result at once when it returns. Use it for a redraw made of many shapes in a
+click or key callback. Batches may be nested, and an error inside one still
+releases the picture before it propagates.
+
+A cleared Canvas forgets its earlier drawings, so an animation that clears in
+every frame can run for as long as the window is open. See
+[`examples/v2.8/bouncing_ball`](../examples/v2.8/README.md).
 
 ## Errors
 
@@ -378,6 +597,12 @@ exist, are compile errors. Problems only the running program can see raise
 - an unknown color;
 - a line width, circle stroke width, or Turtle width that is not greater than 0;
 - a negative radius, width, or height;
+- a polygon with fewer than 3 or more than 2000 corners, or an odd count of
+  numbers;
+- a text with a line break, more than 1000 characters, a size outside
+  0..2000, or an unknown `align`;
+- an image file that is missing, too large, or not a PNG or JPEG image;
+- a timer interval outside 1 millisecond..one day, or a 65th timer;
 - a save path with an unsupported extension, or a file that cannot be written;
 - drawing on a closed Canvas, or using a Turtle whose Canvas was closed with
   `close()`;
@@ -403,8 +628,9 @@ Each open Canvas is drawn by a small bundled program, `ahdgraphics`, that
 AhdCode starts for it and talks to through its standard input and output.
 AhdCode itself validates every argument and computes all Turtle geometry;
 `ahdgraphics` only keeps the list of drawings, shows it in the window, and
-writes PNG and SVG files. It runs no shell command, reads no file except
-through `save`, and uses no network.
+writes PNG and SVG files. It runs no shell command, writes no file except
+through `save`, reads none except the images the program draws, and uses no
+network.
 
 `ahdcode run`, native builds, and the REPL all use the same implementation. A
 native program built with `ahdcode build` records where the installed
@@ -430,13 +656,13 @@ If the helper cannot be found, `Graphics.open` raises `GraphicsError`.
 
 `AHDCODE_GRAPHICS_HEADLESS=1` opens every Canvas without a window, for
 automated tests and servers without a display: drawing and `save` work as
-usual, and `wait()` returns at once because there is no window to close.
+usual, and `wait()` returns at once because there is no window to close. A
+headless Canvas has no clock, so its timers do not run.
 
-## Not in v1.6.0
+## Not in Graphics
 
-Graphics deliberately has no sprites, scenes, collision, physics, animation
-or frame loop (`update`, `draw`, `tick`, frame rates), input polling (`mouseX`,
-`isKeyDown`), mouse movement or drag events, audio, 3D, shaders, widgets, text
-drawing, or image loading, and no `Turtle.speed`. Its only input is the click
-and key-press callbacks above. It draws lines, circles, and rectangles, clears, saves, and
-steers Turtles.
+Graphics deliberately has no sprites, scenes, collision, physics, input
+polling (`mouseX`, `isKeyDown`), wheel or double-click events, audio, 3D,
+shaders, widgets, fonts to choose from, multi-line or rotated text, image
+rotation or cropping, and no `Turtle.speed`. Its input is the click, key,
+move, and drag callbacks above, and its only clock is `canvas.every`.

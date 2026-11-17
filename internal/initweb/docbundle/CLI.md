@@ -22,7 +22,7 @@ ahdcode stop <app.dev|app.run>
 ahdcode kill [--force] <app.dev|app.run>
 ahdcode local status
 ahdcode local hosts [apply|remove]
-ahdcode format [--check] <file.ahd>
+ahdcode format [--check] <file.ahd|folder>...
 ahdcode lsp
 ahdcode --help
 ahdcode --version

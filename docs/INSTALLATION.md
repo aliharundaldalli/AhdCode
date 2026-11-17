@@ -1,6 +1,8 @@
 # Installation, upgrade, and removal
 
-Download the AhdCode v2.7.0 package for your operating system.
+Download the AhdCode v2.7.0 package for your operating system. v2.7.0 is the
+latest installable release. v2.8.0 through v2.11.0 are source releases; their
+git tags do not replace these packages. New installers return at v3.0.
 Every package is self-contained: it carries the compiler, a private Go
 toolchain, AhdDataStudio, the SQLite, numeric and plot helpers, an offline
 LaTeX engine, the project starters, and the English documentation.

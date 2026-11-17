@@ -25,7 +25,8 @@ func TestGraphicsModuleRegistered(t *testing.T) {
 	}
 	canvas := strings.Join(GraphicsCanvasOperations, ",")
 	turtle := strings.Join(GraphicsTurtleOperations, ",")
-	if canvas != "clear,line,circle,rectangle,save,wait,close,isOpen,turtle,onClick,onKey" ||
+	if canvas != "clear,line,circle,rectangle,save,wait,close,isOpen,turtle,onClick,onKey,"+
+		"ellipse,polygon,arc,text,image,onMove,onDrag,every,cancel,batch" ||
 		turtle != "forward,backward,left,right,moveTo,setHeading,penUp,penDown,setColor,setWidth,home,x,y,heading" {
 		t.Fatalf("unexpected member surface:\n%s\n%s", canvas, turtle)
 	}

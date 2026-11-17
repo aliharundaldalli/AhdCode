@@ -34,6 +34,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 	"unicode"
 	"unicode/utf16"
@@ -366,9 +367,28 @@ func AhdMatches(signal *AhdSignal, class *AhdClass) bool {
 var ahdOut = bufio.NewWriter(os.Stdout)
 var ahdIn = bufio.NewReader(os.Stdin)
 
+// ahdOutMu guards ahdOut for write and flush: an HTTP server runs handlers on
+// several goroutines, and each of them may write.
+var ahdOutMu sync.Mutex
+
+// ahdOutLive turns on a flush after every written line. A program that serves
+// forever never reaches the flush at the end of main, so without it output
+// sent to a file or a pipe would stay in the buffer for the life of the server.
+var ahdOutLive atomic.Bool
+
 // AhdFlush writes buffered program output.
 func AhdFlush() {
+	ahdOutMu.Lock()
 	_ = ahdOut.Flush()
+	ahdOutMu.Unlock()
+}
+
+// AhdLiveOutput flushes what the program wrote so far and makes every later
+// line appear as soon as it is written. A call that blocks for the rest of the
+// program, like Server.start, calls it first.
+func AhdLiveOutput() {
+	ahdOutLive.Store(true)
+	AhdFlush()
 }
 
 var ahdExitHooks []func()
@@ -1264,10 +1284,21 @@ func AhdNonNull[T any](value *T) T {
 // Terminal I/O
 // ---------------------------------------------------------------------------
 
+// ahdWriteLocked writes to the buffered standard output. Callers that must
+// stay in program order — write, Terminal.emit, and Terminal.pretty — share
+// this lock, and a live program flushes before the lock is released.
+func ahdWriteLocked(text string) {
+	ahdOutMu.Lock()
+	_, _ = ahdOut.WriteString(text)
+	if ahdOutLive.Load() {
+		_ = ahdOut.Flush()
+	}
+	ahdOutMu.Unlock()
+}
+
 // AhdWrite prints one canonical line of program output.
 func AhdWrite(text string) {
-	_, _ = ahdOut.WriteString(text)
-	_ = ahdOut.WriteByte('\n')
+	ahdWriteLocked(text + "\n")
 }
 
 // AhdTake reads one line of terminal input.
@@ -1276,7 +1307,7 @@ func AhdTake() string { return ahdReadLine() }
 // AhdTakePrompt writes a prompt, without adding a newline, and then reads one
 // line of terminal input. The prompt is never part of the returned String.
 func AhdTakePrompt(prompt string) string {
-	_, _ = ahdOut.WriteString(prompt)
+	ahdWriteLocked(prompt)
 	return ahdReadLine()
 }
 

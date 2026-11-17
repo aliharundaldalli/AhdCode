@@ -16,6 +16,16 @@ Check formatting without modifying the file:
 ahdcode format --check program.ahd
 ```
 
+Since v2.8.0, `format` takes any number of files and folders. A folder stands
+for every `.ahd` file below it; folders whose name starts with a dot are
+skipped. Every target is processed even when one fails, and the exit code is 1
+if any file is invalid or, with `--check`, not canonical:
+
+```bash
+ahdcode format src tests main.ahd
+ahdcode format --check .
+```
+
 The formatter is AST-aware. It preserves comments, string escapes,
 interpolation, and exact multiline-string content, and it renders the single
 canonical layout for everything else:
@@ -39,6 +49,16 @@ format(source)`. In-place updates use an atomic temporary-file replacement
 and preserve the file's permission bits. Invalid source is diagnosed and
 left unchanged -- the formatter never partially rewrites a file that does
 not already parse.
+
+A Function header may be spread over lines in the source, with `->`, the
+return type, `uses [...]`, or `{` each starting a new line. The canonical
+header is one line, and a comment written in such a break moves above the
+declaration. (v2.7.0 and earlier rewrote such a Function into invalid source;
+upgrade before formatting files written that way.)
+
+Before writing, the formatter checks that its layout has exactly the tokens
+and comments of the source. If it ever does not, it reports `FMT001` and
+leaves the file unchanged.
 
 ## Recommended style vs. valid syntax
 

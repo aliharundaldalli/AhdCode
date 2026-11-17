@@ -8,6 +8,7 @@ import (
 	"image/png"
 	"math"
 
+	xdraw "golang.org/x/image/draw"
 	"golang.org/x/image/vector"
 )
 
@@ -23,7 +24,7 @@ const bezierCircle = 0.5522847498307936
 type point struct{ x, y float64 }
 
 type pathOp struct {
-	kind uint8 // 0 move, 1 line, 2 cube, 3 close
+	kind uint8 // 0 move, 1 line, 2 cube, 3 close, 4 quad
 	p    [3]point
 }
 
@@ -81,7 +82,12 @@ func (s *shapePath) polygon(points []point, hole bool) {
 
 // circle adds a closed circle; hole reverses its orientation.
 func (s *shapePath) circle(center point, radius float64, hole bool) {
-	if radius <= 0 {
+	s.ellipse(center, radius, radius, hole)
+}
+
+// ellipse adds a closed axis-aligned ellipse; hole reverses its orientation.
+func (s *shapePath) ellipse(center point, radiusX, radiusY float64, hole bool) {
+	if radiusX <= 0 || radiusY <= 0 {
 		return
 	}
 	direction := 1.0
@@ -89,10 +95,10 @@ func (s *shapePath) circle(center point, radius float64, hole bool) {
 		direction = -1
 	}
 	at := func(angle float64) point {
-		return point{center.x + radius*math.Cos(angle), center.y + radius*math.Sin(angle)}
+		return point{center.x + radiusX*math.Cos(angle), center.y + radiusY*math.Sin(angle)}
 	}
 	tangent := func(angle float64) point {
-		return point{-math.Sin(angle) * direction, math.Cos(angle) * direction}
+		return point{-radiusX * math.Sin(angle) * direction, radiusY * math.Cos(angle) * direction}
 	}
 	start := at(0)
 	s.ops = append(s.ops, pathOp{kind: 0, p: [3]point{start}})
@@ -101,13 +107,104 @@ func (s *shapePath) circle(center point, radius float64, hole bool) {
 		to := direction * float64(quarter+1) * math.Pi / 2
 		p0, p3 := at(from), at(to)
 		t0, t3 := tangent(from), tangent(to)
-		p1 := point{p0.x + bezierCircle*radius*t0.x, p0.y + bezierCircle*radius*t0.y}
-		p2 := point{p3.x - bezierCircle*radius*t3.x, p3.y - bezierCircle*radius*t3.y}
+		p1 := point{p0.x + bezierCircle*t0.x, p0.y + bezierCircle*t0.y}
+		p2 := point{p3.x - bezierCircle*t3.x, p3.y - bezierCircle*t3.y}
 		s.ops = append(s.ops, pathOp{kind: 2, p: [3]point{p1, p2, p3}})
 	}
 	s.ops = append(s.ops, pathOp{kind: 3})
-	s.include(point{center.x - radius, center.y - radius})
-	s.include(point{center.x + radius, center.y + radius})
+	s.include(point{center.x - radiusX, center.y - radiusY})
+	s.include(point{center.x + radiusX, center.y + radiusY})
+}
+
+// outline adds ready-made sub-paths, such as glyph outlines, as they are.
+func (s *shapePath) outline(ops []pathOp) {
+	for _, op := range ops {
+		switch op.kind {
+		case 0, 1:
+			s.include(op.p[0])
+		case 4:
+			s.include(op.p[0])
+			s.include(op.p[1])
+		case 2:
+			s.include(op.p[0])
+			s.include(op.p[1])
+			s.include(op.p[2])
+		}
+	}
+	s.ops = append(s.ops, ops...)
+}
+
+// stroke adds a polyline of the given half width with round joins and caps:
+// one quad per segment and one disc per vertex, all with the same
+// orientation, so the pieces union into a single stroke that is blended once.
+// Segments are clipped to box first, so far-away geometry stays cheap.
+func (s *shapePath) stroke(points []point, closed bool, halfWidth float64, box [4]float64) {
+	count := len(points)
+	if count == 0 {
+		return
+	}
+	segments := count - 1
+	if closed {
+		segments = count
+	}
+	for index := 0; index < segments; index++ {
+		a, b, visible := clipSegment(points[index], points[(index+1)%count], box[0], box[1], box[2], box[3])
+		if !visible {
+			continue
+		}
+		length := math.Hypot(b.x-a.x, b.y-a.y)
+		if length > 1e-9 {
+			nx, ny := -(b.y-a.y)/length*halfWidth, (b.x-a.x)/length*halfWidth
+			s.polygon([]point{{a.x + nx, a.y + ny}, {b.x + nx, b.y + ny}, {b.x - nx, b.y - ny}, {a.x - nx, a.y - ny}}, false)
+		}
+	}
+	for _, vertex := range points {
+		if vertex.x >= box[0] && vertex.x <= box[2] && vertex.y >= box[1] && vertex.y <= box[3] {
+			s.circle(vertex, halfWidth, false)
+		}
+	}
+}
+
+// clipPolygon clips a polygon to a box with Sutherland-Hodgman, so a filled
+// shape that reaches far outside the Canvas is rasterized only where it can
+// be seen.
+func clipPolygon(points []point, minX, minY, maxX, maxY float64) []point {
+	type edge struct {
+		inside    func(p point) bool
+		intersect func(a, b point) point
+	}
+	vertical := func(x float64) func(a, b point) point {
+		return func(a, b point) point { return point{x, a.y + (b.y-a.y)*(x-a.x)/(b.x-a.x)} }
+	}
+	horizontal := func(y float64) func(a, b point) point {
+		return func(a, b point) point { return point{a.x + (b.x-a.x)*(y-a.y)/(b.y-a.y), y} }
+	}
+	edges := []edge{
+		{func(p point) bool { return p.x >= minX }, vertical(minX)},
+		{func(p point) bool { return p.x <= maxX }, vertical(maxX)},
+		{func(p point) bool { return p.y >= minY }, horizontal(minY)},
+		{func(p point) bool { return p.y <= maxY }, horizontal(maxY)},
+	}
+	for _, clip := range edges {
+		if len(points) == 0 {
+			return nil
+		}
+		output := make([]point, 0, len(points)+4)
+		previous := points[len(points)-1]
+		for _, current := range points {
+			switch {
+			case clip.inside(current) && clip.inside(previous):
+				output = append(output, current)
+			case clip.inside(current):
+				output = append(output, clip.intersect(previous, current), current)
+			case clip.inside(previous):
+				output = append(output, clip.intersect(previous, current))
+			}
+			previous = current
+		}
+		points = output
+	}
+	return points
 }
 
 // fill rasterizes the path onto img inside the path's bounds only, so the
@@ -140,6 +237,10 @@ func (s *shapePath) fill(img *image.RGBA, value rgba) {
 			rasterizer.CubeTo(ax, ay, bx, by, cx, cy)
 		case 3:
 			rasterizer.ClosePath()
+		case 4:
+			ax, ay := local(op.p[0])
+			bx, by := local(op.p[1])
+			rasterizer.QuadTo(ax, ay, bx, by)
 		}
 	}
 	source := image.NewUniform(color.NRGBA{R: value[0], G: value[1], B: value[2], A: value[3]})
@@ -187,8 +288,9 @@ func clipSegment(a, b point, minX, minY, maxX, maxY float64) (point, point, bool
 	return point{a.x + t0*dx, a.y + t0*dy}, point{a.x + t1*dx, a.y + t1*dy}, true
 }
 
-// drawCommand renders one primitive. A circle of radius 0 and a rectangle
-// with a zero side draw nothing, which is also what SVG renders for them.
+// drawCommand renders one primitive. A circle or arc of radius 0, an ellipse
+// with a zero radius, and a rectangle or image with a zero side draw nothing,
+// which is also what SVG renders for them.
 func drawCommand(img *image.RGBA, t transform, value command) {
 	bounds := img.Bounds()
 	halfWidth := value.width * t.scale / 2
@@ -256,6 +358,87 @@ func drawCommand(img *image.RGBA, t transform, value command) {
 			frame.polygon(rectangle(left+halfWidth, top+halfWidth, right-halfWidth, bottom-halfWidth), true)
 		}
 		frame.fill(img, value.stroke)
+
+	case ellipseCommand:
+		if value.c <= 0 || value.d <= 0 {
+			return
+		}
+		center := t.pixel(value.a, value.b)
+		radiusX, radiusY := value.c*t.scale, value.d*t.scale
+		if center.x+radiusX+halfWidth < minX || center.x-radiusX-halfWidth > maxX ||
+			center.y+radiusY+halfWidth < minY || center.y-radiusY-halfWidth > maxY {
+			return
+		}
+		if value.hasFill {
+			body := newShapePath()
+			body.ellipse(center, radiusX, radiusY, false)
+			body.fill(img, value.fill)
+		}
+		ring := newShapePath()
+		ring.ellipse(center, radiusX+halfWidth, radiusY+halfWidth, false)
+		ring.ellipse(center, radiusX-halfWidth, radiusY-halfWidth, true)
+		ring.fill(img, value.stroke)
+
+	case polygonCommand:
+		vertices := make([]point, 0, len(value.points)/2)
+		for index := 0; index+1 < len(value.points); index += 2 {
+			vertices = append(vertices, t.pixel(value.points[index], value.points[index+1]))
+		}
+		if value.hasFill {
+			if clipped := clipPolygon(vertices, minX, minY, maxX, maxY); len(clipped) >= 3 {
+				body := newShapePath()
+				ops := make([]pathOp, 0, len(clipped)+1)
+				ops = append(ops, pathOp{kind: 0, p: [3]point{clipped[0]}})
+				for _, vertex := range clipped[1:] {
+					ops = append(ops, pathOp{kind: 1, p: [3]point{vertex}})
+				}
+				body.outline(append(ops, pathOp{kind: 3}))
+				body.fill(img, value.fill)
+			}
+		}
+		border := newShapePath()
+		border.stroke(vertices, true, halfWidth, [4]float64{minX, minY, maxX, maxY})
+		border.fill(img, value.stroke)
+
+	case arcCommand:
+		if value.c <= 0 {
+			return
+		}
+		center := t.pixel(value.a, value.b)
+		radius := value.c * t.scale
+		if center.x+radius+halfWidth < minX || center.x-radius-halfWidth > maxX ||
+			center.y+radius+halfWidth < minY || center.y-radius-halfWidth > maxY {
+			return
+		}
+		curve := newShapePath()
+		curve.stroke(arcPoints(center, radius, value.start, value.end), false, halfWidth, [4]float64{minX, minY, maxX, maxY})
+		curve.fill(img, value.stroke)
+
+	case textCommand:
+		origin := t.pixel(value.a, value.b)
+		size := value.c * t.scale
+		// Text whose line is wholly above or below the image is skipped
+		// before its outline is built.
+		if origin.y+size < minY || origin.y-2*size > maxY {
+			return
+		}
+		glyphs := newShapePath()
+		glyphs.outline(textOutline(value.text, value.align, origin, size))
+		glyphs.fill(img, value.stroke)
+
+	case imageCommand:
+		if value.picture == nil || value.c <= 0 || value.d <= 0 {
+			return
+		}
+		topLeft := t.pixel(value.a, value.b+value.d)
+		bottomRight := t.pixel(value.a+value.c, value.b)
+		target := image.Rect(int(math.Round(topLeft.x)), int(math.Round(topLeft.y)),
+			int(math.Round(bottomRight.x)), int(math.Round(bottomRight.y)))
+		if target.Empty() || !target.Overlaps(bounds) {
+			return
+		}
+		source := value.picture.pixels
+		xdraw.ApproxBiLinear.Scale(img, target, source, source.Bounds(), xdraw.Over, nil)
 	}
 }
 
@@ -283,4 +466,30 @@ func encodePNG(value snapshot) ([]byte, error) {
 		return nil, err
 	}
 	return buffer.Bytes(), nil
+}
+
+// arcSweep limits an arc to one full turn in the direction it was asked for:
+// counter-clockwise when end is greater than start, clockwise otherwise.
+func arcSweep(start, end float64) float64 {
+	return math.Max(-360, math.Min(360, end-start))
+}
+
+// arcPoints samples an arc finely enough that the chords are within a tenth
+// of a pixel of the true curve. Angles are degrees, counter-clockwise from
+// +x in Canvas terms; pixel y points down, so the sine is subtracted.
+func arcPoints(center point, radius, start, end float64) []point {
+	sweep := arcSweep(start, end) * math.Pi / 180
+	step := math.Pi / 2
+	if radius > 0.1 {
+		step = 2 * math.Acos(1-0.1/radius)
+	}
+	count := int(math.Ceil(math.Abs(sweep) / step))
+	count = max(1, min(count, 1440))
+	points := make([]point, 0, count+1)
+	from := start * math.Pi / 180
+	for index := 0; index <= count; index++ {
+		angle := from + sweep*float64(index)/float64(count)
+		points = append(points, point{center.x + radius*math.Cos(angle), center.y - radius*math.Sin(angle)})
+	}
+	return points
 }

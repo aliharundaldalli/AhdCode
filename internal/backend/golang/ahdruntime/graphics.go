@@ -39,6 +39,12 @@ import (
 // time on the program's own goroutine, until the window is closed. The
 // transport, event routing, and queue bound live in helperlink.go, shared with
 // the GUI module.
+//
+// v2.8 completes the Canvas: ellipse, polygon, arc, text, and image
+// primitives; pointer move and drag callbacks; repeating timers, whose ticks
+// are queued with the window's events so a timer callback also runs between
+// other callbacks on the program's goroutine; and batch, which shows a group
+// of drawings at once.
 
 // AhdClassGraphicsError is the runtime descriptor of GraphicsError.
 var AhdClassGraphicsError = &AhdClass{Name: "GraphicsError", Parent: AhdClassError}
@@ -50,12 +56,22 @@ var AhdClassGraphicsError = &AhdClass{Name: "GraphicsError", Parent: AhdClassErr
 var AhdGraphicsRuntimeHint string
 
 const (
-	ahdGraphicsProtocolVersion = 2
+	ahdGraphicsProtocolVersion = 3
 	// AhdGraphicsMaxDimension bounds a Canvas side. A 4096x4096 Canvas is a
 	// 64 MiB image, the largest the helper will allocate for one export.
 	AhdGraphicsMaxDimension  = 4096
 	ahdGraphicsMaxTitleRunes = 256
 	ahdGraphicsMaxPathBytes  = 4096
+	// A polygon has between 3 and 2000 vertices; one line of text has at
+	// most 1000 characters and a font size of at most 2000 Canvas units.
+	ahdGraphicsMinPolygonPoints = 3
+	ahdGraphicsMaxPolygonPoints = 2000
+	ahdGraphicsMaxTextRunes     = 1000
+	ahdGraphicsMaxTextSize      = 2000
+	// ahdGraphicsMaxImageSide bounds the drawn width and height of an image.
+	ahdGraphicsMaxImageSide = 4 * AhdGraphicsMaxDimension
+	// ahdGraphicsMaxTimers bounds the timers one Canvas runs at a time.
+	ahdGraphicsMaxTimers = 64
 	// ahdGraphicsMaxResponseBytes bounds one helper response line.
 	ahdGraphicsMaxResponseBytes = 16 << 10
 	ahdGraphicsOpenTimeout      = 30 * time.Second
@@ -152,6 +168,15 @@ type ahdGraphicsRequest struct {
 
 	Path string `json:"path,omitempty"`
 
+	RX     float64   `json:"rx,omitempty"`
+	RY     float64   `json:"ry,omitempty"`
+	Points []float64 `json:"points,omitempty"`
+	Start  float64   `json:"start,omitempty"`
+	End    float64   `json:"end,omitempty"`
+	Text   string    `json:"text,omitempty"`
+	Size   float64   `json:"size,omitempty"`
+	Align  string    `json:"align,omitempty"`
+
 	Kind   string             `json:"kind,omitempty"`
 	Script []ahdGraphicsEvent `json:"script,omitempty"`
 }
@@ -163,6 +188,9 @@ type ahdGraphicsEvent struct {
 	X     float64 `json:"x,omitempty"`
 	Y     float64 `json:"y,omitempty"`
 	Key   string  `json:"key,omitempty"`
+	// Timer names the timer of a tick; 0 in a scripted tick means every
+	// timer, in the order they were started.
+	Timer int64 `json:"timer,omitempty"`
 }
 
 type ahdGraphicsResponse struct {
@@ -186,8 +214,28 @@ type ahdGraphicsCanvas struct {
 	// replaces the first.
 	onClick func(x, y float64)
 	onKey   func(key string)
+	onMove  func(x, y float64)
+	onDrag  func(x, y float64)
+	// timers holds the running timers by id; timerOrder keeps the order they
+	// were started in. batchDepth counts nested batch calls: the window is
+	// told to hold its picture only by the outermost one.
+	timers     map[int64]*ahdGraphicsTimer
+	timerOrder []int64
+	nextTimer  int64
+	batchDepth int
 	// listening records the event kinds the helper was asked to report.
 	listening map[string]bool
+}
+
+// ahdGraphicsTimer is one repeating timer of a Canvas. Its ticks travel
+// through the Canvas's event queue, so a timer callback runs on the
+// program's own goroutine between other callbacks, never beside one. pending
+// is set while a tick waits in the queue: a callback slower than its interval
+// skips ticks instead of piling them up.
+type ahdGraphicsTimer struct {
+	handler func()
+	stop    chan struct{}
+	pending bool
 }
 
 // ahdGraphicsTurtle is one Turtle's complete state. Geometry happens here,
@@ -333,6 +381,7 @@ func (c *ahdGraphicsCanvas) shutdown() {
 		return
 	}
 	c.usable, c.alive = false, false
+	c.stopTimers()
 	c.link.shutdown(ahdGraphicsCloseTimeout)
 }
 
@@ -412,6 +461,285 @@ func AhdGraphicsRectangle(handle int64, x, y, width, height float64, stroke stri
 	return ahdGraphicsDraw(handle, request)
 }
 
+// AhdGraphicsEllipse draws an axis-aligned ellipse around (x, y).
+func AhdGraphicsEllipse(handle int64, x, y, radiusX, radiusY float64, stroke string, fill *string, width float64) string {
+	if radiusX < 0 || radiusY < 0 {
+		return fmt.Sprintf("ellipse radii must be 0 or greater, not %s and %s", ahdGraphicsNumber(radiusX), ahdGraphicsNumber(radiusY))
+	}
+	if !(width > 0) {
+		return fmt.Sprintf("ellipse stroke width must be greater than 0, not %s", ahdGraphicsNumber(width))
+	}
+	request := ahdGraphicsRequest{Op: "ellipse", X: x, Y: y, RX: radiusX, RY: radiusY, LineWidth: width}
+	if problem := ahdGraphicsPaint(&request, stroke, fill); problem != "" {
+		return problem
+	}
+	return ahdGraphicsDraw(handle, request)
+}
+
+// AhdGraphicsPolygon draws a closed polygon. points lists its vertices as
+// x0, y0, x1, y1, ...; the last vertex is joined back to the first.
+func AhdGraphicsPolygon(handle int64, points []float64, stroke string, fill *string, width float64) string {
+	if len(points)%2 != 0 {
+		return fmt.Sprintf("polygon points must be x, y pairs; received %d numbers", len(points))
+	}
+	if count := len(points) / 2; count < ahdGraphicsMinPolygonPoints || count > ahdGraphicsMaxPolygonPoints {
+		return fmt.Sprintf("a polygon needs between %d and %d points; received %d", ahdGraphicsMinPolygonPoints, ahdGraphicsMaxPolygonPoints, count)
+	}
+	for _, value := range points {
+		if math.IsNaN(value) || math.IsInf(value, 0) {
+			return "polygon points must be finite numbers"
+		}
+	}
+	if !(width > 0) {
+		return fmt.Sprintf("polygon stroke width must be greater than 0, not %s", ahdGraphicsNumber(width))
+	}
+	request := ahdGraphicsRequest{Op: "polygon", Points: points, LineWidth: width}
+	if problem := ahdGraphicsPaint(&request, stroke, fill); problem != "" {
+		return problem
+	}
+	return ahdGraphicsDraw(handle, request)
+}
+
+// AhdGraphicsArc draws part of a circle around (x, y) from the start angle to
+// the end angle, in degrees measured counter-clockwise from +x like a Turtle
+// heading. It turns counter-clockwise when end is greater than start and
+// clockwise otherwise, and never more than one full turn.
+func AhdGraphicsArc(handle int64, x, y, radius, start, end float64, color string, width float64) string {
+	if radius < 0 {
+		return fmt.Sprintf("arc radius must be 0 or greater, not %s", ahdGraphicsNumber(radius))
+	}
+	if math.IsNaN(start) || math.IsInf(start, 0) || math.IsNaN(end) || math.IsInf(end, 0) {
+		return "arc angles must be finite numbers"
+	}
+	parsed, ok := AhdGraphicsParseColor(color)
+	if !ok {
+		return ahdGraphicsColorProblem("arc", color)
+	}
+	if !(width > 0) {
+		return fmt.Sprintf("arc width must be greater than 0, not %s", ahdGraphicsNumber(width))
+	}
+	return ahdGraphicsDraw(handle, ahdGraphicsRequest{Op: "arc", X: x, Y: y, Radius: radius, Start: start, End: end, Color: &parsed, LineWidth: width})
+}
+
+// AhdGraphicsText draws one line of text. (x, y) is on the text's baseline:
+// its left end, its middle, or its right end as align says.
+func AhdGraphicsText(handle int64, x, y float64, text, color string, size float64, align string) string {
+	parsed, ok := AhdGraphicsParseColor(color)
+	if !ok {
+		return ahdGraphicsColorProblem("text", color)
+	}
+	if !(size > 0) || size > ahdGraphicsMaxTextSize {
+		return fmt.Sprintf("text size must be greater than 0 and at most %d, not %s", ahdGraphicsMaxTextSize, ahdGraphicsNumber(size))
+	}
+	if align != "left" && align != "center" && align != "right" {
+		return fmt.Sprintf("unsupported text align %q; use left, center, or right", align)
+	}
+	if !utf8.ValidString(text) || utf8.RuneCountInString(text) > ahdGraphicsMaxTextRunes {
+		return fmt.Sprintf("Canvas text must be at most %d characters", ahdGraphicsMaxTextRunes)
+	}
+	for _, character := range text {
+		if character < 0x20 || character == 0x7f {
+			return "Canvas text is one line; draw each line with its own text call"
+		}
+	}
+	return ahdGraphicsDraw(handle, ahdGraphicsRequest{Op: "text", X: x, Y: y, Text: text, Size: size, Align: align, Color: &parsed})
+}
+
+// AhdGraphicsImage draws a PNG or JPEG file with its lower-left corner at
+// (x, y). A width or height of 0 means "not given": with neither, the image
+// keeps its own size; with one, the other follows the image's proportions.
+// A relative path is relative to the program's working directory.
+func AhdGraphicsImage(handle int64, path string, x, y, width, height float64) string {
+	if path == "" || len(path) > ahdGraphicsMaxPathBytes || strings.ContainsRune(path, 0) {
+		return "image needs a file path"
+	}
+	switch strings.ToLower(filepath.Ext(path)) {
+	case ".png", ".jpg", ".jpeg":
+	default:
+		return fmt.Sprintf("cannot draw %q: Graphics draws only .png, .jpg, and .jpeg images", path)
+	}
+	if width < 0 || height < 0 || width > ahdGraphicsMaxImageSide || height > ahdGraphicsMaxImageSide {
+		return fmt.Sprintf("image width and height must be between 0 and %d, not %s and %s", ahdGraphicsMaxImageSide, ahdGraphicsNumber(width), ahdGraphicsNumber(height))
+	}
+	absolute, err := filepath.Abs(path)
+	if err != nil {
+		return fmt.Sprintf("cannot draw %q: the path cannot be resolved", path)
+	}
+	problem := ahdGraphicsDraw(handle, ahdGraphicsRequest{Op: "image", Path: absolute, X: x, Y: y, W: width, H: height})
+	if problem != "" && problem != ahdGraphicsClosedMessage && !strings.HasPrefix(problem, "the Graphics window helper") {
+		return fmt.Sprintf("cannot draw %q: %s", path, problem)
+	}
+	return problem
+}
+
+// AhdGraphicsBatch runs work and shows everything it draws at once: the
+// window keeps its last complete picture until work returns, so a clear
+// followed by a redraw never flashes. Batches nest; only the outermost one
+// releases the picture. An error in work still releases it, then propagates.
+func AhdGraphicsBatch(handle int64, work func()) string {
+	if work == nil {
+		return "Canvas.batch needs a Function"
+	}
+	canvas, problem := ahdGraphicsCanvasOf(handle)
+	if problem != "" {
+		return problem
+	}
+	canvas.mu.Lock()
+	if !canvas.usable {
+		canvas.mu.Unlock()
+		return ahdGraphicsClosedMessage
+	}
+	canvas.mu.Unlock()
+	ahdGraphicsBatchRun(handle, work)
+	return ""
+}
+
+// ahdGraphicsBatchRun is the batch itself; a Canvas that closes meanwhile
+// simply has nothing left to hold or release.
+func ahdGraphicsBatchRun(handle int64, work func()) {
+	canvas, problem := ahdGraphicsCanvasOf(handle)
+	if problem != "" {
+		work()
+		return
+	}
+	hold := func(op string, change int) {
+		canvas.mu.Lock()
+		defer canvas.mu.Unlock()
+		outermost := canvas.batchDepth == 0
+		canvas.batchDepth += change
+		if change < 0 {
+			outermost = canvas.batchDepth == 0
+		}
+		if outermost && canvas.usable {
+			_, _ = canvas.request(ahdGraphicsRequest{Op: op}, ahdGraphicsRequestTimeout)
+		}
+	}
+	hold("hold", 1)
+	defer hold("release", -1)
+	work()
+}
+
+func AhdGraphicsBatchChecked(handle int64, work func()) {
+	AhdGraphicsCheck(AhdGraphicsBatch(handle, work))
+}
+
+// AhdGraphicsEvery starts a timer that runs handler every interval
+// milliseconds while the program waits on the Canvas, and returns the
+// timer's number for Canvas.cancel. Each run is one frame: what the handler
+// draws appears together. A handler slower than its interval skips ticks.
+// A headless Canvas has no clock: its timers run only on scripted ticks.
+func AhdGraphicsEvery(handle int64, milliseconds int64, handler func()) (int64, string) {
+	if handler == nil {
+		return 0, "Canvas.every needs a Function"
+	}
+	if milliseconds < 1 || milliseconds > 24*60*60*1000 {
+		return 0, fmt.Sprintf("a timer interval must be between 1 millisecond and one day, not %d", milliseconds)
+	}
+	canvas, problem := ahdGraphicsCanvasOf(handle)
+	if problem != "" {
+		return 0, problem
+	}
+	canvas.mu.Lock()
+	defer canvas.mu.Unlock()
+	if !canvas.usable {
+		return 0, ahdGraphicsClosedMessage
+	}
+	if len(canvas.timers) >= ahdGraphicsMaxTimers {
+		return 0, fmt.Sprintf("a Canvas runs at most %d timers at a time; cancel one first", ahdGraphicsMaxTimers)
+	}
+	if canvas.timers == nil {
+		canvas.timers = map[int64]*ahdGraphicsTimer{}
+	}
+	canvas.nextTimer++
+	id := canvas.nextTimer
+	timer := &ahdGraphicsTimer{handler: handler, stop: make(chan struct{})}
+	canvas.timers[id] = timer
+	canvas.timerOrder = append(canvas.timerOrder, id)
+	if !canvas.headless {
+		go canvas.runTimer(id, timer, time.Duration(milliseconds)*time.Millisecond)
+	}
+	return id, ""
+}
+
+// runTimer queues one tick per interval until the timer is cancelled.
+func (c *ahdGraphicsCanvas) runTimer(id int64, timer *ahdGraphicsTimer, interval time.Duration) {
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	line := []byte(fmt.Sprintf(`{"event":"tick","timer":%d}`, id))
+	for {
+		select {
+		case <-timer.stop:
+			return
+		case <-c.link.exited:
+			return
+		case <-ticker.C:
+			c.mu.Lock()
+			queue := !timer.pending && c.alive
+			if queue {
+				timer.pending = true
+			}
+			c.mu.Unlock()
+			if queue {
+				c.link.events.push(line, false)
+			}
+		}
+	}
+}
+
+// dueTimers returns the handlers a tick event runs: the named timer, or every
+// timer in starting order for a scripted tick that names none. A timer
+// cancelled since its tick was queued is skipped.
+func (c *ahdGraphicsCanvas) dueTimers(id int64) []func() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	var due []func()
+	for _, candidate := range c.timerOrder {
+		if timer := c.timers[candidate]; timer != nil && (id == 0 || id == candidate) {
+			timer.pending = false
+			due = append(due, timer.handler)
+		}
+	}
+	return due
+}
+
+// stopTimers ends every timer. The caller holds c.mu.
+func (c *ahdGraphicsCanvas) stopTimers() {
+	for _, timer := range c.timers {
+		close(timer.stop)
+	}
+	c.timers, c.timerOrder = nil, nil
+}
+
+// AhdGraphicsCancel stops one timer. Cancelling a timer that already ended,
+// or a number that never named one, does nothing.
+func AhdGraphicsCancel(handle int64, id int64) string {
+	canvas, problem := ahdGraphicsCanvasOf(handle)
+	if problem != "" {
+		return ""
+	}
+	canvas.mu.Lock()
+	defer canvas.mu.Unlock()
+	timer := canvas.timers[id]
+	if timer == nil {
+		return ""
+	}
+	close(timer.stop)
+	delete(canvas.timers, id)
+	for index, candidate := range canvas.timerOrder {
+		if candidate == id {
+			canvas.timerOrder = append(canvas.timerOrder[:index:index], canvas.timerOrder[index+1:]...)
+			break
+		}
+	}
+	return ""
+}
+
+func AhdGraphicsEveryChecked(handle int64, milliseconds int64, handler func()) int64 {
+	id, problem := AhdGraphicsEvery(handle, milliseconds, handler)
+	AhdGraphicsCheck(problem)
+	return id
+}
+
 func ahdGraphicsPaint(request *ahdGraphicsRequest, stroke string, fill *string) string {
 	parsed, ok := AhdGraphicsParseColor(stroke)
 	if !ok {
@@ -482,11 +810,12 @@ func AhdGraphicsWait(handle int64) string {
 	for {
 		line, kind := canvas.link.events.next(canvas.link.exited)
 		canvas.mu.Lock()
-		alive, onClick, onKey := canvas.alive, canvas.onClick, canvas.onKey
+		alive, onClick, onKey, onMove, onDrag := canvas.alive, canvas.onClick, canvas.onKey, canvas.onMove, canvas.onDrag
 		stale := !canvas.headless && canvas.link.events.closedPending()
 		switch kind {
 		case ahdEventClosed:
 			canvas.usable = false
+			canvas.stopTimers()
 			canvas.mu.Unlock()
 			return ""
 		case ahdEventOverflow:
@@ -522,6 +851,15 @@ func AhdGraphicsWait(handle int64) string {
 			ahdGraphicsDispatch(handle, func() { onClick(event.X, event.Y) })
 		case event.Event == "key" && onKey != nil:
 			ahdGraphicsDispatch(handle, func() { onKey(event.Key) })
+		case event.Event == "move" && onMove != nil:
+			ahdGraphicsDispatch(handle, func() { onMove(event.X, event.Y) })
+		case event.Event == "drag" && onDrag != nil:
+			ahdGraphicsDispatch(handle, func() { onDrag(event.X, event.Y) })
+		case event.Event == "tick":
+			for _, tick := range canvas.dueTimers(event.Timer) {
+				// Each tick is one frame: what it draws appears together.
+				ahdGraphicsDispatch(handle, func() { ahdGraphicsBatchRun(handle, tick) })
+			}
 		}
 	}
 }
@@ -579,6 +917,32 @@ func AhdGraphicsOnKey(handle int64, handler func(key string)) string {
 		return "Canvas.onKey needs a Function"
 	}
 	return ahdGraphicsListen(handle, "key", func(c *ahdGraphicsCanvas) { c.onKey = handler })
+}
+
+// AhdGraphicsOnMove registers the callback for the pointer moving over the
+// Canvas with no button held, replacing any earlier one.
+func AhdGraphicsOnMove(handle int64, handler func(x, y float64)) string {
+	if handler == nil {
+		return "Canvas.onMove needs a Function"
+	}
+	return ahdGraphicsListen(handle, "move", func(c *ahdGraphicsCanvas) { c.onMove = handler })
+}
+
+// AhdGraphicsOnDrag registers the callback for the pointer moving over the
+// Canvas while the left button is held, replacing any earlier one.
+func AhdGraphicsOnDrag(handle int64, handler func(x, y float64)) string {
+	if handler == nil {
+		return "Canvas.onDrag needs a Function"
+	}
+	return ahdGraphicsListen(handle, "drag", func(c *ahdGraphicsCanvas) { c.onDrag = handler })
+}
+
+func AhdGraphicsOnMoveChecked(handle int64, handler func(x, y float64)) {
+	AhdGraphicsCheck(AhdGraphicsOnMove(handle, handler))
+}
+
+func AhdGraphicsOnDragChecked(handle int64, handler func(x, y float64)) {
+	AhdGraphicsCheck(AhdGraphicsOnDrag(handle, handler))
 }
 
 func AhdGraphicsOnClickChecked(handle int64, handler func(x, y float64)) {

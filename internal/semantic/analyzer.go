@@ -52,6 +52,15 @@ type analyzer struct {
 	// else it would have to become an unspecialized Function value, which
 	// AhdCode has no representation for.
 	calleeExpressions map[ast.Expr]bool
+	// resolvingConstant is set while an inferred module Constant's initializer
+	// is being analyzed, so a cycle is SEM010 instead of an untyped IR node.
+	// finishedInferred stops the later source-order visit from analyzing a
+	// declaration a forward reference already completed.
+	resolvingConstant map[*Symbol]bool
+	finishedInferred  map[*ast.VariableDecl]bool
+	// constantCycle records a module constant that already has a SEM010 cycle
+	// diagnostic, so the dependency pass does not report it a second time.
+	constantCycle map[*Symbol]bool
 
 	// importVisibility and importModuleOf are require(...)-only bookkeeping,
 	// keyed by the installed *Symbol pointer rather than a field on Symbol
@@ -106,6 +115,9 @@ func analyzeWithEnvironment(parsed parser.Result, environment Environment) Resul
 
 		reportedPairKeys:  make(map[source.Span]bool),
 		calleeExpressions: make(map[ast.Expr]bool),
+		resolvingConstant: make(map[*Symbol]bool),
+		finishedInferred:  make(map[*ast.VariableDecl]bool),
+		constantCycle:     make(map[*Symbol]bool),
 	}
 	a.result.ResolvedSymbols = make(map[ast.Node]*Symbol)
 	a.result.ExpressionTypes = make(map[ast.Expr]types.Type)
@@ -138,6 +150,7 @@ func analyzeWithEnvironment(parsed parser.Result, environment Environment) Resul
 		outcome := a.analyzeStatement(statement, a.module, a.flow)
 		a.flow = outcome.flow
 	}
+	a.finishConstantDependencies(parsed.Program)
 	a.finalizeInferences(a.moduleInferences)
 
 	a.result.Diagnostics = a.bag.Items()

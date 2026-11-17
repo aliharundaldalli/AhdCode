@@ -104,6 +104,40 @@ func (session *Session) graphicsOperation(name string, receiver any, arguments [
 			session.graphicsCheck(ahdruntime.AhdGraphicsOnKey(canvas, func(key string) {
 				session.invokeHandler(handler, key)
 			}))
+		case "Canvas.ellipse":
+			session.graphicsCheck(ahdruntime.AhdGraphicsEllipse(canvas, real(0, 0), real(1, 0), real(2, 0), real(3, 0), text(4, "black"), nullable(5), real(6, 1)))
+		case "Canvas.polygon":
+			session.graphicsCheck(ahdruntime.AhdGraphicsPolygon(canvas, graphicsReals(arguments, 0), text(1, "black"), nullable(2), real(3, 1)))
+		case "Canvas.arc":
+			session.graphicsCheck(ahdruntime.AhdGraphicsArc(canvas, real(0, 0), real(1, 0), real(2, 0), real(3, 0), real(4, 0), text(5, "black"), real(6, 1)))
+		case "Canvas.text":
+			session.graphicsCheck(ahdruntime.AhdGraphicsText(canvas, real(0, 0), real(1, 0), text(2, ""), text(3, "black"), real(4, 16), text(5, "left")))
+		case "Canvas.image":
+			session.graphicsCheck(ahdruntime.AhdGraphicsImage(canvas, text(0, ""), real(1, 0), real(2, 0), real(3, 0), real(4, 0)))
+		case "Canvas.onMove":
+			handler := session.graphicsHandler(arguments, "Canvas.onMove")
+			session.graphicsCheck(ahdruntime.AhdGraphicsOnMove(canvas, func(x, y float64) {
+				session.invokeHandler(handler, x, y)
+			}))
+		case "Canvas.onDrag":
+			handler := session.graphicsHandler(arguments, "Canvas.onDrag")
+			session.graphicsCheck(ahdruntime.AhdGraphicsOnDrag(canvas, func(x, y float64) {
+				session.invokeHandler(handler, x, y)
+			}))
+		case "Canvas.every":
+			handler := session.graphicsHandler(arguments[min(1, len(arguments)):], "Canvas.every")
+			timer, problem := ahdruntime.AhdGraphicsEvery(canvas, graphicsInt(arguments, 0, 0), func() {
+				session.invokeHandler(handler)
+			})
+			session.graphicsCheck(problem)
+			return timer
+		case "Canvas.cancel":
+			session.graphicsCheck(ahdruntime.AhdGraphicsCancel(canvas, graphicsInt(arguments, 0, 0)))
+		case "Canvas.batch":
+			handler := session.graphicsHandler(arguments, "Canvas.batch")
+			session.graphicsCheck(ahdruntime.AhdGraphicsBatch(canvas, func() {
+				session.invokeHandler(handler)
+			}))
 		case "Canvas.wait":
 			// Output written before wait must be visible while the window is open.
 			session.flushOutput()
@@ -193,4 +227,25 @@ func graphicsText(arguments []any, index int, fallback string) string {
 		}
 	}
 	return fallback
+}
+
+// graphicsReals reads a List<Real> or List<Int> argument as plain numbers.
+func graphicsReals(arguments []any, index int) []float64 {
+	if index >= len(arguments) {
+		return nil
+	}
+	list, ok := arguments[index].(*List)
+	if !ok || list == nil {
+		return nil
+	}
+	values := make([]float64, 0, len(list.Items))
+	for _, item := range list.Items {
+		switch value := item.(type) {
+		case float64:
+			values = append(values, value)
+		case int64:
+			values = append(values, float64(value))
+		}
+	}
+	return values
 }

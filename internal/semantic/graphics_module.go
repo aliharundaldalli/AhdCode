@@ -54,6 +54,18 @@ const (
 	GraphicsCanvasTurtle    TypeOperation = "Canvas.turtle"
 	GraphicsCanvasOnClick   TypeOperation = "Canvas.onClick"
 	GraphicsCanvasOnKey     TypeOperation = "Canvas.onKey"
+	// v2.8: the remaining shapes, text, images, pointer movement, timers,
+	// and batched drawing.
+	GraphicsCanvasEllipse TypeOperation = "Canvas.ellipse"
+	GraphicsCanvasPolygon TypeOperation = "Canvas.polygon"
+	GraphicsCanvasArc     TypeOperation = "Canvas.arc"
+	GraphicsCanvasText    TypeOperation = "Canvas.text"
+	GraphicsCanvasImage   TypeOperation = "Canvas.image"
+	GraphicsCanvasOnMove  TypeOperation = "Canvas.onMove"
+	GraphicsCanvasOnDrag  TypeOperation = "Canvas.onDrag"
+	GraphicsCanvasEvery   TypeOperation = "Canvas.every"
+	GraphicsCanvasCancel  TypeOperation = "Canvas.cancel"
+	GraphicsCanvasBatch   TypeOperation = "Canvas.batch"
 
 	GraphicsTurtleForward    TypeOperation = "Turtle.forward"
 	GraphicsTurtleBackward   TypeOperation = "Turtle.backward"
@@ -74,7 +86,8 @@ const (
 // GraphicsCanvasOperations and GraphicsTurtleOperations name the members
 // each Class publishes, so has/has not reports what a value really offers.
 var (
-	GraphicsCanvasOperations = []string{"clear", "line", "circle", "rectangle", "save", "wait", "close", "isOpen", "turtle", "onClick", "onKey"}
+	GraphicsCanvasOperations = []string{"clear", "line", "circle", "rectangle", "save", "wait", "close", "isOpen", "turtle", "onClick", "onKey",
+		"ellipse", "polygon", "arc", "text", "image", "onMove", "onDrag", "every", "cancel", "batch"}
 	GraphicsTurtleOperations = []string{"forward", "backward", "left", "right", "moveTo", "setHeading",
 		"penUp", "penDown", "setColor", "setWidth", "home", "x", "y", "heading"}
 )
@@ -117,6 +130,22 @@ func graphicsMember(name string, result types.Type, parameters ...graphicsParame
 	}
 }
 
+// graphicsOverloads builds a member with several signatures, selected by the
+// ordinary overload resolution: Canvas.polygon takes its points as a
+// List<Real> or a List<Int>, like a Plot series.
+func graphicsOverloads(name string, result types.Type, alternatives ...[]graphicsParameter) *Symbol {
+	var symbol *Symbol
+	for _, parameters := range alternatives {
+		member := graphicsMember(name, result, parameters...)
+		if symbol == nil {
+			symbol = member
+			symbol.OverloadSet = &OverloadSet{Name: name}
+		}
+		symbol.OverloadSet.Candidates = append(symbol.OverloadSet.Candidates, member.Callable)
+	}
+	return symbol
+}
+
 var graphicsMembers = func() map[TypeOperation]*Symbol {
 	real := func(name string) graphicsParameter { return graphicsRequired(name, types.Real) }
 	fill := graphicsParameter{name: "fill", typ: types.String, optional: true, nullable: true}
@@ -137,6 +166,28 @@ var graphicsMembers = func() map[TypeOperation]*Symbol {
 		// shapes are checked statically like any Function argument.
 		GraphicsCanvasOnClick: graphicsMember("onClick", types.Nothing, graphicsRequired("handler", ClickHandlerType())),
 		GraphicsCanvasOnKey:   graphicsMember("onKey", types.Nothing, graphicsRequired("handler", KeyHandlerType())),
+
+		GraphicsCanvasEllipse: graphicsMember("ellipse", types.Nothing, real("x"), real("y"), real("radiusX"), real("radiusY"),
+			graphicsOptional("stroke", types.String), fill, graphicsOptional("width", types.Real)),
+		GraphicsCanvasPolygon: graphicsOverloads("polygon", types.Nothing,
+			[]graphicsParameter{graphicsRequired("points", types.List{Element: types.Real}),
+				graphicsOptional("stroke", types.String), fill, graphicsOptional("width", types.Real)},
+			[]graphicsParameter{graphicsRequired("points", types.List{Element: types.Int}),
+				graphicsOptional("stroke", types.String), fill, graphicsOptional("width", types.Real)}),
+		GraphicsCanvasArc: graphicsMember("arc", types.Nothing, real("x"), real("y"), real("radius"), real("start"), real("end"),
+			graphicsOptional("color", types.String), graphicsOptional("width", types.Real)),
+		GraphicsCanvasText: graphicsMember("text", types.Nothing, real("x"), real("y"), graphicsRequired("text", types.String),
+			graphicsOptional("color", types.String), graphicsOptional("size", types.Real), graphicsOptional("align", types.String)),
+		GraphicsCanvasImage: graphicsMember("image", types.Nothing, graphicsRequired("path", types.String), real("x"), real("y"),
+			graphicsOptional("width", types.Real), graphicsOptional("height", types.Real)),
+		// Pointer callbacks have the click shape; a timer or batch callback
+		// takes nothing, like a Button's onClick.
+		GraphicsCanvasOnMove: graphicsMember("onMove", types.Nothing, graphicsRequired("handler", ClickHandlerType())),
+		GraphicsCanvasOnDrag: graphicsMember("onDrag", types.Nothing, graphicsRequired("handler", ClickHandlerType())),
+		GraphicsCanvasEvery: graphicsMember("every", types.Int, graphicsRequired("milliseconds", types.Int),
+			graphicsRequired("handler", ClickCallbackType())),
+		GraphicsCanvasCancel: graphicsMember("cancel", types.Nothing, graphicsRequired("timer", types.Int)),
+		GraphicsCanvasBatch:  graphicsMember("batch", types.Nothing, graphicsRequired("handler", ClickCallbackType())),
 
 		GraphicsTurtleForward:    graphicsMember("forward", types.Nothing, real("distance")),
 		GraphicsTurtleBackward:   graphicsMember("backward", types.Nothing, real("distance")),

@@ -172,31 +172,41 @@ func (a *analyzer) analyzeVariableDeclaration(declaration *ast.VariableDecl, cur
 	flow[symbol] = resultNull
 
 	if symbol.Constant {
-		if nullOK && initializer.nullState != NonNull {
-			a.error(codeConstantInitializer, fmt.Sprintf("Constant %q cannot be null", symbol.Name), declaration.Initializer.Span(), "initialize Constant with a NonNull value")
-			return flow
-		}
-		// A Constant reference binding deep-freezes the referenced object graph
-		// instead of requiring a compile-time scalar constant expression. The
-		// constant-expression rule stays scalar-only, as specified.
-		if isReferenceType(typeValue) {
-			return flow
-		}
-		constant, failure := a.evaluateConstant(declaration.Initializer)
-		switch failure {
-		case constCycle:
-			a.error(codeConstantInitializer, fmt.Sprintf("cyclic Constant dependency involving %q", symbol.Name), declaration.Initializer.Span(), "break the Constant dependency cycle")
-		case constNotExpression, constInvalid:
-			a.error(codeConstantInitializer, fmt.Sprintf("initializer of Constant %q is not a scalar constant expression", symbol.Name), declaration.Initializer.Span(), "use only literals, parentheses, pure scalar operators, and scalar Constant references")
-		case constOK:
-			if constant.typeValue.Kind() == types.IntKind && !constant.fitsInt() {
-				a.error(codeConstantRange, fmt.Sprintf("Constant %q overflows signed 64-bit Int", symbol.Name), declaration.Initializer.Span(), "keep the constant result within Int range")
-			} else {
-				symbol.ConstValue = cloneConstant(constant)
-			}
-		}
+		a.applyConstantInitializer(symbol, declaration.Initializer, initializer, nullOK)
 	}
 	return flow
+}
+
+// applyConstantInitializer is the one Constant check for a written type and
+// for an inferred type. A scalar needs a compile-time constant expression; a
+// reference value is deep-frozen instead; null is rejected either way.
+func (a *analyzer) applyConstantInitializer(symbol *Symbol, initializer ast.Expr, info expressionInfo, nullOK bool) {
+	if symbol == nil || !symbol.Constant || initializer == nil {
+		return
+	}
+	if nullOK && info.nullState != NonNull {
+		a.error(codeConstantInitializer, fmt.Sprintf("Constant %q cannot be null", symbol.Name), initializer.Span(), "initialize Constant with a NonNull value")
+		return
+	}
+	// A Constant reference binding deep-freezes the referenced object graph
+	// instead of requiring a compile-time scalar constant expression. The
+	// constant-expression rule stays scalar-only, as specified.
+	if isReferenceType(symbol.Type) {
+		return
+	}
+	constant, failure := a.evaluateConstant(initializer)
+	switch failure {
+	case constCycle:
+		a.reportConstantCycle(symbol, initializer.Span())
+	case constNotExpression, constInvalid:
+		a.error(codeConstantInitializer, fmt.Sprintf("initializer of Constant %q is not a scalar constant expression", symbol.Name), initializer.Span(), "use only literals, parentheses, pure scalar operators, and scalar Constant references")
+	case constOK:
+		if constant.typeValue.Kind() == types.IntKind && !constant.fitsInt() {
+			a.error(codeConstantRange, fmt.Sprintf("Constant %q overflows signed 64-bit Int", symbol.Name), initializer.Span(), "keep the constant result within Int range")
+		} else {
+			symbol.ConstValue = cloneConstant(constant)
+		}
+	}
 }
 
 // isReferenceType reports the v0.1 reference-semantics types, for which
@@ -220,6 +230,11 @@ func isReferenceType(value types.Type) bool {
 // inferred: the same Local/module-root rule the explicit-type path enforces
 // applies here unchanged, using whatever modifiers were actually written.
 func (a *analyzer) analyzeInferredDeclaration(declaration *ast.VariableDecl, current *scope, flow flowState) flowState {
+	if declaration == nil || a.finishedInferred[declaration] {
+		return flow
+	}
+	defer func() { a.finishedInferred[declaration] = true }()
+
 	identifier, isIdentifier := declaration.Target.(*ast.IdentifierExpr)
 	if !isIdentifier {
 		if declaration.Initializer != nil {
@@ -234,6 +249,16 @@ func (a *analyzer) analyzeInferredDeclaration(declaration *ast.VariableDecl, cur
 	} else if !hasModifier(declaration.Modifiers, ast.ModifierLocal) {
 		a.error(codeMissingLocal, fmt.Sprintf("nested declaration %q requires Local", declaration.Name), declaration.Span(), fmt.Sprintf("write %s: Local := ...", declaration.Name))
 	}
+	if current.kind == moduleScope {
+		if existing, ok := current.local(declaration.Name); ok && existing.Declaration == declaration && existing.Constant {
+			if a.resolvingConstant[existing] {
+				a.reportConstantCycle(existing, declaration.Span())
+				return flow
+			}
+			a.resolvingConstant[existing] = true
+			defer delete(a.resolvingConstant, existing)
+		}
+	}
 	if declaration.Initializer == nil {
 		a.error(codeTypeMismatch, fmt.Sprintf("declaration %q requires an initializer", declaration.Name), declaration.Span(), "use := followed by a value")
 		return flow
@@ -242,6 +267,9 @@ func (a *analyzer) analyzeInferredDeclaration(declaration *ast.VariableDecl, cur
 	if types.IsInvalid(initializer.typeValue) {
 		if initializer.nullState == Null {
 			a.error(codeCannotInferType, "cannot infer a type from null", declaration.Initializer.Span(), "declare an explicit nullable type, e.g. name: T? := null")
+			if hasModifier(declaration.Modifiers, ast.ModifierConstant) {
+				a.error(codeConstantInitializer, fmt.Sprintf("Constant %q cannot be null", declaration.Name), declaration.Initializer.Span(), "initialize Constant with a NonNull value")
+			}
 		}
 		return flow
 	}
@@ -257,7 +285,13 @@ func (a *analyzer) analyzeInferredDeclaration(declaration *ast.VariableDecl, cur
 	predeclared, exists := current.local(declaration.Name)
 	var symbol *Symbol
 	if exists && predeclared.Declaration == declaration {
+		// A module Constant is predeclared before its initializer is read.
+		// Written without a type (`name: Constant := value`) it had none
+		// until now; it takes the initializer's, like any inferred binding.
 		symbol = predeclared
+		symbol.Type = typeValue
+		symbol.InitialNull = resultNull
+		symbol.DeclaredNullable = declaredNullable
 	} else if exists {
 		a.error(codeRedeclaration, fmt.Sprintf("%q is already declared in this lexical scope", declaration.Name), declaration.Span(), "use = for reassignment or choose a shadowing declaration in a nested scope")
 		symbol = predeclared
@@ -269,6 +303,8 @@ func (a *analyzer) analyzeInferredDeclaration(declaration *ast.VariableDecl, cur
 			InitialNull:      resultNull,
 			DeclaredNullable: declaredNullable,
 			OriginModuleID:   a.environment.ModuleID,
+			Constant:         hasModifier(declaration.Modifiers, ast.ModifierConstant),
+			Confidential:     hasModifier(declaration.Modifiers, ast.ModifierConfidential),
 		}
 		current.symbols[symbol.Name] = symbol
 		a.result.Symbols = append(a.result.Symbols, symbol)
@@ -287,8 +323,33 @@ func (a *analyzer) analyzeInferredDeclaration(declaration *ast.VariableDecl, cur
 			}
 		}
 	}
+	if symbol.Constant && (!exists || predeclared.Declaration == declaration) {
+		a.applyConstantInitializer(symbol, declaration.Initializer, initializer, true)
+	}
 	flow[symbol] = resultNull
 	return flow
+}
+
+// resolveForwardConstant analyzes an inferred module Constant whose type is
+// not known yet. The declaration may appear later in the module. A use that
+// is already on the resolution stack is a cycle and is reported where the
+// name is written.
+func (a *analyzer) resolveForwardConstant(symbol *Symbol, span source.Span) {
+	if symbol == nil || !symbol.Constant || !symbol.ModuleRoot || !types.IsInvalid(symbol.Type) {
+		return
+	}
+	declaration, ok := symbol.Declaration.(*ast.VariableDecl)
+	if !ok || declaration == nil || !declaration.Inferred {
+		return
+	}
+	if a.finishedInferred[declaration] {
+		return
+	}
+	if a.resolvingConstant[symbol] {
+		a.reportConstantCycle(symbol, span)
+		return
+	}
+	a.analyzeInferredDeclaration(declaration, a.module, a.flow)
 }
 
 func (a *analyzer) analyzeGlobalDeclaration(declaration *ast.VariableDecl, current *scope, flow flowState) flowState {
@@ -309,6 +370,10 @@ func (a *analyzer) analyzeGlobalDeclaration(declaration *ast.VariableDecl, curre
 		a.error(codeInvalidGlobal, fmt.Sprintf("no module-root value binding named %q", declaration.Name), declaration.Span(), "declare the module binding before this callable")
 		return flow
 	}
+	// A Constant declared later in the module is already in scope. Resolve
+	// its type and value before the alias copies them, or the body sees an
+	// untyped binding and reports a mismatch that the program did not write.
+	a.resolveForwardConstant(moduleSymbol, declaration.Span())
 	if _, exists := current.local(declaration.Name); exists {
 		a.error(codeRedeclaration, fmt.Sprintf("%q is already declared in this lexical scope", declaration.Name), declaration.Span(), "remove the duplicate Global declaration")
 		return flow
@@ -318,7 +383,7 @@ func (a *analyzer) analyzeGlobalDeclaration(declaration *ast.VariableDecl, curre
 	// directly, exactly like an inferred ordinary declaration adopts its
 	// initializer's type. Scope intent (Global) stays explicit; only the
 	// value type is inferred.
-	if !declaration.Inferred {
+	if !declaration.Inferred && !types.IsInvalid(moduleSymbol.Type) {
 		declaredType := a.resolveType(declaration.Type)
 		if !types.Equal(declaredType, moduleSymbol.Type) && !(declaredType.Kind() == types.FunctionKind && moduleSymbol.Type.Kind() == types.FunctionKind) {
 			a.typeMismatch(declaration.Type.Span(), moduleSymbol.Type, declaredType, fmt.Sprintf("Global declaration %s", declaration.Name))

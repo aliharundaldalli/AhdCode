@@ -14,6 +14,11 @@ const (
 	lineCommand commandKind = iota + 1
 	circleCommand
 	rectangleCommand
+	ellipseCommand
+	polygonCommand
+	arcCommand
+	textCommand
+	imageCommand
 )
 
 // command is one drawing primitive in Canvas (Cartesian) coordinates. The
@@ -23,11 +28,24 @@ type command struct {
 	kind commandKind
 	// line: a,b = start, c,d = end. circle: a,b = center, c = radius.
 	// rectangle: a,b = lower-left corner, c,d = width and height.
+	// ellipse: a,b = center, c,d = horizontal and vertical radius.
+	// arc: a,b = center, c = radius, start and end = angles in degrees.
+	// text: a,b = anchor on the baseline, c = font size.
+	// image: a,b = lower-left corner, c,d = width and height.
 	a, b, c, d float64
 	stroke     rgba
 	fill       rgba
 	hasFill    bool
 	width      float64
+
+	start, end float64
+	// points holds a polygon's vertices as x0, y0, x1, y1, ...
+	points []float64
+	text   string
+	align  string
+	// picture is the decoded file of an image command, shared by every
+	// command that draws the same file.
+	picture *picture
 }
 
 // model is the Canvas state the helper owns: its size, current background,
@@ -41,6 +59,11 @@ type model struct {
 	background rgba
 	commands   []command
 	generation int
+	// held is true while the program is inside a batch: drawing is recorded
+	// but the window keeps showing the last complete picture.
+	held bool
+	// pictures caches decoded image files by path.
+	pictures map[string]*picture
 }
 
 func newModel(title string, width, height int, background rgba) *model {
@@ -88,6 +111,67 @@ func (m *model) apply(value request) error {
 			shape.fill, shape.hasFill = *value.Fill, true
 		}
 		return m.add(shape)
+	case "ellipse":
+		if value.Stroke == nil || !finite(value.X, value.Y, value.RX, value.RY, value.LineWidth) ||
+			value.RX < 0 || value.RY < 0 || value.LineWidth <= 0 {
+			return errors.New("invalid ellipse")
+		}
+		shape := command{kind: ellipseCommand, a: value.X, b: value.Y, c: value.RX, d: value.RY,
+			stroke: *value.Stroke, width: value.LineWidth}
+		if value.Fill != nil {
+			shape.fill, shape.hasFill = *value.Fill, true
+		}
+		return m.add(shape)
+	case "polygon":
+		if value.Stroke == nil || !finite(value.LineWidth) || value.LineWidth <= 0 || !finite(value.Points...) ||
+			len(value.Points) < 2*minPolygonPoints || len(value.Points)%2 != 0 || len(value.Points) > 2*maxPolygonPoints {
+			return errors.New("invalid polygon")
+		}
+		shape := command{kind: polygonCommand, points: append([]float64(nil), value.Points...),
+			stroke: *value.Stroke, width: value.LineWidth}
+		if value.Fill != nil {
+			shape.fill, shape.hasFill = *value.Fill, true
+		}
+		return m.add(shape)
+	case "arc":
+		if value.Color == nil || !finite(value.X, value.Y, value.Radius, value.Start, value.End, value.LineWidth) ||
+			value.Radius < 0 || value.LineWidth <= 0 {
+			return errors.New("invalid arc")
+		}
+		return m.add(command{kind: arcCommand, a: value.X, b: value.Y, c: value.Radius,
+			start: value.Start, end: value.End, stroke: *value.Color, width: value.LineWidth})
+	case "text":
+		if value.Color == nil || !finite(value.X, value.Y, value.Size) || value.Size <= 0 || value.Size > maxTextSize ||
+			!validText(value.Text) || !validAlign(value.Align) {
+			return errors.New("invalid text")
+		}
+		return m.add(command{kind: textCommand, a: value.X, b: value.Y, c: value.Size,
+			text: value.Text, align: value.Align, stroke: *value.Color})
+	case "image":
+		if !finite(value.X, value.Y, value.W, value.H) || value.W < 0 || value.H < 0 ||
+			value.W > maxImageSide || value.H > maxImageSide {
+			return errors.New("invalid image")
+		}
+		loaded, err := m.picture(value.Path)
+		if err != nil {
+			return err
+		}
+		width, height := value.W, value.H
+		natural := loaded.pixels.Bounds()
+		switch {
+		case width == 0 && height == 0:
+			width, height = float64(natural.Dx()), float64(natural.Dy())
+		case width == 0:
+			width = height * float64(natural.Dx()) / float64(natural.Dy())
+		case height == 0:
+			height = width * float64(natural.Dy()) / float64(natural.Dx())
+		}
+		return m.add(command{kind: imageCommand, a: value.X, b: value.Y, c: width, d: height, picture: loaded})
+	case "hold", "release":
+		m.mu.Lock()
+		m.held = value.Op == "hold"
+		m.mu.Unlock()
+		return nil
 	}
 	return fmt.Errorf("unknown request %q", value.Op)
 }

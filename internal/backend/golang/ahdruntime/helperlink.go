@@ -72,6 +72,12 @@ func (q *ahdEventQueue) push(line []byte, closed bool) {
 		q.items = append(q.items, ahdQueuedEvent{line: line, closed: true})
 	case len(q.items) >= ahdEventQueueLimit:
 		q.overflow = true
+	case ahdEventCoalesces(line) && len(q.items) > 0 && !q.items[len(q.items)-1].closed &&
+		bytes.HasPrefix(q.items[len(q.items)-1].line, line[:ahdEventCoalescePrefix]):
+		// A pointer position replaces the unhandled one before it: a slow
+		// callback sees where the pointer is now, not a backlog of where it
+		// was. A drag is kept whole, because its points are the drawing.
+		q.items[len(q.items)-1].line = line
 	default:
 		q.items = append(q.items, ahdQueuedEvent{line: line})
 	}
@@ -80,6 +86,14 @@ func (q *ahdEventQueue) push(line []byte, closed bool) {
 	case q.notify <- struct{}{}:
 	default:
 	}
+}
+
+// ahdEventCoalescePrefix is the length of {"event":"move".
+const ahdEventCoalescePrefix = len(`{"event":"move"`)
+
+// ahdEventCoalesces reports whether line is a pointer move event.
+func ahdEventCoalesces(line []byte) bool {
+	return bytes.HasPrefix(line, []byte(`{"event":"move"`))
 }
 
 // ahdEventKind is what next found.

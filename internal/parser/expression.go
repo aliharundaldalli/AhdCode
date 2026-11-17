@@ -72,6 +72,7 @@ func (p *parser) parseRequiredExpression(minBindingPower int, message, hint stri
 }
 
 func (p *parser) parsePrefix() ast.Expr {
+	p.reservedOperandName()
 	item := p.current()
 	switch item.Kind {
 	case token.IntLiteral:
@@ -291,8 +292,8 @@ func (p *parser) parseCall(callee ast.Expr) ast.Expr {
 		argumentStart := p.current().Span.Start
 		name := ""
 		style := 0
-		if p.check(token.Identifier) && p.peek(1).Kind == token.Colon {
-			name = p.advance().Value
+		if p.peek(1).Kind == token.Colon && (p.check(token.Identifier) || isReservedKeyword(p.current().Kind)) {
+			name = p.expectName("expected argument name").Value
 			p.advance()
 			style = 1
 		}
@@ -322,7 +323,7 @@ func (p *parser) parseMember(object ast.Expr) ast.Expr {
 		name := p.advance()
 		return &ast.MemberExpr{Base: p.base(spanStart(object), name.Span.End), Object: object, Name: "has"}
 	}
-	name := p.expect(token.Identifier, "expected member name after .")
+	name := p.expectName("expected member name after .")
 	return &ast.MemberExpr{Base: p.base(spanStart(object), name.Span.End), Object: object, Name: name.Value}
 }
 

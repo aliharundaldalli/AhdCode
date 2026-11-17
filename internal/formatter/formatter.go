@@ -65,8 +65,56 @@ func Format(file source.File) Result {
 	if rendered == "" {
 		return result
 	}
-	result.Text = rendered + "\n"
+	text := rendered + "\n"
+	if !sameContent(lexed.Tokens, lexer.Lex(source.NewFile(file.ID, file.Path, text)).Tokens) {
+		// The layout lost or invented a token or a comment. Writing it would
+		// damage the program, so the source is left exactly as it is.
+		result.Diagnostics = append(result.Diagnostics, diagnostics.Diagnostic{
+			Code:     codeUnsafeLayout,
+			Severity: diagnostics.SeverityError,
+			Message:  "the formatter could not lay out this file without changing its content; the file is left unchanged",
+			Span:     lexed.Tokens[0].Span,
+			Hint:     "this is a formatter defect, not a mistake in the program; please report the file",
+		})
+		return result
+	}
+	result.Text = text
 	return result
+}
+
+// codeUnsafeLayout reports a layout that fails the content check below.
+const codeUnsafeLayout = "FMT001"
+
+// sameContent reports whether two token streams carry the same tokens and the
+// same comments, however they are ordered and separated. Formatting may move
+// a modifier or a comment and may add or drop separators (newlines and
+// commas); it must never add or drop anything else.
+func sameContent(before, after []token.Token) bool {
+	count := func(tokens []token.Token) map[string]int {
+		seen := map[string]int{}
+		for _, item := range tokens {
+			for _, trivia := range item.LeadingTrivia {
+				if trivia.Kind == token.LineCommentTrivia || trivia.Kind == token.BlockCommentTrivia {
+					seen["comment "+strings.TrimSpace(trivia.Lexeme)]++
+				}
+			}
+			if item.Kind == token.Newline || item.Kind == token.Comma || item.Kind == token.EOF {
+				continue
+			}
+			seen["token "+item.Lexeme]++
+		}
+		return seen
+	}
+	first, second := count(before), count(after)
+	if len(first) != len(second) {
+		return false
+	}
+	for key, occurrences := range first {
+		if second[key] != occurrences {
+			return false
+		}
+	}
+	return true
 }
 
 // builder walks the AST and the original token stream together: every
@@ -215,6 +263,31 @@ func (b *builder) gapParts() (inline doc, standalone doc, blankBeforeNext bool) 
 		b.advance()
 	}
 	return inline, concat(standaloneParts...), blankRun >= 2
+}
+
+// follow keeps a line comment from swallowing the token written after it.
+// The parser may skip a newline that this formatter has to drain with gap;
+// a "//" comment in that gap must end the line before the next token.
+func follow(gapDoc, next doc) doc {
+	if endsWithLineComment(gapDoc) {
+		return concat(gapDoc, hardline(), next)
+	}
+	return concat(gapDoc, next)
+}
+
+func endsWithLineComment(d doc) bool {
+	switch d.kind {
+	case dText:
+		return strings.HasPrefix(strings.TrimSpace(d.text), "//")
+	case dConcat:
+		for index := len(d.items) - 1; index >= 0; index-- {
+			if isEmptyDoc(d.items[index]) {
+				continue
+			}
+			return endsWithLineComment(d.items[index])
+		}
+	}
+	return false
 }
 
 // withGapSeparator renders the mandatory hard break between two sibling
@@ -408,7 +481,8 @@ func (b *builder) callArgsGroup(arguments []ast.CallArgument) doc {
 		}
 		name := b.leaf()
 		colon := b.leaf()
-		return concat(name, colon, text(" "), b.expr(argument.Value))
+		gapDoc := b.gap()
+		return concat(name, colon, text(" "), follow(gapDoc, b.expr(argument.Value)))
 	})
 }
 
@@ -421,7 +495,8 @@ func (b *builder) pairGroup(entries []ast.PairEntry) doc {
 		entry := entries[index]
 		key := b.expr(entry.Key)
 		colon := b.leaf()
-		return concat(key, colon, text(" "), b.expr(entry.Value))
+		gapDoc := b.gap()
+		return concat(key, colon, text(" "), follow(gapDoc, b.expr(entry.Value)))
 	})
 }
 
@@ -496,16 +571,35 @@ func (b *builder) variableDecl(v *ast.VariableDecl) doc {
 func (b *builder) functionDecl(f *ast.FunctionDecl) doc {
 	head := b.declHead(b.leaf(), &ast.TypeRef{})
 	declare := b.leaf()
+	// The parser accepts line breaks between the parts of a Function header
+	// (a uses list on its own line, the brace on the next). They are layout,
+	// not structure: the canonical header is one line. A comment written in
+	// such a break moves above the declaration, where a line comment fits.
+	var hoisted []doc
+	headerGap := func() {
+		if comment := b.gap(); !isEmptyDoc(comment) {
+			hoisted = append(hoisted, comment, hardline())
+		}
+	}
 	parameters := b.parameterGroup(f.Parameters)
+	headerGap()
 	arrow := b.leaf()
+	headerGap()
 	returnType := b.typeRef(f.ReturnType)
+	headerGap()
 	uses := text("")
 	if b.current().Kind == token.KeywordUses {
 		keyword := b.leaf()
+		headerGap()
 		uses = concat(text(" "), keyword, text(" "), b.captureGroup(f.Captures))
+		headerGap()
 	}
 	body := b.block(f.Body)
-	return concat(head, text(" "), declare, text(" "), parameters, text(" "), arrow, text(" "), returnType, uses, text(" "), body)
+	declaration := concat(head, text(" "), declare, text(" "), parameters, text(" "), arrow, text(" "), returnType, uses, text(" "), body)
+	if len(hoisted) == 0 {
+		return declaration
+	}
+	return concat(append(hoisted, declaration)...)
 }
 
 func (b *builder) classDecl(c *ast.ClassDecl) doc {
@@ -740,7 +834,7 @@ func (b *builder) expr(e ast.Expr) doc {
 		lead := b.gap()
 		inner := b.expr(v.Expression)
 		trail := b.gap()
-		return concat(open, lead, inner, trail, b.leaf())
+		return concat(open, follow(lead, inner), follow(trail, b.leaf()))
 	case *ast.LambdaExpr:
 		keyword := b.leaf()
 		// An explicit capture list is part of the lambda's own syntax, so its
@@ -750,23 +844,24 @@ func (b *builder) expr(e ast.Expr) doc {
 			captures = concat(b.captureGroup(v.Captures), text(" "))
 		}
 		parameters := b.parameterGroup(v.Parameters)
+		beforeArrow := b.gap()
 		arrow := b.leaf()
 		gapDoc := b.gap()
-		return concat(keyword, text(" "), captures, parameters, text(" "), arrow, text(" "), gapDoc, b.expr(v.Body))
+		return concat(keyword, text(" "), captures, parameters, text(" "), follow(beforeArrow, concat(arrow, text(" "), follow(gapDoc, b.expr(v.Body)))))
 	case *ast.UnaryExpr:
 		operator := b.leaf()
 		gapDoc := b.gap()
 		operand := b.expr(v.Operand)
 		if v.Operator == "not" {
-			return concat(operator, text(" "), gapDoc, operand)
+			return concat(operator, text(" "), follow(gapDoc, operand))
 		}
-		return concat(operator, gapDoc, operand)
+		return concat(operator, follow(gapDoc, operand))
 	case *ast.BinaryExpr:
 		left := b.expr(v.Left)
 		operator := b.binaryOperatorLeaf(v.Operator)
 		gapDoc := b.gap()
 		right := b.expr(v.Right)
-		return concat(left, text(" "), operator, text(" "), gapDoc, right)
+		return concat(left, text(" "), operator, text(" "), follow(gapDoc, right))
 	case *ast.CallExpr:
 		callee := b.expr(v.Callee)
 		return concat(callee, b.callArgsGroup(v.Arguments))
@@ -781,7 +876,7 @@ func (b *builder) expr(e ast.Expr) doc {
 		lead := b.gap()
 		index := b.expr(v.Index)
 		trail := b.gap()
-		return concat(object, open, lead, index, trail, b.leaf())
+		return concat(object, open, follow(lead, index), follow(trail, b.leaf()))
 	case *ast.SliceExpr:
 		return b.sliceExpr(v)
 	case *ast.ListExpr:
@@ -798,17 +893,20 @@ func (b *builder) expr(e ast.Expr) doc {
 func (b *builder) sliceExpr(v *ast.SliceExpr) doc {
 	object := b.expr(v.Object)
 	open := b.leaf()
-	parts := []doc{object, open, b.gap()}
+	lead := b.gap()
+	var start doc
 	if v.Start != nil {
-		parts = append(parts, b.expr(v.Start))
+		start = b.expr(v.Start)
 	}
-	parts = append(parts, b.gap(), b.leaf())
-	parts = append(parts, b.gap())
+	colonGap := b.gap()
+	colon := b.leaf()
+	endGap := b.gap()
+	var end doc
 	if v.End != nil {
-		parts = append(parts, b.expr(v.End))
+		end = b.expr(v.End)
 	}
-	parts = append(parts, b.gap(), b.leaf())
-	return concat(parts...)
+	trail := b.gap()
+	return concat(object, open, follow(lead, start), follow(colonGap, colon), follow(endGap, end), follow(trail, b.leaf()))
 }
 
 // binaryOperatorLeaf consumes the token(s) spelling a binary operator. Most

@@ -1,15 +1,37 @@
 package parser
 
 import (
+	"fmt"
+
 	"ahdcode/internal/syntax/ast"
 	"ahdcode/internal/syntax/token"
 )
 
 func (p *parser) parseBlock() *ast.Block {
+	if p.check(token.Newline) && p.tokens[p.nextNonNewlineIndex(p.index)].Kind == token.LeftBrace {
+		// The brace is on a line of its own, as several other languages
+		// write it. That is one mistake with one fix, and the block that
+		// follows is read normally so nothing else is reported for it.
+		p.errorCurrent(codeExpectedToken, "expected { to start block",
+			"move the { up to the end of this line; a block opens on the line that introduces it")
+		p.skipNewlines()
+	}
 	opening := p.expect(token.LeftBrace, "expected { to start block")
 	p.skipNewlines()
 	statements := p.parseStatementList(scopeBlock, token.RightBrace)
-	closing := p.expect(token.RightBrace, "expected } after block")
+	if opening.Synthetic && !p.check(token.RightBrace) {
+		// The missing { was already reported; a missing } is the same
+		// mistake and gets no second diagnostic.
+		at := p.current().Span.Start
+		return &ast.Block{Base: p.base(opening.Span.Start, at), Statements: statements}
+	}
+	if !p.check(token.RightBrace) {
+		p.errorCurrent(codeExpectedToken, "expected } after block",
+			fmt.Sprintf("the block opened with { on line %d is never closed; add its }", opening.Span.Start.Line))
+		at := p.current().Span.Start
+		return &ast.Block{Base: p.base(opening.Span.Start, at), Statements: statements}
+	}
+	closing := p.advance()
 	return &ast.Block{Base: p.base(opening.Span.Start, closing.Span.End), Statements: statements}
 }
 
@@ -56,7 +78,7 @@ func (p *parser) parseUntil() ast.Stmt {
 
 func (p *parser) parseFor() ast.Stmt {
 	start := p.advance().Span.Start
-	name := p.expect(token.Identifier, "expected iteration variable after for")
+	name := p.expectName("expected iteration variable after for")
 	var typeRef *ast.TypeRef
 	if p.match(token.Colon) {
 		// The iteration binding is implicitly Local, so a scope modifier here is
@@ -119,7 +141,7 @@ func (p *parser) parseAttempt() ast.Stmt {
 		typeRef := p.parseTypeRef()
 		name := ""
 		if p.match(token.KeywordAs) {
-			name = p.expect(token.Identifier, "expected exception binding name after as").Value
+			name = p.expectName("expected exception binding name after as").Value
 		}
 		clauseBody := p.parseBlock()
 		excepts = append(excepts, ast.ExceptClause{
@@ -165,7 +187,7 @@ func (p *parser) parseBring() ast.Stmt {
 		module := p.expect(token.Identifier, "expected module name after bring")
 		alias := token.Token{}
 		if p.match(token.KeywordAs) {
-			alias = p.expect(token.Identifier, "expected alias name after as")
+			alias = p.expectName("expected alias name after as")
 		}
 		end := module.Span.End
 		if alias.Value != "" {

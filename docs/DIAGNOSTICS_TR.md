@@ -101,3 +101,68 @@ except CSVError as error { write(error.message) }
 Eksik initializer, atanan ifade, ikili sağ operand, index, çağrı, List, Pair ve
 lambda gövdeleri; parser eksik parçayı bildiğinde yapıya özgü mesaj kullanır.
 Kapanış tanılamaları beklenen `)`, `]` veya `}` işaretini adlandırır.
+
+## Bir hata, bir tanılama
+
+v2.8.0'dan itibaren derleyici bir hata için bir tanılama bildirir; ekrandaki
+ilk mesaj, düzeltilecek olandır. Tanılama metinleri İngilizcedir.
+
+- Bir satır yalnızca ilk sözdizimi hatasını bildirir.
+- Kapatılmamış bir string gibi lexer'ın bildirdiği bir hatadan sonra, o hata
+  düzeltilene kadar dosyanın devamından hiçbir şey bildirilmez.
+- Tür denetimi yalnızca ayrıştırılabilen bir dosyada çalışır; bu yüzden bir
+  sözdizimi hatasını, tanımsız kalan adlarla ilgili hatalar izlemez.
+- Zaten hata bildirmiş bir deyim ayrıca satır sonunun eksikliğini, `{` işareti
+  eksik olan bir blok da ayrıca `}` eksikliğini bildirmez.
+
+12. Ayrılmış bir sözcük ad olamaz (`PAR015`). Ad olarak ilk kullanıldığı yerde,
+bir öneriyle birlikte bir kez bildirilir:
+
+```text
+error [PAR015] main.ahd:1:1
+'not' is a reserved keyword in AhdCode
+  1 | not: Int := 70
+    | ^^^
+  hint: choose a different identifier, such as 'score'
+```
+
+13. Bir bildirim adını `:=` ile tanıtır. Tek başına `=` yalnızca zaten var olan
+bir adı değiştirir.
+
+```ahd
+# geçersiz: PAR002
+count: Int = 5
+
+# düzeltilmiş
+count: Int := 5
+```
+
+14. Bir blok, onu başlatan satırda açılır.
+
+```ahd
+# geçersiz: PAR002
+if ready
+{
+    write("go")
+}
+
+# düzeltilmiş
+if ready {
+    write("go")
+}
+```
+
+Tek istisna Function'dır: `uses [...]` listesi ve `{` işareti yeni birer
+satırda başlayabilir; `ahdcode format` bunları tek bir başlıkta birleştirir.
+
+15. Başka bir dilin yazdığı gibi yazılmış bir deyim (`function`, `def`, `var`,
+`let`, `print`, `elif` ve benzerleri), ipucunda AhdCode yazımıyla yanıtlanır.
+
+16. Niteleyicisi olup türü olmayan bir bildirim, değerinin türünü alır:
+`limit: Constant := 20.0` bir `Constant Real`'dir. v2.8.0'dan önce bu yazım
+dahili bir `IR002` tanılamasıyla başarısız oluyordu.
+
+`FMT001` bir programdaki hata değildir. `ahdcode format`, ürettiği düzenin
+kaynaktaki belirteç ve yorumların tam olarak aynısını taşıdığını denetler;
+taşımıyorsa `FMT001` bildirir ve bozuk bir dosya yazmak yerine dosyayı
+değiştirmeden bırakır. Lütfen dosyayı bildirin.

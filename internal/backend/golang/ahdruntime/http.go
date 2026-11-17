@@ -343,6 +343,9 @@ func AhdHTTPServerStart(class *AhdClass, handle string) {
 	server.mutex.Lock()
 	server.httpServer = httpServer
 	server.mutex.Unlock()
+	// The address line a program writes before start, and every line its
+	// handlers write afterwards, reach a redirected output at once.
+	AhdLiveOutput()
 	err = httpServer.Serve(listener)
 	if err != nil && !errors.Is(err, http.ErrServerClosed) {
 		AhdRaiseClass(class, "HTTP server failed: "+err.Error())

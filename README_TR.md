@@ -16,13 +16,12 @@ veritabanı modülleri, GUI'si, Graphics'i, etkileşimli Plot görüntüleyicisi
 masaüstü uygulaması paketlemesiyle gelir. Küçük bir topluluk tarafından
 pratikte kullanılmaktadır; yaygın (mainstream) bir dil değildir.
 
-Bu, **v2.7.0**, **Sistem İnceleme ve Dağıtım Cilası** sürümüdür. Salt okunur
-`Disk.inspect` dosya sistemi kapasitesi ve `Service.status` Linux systemd
-inceleme modüllerini ekler ve eksiksiz platform paketlerini geri getirir:
-imzalı ve noterlenmiş macOS kurulum paketi, Windows kurulum programı ve hem
-x86-64 hem arm64 için Linux paketleri. Bkz.
-[v2.7.0 ile gelenler](#v27-ile-gelenler). Önceki **DNS ve TLS İnceleme**
-sürümü olan v2.6.0 da kullanılabilir durumdadır.
+Bu, **v2.8.0**, **Graphics'in Tamamlanması ve İlk Hata Deneyimi**
+sürümüdür. Kaynak sürümüdür: git etiketi ve kaynağın GitHub Release'i; yeni
+bir kurulum paketi yoktur. İmzalı kurulum paketleri v3.0'a kadar v2.7.0'da
+kalır. Sözdizimi eklemez. Bkz.
+[v2.8.0 ile gelenler](#v28-ile-gelenler). v2.7.0, **Sistem İnceleme ve
+Dağıtım Cilası**, en güncel kurulabilir sürüm olarak durur.
 
 v2.0.0 bir ana (major) sürümdür, **Masaüstü Uygulamasının Tamamlanması**:
 birinci taraf masaüstü uygulaması temelini tamamlar — GUI'de ListBox, Select,
@@ -528,7 +527,41 @@ bakın.
 VS Code hem de Antigravity'i hedefler.
 [Kurulum rehberine](editors/vscode/README_TR.md) bakın.
 
-## Mevcut sınırlamalar
+## v2.8.0 ile gelenler <a id="v28-ile-gelenler"></a>
+
+v2.8.0, **Graphics'in Tamamlanması ve İlk Hata Deneyimi**, bir kaynak
+sürümüdür. Git etiketinden ya da GitHub'ın kaynak arşivlerinden kurulur.
+Sözdizimi ve kurulum paketi eklemez. İmzalı kurulum paketleri v3.0'a kadar
+v2.7.0'da kalır.
+
+- **[Graphics](docs/GRAPHICS_TR.md)** — `Canvas.text`, `polygon`, `ellipse`,
+  `arc` ve `image`; `onMove` ve `onDrag` işaretçi callback'leri; her turu tek
+  bir tam kare olarak gösterilen `every` ve `cancel` zamanlayıcıları; başka
+  her yerde titremesiz yeniden çizim için `batch`. Metin, paketli bir yazı
+  tipinden pencerede, PNG'de ve SVG'de aynı biçimde çizilir.
+- **[Tanılama](docs/DIAGNOSTICS_TR.md)** — bir hata, bir tanılama: ad olarak
+  kullanılan ayrılmış bir sözcük, önerilen bir tanımlayıcıyla tek bir
+  `PAR015`'tir; bir satır yalnızca ilk sözdizimi hatasını bildirir ve
+  ayrıştırılamayan bir dosyada tür denetimi yapılmaz. `count: Int = 5`, ayrı
+  satırdaki `{` ve başka bir dildeki gibi yazılmış deyimler, düzeltmeyi
+  ipucunda veren birer mesaj alır. Tanılama metinleri İngilizcedir.
+- **Dil** — `limit: Constant := 20.0` modül kökünde türünü çıkarır ve türü
+  yazılmış bir Constant ile aynı sabit-ifade kurallarına uyar. Yalnızca
+  başka sabitlere başvuran bir başlangıç, modülün diğer deyimlerinden önce
+  bağımlılık sırasında çalışır. Değiştirilebilir bir bağlamayı okuyan ya da
+  fonksiyon çağıran bir başlangıç yazıldığı yerde kalır. Bundan önce yapılan
+  kullanım ve bir döngü `SEM010`'dur. Modül fonksiyonu, sabitin beklediği
+  bir değer başlatması değildir.
+- **[Formatter](docs/FORMATTER_TR.md)** — `ahdcode format` klasör ve birden
+  çok dosya alır. `uses [...]` listesi ya da `{` işareti yeni satırda başlayan
+  bir Function doğru biçimlendirilir; v2.7.0 böyle bir dosyayı bozuyordu.
+  Formatter artık yazmadan önce her belirteci ve yorumu koruduğunu doğrular.
+- **Çıktı** — bir programın `Server.start()` öncesinde ve sonrasında
+  işleyicilerinden yazdıkları bir dosyaya ya da boruya hemen ulaşır.
+- **[Spesifikasyon](AHDCODE_LANGUAGE_SPEC_v0.1_TR.md)** — v2.8.0 dahil
+  güncellendi (§9.3, §8.1, §91–§94).
+
+Örnekler: [`examples/v2.8`](examples/v2.8/README_TR.md).
 
 ## v2.7.0 ile gelenler <a id="v27-ile-gelenler"></a>
 

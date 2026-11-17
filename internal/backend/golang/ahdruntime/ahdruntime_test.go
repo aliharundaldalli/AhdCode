@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 	"unsafe"
@@ -1455,5 +1456,67 @@ func TestSubMinuteLocalOffsetKeepsTheInstantExact(t *testing.T) {
 				t.Fatalf("instant shifted by %v", rebuilt.Sub(original))
 			}
 		})
+	}
+}
+
+// Before a call that blocks for the rest of the program, output goes live:
+// what was written so far is flushed and every later line is flushed as it is
+// written, so a server's output reaches a file or a pipe.
+func TestLiveOutputFlushesEveryLine(t *testing.T) {
+	previous := ahdOut
+	var captured strings.Builder
+	ahdOut = bufio.NewWriter(&captured)
+	defer func() {
+		ahdOutLive.Store(false)
+		ahdOut = previous
+	}()
+	AhdWrite("buffered")
+	if captured.Len() != 0 {
+		t.Fatalf("ordinary output was not buffered: %q", captured.String())
+	}
+	AhdLiveOutput()
+	if captured.String() != "buffered\n" {
+		t.Fatalf("after going live: %q", captured.String())
+	}
+	AhdWrite("live")
+	if captured.String() != "buffered\nlive\n" {
+		t.Fatalf("a live line was held back: %q", captured.String())
+	}
+	AhdTerminalEmit(&AhdList[string]{items: []string{"emit"}}, "", "\n")
+	AhdTerminalPretty("pretty")
+	if captured.String() != "buffered\nlive\nemit\npretty\n" {
+		t.Fatalf("emit and pretty were held back: %q", captured.String())
+	}
+}
+
+func TestConcurrentTerminalWritesDoNotRace(t *testing.T) {
+	previous := ahdOut
+	var captured strings.Builder
+	ahdOut = bufio.NewWriter(&captured)
+	defer func() {
+		ahdOutLive.Store(false)
+		ahdOut = previous
+	}()
+	AhdLiveOutput()
+	var group sync.WaitGroup
+	for range 8 {
+		group.Add(3)
+		go func() {
+			defer group.Done()
+			AhdWrite("line")
+		}()
+		go func() {
+			defer group.Done()
+			AhdTerminalEmit(&AhdList[string]{items: []string{"emit"}}, "", "\n")
+		}()
+		go func() {
+			defer group.Done()
+			AhdTerminalPretty("pretty")
+		}()
+	}
+	group.Wait()
+	text := captured.String()
+	if !strings.Contains(text, "line\n") || !strings.Contains(text, "emit\n") || !strings.Contains(text, "pretty\n") {
+		t.Fatalf("missing concurrent output: %q", text)
 	}
 }
