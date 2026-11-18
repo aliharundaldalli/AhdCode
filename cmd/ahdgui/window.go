@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"math"
+	"runtime"
 	"sync"
 
 	"ahdidentity"
@@ -36,6 +37,9 @@ type window struct {
 	texture   *ebiten.Image
 	keys      []ebiten.Key
 	chars     []rune
+	lastClick int
+	lastX     int
+	lastY     int
 }
 
 func (w *window) Update() error {
@@ -66,6 +70,7 @@ func (w *window) Update() error {
 		}
 	}
 	w.ticks++
+	m.tickAnimation()
 	if w.ticks%caretBlinkTicks == 0 {
 		w.caret = !w.caret
 		m.mu.Lock()
@@ -87,12 +92,21 @@ func (w *window) pollMouse() {
 	px, py := ebiten.CursorPosition()
 	x, y := int(math.Floor(float64(px)/w.scale)), int(math.Floor(float64(py)/w.scale))
 	if inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft) {
-		s.model.press(x, y)
+		double := w.lastClick >= 0 && w.ticks-w.lastClick <= 15 && absInt(x-w.lastX) < 4 && absInt(y-w.lastY) < 4
+		w.lastClick, w.lastX, w.lastY = w.ticks, x, y
+		s.model.pressAt(x, y, double)
+		s.reportSort()
+		s.menuActivated(s.model.takeMenu())
 	} else if ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft) {
 		s.model.drag(x, y)
+	} else {
+		s.model.hover(x, y)
 	}
 	if inpututil.IsMouseButtonJustReleased(ebiten.MouseButtonLeft) {
 		s.clicked(s.model.release(x, y))
+	}
+	if kind, id, gx, gy, ok := s.model.takePointer(); ok {
+		s.emitPointer(kind, id, gx, gy)
 	}
 	if dx, dy := ebiten.Wheel(); (dx != 0 || dy != 0) && !math.IsNaN(dx) && !math.IsNaN(dy) {
 		if ebiten.IsKeyPressed(ebiten.KeyShift) {
@@ -108,49 +122,85 @@ func (w *window) pollMouse() {
 // Checkbox with Space, and the focused Select with either, moves a list's
 // selection with the arrow and page keys, and reports each key press, once,
 // to a program listening for keys.
+func modifierState() (command, shift, alt bool) {
+	shift = ebiten.IsKeyPressed(ebiten.KeyShiftLeft) || ebiten.IsKeyPressed(ebiten.KeyShiftRight)
+	alt = ebiten.IsKeyPressed(ebiten.KeyAltLeft) || ebiten.IsKeyPressed(ebiten.KeyAltRight)
+	if runtime.GOOS == "darwin" {
+		command = ebiten.IsKeyPressed(ebiten.KeyMetaLeft) || ebiten.IsKeyPressed(ebiten.KeyMetaRight)
+	} else {
+		command = ebiten.IsKeyPressed(ebiten.KeyControlLeft) || ebiten.IsKeyPressed(ebiten.KeyControlRight)
+	}
+	return command, shift, alt
+}
+
 func (w *window) pollKeys() {
 	s, m := w.session, w.session.model
+	command, shift, alt := modifierState()
 	w.keys = inpututil.AppendJustPressedKeys(w.keys[:0])
 	for _, key := range w.keys {
 		name, known := keyNames[key]
 		if !known {
 			continue
 		}
+		// A command chord belongs to the focused text editor when it is an
+		// editing chord, and otherwise to the one menu item that owns it.
+		// Either way it is not typed and not delivered to Window.onKey.
+		if command {
+			id, copied, didCopy, _ := m.applyChord(runtime.GOOS, true, alt, shift, name)
+			if didCopy {
+				s.emit(event{Event: "clipboard", Text: copied})
+			}
+			if id != 0 {
+				s.menuActivated(id)
+			}
+			continue
+		}
 		switch name {
 		case "Tab":
-			if ebiten.IsKeyPressed(ebiten.KeyShift) {
+			if shift {
 				m.focusPrevious()
 			} else {
 				m.focusNext()
 			}
 		case "Escape":
-			m.escape()
+			if !m.closeMenus() {
+				m.escape()
+			}
 		case "Enter", "Space":
 			if name == "Enter" && m.focusedKind() == kindTextArea {
-				m.edit(name)
+				m.editMove(name, shift)
 			} else {
 				s.clicked(m.activateFocused(name == "Space"))
 			}
 		default:
 			if !m.navigate(name) {
-				m.edit(name)
+				m.editMove(name, shift)
 			}
 		}
 		s.pressedKey(name)
 	}
-	for _, key := range []ebiten.Key{ebiten.KeyBackspace, ebiten.KeyDelete, ebiten.KeyArrowLeft, ebiten.KeyArrowRight,
-		ebiten.KeyArrowUp, ebiten.KeyArrowDown, ebiten.KeyPageUp, ebiten.KeyPageDown} {
-		held := inpututil.KeyPressDuration(key)
-		if held > repeatDelay && (held-repeatDelay)%repeatEvery == 0 {
-			if !m.navigate(keyNames[key]) {
-				m.edit(keyNames[key])
+	if !command {
+		for _, key := range []ebiten.Key{ebiten.KeyBackspace, ebiten.KeyDelete, ebiten.KeyArrowLeft, ebiten.KeyArrowRight,
+			ebiten.KeyArrowUp, ebiten.KeyArrowDown, ebiten.KeyPageUp, ebiten.KeyPageDown} {
+			held := inpututil.KeyPressDuration(key)
+			if held > repeatDelay && (held-repeatDelay)%repeatEvery == 0 {
+				if !m.navigate(keyNames[key]) {
+					m.editMove(keyNames[key], shift)
+				}
 			}
 		}
+		w.chars = ebiten.AppendInputChars(w.chars[:0])
+		if len(w.chars) > 0 {
+			m.insert(w.chars)
+		}
 	}
-	w.chars = ebiten.AppendInputChars(w.chars[:0])
-	if len(w.chars) > 0 {
-		m.insert(w.chars)
+}
+
+func absInt(value int) int {
+	if value < 0 {
+		return -value
 	}
+	return value
 }
 
 func (w *window) Layout(outsideWidth, outsideHeight int) (int, int) {
@@ -203,7 +253,7 @@ func (w *window) Draw(screen *ebiten.Image) {
 // the pipe or sent close.
 func runWindow(s *session) error {
 	m := s.model
-	w := &window{session: s, ready: make(chan struct{}), scale: 1, title: m.title}
+	w := &window{session: s, ready: make(chan struct{}), scale: 1, title: m.title, lastClick: -1}
 	ebiten.SetWindowTitle(m.title)
 	ebiten.SetWindowSize(m.width, m.height)
 	ebiten.SetWindowResizingMode(ebiten.WindowResizingModeDisabled)

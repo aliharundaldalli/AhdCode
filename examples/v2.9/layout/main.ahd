@@ -1,0 +1,48 @@
+// A two-column form in a scrollable window.
+// The menu bar stays above the form. Extra starts hidden, so the grid
+// closes that cell. The lines are long enough to scroll, and the wide
+// label is wider than the window.
+//
+// Run it with `ahdcode run main.ahd`.
+bring GUI
+from GUI bring (Window, Container, Label, Button, TextInput, Menu, MenuItem)
+
+window: Window := GUI.window(title: "Layout", width: 420, height: 280)
+window.setResizable(true)
+file: Menu := window.menu("File")
+save: MenuItem := file.item("Save", "S")
+
+page: Container := window.scroll(spacing: 8, padding: 12)
+form: Container := page.grid(columns: 2, columnGap: 12, rowGap: 8)
+
+form.label("Name")
+name: TextInput := form.textInput()
+form.label("City")
+city: TextInput := form.textInput()
+
+notes: Label := form.label("Notes")
+notes.setSpan(2, 1)
+
+extra: Button := form.button("Extra")
+extra.setVisible(false)
+
+lines: Container := form.column(spacing: 4, padding: 0)
+lines.setSpan(2, 1)
+index := 1
+while index <= 12 {
+    lines.label("Line {index}")
+    index += 1
+}
+
+wide: Label := page.label("This line is wider than the window")
+wide.setMinWidth(640)
+
+onSave: Function := () -> Nothing {
+    name: Global TextInput
+    city: Global TextInput
+    notes: Global Label
+    notes.setText(name.text() + ", " + city.text())
+}
+save.onClick(onSave)
+
+window.wait()

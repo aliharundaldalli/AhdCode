@@ -6575,8 +6575,11 @@ test script — cannot take the focus (Tab skips it; a focused widget that is
 disabled loses the focus), and is drawn faded. `setText`, `setChecked`,
 `text`, and `checked` keep working. `isEnabled` answers from the runtime,
 also after the Window closed; `setEnabled` and every color setter on a
-closed Window raise `GUIError`. There is no visibility API. The GUI helper
-protocol is version 2.
+closed Window raise `GUIError`. Version 1.9.0 has no visibility API.
+`setVisible`, added later and described in the GUI guide, is separate from
+the enabled state: a hidden control leaves the layout, and a disabled
+control stays visible and keeps its place. The GUI helper protocol in this
+section is version 2.
 
 The `ahdgui` and `ahdgraphics` helpers and the Plot viewer (section 86) show
 the AhdCode application identity: on Windows and Linux the AhdCode icon as
@@ -6868,6 +6871,106 @@ Program output written before a call that serves for the rest of the program
 afterwards is delivered when it is written, whether standard output is a
 terminal, a file, or a pipe. `take`, `Canvas.wait`, `Window.wait`, and
 `Scheduler.run` already delivered pending output before blocking.
+
+## 95. GUI Timers, Background Tasks, and Embedded Canvas (v2.9 development)
+
+This section is implemented while the compiler version is still 2.8.0. It does
+not by itself release v2.9. GUI exports the additional classes `Canvas` and
+`Task`, and the function `GUI.checkpoint() -> Bool`. GUI's `Canvas` and
+Graphics' `Canvas` are different classes that share a name. A scope cannot
+bring both.
+
+```text
+Window.every(milliseconds: Int, handler: () -> Nothing) -> Int
+Window.cancel(timer: Int) -> Nothing
+Window.task(work: () -> Int) -> Task
+
+Task.onDone(handler: (value: Int?, problem: String?) -> Nothing) -> Nothing
+Task.cancel() -> Nothing
+Task.cancelled() -> Bool
+
+Container.canvas(width: Int := 240, height: Int := 160) -> Canvas
+
+Canvas.clear(color: String := "") -> Nothing
+Canvas.line(x1: Real, y1: Real, x2: Real, y2: Real, stroke: String := "black", width: Real := 1) -> Nothing
+Canvas.rectangle(x: Real, y: Real, width: Real, height: Real, stroke: String := "black", fill: String := "") -> Nothing
+Canvas.circle(x: Real, y: Real, radius: Real, stroke: String := "black", fill: String := "") -> Nothing
+Canvas.text(x: Real, y: Real, text: String, fill: String := "black", size: Real := 16) -> Nothing
+Canvas.onMove(handler: (x: Real, y: Real) -> Nothing) -> Nothing
+Canvas.onClick(handler: (x: Real, y: Real) -> Nothing) -> Nothing
+Canvas.onDrag(handler: (x: Real, y: Real) -> Nothing) -> Nothing
+```
+
+`every` uses the interval bounds and the 64-timer cap of §92. Callbacks follow
+§84. A handler that outlasts its interval skips the missed turns. `cancel` of
+an unknown identifier does nothing. Closing the Window stops its timers and
+does not run a callback after that close. A headless Window has no clock; a
+scripted `tick` event is that clock. This differs from §92, where a headless
+Graphics Canvas does not run timers at all.
+
+`task` runs `work` while `wait` is running. A Window has one task at a time.
+The function is not interrupted by `cancel` or by the Window closing.
+`checkpoint` returns true outside a task. Inside a task it returns false when
+the task was cancelled or the Window began to close, and it lets queued GUI
+callbacks run. It does not abort `work`. `onDone` runs on the callback path
+only when `work` has returned, the task was not cancelled, and the Window is
+open. A raised Error becomes `problem`; the returned Int becomes `value`.
+The task cannot change widgets. `wait` does not return after a close until
+`work` returns, and that result is discarded. There is no general
+multithreading: the task and the GUI callbacks do not run at the same time
+except across `checkpoint`.
+
+`canvas` adds the surface to a Column, Row, Grid, Scroll, or Tabs page. It
+does not open a Graphics window. The origin is the center of the placed
+rectangle, x grows right, and y grows up. Pointer coordinates use that system
+after scroll. The drawing commands are a subset of §92: line, rectangle,
+circle, text, and clear. Rectangle and circle strokes are one unit wide.
+Empty fill draws no fill. Empty clear is white.
+
+## 96. TableView Sorting and Application Resources (v2.9 development)
+
+The compiler that implements this section still reports version 2.8.0.
+
+```text
+TableView.sort(column: Int, descending: Bool := false) -> Nothing
+TableView.sortedColumn() -> Int?
+TableView.sortDescending() -> Bool
+GUI.resource(name: String) -> String
+```
+
+`sort` orders the current rows by one column. `descending` false is
+ascending. Cells compare as Strings in Unicode code point order. The
+comparison is case-sensitive, not numeric, and not locale-aware: `""` is
+before every other String when ascending, and `"10"` is before `"2"`. Equal
+cells keep their current relative order. The selected row stays the same row
+and moves to its new index. `sort` does not call `onSelect`. A header click
+uses the same order: the first click on a column sorts ascending, the next
+click on that column sorts descending, and a click on another column sorts
+ascending. A disabled TableView ignores a header click. `sortedColumn` is
+null until the table has been sorted. `setRows` keeps the sort and applies it
+to the new rows. The row at the selected index in that new data stays
+selected, then moves with the sort. `rows` returns the order on screen.
+
+`GUI.resource` returns the canonical absolute path of one file in the
+application's resource folder. `name` is relative to that folder. An absolute
+path, an empty path, or a path containing `..` raises `GUIError`, as does a
+missing file or a directory. The folder and the file are both resolved
+through symbolic links. A link is accepted only when the file's canonical
+path stays inside the folder's canonical path. A link that points outside,
+and a link whose target does not exist, raises `GUIError`. The folder is not
+the working directory and not the user's home directory. `ahdcode run` uses
+the `resources` directory next to the entry module. A packaged macOS
+application uses `Contents/Resources/app` beside its executable. A packaged
+Windows or Linux application uses `resources` beside the executable, not its
+`runtime` directory. `image` is unchanged: a relative image path is still the
+working directory.
+
+A wrapping Label's height is the line count at its wrap width. When the
+window or a scroll viewport is narrower, the Label is measured again at that
+width and the widgets below it are placed after the new height. It does not
+become narrower than its minimum width or its widest grapheme cluster, and a
+widget that does not wrap keeps its measured width. Drawing keeps the
+measured line breaks when a box is narrower than the height it was given.
 
 ---
 

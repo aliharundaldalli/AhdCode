@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"unicode/utf8"
@@ -110,7 +111,7 @@ func AhdGUIAddList(container int64, kind string, items []string, selected int64)
 		return 0, problem
 	}
 	index := int(selected)
-	return ahdGUIAdd(parent.window, parent.id, kind, ahdGUIRequest{Items: append([]string{}, items...), Selected: &index})
+	return ahdGUIAdd(parent.window, parent.id, container, kind, ahdGUIRequest{Items: append([]string{}, items...), Selected: &index})
 }
 
 // AhdGUIAddTable adds a TableView.
@@ -122,7 +123,7 @@ func AhdGUIAddTable(container int64, columns []string, rows [][]string) (int64, 
 	if problem != "" {
 		return 0, problem
 	}
-	return ahdGUIAdd(parent.window, parent.id, "table", ahdGUIRequest{Columns: append([]string{}, columns...), Rows: ahdGUICopyRows(rows)})
+	return ahdGUIAdd(parent.window, parent.id, container, "table", ahdGUIRequest{Columns: append([]string{}, columns...), Rows: ahdGUICopyRows(rows)})
 }
 
 // ahdGUIChange sends one change of a widget's contents and records it.
@@ -179,12 +180,29 @@ func AhdGUIColumns(handle int64) ([]string, string) {
 }
 
 func AhdGUIRows(handle int64) ([][]string, string) {
-	widget, _, problem := ahdGUIWidgetOf(handle)
+	widget, window, problem := ahdGUIWidgetOf(handle)
 	if problem != "" {
 		return nil, problem
 	}
+	window.mu.Lock()
+	var fetched [][]string
+	fetchedOK := false
+	if window.usable && window.alive {
+		reply, problem := window.request(ahdGUIRequest{Op: "get", Widget: widget.id, Kind: "rows"}, ahdGUIRequestTimeout)
+		window.mu.Unlock()
+		if problem != "" {
+			return nil, problem
+		}
+		fetched = reply.Rows
+		fetchedOK = true
+	} else {
+		window.mu.Unlock()
+	}
 	ahdGUI.Lock()
 	defer ahdGUI.Unlock()
+	if fetchedOK {
+		widget.rows = ahdGUICopyRows(fetched)
+	}
 	return ahdGUICopyRows(widget.rows), ""
 }
 
@@ -201,7 +219,170 @@ func AhdGUISetRows(handle int64, rows [][]string) string {
 		return problem
 	}
 	copied := ahdGUICopyRows(rows)
-	return ahdGUIChange(handle, ahdGUIRequest{Kind: "rows", Rows: copied}, func(widget *ahdGUIWidget) { widget.rows = copied })
+	return ahdGUIChange(handle, ahdGUIRequest{Kind: "rows", Rows: copied}, func(widget *ahdGUIWidget) {
+		widget.rows = copied
+		ahdGUIOrderRows(widget)
+	})
+}
+
+// AhdGUISort orders a TableView by one column. descending false is ascending.
+// It does not call onSelect. Cells compare as text: Unicode code point order,
+// case-sensitive, so an empty cell is first when ascending and "10" is before
+// "2". Equal cells keep their current relative order. The selected row stays
+// the same row. setRows keeps this order and applies it to the new rows.
+func AhdGUISort(handle int64, column int64, descending bool) string {
+	widget, window, problem := ahdGUIWidgetOf(handle)
+	if problem != "" {
+		return problem
+	}
+	if widget.kind != "table" {
+		return "sort is only for a TableView"
+	}
+	ahdGUI.Lock()
+	columns := len(widget.columns)
+	ahdGUI.Unlock()
+	if column < 0 || int(column) >= columns {
+		return fmt.Sprintf("column %d is outside the %d columns", column, columns)
+	}
+	selected := int(column)
+	window.mu.Lock()
+	if !window.usable {
+		window.mu.Unlock()
+		return ahdGUIClosedMessage
+	}
+	_, problem = window.request(ahdGUIRequest{Op: "set", Widget: widget.id, Kind: "sort", Selected: &selected, Checked: &descending}, ahdGUIRequestTimeout)
+	window.mu.Unlock()
+	if problem != "" {
+		return problem
+	}
+	ahdGUI.Lock()
+	widget.sortColumn = int(column)
+	widget.sortDesc = descending
+	ahdGUIOrderRows(widget)
+	ahdGUI.Unlock()
+	return ""
+}
+
+// AhdGUISortedColumn is the column the table is ordered by. present is false
+// when the rows are still in the order last given to setRows.
+func AhdGUISortedColumn(handle int64) (int64, bool, string) {
+	widget, window, problem := ahdGUIWidgetOf(handle)
+	if problem != "" {
+		return 0, false, problem
+	}
+	window.mu.Lock()
+	if window.usable && window.alive {
+		reply, problem := window.request(ahdGUIRequest{Op: "get", Widget: widget.id, Kind: "sort"}, ahdGUIRequestTimeout)
+		window.mu.Unlock()
+		if problem != "" {
+			return 0, false, problem
+		}
+		ahdGUI.Lock()
+		defer ahdGUI.Unlock()
+		if reply.Selected == nil || *reply.Selected < 0 {
+			widget.sortColumn = -1
+			widget.sortDesc = false
+			return 0, false, ""
+		}
+		widget.sortColumn = *reply.Selected
+		if reply.Checked != nil {
+			widget.sortDesc = *reply.Checked
+		}
+		return int64(widget.sortColumn), true, ""
+	}
+	window.mu.Unlock()
+	ahdGUI.Lock()
+	defer ahdGUI.Unlock()
+	if widget.sortColumn < 0 {
+		return 0, false, ""
+	}
+	return int64(widget.sortColumn), true, ""
+}
+
+// AhdGUISortDescending reports the direction. It is false when the table is
+// not sorted.
+func AhdGUISortDescending(handle int64) (bool, string) {
+	widget, _, problem := ahdGUIWidgetOf(handle)
+	if problem != "" {
+		return false, problem
+	}
+	if _, _, problem := AhdGUISortedColumn(handle); problem != "" {
+		return false, problem
+	}
+	ahdGUI.Lock()
+	defer ahdGUI.Unlock()
+	return widget.sortDesc, ""
+}
+
+// ahdGUINoteSort applies a header click to the cached rows of the Window
+// whose helper sent it. Helper ids start over for every Window, and a
+// closed Window keeps its widgets readable, so the id alone is not enough.
+// The helper has already ordered its copy the same way. There is no
+// selection callback. The caller holds the window lock and must not hold
+// ahdGUI.
+func ahdGUINoteSort(windowHandle int64, event ahdGUIEvent) {
+	if event.Selected == nil || *event.Selected < 0 {
+		return
+	}
+	ahdGUI.Lock()
+	defer ahdGUI.Unlock()
+	widget := ahdGUIWidgetByHelperID(windowHandle, event.Widget)
+	if widget == nil || widget.kind != "table" {
+		return
+	}
+	if *event.Selected >= len(widget.columns) {
+		return
+	}
+	widget.sortColumn = *event.Selected
+	widget.sortDesc = event.Checked
+	ahdGUIOrderRows(widget)
+}
+
+func ahdGUIWidgetByHelperID(windowHandle, helperID int64) *ahdGUIWidget {
+	for _, widget := range ahdGUI.widgets {
+		if widget.window == windowHandle && widget.id == helperID {
+			return widget
+		}
+	}
+	return nil
+}
+
+// ahdGUIOrderRows stably sorts the cached rows. The caller holds ahdGUI.
+// Comparison matches the helper: code point order, empty before any text.
+func ahdGUIOrderRows(widget *ahdGUIWidget) {
+	column := widget.sortColumn
+	if column < 0 || column >= len(widget.columns) {
+		return
+	}
+	rows := widget.rows
+	order := make([]int, len(rows))
+	for index := range order {
+		order[index] = index
+	}
+	descending := widget.sortDesc
+	sort.SliceStable(order, func(i, j int) bool {
+		left := ahdGUICell(rows[order[i]], column)
+		right := ahdGUICell(rows[order[j]], column)
+		if left == right {
+			return false
+		}
+		if descending {
+			return left > right
+		}
+		return left < right
+	})
+	next := make([][]string, len(rows))
+	for newIndex, oldIndex := range order {
+		next[newIndex] = rows[oldIndex]
+	}
+	widget.rows = next
+}
+
+func ahdGUICell(row []string, column int) string {
+	if column < 0 || column >= len(row) {
+		return ""
+	}
+	return row[column]
 }
 
 // AhdGUISelectedIndex reads a ListBox's, Select's, or TableView's
@@ -268,6 +449,9 @@ func AhdGUISelect(handle int64, index int64, present bool) string {
 	selected := -1
 	if present {
 		if index < 0 || index >= int64(count) {
+			if widget.kind == "radioGroup" {
+				return "the option index is outside the group"
+			}
 			return fmt.Sprintf("index %d is outside the %d entries", index, count)
 		}
 		selected = int(index)
@@ -589,6 +773,25 @@ func AhdGUIRowsChecked(handle int64) *AhdList[*AhdList[string]] {
 
 func AhdGUISetRowsChecked(handle int64, rows *AhdList[*AhdList[string]]) {
 	AhdGUICheck(AhdGUISetRows(handle, ahdGUIRowsOf(rows)))
+}
+
+func AhdGUISortChecked(handle int64, column int64, descending bool) {
+	AhdGUICheck(AhdGUISort(handle, column, descending))
+}
+
+func AhdGUISortedColumnChecked(handle int64) *int64 {
+	column, present, problem := AhdGUISortedColumn(handle)
+	AhdGUICheck(problem)
+	if !present {
+		return nil
+	}
+	return &column
+}
+
+func AhdGUISortDescendingChecked(handle int64) bool {
+	descending, problem := AhdGUISortDescending(handle)
+	AhdGUICheck(problem)
+	return descending
 }
 
 func AhdGUISelectedIndexChecked(handle int64) *int64 {

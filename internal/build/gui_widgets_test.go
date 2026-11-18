@@ -179,11 +179,15 @@ func TestLedgerExampleRunsHeadless(t *testing.T) {
 	}
 	sqliteHelperForTest(t)
 	// Widget ids follow creation order: customer 7, kind 9, amount 11,
-	// add 14, table 21, remove 25, export 26.
+	// note 13, add 14, table 21, delete 25, save note 26, export 27.
+	// Amount text sorts "100.0" before "250.5", so deleting row 0 removes
+	// the payment and the exported file is the remaining debt.
 	useHeadlessGUI(t, `[{"event":"type","widget":7,"text":"Ayşe"},{"event":"type","widget":11,"text":"250.5"},{"event":"click","widget":14},`+
 		`{"event":"select","widget":9,"selected":1},{"event":"type","widget":11,"text":"100"},{"event":"click","widget":14},`+
-		`{"event":"select","widget":21,"selected":0},{"event":"click","widget":25},{"event":"click","widget":26}]`)
-	want := "No,Customer,Entry,Amount,Note\n1,Ayşe,Debt,250.5,\n2,Ayşe,Payment,100.0,\n"
+		`{"event":"sort","widget":21,"selected":3},{"event":"select","widget":21,"selected":0},{"event":"click","widget":25},`+
+		`{"event":"select","widget":21,"selected":0},{"event":"type","widget":13,"text":"edited"},{"event":"click","widget":26},`+
+		`{"event":"click","widget":27}]`)
+	want := "No,Customer,Entry,Amount,Note\n1,Ayşe,Debt,250.5,edited\n"
 	for _, mode := range []string{"native", "evaluator"} {
 		t.Run(mode, func(t *testing.T) {
 			directory := t.TempDir()
@@ -191,7 +195,7 @@ func TestLedgerExampleRunsHeadless(t *testing.T) {
 			if err := os.MkdirAll(filepath.Dir(exported), 0o755); err != nil {
 				t.Fatal(err)
 			}
-			answers, _ := json.Marshal([]any{map[string]any{}, map[string]any{"paths": []string{exported}}, map[string]any{}})
+			answers, _ := json.Marshal([]any{map[string]any{"confirm": true}, map[string]any{"paths": []string{exported}}, map[string]any{}})
 			t.Setenv("AHDCODE_GUI_HEADLESS_DIALOGS", string(answers))
 			sources := writeSources(t, map[string]string{"main.ahd": string(source)})
 			if mode == "native" {

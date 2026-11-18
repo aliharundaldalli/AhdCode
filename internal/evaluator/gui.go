@@ -63,6 +63,17 @@ func (session *Session) guiBuiltin(name string, arguments []any) any {
 		result, problem := ahdruntime.AhdGUIDialog("confirm", text(0, ""), text(1, ""), "", nil)
 		session.guiCheck(problem)
 		return result.Confirmed
+	case "clipboard":
+		return ahdruntime.AhdGUIClipboard()
+	case "setClipboard":
+		session.guiCheck(ahdruntime.AhdGUISetClipboard(text(0, "")))
+		return Nothing
+	case "checkpoint":
+		return session.guiCheckpoint()
+	case "resource":
+		path, problem := ahdruntime.AhdGUIResource(text(0, ""))
+		session.guiCheck(problem)
+		return path
 	}
 	session.raise("Error", "unsupported GUI function "+name)
 	return nil
@@ -111,7 +122,8 @@ func rowsList(rows [][]string) *List {
 
 // guiClassPrefixes are the GUI Classes whose members are type operations.
 var guiClassPrefixes = []string{"Window.", "Container.", "Label.", "Button.", "TextInput.", "Checkbox.",
-	"ListBox.", "Select.", "TextArea.", "PasswordInput.", "TableView."}
+	"ListBox.", "Menu.", "MenuItem.", "Select.", "TextArea.", "PasswordInput.", "TableView.", "Image.",
+	"Tabs.", "RadioGroup.", "RadioButton.", "Progress.", "DateField.", "Canvas.", "Task."}
 
 // isGUIOperation reports whether a type operation belongs to a GUI Class.
 func isGUIOperation(name string) bool {
@@ -128,6 +140,7 @@ func (session *Session) guiOperation(name string, receiver any, arguments []any)
 	handle := session.graphicsHandle(receiver, guiHandleField(className))
 	text := func(index int, fallback string) string { return graphicsText(arguments, index, fallback) }
 	integer := func(index int, fallback int64) int64 { return graphicsInt(arguments, index, fallback) }
+	real := func(index int, fallback float64) float64 { return graphicsReal(arguments, index, fallback) }
 	flag := func(index int, fallback bool) bool {
 		if index < len(arguments) {
 			if value, ok := arguments[index].(bool); ok {
@@ -144,25 +157,122 @@ func (session *Session) guiOperation(name string, receiver any, arguments []any)
 	case "Window.column", "Window.row":
 		created, problem := ahdruntime.AhdGUIRoot(handle, strings.TrimPrefix(name, "Window."), integer(0, 8), integer(1, 12))
 		return child("Container", created, problem)
+	case "Window.scroll":
+		created, problem := ahdruntime.AhdGUIRoot(handle, "scroll", integer(0, 8), integer(1, 12))
+		return child("Container", created, problem)
+	case "Window.grid":
+		created, problem := ahdruntime.AhdGUIGrid(handle, true, integer(0, 1), integer(1, 8), integer(2, 8))
+		return child("Container", created, problem)
 	case "Window.onKey":
 		handler := session.graphicsHandler(arguments, name)
 		session.guiCheck(ahdruntime.AhdGUIOnKey(handle, func(key string) { session.invokeHandler(handler, key) }))
 	case "Window.wait":
 		// Output written before wait must be visible while the window is open.
 		session.flushOutput()
-		session.guiCheck(ahdruntime.AhdGUIWait(handle))
+		// Let a background task use the interpreter while wait is blocked.
+		depth := session.yield()
+		problem := ahdruntime.AhdGUIWait(handle)
+		session.resume(depth)
+		session.guiCheck(problem)
 	case "Window.close":
 		session.guiCheck(ahdruntime.AhdGUIClose(handle))
 	case "Window.isOpen":
 		return ahdruntime.AhdGUIIsOpen(handle)
+	case "Window.every":
+		var handler *FunctionValue
+		if len(arguments) > 1 {
+			handler, _ = arguments[1].(*FunctionValue)
+		}
+		if handler == nil {
+			session.raise("NullError", name+" needs a Function")
+		}
+		id, problem := ahdruntime.AhdGUIEvery(handle, integer(0, 0), func() { session.invokeHandler(handler) })
+		session.guiCheck(problem)
+		return id
+	case "Window.cancel":
+		session.guiCheck(ahdruntime.AhdGUICancel(handle, integer(0, 0)))
+	case "Window.task":
+		handler := session.graphicsHandler(arguments, name)
+		id, problem := ahdruntime.AhdGUITask(handle, func() (int64, string) {
+			var problem string
+			var result int64
+			func() {
+				defer func() {
+					if recovered := recover(); recovered != nil {
+						switch value := recovered.(type) {
+						case raised:
+							problem = value.failure.Message
+						case *raised:
+							if value.failure != nil {
+								problem = value.failure.Message
+							}
+						default:
+							panic(recovered)
+						}
+					}
+				}()
+				if number, ok := session.invoke(handler, nil).(int64); ok {
+					result = number
+				}
+			}()
+			return result, problem
+		})
+		return child("Task", id, problem)
+	case "Task.onDone":
+		handler := session.graphicsHandler(arguments, name)
+		session.guiCheck(ahdruntime.AhdGUITaskOnDone(handle, func(value *int64, problem *string) {
+			var first, second any
+			if value != nil {
+				first = *value
+			}
+			if problem != nil {
+				second = *problem
+			}
+			session.invokeHandler(handler, first, second)
+		}))
+	case "Task.cancel":
+		session.guiCheck(ahdruntime.AhdGUITaskCancel(handle))
+	case "Task.cancelled":
+		return ahdruntime.AhdGUITaskCancelled(handle)
+	case "Container.canvas":
+		created, problem := ahdruntime.AhdGUIAddCanvas(handle, integer(0, 240), integer(1, 160))
+		return child("Canvas", created, problem)
+	case "Canvas.clear":
+		session.guiCheck(ahdruntime.AhdGUICanvasDraw(handle, "clear", 0, 0, 0, 0, 0, 0, text(0, ""), "", ""))
+	case "Canvas.line":
+		session.guiCheck(ahdruntime.AhdGUICanvasDraw(handle, "line", real(0, 0), real(1, 0), real(2, 0), real(3, 0), 0, real(5, 1), text(4, "black"), "", ""))
+	case "Canvas.rectangle":
+		session.guiCheck(ahdruntime.AhdGUICanvasDraw(handle, "rectangle", real(0, 0), real(1, 0), real(2, 0), real(3, 0), 0, 1, text(4, "black"), text(5, ""), ""))
+	case "Canvas.circle":
+		session.guiCheck(ahdruntime.AhdGUICanvasDraw(handle, "circle", real(0, 0), real(1, 0), 0, 0, real(2, 0), 1, text(3, "black"), text(4, ""), ""))
+	case "Canvas.text":
+		session.guiCheck(ahdruntime.AhdGUICanvasDraw(handle, "text", real(0, 0), real(1, 0), 0, 0, 0, real(4, 16), text(3, "black"), "", text(2, "")))
+	case "Canvas.onMove":
+		pointer := session.graphicsHandler(arguments, name)
+		session.guiCheck(ahdruntime.AhdGUICanvasOnMove(handle, func(x, y float64) { session.invokeHandler(pointer, x, y) }))
+	case "Canvas.onClick":
+		pointer := session.graphicsHandler(arguments, name)
+		session.guiCheck(ahdruntime.AhdGUICanvasOnClick(handle, func(x, y float64) { session.invokeHandler(pointer, x, y) }))
+	case "Canvas.onDrag":
+		pointer := session.graphicsHandler(arguments, name)
+		session.guiCheck(ahdruntime.AhdGUICanvasOnDrag(handle, func(x, y float64) { session.invokeHandler(pointer, x, y) }))
 	case "Window.setTitle":
 		session.guiCheck(ahdruntime.AhdGUISetTitle(handle, text(0, "")))
 	case "Container.column", "Container.row":
 		created, problem := ahdruntime.AhdGUIContainerLayout(handle, strings.TrimPrefix(name, "Container."), integer(0, 8), integer(1, 0))
 		return child("Container", created, problem)
+	case "Container.scroll":
+		created, problem := ahdruntime.AhdGUIContainerLayout(handle, "scroll", integer(0, 8), integer(1, 0))
+		return child("Container", created, problem)
+	case "Container.grid":
+		created, problem := ahdruntime.AhdGUIGrid(handle, false, integer(0, 1), integer(1, 8), integer(2, 8))
+		return child("Container", created, problem)
 	case "Container.label":
 		created, problem := ahdruntime.AhdGUIAddLeaf(handle, "label", text(0, ""), "", false)
 		return child("Label", created, problem)
+	case "Container.image":
+		created, problem := ahdruntime.AhdGUIAddImage(handle, text(0, ""), integer(1, 0), integer(2, 0))
+		return child("Image", created, problem)
 	case "Container.button":
 		created, problem := ahdruntime.AhdGUIAddLeaf(handle, "button", text(0, ""), "", false)
 		return child("Button", created, problem)
@@ -209,6 +319,14 @@ func (session *Session) guiOperation(name string, receiver any, arguments []any)
 // callbacks, and resizable Windows.
 func (session *Session) guiWidgetOperation(name string, handle int64, arguments []any) any {
 	text := func(index int, fallback string) string { return graphicsText(arguments, index, fallback) }
+	flag := func(index int, fallback bool) bool {
+		if index < len(arguments) {
+			if value, ok := arguments[index].(bool); ok {
+				return value
+			}
+		}
+		return fallback
+	}
 	child := func(className string, created int64, problem string) any {
 		session.guiCheck(problem)
 		return guiInstance(className, created)
@@ -228,8 +346,52 @@ func (session *Session) guiWidgetOperation(name string, handle int64, arguments 
 		}
 		return index
 	}
+	number := func(index int, fallback int64) int64 {
+		if index < len(arguments) {
+			if value, ok := arguments[index].(int64); ok {
+				return value
+			}
+		}
+		return fallback
+	}
 	member := name[strings.IndexByte(name, '.')+1:]
 	switch name {
+	case "Window.menu":
+		created, problem := ahdruntime.AhdGUIMenu(handle, text(0, ""), true)
+		return child("Menu", created, problem)
+	case "Menu.menu":
+		created, problem := ahdruntime.AhdGUIMenu(handle, text(0, ""), false)
+		return child("Menu", created, problem)
+	case "Menu.item":
+		created, problem := ahdruntime.AhdGUIMenuItem(handle, "item", text(0, ""), text(1, ""), false)
+		return child("MenuItem", created, problem)
+	case "Menu.checkItem":
+		created, problem := ahdruntime.AhdGUIMenuItem(handle, "check", text(0, ""), text(1, ""), flag(2, false))
+		return child("MenuItem", created, problem)
+	case "Menu.separator":
+		session.guiCheck(ahdruntime.AhdGUIMenuSeparator(handle))
+		return Nothing
+	case "MenuItem.onClick":
+		handler := session.graphicsHandler(arguments, name)
+		session.guiCheck(ahdruntime.AhdGUIOnMenu(handle, func() { session.invokeHandler(handler) }))
+		return Nothing
+	case "MenuItem.setEnabled":
+		session.guiCheck(ahdruntime.AhdGUIMenuSetEnabled(handle, flag(0, true)))
+		return Nothing
+	case "MenuItem.isEnabled":
+		enabled, problem := ahdruntime.AhdGUIMenuIsEnabled(handle)
+		session.guiCheck(problem)
+		return enabled
+	case "MenuItem.setChecked":
+		session.guiCheck(ahdruntime.AhdGUIMenuSetChecked(handle, flag(0, false)))
+		return Nothing
+	case "MenuItem.checked":
+		checked, problem := ahdruntime.AhdGUIMenuChecked(handle)
+		session.guiCheck(problem)
+		return checked
+	case "MenuItem.setText":
+		session.guiCheck(ahdruntime.AhdGUIMenuSetText(handle, text(0, "")))
+		return Nothing
 	case "Window.setResizable":
 		flag, _ := arguments[0].(bool)
 		session.guiCheck(ahdruntime.AhdGUISetResizable(handle, flag))
@@ -281,6 +443,20 @@ func (session *Session) guiWidgetOperation(name string, handle int64, arguments 
 		index, present := nullableIndex(0)
 		session.guiCheck(ahdruntime.AhdGUISelect(handle, index, present))
 		return Nothing
+	case "TableView.sort":
+		session.guiCheck(ahdruntime.AhdGUISort(handle, graphicsInt(arguments, 0, 0), flag(1, false)))
+		return Nothing
+	case "TableView.sortedColumn":
+		column, present, problem := ahdruntime.AhdGUISortedColumn(handle)
+		session.guiCheck(problem)
+		if !present {
+			return nil
+		}
+		return column
+	case "TableView.sortDescending":
+		descending, problem := ahdruntime.AhdGUISortDescending(handle)
+		session.guiCheck(problem)
+		return descending
 	case "TableView.onSelect":
 		handler := session.graphicsHandler(arguments, name)
 		session.guiCheck(ahdruntime.AhdGUIOnRowSelect(handle, func(row *int64) {
@@ -289,6 +465,77 @@ func (session *Session) guiWidgetOperation(name string, handle int64, arguments 
 				return
 			}
 			session.invokeHandler(handler, *row)
+		}))
+		return Nothing
+	case "Container.tabs":
+		created, problem := ahdruntime.AhdGUIAddTabs(handle)
+		return child("Tabs", created, problem)
+	case "Container.radioGroup":
+		created, problem := ahdruntime.AhdGUIAddRadioGroup(handle)
+		return child("RadioGroup", created, problem)
+	case "Container.progress":
+		created, problem := ahdruntime.AhdGUIAddProgress(handle, number(0, 100))
+		return child("Progress", created, problem)
+	case "Container.date":
+		created, problem := ahdruntime.AhdGUIAddDate(handle, number(0, 2000), number(1, 1), number(2, 1))
+		return child("DateField", created, problem)
+	case "Tabs.page":
+		created, problem := ahdruntime.AhdGUIAddPage(handle, text(0, ""))
+		return child("Container", created, problem)
+	case "Tabs.select":
+		session.guiCheck(ahdruntime.AhdGUISelectTab(handle, number(0, 0)))
+		return Nothing
+	case "Tabs.selectedIndex":
+		index, problem := ahdruntime.AhdGUITabIndex(handle)
+		session.guiCheck(problem)
+		return index
+	case "Tabs.onChange":
+		handler := session.graphicsHandler(arguments, name)
+		session.guiCheck(ahdruntime.AhdGUIOnTabChange(handle, func(index int64) { session.invokeHandler(handler, index) }))
+		return Nothing
+	case "RadioGroup.option":
+		created, problem := ahdruntime.AhdGUIAddOption(handle, text(0, ""))
+		return child("RadioButton", created, problem)
+	case "RadioButton.setText":
+		session.guiCheck(ahdruntime.AhdGUISetRadioText(handle, text(0, "")))
+		return Nothing
+	case "Progress.setValue":
+		session.guiCheck(ahdruntime.AhdGUISetProgressValue(handle, number(0, 0)))
+		return Nothing
+	case "Progress.value":
+		value, problem := ahdruntime.AhdGUIProgressValue(handle)
+		session.guiCheck(problem)
+		return value
+	case "Progress.maximum":
+		value, problem := ahdruntime.AhdGUIProgressMaximum(handle)
+		session.guiCheck(problem)
+		return value
+	case "Progress.setIndeterminate":
+		session.guiCheck(ahdruntime.AhdGUISetProgressSpin(handle, flag(0, false)))
+		return Nothing
+	case "Progress.isIndeterminate":
+		spin, problem := ahdruntime.AhdGUIProgressSpin(handle)
+		session.guiCheck(problem)
+		return spin
+	case "DateField.setDate":
+		session.guiCheck(ahdruntime.AhdGUISetDate(handle, number(0, 0), number(1, 0), number(2, 0)))
+		return Nothing
+	case "DateField.year":
+		year, _, _, problem := ahdruntime.AhdGUIDate(handle)
+		session.guiCheck(problem)
+		return year
+	case "DateField.month":
+		_, month, _, problem := ahdruntime.AhdGUIDate(handle)
+		session.guiCheck(problem)
+		return month
+	case "DateField.day":
+		_, _, day, problem := ahdruntime.AhdGUIDate(handle)
+		session.guiCheck(problem)
+		return day
+	case "DateField.onChange":
+		handler := session.graphicsHandler(arguments, name)
+		session.guiCheck(ahdruntime.AhdGUIOnDateChange(handle, func(year, month, day int64) {
+			session.invokeHandler(handler, year, month, day)
 		}))
 		return Nothing
 	}
@@ -343,6 +590,30 @@ func (session *Session) guiWidgetOperation(name string, handle int64, arguments 
 		enabled, problem := ahdruntime.AhdGUIIsEnabled(handle)
 		session.guiCheck(problem)
 		return enabled
+	case member == "setVisible":
+		flag, _ := arguments[0].(bool)
+		session.guiCheck(ahdruntime.AhdGUISetVisible(handle, flag))
+	case member == "isVisible":
+		visible, problem := ahdruntime.AhdGUIIsVisible(handle)
+		session.guiCheck(problem)
+		return visible
+	case member == "setSize" && strings.HasPrefix(name, "Image."):
+		session.guiCheck(ahdruntime.AhdGUISetImageSize(handle, number(0, 0), number(1, 0)))
+	case member == "setSize":
+		session.guiCheck(ahdruntime.AhdGUISetLabelSize(handle, text(0, "")))
+	case member == "setWrap":
+		session.guiCheck(ahdruntime.AhdGUISetWrap(handle, flag(0, false)))
+	case member == "setBold":
+		flag, _ := arguments[0].(bool)
+		session.guiCheck(ahdruntime.AhdGUISetLabelBold(handle, flag))
+	case member == "setMinWidth":
+		session.guiCheck(ahdruntime.AhdGUISetMinWidth(handle, number(0, 0)))
+	case member == "setPreferredWidth":
+		session.guiCheck(ahdruntime.AhdGUISetPreferredWidth(handle, number(0, 0)))
+	case member == "setAlign":
+		session.guiCheck(ahdruntime.AhdGUISetAlign(handle, text(0, ""), text(1, "")))
+	case member == "setSpan":
+		session.guiCheck(ahdruntime.AhdGUISetSpan(handle, number(0, 1), number(1, 1)))
 	default:
 		session.raise("Error", "unsupported GUI operation "+name)
 	}

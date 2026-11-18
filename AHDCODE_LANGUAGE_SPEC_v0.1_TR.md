@@ -7044,8 +7044,11 @@ betiği — yok sayar, odak alamaz (Tab onu atlar; odaktayken devre dışı
 bırakılan bileşen odağı kaybeder) ve soluk çizilir. `setText`,
 `setChecked`, `text` ve `checked` çalışmaya devam eder. `isEnabled` çalışma
 zamanından yanıt verir, Window kapandıktan sonra da; kapalı bir Window'da
-`setEnabled` ve her renk ayarlayıcı `GUIError` fırlatır. Görünürlük API'si
-yoktur. GUI yardımcı protokolü sürüm 2'dir.
+`setEnabled` ve her renk ayarlayıcı `GUIError` fırlatır. 1.9.0 sürümünde
+görünürlük API'si yoktur. Daha sonra eklenen ve GUI kılavuzunda anlatılan
+`setVisible`, etkin durumdan ayrıdır: gizlenen bir denetim yerleşimden çıkar,
+devre dışı bir denetim görünür kalır ve yerini korur. Bu bölümdeki GUI
+yardımcı protokolü sürüm 2'dir.
 
 `ahdgui` ve `ahdgraphics` yardımcıları ile Plot görüntüleyicisi (bölüm 86)
 AhdCode uygulama kimliğini gösterir: Windows ve Linux'ta pencere simgesi
@@ -7349,6 +7352,106 @@ yazılan program çıktısı, çağrı engellemeden önce teslim edilir; sonras�
 yazılan her satır da, standart çıktı bir terminal, dosya ya da boru olsun,
 yazıldığı anda teslim edilir. `take`, `Canvas.wait`, `Window.wait` ve
 `Scheduler.run` bekleyen çıktıyı engellemeden önce zaten teslim ediyordu.
+
+## 95. GUI Zamanlayıcıları, Arka Plan Görevleri ve Gömülü Canvas (v2.9 geliştirme)
+
+Bu bölüm, derleyici sürümü hâlâ 2.8.0 iken uygulanmıştır. Tek başına v2.9'u
+yayımlamaz. GUI ek olarak `Canvas` ve `Task` sınıflarını ve
+`GUI.checkpoint() -> Bool` fonksiyonunu dışa aktarır. GUI'nin `Canvas`'ı ile
+Graphics'in `Canvas`'ı aynı adı paylaşan farklı sınıflardır. Bir kapsam ikisini
+birden getiremez.
+
+```text
+Window.every(milliseconds: Int, handler: () -> Nothing) -> Int
+Window.cancel(timer: Int) -> Nothing
+Window.task(work: () -> Int) -> Task
+
+Task.onDone(handler: (value: Int?, problem: String?) -> Nothing) -> Nothing
+Task.cancel() -> Nothing
+Task.cancelled() -> Bool
+
+Container.canvas(width: Int := 240, height: Int := 160) -> Canvas
+
+Canvas.clear(color: String := "") -> Nothing
+Canvas.line(x1: Real, y1: Real, x2: Real, y2: Real, stroke: String := "black", width: Real := 1) -> Nothing
+Canvas.rectangle(x: Real, y: Real, width: Real, height: Real, stroke: String := "black", fill: String := "") -> Nothing
+Canvas.circle(x: Real, y: Real, radius: Real, stroke: String := "black", fill: String := "") -> Nothing
+Canvas.text(x: Real, y: Real, text: String, fill: String := "black", size: Real := 16) -> Nothing
+Canvas.onMove(handler: (x: Real, y: Real) -> Nothing) -> Nothing
+Canvas.onClick(handler: (x: Real, y: Real) -> Nothing) -> Nothing
+Canvas.onDrag(handler: (x: Real, y: Real) -> Nothing) -> Nothing
+```
+
+`every`, §92'nin aralık sınırlarını ve 64 zamanlayıcı tavanını kullanır.
+Callback'ler §84'e uyar. Aralığından uzun süren bir işleyici kaçırdığı tikleri
+atlar. Bilinmeyen bir kimliği `cancel` etmek bir şey yapmaz. Window kapanınca
+zamanlayıcıları durur ve bu kapanıştan sonra bir callback çalışmaz. Başsız bir
+Window'un saati yoktur; betikteki bir `tick` olayı o saattir. Bu, başsız bir
+Graphics Canvas'ın zamanlayıcı çalıştırmadığı §92'den farklıdır.
+
+`task`, `work` fonksiyonunu `wait` çalışırken çalıştırır. Bir Window'un aynı
+anda bir görevi vardır. Fonksiyon, `cancel` ile de Window'un kapanmasıyla da
+kesilmez. `checkpoint` görev dışında true döndürür. Görev içinde, görev iptal
+edildiyse veya Window kapanmaya başladıysa false döndürür ve kuyruktaki GUI
+callback'lerinin çalışmasına izin verir. `work` fonksiyonunu durdurmaz.
+`onDone`, callback yolunda yalnızca `work` dönmüşse, görev iptal edilmemişse
+ve Window açıksa çalışır. Fırlatılan bir Error `problem` olur; dönen Int
+`value` olur. Görev bileşenleri değiştiremez. `wait`, bir kapanıştan sonra
+`work` dönene kadar dönmez ve o sonuç atılır. Genel çoklu iş parçacığı yoktur:
+görev ile GUI callback'leri, `checkpoint` arası dışında aynı anda çalışmaz.
+
+`canvas`, yüzeyi bir Column, Row, Grid, Scroll veya Tabs sayfasına ekler. Bir
+Graphics penceresi açmaz. Başlangıç, yerleştirilen dikdörtgenin merkezidir; x
+sağa, y yukarı büyür. İşaretçi koordinatları kaydırmadan sonra bu sistemi
+kullanır. Çizim komutları §92'nin bir alt kümesidir: doğru, dikdörtgen, daire,
+metin ve temizleme. Dikdörtgen ve daire çizgisi bir birim kalınlığındadır. Boş
+dolgu çizilmez. Boş temizleme beyazdır.
+
+## 96. TableView Sıralaması ve Uygulama Kaynakları (v2.9 geliştirme)
+
+Bu bölümü uygulayan derleyici hâlâ 2.8.0 sürümünü bildirir.
+
+```text
+TableView.sort(column: Int, descending: Bool := false) -> Nothing
+TableView.sortedColumn() -> Int?
+TableView.sortDescending() -> Bool
+GUI.resource(name: String) -> String
+```
+
+`sort` geçerli satırları bir sütuna göre sıralar. `descending` false artan
+sıradır. Hücreler String olarak Unicode kod noktası sırasında karşılaştırılır.
+Karşılaştırma büyük-küçük harfe duyarlıdır, sayısal değildir ve yerel ayara
+bağlı değildir: artan sırada `""` diğer her String'den önce gelir ve `"10"`,
+`"2"`den önce gelir. Eşit hücreler şu anki göreli sırasını korur. Seçili satır
+aynı satır kalır ve yeni indeksine taşınır. `sort`, `onSelect` çağırmaz. Bir
+başlık tıklaması aynı sırayı kullanır: bir sütuna ilk tıklama artan, aynı
+sütuna sonraki tıklama azalan sıralar; başka bir sütuna tıklama artan sıralar.
+Devre dışı bir TableView başlık tıklamasını yok sayar. `sortedColumn`, tablo
+sıralanana kadar null'dır. `setRows` sıralamayı korur ve yeni satırlara
+uygular. Yeni veride seçili indeksteki satır seçili kalır, sonra sıralamayla
+taşınır. `rows` ekrandaki sırayı döndürür.
+
+`GUI.resource`, uygulamanın kaynak klasöründeki bir dosyanın kurallı mutlak
+yolunu döndürür. `name` bu klasöre görelidir. Mutlak bir yol, boş bir yol
+veya `..` içeren bir yol `GUIError` fırlatır; eksik bir dosya veya bir dizin
+de öyle. Klasörün kendisi ve dosya, sembolik bağlantılar çözülerek bulunur.
+Bir bağlantı, dosyanın kurallı yolu klasörün kurallı yolunun içinde
+kaldığında kabul edilir. Dışarıyı gösteren bir bağlantı ve hedefi olmayan
+bir bağlantı `GUIError` fırlatır. Klasör çalışma dizini değildir ve
+kullanıcının ev dizini değildir. `ahdcode run` giriş modülünün yanındaki
+`resources` dizinini kullanır. Paketlenmiş bir macOS uygulaması,
+yürütülebilir dosyasının yanında `Contents/Resources/app` kullanır.
+Paketlenmiş bir Windows veya Linux uygulaması, `runtime` dizinini değil,
+yürütülebilir dosyanın yanındaki `resources` dizinini kullanır. `image`
+değişmez: göreli bir resim yolu hâlâ çalışma dizinidir.
+
+Satır kaydıran bir Label'ın yüksekliği, kaydırma genişliğindeki satır
+sayısıdır. Pencere veya bir kaydırma görünümü daha dar olduğunda Label o
+genişlikte yeniden ölçülür ve altındaki bileşenler yeni yükseklikten sonra
+yerleştirilir. En küçük genişliğinden veya en geniş grafik kümesinden daha
+dar olmaz ve kaydırmayan bir bileşen ölçülen genişliğini korur. Bir kutu,
+kendisine verilen yükseklikten dar olursa çizim ölçülen satır sonlarını
+korur.
 
 ---
 

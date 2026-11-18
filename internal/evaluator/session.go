@@ -10,6 +10,8 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"sync"
+	"sync/atomic"
 
 	"ahdcode/internal/ir"
 )
@@ -35,6 +37,10 @@ type Session struct {
 	identities   map[any]int64
 	nextIdentity int64
 	regexCache   map[string]*regexp.Regexp
+	// mu, owner, and depth keep one evaluation at a time. See checkpoint.go.
+	mu    sync.Mutex
+	owner atomic.Int64
+	depth atomic.Int64
 }
 
 type ExecutionResult struct {
@@ -122,6 +128,8 @@ func (session *Session) Execute(compilation *ir.Compilation, entryOffset int) (r
 	if compilation == nil {
 		return ExecutionResult{Failure: &RuntimeError{Name: "Error", Message: "nil IR compilation"}}
 	}
+	session.enter()
+	defer session.leave()
 	session.install(compilation)
 	entry := session.modules[compilation.Entry]
 	if entry == nil {

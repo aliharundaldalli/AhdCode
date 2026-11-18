@@ -44,6 +44,10 @@ const (
 
 	// maxAreaRunes bounds a TextArea's text.
 	maxAreaRunes = 100_000
+	// maxClipboardRunes matches the runtime's GUI clipboard limit.
+	maxClipboardRunes = 100_000
+	// maxUndo bounds the editing history of one text widget.
+	maxUndo = 100
 	// maxItems bounds a ListBox's or Select's items and maxItemRunes each
 	// item's text.
 	maxItems     = 20_000
@@ -81,6 +85,13 @@ type request struct {
 	Part    string `json:"part,omitempty"`
 	Color   string `json:"color,omitempty"`
 	Enabled *bool  `json:"enabled,omitempty"`
+	Visible *bool  `json:"visible,omitempty"`
+	// Size and Bold style a Label: Size is small, normal, large, or title.
+	Size string `json:"size,omitempty"`
+	Bold *bool  `json:"bold,omitempty"`
+	// Clip replaces the window's text clipboard. A pointer distinguishes an
+	// empty clipboard from a request that does not touch it.
+	Clip *string `json:"clip,omitempty"`
 
 	// Items are a ListBox's or Select's texts; Columns and Rows a
 	// TableView's header and cells. Selected is a selection index, -1 for
@@ -96,6 +107,15 @@ type request struct {
 	Name       string   `json:"name,omitempty"`
 	Extensions []string `json:"extensions,omitempty"`
 	Answer     *answer  `json:"answer,omitempty"`
+
+	// Drawing fields for an embedded Canvas. See the runtime request.
+	X       float64 `json:"x,omitempty"`
+	Y       float64 `json:"y,omitempty"`
+	X2      float64 `json:"x2,omitempty"`
+	Y2      float64 `json:"y2,omitempty"`
+	Radius  float64 `json:"radius,omitempty"`
+	StrokeW float64 `json:"stroke,omitempty"`
+	Fill    string  `json:"fill,omitempty"`
 }
 
 // value is one reading of a widget the user can change: a text field's text,
@@ -117,7 +137,10 @@ type response struct {
 	Widget   int64   `json:"widget,omitempty"`
 	Text     *string `json:"text,omitempty"`
 	Checked  *bool   `json:"checked,omitempty"`
+	Enabled  *bool   `json:"enabled,omitempty"`
 	Selected *int    `json:"selected,omitempty"`
+	// Rows is a TableView's current cells, sent for a get of kind "rows".
+	Rows [][]string `json:"rows,omitempty"`
 	// Values are the final readings of every widget the user can change,
 	// sent when the window closes, so a program can still read them after
 	// wait returns.
@@ -147,6 +170,11 @@ type event struct {
 	Width    int     `json:"width,omitempty"`
 	Height   int     `json:"height,omitempty"`
 	Values   []value `json:"values,omitempty"`
+	// X and Y are a pointer position in a script, in window pixels, and a
+	// Canvas position on the way out. Timer selects one scripted timer.
+	X     float64 `json:"x,omitempty"`
+	Y     float64 `json:"y,omitempty"`
+	Timer int64   `json:"timer,omitempty"`
 }
 
 var errRequestTooLarge = errors.New("request exceeds the protocol size limit")
@@ -226,11 +254,21 @@ func validateOpen(first request) error {
 	for _, scripted := range first.Script {
 		switch {
 		case scripted.Event == "click" || scripted.Event == "toggle":
+		case scripted.Event == "sort" && scripted.Widget > 0 && scripted.Selected != nil && *scripted.Selected >= 0:
 		case scripted.Event == "type" && validAreaText(scripted.Text, maxAreaRunes):
 		case scripted.Event == "select" && scripted.Selected != nil && *scripted.Selected >= -1:
 		case scripted.Event == "resize" && scripted.Width >= 1 && scripted.Width <= maxDimension &&
 			scripted.Height >= 1 && scripted.Height <= maxDimension:
 		case scripted.Event == "key" && keyNameKnown(scripted.Key):
+		case scripted.Event == "edit" && editActionKnown(scripted.Key):
+		case scripted.Event == "menu" && scripted.Widget > 0:
+		case scripted.Event == "focus" && scripted.Widget > 0:
+		case scripted.Event == "shortcut" && scripted.Key != "":
+			if _, err := canonicalMenuShortcut(scripted.Key); err != nil {
+				return errors.New("invalid scripted event")
+			}
+		case scripted.Event == "tick":
+		case (scripted.Event == "move" || scripted.Event == "drag") && scripted.Widget > 0:
 		default:
 			return errors.New("invalid scripted event")
 		}

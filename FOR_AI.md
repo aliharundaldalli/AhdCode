@@ -714,7 +714,9 @@ Since v1.9.0: `window.setBackground(color)` and
 `setEnabled(enabled)`/`isEnabled()` on a Button, TextInput, and Checkbox.
 Colors use the Graphics spellings only (nine lower-case names, `#RRGGBB`,
 `#RRGGBBAA`); anything else raises `GUIError`. Do not invent `setFont`,
-`setStyle`, themes, `setVisible`, or `setEnabled` on a Label or Container.
+`setStyle`, themes, or `setEnabled` on a Label or Container. `setVisible`
+exists and is described in the GUI guide: a hidden control leaves the layout,
+and a disabled control stays visible and keeps its place.
 `chart.show()` and `figure.show()` open AhdCode's own interactive viewer
 (zoom, pan, Q/E quarter turns, R reset, Escape) and return once it is open;
 the viewer never changes the Chart, Figure, or a later `save()`. There is no
@@ -736,9 +738,9 @@ and text areas take extra space. Dialogs: `GUI.openFile(title, extensions)`,
 `openFiles`, `selectFolder`, `saveFile(title, suggestedName, extensions)`
 return `String?` (null on cancel; `openFiles` an empty List), and
 `GUI.message(title, text)`/`GUI.confirm(title, text) -> Bool`; extensions are
-plain like `"csv"`, never `"*.csv"`. Do not invent tree views, tabs, menus,
-editable cells, sorting APIs, `setVisible`, radio buttons, themes, threads,
-or async. `Plot.surface(x, y, z: Matrix)` (z: one row per y, one column per
+plain like `"csv"`, never `"*.csv"`. Do not invent tree views, editable
+cells, themes, threads, or async. Tabs, menus, radio buttons, `setVisible`,
+and TableView sorting are described in the GUI guide. `Plot.surface(x, y, z: Matrix)` (z: one row per y, one column per
 x) returns an immutable `Surface` with `title`, `xLabel`, `yLabel`,
 `zLabel`, `size`, `wireframe`, `save` (PNG only), and `show`; there is no
 camera API, mesh, or 3D scatter. `ahdcode package app.ahd --name App` makes a

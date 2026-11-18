@@ -1,0 +1,65 @@
+bring GUI
+from GUI bring (Window, Container, Tabs, RadioGroup, Progress, DateField, Label, Button, TextInput, Menu, MenuItem)
+
+window: Window := GUI.window("Controls", 480, 460)
+file: Menu := window.menu("File")
+quit: MenuItem := file.item("Quit", "Q")
+
+closeWindow: Function := () -> Nothing {
+    window: Global Window
+    window.close()
+}
+quit.onClick(closeWindow)
+
+form: Container := window.column()
+tabs: Tabs := form.tabs()
+setup: Container := tabs.page("Setup")
+notes: Container := tabs.page("Notes")
+
+setup.label("Size")
+group: RadioGroup := setup.radioGroup()
+group.option("Small")
+group.option("Medium")
+group.option("Large")
+group.select(1)
+
+bar: Progress := setup.progress(maximum: 100)
+
+addTen: Function := () -> Nothing {
+    bar: Global Progress
+    next: Local Int := bar.value() + 10
+    if next > bar.maximum() {
+        next = bar.maximum()
+    }
+    bar.setValue(next)
+}
+add: Button := setup.button("Add 10")
+add.onClick(addTen)
+
+toggleMotion: Function := () -> Nothing {
+    bar: Global Progress
+    bar.setIndeterminate(not bar.isIndeterminate())
+}
+motion: Button := setup.button("Toggle motion")
+motion.onClick(toggleMotion)
+
+when: DateField := setup.date(2024, 2, 29)
+chosen: Label := setup.label("Medium")
+shown: Label := setup.label("2024-2-29")
+
+showSize: Function := (index: Int?, text: String?) -> Nothing {
+    chosen: Global Label
+    if text != null {
+        chosen.setText(text)
+    }
+}
+showDate: Function := (year: Int, month: Int, day: Int) -> Nothing {
+    shown: Global Label
+    shown.setText("{year}-{month}-{day}")
+}
+group.onChange(showSize)
+when.onChange(showDate)
+
+notes.label("A note")
+notes.textInput(placeholder: "type here")
+window.wait()

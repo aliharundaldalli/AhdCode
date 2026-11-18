@@ -532,6 +532,12 @@ func RunProgramObserved(entryPath string, arguments []string, stdin io.Reader, s
 	command.Stdin = stdin
 	command.Stdout = stdout
 	command.Stderr = stderr
+	command.Env = os.Environ()
+	if os.Getenv("AHDCODE_RESOURCE_ROOT") == "" {
+		if directory, err := filepath.Abs(filepath.Dir(entryPath)); err == nil {
+			command.Env = append(command.Env, "AHDCODE_RESOURCE_ROOT="+filepath.Join(directory, "resources"))
+		}
+	}
 	if err := command.Start(); err != nil {
 		result.Diagnostics = append(result.Diagnostics, launchFailure(executable, err))
 		return 1, result

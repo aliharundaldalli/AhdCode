@@ -434,3 +434,128 @@ write("typed {name.text()}")
 		t.Fatalf("a packaged program used a helper from outside: %q", out)
 	}
 }
+
+func TestPackageCopiesImageResources(t *testing.T) {
+	folder := t.TempDir()
+	entry := filepath.Join(folder, "app.ahd")
+	writeFile(t, entry, "write(\"ok\")\n", 0o644)
+	writeFile(t, filepath.Join(folder, "resources", "icons", "mark.png"), "png", 0o644)
+	output := t.TempDir()
+	result := Package(Options{Entry: entry, Name: "Ledger", Output: output})
+	if result.Application == "" {
+		t.Fatalf("%+v", result.Diagnostics)
+	}
+	if layoutFor("Ledger", Targets["windows-x64"]).assets != "resources" || layoutFor("Ledger", Targets["linux-x64"]).assets != "resources" {
+		t.Fatal("Windows and Linux images are not in resources beside the program")
+	}
+	if strings.HasPrefix(HostTarget(), "macos") && layoutFor("Ledger", Targets[HostTarget()]).assets != "Contents/Resources/app" {
+		t.Fatal("macOS images are not in Contents/Resources/app")
+	}
+	imagePath := filepath.Join(result.Application, layoutFor("Ledger", Targets[HostTarget()]).assets, "icons", "mark.png")
+	if data, err := os.ReadFile(imagePath); err != nil || string(data) != "png" {
+		t.Fatalf("bundled image: %v %q", err, data)
+	}
+	rejected := filepath.Join(folder, "resources", "notes.txt")
+	writeFile(t, rejected, "no", 0o644)
+	failed := Package(Options{Entry: entry, Name: "Ledger", Output: t.TempDir()})
+	if failed.Application != "" || len(failed.Diagnostics) == 0 || !strings.Contains(failed.Diagnostics[0].Message, "notes.txt") {
+		t.Fatalf("a non-image resource was packaged: %+v", failed.Diagnostics)
+	}
+}
+
+func TestResourceCopyRejectsSymlinks(t *testing.T) {
+	t.Run("nested file", func(t *testing.T) {
+		project := t.TempDir()
+		entry := filepath.Join(project, "main.ahd")
+		writeFile(t, filepath.Join(project, "resources", "icons", "mark.png"), "png", 0o644)
+		destination := t.TempDir()
+		if err := copyImageResources(entry, destination); err != nil {
+			t.Fatal(err)
+		}
+		if data, err := os.ReadFile(filepath.Join(destination, "icons", "mark.png")); err != nil || string(data) != "png" {
+			t.Fatalf("nested image: %v %q", err, data)
+		}
+	})
+	t.Run("link to an outside file", func(t *testing.T) {
+		project, destination := resourceProject(t)
+		outside := filepath.Join(t.TempDir(), "secret.png")
+		writeFile(t, outside, "secret", 0o644)
+		if err := os.Symlink(outside, filepath.Join(project, "resources", "icons", "escape.png")); err != nil {
+			t.Fatal(err)
+		}
+		err := copyImageResources(filepath.Join(project, "main.ahd"), destination)
+		if err == nil || !strings.Contains(err.Error(), "escape.png") || !strings.Contains(err.Error(), "symbolic link") {
+			t.Fatalf("file link: %v", err)
+		}
+		if resourceTreeContains(t, destination, "secret") {
+			t.Fatal("an outside file was copied")
+		}
+	})
+	t.Run("link to an outside folder", func(t *testing.T) {
+		project, destination := resourceProject(t)
+		outside := t.TempDir()
+		writeFile(t, filepath.Join(outside, "mark.png"), "secret", 0o644)
+		if err := os.Symlink(outside, filepath.Join(project, "resources", "linked")); err != nil {
+			t.Fatal(err)
+		}
+		err := copyImageResources(filepath.Join(project, "main.ahd"), destination)
+		if err == nil || !strings.Contains(err.Error(), "symbolic link") {
+			t.Fatalf("directory link: %v", err)
+		}
+		if resourceTreeContains(t, destination, "secret") {
+			t.Fatal("an outside folder was copied")
+		}
+	})
+	t.Run("link that stays inside", func(t *testing.T) {
+		project, destination := resourceProject(t)
+		if err := os.Symlink("mark.png", filepath.Join(project, "resources", "icons", "alias.png")); err != nil {
+			t.Fatal(err)
+		}
+		err := copyImageResources(filepath.Join(project, "main.ahd"), destination)
+		if err == nil || !strings.Contains(err.Error(), "alias.png") {
+			t.Fatalf("inside link: %v", err)
+		}
+		if _, err := os.Stat(filepath.Join(destination, "icons", "alias.png")); !os.IsNotExist(err) {
+			t.Fatal("an inside symbolic link was copied")
+		}
+	})
+	t.Run("resources folder is a link", func(t *testing.T) {
+		project := t.TempDir()
+		real := t.TempDir()
+		writeFile(t, filepath.Join(real, "icons", "mark.png"), "secret", 0o644)
+		if err := os.Symlink(real, filepath.Join(project, "resources")); err != nil {
+			t.Fatal(err)
+		}
+		destination := t.TempDir()
+		err := copyImageResources(filepath.Join(project, "main.ahd"), destination)
+		if err == nil || !strings.Contains(err.Error(), "resources is a symbolic link") {
+			t.Fatalf("folder link: %v", err)
+		}
+		if resourceTreeContains(t, destination, "secret") {
+			t.Fatal("a linked resources folder was copied")
+		}
+	})
+}
+
+func resourceProject(t *testing.T) (string, string) {
+	t.Helper()
+	project := t.TempDir()
+	writeFile(t, filepath.Join(project, "resources", "icons", "mark.png"), "png", 0o644)
+	return project, t.TempDir()
+}
+
+func resourceTreeContains(t *testing.T, root, text string) bool {
+	t.Helper()
+	found := false
+	_ = filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
+		if err != nil || entry.IsDir() {
+			return nil
+		}
+		data, readErr := os.ReadFile(path)
+		if readErr == nil && strings.Contains(string(data), text) {
+			found = true
+		}
+		return nil
+	})
+	return found
+}

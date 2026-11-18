@@ -148,17 +148,27 @@ func (m *model) wheel(x, y int, dx, dy float64) bool {
 		return true
 	}
 	id := m.hit(x, y)
-	if id == 0 || !m.widgets[id].scrolling() || m.widgets[id].disabled {
-		return false
+	if id != 0 && m.widgets[id].scrolling() {
+		if m.widgets[id].disabled {
+			return false
+		}
+		target := m.widgets[id]
+		target.scrollY -= int(dy * notch)
+		if target.kind == kindTable {
+			target.scrollX -= int(dx * notch)
+		}
+		m.clampScroll(target)
+		m.dirty = true
+		return true
 	}
-	target := m.widgets[id]
-	target.scrollY -= int(dy * notch)
-	if target.kind == kindTable {
-		target.scrollX -= int(dx * notch)
+	if scroll := m.scrollUnder(x, y); scroll != nil {
+		scroll.scrollY -= int(dy * float64(notch))
+		scroll.scrollX -= int(dx * float64(notch))
+		m.clampScrollContainer(scroll)
+		m.dirty = true
+		return true
 	}
-	m.clampScroll(target)
-	m.dirty = true
-	return true
+	return false
 }
 
 // ---- the Select's open list ------------------------------------------------
@@ -276,57 +286,6 @@ func areaOffset(text []rune, line, column int) int {
 	return offset + min(max(column, 0), len(lines[line]))
 }
 
-// editArea applies an editing or caret key to a TextArea.
-func (m *model) editArea(target *widget, key string) {
-	line, column := areaPosition(target.text, target.caret)
-	switch key {
-	case "Enter":
-		if len(target.text) < maxAreaRunes {
-			target.text = append(target.text[:target.caret], append([]rune{'\n'}, target.text[target.caret:]...)...)
-			target.caret++
-			m.noteChange(target.id)
-		}
-	case "Backspace":
-		if target.caret > 0 {
-			target.text = append(target.text[:target.caret-1], target.text[target.caret:]...)
-			target.caret--
-			m.noteChange(target.id)
-		}
-	case "Delete":
-		if target.caret < len(target.text) {
-			target.text = append(target.text[:target.caret], target.text[target.caret+1:]...)
-			m.noteChange(target.id)
-		}
-	case "ArrowLeft":
-		target.caret = max(target.caret-1, 0)
-	case "ArrowRight":
-		target.caret = min(target.caret+1, len(target.text))
-	case "ArrowUp":
-		target.caret = areaOffset(target.text, line-1, column)
-		if line == 0 {
-			target.caret = 0
-		}
-	case "ArrowDown":
-		lines := areaLines(target.text)
-		target.caret = areaOffset(target.text, line+1, column)
-		if line == len(lines)-1 {
-			target.caret = len(target.text)
-		}
-	case "Home":
-		target.caret = areaOffset(target.text, line, 0)
-	case "End":
-		target.caret = areaOffset(target.text, line, 1<<30)
-	case "PageUp":
-		target.caret = areaOffset(target.text, line-pageItems, column)
-	case "PageDown":
-		target.caret = areaOffset(target.text, line+pageItems, column)
-	default:
-		return
-	}
-	m.revealCaret(target)
-	m.dirty = true
-}
-
 // revealCaret scrolls a TextArea vertically so its caret line is visible;
 // the horizontal scroll follows the caret when the TextArea is drawn.
 func (m *model) revealCaret(target *widget) {
@@ -345,23 +304,24 @@ func (m *model) revealCaret(target *widget) {
 	m.clampScroll(target)
 }
 
-// placeAreaCaret moves a TextArea's caret to a clicked point.
-func (m *model) placeAreaCaret(target *widget, x, y int) {
+// areaCaretAt is the rune offset nearest a clicked point in a TextArea.
+func (m *model) areaCaretAt(target *widget, x, y int) int {
 	v := m.viewportOf(target)
 	lines := areaLines(target.text)
 	line := min(max((y-v.y+target.scrollY)/lineHeight, 0), len(lines)-1)
 	want := x - v.x + int(float64(target.scroll)/max(m.scale, 1))
 	column := 0
 	for column < len(lines[line]) {
-		next := m.measure(string(lines[line][:column+1]))
-		if next > want {
+		next := clusterEnd(lines[line], column)
+		width := m.measure(string(lines[line][:next]))
+		if width > want {
 			previous := m.measure(string(lines[line][:column]))
-			if want-previous > next-want {
-				column++
+			if want-previous > width-want {
+				column = next
 			}
 			break
 		}
-		column++
+		column = next
 	}
-	target.caret = areaOffset(target.text, line, column)
+	return snapCluster(target.text, areaOffset(target.text, line, column))
 }

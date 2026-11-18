@@ -30,6 +30,22 @@ save: Button := form.button("Save")
 save.setForeground("white")
 save.setBackground("#0066CCFF")
 write("enabled by default {save.isEnabled()} {name.isEnabled()} {paid.isEnabled()}")
+write("visible {title.isVisible()} {form.isVisible()} {save.isVisible()}")
+title.setSize("title")
+title.setBold(true)
+form.setVisible(false)
+write("form hidden {form.isVisible()} {title.isVisible()}")
+form.setVisible(true)
+save.setVisible(false)
+write("save hidden {save.isVisible()} {title.isVisible()}")
+save.setVisible(true)
+GUI.setClipboard("defter")
+write("clip {GUI.clipboard()}")
+attempt {
+    title.setSize("huge")
+} except GUIError as error {
+    write(error.message)
+}
 for bad in ["Red", "purple", "#fff", ""] {
     attempt {
         save.setBackground(bad)
@@ -80,6 +96,11 @@ attempt {
 } except GUIError as error {
     write("after close: " + error.message)
 }
+attempt {
+    save.setVisible(false)
+} except GUIError as error {
+    write("after close: " + error.message)
+}
 `
 
 const guiStyleScript = `[{"event":"click","widget":5},{"event":"type","widget":3,"text":"ignored"},{"event":"toggle","widget":4},` +
@@ -87,6 +108,11 @@ const guiStyleScript = `[{"event":"click","widget":5},{"event":"type","widget":3
 	`{"event":"click","widget":5},{"event":"key","key":"Escape"}]`
 
 const guiStyleExpected = `enabled by default true true true
+visible true true true
+form hidden false false
+save hidden false true
+clip defter
+label size must be "small", "normal", "large", or "title"
 unsupported background color "Red"; use black, white, red, green, blue, yellow, cyan, magenta, gray, #RRGGBB, or #RRGGBBAA
 unsupported background color "purple"; use black, white, red, green, blue, yellow, cyan, magenta, gray, #RRGGBB, or #RRGGBBAA
 unsupported background color "#fff"; use black, white, red, green, blue, yellow, cyan, magenta, gray, #RRGGBB, or #RRGGBBAA
@@ -95,6 +121,7 @@ disabled false false false [programmatic] true
 enabled again true true true
 saved [programmatic!] false
 after close true [programmatic!] false
+after close: the Window is closed
 after close: the Window is closed
 after close: the Window is closed
 `

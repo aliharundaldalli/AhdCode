@@ -1168,6 +1168,9 @@ func (generator *generator) builtinCall(value *ir.CallExpr) string {
 		if strings.HasPrefix(name, "Surface.") {
 			return generator.plotSurfaceOperation(name, value)
 		}
+		if strings.HasPrefix(name, "Canvas.") && generator.guiCanvasReceiver(value) {
+			return generator.guiOperation(name, value)
+		}
 		if strings.HasPrefix(name, "Canvas.") || strings.HasPrefix(name, "Turtle.") {
 			return generator.graphicsOperation(name, value)
 		}

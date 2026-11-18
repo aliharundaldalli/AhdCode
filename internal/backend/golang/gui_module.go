@@ -14,9 +14,20 @@ func guiHandleField(name string) ir.FieldID {
 	return ir.FieldID("builtin:GUI::class::" + name + "::field::handle")
 }
 
+// guiCanvasReceiver reports a call on GUI's Canvas. Graphics has a class of
+// the same name, and its members are lowered first unless the receiver is
+// the GUI class.
+func (generator *generator) guiCanvasReceiver(value *ir.CallExpr) bool {
+	if value.Callee == nil {
+		return false
+	}
+	return value.Callee.ExprMeta().Type.Class == guiClass("Canvas")
+}
+
 // guiClassNames are the GUI Classes whose members are type operations.
 var guiClassNames = []string{"Window.", "Container.", "Label.", "Button.", "TextInput.", "Checkbox.",
-	"ListBox.", "Select.", "TextArea.", "PasswordInput.", "TableView."}
+	"ListBox.", "Menu.", "MenuItem.", "Select.", "TextArea.", "PasswordInput.", "TableView.", "Image.",
+	"Tabs.", "RadioGroup.", "RadioButton.", "Progress.", "DateField.", "Canvas.", "Task."}
 
 // isGUIOperation reports whether a type operation belongs to a GUI Class.
 func isGUIOperation(name string) bool {
@@ -56,6 +67,14 @@ func (generator *generator) guiCall(value *ir.CallExpr) string {
 		return "AhdGUIMessageChecked(" + arguments.text(0, `""`) + ", " + arguments.text(1, `""`) + ")"
 	case "confirm":
 		return "AhdGUIConfirmChecked(" + arguments.text(0, `""`) + ", " + arguments.text(1, `""`) + ")"
+	case "clipboard":
+		return "AhdGUIClipboard()"
+	case "setClipboard":
+		return "AhdGUISetClipboardChecked(" + arguments.text(0, `""`) + ")"
+	case "checkpoint":
+		return "AhdGUICheckpointChecked()"
+	case "resource":
+		return "AhdGUIResourceChecked(" + arguments.text(0, `""`) + ")"
 	}
 	return generator.unsupported("GUI function "+name, meta.Span)
 }
@@ -81,15 +100,38 @@ func (generator *generator) guiOperation(name string, value *ir.CallExpr) string
 		return generator.value(value.Arguments[index].Value, ir.Type{Kind: ir.BoolType}, false)
 	}
 	child := func(className, call string) string { return generator.graphicsValue(guiClass(className), call, meta) }
-	handler := func(params ...ir.Type) string {
+	handlerAt := func(index int, params ...ir.Type) string {
+		if index >= len(value.Arguments) || value.Arguments[index].Value == nil {
+			return generator.unsupported(name+" with a malformed argument list", meta.Span)
+		}
+		return generator.adaptHandler(value.Arguments[index].Value, params...)
+	}
+	handler := func(params ...ir.Type) string { return handlerAt(0, params...) }
+	// taskWork runs the function on the task goroutine and turns a raised
+	// Error into the problem string. asIs passes a nullable callback through
+	// unchanged, because its parameters are already pointers.
+	taskWork := func() string {
 		if len(value.Arguments) != 1 || value.Arguments[0].Value == nil {
 			return generator.unsupported(name+" with a malformed argument list", meta.Span)
 		}
-		return generator.adaptHandler(value.Arguments[0].Value, params...)
+		call := generator.expr(value.Arguments[0].Value) + "()"
+		// A Function value returns a nullable Int, so the task reads the
+		// pointer. Null becomes a reported problem rather than a zero result.
+		return "func() (result int64, problem string) { func() { defer func() { if recovered := recover(); recovered != nil { problem = AhdSignalOf(recovered).Message } }(); if value := " + call + "; value != nil { result = *value } else if problem == \"\" { problem = \"the background task returned null\" } }(); return }"
+	}
+	asIs := func() string {
+		if len(value.Arguments) != 1 || value.Arguments[0].Value == nil {
+			return generator.unsupported(name+" with a malformed argument list", meta.Span)
+		}
+		return generator.expr(value.Arguments[0].Value)
 	}
 	switch name {
 	case "Window.column", "Window.row":
 		return child("Container", "AhdGUIRootChecked("+handle+", "+`"`+strings.TrimPrefix(name, "Window.")+`", `+arguments.integer(0, "int64(8)")+", "+arguments.integer(1, "int64(12)")+")")
+	case "Window.scroll":
+		return child("Container", "AhdGUIRootChecked("+handle+`, "scroll", `+arguments.integer(0, "int64(8)")+", "+arguments.integer(1, "int64(12)")+")")
+	case "Window.grid":
+		return child("Container", "AhdGUIGridChecked("+handle+", true, "+arguments.integer(0, "int64(1)")+", "+arguments.integer(1, "int64(8)")+", "+arguments.integer(2, "int64(8)")+")")
 	case "Window.onKey":
 		return check("AhdGUIOnKey(" + handle + ", " + handler(ir.Type{Kind: ir.StringType}) + ")")
 	case "Window.wait":
@@ -102,8 +144,14 @@ func (generator *generator) guiOperation(name string, value *ir.CallExpr) string
 		return check("AhdGUISetTitle(" + handle + ", " + arguments.text(0, `""`) + ")")
 	case "Container.column", "Container.row":
 		return child("Container", "AhdGUIContainerLayoutChecked("+handle+", "+`"`+strings.TrimPrefix(name, "Container.")+`", `+arguments.integer(0, "int64(8)")+", "+arguments.integer(1, "int64(0)")+")")
+	case "Container.scroll":
+		return child("Container", "AhdGUIContainerLayoutChecked("+handle+`, "scroll", `+arguments.integer(0, "int64(8)")+", "+arguments.integer(1, "int64(0)")+")")
+	case "Container.grid":
+		return child("Container", "AhdGUIGridChecked("+handle+", false, "+arguments.integer(0, "int64(1)")+", "+arguments.integer(1, "int64(8)")+", "+arguments.integer(2, "int64(8)")+")")
 	case "Container.label":
 		return child("Label", "AhdGUIAddLeafChecked("+handle+`, "label", `+arguments.text(0, `""`)+`, "", false)`)
+	case "Container.image":
+		return child("Image", "AhdGUIAddImageChecked("+handle+", "+arguments.text(0, `""`)+", "+arguments.integer(1, "int64(0)")+", "+arguments.integer(2, "int64(0)")+")")
 	case "Container.button":
 		return child("Button", "AhdGUIAddLeafChecked("+handle+`, "button", `+arguments.text(0, `""`)+`, "", false)`)
 	case "Container.textInput":
@@ -130,6 +178,36 @@ func (generator *generator) guiOperation(name string, value *ir.CallExpr) string
 		return check("AhdGUISetEnabled(" + handle + ", " + flag(0, "true") + ")")
 	case "Button.isEnabled", "TextInput.isEnabled", "Checkbox.isEnabled":
 		return "AhdGUIIsEnabledChecked(" + handle + ")"
+	case "Window.every":
+		return "AhdGUIEveryChecked(" + handle + ", " + arguments.integer(0, "int64(0)") + ", " + handlerAt(1) + ")"
+	case "Window.cancel":
+		return check("AhdGUICancel(" + handle + ", " + arguments.integer(0, "int64(0)") + ")")
+	case "Window.task":
+		return child("Task", "AhdGUITaskChecked("+handle+", "+taskWork()+")")
+	case "Task.onDone":
+		return check("AhdGUITaskOnDone(" + handle + ", " + asIs() + ")")
+	case "Task.cancel":
+		return check("AhdGUITaskCancel(" + handle + ")")
+	case "Task.cancelled":
+		return "AhdGUITaskCancelledChecked(" + handle + ")"
+	case "Container.canvas":
+		return child("Canvas", "AhdGUIAddCanvasChecked("+handle+", "+arguments.integer(0, "int64(240)")+", "+arguments.integer(1, "int64(160)")+")")
+	case "Canvas.clear":
+		return check("AhdGUICanvasDraw(" + handle + `, "clear", 0, 0, 0, 0, 0, 0, ` + arguments.text(0, `""`) + `, "", "")`)
+	case "Canvas.line":
+		return check("AhdGUICanvasDraw(" + handle + `, "line", ` + arguments.real(0, "0") + ", " + arguments.real(1, "0") + ", " + arguments.real(2, "0") + ", " + arguments.real(3, "0") + ", 0, " + arguments.real(5, "1") + ", " + arguments.text(4, `"black"`) + `, "", "")`)
+	case "Canvas.rectangle":
+		return check("AhdGUICanvasDraw(" + handle + `, "rectangle", ` + arguments.real(0, "0") + ", " + arguments.real(1, "0") + ", " + arguments.real(2, "0") + ", " + arguments.real(3, "0") + ", 0, 1, " + arguments.text(4, `"black"`) + ", " + arguments.text(5, `""`) + `, "")`)
+	case "Canvas.circle":
+		return check("AhdGUICanvasDraw(" + handle + `, "circle", ` + arguments.real(0, "0") + ", " + arguments.real(1, "0") + ", 0, 0, " + arguments.real(2, "0") + ", 1, " + arguments.text(3, `"black"`) + ", " + arguments.text(4, `""`) + `, "")`)
+	case "Canvas.text":
+		return check("AhdGUICanvasDraw(" + handle + `, "text", ` + arguments.real(0, "0") + ", " + arguments.real(1, "0") + `, 0, 0, 0, ` + arguments.real(4, "16") + ", " + arguments.text(3, `"black"`) + `, "", ` + arguments.text(2, `""`) + ")")
+	case "Canvas.onMove":
+		return check("AhdGUICanvasOnMove(" + handle + ", " + handler(ir.Type{Kind: ir.RealType}, ir.Type{Kind: ir.RealType}) + ")")
+	case "Canvas.onClick":
+		return check("AhdGUICanvasOnClick(" + handle + ", " + handler(ir.Type{Kind: ir.RealType}, ir.Type{Kind: ir.RealType}) + ")")
+	case "Canvas.onDrag":
+		return check("AhdGUICanvasOnDrag(" + handle + ", " + handler(ir.Type{Kind: ir.RealType}, ir.Type{Kind: ir.RealType}) + ")")
 	}
 	if call, ok := generator.guiWidgetOperation(name, value, handle, arguments); ok {
 		return call
@@ -179,6 +257,28 @@ func (generator *generator) guiWidgetOperation(name string, value *ir.CallExpr, 
 	className := name[:strings.IndexByte(name, '.')]
 	member := name[strings.IndexByte(name, '.')+1:]
 	switch name {
+	case "Window.menu":
+		return child("Menu", "AhdGUIAddMenuChecked("+handle+", "+arguments.text(0, `""`)+", true)"), true
+	case "Menu.menu":
+		return child("Menu", "AhdGUIAddMenuChecked("+handle+", "+arguments.text(0, `""`)+", false)"), true
+	case "Menu.item":
+		return child("MenuItem", "AhdGUIMenuItemChecked("+handle+`, "item", `+arguments.text(0, `""`)+", "+arguments.text(1, `""`)+", false)"), true
+	case "Menu.checkItem":
+		return child("MenuItem", "AhdGUIMenuItemChecked("+handle+`, "check", `+arguments.text(0, `""`)+", "+arguments.text(1, `""`)+", "+flag(2, "false")+")"), true
+	case "Menu.separator":
+		return check("AhdGUIMenuSeparator(" + handle + ")"), true
+	case "MenuItem.onClick":
+		return check("AhdGUIOnMenu(" + handle + ", " + handler() + ")"), true
+	case "MenuItem.setEnabled":
+		return check("AhdGUIMenuSetEnabled(" + handle + ", " + flag(0, "true") + ")"), true
+	case "MenuItem.isEnabled":
+		return "AhdGUIMenuIsEnabledChecked(" + handle + ")", true
+	case "MenuItem.setChecked":
+		return check("AhdGUIMenuSetChecked(" + handle + ", " + flag(0, "false") + ")"), true
+	case "MenuItem.checked":
+		return "AhdGUIMenuCheckedChecked(" + handle + ")", true
+	case "MenuItem.setText":
+		return check("AhdGUIMenuSetText(" + handle + ", " + arguments.text(0, `""`) + ")"), true
 	case "Window.setResizable":
 		return check("AhdGUISetResizable(" + handle + ", " + flag(0, "true") + ")"), true
 	case "Window.isResizable":
@@ -207,6 +307,52 @@ func (generator *generator) guiWidgetOperation(name string, value *ir.CallExpr, 
 		return "AhdGUISelectChecked(" + handle + ", " + nullableInt(0) + ")", true
 	case "TableView.onSelect":
 		return check("AhdGUIOnRowSelect(" + handle + ", " + callback() + ")"), true
+	case "TableView.sort":
+		return "AhdGUISortChecked(" + handle + ", " + arguments.integer(0, "int64(0)") + ", " + flag(1, "false") + ")", true
+	case "TableView.sortedColumn":
+		return "AhdGUISortedColumnChecked(" + handle + ")", true
+	case "TableView.sortDescending":
+		return "AhdGUISortDescendingChecked(" + handle + ")", true
+	case "Container.tabs":
+		return child("Tabs", "AhdGUIAddTabsChecked("+handle+")"), true
+	case "Container.radioGroup":
+		return child("RadioGroup", "AhdGUIAddRadioGroupChecked("+handle+")"), true
+	case "Container.progress":
+		return child("Progress", "AhdGUIAddProgressChecked("+handle+", "+arguments.integer(0, "int64(100)")+")"), true
+	case "Container.date":
+		return child("DateField", "AhdGUIAddDateChecked("+handle+", "+arguments.integer(0, "int64(2000)")+", "+arguments.integer(1, "int64(1)")+", "+arguments.integer(2, "int64(1)")+")"), true
+	case "Tabs.page":
+		return child("Container", "AhdGUIAddPageChecked("+handle+", "+arguments.text(0, `""`)+")"), true
+	case "Tabs.select":
+		return check("AhdGUISelectTab(" + handle + ", " + arguments.integer(0, "int64(0)") + ")"), true
+	case "Tabs.selectedIndex":
+		return "AhdGUITabIndexChecked(" + handle + ")", true
+	case "Tabs.onChange":
+		return check("AhdGUIOnTabChange(" + handle + ", " + handler(ir.Type{Kind: ir.IntType}) + ")"), true
+	case "RadioGroup.option":
+		return child("RadioButton", "AhdGUIAddOptionChecked("+handle+", "+arguments.text(0, `""`)+")"), true
+	case "RadioButton.setText":
+		return check("AhdGUISetRadioText(" + handle + ", " + arguments.text(0, `""`) + ")"), true
+	case "Progress.setValue":
+		return check("AhdGUISetProgressValue(" + handle + ", " + arguments.integer(0, "int64(0)") + ")"), true
+	case "Progress.value":
+		return "AhdGUIProgressValueChecked(" + handle + ")", true
+	case "Progress.maximum":
+		return "AhdGUIProgressMaximumChecked(" + handle + ")", true
+	case "Progress.setIndeterminate":
+		return check("AhdGUISetProgressSpin(" + handle + ", " + flag(0, "false") + ")"), true
+	case "Progress.isIndeterminate":
+		return "AhdGUIProgressSpinChecked(" + handle + ")", true
+	case "DateField.setDate":
+		return check("AhdGUISetDate(" + handle + ", " + arguments.integer(0, "int64(0)") + ", " + arguments.integer(1, "int64(0)") + ", " + arguments.integer(2, "int64(0)") + ")"), true
+	case "DateField.year":
+		return "AhdGUIDateYearChecked(" + handle + ")", true
+	case "DateField.month":
+		return "AhdGUIDateMonthChecked(" + handle + ")", true
+	case "DateField.day":
+		return "AhdGUIDateDayChecked(" + handle + ")", true
+	case "DateField.onChange":
+		return check("AhdGUIOnDateChange(" + handle + ", " + handler(ir.Type{Kind: ir.IntType}, ir.Type{Kind: ir.IntType}, ir.Type{Kind: ir.IntType}) + ")"), true
 	}
 	switch className + "." + member {
 	case "TextInput.onChange", "PasswordInput.onChange", "TextArea.onChange":
@@ -219,13 +365,13 @@ func (generator *generator) guiWidgetOperation(name string, value *ir.CallExpr, 
 		return "AhdGUIItemsChecked(" + handle + ")", true
 	case "ListBox.setItems", "Select.setItems":
 		return "AhdGUISetItemsChecked(" + handle + ", " + list(0, "AhdNewList[string]()") + ")", true
-	case "ListBox.selectedIndex", "Select.selectedIndex":
+	case "ListBox.selectedIndex", "Select.selectedIndex", "RadioGroup.selectedIndex":
 		return "AhdGUISelectedIndexChecked(" + handle + ")", true
-	case "ListBox.selectedText", "Select.selectedText":
+	case "ListBox.selectedText", "Select.selectedText", "RadioGroup.selectedText":
 		return "AhdGUISelectedTextChecked(" + handle + ")", true
-	case "ListBox.select", "Select.select":
+	case "ListBox.select", "Select.select", "RadioGroup.select":
 		return "AhdGUISelectChecked(" + handle + ", " + nullableInt(0) + ")", true
-	case "ListBox.onChange", "Select.onChange":
+	case "ListBox.onChange", "Select.onChange", "RadioGroup.onChange":
 		return check("AhdGUIOnSelectionChange(" + handle + ", " + callback() + ")"), true
 	}
 	switch member {
@@ -237,6 +383,35 @@ func (generator *generator) guiWidgetOperation(name string, value *ir.CallExpr, 
 		return check("AhdGUISetEnabled(" + handle + ", " + flag(0, "true") + ")"), true
 	case "isEnabled":
 		return "AhdGUIIsEnabledChecked(" + handle + ")", true
+	case "setVisible":
+		visible := "true"
+		if arguments.present(0) {
+			visible = generator.value(value.Arguments[0].Value, ir.Type{Kind: ir.BoolType}, false)
+		}
+		return check("AhdGUISetVisible(" + handle + ", " + visible + ")"), true
+	case "isVisible":
+		return "AhdGUIIsVisibleChecked(" + handle + ")", true
+	case "setSize":
+		if className == "Image" {
+			return check("AhdGUISetImageSize(" + handle + ", " + arguments.integer(0, "int64(0)") + ", " + arguments.integer(1, "int64(0)") + ")"), true
+		}
+		return check("AhdGUISetLabelSize(" + handle + ", " + arguments.text(0, `""`) + ")"), true
+	case "setWrap":
+		return check("AhdGUISetWrap(" + handle + ", " + flag(0, "false") + ")"), true
+	case "setBold":
+		bold := "false"
+		if arguments.present(0) {
+			bold = generator.value(value.Arguments[0].Value, ir.Type{Kind: ir.BoolType}, false)
+		}
+		return check("AhdGUISetLabelBold(" + handle + ", " + bold + ")"), true
+	case "setMinWidth":
+		return check("AhdGUISetMinWidth(" + handle + ", " + arguments.integer(0, "int64(0)") + ")"), true
+	case "setPreferredWidth":
+		return check("AhdGUISetPreferredWidth(" + handle + ", " + arguments.integer(0, "int64(0)") + ")"), true
+	case "setAlign":
+		return check("AhdGUISetAlign(" + handle + ", " + arguments.text(0, `""`) + ", " + arguments.text(1, `""`) + ")"), true
+	case "setSpan":
+		return check("AhdGUISetSpan(" + handle + ", " + arguments.integer(0, "int64(1)") + ", " + arguments.integer(1, "int64(1)") + ")"), true
 	}
 	return "", false
 }

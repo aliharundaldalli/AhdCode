@@ -241,7 +241,7 @@ func TestDisabledWidgetsIgnoreTheUser(t *testing.T) {
 	if _, checked, _ := m.read(check); checked {
 		t.Fatal("clicking the re-enabled checked Checkbox did not uncheck it")
 	}
-	m.press(5, 70)
+	m.press(8+3*10, 70) // a click after "set" focuses the field and leaves the caret there
 	if !m.insert([]rune("!")) {
 		t.Fatal("a re-enabled TextInput")
 	}

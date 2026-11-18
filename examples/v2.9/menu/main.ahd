@@ -1,0 +1,41 @@
+// A window menu. Save reads the note and writes it on the label.
+// The shortcut is Command+S on macOS and Ctrl+S on Windows and Linux.
+// Write the key only: the platform command key is added for you.
+// While the note field is focused, Command/Ctrl+C still copies its
+// selection. A menu item does not take that chord.
+//
+// Run it with `ahdcode run main.ahd`.
+bring GUI
+from GUI bring (Window, Container, Label, TextInput, Menu, MenuItem)
+
+window: Window := GUI.window(title: "Notes", width: 420, height: 220)
+file: Menu := window.menu("File")
+save: MenuItem := file.item("Save", "S")
+file.separator()
+view: Menu := file.menu("View")
+bold: MenuItem := view.checkItem("Bold title", "", false)
+
+form: Container := window.column(spacing: 8, padding: 12)
+form.label("Note")
+note: TextInput := form.textInput(placeholder: "Write something")
+status: Label := form.label("Not saved")
+
+onSave: Function := () -> Nothing {
+    note: Global TextInput
+    status: Global Label
+    status.setText("Saved: " + note.text())
+}
+save.onClick(onSave)
+
+onBold: Function := () -> Nothing {
+    status: Global Label
+    bold: Global MenuItem
+    if bold.checked() {
+        status.setBold(true)
+    } else {
+        status.setBold(false)
+    }
+}
+bold.onClick(onBold)
+
+window.wait()

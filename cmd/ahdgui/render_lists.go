@@ -85,9 +85,23 @@ func drawTextArea(img *image.RGBA, face font.Face, f frame, w *widget, box image
 		w.scroll = caretX
 	}
 	first := w.scrollY / lineHeight
+	offset := 0
+	for index := 0; index < first && index < len(lines); index++ {
+		offset += len(lines[index]) + 1
+	}
 	for index := first; index < len(lines) && index*lineHeight-w.scrollY < v.h; index++ {
 		row := scaled(s, v.x, v.y+index*lineHeight-w.scrollY, v.w, lineHeight)
+		lineStart, lineEnd := offset, offset+len(lines[index])
+		selStart, selEnd := w.anchor, w.caret
+		if selStart > selEnd {
+			selStart, selEnd = selEnd, selStart
+		}
+		from, to := max(selStart, lineStart), min(selEnd, lineEnd)
+		if from < to {
+			paintSelection(img, face, view, view.Min.X, w.scroll, lines[index], from-lineStart, to-lineStart, row.Min.Y, row.Max.Y)
+		}
 		text(img, face, view, view.Min.X-w.scroll, row, string(lines[index]), foreground)
+		offset += len(lines[index]) + 1
 	}
 	if focused && f.caretVisible {
 		row := scaled(s, v.x, v.y+caretLine*lineHeight-w.scrollY, v.w, lineHeight)
@@ -175,6 +189,13 @@ func drawTable(img *image.RGBA, face font.Face, f frame, w *widget, box image.Re
 	}
 	for index, title := range w.columns {
 		cell := scaled(s, lefts[index], w.y+1, w.widths[index], headerHeight)
+		if index == w.sortColumn {
+			if w.sortDesc {
+				title += " v"
+			} else {
+				title += " ^"
+			}
+		}
 		text(img, face, cell.Intersect(header), cell.Min.X+inset, cell, title, foreground)
 		fill(img, scaled(s, lefts[index]+w.widths[index]-1, w.y+1, 1, headerHeight).Intersect(header), colorGrid)
 	}

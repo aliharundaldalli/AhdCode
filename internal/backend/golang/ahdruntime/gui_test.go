@@ -178,6 +178,51 @@ func TestGUIWidgetValues(t *testing.T) {
 	}
 }
 
+func TestGUIVisibilityLabelStyleAndClipboard(t *testing.T) {
+	ok := guiMust2(t)
+	window := openTestWindow(t, "")
+	root := ok(AhdGUIRoot(window, "column", 8, 0))
+	nested := ok(AhdGUIContainerLayout(root, "column", 0, 0))
+	label := ok(AhdGUIAddLeaf(nested, "label", "Hello", "", false))
+	button := ok(AhdGUIAddLeaf(root, "button", "Save", "", false))
+	if !guiBool(t)(AhdGUIIsVisible(label)) || !guiBool(t)(AhdGUIIsVisible(nested)) {
+		t.Fatal("widgets start visible")
+	}
+	if problem := AhdGUISetVisible(nested, false); problem != "" {
+		t.Fatal(problem)
+	}
+	if guiBool(t)(AhdGUIIsVisible(label)) || guiBool(t)(AhdGUIIsVisible(nested)) {
+		t.Fatal("a hidden Container left its Label visible")
+	}
+	if guiBool(t)(AhdGUIIsVisible(button)) == false {
+		t.Fatal("hiding one Container hid the Button")
+	}
+	if problem := AhdGUISetVisible(label, true); problem != "" || guiBool(t)(AhdGUIIsVisible(label)) {
+		t.Fatal("showing a Label inside a hidden Container made it visible")
+	}
+	if problem := AhdGUISetVisible(nested, true); problem != "" || !guiBool(t)(AhdGUIIsVisible(label)) {
+		t.Fatal("showing the Container did not show the Label")
+	}
+	if problem := AhdGUISetLabelSize(label, "title"); problem != "" {
+		t.Fatal(problem)
+	}
+	if problem := AhdGUISetLabelBold(label, true); problem != "" {
+		t.Fatal(problem)
+	}
+	if problem := AhdGUISetLabelSize(button, "large"); !strings.Contains(problem, "does not support") {
+		t.Fatalf("a Button accepted a label size: %q", problem)
+	}
+	if problem := AhdGUISetLabelSize(label, "huge"); !strings.Contains(problem, "small") {
+		t.Fatalf("bad size: %q", problem)
+	}
+	if problem := AhdGUISetClipboard("defter"); problem != "" || AhdGUIClipboard() != "defter" {
+		t.Fatalf("clipboard %q", AhdGUIClipboard())
+	}
+	if problem := AhdGUISetClipboard(strings.Repeat("x", ahdGUIMaxClipboardRunes+1)); !strings.Contains(problem, "at most") {
+		t.Fatalf("oversized clipboard: %q", problem)
+	}
+}
+
 func TestGUIWindowsAreIndependentAndCloseCleanly(t *testing.T) {
 	ok := guiMust2(t)
 	first := openTestWindow(t, "")
@@ -400,5 +445,187 @@ func TestCanvasCallbackErrorClosesTheCanvasAndPropagates(t *testing.T) {
 	}()
 	if calls != 1 || AhdGraphicsIsOpen(canvas) || record.link.process.ProcessState == nil {
 		t.Fatalf("after a callback error: %d calls, helper reaped %v", calls, record.link.process.ProcessState != nil)
+	}
+}
+
+func TestGUITimerOrderCancelAndSlowTicks(t *testing.T) {
+	window := openTestWindow(t, `[{"event":"tick"},{"event":"tick"},{"event":"tick"}]`)
+	var order []int64
+	first, problem := AhdGUIEvery(window, 1000, func() { order = append(order, 1) })
+	must(t, problem)
+	second, problem := AhdGUIEvery(window, 1000, func() {
+		order = append(order, 2)
+		must(t, AhdGUICancel(window, first))
+	})
+	must(t, problem)
+	if _, problem := AhdGUIEvery(window, 0, func() {}); !strings.Contains(problem, "between 1 millisecond and one day") {
+		t.Fatalf("interval: %q", problem)
+	}
+	if problem := AhdGUIWait(window); problem != "" {
+		t.Fatal(problem)
+	}
+	// Three scripted ticks. The first runs both timers and cancels the
+	// earlier one, so the later ticks run only the second.
+	want := []int64{1, 2, 2, 2}
+	if len(order) != len(want) {
+		t.Fatalf("timer order %v", order)
+	}
+	for index := range want {
+		if order[index] != want[index] {
+			t.Fatalf("timer order %v", order)
+		}
+	}
+	if problem := AhdGUICancel(window, second); problem != "" {
+		t.Fatal(problem)
+	}
+	bare := &ahdGUIWindow{alive: true, timers: map[int64]*ahdGUITimer{7: {pending: true}}}
+	if bare.queueTick(7) {
+		t.Fatal("a pending timer accepted another tick")
+	}
+	bare.timers[7].pending = false
+	if !bare.queueTick(7) || bare.queueTick(7) {
+		t.Fatal("queueTick did not keep a single outstanding tick")
+	}
+}
+
+func TestGUITaskCompletesOnTheCallbackPath(t *testing.T) {
+	window := openTestWindow(t, `[{"event":"tick"},{"event":"tick"},{"event":"tick"},{"event":"tick"}]`)
+	var got int64
+	var failed string
+	task, problem := AhdGUITask(window, func() (int64, string) { return 42, "" })
+	must(t, problem)
+	must(t, AhdGUITaskOnDone(task, func(value *int64, problem *string) {
+		if value != nil {
+			got = *value
+		}
+		if problem != nil {
+			failed = *problem
+		}
+		if AhdGUIInTask() {
+			t.Error("completion ran inside the task")
+		}
+	}))
+	if _, problem := AhdGUITask(window, func() (int64, string) { return 0, "" }); !strings.Contains(problem, "one background task") {
+		t.Fatalf("second task: %q", problem)
+	}
+	if problem := AhdGUIWait(window); problem != "" {
+		t.Fatal(problem)
+	}
+	if got != 42 || failed != "" {
+		t.Fatalf("completion %d %q", got, failed)
+	}
+}
+
+func TestGUITaskErrorCancelAndClosedWindow(t *testing.T) {
+	window := openTestWindow(t, `[{"event":"tick"},{"event":"tick"},{"event":"tick"},{"event":"tick"}]`)
+	var problemText string
+	task, problem := AhdGUITask(window, func() (int64, string) { return 0, "nope" })
+	must(t, problem)
+	must(t, AhdGUITaskOnDone(task, func(value *int64, problem *string) {
+		if value != nil || problem == nil {
+			t.Fatalf("error delivery %v %v", value, problem)
+		}
+		problemText = *problem
+	}))
+	if problem := AhdGUIWait(window); problem != "" || problemText != "nope" {
+		t.Fatalf("wait %q problem %q", problem, problemText)
+	}
+
+	started := make(chan struct{})
+	release := make(chan struct{})
+	blocked := openTestWindow(t, `[{"event":"tick"}]`)
+	var delivered atomic.Bool
+	running, problem := AhdGUITask(blocked, func() (int64, string) {
+		close(started)
+		<-release
+		return 7, ""
+	})
+	must(t, problem)
+	must(t, AhdGUITaskOnDone(running, func(*int64, *string) { delivered.Store(true) }))
+	finished := make(chan struct{})
+	go func() {
+		if problem := AhdGUIWait(blocked); problem != "" {
+			t.Errorf("wait: %s", problem)
+		}
+		close(finished)
+	}()
+	<-started
+	must(t, AhdGUITaskCancel(running))
+	if !AhdGUITaskCancelled(running) {
+		t.Fatal("cancel did not stick")
+	}
+	close(release)
+	<-finished
+	if delivered.Load() {
+		t.Fatal("a cancelled task delivered its result")
+	}
+
+	hold := make(chan struct{})
+	letGo := make(chan struct{})
+	closing := openTestWindow(t, `[{"event":"tick"}]`)
+	var deliveredClose atomic.Bool
+	closingTask, problem := AhdGUITask(closing, func() (int64, string) {
+		close(hold)
+		<-letGo
+		return 1, ""
+	})
+	must(t, problem)
+	must(t, AhdGUITaskOnDone(closingTask, func(*int64, *string) { deliveredClose.Store(true) }))
+	closed := make(chan struct{})
+	go func() {
+		if problem := AhdGUIWait(closing); problem != "" {
+			t.Errorf("wait during close: %s", problem)
+		}
+		close(closed)
+	}()
+	<-hold
+	AhdGUIClose(closing)
+	close(letGo)
+	<-closed
+	if deliveredClose.Load() {
+		t.Fatal("a task still running when the window closed delivered a result")
+	}
+}
+
+func TestGUICheckpointAndTaskCannotChangeWidgets(t *testing.T) {
+	window := openTestWindow(t, `[{"event":"tick"}]`)
+	root, problem := AhdGUIRoot(window, "column", 0, 0)
+	must(t, problem)
+	label, problem := AhdGUIAddLeaf(root, "label", "hello", "", false)
+	must(t, problem)
+	var denied string
+	var sawStop atomic.Bool
+	task, problem := AhdGUITask(window, func() (int64, string) {
+		denied = AhdGUISetText(label, "from the task")
+		for !sawStop.Load() {
+			if !AhdGUICheckpoint() {
+				sawStop.Store(true)
+				return 0, ""
+			}
+		}
+		return 1, ""
+	})
+	must(t, problem)
+	var delivered atomic.Bool
+	must(t, AhdGUITaskOnDone(task, func(*int64, *string) { delivered.Store(true) }))
+	finished := make(chan struct{})
+	go func() {
+		if problem := AhdGUIWait(window); problem != "" {
+			t.Errorf("wait: %s", problem)
+		}
+		close(finished)
+	}()
+	<-finished
+	if !sawStop.Load() {
+		t.Fatal("checkpoint did not report that the window closed")
+	}
+	if delivered.Load() {
+		t.Fatal("a task cancelled by the closing window delivered a result")
+	}
+	if !strings.Contains(denied, "background task") {
+		t.Fatalf("widget update from a task: %q", denied)
+	}
+	if text, problem := AhdGUIText(label); problem != "" || text != "hello" {
+		t.Fatalf("label %q %s", text, problem)
 	}
 }

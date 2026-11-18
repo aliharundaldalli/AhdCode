@@ -224,6 +224,18 @@ var GUISource string
 //go:embed gui_widgets.go
 var GUIWidgetsSource string
 
+// GUIControlsSource is the v2.9 part of the GUI runtime: Tabs, radio
+// buttons, progress bars, and date fields.
+//
+//go:embed gui_controls.go
+var GUIControlsSource string
+
+// GUIPhase6Source is the v2.9 part of the GUI runtime: Window timers,
+// background tasks, and the embedded Canvas.
+//
+//go:embed gui_phase6.go
+var GUIPhase6Source string
+
 // PlotViewSource is emitted as a separate generated Go file. It opens
 // AhdCode's own interactive Plot viewer for Chart.show and Figure.show.
 //

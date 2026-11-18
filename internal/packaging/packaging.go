@@ -8,11 +8,16 @@
 // SQLite, ahdnumeric for Numeric, and the LaTeX engine for Latex), its name,
 // and its icon. It never holds the compiler, the Go toolchain, the language
 // server, documentation, source files, or anything else from the project
-// folder: nothing is copied from beside the entry module.
+// folder. The only files copied from beside the entry are .png, .jpg, and
+// .jpeg images in a resources folder, and those go in the application's
+// own resource folder, not the working directory. A symbolic link is not
+// followed and stops packaging, so a link cannot bring in a file from
+// outside that folder.
 //
-//	macOS    Name.app (Contents/MacOS: program and helpers; Resources: icon)
-//	Windows  Name/ (Name.exe and runtime/) and Name-windows-x64.zip
-//	Linux    Name/ (Name and runtime/) and Name-linux-x64.tar.gz
+//	macOS    Name.app (Contents/MacOS: program and helpers; Resources: icon;
+//	         Resources/app: bundled images)
+//	Windows  Name/ (Name.exe, runtime/, and resources/) and Name-windows-x64.zip
+//	Linux    Name/ (Name, runtime/, and resources/) and Name-linux-x64.tar.gz
 //
 // The program finds its helpers only inside the application (see
 // AhdPackagedApplication in the runtime). macOS applications are not code
@@ -334,6 +339,10 @@ func Package(options Options) Result {
 		}
 	}
 
+	if err := copyImageResources(options.Entry, filepath.Join(root, layout.assets)); err != nil {
+		return fail("%s", err.Error())
+	}
+
 	if problems := leakGate(root, layout, sets, target); len(problems) != 0 {
 		return fail("the application was not written, because it would hold files it must not: %s", strings.Join(problems, "; "))
 	}
@@ -372,17 +381,154 @@ type layout struct {
 	helpers    string
 	resources  string
 	identity   string // the folder of ahdcode-app.json
+	assets     string // bundled images, separate from identity and helpers
 }
 
 func layoutFor(name string, target build.Target) layout {
 	switch target.OS {
 	case "darwin":
 		return layout{root: name + ".app", program: "Contents/MacOS", executable: name,
-			helpers: "Contents/MacOS", resources: "Contents/Resources", identity: "Contents/Resources"}
+			helpers: "Contents/MacOS", resources: "Contents/Resources", identity: "Contents/Resources",
+			assets: "Contents/Resources/app"}
 	case "windows":
-		return layout{root: name, program: ".", executable: name + ".exe", helpers: "runtime", resources: "runtime", identity: "runtime"}
+		return layout{root: name, program: ".", executable: name + ".exe", helpers: "runtime", resources: "runtime", identity: "runtime",
+			assets: "resources"}
 	}
-	return layout{root: name, program: ".", executable: name, helpers: "runtime", resources: "runtime", identity: "runtime"}
+	return layout{root: name, program: ".", executable: name, helpers: "runtime", resources: "runtime", identity: "runtime",
+		assets: "resources"}
+}
+
+// copyImageResources copies a resources folder next to the entry, when it
+// exists, into the application's image folder. Only regular .png, .jpg, and
+// .jpeg files are copied. Anything else in that folder is an error, so a
+// data file is not silently dropped and is not packaged. The folder is
+// opened from its parent without following a symbolic link, and each file
+// is opened through that directory, so a link cannot copy a file that lives
+// outside the folder. Replacing a file with a link after the directory is
+// opened still cannot copy an outside file; the copy then fails.
+func copyImageResources(entry, destination string) error {
+	folder := filepath.Join(filepath.Dir(entry), "resources")
+	parent, err := os.OpenRoot(filepath.Dir(folder))
+	if err != nil {
+		return fmt.Errorf("the resources folder cannot be read: %v", err)
+	}
+	defer parent.Close()
+	info, err := parent.Lstat(filepath.Base(folder))
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return fmt.Errorf("the resources folder cannot be read: %v", err)
+	}
+	if info.Mode()&os.ModeSymlink != 0 {
+		return fmt.Errorf("resources is a symbolic link and cannot be packaged")
+	}
+	if !info.IsDir() {
+		return fmt.Errorf("resources next to the program is not a folder")
+	}
+	tree, err := parent.OpenRoot(filepath.Base(folder))
+	if err != nil {
+		return fmt.Errorf("the resources folder cannot be read: %v", err)
+	}
+	defer tree.Close()
+	destination, err = filepath.Abs(destination)
+	if err != nil {
+		return fmt.Errorf("the resources folder cannot be written: %v", err)
+	}
+	return fs.WalkDir(tree.FS(), ".", func(path string, entry fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if path == "." {
+			return nil
+		}
+		if !imageResourceRelative(path) {
+			return fmt.Errorf("%s leaves the resources folder", path)
+		}
+		linked, err := tree.Lstat(path)
+		if err != nil {
+			return err
+		}
+		if linked.Mode()&os.ModeSymlink != 0 {
+			return fmt.Errorf("%s is a symbolic link and cannot be packaged", path)
+		}
+		if linked.IsDir() {
+			return nil
+		}
+		if forbiddenNames.MatchString(entry.Name()) {
+			return fmt.Errorf("%s must not be packaged", path)
+		}
+		switch strings.ToLower(filepath.Ext(path)) {
+		case ".png", ".jpg", ".jpeg":
+		default:
+			return fmt.Errorf("%s is not a .png, .jpg, or .jpeg resource", path)
+		}
+		input, err := tree.Open(path)
+		if err != nil {
+			return fmt.Errorf("%s cannot be packaged: %v", path, err)
+		}
+		opened, err := input.Stat()
+		if err != nil || !opened.Mode().IsRegular() {
+			input.Close()
+			return fmt.Errorf("%s is not a file and cannot be packaged", path)
+		}
+		target := filepath.Join(destination, filepath.FromSlash(path))
+		if !imageDestinationInside(destination, target) {
+			input.Close()
+			return fmt.Errorf("%s leaves the resources folder", path)
+		}
+		if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+			input.Close()
+			return err
+		}
+		copyErr := copyFrom(input, target, 0o644)
+		input.Close()
+		return copyErr
+	})
+}
+
+// imageResourceRelative reports a slash-separated path that stays under the
+// directory fs.WalkDir started from.
+func imageResourceRelative(path string) bool {
+	if path == "" || strings.Contains(path, `\`) {
+		return false
+	}
+	for _, part := range strings.Split(path, "/") {
+		if part == "" || part == "." || part == ".." {
+			return false
+		}
+	}
+	return true
+}
+
+// imageDestinationInside reports whether candidate is a file beneath root.
+func imageDestinationInside(root, candidate string) bool {
+	relative, err := filepath.Rel(filepath.Clean(root), filepath.Clean(candidate))
+	if err != nil || relative == "." || filepath.IsAbs(relative) {
+		return false
+	}
+	for _, part := range strings.Split(relative, string(filepath.Separator)) {
+		if part == "" || part == "." || part == ".." {
+			return false
+		}
+	}
+	return true
+}
+
+// copyFrom writes an already-opened file. The caller has decided the source.
+func copyFrom(input io.Reader, destination string, mode os.FileMode) error {
+	output, err := os.OpenFile(destination, os.O_WRONLY|os.O_CREATE|os.O_EXCL, mode)
+	if err != nil {
+		return err
+	}
+	if _, err := io.Copy(output, input); err != nil {
+		output.Close()
+		return err
+	}
+	if err := output.Close(); err != nil {
+		return err
+	}
+	return os.Chmod(destination, mode)
 }
 
 // bundleIdentifier is a reverse-DNS identifier made from the name.
@@ -659,6 +805,12 @@ func leakGate(root string, layout layout, sets []helperSet, target build.Target)
 		inFolder := false
 		for folder := range folders {
 			if strings.HasPrefix(relative, folder+string(filepath.Separator)) {
+				inFolder = true
+			}
+		}
+		if strings.HasPrefix(relative, layout.assets+string(filepath.Separator)) {
+			switch strings.ToLower(filepath.Ext(entry.Name())) {
+			case ".png", ".jpg", ".jpeg":
 				inFolder = true
 			}
 		}

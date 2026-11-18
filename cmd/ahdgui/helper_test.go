@@ -22,6 +22,72 @@ func mustAdd(t *testing.T, m *model, parent int64, kind, text string) int64 {
 	return id
 }
 
+func TestHiddenWidgetsLeaveNoGap(t *testing.T) {
+	m := newModel("t", 400, 300, fixedMeasure)
+	root, err := m.add(0, kindColumn, "", "", false, 8, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	first := mustAdd(t, m, root, kindLabel, "one")
+	middle := mustAdd(t, m, root, kindButton, "two")
+	last := mustAdd(t, m, root, kindLabel, "three")
+	m.mu.Lock()
+	m.layout()
+	open := m.widgets[last].y
+	m.mu.Unlock()
+	if err := m.setVisible(middle, false); err != nil {
+		t.Fatal(err)
+	}
+	m.mu.Lock()
+	m.layout()
+	if m.widgets[middle].h != 0 {
+		t.Fatal("a hidden Button kept its height")
+	}
+	if m.widgets[last].y >= open {
+		t.Fatalf("hiding the middle widget left a gap: y %d, was %d", m.widgets[last].y, open)
+	}
+	if m.widgets[first].h != labelHeight("") {
+		t.Fatal("the first Label changed size")
+	}
+	m.mu.Unlock()
+	if err := m.setVisible(root, false); err != nil {
+		t.Fatal(err)
+	}
+	m.press(20, 20)
+	if m.focus != 0 {
+		t.Fatal("a hidden Container accepted the focus")
+	}
+	if err := m.setVisible(root, true); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.setLabelStyle(first, "title", nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.setLabelStyle(middle, "large", nil); err != errWrongKind {
+		t.Fatalf("a Button accepted a label size: %v", err)
+	}
+	if err := m.setLabelStyle(first, "huge", nil); err != errLabelSize {
+		t.Fatalf("bad size: %v", err)
+	}
+	bold := true
+	if err := m.setLabelStyle(first, "", &bold); err != nil {
+		t.Fatal(err)
+	}
+	m.mu.Lock()
+	if m.widgets[first].labelSize != "title" || !m.widgets[first].bold {
+		t.Fatal("label style did not stick")
+	}
+	m.layout()
+	titleWidth := m.widgets[first].natW
+	m.widgets[first].labelSize = ""
+	m.widgets[first].bold = false
+	m.layout()
+	if titleWidth <= m.widgets[first].natW {
+		t.Fatalf("a title is not wider than normal: %d <= %d", titleWidth, m.widgets[first].natW)
+	}
+	m.mu.Unlock()
+}
+
 func TestRootRules(t *testing.T) {
 	m := newModel("t", 400, 300, fixedMeasure)
 	if _, err := m.add(0, kindLabel, "x", "", false, 0, 0); err == nil {
@@ -46,7 +112,7 @@ func TestRootRules(t *testing.T) {
 			t.Fatalf("spacing/padding %v accepted", bad)
 		}
 	}
-	if _, err := m.add(root, "grid", "", "", false, 0, 0); err == nil {
+	if _, err := m.add(root, "dock", "", "", false, 0, 0); err == nil {
 		t.Fatal("unknown kind accepted")
 	}
 }

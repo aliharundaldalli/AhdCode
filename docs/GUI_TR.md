@@ -15,9 +15,13 @@ Tıklamalar, tuş basışları, düzenlemeler ve seçimler bir AhdCode Function'
 
 v2.0 ile AhdCode'un birinci taraf GUI'si küçük formlar, veri giriş araçları,
 veritabanı ön yüzleri ve dosya odaklı masaüstü yardımcıları için gereken
-sıradan denetimleri kapsar. Sonraki sürümler gerçek bir kullanım gerektirdiğinde
-odaklı bileşenler ekleyebilir; ancak GUI artık etkin bir temel yol haritası
-değildir.
+sıradan denetimleri kapsar. v2.9 bu takımı sürdürür. Görünürlük, Label boyu
+ve kalınlığı, program panosu, metin düzenleme, pencere menüleri, ızgara,
+hizalama, kaydırılabilir alanlar, resimler, satır kaydıran etiketler,
+sekmeler, radyo düğmeleri, ilerleme çubukları, tarih alanları, zamanlayıcılar,
+bir arka plan görevi ve pencerenin içine gömülü bir Canvas vardır. Bir
+TableView başlıklarından sıralanır ve `GUI.resource` uygulamanın kaynak
+klasöründeki bir dosyayı adlandırır.
 
 AhdCode GUI; formlar, veri giriş araçları, basit veritabanı ön yüzleri,
 yardımcı programlar ve API tabanlı uygulamalar gibi öğrenme ve küçük masaüstü
@@ -130,6 +134,8 @@ TableView.rows() -> List<List<String>>
 TableView.setRows(rows: List<List<String>>) -> Nothing
 TableView.selectedRow() -> Int?     TableView.selectRow(index: Int?) -> Nothing
 TableView.onSelect(handler: (row: Int?) -> Nothing) -> Nothing
+TableView.sort(column: Int, descending: Bool := false) -> Nothing
+TableView.sortedColumn() -> Int?    TableView.sortDescending() -> Bool
 
 GUI.openFile(title: String := "Open File", extensions: List<String> := []) -> String?
 GUI.openFiles(title: String := "Open Files", extensions: List<String> := []) -> List<String>
@@ -137,6 +143,7 @@ GUI.selectFolder(title: String := "Select Folder") -> String?
 GUI.saveFile(title: String := "Save File", suggestedName: String := "", extensions: List<String> := []) -> String?
 GUI.message(title: String, text: String) -> Nothing
 GUI.confirm(title: String, text: String) -> Bool
+GUI.resource(name: String) -> String
 ```
 
 PasswordInput, TextArea, Select, ListBox ve TableView'da da v1.9 bileşenleri
@@ -175,38 +182,122 @@ Bir Window kapandıktan sonra her metin alanının `text()`, Checkbox'ın
 döndükten sonra formu okuyabilir. Kapalı bir Window'da bir bileşeni
 değiştirmek, bileşen eklemek veya callback kaydetmek `GUIError`'dır.
 
-## Yerleşim: tek kök, Column ve Row
+## Yerleşim: tek kök, Column, Row ve ızgara
 
-Bir Window'un en fazla bir kök Container'ı vardır: ilk `window.column()` veya
-`window.row()` onu oluşturur; ikisinden birini yeniden çağırmak `GUIError`'dır.
-Boş bir Window geçerlidir. Diğer her Container bir Container'ın içinde
-oluşturulur.
+Bir Window'un en fazla bir kök Container'ı vardır: ilk `window.column()`,
+`window.row()`, `window.grid()` veya `window.scroll()` onu oluşturur; bir
+kök daha istemek `GUIError`'dır. Boş bir Window geçerlidir. Diğer her
+Container bir Container'ın içinde oluşturulur.
 
 - **Column** çocuklarını yukarıdan aşağıya, **Row** soldan sağa yerleştirir.
-- `spacing` komşu çocuklar arasındaki boşluk, `padding` Container kenarlarının
-  içindeki kenar boşluğudur; ikisi de pencere noktası cinsindendir. İkisi de 0
-  ile 1000 arasında olmalıdır; negatif değer `GUIError`'dır.
+  **grid** onları sabit sayıda sütunda soldan sağa dizer ve satır dolunca
+  alta geçer. `columnGap` sütunlar, `rowGap` satırlar arasındaki boşluktur;
+  ikisinin varsayılanı 8'dir.
+- `spacing`, Column, Row veya kaydırma alanının komşu çocukları arasındaki
+  boşluk, `padding` ise kenar boşluğudur; ikisi de pencere noktası
+  cinsindendir. Spacing, padding ve ızgara boşlukları 0 ile 1000 arasında
+  olmalıdır. Bir ızgaranın 1 ile 32 arasında sütunu vardır.
 - Her bileşenin doğal bir boyutu vardır: Label metni kadar geniştir, Button
   metni artı bir kenar boşluğu kadar (en az 64 nokta), TextInput ve
   PasswordInput 260 nokta genişliğindedir ve her tek satırlık bileşen 32
   nokta yüksekliğindedir. TextArea 360 × 136, ListBox 260 × 146 noktadır;
   Select en uzun öğesi kadar (200 ile 480 nokta), TableView sütunları kadar
   (200 ile 640 nokta) geniştir ve 222 nokta yüksekliğindedir.
-- Column'un çocukları sol kenarına hizalanır; Row'un çocukları dikey olarak
-  ortalanır.
-- Kök Container pencerenin sol üst köşesinden başlar. Pencereye sığmayan kısım
-  kırpılır; forma uyan bir pencere boyutu seçin.
+- Açık bir hizalama yoksa Column'un çocukları sol kenarda, Row'un çocukları
+  dikey olarak ortada kalır. Izgara hücresi çocuğu hücrenin sol üstüne koyar.
+- Kök, pencerenin sol üstünden başlar. Pencerede menü çubuğu varsa kök onun
+  28 nokta altından başlar; çubuk formun üzerine binmez. Sığmayan kısım
+  kırpılır. Kök bir kaydırma alanıysa bu kuralın yerine aşağıdaki kural geçer.
 
-Kaydırmalı bileşenler — TextArea, ListBox ve TableView — ve bunları içeren
-her Container **büyür**. Pencere içeriğinden büyük olduğunda (kullanıcının
-büyüttüğü yeniden boyutlandırılabilir bir pencere veya büyük açılmış bir
-pencere), Column'un fazladan yüksekliği büyüyen çocukları arasında eşit
-paylaşılır; Row'un fazladan genişliği de öyle. Büyüyen bir çocuk ayrıca
-Column'unun genişliğini (Row'unun yüksekliğini) doldurur. Label, Button,
-metin alanları, Checkbox ve Select hiçbir zaman esnemez; hiçbir şey doğal
-boyutunun altına küçülmez. Izgara, mutlak konumlandırma, hizalama veya büyüme
-ayarı yoktur: bu tek kural bir tablonun veya listenin büyük bir pencerenin
-alanını kullanmasını sağlar.
+`setMinWidth(width)` ve `setPreferredWidth(width)` doğal genişliği yükseltir.
+Küçültmez: içerikten küçük bir tercih yok sayılır, 0 ayarı temizler. Negatif
+bir genişlik veya 4096'dan büyük bir genişlik `GUIError`'dır.
+
+`setAlign(horizontal, vertical := "")` hizalamayı seçer. Değerler `"start"`,
+`"center"`, `"end"` veya `"stretch"` olabilir. Yatay hizalama Column'da ve
+ızgara hücresinde, dikey hizalama Row'da ve ızgara hücresinde geçerlidir. Boş
+dikey değer Row'un eski davranışını korur. Stretch, çocuğu o eksende yuvasına
+yayar. Hizalama bir bileşeni küçültmez; yuvasından büyük bir bileşeni içeri
+çekmez. Taşan kısım kırpılır veya bileşen bir kaydırma alanındaysa kayar.
+
+`setSpan(columns, rows := 1)`, bir bileşenin kapladığı ızgara hücresi
+sayısıdır; 1 ile 32 arasındadır. Izgaradan geniş bir span bütün sütunları
+kullanır. Izgara dışında span saklanır ve yerleşimi değiştirmez.
+
+Izgara kuralları, sırasıyla:
+
+1. Gizli çocuklar atlanır. Sonraki görünen çocuk o hücreye gelir. Gizlemek
+   boş bir delik bırakmaz.
+2. Satıra sığmayan çocuk alta geçer. Bir satır span'inin kapladığı hücre
+   atlanır.
+3. Bir sütunun genişliği, o sütunu tek başına kullanan en geniş çocuktur.
+   Bir satırın yüksekliği, o satırı tek başına kullanan en uzun çocuktur.
+   Birden çok iz süren çocuk, toplam ve boşluklar onu alana kadar o izleri
+   eşit yükseltir.
+4. Izgaranın doğal boyutu izler, boşluklar ve padding'dir.
+5. Izgaraya fazla genişlik verilirse her sütun eşit pay alır; kalan pay ilk
+   sütunlara gider. Fazla yükseklik yalnızca büyüyen bir çocuk içeren
+   satırlara gider (TextArea, ListBox, TableView veya bunları tutan bir
+   Container). Aksi halde ızgara üste hizalı kalır.
+6. Çocuk hücresinin içinde hizalanır. Büyüyen çocuk hücresini doldurur.
+   Hiçbir şey doğal genişliğinin altına inmez.
+
+Mutlak konumlandırma yoktur. Kaydırmalı bileşenler — TextArea, ListBox ve
+TableView — ve bunları içeren her Column, Row veya ızgara **büyür**. Pencere
+içeriğinden büyük olduğunda Column'un fazladan yüksekliği büyüyen çocukları
+arasında eşit paylaşılır; Row'un fazladan genişliği de öyle. Büyüyen bir
+çocuk Column'unun genişliğini (Row'unun yüksekliğini) doldurur.
+
+### Kaydırma alanları
+
+`window.scroll(spacing := 8, padding := 12)` kaydırılabilir köktür.
+`container.scroll(spacing := 8, padding := 0)` iç içe olandır. Çocuklar
+doğal boyutlarında yukarıdan aşağıya dizilir; kaydırma alanının içinde
+büyümezler. Yığının genişliği alanın doğal genişliğidir. Doğal yükseklik
+yığının yüksekliğidir; yığın daha uzunsa 256 noktadır. Daha uzun bir kaydırma
+alanı büyür, böylece bir Column ona büyük pencereden pay verebilir.
+
+Kaydırma **kökü** ayrıdır: pencereyi doldurur; menü çubuğu varsa onun
+altında. Formdan kısa bir pencere dikey, formdan dar bir pencere yatay
+kayar. Geniş bir formu kaydırmanın olağan yolu budur. İç içe bir kaydırma
+alanı içeriği kadar geniştir ve dikey kayar. İki yönde kaydırmak için kaydırma
+alanını kök yapın.
+
+Tekerlek, imlecin altındaki kaydırma alanını her iki eksende kaydırır ve
+kaydırma çubuğu sürüklenebilir.
+İmleç bir ListBox, TableView veya TextArea üzerindeyse o bileşen kendi
+kaydırmasını korur. Bir çentik 72 noktadır. Devre dışı bir liste kaymaz.
+İçerik alanın dışına çizilmez. Görünümün dışına kaymış bir bileşene tıklama
+ona gitmez; tıklama, görünümün içinde o anda imlecin altındaki bileşene gider,
+kaydırma çubuğuna değil. Tab ve betikli odak, odaklanan denetimi görünüme
+getirir. Gizli bir denetim yer kaplamaz; tıklama ve Tab onu atlar. Devre
+dışı bir denetim görünür kalır, yerini korur ve tıklama, tuş veya Tab kabul
+etmez. Açık bir Select listesi ve menü çubuğu kayan içeriğin üstünde
+çizilir.
+
+`examples/v2.9/layout`, kaydırılabilir bir pencerede iki sütunlu bir formdur:
+iç içe bir column, gizli bir düğme ve kaydırmaya yetecek kadar satır vardır.
+
+### Yerleşimi elle denemek
+
+Otomatik testler geometriyi, kırpmayı, tekerlek kaydırmasını, odağı ve bir
+noktanın hangi bileşene denk geldiğini denetler. Fiziksel fareyi oynatmazlar.
+Bu geliştirme Mac'inde bir kişi `examples/v2.9/layout` penceresini fiziksel
+fare ve klavye ile denedi: File menüsü açıldı, metin alanına yazıldı,
+Command+A, Command+C, Command+V ve Command+Z o alanı düzenledi, tekerlek
+formu kaydırdı ve pencere temiz kapandı. Windows 11 ve Wayland
+çalıştırılmadı.
+
+Aynı pencere bu denetimi yinelemek içindir:
+
+1. `examples/v2.9/layout` çalıştırılır. Menü çubuğu formun üstündedir.
+2. Name alanına tıklanıp yazılır. macOS'ta Command, Windows ve Linux'ta Ctrl
+   ile C alanı kopyalar. Aynı değiştirici ile S, Save'i çalıştırır.
+3. Tekerlekle kaydırılır. İmlecin o anda altındaki denetime tıklanır ve
+   tıklamayı onun aldığı görülür.
+4. Tab'a, pencerenin altında başlayan bir denetim görünüme gelene kadar
+   basılır.
+5. Gizli Extra düğmesinin boş hücre bırakmadığı görülür.
 
 ```ahd
 bring GUI
@@ -318,10 +409,23 @@ window.wait()
 - Tablo fare tekerleği, kaydırma çubuğu ve klavyeyle dikey; yana kaydırma
   veya Shift ile tekerlekle yatay kayar. Yalnızca görünen satırlar çizilir;
   bu yüzden on binlerce satır hızlı kalır.
-- Tıklama bir satır seçer; tablo odaktayken ok tuşları, Home, End, PageUp ve
-  PageDown seçimi taşır. Hücreler düzenlenemez: veriyi değiştirip `setRows`
-  çağırın.
-- `columns()` ve `rows()` kopya döndürür. Bir TableView en fazla 64 sütun,
+- Gövdeye tıklamak bir satır seçer; tablo odaktayken ok tuşları, Home, End,
+  PageUp ve PageDown seçimi taşır. Bir başlığa tıklamak o sütunu sıralar. İlk
+  tıklama artandır. Aynı başlığa sonraki tıklama azalandır. Başka bir başlık
+  o sütunu artan sıralar. Hücreler metin olarak, Unicode kod noktası sırasında
+  ve büyük-küçük harfe duyarlı karşılaştırılır: artan sırada boş bir hücre
+  diğer her metinden önce gelir ve `"10"`, `"2"`den önce gelir. Sıra sayısal
+  değildir ve yerel ayara bağlı değildir. Eşit hücreler şu anki göreli
+  sırasını korur. Seçili satır aynı satır kalır ve yeni indeksine taşınır.
+  Başlık tıklaması `onSelect` çağırmaz. `sort(column, descending := false)`
+  programın seçtiği aynı sıradır ve o da `onSelect` çağırmaz.
+  `sortedColumn()`, tablo sıralanana kadar null'dır. `setRows` geçerli
+  sıralamayı korur ve yeni satırlara uygular: yeni veride seçili indekse
+  düşen satır seçili kalır, sonra sıralamayla taşınır. Devre dışı bir tablo
+  başlık tıklamasını yok sayar. `sort` yine çalışır. Hücreler düzenlenemez:
+  veriyi değiştirip `setRows` çağırın.
+- `columns()` ve `rows()` ekrandaki sıranın kopyasını döndürür. Bir TableView
+  en fazla 64 sütun,
   20.000 satır ve 1024 karakterlik 200.000 hücre tutar.
 
 Bir [Data](DATA_TR.md) Table'ının `rows()` değeri kayıtlardır
@@ -355,7 +459,9 @@ uyuşmazlık çalışma zamanı hatası değil derleme hatasıdır.
   öncekinin **yerine geçer**. Bir callback'i kaldırmanın yolu yoktur.
 - Callback'ler `wait()` sırasında, birer birer, olayların gerçekleştiği
   sırayla, programın kendi yürütme yolunda çalışır. İki callback hiçbir zaman
-  aynı anda çalışmaz ve yönetilecek bir iş parçacığı yoktur.
+  aynı anda çalışmaz. Bir arka plan görevi de bir callback ile aynı anda
+  çalışmaz; pencerenin olayları işlemesine izin verdiği tek yer
+  `GUI.checkpoint` çağrısıdır.
 - Bir callback herhangi bir bileşeni okuyup değiştirebilir, başka bir Window
   açabilir veya herhangi bir modülü çağırabilir.
 - **Uzun bir callback pencereyi bekletir.** Bir callback çalışırken pencere
@@ -436,9 +542,11 @@ Kapalı bir Window'da renk değiştirmek `GUIError`'dır.
 
 > v1.9.0 ile eklendi; v2.0 bileşenleri dahil.
 
-Bir Button, TextInput, Checkbox, PasswordInput, TextArea, Select, ListBox
-veya TableView devre dışı bırakılabilir. Her bileşen etkin başlar; Label ve
-Container'ların etkinlik durumu yoktur.
+Bir Button, TextInput, Checkbox, PasswordInput, TextArea, Select, ListBox,
+TableView, Image, RadioButton, DateField veya Progress devre dışı
+bırakılabilir. Her bileşen etkin başlar; Label, Container, Tabs ve
+RadioGroup için etkinlik durumu yoktur. Image ve Progress, etkin de olsa
+devre dışı da olsa, Tab sırasında yer almaz.
 
 - Devre dışı bir Button tıklanamaz ve Enter veya Space ile etkinleştirilemez;
   bu yüzden `onClick` callback'i çalışmaz.
@@ -449,14 +557,20 @@ Container'ların etkinlik durumu yoktur.
 - Devre dışı bir bileşen odak alamaz: ona tıklamak odağı hiçbir yere
   taşımaz, Tab onu atlar ve odaktayken devre dışı bırakılan bir bileşen
   odağı kaybeder.
+- Devre dışı bir RadioButton tıklama, Space veya ok tuşlarıyla seçilemez.
+  Program onu yine seçebilir.
+- Devre dışı bir DateField tıklamayı ve yazmayı yok sayar. Program yine
+  `setDate` çağırabilir.
+- Devre dışı bir Progress soluk çizilir. Program değerini yine ayarlayabilir.
 - Program devre dışı bir bileşeni yine değiştirebilir: `setText` ve
   `setChecked` çalışır, `text()` ve `checked()` onu okur.
 - Devre dışı bir bileşen normal çizilir ve ardından pencerenin varsayılan
   rengine doğru soluklaştırılır.
 
 `isEnabled()` durumu bildirir, Window kapandıktan sonra da; kapalı bir
-Window'da `setEnabled` bir `GUIError`'dır. Görünürlük, gizleme veya gösterme
-API'si yoktur.
+Window'da `setEnabled` bir `GUIError`'dır. Devre dışı bir denetim görünür
+kalır ve yerleşimdeki yerini korur. Gizlemek ayrıdır: `setVisible` denetimi
+yerleşimden, tıklamadan ve Tab'dan çıkarır.
 
 ## Yeniden boyutlandırılabilir pencereler
 
@@ -523,7 +637,11 @@ kapandıktan sonra çalışır.
 veya padding, desteklenmeyen renk, ikinci bir kök Container, yanlış
 genişlikte bir TableView satırı, girdilerin dışında bir indeks, geçersiz bir
 dosya uzantısı, kapalı bir Window'da değişiklik, gösterilemeyen bir iletişim
-kutusu, eksik veya başarısız `ahdgui` yardımcısı ve bozuk yardımcı yanıtı.
+kutusu, eksik, bozuk veya desteklenmeyen bir resim, eksik veya başarısız
+`ahdgui` yardımcısı, bozuk bir yardımcı yanıtı, gerçek bir takvim günü
+olmayan bir tarih, sınırın dışındaki bir ilerleme değeri veya üst sınırı,
+denetimin dışındaki bir sekme veya radyo indeksi, boş bir sekme başlığı
+veya radyo yazısı.
 Bir callback'in fırlattığı hata ve iptal edilen bir iletişim kutusu için
 hiçbir zaman kullanılmaz.
 
@@ -540,6 +658,13 @@ hiçbir zaman kullanılmaz.
 | Bir Window'daki bileşenler | 1024 |
 | İletişim kutusu başlığı, metni | 256, 4096 karakter |
 | Önerilen dosya adı, uzantılar | 255 karakter, 16 karakterlik 32 uzantı |
+| Resim dosyası | PNG veya JPEG, en çok 64 MiB, bir kenarı en çok 8192 piksel |
+| Resim yolu | 4096 bayt |
+| Resim genişliği ve yüksekliği | 0 ile 4096 nokta; 0 o kenarın verilmediği anlamına gelir |
+| Tabs | 32 sayfa; başlık 1 ile 256 karakter |
+| Radyo grubu | 64 seçenek; yazı 1 ile 256 karakter |
+| Progress üst sınırı | 1 ile 1000000; değer 0 ile bu üst sınır arasındadır |
+| Tarih | yıl 1 ile 9999, gerçek bir Gregoryen ayı ve günü |
 
 Sınırı aşan bir istek `GUIError`'dır; hiçbir şey sessizce kısaltılmaz.
 
@@ -551,8 +676,9 @@ yardımcının kısa ömürlü bir süreci tarafından çizilir. Program ile yar
 yardımcının standart girdisi ve çıktısı üzerinden sınırlı JSON mesajları
 alışverişi yapar; yardımcı tıklama, tuş, değişiklik ve kapanma olaylarını
 geri gönderir.
-Yardımcı kabuk komutu çalıştırmaz, ağ kullanmaz, dosya veya ortam dosyası
-okumaz ve kullanıcının yazdığı hiçbir şeyi günlüğe yazmaz. Graphics
+Yardımcı kabuk komutu çalıştırmaz, ağ kullanmaz ve kullanıcının yazdığı
+hiçbir şeyi günlüğe yazmaz. Okuduğu tek dosya, programın göstermesini
+istediği resimdir. Graphics
 yardımcısıyla aynı pencere kitaplığıyla (Ebitengine v2.10.2) derlenir ve Go
 Regular yazı tipini içerir; bkz.
 [THIRD_PARTY_NOTICES_GUI.md](../THIRD_PARTY_NOTICES_GUI.md).
@@ -564,12 +690,16 @@ AhdCode kurulumunda kendi yanında bulur; `PATH` hiçbir zaman aranmaz.
 
 ## Platform notları
 
-- macOS: bu sürümün geliştirme Mac'inde canlı olarak test edildi. v1.9.0'dan
+- macOS: bu sürümün geliştirme Mac'inde canlı olarak test edildi. Fiziksel
+  fare ve klavye ile pencere içindeki File menüsü, metin düzenleme,
+  Command+A, C, V ve Z, kaydırma ve pencereyi kapatma da denendi. v1.9.0'dan
   itibaren bir Window odaktayken menü çubuğu **AhdCode**'u, Dock ise AhdCode
   simgesini gösterir (v1.8.0 yardımcının adını, `ahdgui`, gösteriyordu);
   v2.0'dan itibaren Dock simgesi macOS'un yuvarlatılmış biçimindedir.
-  [`ahdcode package`](PACKAGING_TR.md) ile yapılan bir uygulamada bunların
-  yerine uygulamanın kendi adı ve simgesi gösterilir.
+  Bu sistem menü çubuğu yalnızca uygulamanın adıdır. AhdCode menüleri her
+  platformda pencerenin içinde çizilir. [`ahdcode package`](PACKAGING_TR.md)
+  ile yapılan bir uygulamada bunların yerine uygulamanın kendi adı ve
+  simgesi gösterilir.
 - Windows ve Linux: v1.9.0'dan itibaren pencere, sistemin pencere simgesi
   gösterdiği yerlerde AhdCode simgesini kullanır.
 - Windows ve Linux: yardımcı her ikisi için de derlenir; Linux masaüstü bir
@@ -579,26 +709,425 @@ AhdCode kurulumunda kendi yanında bulur; `PATH` hiçbir zaman aranmaz.
 - Otomatik testler: `AHDCODE_GUI_HEADLESS=1` her Window'u ekran olmadan açar,
   `AHDCODE_GUI_HEADLESS_DIALOGS` iletişim kutularını bir listeden yanıtlar.
 
+## Görünürlük, Label boyu ve pano
+
+Her bileşenin ve her Container'ın `setVisible(visible)` ve `isVisible()`
+üyesi vardır. Gizli bir bileşen Column, Row, ızgara veya kaydırma alanında
+yer kaplamaz, tıklama almaz ve Tab ile atlanır. Bir Container gizlenince içindeki her şey de
+gizlenir; çocuk üzerindeki `isVisible()` o Container yeniden gösterilene
+kadar false döner. Gösterilen bileşen kardeşleriyle birlikte yeniden yerleşir.
+Gizli bir bileşen, devre dışı bir bileşen değildir: devre dışı bileşen görünür
+kalır ve yerini korur.
+
+Bir Label'ın `setSize(size)` ve `setBold(bold)` üyesi vardır. `size`
+`"small"`, `"normal"`, `"large"` veya `"title"` olur. Başka bir metin
+GUIError'dur. Serbest yazı tipi seçimi yoktur.
+
+`GUI.setClipboard(text)` programın metin panosunu değiştirir,
+`GUI.clipboard()` onu okur. Metin en çok 100000 karakterdir. TextInput,
+PasswordInput ve TextArea bu panoyu paylaşır.
+
+Tıklama imleci koyar. Sürüklemek seçer, çift tıklama işaretçinin altındaki
+sözcüğü seçer. Shift ile ok tuşları, Home ve End seçimi büyütür. Backspace,
+Delete ve yazma seçimin tamamına uygulanır. İmleç yazı birimiyle ilerler;
+birleşen işaret veya emoji taban karakterinden ayrılmaz. Alana sığmayan bir
+yapıştırma reddedilir ve metin olduğu gibi kalır. PasswordInput yapıştırmayı
+kabul eder; kopyalamaz ve kesmez.
+
+Art arda yazmak tek bir geri alma adımıdır. Yapıştırma, silme veya seçimin
+yazmayla değiştirilmesi ayrı birer adımdır. Geri alma ve yineleme metni ve
+imleci geri getirir. macOS kısayolları Command+A, C, X, V ve Z'dir;
+Command+Shift+Z yinelemedir. Windows ve Linux kısayolları Control+A, C, X, V
+ve Z'dir; Control+Y ve Control+Shift+Z yinelemedir. Gizli veya etkisiz bir
+alan bu tuşları yok sayar.
+
+```ahd
+bring GUI
+form: Container := GUI.window("Form").column()
+note: Label := form.label("Ready")
+note.setSize("title")
+note.setBold(true)
+save: Button := form.button("Save")
+save.setVisible(false)
+GUI.setClipboard(note.text())
+```
+
+## Menüler ve kısayollar
+
+Bir menü, Window'unun üstünde bir çubukta çizilir. macOS, Windows ve Linux
+aynı çubuğu kullanır. Bu, işletim sisteminin menü çubuğu değildir.
+
+```ahd
+file: Menu := window.menu("File")
+save: MenuItem := file.item("Save", "S")
+file.separator()
+view: Menu := file.menu("View")
+bold: MenuItem := view.checkItem("Bold title", "", false)
+save.onClick(onSave)
+```
+
+`menu(title)` çubuğa bir menü veya bir menünün içine bir alt menü ekler.
+Bir alt menü başka bir menü içeremez. `item(label, shortcut := "")` bir
+öğe ekler. `checkItem(label, shortcut := "", checked := false)` işaretli
+bir öğe ekler. `separator()` bir çizgi çizer. Bir öğenin `onClick`,
+`setEnabled`, `isEnabled` ve `setText` üyesi vardır. İşaretli bir öğenin
+ayrıca `setChecked` ve `checked` üyesi vardır. Düz bir öğede `setChecked`
+GUIError'dur.
+
+Kısayol metni platformun komut tuşunu içermez. `"S"`, macOS'ta Command+S,
+Windows ve Linux'ta Ctrl+S demektir. `"Shift+S"`, `"Alt+S"` ve
+`"Alt+Shift+S"` Shift ve Alt (macOS'ta Option) ekler. `Ctrl`, `Command`
+ve `Cmd` reddedilir; komut tuşu iki kez yazılmaz. Bir harf büyük veya
+küçük yazılabilir. İki öğe aynı kısayolu kullanamaz; ikincisi GUIError'dur.
+Boş kısayol çakışma değildir.
+
+Etkisiz bir öğe kısayolunu tutar ve kısayol bir şey yapmaz. İşaretli bir
+öğe çalışınca, `onClick`'ten önce işareti değişir. Geri çağrılar Button
+tıklamaları gibi teker teker çalışır ve başka bir Function ile aynı
+`Global` adları görür. Menü açmak yerel değişken yakalamaz.
+
+Odaktaki bir Window için kısayol sırası:
+
+1. Odakta bir TextInput, TextArea veya PasswordInput varsa ve akor bir
+   düzenleme akoruysa alanı onu işler, menü öğesi çalışmaz. Bu akorlar
+   her platformda A, C, X, V ve Z, her platformda Shift+Z ve Windows ile
+   Linux'ta Y'dir. PasswordInput yine kopyalamaz ve kesmez; C ve X'i yine
+   de tüketir.
+2. Aksi halde akora sahip tek etkin öğe bir kez çalışır. Tuş yazılmaz ve
+   `Window.onKey`'e iletilmez.
+3. Akorun tek öğesi etkisizse akor bir şey yapmaz.
+4. Odakta olmayan bir Window kısayol almaz. Gizli veya etkisiz bir alan
+   odakta değildir, bu yüzden bir düzenleme akoru almaz.
+
+`examples/v2.9/menu` küçük bir not penceresidir: Save, TextInput'u okur
+ve kısayolu Command/Ctrl+S'tir.
+
+## Resimler
+
+`container.image(path, width := 0, height := 0)` bir PNG veya JPEG dosyası
+gösterir. Image bir çizim yüzeyi değildir ve bir Button değildir: tıklama
+callback'i yoktur ve Tab sırasında yer almaz.
+
+`width` ve `height` pencere noktasıdır, 0 ile 4096 arasındadır. Sıfır, o
+kenarın verilmediği anlamına gelir.
+
+- İkisi de verilmezse kutu resmin kendi piksel boyudur; iki kenar da 4096'yı
+  aşmayacak biçimde küçültülür. Oran korunur.
+- Yalnız genişlik verilirse yükseklik resme uyar. Yalnız yükseklik verilirse
+  genişlik resme uyar. Uyan kenar 4096'yı aşacaksa o kenar 4096 olur ve resim
+  kutunun içine sığdırılır.
+- İkisi de verilirse kutu tam o boydur. Resim kutunun içinde ortalanır ve
+  oranı korunur. Boş kalan yer Image'ın arka planını, arka plan yoksa
+  arkasında ne varsa onu gösterir.
+
+`setSize(width := 0, height := 0)` bu seçimi sonradan değiştirir.
+`setMinWidth` ve `setPreferredWidth` kutuyu resimden daha geniş yapabilir.
+Resim ortada kalır ve gerilmez. `setAlign` ve `setSpan` diğer bileşenlerdeki
+gibi çalışır. Image bir Column, Row, ızgara veya kaydırma alanında durabilir
+ve bir kaydırma alanı onu Label gibi kırpar.
+
+Resim, Image oluşturulurken okunur ve saklanır. Sonraki kareler dosyayı
+yeniden okumaz ve yeniden çözmez. Eksik bir dosya, bir dizin, 64 MiB'den
+büyük bir dosya, bir kenarı 8192 pikselden büyük bir resim, bozuk bir dosya
+veya PNG ya da JPEG olmayan bir dosya GUIError'dır ve Image oluşturulmaz.
+GIF ve diğer biçimler reddedilir.
+
+Yol, Graphics ve File ile aynı kural olarak programın çalışma dizinine
+göredir. Çalışma zamanı yolu mutlak yapar, yardımcı ondan sonra okur.
+Yardımcının kendi klasörü aranmaz. Finder'dan açılan paketlenmiş bir
+uygulamanın çalışma dizini ev klasörüdür; bir terminalden başlatılan
+uygulamanınki o terminalin klasörüdür. `image` uygulamanın kaynak klasörüne
+bakmaz.
+
+`GUI.resource(name)` o kaynak klasöründeki bir dosyanın kurallı mutlak
+yolunu döndürür. `name` klasöre görelidir; `..` ve mutlak yol kabul edilmez.
+Çalışma dizini değildir ve ev dizini değildir. Klasörün kendisi ve dosya,
+sembolik bağlantılar çözülerek bulunur. Bir bağlantı, dosyanın kurallı yolu
+klasörün kurallı yolunun içinde kaldığında kabul edilir; iç içe bir dizin
+bağlantısı da buna dahildir. Dışarıyı gösteren bir bağlantı GUIError'dır.
+Hedefi olmayan bir bağlantı, eksik bir dosya veya bir dizin de GUIError'dır.
+`ahdcode run`, giriş modülünün yanındaki `resources` klasörünü kullanır.
+Paketlenmiş bir macOS uygulaması `Contents/Resources/app` kullanır.
+Paketlenmiş bir Windows veya Linux uygulaması, `runtime` değil, programın
+yanındaki `resources` klasörünü kullanır. Paketlenmiş bir resim isteyen
+program o yolu `image`'a verir:
+
+```ahd
+mark: Image := form.image(GUI.resource("icons/mark.png"))
+```
+
+`ahdcode package`, girişin yanındaki `resources` klasöründen `.png`, `.jpg`
+ve `.jpeg` dosyalarını uygulamanın bu klasörüne kopyalar. Oradaki başka bir
+dosya hatadır. Veri dosyaları kopyalanmaz.
+
+`setEnabled(false)` Image'ı görünür, yerinde ve soluk bırakır. Yine tıklama
+veya Tab kabul etmez. `setVisible(false)` onu yerleşimden çıkarır.
+
+```ahd
+mark: Image := form.image("mark.png", 160, 0)
+mark.setSize(120, 80)
+```
+
+## Satır kaydıran etiketler
+
+`label.setWrap(wrap)` satır kaydırmayı açar veya kapatır. Program açmadıkça
+kaydırma kapalıdır. Kaydırmayan bir Label tek satırdır; `setSize` ve
+`setBold` önceki gibi çalışır.
+
+Kaydırma açıkken:
+
+- Kaydırma genişliği, ikisinden biri sıfırdan büyükse tercih edilen genişlik
+  ile en küçük genişliğin büyüğüdür. Metin daha geniş olsa da bu genişlik
+  kullanılır. Label'ın genişliği bu kaydırma genişliği olur; yüksekliği satır
+  sayısı çarpı Label'ın satır yüksekliğidir.
+- İki genişlik de verilmemişse Label yalnızca açık satır sonlarında kırılır.
+  Genişliği en uzun satırıdır.
+- `\r\n` ve `\r`, `\n` gibi satır sonudur. Boş bir satır yüksekliğini korur.
+- Boşluklar kelimeleri ayırır; art arda gelen boşluklar tek boşluk olur.
+  Satırdan geniş bir kelime grafik kümelere bölünür, bu yüzden bir Türkçe
+  harf veya bir emoji ortadan kesilmez. Satırdan geniş tek bir küme kendi
+  satırında kalır ve Label'ın kutusuna kırpılır. Gömülü yazı tipinde emoji
+  glifi yoktur; o küme yazı tipinin eksik karakter kutusu olarak çizilir.
+- Metin kutunun üstünden, satır satır çizilir ve kutuya kırpılır. Bir
+  kaydırma alanı onu bir kez daha kırpar. Label gerilirse kutu genişler ve
+  metin o genişliğe göre yeniden kayar. Kutu genişlediğinde yükseklik
+  küçülmez.
+- Pencere veya bir kaydırma görünümü, ölçülen genişlikten dar olduğunda
+  Label, altındaki bileşenler yerleştirilmeden önce bu dar genişlikte yeniden
+  ölçülür. Yeni yükseklik yeni satır sayısıdır; alttaki bileşenler aşağı
+  kayar ve satırlar onların üzerine binmez. Label, en küçük genişliğinden
+  veya en geniş grafik kümesinden daha dar olmaz. Kaydırmayan bir alan,
+  düğme, resim veya başka bir bileşen ölçülen genişliğini korur ve bir ızgara
+  sütunu o bileşene yetecek kadar geniş kalır. Label bundan sonra o
+  bileşenlerin bıraktığı yuvaya kayar. Yuva pencereden hâlâ genişse fazlalık
+  kayar veya kırpılır. Bir kutu, kendisine verilen yükseklikten dar olursa
+  çizim ölçülen satır sonlarını korumaya devam eder.
+- `setSize` ve `setBold` satır yüksekliğini ve kalınlığı değiştirmeye devam
+  eder. Kalın bir Label'ın ek genişliği, tek satırlık bir Label'ın ek
+  genişliğiyle aynıdır.
+
+Label dışında bir bileşende `setWrap` bir GUIError'dır. Argümansız
+`setWrap()` derleyici tarafından reddedilir.
+
+`examples/v2.9/gallery` bir pencerede resim, satır kaydıran etiket, ızgara
+ve kaydırma alanını bir araya getirir.
+
 ## GUI ne değildir
 
 Bunlar eksik temel özellikler değil, bilinçli sınırlardır:
 
-- ağaç görünümü, sekmeler, menüler, şerit (ribbon), yerleştirme (docking)
-  veya çok belgeli pencereler yoktur;
+- ağaç görünümü, şerit (ribbon), yerleştirme (docking) veya çok belgeli
+  pencereler yoktur; işletim sistemi menü çubuğu uygulama adının ötesinde
+  yoktur;
 - zengin metin düzenleyici, sözdizimi renklendirme, gömülü tarayıcı veya
   web görünümü yoktur;
-- tema veya CSS motoru, yazı tipleri veya açık renklerin ötesinde stiller
-  yoktur;
+- tema veya CSS motoru yoktur; yazı tipi bir Label'ın dört boyu ve
+  kalınlığıyla sınırlıdır;
 - özel bileşen veya eklenti sistemi ve görsel GUI tasarımcısı yoktur;
-- TableView'da düzenlenebilir hesap tablosu hücreleri, formüller, sıralama
-  veya filtreleme çerçevesi ve veritabanlarına veya Data Table'lara otomatik
-  bağlama yoktur;
-- sürükle-bırak, pano API'si, animasyonlar veya Window içinde çizim yoktur
-  (çizim için [Graphics](GRAPHICS_TR.md) kullanın);
-- async, iş parçacıkları, future'lar veya arka plan görevleri yoktur:
-  callback'ler birer birer çalışır ve uzun bir callback penceresini bekletir;
+- TableView'da düzenlenebilir hesap tablosu hücreleri, formüller veya
+  filtreleme çerçevesi yoktur. Başlık sıralaması metni karşılaştırır; yukarıda
+  anlatılmıştır. Veritabanlarına veya Data Table'lara otomatik bağlama yoktur;
+- sürükle-bırak yoktur ve genel bir animasyon çerçevesi yoktur.
+  `window.every` bir zamanlayıcıdır. Belirsiz ilerleme çubuğu kendi hareketli
+  bloğunu çizmeye devam eder. Image bir resim dosyası gösterir. Pencerenin
+  içindeki Canvas küçük bir şekil kümesi çizer; tam çizim penceresi
+  [Graphics](GRAPHICS_TR.md) olmaya devam eder;
+- pencere başına işbirlikli bir arka plan görevi vardır; async, iş
+  parçacıkları, future'lar veya genel çoklu iş parçacığı yoktur. Bir callback
+  hâlâ birer birer çalışır ve uzun bir callback o pencereyi, dönene kadar
+  bekletir;
 - video düzenleyiciler, 3B tasarım araçları veya oyun motorları gibi
   profesyonel yaratıcı uygulamalar için altyapı yoktur.
 
-Radyo düğmelerinin işini Select görür; görünürlük (gizle/göster) v2.0'da
-yoktur.
+## Sekmeler, radyo düğmeleri, ilerleme ve tarih
+
+`container.tabs()` bir Tabs denetimi döndürür. `tabs.page(title)` bir sayfa
+ekler ve bir Container döndürür; bu sayfa bir Column'un tuttuğu bileşenleri
+tutar. Başlık 1 ile 256 karakterdir ve bir Tabs en çok 32 sayfa tutar. İlk
+sayfa seçilidir. `select(index)` sayfayı oluşturulma sırasındaki indeksiyle
+seçer, gizli bir sayfa da buna dahildir; `selectedIndex()` bu indeksi
+döndürür. Sayfa yoksa veya indeks dışarıdaysa ikisi de `GUIError` fırlatır.
+
+Yalnızca seçili sayfa çizilir ve tıklama, tuş ve Tab alır. Diğer sayfalar
+bileşenlerini tutar ama o bileşenler tıklanamaz ve Tab sırasında yoktur.
+Bir başlığa tıklamak o sayfayı seçer. Sol ve Sağ görünür başlıklar arasında
+gezer ve odağı sekme çubuğunda bırakır. Bir başlığa tıklayarak bir sayfaya
+dönmek, o sayfada odağı en son tutan ve hâlâ odak alabilen denetime odağı
+geri verir. Gizli bir sayfanın başlığı yoktur. Seçili sayfa gizliyse içerik
+alanı boştur. `onChange` yeni indeksi, sayfayı kullanıcı değiştirdiğinde
+alır. `select` onu çağırmaz.
+
+`container.radioGroup()` bir RadioGroup döndürür. `group.option(text)` yazısı
+1 ile 256 karakter olan bir RadioButton ekler. Bir grup en çok 64 seçenek
+tutar. Kullanıcı veya program seçene kadar hiçbir şey seçili değildir.
+`select(index)` `Int?` alır; `null` seçimi temizler. `selectedIndex()` ve
+`selectedText()`, hiçbir şey seçili değilse null'dır. İndeks gizli olanlar
+dahil her seçeneği sayar. Tıklama veya Space etkin bir seçeneği seçer. Yukarı
+ve Aşağı, etkin ve görünür seçenekler arasında gezer ve vardığı seçeneği
+seçer. Devre dışı bir seçeneği kullanıcı seçemez; `select` onu yine
+seçebilir. `onChange` indeksi ve yazıyı alır; seçim temizlenince ikisi de
+null'dır ve yalnızca kullanıcının değişikliği için çalışır. Bir RadioButton'ın
+yazısı, renkleri, etkinliği ve görünürlüğü vardır. Grubun kendisi etkin veya
+devre dışı yapılmaz.
+
+`container.progress(maximum := 100)` bir Progress çubuğu döndürür. Üst sınır
+1 ile 1000000 arasında bir Int'tir. Değer 0'dan başlar. `setValue`, 0 ile üst
+sınır arasında bir Int ister; dışı `GUIError` fırlatır ve değeri değiştirmez.
+`setIndeterminate(true)` çubuğun bir kesri yerine hareketli bir blok çizer.
+Program, blok hareket ederken de değeri okuyup ayarlayabilir. Değeri ayarlamak
+bir callback çalıştırmaz ve beklemez: pencere yeni değeri kendi sonraki
+çerçevesinde çizer. Progress bir Tab durağı değildir. Onu devre dışı bırakmak
+soluklaştırır ve programın değeri ayarlamasını durdurmaz. Doğal boyu bir metin
+alanı genişliğinde ve bir satır yüksekliğindedir.
+
+`container.date(year := 2000, month := 1, day := 1)` bir DateField döndürür.
+Tarih, proleptik Gregoryen takviminde bir gündür: yıl 1 ile 9999, ay 1 ile 12
+ve o ayda bulunan bir gün. 29 Şubat, yıl 4'e bölünüyorsa geçerlidir; 100'e
+bölünen yıllar ancak 400'e de bölünüyorsa geçerlidir. Denetim her zaman gerçek
+bir tarih tutar. Geçersiz bir tarih `GUIError` fırlatır. `setDate` o zaman
+önceki tarihi yerinde bırakır. Alan `YYYY-MM-DD` olarak, sıfırlarla ve ay
+adları olmadan çizilir; macOS, Windows ve Linux aynı rakamları gösterir. Tek
+bir Tab durağıdır ve üç eşit parçası vardır. Tıklama bir parça seçer. Sol ve
+Sağ parçalar arasında gezer. Yukarı ve Aşağı o parçayı bir değiştirir. Yıl
+1 ile 9999, ay 1 ile 12 arasında kalır; gün ayın uzunluğuna kıstırılır, ay
+veya yıl değişince de. Rakamlar parçayı değiştirir: yıl için dört, ay veya
+gün için iki. Ancak ortaya çıkan tarih gerçekse uygulanır. `year()`,
+`month()` ve `day()` onu okur. `onChange` üçünü de, tarihi kullanıcı
+değiştirince alır. `setDate` onu çağırmaz.
+
+`examples/v2.9/controls` dört denetimi bir pencerede bir araya getirir.
+
+## Zamanlayıcılar, arka plan görevleri ve gömülü Canvas
+
+`window.every(milliseconds, handler)` yinelenen bir zamanlayıcı kaydeder ve
+Int kimliğini döndürür. `window.cancel(timer)` o zamanlayıcıyı durdurur.
+Hiçbir zamanlayıcıyı adlandırmayan bir kimliği iptal etmek bir şey yapmaz.
+Aralık 1 milisaniye ile bir gün (86.400.000 milisaniye) arasındadır. Bir
+pencere en çok 64 zamanlayıcı tutar; biri iptal edilene kadar sonraki
+`every` çağrısı `GUIError` fırlatır. İşleyici `() -> Nothing` şeklindedir.
+
+Gerçek bir pencere, tıklamalar ve tuşlarla aynı olay kuyruğuna her seferinde
+bir tik koyar. İşleyici `wait` içinde, o olaylarla sırayla ve birer birer
+çalışır; bileşenleri okuyup değiştirebilir. Aralığından uzun süren bir
+işleyici kuyruk biriktirmez: kaçırdığı tikler atlanır. İşleyicinin içinden
+iptal, sonraki tikten önce geçerli olur. Pencere kapanınca her zamanlayıcı
+durur ve kapanıştan sonra kuyruğa girmiş bir tik çalışmaz. Başsız bir
+pencerenin saati yoktur. Zamanlayıcıları yalnızca betik
+`{"event":"tick"}` gönderince çalışır. `timer` alanı olmayan veya `timer`
+değeri 0 olan bir tik, başlatma sırasıyla her zamanlayıcıyı çalıştırır. Sıfır
+olmayan bir `timer` yalnızca onu çalıştırır.
+
+`window.task(work)` bir arka plan görevi başlatır ve bir `Task` döndürür.
+`work`, `() -> Int` şeklindedir. Bir pencere aynı anda bir görev çalıştırır;
+ilki dönmeden yapılan ikinci `task` çağrısı `GUIError` fırlatır. Fonksiyon,
+`wait` çalışırken çalışır; `wait` öncesinde oluşturulan bir görev de buna
+dahildir. Bir tıklama, bir zamanlayıcı veya başka bir GUI callback'i ile aynı
+anda çalışmaz. `GUI.checkpoint()` bu callback'lerin çalışmasına izin verme
+yoludur. Görev dışında `checkpoint` true döndürür ve hiçbir şeyi değiştirmez.
+Görev içinde, görev iptal edildiyse veya pencere kapanmaya başladıysa false,
+pencere hâlâ bir sonuç teslim edebiliyorsa true döndürür. Fonksiyonu durdurmaz.
+Dönüp dönmemeye fonksiyon karar verir. `checkpoint` çağırmayan bir kesit,
+tek bir dosya veya veritabanı çağrısı da buna dahil, GUI callback'lerini o
+kesit dönene kadar tutar. Pencere süreci çizmeye devam eder; program o kesitte
+tıklamaları ve zamanlayıcıları işlemez.
+
+`task.onDone(handler)`, `(value: Int?, problem: String?) -> Nothing` işleyicisini
+kaydeder. Yeniden kaydetmek öncekinin yerine geçer. İşleyici diğer
+callback'lerle aynı yolda çalışır, bu yüzden bileşenleri değiştirebilir.
+Başarıda `value` Int'tir ve `problem` null'dır. `work` bir Error fırlatırsa
+`value` null'dır ve `problem` o hatanın mesajıdır; başka bir başarısızlık
+yayılmaya devam eder. `onDone` yalnızca fonksiyon dönmüşse, görev iptal
+edilmemişse ve pencere hâlâ açıksa çalışır. `onDone` kaydedildiğinde görev
+bitmişse, aynı kurallarla o anda teslim edilir.
+
+`task.cancel()` sonucun atılmasını ister. Fonksiyonu kesmez. Fonksiyon
+`cancel` sonrasında dönerse `onDone` çalışmaz. `task.cancelled()`, `cancel`
+sonrasında, fonksiyon hâlâ çalışırken pencere kapanmaya başladıktan sonra ve
+hiçbir görevi adlandırmayan bir kimlik için true'dur. Bitmiş bir görevi veya
+bilinmeyen bir görevi iptal etmek bir şey yapmaz.
+
+Görev pencereyi değiştirmemelidir. Görevden yapılan bir bileşen çağrısı
+`GUIError` fırlatır (`a background task cannot change the window`). Label,
+ilerleme çubuğu ve diğer bileşenleri `onDone` içinden, bir zamanlayıcıdan
+veya başka bir callback'ten güncelleyin. Görev ile bu callback'ler gizli bir
+değişken depo paylaşmaz: yalnızca programın kendi atadığı değerleri kullanırlar
+ve `checkpoint` callback'lere izin verdiği süre dışında aynı anda çalışmazlar.
+`checkpoint` boyunca aynı değişkeni iki taraftan okuyup yazmayın; program her
+iki sırayı da kabul edemiyorsa.
+
+Pencereyi kapatmak, henüz dönmemiş bir görevi iptal eder. `wait` bundan sonra
+fonksiyon dönene kadar bekler; `checkpoint`'i yok sayan ve hiç dönmeyen bir
+fonksiyon `wait`'in de dönmesini engeller. Sonuç atılır ve `onDone` çalışmaz.
+Pencere açıkken bitmiş ve tamamlanması kuyruğa girmiş bir görev, `wait`
+dönmeden `onDone`'ını hâlâ çalıştırabilir.
+
+`container.canvas(width := 240, height := 160)` bir Canvas döndürür ve bir
+Graphics penceresi açmaz. Bir Column, Row, Grid, Scroll veya Tabs sayfasına
+eklenebilir. Kök olamaz. Genişlik ve yükseklik doğal boydur, 1 ile 4096
+arasındadır. Yerleşim onu gerebilir. Koordinatlar yerleştirilen boyu kullanır:
+başlangıç merkezdir, x sağa, y yukarı büyür; Graphics ile aynı düzen.
+Çizim Canvas'a ve onu saran bir kaydırma görünümüne kırpılır. Gizli bir
+Canvas yer kaplamaz ve işaretçi olayı almaz. Devre dışı bir Canvas görünür
+kalır, soluklaşır ve hiç işaretçi olayı almaz.
+
+Bu Canvas, Graphics çiziminin bir alt kümesidir. Kaplumbağa, resim, yay,
+çokgen, elips, SVG veya batch yoktur. Dikdörtgen ve daire çizgisi bir birim
+kalınlığındadır. Bir doğrunun kalınlığı 1 ile 64 arasındadır.
+
+```text
+Canvas.clear(color: String := "") -> Nothing
+Canvas.line(x1: Real, y1: Real, x2: Real, y2: Real, stroke: String := "black", width: Real := 1) -> Nothing
+Canvas.rectangle(x: Real, y: Real, width: Real, height: Real, stroke: String := "black", fill: String := "") -> Nothing
+Canvas.circle(x: Real, y: Real, radius: Real, stroke: String := "black", fill: String := "") -> Nothing
+Canvas.text(x: Real, y: Real, text: String, fill: String := "black", size: Real := 16) -> Nothing
+Canvas.onMove(handler: (x: Real, y: Real) -> Nothing) -> Nothing
+Canvas.onClick(handler: (x: Real, y: Real) -> Nothing) -> Nothing
+Canvas.onDrag(handler: (x: Real, y: Real) -> Nothing) -> Nothing
+```
+
+Boş bir `clear` rengi beyazdır. Boş bir dolgu, dolgu çizmez. Renkler Graphics
+adları ile `#RRGGBB` ve `#RRGGBBAA` biçimleridir. Koordinatlar sonlu olmalı
+ve mutlak değeri en çok 100.000 olmalıdır. Bir dikdörtgenin genişliği ve
+yüksekliği 0'dan büyük olmalıdır. Bir dairenin yarıçapı 0'dan büyük ve en
+çok 100.000 olmalıdır. Metin 1 ile 1000 karakterdir ve boyu 1 ile 200
+arasındadır. Metin için `(x, y)` taban çizgisidir. Bir Canvas en çok 4096
+çizim komutu tutar; `clear` yeniden başlatır. `setBackground`, `setEnabled`,
+`setVisible`, `setMinWidth`, `setPreferredWidth`, `setAlign` ve `setSpan`
+diğer bileşenlerdeki üyelerdir. `setForeground` yoktur. Canvas bir Tab
+durağı değildir.
+
+`onMove`, hiçbir düğme basılı değilken işaretçiyi bildirir. `onClick`,
+Canvas üzerinde başlayan bir basışı bildirir. `onDrag`, o basış sürerken
+işaretçiyi bildirir; işaretçi Canvas'tan çıksa da, bu yüzden bir koordinat
+dışarıda olabilir. Devre dışı, gizli veya etkin olmayan bir sayfadaki Canvas
+bunların hiçbirini bildirmez. Başlamış bir sürükleme, Canvas devre dışı
+kalırsa veya gizlenirse durur. Koordinatlar Canvas koordinatlarıdır; Canvas
+kaydırılmış bir kabın içindeyse de öyledir: bileşenin yeri kaydırmayı zaten
+içerir ve işaretçi Canvas'ın merkezinden ölçülür. GUI'nin Canvas'ı ile
+Graphics'in Canvas'ı aynı ada sahip farklı sınıflardır. `from GUI bring Canvas`
+ile `from Graphics bring Canvas` aynı kapsamda birlikte bulunamaz. Yalnızca
+gömülü yüzeye ihtiyacı olan bir program GUI'nin Canvas'ını getirir veya sınıfı
+hiç adlandırmaz ve `container.canvas` değerini kullanır.
+
+`examples/v2.9/interactive` bir zamanlayıcıyı, bir ilerleme çubuğunu, bir
+arka plan toplamını ve hareket eden bir daireyi, Start, Stop ve Cancel ile
+tek bir Canvas üzerinde bir araya getirir.
+
+## Açık kalan sınırlar
+
+Bunlar çözülmedi. v2.9 kabul denetimi için açık kalırlar:
+
+1. Bu GUI çalışması Windows 11'de ve bir Wayland oturumunda çalıştırılmadı.
+   Şimdiye kadarki denetimler bu Mac'teki otomatik testler ve yerleşim
+   örneği için bir fiziksel fare ve klavye geçişidir.
+2. Sekmeler, radyo düğmeleri, ilerleme çubuğu ve tarih alanının otomatik
+   etkileşim testleri ve bir macOS çizim denetimi vardır. Bu dört denetimin
+   fiziksel fare ve klavye geçişi hâlâ açıktır.
+3. Zamanlayıcılar, arka plan görevi ve gömülü Canvas'ın otomatik testleri ve
+   `examples/v2.9/interactive` için bir macOS çizim denetimi vardır. Bu
+   pencerenin fiziksel fare ve klavye geçişi hâlâ açıktır. Çizim denetimi
+   tıklamaz, yazmaz ve tuşa basmaz.
+4. Defterin ekleme, düzenleme, silme, sıralama, CSV dışa aktarma ve SQLite
+   dosyasını yeniden açma için otomatik bir kabul testi vardır.
+   `examples/v2.0/ledger_app` için fiziksel fare ve klavye geçişi hâlâ
+   açıktır. Bir çizim denetimi bu geçişin yerine geçmez.

@@ -34,9 +34,9 @@ command line is the whole configuration.
 
 | Platform | Application |
 | --- | --- |
-| macOS | `Name.app` — `Contents/MacOS` holds the program and its helpers, `Contents/Resources` the icon (`AppIcon.icns`) |
-| Windows | a folder `Name/` with `Name.exe` and `runtime/`, and the same as `Name-windows-x64.zip` |
-| Linux | a folder `Name/` with `Name` and `runtime/`, and the same as `Name-linux-x64.tar.gz` |
+| macOS | `Name.app` — `Contents/MacOS` holds the program and its helpers, `Contents/Resources` the icon (`AppIcon.icns`), and `Contents/Resources/app` bundled images |
+| Windows | a folder `Name/` with `Name.exe`, `runtime/`, and `resources/` for bundled images, and the same as `Name-windows-x64.zip` |
+| Linux | a folder `Name/` with `Name`, `runtime/`, and `resources/` for bundled images, and the same as `Name-linux-x64.tar.gz` |
 
 An application holds exactly:
 
@@ -50,10 +50,18 @@ An application holds exactly:
   `Info.plist`, `PkgInfo`, and `AppIcon.icns`.
 
 It never holds the AhdCode compiler, its Go toolchain, the language server,
-documentation, AhdDataStudio, or any file from the project folder: nothing
-beside the entry module is copied — not `.env`, `.git`, databases,
-spreadsheets, CSV files, screenshots, logs, or source files. A program that
-needs a data file creates it or asks for it with [GUI dialogs](GUI.md#dialogs).
+documentation, or AhdDataStudio. Nothing beside the entry module is copied
+except `.png`, `.jpg`, and `.jpeg` files in a `resources` folder next to that
+module. Those images are copied into the application's own resource folder:
+`Contents/Resources/app` on macOS, and `resources` beside the program on
+Windows and Linux. Any other file in that folder, including `.env`, `.git`,
+databases, spreadsheets, CSV files, logs, and source files, stops packaging.
+A symbolic link in that folder, including a `resources` folder that is itself
+a symbolic link, also stops packaging. The link is not followed, so packaging
+cannot copy a file that lives outside the folder.
+A program that needs a data file creates it or asks for it with
+[GUI dialogs](GUI.md#dialogs). A picture loaded with `GUI.resource` uses this
+folder. `image("mark.png")` still uses the working directory.
 Before anything is written, a leak check refuses the application if it would
 hold any other file, a file with a forbidden name, or metadata that looks
 like a secret. It cannot look inside the compiled program: a password written
@@ -74,7 +82,8 @@ platform. A missing helper is reported as missing from the application.
 An application opened from the macOS Finder starts in the user's home
 folder instead of the root folder, so a relative path such as
 `"ledger.db"` means a file in the home folder. Started from a terminal, it
-uses the terminal's current folder, as any program does.
+uses the terminal's current folder, as any program does. Bundled images do
+not use that folder. `GUI.resource` reads the application's resource folder.
 
 ## Name and icon
 

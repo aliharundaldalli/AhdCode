@@ -30,6 +30,31 @@ status.setForeground("blue")
 save.setBackground(color: "#0066CC")
 save.setEnabled(false)
 active := save.isEnabled()
+save.setVisible(false)
+shown := save.isVisible()
+status.setSize("large")
+status.setBold(true)
+status.setWrap(true)
+photo := form.image("mark.png", 80, 40)
+photo.setSize(40)
+GUI.setClipboard("note")
+note := GUI.clipboard()
+file := window.menu("File")
+saveItem := file.item("Save", "S")
+boldItem := file.checkItem("Bold", "", false)
+file.separator()
+saveItem.onClick(lambda () -> status.setText("saved"))
+saveItem.setEnabled(false)
+itemOn := saveItem.isEnabled()
+boldItem.setChecked(true)
+marked := boldItem.checked()
+saveItem.setText("Store")
+sheet := form.grid(columns: 2, columnGap: 8, rowGap: 4)
+sheet.label("A")
+save.setMinWidth(80)
+save.setPreferredWidth(120)
+save.setAlign("center")
+save.setSpan(2, 1)
 `
 
 func TestCompletionOffersGUIModuleAndMembers(t *testing.T) {
@@ -45,15 +70,18 @@ func TestCompletionOffersGUIModuleAndMembers(t *testing.T) {
 		absent []string
 	}{
 		{"bring GUI\nGUI.", []string{"window", "Window", "Container", "Label", "Button", "TextInput", "Checkbox", "GUIError",
-			"ListBox", "Select", "TextArea", "PasswordInput", "TableView", "openFile", "openFiles", "selectFolder", "saveFile", "message", "confirm"},
-			[]string{"alert", "fileDialog", "Table", "RadioGroup", "TreeView"}},
-		{"bring GUI\nw := GUI.window()\nw.", []string{"column", "row", "onKey", "wait", "close", "isOpen", "setTitle", "setBackground", "setResizable", "isResizable"}, []string{"onClick", "menu", "setForeground", "setEnabled", "setTheme", "resize"}},
-		{"bring GUI\nc := GUI.window().column()\nc.", []string{"column", "row", "label", "button", "textInput", "checkbox", "setBackground",
-			"passwordInput", "textArea", "listBox", "select", "table"}, []string{"dropdown", "tree", "setForeground", "setEnabled", "scrollColumn"}},
-		{"bring GUI\nb := GUI.window().column().button(\"x\")\nb.", []string{"text", "setText", "onClick", "setForeground", "setBackground", "setEnabled", "isEnabled"}, []string{"setVisible", "setFont", "setStyle"}},
-		{"bring GUI\ni := GUI.window().column().textInput()\ni.", []string{"text", "setText", "onChange", "setForeground", "setBackground", "setEnabled", "isEnabled"}, []string{"onKey", "setFont"}},
-		{"bring GUI\nk := GUI.window().column().checkbox(\"x\")\nk.", []string{"checked", "setChecked", "onChange", "setForeground", "setBackground", "setEnabled", "isEnabled"}, []string{"onClick", "setFont"}},
-		{"bring GUI\nl := GUI.window().column().label(\"x\")\nl.", []string{"text", "setText", "setForeground", "setBackground"}, []string{"onClick", "setEnabled", "isEnabled", "setVisible", "setFont"}},
+			"ListBox", "Menu", "MenuItem", "Select", "TextArea", "PasswordInput", "TableView", "Image",
+			"Tabs", "RadioGroup", "RadioButton", "Progress", "DateField", "Canvas", "Task",
+			"openFile", "openFiles", "selectFolder", "saveFile", "message", "confirm", "clipboard", "setClipboard", "checkpoint"},
+			[]string{"alert", "fileDialog", "Table", "TreeView"}},
+		{"bring GUI\nw := GUI.window()\nw.", []string{"column", "row", "scroll", "grid", "onKey", "wait", "close", "isOpen", "setTitle", "setBackground", "setResizable", "isResizable", "menu", "every", "cancel", "task"}, []string{"onClick", "setForeground", "setEnabled", "setTheme", "resize"}},
+		{"bring GUI\nc := GUI.window().column()\nc.", []string{"column", "row", "grid", "scroll", "label", "image", "button", "textInput", "checkbox", "setBackground",
+			"passwordInput", "textArea", "listBox", "select", "table", "tabs", "radioGroup", "progress", "date", "canvas",
+			"setVisible", "isVisible", "setMinWidth", "setPreferredWidth", "setAlign", "setSpan"}, []string{"dropdown", "tree", "setForeground", "setEnabled", "scrollColumn"}},
+		{"bring GUI\nb := GUI.window().column().button(\"x\")\nb.", []string{"text", "setText", "onClick", "setForeground", "setBackground", "setEnabled", "isEnabled", "setVisible", "isVisible", "setMinWidth", "setPreferredWidth", "setAlign", "setSpan"}, []string{"setFont", "setStyle"}},
+		{"bring GUI\ni := GUI.window().column().textInput()\ni.", []string{"text", "setText", "onChange", "setForeground", "setBackground", "setEnabled", "isEnabled", "setVisible", "isVisible"}, []string{"onKey", "setFont"}},
+		{"bring GUI\nk := GUI.window().column().checkbox(\"x\")\nk.", []string{"checked", "setChecked", "onChange", "setForeground", "setBackground", "setEnabled", "isEnabled", "setVisible", "isVisible"}, []string{"onClick", "setFont"}},
+		{"bring GUI\nl := GUI.window().column().label(\"x\")\nl.", []string{"text", "setText", "setForeground", "setBackground", "setVisible", "isVisible", "setSize", "setBold", "setWrap"}, []string{"onClick", "setEnabled", "isEnabled", "setFont"}},
 		{"bring Graphics\ncanvas := Graphics.open()\ncanvas.", []string{"onClick", "onKey", "wait", "turtle"}, []string{"mouseX", "isKeyDown"}},
 	} {
 		store.Open(path, testCase.prefix+"\n")
@@ -91,6 +119,25 @@ func TestHoverAndSignatureHelpForGUI(t *testing.T) {
 		{"status.setForeground", "setForeground: (color: String) -> Nothing"},
 		{"save.setEnabled", "setEnabled: (enabled: Bool) -> Nothing"},
 		{"save.isEnabled", "isEnabled: () -> Bool"},
+		{"save.setVisible", "setVisible: (visible: Bool) -> Nothing"},
+		{"form.grid", "grid: (columns: Int, columnGap: Int := default, rowGap: Int := default) -> Container"},
+		{"save.setMinWidth", "setMinWidth: (width: Int) -> Nothing"},
+		{"save.setAlign", "setAlign: (horizontal: String, vertical: String := default) -> Nothing"},
+		{"save.setSpan", "setSpan: (columns: Int, rows: Int := default) -> Nothing"},
+		{"save.isVisible", "isVisible: () -> Bool"},
+		{"status.setSize", "setSize: (size: String) -> Nothing"},
+		{"status.setBold", "setBold: (bold: Bool) -> Nothing"},
+		{"status.setWrap", "setWrap: (wrap: Bool) -> Nothing"},
+		{"form.image", "image: (path: String, width: Int := default, height: Int := default) -> Image"},
+		{"photo.setSize", "setSize: (width: Int := default, height: Int := default) -> Nothing"},
+		{"GUI.setClipboard", "setClipboard: (text: String) -> Nothing"},
+		{"GUI.clipboard", "clipboard: () -> String"},
+		{"window.menu", "menu: (title: String) -> Menu"},
+		{"file.item", "item: (label: String, shortcut: String := default) -> MenuItem"},
+		{"file.checkItem", "checkItem: (label: String, shortcut: String := default, checked: Bool := default) -> MenuItem"},
+		{"saveItem.onClick", "onClick: (handler: Function() -> Nothing) -> Nothing"},
+		{"saveItem.setEnabled", "setEnabled: (enabled: Bool) -> Nothing"},
+		{"boldItem.checked", "checked: () -> Bool"},
 	} {
 		dot := strings.Index(testCase.target, ".")
 		hover, ok := store.Hover(path, offsetOf(t, guiSource, testCase.target)+dot+2)

@@ -66,6 +66,8 @@ func (session *Session) evalCall(call *ir.CallExpr, current *frame) any {
 }
 
 func (session *Session) invoke(value *FunctionValue, arguments []argumentValue) any {
+	session.enter()
+	defer session.leave()
 	if value == nil {
 		session.raise("NullError", "Function value is null")
 	}
@@ -369,7 +371,13 @@ func (session *Session) core(name string, receiver any, arguments []any) any {
 	if strings.HasPrefix(name, "Surface.") {
 		return session.plotSurfaceOperation(name, receiver, arguments)
 	}
-	if strings.HasPrefix(name, "Canvas.") || strings.HasPrefix(name, "Turtle.") {
+	if strings.HasPrefix(name, "Canvas.") {
+		if instance, ok := receiver.(*Instance); ok && instance != nil && instance.Class == guiClassID("Canvas") {
+			return session.guiOperation(name, receiver, arguments)
+		}
+		return session.graphicsOperation(name, receiver, arguments)
+	}
+	if strings.HasPrefix(name, "Turtle.") {
 		return session.graphicsOperation(name, receiver, arguments)
 	}
 	if isGUIOperation(name) {

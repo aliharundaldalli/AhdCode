@@ -1,0 +1,124 @@
+bring GUI
+from GUI bring (Window, Container, Canvas, Progress, Label, Button, Task, Menu, MenuItem)
+
+window: Window := GUI.window("Interactive", 520, 460)
+file: Menu := window.menu("File")
+quit: MenuItem := file.item("Quit", "Q")
+
+closeWindow: Function := () -> Nothing {
+    window: Global Window
+    window.close()
+}
+quit.onClick(closeWindow)
+
+form: Container := window.column(8, 12)
+status: Label := form.label("Ready")
+bar: Progress := form.progress(maximum: 100)
+board: Canvas := form.canvas(360, 200)
+actions: Container := form.row(8, 0)
+start: Button := actions.button("Start")
+stop: Button := actions.button("Stop")
+cancel: Button := actions.button("Cancel")
+
+place: Real := -120.0
+frame: Int := 0
+clock: Int := 0
+busy: Bool := false
+nothingToDo: Function := () -> Int {
+    return 0
+}
+job: Task := window.task(nothingToDo)
+
+// The sum is 200000 * 200001 / 2. The task does not touch widgets.
+// GUI.checkpoint lets timers and clicks run; it does not abort the loop.
+count: Function := () -> Int {
+    total: Local Int := 0
+    n: Local Int := 1
+    while n <= 200000 {
+        total = total + n
+        if n % 1000 == 0 {
+            if not GUI.checkpoint() {
+                return 0
+            }
+        }
+        n = n + 1
+    }
+    return total
+}
+
+step: Function := () -> Nothing {
+    place: Global Real
+    frame: Global Int
+    board: Global Canvas
+    bar: Global Progress
+    place = place + 8.0
+    if place > 120.0 {
+        place = -120.0
+    }
+    frame = frame + 1
+    if frame > 100 {
+        frame = 1
+    }
+    board.clear("white")
+    bar.setValue(frame)
+    board.circle(place, 0.0, 18.0, "blue", "cyan")
+}
+
+finished: Function := (value: Int?, problem: String?) -> Nothing {
+    status: Global Label
+    bar: Global Progress
+    busy: Global Bool
+    busy = false
+    if problem != null {
+        status.setText(problem)
+        return
+    }
+    if value != null {
+        status.setText("Sum {value}")
+        bar.setValue(100)
+    }
+}
+
+startWork: Function := () -> Nothing {
+    window: Global Window
+    clock: Global Int
+    busy: Global Bool
+    job: Global Task
+    if clock == 0 {
+        clock = window.every(50, step)
+    }
+    if busy {
+        return
+    }
+    busy = true
+    status: Global Label
+    status.setText("Counting")
+    job = window.task(count)
+    job.onDone(finished)
+}
+
+stopMotion: Function := () -> Nothing {
+    window: Global Window
+    clock: Global Int
+    if clock != 0 {
+        window.cancel(clock)
+        clock = 0
+    }
+}
+
+cancelWork: Function := () -> Nothing {
+    job: Global Task
+    busy: Global Bool
+    status: Global Label
+    job.cancel()
+    busy = false
+    status.setText("Cancel requested")
+}
+
+start.onClick(startWork)
+stop.onClick(stopMotion)
+cancel.onClick(cancelWork)
+board.clear("white")
+board.circle(place, 0.0, 18.0, "blue", "cyan")
+window.wait()
+write(status.text())

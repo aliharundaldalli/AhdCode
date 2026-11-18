@@ -53,7 +53,10 @@ func newDialogController(req dialogRequest, start string) (*dialogController, er
 		out:        bufio.NewWriter(io.Discard),
 		windowGone: make(chan struct{}),
 		clicks:     map[int64]bool{},
+		moves:      map[int64]bool{},
+		drags:      map[int64]bool{},
 		changes:    map[int64]bool{},
+		menuClicks: map[int64]bool{},
 	}
 	c := &dialogController{req: req, session: s, result: dialogResult{cancelled: true}}
 	s.sink = c.handle

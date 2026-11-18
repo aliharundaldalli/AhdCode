@@ -62,15 +62,22 @@ func main() {
 }
 
 func newSession(first request, in *bufio.Reader, out *bufio.Writer) *session {
+	model := newModel(first.Title, first.Width, first.Height, measureText)
+	if first.Clip != nil && validText(*first.Clip, maxClipboardRunes) {
+		model.clipboard = *first.Clip
+	}
 	return &session{
-		model:      newModel(first.Title, first.Width, first.Height, measureText),
+		model:      model,
 		in:         in,
 		out:        out,
 		headless:   first.Headless,
 		openID:     first.ID,
 		windowGone: make(chan struct{}),
 		clicks:     map[int64]bool{},
+		moves:      map[int64]bool{},
+		drags:      map[int64]bool{},
 		changes:    map[int64]bool{},
+		menuClicks: map[int64]bool{},
 		script:     first.Script,
 	}
 }

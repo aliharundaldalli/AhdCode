@@ -28,6 +28,7 @@ var (
 	colorButtonPress = color.RGBA{198, 198, 198, 255}
 	colorField       = color.RGBA{255, 255, 255, 255}
 	colorFocus       = color.RGBA{0, 110, 220, 255}
+	colorTextSelect  = color.RGBA{168, 206, 245, 255}
 	// colorDisabled fades a disabled widget: the default window color at 60%
 	// opacity, painted over the finished widget.
 	colorDisabled = color.NRGBA{242, 242, 242, 153}
@@ -123,12 +124,17 @@ func render(f frame) *image.RGBA {
 	m.layout()
 	face := faceAt(s)
 	for _, id := range m.order {
+		if !m.shown(id) || !m.tabShown(id) {
+			continue
+		}
 		drawWidget(img, face, f, m.widgets[id])
 	}
 	if m.popup != 0 {
 		// An open Select list lies over every widget.
 		drawPopup(img, face, f, m.widgets[m.popup])
 	}
+	// An open menu lies over the widgets and over a Select list.
+	drawMenus(img, face, f)
 	return img
 }
 
@@ -162,8 +168,31 @@ func text(img *image.RGBA, face font.Face, clip image.Rectangle, x int, box imag
 	drawer.DrawString(value)
 }
 
+// paintSelection fills the selected run of one line of text.
+func paintSelection(img *image.RGBA, face font.Face, clip image.Rectangle, originX, scroll int, shown []rune, start, end, top, bottom int) {
+	if start > end {
+		start, end = end, start
+	}
+	if start == end || start < 0 || end > len(shown) {
+		return
+	}
+	x0 := font.MeasureString(face, string(shown[:start])).Ceil()
+	x1 := font.MeasureString(face, string(shown[:end])).Ceil()
+	fill(img, image.Rect(originX+x0-scroll, top, originX+x1-scroll, bottom).Intersect(clip), colorTextSelect)
+}
+
 func drawWidget(img *image.RGBA, face font.Face, f frame, w *widget) {
 	s, m := f.scale, f.model
+	if clip, limited := m.scrollClip(w.id, s); limited {
+		if clip.Empty() {
+			return
+		}
+		sub, ok := img.SubImage(clip.Intersect(img.Bounds())).(*image.RGBA)
+		if !ok || sub.Bounds().Empty() {
+			return
+		}
+		img = sub
+	}
 	box := scaled(s, w.x, w.y, w.w, w.h)
 	line := max(1, int(math.Round(s)))
 	focused := m.focus == w.id
@@ -173,15 +202,31 @@ func drawWidget(img *image.RGBA, face font.Face, f frame, w *widget) {
 		defer fill(img, box, colorDisabled)
 	}
 	switch w.kind {
-	case kindColumn, kindRow:
+	case kindColumn, kindRow, kindGrid, kindScroll, kindPage, kindRadioGroup:
 		if w.background != nil {
 			fill(img, box, *w.background)
+		}
+		if w.kind == kindScroll {
+			m.drawScrollBars(img, f, w)
 		}
 	case kindLabel:
 		if w.background != nil {
 			fill(img, box, *w.background)
 		}
-		text(img, face, box, box.Min.X, box, string(w.text), foreground)
+		if w.wrap {
+			m.drawWrappedLabel(img, s, box, w, foreground)
+			break
+		}
+		labelFace := faceAt(s * labelScale(w.labelSize))
+		text(img, labelFace, box, box.Min.X, box, string(w.text), foreground)
+		if w.bold {
+			text(img, labelFace, box, box.Min.X+max(1, int(math.Round(s))), box, string(w.text), foreground)
+		}
+	case kindImage:
+		if w.background != nil {
+			fill(img, box, *w.background)
+		}
+		m.drawImage(img, w, s)
 	case kindButton:
 		background := or(w.background, colorButton)
 		if m.pressed == w.id {
@@ -221,6 +266,7 @@ func drawWidget(img *image.RGBA, face font.Face, f frame, w *widget) {
 		if caretX < w.scroll {
 			w.scroll = caretX
 		}
+		paintSelection(img, face, inner, inner.Min.X, w.scroll, shown, w.anchor, w.caret, inner.Min.Y, inner.Max.Y)
 		text(img, face, inner, inner.Min.X-w.scroll, box, string(shown), foreground)
 		if focused && f.caretVisible {
 			x := inner.Min.X + caretX - w.scroll
@@ -234,6 +280,16 @@ func drawWidget(img *image.RGBA, face font.Face, f frame, w *widget) {
 		drawSelect(img, face, f, w, box, line, focused, foreground)
 	case kindTable:
 		drawTable(img, face, f, w, box, line, focused, foreground)
+	case kindTabs:
+		m.drawTabs(img, face, f, w, box, line, focused, foreground)
+	case kindRadio:
+		m.drawRadio(img, face, f, w, box, line, focused, foreground)
+	case kindProgress:
+		m.drawProgress(img, f, w, box, line)
+	case kindDate:
+		m.drawDate(img, face, f, w, box, line, focused, foreground)
+	case kindCanvas:
+		drawCanvas(img, face, f, w, box)
 	case kindCheckbox:
 		if w.background != nil {
 			fill(img, box, *w.background)

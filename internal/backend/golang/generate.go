@@ -86,6 +86,8 @@ const (
 	helperLinkRuntimeFileName      = "ahdcode_helperlink_runtime.go"
 	guiRuntimeFileName             = "ahdcode_gui_runtime.go"
 	guiWidgetsRuntimeFileName      = "ahdcode_gui_widgets_runtime.go"
+	guiControlsRuntimeFileName     = "ahdcode_gui_controls_runtime.go"
+	guiPhase6RuntimeFileName       = "ahdcode_gui_phase6_runtime.go"
 	plotViewRuntimeFileName        = "ahdcode_plotview_runtime.go"
 	// v2.5.0 systems primitives. The Process runtime has one portable file
 	// and one per platform family; each carries its own build constraint.
@@ -271,6 +273,8 @@ func Generate(compilation *ir.Compilation) (*GeneratedProgram, []diagnostics.Dia
 		{helperLinkRuntimeFileName, ahdruntime.HelperLinkSource, "window helper link"},
 		{guiRuntimeFileName, ahdruntime.GUISource, "GUI"},
 		{guiWidgetsRuntimeFileName, ahdruntime.GUIWidgetsSource, "GUI widgets"},
+		{guiControlsRuntimeFileName, ahdruntime.GUIControlsSource, "GUI controls"},
+		{guiPhase6RuntimeFileName, ahdruntime.GUIPhase6Source, "GUI timers, tasks, and canvas"},
 		{plotViewRuntimeFileName, ahdruntime.PlotViewSource, "Plot viewer"},
 		{archiveReadRuntimeFileName, ahdruntime.ArchiveReadSource, "Archive reading"},
 		{filesystemRuntimeFileName, ahdruntime.FilesystemSource, "File deployment"},

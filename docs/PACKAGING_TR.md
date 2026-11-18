@@ -34,9 +34,9 @@ yapılandırmanın tamamı komut satırıdır.
 
 | Platform | Uygulama |
 | --- | --- |
-| macOS | `Name.app` — `Contents/MacOS` programı ve yardımcılarını, `Contents/Resources` simgeyi (`AppIcon.icns`) içerir |
-| Windows | `Name.exe` ve `runtime/` içeren bir `Name/` klasörü ve aynısı `Name-windows-x64.zip` olarak |
-| Linux | `Name` ve `runtime/` içeren bir `Name/` klasörü ve aynısı `Name-linux-x64.tar.gz` olarak |
+| macOS | `Name.app` — `Contents/MacOS` programı ve yardımcılarını, `Contents/Resources` simgeyi (`AppIcon.icns`), `Contents/Resources/app` paketli resimleri içerir |
+| Windows | `Name.exe`, `runtime/` ve paketli resimler için `resources/` içeren bir `Name/` klasörü ve aynısı `Name-windows-x64.zip` olarak |
+| Linux | `Name`, `runtime/` ve paketli resimler için `resources/` içeren bir `Name/` klasörü ve aynısı `Name-linux-x64.tar.gz` olarak |
 
 Bir uygulama tam olarak şunları içerir:
 
@@ -49,12 +49,21 @@ Bir uygulama tam olarak şunları içerir:
 - `ahdcode-app.json` (ad ve simge dosyasının adı), simge ve macOS'ta
   `Info.plist`, `PkgInfo` ve `AppIcon.icns`.
 
-AhdCode derleyicisini, Go araç zincirini, dil sunucusunu, belgeleri,
-AhdDataStudio'yu veya proje klasöründen hiçbir dosyayı içermez: giriş
-modülünün yanındaki hiçbir şey kopyalanmaz — `.env`, `.git`, veritabanları,
-hesap tabloları, CSV dosyaları, ekran görüntüleri, günlükler veya kaynak
-dosyalar da. Bir veri dosyasına ihtiyaç duyan program onu oluşturur ya da
-[GUI iletişim kutularıyla](GUI_TR.md#dosya-ve-mesaj-iletişim-kutuları) sorar. Hiçbir şey
+AhdCode derleyicisini, Go araç zincirini, dil sunucusunu, belgeleri veya
+AhdDataStudio'yu içermez. Giriş modülünün yanından yalnızca o modülün
+yanındaki `resources` klasöründeki `.png`, `.jpg` ve `.jpeg` dosyaları
+kopyalanır. Bu resimler uygulamanın kendi kaynak klasörüne gider: macOS'ta
+`Contents/Resources/app`, Windows ve Linux'ta programın yanındaki
+`resources`. O klasördeki başka bir dosya, `.env`, `.git`, veritabanları,
+hesap tabloları, CSV dosyaları, günlükler ve kaynak dosyalar dahil,
+paketlemeyi durdurur. O klasördeki bir sembolik bağlantı, kendisi sembolik
+bağlantı olan bir `resources` klasörü dahil, paketlemeyi durdurur. Bağlantı
+izlenmez; bu yüzden paketleme klasörün dışında yaşayan bir dosyayı
+kopyalayamaz.
+Bir veri dosyasına ihtiyaç duyan program onu oluşturur
+ya da [GUI iletişim kutularıyla](GUI_TR.md#dosya-ve-mesaj-iletişim-kutuları)
+sorar. `GUI.resource` ile yüklenen bir resim bu klasörü kullanır.
+`image("mark.png")` yine çalışma dizinini kullanır. Hiçbir şey
 yazılmadan önce bir sızıntı denetimi, başka bir dosya, yasak adlı bir dosya
 veya gizli bilgiye benzeyen meta veri içerecek uygulamayı reddeder. Derlenmiş
 programın içine bakamaz: programın kendi kaynağına yazılmış bir parola
@@ -76,7 +85,8 @@ bir yardımcı, uygulamada eksik olarak bildirilir.
 macOS Finder'dan açılan bir uygulama kök klasör yerine kullanıcının ana
 klasöründe başlar; böylece `"ledger.db"` gibi göreli bir yol ana klasördeki
 bir dosya anlamına gelir. Bir terminalden başlatıldığında, her program gibi
-terminalin geçerli klasörünü kullanır.
+terminalin geçerli klasörünü kullanır. Paketli resimler bu klasörü kullanmaz.
+`GUI.resource` uygulamanın kaynak klasörünü okur.
 
 ## Ad ve simge
 

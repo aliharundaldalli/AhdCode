@@ -8,6 +8,9 @@
 // `ahdcode package main.ahd --name Ledger`. The database file
 // ahdcode-ledger.db is created in the working folder (for a packaged
 // application opened from the Finder, the home folder).
+// A click on a table header sorts that column. The first click is
+// ascending and the next click on the same header is descending. Delete,
+// export, and Save note use the row that is on screen.
 bring GUI
 bring SQLite
 bring CSV
@@ -18,7 +21,6 @@ db: Database := SQLite.open("ahdcode-ledger.db")
 db.execute("CREATE TABLE IF NOT EXISTS entries (id INTEGER PRIMARY KEY, customer TEXT NOT NULL, kind TEXT NOT NULL, amount REAL NOT NULL, note TEXT NOT NULL)")
 
 columns: List<String> := ["No", "Customer", "Entry", "Amount", "Note"]
-shownRows: List<List<String>> := []
 
 window: Window := GUI.window(title: "Ledger", width: 960, height: 640)
 window.setResizable(true)
@@ -61,6 +63,7 @@ total.setForeground("#1F4E79")
 actions: Container := ledger.row(spacing: 8)
 remove: Button := actions.button("Delete entry")
 remove.setEnabled(false)
+saveNote: Button := actions.button("Save note")
 export: Button := actions.button("Export CSV…")
 
 // amountValue is the typed amount, or null when it is not a positive number.
@@ -92,7 +95,6 @@ refreshTable: Function := () -> Nothing {
     remove: Global Button
     showAll: Global Checkbox
     customers: Global ListBox
-    shownRows: Global List<List<String>>
     chosen: Local String? := customers.selectedText()
     query: Local String := "SELECT id, customer, kind, amount, note FROM entries ORDER BY id"
     parameters: Local List<SQLiteValue> := []
@@ -113,7 +115,6 @@ refreshTable: Function := () -> Nothing {
         }
         rows.add([str(row["id"].int()), row["customer"].string(), entry, str(value), row["note"].string()])
     }
-    shownRows = rows
     table.setRows(rows)
     total.setText("Balance: {balance}")
     if balance > 0.0 {
@@ -177,14 +178,13 @@ deleteEntry: Function := () -> Nothing {
     db: Global Database
     table: Global TableView
     status: Global Label
-    shownRows: Global List<List<String>>
     refreshCustomers: Global Function
     refreshTable: Global Function
     row: Local Int? := table.selectedRow()
     if row == null {
         return
     }
-    entry: Local List<String> := shownRows[row]
+    entry: Local List<String> := table.rows()[row]
     if GUI.confirm("Delete entry", "Delete entry {entry[0]} ({entry[2]} of {entry[3]} for {entry[1]})?") {
         db.execute("DELETE FROM entries WHERE id = ?", [SQLite.fromInt(int(entry[0]))])
         status.setForeground("#1F4E79")
@@ -194,23 +194,42 @@ deleteEntry: Function := () -> Nothing {
     }
 }
 
+updateNote: Function := () -> Nothing {
+    db: Global Database
+    table: Global TableView
+    note: Global TextArea
+    status: Global Label
+    refreshTable: Global Function
+    row: Local Int? := table.selectedRow()
+    if row == null {
+        status.setText("Select an entry to change its note.")
+        return
+    }
+    entry: Local List<String> := table.rows()[row]
+    db.execute("UPDATE entries SET note = ? WHERE id = ?", [SQLite.fromString(note.text()), SQLite.fromInt(int(entry[0]))])
+    status.setForeground("#1F4E79")
+    status.setText("Updated the note of entry {entry[0]}.")
+    refreshTable()
+}
+
 exportRows: Function := () -> Nothing {
     columns: Global List<String>
-    shownRows: Global List<List<String>>
+    table: Global TableView
     status: Global Label
     path: Local String? := GUI.saveFile(title: "Export the ledger", suggestedName: "ledger.csv", extensions: ["csv"])
     if path == null {
         status.setText("Export cancelled.")
         return
     }
+    visible: Local List<List<String>> := table.rows()
     rows: Local List<List<String>> := [columns]
-    for row in shownRows {
+    for row in visible {
         rows.add(row)
     }
     CSV.write(path, rows)
     status.setForeground("#1F4E79")
-    status.setText("Exported {len(shownRows)} entries.")
-    GUI.message("Export", "Saved {len(shownRows)} entries to {path}.")
+    status.setText("Exported {len(visible)} entries.")
+    GUI.message("Export", "Saved {len(visible)} entries to {path}.")
 }
 
 customer.onChange(lambda (text: String) -> validate())
@@ -220,6 +239,7 @@ showAll.onChange(lambda (checked: Bool) -> refreshTable())
 table.onSelect(lambda [@remove] (row: Int?) -> remove.setEnabled(row != null))
 add.onClick(addEntry)
 remove.onClick(deleteEntry)
+saveNote.onClick(updateNote)
 export.onClick(exportRows)
 closeOnEscape: Function := (key: String) -> Nothing {
     window: Global Window

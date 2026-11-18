@@ -41,6 +41,9 @@ func TestCompletionOffersEveryV2Member(t *testing.T) {
 	receivers := map[string]string{
 		"ListBox": "form.listBox()", "Select": "form.select([\"a\"])", "TextArea": "form.textArea()",
 		"PasswordInput": "form.passwordInput()", "TableView": "form.table([\"a\"])",
+		"Tabs": "form.tabs()", "RadioGroup": "form.radioGroup()", "RadioButton": "form.radioGroup().option(\"A\")",
+		"Progress": "form.progress()", "DateField": "form.date()",
+		"Canvas": "form.canvas()", "Task": "GUI.window().task(lambda () -> 1)",
 	}
 	for class, create := range receivers {
 		prefix := "bring GUI\nform := GUI.window().column()\nw := " + create + "\nw."

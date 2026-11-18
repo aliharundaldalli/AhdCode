@@ -1,0 +1,43 @@
+// A picture, a wrapping label, a grid, and a scrollable window.
+// Type in the field, use the File menu, and scroll the lines.
+//
+// Run it from this directory so mark.png resolves:
+//   ahdcode run main.ahd
+bring GUI
+from GUI bring (Window, Container, Label, Button, TextInput, Image, Menu, MenuItem)
+
+window: Window := GUI.window(title: "AhdCode Try", width: 480, height: 360)
+window.setResizable(true)
+file: Menu := window.menu("File")
+save: MenuItem := file.item("Save", "S")
+
+page: Container := window.scroll(spacing: 8, padding: 12)
+form: Container := page.grid(columns: 2, columnGap: 12, rowGap: 8)
+
+form.label("Name")
+name: TextInput := form.textInput(placeholder: "type here")
+
+mark: Image := form.image("mark.png", 160, 0)
+mark.setSpan(2, 1)
+
+story: Label := form.label("AhdCode GUI shows a picture and wraps this sentence. İstanbul, ĞÜŞİÖÇ, and 👍 stay whole. A verylongwordwithoutspaces is split only between characters, and this paragraph stays inside the label while the window scrolls.")
+story.setSpan(2, 1)
+story.setWrap(true)
+story.setPreferredWidth(280)
+
+lines: Container := form.column(spacing: 4, padding: 0)
+lines.setSpan(2, 1)
+index := 1
+while index <= 14 {
+    lines.label("Line {index}")
+    index += 1
+}
+
+onSave: Function := () -> Nothing {
+    name: Global TextInput
+    story: Global Label
+    story.setText(name.text())
+}
+save.onClick(onSave)
+
+window.wait()
