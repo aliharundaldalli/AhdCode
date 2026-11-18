@@ -532,7 +532,8 @@ VS Code hem de Antigravity'i hedefler.
 v2.9.0, **GUI Etkileşimi ve Uygulama Kaynakları**, bir kaynak sürümüdür.
 Git etiketinden ya da GitHub'ın kaynak arşivlerinden kurulur. Sözdizimi ve
 kurulum paketi eklemez. İmzalı kurulum paketleri v3.0'a kadar v2.7.0'da
-kalır. Windows 11 ve Wayland bu sürümün denetimlerine girmedi.
+kalır. Windows 11 fiziksel fare ve klavye ile çalıştırıldı ve çalıştığı
+bildirildi. Wayland bu sürümün denetimlerine girmedi.
 
 - **[GUI](docs/GUI_TR.md)** — sekmeler, radyo düğmeleri, ilerleme çubuğu ve
   tarih alanı; `Window.every` ve `Window.cancel`; `GUI.checkpoint` ile tek

@@ -514,7 +514,7 @@ diagnostics and hover. The same VSIX targets VS Code and Antigravity. See its
 v2.9.0, **GUI Interaction & Application Resources**, is a source release.
 Install it from the git tag or from GitHub's source archives. It adds no
 syntax and no installer. The signed installers stay at v2.7.0 until v3.0.
-Windows 11 and Wayland were not part of this release's checks.
+Windows 11 was run with a physical mouse and keyboard and reported as working. Wayland was not part of this release's checks.
 
 - **[GUI](docs/GUI.md)** — tabs, radio buttons, a progress bar, and a date
   field; `Window.every` and `Window.cancel`; one cooperative background

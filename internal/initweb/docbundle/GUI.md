@@ -291,7 +291,8 @@ widget a point hits. They do not move the physical mouse. On this development
 Mac, a person used the physical mouse and keyboard on `examples/v2.9/layout`:
 the File menu opened, the text field accepted typing, Command+A, Command+C,
 Command+V, and Command+Z edited that field, the wheel scrolled the form, and
-the window closed cleanly. Windows 11 and Wayland were not run.
+the window closed cleanly. Windows 11 was later run with a physical mouse
+and keyboard and reported as working. Wayland was not run.
 
 The same window is the place to repeat that check:
 
@@ -1107,6 +1108,7 @@ and a moving circle on one Canvas, with Start, Stop, and Cancel.
 
 ## Known limits still open
 
-1. Windows 11 and a Wayland session have not been run for this GUI work.
-   macOS has the automated tests and physical mouse and keyboard passes of
-   the layout example, Controls, Interactive, and the ledger.
+1. A Wayland session has not been run for this GUI work. macOS has the
+   automated tests and physical mouse and keyboard passes of the layout
+   example, Controls, Interactive, and the ledger. Windows 11 was run with
+   a physical mouse and keyboard and reported as working.

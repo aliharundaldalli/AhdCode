@@ -285,7 +285,8 @@ noktanın hangi bileşene denk geldiğini denetler. Fiziksel fareyi oynatmazlar.
 Bu geliştirme Mac'inde bir kişi `examples/v2.9/layout` penceresini fiziksel
 fare ve klavye ile denedi: File menüsü açıldı, metin alanına yazıldı,
 Command+A, Command+C, Command+V ve Command+Z o alanı düzenledi, tekerlek
-formu kaydırdı ve pencere temiz kapandı. Windows 11 ve Wayland
+formu kaydırdı ve pencere temiz kapandı. Windows 11 daha sonra fiziksel
+fare ve klavye ile çalıştırıldı ve çalıştığı bildirildi. Wayland
 çalıştırılmadı.
 
 Aynı pencere bu denetimi yinelemek içindir:
@@ -1115,6 +1116,7 @@ tek bir Canvas üzerinde bir araya getirir.
 
 ## Açık kalan sınırlar
 
-1. Bu GUI çalışması Windows 11'de ve bir Wayland oturumunda çalıştırılmadı.
-   macOS'ta otomatik testler ve yerleşim örneği, Controls, Interactive ve
-   defter için fiziksel fare ve klavye geçişleri vardır.
+1. Bu GUI çalışması bir Wayland oturumunda çalıştırılmadı. macOS'ta otomatik
+   testler ve yerleşim örneği, Controls, Interactive ve defter için fiziksel
+   fare ve klavye geçişleri vardır. Windows 11 fiziksel fare ve klavye ile
+   çalıştırıldı ve çalıştığı bildirildi.
