@@ -1115,19 +1115,6 @@ tek bir Canvas üzerinde bir araya getirir.
 
 ## Açık kalan sınırlar
 
-Bunlar çözülmedi. v2.9 kabul denetimi için açık kalırlar:
-
 1. Bu GUI çalışması Windows 11'de ve bir Wayland oturumunda çalıştırılmadı.
-   Şimdiye kadarki denetimler bu Mac'teki otomatik testler ve yerleşim
-   örneği için bir fiziksel fare ve klavye geçişidir.
-2. Sekmeler, radyo düğmeleri, ilerleme çubuğu ve tarih alanının otomatik
-   etkileşim testleri ve bir macOS çizim denetimi vardır. Bu dört denetimin
-   fiziksel fare ve klavye geçişi hâlâ açıktır.
-3. Zamanlayıcılar, arka plan görevi ve gömülü Canvas'ın otomatik testleri ve
-   `examples/v2.9/interactive` için bir macOS çizim denetimi vardır. Bu
-   pencerenin fiziksel fare ve klavye geçişi hâlâ açıktır. Çizim denetimi
-   tıklamaz, yazmaz ve tuşa basmaz.
-4. Defterin ekleme, düzenleme, silme, sıralama, CSV dışa aktarma ve SQLite
-   dosyasını yeniden açma için otomatik bir kabul testi vardır.
-   `examples/v2.0/ledger_app` için fiziksel fare ve klavye geçişi hâlâ
-   açıktır. Bir çizim denetimi bu geçişin yerine geçmez.
+   macOS'ta otomatik testler ve yerleşim örneği, Controls, Interactive ve
+   defter için fiziksel fare ve klavye geçişleri vardır.

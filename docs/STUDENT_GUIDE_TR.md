@@ -119,7 +119,7 @@ Merhaba!
 AhdCode, programı çalıştırmadan önce yazdığınız kodu kontrol eder. Örneğin bir metni sayı gibi kullanmaya çalışırsanız veya `null` olabilecek bir değeri kontrol etmeden kullanırsanız, mümkün olduğunda hatayı daha program başlamadan söyler. Ama başlangıçta bunun ayrıntılarını düşünmeniz gerekmiyor; ilerleyen bölümlerde örneklerle göreceğiz.
 
 AhdCode v1.0.0 ilk kararlı sürümdü. Güncel kurulabilir sürüm v2.7.0'dır.
-v2.8.0 bir kaynak sürümüdür; yeni kurulum paketleri v3.0'da döner. Bu rehber
+v2.8.0 ve v2.9.0 kaynak sürümleridir; yeni kurulum paketleri v3.0'da döner. Bu rehber
 kararlı temeli öğretir ve yeni modüller için ilk alıştırmayı verir; her
 modülün başvuru sayfası API'sinin tamamını belgeler.
 

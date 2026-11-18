@@ -1,6 +1,6 @@
 # AhdCode Language Specification v0.1
 
-**Status:** Normative language specification for AhdCode; core language as released in v1.0.0, with the later revisions listed below, through v2.8.0<br>
+**Status:** Normative language specification for AhdCode; core language as released in v1.0.0, with the later revisions listed below, through v2.9.0<br>
 **Historical note:** Historical filename retained for compatibility<br>
 **Clarification revision:** 2026-09-07; normative core specification as released in v1.0.0<br>
 **Primary implementation target:** Go<br>
@@ -15,8 +15,13 @@ dependency clause described in §15.
 entry is the other spelling of a `Global` declaration (§9.3), states the
 inferred declaration with a modifier (§8.1), states how module constants are initialized (§10.1), tightens diagnostic recovery
 (§93) and the formatter contract (§3.3, §94), and extends Graphics (§92).
-Standard modules added between v2.1 and v2.7 are indexed in §91. The version
-in the title and the file name is historical; this document is the current
+Standard modules added between v2.1 and v2.7 are indexed in §91.
+
+**v2.9.0 revision note:** v2.9.0 adds no syntax. It states GUI timers,
+background tasks, and the embedded Canvas (§95), and TableView sorting and
+`GUI.resource` (§96).
+
+The version in the title and the file name is historical; this document is the current
 specification.
 
 ---
@@ -6872,10 +6877,9 @@ afterwards is delivered when it is written, whether standard output is a
 terminal, a file, or a pipe. `take`, `Canvas.wait`, `Window.wait`, and
 `Scheduler.run` already delivered pending output before blocking.
 
-## 95. GUI Timers, Background Tasks, and Embedded Canvas (v2.9 development)
+## 95. GUI Timers, Background Tasks, and Embedded Canvas (v2.9.0)
 
-This section is implemented while the compiler version is still 2.8.0. It does
-not by itself release v2.9. GUI exports the additional classes `Canvas` and
+Released in v2.9.0. GUI exports the additional classes `Canvas` and
 `Task`, and the function `GUI.checkpoint() -> Bool`. GUI's `Canvas` and
 Graphics' `Canvas` are different classes that share a name. A scope cannot
 bring both.
@@ -6927,9 +6931,9 @@ after scroll. The drawing commands are a subset of §92: line, rectangle,
 circle, text, and clear. Rectangle and circle strokes are one unit wide.
 Empty fill draws no fill. Empty clear is white.
 
-## 96. TableView Sorting and Application Resources (v2.9 development)
+## 96. TableView Sorting and Application Resources (v2.9.0)
 
-The compiler that implements this section still reports version 2.8.0.
+Released in v2.9.0. The compiler reports version 2.9.0.
 
 ```text
 TableView.sort(column: Int, descending: Bool := false) -> Nothing

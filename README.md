@@ -16,10 +16,10 @@ modules, GUI, Graphics, interactive Plot viewer, and desktop application
 packaging. It is used in practice by a small community; it is not a
 mainstream language.
 
-This is **v2.8.0**, **Graphics Completion & First-Error Experience**. It is a
+This is **v2.9.0**, **GUI Interaction & Application Resources**. It is a
 source release: a git tag and a GitHub Release of the source, with no new
 installer. The signed installers stay at v2.7.0 until v3.0. It adds no syntax.
-See [What is new in v2.8.0](#what-is-new-in-v280). v2.7.0, **System Inspection
+See [What is new in v2.9.0](#what-is-new-in-v290). v2.7.0, **System Inspection
 & Distribution Polish**, remains the latest installable release.
 
 v2.0.0 is a major release, **Desktop Application Completion**: it completes
@@ -508,6 +508,28 @@ the editor title play button, Command Palette, or `F6`, and connects to the
 [language server](docs/LSP.md) (`ahdcode lsp`) for compiler-backed
 diagnostics and hover. The same VSIX targets VS Code and Antigravity. See its
 [installation guide](editors/vscode/README.md).
+
+## What is new in v2.9.0 <a id="what-is-new-in-v290"></a>
+
+v2.9.0, **GUI Interaction & Application Resources**, is a source release.
+Install it from the git tag or from GitHub's source archives. It adds no
+syntax and no installer. The signed installers stay at v2.7.0 until v3.0.
+Windows 11 and Wayland were not part of this release's checks.
+
+- **[GUI](docs/GUI.md)** — tabs, radio buttons, a progress bar, and a date
+  field; `Window.every` and `Window.cancel`; one cooperative background
+  `Task` with `GUI.checkpoint`; and an embedded `Canvas` that is not the
+  Graphics Canvas. A wrapping label is measured again when its window or
+  scroll viewport is narrower, and the widgets below it move down.
+- **Tables and resources** — a TableView header sorts by Unicode code
+  point, ascending on the first click and descending on the next.
+  `GUI.resource` returns one file inside the application's resource folder.
+  A symbolic link is accepted only when its canonical path stays inside
+  that folder. Packaging refuses to copy a symbolic link out of `resources`.
+- **[Specification](AHDCODE_LANGUAGE_SPEC_v0.1.md)** — brought up to date
+  through v2.9.0 (§95–§96).
+
+Examples: [`examples/v2.9`](examples/v2.9/README.md).
 
 ## What is new in v2.8.0 <a id="what-is-new-in-v280"></a>
 

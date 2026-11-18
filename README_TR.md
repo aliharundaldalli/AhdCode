@@ -16,11 +16,11 @@ veritabanı modülleri, GUI'si, Graphics'i, etkileşimli Plot görüntüleyicisi
 masaüstü uygulaması paketlemesiyle gelir. Küçük bir topluluk tarafından
 pratikte kullanılmaktadır; yaygın (mainstream) bir dil değildir.
 
-Bu, **v2.8.0**, **Graphics'in Tamamlanması ve İlk Hata Deneyimi**
-sürümüdür. Kaynak sürümüdür: git etiketi ve kaynağın GitHub Release'i; yeni
-bir kurulum paketi yoktur. İmzalı kurulum paketleri v3.0'a kadar v2.7.0'da
+Bu, **v2.9.0**, **GUI Etkileşimi ve Uygulama Kaynakları** sürümüdür.
+Kaynak sürümüdür: git etiketi ve kaynağın GitHub Release'i; yeni bir
+kurulum paketi yoktur. İmzalı kurulum paketleri v3.0'a kadar v2.7.0'da
 kalır. Sözdizimi eklemez. Bkz.
-[v2.8.0 ile gelenler](#v28-ile-gelenler). v2.7.0, **Sistem İnceleme ve
+[v2.9.0 ile gelenler](#v29-ile-gelenler). v2.7.0, **Sistem İnceleme ve
 Dağıtım Cilası**, en güncel kurulabilir sürüm olarak durur.
 
 v2.0.0 bir ana (major) sürümdür, **Masaüstü Uygulamasının Tamamlanması**:
@@ -526,6 +526,28 @@ bakın.
 [dil sunucusuna](docs/LSP_TR.md) (`ahdcode lsp`) bağlanır. Aynı VSIX, hem
 VS Code hem de Antigravity'i hedefler.
 [Kurulum rehberine](editors/vscode/README_TR.md) bakın.
+
+## v2.9.0 ile gelenler <a id="v29-ile-gelenler"></a>
+
+v2.9.0, **GUI Etkileşimi ve Uygulama Kaynakları**, bir kaynak sürümüdür.
+Git etiketinden ya da GitHub'ın kaynak arşivlerinden kurulur. Sözdizimi ve
+kurulum paketi eklemez. İmzalı kurulum paketleri v3.0'a kadar v2.7.0'da
+kalır. Windows 11 ve Wayland bu sürümün denetimlerine girmedi.
+
+- **[GUI](docs/GUI_TR.md)** — sekmeler, radyo düğmeleri, ilerleme çubuğu ve
+  tarih alanı; `Window.every` ve `Window.cancel`; `GUI.checkpoint` ile tek
+  bir işbirlikçi arka plan `Task`'ı; Graphics Canvas'ı olmayan gömülü bir
+  `Canvas`. Satır kaydıran bir etiket, penceresi veya kaydırma görünümü
+  daha dar olduğunda yeniden ölçülür ve altındaki bileşenler aşağı kayar.
+- **Tablolar ve kaynaklar** — bir TableView başlığı Unicode kod noktasına
+  göre sıralar; ilk tıklama artan, aynı başlığa ikinci tıklama azalan
+  sıradır. `GUI.resource` uygulama kaynak klasörünün içindeki bir dosyayı
+  döndürür. Sembolik bağ, kurallı yolu o klasörün içinde kaldığında kabul
+  edilir. Paketleme, `resources` dışına çıkan bir sembolik bağı kopyalamaz.
+- **[Spesifikasyon](AHDCODE_LANGUAGE_SPEC_v0.1_TR.md)** — v2.9.0'a kadar
+  güncellendi (§95–§96).
+
+Örnekler: [`examples/v2.9`](examples/v2.9/README_TR.md).
 
 ## v2.8.0 ile gelenler <a id="v28-ile-gelenler"></a>
 

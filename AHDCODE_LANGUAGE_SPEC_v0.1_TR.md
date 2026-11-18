@@ -6,7 +6,7 @@
 > Uygulama açısından iki belge aynı kuralları açıklar; metinsel bir çeviri
 > uyuşmazlığı oluşursa İngilizce ana spesifikasyon esas alınır.
 
-**Durum:** AhdCode için normatif dil spesifikasyonu; v1.0.0'da yayımlanan çekirdek dil ve aşağıda listelenen sonraki revizyonlar, v2.8.0 dahil<br>
+**Durum:** AhdCode için normatif dil spesifikasyonu; v1.0.0'da yayımlanan çekirdek dil ve aşağıda listelenen sonraki revizyonlar, v2.9.0 dahil<br>
 **Tarihsel not:** Uyumluluk için tarihsel dosya adı korunmuştur<br>
 **Açıklama revizyonu:** 2026-09-07; v1.0.0'da yayımlanan hâliyle normatif çekirdek spesifikasyon<br>
 **Birincil uygulama hedefi:** Go<br>
@@ -21,8 +21,13 @@ bildirim yüzeyine ekler.
 `Global` bildiriminin diğer yazımı olduğunu kaydeder (§9.3), niteleyicili
 çıkarımlı bildirimi belirtir (§8.1), modül sabitlerinin nasıl başlatıldığını yazar (§10.1), tanılama toparlamasını (§93) ve formatter
 sözleşmesini (§3.3, §94) sıkılaştırır ve Graphics'i genişletir (§92). v2.1 ile
-v2.7 arasında eklenen standart modüller §91'de dizinlenmiştir. Başlıktaki ve
-dosya adındaki sürüm tarihseldir; bu belge güncel spesifikasyondur.
+v2.7 arasında eklenen standart modüller §91'de dizinlenmiştir.
+
+**v2.9.0 revizyon notu:** v2.9.0 sözdizimi eklemez. GUI zamanlayıcılarını,
+arka plan görevlerini ve gömülü Canvas'ı (§95) ile TableView sıralamasını ve
+`GUI.resource` fonksiyonunu (§96) belirtir.
+
+Başlıktaki ve dosya adındaki sürüm tarihseldir; bu belge güncel spesifikasyondur.
 
 ---
 
@@ -7353,10 +7358,9 @@ yazılan her satır da, standart çıktı bir terminal, dosya ya da boru olsun,
 yazıldığı anda teslim edilir. `take`, `Canvas.wait`, `Window.wait` ve
 `Scheduler.run` bekleyen çıktıyı engellemeden önce zaten teslim ediyordu.
 
-## 95. GUI Zamanlayıcıları, Arka Plan Görevleri ve Gömülü Canvas (v2.9 geliştirme)
+## 95. GUI Zamanlayıcıları, Arka Plan Görevleri ve Gömülü Canvas (v2.9.0)
 
-Bu bölüm, derleyici sürümü hâlâ 2.8.0 iken uygulanmıştır. Tek başına v2.9'u
-yayımlamaz. GUI ek olarak `Canvas` ve `Task` sınıflarını ve
+v2.9.0'da yayımlanmıştır. GUI ek olarak `Canvas` ve `Task` sınıflarını ve
 `GUI.checkpoint() -> Bool` fonksiyonunu dışa aktarır. GUI'nin `Canvas`'ı ile
 Graphics'in `Canvas`'ı aynı adı paylaşan farklı sınıflardır. Bir kapsam ikisini
 birden getiremez.
@@ -7407,9 +7411,9 @@ kullanır. Çizim komutları §92'nin bir alt kümesidir: doğru, dikdörtgen, d
 metin ve temizleme. Dikdörtgen ve daire çizgisi bir birim kalınlığındadır. Boş
 dolgu çizilmez. Boş temizleme beyazdır.
 
-## 96. TableView Sıralaması ve Uygulama Kaynakları (v2.9 geliştirme)
+## 96. TableView Sıralaması ve Uygulama Kaynakları (v2.9.0)
 
-Bu bölümü uygulayan derleyici hâlâ 2.8.0 sürümünü bildirir.
+v2.9.0'da yayımlanmıştır. Derleyici 2.9.0 sürümünü bildirir.
 
 ```text
 TableView.sort(column: Int, descending: Bool := false) -> Nothing

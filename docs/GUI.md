@@ -1107,19 +1107,6 @@ and a moving circle on one Canvas, with Start, Stop, and Cancel.
 
 ## Known limits still open
 
-These are not resolved. They stay open for the v2.9 acceptance check:
-
 1. Windows 11 and a Wayland session have not been run for this GUI work.
-   The checks so far are automated tests on this Mac and, for the layout
-   example, one physical mouse and keyboard pass.
-2. The tabs, radio buttons, progress bar, and date field have automated
-   interaction tests and a macOS drawing check. A physical mouse and keyboard
-   pass of those four controls is still open.
-3. Timers, the background task, and the embedded Canvas have automated tests
-   and a macOS drawing check of `examples/v2.9/interactive`. A physical mouse
-   and keyboard pass of that window is still open. The drawing check does not
-   click, type, or press keys.
-4. The ledger has an automated acceptance test for adding, editing, deleting,
-   sorting, exporting CSV, and reopening its SQLite file. A physical mouse and
-   keyboard pass of `examples/v2.0/ledger_app` is still open. A drawing check
-   does not replace that pass.
+   macOS has the automated tests and physical mouse and keyboard passes of
+   the layout example, Controls, Interactive, and the ledger.

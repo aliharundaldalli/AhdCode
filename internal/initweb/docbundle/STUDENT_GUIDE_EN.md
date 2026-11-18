@@ -118,7 +118,7 @@ Hello!
 AhdCode checks the code you wrote before running the program. For example, if you try to use text like a number, or if you use a value that could be `null` without checking it, it will tell you the error before the program even starts, whenever possible. But you don't need to think about these details at the beginning; we'll see examples in later sections.
 
 AhdCode v1.0.0 was the first stable release. The current installable release
-is v2.7.0. v2.8.0 is a source release; new installers return at v3.0.
+is v2.7.0. v2.8.0 and v2.9.0 are source releases; new installers return at v3.0.
 This guide teaches the stable foundation and gives a first exercise for the
 newer modules; each module's reference page documents its complete API.
 
