@@ -96,6 +96,9 @@ func (generator *generator) httpCall(value *ir.CallExpr) string {
 	case "sessions":
 		return generator.httpValueFrom(httpSessionStoreClass, "AhdHTTPSessions("+errorClass+", "+
 			text(0, `"ahd_session"`)+", "+integer(1, "int64(86400)")+", "+boolean(2, "false")+", "+text(3, `"Lax"`)+")", meta)
+	case "persistentSessions":
+		return generator.httpValueFrom(httpSessionStoreClass, "AhdHTTPPersistentSessions("+errorClass+", "+
+			text(0, `""`)+", "+text(1, `"ahd_session"`)+", "+integer(2, "int64(86400)")+", "+boolean(3, "false")+", "+text(4, `"Lax"`)+")", meta)
 	case "client":
 		return generator.httpValueFrom(httpClientClass, "AhdHTTPClient("+errorClass+", "+
 			integer(0, "int64(30)")+", "+integer(1, "int64(8388608)")+", "+boolean(2, "true")+")", meta)
@@ -156,6 +159,12 @@ func (generator *generator) httpOperation(name string, value *ir.CallExpr) strin
 		return "AhdHTTPServerApplyWebLimits(" + errorClass + ", " + generator.httpDataOf(httpServerClass, httpServerHandleField, value.Callee) + ")"
 	case "Server.start":
 		return "AhdHTTPServerStart(" + errorClass + ", " + generator.httpDataOf(httpServerClass, httpServerHandleField, value.Callee) + ")"
+	case "Server.notFound":
+		return "AhdHTTPServerNotFound(" + errorClass + ", " + generator.httpDataOf(httpServerClass, httpServerHandleField, value.Callee) + ", " +
+			generator.httpHandler(value, 0) + ")"
+	case "Server.internalError":
+		return "AhdHTTPServerInternalError(" + errorClass + ", " + generator.httpDataOf(httpServerClass, httpServerHandleField, value.Callee) + ", " +
+			generator.httpHandler(value, 0) + ")"
 	case "Request.method":
 		return "AhdHTTPRequestMethod(" + generator.httpDataOf(httpRequestClass, httpRequestDataField, value.Callee) + ")"
 	case "Request.path":

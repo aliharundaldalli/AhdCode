@@ -38,6 +38,13 @@ usage:
   ahdcode databases list                     list registered local databases
   ahdcode databases add <file.db>            register a SQLite file with AhdDataStudio
   ahdcode databases remove <file.db>         forget a SQLite file (the file is kept)
+  ahdcode migrate new <name> [--dir <dir>]   create the next migration file
+  ahdcode migrate status --db <file> [--dir <dir>]
+                                             list applied and pending migrations
+  ahdcode migrate up --db <file> [--dir <dir>]
+                                             apply pending SQLite migrations
+  ahdcode migrate down --db <file> [--steps <n>] [--dir <dir>]
+                                             roll back applied migrations that have a down script
   ahdcode build <entry.ahd> [-o <output>]    compile to a native executable
   ahdcode package <entry.ahd> [--name <name>] [--output <folder>] [--icon <icon.png>]
                   [--target <os-arch>] [--helpers <folder>] [--console]
@@ -87,6 +94,8 @@ func runWithIO(arguments []string, input io.Reader, output, errorOutput io.Write
 		return runInit(arguments[1:], input, output, errorOutput)
 	case "databases":
 		return runDatabases(arguments[1:], input, output, errorOutput)
+	case "migrate":
+		return runMigrate(arguments[1:], output, errorOutput)
 	case "build":
 		return runBuild(arguments[1:], output, errorOutput)
 	case "package":

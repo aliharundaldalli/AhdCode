@@ -38,7 +38,7 @@ from HTML bring HTMLError
   bulmanızı sağlayan bir **ayrıştırıcı ve sorgu yüzeyi** (`HTML.parse`,
   `HTMLDocument`, `HTMLElement`).
 
-Şablon motoru, tarayıcı veya tam bir CSS motoru değildir. `HTML.raw` ve
+Şablon motoru, tarayıcı veya tam bir CSS motoru değildir. Dosya şablonları [`Templates`](TEMPLATES_TR.md) modülündedir. `HTML.raw` ve
 `HTML.div` kısayolu yoktur. Oluşturucuya verilen dinamik metin ve öznitelik
 değerleri çizim anında Go `html.EscapeString` ile kaçırılır.
 

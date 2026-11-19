@@ -16,12 +16,10 @@ veritabanı modülleri, GUI'si, Graphics'i, etkileşimli Plot görüntüleyicisi
 masaüstü uygulaması paketlemesiyle gelir. Küçük bir topluluk tarafından
 pratikte kullanılmaktadır; yaygın (mainstream) bir dil değildir.
 
-Bu, **v2.9.0**, **GUI Etkileşimi ve Uygulama Kaynakları** sürümüdür.
-Kaynak sürümüdür: git etiketi ve kaynağın GitHub Release'i; yeni bir
-kurulum paketi yoktur. İmzalı kurulum paketleri v3.0'a kadar v2.7.0'da
-kalır. Sözdizimi eklemez. Bkz.
-[v2.9.0 ile gelenler](#v29-ile-gelenler). v2.7.0, **Sistem İnceleme ve
-Dağıtım Cilası**, en güncel kurulabilir sürüm olarak durur.
+Bu, **v2.10.0**, **Web Geliştirme ve Uygulama Güvenilirliği** sürümüdür.
+Sürüm GitHub kaynak arşivleriyle dağıtılır. İmzalı kurulum paketleri v3.0'a
+kadar v2.7.0'da kalır. [v2.10.0 ile gelenler](#release-v2-10-0) ve
+[sürüm ve yükseltme notlarına](docs/RELEASE_2.10.0_TR.md) bakın.
 
 v2.0.0 bir ana (major) sürümdür, **Masaüstü Uygulamasının Tamamlanması**:
 birinci taraf masaüstü uygulaması temelini tamamlar — GUI'de ListBox, Select,
@@ -35,7 +33,7 @@ v2.1.0 ikili güvenli giden indirmeler, giden multipart yüklemeler, SMTP
 ekleri, WebSocket istemcisi ekler ve v2.0 Plot Save çalışma zamanı bulma
 gerilemesini düzeltir. Bkz. [v2.1.0 ile gelenler](#v210-ile-gelenler).
 
-Ürün, kendi kendine yeten bir platform paketi olarak dağıtılır: `ahdcode` CLI,
+İmzalı v2.7.0 dağıtımı, kendi kendine yeten bir platform paketidir. `ahdcode` CLI,
 özel Go 1.27.0 araç zinciri, AhdDataStudio, `ahdsqlite`, `ahdnumeric`, `ahdplot`,
 `ahdgraphics` ve `ahdgui` yardımcıları, etkileşimli Plot görüntüleyicisi `ahdplotview`, sabitlenmiş kaynak paketiyle çevrimdışı Tectonic LaTeX
 motoru, Web starter'ları ve bu sürüme ait İngilizce belge paketi.
@@ -526,6 +524,13 @@ bakın.
 [dil sunucusuna](docs/LSP_TR.md) (`ahdcode lsp`) bağlanır. Aynı VSIX, hem
 VS Code hem de Antigravity'i hedefler.
 [Kurulum rehberine](editors/vscode/README_TR.md) bakın.
+
+## v2.10.0 ile gelenler <a id="release-v2-10-0"></a>
+
+Tarayıcıda canlı yenileme, SQLite tabanlı oturumlar ve şema göçleri, HTML
+şablonları ve yalıtılmış sayfa yerleşimleri, özel HTTP hata sayfaları ve
+Türkçe Basic Web başlangıç projesi bu sürüme eklendi. HTTP, WebSocket ve
+değerlendirici eşzamanlaması iyileştirildi. [Sürüm ve yükseltme notlarına](docs/RELEASE_2.10.0_TR.md) bakın.
 
 ## v2.9.0 ile gelenler <a id="v29-ile-gelenler"></a>
 

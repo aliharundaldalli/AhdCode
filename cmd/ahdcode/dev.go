@@ -1,6 +1,8 @@
 package main
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"os"
@@ -64,11 +66,16 @@ type devChild struct {
 	waitErr    error
 }
 
-func startDevChild(binaryPath string, generation int, output, errorOutput io.Writer, events chan<- devControllerEvent) (*devChild, error) {
+func startDevChild(binaryPath, session string, generation int, output, errorOutput io.Writer, events chan<- devControllerEvent) (*devChild, error) {
 	cmd := exec.Command(binaryPath)
 	cmd.Stdout = output
 	cmd.Stderr = errorOutput
 	cmd.Stdin = os.Stdin
+	// The generation is the browser-refresh identity. Only this child sees
+	// it; ahdcode run and a production process do not.
+	if environ := devReloadEnvironment(session, generation); len(environ) > 0 {
+		cmd.Env = append(os.Environ(), environ...)
+	}
 	if err := cmd.Start(); err != nil {
 		return nil, err
 	}
@@ -84,6 +91,28 @@ func startDevChild(binaryPath string, generation int, output, errorOutput io.Wri
 		}
 	}()
 	return child, nil
+}
+
+// devReloadEnvironment is the process environment ahdcode dev adds to its
+// child before the child starts. The HTTP runtime reads it once, at process
+// start, and then ignores later changes, including Env.load. A failed rebuild
+// does not start a child, so the previous generation stays in place. A new
+// ahdcode dev process uses a new session.
+func devReloadEnvironment(session string, generation int) []string {
+	if len(session) != 32 || generation < 1 {
+		return nil
+	}
+	for _, r := range session {
+		switch {
+		case r >= '0' && r <= '9', r >= 'a' && r <= 'f':
+		default:
+			return nil
+		}
+	}
+	return []string{
+		"AHDCODE_DEV_SESSION=" + session,
+		fmt.Sprintf("AHDCODE_DEV_GENERATION=%d", generation),
+	}
 }
 
 // stopDevChild sends SIGTERM and waits up to shutdownGracePeriod for the
@@ -169,6 +198,12 @@ type devController struct {
 	localRoute   devLocalRoute
 	routerHolder *localRouterHolder
 
+	// reloadSession identifies this dev process. A later ahdcode dev gets a
+	// new session, so a browser tab left open across a full restart can tell
+	// the new process from the one that served the page. It is not derived
+	// from the generation counter, which starts again at 1.
+	reloadSession string
+
 	// exitStatus is the process exit code this session ends with. It stays 0
 	// for every ordinary run, including a failed build, which dev recovers
 	// from; a refused configuration is not recoverable and ends non-zero so
@@ -180,9 +215,18 @@ func newDevController(entry, binDir, descriptorPath string, output, errorOut io.
 	return &devController{
 		entry: entry, binDir: binDir, descriptorPath: descriptorPath,
 		output: output, errorOut: errorOut,
-		events:       make(chan devControllerEvent, 8),
-		shutdownDone: make(chan struct{}),
+		events:        make(chan devControllerEvent, 8),
+		shutdownDone:  make(chan struct{}),
+		reloadSession: newDevReloadSession(),
 	}
+}
+
+func newDevReloadSession() string {
+	buf := make([]byte, 16)
+	if _, err := rand.Read(buf); err != nil {
+		return ""
+	}
+	return hex.EncodeToString(buf)
 }
 
 func (c *devController) printf(format string, args ...any) {
@@ -218,6 +262,16 @@ func (c *devController) updateWatchSet(result build.Result) {
 	seen := map[string]bool{c.entry: true}
 	paths := []string{c.entry}
 	for _, path := range result.SourcePaths {
+		if seen[path] {
+			continue
+		}
+		seen[path] = true
+		paths = append(paths, path)
+	}
+	// templates/ beside the entry is watched only by ahdcode dev. The running
+	// program still loads those files once, so a change restarts it. ahdcode
+	// run does not watch them, and this walk does not write any template file.
+	for _, path := range devTemplatePaths(c.entry) {
 		if seen[path] {
 			continue
 		}
@@ -294,7 +348,7 @@ func (c *devController) run() {
 					c.printf("→ Starting...\n")
 				}
 				c.childGeneration++
-				child, err := startDevChild(event.buildPath, c.childGeneration, c.output, c.errorOut, c.events)
+				child, err := startDevChild(event.buildPath, c.reloadSession, c.childGeneration, c.output, c.errorOut, c.events)
 				if err != nil {
 					c.printf("✗ Could not start the application: %v\n", err)
 					c.child = nil
@@ -303,6 +357,9 @@ func (c *devController) run() {
 					c.child = child
 					c.currentBinary = event.buildPath
 					c.printf("✓ Running\n")
+					if c.webAnnounced && c.childGeneration > 1 {
+						c.printf("✓ Browser will refresh\n")
+					}
 					c.publishDescriptor()
 					if c.webAnnounced && !c.webBannerShown {
 						// The route is claimed only now, with a child

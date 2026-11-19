@@ -1,6 +1,7 @@
 package evaluator
 
 import (
+	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -8,33 +9,134 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
+
+	"ahdcode/internal/backend/golang/ahdruntime"
+	"ahdcode/internal/ir"
 )
 
-func startEvaluatorHTTP(t *testing.T, source string, port int) string {
-	t.Helper()
-	compilation := compileAhd(t, source)
+type evaluatorRunOutcome struct {
+	result   ExecutionResult
+	panicked bool
+	panicVal any
+}
+
+func formatEvaluatorOutcome(outcome evaluatorRunOutcome) string {
+	if outcome.panicked {
+		return fmt.Sprintf("evaluator panicked: %v", outcome.panicVal)
+	}
+	if outcome.result.Failure != nil {
+		return fmt.Sprintf("evaluator failed (%s): %s", outcome.result.Failure.Name, outcome.result.Failure.Message)
+	}
+	return "evaluator returned before HTTP server became ready (no error reported)"
+}
+
+// launchEvaluatorProgram runs a compiled program on a background goroutine,
+// capturing both ExecutionResult and any recovered panic without masking them.
+// Once finished closes, reading *outcome is race-free.
+func launchEvaluatorProgram(compilation *ir.Compilation) (finished <-chan struct{}, outcome *evaluatorRunOutcome) {
 	session := newLatexTestSession()
+	done := make(chan struct{})
+	captured := &evaluatorRunOutcome{}
 	go func() {
-		defer func() { _ = recover() }()
-		_ = session.Execute(compilation, 0)
+		defer close(done)
+		defer func() {
+			if r := recover(); r != nil {
+				captured.panicked = true
+				captured.panicVal = r
+			}
+		}()
+		captured.result = session.Execute(compilation, 0)
 	}()
-	base := "http://127.0.0.1:" + strconv.Itoa(port)
-	deadline := time.Now().Add(2 * time.Second)
+	return done, captured
+}
+
+// stopEvaluatorProgram shuts down host:port and waits until the evaluator
+// goroutine exits, nudging shutdown briefly in case Server.start had not yet
+// bound when Cleanup began.
+func stopEvaluatorProgram(host string, port int, finished <-chan struct{}) {
+	_ = ahdruntime.AhdHTTPShutdownAddress(host, port)
+	deadline := time.Now().Add(5 * time.Second)
 	for time.Now().Before(deadline) {
-		response, err := http.Get(base + "/ok")
+		select {
+		case <-finished:
+			return
+		case <-time.After(10 * time.Millisecond):
+			_ = ahdruntime.AhdHTTPShutdownAddress(host, port)
+		}
+	}
+}
+
+// evaluatorHTTPGet fails within half a second. A callback blocked on the
+// interpreter lock must make the test fail here instead of hanging the suite.
+func evaluatorHTTPGet(url string) (*http.Response, error) {
+	client := &http.Client{
+		Timeout:   500 * time.Millisecond,
+		Transport: &http.Transport{DisableKeepAlives: true},
+	}
+	return client.Get(url)
+}
+
+func waitForEvaluatorHTTP(compilation *ir.Compilation, port int, timeout time.Duration) (string, <-chan struct{}, *evaluatorRunOutcome, func(), error) {
+	finished, outcome := launchEvaluatorProgram(compilation)
+	var stopOnce sync.Once
+	cleanup := func() {
+		stopOnce.Do(func() {
+			stopEvaluatorProgram("127.0.0.1", port, finished)
+		})
+	}
+	base := "http://127.0.0.1:" + strconv.Itoa(port)
+	deadline := time.Now().Add(timeout)
+	var lastErr error
+	for time.Now().Before(deadline) {
+		select {
+		case <-finished:
+			cleanup()
+			return "", finished, outcome, cleanup, fmt.Errorf("evaluator HTTP server did not start: %s", formatEvaluatorOutcome(*outcome))
+		default:
+		}
+		response, err := evaluatorHTTPGet(base + "/ok")
 		if err == nil {
 			_, _ = io.Copy(io.Discard, response.Body)
 			_ = response.Body.Close()
-			if response.StatusCode == 200 {
-				return base
+			if response.StatusCode == http.StatusOK {
+				return base, finished, outcome, cleanup, nil
 			}
+			lastErr = fmt.Errorf("GET %s/ok returned HTTP %d", base, response.StatusCode)
+		} else {
+			lastErr = err
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
-	t.Fatal("evaluator HTTP server did not start")
-	return ""
+	cleanup()
+	select {
+	case <-finished:
+		if outcome.panicked || outcome.result.Failure != nil {
+			return "", finished, outcome, cleanup, fmt.Errorf("evaluator HTTP server did not start within %s: %s (last probe: %v)", timeout, formatEvaluatorOutcome(*outcome), lastErr)
+		}
+	default:
+		return "", finished, outcome, cleanup, fmt.Errorf("evaluator HTTP server did not start within %s (evaluator still running at deadline; last probe: %v)", timeout, lastErr)
+	}
+	return "", finished, outcome, cleanup, fmt.Errorf("evaluator HTTP server did not start within %s (last probe: %v)", timeout, lastErr)
+}
+
+func startEvaluatorHTTPWithDone(t *testing.T, source string, port int) (string, <-chan struct{}, *evaluatorRunOutcome) {
+	t.Helper()
+	compilation := compileAhd(t, source)
+	base, finished, outcome, cleanup, err := waitForEvaluatorHTTP(compilation, port, 2*time.Second)
+	t.Cleanup(cleanup)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return base, finished, outcome
+}
+
+func startEvaluatorHTTP(t *testing.T, source string, port int) string {
+	t.Helper()
+	base, _, _ := startEvaluatorHTTPWithDone(t, source, port)
+	return base
 }
 
 func freeEvaluatorPort(t *testing.T) int {

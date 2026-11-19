@@ -13,6 +13,10 @@ ahdcode databases
 ahdcode databases list
 ahdcode databases add <file.db>
 ahdcode databases remove <file.db>
+ahdcode migrate new <name> [--dir <directory>]
+ahdcode migrate status --db <file> [--dir <directory>] [--driver sqlite]
+ahdcode migrate up --db <file> [--dir <directory>] [--driver sqlite]
+ahdcode migrate down --db <file> [--dir <directory>] [--steps <n>] [--driver sqlite]
 ahdcode build <entry.ahd> [-o <output>]
 ahdcode package <entry.ahd> [--name <name>] [--output <folder>] [--icon <icon.png>]
                 [--target <os-arch>] [--helpers <folder>] [--console]
@@ -119,6 +123,66 @@ yeniden derler:
   kaydı beklemeye döner; aynı bozuk ikiliyi yeniden deneyerek döngüye
   girmez.
 
+`dev` ile başlatılan süreç, başlamadan önce `AHDCODE_DEV_SESSION` ve
+`AHDCODE_DEV_GENERATION` alır. HTTP çalışma zamanı bu çifti bir kez, süreç
+başlarken okur. `Env.load`, `Web.configure` ve `Web.start` daha sonra
+çalışır; bir `.env` dosyası kancayı açamaz ve `dev`'in koyduğu oturumu
+değiştiremez. `ahdcode run` bu çifti eklemez.
+
+Üretim uyarısı: tek başına çalışan bir süreç, başlangıç ortamında geçerli
+bir oturum ve nesil varsa kancayı açar. `AHDCODE_DEV_SESSION` ve
+`AHDCODE_DEV_GENERATION` değerlerini bir üretim kabuğuna, servisine veya
+kapsayıcısına vermeyin. İkili, geri döngü istemcilerine geliştirme betiğini
+ekler. Uygulama yapılandırması süreç başladıktan sonra bunu yapamaz;
+başlangıçta duran bir ortam yapabilir.
+
+`bring Web` kullanan bir programın ilk başarılı başlangıcı, Web başlığında
+`Browser refresh:` bölümünü yazar ve ilk `✓ Running` satırından sonra
+`✓ Browser will refresh` yazmaz. Sonraki başarılı bir yeniden derleme
+şunu yazar:
+
+```
+→ Restarting...
+✓ Running
+✓ Browser will refresh
+```
+
+Yalnızca geri döngü istemcisi için, ve uygulama bu yola herhangi bir yöntem
+kaydetmemişse,
+süreç `GET /__ahdcode/dev/reload` adresini `oturum nesil` olarak ve
+`GET /__ahdcode/dev/reload.js` adresini aynı kökenden bir betik olarak
+yanıtlar. Uygun HTML, satır içi betik yerine
+`<script src="/__ahdcode/dev/reload.js" ...>` alır; `script-src 'self'` onu
+çalıştırabilir. Etiket, sayfayı yazan oturumu ve nesli taşır. Aynı anda tek
+sorgu çalışır. Farklı bir çift sayfayı bir kez yeniler. Başarısız bir
+derleme aynı süreci tutar, çift değişmez ve son sayfa kalır. `ahdcode dev`
+durdurulup yeniden başlatılınca yeni bir oturum oluşur; açık kalan sekme,
+nesil `1` olduğu için eski sayfada kalmaz.
+
+Betik, UTF-8 konumlarını kaydırmadan bulunan son `</body>` etiketinin
+öncesine konur; yanıt bir HTML parçasıysa sona eklenir. 1xx veya 3xx
+yanıta, `identity` dışında bir `Content-Encoding` değerine, bir eke, ya da
+UTF-8, US-ASCII, ISO-8859-1, ISO-8859-15, Windows-1252 veya Windows-1254
+dışındaki bir karakter kümesine eklenmez. Karakter kümesi yoksa uyumlu
+sayılır. `withHeader` sonrasındaki son `Content-Type` karar verir.
+`/__ahdcode/dev/reload` adresini yalnızca anan bir sayfa yine uygundur.
+`HTTP.file` ve `server.static` yeniden yazılmaz. Geri döngü olmayan bir
+istemci sıradan HTML'i değiştirilmeden alır: betik yok, oturum kimliği yok
+ve geliştirme önbellek başlığı yok. Sondağı ve betik dosyasını da almaz.
+Uygulama bu yollardan birine herhangi bir yöntemle kayıt yaptıysa o kayıt
+her istemci için durur ve geliştirme işleyicisi yolu yanıtlamaz.
+
+Yenileme tam sayfa yüklemesidir, sıcak modül değişimi değildir; form
+girdisini ve kaydırma konumunu korumaz. Statik dosyalar izleme kümesinin
+dışındadır, bu yüzden birini düzenlemek yeniden derlemez ve tarayıcıyı
+yenilemez.
+
+Yeni süreç portuna bağlanamazsa, HTTP sunucusunun kendi bağlanma hatasıyla
+çıkar ve `dev` sonraki kaydı bekler. Yeni başarısız olan süreçten dinleyen
+bir şey kalmaz. Ctrl+C ve `ahdcode stop` hem çocuğu hem izleyiciyi
+durdurur. İlk oturumun tanımlayıcısı dururken aynı girişe ikinci bir `dev`
+reddedilir.
+
 Kayıtlar debounce edilir (~150-300ms), böylece bir editörden gelen ardışık
 yazma patlaması tek bir yeniden derlemeye dönüşür, birkaçına değil; ve aynı
 anda yalnızca bir derleme çalışır.
@@ -155,6 +219,13 @@ yeniden derlemeyi tetiklemez, çünkü statik dosyalar her istekte doğrudan
 diskten okunur. Bu grafiğin izlediği birleştirme kuralları için bkz.
 [`require(...)`](REQUIRE_TR.md).
 
+`dev`, giriş dosyasının yanındaki `templates/` altında düzenli `.html`
+dosyalarını da izler. Bir değişiklik yeniden derler ve yeniden başlatır;
+geliştirme sayfasındaki tarayıcı böyle yenilenir. İzleme sembolik bağ
+izlemez ve bu dosyaları yeniden yazmaz, bu yüzden bir şablonu kaydetmek
+kendi başına ikinci bir derleme planlamaz. `ahdcode run` bunları izlemez.
+`ahdcode dev` olmadan başlayan bir program yenileme betiğini eklemez.
+
 Gömülü birinci taraf modüller de izlenmez. `bring Web`, derleyiciye gömülü
 kaynaktan derlenir; diskte değişecek bir dosya yoktur.
 
@@ -170,6 +241,10 @@ AhdCode Web
 
   Open:
   http://127.0.0.1:8080
+
+  Browser refresh:
+  Open pages reload after a successful rebuild.
+  A failed build keeps the last page.
 
   Local identity:
   http://ahdakademi.test/
@@ -525,3 +600,175 @@ kullanıcıya özel dosyalardır (Linux'ta `~/.config/ahdcode/`, macOS'ta
 Yalnızca yerel geliştirme meta verisi tutarlar — konak adları, geri döngü
 portları, dosya yolları — asla parola, belirteç veya veritabanı içeriği
 tutmazlar. Bkz. [Env](ENV_TR.md).
+
+## `ahdcode migrate`
+
+Sürümlü SQL dosyalarını tek bir yerel SQLite veritabanına uygular. Bu bir
+CLI iş akışıdır. `SQLite` ve `MySQL` dil modüllerinde migration metodu yoktur
+ve `ahdcode databases` hâlâ yalnızca Studio kayıt defterini listeler, ekler
+ve siler.
+
+```bash
+ahdcode migrate new create_notes
+ahdcode migrate status --db notes.db
+ahdcode migrate up --db notes.db
+ahdcode migrate down --db notes.db --steps 1
+```
+
+Varsayılan dizin, çalışma dizininin yanındaki `migrations` klasörüdür.
+`--dir` göreli veya mutlak yol alır. `--driver` varsayılanı `sqlite` olur.
+`mysql` ve başka her sürücü, bağlantı açmadan bir tanı ile durur. Kullanım
+hataları 2 ile çıkar. Başarısız bir migration 1 ile çıkar.
+
+Ad, bir harfle başlar; ardından harf, rakam veya alt çizgi gelir ve en çok
+64 karakterdir. `new`, sonraki kesintisiz sürümü iki dosya olarak yazar:
+
+```text
+migrations/0001_create_notes.up.sql
+migrations/0001_create_notes.down.sql
+```
+
+Yalnızca bu adlar geçerlidir. Sürüm, öndeki tam sayıdır; `0002` ile `2`
+aynı sürümdür. Sürümler boşluksuz ve tekrarsız `1..N` olmalıdır. Başka
+`*.sql` adları, boş dosyalar ve geçerli UTF-8 olmayan dosyalar hatadır.
+Sembolik bağ olan bir dizin girdisi reddedilir; bağ, migration kökünün
+dışından bir betik çekemez. Migration kökü ya da bir üst dizin sembolik bağ
+veya NTFS junction ise o da reddedilir. `filepath` temizliği bu bağları
+izlemez. Son dosya, yeniden ayrıştırma noktası izlenmeden açılır ve çalışan
+baytlar sağlanan baytlardır. Dizin kilit dosyası ve kurtarma sırasında yapılan
+yeniden adlandırma da sembolik bağı, junction'ı, yeniden ayrıştırma noktasını
+veya normal olmayan dosyayı reddeder. Yerine konmuş bir kilit dosyasını izlemez
+ve gelen dosyayı başka bir dosyanın üzerine yeniden adlandırmaz. Denetimden
+sonra bir üst dizinin bağla değiştirilmesi, kalan yarıştır; migrate bağı
+görebildiğinde kapanır.
+Veritabanı yolu boş olamaz, `:memory:` olamaz, dizin olamaz ve sembolik bağ
+ya da junction olamaz. `up`, eksik veritabanı dosyasını oluşturur ve eksik
+üst dizini reddeder. `status`, eksik bir veritabanını oluşturmaz: 0 ile çıkar
+ve bekleyen dosyaları listeler. `down` da eksik bir veritabanını oluşturmaz.
+
+`up`, bekleyen her dosyayı sürüm sırasında uygular. Sonraki bir dosya
+başarısız olursa, daha önce işlenen sürümler hatadan önce yazılır ve geri
+alınmaz. `status`, her sürüm için bir `applied` veya `pending` satırı basar.
+Bekleyen bir şey yokken `up` yeniden çalışırsa `No pending migrations.` basar
+ve hiçbir şeyi değiştirmez. Alt komuta ait olmayan bir bayrak ya da iki kez
+verilen aynı bayrak 2 ile çıkar. `--help` ve `-h` bu kullanımı basar ve 0
+ile çıkar.
+
+Her dosya tek bir SQLite betiği olarak çalışır. AhdCode dosyayı noktalı
+virgüllere bölmez; tetikleyiciler, tırnaklı dizeler ve SQL içindeki noktalı
+virgüller olduğu gibi kalır. Yalnızca boşluk veya yorum olan bir dosyada
+çalıştırılabilir deyim yoktur ve kaydedilmez. Yorumun ardından gelen SQL
+çalıştırılabilir. Betiğin tamamı ile geçmiş satırı tek bir `BEGIN IMMEDIATE`
+işlemi paylaşır. Betik çalışırken SQLite yetkilendiricisi `BEGIN`, `COMMIT`,
+`ROLLBACK`, `END`, `ATTACH`, `DETACH`, `VACUUM` ve `ahd_schema_migrations`
+yazmalarını reddeder. `SAVEPOINT`, `ROLLBACK TO` ve `RELEASE` dış işlemi
+bitirmediği için serbesttir. Reddedilen ya da başarısız olan betik o işlemi
+geri alır; sürüm kaydedilmez ve işlenmiş kısmi bir şema kalmaz. `CREATE TABLE`
+gibi olağan DDL, SQLite'ın kendi şema tablosuna içeriden yazar; bu iç yazma
+serbesttir. `sqlite_master` üzerinde doğrudan değişiklik `PRAGMA writable_schema`
+ister ve o pragma reddedilir.
+
+Bir tetikleyici oluşturmak gövdesini yetkilendirmez. Migration işlenmeden
+önce migrate, bu SQLite derlemesinden, ana şemada veya geçici şemada
+tetikleyicisi olan her tablo ve görünüm için bir `INSERT`, bir `UPDATE` ve
+bir `DELETE` derlemesini ister. `UPDATE` her olağan sütunu kendisine atar.
+`rowid` bulunan bir tabloda `rowid`, `oid` ve `_rowid_` de atanır; çünkü bu
+adlar üzerindeki `UPDATE OF`, olağan bir sütun atamakla derlenmez. Üretilmiş
+sütunlar atanmaz. Bu deyimler hazırlanır, çalıştırılmaz.
+
+Kapsam, bu SQLite derlemesinin bayt koduna ait bir iç ayrıntıdır; kararlı bir
+genel SQLite API'si değildir. Bir tetikleyici ancak `EXPLAIN` bilinen sekiz
+sütunu verdiğinde ve adres 0'daki bir `Init` komutunun `p4` değeri tam olarak
+`-- TRIGGER`, bir boşluk ve o tetikleyicinin adı olduğunda derlenmiş sayılır.
+İşlem kodu, adres, `p1`, `p3`, `p5` ve boş açıklama da bu biçime uymalıdır.
+Başka bir işlem kodundaki metin, bir `DEFAULT`, bir `CHECK` ya da başka bir
+tetikleyicinin içindeki dizgi dahil, kapsam sayılmaz. Bayt kodu düzeni bu
+komutun denendiği düzen değilse migration reddedilir. `ahd_schema_migrations`
+yazan bir gövde reddedilir. Bu imle görünmeyen bir tetikleyici, atanamayan
+üretilmiş bir sütun ya da olmayan bir sütun üzerindeki `UPDATE OF` dahil,
+reddedilir. Bir hazırlama hatası, gövdenin güvenli olduğunun kanıtı değildir.
+
+İm, şema adını taşımaz. SQLite'ın ASCII büyük/küçük harf katlamasında aynı
+adı taşıyan iki tetikleyici, `main` ve `temp` içindeki aynı ad ya da yalnız
+ASCII durumda ayrılan adlar dahil, reddedilir; çünkü derlenen bir gövde
+diğerini kanıtlamaz. `BEFORE`, `AFTER` ve `INSTEAD OF` tetikleyicileri,
+gerçek bir sütundaki `UPDATE OF`, görünümler, `WITHOUT ROWID` tablolar, birden
+çok deyimli gövdeler, tırnaklı tanımlayıcılar, iç içe tetikleyiciler ve
+sonraki bir migration'ın eklediği tetikleyici bu yolla denetlenir. Kabul
+edilen tetikleyici olağan bir uygulama tetikleyicisidir. Bu denetim, gelecekteki
+her SQLite bayt kodu biçimini tanıdığını söylemez.
+
+Yetkilendirici, aynı bağlantıdaki sonraki bir migration'ın kilidini,
+yetkisini veya bütünlüğünü değiştirecek bağlantı pragma'larını da reddeder:
+`busy_timeout`, `locking_mode`, `trusted_schema`, `recursive_triggers`,
+`foreign_keys`, `defer_foreign_keys`, `ignore_check_constraints`,
+`query_only`, `read_uncommitted`, `cell_size_check`, `legacy_alter_table`,
+`synchronous`, `writable_schema`, `journal_mode`, `wal_checkpoint`,
+`wal_autocheckpoint`, `case_sensitive_like`, `secure_delete`,
+`reverse_unordered_selects`, `temp_store`, `incremental_vacuum` ve
+`schema_version`. Her migration kilidi almadan önce komut meşgul zaman
+aşımını yeniden beş saniyeye kurar ve bu bağlantı ayarlarını dayandığı
+varsayılanlara döndürür. `auto_vacuum` serbesttir: bu, komutun sıfırladığı
+bir bağlantı bayrağı değil, veritabanı saklama ayarıdır. `table_info` gibi
+şema sorguları serbesttir. Journal kipi değiştirilmez.
+
+Geçmiş `ahd_schema_migrations` tablosundadır:
+
+| sütun | anlamı |
+| --- | --- |
+| `version` | tamsayı birincil anahtar |
+| `name` | sürüm önekinden sonraki ad |
+| `up_checksum` | `.up.sql` baytlarının SHA-256 onaltılığı |
+| `down_checksum` | `.down.sql` baytlarının SHA-256 onaltılığı; uygulama anında down dosyası yoksa boş |
+| `applied_at` | Unix saniyesi |
+
+`new`, migration dizininde işletim sistemi kilidi alır ve kilidi aldıktan
+sonra yeniden tarar; iki oluşturucu aynı sürümü seçemez. Kilit, süreç
+çöktüğünde de süreç bitince bırakılır. Down dosyasını yayımladıktan sonra
+öldürülen bir oluşturucuyu sonraki `new` tamamlar; yayımlanmamış geçici
+dosyalar atılır. Yalnızca down dosyası olmayan mevcut bir migration
+silinmez.
+
+Geçmiş adı, SQLite'ın büyük/küçük harfe duyarsız ASCII tanımlayıcı kurallarına
+uyar. `AHD_SCHEMA_MIGRATIONS` ile `ahd_schema_migrations` aynı nesnedir. Bu
+adda bir görünüm ya da birden çok nesne hatadır; migrate yerine yeni bir tablo
+oluşturmaz. Tablo, ilk başarılı migration ile aynı işlemin içinde oluşturulur.
+Sütunları,
+bildirilen tipleri, `NOT NULL` kısıtları, birincil anahtarı ve dizinleri tam
+olarak eşleşmelidir. Migrate sürümleri, sağlamaları ve zaman damgalarını
+SQLite değer tipleriyle okur; metni tamsayıya ya da NULL'u boş dizgeye
+dönüştürmez. Yanlış bir biçim ya da kötü bir değer komutu durdurur. Tablo
+onarmak için değiştirilmez, silinmez ya da yeniden yazılmaz. Uygulanmış
+sürümler tam olarak `1..N`
+olmalıdır. Eşleşen dosyası olmayan bir veritabanı sürümü, yeniden adlandırılmış
+bir dosya veya diskteki baytlarla artık eşleşmeyen bir sağlama, komutu durdurur.
+Sağlamalar ham dosya baytlarıdır; CRLF'yi LF yapmak bir değişikliktir.
+Meta veri sorguları bağlı parametre kullanır.
+
+İki `ahdcode migrate up` süreci aynı dosyada `BEGIN IMMEDIATE` alır. Bekleyen
+en çok beş saniye bekler. Kilidi alınca geçmişi yeniden okur ve diğer sürecin
+kaydettiği sürümü atlar. Aynı sürüm iki kez uygulanmaz. İşlemin içinde
+öldürülen bir süreç geçmiş satırı bırakmaz; sonraki `up` o sürümü uygular.
+
+`down`, `up` başarısız olduğu için asla çalışmaz. Yalnızca son uygulanan
+sürümü, ya da `--steps` kadarını, ve yalnızca uygulama anında kaydedilen
+down betiği hâlâ bayt bayt aynı dosyaysa geri alır. Her adım kendi işlemidir:
+down betiği çalışır, sonra o geçmiş satırı silinir. Sonraki bir adım
+başarısız olursa önceki geri almalar kalır. İşlenen her geri alma yazılır,
+ardından hata ve işlenen geri alma sayısı yazılır ve komut 1 ile çıkar.
+Üretilen down dosyası, siz değiştirene kadar başarısız olan bir deyim içerir;
+düzenlenmemiş bir down geçmişi silemez. Down dosyası olmadan uygulanan bir
+migration, sonradan bir down dosyası görünse bile geri alınamaz.
+
+`ahdcode migrate` journal kipini değiştirmez. Yukarıdaki bağlantı
+pragma'larını, `foreign_keys` ve `synchronous` dahil, reddeder ve aynı
+bağlantıdaki sonraki migration'dan önce onları geri yükler. Sizin yazdığınız
+SQL dışında uygulama tablolarını silmez.
+Kalıcı HTTP oturum tabloları (`ahd_session_meta`, `ahd_sessions`,
+`ahd_session_revoked`) migration geçmişi değildir. Yazdığınız bir migration
+onları ancak SQL'i öyle diyorsa değiştirir.
+
+Sıradan SQLite migration'ları yönetici hakkı ve ağ istemez. Windows
+`backupTo` URI yolu kullanılmaz.
+
+Bkz. [`examples/v2.10/migrations`](../examples/v2.10/migrations).

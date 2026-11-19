@@ -175,6 +175,12 @@ func (helper *ahdSQLiteHelper) call(request ahdSQLiteRequest) (ahdSQLiteResponse
 	return response, nil
 }
 
+func ahdSQLiteHelperFailed() bool {
+	ahdSQLiteSession.mutex.Lock()
+	defer ahdSQLiteSession.mutex.Unlock()
+	return ahdSQLiteSession.failure != nil
+}
+
 // ---------------------------------------------------------------------------
 // SQLiteValue encoding
 // ---------------------------------------------------------------------------

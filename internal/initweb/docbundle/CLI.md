@@ -13,6 +13,10 @@ ahdcode databases
 ahdcode databases list
 ahdcode databases add <file.db>
 ahdcode databases remove <file.db>
+ahdcode migrate new <name> [--dir <directory>]
+ahdcode migrate status --db <file> [--dir <directory>] [--driver sqlite]
+ahdcode migrate up --db <file> [--dir <directory>] [--driver sqlite]
+ahdcode migrate down --db <file> [--dir <directory>] [--steps <n>] [--driver sqlite]
 ahdcode build <entry.ahd> [-o <output>]
 ahdcode package <entry.ahd> [--name <name>] [--output <folder>] [--icon <icon.png>]
                 [--target <os-arch>] [--helpers <folder>] [--console]
@@ -115,6 +119,65 @@ every save it rebuilds:
   runtime crash, for instance), `dev` reports it and goes back to waiting
   for the next save; it does not loop retrying the same broken binary.
 
+A process started by `dev` receives `AHDCODE_DEV_SESSION` and
+`AHDCODE_DEV_GENERATION` before it starts. The HTTP runtime reads that pair
+once, at process start. `Env.load`, `Web.configure`, and `Web.start` run
+later, so a `.env` file cannot turn the hook on and cannot change a session
+that `dev` already set. `ahdcode run` does not add the pair.
+
+Production warning: a standalone process activates the hook when its
+startup environment already contains a valid session and generation. Do not
+export `AHDCODE_DEV_SESSION` and `AHDCODE_DEV_GENERATION` into a production
+shell, service, or container. The binary will inject the development script
+for loopback clients. Application configuration cannot do this after the
+process has started; an environment that is present at startup can.
+
+For a program that `bring Web`, the first successful start prints a
+`Browser refresh:` section in the Web banner and does not print
+`✓ Browser will refresh` after the first `✓ Running`. A later successful
+rebuild prints:
+
+```
+→ Restarting...
+✓ Running
+✓ Browser will refresh
+```
+
+For a loopback client, and only when the application did not register any
+method on the path, the process answers `GET /__ahdcode/dev/reload` with `session
+generation` and `GET /__ahdcode/dev/reload.js` with a same-origin script.
+Eligible HTML gains `<script src="/__ahdcode/dev/reload.js" ...>` rather than
+an inline script, so `script-src 'self'` can run it. The tag carries the
+session and generation that wrote the page. One poll runs at a time. A
+different pair reloads the page once. A failed rebuild keeps the same
+process, so the pair does not change and the last page stays up. Stopping
+`ahdcode dev` and starting it again creates a new session, so a tab left
+open reloads instead of treating generation `1` as the page it already has.
+
+The script is inserted before the last `</body>`, matched without changing
+UTF-8 offsets, or appended when the response is an HTML fragment. It is not
+added to a 1xx or 3xx response, a `Content-Encoding` other than `identity`,
+an attachment, or a charset other than UTF-8, US-ASCII, ISO-8859-1,
+ISO-8859-15, Windows-1252, or Windows-1254. A missing charset is treated as
+compatible. The final `Content-Type`, after `withHeader`, decides. A page
+that merely mentions `/__ahdcode/dev/reload` is still eligible. `HTTP.file`
+and `server.static` are not rewritten. A non-loopback client receives the
+ordinary HTML unchanged: no script, no session identifier, and no
+development cache header. It also does not receive the probe or the script
+file. If the application registered any method on one of those paths, that
+registration is left in place for every client and the development handler
+does not answer the path.
+
+The refresh is a full page load, not hot module replacement, and it does
+not preserve form input or scroll position. Static files are outside the
+watch set, so editing one does not rebuild and does not refresh the browser.
+
+If the new process cannot bind its port, it exits with the HTTP server's
+own bind error and `dev` waits for the next save. Nothing is left listening
+from the process that just failed. Ctrl+C and `ahdcode stop` both stop the
+child and the watcher. A second `dev` on the same entry is refused while
+the first session's descriptor is live.
+
 Saves are debounced (~150-300ms) so a burst of writes from an editor
 produces one rebuild, not several, and only one build ever runs at a time.
 
@@ -146,6 +209,13 @@ never part of this graph: editing one never triggers a rebuild, since
 static files are read straight from disk on every request. See
 [`require(...)`](REQUIRE.md) for the composition rules this graph follows.
 
+`dev` also watches regular `.html` files under `templates/` beside the
+entry file. A change rebuilds and restarts, which is what refreshes a
+browser that is already on a development page. The watch does not follow a
+symbolic link and does not rewrite those files, so saving one template does
+not schedule another rebuild by itself. `ahdcode run` does not watch them.
+A program started without `ahdcode dev` does not inject the reload script.
+
 Bundled first-party modules are never watched either. `bring Web` compiles
 from source embedded in the compiler, so there is no file on disk to change.
 
@@ -161,6 +231,10 @@ AhdCode Web
 
   Open:
   http://127.0.0.1:8080
+
+  Browser refresh:
+  Open pages reload after a successful rebuild.
+  A failed build keeps the last page.
 
   Local identity:
   http://ahdakademi.test/
@@ -512,3 +586,179 @@ macOS), created `0700`, with each file written atomically at `0600`.
 `AHDCODE_LOCAL_HOME` overrides the location. They hold local development
 metadata only — hostnames, loopback ports, file paths — and never a password,
 a token, or any database content. See [Env](ENV.md).
+
+## `ahdcode migrate`
+
+Applies versioned SQL files to one local SQLite database. This is a CLI
+workflow. The `SQLite` and `MySQL` language modules have no migration methods,
+and `ahdcode databases` still only lists, adds, and removes Studio registry
+entries.
+
+```bash
+ahdcode migrate new create_notes
+ahdcode migrate status --db notes.db
+ahdcode migrate up --db notes.db
+ahdcode migrate down --db notes.db --steps 1
+```
+
+The default directory is `migrations`, next to the working directory. `--dir`
+accepts a relative or absolute path. `--driver` defaults to `sqlite`.
+`mysql` and any other driver stop with a diagnostic and open no connection.
+Usage mistakes exit 2. A migration that fails exits 1.
+
+A name is one letter followed by letters, digits, or underscores, at most 64
+characters. `new` writes the next contiguous version as two files:
+
+```text
+migrations/0001_create_notes.up.sql
+migrations/0001_create_notes.down.sql
+```
+
+Only those names are accepted: `0001_create_notes.up.sql` and
+`0001_create_notes.down.sql`. A version is the integer prefix, so `0002` and
+`2` are the same version. Versions must be `1..N` with no gaps and no
+duplicates. Other `*.sql` names, empty files, and files that are not valid
+UTF-8 are errors. A directory entry that is a symbolic link is rejected, so a
+link or junction cannot pull a script from outside the migration directory.
+The same rejection applies to a migration root or parent that is a symbolic
+link or an NTFS junction. `filepath` cleaning does not follow those links.
+The final file is opened without following a reparse point, and the bytes
+that are executed are the bytes that were checksummed. The directory lock
+file and a recovery rename also refuse a symbolic link, junction, reparse
+point, or other non-regular file. They do not follow a substituted lock file
+and do not rename an incoming file onto another file. A parent directory
+replaced by a link in the gap after that check is the remaining race; migrate
+fails closed when it can see the link. The database path cannot be empty,
+`:memory:`, a directory, or a symbolic link or junction. `up` creates a
+missing database file and refuses a missing parent directory. `status` does
+not create a missing database: it exits 0 and lists the pending files.
+`down` does not create a missing database either.
+
+`up` applies every pending file in version order. If a later file fails, the
+versions already committed are printed before the error and are not undone.
+`status` prints one `applied` or `pending` row per version. Running `up`
+again when nothing is pending prints `No pending migrations.` and changes
+nothing. A flag that does not belong to the subcommand, or the same flag
+given twice, exits 2. `--help` and `-h` print this usage and exit 0.
+
+Each file is executed as one SQLite script. AhdCode does not split the file
+on semicolons, so triggers, quoted strings, and semicolons inside SQL stay
+intact. A file of only whitespace or comments has no executable statement and
+is not recorded. A comment followed by SQL is executable. The whole script
+and the history row share one `BEGIN IMMEDIATE` transaction. While the script
+runs, SQLite's authorizer rejects `BEGIN`, `COMMIT`, `ROLLBACK`, `END`,
+`ATTACH`, `DETACH`, `VACUUM`, and writes to `ahd_schema_migrations`.
+`SAVEPOINT`, `ROLLBACK TO`, and `RELEASE` stay allowed because they do not
+end the outer transaction. A rejected or failed script rolls that transaction
+back, so it is not recorded and it does not leave a committed partial schema.
+Ordinary DDL such as `CREATE TABLE` writes SQLite's own schema table
+internally; that internal write stays allowed. Direct edits of
+`sqlite_master` still require `PRAGMA writable_schema`, which is rejected.
+
+Creating a trigger does not authorize its body. Before the migration can
+commit, migrate asks this build of SQLite to compile an `INSERT`, an
+`UPDATE`, and a `DELETE` for every table or view that has a trigger in the
+main or temporary schema. The `UPDATE` assigns each ordinary column to
+itself. On a table that has a rowid it also assigns `rowid`, `oid`, and
+`_rowid_`, because `UPDATE OF` those names is not compiled by assigning a
+normal column. Generated columns are not assigned. Those statements are
+prepared, not executed.
+
+Coverage is one internal detail of this SQLite build's bytecode, not a stable
+public SQLite API. A trigger counts as compiled only when `EXPLAIN` has the
+usual eight columns and an `Init` instruction at address 0 whose `p4` is
+exactly `-- TRIGGER`, a space, and that trigger's name. The opcode, address,
+`p1`, `p3`, `p5`, and empty comment have to match that shape as well. Text in
+another opcode, including a `DEFAULT`, a `CHECK`, or a string inside a
+different trigger, is not coverage. If the bytecode layout is not the one
+this command was tested against, the migration is rejected. A body that
+writes `ahd_schema_migrations` is rejected. A trigger that does not appear as
+that marker, including `UPDATE OF` a missing column or a generated column
+that cannot be assigned, is rejected. A prepare error is not proof that the
+body is safe.
+
+The marker does not name the schema. Two triggers whose names match under
+SQLite's ASCII case folding, including the same name in `main` and `temp` or
+names that differ only by ASCII case, are rejected because one compiled body
+cannot prove the other. `BEFORE`, `AFTER`, and `INSTEAD OF` triggers are
+checked this way, including `UPDATE OF` a real column, views, `WITHOUT ROWID`
+tables, multi-statement bodies, quoted identifiers, nested triggers, and a
+trigger added by a later migration. An accepted trigger is an ordinary
+application trigger. This check does not claim to recognize every future
+SQLite bytecode shape.
+
+The authorizer also rejects connection pragmas that would change locking,
+authorization, or integrity for a later migration on the same connection:
+`busy_timeout`, `locking_mode`, `trusted_schema`, `recursive_triggers`,
+`foreign_keys`, `defer_foreign_keys`, `ignore_check_constraints`,
+`query_only`, `read_uncommitted`, `cell_size_check`, `legacy_alter_table`,
+`synchronous`, `writable_schema`, `journal_mode`, `wal_checkpoint`,
+`wal_autocheckpoint`, `case_sensitive_like`, `secure_delete`,
+`reverse_unordered_selects`, `temp_store`, `incremental_vacuum`, and
+`schema_version`. Before each migration takes its lock, the command sets the
+busy timeout back to five seconds and restores those connection settings to
+the defaults it relies on. `auto_vacuum` stays allowed: it is database
+storage configuration, not a connection flag this command resets. Schema
+queries such as `table_info` stay allowed. Journal mode is not changed.
+
+History lives in `ahd_schema_migrations`:
+
+| column | meaning |
+| --- | --- |
+| `version` | integer primary key |
+| `name` | the name after the version prefix |
+| `up_checksum` | SHA-256 hex of the exact `.up.sql` bytes |
+| `down_checksum` | SHA-256 hex of the `.down.sql` bytes, or empty when no down file existed at apply time |
+| `applied_at` | Unix seconds |
+
+`new` takes an operating-system lock on the migration directory and scans
+again after it has the lock, so two creators cannot choose the same version.
+The lock is released when the process exits, including after a crash. A
+creator that is killed after publishing the down file is completed by the
+next `new`; unpublished temporary files are discarded. An existing migration
+that simply has no down file is not deleted.
+
+The history name follows SQLite's case-insensitive ASCII identifier rules.
+`AHD_SCHEMA_MIGRATIONS` is the same object as `ahd_schema_migrations`. A view,
+or more than one object with that name, is an error; migrate does not create
+a replacement table. The table is created inside the same transaction as the
+first successful migration. Its columns, declared types, `NOT NULL`
+constraints, primary key, and indexes must match exactly. Migrate reads
+versions, checksums, and
+timestamps with SQLite's value types and does not coerce text into integers
+or NULL into an empty string. A wrong shape or a bad value stops the command.
+The table is never altered, dropped, or rewritten to repair it. Applied
+versions must be exactly `1..N`. A database version with no matching file, a
+renamed file, or a checksum that no longer matches the bytes on disk stops
+the command. Checksums are the raw file bytes, so changing CRLF to LF is a
+modification. Metadata queries use bound parameters.
+
+Two `ahdcode migrate up` processes take `BEGIN IMMEDIATE` on the same file.
+The waiter waits up to five seconds. After the lock, it reads history again
+and skips a version the other process already recorded. The same version is
+not applied twice. A process killed inside the transaction leaves no history
+row; the next `up` applies that version.
+
+`down` is never run because `up` failed. It rolls back only the latest
+applied version, or `--steps` of them, and only when the down script recorded
+at apply time is still byte-for-byte the same file. Each step is its own
+transaction: the down script runs, then that history row is deleted. A later
+step that fails leaves the earlier rollbacks committed. Each committed
+rollback is printed, then the error and the number of rollbacks that
+committed, and the command exits 1. The generated down file contains a
+statement that fails until you
+replace it, so an unedited down cannot remove history. A migration applied
+without a down file cannot be rolled back later, even if a down file appears
+afterwards.
+
+`ahdcode migrate` does not change journal mode. It rejects the connection
+pragmas listed above, including `foreign_keys` and `synchronous`, and it
+restores them before the next migration on that connection. It does not
+delete application tables except by running the SQL you wrote. Persistent HTTP session tables (`ahd_session_meta`,
+`ahd_sessions`, `ahd_session_revoked`) are not migration history. A migration
+you write can change them only if its SQL says so.
+
+Ordinary SQLite migrations need no administrator rights and no network.
+The Windows `backupTo` URI path is not used.
+
+See `examples/v2.10/migrations`.

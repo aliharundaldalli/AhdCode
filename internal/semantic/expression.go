@@ -733,6 +733,9 @@ func (a *analyzer) analyzeCallWithCallee(call *ast.CallExpr, callee expressionIn
 			hint, supplied = htmlConstructionHint(class.Symbol)
 		}
 		if !supplied {
+			hint, supplied = templateConstructionHint(class.Symbol)
+		}
+		if !supplied {
 			hint, supplied = smtpConstructionHint(class.Symbol)
 		}
 		if !supplied {
@@ -872,6 +875,9 @@ func typeOperationFor(receiver types.Type, name string) (TypeOperation, bool) {
 			return operation, true
 		}
 		if operation, ok := htmlOperationFor(receiver, name); ok {
+			return operation, true
+		}
+		if operation, ok := templateOperationFor(receiver, name); ok {
 			return operation, true
 		}
 		if operation, ok := smtpOperationFor(receiver, name); ok {
@@ -1131,6 +1137,9 @@ func (a *analyzer) analyzeTypeOperation(call *ast.CallExpr, member *ast.MemberEx
 	}
 	if shape, isHTML := htmlOperationShapes()[operation]; isHTML {
 		return a.analyzeHTMLOperation(call, operation, shape, current, flow), true
+	}
+	if shape, isTemplate := templateOperationShapes()[operation]; isTemplate {
+		return a.analyzeTemplateOperation(call, operation, shape, current, flow), true
 	}
 	if shape, isSMTP := smtpOperationShapes()[operation]; isSMTP {
 		return a.analyzeSMTPOperation(call, operation, shape, current, flow), true

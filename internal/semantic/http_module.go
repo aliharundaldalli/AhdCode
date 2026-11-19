@@ -76,7 +76,7 @@ func HTTPWebSocketConnectionIdentity() *types.ClassSymbol {
 // name the members each Class publishes through built-in type operations, so
 // has/has not reports the real surface and the IR Class agrees with the
 // frontend.
-var HTTPServerOperations = []string{"get", "post", "route", "static", "managed", "applyWebLimits", "start", "websocket"}
+var HTTPServerOperations = []string{"get", "post", "route", "static", "managed", "applyWebLimits", "start", "websocket", "notFound", "internalError"}
 
 // HTTPWebSocketOperations and HTTPWebSocketEndpointOperations are the v1.4.0
 // WebSocket surface: one accepted connection, and its immutable endpoint
@@ -270,6 +270,12 @@ func httpModuleInterface() *ModuleInterface {
 		types.Parameter{Name: "maxAgeSeconds", Type: types.Int, HasDefault: true},
 		types.Parameter{Name: "secure", Type: types.Bool, HasDefault: true},
 		types.Parameter{Name: "sameSite", Type: types.String, HasDefault: true}))
+	addStandardExport(module, standardFunction(httpModuleID, "persistentSessions", httpSessionStoreType(),
+		types.Parameter{Name: "path", Type: types.String},
+		types.Parameter{Name: "cookieName", Type: types.String, HasDefault: true},
+		types.Parameter{Name: "maxAgeSeconds", Type: types.Int, HasDefault: true},
+		types.Parameter{Name: "secure", Type: types.Bool, HasDefault: true},
+		types.Parameter{Name: "sameSite", Type: types.String, HasDefault: true}))
 	addStandardExport(module, standardFunction(httpModuleID, "client", httpClientType(),
 		types.Parameter{Name: "timeoutSeconds", Type: types.Int, HasDefault: true},
 		types.Parameter{Name: "maxResponseBytes", Type: types.Int, HasDefault: true},
@@ -312,7 +318,7 @@ func httpConstructionHint(identity *types.ClassSymbol) (string, bool) {
 	case "Cookie":
 		return "create a Cookie with HTTP.cookie or HTTP.deleteCookie", true
 	case "SessionStore":
-		return "create a SessionStore with HTTP.sessions", true
+		return "create a SessionStore with HTTP.sessions or HTTP.persistentSessions", true
 	case "Session":
 		return "Session values are produced by SessionStore.open", true
 	case "Client":
@@ -356,6 +362,8 @@ func httpOperationShapes() map[TypeOperation]httpOperationShape {
 		HTTPServerManaged:        {[]types.Type{types.String, types.String}, types.Nothing, false, "pass a URL path prefix String and a filesystem root directory String"},
 		HTTPServerApplyWebLimits: {none, types.Nothing, false, "call applyWebLimits with no argument"},
 		HTTPServerStart:          {none, types.Nothing, false, "call start with no argument"},
+		HTTPServerNotFound:       {[]types.Type{handler}, types.Nothing, false, "pass a (request: Request) -> Response Function"},
+		HTTPServerInternalError:  {[]types.Type{handler}, types.Nothing, false, "pass a (request: Request) -> Response Function"},
 
 		HTTPRequestMethod:    {none, types.String, false, "call method with no argument"},
 		HTTPRequestPath:      {none, types.String, false, "call path with no argument"},
@@ -460,6 +468,7 @@ var httpOperationNames = map[string]map[string]TypeOperation{
 		"static": HTTPServerStatic, "managed": HTTPServerManaged,
 		"applyWebLimits": HTTPServerApplyWebLimits, "start": HTTPServerStart,
 		"websocket": HTTPServerWebSocket,
+		"notFound":  HTTPServerNotFound, "internalError": HTTPServerInternalError,
 	},
 	"Request": {
 		"method": HTTPRequestMethod, "path": HTTPRequestPath,

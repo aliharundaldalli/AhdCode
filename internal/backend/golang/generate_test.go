@@ -2,6 +2,7 @@ package golang
 
 import (
 	"go/format"
+	"slices"
 	"strings"
 	"testing"
 
@@ -159,10 +160,24 @@ func TestGeneratedProgramCarriesRuntime(t *testing.T) {
 	for _, file := range program.Files {
 		names = append(names, file.Name)
 	}
-	if strings.Join(names, ",") != programFileName+","+runtimeFileName+","+excelRuntimeFileName+","+pdfRuntimeFileName+","+archiveRuntimeFileName+","+sqliteRuntimeFileName+","+httpRuntimeFileName+","+websocketRuntimeFileName+","+htmlRuntimeFileName+","+smtpRuntimeFileName+","+securityRuntimeFileName+","+identityRuntimeFileName+","+uuidRuntimeFileName+","+bitsRuntimeFileName+","+charactersRuntimeFile+","+cronRuntimeFileName+","+httpFilesRuntimeFileName+","+websocketClientRuntimeFile+","+svgRuntimeFileName+","+documentRuntimeFileName+
-		","+terminalRuntimeFileName+","+terminalDarwinRuntimeFileName+","+terminalLinuxRuntimeFileName+","+terminalWindowsRuntimeFileName+","+terminalOtherRuntimeFileName+","+graphicsRuntimeFileName+","+fundamentalsRuntimeFileName+","+helperLinkRuntimeFileName+","+guiRuntimeFileName+","+guiWidgetsRuntimeFileName+","+guiControlsRuntimeFileName+","+guiPhase6RuntimeFileName+","+plotViewRuntimeFileName+
-		","+archiveReadRuntimeFileName+","+filesystemRuntimeFileName+","+processRuntimeFileName+","+processUnixRuntimeFileName+","+processWindowsRuntimeFileName+","+networkRuntimeFileName+","+systemRuntimeFileName+","+diskUnixRuntimeFileName+","+diskDarwinRuntimeFileName+","+diskLinuxRuntimeFileName+","+diskWindowsRuntimeFileName+","+diskOtherRuntimeFileName {
-		t.Fatalf("unexpected generated files %v", names)
+	want := []string{
+		programFileName, runtimeFileName, excelRuntimeFileName, pdfRuntimeFileName,
+		archiveRuntimeFileName, sqliteRuntimeFileName, httpRuntimeFileName, websocketRuntimeFileName,
+		htmlRuntimeFileName, templateRuntimeFileName, smtpRuntimeFileName, securityRuntimeFileName,
+		identityRuntimeFileName, uuidRuntimeFileName, bitsRuntimeFileName, charactersRuntimeFile,
+		cronRuntimeFileName, httpFilesRuntimeFileName, httpSessionsRuntimeFileName, httpDevReloadRuntimeFileName,
+		templateWindowsRuntimeFileName, templateUnixRuntimeFileName, templateOtherRuntimeFileName,
+		websocketClientRuntimeFile, svgRuntimeFileName, documentRuntimeFileName,
+		terminalRuntimeFileName, terminalDarwinRuntimeFileName, terminalLinuxRuntimeFileName,
+		terminalWindowsRuntimeFileName, terminalOtherRuntimeFileName, graphicsRuntimeFileName,
+		fundamentalsRuntimeFileName, helperLinkRuntimeFileName, guiRuntimeFileName, guiWidgetsRuntimeFileName,
+		guiControlsRuntimeFileName, guiPhase6RuntimeFileName, plotViewRuntimeFileName, archiveReadRuntimeFileName,
+		filesystemRuntimeFileName, processRuntimeFileName, processUnixRuntimeFileName, processWindowsRuntimeFileName,
+		networkRuntimeFileName, systemRuntimeFileName, diskUnixRuntimeFileName, diskDarwinRuntimeFileName,
+		diskLinuxRuntimeFileName, diskWindowsRuntimeFileName, diskOtherRuntimeFileName,
+	}
+	if !slices.Equal(names, want) {
+		t.Fatalf("generated files:\n%v\nwant:\n%v", names, want)
 	}
 	// The bcrypt runtime imports vendored x/crypto, so a program that does
 	// not call bcrypt never receives it.

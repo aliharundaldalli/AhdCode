@@ -31,13 +31,13 @@ v0.15 bilinçli olarak şunları **içermez**:
 
 | İçermez | Durumu |
 | --- | --- |
-| ORM, sorgu kurucu, göç (migration) | `SQLite` / `MySQL` açıkça kullanılır |
+| ORM, sorgu kurucu | `SQLite` / `MySQL` açıkça kullanılır. Sürümlü SQL [`ahdcode migrate`](CLI_TR.md#ahdcode-migrate) komutudur |
 | Form, doğrulama, eski girdi, hata torbaları | v0.16'da yayımlandı (bkz. bölüm 16) |
 | Ara katman zincirleri, rota grupları, yetki bekçileri | v0.17 için planlı |
-| Şablon dili | `Web.document` bir kabuktur, şablon değil |
+| `Web.document` içinde şablon dili | `Web.document` hâlâ bir kabuktur. Dosya şablonları, yerleşimler ve parçalar [`Templates`](TEMPLATES_TR.md) modülündedir |
 | Sanal DOM, hydration, tepkisel durum, hooks | Planlı değil; sayfalar sunucuda kurulur |
 | Ön yüz paketleyici, npm, Node, CSS-in-JS | Planlı değil; varlıklar diskteki dosyalardır |
-| Tarayıcı canlı yenileme / HMR | v0.15 için planlı değil |
+| Tarayıcı canlı yenileme / HMR | `ahdcode dev`, başarılı bir yeniden derlemeden sonra sayfanın tamamını aynı kökenden bir betikle yeniler. Sıcak modül değişimi değildir. `ahdcode run` ve bir `.env` dosyası bunu açmaz |
 | ACME, Let's Encrypt, sertifika yenileme | TLS'i ters vekilde sonlandırın |
 
 Paket yöneticisi de yoktur. `bring Web` çevrimdışı çözülür: derleyiciye gömülü
@@ -199,6 +199,8 @@ academy.start()
 | `assets(prefix, root)` | statik dosya dizinini sunar |
 | `managedAssets(prefix, root)` | yalnızca `Web.Assets` ile bildirilen dosyaları sunar |
 | `websocket(path, endpoint)` | `Web.websocket` ile kurulan bir [WebSocket](WEBSOCKET_TR.md) uç noktasını kaydeder (v1.4.0) |
+| `notFound(handler)` | eşleşmeyen yolun sayfası; durum 404'tür |
+| `internalError(handler)` | bir işleyici başarısız olunca sayfa; durum 500'dür |
 | `start()` | bağlanır ve sunar; geri dönmez |
 | `configuration()` | doğrulanmış `AppConfig` |
 
@@ -214,13 +216,23 @@ beklenen imzayı söyleyen bir derleme hatasıdır.
 | Çağrı | Döndürür |
 | --- | --- |
 | `Web.html(node, status := 200)` | düğüm ağacından HTML yanıtı |
+| `Web.markup(body, status := 200)` | şablon metninden HTML yanıtı |
 | `Web.page(title, body, head := [], status := 200)` | tam belge, yanıt olarak |
 | `Web.document(title, body, head := [])` | tam belge, biçimlenmiş metin olarak |
 | `Web.text(body, status := 200)` | düz metin yanıtı |
 | `Web.redirect(location, status := 303)` | yönlendirme (303, POST sonrası için uygundur) |
 | `Web.response(status, body, contentType)` | diğer her şey |
 | `Web.render(node)` | düğüm ağacından biçimlenmiş metne |
-| `Web.sessions(...)` | bir `SessionStore` |
+| `Web.sessions(...)` | bellek içi bir `SessionStore` |
+| `Web.persistentSessions(path, ...)` | SQLite dosyasında saklanan bir `SessionStore` |
+
+`bring Web` SQLite yardımcısını gerektirmez. `Web.render` ve `Web.sessions`
+de gerektirmez. `Web.sessions` süreç yeniden başlayınca durmaz.
+`Web.persistentSessions`, `path` gerçek bir dosya ve üst dizini varken durur
+ve yardımcıyı gerektiren çağrı budur. Çerez varsayılanları
+`Web.sessions` ile aynıdır: ad `ahdsession`, süre 86400 saniye, `secure: true`,
+SameSite `Lax`. Düz HTTP geliştirme `secure: false` geçirmelidir. Saklama,
+süre, döndürme ve hata davranışı [HTTP_TR.md](HTTP_TR.md) oturum kurallarıdır.
 
 ## 9. Web.UI
 
@@ -502,8 +514,10 @@ göreli dosyayı yönetilen sunuma kaydeder.
 
 Statik bir dosyayı düzenlemek, tarayıcının bir sonraki istekte alacağını
 değiştirir. AhdCode kaynağını **yeniden derlemez**, çünkü hiçbiri AhdCode
-kaynağı değildir. Sıcak modül değişimi ve enjekte edilen tarayıcı yenilemesi
-yoktur: sayfayı yeniden yükleyin.
+kaynağı değildir. `ahdcode dev` tarayıcıyı başarılı bir kaynak yeniden
+derlemesinden sonra yeniler; statik dosya düzenlemesi bu derlemelerden
+biri değildir, bu yüzden tarayıcıyı yenilemez. Stil sayfası veya betik
+değişikliğinden sonra sayfayı kendiniz yükleyin.
 
 ## 12. Geliştirme kipi
 
@@ -527,11 +541,23 @@ AhdCode Web
   Open:
   http://127.0.0.1:8080
 
+  Browser refresh:
+  Open pages reload after a successful rebuild.
+  A failed build keeps the last page.
+
   Local identity:
   http://ahdakademi.test/
   Bind: 127.0.0.1:8080
 
 Waiting for changes...
+```
+
+Sonraki başarılı bir yeniden derleme şunu yazar:
+
+```
+→ Restarting...
+✓ Running
+✓ Browser will refresh
 ```
 
 `Open:` altındaki adres, uygulamanın gerçekten bağlandığı soket olan
@@ -550,12 +576,22 @@ Yönlendirme kurulamazsa başlık bunu tek satırda söyler ve uygulama yine
 çalışır — bir kolaylığın başarısız olması, düzgün başlamış bir oturumu asla
 başarısız kılmaz.
 
-v0.13/v0.14'ün bağımlılık farkında geliştirme denetleyicisi değişmemiştir ve
-kaynak çizgesi, izleyici, son iyi yapı, yeniden derleme, yeniden başlatma ve
-durdurma hâlâ ona aittir. Web bir başlık ve iki güvenlik denetimi ekler.
+Geliştirme denetleyicisi kaynak çizgesine, izleyiciye, son iyi yapıya,
+yeniden derlemeye, yeniden başlatmaya ve durdurmaya sahiptir. Web bir başlık
+ve iki güvenlik denetimi ekler. İlk başarılı başlangıç, bu başlığın içinde
+`Browser refresh:` bölümünü yazar. İlk `✓ Running` satırından sonra
+`✓ Browser will refresh` yazılmaz. O onay, sonraki başarılı yeniden
+derlemede `→ Restarting...` ve `✓ Running` satırlarından sonra görünür.
+Sayfa, `/__ahdcode/dev/reload.js` betiğini aynı kökenden yükler; `script-src
+'self'` içeren bir `Content-Security-Policy` buna izin verebilir. Bir `.env`
+dosyası kancayı açamaz: oturum süreç başlarken sabitlenir. Üretim uyarısı,
+başarısız derlemeler, parçalar, ekler, sıkıştırılmış yanıtlar, karakter
+kümeleri ve bir statik dosyanın neden yenileme tetiklemediği için bkz.
+[CLI](CLI_TR.md#dev-izle-yeniden-derle-yeniden-başlat).
 
 `require(...)` çizgesindeki herhangi bir kaynak dosyayı düzenlemek yeniden
-derler ve yeniden başlatır. `public/app.css`'i düzenlemek bunu yapmaz.
+derler ve yeniden başlatır. `public/app.css`'i düzenlemek bunu yapmaz ve
+tarayıcıyı yenilemez.
 
 ### Reddedilen yapılandırmalar
 
@@ -1029,9 +1065,17 @@ posta anahtarı yoktur. `.env` altı uygulama anahtarında kalır.
 
 ### Basic
 
-Aynı kabuk artı `Config/Mail.ahd` ve bu fonksiyonların gerçekten okuduğu
-`MAIL_*` anahtarları. `MAIL_SECURITY` varsayılanı `starttls` (587). Boş
-`MAIL_HOST` uygulamayı yine başlatır. Veritabanı ve kimlik doğrulama yoktur.
+Empty kabuğunun üstünde küçük bir Türkçe site, artı `Config/Mail.ahd` ve
+bu fonksiyonların gerçekten okuduğu `MAIL_*` anahtarları. `MAIL_SECURITY`
+varsayılanı `starttls` (587). Boş `MAIL_HOST` uygulamayı yine başlatır.
+Veritabanı ve kimlik doğrulama yoktur.
+
+Sayfalar [`Templates.files("templates")`](TEMPLATES_TR.md) ile yüklenir.
+Ortak `layouts/site.html`, `pages/home.html` ve `pages/about.html`'i sarar;
+`components/nav.html` bir kısmi şablondur. Yollar `/`, `/hakkinda` ve
+`/ornek-hata`'dır. `site.notFound` ve `site.internalError` aynı yerleşimden
+özel 404 ve 500 sayfaları sunar. İşleyiciler Türkçe dizgileri
+`Templates.object({...})` ile `pages.layout`'a, sonra `Web.markup`'a verir.
 
 ### Admin
 

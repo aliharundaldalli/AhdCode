@@ -1,0 +1,89 @@
+bring HTTP
+bring Env
+from HTTP bring Server
+from HTTP bring Request
+from HTTP bring Response
+from HTTP bring SessionStore
+from HTTP bring Session
+
+// Durable sessions. This is session storage, not a password or OAuth system.
+// AHD_SESSION_DB is the SQLite file. Its parent directory must already exist.
+// AHD_SESSION_MAX_AGE is the server expiry in seconds. secure is false because
+// this example speaks plain HTTP; an HTTPS deployment passes true.
+port: Int := int(Env.getOr("AHD_PORT", "8765"))
+databasePath: String := Env.getOr("AHD_SESSION_DB", "sessions.db")
+maxAge: Int := int(Env.getOr("AHD_SESSION_MAX_AGE", "3600"))
+sessions: SessionStore := HTTP.persistentSessions(databasePath, "ahd_session", maxAge, false, "Lax")
+
+ok: Function := (request: Request) -> Response {
+    return HTTP.text("ok")
+}
+
+login: Function := (request: Request) -> Response {
+    sessions: Global SessionStore
+    session: Local Session := sessions.open(request)
+    name: Local String? := request.form("name")
+    if name == null {
+        return sessions.commit(session, HTTP.text("name is required", 400))
+    }
+    session.rotate()
+    session.set("user", name)
+    return sessions.commit(session, HTTP.text("in"))
+}
+
+panel: Function := (request: Request) -> Response {
+    sessions: Global SessionStore
+    session: Local Session := sessions.open(request)
+    user: Local String? := session.get("user")
+    if user == null {
+        return sessions.commit(session, HTTP.text("anonymous"))
+    }
+    return sessions.commit(session, HTTP.text(user))
+}
+
+logout: Function := (request: Request) -> Response {
+    sessions: Global SessionStore
+    session: Local Session := sessions.open(request)
+    session.destroy()
+    return sessions.commit(session, HTTP.text("out"))
+}
+
+rotate: Function := (request: Request) -> Response {
+    sessions: Global SessionStore
+    session: Local Session := sessions.open(request)
+    user: Local String? := session.get("user")
+    if user == null {
+        return sessions.commit(session, HTTP.text("anonymous"))
+    }
+    session.rotate()
+    session.set("user", user)
+    return sessions.commit(session, HTTP.text("rotated"))
+}
+
+note: Function := (request: Request) -> Response {
+    sessions: Global SessionStore
+    session: Local Session := sessions.open(request)
+    user: Local String? := session.get("user")
+    if user == null {
+        return sessions.commit(session, HTTP.text("anonymous"))
+    }
+    value: Local String? := request.form("value")
+    if value != null {
+        session.set("note", value)
+    }
+    current: Local String? := session.get("note")
+    if current == null {
+        return sessions.commit(session, HTTP.text(""))
+    }
+    return sessions.commit(session, HTTP.text(current))
+}
+
+app: Server := HTTP.server("127.0.0.1", port)
+app.get("/ok", ok)
+app.post("/login", login)
+app.get("/panel", panel)
+app.post("/logout", logout)
+app.post("/rotate", rotate)
+app.post("/note", note)
+app.get("/note", note)
+app.start()

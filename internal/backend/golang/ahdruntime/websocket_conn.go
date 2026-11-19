@@ -109,17 +109,23 @@ func ahdWebSocketRun(state *ahdHTTPServerState, endpoint *ahdWebSocketEndpointSt
 	// close with its own 1009 instead of the library's.
 	conn.SetReadLimit(endpoint.maxMessageBytes + 1)
 
+	clock := ahdWebSocketClockSnapshot()
 	ctx, cancel := context.WithCancel(context.Background())
 	readerDone := make(chan struct{})
 	writerDone := make(chan struct{})
-	go ahdWebSocketWriter(conn, socket, readerDone, writerDone)
-	go ahdWebSocketPinger(ctx, conn)
+	pingerDone := make(chan struct{})
+	go ahdWebSocketWriter(conn, socket, readerDone, writerDone, clock.writeTimeout)
+	go func() {
+		defer close(pingerDone)
+		ahdWebSocketPinger(ctx, conn, clock.pingInterval, clock.pongTimeout)
+	}()
 
 	code, reason := ahdWebSocketReadLoop(state, endpoint, conn, socket)
 	socket.markClosed()
 	close(readerDone)
-	<-writerDone
 	cancel()
+	<-writerDone
+	<-pingerDone
 	_ = conn.CloseNow()
 	ahdWebSocketFinish(state, endpoint, socket, code, reason)
 }
@@ -177,22 +183,22 @@ func ahdWebSocketReadLoop(state *ahdHTTPServerState, endpoint *ahdWebSocketEndpo
 
 // ahdWebSocketWriter drains one socket's queue and performs a server-initiated
 // close. It is the only goroutine that writes data frames.
-func ahdWebSocketWriter(conn *websocket.Conn, socket *ahdWebSocketSocket, readerDone <-chan struct{}, done chan<- struct{}) {
+func ahdWebSocketWriter(conn *websocket.Conn, socket *ahdWebSocketSocket, readerDone <-chan struct{}, done chan<- struct{}, writeTimeout time.Duration) {
 	defer close(done)
 	for {
 		select {
 		case text := <-socket.outbound:
-			if !ahdWebSocketWrite(conn, text) {
+			if !ahdWebSocketWrite(conn, text, writeTimeout) {
 				_ = conn.CloseNow()
 				return
 			}
 		case request := <-socket.closeRequests:
-			ahdWebSocketFinishClose(conn, socket, request)
+			ahdWebSocketFinishClose(conn, socket, request, writeTimeout)
 			return
 		case <-readerDone:
 			select {
 			case request := <-socket.closeRequests:
-				ahdWebSocketFinishClose(conn, socket, request)
+				ahdWebSocketFinishClose(conn, socket, request, writeTimeout)
 			default:
 			}
 			return
@@ -200,11 +206,11 @@ func ahdWebSocketWriter(conn *websocket.Conn, socket *ahdWebSocketSocket, reader
 	}
 }
 
-func ahdWebSocketFinishClose(conn *websocket.Conn, socket *ahdWebSocketSocket, request ahdWebSocketCloseRequest) {
+func ahdWebSocketFinishClose(conn *websocket.Conn, socket *ahdWebSocketSocket, request ahdWebSocketCloseRequest, writeTimeout time.Duration) {
 	for request.flush {
 		select {
 		case text := <-socket.outbound:
-			if !ahdWebSocketWrite(conn, text) {
+			if !ahdWebSocketWrite(conn, text, writeTimeout) {
 				_ = conn.CloseNow()
 				return
 			}
@@ -216,23 +222,25 @@ func ahdWebSocketFinishClose(conn *websocket.Conn, socket *ahdWebSocketSocket, r
 	_ = conn.Close(websocket.StatusCode(request.code), request.reason)
 }
 
-func ahdWebSocketWrite(conn *websocket.Conn, text string) bool {
-	ctx, cancel := context.WithTimeout(context.Background(), ahdWebSocketWriteTimeout)
+func ahdWebSocketWrite(conn *websocket.Conn, text string, writeTimeout time.Duration) bool {
+	ctx, cancel := context.WithTimeout(context.Background(), writeTimeout)
 	defer cancel()
 	return conn.Write(ctx, websocket.MessageText, []byte(text)) == nil
 }
 
 // ahdWebSocketPinger sends a ping on an interval; a peer that does not answer
-// in time is treated as lost.
-func ahdWebSocketPinger(ctx context.Context, conn *websocket.Conn) {
-	ticker := time.NewTicker(ahdWebSocketPingInterval)
+// in time is treated as lost. The durations are the connection's own copy.
+func ahdWebSocketPinger(ctx context.Context, conn *websocket.Conn, pingInterval, pongTimeout time.Duration) {
+	ahdWebSocketLivePingers.Add(1)
+	defer ahdWebSocketLivePingers.Add(-1)
+	ticker := time.NewTicker(pingInterval)
 	defer ticker.Stop()
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			pingContext, cancel := context.WithTimeout(ctx, ahdWebSocketPongTimeout)
+			pingContext, cancel := context.WithTimeout(ctx, pongTimeout)
 			err := conn.Ping(pingContext)
 			cancel()
 			if err != nil {
@@ -255,18 +263,32 @@ func ahdWebSocketPeerClose(err error) (int64, string) {
 
 // ahdWebSocketCall runs one callback holding the server's handler mutex,
 // exactly like an HTTP handler, and reports whether it raised. The failure is
-// written to stderr, never to the peer.
+// written to stderr, never to the peer. handlerOwner is set for the same
+// re-entry rule HTTP uses, and it is cleared on return, raise, and panic.
 func ahdWebSocketCall(state *ahdHTTPServerState, callback func()) (failed bool) {
 	state.mutex.Lock()
-	defer state.mutex.Unlock()
-	defer func() {
-		if recovered := recover(); recovered != nil {
+	entered := false
+	func() {
+		defer state.mutex.Unlock()
+		if state.closing.Load() {
 			failed = true
-			ahdWebSocketLogFailure(recovered)
+			return
 		}
+		state.enterCallback()
+		entered = true
+		defer state.leaveCallback()
+		defer func() {
+			if recovered := recover(); recovered != nil {
+				failed = true
+				ahdWebSocketLogFailure(recovered)
+			}
+		}()
+		callback()
 	}()
-	callback()
-	return false
+	if entered {
+		state.finishCallback()
+	}
+	return failed
 }
 
 func ahdWebSocketLogFailure(recovered any) {

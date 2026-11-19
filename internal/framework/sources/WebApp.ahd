@@ -53,6 +53,19 @@ App: Class<> := {
     websocket: Function := (path: String, endpoint: WebSocketEndpoint) -> Nothing {
         attribute.server.websocket(path, endpoint)
     }
+    // notFound renders the page for a path that matches no route, static
+    // file, or managed asset. The handler is Function(Request) -> Response,
+    // the same shape as Server.get. The response status is 404.
+    notFound: Function := (handler: Function) -> Nothing {
+        attribute.server.notFound(handler)
+    }
+    // internalError renders the page when a request handler fails. The
+    // handler is Function(Request) -> Response. The response status is 500.
+    // If this handler also fails, the client receives plain text and no
+    // second attempt is made.
+    internalError: Function := (handler: Function) -> Nothing {
+        attribute.server.internalError(handler)
+    }
     // start binds the socket and serves. It does not return.
     start: Function := () -> Nothing {
         attribute.server.start()

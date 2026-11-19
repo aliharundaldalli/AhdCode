@@ -415,9 +415,10 @@ func TestWebSocketServerCloseFlushesQueuedMessages(t *testing.T) {
 }
 
 func TestWebSocketQueueOverflowClosesWith1008(t *testing.T) {
-	previous := ahdWebSocketWriteTimeout
-	ahdWebSocketWriteTimeout = 500 * time.Millisecond
-	t.Cleanup(func() { ahdWebSocketWriteTimeout = previous })
+	current := ahdWebSocketClockSnapshot()
+	current.writeTimeout = 500 * time.Millisecond
+	previous := ahdWebSocketReplaceClock(current)
+	t.Cleanup(func() { ahdWebSocketReplaceClock(previous) })
 	events := &recorder{}
 	payload := strings.Repeat("x", 60000)
 	base := startWebSocketServer(t, func(handle string) {
@@ -458,9 +459,11 @@ func TestWebSocketSurvivesHTTPServerTimeouts(t *testing.T) {
 }
 
 func TestWebSocketUnresponsivePeerIsClosedAsAbnormal(t *testing.T) {
-	previousInterval, previousTimeout := ahdWebSocketPingInterval, ahdWebSocketPongTimeout
-	ahdWebSocketPingInterval, ahdWebSocketPongTimeout = 100*time.Millisecond, 150*time.Millisecond
-	t.Cleanup(func() { ahdWebSocketPingInterval, ahdWebSocketPongTimeout = previousInterval, previousTimeout })
+	current := ahdWebSocketClockSnapshot()
+	current.pingInterval = 100 * time.Millisecond
+	current.pongTimeout = 150 * time.Millisecond
+	previous := ahdWebSocketReplaceClock(current)
+	t.Cleanup(func() { ahdWebSocketReplaceClock(previous) })
 	events := &recorder{}
 	base := startWebSocketServer(t, func(handle string) {
 		AhdHTTPServerWebSocket(AhdClassHTTPError, handle, "/quiet", recordingEndpoint(events, func(string, string) {}))
@@ -470,6 +473,74 @@ func TestWebSocketUnresponsivePeerIsClosedAsAbnormal(t *testing.T) {
 	got := events.waitFor(t, "close")
 	if strings.Join(got, "|") != "open /quiet|close 1006 " {
 		t.Fatalf("events = %q", got)
+	}
+	if running := ahdWebSocketLivePingers.Load(); running != 0 {
+		t.Fatalf("pinger still running after abnormal close: %d", running)
+	}
+}
+
+// TestWebSocketClockIsImmutablePerConnection checks that a connection keeps
+// the timings it copied at start, and that a second connection copies the
+// clock as it is when that connection starts.
+func TestWebSocketClockIsImmutablePerConnection(t *testing.T) {
+	short := ahdWebSocketClockSnapshot()
+	short.pingInterval = 80 * time.Millisecond
+	short.pongTimeout = 120 * time.Millisecond
+	previous := ahdWebSocketReplaceClock(short)
+	t.Cleanup(func() { ahdWebSocketReplaceClock(previous) })
+
+	fast := &recorder{}
+	slow := &recorder{}
+	base := startWebSocketServer(t, func(handle string) {
+		AhdHTTPServerWebSocket(AhdClassHTTPError, handle, "/fast", recordingEndpoint(fast, func(string, string) {}))
+		AhdHTTPServerWebSocket(AhdClassHTTPError, handle, "/slow", recordingEndpoint(slow, func(string, string) {}))
+	})
+	dialWebSocket(t, base+"/fast", nil)
+	long := previous
+	long.pingInterval = 30 * time.Second
+	long.pongTimeout = 30 * time.Second
+	ahdWebSocketReplaceClock(long)
+	dialWebSocket(t, base+"/slow", nil)
+
+	got := fast.waitFor(t, "close")
+	if strings.Join(got, "|") != "open /fast|close 1006 " {
+		t.Fatalf("fast events = %q", got)
+	}
+	deadline := time.Now().Add(400 * time.Millisecond)
+	for time.Now().Before(deadline) {
+		if strings.Contains(strings.Join(slow.snapshot(), "|"), "close") {
+			t.Fatalf("slow connection closed under the long clock: %q", slow.snapshot())
+		}
+		time.Sleep(40 * time.Millisecond)
+	}
+	if running := ahdWebSocketLivePingers.Load(); running != 1 {
+		t.Fatalf("expected only the slow pinger, have %d", running)
+	}
+}
+
+func TestWebSocketCloseJoinsThePinger(t *testing.T) {
+	events := &recorder{}
+	base := startWebSocketServer(t, func(handle string) {
+		AhdHTTPServerWebSocket(AhdClassHTTPError, handle, "/join", recordingEndpoint(events, func(string, string) {}))
+	})
+	conn := dialWebSocket(t, base+"/join", nil)
+	events.waitFor(t, "open")
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) && ahdWebSocketLivePingers.Load() != 1 {
+		time.Sleep(5 * time.Millisecond)
+	}
+	if running := ahdWebSocketLivePingers.Load(); running != 1 {
+		t.Fatalf("pinger was not running after open: %d", running)
+	}
+	if err := conn.Close(websocket.StatusNormalClosure, "bye"); err != nil {
+		t.Fatal(err)
+	}
+	got := events.waitFor(t, "close")
+	if strings.Join(got, "|") != "open /join|close 1000 bye" {
+		t.Fatalf("events = %q", got)
+	}
+	if running := ahdWebSocketLivePingers.Load(); running != 0 {
+		t.Fatalf("pinger still running after close: %d", running)
 	}
 }
 
@@ -662,5 +733,118 @@ func TestWebSocketWildcardAndMethodRouting(t *testing.T) {
 	_ = response.Body.Close()
 	if string(body) != "lobby page" {
 		t.Fatalf("exact GET = %d %q", response.StatusCode, body)
+	}
+}
+
+func TestWebSocketSameServerMutationDoesNotDeadlock(t *testing.T) {
+	var serverHandle string
+	base := startWebSocketServer(t, func(handle string) {
+		serverHandle = handle
+		mutate := func() {
+			AhdHTTPServerGet(AhdClassHTTPError, handle, "/extra", func(string) string {
+				return AhdHTTPText(AhdClassHTTPError, "extra", 200)
+			})
+		}
+		accept := AhdHTTPWebSocket(AhdClassHTTPError, func(string, string) {})
+		accept = AhdWebSocketEndpointWithAccept(AhdClassHTTPError, accept, func(string) *string {
+			mutate()
+			return nil
+		})
+		AhdHTTPServerWebSocket(AhdClassHTTPError, handle, "/accept", accept)
+
+		opened := AhdHTTPWebSocket(AhdClassHTTPError, func(string, string) {})
+		opened = AhdWebSocketEndpointWithOpen(AhdClassHTTPError, opened, func(string, string) { mutate() })
+		AhdHTTPServerWebSocket(AhdClassHTTPError, handle, "/open", opened)
+
+		AhdHTTPServerWebSocket(AhdClassHTTPError, handle, "/message", AhdHTTPWebSocket(AhdClassHTTPError, func(string, string) {
+			mutate()
+		}))
+
+		closed := AhdHTTPWebSocket(AhdClassHTTPError, func(string, string) {})
+		closed = AhdWebSocketEndpointWithClose(AhdClassHTTPError, closed, func(string, int64, string) { mutate() })
+		AhdHTTPServerWebSocket(AhdClassHTTPError, handle, "/close", closed)
+
+		AhdHTTPServerWebSocket(AhdClassHTTPError, handle, "/echo", AhdHTTPWebSocket(AhdClassHTTPError, func(socket string, text string) {
+			AhdWebSocketSend(AhdClassHTTPError, socket, "echo:"+text)
+		}))
+		AhdHTTPServerGet(AhdClassHTTPError, handle, "/ping", func(string) string {
+			return AhdHTTPText(AhdClassHTTPError, "pong", 200)
+		})
+	})
+	httpBase := "http" + strings.TrimPrefix(base, "ws")
+
+	acceptCtx, acceptCancel := context.WithTimeout(context.Background(), time.Second)
+	defer acceptCancel()
+	_, response, err := websocket.Dial(acceptCtx, base+"/accept", nil)
+	if err == nil {
+		t.Fatal("accept callback mutation was treated as success")
+	}
+	if response == nil || response.StatusCode != http.StatusInternalServerError {
+		status := 0
+		if response != nil {
+			status = response.StatusCode
+		}
+		t.Fatalf("accept mutation status = %d, err = %v", status, err)
+	}
+
+	openCtx, openCancel := context.WithTimeout(context.Background(), time.Second)
+	defer openCancel()
+	openConn, _, err := websocket.Dial(openCtx, base+"/open", nil)
+	if err != nil {
+		t.Fatalf("onOpen mutation hung the handshake: %v", err)
+	}
+	_, _, err = openConn.Read(openCtx)
+	if err == nil || errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("onOpen mutation did not reject promptly: %v", err)
+	}
+	_ = openConn.CloseNow()
+
+	messageCtx, messageCancel := context.WithTimeout(context.Background(), time.Second)
+	defer messageCancel()
+	messageConn, _, err := websocket.Dial(messageCtx, base+"/message", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeText(t, messageConn, "change")
+	_, _, err = messageConn.Read(messageCtx)
+	if err == nil || errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("onMessage mutation did not reject promptly: %v", err)
+	}
+	_ = messageConn.CloseNow()
+
+	closeConn := dialWebSocket(t, base+"/close", nil)
+	if err := closeConn.Close(websocket.StatusNormalClosure, "bye"); err != nil {
+		t.Fatal(err)
+	}
+
+	ping, err := http.Get(httpBase + "/ping")
+	if err != nil {
+		t.Fatalf("HTTP after rejected WebSocket mutations: %v", err)
+	}
+	body, _ := io.ReadAll(ping.Body)
+	_ = ping.Body.Close()
+	if ping.StatusCode != http.StatusOK || string(body) != "pong" {
+		t.Fatalf("ping = %d %q", ping.StatusCode, body)
+	}
+	extra, err := http.Get(httpBase + "/extra")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = extra.Body.Close()
+	if extra.StatusCode != http.StatusNotFound {
+		t.Fatalf("rejected route was stored, status = %d", extra.StatusCode)
+	}
+	echo := dialWebSocket(t, base+"/echo", nil)
+	writeText(t, echo, "one")
+	if got := readText(t, echo); got != "echo:one" {
+		t.Fatalf("first echo = %q", got)
+	}
+	writeText(t, echo, "two")
+	if got := readText(t, echo); got != "echo:two" {
+		t.Fatalf("second echo = %q", got)
+	}
+	_ = echo.Close(websocket.StatusNormalClosure, "done")
+	if !ahdHTTPHandleRegistered(serverHandle) {
+		t.Fatal("rejected WebSocket mutations removed the server")
 	}
 }

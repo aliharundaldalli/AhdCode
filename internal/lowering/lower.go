@@ -176,6 +176,11 @@ func LowerCompilation(compilation module.CompilationResult) Result {
 					htmlModule(ir.ModuleID(current.ID), current.Source.Name, current.Source.Path))
 				continue
 			}
+			if string(current.ID) == TemplatesModuleID {
+				result.Modules = append(result.Modules,
+					templatesModule(ir.ModuleID(current.ID), current.Source.Name, current.Source.Path))
+				continue
+			}
 			if string(current.ID) == BitsModuleID {
 				result.Modules = append(result.Modules,
 					bitsModule(ir.ModuleID(current.ID), current.Source.Name, current.Source.Path))

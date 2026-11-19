@@ -13,10 +13,12 @@ import (
 	"mime/multipart"
 	"net"
 	"net/http"
+	"net/netip"
 	"net/textproto"
 	"net/url"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -33,6 +35,9 @@ const (
 	ahdHTTPReadTimeout       = 15 * time.Second
 	ahdHTTPWriteTimeout      = 15 * time.Second
 	ahdHTTPIdleTimeout       = 60 * time.Second
+	// ahdHTTPShutdownTimeout is the graceful wait. It starts when shutdown
+	// loads the listener, not when a handler returns. Close follows it.
+	ahdHTTPShutdownTimeout   = 2 * time.Second
 	ahdHTTPDefaultMaxBody    = 1048576
 	ahdHTTPSessionIDBytes    = 32
 	ahdHTTPDefaultCookiePath = "/"
@@ -46,7 +51,35 @@ type ahdHTTPRouteKey struct {
 }
 
 type ahdHTTPServerState struct {
-	mutex        sync.Mutex
+	// mutex serializes route updates and HTTP/WebSocket callbacks. A callback
+	// holds it for the whole user call. Shutdown and the interpreter lock
+	// must not wait on it.
+	//
+	// Permitted acquisition order:
+	//   - mutex, then the evaluator session lock (a callback invokes user code)
+	//   - session lock released before any wait on mutex
+	//   - lifecycle alone, and only around listener publication
+	//   - the server registry alone, and only to snapshot or delete
+	// Forbidden: session lock then a blocking mutex lock; lifecycle then mutex.
+	mutex sync.Mutex
+	// lifecycle guards only listener and httpServer publication. Shutdown
+	// holds it just long enough to copy those pointers, then waits outside
+	// it. Never acquire mutex while holding lifecycle.
+	lifecycle  sync.Mutex
+	listener   net.Listener
+	httpServer *http.Server
+	stopOnce   sync.Once
+	// closing refuses new handler calls as soon as shutdown is claimed.
+	// Close does not cancel a handler that is already inside user code.
+	closing atomic.Bool
+	// routesFrozen is set under mutex before the first callback can run.
+	// Mutators that see it raise without taking mutex, so they cannot form
+	// a lock cycle with a callback that holds mutex and wants the session.
+	routesFrozen atomic.Bool
+	// handlerOwner is the goroutine inside the locked HTTP or WebSocket
+	// callback. Same-server start and route changes from that goroutine are
+	// rejected instead of locking mutex a second time.
+	handlerOwner atomic.Int64
 	host         string
 	port         int
 	maxBodyBytes int64
@@ -61,7 +94,13 @@ type ahdHTTPServerState struct {
 	routes         map[ahdHTTPRouteKey]AhdHTTPHandler
 	methods        map[string][]string
 	started        bool
-	httpServer     *http.Server
+	// owner is set when start claims this server and cleared when that start
+	// is abandoned or the server retires. A server object that was only
+	// constructed stays false, so it cannot keep a session file open.
+	owner atomic.Bool
+	// activeHandlers and ownedDatabases are protected exclusively by ahdHTTPLifetimeMu.
+	activeHandlers int
+	ownedDatabases map[*ahdHTTPSessionDatabase]struct{}
 	// staticRoutes are prefix-matched, checked only after routes misses
 	// entirely (see ahdHTTPDispatcher.ServeHTTP): a program that registers
 	// both an exact route and an overlapping static prefix always has the
@@ -74,6 +113,12 @@ type ahdHTTPServerState struct {
 	// webSockets are the Server.websocket registrations (v1.4.0), keyed by
 	// path. A GET on such a path is a WebSocket upgrade (see websocket.go).
 	webSockets map[string]*ahdHTTPWebSocketRoute
+	// notFound and internalError are optional application pages. A missing
+	// registration keeps the plain-text status response. The handlers are
+	// called at most once per request, and a failure inside them falls back
+	// to that plain text instead of calling the other page.
+	notFound      AhdHTTPHandler
+	internalError AhdHTTPHandler
 }
 
 // ahdHTTPStaticEntry is one server.static(prefix, root) registration.
@@ -150,6 +195,9 @@ type ahdHTTPSessionData struct {
 	Values    map[string]string `json:"values"`
 	Dirty     bool              `json:"dirty"`
 	Destroyed bool              `json:"destroyed"`
+	// Fresh is true when ID is not yet a row in durable storage. Memory
+	// stores ignore it. omitempty keeps existing in-memory session JSON stable.
+	Fresh bool `json:"fresh,omitempty"`
 }
 
 type ahdHTTPStoredSession struct {
@@ -164,6 +212,9 @@ type ahdHTTPSessionStoreState struct {
 	secure        bool
 	sameSite      string
 	sessions      map[string]*ahdHTTPStoredSession
+	// durable is nil for an in-memory store. A persistent store keeps its
+	// rows in SQLite and does not use sessions.
+	durable *ahdHTTPDurableSessions
 }
 
 var (
@@ -174,10 +225,28 @@ var (
 )
 
 var (
-	ahdHTTPServers   = map[string]*ahdHTTPServerState{}
-	ahdHTTPServersMu sync.Mutex
-	ahdHTTPNextID    atomic.Int64
+	ahdHTTPServers       = map[string]*ahdHTTPServerState{}
+	ahdHTTPServersMu     sync.Mutex
+	ahdHTTPNextID        atomic.Int64
+	ahdHTTPEvaluatorRuns atomic.Int32
+	// ahdHTTPHandlers counts HTTP and WebSocket callbacks that have entered
+	// user code and have not returned. Shutdown can retire the server while
+	// one of these is still running; the file stays open until that callback
+	// returns.
+	ahdHTTPHandlers atomic.Int32
+	// ahdHTTPLifetimeMu covers the decision to close session files. Begin,
+	// end, handler entry and return, claiming a server, and the idle check
+	// all take it, so one owner cannot observe "idle" while another owner
+	// is already recorded.
+	ahdHTTPLifetimeMu         sync.Mutex
+	ahdHTTPEvaluatorScopeNext atomic.Uint64
+	ahdHTTPEvaluatorScopes    = map[uint64]*ahdHTTPEvaluatorScope{}
 )
+
+type ahdHTTPEvaluatorScope struct {
+	databases map[*ahdHTTPSessionDatabase]int
+	servers   map[*ahdHTTPServerState]struct{}
+}
 
 func AhdHTTPServer(class *AhdClass, host string, port int64, maxBodyBytes int64) string {
 	if strings.TrimSpace(host) == "" {
@@ -298,24 +367,60 @@ func AhdHTTPServerRoute(class *AhdClass, handle, method, path string, handler Ah
 	ahdHTTPRegister(class, handle, method, path, handler)
 }
 
-func AhdHTTPServerStart(class *AhdClass, handle string) {
-	server := ahdHTTPLookup(class, handle)
-	server.mutex.Lock()
-	if server.started {
-		server.mutex.Unlock()
-		AhdRaiseClass(class, "HTTP server has already started")
+func AhdHTTPServerNotFound(class *AhdClass, handle string, handler AhdHTTPHandler) {
+	ahdHTTPRegisterStatus(class, handle, handler, true)
+}
+
+func AhdHTTPServerInternalError(class *AhdClass, handle string, handler AhdHTTPHandler) {
+	ahdHTTPRegisterStatus(class, handle, handler, false)
+}
+
+func ahdHTTPRegisterStatus(class *AhdClass, handle string, handler AhdHTTPHandler, missing bool) {
+	if handler == nil {
+		AhdRaiseClass(class, "HTTP error page handler is missing")
 	}
+	server := ahdHTTPLookup(class, handle)
+	ahdHTTPLockRoutes(class, server)
+	defer server.mutex.Unlock()
+	if missing {
+		if server.notFound != nil {
+			AhdRaiseClass(class, "HTTP notFound page is already registered")
+		}
+		server.notFound = handler
+		return
+	}
+	if server.internalError != nil {
+		AhdRaiseClass(class, "HTTP internalError page is already registered")
+	}
+	server.internalError = handler
+}
+
+func AhdHTTPServerStart(class *AhdClass, handle string) {
+	AhdHTTPServerStartScoped(class, 0, handle)
+}
+
+// AhdHTTPServerStartScoped runs Server.start while associating the started
+// server with an active evaluator execution scope so any scoped persistent
+// session databases outlive the scope only while this server or its callbacks
+// remain active.
+func AhdHTTPServerStartScoped(class *AhdClass, scopeID uint64, handle string) {
+	server := ahdHTTPLookup(class, handle)
+	ahdHTTPAcquireRoutes(class, server, "HTTP server has already started")
 	server.started = true
+	server.routesFrozen.Store(true)
+	ahdHTTPLifetimeMu.Lock()
+	server.owner.Store(true)
+	if scopeID != 0 {
+		if scope := ahdHTTPEvaluatorScopes[scopeID]; scope != nil {
+			if scope.servers == nil {
+				scope.servers = make(map[*ahdHTTPServerState]struct{})
+			}
+			scope.servers[server] = struct{}{}
+		}
+	}
+	ahdHTTPLifetimeMu.Unlock()
 	host := server.host
 	port := server.port
-	server.mutex.Unlock()
-
-	addr := net.JoinHostPort(host, strconv.Itoa(port))
-	listener, err := net.Listen("tcp", addr)
-	if err != nil {
-		AhdRaiseClass(class, "HTTP server could not bind "+addr+": "+err.Error())
-	}
-	server.mutex.Lock()
 	readTimeout := server.readTimeout
 	writeTimeout := server.writeTimeout
 	idleTimeout := server.idleTimeout
@@ -340,15 +445,163 @@ func AhdHTTPServerStart(class *AhdClass, handle string) {
 		WriteTimeout:      writeTimeout,
 		IdleTimeout:       idleTimeout,
 	}
-	server.mutex.Lock()
+
+	// Listen and publication share lifecycle, so a shutdown that arrives
+	// after the socket exists cannot miss it. The request mutex stays free.
+	server.lifecycle.Lock()
+	if server.closing.Load() {
+		server.lifecycle.Unlock()
+		server.retire()
+		return
+	}
+	addr := net.JoinHostPort(host, strconv.Itoa(port))
+	listener, err := net.Listen("tcp", addr)
+	if err != nil {
+		server.lifecycle.Unlock()
+		ahdHTTPClearStarted(server)
+		AhdRaiseClass(class, "HTTP server could not bind "+addr+": "+err.Error())
+	}
+	server.listener = listener
 	server.httpServer = httpServer
-	server.mutex.Unlock()
+	server.lifecycle.Unlock()
+	// Publication and Serve share this cleanup. A panic, a shutdown, or a
+	// normal return all retire the same server value, and retire closes only
+	// the listener pointer still stored here.
+	defer server.retire()
+	if ahdHTTPTestBeforeServe != nil {
+		ahdHTTPTestBeforeServe()
+	}
 	// The address line a program writes before start, and every line its
 	// handlers write afterwards, reach a redirected output at once.
 	AhdLiveOutput()
 	err = httpServer.Serve(listener)
-	if err != nil && !errors.Is(err, http.ErrServerClosed) {
+	// Shutdown closes the raw listener before Serve may have registered it.
+	// Accept then returns a closed-connection error instead of ErrServerClosed.
+	// That error is the shutdown itself once closing is set.
+	if err != nil && !errors.Is(err, http.ErrServerClosed) && !server.closing.Load() {
 		AhdRaiseClass(class, "HTTP server failed: "+err.Error())
+	}
+}
+
+// ahdHTTPTestBeforeServe runs after the listener is visible to shutdown and
+// before Serve. Tests use it to prove that window is not a miss. Production
+// leaves it nil.
+var ahdHTTPTestBeforeServe func()
+
+func ahdHTTPClearStarted(server *ahdHTTPServerState) {
+	server.mutex.Lock()
+	server.started = false
+	server.routesFrozen.Store(false)
+	server.mutex.Unlock()
+	ahdHTTPLifetimeMu.Lock()
+	server.owner.Store(false)
+	if server.activeHandlers == 0 {
+		ahdHTTPDetachServerDatabasesWhileLocked(server)
+		ahdHTTPCloseIdleScopedDatabasesWhileLocked()
+	}
+	ahdHTTPReleasePersistentSessionsWhileLocked()
+	ahdHTTPLifetimeMu.Unlock()
+}
+
+func ahdHTTPDetachServerDatabasesWhileLocked(server *ahdHTTPServerState) {
+	if server == nil {
+		return
+	}
+	for _, scope := range ahdHTTPEvaluatorScopes {
+		if scope.servers != nil {
+			delete(scope.servers, server)
+		}
+	}
+	for database := range server.ownedDatabases {
+		if database != nil && database.servers != nil {
+			delete(database.servers, server)
+		}
+	}
+	server.ownedDatabases = nil
+}
+
+func (server *ahdHTTPServerState) enterCallback() {
+	ahdHTTPLifetimeMu.Lock()
+	ahdHTTPHandlers.Add(1)
+	server.activeHandlers++
+	ahdHTTPLifetimeMu.Unlock()
+	server.handlerOwner.Store(ahdHTTPGoroutineID())
+}
+
+func (server *ahdHTTPServerState) leaveCallback() {
+	server.handlerOwner.Store(0)
+}
+
+// finishCallback runs after the callback's server mutex is released.
+// The matching enter counted this callback. Returning is the point where a
+// handler that reopened the session file during shutdown no longer needs it.
+func (server *ahdHTTPServerState) finishCallback() {
+	ahdHTTPLifetimeMu.Lock()
+	if ahdHTTPHandlers.Add(-1) < 0 {
+		ahdHTTPHandlers.Store(0)
+	}
+	if server != nil {
+		if server.activeHandlers > 0 {
+			server.activeHandlers--
+		}
+		if !server.owner.Load() && server.activeHandlers == 0 {
+			ahdHTTPDetachServerDatabasesWhileLocked(server)
+			ahdHTTPCloseIdleScopedDatabasesWhileLocked()
+		}
+	}
+	ahdHTTPReleasePersistentSessionsWhileLocked()
+	ahdHTTPLifetimeMu.Unlock()
+}
+
+// ahdHTTPGoroutineID identifies the caller so a handler can be refused when
+// it tries to lock the same server again. Go's mutex is not re-entrant.
+func ahdHTTPGoroutineID() int64 {
+	var buf [64]byte
+	n := runtime.Stack(buf[:], false)
+	var id int64
+	for index := len("goroutine "); index < n; index++ {
+		if buf[index] < '0' || buf[index] > '9' {
+			break
+		}
+		id = id*10 + int64(buf[index]-'0')
+	}
+	return id
+}
+
+func ahdHTTPRejectOwnHandler(class *AhdClass, server *ahdHTTPServerState) {
+	owner := server.handlerOwner.Load()
+	if owner != 0 && owner == ahdHTTPGoroutineID() {
+		AhdRaiseClass(class, "HTTP server cannot start or change routes from its own request handler")
+	}
+}
+
+func ahdHTTPLockRoutes(class *AhdClass, server *ahdHTTPServerState) {
+	ahdHTTPAcquireRoutes(class, server, "HTTP routes cannot be changed after start")
+}
+
+// ahdHTTPAcquireRoutes locks the route mutex for a mutation or for start.
+// After the server has started, or while one of its callbacks holds the mutex,
+// it raises instead of waiting. Waiting here would deadlock an evaluator
+// callback: that callback holds the session lock, and the server callback
+// holds this mutex while trying to resume the same session lock.
+func ahdHTTPAcquireRoutes(class *AhdClass, server *ahdHTTPServerState, busyMessage string) {
+	ahdHTTPRejectOwnHandler(class, server)
+	for {
+		owner := server.handlerOwner.Load()
+		if server.routesFrozen.Load() || (owner != 0 && owner != ahdHTTPGoroutineID()) {
+			AhdRaiseClass(class, busyMessage)
+		}
+		if server.mutex.TryLock() {
+			if server.routesFrozen.Load() || server.started {
+				server.mutex.Unlock()
+				AhdRaiseClass(class, busyMessage)
+			}
+			return
+		}
+		if server.handlerOwner.Load() != 0 || server.routesFrozen.Load() {
+			AhdRaiseClass(class, busyMessage)
+		}
+		runtime.Gosched()
 	}
 }
 
@@ -356,18 +609,265 @@ func ahdHTTPTestShutdown(handle string) {
 	ahdHTTPServersMu.Lock()
 	server := ahdHTTPServers[handle]
 	ahdHTTPServersMu.Unlock()
+	_ = ahdHTTPShutdownState(server)
+}
+
+// AhdHTTPShutdownAddress stops the server created with this host and port.
+// It is not an AhdCode method. Server.start stays blocked in Serve until this
+// returns or the process exits.
+//
+// Host matching is the string passed to HTTP.server, not the address the OS
+// resolved:
+//   - ports must be the same integer
+//   - IP text matches that IP only (netip canonical form, zones ignored)
+//   - any other host matches case-insensitively, after trimming space and
+//     optional brackets
+//   - localhost, 127.0.0.1, ::1, 0.0.0.0, and :: are different endpoints
+//   - a wildcard server stops only when the request names that wildcard
+//
+// The two-second graceful deadline starts as soon as the listener is claimed.
+// A handler that is still running does not delay that claim. The raw listener
+// is closed by this runtime even when Serve has not registered it yet. When
+// the deadline expires, Close runs. Close makes Serve return and releases the
+// port. It does not stop a handler goroutine blocked inside application code.
+//
+// The boolean is about this call, not about a global "fully idle" state.
+// true means this call claimed an active listener and closed that listener.
+// false means this call did not claim one: there was no matching server, or
+// another call already claimed it. false can therefore arrive while the
+// caller that received true is still inside the graceful wait. It does not
+// mean that wait has finished, and it does not close a different server that
+// later binds the same address.
+func AhdHTTPShutdownAddress(host string, port int) bool {
+	if port < 1 || port > 65535 || strings.TrimSpace(host) == "" {
+		return false
+	}
+	ahdHTTPServersMu.Lock()
+	matches := make([]*ahdHTTPServerState, 0, 1)
+	for _, server := range ahdHTTPServers {
+		if server != nil && server.port == port && ahdHTTPSameEndpoint(server.host, host) {
+			matches = append(matches, server)
+		}
+	}
+	ahdHTTPServersMu.Unlock()
+	stopped := false
+	for _, server := range matches {
+		if ahdHTTPShutdownState(server) {
+			stopped = true
+		}
+	}
+	return stopped
+}
+
+func ahdHTTPSameEndpoint(configured, requested string) bool {
+	left, leftOK := ahdHTTPCanonicalHost(configured)
+	right, rightOK := ahdHTTPCanonicalHost(requested)
+	return leftOK && rightOK && left == right
+}
+
+func ahdHTTPCanonicalHost(host string) (string, bool) {
+	host = strings.TrimSpace(host)
+	if len(host) >= 2 && host[0] == '[' && host[len(host)-1] == ']' {
+		host = host[1 : len(host)-1]
+	}
+	if host == "" {
+		return "", false
+	}
+	if addr, err := netip.ParseAddr(host); err == nil {
+		return addr.WithZone("").String(), true
+	}
+	return strings.ToLower(host), true
+}
+
+func ahdHTTPShutdownState(server *ahdHTTPServerState) bool {
 	if server == nil {
-		return
+		return false
 	}
-	server.mutex.Lock()
+	server.lifecycle.Lock()
 	httpServer := server.httpServer
-	server.mutex.Unlock()
-	if httpServer == nil {
+	listener := server.listener
+	if httpServer == nil && listener == nil {
+		if !server.owner.Load() || server.closing.Load() {
+			server.lifecycle.Unlock()
+			return false
+		}
+		server.closing.Store(true)
+		server.lifecycle.Unlock()
+		server.retire()
+		ahdHTTPReleasePersistentSessionsIfIdle()
+		return true
+	}
+	// Claim before the deadline so a second call is not still "active",
+	// and so ServeHTTP can refuse work without taking the handler mutex.
+	server.httpServer = nil
+	server.listener = nil
+	server.closing.Store(true)
+	server.lifecycle.Unlock()
+
+	// Serve registers the listener only after it starts. Shutdown closes
+	// listeners it knows about, so a published listener must be closed here
+	// or the port stays bound and this call would still look successful.
+	if listener != nil {
+		_ = listener.Close()
+	}
+	if httpServer != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), ahdHTTPShutdownTimeout)
+		err := httpServer.Shutdown(ctx)
+		cancel()
+		if err != nil && !errors.Is(err, http.ErrServerClosed) {
+			_ = httpServer.Close()
+		}
+	}
+	server.retire()
+	// Serve's defer retire runs when the listener closes, which is before
+	// Shutdown finishes the handler. That first release is once-only. A
+	// handler can reopen the session file and commit before Shutdown
+	// returns, so the idle check runs again here. A callback that is still
+	// inside the forced-close window keeps the file and releases it on return.
+	ahdHTTPReleasePersistentSessionsIfIdle()
+	return true
+}
+
+// retire drops the registry entry and the listener exactly once. Shutdown and
+// a natural Serve return share it, so they cannot delete twice or leave the
+// port registered.
+func (server *ahdHTTPServerState) retire() {
+	server.stopOnce.Do(func() {
+		ahdHTTPLifetimeMu.Lock()
+		server.owner.Store(false)
+		if server.activeHandlers == 0 {
+			ahdHTTPDetachServerDatabasesWhileLocked(server)
+			ahdHTTPCloseIdleScopedDatabasesWhileLocked()
+		}
+		ahdHTTPLifetimeMu.Unlock()
+		server.closing.Store(true)
+		server.lifecycle.Lock()
+		listener := server.listener
+		server.listener = nil
+		server.httpServer = nil
+		server.lifecycle.Unlock()
+		if listener != nil {
+			_ = listener.Close()
+		}
+		ahdHTTPServersMu.Lock()
+		for id, candidate := range ahdHTTPServers {
+			if candidate == server {
+				delete(ahdHTTPServers, id)
+			}
+		}
+		ahdHTTPServersMu.Unlock()
+		// Release only when no started server and no evaluator execution
+		// still owns the file. An object that was registered and never
+		// started does not count.
+		ahdHTTPReleasePersistentSessionsIfIdle()
+	})
+}
+
+// AhdHTTPEvaluatorBegin records one in-progress evaluator execution. The
+// matching end releases persistent-session files when this was the last
+// execution and no HTTP server is actually running.
+func AhdHTTPEvaluatorBegin() {
+	ahdHTTPLifetimeMu.Lock()
+	ahdHTTPEvaluatorRuns.Add(1)
+	ahdHTTPLifetimeMu.Unlock()
+}
+
+// AhdHTTPEvaluatorEnd records that one evaluator execution has returned.
+func AhdHTTPEvaluatorEnd() {
+	ahdHTTPLifetimeMu.Lock()
+	if ahdHTTPEvaluatorRuns.Add(-1) < 0 {
+		ahdHTTPEvaluatorRuns.Store(0)
+	}
+	ahdHTTPReleasePersistentSessionsWhileLocked()
+	ahdHTTPLifetimeMu.Unlock()
+}
+
+// AhdHTTPEvaluatorScopeBegin records one in-progress evaluator execution and
+// attaches existing persistent stores from that evaluator session to the scope.
+func AhdHTTPEvaluatorScopeBegin(storeHandles []string) uint64 {
+	databases := ahdHTTPSessionDatabasesForStores(storeHandles)
+	ahdHTTPLifetimeMu.Lock()
+	defer ahdHTTPLifetimeMu.Unlock()
+	ahdHTTPEvaluatorRuns.Add(1)
+	id := ahdHTTPEvaluatorScopeNext.Add(1)
+	scope := &ahdHTTPEvaluatorScope{}
+	ahdHTTPEvaluatorScopes[id] = scope
+	for _, database := range databases {
+		ahdHTTPAttachDatabaseScopeWhileLocked(id, database)
+	}
+	return id
+}
+
+// AhdHTTPEvaluatorScopeEnd finishes an evaluator execution scope, hands off
+// owned persistent-session databases to any active servers started in that
+// scope, and closes any scoped databases with no remaining scope or server owner.
+func AhdHTTPEvaluatorScopeEnd(scopeID uint64) {
+	ahdHTTPLifetimeMu.Lock()
+	defer ahdHTTPLifetimeMu.Unlock()
+	if ahdHTTPEvaluatorRuns.Add(-1) < 0 {
+		ahdHTTPEvaluatorRuns.Store(0)
+	}
+	scope := ahdHTTPEvaluatorScopes[scopeID]
+	delete(ahdHTTPEvaluatorScopes, scopeID)
+	if scope != nil {
+		activeServers := make([]*ahdHTTPServerState, 0, len(scope.servers))
+		for server := range scope.servers {
+			if server != nil && (server.owner.Load() || server.activeHandlers > 0) {
+				activeServers = append(activeServers, server)
+			}
+		}
+		for database := range scope.databases {
+			if database == nil {
+				continue
+			}
+			if database.scopes != nil {
+				delete(database.scopes, scopeID)
+			}
+			for _, server := range activeServers {
+				if database.servers == nil {
+					database.servers = make(map[*ahdHTTPServerState]struct{})
+				}
+				database.servers[server] = struct{}{}
+				if server.ownedDatabases == nil {
+					server.ownedDatabases = make(map[*ahdHTTPSessionDatabase]struct{})
+				}
+				server.ownedDatabases[database] = struct{}{}
+			}
+		}
+		ahdHTTPCloseIdleScopedDatabasesWhileLocked()
+	}
+	ahdHTTPReleasePersistentSessionsWhileLocked()
+}
+
+func ahdHTTPOwningServerCount() int {
+	ahdHTTPServersMu.Lock()
+	defer ahdHTTPServersMu.Unlock()
+	count := 0
+	for _, server := range ahdHTTPServers {
+		if server != nil && server.owner.Load() {
+			count++
+		}
+	}
+	return count
+}
+
+func ahdHTTPReleasePersistentSessionsIfIdle() {
+	ahdHTTPLifetimeMu.Lock()
+	ahdHTTPReleasePersistentSessionsWhileLocked()
+	ahdHTTPLifetimeMu.Unlock()
+}
+
+func ahdHTTPReleasePersistentSessionsWhileLocked() {
+	if ahdHTTPEvaluatorRuns.Load() > 0 || ahdHTTPHandlers.Load() > 0 || ahdHTTPOwningServerCount() > 0 {
 		return
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-	_ = httpServer.Shutdown(ctx)
+	AhdHTTPReleasePersistentSessionStorage()
+}
+
+// AhdHTTPServerActive reports whether an HTTP server has claimed start and
+// has not retired. A server object that was only constructed is inactive.
+func AhdHTTPServerActive() bool {
+	return ahdHTTPOwningServerCount() > 0
 }
 
 func AhdHTTPRequestMethod(data string) string { return ahdHTTPDecodeRequest(data).Method }
@@ -475,7 +975,7 @@ func ahdHTTPRegister(class *AhdClass, handle, method, path string, handler AhdHT
 		AhdRaiseClass(class, "HTTP route path "+ahdHTMLQuote(path)+" may use a trailing /* for one path segment")
 	}
 	server := ahdHTTPLookup(class, handle)
-	server.mutex.Lock()
+	ahdHTTPLockRoutes(class, server)
 	defer server.mutex.Unlock()
 	if server.started {
 		AhdRaiseClass(class, "HTTP routes cannot be changed after start")
@@ -567,7 +1067,7 @@ func AhdHTTPServerStatic(class *AhdClass, handle, prefix, root string) {
 	}
 
 	server := ahdHTTPLookup(class, handle)
-	server.mutex.Lock()
+	ahdHTTPLockRoutes(class, server)
 	defer server.mutex.Unlock()
 	if server.started {
 		AhdRaiseClass(class, "HTTP routes cannot be changed after start")
@@ -608,7 +1108,7 @@ func AhdHTTPServerManaged(class *AhdClass, handle, prefix, root string) {
 	}
 
 	server := ahdHTTPLookup(class, handle)
-	server.mutex.Lock()
+	ahdHTTPLockRoutes(class, server)
 	defer server.mutex.Unlock()
 	if server.started {
 		AhdRaiseClass(class, "HTTP routes cannot be changed after start")
@@ -690,7 +1190,7 @@ func AhdHTTPServerSetLimits(class *AhdClass, handle string, maxBody, maxUpload i
 		AhdRaiseClass(class, ahdWebEnvMaxUploadSize+" must not be greater than "+ahdWebEnvMaxBodySize)
 	}
 	server := ahdHTTPLookup(class, handle)
-	server.mutex.Lock()
+	ahdHTTPLockRoutes(class, server)
 	defer server.mutex.Unlock()
 	if server.started {
 		AhdRaiseClass(class, "HTTP routes cannot be changed after start")
@@ -998,9 +1498,16 @@ func (dispatcher ahdHTTPDispatcher) ServeHTTP(writer http.ResponseWriter, reques
 			ahdHTTPWritePlain(writer, http.StatusInternalServerError, "Internal Server Error")
 		}
 	}()
+	if dispatcher.state.closing.Load() {
+		ahdHTTPWritePlain(writer, http.StatusServiceUnavailable, "Service Unavailable")
+		return
+	}
 
 	path := request.URL.Path
 	method := request.Method
+	if ahdDevReloadServe(dispatcher.state, writer, request) {
+		return
+	}
 	dispatcher.state.mutex.Lock()
 	socketRoute := ahdHTTPLookupWebSocket(dispatcher.state, path)
 	handler, found, allowed := ahdHTTPLookupRoute(dispatcher.state, method, path)
@@ -1029,7 +1536,10 @@ func (dispatcher ahdHTTPDispatcher) ServeHTTP(writer http.ResponseWriter, reques
 			if ahdHTTPServeManaged(dispatcher.state, writer, request, method, path) {
 				return
 			}
-			ahdHTTPWritePlain(writer, http.StatusNotFound, "Not Found")
+			dispatcher.state.mutex.Lock()
+			missing := dispatcher.state.notFound
+			dispatcher.state.mutex.Unlock()
+			ahdHTTPServeInstalledPage(dispatcher.state, writer, request, missing, ahdHTTPSnapshotWithoutBody(request, method, path), http.StatusNotFound, "Not Found")
 			return
 		}
 		writer.Header().Set("Allow", strings.Join(allowed, ", "))
@@ -1069,9 +1579,18 @@ func (dispatcher ahdHTTPDispatcher) ServeHTTP(writer http.ResponseWriter, reques
 	defer ahdHTTPReleaseUploads(uploadIDs)
 	var encoded string
 	failed := false
+	rejected := false
+	tracked := false
 	func() {
 		dispatcher.state.mutex.Lock()
 		defer dispatcher.state.mutex.Unlock()
+		if dispatcher.state.closing.Load() {
+			rejected = true
+			return
+		}
+		dispatcher.state.enterCallback()
+		tracked = true
+		defer dispatcher.state.leaveCallback()
 		defer func() {
 			recovered := recover()
 			if recovered == nil {
@@ -1082,13 +1601,25 @@ func (dispatcher ahdHTTPDispatcher) ServeHTTP(writer http.ResponseWriter, reques
 		}()
 		encoded = handler(ahdHTTPEncodeRequest(snapshot))
 	}()
-	if failed {
+	if tracked {
+		dispatcher.state.finishCallback()
+	}
+	if rejected {
 		if !ahdHTTPHeaderWritten(writer) {
-			ahdHTTPWritePlain(writer, http.StatusInternalServerError, "Internal Server Error")
+			ahdHTTPWritePlain(writer, http.StatusServiceUnavailable, "Service Unavailable")
 		}
 		return
 	}
-	ahdHTTPWriteEncoded(writer, request, encoded)
+	if failed {
+		if !ahdHTTPHeaderWritten(writer) {
+			dispatcher.state.mutex.Lock()
+			failure := dispatcher.state.internalError
+			dispatcher.state.mutex.Unlock()
+			ahdHTTPServeInstalledPage(dispatcher.state, writer, request, failure, snapshot, http.StatusInternalServerError, "Internal Server Error")
+		}
+		return
+	}
+	ahdHTTPWriteEncoded(writer, ahdDevReloadRequest(request, dispatcher.state), encoded)
 }
 
 // ahdHTTPMaterialize snapshots one request. The returned id slice names every
@@ -1289,6 +1820,88 @@ func ahdHTTPDecodeResponse(class *AhdClass, data string) ahdHTTPResponseData {
 	return response
 }
 
+// ahdHTTPSnapshotWithoutBody is the request an unknown path can show. The
+// body is not read. Cookies and the query string are still available.
+func ahdHTTPSnapshotWithoutBody(request *http.Request, method, path string) ahdHTTPRequestData {
+	snapshot, _, err := ahdHTTPMaterialize(request, nil, 0, 0)
+	if err != nil || snapshot.Path == "" {
+		return ahdHTTPRequestData{
+			Method: method, Path: path, BodyUTF8: true,
+			Query: map[string][]string{}, Headers: map[string][]string{},
+		}
+	}
+	return snapshot
+}
+
+// ahdHTTPServeInstalledPage runs one 404 or 500 handler. The status written
+// is the status of that page, not whatever the handler put in its response.
+// A panic, a file response, or an unreadable response becomes the plain
+// fallback. This function does not call itself or the other error page.
+func ahdHTTPServeInstalledPage(state *ahdHTTPServerState, writer http.ResponseWriter, request *http.Request, handler AhdHTTPHandler, snapshot ahdHTTPRequestData, status int, fallback string) {
+	if handler == nil {
+		ahdHTTPWritePlain(writer, status, fallback)
+		return
+	}
+	encoded := ""
+	failed := false
+	rejected := false
+	tracked := false
+	func() {
+		state.mutex.Lock()
+		defer state.mutex.Unlock()
+		if state.closing.Load() {
+			rejected = true
+			return
+		}
+		state.enterCallback()
+		tracked = true
+		defer state.leaveCallback()
+		defer func() {
+			if recover() != nil {
+				failed = true
+			}
+		}()
+		encoded = handler(ahdHTTPEncodeRequest(snapshot))
+	}()
+	if tracked {
+		state.finishCallback()
+	}
+	if rejected {
+		if !ahdHTTPHeaderWritten(writer) {
+			ahdHTTPWritePlain(writer, http.StatusServiceUnavailable, "Service Unavailable")
+		}
+		return
+	}
+	if failed || !ahdHTTPWriteForcedStatus(state, writer, request, encoded, status) {
+		if !ahdHTTPHeaderWritten(writer) {
+			ahdHTTPWritePlain(writer, status, fallback)
+		}
+	}
+}
+
+func ahdHTTPWriteForcedStatus(state *ahdHTTPServerState, writer http.ResponseWriter, request *http.Request, encoded string, status int) bool {
+	var response ahdHTTPResponseData
+	if err := json.Unmarshal([]byte(encoded), &response); err != nil || response.IsFile {
+		return false
+	}
+	response.Status = status
+	// A forced 404/500 must not keep redirect metadata from the handler.
+	filtered := make([]ahdHTTPHeaderPair, 0, len(response.Headers))
+	for _, header := range response.Headers {
+		if strings.EqualFold(header.Name, "Location") {
+			continue
+		}
+		filtered = append(filtered, header)
+	}
+	response.Headers = filtered
+	rewritten, err := json.Marshal(response)
+	if err != nil {
+		return false
+	}
+	ahdHTTPWriteEncoded(writer, ahdDevReloadRequest(request, state), string(rewritten))
+	return true
+}
+
 func ahdHTTPWriteEncoded(writer http.ResponseWriter, request *http.Request, data string) {
 	var response ahdHTTPResponseData
 	if err := json.Unmarshal([]byte(data), &response); err != nil {
@@ -1299,6 +1912,15 @@ func ahdHTTPWriteEncoded(writer http.ResponseWriter, request *http.Request, data
 		ahdHTTPWriteFile(writer, request, response)
 		return
 	}
+	body := response.Body
+	status := response.Status
+	if status == 0 {
+		status = http.StatusOK
+	}
+	modified := false
+	if !ahdDevReloadBlocked(request) {
+		body, modified = ahdDevReloadPrepare(response.ContentType, status, response.Headers, body)
+	}
 	if response.ContentType != "" {
 		writer.Header().Set("Content-Type", response.ContentType)
 	}
@@ -1308,12 +1930,15 @@ func ahdHTTPWriteEncoded(writer http.ResponseWriter, request *http.Request, data
 	for _, cookie := range response.Cookies {
 		writer.Header().Add("Set-Cookie", ahdHTTPCookieWire(cookie))
 	}
-	status := response.Status
-	if status == 0 {
-		status = http.StatusOK
+	if modified {
+		writer.Header().Del("Content-Length")
+		writer.Header().Set("Content-Length", strconv.Itoa(len(body)))
+		if writer.Header().Get("Cache-Control") == "" {
+			writer.Header().Set("Cache-Control", "no-store")
+		}
 	}
 	writer.WriteHeader(status)
-	_, _ = io.WriteString(writer, response.Body)
+	_, _ = io.WriteString(writer, body)
 }
 
 // ahdHTTPWriteFile commits a HTTP.file / HTTP.download response. The file is
@@ -1486,6 +2111,7 @@ func AhdHTTPSessions(class *AhdClass, cookieName string, maxAgeSeconds int64, se
 		AhdRaiseClass(class, "HTTP session maxAgeSeconds must be greater than 0")
 	}
 	ahdHTTPRequireSameSite(class, sameSite, secure)
+	ahdHTTPRequireSessionCookiePrefix(class, cookieName, secure)
 	id := strconv.FormatInt(ahdHTTPSessionNextID.Add(1), 10)
 	ahdHTTPSessionStoresMu.Lock()
 	ahdHTTPSessionStores[id] = &ahdHTTPSessionStoreState{
@@ -1500,20 +2126,30 @@ func AhdHTTPSessionStoreOpen(class *AhdClass, storeHandle, requestData string) s
 	store := ahdHTTPLookupSessionStore(class, storeHandle)
 	request := ahdHTTPDecodeRequest(requestData)
 	now := ahdHTTPTimeNow()
-	session := ahdHTTPSessionData{StoreID: storeHandle, Values: map[string]string{}}
-	store.mutex.Lock()
-	store.cleanupExpiredLocked(now)
+	session := ahdHTTPSessionData{StoreID: storeHandle, Values: map[string]string{}, Fresh: true}
+	var presented string
 	for _, cookie := range request.Cookies {
-		if cookie.Name != store.cookieName {
-			continue
+		if cookie.Name == store.cookieName {
+			presented = cookie.Value
+			break
 		}
-		if stored := store.sessions[cookie.Value]; stored != nil && stored.expiresAt.After(now) {
-			session.ID = cookie.Value
+	}
+	store.mutex.Lock()
+	var err error
+	if store.durable != nil {
+		session, err = store.durable.open(storeHandle, presented, now)
+	} else {
+		store.cleanupExpiredLocked(now)
+		if stored := store.sessions[presented]; presented != "" && stored != nil && stored.expiresAt.After(now) {
+			session.ID = presented
 			session.Values = ahdHTTPCopyStringMap(stored.values)
+			session.Fresh = false
 		}
-		break
 	}
 	store.mutex.Unlock()
+	if err != nil {
+		ahdHTTPSessionRaise(class, err)
+	}
 	return ahdHTTPEncodeSession(class, session)
 }
 
@@ -1526,29 +2162,53 @@ func AhdHTTPSessionStoreCommit(class *AhdClass, storeHandle, sessionData, respon
 	now := ahdHTTPTimeNow()
 	if session.Destroyed {
 		store.mutex.Lock()
-		store.cleanupExpiredLocked(now)
-		if session.ID != "" {
-			delete(store.sessions, session.ID)
+		var err error
+		if store.durable != nil {
+			err = store.durable.forget(session.ID, now)
+		} else {
+			store.cleanupExpiredLocked(now)
+			if session.ID != "" {
+				delete(store.sessions, session.ID)
+			}
 		}
 		store.mutex.Unlock()
-		return AhdHTTPResponseWithCookie(class, responseData, AhdHTTPDeleteCookie(class, store.cookieName, ahdHTTPDefaultCookiePath))
+		if err != nil {
+			ahdHTTPSessionRaise(class, err)
+		}
+		return AhdHTTPResponseWithCookie(class, responseData, ahdHTTPSessionClearCookie(class, store))
 	}
 	if !session.Dirty {
 		return responseData
 	}
+	if err := ahdHTTPSessionValuesSize(session.Values); err != nil {
+		ahdHTTPSessionRaise(class, err)
+	}
 	if session.ID == "" {
 		session.ID = ahdHTTPNewSessionID(class)
+		session.Fresh = true
 	}
 	store.mutex.Lock()
-	store.cleanupExpiredLocked(now)
-	store.sessions[session.ID] = &ahdHTTPStoredSession{
-		values: ahdHTTPCopyStringMap(session.Values), expiresAt: now.Add(time.Duration(store.maxAgeSeconds) * time.Second),
+	var err error
+	if store.durable != nil {
+		err = store.durable.save(session, now)
+	} else {
+		store.cleanupExpiredLocked(now)
+		if !session.Fresh && !store.memoryLiveLocked(session.ID, now) {
+			err = errHTTPSessionStale
+		} else {
+			store.sessions[session.ID] = &ahdHTTPStoredSession{
+				values: ahdHTTPCopyStringMap(session.Values), expiresAt: now.Add(time.Duration(store.maxAgeSeconds) * time.Second),
+			}
+		}
 	}
 	cookieName := store.cookieName
 	maxAge := store.maxAgeSeconds
 	secure := store.secure
 	sameSite := store.sameSite
 	store.mutex.Unlock()
+	if err != nil {
+		ahdHTTPSessionRaise(class, err)
+	}
 	cookie := ahdHTTPRequireCookie(class, ahdHTTPCookieData{
 		Name: cookieName, Value: session.ID, Path: ahdHTTPDefaultCookiePath,
 		HttpOnly: true, Secure: secure, SameSite: sameSite, MaxAge: &maxAge,
@@ -1583,6 +2243,12 @@ func AhdHTTPSessionHas(class *AhdClass, data, name string) bool {
 func AhdHTTPSessionSet(class *AhdClass, data, name, value string) string {
 	session := ahdHTTPRequireMutableSession(class, data)
 	ahdHTTPRequireSessionKey(class, name)
+	if len(name) > ahdHTTPSessionKeyMaxBytes {
+		AhdRaiseClass(class, "HTTP session key is too long")
+	}
+	if len(value) > ahdHTTPSessionValueMaxBytes {
+		AhdRaiseClass(class, "HTTP session value is too large")
+	}
 	if session.Values == nil {
 		session.Values = map[string]string{}
 	}
@@ -1614,13 +2280,26 @@ func AhdHTTPSessionRotate(class *AhdClass, data string) string {
 	session := ahdHTTPRequireMutableSession(class, data)
 	store := ahdHTTPLookupSessionStore(class, session.StoreID)
 	oldID := session.ID
-	session.ID = ahdHTTPNewSessionID(class)
-	session.Dirty = true
-	if oldID != "" {
-		store.mutex.Lock()
+	oldFresh := session.Fresh
+	now := nowFromStore(store)
+	store.mutex.Lock()
+	var err error
+	if oldID != "" && !oldFresh {
+		if store.durable != nil {
+			err = store.durable.revokeLive(oldID, now)
+		} else if !store.takeLiveLocked(oldID, now) {
+			err = errHTTPSessionStale
+		}
+	} else if store.durable == nil && oldID != "" {
 		delete(store.sessions, oldID)
-		store.mutex.Unlock()
 	}
+	store.mutex.Unlock()
+	if err != nil {
+		ahdHTTPSessionRaise(class, err)
+	}
+	session.ID = ahdHTTPNewSessionID(class)
+	session.Fresh = true
+	session.Dirty = true
 	return ahdHTTPEncodeSession(class, session)
 }
 
@@ -1628,13 +2307,22 @@ func AhdHTTPSessionDestroy(class *AhdClass, data string) string {
 	session := ahdHTTPRequireMutableSession(class, data)
 	store := ahdHTTPLookupSessionStore(class, session.StoreID)
 	oldID := session.ID
+	oldFresh := session.Fresh
 	session.Destroyed = true
 	session.Dirty = false
 	session.Values = map[string]string{}
-	if oldID != "" {
-		store.mutex.Lock()
+	store.mutex.Lock()
+	var err error
+	if store.durable != nil {
+		if oldID != "" && !oldFresh {
+			err = store.durable.revoke(oldID, nowFromStore(store))
+		}
+	} else if oldID != "" {
 		delete(store.sessions, oldID)
-		store.mutex.Unlock()
+	}
+	store.mutex.Unlock()
+	if err != nil {
+		ahdHTTPSessionRaise(class, err)
 	}
 	return ahdHTTPEncodeSession(class, session)
 }
@@ -1666,6 +2354,42 @@ func ahdHTTPRequireCookiePath(class *AhdClass, path string) {
 	if path == "" || !ahdHTTPCookiePathOK(path) {
 		AhdRaiseClass(class, "HTTP cookie path "+ahdHTMLQuote(path)+" is not valid")
 	}
+}
+
+func ahdHTTPRequireSessionCookiePrefix(class *AhdClass, name string, secure bool) {
+	if strings.HasPrefix(name, "__Host-") || strings.HasPrefix(name, "__Secure-") {
+		if !secure {
+			AhdRaiseClass(class, "HTTP session cookie "+ahdHTMLQuote(name)+" requires Secure=true")
+		}
+	}
+}
+
+func ahdHTTPSessionClearCookie(class *AhdClass, store *ahdHTTPSessionStoreState) string {
+	zero := int64(0)
+	cookie := ahdHTTPCookieData{
+		Name: store.cookieName, Value: "", Path: ahdHTTPDefaultCookiePath,
+		HttpOnly: true, Secure: store.secure, SameSite: store.sameSite, MaxAge: &zero,
+	}
+	if strings.HasPrefix(cookie.Name, "__Host-") || strings.HasPrefix(cookie.Name, "__Secure-") {
+		cookie.Secure = true
+	}
+	if strings.HasPrefix(cookie.Name, "__Host-") {
+		cookie.Path = ahdHTTPDefaultCookiePath
+	}
+	return ahdHTTPEncodeCookie(class, ahdHTTPRequireCookie(class, cookie))
+}
+
+func (store *ahdHTTPSessionStoreState) memoryLiveLocked(id string, now time.Time) bool {
+	stored := store.sessions[id]
+	return id != "" && stored != nil && stored.expiresAt.After(now)
+}
+
+func (store *ahdHTTPSessionStoreState) takeLiveLocked(id string, now time.Time) bool {
+	if !store.memoryLiveLocked(id, now) {
+		return false
+	}
+	delete(store.sessions, id)
+	return true
 }
 
 func ahdHTTPRequireSameSite(class *AhdClass, mode string, secure bool) {
@@ -1831,6 +2555,13 @@ func ahdHTTPTestStoreSize(handle string) int {
 	}
 	store.mutex.Lock()
 	defer store.mutex.Unlock()
+	if store.durable != nil {
+		count, err := store.durable.count()
+		if err != nil {
+			return -1
+		}
+		return count
+	}
 	return len(store.sessions)
 }
 

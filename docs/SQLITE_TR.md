@@ -18,8 +18,16 @@ from SQLite bring SQLiteError
 `SQLite`, gerçek bir yerel SQLite veritabanına güvenli ve tipli bir köprüdür.
 Siz sıradan SQL yazarsınız; AhdCode parametre bağlamayı ve tipli değer
 dönüşümünü yapar, başka hiçbir şey yapmaz. ORM yok, sorgu oluşturucu yok,
-şema çıkarımı yok, migration çatısı yok ve `Any` yok: SQL'den AhdCode'a geçen
-her değer, türünü açıkça okuduğunuz bir `SQLiteValue`'dur.
+şema çıkarımı yok ve `Any` yok: SQL'den AhdCode'a geçen her değer, türünü
+açıkça okuduğunuz bir `SQLiteValue`'dur. Sürümlü SQL dosyalarını
+[`ahdcode migrate`](CLI_TR.md#ahdcode-migrate) uygular; `SQLite` üzerinde bir
+migration metodu yoktur. Bu komut yalnız SQLite içindir. Bir migration
+dosyasının içinde işlem denetimini, `ATTACH`'i, migration geçmiş tablosuna
+yazmayı (buna geçmişi yazacak bir tetikleyici gövdesi de dahildir) ve sonraki
+bir migration'ın kilidini ya da bütünlüğünü değiştirecek bağlantı
+pragma'larını reddeder. Tetikleyici denetimi, bu SQLite derlemesinin bayt
+kodundaki bir ayrıntıyı okur; tetikleyici adına benzeyen bir dizgi, gövdenin
+derlendiğinin kanıtı sayılmaz.
 
 ## Genel yüzey
 
@@ -438,7 +446,7 @@ Bkz. [`THIRD_PARTY_NOTICES_SQLITE.md`](../THIRD_PARTY_NOTICES_SQLITE.md).
 
 Bu sürüm bilinçli olarak bir SQL köprüsüdür, daha fazlası değildir: ORM ya da
 active-record katmanı yok, model sınıfları ya da satırdan Class'a eşleme yok,
-sorgu ya da şema oluşturucu yok, migration yok, ilişkiler yok, bağlantı
+sorgu ya da şema oluşturucu yok, ilişkiler yok, bağlantı
 havuzu API'si yok, eşzamansız SQL ya da arka plan iş parçacıkları yok,
 şifreleme katmanı yok, SQL yeniden yazımı yok (AhdCode asla `LIMIT`,
 `ORDER BY` ya da tırnak eklemez), AhdCode'un bir ikili veri tipi olana kadar

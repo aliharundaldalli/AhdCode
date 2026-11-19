@@ -200,6 +200,21 @@ func TestWizardBasicSkipsAuthAndDatabase(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(root, "Pages/Login.ahd")); !os.IsNotExist(err) {
 		t.Fatal("Basic created Login")
 	}
+	for _, path := range []string{
+		"Pages/Site.ahd",
+		"Pages/About.ahd",
+		"Pages/Errors.ahd",
+		"templates/layouts/site.html",
+		"templates/components/nav.html",
+		"templates/pages/home.html",
+		"templates/pages/about.html",
+		"templates/pages/not-found.html",
+		"templates/pages/server-error.html",
+	} {
+		if _, err := os.Stat(filepath.Join(root, path)); err != nil {
+			t.Fatalf("Basic missing %s: %v", path, err)
+		}
+	}
 	env, _ := os.ReadFile(filepath.Join(root, ".env"))
 	text := string(env)
 	for _, key := range []string{"MAIL_HOST=", "MAIL_PORT=587", "MAIL_SECURITY=starttls"} {
@@ -507,6 +522,9 @@ func TestWebSymlinkConflict(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := os.Symlink(target, filepath.Join(root, "app.ahd")); err != nil {
+		if strings.Contains(err.Error(), "A required privilege is not held by the client") {
+			t.Skip(err.Error())
+		}
 		t.Fatal(err)
 	}
 	err := Web(root, ioDiscard{}, ioDiscard{}, emptyOpts())

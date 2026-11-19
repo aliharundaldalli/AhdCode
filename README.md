@@ -16,11 +16,10 @@ modules, GUI, Graphics, interactive Plot viewer, and desktop application
 packaging. It is used in practice by a small community; it is not a
 mainstream language.
 
-This is **v2.9.0**, **GUI Interaction & Application Resources**. It is a
-source release: a git tag and a GitHub Release of the source, with no new
-installer. The signed installers stay at v2.7.0 until v3.0. It adds no syntax.
-See [What is new in v2.9.0](#what-is-new-in-v290). v2.7.0, **System Inspection
-& Distribution Polish**, remains the latest installable release.
+This is **v2.10.0**, **Web Development & Application Reliability**. It is a
+source-only release with GitHub source archives. Signed installers remain at
+v2.7.0 until v3.0. See [what is new in v2.10.0](#release-v2-10-0) and the
+[release and upgrade notes](docs/RELEASE_2.10.0.md).
 
 v2.0.0 is a major release, **Desktop Application Completion**: it completes
 the first-party desktop application foundation — ListBox, Select, TextArea,
@@ -33,7 +32,7 @@ v2.1.0 adds binary-safe outbound downloads, outbound multipart uploads, SMTP
 attachments, a WebSocket client, and fixes the v2.0 Plot Save runtime
 discovery regression. See [What is new in v2.1.0](#what-is-new-in-v210).
 
-It ships as a self-contained platform package: the `ahdcode` CLI, a private
+The signed v2.7.0 distribution is a self-contained platform package: the `ahdcode` CLI, a private
 Go 1.27.0 toolchain, AhdDataStudio, the `ahdsqlite`, `ahdnumeric`, `ahdplot`,
 `ahdgraphics`, and `ahdgui` helpers, the interactive Plot viewer `ahdplotview`, an offline Tectonic LaTeX engine with its pinned resource
 bundle, the Web starters, and an exact-version English documentation bundle.
@@ -318,7 +317,7 @@ To maintain conceptual clarity, AhdCode's capabilities are organized into four d
    - **System & Environment:** [`Time`](docs/TIME.md), [`Cron`](docs/CRON.md) (bounded in-process scheduling), [`Path`](docs/FILESYSTEM.md), [`File`](docs/FILESYSTEM.md), [`Env`](docs/ENV.md), [`Terminal`](docs/TERMINAL.md) (v1.5.0: standard error, flushing, terminal detection and size, styled text, pretty layout), [`Process`](docs/PROCESS.md) (run one program with an argument list, never through a shell; bounded time and output), [`DNS`](docs/DNS.md) and [`TLS`](docs/TLS.md) (bounded address lookup and certificate inspection), [`Disk`](docs/DISK.md) and [`Service`](docs/SERVICE.md) (read-only filesystem capacity and Linux systemd service status)
 
 3. **First-Party Runtime / Framework Modules:**
-   - **Network, Server & Storage Primitives:** [`HTTP`](docs/HTTP.md) (in-memory server, request/response, cookies, sessions, static file server, [WebSocket endpoints](docs/WEBSOCKET.md), client), [`HTML`](docs/HTML.md) (semantic builder, parser, selector engine), [`Security`](docs/SECURITY.md) (Argon2id hashing, bcrypt compatibility, secure tokens, constant-time comparison, SHA-2 digests, HMAC, encodings, RS256 signatures, AES-256-GCM), [`SQLite`](docs/SQLITE.md) (local typed database bridge), [`MySQL`](docs/MYSQL.md) (network database with connection pool and transactions), [`PostgreSQL`](docs/POSTGRESQL.md) (network database with connection pool and transactions), [`SMTP`](docs/SMTP.md) (send-only mail client)
+   - **Network, Server & Storage Primitives:** [`HTTP`](docs/HTTP.md) (in-memory server, request/response, cookies, sessions, static file server, [WebSocket endpoints](docs/WEBSOCKET.md), client), [`HTML`](docs/HTML.md) (semantic builder, parser, selector engine), [`Templates`](docs/TEMPLATES.md) (HTML file templates, layouts, and escaped data), [`Security`](docs/SECURITY.md) (Argon2id hashing, bcrypt compatibility, secure tokens, constant-time comparison, SHA-2 digests, HMAC, encodings, RS256 signatures, AES-256-GCM), [`SQLite`](docs/SQLITE.md) (local typed database bridge), [`MySQL`](docs/MYSQL.md) (network database with connection pool and transactions), [`PostgreSQL`](docs/POSTGRESQL.md) (network database with connection pool and transactions), [`SMTP`](docs/SMTP.md) (send-only mail client)
    - **Web Application Framework:** [`Web`](docs/WEB.md) (first-party bundled web framework, [`Web.UI`](docs/WEB.md#9-webui) semantic components, `RequestContext`, typed `Forms`, ordered `ValidationErrors`, selected `OldInput`, session-bound CSRF, and flash lifecycle)
 
 4. **Developer Tools:**
@@ -455,6 +454,7 @@ See the [CLI guide](docs/CLI.md), [formatter guide](docs/FORMATTER.md),
 - [HTTP module](docs/HTTP.md)
 - [WebSocket endpoints](docs/WEBSOCKET.md)
 - [HTML module](docs/HTML.md)
+- [Templates module](docs/TEMPLATES.md)
 - [SMTP module](docs/SMTP.md)
 - [XML module](docs/XML.md)
 - [Env module](docs/ENV.md)
@@ -508,6 +508,13 @@ the editor title play button, Command Palette, or `F6`, and connects to the
 [language server](docs/LSP.md) (`ahdcode lsp`) for compiler-backed
 diagnostics and hover. The same VSIX targets VS Code and Antigravity. See its
 [installation guide](editors/vscode/README.md).
+
+## What is new in v2.10.0 <a id="release-v2-10-0"></a>
+
+Browser live reload, SQLite-backed sessions and migrations, HTML templates
+and isolated page layouts, custom HTTP error pages, and a Turkish Basic
+Web starter are included. HTTP, WebSocket, and evaluator synchronization
+has been improved. See [release and upgrade notes](docs/RELEASE_2.10.0.md).
 
 ## What is new in v2.9.0 <a id="what-is-new-in-v290"></a>
 

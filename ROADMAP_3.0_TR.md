@@ -157,6 +157,9 @@ ekran-görüntüsü karşılaştırma testi her bileşeni kapsar.
 
 ### v2.10 — Web'in Kusursuzlaşması
 
+Yayımlanan kapsam için [v2.10.0 sürüm notlarına](docs/RELEASE_2.10.0_TR.md) bakın.
+Bu bölüm ilk planı kaydeder. Yerel HTTPS ve PWA bu kaynak sürümünden sonraya ertelendi.
+
 Geliştirme deneyimi:
 - `ahdcode dev` tarayıcıyı kendisi yeniler (W3): yalnızca geliştirme kipinde sayfaya eklenen küçük bir yeniden bağlanma betiği.
 - Kalıcı oturum deposu (W4): `Web.sessions(..., store: "file" | "sqlite")`; `dev` yeniden başlatmasında giriş korunur.

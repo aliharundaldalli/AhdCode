@@ -89,6 +89,8 @@ site.start()
 const basicAppSource = `require("Config/App.ahd")
 require("Config/Mail.ahd")
 require("Pages/Home.ahd")
+require("Pages/About.ahd")
+require("Pages/Errors.ahd")
 bring Web
 from Web bring (App, SessionStore)
 
@@ -102,6 +104,10 @@ sessions: SessionStore := Web.sessions(
 routes := Web.routes(site, sessions)
 site.assets("/assets", "public")
 routes.get("/", home)
+routes.get("/hakkinda", about)
+routes.get("/ornek-hata", exampleError)
+site.notFound(notFound)
+site.internalError(serverError)
 write("{application.name} — http://{application.address()}")
 site.start()
 `
@@ -422,91 +428,102 @@ home: Function := (context: RequestContext) -> Response {
 }
 `
 
-const basicHomeSource = `require("Config/App.ahd")
-require("Config/Mail.ahd")
-require("Layouts/Main.ahd")
-bring Web
-from Web bring (RequestContext, Response, HTMLNode, AppConfig)
+const basicSiteSource = `bring Templates
+from Templates bring TemplateSet
 
-home: Function := (context: RequestContext) -> Response {
+pages: TemplateSet := Templates.files("templates")
+`
+
+const basicAboutSource = `require("Config/App.ahd")
+require("Pages/Site.ahd")
+bring Templates
+from Templates bring TemplateSet
+bring Web
+from Web bring (RequestContext, Response, AppConfig)
+
+about: Function := (context: RequestContext) -> Response {
+    pages: Global TemplateSet
     config: Local AppConfig := configuration()
-    return context.respond(
-        mainLayout(
-            config
-            "Welcome"
-            [
-                Web.UI.section(
-                    [
-                        Web.UI.img(
-                            "/assets/ahdcode-logo.png"
-                            "AhdCode"
-                            {"class": "app-hero-logo"}
-                        )
-                        Web.UI.h1("Let's get started")
-                        Web.UI.p(
-                            "A ready application shell with common configuration."
-                            {"class": "app-lead"}
-                        )
-                        Web.UI.p(
-                            "Environment, host, and mail settings live in .env and Config/."
-                            {"class": "app-sub"}
-                        )
-                    ]
-                    {"class": "app-stage"}
-                )
-                Web.UI.section(
-                    [
-                        Web.UI.div(
-                            [
-                                Web.UI.section(
-                                    [
-                                        Web.UI.h2("Application")
-                                        Web.UI.p(
-                                            "Environment: {config.environment}"
-                                        )
-                                        Web.UI.p("Public host: {config.host}")
-                                    ]
-                                    {"class": "app-card"}
-                                )
-                                Web.UI.section(
-                                    [Web.UI.h2("Mail"), mailStatus()]
-                                    {"class": "app-card"}
-                                )
-                                Web.UI.section(
-                                    [
-                                        Web.UI.h2("Next")
-                                        Web.UI.ul(
-                                            [
-                                                Web.UI.li("Edit Pages/Home.ahd")
-                                                Web.UI.li(
-                                                    "Adjust Config/Mail.ahd"
-                                                )
-                                                Web.UI.li(
-                                                    "Add a route in app.ahd"
-                                                )
-                                            ]
-                                            {"class": "app-files"}
-                                        )
-                                    ]
-                                    {"class": "app-card"}
-                                )
-                            ]
-                            {"class": "app-cards"}
-                        )
-                    ]
-                    {"class": "app-notes"}
-                )
-            ]
+    return context.respond(Web.markup(pages.layout(
+        "layouts/site.html"
+        "pages/about.html"
+        Templates.object({
+            "title": Templates.fromString("Hakkında")
+            "name": Templates.fromString(config.name)
+            "note": Templates.fromString("Bu sayfa aynı yerleşimi kullanır.")
+        })
+    )))
+}
+`
+
+const basicErrorsSource = `require("Config/App.ahd")
+require("Pages/Site.ahd")
+bring Templates
+from Templates bring TemplateSet
+bring Web
+from Web bring (Request, RequestContext, Response, AppConfig)
+
+notFound: Function := (request: Request) -> Response {
+    pages: Global TemplateSet
+    config: Local AppConfig := configuration()
+    return Web.markup(
+        pages.layout(
+            "layouts/site.html"
+            "pages/not-found.html"
+            Templates.object({
+                "title": Templates.fromString("Sayfa bulunamadı")
+                "name": Templates.fromString(config.name)
+            })
         )
+        404
     )
 }
 
-mailStatus: Function := () -> HTMLNode {
-    if mailConfigured() {
-        return Web.UI.p("Mail host is set in .env.")
-    }
+serverError: Function := (request: Request) -> Response {
+    pages: Global TemplateSet
+    config: Local AppConfig := configuration()
+    return Web.markup(
+        pages.layout(
+            "layouts/site.html"
+            "pages/server-error.html"
+            Templates.object({
+                "title": Templates.fromString("Sunucu hatası")
+                "name": Templates.fromString(config.name)
+            })
+        )
+        500
+    )
+}
 
-    return Web.UI.p("Mail configuration is available in .env.")
+exampleError: Function := (context: RequestContext) -> Response {
+    toss(DomainError("ornek"))
+}
+`
+
+const basicHomeSource = `require("Config/App.ahd")
+require("Pages/Site.ahd")
+bring Templates
+from Templates bring TemplateSet
+bring Web
+from Web bring (RequestContext, Response, AppConfig)
+
+home: Function := (context: RequestContext) -> Response {
+    pages: Global TemplateSet
+    config: Local AppConfig := configuration()
+    return context.respond(Web.markup(pages.layout(
+        "layouts/site.html"
+        "pages/home.html"
+        Templates.object({
+            "title": Templates.fromString("Ana sayfa")
+            "name": Templates.fromString(config.name)
+            "note": Templates.fromString("İstanbul'da küçük bir başlangıç. Ortam: {config.environment}.")
+            "topics": Templates.list([
+                Templates.fromString("Şablonlar")
+                Templates.fromString("Yerleşim")
+                Templates.fromString("Hata sayfaları")
+            ])
+        })
+    )))
 }
 `
 

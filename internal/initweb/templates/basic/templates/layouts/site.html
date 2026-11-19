@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<title>{{.title}}</title>
+<link rel="stylesheet" href="/assets/style.css">
+</head>
+<body>
+{{template "components/nav.html" .}}
+<main>
+{{block "content" .}}{{end}}
+</main>
+<footer><p>{{.name}}</p></footer>
+</body>
+</html>

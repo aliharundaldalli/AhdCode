@@ -77,3 +77,160 @@ func TestDevWatcherPathSetReplaceIsGraphAware(t *testing.T) {
 		t.Fatalf("expected pollChanges to observe the previously-missing path being created")
 	}
 }
+
+func TestDevReloadEnvironmentNamesOneSession(t *testing.T) {
+	session := "0123456789abcdef0123456789abcdef"
+	if env := devReloadEnvironment(session, 0); env != nil {
+		t.Fatalf("generation 0 = %v", env)
+	}
+	if env := devReloadEnvironment("not-a-session", 7); env != nil {
+		t.Fatalf("bad session = %v", env)
+	}
+	env := devReloadEnvironment(session, 7)
+	if len(env) != 2 || env[0] != "AHDCODE_DEV_SESSION="+session || env[1] != "AHDCODE_DEV_GENERATION=7" {
+		t.Fatalf("environment = %v", env)
+	}
+}
+
+func TestDevWatcherSeesTemplateFilesOnce(t *testing.T) {
+	dir := t.TempDir()
+	entry := filepath.Join(dir, "app.ahd")
+	page := filepath.Join(dir, "templates", "pages", "home.html")
+	if err := os.MkdirAll(filepath.Dir(page), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	touch(t, entry, "entry")
+	touch(t, page, "<p>Ana sayfa</p>")
+	found := devTemplatePaths(entry)
+	if len(found) != 1 || found[0] != page {
+		t.Fatalf("template paths = %v", found)
+	}
+	events := make(chan devControllerEvent, 2)
+	watcher := newDevWatcher([]string{entry}, events)
+	if watcher.pollChanges() {
+		t.Fatal("an existing template must not trigger a rebuild on startup")
+	}
+	watcher.applyPathSet(append([]string{entry}, found...))
+	touch(t, page, "<p>Ana sayfa değişti</p>")
+	if !watcher.pollChanges() {
+		t.Fatal("a template edit was not observed")
+	}
+	if watcher.pollChanges() {
+		t.Fatal("the same template edit was observed twice")
+	}
+	assertChangeOnce := func(t *testing.T, operation string) {
+		t.Helper()
+		if !watcher.pollChanges() {
+			t.Fatalf("template %s was not observed", operation)
+		}
+		if watcher.pollChanges() {
+			t.Fatalf("template %s was observed twice", operation)
+		}
+	}
+	t.Run("create", func(t *testing.T) {
+		touch(t, filepath.Join(filepath.Dir(page), "about.HTML"), "<p>Hakkında</p>")
+		assertChangeOnce(t, "creation")
+	})
+	t.Run("delete", func(t *testing.T) {
+		if err := os.Remove(page); err != nil {
+			t.Fatal(err)
+		}
+		assertChangeOnce(t, "deletion")
+	})
+	t.Run("restore", func(t *testing.T) {
+		touch(t, page, "<p>Ana sayfa</p>")
+		assertChangeOnce(t, "restoration")
+	})
+	t.Run("rename", func(t *testing.T) {
+		renamed := filepath.Join(filepath.Dir(page), "renamed.html")
+		if err := os.Rename(page, renamed); err != nil {
+			t.Fatal(err)
+		}
+		assertChangeOnce(t, "rename")
+		if snapshot, tracked := watcher.snapshots[renamed]; !watcher.snapshots[page].missing || !tracked || snapshot.missing {
+			t.Fatal("rename did not record both the old and new paths")
+		}
+	})
+}
+
+func TestDevWatcherMissingPolicy(t *testing.T) {
+	dir := t.TempDir()
+	entry := filepath.Join(dir, "app.ahd")
+	dep := filepath.Join(dir, "templates", "data.ahd")
+	otherHTML := filepath.Join(dir, "templates-other", "home.html")
+	page := filepath.Join(dir, "templates", "home.html")
+	for _, path := range []string{dep, otherHTML} {
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	paths := []string{entry, dep, otherHTML, page}
+	for _, path := range paths {
+		touch(t, path, "initial")
+	}
+	watcher := newDevWatcher(paths, nil)
+	for _, path := range paths[1:] {
+		t.Run(filepath.Base(filepath.Dir(path))+"/"+filepath.Base(path), func(t *testing.T) {
+			if err := os.Remove(path); err != nil {
+				t.Fatal(err)
+			}
+			if changed := watcher.pollChanges(); changed != (path == page) {
+				t.Fatalf("poll after removing %s = %v", path, changed)
+			}
+			touch(t, path, "restored")
+			if !watcher.pollChanges() {
+				t.Fatalf("restoring %s did not trigger a change", path)
+			}
+		})
+	}
+}
+
+func TestDevWatcherDebouncesABurstAndSeesReplace(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "öğrenci proje")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	entry := filepath.Join(dir, "Sayfa.ahd")
+	touch(t, entry, "version-one")
+	events := make(chan devControllerEvent, 4)
+	watcher := newDevWatcher([]string{entry}, events)
+	watcher.start()
+	defer watcher.close()
+
+	touch(t, entry, "version-two")
+	time.Sleep(40 * time.Millisecond)
+	touch(t, entry, "version-three-longer")
+	waitDevEvent(t, events)
+	expectNoDevEvent(t, events)
+
+	if err := os.Remove(entry); err != nil {
+		t.Fatal(err)
+	}
+	expectNoDevEvent(t, events)
+	touch(t, entry, "created-again")
+	waitDevEvent(t, events)
+
+	replaceFile(t, entry, "replaced-by-rename")
+	waitDevEvent(t, events)
+}
+
+func waitDevEvent(t *testing.T, events <-chan devControllerEvent) {
+	t.Helper()
+	select {
+	case event := <-events:
+		if event.kind != eventSourceChanged {
+			t.Fatalf("event = %v", event.kind)
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("timed out waiting for a source change")
+	}
+}
+
+func expectNoDevEvent(t *testing.T, events <-chan devControllerEvent) {
+	t.Helper()
+	select {
+	case event := <-events:
+		t.Fatalf("unexpected event %v", event.kind)
+	case <-time.After(450 * time.Millisecond):
+	}
+}

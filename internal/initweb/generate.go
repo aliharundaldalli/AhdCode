@@ -30,6 +30,19 @@ func managedFor(options Options) []fileSpec {
 			fileSpec{relPath: "Pages/Home.ahd", perm: 0o644, content: []byte(renderHome(options))},
 		)
 	}
+	if options.Starter == StarterBasic {
+		files = append(files,
+			fileSpec{relPath: "Pages/Site.ahd", perm: 0o644, content: []byte(basicSiteSource)},
+			fileSpec{relPath: "Pages/About.ahd", perm: 0o644, content: []byte(basicAboutSource)},
+			fileSpec{relPath: "Pages/Errors.ahd", perm: 0o644, content: []byte(basicErrorsSource)},
+			fileSpec{relPath: "templates/layouts/site.html", perm: 0o644, embedPath: "templates/basic/templates/layouts/site.html"},
+			fileSpec{relPath: "templates/components/nav.html", perm: 0o644, embedPath: "templates/basic/templates/components/nav.html"},
+			fileSpec{relPath: "templates/pages/home.html", perm: 0o644, embedPath: "templates/basic/templates/pages/home.html"},
+			fileSpec{relPath: "templates/pages/about.html", perm: 0o644, embedPath: "templates/basic/templates/pages/about.html"},
+			fileSpec{relPath: "templates/pages/not-found.html", perm: 0o644, embedPath: "templates/basic/templates/pages/not-found.html"},
+			fileSpec{relPath: "templates/pages/server-error.html", perm: 0o644, embedPath: "templates/basic/templates/pages/server-error.html"},
+		)
+	}
 	if options.Starter == StarterBasic || options.Starter == StarterAdmin || options.isAppStarter() {
 		files = append(files, fileSpec{
 			relPath:   "Config/Mail.ahd",

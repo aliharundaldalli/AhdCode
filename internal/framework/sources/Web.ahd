@@ -123,7 +123,7 @@ html: Function := (body: HTMLNode, status: Int := 200) -> Response {
 // This is the whole of Web's document handling. It is a shell, not a template
 // language: there are no slots, no inheritance, no directives, and no
 // expressions embedded in markup. A Layout is an ordinary Function that ends
-// by calling this.
+// by calling this. File templates live in the Templates module.
 document: Function := (
     title: String
     body: List<HTMLNode>
@@ -139,6 +139,13 @@ page: Function := (
     status: Int := 200
 ) -> Response {
     return HTTP.html(document(title, body, head), status)
+}
+// markup returns an HTML response whose body is already rendered text.
+// Templates.render and TemplateSet.layout escape ordinary values before this
+// call. status defaults to 200. A notFound or internalError handler may pass
+// 404 or 500; the server still forces that status when it invokes the page.
+markup: Function := (body: String, status: Int := 200) -> Response {
+    return HTTP.html(body, status)
 }
 // text returns a plain-text response, mirroring HTTP.text. To build an
 // escaped text *node* for a page, use Web.UI.text.
@@ -173,6 +180,19 @@ sessions: Function := (
     sameSite: String := "Lax"
 ) -> SessionStore {
     return HTTP.sessions(cookieName, maxAgeSeconds, secure, sameSite)
+}
+// persistentSessions stores the same SessionStore in a SQLite file at path.
+// The file survives process exit. HTTP.sessions remains memory-only.
+// secure defaults to true, matching Web.sessions; plain HTTP development
+// passes false explicitly.
+persistentSessions: Function := (
+    path: String
+    cookieName: String := "ahdsession"
+    maxAgeSeconds: Int := 86400
+    secure: Bool := true
+    sameSite: String := "Lax"
+) -> SessionStore {
+    return HTTP.persistentSessions(path, cookieName, maxAgeSeconds, secure, sameSite)
 }
 // Context-aware registration over an existing App. Handlers receive
 // RequestContext; they still finalize with context.respond. Request-based

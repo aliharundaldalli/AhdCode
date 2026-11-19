@@ -40,6 +40,13 @@ var SQLiteSource string
 //go:embed http.go
 var HTTPSource string
 
+// DevReloadSource is emitted beside the HTTP runtime. ahdcode dev turns it on
+// with process environment variables; the generated program otherwise leaves
+// HTML responses unchanged.
+//
+//go:embed http_devreload.go
+var DevReloadSource string
+
 // HTTPFilesSource is emitted as a separate generated Go file beside
 // HTTPSource. It holds the v2.1.0 binary-safe outbound file transfer:
 // Client.download, Client.sendToFile, and outbound multipart/form-data. Like
@@ -48,8 +55,33 @@ var HTTPSource string
 //go:embed http_files.go
 var HTTPFilesSource string
 
+// HTTPSessionsSource is the persistent SessionStore backend. It joins every
+// generated program, like the rest of the HTTP runtime, and talks to the
+// bundled ahdsqlite helper only when a program calls HTTP.persistentSessions.
+//
+//go:embed http_sessions.go
+var HTTPSessionsSource string
+
 //go:embed html.go
 var HTMLSource string
+
+// TemplateSource is the HTML template runtime. It uses Go's html/template and
+// joins every generated program, the same way the HTML builder does.
+//
+//go:embed templates.go
+var TemplateSource string
+
+// Template filesystem helpers carry build constraints so only one is compiled
+// into a generated program, the same way Disk and Process platform files are.
+//
+//go:embed templates_fs_windows.go
+var TemplateWindowsSource string
+
+//go:embed templates_fs_unix.go
+var TemplateUnixSource string
+
+//go:embed templates_fs_other.go
+var TemplateOtherSource string
 
 //go:embed smtp.go
 var SMTPSource string

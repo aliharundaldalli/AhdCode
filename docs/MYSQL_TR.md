@@ -318,7 +318,9 @@ bakın.
 ## Kapsam dışı olanlar
 
 ORM veya active-record katmanı yok, model sınıfları yok, sorgu veya şema
-oluşturucu yok, migration yok, bağlantı dizesi/DSN mini-dili yok, saklı
+oluşturucu yok, `MySQL` üzerinde migration API'si yok (`ahdcode migrate` yerel
+bir SQLite dosyasını hedefler ve MySQL'i reddeder; bkz.
+[CLI](CLI_TR.md#ahdcode-migrate)), bağlantı dizesi/DSN mini-dili yok, saklı
 yordam veya tetikleyici çerçevesi yok, replikasyon veya binlog API'si yok,
 yönetim sunucusu yok, bağlantı havuzu ayarlama API'si yok ve
 [SQLite](SQLITE_TR.md) ile paylaşılan genel bir `Database` arayüzü yok.

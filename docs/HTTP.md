@@ -77,6 +77,13 @@ HTTP.sessions(
     secure: Bool := false
     sameSite: String := "Lax"
 ) -> SessionStore
+HTTP.persistentSessions(
+    path: String
+    cookieName: String := "ahd_session"
+    maxAgeSeconds: Int := 86400
+    secure: Bool := false
+    sameSite: String := "Lax"
+) -> SessionStore
 HTTP.client(
     timeoutSeconds: Int := 30
     maxResponseBytes: Int := 8388608
@@ -185,7 +192,9 @@ the other type names, have no public attributes, and are obtained only from
 the functions above. All arguments are positional. Omitted `maxBodyBytes` is `1048576`. Omitted
 `HTTP.text` / `HTTP.html` status is `200`. Omitted redirect status is `303`.
 Omitted `HTTP.deleteCookie` path is `"/"`. Omitted `HTTP.sessions` arguments
-are `ahd_session`, `86400`, `false`, and `"Lax"`. Omitted `HTTP.client`
+are `ahd_session`, `86400`, `false`, and `"Lax"`. `HTTP.persistentSessions`
+requires `path`; its omitted cookie arguments are the same four.
+Omitted `HTTP.client`
 arguments are `30`, `8388608`, and `true`. Omitted `Client.post` content type
 is `text/plain; charset=utf-8`. Omitted `withMultipartFile` arguments are
 `""` (the path's own basename) and `application/octet-stream`.
@@ -232,6 +241,20 @@ stopped.
 `host` must be non-empty. `port` must be in `1..65535` (port `0` is invalid).
 `maxBodyBytes` must not be negative. Bind failures raise `HTTPError`.
 
+A request handler must not call `start()`, or register routes, on that same
+server. The same rule applies to a WebSocket `accept`, `onOpen`, `onMessage`,
+or `onClose` callback. The call raises `HTTPError` and leaves the running
+server unchanged. A handler may call `start()` on a different server. That
+call blocks only the request that made it, until the inner server stops.
+Stopping one server does not stop the other. Registering a route on a server
+that has already started also raises `HTTPError`, and it does so without
+waiting for that server's current callback to return.
+
+The host string stored by `HTTP.server` is the server's identity. Names match
+case-insensitively. An IP matches only that IP. `localhost`, `127.0.0.1`,
+`::1`, `0.0.0.0`, and `::` are different servers. Stopping `127.0.0.1` does
+not stop a server created with `localhost` or with a wildcard.
+
 `127.0.0.1` is this machine only. Open `http://127.0.0.1:8080/` in a browser
 on the same computer. Binding `0.0.0.0` makes the port reachable from other
 machines on the network; do not do that casually.
@@ -250,6 +273,17 @@ end with `/*` to match exactly one extra segment (`/question/*` matches
 
 Unknown paths return **404**. A path that exists for another method returns
 **405** with an `Allow` header listing the registered methods.
+
+`server.notFound(handler)` and `server.internalError(handler)` replace the
+plain text for an unmatched path and for a handler that fails. The handler
+is `Function(Request) -> Response`. The status written is 404 or 500 even
+if the handler chose another status. A `Location` header from that handler
+is dropped so the forced status cannot become a redirect. A file response
+is not used. If that handler fails, the client receives the plain text
+`Not Found` or `Internal Server Error`, and the other error page is not
+called. The page does not receive the failure text. A missing file inside a
+prefix already claimed by `static` or `managed` stays the existing plain
+404. See [Templates](TEMPLATES.md).
 
 ## Static files
 
@@ -292,8 +326,16 @@ called after `start()`, `prefix` must begin with `/`, `root` must already
 exist and be a directory, and two registered prefixes may not overlap.
 
 Editing a static file never triggers `ahdcode dev`'s rebuild -- static
-serving reads straight from disk on every request, so a manual browser
-refresh is always enough. See the [CLI guide](CLI.md#dev-watch-scope).
+serving reads straight from disk on every request. Browser refresh follows
+a successful source rebuild, so a static-file edit still needs a manual
+refresh. `HTTP.file`, `HTTP.download`, and `server.static` responses are
+not rewritten. A redirect, a 1xx status, a compressed body, an attachment,
+or a charset outside the list in the
+[CLI guide](CLI.md#dev-watch-rebuild-restart) is left unchanged. An HTML
+fragment that has no `</body>` receives the script at the end of the body.
+A page that only mentions the reload path is still eligible. The injected
+tag is an external same-origin script, so `script-src 'self'` can run it.
+`HEAD` keeps a `Content-Length` when the body length is known.
 
 ## Managed files
 
@@ -563,25 +605,81 @@ Both `Set-Cookie` headers reach the client.
 
 ## Sessions
 
-`HTTP.sessions` creates an independent in-memory `SessionStore`. Two stores
-do not share identifiers or values, even if cookie names differ only by
-choice. The store is not tied to one `Server`.
+`HTTP.sessions` creates an independent **in-memory** `SessionStore`. Values
+are lost when the process exits. That is the v0.5.0 contract, not a bug.
 
-A session cookie contains **only** an opaque random identifier (256 bits from
-`crypto/rand`, base64url without padding). Application values are String-only
-and live on the server. They are lost when the process exits. That is the
-v0.5.0 contract, not a bug. SQLite data in the same program can persist
-independently.
+`HTTP.persistentSessions(path, ...)` creates a `SessionStore` with the same
+`open` / `commit` / `rotate` / `destroy` operations, stored in the SQLite
+file `path`. Committed values and revocations survive a normal process exit
+and are visible to the next process that opens the same file and cookie name.
+In-memory sessions are not persistent. Calling `HTTP.sessions` does not create
+a database and does not keep data across a restart.
+
+```ahd
+sessions: SessionStore := HTTP.persistentSessions("data/sessions.db", "ahd_session", 86400, false, "Lax")
+```
+
+`path` is a filesystem path, not a URI and not `":memory:"`. The parent
+directory must already exist; AhdCode does not create it. The path may
+contain spaces, a Windows drive letter, and Unicode. A relative path is
+resolved once, when the store is created. A native program resolves it
+against the process working directory. The evaluator resolves it against the
+session directory, the same way `SQLite.open` and `File` do. An absolute
+path, including a Windows drive letter, is used as given. Two stores with
+different cookie names may share one file; their rows stay separate. Two
+stores with the same cookie name and the same file are the same session
+namespace, which is how a restarted process finds the sessions the previous
+process committed.
+
+The database uses schema version `1` (`ahd_session_meta`, `ahd_sessions`,
+`ahd_session_revoked`). A file whose schema version is not `1` raises
+`HTTPError` and is left unchanged. There is no automatic migration. Journal
+mode is WAL. `open`, `commit`, `rotate`, and `destroy` each take
+`BEGIN IMMEDIATE`. That is a writer lock: WAL does not let `open` read past
+a current writer, and it does not let these calls skip the lock. If another
+process holds the lock, SQLite waits up to 5 seconds and then the call raises
+`HTTPError`. A storage error is never turned into an empty or authenticated
+session. One file uses one connection inside the process. The connection
+stays open while an HTTP server is actually running, while one of its
+handlers is still inside the request, or while the evaluator is still
+executing the program. A server object that was created and never started
+does not keep the file open. When the last running server stops, its handlers
+have returned, and no evaluator execution is still in progress, the connection
+is closed and the file is left in place. A handler that is still running after
+the graceful shutdown deadline keeps the file until that handler returns. The
+next session operation opens the same file. Closing it does not delete
+committed rows.
 
 This is not authentication. There is no User, Login, Password, Role, or Guard
 type. An application may store `user_id` itself after it verifies a password.
+SameSite is not a substitute for an application CSRF check.
+
+A session cookie contains **only** an opaque random identifier (256 bits from
+`crypto/rand`, base64url without padding). The database stores SHA-256 of
+that identifier, not the cookie value. Application values are String-only.
+Keys are at most 128 bytes. One value is at most 65536 bytes. The stored map
+is at most 262144 bytes of JSON. Larger data raises `HTTPError`. Identifiers
+are not written to ordinary diagnostics.
 
 Default session cookie: Path `/`, HttpOnly **always true**, Secure and
 SameSite as configured, Max-Age = `maxAgeSeconds`. HttpOnly cannot be
-disabled. `maxAgeSeconds` must be greater than 0 and controls both the
-browser cookie and server-side expiry. Expired sessions are not accepted.
-Cleanup runs lazily during `open` and `commit`; there is no background
-goroutine.
+disabled. `secure: false` is what plain HTTP development needs, because a
+browser will not return a Secure cookie on `http://`. An HTTPS deployment
+passes `secure: true`. `"None"` still requires `secure: true`.
+
+`maxAgeSeconds` must be greater than 0. It is both the cookie Max-Age and the
+server expiry. Expiry is measured on the server. It slides only when `commit`
+successfully writes the session: `open` does not extend it. An expired or
+revoked identifier is not accepted, including after a restart, and a later
+`commit` or `rotate` of that identifier raises `HTTPError` instead of creating
+another authenticated session. `set`, `remove`, and `clear` change only the
+request's copy. They are not durable until `commit`. A crash before `commit`
+drops those edits; the previously committed map stays as it was. Cleanup of
+expired rows runs inside the session transaction. A crash during that
+transaction rolls it back; expired rows stay expired.
+
+Two stores do not share identifiers or values unless they were pointed at the
+same file and the same cookie name. The store is not tied to one `Server`.
 
 `Session.has(name)` is a method. After `.`, `has` is a member name; the `x has y`
 operator is unchanged.
@@ -606,16 +704,33 @@ not create stored state or a `Set-Cookie` header. Persistence happens when
 state actually changes, or when `rotate()` needs a concrete identifier.
 
 `Session.set` does not write HTTP headers. `SessionStore.commit(session, response)`
-returns a **new** Response. That explicit boundary is required.
+returns a **new** Response. That explicit boundary is required. `commit`
+replaces the whole value map. It does not merge keys with another request's
+map. On one `Server`, handlers stay serialized, so one request's
+open-modify-commit is not interleaved with another handler on that server.
+Two servers, or two processes, can interleave between `open` and `commit`;
+the later successful `commit` of a still-valid identifier replaces the map.
+There is no compare-and-swap and no key-level merge. A `commit` whose
+identifier was revoked, rotated away, or expired raises `HTTPError` and does
+not write a row.
 
 Values are String only. Convert explicitly: `int(session.get("count"))` after
-a null check. There is no Any, JSON, or implicit Int.
+a null check. There is no Any, JSON, or implicit Int. A database row whose
+JSON is not an object of strings raises `HTTPError` (`HTTP session data is
+corrupted`) and is not treated as a logged-in session.
 
 ### Rotate, destroy, clear
 
-`rotate()` invalidates the old identifier immediately, issues a new random
-id, keeps values, and `commit` sends the new cookie. A typical login-style
-flow:
+`rotate()` of a stored session checks, in one transaction, that the
+identifier's row still exists, has not expired, and has not been revoked.
+Only then does it revoke that identifier and return a new one. The in-memory
+store uses the same rule. A missing, expired, revoked, or already-rotated
+identifier raises `HTTPError` and does not change the caller's session into
+a replacement. `commit` of a successful rotation sends the new cookie and
+keeps the values. If the process stops after that revocation and before
+`commit` stores the replacement, the old identifier stays invalid and the
+new one was never stored. The client has to sign in again. That outcome is
+fail-closed. A typical login-style flow:
 
 ```ahd
 session.rotate()
@@ -626,9 +741,14 @@ return sessions.commit(session, HTTP.redirect("/panel"))
 The pre-login cookie must not recover the logged-in session.
 
 `remove(name)` deletes one key. `clear()` deletes all values but keeps the
-session. `destroy()` invalidates server state; `commit` sends a deletion
-cookie; the old id cannot be reused. After destroy, `get` is `null` and `has`
-is `false`. Further mutating operations raise `HTTPError`.
+session. `destroy()` revokes a stored identifier immediately. `commit` sends
+a deletion cookie with the same name, path `/`, HttpOnly, Secure, and
+SameSite as the session cookie, and `Max-Age=0`. Session cookies are
+host-only: they set no Domain, and the deletion cookie does not either.
+`__Host-` and `__Secure-` cookie names require `secure: true`. The old id
+cannot be reused, including by a stale `rotate` or `commit`. After destroy,
+`get` is `null` and `has` is `false`. Further mutating operations raise
+`HTTPError`.
 
 ```ahd
 session.destroy()

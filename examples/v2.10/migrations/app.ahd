@@ -1,0 +1,20 @@
+// Reads the notes table created by `ahdcode migrate up`.
+// The migration CLI owns the schema. This program only uses the SQLite module.
+bring SQLite
+from SQLite bring Database
+from SQLite bring SQLiteValue
+
+db: Database := SQLite.open("notes.db")
+rows: List<Pair<String, SQLiteValue>> := db.query(
+    "SELECT id, body, author FROM notes ORDER BY id"
+)
+for row in rows {
+    write("{row["id"].int()} {row["body"].string()} {row["author"].string()}")
+}
+db.execute(
+    "INSERT INTO notes (body, author) VALUES (?, ?)"
+    [SQLite.fromString("ikinci not"), SQLite.fromString("Ayşe")]
+)
+total: Int := db.query("SELECT COUNT(*) AS total FROM notes")[0]["total"].int()
+write("total {total}")
+db.close()

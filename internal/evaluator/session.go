@@ -13,6 +13,7 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"ahdcode/internal/backend/golang/ahdruntime"
 	"ahdcode/internal/ir"
 )
 
@@ -38,9 +39,11 @@ type Session struct {
 	nextIdentity int64
 	regexCache   map[string]*regexp.Regexp
 	// mu, owner, and depth keep one evaluation at a time. See checkpoint.go.
-	mu    sync.Mutex
-	owner atomic.Int64
-	depth atomic.Int64
+	mu               sync.Mutex
+	owner            atomic.Int64
+	depth            atomic.Int64
+	activeHTTPScope  uint64
+	persistentStores []string
 }
 
 type ExecutionResult struct {
@@ -129,7 +132,14 @@ func (session *Session) Execute(compilation *ir.Compilation, entryOffset int) (r
 		return ExecutionResult{Failure: &RuntimeError{Name: "Error", Message: "nil IR compilation"}}
 	}
 	session.enter()
-	defer session.leave()
+	scopeID := ahdruntime.AhdHTTPEvaluatorScopeBegin(session.persistentStores)
+	prevScope := session.activeHTTPScope
+	session.activeHTTPScope = scopeID
+	defer ahdruntime.AhdHTTPEvaluatorScopeEnd(scopeID)
+	defer func() {
+		session.activeHTTPScope = prevScope
+		session.leave()
+	}()
 	session.install(compilation)
 	entry := session.modules[compilation.Entry]
 	if entry == nil {

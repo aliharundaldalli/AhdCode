@@ -157,26 +157,27 @@ func TestHTTPModuleInterfaceExportsExactSurface(t *testing.T) {
 	wantExports := []string{
 		"Client", "ClientFileResponse", "ClientRequest", "ClientResponse", "Cookie", "HTTPError", "Request", "Response",
 		"Server", "Session", "SessionStore", "UploadedFile", "WebSocket", "WebSocketClient", "WebSocketConnection", "WebSocketEndpoint",
-		"client", "clientRequest", "contextHandler", "cookie", "deleteCookie", "download", "file", "html", "redirect", "response", "server", "sessions", "text", "webSocketClient", "websocket",
+		"client", "clientRequest", "contextHandler", "cookie", "deleteCookie", "download", "file", "html", "persistentSessions", "redirect", "response", "server", "sessions", "text", "webSocketClient", "websocket",
 	}
 	if strings.Join(module.ExportNames, ",") != strings.Join(wantExports, ",") {
 		t.Fatalf("HTTP exports %v; want %v", module.ExportNames, wantExports)
 	}
 	signatures := map[string]string{
-		"server":         "(host: String, port: Int, maxBodyBytes: Int := default) -> Server",
-		"text":           "(body: String, status: Int := default) -> Response",
-		"html":           "(body: String, status: Int := default) -> Response",
-		"response":       "(status: Int, body: String, contentType: String) -> Response",
-		"redirect":       "(location: String, status: Int := default) -> Response",
-		"file":           "(path: String, contentType: String) -> Response",
-		"download":       "(path: String, contentType: String, fileName: String) -> Response",
-		"cookie":         "(name: String, value: String) -> Cookie",
-		"deleteCookie":   "(name: String, path: String := default) -> Cookie",
-		"sessions":       "(cookieName: String := default, maxAgeSeconds: Int := default, secure: Bool := default, sameSite: String := default) -> SessionStore",
-		"client":         "(timeoutSeconds: Int := default, maxResponseBytes: Int := default, followRedirects: Bool := default) -> Client",
-		"clientRequest":  "(method: String, url: String) -> ClientRequest",
-		"contextHandler": "(store: SessionStore, opener: Function(Request, SessionStore) -> RequestContext, handler: Function(RequestContext) -> Response, first: Function(RequestContext) -> Response, second: Function(RequestContext) -> Response) -> Function(Request) -> Response",
-		"websocket":      "(onMessage: Function(WebSocket, String) -> Nothing) -> WebSocketEndpoint",
+		"server":             "(host: String, port: Int, maxBodyBytes: Int := default) -> Server",
+		"text":               "(body: String, status: Int := default) -> Response",
+		"html":               "(body: String, status: Int := default) -> Response",
+		"response":           "(status: Int, body: String, contentType: String) -> Response",
+		"redirect":           "(location: String, status: Int := default) -> Response",
+		"file":               "(path: String, contentType: String) -> Response",
+		"download":           "(path: String, contentType: String, fileName: String) -> Response",
+		"cookie":             "(name: String, value: String) -> Cookie",
+		"deleteCookie":       "(name: String, path: String := default) -> Cookie",
+		"sessions":           "(cookieName: String := default, maxAgeSeconds: Int := default, secure: Bool := default, sameSite: String := default) -> SessionStore",
+		"persistentSessions": "(path: String, cookieName: String := default, maxAgeSeconds: Int := default, secure: Bool := default, sameSite: String := default) -> SessionStore",
+		"client":             "(timeoutSeconds: Int := default, maxResponseBytes: Int := default, followRedirects: Bool := default) -> Client",
+		"clientRequest":      "(method: String, url: String) -> ClientRequest",
+		"contextHandler":     "(store: SessionStore, opener: Function(Request, SessionStore) -> RequestContext, handler: Function(RequestContext) -> Response, first: Function(RequestContext) -> Response, second: Function(RequestContext) -> Response) -> Function(Request) -> Response",
+		"websocket":          "(onMessage: Function(WebSocket, String) -> Nothing) -> WebSocketEndpoint",
 	}
 	for name, want := range signatures {
 		symbol := module.Exports[name]

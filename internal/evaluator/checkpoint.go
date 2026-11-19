@@ -9,8 +9,9 @@ import (
 // The interpreter is one Session. A background task runs on another
 // goroutine, so evaluation takes this lock. It is reentrant for the
 // goroutine that holds it: a function call from inside a function does not
-// lock twice. Window.wait and GUI.checkpoint release it, which is when the
-// other goroutine may run.
+// lock twice. Window.wait, GUI.checkpoint, and HTTP Server.start release it
+// around the blocking wait. Request callbacks then take the same lock, one
+// at a time, and release it before the next callback runs.
 
 func evalGoroutine() int64 {
 	var buf [64]byte

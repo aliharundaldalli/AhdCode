@@ -559,3 +559,50 @@ func resourceTreeContains(t *testing.T, root, text string) bool {
 	})
 	return found
 }
+
+func TestWindowsPackageIncludesSQLiteWhenCStrNeedsIt(t *testing.T) {
+	cstr := `bring HTTP
+from HTTP bring SessionStore
+
+Ledger: Class<> := {
+    structure: Attributes := (name: String)
+    CStr: Function := () -> String {
+        store: Local SessionStore := HTTP.persistentSessions("sessions.db")
+        return attribute.name
+    }
+}
+
+book: Ledger := Ledger(name: "kasa")
+write(book)
+`
+	web := "bring Web\nwrite(Web.render(Web.UI.text(\"ok\")))\n"
+	for _, testCase := range []struct {
+		name   string
+		source string
+		want   bool
+	}{
+		{"cstr", cstr, true},
+		{"web", web, false},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			output := t.TempDir()
+			result := Package(Options{
+				Entry: project(t, testCase.source), Name: "Ledger", Output: output,
+				Target: "windows-x64", Helpers: fakeHelpers(t, true), Console: true,
+			})
+			if result.Application == "" {
+				t.Fatalf("diagnostics %+v", result.Diagnostics)
+			}
+			names, _ := readArchive(t, result.Archive, true)
+			found := false
+			for _, name := range names {
+				if strings.HasSuffix(name, "ahdsqlite.exe") {
+					found = true
+				}
+			}
+			if found != testCase.want {
+				t.Fatalf("ahdsqlite.exe present = %v, want %v\n%s", found, testCase.want, strings.Join(names, "\n"))
+			}
+		})
+	}
+}

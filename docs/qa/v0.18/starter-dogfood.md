@@ -37,7 +37,9 @@ No `database/`, `Services/`, `Repositories/`, Login, or Dashboard.
 
 Same three commands. Wizard: Basic → application name.
 
-Adds `Config/Mail.ahd` and `MAIL_*` keys. Still no database and no login.
+Adds `Config/Mail.ahd`, `MAIL_*` keys, a Turkish `templates/` tree (layout,
+nav, home, about, 404, 500), and routes `/`, `/hakkinda`, `/ornek-hata`.
+Still no database and no login.
 
 ## Admin SQLite
 

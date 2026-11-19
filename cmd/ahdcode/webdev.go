@@ -263,6 +263,10 @@ func announceWebApplication(output io.Writer, environment webEnvironment, local 
 		fmt.Fprintln(output, "  Open:")
 		fmt.Fprintf(output, "  %s\n", environment.openURL())
 	}
+	fmt.Fprintln(output)
+	fmt.Fprintln(output, "  Browser refresh:")
+	fmt.Fprintln(output, "  Open pages reload after a successful rebuild.")
+	fmt.Fprintln(output, "  A failed build keeps the last page.")
 	writeLocalIdentity(output, environment, local)
 	fmt.Fprintln(output)
 }

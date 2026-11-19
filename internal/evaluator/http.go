@@ -1,6 +1,9 @@
 package evaluator
 
 import (
+	"path/filepath"
+	"strings"
+
 	"ahdcode/internal/backend/golang/ahdruntime"
 	"ahdcode/internal/ir"
 )
@@ -210,6 +213,24 @@ func (session *Session) httpBuiltin(name string, args []any) any {
 			session.httpIntArg(args, 1, 86400),
 			session.httpBoolArg(args, 2, false),
 			session.httpStringArg(args, 3, "Lax")))
+	case "persistentSessions":
+		path := args[0].(string)
+		// Match SQLite.open and File: a relative path uses the evaluator
+		// session directory. Absolute paths, including Windows drive letters,
+		// stay as given. Empty, NUL, and ":memory:" are left for the runtime
+		// check so the diagnostic does not change.
+		if strings.TrimSpace(path) != "" && path != ":memory:" && !strings.ContainsRune(path, 0) && !filepath.IsAbs(path) {
+			path = session.sessionPath(path)
+		}
+		handle := ahdruntime.AhdHTTPPersistentSessionsScoped(class,
+			session.activeHTTPScope,
+			path,
+			session.httpStringArg(args, 1, "ahd_session"),
+			session.httpIntArg(args, 2, 86400),
+			session.httpBoolArg(args, 3, false),
+			session.httpStringArg(args, 4, "Lax"))
+		session.persistentStores = append(session.persistentStores, handle)
+		return session.httpSessionStore(handle)
 	case "client":
 		return session.httpClient(ahdruntime.AhdHTTPClient(class,
 			session.httpIntArg(args, 0, 30),
@@ -293,8 +314,24 @@ func (session *Session) httpOperation(name string, receiver any, args []any) any
 	case "Server.applyWebLimits":
 		ahdruntime.AhdHTTPServerApplyWebLimits(class, session.httpHandleOf(receiver))
 		return Nothing
+	case "Server.notFound":
+		ahdruntime.AhdHTTPServerNotFound(class, session.httpHandleOf(receiver), session.httpHandler(args[0]))
+		return Nothing
+	case "Server.internalError":
+		ahdruntime.AhdHTTPServerInternalError(class, session.httpHandleOf(receiver), session.httpHandler(args[0]))
+		return Nothing
 	case "Server.start":
-		ahdruntime.AhdHTTPServerStart(class, session.httpHandleOf(receiver))
+		// Serve blocks until the server shuts down. Holding the interpreter
+		// lock across that wait deadlocks the first request: its callback
+		// needs the same lock, and only this goroutine can release it.
+		// Yielding matches Window.wait. Callbacks stay serialized because
+		// invoke takes the lock again. The native backend has no interpreter
+		// lock, so its start call is unchanged.
+		handle := session.httpHandleOf(receiver)
+		scopeID := session.activeHTTPScope
+		depth := session.yield()
+		defer session.resume(depth)
+		ahdruntime.AhdHTTPServerStartScoped(class, scopeID, handle)
 		return Nothing
 	case "Request.method":
 		return ahdruntime.AhdHTTPRequestMethod(session.httpDataOf(receiver, evaluatorHTTPRequestClass, evaluatorHTTPRequestField, "Request"))
@@ -574,8 +611,11 @@ func (session *Session) webSocketFunction(value any, name string) *FunctionValue
 }
 
 // The WebSocket callbacks run the AhdCode Function through the same session a
-// route handler uses. The runtime calls them holding the server mutex, so the
-// session is never entered by two callbacks at once.
+// route handler uses. The runtime calls them holding the server mutex and
+// records that goroutine as the callback owner, so the session is never
+// entered by two callbacks at once. A route change from one of these callbacks
+// must raise instead of waiting for that mutex: the callback already holds
+// the session lock, and the server callback may be waiting to resume it.
 func (session *Session) webSocketMessageHandler(value any) ahdruntime.AhdWebSocketMessageHandler {
 	function := session.webSocketFunction(value, "onMessage handler")
 	return func(socket string, text string) {

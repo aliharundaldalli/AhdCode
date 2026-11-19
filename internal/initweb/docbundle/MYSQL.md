@@ -309,7 +309,9 @@ vendored code's licenses.
 ## Non-goals
 
 No ORM or active-record layer, no model classes, no query or schema builder,
-no migrations, no connection-string/DSN mini-language, no stored-procedure or
+no migration API on `MySQL` (`ahdcode migrate` targets a local SQLite file
+and refuses MySQL; see [CLI](CLI.md#ahdcode-migrate)), no connection-string/DSN
+mini-language, no stored-procedure or
 trigger framework, no replication or binlog API, no administration server,
 no connection pool tuning API, and no generic `Database` interface shared
 with [SQLite](SQLITE.md). Bound binary parameters and a public `Bytes` type

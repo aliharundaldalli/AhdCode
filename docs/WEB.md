@@ -31,13 +31,13 @@ v0.15 deliberately does **not** include:
 
 | Not included | Where it stands |
 | --- | --- |
-| ORM, query builder, migrations | Use `SQLite` / `MySQL` explicitly |
+| ORM, query builder | Use `SQLite` / `MySQL` explicitly. Versioned SQL is [`ahdcode migrate`](CLI.md#ahdcode-migrate) |
 | Forms, validation, old input, error bags | Released in v0.16 (see section 16) |
 | Middleware chains, route groups, auth guards | Planned for v0.17 |
-| Template language | `Web.document` is a shell, not a template |
+| Template language inside `Web.document` | `Web.document` is still a shell. File templates, layouts, and partials are [`Templates`](TEMPLATES.md) |
 | Virtual DOM, hydration, reactive state, hooks | Not planned; pages are composed on the server |
 | Frontend bundler, npm, Node, CSS-in-JS | Not planned; assets are files on disk |
-| Browser live reload / HMR | Not planned for v0.15 |
+| Browser live reload / HMR | `ahdcode dev` reloads the full page after a successful rebuild, through a same-origin script. Not hot module replacement. `ahdcode run` and a `.env` file do not turn it on |
 | ACME, Let's Encrypt, certificate renewal | Terminate TLS at a reverse proxy |
 
 There is no package manager either. `bring Web` resolves offline, from bytes
@@ -196,6 +196,8 @@ academy.start()
 | `assets(prefix, root)` | serve a directory of static files |
 | `managedAssets(prefix, root)` | serve only files declared through `Web.Assets` |
 | `websocket(path, endpoint)` | register a [WebSocket](WEBSOCKET.md) endpoint built with `Web.websocket` (v1.4.0) |
+| `notFound(handler)` | page for an unmatched path; status is 404 |
+| `internalError(handler)` | page when a handler fails; status is 500 |
 | `start()` | bind and serve; does not return |
 | `configuration()` | the validated `AppConfig` |
 
@@ -211,13 +213,24 @@ Its *name* is irrelevant to routing; see
 | Call | Returns |
 | --- | --- |
 | `Web.html(node, status := 200)` | HTML response from a node tree |
+| `Web.markup(body, status := 200)` | HTML response from template text |
 | `Web.page(title, body, head := [], status := 200)` | full document as a response |
 | `Web.document(title, body, head := [])` | full document as markup |
 | `Web.text(body, status := 200)` | plain-text response |
 | `Web.redirect(location, status := 303)` | redirect (303 suits POST-then-redirect) |
 | `Web.response(status, body, contentType)` | anything else |
 | `Web.render(node)` | node tree to markup |
-| `Web.sessions(...)` | a `SessionStore` |
+| `Web.sessions(...)` | an in-memory `SessionStore` |
+| `Web.persistentSessions(path, ...)` | a `SessionStore` stored in a SQLite file |
+
+`bring Web` does not require the SQLite helper. `Web.render` and
+`Web.sessions` do not either. `Web.sessions` does not survive a process
+restart. `Web.persistentSessions` does, when `path` is a real file whose
+parent directory already exists, and that call is what requires the helper.
+Cookie defaults match `Web.sessions`: name `ahdsession`, max-age 86400
+seconds, `secure: true`, SameSite `Lax`. Plain HTTP development must pass
+`secure: false`. Storage, expiry, rotation, crash, locking, and failure
+behavior are the HTTP session rules in [HTTP.md](HTTP.md).
 
 ## 9. Web.UI
 
@@ -500,8 +513,9 @@ relative file for managed exposure.
 
 Editing a static file changes what the browser gets on the next request. It
 does **not** rebuild AhdCode source, because none of it is AhdCode source.
-There is no hot module replacement and no injected browser refresh: reload the
-page.
+`ahdcode dev` refreshes the browser after a successful source rebuild; a
+static-file edit is not one of those rebuilds, so it does not refresh the
+browser. Reload the page yourself after a stylesheet or script change.
 
 ## 12. Dev mode
 
@@ -525,11 +539,23 @@ AhdCode Web
   Open:
   http://127.0.0.1:8080
 
+  Browser refresh:
+  Open pages reload after a successful rebuild.
+  A failed build keeps the last page.
+
   Local identity:
   http://ahdakademi.test/
   Bind: 127.0.0.1:8080
 
 Waiting for changes...
+```
+
+A later successful rebuild prints:
+
+```
+→ Restarting...
+✓ Running
+✓ Browser will refresh
 ```
 
 The address under `Open:` is `SERVER_HOST` and `SERVER_PORT`, the socket the
@@ -547,12 +573,21 @@ socket is; the local URL says what name this machine routes to it. If routing
 cannot be arranged, the banner says so in one line and the application still
 runs — a convenience failing never fails a session that started correctly.
 
-The v0.13/v0.14 dependency-aware dev controller is unchanged and still owns
-the source graph, the watcher, last-good, rebuild, restart, and stop. Web adds
-a banner and two safety checks.
+The dev controller still owns the source graph, the watcher, last-good,
+rebuild, restart, and stop. Web adds a banner and two safety checks. The
+first successful start prints the `Browser refresh:` section inside that
+banner. It does not print `✓ Browser will refresh` after the first
+`✓ Running`. That checkmark appears after `→ Restarting...` and
+`✓ Running` on a later successful rebuild. The page itself loads
+`/__ahdcode/dev/reload.js` from the same origin, which a
+`Content-Security-Policy` of `script-src 'self'` can allow. A `.env` file
+cannot turn the hook on: the session is fixed when the process starts.
+See [CLI](CLI.md#dev-watch-rebuild-restart) for the refresh rule, including
+the production warning, failed builds, fragments, attachments, compressed
+responses, charsets, and why a static file does not trigger a refresh.
 
 Editing any source file in the `require(...)` graph rebuilds and restarts.
-Editing `public/app.css` does not.
+Editing `public/app.css` does not, and does not refresh the browser.
 
 ### Refusals
 
@@ -1043,9 +1078,17 @@ or mail keys. `.env` stays the six application keys.
 
 ### Basic
 
-The same shell plus `Config/Mail.ahd` and `MAIL_*` keys that those functions
-actually read. `MAIL_SECURITY` defaults to `starttls` (SMTP on port 587).
-Empty `MAIL_HOST` still lets the app start. No database and no authentication.
+A small Turkish-language site on top of the Empty shell, plus
+`Config/Mail.ahd` and `MAIL_*` keys those functions actually read.
+`MAIL_SECURITY` defaults to `starttls` (SMTP on port 587). Empty
+`MAIL_HOST` still lets the app start. No database and no authentication.
+
+Pages load with [`Templates.files("templates")`](TEMPLATES.md). A shared
+`layouts/site.html` wraps `pages/home.html` and `pages/about.html`;
+`components/nav.html` is a partial. Routes are `/`, `/hakkinda`, and
+`/ornek-hata`. `site.notFound` and `site.internalError` serve custom 404
+and 500 pages from the same layout. Handlers pass Turkish strings through
+`Templates.object({...})` into `pages.layout`, then `Web.markup`.
 
 ### Admin
 

@@ -51,13 +51,43 @@ const (
 	ahdWebSocketMaximumReasonBytes     = 123
 )
 
-// Connection timing is internal, like the HTTP server's timeouts, and not a
-// public API. These are variables only so the runtime's tests can shorten them.
+// ahdWebSocketClock is the timing one connection copies when it starts.
+// The copy is immutable for that connection. Production code does not change
+// the current clock; tests replace it through ahdWebSocketReplaceClock, which
+// is synchronized with the copy, so a live pinger never reads a value another
+// goroutine is writing.
+type ahdWebSocketClock struct {
+	pingInterval time.Duration
+	pongTimeout  time.Duration
+	writeTimeout time.Duration
+}
+
 var (
-	ahdWebSocketPingInterval = 30 * time.Second
-	ahdWebSocketPongTimeout  = 30 * time.Second
-	ahdWebSocketWriteTimeout = 10 * time.Second
+	ahdWebSocketClockMu  sync.Mutex
+	ahdWebSocketClockNow = ahdWebSocketClock{
+		pingInterval: 30 * time.Second,
+		pongTimeout:  30 * time.Second,
+		writeTimeout: 10 * time.Second,
+	}
+	// ahdWebSocketLivePingers counts pinger goroutines that have not returned.
+	// Teardown joins each one before onClose, so a finished connection leaves
+	// this at the count it had before that connection.
+	ahdWebSocketLivePingers atomic.Int32
 )
+
+func ahdWebSocketClockSnapshot() ahdWebSocketClock {
+	ahdWebSocketClockMu.Lock()
+	defer ahdWebSocketClockMu.Unlock()
+	return ahdWebSocketClockNow
+}
+
+func ahdWebSocketReplaceClock(next ahdWebSocketClock) ahdWebSocketClock {
+	ahdWebSocketClockMu.Lock()
+	defer ahdWebSocketClockMu.Unlock()
+	previous := ahdWebSocketClockNow
+	ahdWebSocketClockNow = next
+	return previous
+}
 
 // ahdWebSocketEndpointState is one immutable WebSocketEndpoint configuration.
 // Every with* member stores a changed copy under a new handle, the same way a
@@ -316,7 +346,7 @@ func AhdHTTPServerWebSocket(class *AhdClass, handle, path, endpointHandle string
 		AhdRaiseClass(class, "HTTP route path "+ahdHTMLQuote(path)+" may use a trailing /* for one path segment")
 	}
 	server := ahdHTTPLookup(class, handle)
-	server.mutex.Lock()
+	ahdHTTPLockRoutes(class, server)
 	defer server.mutex.Unlock()
 	if server.started {
 		AhdRaiseClass(class, "HTTP routes cannot be changed after start")
@@ -524,5 +554,11 @@ func ahdWebSocketTestCloseAll() {
 		if socket.forceClose != nil {
 			socket.forceClose()
 		}
+	}
+	// forceClose unblocks the connection goroutine, which joins its pinger
+	// before returning. Wait so the next test cannot observe that pinger.
+	deadline := time.Now().Add(2 * time.Second)
+	for ahdWebSocketLivePingers.Load() != 0 && time.Now().Before(deadline) {
+		time.Sleep(5 * time.Millisecond)
 	}
 }

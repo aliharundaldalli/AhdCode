@@ -16,10 +16,10 @@ var (
 	sqliteValueDataField      = ir.FieldID("builtin:SQLite::class::SQLiteValue::field::data")
 )
 
-// sqliteCall lowers the SQLite module's plain functions. Any use marks the
-// program as requiring the bundled ahdsqlite helper at run time.
+// sqliteCall lowers the SQLite module's plain functions. Reachable use, not
+// the mere presence of an unused framework wrapper, marks the program as
+// requiring the bundled ahdsqlite helper.
 func (generator *generator) sqliteCall(value *ir.CallExpr) string {
-	generator.usesSQLite = true
 	meta := value.ExprMeta()
 	name := strings.TrimPrefix(string(value.Callable), sqliteModulePrefix)
 	errorClass := generator.descriptorName(sqliteErrorClass)
@@ -119,7 +119,6 @@ func (generator *generator) sqliteParameterTexts(value *ir.CallExpr, index int) 
 
 // sqliteOperation lowers the built-in members of Database and SQLiteValue.
 func (generator *generator) sqliteOperation(name string, value *ir.CallExpr) string {
-	generator.usesSQLite = true
 	meta := value.ExprMeta()
 	errorClass := generator.descriptorName(sqliteErrorClass)
 	text := func(index int) string {

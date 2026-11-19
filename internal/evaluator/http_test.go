@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"bytes"
 	"io"
-	"net"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -56,14 +55,7 @@ func compileAhd(t *testing.T, source string) *ir.Compilation {
 }
 
 func TestHTTPEvaluatorServesAHandler(t *testing.T) {
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		t.Fatal(err)
-	}
-	port := listener.Addr().(*net.TCPAddr).Port
-	if err := listener.Close(); err != nil {
-		t.Fatal(err)
-	}
+	port := freeEvaluatorPort(t)
 	source := `bring HTTP
 from HTTP bring Server
 from HTTP bring Request
@@ -86,65 +78,38 @@ app.get("/ok", home)
 app.get("/throws", throws)
 app.start()
 `
-	compilation := compileAhd(t, source)
-	session := newLatexTestSession()
-	go func() {
-		defer func() { _ = recover() }()
-		_ = session.Execute(compilation, 0)
-	}()
-	base := "http://127.0.0.1:" + strconv.Itoa(port)
-	deadline := time.Now().Add(2 * time.Second)
-	for time.Now().Before(deadline) {
-		response, err := http.Get(base + "/ok")
-		if err == nil {
-			body, _ := io.ReadAll(response.Body)
-			_ = response.Body.Close()
-			if response.StatusCode != 200 || string(body) != "ok" {
-				t.Fatalf("GET /ok = %d %q", response.StatusCode, body)
-			}
-			response, err = http.Get(base + "/ok?name=" + url.QueryEscape("Ayşe"))
-			if err != nil {
-				t.Fatal(err)
-			}
-			body, _ = io.ReadAll(response.Body)
-			_ = response.Body.Close()
-			if string(body) != "Ayşe" {
-				t.Fatalf("query name = %q", body)
-			}
-			response, err = http.Get(base + "/throws")
-			if err != nil {
-				t.Fatal(err)
-			}
-			body, _ = io.ReadAll(response.Body)
-			_ = response.Body.Close()
-			if response.StatusCode != 500 || !strings.Contains(string(body), "Internal Server Error") {
-				t.Fatalf("GET /throws = %d %q", response.StatusCode, body)
-			}
-			response, err = http.Get(base + "/ok")
-			if err != nil {
-				t.Fatal(err)
-			}
-			body, _ = io.ReadAll(response.Body)
-			_ = response.Body.Close()
-			if response.StatusCode != 200 || string(body) != "ok" {
-				t.Fatalf("server did not survive: %d %q", response.StatusCode, body)
-			}
-			return
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
-	t.Fatal("evaluator HTTP server did not start")
-}
-
-func TestHTTPEvaluatorRejectsMalformedQueryAndFormBeforeHandler(t *testing.T) {
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	base := startEvaluatorHTTP(t, source, port)
+	response, err := http.Get(base + "/ok?name=" + url.QueryEscape("Ayşe"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	port := listener.Addr().(*net.TCPAddr).Port
-	if err := listener.Close(); err != nil {
+	body, _ := io.ReadAll(response.Body)
+	_ = response.Body.Close()
+	if string(body) != "Ayşe" {
+		t.Fatalf("query name = %q", body)
+	}
+	response, err = http.Get(base + "/throws")
+	if err != nil {
 		t.Fatal(err)
 	}
+	body, _ = io.ReadAll(response.Body)
+	_ = response.Body.Close()
+	if response.StatusCode != 500 || !strings.Contains(string(body), "Internal Server Error") {
+		t.Fatalf("GET /throws = %d %q", response.StatusCode, body)
+	}
+	response, err = http.Get(base + "/ok")
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, _ = io.ReadAll(response.Body)
+	_ = response.Body.Close()
+	if response.StatusCode != 200 || string(body) != "ok" {
+		t.Fatalf("server did not survive: %d %q", response.StatusCode, body)
+	}
+}
+
+func TestHTTPEvaluatorRejectsMalformedQueryAndFormBeforeHandler(t *testing.T) {
+	port := freeEvaluatorPort(t)
 	source := `bring HTTP
 from HTTP bring Server
 from HTTP bring Request
@@ -188,31 +153,8 @@ app.get("/hits", status)
 app.get("/ok", ok)
 app.start()
 `
-	compilation := compileAhd(t, source)
-	session := newLatexTestSession()
-	go func() {
-		defer func() { _ = recover() }()
-		_ = session.Execute(compilation, 0)
-	}()
-	base := "http://127.0.0.1:" + strconv.Itoa(port)
-	client := &http.Client{Timeout: 2 * time.Second}
-	started := false
-	deadline := time.Now().Add(2 * time.Second)
-	for time.Now().Before(deadline) {
-		response, err := client.Get(base + "/ok")
-		if err == nil {
-			_, _ = io.Copy(io.Discard, response.Body)
-			_ = response.Body.Close()
-			if response.StatusCode == 200 {
-				started = true
-				break
-			}
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
-	if !started {
-		t.Fatal("evaluator HTTP server did not start")
-	}
+	base := startEvaluatorHTTP(t, source, port)
+	client := &http.Client{Timeout: 2 * time.Second, Transport: &http.Transport{DisableKeepAlives: true}}
 
 	hits := func() string {
 		t.Helper()

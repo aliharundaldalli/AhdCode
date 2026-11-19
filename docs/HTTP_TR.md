@@ -78,6 +78,13 @@ HTTP.sessions(
     secure: Bool := false
     sameSite: String := "Lax"
 ) -> SessionStore
+HTTP.persistentSessions(
+    path: String
+    cookieName: String := "ahd_session"
+    maxAgeSeconds: Int := 86400
+    secure: Bool := false
+    sameSite: String := "Lax"
+) -> SessionStore
 HTTP.client(
     timeoutSeconds: Int := 30
     maxResponseBytes: Int := 8388608
@@ -223,6 +230,19 @@ afişi yazdırmaz. Program durdurulana kadar terminal meşgul kalır.
 `host` boş olamaz. `port` `1..65535` aralığında olmalıdır (port `0` geçersizdir).
 Bağlanma hataları `HTTPError` fırlatır.
 
+Bir istek işleyicisi aynı sunucuda `start()` çağıramaz ve yol kaydedemez.
+Aynı kural bir WebSocket `accept`, `onOpen`, `onMessage` veya `onClose`
+geri çağrısı için de geçerlidir. Çağrı `HTTPError` fırlatır; çalışan sunucu
+değişmez. İşleyici başka bir sunucuda `start()` çağırabilir. Bu çağrı
+yalnızca o isteği, iç sunucu durana kadar bekletir. Bir sunucuyu durdurmak
+diğerini durdurmaz. Başlamış bir sunucuya yol kaydetmek de `HTTPError`
+fırlatır ve o sunucunun sürmekte olan geri çağrısının bitmesini beklemez.
+
+`HTTP.server` ile verilen host, sunucunun kimliğidir. Adlar büyük-küçük
+harften bağımsız eşleşir. Bir IP yalnızca o IP ile eşleşir. `localhost`,
+`127.0.0.1`, `::1`, `0.0.0.0` ve `::` farklı sunuculardır. `127.0.0.1`
+durdurmak, `localhost` veya joker adresle kurulan sunucuyu durdurmaz.
+
 `127.0.0.1` yalnızca bu makinedir. Aynı bilgisayarın tarayıcısında
 `http://127.0.0.1:8080/` açın. `0.0.0.0` bağlamak portu ağdaki diğer
 makinelere açar; bunu gelişigüzel yapmayın.
@@ -241,6 +261,17 @@ değişmez.
 
 Bilinmeyen yollar **404** döner. Başka bir yöntem için var olan bir yol
 **405** ve `Allow` başlığı döner.
+
+`server.notFound(handler)` ve `server.internalError(handler)`, eşleşmeyen
+yolun ve başarısız bir işleyicinin düz metnini değiştirir. İşleyici
+`Function(Request) -> Response` biçimindedir. Yazılan durum, işleyici başka
+bir durum seçse bile 404 veya 500'tür. İşleyicinin `Location` başlığı
+düşürülür; böylece zorlanmış durum bir yönlendirme olamaz. Dosya yanıtı
+kullanılmaz. Bu işleyici de başarısız olursa istemci düz `Not Found` veya
+`Internal Server Error` metnini alır ve diğer hata sayfası çağrılmaz. Sayfa,
+başarısızlığın metnini almaz. `static` veya `managed` tarafından zaten
+yanıtlanmış bir önekteki eksik dosya, mevcut düz 404 olarak kalır. Bkz.
+[Templates](TEMPLATES_TR.md).
 
 ## Statik dosyalar
 
@@ -283,8 +314,17 @@ başlıkları çalışır ve hiçbir şey bir AhdCode `String`'inden geçmez.
 dizin olmalıdır, ve iki kayıtlı önek çakışamaz.
 
 Statik bir dosyayı düzenlemek `ahdcode dev`'in yeniden derlemesini asla
-tetiklemez -- statik sunum her istekte doğrudan diskten okur, bu yüzden
-elle bir tarayıcı yenilemesi her zaman yeterlidir.
+tetiklemez -- statik sunum her istekte doğrudan diskten okur. Tarayıcı
+yenilemesi başarılı bir kaynak yeniden derlemesini izler, bu yüzden statik
+dosya düzenlemesi hâlâ elle yenileme ister. `HTTP.file`, `HTTP.download`
+ve `server.static` yanıtları yeniden yazılmaz. Yönlendirme, 1xx durumu,
+sıkıştırılmış gövde, ek veya
+[CLI](CLI_TR.md#dev-izle-yeniden-derle-yeniden-başlat) listesinin dışındaki
+bir karakter kümesi olduğu gibi bırakılır. `</body>` içermeyen bir HTML
+parçası betiği gövdenin sonuna alır. Yenileme yolunu yalnızca anan bir
+sayfa yine uygundur. Eklenen etiket aynı kökenden harici bir betiktir;
+`script-src 'self'` onu çalıştırabilir. `HEAD`, gövde uzunluğu biliniyorsa
+`Content-Length` taşır.
 
 ## Yönetilen dosyalar
 
@@ -517,15 +557,63 @@ silinmez veya kodlanmaz. Oturum kimlikleri bu sözleşmeyi sağlar.
 
 ## Oturumlar
 
-`HTTP.sessions` bağımsız, bellek içi bir `SessionStore` oluşturur. İki store
-durum paylaşmaz. Oturum çerezi yalnızca opak rastgele bir kimlik taşır
-(`crypto/rand`, en az 256 bit, padding'siz base64url). Değerler yalnızca
-String'dir ve sunucudadır. Süreç bitince kaybolur; bu tasarım gereğidir, hata
-değildir. Kimlik doğrulama çerçevesi yoktur.
+`HTTP.sessions` bağımsız, **bellek içi** bir `SessionStore` oluşturur.
+Değerler süreç bitince kaybolur; bu v0.5.0 sözleşmesidir, hata değildir.
+
+`HTTP.persistentSessions(path, ...)` aynı `open` / `commit` / `rotate` /
+`destroy` işlemlerini `path` SQLite dosyasında saklar. Başarıyla commit
+edilmiş değerler ve iptaller süreç kapansa da kalır; aynı dosyayı ve aynı
+çerez adını açan sonraki süreç onları görür. `HTTP.sessions` veritabanı
+oluşturmaz ve yeniden başlatmada veri tutmaz.
+
+```ahd
+sessions: SessionStore := HTTP.persistentSessions("data/sessions.db", "ahd_session", 86400, false, "Lax")
+```
+
+`path` bir dosya yoludur; URI ya da `":memory:"` değildir. Üst dizin önceden
+var olmalıdır. Yol boşluk, Windows sürücü harfi ve Unicode içerebilir. Göreli
+yol store oluşturulurken bir kez çözülür. Yerel program süreç çalışma dizinini
+kullanır. Değerlendirici, `SQLite.open` ve `File` gibi oturum dizinini kullanır.
+Mutlak yol, Windows sürücü harfi dahil, olduğu gibi kullanılır. Farklı çerez
+adları aynı dosyayı paylaşabilir; satırları ayrıdır. Aynı çerez adı ve aynı
+dosya, yeniden başlayan sürecin eski oturumları bulduğu addır.
+
+Şema sürümü `1`'dir. Sürüm `1` değilse `HTTPError` fırlatılır ve dosyaya
+otomatik göç uygulanmaz. Günlük kipi WAL'dir. `open`, `commit`, `rotate` ve
+`destroy` her biri `BEGIN IMMEDIATE` alır. Bu bir yazma kilididir: WAL,
+`open`'ın süren bir yazıcının önünden okumasını sağlamaz. Kilit 5 saniyeden
+uzun sürerse çağrı `HTTPError` fırlatır. Depolama hatası boş ya da kimliği
+doğrulanmış bir oturuma çevrilmez. Bir dosya süreç içinde tek bağlantı kullanır.
+Bağlantı, bir HTTP sunucusu gerçekten çalışırken, istek içindeki bir işleyicisi
+henüz dönmemişken ya da değerlendirici programı yürütürken açık kalır.
+Oluşturulup hiç başlatılmamış bir sunucu nesnesi dosyayı açık tutmaz. Son
+çalışan sunucu durduğunda, işleyicileri döndüğünde ve süren bir değerlendirici
+yürütmesi kalmadığında bağlantı kapanır; dosya yerinde kalır. Zarif kapanma
+süresi dolduktan sonra hâlâ çalışan bir işleyici, dönene kadar dosyayı açık
+tutar. Sonraki oturum işlemi aynı dosyayı yeniden açar. Kapatmak commit edilmiş
+satırları silmez.
+
+Bu bir kimlik doğrulama çerçevesi değildir. SameSite, uygulama düzeyinde CSRF
+kontrolünün yerine geçmez.
+
+Çerez yalnızca opak rastgele bir kimlik taşır (`crypto/rand`, 256 bit,
+padding'siz base64url). Veritabanı çerezin kendisini değil, SHA-256 özetini
+saklar. Değerler yalnızca String'dir. Anahtar en çok 128 bayt, bir değer en
+çok 65536 bayt, kayıtlı harita en çok 262144 bayt JSON olabilir. Kimlikler
+olağan tanı iletilerine yazılmaz.
 
 Varsayılan oturum çerezi: Path `/`, HttpOnly her zaman `true`, Max-Age =
-`maxAgeSeconds`. HttpOnly kapatılamaz. Süresi dolmuş oturumlar kabul edilmez.
-Temizlik `open`/`commit` sırasında tembeldir.
+`maxAgeSeconds`. HttpOnly kapatılamaz. Düz HTTP geliştirme `secure: false`
+ister; tarayıcı `http://` üzerinde Secure çerezi geri göndermez. HTTPS
+dağıtımı `secure: true` geçirir.
+
+Süre sunucuda ölçülür ve yalnızca başarılı `commit` ile yenilenir; `open`
+süreyi uzatmaz. Süresi dolmuş ya da iptal edilmiş kimlik, yeniden başlatmadan
+sonra da kabul edilmez. Böyle bir kimliği `commit` etmek satırı yeniden
+oluşturmaz, `HTTPError` fırlatır. `commit` haritanın tamamını değiştirir;
+anahtarları başka bir istekle birleştirmez. Aynı `Server` üzerindeki
+işleyiciler seri çalışır. İki süreç araya girebilir; geçerli kimliğin sonraki
+başarılı `commit`'i haritanın tümünü yazar. Bozuk JSON, oturum açılmış sayılmaz.
 
 İşleyici içinde modül düzeyindeki store `Global` ile bildirilir:
 
@@ -539,10 +627,27 @@ kimliği sunucu kimliği olarak kullanılmaz. `set`/`remove`/`clear`/`rotate`
 olmadan `open` kalıcı durum veya `Set-Cookie` üretmez. `Session.set` başlık
 yazmaz; `commit` yeni bir `Response` döndürür.
 
-`rotate()` eski kimliği geçersiz kılar, değerleri korur, yeni çerez gönderir.
-`destroy()` sunucu durumunu siler; `commit` silme çerezi gönderir. Destroy
-sonrası `get` `null`, `has` `false`; mutasyon `HTTPError` fırlatır.
-`remove` bir anahtarı, `clear` değerleri, `destroy` oturumu siler.
+`set`, `remove` ve `clear` yalnızca isteğin kopyasını değiştirir. `commit`
+olmadan süreç kapanırsa bu değişiklikler kaybolur; önceki commit durur.
+`commit` haritanın tamamını yazar. Anahtar birleştirme ve karşılaştır-değiştir
+yoktur. Süresi dolmuş, iptal edilmiş veya döndürülmüş bir kimliğin `commit`'i
+`HTTPError` fırlatır ve satır yazmaz.
+
+Kayıtlı bir oturumda `rotate()`, aynı transaction içinde satırın hâlâ var
+olduğunu, süresinin dolmadığını ve iptal edilmediğini doğrular. Ancak ondan
+sonra eski kimliği iptal eder ve yeni kimlik döndürür. Bellek içi store aynı
+kuralı kullanır. Eksik, süresi dolmuş, iptal edilmiş veya daha önce döndürülmüş
+bir kimlik `HTTPError` fırlatır ve yeni kimliği doğrulanmış oturum olmaz.
+İptal commit edildikten sonra, yeni kimlik `commit` edilmeden süreç durursa
+eski kimlik geçersiz kalır ve yeni kimlik hiç yazılmaz. İstemci yeniden
+oturum açmalıdır. Bu kasıtlı kapalı-başarısız sonuçtur.
+
+`destroy()` kayıtlı kimliği hemen iptal eder. `commit` silme çerezini aynı ad,
+`Path=/`, HttpOnly, Secure ve SameSite ile, `Max-Age=0` olarak gönderir.
+Oturum çerezinin Domain alanı yoktur; silme çerezinin de yoktur. `__Host-` ve
+`__Secure-` adları `secure: true` ister. Eski kimlik, geç kalmış `rotate` veya
+`commit` ile de kullanılamaz. Destroy sonrası `get` `null`, `has` `false`;
+mutasyon `HTTPError` fırlatır.
 
 ## Giden istemci
 

@@ -16,9 +16,16 @@ from SQLite bring SQLiteError
 
 `SQLite` is a safe, typed bridge to a real local SQLite database. You write
 ordinary SQL; AhdCode performs parameter binding and typed value conversion,
-and nothing else. There is no ORM, no query builder, no schema inference, no
-migration framework, and no `Any`: every value that crosses from SQL into
-AhdCode is a `SQLiteValue` whose kind you read explicitly.
+and nothing else. There is no ORM, no query builder, no schema inference,
+and no `Any`: every value that crosses from SQL into AhdCode is a
+`SQLiteValue` whose kind you read explicitly. Versioned SQL files are applied
+by [`ahdcode migrate`](CLI.md#ahdcode-migrate), not by a method on `SQLite`.
+That command is SQLite-only. Inside a migration file it rejects transaction
+control, `ATTACH`, writes to the migration history table (including a trigger
+body that would write it), and connection pragmas that would change locking
+or integrity for a later migration. The trigger check reads one bytecode
+detail of this SQLite build; a string that merely looks like a trigger name
+is not treated as proof that the body was compiled.
 
 ## Public surface
 
@@ -433,7 +440,7 @@ the `sqlite3` CLI), and AhdCode reads files those tools produce. See
 
 This release is intentionally a SQL bridge and nothing more: no ORM or
 active-record layer, no model classes or row-to-Class mapping, no query or
-schema builder, no migrations, no relationships, no connection pool API, no
+schema builder, no relationships, no connection pool API, no
 async SQL or background threads, no encryption layer, no SQL rewriting
 (AhdCode never injects `LIMIT`, `ORDER BY`, or quoting), no `BLOB` support
 until AhdCode has a binary-data type, no named-parameter API, no savepoints,

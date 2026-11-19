@@ -118,7 +118,7 @@ Hello!
 AhdCode checks the code you wrote before running the program. For example, if you try to use text like a number, or if you use a value that could be `null` without checking it, it will tell you the error before the program even starts, whenever possible. But you don't need to think about these details at the beginning; we'll see examples in later sections.
 
 AhdCode v1.0.0 was the first stable release. The current installable release
-is v2.7.0. v2.8.0 and v2.9.0 are source releases; new installers return at v3.0.
+is v2.7.0. v2.8.0 through v2.10.0 are source releases. New installers return at v3.0.
 This guide teaches the stable foundation and gives a first exercise for the
 newer modules; each module's reference page documents its complete API.
 
@@ -2865,7 +2865,7 @@ See [Lists](LISTS.md) and [KeyValue](KEYVALUE.md) for every signature.
 
 ## 35. SQLite: a database that remembers
 
-Until now, the values in a program disappeared when the program ended. A **database** is a file that keeps rows of data after the program closes. **SQLite** is a small database engine that lives in a single file on your computer (or in memory while you practice). You write ordinary SQL; AhdCode is a safe typed bridge: it binds parameters and converts values. It is not an ORM, not a query builder, and not a migration tool.
+Until now, the values in a program disappeared when the program ended. A **database** is a file that keeps rows of data after the program closes. **SQLite** is a small database engine that lives in a single file on your computer (or in memory while you practice). You write ordinary SQL; AhdCode is a safe typed bridge: it binds parameters and converts values. It is not an ORM and not a query builder. Versioned SQL files are applied with `ahdcode migrate`, outside the program.
 
 ### Tables, rows, and columns
 
@@ -4753,8 +4753,9 @@ available without a session. `Form.integer` separates missing null from invalid
 (`ahdcode init web empty`, `basic`, `admin`):
 
 - **Empty** -- a welcome page. No database, no login.
-- **Basic** -- the same shell plus common application and mail configuration
-  in `.env`.
+- **Basic** -- a small Turkish site with file templates, a shared layout,
+  custom 404/500 pages, and common application and mail configuration in
+  `.env`. See [Templates](TEMPLATES.md).
 - **Admin** -- Home, Login, and a Dashboard, with one administrator account in
   either SQLite or MySQL.
 

@@ -119,7 +119,8 @@ Merhaba!
 AhdCode, programı çalıştırmadan önce yazdığınız kodu kontrol eder. Örneğin bir metni sayı gibi kullanmaya çalışırsanız veya `null` olabilecek bir değeri kontrol etmeden kullanırsanız, mümkün olduğunda hatayı daha program başlamadan söyler. Ama başlangıçta bunun ayrıntılarını düşünmeniz gerekmiyor; ilerleyen bölümlerde örneklerle göreceğiz.
 
 AhdCode v1.0.0 ilk kararlı sürümdü. Güncel kurulabilir sürüm v2.7.0'dır.
-v2.8.0 ve v2.9.0 kaynak sürümleridir; yeni kurulum paketleri v3.0'da döner. Bu rehber
+v2.8.0 ile v2.10.0 arasındaki sürümler yalnızca kaynak olarak yayımlanır.
+Yeni kurulum paketleri v3.0'da döner. Bu rehber
 kararlı temeli öğretir ve yeni modüller için ilk alıştırmayı verir; her
 modülün başvuru sayfası API'sinin tamamını belgeler.
 
@@ -2891,7 +2892,7 @@ Her imza için [Lists](LISTS_TR.md) ve [KeyValue](KEYVALUE_TR.md) referansların
 
 ## 35. SQLite: hatırlayan bir veritabanı
 
-Şimdiye kadar programdaki değerler, program bitince kayboluyordu. Bir **veritabanı**, program kapandıktan sonra da satırları duran bir dosyadır. **SQLite**, bilgisayarınızda tek bir dosyada (veya denemek için bellekte) yaşayan küçük bir veritabanı motorudur. Siz sıradan SQL yazarsınız; AhdCode güvenli ve tipli bir köprüdür: parametreleri bağlar ve değerleri dönüştürür. ORM değildir, sorgu oluşturucu değildir, migration aracı değildir.
+Şimdiye kadar programdaki değerler, program bitince kayboluyordu. Bir **veritabanı**, program kapandıktan sonra da satırları duran bir dosyadır. **SQLite**, bilgisayarınızda tek bir dosyada (veya denemek için bellekte) yaşayan küçük bir veritabanı motorudur. Siz sıradan SQL yazarsınız; AhdCode güvenli ve tipli bir köprüdür: parametreleri bağlar ve değerleri dönüştürür. ORM değildir ve sorgu oluşturucu değildir. Sürümlü SQL dosyaları programın dışında `ahdcode migrate` ile uygulanır.
 
 ### Tablolar, satırlar ve sütunlar
 
@@ -4796,8 +4797,9 @@ API'yi öğretir; v0.15 API'leri kaynak uyumluluğunu korur.
 adlandırabilirsiniz (`ahdcode init web empty`, `basic`, `admin`):
 
 - **Empty** — bir karşılama sayfası. Veritabanı yok, giriş yok.
-- **Basic** — aynı kabuk artı `.env` içinde ortak uygulama ve posta
-  yapılandırması.
+- **Basic** — dosya şablonları, ortak yerleşim, özel 404/500 sayfaları ve
+  `.env` içinde ortak uygulama ve posta yapılandırması olan küçük bir
+  Türkçe site. [Templates](TEMPLATES_TR.md) sayfasına bakın.
 - **Admin** — Home, Login ve bir Dashboard; SQLite ya da MySQL üzerinde tek bir
   yönetici hesabıyla.
 

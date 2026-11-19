@@ -1,0 +1,26 @@
+// A page whose text changes when this file is saved under ahdcode dev.
+//
+//     ahdcode dev app.ahd
+//
+// Open the printed address and leave that browser tab alone. Save a change
+// to the heading. After the rebuild succeeds, the tab loads the new page
+// by itself. A syntax error keeps the last page up and prints the
+// diagnostic in the terminal; fixing the file reloads the tab.
+//
+// ahdcode run serves the same page and does not inject the refresh script.
+bring HTTP
+bring Env
+from HTTP bring (Server, Request, Response)
+
+home: Function := (request: Request) -> Response {
+    page: Local String := "<!doctype html><html><head><meta charset=\"utf-8\"><title>Dev reload</title></head><body><h1>Reload marker alpha</h1><p>Save app.ahd while ahdcode dev is running.</p></body></html>"
+    return HTTP.html(page, 200)
+}
+
+server: Server := HTTP.server(
+    "127.0.0.1"
+    int(Env.getOr("SERVER_PORT", "8765"))
+)
+server.get("/", home)
+write("Open: http://127.0.0.1:" + Env.getOr("SERVER_PORT", "8765") + "/")
+server.start()

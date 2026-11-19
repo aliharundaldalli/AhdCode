@@ -74,11 +74,14 @@ skip the first question. Admin, MVC, and CRUD continue with SQLite or
 MySQL and the administrator account.
 
 Empty and Basic do not ask for a database and do not generate login or
-`database/`. Admin, MVC, and CRUD initialize the schema and administrator
-immediately: after `ahdcode dev app.ahd` the app is ready. Logout is POST
-`/logout`. Admin redirects to `/`; MVC and CRUD rotate to an anonymous
-session and redirect to `/login` with a signed-out notice. Every starter also
-writes `AHDCODE.md` and an English `Documents/AhdCode/` snapshot. Those files are not runtime.
+`database/`. Basic also writes a Turkish `templates/` tree (layout, nav,
+home, about, 404, and 500) and routes `/`, `/hakkinda`, and `/ornek-hata`
+through [`Templates`](TEMPLATES.md). Admin, MVC, and CRUD initialize the
+schema and administrator immediately: after `ahdcode dev app.ahd` the app
+is ready. Logout is POST `/logout`. Admin redirects to `/`; MVC and CRUD
+rotate to an anonymous session and redirect to `/login` with a signed-out
+notice. Every starter also writes `AHDCODE.md` and an English
+`Documents/AhdCode/` snapshot. Those files are not runtime.
 
 `.env` is gitignored. Admin SQLite ignores `database/*.db` and keeps
 `database/schema.sql` trackable. `.env.example` never contains entered
