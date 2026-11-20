@@ -21,11 +21,11 @@ jobs:
           cache-dependency-path: go.sum
 
       - name: Run tests
-        # internal/build compiles many native programs and has measured between
-        # 415s and 565s on these runners, which leaves no margin under Go's
-        # default 10m per-package timeout. The race step below already carries an
-        # explicit timeout for the same reason.
-        run: go test -count=1 -timeout 25m ./...
+        # internal/build runs in its own dedicated job below because it
+        # compiles hundreds of native executables and exceeds 25m when
+        # sharing a runner with the rest of the workspace.
+        run: |
+          go list ./... | grep -v '^ahdcode/internal/build$' | xargs go test -count=1 -timeout 25m
 
       - name: Run vet
         run: go vet ./...
@@ -41,6 +41,23 @@ jobs:
 
       - name: Check git diff
         run: git diff --check
+
+  native-build:
+    name: Native build suite
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+
+      - name: Run internal/build tests
+        run: go test -count=1 -timeout 45m ./internal/build
 
   nested:
     name: Nested helper modules

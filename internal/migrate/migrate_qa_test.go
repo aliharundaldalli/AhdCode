@@ -444,6 +444,9 @@ func TestMigrateCreateRecoversAfterTheProcessIsKilled(t *testing.T) {
 }
 
 func TestMigrateRejectsJunctions(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("unprivileged junctions are created with mklink /J")
+	}
 	root := t.TempDir()
 	real := filepath.Join(root, "real")
 	if err := os.MkdirAll(real, 0o755); err != nil {
