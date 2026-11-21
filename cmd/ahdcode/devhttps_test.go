@@ -190,3 +190,103 @@ func TestDevHTTPSInvalidCredentials(t *testing.T) {
 		t.Fatalf("invalid key accepted or leaked in error: %v", err)
 	}
 }
+
+func TestDevHTTPSOutsideProjectCanonicalAndSymlinkRejection(t *testing.T) {
+	home := newDevHTTPSTestHome(t)
+	rawBase := t.TempDir()
+	canonBase, err := filepath.EvalSymlinks(rawBase)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rawProj := filepath.Join(rawBase, "proj")
+	canonProj := filepath.Join(canonBase, "proj")
+	if err := os.MkdirAll(filepath.Join(rawProj, "public"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	rawEntry := filepath.Join(rawProj, "app.ahd")
+	canonEntry := filepath.Join(canonProj, "app.ahd")
+	files, _, err := prepareDevHTTPS(rawEntry, devHTTPSFiles{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	other := filepath.Join(home, "outside")
+	if err := mkdirPrivateDevHTTPS(other); err != nil {
+		t.Fatal(err)
+	}
+	if err := writeDevHTTPSCertificate(other, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+
+	rawKeyInProject := filepath.Join(rawProj, "public", "server-key.pem")
+	canonKeyInProject := filepath.Join(canonProj, "public", "server-key.pem")
+	for _, tc := range []struct {
+		name, entry, key string
+	}{
+		{"noncanonical entry and key", rawEntry, rawKeyInProject},
+		{"noncanonical entry canonical key", rawEntry, canonKeyInProject},
+		{"canonical entry noncanonical key", canonEntry, rawKeyInProject},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if _, _, err := prepareDevHTTPS(tc.entry, devHTTPSFiles{files.cert, tc.key}); err == nil || !strings.Contains(err.Error(), "outside") {
+				t.Fatalf("project key not refused with outside error: %v", err)
+			}
+		})
+	}
+
+	t.Run("traversal into project", func(t *testing.T) {
+		relToProj, err := filepath.Rel(other, canonProj)
+		if err != nil {
+			t.Fatal(err)
+		}
+		traversing := other + string(os.PathSeparator) + relToProj + string(os.PathSeparator) + "public" + string(os.PathSeparator) + "server-key.pem"
+		if _, _, err := prepareDevHTTPS(canonEntry, devHTTPSFiles{files.cert, traversing}); err == nil || !strings.Contains(err.Error(), "outside") {
+			t.Fatalf("traversal key not refused with outside error: %v", err)
+		}
+	})
+
+	t.Run("symlink directory into project", func(t *testing.T) {
+		linkIntoProject := filepath.Join(home, "link-into-project")
+		if err := os.Symlink(canonProj, linkIntoProject); err != nil {
+			t.Skipf("directory symlinks unavailable: %v", err)
+		}
+		keyViaLink := filepath.Join(linkIntoProject, "public", "server-key.pem")
+		if _, _, err := prepareDevHTTPS(rawEntry, devHTTPSFiles{files.cert, keyViaLink}); err == nil || !strings.Contains(err.Error(), "outside") {
+			t.Fatalf("symlink into project not refused with outside error: %v", err)
+		}
+	})
+
+	t.Run("symlink directory to valid outside store", func(t *testing.T) {
+		linkOutside := filepath.Join(home, "link-outside")
+		if err := os.Symlink(other, linkOutside); err != nil {
+			t.Skipf("directory symlinks unavailable: %v", err)
+		}
+		keyViaLink := filepath.Join(linkOutside, "localhost-key.pem")
+		if _, _, err := prepareDevHTTPS(rawEntry, devHTTPSFiles{files.cert, keyViaLink}); err == nil || !strings.Contains(err.Error(), "symbolic links or junctions") {
+			t.Fatalf("outside symlinked key not refused: %v", err)
+		}
+	})
+
+	if rawBase != canonBase {
+		t.Run("noncanonical outside path still refused on macOS", func(t *testing.T) {
+			rawStore := filepath.Join(rawBase, "privstore")
+			if err := mkdirPrivateDevHTTPS(rawStore); err != nil {
+				t.Fatal(err)
+			}
+			if err := writeDevHTTPSCertificate(rawStore, time.Now()); err != nil {
+				t.Fatal(err)
+			}
+			rawCert := filepath.Join(rawStore, "localhost.pem")
+			rawKey := filepath.Join(rawStore, "localhost-key.pem")
+			if _, _, err := prepareDevHTTPS(rawEntry, devHTTPSFiles{rawCert, rawKey}); err == nil || !strings.Contains(err.Error(), "symbolic links or junctions") {
+				t.Fatalf("noncanonical symlinked path accepted: %v", err)
+			}
+			canonStore := filepath.Join(canonBase, "privstore")
+			canonCert := filepath.Join(canonStore, "localhost.pem")
+			canonKey := filepath.Join(canonStore, "localhost-key.pem")
+			if _, _, err := prepareDevHTTPS(rawEntry, devHTTPSFiles{canonCert, canonKey}); err != nil {
+				t.Fatalf("canonical outside pair rejected: %v", err)
+			}
+		})
+	}
+}

@@ -149,17 +149,75 @@ func devHTTPSOutsideProject(entry, key string) error {
 	if err != nil {
 		return fmt.Errorf("cannot resolve the local HTTPS working directory")
 	}
+	cleanKey, err := filepath.Abs(key)
+	if err != nil {
+		return fmt.Errorf("cannot resolve the local HTTPS private-key path")
+	}
+	keyCandidates := []string{cleanKey}
+	canonicalKey, canonicalErr := devHTTPSCanonicalPath(cleanKey)
+	if canonicalErr == nil && canonicalKey != cleanKey {
+		keyCandidates = append(keyCandidates, canonicalKey)
+	}
 	for _, directory := range []string{filepath.Dir(entry), cwd} {
-		project, err := filepath.EvalSymlinks(directory)
+		absDir, err := filepath.Abs(directory)
 		if err != nil {
 			return fmt.Errorf("cannot resolve the local HTTPS project directory")
 		}
-		relative, err := filepath.Rel(project, key)
-		if err == nil && filepath.IsLocal(relative) {
-			return fmt.Errorf("keep the local HTTPS private key outside the project and working directories")
+		project, err := filepath.EvalSymlinks(absDir)
+		if err != nil {
+			return fmt.Errorf("cannot resolve the local HTTPS project directory")
+		}
+		dirCandidates := []string{absDir}
+		if project != absDir {
+			dirCandidates = append(dirCandidates, project)
+		}
+		for _, dir := range dirCandidates {
+			for _, candidate := range keyCandidates {
+				if devHTTPSPathWithin(dir, candidate) {
+					return fmt.Errorf("keep the local HTTPS private key outside the project and working directories")
+				}
+			}
 		}
 	}
+	if canonicalErr != nil {
+		return fmt.Errorf("cannot resolve the local HTTPS private-key path")
+	}
 	return nil
+}
+
+// devHTTPSCanonicalPath resolves symlinks in the deepest existing ancestor
+// of path and reattaches missing trailing segments. It is used ONLY to reject
+// private-key paths inside the project or working directory and must NEVER
+// replace the path passed to devHTTPSPathWithoutLinks.
+func devHTTPSCanonicalPath(path string) (string, error) {
+	cleaned, err := filepath.Abs(path)
+	if err != nil {
+		return "", err
+	}
+	var tail []string
+	for current := cleaned; ; {
+		resolved, err := filepath.EvalSymlinks(current)
+		if err == nil {
+			parts := make([]string, 0, 1+len(tail))
+			parts = append(parts, resolved)
+			parts = append(parts, tail...)
+			return filepath.Join(parts...), nil
+		}
+		if !os.IsNotExist(err) {
+			return "", err
+		}
+		parent := filepath.Dir(current)
+		if parent == current {
+			return cleaned, nil
+		}
+		tail = append([]string{filepath.Base(current)}, tail...)
+		current = parent
+	}
+}
+
+func devHTTPSPathWithin(dir, candidate string) bool {
+	relative, err := filepath.Rel(dir, candidate)
+	return err == nil && (relative == "." || filepath.IsLocal(relative))
 }
 
 func ensureDevHTTPSStore(home, dir string) error {
