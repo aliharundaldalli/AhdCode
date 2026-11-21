@@ -1,37 +1,65 @@
 # Kurulum, yükseltme ve kaldırma
 
-İşletim sisteminize uygun AhdCode v2.7.0 paketini indirin. v2.7.0 en güncel
-kurulabilir sürümdür. v2.8.0 ile v2.11.0 arası kaynak sürümleridir; git
-etiketleri bu paketlerin yerine geçmez. Yeni kurulum paketleri v3.0'da döner. Her paket
-kendi kendine yeterlidir: derleyici, özel Go araç zinciri, AhdDataStudio,
+Yayımlanan en güncel imzalı kararlı kurulum paketi için AhdCode v2.7.0'ı
+indirin. `v2.7.0`, yayımlanmış son imzalı kararlı kurucu sürümüdür; `v2.8.0` ile
+`v2.10.0` arası kaynak sürümleridir. `v2.11.0` sürüm adayından itibaren macOS
+araç zinciri paketleri (`.pkg`, `.dmg` ve `.tar.gz`) dağıtım betikleriyle
+doğrudan üretilebilir; Windows ve Linux paketleri ise tam masaüstü dağıtımının
+döndüğü `v3.0`'a kadar kaynak sürüm olarak kalır. Her tam v2.7.0 paketi kendi
+kendine yeterlidir: derleyici, özel Go araç zinciri, AhdDataStudio,
 SQLite/numeric/plot yardımcıları, çevrimdışı LaTeX motoru, proje starter'ları
 ve İngilizce belgeler paketin içindedir.
 
-## macOS (Apple Silicon)
+## macOS (Apple Silicon ve x64 paketleme)
 
-macOS paketi Apple Silicon Mac'leri hedefler — M1, M2, M3, M4 ve sonraki
-arm64 modeller. Intel sürümü yoktur.
+Yayımlanan v2.7.0 imzalı kurucuları Apple Silicon Mac'leri (`arm64` — M1, M2,
+M3, M4 ve sonraki modeller) hedefler. `v2.11.0` sürüm adayı paketlemesiyle
+birlikte `tooling/distribution/build.py --platform darwin`, macOS `arm64` (ve
+isteğe bağlı çapraz derlenen `x86_64`) `.pkg`, `.dmg` ve `.tar.gz` çıktıları
+üretir:
 
-`AhdCode-2.7.0-macos-arm64.pkg` dosyasına çift tıklayıp kurulumu izleyin. Paket
-yayımlanan önerilen kurulum biçimidir. Developer ID ile imzalanmış ve Apple
-tarafından noterlenmiştir; noter bileti pakete zımbalanmıştır, bu yüzden
-Gatekeeper uyarı göstermeden kabul eder. Yalnızca sizin hesabınıza kurar,
-yönetici şifresi istemez ve ev dizininizin dışına hiçbir şey yazmaz. İndirilen
-dosyayı yayımlanan SHA-256 değeriyle doğrulayın; sistem korumalarını asla
-kapatmayın veya atlatmayın.
+- `.pkg`: Önerilen yerel kurucu (`AhdCode-<sürüm>-macos-<mimari>.pkg`; Apple
+  Developer ID imzası ve noter onayı olmadan üretildiyse `-unsigned`). Finder'da
+  çift tıklayın veya `installer -pkg <dosya>.pkg -target CurrentUserHomeDirectory`
+  komutunu kullanın.
+- `.dmg`: `.pkg` kurucusunu `INSTALL.txt` ve `VERSION` dosyalarıyla birlikte
+  taşıyan disk kalıbıdır.
+- `.tar.gz`: `install.sh`, `INSTALL.txt`, `VERSION` ve `payload/` içeren
+  taşınabilir araç zinciri arşividir. Açıp `sh install.sh --setup-path`
+  çalıştırın.
 
-Dosyalar `~/Library/AhdCode/versions/2.7.0` altına kurulur. `current` etkin
-sürümü seçer, sabit komut `~/Library/AhdCode/bin/ahdcode`'dur. PATH'e yalnızca
-bu tek dizin eklenir.
+Developer ID ile imzalanıp Apple tarafından noterlenmiş ve noter bileti
+zımbalanmış paketleri Gatekeeper uyarı göstermeden kabul eder. Noter kimliği
+olmadan üretilen geliştirme / sürüm adayı paketleri adlarında ve `INSTALL.txt`
+içinde `-unsigned` etiketi taşır; kurulumdan önce `SHA256SUMS.txt` dosyasını
+`shasum -a 256 -c SHA256SUMS.txt` ile doğrulayın ve Gatekeeper korumalarını
+asla kapatmayın veya atlatmayın.
 
-Ardından **yeni** bir Terminal açıp `ahdcode --version` çalıştırın. Zaten açık
-olan bir terminal başlatıldığı ortamı korur; yeni açılan değişikliği hemen
-görür.
+Dosyalar `~/Library/AhdCode/versions/<sürüm>` altına kurulur ve `2.9.0` dahil
+önceki kurulu sürümler korunur. `current` sembolik bağı etkin sürümü seçer ve
+sabit komut `~/Library/AhdCode/bin/ahdcode`, `~/.zprofile`, `~/.zshrc` ile
+`~/.bash_profile` dosyalarına bir kez (idempotent biçimde) eklenir. Yönetici
+şifresi istenmez, sistem dizinlerine yazılmaz ve mevcut projeler, veritabanları
+ile `~/Library/Application Support/ahdcode` verileri korunur.
 
-`AhdCode-2.7.0-macos-arm64.dmg`, disk imajı tercih edenler için aynı içeriğe
-sahip, imzalı ve noterlenmiş bir disk imajıdır: açın ve `Install.command`'ı
-çalıştırın (`install.sh --setup-path` çalıştırır). Önerilen kurulum biçimi
-`.pkg`'dir.
+Ardından **yeni** bir Terminal açıp `ahdcode version` çalıştırın. Önceki bir
+sürüme (örneğin `2.9.0`) geri dönmek için:
+
+```sh
+ln -sfn versions/2.9.0 ~/Library/AhdCode/.current-new && mv -fh ~/Library/AhdCode/.current-new ~/Library/AhdCode/current
+```
+
+Kaynaktan macOS dağıtım paketleri üretmek için:
+
+```sh
+python3 tooling/distribution/build.py --platform darwin --macos-arch both --without-bundled-runtimes --without-vsix --output dist/macos
+```
+
+Apple Developer ID sertifikaları ve `notarytool` profili mevcutsa `--sign-app`,
+`--sign-installer` ve `--notary-profile` seçeneklerini ekleyin.
+
+Önerilen kurulum biçimi `.pkg`'dir. (Eski `v2.7.0` `.dmg` imajı doğrudan
+`Install.command` da taşıyordu.)
 
 ## Windows x64
 

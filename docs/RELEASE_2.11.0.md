@@ -13,8 +13,36 @@ go build -o ahdsqlite ./cmd/ahdsqlite
 
 On Windows, use `ahdcode.exe` and `ahdsqlite.exe`. The version command
 reports `AhdCode v2.11.0`. Keep the matching SQLite helper beside the CLI
-for applications that need it. Existing signed installers remain v2.7.0.
-The Web application package built by the toolchain is a separate artifact.
+for applications that need it. Existing published signed installers remain
+v2.7.0 until a final signed release is published. The Web application
+package built by the toolchain is a separate artifact.
+
+## macOS distribution packaging (.pkg, .dmg, .tar.gz)
+
+`tooling/distribution/build.py --platform darwin` produces macOS ARM64 (and
+optional cross-compiled `x86_64`) toolchain packages without altering
+Windows or Linux release behavior:
+
+- `AhdCode-<version>-macos-<arch>[-unsigned].tar.gz`: portable toolchain +
+  `install.sh`, installing into `~/Library/AhdCode/versions/<version>`.
+- `AhdCode-<version>-macos-<arch>[-unsigned].pkg`: native home-directory
+  `.pkg` installer (`auth="none"`, no admin password), preserving previously
+  installed versions such as `2.9.0`, updating `current` and
+  `~/Library/AhdCode/bin/ahdcode`, idempotently updating shell PATH profiles,
+  and bundling `install.sh` for `--uninstall`.
+- `AhdCode-<version>-macos-<arch>[-unsigned].dmg`: UDZO disk image containing
+  the `.pkg`, `INSTALL.txt`, and `VERSION`.
+- `SHA256SUMS.txt`: SHA-256 digests for every generated artifact.
+
+When `--sign-app`, `--sign-installer`, and `--notary-profile` are supplied,
+artifacts use Apple's standard `codesign`, `productbuild --sign`,
+`xcrun notarytool`, and `xcrun stapler` workflow. Without notarization
+credentials, builds are clearly labeled `-unsigned` and never bypass
+Gatekeeper. Uninstall with:
+
+```sh
+sh "$HOME/Library/AhdCode/current/install.sh" --uninstall
+```
 
 ## Changes since v2.10.0
 

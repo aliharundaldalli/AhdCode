@@ -8,15 +8,28 @@ set -eu
 # is the user's home; fall back to HOME when the script is exercised directly.
 home=${3:-}
 case "$home" in ""|"/") home=$HOME;; esac
+case "$home" in /*) ;; *) echo "AhdCode: installation home must be absolute" >&2; exit 1;; esac
+[ ! -L "$home/Library" ] || { echo "AhdCode: ~/Library must not be a symlink" >&2; exit 1; }
 
 root="$home/Library/AhdCode"
+[ ! -L "$root" ] || { echo "AhdCode: installation root must not be a symlink" >&2; exit 1; }
+[ ! -L "$root/versions" ] || { echo "AhdCode: versions directory must not be a symlink" >&2; exit 1; }
+[ ! -L "$root/bin" ] || { echo "AhdCode: bin directory must not be a symlink" >&2; exit 1; }
+
 version=$(cat "$root/versions/VERSION.current" 2>/dev/null || true)
-[ -n "$version" ] || { echo "AhdCode: no version was recorded" >&2; exit 1; }
+case "$version" in
+    *[!0-9A-Za-z._-]*|''|*..*) echo "AhdCode: invalid version recorded" >&2; exit 1;;
+esac
+
 target="$root/versions/$version"
+[ ! -L "$target" ] || { echo "AhdCode: version directory must not be a symlink" >&2; exit 1; }
 [ -x "$target/bin/ahdcode" ] || { echo "AhdCode: ahdcode is missing from $target" >&2; exit 1; }
+chmod 0755 "$target/bin/ahdcode"
+[ ! -f "$target/install.sh" ] || chmod 0755 "$target/install.sh"
 
 # The stable launcher: one path that never changes between versions, so PATH is
-# written once and an upgrade only moves this link.
+# written once and an upgrade only moves this link. Existing versions under
+# $root/versions/ (such as 2.9.0) are preserved for side-by-side use and rollback.
 ln -sfn "versions/$version" "$root/.current-new"
 mv -fh "$root/.current-new" "$root/current"
 mkdir -p "$root/bin"

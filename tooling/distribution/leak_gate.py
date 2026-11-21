@@ -137,9 +137,9 @@ def expand(name, data):
             yield from expand(inner, content)
 
 
-def tree_members(root):
+def tree_members(root, workspace=None, prefix=''):
     for path in sorted(root.rglob('*')):
-        relative = path.relative_to(root).as_posix()
+        relative = prefix + path.relative_to(root).as_posix()
         if path.is_symlink():
             yield relative, b''
         elif path.is_file():
@@ -148,6 +148,10 @@ def tree_members(root):
             except OSError as error:
                 raise GateError('cannot read %s: %s' % (relative, error))
             yield from expand(relative, content)
+            if workspace is not None and path.name.lower().endswith('.pkg'):
+                expanded = pathlib.Path(tempfile.mkdtemp(prefix='leakgate-pkg-', dir=workspace)) / 'expanded'
+                subprocess.run(['pkgutil', '--expand-full', str(path), str(expanded)], check=True, capture_output=True)
+                yield from tree_members(expanded, workspace, prefix=relative + '!')
 
 
 def artifact_members(path, workspace):
@@ -176,7 +180,7 @@ def artifact_members(path, workspace):
         subprocess.run(['hdiutil', 'attach', '-readonly', '-nobrowse', '-noautoopen', '-mountpoint', mount, str(path)],
                        check=True, capture_output=True)
         try:
-            yield from tree_members(pathlib.Path(mount))
+            yield from tree_members(pathlib.Path(mount), workspace)
         finally:
             subprocess.run(['hdiutil', 'detach', mount], check=False, capture_output=True)
     elif lower.endswith('.pkg'):

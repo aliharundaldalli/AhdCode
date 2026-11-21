@@ -34,6 +34,19 @@ launching the binary from `Contents/MacOS`. Record the macOS version,
 architecture, and any filesystem-dependent skips. GitHub runs this
 selection on ARM64.
 
+To build and verify the macOS distribution artifacts (`.tar.gz`, `.pkg`,
+`.dmg` + `SHA256SUMS.txt`):
+
+```sh
+python3 tooling/distribution/leak_gate.py --self-test
+python3 tooling/distribution/build.py --platform darwin --macos-arch both --without-bundled-runtimes --without-vsix --output "$qa_dir/macos-dist"
+AHDCODE_TEST_MACOS_DIST_DIR="$qa_dir/macos-dist" python3 -m unittest -v tooling/distribution/test_macos_dist.py
+```
+
+Note: When built on Apple Silicon (`arm64`) without an Intel runner, `x86_64`
+binary execution is cross-compiled and layout-verified while native runtime
+execution on `x86_64` hardware remains unverified.
+
 ## Linux verification
 
 ```sh

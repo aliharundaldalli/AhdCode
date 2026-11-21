@@ -13,8 +13,35 @@ go build -o ahdsqlite ./cmd/ahdsqlite
 
 Windows'ta `ahdcode.exe` ve `ahdsqlite.exe` adlarını kullanın.
 Sürüm komutu `AhdCode v2.11.0` gösterir. SQLite gereken uygulamalar için
-uyumlu yardımcıyı CLI'ın yanında tutun. Mevcut imzalı kurucular v2.7.0'da
-kalır. Araç zincirinin ürettiği Web uygulama paketi ayrı bir çıktıdır.
+uyumlu yardımcıyı CLI'ın yanında tutun. Yayımlanmış mevcut imzalı kararlı
+kurucular, nihai imzalı sürüm yayımlanana kadar v2.7.0'da kalır. Araç
+zincirinin ürettiği Web uygulama paketi ayrı bir çıktıdır.
+
+## macOS dağıtım paketleme (.pkg, .dmg, .tar.gz)
+
+`tooling/distribution/build.py --platform darwin`, Windows ve Linux dağıtım
+davranışını değiştirmeden macOS ARM64 (ve isteğe bağlı çapraz derlenen
+`x86_64`) araç zinciri paketleri üretir:
+
+- `AhdCode-<sürüm>-macos-<mimari>[-unsigned].tar.gz`: `install.sh` içeren ve
+  `~/Library/AhdCode/versions/<sürüm>` altına kuran taşınabilir arşiv.
+- `AhdCode-<sürüm>-macos-<mimari>[-unsigned].pkg`: yönetici şifresi istemeyen
+  (`auth="none"`) ev dizini `.pkg` kurucusu; `2.9.0` gibi mevcut sürümleri
+  korur, `current` bağını ve `~/Library/AhdCode/bin/ahdcode` yolunu günceller,
+  kabuk PATH bloklarını idempotent biçimde ekler ve kaldırma için
+  `install.sh` içerir.
+- `AhdCode-<sürüm>-macos-<mimari>[-unsigned].dmg`: `.pkg`, `INSTALL.txt` ve
+  `VERSION` dosyalarını içeren UDZO disk imajı.
+- `SHA256SUMS.txt`: üretilen her dosya için SHA-256 doğrulama listesi.
+
+`--sign-app`, `--sign-installer` ve `--notary-profile` verildiğinde Apple'ın
+standart `codesign`, `productbuild --sign`, `xcrun notarytool` ve
+`xcrun stapler` iş akışı kullanılır. Noter kimlikleri yoksa çıktılar açıkça
+`-unsigned` olarak etiketlenir ve Gatekeeper asla atlatılmaz. Kaldırmak için:
+
+```sh
+sh "$HOME/Library/AhdCode/current/install.sh" --uninstall
+```
 
 ## v2.10.0 sonrasındaki değişiklikler
 

@@ -1,37 +1,68 @@
 # Installation, upgrade, and removal
 
-Download the AhdCode v2.7.0 package for your operating system. v2.7.0 is the
-latest installable release. v2.8.0 through v2.11.0 are source releases; their
-git tags do not replace these packages. New installers return at v3.0.
-Every package is self-contained: it carries the compiler, a private Go
+Download the published AhdCode v2.7.0 stable package for your operating
+system. `v2.7.0` remains the latest published signed stable release. `v2.8.0`
+through `v2.10.0` are source releases. Starting with `v2.11.0` release-candidate
+builds, macOS toolchain packages (`.pkg`, `.dmg`, and `.tar.gz`) can also be
+produced directly from the distribution tooling, while Windows and Linux builds
+remain source releases until the next full desktop release at `v3.0`.
+Every full v2.7.0 package is self-contained: it carries the compiler, a private Go
 toolchain, AhdDataStudio, the SQLite, numeric and plot helpers, an offline
 LaTeX engine, the project starters, and the English documentation.
 
-## macOS (Apple Silicon)
+## macOS (Apple Silicon and x64 packaging)
 
-The macOS package targets Apple Silicon Macs — M1, M2, M3, M4 and later arm64
-models. There is no Intel build.
+The published v2.7.0 signed installers target Apple Silicon Macs (`arm64` — M1,
+M2, M3, M4 and later models). Beginning with v2.11.0 release-candidate
+packaging, `tooling/distribution/build.py --platform darwin` produces macOS
+`arm64` (and optional cross-compiled `x86_64`) `.pkg`, `.dmg`, and `.tar.gz`
+artifacts:
 
-Double-click `AhdCode-2.7.0-macos-arm64.pkg` and follow the installer. The
-published `.pkg` is the recommended installer. It is signed with a Developer ID
-and notarized by Apple, with the notarization ticket stapled, so Gatekeeper
-accepts it without a warning. It installs for your account only, asks for no
-administrator password, and writes nothing outside your home folder. Verify the
-download against the published SHA-256 checksum, and never disable or bypass
-system protections.
+- `.pkg`: Recommended native installer (`AhdCode-<version>-macos-<arch>.pkg`, or
+  `-unsigned` when built without Apple Developer ID signing and notarization).
+  Double-click it in Finder or run
+  `installer -pkg <file>.pkg -target CurrentUserHomeDirectory`.
+- `.dmg`: Disk image wrapping the `.pkg` installer alongside `INSTALL.txt` and
+  `VERSION`.
+- `.tar.gz`: Portable toolchain archive containing `install.sh`, `INSTALL.txt`,
+  `VERSION`, and `payload/`. Extract it and run `sh install.sh --setup-path`.
 
-Files go under `~/Library/AhdCode/versions/2.7.0`. `current` selects the
-active version and `~/Library/AhdCode/bin/ahdcode` is the stable command. That
-one folder is added to your PATH.
+When signed with a Developer ID and notarized by Apple with the ticket stapled,
+Gatekeeper accepts `.pkg` and `.dmg` artifacts without a warning. Development or
+release-candidate builds created without notarization credentials carry
+`-unsigned` in their filenames and `INSTALL.txt`; verify downloads against
+`SHA256SUMS.txt` (`shasum -a 256 -c SHA256SUMS.txt`), and never disable or
+bypass Gatekeeper protections.
 
-Then open a **new** Terminal and run `ahdcode --version`. A terminal that was
+The installer puts files under `~/Library/AhdCode/versions/<version>`, leaving
+previously installed versions (such as `2.9.0`) intact on disk. `current`
+selects the active version, and `~/Library/AhdCode/bin/ahdcode` is the stable
+command added once (idempotently) to `~/.zprofile`, `~/.zshrc`, and
+`~/.bash_profile`. No administrator password is required, nothing is written to
+system directories, and existing projects, databases, and
+`~/Library/Application Support/ahdcode` data are preserved.
+
+Then open a **new** Terminal and run `ahdcode version`. A terminal that was
 already open keeps the environment it started with; a new one picks up the
-change immediately.
+change immediately. To roll back to an earlier installed version (for example
+`2.9.0`):
 
-`AhdCode-2.7.0-macos-arm64.dmg` is a signed and notarized disk image with the
-same payload for anyone who prefers one: open it and run `Install.command`
-(which runs `install.sh --setup-path`). The `.pkg` is the recommended
-installer.
+```sh
+ln -sfn versions/2.9.0 ~/Library/AhdCode/.current-new && mv -fh ~/Library/AhdCode/.current-new ~/Library/AhdCode/current
+```
+
+To build macOS distribution packages from source:
+
+```sh
+python3 tooling/distribution/build.py --platform darwin --macos-arch both --without-bundled-runtimes --without-vsix --output dist/macos
+```
+
+Pass `--sign-app`, `--sign-installer`, and `--notary-profile` when Apple
+Developer ID certificates and `notarytool` credentials are available.
+
+Legacy v2.7.0 `AhdCode-2.7.0-macos-arm64.dmg` also carried `Install.command`
+for anyone who prefers running `install.sh --setup-path`. The `.pkg` is the
+recommended installer.
 
 ## Windows x64
 
