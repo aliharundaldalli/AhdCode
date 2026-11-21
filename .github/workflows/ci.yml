@@ -99,9 +99,9 @@ jobs:
 
       - name: Build and test macOS distribution artifacts (tar.gz, pkg, dmg)
         run: |
-          python3 tooling/distribution/leak_gate.py --self-test
-          python3 tooling/distribution/build.py --platform darwin --macos-arch both --without-bundled-runtimes --without-vsix --output "$RUNNER_TEMP/macos-dist"
-          AHDCODE_TEST_MACOS_DIST_DIR="$RUNNER_TEMP/macos-dist" python3 -m unittest -v tooling/distribution/test_macos_dist.py
+          python3 -B tooling/distribution/leak_gate.py --self-test
+          python3 -B tooling/distribution/build.py --platform darwin --macos-arch both --without-bundled-runtimes --without-vsix --output "$RUNNER_TEMP/macos-dist"
+          AHDCODE_TEST_MACOS_DIST_DIR="$RUNNER_TEMP/macos-dist" python3 -B -m unittest -v tooling/distribution/test_macos_dist.py
           mkdir -p "$HOME/Library/AhdCode/versions/2.9.0/bin" "$HOME/Library/AhdCode/bin" "$HOME/Library/Application Support/ahdcode"
           printf '#!/bin/sh\necho "AhdCode v2.9.0"\n' > "$HOME/Library/AhdCode/versions/2.9.0/bin/ahdcode"
           chmod 0755 "$HOME/Library/AhdCode/versions/2.9.0/bin/ahdcode"
