@@ -17,6 +17,18 @@ def run(args, **kwargs):
     subprocess.run([str(a) for a in args], check=True, **kwargs)
 
 
+def remove_tree(path):
+    """Remove a directory tree even when copied Go module files are read-only on Windows."""
+    def handle(func, target, _exc):
+        os.chmod(target, 0o700)
+        func(target)
+
+    if sys.version_info >= (3, 12):
+        shutil.rmtree(path, onexc=handle)
+    else:
+        shutil.rmtree(path, onerror=handle)
+
+
 def extract(archive, dest):
     if str(archive).endswith('.zip'):
         with zipfile.ZipFile(archive) as z:
@@ -132,6 +144,7 @@ def licenses(payload, modules):
                 rel = pathlib.Path('modules') / (mod['Path'].replace('/', '_') + '@' + mod.get('Version', '')) / file.name
                 (dest / rel).parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(file, dest / rel)
+                os.chmod(dest / rel, 0o644)
                 entry['notices'].append(str(rel))
         if not entry['notices']:
             raise RuntimeError('Missing license: ' + mod['Path'])
@@ -461,7 +474,7 @@ def main():
     for goos, arch, label in targets:
         staging = a.output / ('stage-' + label)
         if staging.exists():
-            shutil.rmtree(staging)
+            remove_tree(staging)
         staging.mkdir()
         payload = staging / 'payload'
         (payload / 'bin').mkdir(parents=True)
@@ -581,7 +594,7 @@ def main():
                 build('./tooling/distribution/windows', artifact, goos, arch, '-buildid= -H=windowsgui')
             finally:
                 zipped.unlink(missing_ok=True)
-            shutil.rmtree(staging)
+            remove_tree(staging)
             records.append({
                 'filename': artifact.name,
                 'size': artifact.stat().st_size,
@@ -630,7 +643,7 @@ def main():
 
             dmg_stage = a.output / f'dmg-{label}'
             if dmg_stage.exists():
-                shutil.rmtree(dmg_stage)
+                remove_tree(dmg_stage)
             dmg_stage.mkdir()
             shutil.copy2(pkg, dmg_stage / pkg.name)
             (dmg_stage / 'VERSION').write_text(version + '\n')
@@ -639,8 +652,8 @@ def main():
             dmg_bytes = sum(p.stat().st_size for p in dmg_stage.rglob('*') if p.is_file())
             size_mb = max(96, int((dmg_bytes / (1024 * 1024)) * 1.5) + 48)
             create_dmg(dmg_stage, dmg, volname, size_mb)
-            shutil.rmtree(dmg_stage)
-            shutil.rmtree(staging)
+            remove_tree(dmg_stage)
+            remove_tree(staging)
             if a.sign_app:
                 run(['codesign', '--force', '--timestamp', '--sign', a.sign_app, dmg])
                 run(['codesign', '--verify', '--verbose=2', dmg])
@@ -668,7 +681,7 @@ def main():
             shutil.copy2(R / 'tooling/distribution/install.sh', staging / 'install.sh')
             (staging / 'install.sh').chmod(0o755)
             tar_tree(staging, artifact, f'AhdCode-{version}-{label}')
-            shutil.rmtree(staging)
+            remove_tree(staging)
             records.append({
                 'filename': artifact.name,
                 'size': artifact.stat().st_size,
