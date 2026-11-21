@@ -572,7 +572,11 @@ def main():
             (dmg_stage / 'VERSION').write_text(version + '\n')
             (dmg_stage / 'INSTALL.txt').write_text(instructions)
             volname = f'AhdCode {version} {label}' + ('' if art_suffix == '' else f' {art_suffix.lstrip("-")}')
-            run(['hdiutil', 'create', '-volname', volname, '-srcfolder', dmg_stage, '-format', 'UDZO', '-ov', dmg])
+            dmg_bytes = sum(p.stat().st_size for p in dmg_stage.rglob('*') if p.is_file())
+            size_mb = max(96, int((dmg_bytes / (1024 * 1024)) * 1.5) + 48)
+            run(['hdiutil', 'create', '-volname', volname, '-srcfolder', dmg_stage, '-fs', 'HFS+', '-size', f'{size_mb}m', '-format', 'UDZO', '-ov', dmg])
+            shutil.rmtree(dmg_stage)
+            shutil.rmtree(staging)
             if a.sign_app:
                 run(['codesign', '--force', '--timestamp', '--sign', a.sign_app, dmg])
                 run(['codesign', '--verify', '--verbose=1', dmg])
