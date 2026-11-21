@@ -12,7 +12,7 @@ func mkdirPrivateDevHTTPS(path string) error {
 	if err != nil {
 		return err
 	}
-	sd, err := windows.SecurityDescriptorFromString("O:" + user.User.Sid.String() + "D:P(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;FA;;;" + user.User.Sid.String() + ")")
+	sd, err := windows.SecurityDescriptorFromString("D:P(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;FA;;;" + user.User.Sid.String() + ")")
 	if err != nil {
 		return err
 	}
@@ -26,7 +26,8 @@ func mkdirPrivateDevHTTPS(path string) error {
 }
 
 func checkDevHTTPSPrivacy(path string) error {
-	user, err := windows.GetCurrentProcessToken().GetTokenUser()
+	token := windows.GetCurrentProcessToken()
+	user, err := token.GetTokenUser()
 	if err != nil {
 		return fmt.Errorf("cannot verify the Windows identity for local HTTPS key storage")
 	}
@@ -35,7 +36,8 @@ func checkDevHTTPSPrivacy(path string) error {
 		return fmt.Errorf("cannot inspect Windows local HTTPS key permissions: %w", err)
 	}
 	owner, _, err := sd.Owner()
-	if err != nil || owner == nil || !owner.Equals(user.User.Sid) {
+	ownerOK := owner != nil && (owner.Equals(user.User.Sid) || (token.IsElevated() && owner.IsWellKnown(windows.WinBuiltinAdministratorsSid)))
+	if err != nil || !ownerOK {
 		return fmt.Errorf("local HTTPS key storage must be owned by the current Windows user")
 	}
 	dacl, _, err := sd.DACL()

@@ -2,11 +2,10 @@
 
 [English](UPGRADE_2.11.md)
 
-Proje sahibi, genel kullanıma açık `Templates` modülünün v2.11'de
-kaldırılmasını onayladı. Bu, bilinçli bir geriye dönük uyumluluk kırılmasıdır.
-v2.10 API'sini kullanan uygulamaları yükseltmeden önce `Templates`
+Genel kullanıma açık `Templates` modülü AhdCode v2.11.0 ile kaldırılmıştır.
+v2.10 `Templates` API'sini kullanan uygulamaları yükseltmeden önce `Templates`
 aktarımlarını ve `TemplateSet`, `TemplateData`, `TemplateError` kullanımlarını
-değiştirin.
+aşağıdaki yapıya taşıyın.
 
 Sayfa, yerleşim ve bileşenleri `.ahd` dosyalarında yazın. `Web.UI` ile
 `HTMLNode` değerleri oluşturan fonksiyonlara türü belli değerler aktarın.
@@ -16,7 +15,8 @@ sırasında kaçırılmaları için metin düğümleriyle veya metin alan yardı
 aktarın. Yeni üretilen Basic uygulaması bu yapıyı gösterir.
 [Web uygulama yapısı](WEB_TR.md).
 
-Derlenen uygulamayı ve genel statik varlıklarını birlikte geliştirin ve
-paketleyin. Gelecekteki PWA ve paketleme çalışmaları bu yapıyı temel alır.
+Derlenen uygulamayı genel statik varlıkları ve isteğe bağlı PWA dosyalarıyla
+birlikte `ahdcode package app.ahd --web` (ve PWA yapılandırılmışsa `--pwa`)
+komutuyla paketleyip dağıtabilirsiniz.
 
 Önceki API, [v2.10.0 sürüm notlarında](RELEASE_2.10.0_TR.md) yer alır.

@@ -43,7 +43,7 @@ spctl -a -vv -t open --context context:primary-signature AhdCode-<version>-macos
 codesign --verify --deep --strict --verbose=2 path/to/AhdCode-<version>-macos-arm64/payload/bin/ahdcode
 ```
 
-Development or release-candidate builds created without notarization credentials
+Local development builds created without notarization credentials
 carry `-unsigned` in their filenames and `INSTALL.txt`; verify downloads
 against `SHA256SUMS.txt` (`shasum -a 256 -c SHA256SUMS.txt`), and never disable
 or bypass Gatekeeper protections.

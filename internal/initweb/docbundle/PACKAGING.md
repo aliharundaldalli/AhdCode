@@ -162,12 +162,10 @@ dialogs — show the application's name and icon, not AhdCode's:
 
 ## Targets
 
-| Target | Output | Status |
+| Target | Output | Notes |
 | --- | --- | --- |
-| `windows-x64` | folder and `.zip` | run on Windows in v2.11.0 QA |
-| `linux-x64` | folder and `.tar.gz` | archive and executable format checked from Windows |
-| `macos-arm64`, `macos-x64` | `.app` | available targets. Native execution unverified in v2.11.0 QA |
-| `windows-arm64`, `linux-arm64` | folder and platform archive | available targets. Native execution unverified in v2.11.0 QA |
+| `macos-arm64`, `windows-x64`, `linux-x64`, `linux-arm64` | native bundle / archive | standard targets (`--target` defaults to the host platform) |
+| `macos-x64`, `windows-arm64` | `.app`, folder, or `.zip` | cross-compiled targets when matching `--helpers` are supplied |
 
 By default, `ahdcode package` packages for the computer it runs on, with this
 installation's helpers. A program is plain Go without C code, so AhdCode can

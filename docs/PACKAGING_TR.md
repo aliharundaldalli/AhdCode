@@ -154,12 +154,10 @@ adını ve simgesini gösterir:
 
 ## Hedefler
 
-| Hedef | Çıktı | Durum |
+| Hedef | Çıktı | Not |
 | --- | --- | --- |
-| `windows-x64` | klasör ve `.zip` | v2.11.0 QA'da Windows'ta çalıştırıldı |
-| `linux-x64` | klasör ve `.tar.gz` | arşiv ve yürütülebilir biçim Windows'tan doğrulandı |
-| `macos-arm64`, `macos-x64` | `.app` | desteklenen hedefler. v2.11.0 QA'da yerel çalıştırma doğrulanmadı |
-| `windows-arm64`, `linux-arm64` | klasör ve platform arşivi | desteklenen hedefler. v2.11.0 QA'da yerel çalıştırma doğrulanmadı |
+| `macos-arm64`, `windows-x64`, `linux-x64`, `linux-arm64` | paket ve platform arşivi | standart hedefler (`--target` varsayılan olarak geçerli bilgisayarı seçer) |
+| `macos-x64`, `windows-arm64` | `.app`, klasör veya `.zip` | uyumlu `--helpers` dizini verildiğinde çapraz derlenen hedefler |
 
 Varsayılan olarak `ahdcode package`, çalıştığı bilgisayar için bu kurulumun
 yardımcılarıyla paketler. Bir program C kodu içermeyen düz Go'dur; bu yüzden

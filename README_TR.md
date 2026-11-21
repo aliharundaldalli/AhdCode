@@ -59,7 +59,7 @@ komutudur. `ahdcode databases`, kurulu CLI'ye gömülü tam sürüm
 AhdDataStudio'yu başlatır; AhdCode deposuna veya `AHDCODE_ROOT` değerine
 ihtiyaç duymaz. `AHDCODE_ROOT` yalnızca geliştirici geçersiz kılmasıdır.
 
-v2.11 geliştirme dalı `ahdcode dev --https app.ahd` komutuyla isteğe
+AhdCode v2.11.0, `ahdcode dev --https app.ahd` komutuyla isteğe
 bağlı geri döngü HTTPS sunar. Normal dev HTTP kullanır. Sertifika ve
 tarayıcı güveni için [yerel HTTPS](docs/WEB_TR.md#14-yerel-https) bölümüne bakın.
 

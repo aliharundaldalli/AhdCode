@@ -45,7 +45,7 @@ spctl -a -vv -t open --context context:primary-signature AhdCode-<sürüm>-macos
 codesign --verify --deep --strict --verbose=2 yol/AhdCode-<sürüm>-macos-arm64/payload/bin/ahdcode
 ```
 
-Noter kimliği olmadan üretilen geliştirme / sürüm adayı paketleri adlarında ve
+Noter kimliği olmadan üretilen yerel geliştirme paketleri adlarında ve
 `INSTALL.txt` içinde `-unsigned` etiketi taşır; kurulumdan önce `SHA256SUMS.txt`
 dosyasını `shasum -a 256 -c SHA256SUMS.txt` ile doğrulayın ve Gatekeeper
 korumalarını asla kapatmayın veya atlatmayın.

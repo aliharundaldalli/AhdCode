@@ -58,7 +58,7 @@ on the happy path. `ahdcode databases` starts the exact-version AhdDataStudio
 bundled in the installed CLI; it does not need the AhdCode repository or
 `AHDCODE_ROOT`. `AHDCODE_ROOT` is a developer override only.
 
-The v2.11 development branch adds opt-in loopback HTTPS with
+AhdCode v2.11.0 adds opt-in loopback HTTPS with
 `ahdcode dev --https app.ahd`. Ordinary dev continues to use HTTP. See
 [local HTTPS](WEB.md#14-local-https) for certificates and browser trust.
 

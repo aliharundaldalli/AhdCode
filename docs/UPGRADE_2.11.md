@@ -2,10 +2,10 @@
 
 [Türkçe](UPGRADE_2.11_TR.md)
 
-The project owner approved the removal of the public `Templates` builtin in
-v2.11. This is an intentional compatibility break. Imports of `Templates`
-and references to `TemplateSet`, `TemplateData`, and `TemplateError` must
-be migrated before upgrading applications that used the v2.10 API.
+The public `Templates` builtin was removed in AhdCode v2.11.0. Before
+upgrading applications that used the v2.10 `Templates` API, migrate
+`Templates` imports and references to `TemplateSet`, `TemplateData`, and
+`TemplateError`.
 
 Use `.ahd` files for pages, layouts, and components. Pass typed values to
 functions that assemble `HTMLNode` values with `Web.UI`. Have the layout
@@ -15,7 +15,8 @@ or through text-taking helpers so they are escaped during rendering.
 A newly generated Basic app shows the page, layout, and component structure.
 See [Web application structure](WEB.md).
 
-Develop and package the compiled application with its public assets. Future
-PWA and packaging work will build on that structure.
+Package the compiled application together with its public assets and optional
+PWA files using `ahdcode package app.ahd --web` (and `--pwa` when PWA is
+configured).
 
 The previous API is documented in the [v2.10.0 release](RELEASE_2.10.0.md).
