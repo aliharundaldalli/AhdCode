@@ -4,15 +4,17 @@
 
 ## AhdCode kurulumu
 
-Platformunuza uygun sürüm paketini [Kurulum](INSTALLATION_TR.md) adımlarına göre kurun.
-Paket; özel Go araç zincirini, AhdDataStudio'yu, yardımcı programları ve çevrimdışı
-LaTeX kaynaklarını içerir. Git, kaynak deposu, sistem Go kurulumu, `AHDCODE_ROOT`,
-npm veya ayrı TeX kurulumu gerekmez.
+Platformunuza uygun **v2.11.0** sürüm paketini [Kurulum](INSTALLATION_TR.md)
+adımlarına göre kurun. Paket; `ahdcode` CLI'ını, standart kütüphaneyi,
+`AhdDataStudio`'yu ve çalışma zamanı yardımcılarını içerir. Betikleri `ahdcode run`
+ile doğrudan çalıştırabilirsiniz; yerel çalıştırılabilir dosya derlemek (`ahdcode build`
+ve `ahdcode package`) için `PATH` üzerinde `go.mod` ile uyumlu bir Go sürümü gerekir
+(dahili Go ve çevrimdışı LaTeX içeren tam paketler `v2.7.0` arşivinde kalır).
 
 Yeni bir terminal açıp doğrulayın:
 
 ```bash
-ahdcode --version
+ahdcode version
 ```
 
 Kaynaktan derleme, geliştirici iş akışıdır; kök README belgesine bakın.

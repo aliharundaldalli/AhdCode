@@ -6,15 +6,17 @@
 
 ## Install AhdCode
 
-Install the release package for your platform following [Installation](INSTALLATION.md).
-The packaged product includes its own Go toolchain, AhdDataStudio, runtime helpers,
-and offline LaTeX resources. You do not need Git, a source checkout, system Go,
-`AHDCODE_ROOT`, npm, or a separate TeX installation.
+Install the **v2.11.0** release package for your platform following [Installation](INSTALLATION.md).
+The release package includes the `ahdcode` CLI, standard library, `AhdDataStudio`,
+and companion runtime helpers. Scripts run directly with `ahdcode run`; native
+compilation commands (`ahdcode build` and `ahdcode package`) use a `go.mod`-compatible
+Go toolchain on `PATH` (self-contained bundles with private Go and offline LaTeX
+remain archived under `v2.7.0`).
 
 Open a new terminal and confirm:
 
 ```bash
-ahdcode --version
+ahdcode version
 ```
 
 Source builds are a contributor workflow; see the root README's source-build section.

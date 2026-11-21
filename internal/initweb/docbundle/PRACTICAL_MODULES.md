@@ -31,6 +31,7 @@ its blocks from top to bottom in one `.ahd` file.
 - [7. HTTP and HTTPS: requests, responses, and failures](#7-http-and-https-requests-responses-and-failures)
 - [8. HTML: build safe pages and parse documents](#8-html-build-safe-pages-and-parse-documents)
 - [9. Final project: produce two reports from one dataset](#9-final-project-produce-two-reports-from-one-dataset)
+- [10. Persistent sessions, schema migrations, PWA, and web packaging](#10-persistent-sessions-schema-migrations-pwa-and-web-packaging)
 - [Which document should I read?](#which-document-should-i-read)
 
 ## Learning map
@@ -1169,6 +1170,27 @@ Word headings and table text after reading the DOCX back
 These checks are the difference between “the program ran” and “the output is
 correct.”
 
+## 10. Persistent sessions, schema migrations, PWA, and web packaging
+
+Combine the v2.10 and v2.11 web workflows to package an installable PWA whose
+user sessions survive restarts:
+
+1. Scaffold a project with `ahdcode init web basic` and author pages/layouts with
+   `Web.UI` (the legacy `Templates` module was removed in v2.11).
+2. Manage SQLite schema changes with `ahdcode migrate new init_app` and
+   `ahdcode migrate up --db data/app.db`.
+3. Store sessions in a dedicated SQLite file via
+   `Web.persistentSessions("data/sessions.db", "app_session", 3600, application.isSecure(), "Lax")`
+   and register custom error handlers via `app.notFound(...)` and `app.internalError(...)`.
+4. Scaffold PWA files with `ahdcode pwa init --name "My App" --short-name "App"`,
+   wire `PWA/Integration.ahd`, and call `ahdPwaMount(app)` before `app.start()`.
+5. Develop over local HTTPS with `ahdcode dev --https app.ahd`, then produce a
+   deployable bundle with `ahdcode package app.ahd --web --pwa`.
+
+Checkpoints: verify the manifest is served as `application/manifest+json`, custom
+404 responses render cleanly, and `PWA/` plus static assets are copied into the
+packaged output directory.
+
 ## Which document should I read?
 
 | Need | Start here | Then use the full reference |
@@ -1181,6 +1203,9 @@ correct.”
 | Produce an academic PDF or slides | Workshop 6 | [Latex](LATEX.md) |
 | Call an API or website | Workshop 7 | [HTTP](HTTP.md) |
 | Build or parse HTML | Workshop 8 | [HTML](HTML.md) |
+| Persistent sessions, migrations, PWA, and web packaging | Workshop 10 / [Student Guide 75–76](STUDENT_GUIDE_EN.md#75-persistent-sessions-schema-migrations-and-custom-error-pages) | [Web](WEB.md) · [PWA](PWA.md) · [Packaging](PACKAGING.md) |
+| Interactive 2D canvas and timers | [Student Guide 73](STUDENT_GUIDE_EN.md#73-interactive-graphics-shapes-text-timers-and-pointer-events) | [Graphics](GRAPHICS.md) |
+| Desktop widgets and menus | [Student Guide 74](STUDENT_GUIDE_EN.md#74-rich-desktop-gui-tabs-selectors-date-field-and-menus) | [GUI](GUI.md) |
 | Store data in PostgreSQL | [Student Guide 59](STUDENT_GUIDE_EN.md#59-postgresql-a-powerful-network-database) | [PostgreSQL](POSTGRESQL.md) |
 | Push live updates to a browser | [Student Guide 60](STUDENT_GUIDE_EN.md#60-websocket-live-connections) | [WebSocket](WEBSOCKET.md) |
 | Create or compare UUIDs | [Student Guide 57](STUDENT_GUIDE_EN.md#57-uuid-unique-identifiers) | [UUID](UUID.md) |

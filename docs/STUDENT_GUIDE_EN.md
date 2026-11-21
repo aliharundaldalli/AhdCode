@@ -1,4 +1,4 @@
-# AhdCode Student Guide (v2.7)
+# AhdCode Student Guide (v2.11)
 
 This guide is designed so that **even someone who has never programmed before** can follow along. You can read it in order from beginning to end; in each section, you will first see what we want to achieve, then write a working example, and finally learn the necessary rules.
 
@@ -18,11 +18,14 @@ This guide teaches; it is not a reference manual and not a changelog. Where a
 module has more to it than a beginner needs on the first pass, the section
 says so and links to the reference page that lists every signature.
 
-This guide targets the v2.7.0 public release. Named-Function `uses` captures
-are part of the stable language. Sections 70–72 introduce the mathematical
+This guide targets the v2.11.0 public release. Named-Function `uses` captures
+are part of the stable language. Sections 70–76 introduce the mathematical
 rendering and styling from v2.3–v2.4, the safe file and process operations from
-v2.5, and the read-only network and system inspection modules from v2.6–v2.7.
-The linked module references give their complete APIs and platform limits.
+v2.5, the read-only network and system inspection modules from v2.6–v2.7,
+interactive `Graphics` and desktop `GUI` widgets from v2.8–v2.9, persistent
+sessions and schema migrations from v2.10, and Progressive Web Apps (PWA) with
+`--web` packaging from v2.11. The linked module references give their complete
+APIs and platform limits.
 
 ## Table of Contents
 - [1. What is AhdCode?](#1-what-is-ahdcode)
@@ -98,6 +101,10 @@ The linked module references give their complete APIs and platform limits.
 - [70. Mathematical labels and plot styles](#70-mathematical-labels-and-plot-styles)
 - [71. Safely preparing a release](#71-safely-preparing-a-release)
 - [72. Inspecting a deployed service](#72-inspecting-a-deployed-service)
+- [73. Interactive Graphics: shapes, text, timers, and pointer events](#73-interactive-graphics-shapes-text-timers-and-pointer-events)
+- [74. Rich desktop GUI: tabs, selectors, date field, and menus](#74-rich-desktop-gui-tabs-selectors-date-field-and-menus)
+- [75. Persistent sessions, schema migrations, and custom error pages](#75-persistent-sessions-schema-migrations-and-custom-error-pages)
+- [76. Progressive Web Apps (PWA) and Web packaging](#76-progressive-web-apps-pwa-and-web-packaging)
 
 ## 1. What is AhdCode?
 
@@ -117,8 +124,11 @@ Hello!
 
 AhdCode checks the code you wrote before running the program. For example, if you try to use text like a number, or if you use a value that could be `null` without checking it, it will tell you the error before the program even starts, whenever possible. But you don't need to think about these details at the beginning; we'll see examples in later sections.
 
-AhdCode v1.0.0 was the first stable release. The current installable release
-is v2.7.0. v2.8.0 through v2.10.0 are source releases. New installers return at v3.0.
+AhdCode v1.0.0 was the first stable release. The current stable release
+is **v2.11.0**, providing installers for macOS (`.pkg` / `.dmg`), Windows
+(`.exe`), and Linux (`amd64` / `arm64` `.tar.gz`). `ahdcode build` and
+`ahdcode package` require a Go toolchain compatible with `go.mod` on `PATH`;
+self-contained v2.7.0 bundles with private Go and offline LaTeX remain archived.
 This guide teaches the stable foundation and gives a first exercise for the
 newer modules; each module's reference page documents its complete API.
 
@@ -7601,3 +7611,139 @@ program decides the warning threshold and what action to take.
 **Try it yourself:** Inspect the filesystem containing your project and
 compare `freeBytes()` with `availableBytes()`. On Linux, also inspect a known
 service and compare `activeState()` with `running()`.
+
+## 73. Interactive Graphics: shapes, text, timers, and pointer events
+
+> Added in v2.8.0.
+
+The `Graphics` canvas draws aligned text, polygons, ellipses, arcs, and
+embedded images in addition to lines and rectangles. Interactive sketches can
+use the frame timer `Canvas.every(16, handler)` together with `onClick`,
+`onDrag`, and `onMove` pointer callbacks:
+
+```ahd
+bring Graphics
+bring Math
+from Graphics bring Canvas
+
+canvas: Canvas := Graphics.open(480, 360, "Shapes and text", "#f8f8f8")
+canvas.text(0, 140, "AhdCode Graphics", "blue", 30, "center")
+canvas.polygon([-200, -40, -100, -40, -150, 50], "black", "yellow", 2)
+canvas.ellipse(150, 10, 60, 30, "green", "#00ff0040", 3)
+canvas.arc(150, 10, 45, 200, 340, "black", 4)
+canvas.save("shapes.png")
+canvas.save("shapes.svg")
+```
+
+See the [Graphics reference](GRAPHICS.md) and
+[v2.8 examples](../examples/v2.8/README.md) for `Canvas.cancel(...)` and live
+drawing demos.
+
+## 74. Rich desktop GUI: tabs, selectors, date field, and menus
+
+> Added in v2.9.0.
+
+v2.9 expands desktop `GUI` windows with `Tabs`, `RadioGroup`, `Progress`,
+`DateField`, and window `Menu` / `MenuItem` bars:
+
+```ahd
+bring GUI
+from GUI bring (Window, Container, Tabs, RadioGroup, Progress, DateField, Menu, MenuItem)
+
+window: Window := GUI.window("Controls", 480, 420)
+fileMenu: Menu := window.menu("File")
+quitItem: MenuItem := fileMenu.item("Quit", "Q")
+
+closeApp: Function := () -> Nothing {
+    window: Global Window
+    window.close()
+}
+quitItem.onClick(closeApp)
+
+form: Container := window.column()
+tabs: Tabs := form.tabs()
+setup: Container := tabs.page("Setup")
+group: RadioGroup := setup.radioGroup()
+group.option("Small")
+group.option("Large")
+bar: Progress := setup.progress(maximum: 100)
+bar.setValue(40)
+when: DateField := setup.date(2026, 11, 21)
+```
+
+See the [GUI reference](GUI.md) and
+[v2.9 examples](../examples/v2.9/README.md) for all widget signatures and
+callbacks.
+
+## 75. Persistent sessions, schema migrations, and custom error pages
+
+> Added in v2.10.0.
+
+Production web applications should keep active user sessions across restarts.
+`Web.persistentSessions` (or `HTTP.persistentSessions`) stores session payloads
+and revocations in SQLite, while `notFound` and `internalError` register custom
+HTTP 404 and 500 handlers:
+
+```ahd
+bring Web
+from Web bring (App, AppConfig, Request, Response, SessionStore)
+
+config: AppConfig := Web.configure()
+store: SessionStore := Web.persistentSessions(
+    "sessions.db"
+    "ahd_session"
+    3600
+    config.isSecure()
+    "Lax"
+)
+
+home: Function := (request: Request) -> Response {
+    store: Global SessionStore
+    ctx: Local := Web.context(request, store)
+    return ctx.respond(Web.html(Web.UI.h1("AhdCode v2.11")))
+}
+
+missing: Function := (request: Request) -> Response {
+    return Web.text("Page not found", 404)
+}
+
+app: App := Web.app(config)
+app.get("/", home)
+app.notFound(missing)
+app.start()
+```
+
+Manage SQLite schema changes with the built-in migration CLI:
+
+```bash
+ahdcode migrate new create_notes
+ahdcode migrate status --db notes.db
+ahdcode migrate up --db notes.db
+```
+
+During development, `ahdcode dev app.ahd` automatically rebuilds and reloads
+connected browser tabs after saving. See [Web](WEB.md), [SQLite](SQLITE.md),
+[CLI](CLI.md), and the
+[v2.10 dev reload example](../examples/v2.10/web_dev_reload/README.md).
+
+## 76. Progressive Web Apps (PWA) and Web packaging
+
+> Added in v2.11.0.
+
+v2.11 adds first-party scaffolding for installable Progressive Web Apps (PWA),
+local HTTPS development certificates, and standalone web bundle packaging:
+
+```bash
+ahdcode pwa init --name "Sample Site" --short-name "Sample"
+ahdcode dev --https app.ahd
+ahdcode package app.ahd --web --pwa
+```
+
+Require the generated `PWA/Integration.ahd` helper, add `ahdPwaManifest()` and
+`ahdPwaRegistration()` to your layout `<head>`, and call `ahdPwaMount(site)`
+before `site.start()`. Pages and layouts are built directly with `Web.UI`
+because the legacy template module was removed in v2.11.
+
+See the [PWA guide](PWA.md), [Packaging guide](PACKAGING.md),
+[v2.11 upgrade guide](UPGRADE_2.11.md), and
+[v2.11.0 release notes](RELEASE_2.11.0.md).

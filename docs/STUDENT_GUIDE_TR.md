@@ -1,4 +1,4 @@
-# AhdCode Öğrenci Rehberi (v2.7)
+# AhdCode Öğrenci Rehberi (v2.11)
 
 Bu rehber, **daha önce hiç programlama yapmamış birinin de takip edebilmesi** için hazırlanmıştır. Baştan sona sırayla okuyabilirsiniz; her bölümde önce ne yapmak istediğimizi görecek, sonra çalışan bir örnek yazacak, en son gerekli kuralları öğreneceksiniz.
 
@@ -14,11 +14,14 @@ belgesine geçin. Orada modüller `CSV → Data → Statistics/Plot → Excel/Wo
 Tek tek bütün imzalar ve sınır koşulları ise her modülün kendi referans
 belgesindedir.
 
-Bu rehber v2.7.0 genel sürümünü temel alır. İsimli Function `uses` capture
-sözdizimi kararlı dilin parçasıdır. 70–72. bölümler v2.3–v2.4 matematik
+Bu rehber v2.11.0 genel sürümünü temel alır. İsimli Function `uses` capture
+sözdizimi kararlı dilin parçasıdır. 70–76. bölümler v2.3–v2.4 matematik
 çizimini ve stillerini, v2.5 güvenli dosya ve süreç işlemlerini, v2.6–v2.7
-salt okunur ağ ve sistem inceleme modüllerini tanıtır. Bağlantı verilen
-modül başvuruları API'lerin tamamını ve platform sınırlarını açıklar.
+salt okunur ağ ve sistem inceleme modüllerini, v2.8–v2.9 etkileşimli
+`Graphics` ve masaüstü `GUI` bileşenlerini, v2.10 kalıcı oturumları ve
+şema göçünü, v2.11 ise Progresif Web Uygulamaları (PWA) ile `--web`
+paketlemesini tanıtır. Bağlantı verilen modül başvuruları API'lerin tamamını
+ve platform sınırlarını açıklar.
 
 Bu rehber öğretir; bir referans kılavuzu ya da değişiklik günlüğü değildir. Bir
 modülün, yeni başlayan birinin ilk okumada ihtiyaç duyduğundan fazlası varsa,
@@ -99,6 +102,10 @@ verir.
 - [70. Matematiksel etiketler ve grafik stilleri](#70-matematiksel-etiketler-ve-grafik-stilleri)
 - [71. Bir sürümü güvenle hazırlamak](#71-bir-sürümü-güvenle-hazırlamak)
 - [72. Yayındaki servisi incelemek](#72-yayındaki-servisi-incelemek)
+- [73. Etkileşimli Graphics: şekiller, metin, zamanlayıcılar ve işaretçi olayları](#73-etkileşimli-graphics-şekiller-metin-zamanlayıcılar-ve-işaretçi-olayları)
+- [74. Zengin masaüstü GUI: sekmeler, seçimler, tarih alanı ve menüler](#74-zengin-masaüstü-gui-sekmeler-seçimler-tarih-alanı-ve-menüler)
+- [75. Kalıcı oturumlar, şema göçü ve özel hata sayfaları](#75-kalıcı-oturumlar-şema-göçü-ve-özel-hata-sayfaları)
+- [76. Progresif Web Uygulamaları (PWA) ve Web paketleme](#76-progresif-web-uygulamaları-pwa-ve-web-paketleme)
 
 ## 1. AhdCode nedir?
 
@@ -118,11 +125,13 @@ Merhaba!
 
 AhdCode, programı çalıştırmadan önce yazdığınız kodu kontrol eder. Örneğin bir metni sayı gibi kullanmaya çalışırsanız veya `null` olabilecek bir değeri kontrol etmeden kullanırsanız, mümkün olduğunda hatayı daha program başlamadan söyler. Ama başlangıçta bunun ayrıntılarını düşünmeniz gerekmiyor; ilerleyen bölümlerde örneklerle göreceğiz.
 
-AhdCode v1.0.0 ilk kararlı sürümdü. Güncel kurulabilir sürüm v2.7.0'dır.
-v2.8.0 ile v2.10.0 arasındaki sürümler yalnızca kaynak olarak yayımlanır.
-Yeni kurulum paketleri v3.0'da döner. Bu rehber
-kararlı temeli öğretir ve yeni modüller için ilk alıştırmayı verir; her
-modülün başvuru sayfası API'sinin tamamını belgeler.
+AhdCode v1.0.0 ilk kararlı sürümdü. Güncel kararlı sürüm **v2.11.0**'dır:
+macOS (`.pkg` / `.dmg`), Windows (`.exe`) ve Linux (`amd64` / `arm64` `.tar.gz`)
+kurulum paketleri sunar. `ahdcode build` ve `ahdcode package` komutları için
+`PATH` üzerinde `go.mod` ile uyumlu Go gerekir; dahili Go ve çevrimdışı LaTeX
+içeren tam paketler v2.7.0 altında korunur. Bu rehber kararlı temeli öğretir
+ve yeni modüller için ilk alıştırmayı verir; her modülün başvuru sayfası
+API'sinin tamamını belgeler.
 
 Onunla küçük komut satırı programları yazabilir veya bunları yerel executable uygulamalara derleyebilirsiniz; veriyi yerel bir SQLite veritabanında ya da bir MySQL sunucusunda tutabilirsiniz; birinci taraf `Web` çatısıyla eksiksiz bir web uygulaması kurabilirsiniz — sayfalar, yerleşimler, formlar, doğrulama, CSRF, flash mesajları, oturumlar ve dosya yüklemeleri; dış HTTP ve HTTPS API'leri çağırabilir, HTML ayrıştırabilir, SMTP ile e-posta gönderebilir, `Security` ile parola hashleyip güvenli belirteç üretebilir ve dil sunucusunu (`ahdcode lsp`) VS Code gibi bir editörden kullanabilirsiniz.
 
@@ -7656,3 +7665,142 @@ uyarı eşiğine ve yapılacak işleme programınız karar verir.
 **Kendiniz deneyin:** Projenizi içeren dosya sistemini inceleyip
 `freeBytes()` ile `availableBytes()` değerlerini karşılaştırın. Linux'ta
 bildiğiniz bir servisin `activeState()` ve `running()` değerlerine de bakın.
+
+## 73. Etkileşimli Graphics: şekiller, metin, zamanlayıcılar ve işaretçi olayları
+
+> v2.8.0'da eklendi.
+
+`Graphics` tuvali yalnızca çizgi ve dikdörtgen değil; hizalı metin, çokgen,
+elips, yay ve içe aktarılmış görseller de çizer. Etkileşimli programlar için
+kare hızına bağlı `Canvas.every(16, handler)` zamanlayıcısı ve `onClick`,
+`onDrag`, `onMove` işaretçi geri çağrıları sunar:
+
+```ahd
+bring Graphics
+bring Math
+from Graphics bring Canvas
+
+canvas: Canvas := Graphics.open(480, 360, "Şekiller ve metin", "#f8f8f8")
+canvas.text(0, 140, "AhdCode Graphics", "blue", 30, "center")
+canvas.polygon([-200, -40, -100, -40, -150, 50], "black", "yellow", 2)
+canvas.ellipse(150, 10, 60, 30, "green", "#00ff0040", 3)
+canvas.arc(150, 10, 45, 200, 340, "black", 4)
+canvas.save("sekiller.png")
+canvas.save("sekiller.svg")
+```
+
+Zamanlayıcıyı durdurup sürdürmek için `Canvas.cancel(...)`, etkileşimli örnekler
+için [Graphics başvurusu](GRAPHICS_TR.md) ve
+[v2.8 örnekleri](../examples/v2.8/README_TR.md) belgelerine bakın.
+
+## 74. Zengin masaüstü GUI: sekmeler, seçimler, tarih alanı ve menüler
+
+> v2.9.0'da eklendi.
+
+v2.9 ile masaüstü `GUI` penceresine sekmeli düzen (`Tabs`), radyo düğme grubu
+(`RadioGroup`), ilerleme çubuğu (`Progress`), tarih alanı (`DateField`) ve
+pencere menüleri (`Menu` / `MenuItem`) eklendi:
+
+```ahd
+bring GUI
+from GUI bring (Window, Container, Tabs, RadioGroup, Progress, DateField, Menu, MenuItem)
+
+window: Window := GUI.window("Denetimler", 480, 420)
+fileMenu: Menu := window.menu("Dosya")
+quitItem: MenuItem := fileMenu.item("Çıkış", "Q")
+
+closeApp: Function := () -> Nothing {
+    window: Global Window
+    window.close()
+}
+quitItem.onClick(closeApp)
+
+form: Container := window.column()
+tabs: Tabs := form.tabs()
+setup: Container := tabs.page("Kurulum")
+group: RadioGroup := setup.radioGroup()
+group.option("Küçük")
+group.option("Büyük")
+bar: Progress := setup.progress(maximum: 100)
+bar.setValue(40)
+when: DateField := setup.date(2026, 11, 21)
+```
+
+Tüm denetimler ve olay imzaları için [GUI başvurusu](GUI_TR.md) ve
+[v2.9 örnekleri](../examples/v2.9/README_TR.md) sayfasına bakın.
+
+## 75. Kalıcı oturumlar, şema göçü ve özel hata sayfaları
+
+> v2.10.0'da eklendi.
+
+Üretim web uygulamalarında oturumların süreç yeniden başladığında silinmemesi
+gerekir. `Web.persistentSessions` (veya `HTTP.persistentSessions`) oturum
+kimliklerini ve iptal kayıtlarını ayrı bir SQLite veritabanında saklar;
+`notFound` ve `internalError` işleyicileri ise özel HTTP 404/500 sayfaları
+döndürür:
+
+```ahd
+bring Web
+from Web bring (App, AppConfig, Request, Response, SessionStore)
+
+config: AppConfig := Web.configure()
+store: SessionStore := Web.persistentSessions(
+    "sessions.db"
+    "ahd_session"
+    3600
+    config.isSecure()
+    "Lax"
+)
+
+home: Function := (request: Request) -> Response {
+    store: Global SessionStore
+    ctx: Local := Web.context(request, store)
+    return ctx.respond(Web.html(Web.UI.h1("AhdCode v2.11")))
+}
+
+missing: Function := (request: Request) -> Response {
+    return Web.text("Sayfa bulunamadı", 404)
+}
+
+app: App := Web.app(config)
+app.get("/", home)
+app.notFound(missing)
+app.start()
+```
+
+Veritabanı tablolarını sürümlemek için SQLite göç komutlarını kullanın:
+
+```bash
+ahdcode migrate new create_notes
+ahdcode migrate status --db notes.db
+ahdcode migrate up --db notes.db
+```
+
+Geliştirme sırasında `ahdcode dev app.ahd` dosyalar kaydedildikçe uygulamayı
+otomatik yeniden derler ve bağlı tarayıcı sekmesini yeniler. Bkz.
+[Web](WEB_TR.md), [SQLite](SQLITE_TR.md), [CLI](CLI_TR.md) ve
+[v2.10 geliştirme yenileme örneği](../examples/v2.10/web_dev_reload/README_TR.md).
+
+## 76. Progresif Web Uygulamaları (PWA) ve Web paketleme
+
+> v2.11.0'da eklendi.
+
+Bir `Web` uygulamasını kurulabilir Progresif Web Uygulamasına (PWA) dönüştürmek
+ve sunucu varlıklarıyla birlikte tek bir dağıtım paketi üretmek için v2.11 ile
+gelen iş akışını kullanabilirsiniz:
+
+```bash
+ahdcode pwa init --name "Örnek Site" --short-name "Örnek"
+ahdcode dev --https app.ahd
+ahdcode package app.ahd --web --pwa
+```
+
+Proje kökünde oluşturulan `PWA/Integration.ahd` dosyasını `require` ile dahil
+edin, yerleşim başlığına `ahdPwaManifest()` ile `ahdPwaRegistration()`
+ekleyin ve `site.start()` öncesinde `ahdPwaMount(site)` çağırın. v2.11'de
+önceki harici şablon modülü kaldırıldığı için sayfa ve yerleşimler yalnızca
+`Web.UI` bileşenleriyle oluşturulur.
+
+Ayrıntılar için [PWA rehberi](PWA_TR.md), [Paketleme rehberi](PACKAGING_TR.md),
+[v2.11 yükseltme notları](UPGRADE_2.11_TR.md) ve
+[v2.11.0 sürüm notları](RELEASE_2.11.0_TR.md) belgelerine bakın.

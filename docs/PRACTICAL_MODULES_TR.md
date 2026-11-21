@@ -30,6 +30,7 @@ blokları yukarıdan aşağıya aynı `.ahd` dosyasında birleştirin.
 - [7. HTTP ve HTTPS: istek, yanıt ve hata sınırı](#7-http-ve-https-istek-yanıt-ve-hata-sınırı)
 - [8. HTML: güvenli sayfa kurmak ve belge ayrıştırmak](#8-html-güvenli-sayfa-kurmak-ve-belge-ayrıştırmak)
 - [9. Bitirme projesi: veriden iki rapor üretmek](#9-bitirme-projesi-veriden-iki-rapor-üretmek)
+- [10. Kalıcı oturumlar, şema göçü, PWA ve web dağıtımı](#10-kalıcı-oturumlar-şema-göçü-pwa-ve-web-dağıtımı)
 - [Hangi belgeye ne zaman bakmalıyım?](#hangi-belgeye-ne-zaman-bakmalıyım)
 
 ## Öğrenme haritası
@@ -1173,6 +1174,28 @@ Word belgesini yeniden okuyarak başlık ve tablo metni
 
 Bu kontroller, “program çalıştı” ile “çıktı doğru” arasındaki farktır.
 
+## 10. Kalıcı oturumlar, şema göçü, PWA ve web dağıtımı
+
+v2.10 ve v2.11 iş akışlarını bir araya getirerek yeniden başlatmalarda oturumu
+koruyan, kurulabilir bir PWA web uygulaması paketleyebilirsiniz:
+
+1. `ahdcode init web basic` ile başlangıç projesini oluşturun; sayfaları ve
+   yerleşimleri `Web.UI` ile yazın (`Templates` modülü v2.11'de kaldırılmıştır).
+2. `ahdcode migrate new init_app` ve `ahdcode migrate up --db data/app.db` ile
+   uygulama şemasını kurun.
+3. Oturumları yeniden başlatmalarda korumak için ayrı bir SQLite dosyasında
+   `Web.persistentSessions("data/sessions.db", "app_session", 3600, application.isSecure(), "Lax")`
+   kullanın; 404/500 yanıtlarını `app.notFound(...)` ve `app.internalError(...)`
+   ile tanımlayın.
+4. `ahdcode pwa init --name "Uygulamam" --short-name "Uygulama"` çalıştırıp
+   `PWA/Integration.ahd` dosyasını bağlayın ve `ahdPwaMount(app)` ekleyin.
+5. Yerel HTTPS üzerinde test etmek için `ahdcode dev --https app.ahd`, üretim
+   paketi üretmek için `ahdcode package app.ahd --web --pwa` çalıştırın.
+
+Denetim noktaları: `curl -I` çıktısında manifest için `application/manifest+json`
+türünü, `Web.UI` çıkışında özel 404 sayfasını ve üretilen dağıtım klasöründe
+statik + PWA varlıklarının birlikte kopyalandığını doğrulayın.
+
 ## Hangi belgeye ne zaman bakmalıyım?
 
 | İhtiyaç | Önce burası | Sonra ayrıntılı referans |
@@ -1185,6 +1208,9 @@ Bu kontroller, “program çalıştı” ile “çıktı doğru” arasındaki f
 | Akademik PDF/slayt | Atölye 6 | [Latex](LATEX_TR.md) |
 | API veya web isteği | Atölye 7 | [HTTP](HTTP_TR.md) |
 | HTML kurmak/ayrıştırmak | Atölye 8 | [HTML](HTML_TR.md) |
+| Kalıcı oturum, göç, PWA ve web dağıtımı | Atölye 10 / [Öğrenci Rehberi 75–76](STUDENT_GUIDE_TR.md#75-kalıcı-oturumlar-şema-göçü-ve-özel-hata-sayfaları) | [Web](WEB_TR.md) · [PWA](PWA_TR.md) · [Paketleme](PACKAGING_TR.md) |
+| Etkileşimli 2B çizim ve zamanlayıcı | [Öğrenci Rehberi 73](STUDENT_GUIDE_TR.md#73-etkileşimli-graphics-şekiller-metin-zamanlayıcılar-ve-işaretçi-olayları) | [Graphics](GRAPHICS_TR.md) |
+| Masaüstü arayüz ve menüler | [Öğrenci Rehberi 74](STUDENT_GUIDE_TR.md#74-zengin-masaüstü-gui-sekmeler-seçimler-tarih-alanı-ve-menüler) | [GUI](GUI_TR.md) |
 | Veriyi PostgreSQL'de saklamak | [Öğrenci Rehberi 59](STUDENT_GUIDE_TR.md#59-postgresql-güçlü-bir-ağ-veritabanı) | [PostgreSQL](POSTGRESQL_TR.md) |
 | Tarayıcıya canlı güncelleme göndermek | [Öğrenci Rehberi 60](STUDENT_GUIDE_TR.md#60-websocket-canlı-bağlantılar) | [WebSocket](WEBSOCKET_TR.md) |
 | UUID üretmek ya da karşılaştırmak | [Öğrenci Rehberi 57](STUDENT_GUIDE_TR.md#57-uuid-benzersiz-kimlikler) | [UUID](UUID_TR.md) |
