@@ -2,8 +2,9 @@
 
 [English](RELEASE_2.11.0.md)
 
-Araç zinciri kaynak kod olarak dağıtılır. v2.11.0 kaynaklarını
-`go.mod` dosyasında belirtilen Go sürümüyle derleyin:
+AhdCode `v2.11.0`; macOS, Windows ve Linux için araç zinciri dağıtım
+paketleri sunar ve `v2.11.0` etiketli kaynaktan `go.mod` içindeki Go
+sürümüyle de derlenebilir:
 
 ```sh
 go build -o ahdcode ./cmd/ahdcode
@@ -12,27 +13,39 @@ go build -o ahdsqlite ./cmd/ahdsqlite
 ```
 
 Windows'ta `ahdcode.exe` ve `ahdsqlite.exe` adlarını kullanın.
-Sürüm komutu `AhdCode v2.11.0` gösterir. SQLite gereken uygulamalar için
-uyumlu yardımcıyı CLI'ın yanında tutun. Yayımlanmış mevcut imzalı kararlı
-kurucular, nihai imzalı sürüm yayımlanana kadar v2.7.0'da kalır. Araç
-zincirinin ürettiği Web uygulama paketi ayrı bir çıktıdır.
+Sürüm komutu `AhdCode v2.11.0` gösterir. Kaynaktan derlediğinizde uyumlu
+yardımcıları CLI'ın yanında tutun. Araç zinciri paketleri yerel
+`ahdcode build` ve `ahdcode package` komutları için `PATH` üzerinde
+`go.mod` içindeki Go sürümünü gerektirir; özel Go, çevrimdışı Tectonic LaTeX
+ve VSIX içeren tam kendi kendine yeten paketler `v2.7.0`'da mevcuttur ve
+`v3.0`'da geri döner. `ahdcode package app.ahd --web` ile üretilen Web
+uygulama paketi ayrı bir dağıtım çıktısıdır.
 
-## macOS dağıtım paketleme (.pkg, .dmg, .tar.gz)
+## Çoklu platform dağıtım paketleme
 
-`tooling/distribution/build.py --platform darwin`, Windows ve Linux dağıtım
-davranışını değiştirmeden macOS ARM64 (ve isteğe bağlı çapraz derlenen
-`x86_64`) araç zinciri paketleri üretir:
+`tooling/distribution/build.py`; macOS, Windows ve Linux için yerel araç
+zinciri paketleri üretir:
 
-- `AhdCode-<sürüm>-macos-<mimari>[-unsigned].tar.gz`: `install.sh` içeren ve
-  `~/Library/AhdCode/versions/<sürüm>` altına kuran taşınabilir arşiv.
-- `AhdCode-<sürüm>-macos-<mimari>[-unsigned].pkg`: yönetici şifresi istemeyen
-  (`auth="none"`) ev dizini `.pkg` kurucusu; `2.9.0` gibi mevcut sürümleri
-  korur, `current` bağını ve `~/Library/AhdCode/bin/ahdcode` yolunu günceller,
-  kabuk PATH bloklarını idempotent biçimde ekler ve kaldırma için
-  `install.sh` içerir.
-- `AhdCode-<sürüm>-macos-<mimari>[-unsigned].dmg`: `.pkg`, `INSTALL.txt` ve
-  `VERSION` dosyalarını içeren UDZO disk imajı.
-- `SHA256SUMS.txt`: üretilen her dosya için SHA-256 doğrulama listesi.
+- **macOS (`arm64` ve çapraz derlenen `x64`):**
+  - `AhdCode-2.11.0-macos-<mimari>.pkg`: yönetici şifresi istemeyen
+    (`auth="none"`) ev dizini `.pkg` kurucusu; `2.9.0` gibi mevcut sürümleri
+    korur, `current` bağını ve `~/Library/AhdCode/bin/ahdcode` yolunu
+    günceller, kabuk PATH bloklarını idempotent biçimde ekler ve kaldırma için
+    `install.sh` içerir. Apple Developer ID Installer ile imzalı, Apple noter
+    onaylı ve bilet zımbalıdır.
+  - `AhdCode-2.11.0-macos-<mimari>.dmg`: `.pkg`, `INSTALL.txt` ve `VERSION`
+    dosyalarını içeren UDZO disk imajı. Apple Developer ID Application ile
+    imzalı ve noter onaylıdır.
+  - `AhdCode-2.11.0-macos-<mimari>.tar.gz`: sertleştirilmiş çalışma zamanı ve
+    zaman damgalı Developer ID imzalı Mach-O ikilileri içeren taşınabilir arşiv
+    + `install.sh`.
+- **Windows (`x64`):** `AhdCode-2.11.0-windows-x64.exe` kullanıcı başına
+  kurulum programı ve sabit başlatıcı (`--silent` destekli). Authenticode
+  imzalı değildir; çalıştırmadan önce SHA-256 özetini doğrulayın.
+- **Linux (`amd64` ve `arm64`):** `AhdCode-2.11.0-linux-amd64.tar.gz` ve
+  `AhdCode-2.11.0-linux-arm64.tar.gz` arşivleri (`install.sh` ile `--setup-path`,
+  `--prefix`, `--uninstall`).
+- **`SHA256SUMS.txt`:** Yayımlanan her dosya için SHA-256 doğrulama listesi.
 
 `--sign-app`, `--sign-installer` ve `--notary-profile` verildiğinde Apple'ın
 standart `codesign --verify --deep --strict`, `pkgutil --check-signature`,

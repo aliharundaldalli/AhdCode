@@ -3,6 +3,8 @@ package winsetup
 import (
 	"archive/zip"
 	"bytes"
+	"encoding/json"
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
@@ -41,18 +43,35 @@ func TestRealWindowsPayload(t *testing.T) {
 	}
 	// The two executables the installed product depends on must be present:
 	// the stable launcher that goes on PATH, and the release it activates.
-	for _, name := range []string{
+	bundledRuntimes := true
+	if rawMeta, err := os.ReadFile(filepath.Join(staging, "BUILD.json")); err == nil {
+		var meta struct {
+			BundledRuntimes *bool `json:"bundled_runtimes"`
+		}
+		if err := json.Unmarshal(rawMeta, &meta); err == nil && meta.BundledRuntimes != nil {
+			bundledRuntimes = *meta.BundledRuntimes
+		}
+	}
+	required := []string{
 		filepath.Join("launcher", "ahdcode.exe"),
 		filepath.Join("bin", "ahdcode.exe"),
-		filepath.Join("libexec", "go", "bin", "go.exe"),
+		filepath.Join("libexec", "ahdcode", "ahdsqlite.exe"),
+		"BUILD.json",
+		"FILES.json",
 		"uninstall.ps1",
-	} {
+	}
+	if bundledRuntimes {
+		required = append(required, filepath.Join("libexec", "go", "bin", "go.exe"))
+	}
+	for _, name := range required {
 		information, err := os.Stat(filepath.Join(staging, name))
 		if err != nil || !information.Mode().IsRegular() || information.Size() == 0 {
 			t.Errorf("%s missing or empty: %v", name, err)
 		}
 	}
-	t.Logf("verified %d inventoried files", len(inventory))
+	// Avoid unused io import if extended later; check BUILD.json directly from zip too.
+	_ = io.Discard
+	t.Logf("verified %d inventoried files (bundled_runtimes=%v)", len(inventory), bundledRuntimes)
 }
 
 // embeddedPayload finds the zip the setup program carries.

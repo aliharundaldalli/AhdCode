@@ -1,22 +1,21 @@
 # Kurulum, yükseltme ve kaldırma
 
-Yayımlanan en güncel imzalı kararlı kurulum paketi için AhdCode v2.7.0'ı
-indirin. `v2.7.0`, yayımlanmış son imzalı kararlı kurucu sürümüdür; `v2.8.0` ile
-`v2.10.0` arası kaynak sürümleridir. `v2.11.0` sürüm adayından itibaren macOS
-araç zinciri paketleri (`.pkg`, `.dmg` ve `.tar.gz`) dağıtım betikleriyle
-doğrudan üretilebilir; Windows ve Linux paketleri ise tam masaüstü dağıtımının
-döndüğü `v3.0`'a kadar kaynak sürüm olarak kalır. Her tam v2.7.0 paketi kendi
-kendine yeterlidir: derleyici, özel Go araç zinciri, AhdDataStudio,
-SQLite/numeric/plot yardımcıları, çevrimdışı LaTeX motoru, proje starter'ları
-ve İngilizce belgeler paketin içindedir.
+İşletim sisteminiz için yayımlanan AhdCode **v2.11.0** kararlı kurulum paketini
+indirin (macOS `arm64`/`x64`, Windows `x64` veya Linux `amd64`/`arm64`).
+`v2.11.0` araç zinciri paketleri derleyiciyi, tüm yardımcıları (`ahdsqlite`,
+`ahdnumeric`, `ahdplot`, `ahdgraphics`, `ahdgui`, `ahdplotview`), gömülü
+AhdDataStudio'yu, starter'ları ve İngilizce belgeleri taşır; yerel
+`ahdcode build` ve `ahdcode package` komutları için `PATH` üzerinde `go.mod`
+dosyasındaki Go sürümünü kullanır. `v2.8.0`–`v2.10.0` geçmiş kaynak
+sürümleridir. Özel Go 1.27.0, çevrimdışı Tectonic LaTeX motoru ve VS Code
+`.vsix` eklentisini birlikte taşıyan kendi kendine yeten tam paketler
+`v2.7.0` sürümünde kalır ve `v3.0`'da geri döner.
 
 ## macOS (Apple Silicon ve x64 paketleme)
 
-Yayımlanan v2.7.0 imzalı kurucuları Apple Silicon Mac'leri (`arm64` — M1, M2,
-M3, M4 ve sonraki modeller) hedefler. `v2.11.0` sürüm adayı paketlemesiyle
-birlikte `tooling/distribution/build.py --platform darwin`, macOS `arm64` (ve
-isteğe bağlı çapraz derlenen `x86_64`) `.pkg`, `.dmg` ve `.tar.gz` çıktıları
-üretir:
+AhdCode `v2.11.0`; Apple Silicon (`arm64` — M1, M2, M3, M4 ve sonraki modeller)
+ve çapraz derlenen Intel x86-64 (`x64`) için `.pkg`, `.dmg` ve `.tar.gz`
+paketleri sunar:
 
 - `.pkg`: Önerilen yerel kurucu (`AhdCode-<sürüm>-macos-<mimari>.pkg`; Apple
   Developer ID imzası ve noter onayı olmadan üretildiyse `-unsigned`). Finder'da
@@ -79,20 +78,23 @@ Apple Developer ID sertifikaları ve `notarytool` profili mevcutsa `--sign-app`,
 
 ## Windows x64
 
-`AhdCode-2.7.0-windows-x64.exe` dosyasına Dosya Gezgini'nde çift tıklayın.
-Kurulum küçük bir grafik programdır: ne kuracağını gösterir, gömülü paketi
-ilerleme penceresiyle açıp doğrular ve bir onay penceresiyle biter. Konsol,
-terminal veya komut yazmak gerekmez.
+`AhdCode-2.11.0-windows-x64.exe` dosyasına Dosya Gezgini'nde çift tıklayın
+(veya otomatik kurulum için `AhdCode-2.11.0-windows-x64.exe --silent`
+çalıştırın). Kurulum küçük bir grafik programdır: ne kuracağını gösterir,
+gömülü paketi ilerleme penceresiyle açıp doğrular ve bir onay penceresiyle biter.
+Konsol, terminal veya komut yazmak gerekmez.
 
 Bu sürümün kurulum programı Authenticode imzalı değildir ve Windows SmartScreen “yayıncı
 bilinmiyor” uyarısı gösterebilir. Sistemin **Daha fazla bilgi → Yine de
 çalıştır** yolunu kullanmadan önce dosyayı yayımlanan SHA-256 değeriyle
 doğrulayın; Windows güvenlik korumalarını kapatmayın.
 
-Dosyalar `%LOCALAPPDATA%\AhdCode\versions\2.7.0` altına kurulur. Sabit komut
-`%LOCALAPPDATA%\AhdCode\bin\ahdcode.exe`'dir ve kullanıcı PATH'ine yalnızca bu
-tek dizin, yalnızca ilk kurulumda eklenir. Yönetici izni, Git veya sistem Go
-kurulumu gerekmez; kaldırma kaydı Installed Apps içine yazılır.
+Dosyalar `%LOCALAPPDATA%\AhdCode\versions\2.11.0` altına kurulur (`2.7.0` gibi
+önceki sürümler korunur). Sabit komut `%LOCALAPPDATA%\AhdCode\bin\ahdcode.exe`'dir
+ve kullanıcı PATH'ine yalnızca bu tek dizin, yalnızca ilk kurulumda eklenir.
+Yönetici izni veya Git gerekmez; kaldırma kaydı Installed Apps içine yazılır.
+Yerel `ahdcode build` ve `ahdcode package` komutları için `PATH` üzerinde
+`go.mod` içindeki Go sürümü kullanılır.
 
 Ardından **yeni** bir PowerShell veya Komut İstemi açıp `ahdcode --version`
 çalıştırın.
@@ -106,16 +108,17 @@ PATH girdilerini aynen korur ve eşdeğer tek bir AhdCode girdisi bırakır.
 Kaldırma yalnızca eşdeğer `%LOCALAPPDATA%\AhdCode\bin` girdilerini kaldırır,
 diğer PATH girdilerine ve makine PATH'ine dokunmaz.
 
-`AhdCode-2.7.0-windows-x64.exe --silent` hiçbir pencere açmadan kurar.
+`AhdCode-2.11.0-windows-x64.exe --silent` hiçbir pencere açmadan kurar.
 
 Linux (x86-64 ve arm64): işlemcinize uygun paketi seçin — `uname -m`, `amd64`
 için `x86_64`, `arm64` için `aarch64` yazdırır:
-`AhdCode-v2.7.0-linux-amd64.tar.gz` (64 bit Intel/AMD) ya da
-`AhdCode-v2.7.0-linux-arm64.tar.gz` (64 bit ARM; örneğin Ampere, AWS Graviton,
-64 bit işletim sistemli Raspberry Pi 4/5). Arşivi açın, `AhdCode-2.7.0`
-dizinine girin ve `sh install.sh --setup-path` çalıştırın. Kurulum programı
-hiçbir şey kurmadan önce paketin bu makinede çalıştığını denetler. Kök
-`~/.local/share/ahdcode` dizinidir; PATH bloğu `~/.profile` dosyasına eklenir.
+`AhdCode-2.11.0-linux-amd64.tar.gz` (64 bit Intel/AMD) ya da
+`AhdCode-2.11.0-linux-arm64.tar.gz` (64 bit ARM; örneğin Ampere, AWS Graviton,
+64 bit işletim sistemli Raspberry Pi 4/5). Arşivi açın,
+`AhdCode-2.11.0-linux-amd64` dizinine girin ve `sh install.sh --setup-path`
+çalıştırın. Kurulum programı hiçbir şey kurmadan önce paketin bu makinede
+çalıştığını denetler. Kök `~/.local/share/ahdcode` dizinidir; PATH bloğu
+`~/.profile` dosyasına eklenir.
 
 VS Code eklentisi: her pakette kurulum kökü altındaki `vscode/` klasöründe bir
 `.vsix` dosyası ve kısa bir `README.txt` bulunur. AhdCode için gerekli değildir

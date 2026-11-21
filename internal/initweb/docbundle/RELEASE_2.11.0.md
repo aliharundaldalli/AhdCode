@@ -2,8 +2,9 @@
 
 Türkçe
 
-The toolchain release is source-only. From the v2.11.0 source, build with
-the Go version specified in `go.mod`:
+AhdCode `v2.11.0` ships toolchain distribution packages for macOS, Windows,
+and Linux, as well as source builds from the `v2.11.0` tag with the Go version
+specified in `go.mod`:
 
 ```sh
 go build -o ahdcode ./cmd/ahdcode
@@ -12,27 +13,38 @@ go build -o ahdsqlite ./cmd/ahdsqlite
 ```
 
 On Windows, use `ahdcode.exe` and `ahdsqlite.exe`. The version command
-reports `AhdCode v2.11.0`. Keep the matching SQLite helper beside the CLI
-for applications that need it. Existing published signed installers remain
-v2.7.0 until a final signed release is published. The Web application
-package built by the toolchain is a separate artifact.
+reports `AhdCode v2.11.0`. Keep the matching helpers beside the CLI when
+running from source. Toolchain packages require the Go version specified in
+`go.mod` on `PATH` for native `ahdcode build` and `ahdcode package`; full
+self-contained bundles with private Go, offline Tectonic LaTeX, and VSIX remain
+available on `v2.7.0` and return at `v3.0`. The Web application package built
+by `ahdcode package app.ahd --web` is a separate deployment artifact.
 
-## macOS distribution packaging (.pkg, .dmg, .tar.gz)
+## Multi-platform distribution packaging
 
-`tooling/distribution/build.py --platform darwin` produces macOS ARM64 (and
-optional cross-compiled `x86_64`) toolchain packages without altering
-Windows or Linux release behavior:
+`tooling/distribution/build.py` produces native toolchain packages for macOS,
+Windows, and Linux:
 
-- `AhdCode-<version>-macos-<arch>[-unsigned].tar.gz`: portable toolchain +
-  `install.sh`, installing into `~/Library/AhdCode/versions/<version>`.
-- `AhdCode-<version>-macos-<arch>[-unsigned].pkg`: native home-directory
-  `.pkg` installer (`auth="none"`, no admin password), preserving previously
-  installed versions such as `2.9.0`, updating `current` and
-  `~/Library/AhdCode/bin/ahdcode`, idempotently updating shell PATH profiles,
-  and bundling `install.sh` for `--uninstall`.
-- `AhdCode-<version>-macos-<arch>[-unsigned].dmg`: UDZO disk image containing
-  the `.pkg`, `INSTALL.txt`, and `VERSION`.
-- `SHA256SUMS.txt`: SHA-256 digests for every generated artifact.
+- **macOS (`arm64` and cross-compiled `x64`):**
+  - `AhdCode-2.11.0-macos-<arch>.pkg`: home-directory `.pkg` installer
+    (`auth="none"`, no admin password), preserving prior versions such as
+    `2.9.0`, updating `current` and `~/Library/AhdCode/bin/ahdcode`,
+    idempotently updating shell PATH profiles, and bundling `install.sh` for
+    `--uninstall`. Signed with Apple Developer ID Installer and notarized by
+    Apple with a stapled ticket.
+  - `AhdCode-2.11.0-macos-<arch>.dmg`: UDZO disk image containing the `.pkg`,
+    `INSTALL.txt`, and `VERSION`. Signed with Apple Developer ID Application
+    and notarized/stapled.
+  - `AhdCode-2.11.0-macos-<arch>.tar.gz`: portable toolchain + `install.sh`
+    with Developer ID Application signed Mach-O binaries (hardened runtime and
+    secure timestamp).
+- **Windows (`x64`):** `AhdCode-2.11.0-windows-x64.exe` per-user installer and
+  stable launcher (`--silent` supported). It is not Authenticode-signed; verify
+  its SHA-256 digest before running.
+- **Linux (`amd64` and `arm64`):** `AhdCode-2.11.0-linux-amd64.tar.gz` and
+  `AhdCode-2.11.0-linux-arm64.tar.gz` with `install.sh` (`--setup-path`,
+  `--prefix`, `--uninstall`).
+- **`SHA256SUMS.txt`:** SHA-256 digests for every published artifact.
 
 When `--sign-app`, `--sign-installer`, and `--notary-profile` are supplied,
 artifacts enforce Apple's standard `codesign --verify --deep --strict`,

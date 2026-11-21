@@ -29,8 +29,37 @@ def extract(archive, dest):
 def build(target, output, goos, arch, ldflags='-buildid=', module=None):
     env = dict(os.environ, GOFLAGS='-p=1', GOMAXPROCS='2', GOOS=goos, GOARCH=arch, CGO_ENABLED='0')
     print('Building', goos, arch, target, flush=True)
-    run(['nice', '-n', '10', 'go', 'build', '-trimpath', '-ldflags=' + ldflags, '-o', output, target], cwd=module or R, env=env)
+    cmd = ['go', 'build', '-trimpath', '-ldflags=' + ldflags, '-o', output, target]
+    if os.name != 'nt':
+        cmd = ['nice', '-n', '10'] + cmd
+    run(cmd, cwd=module or R, env=env)
     time.sleep(4)
+
+
+def create_dmg(dmg_stage, dmg, volname, size_mb):
+    """Create a compressed UDZO DMG, retrying transient hdiutil resource locks."""
+    cmd = [
+        'hdiutil', 'create', '-volname', volname, '-srcfolder', dmg_stage,
+        '-fs', 'HFS+', '-size', f'{size_mb}m', '-format', 'UDZO', '-ov', dmg,
+    ]
+    for attempt in range(1, 6):
+        res = subprocess.run([str(a) for a in cmd], capture_output=True, text=True)
+        out = (res.stdout + '\n' + res.stderr).strip()
+        if res.returncode == 0:
+            if out:
+                print(out, flush=True)
+            return
+        lower = out.lower()
+        transient = 'resource busy' in lower or 'temporarily unavailable' in lower
+        if attempt < 5 and transient:
+            print(f'hdiutil create transient busy error on attempt {attempt}; retrying: {out}', flush=True)
+            if dmg.exists():
+                dmg.unlink()
+            time.sleep(4 * attempt)
+            continue
+        if out:
+            print(out, file=sys.stderr, flush=True)
+        raise subprocess.CalledProcessError(res.returncode, [str(a) for a in cmd], output=res.stdout, stderr=res.stderr)
 
 
 # The Graphics and GUI window helpers and the interactive Plot viewer are their
@@ -342,8 +371,8 @@ def dmg_instructions(version, arch, label, commit, pkg_name, bundled_runtimes, s
 
 
 def source_only_release(version, platform='all'):
-    """v2.8.0 through v2.10.x stay source-only; Windows/Linux remain source-only
-    for v2.11.x while native macOS RC packaging is enabled on --platform darwin."""
+    """v2.8.0 through v2.10.x stay source-only; v2.11.0+ enables native
+    toolchain distribution across macOS, Windows, and Linux."""
     head = version.split('-')[0]
     parts = head.split('.')
     if len(parts) < 2:
@@ -352,9 +381,7 @@ def source_only_release(version, platform='all'):
         major, minor = int(parts[0]), int(parts[1])
     except ValueError:
         return False
-    if major == 2 and minor >= 8:
-        if platform == 'darwin' and (major, minor) >= (2, 11):
-            return False
+    if major == 2 and 8 <= minor <= 10:
         return True
     return major == 3 and minor == 0 and 'beta' in version.lower()
 
@@ -379,7 +406,7 @@ def main():
     ap.add_argument('--notary-profile', default='', help='xcrun notarytool keychain profile name for signing+notarization')
     ap.add_argument('--vsix', type=pathlib.Path, help='the .vsix from tooling/distribution/build_vsix.py')
     ap.add_argument('--without-vsix', action='store_true', help='deliberately ship no editor extension')
-    ap.add_argument('--without-bundled-runtimes', action='store_true', help='macOS only: package compiler and helper binaries without bundled Go/LaTeX downloads')
+    ap.add_argument('--without-bundled-runtimes', action='store_true', help='package compiler and helper binaries without bundled Go/LaTeX downloads')
     ap.add_argument('--platform', choices=['darwin', 'windows', 'linux', 'all'], default='all')
     ap.add_argument('--macos-arch', choices=['arm64', 'amd64', 'both'], default='arm64', help='macOS target architecture(s)')
     ap.add_argument('--leak-forbid-file', type=pathlib.Path, action='append', default=[], help='a developer-local file whose exact contents must not appear in any artifact')
@@ -396,12 +423,10 @@ def main():
             'Full multi-platform desktop distribution returns at v3.0.'
         )
 
-    if a.without_bundled_runtimes and a.platform != 'darwin':
-        raise SystemExit('--without-bundled-runtimes is supported only for --platform darwin')
     if a.notary_profile and not (a.sign_app and a.sign_installer):
         raise SystemExit('--notary-profile requires both --sign-app and --sign-installer')
     if not a.without_bundled_runtimes and (not a.downloads or not a.latex_runtime):
-        raise SystemExit('pass --downloads <dir> and --latex-runtime <dir> (or --without-bundled-runtimes for --platform darwin)')
+        raise SystemExit('pass --downloads <dir> and --latex-runtime <dir> (or --without-bundled-runtimes)')
 
     commit = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=R, text=True).strip()
     dirty = subprocess.check_output(['git', 'status', '--porcelain', '--ignored', '--untracked-files=all'], cwd=R, text=True)
@@ -430,7 +455,7 @@ def main():
     if a.platform in ('all', 'windows'):
         targets.append(('windows', 'amd64', 'windows-x64'))
     if a.platform in ('all', 'linux'):
-        targets.append(('linux', 'amd64', 'linux-x64'))
+        targets.append(('linux', 'amd64', 'linux-amd64'))
         targets.append(('linux', 'arm64', 'linux-arm64'))
 
     for goos, arch, label in targets:
@@ -556,6 +581,7 @@ def main():
                 build('./tooling/distribution/windows', artifact, goos, arch, '-buildid= -H=windowsgui')
             finally:
                 zipped.unlink(missing_ok=True)
+            shutil.rmtree(staging)
             records.append({
                 'filename': artifact.name,
                 'size': artifact.stat().st_size,
@@ -563,6 +589,7 @@ def main():
                 'platform': goos,
                 'architecture': arch,
                 'format': 'exe',
+                'bundled_runtimes': not a.without_bundled_runtimes,
                 'components': base_components + ['graphical per-user setup', 'stable ahdcode.exe launcher'],
                 'notices': 'payload/THIRD_PARTY_NOTICES.md',
             })
@@ -611,7 +638,7 @@ def main():
             volname = f'AhdCode {version} {label}' + ('' if art_suffix == '' else f' {art_suffix.lstrip("-")}')
             dmg_bytes = sum(p.stat().st_size for p in dmg_stage.rglob('*') if p.is_file())
             size_mb = max(96, int((dmg_bytes / (1024 * 1024)) * 1.5) + 48)
-            run(['hdiutil', 'create', '-volname', volname, '-srcfolder', dmg_stage, '-fs', 'HFS+', '-size', f'{size_mb}m', '-format', 'UDZO', '-ov', dmg])
+            create_dmg(dmg_stage, dmg, volname, size_mb)
             shutil.rmtree(dmg_stage)
             shutil.rmtree(staging)
             if a.sign_app:
@@ -639,8 +666,9 @@ def main():
         else:
             artifact = a.output / ('AhdCode-' + version + '-' + label + '.tar.gz')
             shutil.copy2(R / 'tooling/distribution/install.sh', staging / 'install.sh')
-            with tarfile.open(artifact, 'w:gz') as t:
-                t.add(staging, arcname='AhdCode-' + version)
+            (staging / 'install.sh').chmod(0o755)
+            tar_tree(staging, artifact, f'AhdCode-{version}-{label}')
+            shutil.rmtree(staging)
             records.append({
                 'filename': artifact.name,
                 'size': artifact.stat().st_size,
@@ -648,7 +676,8 @@ def main():
                 'platform': goos,
                 'architecture': arch,
                 'format': 'tar.gz',
-                'components': base_components,
+                'bundled_runtimes': not a.without_bundled_runtimes,
+                'components': base_components + ['install.sh installer'],
                 'notices': 'payload/THIRD_PARTY_NOTICES.md',
             })
             print('ARTIFACT', artifact, records[-1]['sha256'], flush=True)

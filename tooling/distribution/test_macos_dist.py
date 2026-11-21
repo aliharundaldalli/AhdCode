@@ -75,15 +75,16 @@ def verify_sqlite_execution(ahdcode_bin, workdir):
 
 
 class FastDistributionPolicyTests(unittest.TestCase):
-    def test_source_only_gate_preserves_windows_linux_behavior(self):
-        for plat in ('windows', 'linux', 'all'):
-            with tempfile.TemporaryDirectory(prefix='ahdcode-pol-') as tmp:
-                res = subprocess.run(
-                    [sys.executable, str(TOOLS / 'build.py'), '--platform', plat, '--without-vsix', '--output', tmp],
-                    cwd=ROOT, capture_output=True, text=True,
-                )
-                self.assertNotEqual(res.returncode, 0, f'platform={plat} should still be blocked on 2.11.0')
-                self.assertIn('source-only release', res.stderr)
+    def test_source_only_gate_policy(self):
+        sys.path.insert(0, str(TOOLS))
+        try:
+            import build as dist_build
+        finally:
+            sys.path.pop(0)
+        for plat in ('darwin', 'windows', 'linux', 'all'):
+            self.assertTrue(dist_build.source_only_release('2.8.0', plat), (plat, '2.8.0'))
+            self.assertTrue(dist_build.source_only_release('2.10.0', plat), (plat, '2.10.0'))
+            self.assertFalse(dist_build.source_only_release('2.11.0', plat), (plat, '2.11.0'))
 
     def test_postinstall_rejects_traversal_and_symlink_root(self):
         postinstall = TOOLS / 'macos' / 'postinstall'
