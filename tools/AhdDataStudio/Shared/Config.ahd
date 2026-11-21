@@ -9,7 +9,16 @@ loadEnvFile: Function := () -> Nothing {
     }
 }
 
-sessions: SessionStore := HTTP.sessions("ahd_datastudio", 3600, false, "Lax")
+studioCookieSecure: Function := () -> Bool {
+    loadEnvFile()
+    flag: Local String := Env.getOr("AHD_DATA_SECURE_COOKIES", "").trim().lower()
+    if flag == "1" or flag == "true" or flag == "yes" {
+        return true
+    }
+    return Env.getOr("APP_PROTOCOL", "").trim().lower() == "https"
+}
+
+sessions: SessionStore := HTTP.sessions("ahd_datastudio", 3600, studioCookieSecure(), "Lax")
 
 pageSize: Int := 50
 mysqlSchemaCache: List<String> := []

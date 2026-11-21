@@ -45,11 +45,8 @@ bring HTML
 bring HTTP
 bring Security
 from Env bring EnvError
-from HTML bring HTMLError
-from HTTP bring Server
-from HTTP bring Request
-from HTTP bring Response
-from HTTP bring HTTPError
+from HTML bring (HTMLError, HTMLNode)
+from HTTP bring (Server, Request, Response, HTTPError, SessionStore)
 from Security bring SecurityError
 
 // staticAssetsRoot mirrors the old per-file bootstrapPath/logoPath fallback:
@@ -76,10 +73,54 @@ staticAssetsRoot: Function := () -> String {
     return "tools/AhdDataStudio/assets"
 }
 
+studioPort: Function := () -> Int {
+    raw: Local String := Env.getOr("AHD_DATA_PORT", "8081").trim()
+    attempt {
+        port: Local Int := int(raw)
+        if port > 0 and port <= 65535 {
+            return port
+        }
+    }
+    except Error {}
+    return 8081
+}
+
+studioNotFound: Function := (request: Request) -> Response {
+    sessions: Global SessionStore
+    studioLang: Global String
+    token: Local String := ""
+    title: Local String := "Not Found"
+    bodyText: Local String := "The requested Studio route does not exist."
+    attempt {
+        session: Local := sessions.open(request)
+        rememberLang(session)
+        token = csrfToken(session)
+        if studioLang == "tr" {
+            title = "Sayfa Bulunamadı"
+            bodyText = "İstediğiniz Studio sayfası mevcut değil."
+        }
+        nodes: Local List<HTMLNode> := [
+            HTML.element("h1", {"class": "h4 mb-3"}, [HTML.text(title)])
+            HTML.element("p", {"class": "text-muted mb-3"}, [HTML.text(bodyText)])
+            HTML.element("a", {"class": "btn btn-sm btn-outline-primary", "href": "/AhdDataStudio"}, [HTML.text(t("nav_dashboard"))])
+        ]
+        return sessions.commit(session, HTTP.response(404, layout(title, token, nodes), "text/html; charset=utf-8").withHeader("Cache-Control", "no-store"))
+    }
+    except Error {
+        return HTTP.response(404, "<!doctype html><html><head><meta charset=\"utf-8\"><title>404 — AhdDataStudio</title></head><body><h1>Not Found</h1><p><a href=\"/AhdDataStudio\">AhdDataStudio</a></p></body></html>", "text/html; charset=utf-8").withHeader("Cache-Control", "no-store")
+    }
+}
+
+studioInternalError: Function := (request: Request) -> Response {
+    html: Local String := "<!doctype html><html><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><link rel=\"stylesheet\" href=\"/AhdDataStudio/assets/bootstrap.min.css\"><title>500 — AhdDataStudio</title></head><body class=\"bg-light p-4\"><div class=\"container\" style=\"max-width:540px\"><div class=\"card\"><div class=\"card-body\"><h1 class=\"h4 mb-2\">Server Error</h1><p class=\"text-muted mb-3\">AhdDataStudio could not complete this request.</p><a class=\"btn btn-sm btn-outline-primary\" href=\"/AhdDataStudio\">Dashboard</a></div></div></div></body></html>"
+    return HTTP.response(500, html, "text/html; charset=utf-8").withHeader("Cache-Control", "no-store")
+}
+
 startStudio: Function := () -> Nothing {
     loadEnvFile()
     loadMysqlSettings()
-    app: Local Server := HTTP.server("127.0.0.1", 8081)
+    port: Local Int := studioPort()
+    app: Local Server := HTTP.server("127.0.0.1", port)
     app.static("/AhdDataStudio/assets", staticAssetsRoot())
     app.get("/", studioRoot)
     app.get("/AhdDataStudio", home)
@@ -112,7 +153,9 @@ startStudio: Function := () -> Nothing {
     app.post("/AhdDataStudio/sqlite/delete", sqliteDelete)
     app.get("/AhdDataStudio/sqlite/confirm", sqliteConfirmPage)
     app.post("/AhdDataStudio/sqlite/drop", sqliteDrop)
-    write("AhdDataStudio listening on http://127.0.0.1:8081/AhdDataStudio")
+    app.notFound(studioNotFound)
+    app.internalError(studioInternalError)
+    write("AhdDataStudio listening on http://127.0.0.1:{port}/AhdDataStudio")
     app.start()
 }
 
