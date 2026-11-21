@@ -34,13 +34,36 @@ launching the binary from `Contents/MacOS`. Record the macOS version,
 architecture, and any filesystem-dependent skips. GitHub runs this
 selection on ARM64.
 
-To build and verify the macOS distribution artifacts (`.tar.gz`, `.pkg`,
-`.dmg` + `SHA256SUMS.txt`):
+To build and verify the unsigned macOS CI distribution artifacts (`.tar.gz`,
+`.pkg`, `.dmg` + `SHA256SUMS.txt`):
 
 ```sh
-python3 tooling/distribution/leak_gate.py --self-test
-python3 tooling/distribution/build.py --platform darwin --macos-arch both --without-bundled-runtimes --without-vsix --output "$qa_dir/macos-dist"
-AHDCODE_TEST_MACOS_DIST_DIR="$qa_dir/macos-dist" python3 -m unittest -v tooling/distribution/test_macos_dist.py
+python3 -B tooling/distribution/leak_gate.py --self-test
+python3 -B tooling/distribution/build.py --platform darwin --macos-arch both --without-bundled-runtimes --without-vsix --output "$qa_dir/macos-dist"
+AHDCODE_TEST_MACOS_DIST_DIR="$qa_dir/macos-dist" python3 -B -m unittest -v tooling/distribution/test_macos_dist.py
+```
+
+When Developer ID certificates and a `notarytool` keychain profile are
+configured on a macOS signing host, produce and verify the signed and
+Apple-notarized artifacts with Gatekeeper enabled:
+
+```sh
+spctl --status
+python3 -B tooling/distribution/build.py \
+  --platform darwin \
+  --macos-arch both \
+  --without-bundled-runtimes \
+  --without-vsix \
+  --sign-app "Developer ID Application: <Team Name> (<Team ID>)" \
+  --sign-installer "Developer ID Installer: <Team Name> (<Team ID>)" \
+  --notary-profile "<notarytool-keychain-profile>" \
+  --output "$qa_dir/macos-dist-signed"
+AHDCODE_TEST_MACOS_DIST_DIR="$qa_dir/macos-dist-signed" python3 -B -m unittest -v tooling/distribution/test_macos_dist.py
+(cd "$qa_dir/macos-dist-signed" && shasum -a 256 -c SHA256SUMS.txt)
+pkgutil --check-signature "$qa_dir/macos-dist-signed"/AhdCode-*.pkg
+xcrun stapler validate "$qa_dir/macos-dist-signed"/AhdCode-*.pkg "$qa_dir/macos-dist-signed"/AhdCode-*.dmg
+spctl -a -vv -t install "$qa_dir/macos-dist-signed"/AhdCode-*-macos-arm64.pkg
+spctl -a -vv -t open --context context:primary-signature "$qa_dir/macos-dist-signed"/AhdCode-*-macos-arm64.dmg
 ```
 
 Note: When built on Apple Silicon (`arm64`) without an Intel runner, `x86_64`

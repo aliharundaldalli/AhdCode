@@ -35,9 +35,13 @@ davranışını değiştirmeden macOS ARM64 (ve isteğe bağlı çapraz derlenen
 - `SHA256SUMS.txt`: üretilen her dosya için SHA-256 doğrulama listesi.
 
 `--sign-app`, `--sign-installer` ve `--notary-profile` verildiğinde Apple'ın
-standart `codesign`, `productbuild --sign`, `xcrun notarytool` ve
-`xcrun stapler` iş akışı kullanılır. Noter kimlikleri yoksa çıktılar açıkça
-`-unsigned` olarak etiketlenir ve Gatekeeper asla atlatılmaz. Kaldırmak için:
+standart `codesign --verify --deep --strict`, `pkgutil --check-signature`,
+`xcrun notarytool submit --wait`, `xcrun stapler staple`/`validate` ve
+Gatekeeper `spctl` denetimleri zorunlu olarak çalıştırılır: `.tar.gz`
+arşivleri sertleştirilmiş çalışma zamanı ve zaman damgalı Developer ID imzalı
+ikililer taşır; `.pkg` ve `.dmg` paketleri ise imzalanır, Apple noter onayından
+geçer ve bilet zımbalanır. Noter kimlikleri yoksa çıktılar açıkça `-unsigned`
+olarak etiketlenir ve Gatekeeper asla atlatılmaz. Kaldırmak için:
 
 ```sh
 sh "$HOME/Library/AhdCode/current/install.sh" --uninstall

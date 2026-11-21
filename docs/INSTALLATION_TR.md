@@ -29,11 +29,27 @@ isteğe bağlı çapraz derlenen `x86_64`) `.pkg`, `.dmg` ve `.tar.gz` çıktıl
   çalıştırın.
 
 Developer ID ile imzalanıp Apple tarafından noterlenmiş ve noter bileti
-zımbalanmış paketleri Gatekeeper uyarı göstermeden kabul eder. Noter kimliği
-olmadan üretilen geliştirme / sürüm adayı paketleri adlarında ve `INSTALL.txt`
-içinde `-unsigned` etiketi taşır; kurulumdan önce `SHA256SUMS.txt` dosyasını
-`shasum -a 256 -c SHA256SUMS.txt` ile doğrulayın ve Gatekeeper korumalarını
-asla kapatmayın veya atlatmayın.
+zımbalanmış paketleri Gatekeeper uyarı göstermeden kabul eder: `.tar.gz`
+arşivleri sertleştirilmiş çalışma zamanı (`hardened runtime`) ve zaman damgası
+ile Developer ID imzalı Mach-O ikilileri içerir; `.pkg` ve `.dmg` paketleri ise
+hem Developer ID ile imzalanır hem de Apple noter onayından geçip bilet
+zımbalanır. İmzalı ve noter onaylı paketleri Gatekeeper açıkken doğrulamak için:
+
+```sh
+spctl --status
+shasum -a 256 -c SHA256SUMS.txt
+pkgutil --check-signature AhdCode-<sürüm>-macos-arm64.pkg
+xcrun stapler validate AhdCode-<sürüm>-macos-arm64.pkg
+xcrun stapler validate AhdCode-<sürüm>-macos-arm64.dmg
+spctl -a -vv -t install AhdCode-<sürüm>-macos-arm64.pkg
+spctl -a -vv -t open --context context:primary-signature AhdCode-<sürüm>-macos-arm64.dmg
+codesign --verify --deep --strict --verbose=2 yol/AhdCode-<sürüm>-macos-arm64/payload/bin/ahdcode
+```
+
+Noter kimliği olmadan üretilen geliştirme / sürüm adayı paketleri adlarında ve
+`INSTALL.txt` içinde `-unsigned` etiketi taşır; kurulumdan önce `SHA256SUMS.txt`
+dosyasını `shasum -a 256 -c SHA256SUMS.txt` ile doğrulayın ve Gatekeeper
+korumalarını asla kapatmayın veya atlatmayın.
 
 Dosyalar `~/Library/AhdCode/versions/<sürüm>` altına kurulur ve `2.9.0` dahil
 önceki kurulu sürümler korunur. `current` sembolik bağı etkin sürümü seçer ve

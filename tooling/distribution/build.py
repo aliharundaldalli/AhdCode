@@ -252,10 +252,47 @@ def sign_payload(root, identity):
     for target in targets:
         run(['codesign', '--force', '--options', 'runtime', '--timestamp', '--sign', identity, target])
     for target in targets:
-        result = subprocess.run(['codesign', '--verify', '--strict', '--verbose=1', str(target)], capture_output=True, text=True)
+        result = subprocess.run(['codesign', '--verify', '--deep', '--strict', '--verbose=2', str(target)], capture_output=True, text=True)
         if result.returncode != 0:
             raise SystemExit('signature did not verify: %s\n%s' % (target, result.stderr.strip()))
     print('Signed and verified', len(targets), 'Mach-O files', flush=True)
+
+
+def notarize_and_verify_dmg(dmg, profile):
+    result = subprocess.run(
+        ['xcrun', 'notarytool', 'submit', str(dmg), '--keychain-profile', profile, '--wait', '--output-format', 'json'],
+        capture_output=True, text=True,
+    )
+    payload = {}
+    try:
+        payload = json.loads(result.stdout) if result.stdout.strip() else {}
+    except json.JSONDecodeError:
+        payload = {}
+    submission_id = payload.get('id', '')
+    status = payload.get('status', '')
+    if result.returncode != 0 or status != 'Accepted':
+        log_detail = ''
+        if submission_id:
+            log_res = subprocess.run(
+                ['xcrun', 'notarytool', 'log', str(submission_id), '--keychain-profile', profile],
+                capture_output=True, text=True,
+            )
+            log_detail = (log_res.stdout or log_res.stderr or '').strip()[:2000]
+        raise SystemExit(
+            f'Notarization failed for {dmg.name}: rc={result.returncode} status={status!r} id={submission_id!r}\n'
+            f'{(result.stderr or result.stdout).strip()}\n{log_detail}'.strip()
+        )
+    print(f'Notarization Accepted: {dmg.name} (id={submission_id})', flush=True)
+    run(['xcrun', 'stapler', 'staple', str(dmg)])
+    run(['xcrun', 'stapler', 'validate', str(dmg)])
+    sp = subprocess.run(
+        ['spctl', '-a', '-vv', '-t', 'open', '--context', 'context:primary-signature', str(dmg)],
+        capture_output=True, text=True,
+    )
+    combined = (sp.stdout + '\n' + sp.stderr).strip()
+    if sp.returncode != 0 or 'accepted' not in combined.lower() or 'Notarized Developer ID' not in combined:
+        raise SystemExit(f'Gatekeeper spctl open check failed for {dmg.name}:\n{combined}')
+    print('Gatekeeper spctl verification:', dmg.name, 'accepted (Notarized Developer ID)', flush=True)
 
 
 def dmg_instructions(version, arch, label, commit, pkg_name, bundled_runtimes, sign_app, sign_installer, notary_profile):
@@ -295,7 +332,7 @@ def dmg_instructions(version, arch, label, commit, pkg_name, bundled_runtimes, s
         f'   - Places files in ~/Library/AhdCode/versions/{version} and preserves prior versions (including 2.9.0).\n'
         '   - Updates ~/Library/AhdCode/current and ~/Library/AhdCode/bin/ahdcode.\n'
         '   - Idempotently adds ~/Library/AhdCode/bin to ~/.zprofile, ~/.zshrc, and ~/.bash_profile.\n\n'
-        '2. Verify checksums\n'
+        '2. Verify SHA-256 checksums\n'
         '   shasum -a 256 -c SHA256SUMS.txt\n\n'
         '3. Roll back to an older installed version (example: 2.9.0)\n'
         '   ln -sfn versions/2.9.0 ~/Library/AhdCode/.current-new && mv -fh ~/Library/AhdCode/.current-new ~/Library/AhdCode/current\n\n'
@@ -579,11 +616,9 @@ def main():
             shutil.rmtree(staging)
             if a.sign_app:
                 run(['codesign', '--force', '--timestamp', '--sign', a.sign_app, dmg])
-                run(['codesign', '--verify', '--verbose=1', dmg])
+                run(['codesign', '--verify', '--verbose=2', dmg])
             if a.sign_app and a.notary_profile:
-                run(['xcrun', 'notarytool', 'submit', str(dmg), '--keychain-profile', a.notary_profile, '--wait'])
-                run(['xcrun', 'stapler', 'staple', str(dmg)])
-                run(['xcrun', 'stapler', 'validate', str(dmg)])
+                notarize_and_verify_dmg(dmg, a.notary_profile)
 
             for fmt, art_path in [('tar.gz', targz), ('pkg', pkg), ('dmg', dmg)]:
                 rec = {

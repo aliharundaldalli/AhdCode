@@ -35,10 +35,13 @@ Windows or Linux release behavior:
 - `SHA256SUMS.txt`: SHA-256 digests for every generated artifact.
 
 When `--sign-app`, `--sign-installer`, and `--notary-profile` are supplied,
-artifacts use Apple's standard `codesign`, `productbuild --sign`,
-`xcrun notarytool`, and `xcrun stapler` workflow. Without notarization
-credentials, builds are clearly labeled `-unsigned` and never bypass
-Gatekeeper. Uninstall with:
+artifacts enforce Apple's standard `codesign --verify --deep --strict`,
+`pkgutil --check-signature`, `xcrun notarytool submit --wait`,
+`xcrun stapler staple`/`validate`, and Gatekeeper `spctl` assessment:
+`.tar.gz` carries Developer ID signed Mach-O binaries with hardened runtime and
+timestamp, while `.pkg` and `.dmg` artifacts are signed, Apple-notarized, and
+stapled. Without notarization credentials, builds are clearly labeled
+`-unsigned` and never bypass Gatekeeper. Uninstall with:
 
 ```sh
 sh "$HOME/Library/AhdCode/current/install.sh" --uninstall

@@ -28,11 +28,27 @@ artifacts:
   `VERSION`, and `payload/`. Extract it and run `sh install.sh --setup-path`.
 
 When signed with a Developer ID and notarized by Apple with the ticket stapled,
-Gatekeeper accepts `.pkg` and `.dmg` artifacts without a warning. Development or
-release-candidate builds created without notarization credentials carry
-`-unsigned` in their filenames and `INSTALL.txt`; verify downloads against
-`SHA256SUMS.txt` (`shasum -a 256 -c SHA256SUMS.txt`), and never disable or
-bypass Gatekeeper protections.
+Gatekeeper accepts `.pkg` and `.dmg` artifacts without a warning: `.tar.gz`
+carries Developer ID signed Mach-O binaries with the hardened runtime and a
+secure timestamp, while `.pkg` and `.dmg` are both Developer ID signed and
+Apple-notarized/stapled. Verify signed and notarized artifacts with Gatekeeper
+enabled before or after downloading:
+
+```sh
+spctl --status
+shasum -a 256 -c SHA256SUMS.txt
+pkgutil --check-signature AhdCode-<version>-macos-arm64.pkg
+xcrun stapler validate AhdCode-<version>-macos-arm64.pkg
+xcrun stapler validate AhdCode-<version>-macos-arm64.dmg
+spctl -a -vv -t install AhdCode-<version>-macos-arm64.pkg
+spctl -a -vv -t open --context context:primary-signature AhdCode-<version>-macos-arm64.dmg
+codesign --verify --deep --strict --verbose=2 path/to/AhdCode-<version>-macos-arm64/payload/bin/ahdcode
+```
+
+Development or release-candidate builds created without notarization credentials
+carry `-unsigned` in their filenames and `INSTALL.txt`; verify downloads
+against `SHA256SUMS.txt` (`shasum -a 256 -c SHA256SUMS.txt`), and never disable
+or bypass Gatekeeper protections.
 
 The installer puts files under `~/Library/AhdCode/versions/<version>`, leaving
 previously installed versions (such as `2.9.0`) intact on disk. `current`

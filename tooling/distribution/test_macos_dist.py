@@ -262,7 +262,7 @@ class MacOSDistributionArtifactTests(unittest.TestCase):
         self._exercise_pkg_isolated(pkg, 'standalone')
 
     def test_dmg_mount_contents_and_pkg_install(self):
-        dmg, _ = self._artifact('arm64', 'dmg')
+        dmg, dmg_rec = self._artifact('arm64', 'dmg')
         standalone_pkg, _ = self._artifact('arm64', 'pkg')
         with tempfile.TemporaryDirectory(prefix='ahdcode-dmg-test-') as tmp:
             mount = pathlib.Path(tmp) / 'mnt'
@@ -279,12 +279,88 @@ class MacOSDistributionArtifactTests(unittest.TestCase):
                 self.assertIn('SHA-256', inst_txt)
                 self.assertNotIn('spctl', inst_txt)
                 self.assertNotIn('xattr -d', inst_txt)
+                if dmg_rec.get('notarized'):
+                    self.assertIn('Signed with Apple Developer ID and notarized by Apple.', inst_txt)
+                    self.assertNotIn('-unsigned', dmg.name)
+                elif not dmg_rec.get('signed'):
+                    self.assertIn('UNSIGNED', inst_txt)
+                    self.assertIn('-unsigned', dmg.name)
                 dmg_pkg = mount / standalone_pkg.name
                 self.assertTrue(dmg_pkg.is_file())
                 self.assertEqual(sha256_file(dmg_pkg), sha256_file(standalone_pkg))
                 self._exercise_pkg_isolated(dmg_pkg, 'from-dmg')
             finally:
                 subprocess.run(['hdiutil', 'detach', str(mount)], check=False, capture_output=True, text=True)
+
+    def test_signature_notarization_and_gatekeeper_status(self):
+        for rec in self.manifest['artifacts']:
+            path = self.dist_dir / rec['filename']
+            fmt = rec['format']
+            if rec.get('signed'):
+                if fmt == 'tar.gz':
+                    with tempfile.TemporaryDirectory(prefix='ahdcode-sig-tgz-') as tmp:
+                        with tarfile.open(path, 'r:gz') as tf:
+                            tf.extractall(tmp, filter='data')
+                        root_dir = next(pathlib.Path(tmp).iterdir())
+                        bins = [root_dir / 'payload' / 'bin' / 'ahdcode'] + [
+                            root_dir / 'payload' / 'libexec' / 'ahdcode' / h for h in EXPECTED_HELPERS
+                        ]
+                        for b in bins:
+                            subprocess.run(
+                                ['codesign', '--verify', '--deep', '--strict', '--verbose=2', str(b)],
+                                check=True, capture_output=True, text=True,
+                            )
+                            info = subprocess.run(
+                                ['codesign', '-dvv', str(b)],
+                                check=True, capture_output=True, text=True,
+                            )
+                            combined = info.stdout + '\n' + info.stderr
+                            self.assertIn('Authority=Developer ID Application:', combined, str(b))
+                            self.assertIn('runtime', combined, str(b))
+                            self.assertIn('Timestamp=', combined, str(b))
+                elif fmt == 'pkg':
+                    res = subprocess.run(
+                        ['pkgutil', '--check-signature', str(path)],
+                        check=True, capture_output=True, text=True,
+                    )
+                    self.assertIn('Status: signed by a developer certificate issued by Apple for distribution', res.stdout)
+                    self.assertIn('Developer ID Installer:', res.stdout)
+                elif fmt == 'dmg':
+                    subprocess.run(
+                        ['codesign', '--verify', '--verbose=2', str(path)],
+                        check=True, capture_output=True, text=True,
+                    )
+                    info = subprocess.run(
+                        ['codesign', '-dvv', str(path)],
+                        check=True, capture_output=True, text=True,
+                    )
+                    combined = info.stdout + '\n' + info.stderr
+                    self.assertIn('Authority=Developer ID Application:', combined)
+                    self.assertIn('Timestamp=', combined)
+            else:
+                self.assertIn('-unsigned', path.name)
+
+            if rec.get('notarized'):
+                subprocess.run(
+                    ['xcrun', 'stapler', 'validate', str(path)],
+                    check=True, capture_output=True, text=True,
+                )
+                if fmt == 'pkg':
+                    sp = subprocess.run(
+                        ['spctl', '-a', '-vv', '-t', 'install', str(path)],
+                        check=True, capture_output=True, text=True,
+                    )
+                    combined = sp.stdout + '\n' + sp.stderr
+                    self.assertIn('accepted', combined.lower())
+                    self.assertIn('Notarized Developer ID', combined)
+                elif fmt == 'dmg':
+                    sp = subprocess.run(
+                        ['spctl', '-a', '-vv', '-t', 'open', '--context', 'context:primary-signature', str(path)],
+                        check=True, capture_output=True, text=True,
+                    )
+                    combined = sp.stdout + '\n' + sp.stderr
+                    self.assertIn('accepted', combined.lower())
+                    self.assertIn('Notarized Developer ID', combined)
 
     def test_x64_packaging_artifacts_if_present(self):
         has_x64 = any(r['architecture'] == 'amd64' for r in self.manifest['artifacts'])

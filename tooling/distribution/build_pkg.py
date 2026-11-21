@@ -13,6 +13,7 @@ either refused to run or would have put user data inside something an uninstall
 deletes.
 """
 import argparse
+import json
 import pathlib
 import re
 import shutil
@@ -149,7 +150,30 @@ def relax_authorization(component, workspace):
 
 
 def notarize_and_staple(package, profile):
-    run(['xcrun', 'notarytool', 'submit', str(package), '--keychain-profile', profile, '--wait'])
+    result = subprocess.run(
+        ['xcrun', 'notarytool', 'submit', str(package), '--keychain-profile', profile, '--wait', '--output-format', 'json'],
+        capture_output=True, text=True,
+    )
+    payload = {}
+    try:
+        payload = json.loads(result.stdout) if result.stdout.strip() else {}
+    except json.JSONDecodeError:
+        payload = {}
+    submission_id = payload.get('id', '')
+    status = payload.get('status', '')
+    if result.returncode != 0 or status != 'Accepted':
+        log_detail = ''
+        if submission_id:
+            log_res = subprocess.run(
+                ['xcrun', 'notarytool', 'log', str(submission_id), '--keychain-profile', profile],
+                capture_output=True, text=True,
+            )
+            log_detail = (log_res.stdout or log_res.stderr or '').strip()[:2000]
+        raise SystemExit(
+            f'Notarization failed for {package.name}: rc={result.returncode} status={status!r} id={submission_id!r}\n'
+            f'{(result.stderr or result.stdout).strip()}\n{log_detail}'.strip()
+        )
+    print(f'Notarization Accepted: {package.name} (id={submission_id})', flush=True)
     run(['xcrun', 'stapler', 'staple', str(package)])
     run(['xcrun', 'stapler', 'validate', str(package)])
 
@@ -239,11 +263,11 @@ def main():
     if arguments.notary_profile:
         notarize_and_staple(arguments.output, arguments.notary_profile)
 
-    verify(arguments.output, arguments.version, bool(arguments.sign), host_arch=host_arch)
+    verify(arguments.output, arguments.version, bool(arguments.sign), host_arch=host_arch, notarized=bool(arguments.notary_profile))
     print('Built', arguments.output, arguments.output.stat().st_size, 'bytes')
 
 
-def verify(package, version, signed, host_arch='arm64'):
+def verify(package, version, signed, host_arch='arm64', notarized=False):
     """Check the shape a Mac actually installs, not merely that a file exists."""
     with tempfile.TemporaryDirectory(prefix='ahdcode-pkg-check-') as workspace:
         expanded = pathlib.Path(workspace) / 'expanded'
@@ -280,9 +304,19 @@ def verify(package, version, signed, host_arch='arm64'):
             raise SystemExit('the package would ask for an administrator password (auth=%s)' % authorization)
     result = subprocess.run(['pkgutil', '--check-signature', str(package)],
                             capture_output=True, text=True)
-    status = 'signed' if 'Status: signed' in result.stdout else 'unsigned'
-    if signed and status != 'signed':
-        raise SystemExit('signing was requested but the package is not signed')
+    is_signed = result.returncode == 0 and 'Status: signed by a developer certificate issued by Apple for distribution' in result.stdout
+    status = 'signed' if is_signed else ('signed-other' if 'Status: signed' in result.stdout else 'unsigned')
+    if signed and not is_signed:
+        raise SystemExit('signing was requested but the package signature did not verify:\n' + (result.stdout + '\n' + result.stderr).strip())
+    if notarized:
+        run(['xcrun', 'stapler', 'validate', str(package)])
+        sp = subprocess.run(['spctl', '-a', '-vv', '-t', 'install', str(package)],
+                            capture_output=True, text=True)
+        combined = (sp.stdout + '\n' + sp.stderr).strip()
+        if sp.returncode != 0 or 'accepted' not in combined.lower() or 'Notarized Developer ID' not in combined:
+            raise SystemExit(f'Gatekeeper spctl install check failed for {package.name}:\n{combined}')
+        print('Gatekeeper spctl verification:', package.name, 'accepted (Notarized Developer ID)', flush=True)
+        status += '+notarized'
     print(
         'Package verification: install root',
         INSTALL_ROOT + f', hostArchitectures={host_arch}, home-directory domain, no administrator password,',
