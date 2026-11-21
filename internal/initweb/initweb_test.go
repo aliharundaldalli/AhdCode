@@ -201,18 +201,20 @@ func TestWizardBasicSkipsAuthAndDatabase(t *testing.T) {
 		t.Fatal("Basic created Login")
 	}
 	for _, path := range []string{
-		"Pages/Site.ahd",
+		"Pages/Home.ahd",
 		"Pages/About.ahd",
 		"Pages/Errors.ahd",
-		"templates/layouts/site.html",
-		"templates/components/nav.html",
-		"templates/pages/home.html",
-		"templates/pages/about.html",
-		"templates/pages/not-found.html",
-		"templates/pages/server-error.html",
+		"Layouts/Main.ahd",
+		"Components/Navbar.ahd",
+		"Components/Footer.ahd",
 	} {
 		if _, err := os.Stat(filepath.Join(root, path)); err != nil {
 			t.Fatalf("Basic missing %s: %v", path, err)
+		}
+	}
+	for _, path := range []string{"Pages/Site.ahd", "templates"} {
+		if _, err := os.Stat(filepath.Join(root, path)); !os.IsNotExist(err) {
+			t.Fatalf("obsolete Basic starter path %s: %v", path, err)
 		}
 	}
 	env, _ := os.ReadFile(filepath.Join(root, ".env"))

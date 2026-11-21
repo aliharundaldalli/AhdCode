@@ -16,10 +16,14 @@ modules, GUI, Graphics, interactive Plot viewer, and desktop application
 packaging. It is used in practice by a small community; it is not a
 mainstream language.
 
-This is **v2.10.0**, **Web Development & Application Reliability**. It is a
-source-only release with GitHub source archives. Signed installers remain at
-v2.7.0 until v3.0. See [what is new in v2.10.0](#release-v2-10-0) and the
-[release and upgrade notes](RELEASE_2.10.0.md).
+This is **v2.11.0**, **Web Deployment & Progressive Web Apps**, the latest
+stable release. Toolchain packages ship for macOS (`arm64` and `x64`, signed
+and Apple-notarized `.pkg`/`.dmg` plus signed `.tar.gz`), Windows (`x64`
+per-user `.exe`), and Linux (`amd64` and `arm64` `.tar.gz`), requiring the Go
+version from `go.mod` on `PATH` for native `ahdcode build` / `package`. Self-contained
+bundles with private Go, offline Tectonic LaTeX, and VSIX remain on v2.7.0
+and return at v3.0. See the [release notes](RELEASE_2.11.0.md) and the
+[upgrade notes](UPGRADE_2.11.md).
 
 v2.0.0 is a major release, **Desktop Application Completion**: it completes
 the first-party desktop application foundation — ListBox, Select, TextArea,
@@ -54,10 +58,9 @@ on the happy path. `ahdcode databases` starts the exact-version AhdDataStudio
 bundled in the installed CLI; it does not need the AhdCode repository or
 `AHDCODE_ROOT`. `AHDCODE_ROOT` is a developer override only.
 
-Local development is still HTTP: there is no local TLS, certificate
-authority, or ACME. No language syntax changed in this release. See
-[CLI](CLI.md#local-development-test-names-and-the-router) and
-[Web](WEB.md).
+AhdCode v2.11.0 adds opt-in loopback HTTPS with
+`ahdcode dev --https app.ahd`. Ordinary dev continues to use HTTP. See
+[local HTTPS](WEB.md#14-local-https) for certificates and browser trust.
 
 v0.18.5, **Web Starter & Application Bootstrap**, turns `ahdcode init web`
 into a starter wizard: Empty, Basic, or Admin. Empty is a polished welcome
@@ -104,7 +107,7 @@ bind address separate for reverse-proxy deployments, with no silent defaults
 and no `.env` values ever embedded in a binary. Still deliberately out of
 scope: ORM, middleware, auth, bundler, and browser live reload. Local trusted
 HTTPS for `<APP_HOST>.test` is
-[deferred](WEB.md#14-local-https--current-limitation) rather than
+[deferred](WEB.md#14-local-https) rather than
 approximated: it would need permanently privileged system state.
 
 v0.14.1 is a tooling hotfix for `require(...)` (language server, formatter,
@@ -317,7 +320,7 @@ To maintain conceptual clarity, AhdCode's capabilities are organized into four d
    - **System & Environment:** [`Time`](TIME.md), [`Cron`](CRON.md) (bounded in-process scheduling), [`Path`](FILESYSTEM.md), [`File`](FILESYSTEM.md), [`Env`](ENV.md), [`Terminal`](TERMINAL.md) (v1.5.0: standard error, flushing, terminal detection and size, styled text, pretty layout), [`Process`](PROCESS.md) (run one program with an argument list, never through a shell; bounded time and output), [`DNS`](DNS.md) and [`TLS`](TLS.md) (bounded address lookup and certificate inspection), [`Disk`](DISK.md) and [`Service`](SERVICE.md) (read-only filesystem capacity and Linux systemd service status)
 
 3. **First-Party Runtime / Framework Modules:**
-   - **Network, Server & Storage Primitives:** [`HTTP`](HTTP.md) (in-memory server, request/response, cookies, sessions, static file server, [WebSocket endpoints](WEBSOCKET.md), client), [`HTML`](HTML.md) (semantic builder, parser, selector engine), [`Templates`](TEMPLATES.md) (HTML file templates, layouts, and escaped data), [`Security`](SECURITY.md) (Argon2id hashing, bcrypt compatibility, secure tokens, constant-time comparison, SHA-2 digests, HMAC, encodings, RS256 signatures, AES-256-GCM), [`SQLite`](SQLITE.md) (local typed database bridge), [`MySQL`](MYSQL.md) (network database with connection pool and transactions), [`PostgreSQL`](POSTGRESQL.md) (network database with connection pool and transactions), [`SMTP`](SMTP.md) (send-only mail client)
+   - **Network, Server & Storage Primitives:** [`HTTP`](HTTP.md) (in-memory server, request/response, cookies, sessions, static file server, [WebSocket endpoints](WEBSOCKET.md), client), [`HTML`](HTML.md) (semantic builder, parser, selector engine), [`Security`](SECURITY.md) (Argon2id hashing, bcrypt compatibility, secure tokens, constant-time comparison, SHA-2 digests, HMAC, encodings, RS256 signatures, AES-256-GCM), [`SQLite`](SQLITE.md) (local typed database bridge), [`MySQL`](MYSQL.md) (network database with connection pool and transactions), [`PostgreSQL`](POSTGRESQL.md) (network database with connection pool and transactions), [`SMTP`](SMTP.md) (send-only mail client)
    - **Web Application Framework:** [`Web`](WEB.md) (first-party bundled web framework, [`Web.UI`](WEB.md#9-webui) semantic components, `RequestContext`, typed `Forms`, ordered `ValidationErrors`, selected `OldInput`, session-bound CSRF, and flash lifecycle)
 
 4. **Developer Tools:**
@@ -394,7 +397,7 @@ On a terminal, `ahdcode init web` asks which starter to write:
 - **Admin** — Home, Login, Dashboard, and one administrator on SQLite or MySQL
 
 You can also pass the starter: `ahdcode init web empty`, `basic`, or `admin`.
-Templates and Bootstrap 5.3.3 ship inside the CLI (MIT, local files, no CDN).
+Starter sources and Bootstrap 5.3.3 ship inside the CLI (MIT, local files, no CDN).
 `.env` is gitignored; Admin SQLite `database/*.db` files are ignored too.
 Existing files and existing databases are never overwritten.
 
@@ -454,7 +457,6 @@ See the [CLI guide](CLI.md), [formatter guide](FORMATTER.md),
 - [HTTP module](HTTP.md)
 - [WebSocket endpoints](WEBSOCKET.md)
 - [HTML module](HTML.md)
-- [Templates module](TEMPLATES.md)
 - [SMTP module](SMTP.md)
 - [XML module](XML.md)
 - [Env module](ENV.md)
@@ -508,6 +510,8 @@ the editor title play button, Command Palette, or `F6`, and connects to the
 [language server](LSP.md) (`ahdcode lsp`) for compiler-backed
 diagnostics and hover. The same VSIX targets VS Code and Antigravity. See its
 installation guide.
+
+[v2.11 upgrade note](UPGRADE_2.11.md)
 
 ## What is new in v2.10.0 <a id="release-v2-10-0"></a>
 

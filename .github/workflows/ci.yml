@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, 'release/v2.11.0-rc1' ]
   pull_request:
     branches: [ main ]
 
@@ -42,6 +42,32 @@ jobs:
       - name: Check git diff
         run: git diff --check
 
+      - name: Test PWA worker
+        run: node --test internal/initweb/pwa_worker_test.cjs
+
+      - name: Build and verify Linux distribution archives
+        run: |
+          python3 -B tooling/distribution/leak_gate.py --self-test
+          python3 -B tooling/distribution/build.py --platform linux --without-bundled-runtimes --without-vsix --output "$RUNNER_TEMP/linux-dist"
+          (cd "$RUNNER_TEMP/linux-dist" && sha256sum -c SHA256SUMS.txt)
+          mkdir -p "$RUNNER_TEMP/linux-extract" "$RUNNER_TEMP/linux-sqlite"
+          tar -xzf "$RUNNER_TEMP/linux-dist/AhdCode-2.11.0-linux-amd64.tar.gz" -C "$RUNNER_TEMP/linux-extract"
+          sh "$RUNNER_TEMP/linux-extract/AhdCode-2.11.0-linux-amd64/install.sh" --prefix "$RUNNER_TEMP/ahd-linux-test"
+          test "$("$RUNNER_TEMP/ahd-linux-test/bin/ahdcode" version)" = 'AhdCode v2.11.0'
+          printf '%s\n' \
+            'bring SQLite' \
+            'from SQLite bring (Database, SQLiteValue)' \
+            'db: Database := SQLite.open("ci.db")' \
+            'db.execute("CREATE TABLE items(id INTEGER PRIMARY KEY, name TEXT)")' \
+            'db.execute("INSERT INTO items(name) VALUES(?)", [SQLite.fromString("linux-ok")])' \
+            'rows: List<Pair<String, SQLiteValue>> := db.query("SELECT name FROM items")' \
+            'write(rows[0]["name"].string())' \
+            'db.close()' > "$RUNNER_TEMP/linux-sqlite/main.ahd"
+          out=$(cd "$RUNNER_TEMP/linux-sqlite" && env -u AHDCODE_BIN -u AHDCODE_SQLITE_RUNTIME "$RUNNER_TEMP/ahd-linux-test/bin/ahdcode" run main.ahd)
+          test "$out" = 'linux-ok'
+          sh "$RUNNER_TEMP/ahd-linux-test/current/install.sh" --prefix "$RUNNER_TEMP/ahd-linux-test" --uninstall
+          test ! -e "$RUNNER_TEMP/ahd-linux-test"
+
   native-build:
     name: Native build suite
     runs-on: ubuntu-latest
@@ -58,6 +84,143 @@ jobs:
 
       - name: Run internal/build tests
         run: go test -count=1 -timeout 45m ./internal/build
+
+  macos-rc:
+    name: macOS ARM64 verification and packaging
+    runs-on: macos-15
+    timeout-minutes: 35
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+
+      - name: Build the native CLI and SQLite helper
+        run: |
+          go build -trimpath -o "$RUNNER_TEMP/ahdcode" ./cmd/ahdcode
+          go build -trimpath -o "$RUNNER_TEMP/ahdsqlite" ./cmd/ahdsqlite
+          test "$("$RUNNER_TEMP/ahdcode" version)" = 'AhdCode v2.11.0'
+          echo "AHDCODE_BIN=$RUNNER_TEMP/ahdcode" >> "$GITHUB_ENV"
+          echo "AHDCODE_SQLITE_RUNTIME=$RUNNER_TEMP/ahdsqlite" >> "$GITHUB_ENV"
+
+      - name: Exercise native Web, HTTPS, PWA and deployment
+        run: |
+          go test -count=1 -timeout 20m -run 'Test(BasicStarter|PWA|DevHTTPS|DevReload|HTTPNativeAndEvaluator|HTTPErrorPage|PersistentSession|WebSocket|WebPackage|WebAssets|WebPWA)' \
+            ./cmd/ahdcode ./internal/backend/golang/ahdruntime ./internal/build ./internal/initweb ./internal/packaging
+          node --test internal/initweb/pwa_worker_test.cjs
+
+      - name: Race-test the Web runtime and packager
+        run: |
+          go test -race -count=1 -timeout 20m -run 'Test(DevHTTPS|HTTPShutdown|PersistentSession|WebSocket|WebPackage|WebAssets|WebPWA)' \
+            ./cmd/ahdcode ./internal/backend/golang/ahdruntime ./internal/packaging
+
+      - name: Build and test macOS distribution artifacts (tar.gz, pkg, dmg)
+        run: |
+          python3 -B tooling/distribution/leak_gate.py --self-test
+          python3 -B tooling/distribution/build.py --platform darwin --macos-arch both --without-bundled-runtimes --without-vsix --output "$RUNNER_TEMP/macos-dist"
+          AHDCODE_TEST_MACOS_DIST_DIR="$RUNNER_TEMP/macos-dist" python3 -B -m unittest -v tooling/distribution/test_macos_dist.py
+          mkdir -p "$HOME/Library/AhdCode/versions/2.9.0/bin" "$HOME/Library/AhdCode/bin" "$HOME/Library/Application Support/ahdcode"
+          printf '#!/bin/sh\necho "AhdCode v2.9.0"\n' > "$HOME/Library/AhdCode/versions/2.9.0/bin/ahdcode"
+          chmod 0755 "$HOME/Library/AhdCode/versions/2.9.0/bin/ahdcode"
+          printf 'AhdCode installer v1\n' > "$HOME/Library/AhdCode/.ahdcode-install"
+          ln -sfn versions/2.9.0 "$HOME/Library/AhdCode/current"
+          ln -sfn ../current/bin/ahdcode "$HOME/Library/AhdCode/bin/ahdcode"
+          printf 'preserve-me\n' > "$HOME/Library/Application Support/ahdcode/keep.txt"
+          /usr/sbin/installer -pkg "$RUNNER_TEMP/macos-dist/AhdCode-2.11.0-macos-arm64-unsigned.pkg" -target CurrentUserHomeDirectory
+          test -x "$HOME/Library/AhdCode/versions/2.9.0/bin/ahdcode"
+          test "$(env -u AHDCODE_BIN -u AHDCODE_SQLITE_RUNTIME "$HOME/Library/AhdCode/bin/ahdcode" version)" = 'AhdCode v2.11.0'
+          test "$(readlink "$HOME/Library/AhdCode/current")" = 'versions/2.11.0'
+          test "$(grep -c '^# >>> AhdCode PATH >>>$' "$HOME/.zshrc")" = '1'
+          sh "$HOME/Library/AhdCode/current/install.sh" --uninstall
+          test ! -e "$HOME/Library/AhdCode"
+          test "$(cat "$HOME/Library/Application Support/ahdcode/keep.txt")" = 'preserve-me'
+
+  windows:
+    name: Windows x64 verification and packaging
+    runs-on: windows-latest
+    timeout-minutes: 35
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+
+      - name: Build native CLI and SQLite helper
+        run: |
+          go build -trimpath -o "$env:RUNNER_TEMP\ahdcode.exe" ./cmd/ahdcode
+          go build -trimpath -o "$env:RUNNER_TEMP\ahdsqlite.exe" ./cmd/ahdsqlite
+          $ver = (& "$env:RUNNER_TEMP\ahdcode.exe" version).Trim()
+          if ($ver -ne 'AhdCode v2.11.0') { throw "Unexpected version: $ver" }
+          "AHDCODE_BIN=$env:RUNNER_TEMP\ahdcode.exe" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "AHDCODE_SQLITE_RUNTIME=$env:RUNNER_TEMP\ahdsqlite.exe" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Exercise Windows Web, HTTPS, PWA, packaging and migrations
+        run: |
+          node --test internal/initweb/pwa_worker_test.cjs
+          go test -count=1 -timeout 20m ./tooling/distribution/winsetup ./internal/initweb ./internal/migrate
+          go test -count=1 -timeout 20m -run 'Test(BasicStarter|PWA|DevHTTPS|HTTPNativeAndEvaluator|HTTPErrorPage|PersistentSession|WebSocket|WebPackage|WebAssets|WebPWA)' `
+            ./cmd/ahdcode ./internal/backend/golang/ahdruntime ./internal/packaging
+
+      - name: Race-test Windows Web runtime and packaging
+        run: |
+          if (-not (Get-Command gcc -ErrorAction SilentlyContinue)) {
+            foreach ($cand in @('C:\msys64\mingw64\bin', 'C:\msys64\ucrt64\bin', 'C:\Strawberry\c\bin')) {
+              if (Test-Path (Join-Path $cand 'gcc.exe')) {
+                $env:PATH = "$cand;$env:PATH"
+                break
+              }
+            }
+          }
+          go test -race -count=1 -timeout 20m -run 'Test(DevHTTPS|HTTPShutdown|PersistentSession|WebSocket|WebPackage|WebAssets|WebPWA)' `
+            ./cmd/ahdcode ./internal/backend/golang/ahdruntime ./internal/packaging
+
+      - name: Build and verify Windows x64 installer
+        run: |
+          $distDir = Join-Path $env:RUNNER_TEMP 'win-dist'
+          python -B tooling/distribution/build.py --platform windows --without-bundled-runtimes --without-vsix --output $distDir
+          if ($LASTEXITCODE -ne 0) { throw "build.py exited with $LASTEXITCODE" }
+          $exe = Join-Path $distDir 'AhdCode-2.11.0-windows-x64.exe'
+          if (-not (Test-Path $exe)) { throw "Missing $exe" }
+          $env:AHDCODE_WINDOWS_SETUP = $exe
+          go test -v -count=1 ./tooling/distribution/winsetup
+          $proc = Start-Process -FilePath $exe -ArgumentList '--silent' -Wait -PassThru
+          if ($proc.ExitCode -ne 0) { throw "Silent installer exited with $($proc.ExitCode)" }
+          Remove-Item Env:AHDCODE_BIN -ErrorAction SilentlyContinue
+          Remove-Item Env:AHDCODE_SQLITE_RUNTIME -ErrorAction SilentlyContinue
+          $installed = Join-Path $env:LOCALAPPDATA 'AhdCode\bin\ahdcode.exe'
+          $ver = (& $installed version).Trim()
+          if ($ver -ne 'AhdCode v2.11.0') { throw "Unexpected installed version: $ver" }
+          $smokeDir = Join-Path $env:RUNNER_TEMP 'win-sqlite'
+          New-Item -ItemType Directory -Force -Path $smokeDir | Out-Null
+          $code = @(
+            'bring SQLite'
+            'from SQLite bring (Database, SQLiteValue)'
+            'db: Database := SQLite.open("ci.db")'
+            'db.execute("CREATE TABLE items(id INTEGER PRIMARY KEY, name TEXT)")'
+            'db.execute("INSERT INTO items(name) VALUES(?)", [SQLite.fromString("win-ok")])'
+            'rows: List<Pair<String, SQLiteValue>> := db.query("SELECT name FROM items")'
+            'write(rows[0]["name"].string())'
+            'db.close()'
+          )
+          [System.IO.File]::WriteAllLines((Join-Path $smokeDir 'main.ahd'), $code, [System.Text.UTF8Encoding]::new($false))
+          Push-Location $smokeDir
+          try {
+            $out = (& $installed run .\main.ahd).Trim()
+            if ($out -ne 'win-ok') { throw "Unexpected SQLite output: $out" }
+          } finally {
+            Pop-Location
+          }
 
   nested:
     name: Nested helper modules
@@ -99,6 +262,9 @@ jobs:
         run: |
           go test -race -count=1 -timeout 25m ./internal/backend/golang/ahdruntime/ ./internal/evaluator/
           go test -race -count=1 -timeout 25m -run 'WebSocket|HTTP|SMTP|V210' ./internal/build/
+
+      - name: Race-test packaging and migrations
+        run: go test -race -count=1 -timeout 20m ./internal/packaging ./internal/migrate
 
   postgresql:
     # The PostgreSQL integration suite needs a live server, so it runs here

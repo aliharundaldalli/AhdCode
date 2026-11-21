@@ -1,15 +1,23 @@
 package ahdruntime
 
 import (
+	"bytes"
 	"context"
+	"crypto/rsa"
+	"crypto/tls"
+	"crypto/x509"
+	"encoding/pem"
+	"fmt"
 	"io"
 	"mime"
 	"net"
 	"net/http"
 	"net/textproto"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // Development-server browser refresh.
@@ -33,6 +41,9 @@ import (
 // only for a loopback client.
 
 const (
+	// The CLI forwards only filenames, never private-key bytes.
+	AhdDevTLSCertEnv          = "AHDCODE_DEV_TLS_CERT"
+	AhdDevTLSKeyEnv           = "AHDCODE_DEV_TLS_KEY"
 	ahdDevReloadSessionEnv    = "AHDCODE_DEV_SESSION"
 	ahdDevReloadGenerationEnv = "AHDCODE_DEV_GENERATION"
 	ahdDevReloadPath          = "/__ahdcode/dev/reload"
@@ -42,16 +53,21 @@ const (
 )
 
 var (
-	ahdDevReloadOn             bool
-	ahdDevReloadSession        string
-	ahdDevReloadGeneration     string
-	ahdDevReloadInitOn         bool
-	ahdDevReloadInitSession    string
-	ahdDevReloadInitGeneration string
+	ahdDevReloadOn              bool
+	ahdDevReloadSession         string
+	ahdDevReloadGeneration      string
+	ahdDevReloadInitOn          bool
+	ahdDevReloadInitSession     string
+	ahdDevReloadInitGeneration  string
+	ahdDevTLSCert, ahdDevTLSKey string
 )
 
 func init() {
 	ahdDevReloadCaptureFromEnvironment()
+	if ahdDevReloadOn {
+		ahdDevTLSCert = os.Getenv(AhdDevTLSCertEnv)
+		ahdDevTLSKey = os.Getenv(AhdDevTLSKeyEnv)
+	}
 	ahdDevReloadInitOn = ahdDevReloadOn
 	ahdDevReloadInitSession = ahdDevReloadSession
 	ahdDevReloadInitGeneration = ahdDevReloadGeneration
@@ -317,4 +333,142 @@ func ahdDevReloadTag() string {
 
 func ahdDevReloadScript() string {
 	return `(function(){var c=document.currentScript;if(!c){return;}var session=c.getAttribute("data-session")||"";var generation=c.getAttribute("data-generation")||"";var path="` + ahdDevReloadPath + `";var busy=false;var stopped=false;function tick(){if(busy||stopped){return;}busy=true;fetch(path,{cache:"no-store"}).then(function(r){if(!r.ok){throw new Error("reload");}return r.text();}).then(function(text){busy=false;var parts=text.replace(/^\s+|\s+$/g,"").split(" ");if(parts.length!==2){return;}if(!/^[0-9a-f]{32}$/.test(parts[0])||!/^[0-9]+$/.test(parts[1])){return;}if(parts[0]!==session||parts[1]!==generation){stopped=true;location.reload();}}).catch(function(){busy=false;});}setInterval(tick,` + strconv.Itoa(ahdDevReloadPoll) + `);tick();})();`
+}
+
+// AhdHTTPDevLoadTLS validates the local HTTPS certificate pair used by dev.
+// The returned config negotiates HTTP/1.1 so the existing WebSocket upgrade
+// path remains available. Certificate trust is the client's decision.
+func AhdHTTPDevLoadTLS(certPath, keyPath string, now time.Time) (*tls.Config, error) {
+	cert, err := ahdDevTLSRead(certPath, "certificate")
+	if err != nil {
+		return nil, err
+	}
+	// The certificate path may be public. An accidentally concatenated
+	// private key must never be accepted as part of its PEM content.
+	rest := bytes.TrimSpace(cert)
+	for len(rest) != 0 {
+		block, remaining := pem.Decode(rest)
+		if !bytes.HasPrefix(rest, []byte("-----BEGIN CERTIFICATE-----")) || block == nil || block.Type != "CERTIFICATE" {
+			return nil, fmt.Errorf("local HTTPS certificate file must contain only PEM certificates")
+		}
+		rest = bytes.TrimSpace(remaining)
+	}
+	key, err := ahdDevTLSRead(keyPath, "private key")
+	if err != nil {
+		return nil, err
+	}
+	pair, err := tls.X509KeyPair(cert, key)
+	if err != nil {
+		return nil, fmt.Errorf("local HTTPS certificate and private key could not be loaded as a matching PEM pair")
+	}
+	for index, der := range pair.Certificate {
+		certificate, err := x509.ParseCertificate(der)
+		if err != nil {
+			return nil, fmt.Errorf("local HTTPS certificate chain is invalid")
+		}
+		if index == 0 {
+			pair.Leaf = certificate
+		}
+		if now.Before(certificate.NotBefore) {
+			return nil, fmt.Errorf("local HTTPS certificate is not yet valid")
+		}
+		if !now.Before(certificate.NotAfter) {
+			return nil, fmt.Errorf("local HTTPS certificate has expired")
+		}
+	}
+	if pair.Leaf.IsCA {
+		return nil, fmt.Errorf("local HTTPS needs a server certificate, not a CA certificate")
+	}
+	if key, ok := pair.Leaf.PublicKey.(*rsa.PublicKey); ok && key.N.BitLen() < 2048 {
+		return nil, fmt.Errorf("local HTTPS RSA keys must be at least 2048 bits")
+	}
+	if len(pair.Leaf.ExtKeyUsage) > 0 || len(pair.Leaf.UnknownExtKeyUsage) > 0 {
+		server := false
+		for _, usage := range pair.Leaf.ExtKeyUsage {
+			server = server || usage == x509.ExtKeyUsageAny || usage == x509.ExtKeyUsageServerAuth
+		}
+		if !server {
+			return nil, fmt.Errorf("local HTTPS certificate is not valid for server authentication")
+		}
+	}
+	for _, name := range []string{"localhost", "127.0.0.1", "::1"} {
+		if pair.Leaf.VerifyHostname(name) != nil {
+			return nil, fmt.Errorf("local HTTPS certificate must cover localhost, 127.0.0.1, and ::1")
+		}
+	}
+	return &tls.Config{
+		MinVersion:   tls.VersionTLS12,
+		NextProtos:   []string{"http/1.1"},
+		Certificates: []tls.Certificate{pair},
+	}, nil
+}
+
+// AhdHTTPDevCheckTLSPath checks the credential path for symlinks and junctions.
+func AhdHTTPDevCheckTLSPath(path string) error {
+	volume := filepath.VolumeName(path)
+	if !filepath.IsAbs(path) || strings.Contains(path[len(volume):], ":") || strings.HasPrefix(volume, `\\`) {
+		return fmt.Errorf("local HTTPS credential paths must be absolute local paths without symbolic links or junctions")
+	}
+	for current := filepath.Clean(path); ; current = filepath.Dir(current) {
+		if filepath.Dir(current) == current {
+			return nil
+		}
+		reparse, err := ahdDevTLSComponentReparse(current)
+		if reparse || (err != nil && !ahdDevTLSMissing(err)) {
+			return fmt.Errorf("local HTTPS credential paths must be readable and must not use symbolic links or junctions")
+		}
+	}
+}
+
+func ahdDevTLSRead(path, kind string) ([]byte, error) {
+	// Use the existing bounded, no-follow leaf reader and parent checks.
+	// Do not include parser input or key contents in diagnostics.
+	if AhdHTTPDevCheckTLSPath(path) != nil {
+		return nil, fmt.Errorf("local HTTPS %s path is missing or unsafe", kind)
+	}
+	info, err := os.Lstat(path)
+	if err != nil || !info.Mode().IsRegular() {
+		return nil, fmt.Errorf("local HTTPS %s must be a readable regular file", kind)
+	}
+	data, err := ahdDevTLSReadCredential(path)
+	if err != nil {
+		return nil, fmt.Errorf("local HTTPS %s could not be read", kind)
+	}
+	return data, nil
+}
+
+func ahdDevTLSReadLimited(reader io.Reader) ([]byte, error) {
+	const maxCredentialBytes = 1 << 20
+	data, err := io.ReadAll(io.LimitReader(reader, maxCredentialBytes+1))
+	if err != nil {
+		return nil, err
+	}
+	if len(data) > maxCredentialBytes {
+		return nil, fmt.Errorf("local HTTPS credential exceeds %d bytes", maxCredentialBytes)
+	}
+	return data, nil
+}
+
+func ahdHTTPDevListen(network, address string) (net.Listener, error) {
+	host, port, err := net.SplitHostPort(address)
+	if err != nil {
+		return nil, fmt.Errorf("local HTTPS needs a loopback address")
+	}
+	switch strings.ToLower(host) {
+	case "localhost":
+		// Never use DNS or the hosts file to decide what local HTTPS binds.
+		host = "127.0.0.1"
+	case "127.0.0.1", "::1":
+	default:
+		return nil, fmt.Errorf("local HTTPS can bind only localhost, 127.0.0.1, or ::1")
+	}
+	config, err := AhdHTTPDevLoadTLS(ahdDevTLSCert, ahdDevTLSKey, time.Now())
+	if err != nil {
+		return nil, err
+	}
+	listener, err := net.Listen(network, net.JoinHostPort(host, port))
+	if err != nil {
+		return nil, err
+	}
+	return tls.NewListener(listener, config), nil
 }

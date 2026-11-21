@@ -123,7 +123,7 @@ html: Function := (body: HTMLNode, status: Int := 200) -> Response {
 // This is the whole of Web's document handling. It is a shell, not a template
 // language: there are no slots, no inheritance, no directives, and no
 // expressions embedded in markup. A Layout is an ordinary Function that ends
-// by calling this. File templates live in the Templates module.
+// by calling this.
 document: Function := (
     title: String
     body: List<HTMLNode>
@@ -141,8 +141,8 @@ page: Function := (
     return HTTP.html(document(title, body, head), status)
 }
 // markup returns an HTML response whose body is already rendered text.
-// Templates.render and TemplateSet.layout escape ordinary values before this
-// call. status defaults to 200. A notFound or internalError handler may pass
+// Escape any dynamic values when constructing the markup. The status defaults
+// to 200. A notFound or internalError handler may pass
 // 404 or 500; the server still forces that status when it invokes the page.
 markup: Function := (body: String, status: Int := 200) -> Response {
     return HTTP.html(body, status)

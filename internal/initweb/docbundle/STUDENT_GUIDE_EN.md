@@ -4753,15 +4753,14 @@ available without a session. `Form.integer` separates missing null from invalid
 (`ahdcode init web empty`, `basic`, `admin`):
 
 - **Empty** -- a welcome page. No database, no login.
-- **Basic** -- a small Turkish site with file templates, a shared layout,
-  custom 404/500 pages, and common application and mail configuration in
-  `.env`. See [Templates](TEMPLATES.md).
+- **Basic** -- a small Turkish site built with `.ahd` and `Web.UI`, with a shared
+  layout, custom 404/500 pages, and application and mail configuration in `.env`.
 - **Admin** -- Home, Login, and a Dashboard, with one administrator account in
   either SQLite or MySQL.
 
 Everything it writes is ordinary AhdCode you can read and change: pages,
 layouts, components, and a `Config/` folder, wired together with
-`require(...)` exactly as section 19 described. Templates and Bootstrap ship
+`require(...)` exactly as section 19 described. Starter sources and Bootstrap ship
 inside the CLI, so `init` needs no network and installs no package manager.
 It never overwrites a file or a database that is already there.
 

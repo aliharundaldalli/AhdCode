@@ -1,41 +1,87 @@
 # Installation, upgrade, and removal
 
-Download the AhdCode v2.7.0 package for your operating system. v2.7.0 is the
-latest installable release. v2.8.0 through v2.11.0 are source releases; their
-git tags do not replace these packages. New installers return at v3.0.
-Every package is self-contained: it carries the compiler, a private Go
-toolchain, AhdDataStudio, the SQLite, numeric and plot helpers, an offline
-LaTeX engine, the project starters, and the English documentation.
+Download the published AhdCode **v2.11.0** stable package for your operating
+system (macOS `arm64`/`x64`, Windows `x64`, or Linux `amd64`/`arm64`). `v2.11.0`
+toolchain packages include the compiler, all helpers (`ahdsqlite`,
+`ahdnumeric`, `ahdplot`, `ahdgraphics`, `ahdgui`, `ahdplotview`), embedded
+AhdDataStudio, starters, and English documentation, and rely on the Go version
+specified in `go.mod` on `PATH` for native `ahdcode build` and `ahdcode package`
+commands. `v2.8.0` through `v2.10.0` are historical source-only releases. Self-contained
+bundles that also embed private Go 1.27.0, the offline Tectonic LaTeX engine,
+and the VS Code `.vsix` remain available on `v2.7.0` and return at `v3.0`.
 
-## macOS (Apple Silicon)
+## macOS (Apple Silicon and x64 packaging)
 
-The macOS package targets Apple Silicon Macs — M1, M2, M3, M4 and later arm64
-models. There is no Intel build.
+AhdCode `v2.11.0` distributes native `.pkg`, `.dmg`, and `.tar.gz` toolchain
+packages for Apple Silicon (`arm64` — M1, M2, M3, M4 and later) and cross-compiled
+Intel x86-64 (`x64`):
 
-Double-click `AhdCode-2.7.0-macos-arm64.pkg` and follow the installer. The
-published `.pkg` is the recommended installer. It is signed with a Developer ID
-and notarized by Apple, with the notarization ticket stapled, so Gatekeeper
-accepts it without a warning. It installs for your account only, asks for no
-administrator password, and writes nothing outside your home folder. Verify the
-download against the published SHA-256 checksum, and never disable or bypass
-system protections.
+- `.pkg`: Recommended native installer (`AhdCode-<version>-macos-<arch>.pkg`, or
+  `-unsigned` when built without Apple Developer ID signing and notarization).
+  Double-click it in Finder or run
+  `installer -pkg <file>.pkg -target CurrentUserHomeDirectory`.
+- `.dmg`: Disk image wrapping the `.pkg` installer alongside `INSTALL.txt` and
+  `VERSION`.
+- `.tar.gz`: Portable toolchain archive containing `install.sh`, `INSTALL.txt`,
+  `VERSION`, and `payload/`. Extract it and run `sh install.sh --setup-path`.
 
-Files go under `~/Library/AhdCode/versions/2.7.0`. `current` selects the
-active version and `~/Library/AhdCode/bin/ahdcode` is the stable command. That
-one folder is added to your PATH.
+When signed with a Developer ID and notarized by Apple with the ticket stapled,
+Gatekeeper accepts `.pkg` and `.dmg` artifacts without a warning: `.tar.gz`
+carries Developer ID signed Mach-O binaries with the hardened runtime and a
+secure timestamp, while `.pkg` and `.dmg` are both Developer ID signed and
+Apple-notarized/stapled. Verify signed and notarized artifacts with Gatekeeper
+enabled before or after downloading:
 
-Then open a **new** Terminal and run `ahdcode --version`. A terminal that was
+```sh
+spctl --status
+shasum -a 256 -c SHA256SUMS.txt
+pkgutil --check-signature AhdCode-<version>-macos-arm64.pkg
+xcrun stapler validate AhdCode-<version>-macos-arm64.pkg
+xcrun stapler validate AhdCode-<version>-macos-arm64.dmg
+spctl -a -vv -t install AhdCode-<version>-macos-arm64.pkg
+spctl -a -vv -t open --context context:primary-signature AhdCode-<version>-macos-arm64.dmg
+codesign --verify --deep --strict --verbose=2 path/to/AhdCode-<version>-macos-arm64/payload/bin/ahdcode
+```
+
+Local development builds created without notarization credentials
+carry `-unsigned` in their filenames and `INSTALL.txt`; verify downloads
+against `SHA256SUMS.txt` (`shasum -a 256 -c SHA256SUMS.txt`), and never disable
+or bypass Gatekeeper protections.
+
+The installer puts files under `~/Library/AhdCode/versions/<version>`, leaving
+previously installed versions (such as `2.9.0`) intact on disk. `current`
+selects the active version, and `~/Library/AhdCode/bin/ahdcode` is the stable
+command added once (idempotently) to `~/.zprofile`, `~/.zshrc`, and
+`~/.bash_profile`. No administrator password is required, nothing is written to
+system directories, and existing projects, databases, and
+`~/Library/Application Support/ahdcode` data are preserved.
+
+Then open a **new** Terminal and run `ahdcode version`. A terminal that was
 already open keeps the environment it started with; a new one picks up the
-change immediately.
+change immediately. To roll back to an earlier installed version (for example
+`2.9.0`):
 
-`AhdCode-2.7.0-macos-arm64.dmg` is a signed and notarized disk image with the
-same payload for anyone who prefers one: open it and run `Install.command`
-(which runs `install.sh --setup-path`). The `.pkg` is the recommended
-installer.
+```sh
+ln -sfn versions/2.9.0 ~/Library/AhdCode/.current-new && mv -fh ~/Library/AhdCode/.current-new ~/Library/AhdCode/current
+```
+
+To build macOS distribution packages from source:
+
+```sh
+python3 tooling/distribution/build.py --platform darwin --macos-arch both --without-bundled-runtimes --without-vsix --output dist/macos
+```
+
+Pass `--sign-app`, `--sign-installer`, and `--notary-profile` when Apple
+Developer ID certificates and `notarytool` credentials are available.
+
+Legacy v2.7.0 `AhdCode-2.7.0-macos-arm64.dmg` also carried `Install.command`
+for anyone who prefers running `install.sh --setup-path`. The `.pkg` is the
+recommended installer.
 
 ## Windows x64
 
-Double-click `AhdCode-2.7.0-windows-x64.exe` in File Explorer. Setup is a small
+Double-click `AhdCode-2.11.0-windows-x64.exe` in File Explorer (or run
+`AhdCode-2.11.0-windows-x64.exe --silent` for automated setup). Setup is a small
 graphical per-user program: it shows what it will install, unpacks and checks
 its embedded payload with a progress window, and finishes with a confirmation.
 No console, no terminal, and no typed commands are involved.
@@ -45,11 +91,13 @@ may show an unknown-publisher warning. Verify the file against the published SHA
 the system-provided **More info → Run anyway** path, and do not disable Windows
 security protections.
 
-Files go under `%LOCALAPPDATA%\AhdCode\versions\2.7.0`. The stable command
+Files go under `%LOCALAPPDATA%\AhdCode\versions\2.11.0` (with previous
+versions such as `2.7.0` preserved alongside). The stable command
 is `%LOCALAPPDATA%\AhdCode\bin\ahdcode.exe`, and only that one folder is added
-to your user PATH — once, on first installation. Administrator rights, Git, and
-a system Go installation are not required, and an uninstall entry is registered
-in Windows Installed Apps.
+to your user PATH — once, on first installation. Administrator rights and Git
+are not required, and an uninstall entry is registered in Windows Installed Apps.
+Native `ahdcode build` and `ahdcode package` commands use the Go version required
+by `go.mod` on your `PATH`.
 
 Then open a **new** PowerShell or Command Prompt and run `ahdcode --version`.
 The installer broadcasts the per-user environment change, but terminals and IDEs
@@ -62,7 +110,7 @@ entries exactly as they are and leaves one equivalent AhdCode entry. Uninstall
 removes only equivalent `%LOCALAPPDATA%\AhdCode\bin` entries and preserves
 unrelated PATH entries; it does not edit the machine PATH.
 
-`AhdCode-2.7.0-windows-x64.exe --silent` installs with no windows at all, for
+`AhdCode-2.11.0-windows-x64.exe --silent` installs with no windows at all, for
 scripted deployment. Because setup is a graphical program, run it from a script
 as `Start-Process -Wait` if you need to block until it finishes.
 
@@ -71,18 +119,18 @@ as `Start-Process -Wait` if you need to block until it finishes.
 Choose the package for your processor — `uname -m` prints `x86_64` for
 `amd64` and `aarch64` for `arm64`:
 
-- `AhdCode-v2.7.0-linux-amd64.tar.gz` — 64-bit Intel/AMD
-- `AhdCode-v2.7.0-linux-arm64.tar.gz` — 64-bit ARM (for example Ampere,
+- `AhdCode-2.11.0-linux-amd64.tar.gz` — 64-bit Intel/AMD
+- `AhdCode-2.11.0-linux-arm64.tar.gz` — 64-bit ARM (for example Ampere,
   AWS Graviton, Raspberry Pi 4/5 with a 64-bit OS)
 
 ```sh
-tar -xzf AhdCode-v2.7.0-linux-amd64.tar.gz
-cd AhdCode-2.7.0
+tar -xzf AhdCode-2.11.0-linux-amd64.tar.gz
+cd AhdCode-2.11.0-linux-amd64
 sh install.sh --setup-path
 ```
 
 The installer checks that the package runs on this machine before it
-installs anything. Files live under `~/.local/share/ahdcode/versions/2.7.0`. The installer adds
+installs anything. Files live under `~/.local/share/ahdcode/versions/2.11.0`. The installer adds
 one owned PATH block to `~/.profile`. Open a login shell or source that profile.
 
 ## What is included

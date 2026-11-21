@@ -1,4 +1,4 @@
-# Masaüstü uygulaması paketleme
+# AhdCode uygulamalarını paketleme
 
 [English](PACKAGING.md) · [Türkçe]
 
@@ -11,7 +11,7 @@ bilgisayarda çalışan bir masaüstü uygulamasına dönüştürür.
 
 ```text
 ahdcode package <entry.ahd> [--name <name>] [--output <folder>] [--icon <icon.png>]
-                [--target <os-arch>] [--helpers <folder>] [--console]
+                [--target <os-arch>] [--helpers <folder>] [--console] [--web [--pwa]]
 ```
 
 ```sh
@@ -26,11 +26,57 @@ ahdcode package examples/v2.0/ledger_app/main.ahd --name Ledger --icon ledger.pn
 | `--target` | Paketlenecek platform (bkz. [Hedefler](#hedefler)) | bu bilgisayar |
 | `--helpers` | O platformun AhdCode yardımcılarını içeren klasör | bu kurulumunki |
 | `--console` | Yalnızca Windows: masaüstü programı için konsol penceresini koru | konsol yok |
+| `--web` | Gözden geçirilmiş genel varlıkları pakete ekle | kapalı |
+| `--pwa` | PWA varlıklarını ekle ve dosya düzenini denetle. `--web` gerekir | kapalı |
 
 Manifest dosyası, paket kayıt defteri veya bağımlılık yöneticisi yoktur:
 yapılandırmanın tamamı komut satırıdır.
 
-## Bir uygulama neler içerir
+## Web uygulaması dağıtımı
+
+```sh
+ahdcode package app.ahd --web --name Site --output releases/v2.11
+# PWA entegrasyonu eklenmişse:
+ahdcode package app.ahd --web --pwa --name Site --output releases/v2.11-pwa
+```
+
+`--web`, giriş dosyasının yanındaki gözden geçirilmiş `public/` ağacını
+göreli yollarıyla kopyalar. `--pwa` ayrıca `PWA/app.webmanifest`,
+`PWA/worker.js` ve `PWA/public/` dosyalarını ekler. Manifest geçerli
+olmalı ve yerel `/ahd-pwa/` simgelerini göstermelidir.
+`PWA/Integration.ahd` derleme sırasında kullanılır. [PWA kurulumu](PWA_TR.md).
+
+Çalışma dizini yürütülebilir dosyanın bulunduğu dizindir. Windows ve
+Linux'ta paket kökünü, macOS'ta `Name.app/Contents/MacOS` yolunu kullanın.
+Windows'ta yürütülebilir dosya `Site.exe` olur. Örneğin Linux veya macOS'ta:
+
+```sh
+APP_NAME=Site APP_ENV=production APP_PROTOCOL=https APP_HOST=example.com \
+  SERVER_HOST=127.0.0.1 SERVER_PORT=8080 ./Site
+```
+
+Yapılandırmayı süreç ortamından sağlayın. Uygulama `.env` okuyorsa özel
+dosyayı dağıtımda ayrıca oluşturun. Admin, MVC ve CRUD için `DB_*`
+değerlerini ve hazırlanmış veritabanını ayrı sağlayın. Kalıcı oturum
+dosyaları için yazılabilir özel bir dizin kullanın. Caddy dış HTTPS'i
+sonlandırırken AhdCode loopback HTTP üzerinden çalışabilir.
+[HTTPS ayarları](WEB_TR.md#14-yerel-https).
+
+Genel ağaçlara CSS, JavaScript, statik HTML, web manifesti, yaygın görsel
+ve yazı tipi dosyaları ile `LICENSE` dosyaları eklenebilir. Sembolik bağlar,
+junction'lar, gizli yollar, özel dizin adları, büyük/küçük harfe duyarsız
+dosya sistemlerinde çakışan yollar, desteklenmeyen türler ve
+PEM özel anahtarı içeren dosyalar reddedilir. Genel varlıkların içeriğini
+gözden geçirin. Paketleyici tüm gizli değerleri tanıyamaz. Proje ayarları,
+kaynak modülleri ve veritabanları otomatik kopyalanmaz. Özel varlık
+köklerini yapılandırılmış yollarına ayrıca yerleştirin.
+
+Mevcut Web paketinin veya arşivinin üzerine yazılmaz. Yeni dağıtım için
+yeni bir hedef seçin. Elle dağıtımda `ahdcode build app.ahd -o Site`
+yalnızca yürütülebilir dosyayı oluşturur. Varlıkları ve gereken yardımcıları
+belirtilen dizin düzeniyle ayrıca sağlayın.
+
+## Bir masaüstü uygulaması neler içerir
 
 | Platform | Uygulama |
 | --- | --- |
@@ -108,23 +154,20 @@ adını ve simgesini gösterir:
 
 ## Hedefler
 
-| Hedef | Çıktı | Durum |
+| Hedef | Çıktı | Not |
 | --- | --- | --- |
-| `macos-arm64` | `.app` | bu sürüm için canlı test edildi |
-| `windows-x64` | klasör ve `.zip` | paket testi yapıldı (yapı, yürütülebilir biçim, simge kaynağı); bu sürüm için Windows'ta çalıştırılmadı |
-| `linux-x64` | klasör ve `.tar.gz` | paket testi yapıldı (yapı, yürütülebilir biçim); bu sürüm için Linux'ta çalıştırılmadı |
-| `macos-x64`, `windows-arm64`, `linux-arm64` | yukarıdaki gibi | yalnızca derlendi |
+| `macos-arm64`, `windows-x64`, `linux-x64`, `linux-arm64` | paket ve platform arşivi | standart hedefler (`--target` varsayılan olarak geçerli bilgisayarı seçer) |
+| `macos-x64`, `windows-arm64` | `.app`, klasör veya `.zip` | uyumlu `--helpers` dizini verildiğinde çapraz derlenen hedefler |
 
 Varsayılan olarak `ahdcode package`, çalıştığı bilgisayar için bu kurulumun
 yardımcılarıyla paketler. Bir program C kodu içermeyen düz Go'dur; bu yüzden
 AhdCode onu başka bir platform için de derleyebilir; ancak yardımcılar her
 biri tek bir platform için derlenir. Başka bir platform için paketlemek üzere
-`--target`'ı, o platformun yardımcılarını içeren bir klasörü gösteren
-`--helpers` ile verin — örneğin o platformun AhdCode indirmesindeki
-`libexec/ahdcode` klasörü:
+`--target`'ı, hedef için derlenmiş uyumlu yardımcıların klasörünü gösteren
+`--helpers` ile verin:
 
 ```sh
-ahdcode package app.ahd --target windows-x64 --helpers ~/Downloads/AhdCode-windows/libexec/ahdcode
+ahdcode package app.ahd --target windows-x64 --helpers ./helpers/windows-x64
 ```
 
 Kurulum programı, `.msi`, `.deb`, `.rpm`, AppImage veya Flatpak çıktısı

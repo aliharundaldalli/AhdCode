@@ -38,7 +38,6 @@ from HTML bring HTMLError
   a small CSS-like selector language.
 
 It is not a template engine, not a browser, and not a full CSS engine.
-File templates are [`Templates`](TEMPLATES.md).
 There is no `HTML.raw` and no `HTML.div` shortcut. Dynamic text and
 attribute values passed to the builder are escaped with Go's
 `html.EscapeString` at render time.

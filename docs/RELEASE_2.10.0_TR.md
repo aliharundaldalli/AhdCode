@@ -79,4 +79,4 @@ olmalıdır. Her dosya kendi şablon adına sahiptir. Paylaşılan dosyalar
 - Yerel HTTPS, PWA, daha kapsamlı çalışma zamanı birleştirmesi ve sonraki
   dil belirtimi çalışmaları ertelendi.
 
-[CLI](CLI_TR.md) · [HTTP](HTTP_TR.md) · [Şablonlar](TEMPLATES_TR.md) · [Web](WEB_TR.md)
+[CLI](CLI_TR.md) · [HTTP](HTTP_TR.md) · [Şablonlar](https://github.com/aliharundaldalli/AhdCode/blob/v2.10.0/docs/TEMPLATES_TR.md) · [Web](WEB_TR.md)

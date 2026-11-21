@@ -184,7 +184,47 @@ Kabul ölçütü: ahdcode.org ve bir starter projesi telefonda Lighthouse
 erişilebilirlik ve en iyi uygulama denetimlerinden geçer; starter'ların tamamı
 masaüstü ve telefon genişliğinde tarayıcıda gözle sınanır.
 
-### v2.11 — Dilin Oturması ve Süreç İçi Çalışma Zamanı
+### v2.11 — Web Platformu ve PWA
+
+Amaç, AhdCode ile kurulabilir web uygulamaları geliştirmek, sınamak ve
+dağıtmak. Geliştirme, yayımlanan v2.10.0 kaynağına dayanır. Derleyici sürümü
+son sürüm hazırlığına kadar v2.10.0 olarak kalır.
+
+1. **Faz 0 — Kararlılık.** HTTP/WebSocket geri çağırma kabulü ile sunucu
+   kapanışını ve SQLite oturum sahipliğini eşgüdümle. Bağlama hatasından
+   sonra sunucu tanıtıcısının tekrar kullanılabildiğini ve WebSocket saat
+   testinin sabit bir başlangıç noktasına dayandığını doğrula. Faz 5'e
+   geçiş için bağımsız QA kararı gerekir. [Faz 0 raporu](docs/qa/v2.11/phase-0.md)
+2. **Faz 5 — İsteğe bağlı yerel HTTPS.** Go'nun TLS dinleyicisini ve
+   yerel sertifika yönetimi seçeneklerini incele. Sertifikanın DNS/IP
+   adları, tarayıcı güveni, anahtar erişimi, süre sonu ve yenileme birlikte
+   ele alınmalı. Mevcut `.test` yönlendiricisi, doğrudan loopback erişimi,
+   `wss://`, canlı yenileme ve ters vekilde TLS sonlandırma ayrı kabul
+   senaryolarıdır. `ahdcode dev --https` arayüzü tasarım adayıdır. [Go HTTP](https://pkg.go.dev/net/http#Server.ServeTLS)
+3. **Faz 6 — PWA.** Manifest, simgeler, service worker, çevrimdışı sayfa
+   ve sürümlü varlık önbelleği için açık Web dosyaları üretmeyi değerlendir.
+   Service worker güvenli bağlama ve doğru köken/kapsama bağlıdır. HTTP
+   üzerindeki `localhost` ve loopback istisnalarını özel `.test` adları
+   için varsayma. Oturumlu HTML, özel API, yönetim sayfaları ve POST
+   yanıtları varsayılan olarak yalnız ağdan alınır. Gerçek masaüstü ve
+   mobil tarayıcılarda kurulum, güncelleme ve çevrimdışı dönüş sınanır.
+   [Güvenli bağlamlar](https://w3c.github.io/webappsec-secure-contexts/)
+   · [Service Worker](https://w3c.github.io/ServiceWorker/)
+4. **Faz 6.5 — Web varlıklarının dağıtımı.** Faz 6'nın dosya adları ve
+   kapsamı kesinleşince derlenen .ahd uygulaması, statik dosya, manifest, worker ve simgeler
+   için açık bir dağıtım listesi tasarla. `ahdcode package` ile ayrı Web
+   dağıtımı seçeneklerini karşılaştır. Taşıma, çalışma dizini, platform
+   yolları ve gizli dosyaların dışarıda kalması kabul ölçütleridir.
+5. **Faz 7 — Son QA ve sürüm hazırlığı.** Onaylı fazlar tamamlandıktan sonra
+   tarayıcı ve platform matrisini, önceki Web davranışlarını ve kaynak
+   dağıtımını doğrula. Yayın için açık kullanıcı onayı gerekir.
+
+Web uygulamalarında .ahd, Web.UI ve HTMLNode kullanılır. PWA ve gelecekteki
+paketleme çalışmaları derlenen uygulama ve statik varlıkları temel alır.
+
+#### Dil belirtimi ve süreç içi çalışma zamanı
+
+Aşağıdaki mobil önkoşulları için ayrı bir kapsam ve sürüm kararı gerekir.
 
 Dil dondurma (D5, D7):
 - Tek, güncel **AhdCode Dil Belirtimi 3.0 (taslak)**: belirtim v2.8'de güncellendi (§91–§94); 3.0 için kalan iş, sürüm sırasına göre eklenmiş bölümlerin (§47–§94) konu sırasına göre yeniden düzenlenmesi ve dosyanın yeniden adlandırılması; İngilizce ve Türkçe.
@@ -231,7 +271,7 @@ Kabul ölçütü: aynı kaynak dosya macOS, Windows, Linux, Android ve iOS'ta
 v2.8  Graphics + ilk hata deneyimi      (kaynak sürüm; kurulum paketleri v2.7.0'da kalır)
 v2.9  GUI                               (kaynak sürüm)
 v2.10 Web                               (kaynak sürüm)
-v2.11 Dil dondurma + süreç içi kip      (kaynak sürüm)
+v2.11 Web platformu + PWA              (kaynak sürüm planı)
 v3.0-beta Android                       (yalnızca geliştirici ve mobil test paketleri)
 v3.0  Android + iOS                     (tam masaüstü ve mobil dağıtım burada döner)
 ```
@@ -271,9 +311,8 @@ güvenlik; yeni sözdizimi yalnızca gerçekten gerekliyse.
 4. `uses`, modül kökündeki adlandırılmış Function'larda ve sınıf metotlarında v2.3'ten beri çalışır; listenin imzadan sonraki satıra yazılması da geçerlidir. Genişletilecek bir şey yoktur.
 5. Eski programlar etkilenmez: hiçbir kural değişmez, `Global` bildirimi geçerli kalır.
 
-Sonuç: v2.11'de dil değişikliği yapılmaz; iş belge, örnek, starter ve hızlı
-düzeltme tarafındadır. `components` gibi yeni bir anahtar sözcük ya da GUI'ye
-özel ikinci bir erişim yolu eklenmez.
+Bu geçiş dil değişikliği gerektirmez. Belge, örnek, starter ve hızlı
+düzeltme güncellemeleri ayrı kapsam kararı bekler.
 
 ## 8. Kesinleşmiş dağıtım politikası: v3.0'a kadar kaynak sürüm
 

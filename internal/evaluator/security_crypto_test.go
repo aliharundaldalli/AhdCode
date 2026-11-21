@@ -172,7 +172,11 @@ func TestSecurityAESGCMRoundTrip(t *testing.T) {
 	expectEvaluatorRaise(t, "SecurityError", func() {
 		session.securityBuiltin("aesDecrypt", []any{otherKey, sealed})
 	})
-	tampered := "A" + sealed[1:]
+	flip := "A"
+	if sealed[0] == 'A' {
+		flip = "B"
+	}
+	tampered := flip + sealed[1:]
 	expectEvaluatorRaise(t, "SecurityError", func() {
 		session.securityBuiltin("aesDecrypt", []any{key, tampered})
 	})

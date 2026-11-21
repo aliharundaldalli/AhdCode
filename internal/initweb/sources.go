@@ -27,17 +27,25 @@ func renderHome(options Options) string {
 }
 
 func renderNavbar(options Options) string {
-	if options.Starter == StarterAdmin {
+	switch options.Starter {
+	case StarterBasic:
+		return basicNavbarSource
+	case StarterAdmin:
 		return adminNavbarSource
+	default:
+		return publicNavbarSource
 	}
-	return publicNavbarSource
 }
 
 func renderMainLayout(options Options) string {
-	if options.Starter == StarterAdmin {
+	switch options.Starter {
+	case StarterBasic:
+		return basicMainLayoutSource
+	case StarterAdmin:
 		return adminMainLayoutSource
+	default:
+		return publicMainLayoutSource
 	}
-	return publicMainLayoutSource
 }
 
 func renderDatabaseConfig(options Options) string {
@@ -108,7 +116,11 @@ routes.get("/hakkinda", about)
 routes.get("/ornek-hata", exampleError)
 site.notFound(notFound)
 site.internalError(serverError)
-write("{application.name} — http://{application.address()}")
+if application.isSecure() {
+    write("{application.name} — {application.effectiveURL()}")
+} else {
+    write("{application.name} — http://{application.address()}")
+}
 site.start()
 `
 
@@ -428,71 +440,97 @@ home: Function := (context: RequestContext) -> Response {
 }
 `
 
-const basicSiteSource = `bring Templates
-from Templates bring TemplateSet
+const basicNavbarSource = `bring Web
+from Web bring HTMLNode
 
-pages: TemplateSet := Templates.files("templates")
+navbar: Function := () -> HTMLNode {
+    return Web.UI.nav(
+        [
+            Web.UI.a("/", "Ana sayfa", {"class": "nav-link"})
+            Web.UI.a("/hakkinda", "Hakkında", {"class": "nav-link"})
+            Web.UI.a("/ornek-hata", "Hata örneği", {"class": "nav-link"})
+        ]
+        {"class": "nav app-topbar", "aria-label": "Ana gezinme"}
+    )
+}
+`
+
+const basicMainLayoutSource = `require("Components/Navbar.ahd")
+require("Components/Footer.ahd")
+bring HTML
+bring Web
+from Web bring (HTMLNode, Response, AppConfig)
+
+mainLayout: Function := (
+    config: AppConfig
+    title: String
+    content: List<HTMLNode>
+    status: Int := 200
+) -> Response {
+    head: Local HTMLNode := Web.UI.element(
+        "head"
+        {}
+        [
+            Web.UI.element("meta", {"charset": "utf-8"}, [])
+            Web.UI.element("meta", {"name": "viewport", "content": "width=device-width, initial-scale=1"}, [])
+            Web.UI.element("title", {}, [Web.UI.text(title)])
+            Web.UI.stylesheet("/assets/vendor/bootstrap/bootstrap.min.css")
+            Web.UI.stylesheet("/assets/style.css")
+            Web.UI.element(
+                "script"
+                {"src": "/assets/vendor/bootstrap/bootstrap.bundle.min.js", "defer": "defer"}
+                []
+            )
+            Web.UI.element("script", {"src": "/assets/main.js", "defer": "defer"}, [])
+        ]
+    )
+    body: Local HTMLNode := Web.UI.element(
+        "body"
+        {"class": "app-shell"}
+        [
+            navbar()
+            Web.UI.main(content, {"class": "app-main"})
+            footer(config.name)
+        ]
+    )
+    document: Local HTMLNode := Web.UI.element("html", {"lang": "tr"}, [head, body])
+    return Web.markup("<!DOCTYPE html>{HTML.render(document)}", status)
+}
 `
 
 const basicAboutSource = `require("Config/App.ahd")
-require("Pages/Site.ahd")
-bring Templates
-from Templates bring TemplateSet
+require("Layouts/Main.ahd")
 bring Web
 from Web bring (RequestContext, Response, AppConfig)
 
 about: Function := (context: RequestContext) -> Response {
-    pages: Global TemplateSet
     config: Local AppConfig := configuration()
-    return context.respond(Web.markup(pages.layout(
-        "layouts/site.html"
-        "pages/about.html"
-        Templates.object({
-            "title": Templates.fromString("Hakkında")
-            "name": Templates.fromString(config.name)
-            "note": Templates.fromString("Bu sayfa aynı yerleşimi kullanır.")
-        })
-    )))
+    return context.respond(mainLayout(config, "Hakkında", [
+        Web.UI.h1("Hakkında")
+        Web.UI.p("Bu sayfa aynı yerleşimi kullanır.")
+    ]))
 }
 `
 
 const basicErrorsSource = `require("Config/App.ahd")
-require("Pages/Site.ahd")
-bring Templates
-from Templates bring TemplateSet
+require("Layouts/Main.ahd")
 bring Web
 from Web bring (Request, RequestContext, Response, AppConfig)
 
 notFound: Function := (request: Request) -> Response {
-    pages: Global TemplateSet
     config: Local AppConfig := configuration()
-    return Web.markup(
-        pages.layout(
-            "layouts/site.html"
-            "pages/not-found.html"
-            Templates.object({
-                "title": Templates.fromString("Sayfa bulunamadı")
-                "name": Templates.fromString(config.name)
-            })
-        )
-        404
-    )
+    return mainLayout(config, "Sayfa bulunamadı", [
+        Web.UI.h1("Sayfa bulunamadı")
+        Web.UI.p("Bu adres bu sitede yok.")
+    ], 404)
 }
 
 serverError: Function := (request: Request) -> Response {
-    pages: Global TemplateSet
     config: Local AppConfig := configuration()
-    return Web.markup(
-        pages.layout(
-            "layouts/site.html"
-            "pages/server-error.html"
-            Templates.object({
-                "title": Templates.fromString("Sunucu hatası")
-                "name": Templates.fromString(config.name)
-            })
-        )
-        500
-    )
+    return mainLayout(config, "Sunucu hatası", [
+        Web.UI.h1("Sunucu hatası")
+        Web.UI.p("İstek tamamlanamadı. Ayrıntı gösterilmez.")
+    ], 500)
 }
 
 exampleError: Function := (context: RequestContext) -> Response {
@@ -501,29 +539,22 @@ exampleError: Function := (context: RequestContext) -> Response {
 `
 
 const basicHomeSource = `require("Config/App.ahd")
-require("Pages/Site.ahd")
-bring Templates
-from Templates bring TemplateSet
+require("Layouts/Main.ahd")
 bring Web
 from Web bring (RequestContext, Response, AppConfig)
 
 home: Function := (context: RequestContext) -> Response {
-    pages: Global TemplateSet
     config: Local AppConfig := configuration()
-    return context.respond(Web.markup(pages.layout(
-        "layouts/site.html"
-        "pages/home.html"
-        Templates.object({
-            "title": Templates.fromString("Ana sayfa")
-            "name": Templates.fromString(config.name)
-            "note": Templates.fromString("İstanbul'da küçük bir başlangıç. Ortam: {config.environment}.")
-            "topics": Templates.list([
-                Templates.fromString("Şablonlar")
-                Templates.fromString("Yerleşim")
-                Templates.fromString("Hata sayfaları")
-            ])
-        })
-    )))
+    return context.respond(mainLayout(config, "Ana sayfa", [
+        Web.UI.h1("Ana sayfa")
+        Web.UI.p("Merhaba, {config.name}.")
+        Web.UI.p("İstanbul'da küçük bir başlangıç. Ortam: {config.environment}.")
+        Web.UI.ul([
+            Web.UI.li("Bileşenler")
+            Web.UI.li("Yerleşim")
+            Web.UI.li("Hata sayfaları")
+        ])
+    ]))
 }
 `
 

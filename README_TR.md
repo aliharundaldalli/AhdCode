@@ -16,10 +16,15 @@ veritabanı modülleri, GUI'si, Graphics'i, etkileşimli Plot görüntüleyicisi
 masaüstü uygulaması paketlemesiyle gelir. Küçük bir topluluk tarafından
 pratikte kullanılmaktadır; yaygın (mainstream) bir dil değildir.
 
-Bu, **v2.10.0**, **Web Geliştirme ve Uygulama Güvenilirliği** sürümüdür.
-Sürüm GitHub kaynak arşivleriyle dağıtılır. İmzalı kurulum paketleri v3.0'a
-kadar v2.7.0'da kalır. [v2.10.0 ile gelenler](#release-v2-10-0) ve
-[sürüm ve yükseltme notlarına](docs/RELEASE_2.10.0_TR.md) bakın.
+Bu, en güncel kararlı sürüm olan **v2.11.0**, **Web Dağıtımı ve Progresif Web
+Uygulamaları** sürümüdür. Araç zinciri paketleri macOS (`arm64` ve `x64`,
+imzalı ve Apple noter onaylı `.pkg`/`.dmg` ile imzalı `.tar.gz`), Windows (`x64`
+kullanıcı başına `.exe`) ve Linux (`amd64` ve `arm64` `.tar.gz`) için sunulur;
+yerel `ahdcode build` / `package` için `go.mod` içindeki Go sürümünün `PATH`
+üzerinde bulunması gerekir. Özel Go, çevrimdışı Tectonic LaTeX ve VSIX içeren
+tam paketler v2.7.0'da mevcuttur ve v3.0'da geri döner.
+[Sürüm notlarına](docs/RELEASE_2.11.0_TR.md) ve
+[geçiş notlarına](docs/UPGRADE_2.11_TR.md) bakın.
 
 v2.0.0 bir ana (major) sürümdür, **Masaüstü Uygulamasının Tamamlanması**:
 birinci taraf masaüstü uygulaması temelini tamamlar — GUI'de ListBox, Select,
@@ -54,10 +59,9 @@ komutudur. `ahdcode databases`, kurulu CLI'ye gömülü tam sürüm
 AhdDataStudio'yu başlatır; AhdCode deposuna veya `AHDCODE_ROOT` değerine
 ihtiyaç duymaz. `AHDCODE_ROOT` yalnızca geliştirici geçersiz kılmasıdır.
 
-Yerel geliştirme hâlâ HTTP'dir: yerel TLS, sertifika otoritesi veya ACME
-yoktur. Bu sürümde dil sözdizimi değişmemiştir. Bkz.
-[CLI](docs/CLI_TR.md#yerel-geliştirme-test-adları-ve-yönlendirici) ve
-[Web](docs/WEB_TR.md).
+AhdCode v2.11.0, `ahdcode dev --https app.ahd` komutuyla isteğe
+bağlı geri döngü HTTPS sunar. Normal dev HTTP kullanır. Sertifika ve
+tarayıcı güveni için [yerel HTTPS](docs/WEB_TR.md#14-yerel-https) bölümüne bakın.
 
 v0.18.5, **Web Starter ve Uygulama Başlangıcı**, `ahdcode init web` komutunu
 Empty, Basic veya Admin seçen bir sihirbaza çevirir. Empty cilalı bir
@@ -106,7 +110,7 @@ varsayılan yoktur ve hiçbir `.env` değeri bir ikiliye gömülmez. Bilinçli
 olarak kapsam dışı kalanlar: ORM, ara katman, yetkilendirme, paketleyici ve
 tarayıcı canlı yenilemesi. `<APP_HOST>.test` için yerel
 güvenilir HTTPS, yaklaşık bir çözüm üretmek yerine
-[ertelenmiştir](docs/WEB_TR.md#14-yerel-https--mevcut-sınır): kalıcı olarak
+[ertelenmiştir](docs/WEB_TR.md#14-yerel-https): kalıcı olarak
 ayrıcalıklı sistem durumu gerektirirdi.
 
 v0.14.1, `require(...)` için bir araç düzeltmesidir (dil sunucusu,
@@ -409,7 +413,7 @@ Bir terminalde `ahdcode init web` hangi starter'ın yazılacağını sorar:
 - **Admin** — Home, Login, Dashboard ve SQLite veya MySQL üzerinde bir yönetici
 
 Starter'ı doğrudan da verebilirsiniz: `ahdcode init web empty`, `basic` veya
-`admin`. Şablonlar ve Bootstrap 5.3.3 CLI içindedir (MIT, yerel dosyalar,
+`admin`. Başlangıç proje dosyaları ve Bootstrap 5.3.3 CLI içindedir (MIT, yerel dosyalar,
 CDN yok). `.env` gitignore'dadır; Admin SQLite `database/*.db` dosyaları da
 yok sayılır. Var olan dosyaların ve var olan veritabanlarının üzerine
 yazılmaz.
@@ -524,6 +528,8 @@ bakın.
 [dil sunucusuna](docs/LSP_TR.md) (`ahdcode lsp`) bağlanır. Aynı VSIX, hem
 VS Code hem de Antigravity'i hedefler.
 [Kurulum rehberine](editors/vscode/README_TR.md) bakın.
+
+[v2.11 geçiş notu](docs/UPGRADE_2.11_TR.md)
 
 ## v2.10.0 ile gelenler <a id="release-v2-10-0"></a>
 

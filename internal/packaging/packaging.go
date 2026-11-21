@@ -8,11 +8,8 @@
 // SQLite, ahdnumeric for Numeric, and the LaTeX engine for Latex), its name,
 // and its icon. It never holds the compiler, the Go toolchain, the language
 // server, documentation, source files, or anything else from the project
-// folder. The only files copied from beside the entry are .png, .jpg, and
-// .jpeg images in a resources folder, and those go in the application's
-// own resource folder, not the working directory. A symbolic link is not
-// followed and stops packaging, so a link cannot bring in a file from
-// outside that folder.
+// folder. By default only image resources are copied from beside the entry.
+// The opt-in Web layout also carries approved static and PWA files.
 //
 //	macOS    Name.app (Contents/MacOS: program and helpers; Resources: icon;
 //	         Resources/app: bundled images)
@@ -63,6 +60,10 @@ type Options struct {
 	// Console keeps a Windows console window for a program that uses no
 	// window of its own anyway; a desktop program has none by default.
 	Console bool
+	// Web includes approved files under public/. PWA also includes its
+	// manifest, worker and public files. Neither option copies app data.
+	Web bool
+	PWA bool
 }
 
 // Result describes a finished application.
@@ -203,6 +204,7 @@ func findHelper(set helperSet, helpers string, target build.Target) (string, err
 type appIdentity struct {
 	Name string `json:"name"`
 	Icon string `json:"icon"`
+	Web  bool   `json:"web,omitempty"`
 }
 
 const (
@@ -230,6 +232,12 @@ func Package(options Options) Result {
 	}
 	if !ValidName(options.Name) {
 		return fail("%q cannot name an application; use up to %d letters, digits, spaces, dots, underscores, or hyphens", options.Name, maxNameRunes)
+	}
+	if options.PWA && !options.Web {
+		return fail("--pwa requires --web")
+	}
+	if options.Web && !validWebComponent(options.Name) {
+		return fail("%q cannot name a portable Web package folder", options.Name)
 	}
 	if options.Output == "" {
 		options.Output = "dist"
@@ -280,9 +288,36 @@ func Package(options Options) Result {
 
 	layout := layoutFor(options.Name, target)
 	root := filepath.Join(staging, layout.root)
+	final := filepath.Join(options.Output, layout.root)
+	var webArchive string
+	if options.Web {
+		switch target.OS {
+		case "windows":
+			webArchive = options.Name + "-" + options.Target + ".zip"
+		case "linux":
+			webArchive = options.Name + "-" + options.Target + ".tar.gz"
+		}
+		destinations := []string{final}
+		if webArchive != "" {
+			destinations = append(destinations, filepath.Join(options.Output, webArchive))
+		}
+		for _, path := range destinations {
+			if _, err := os.Lstat(path); !os.IsNotExist(err) {
+				return fail("Web package destination is present or inaccessible: %s; choose another --output or --name", path)
+			}
+		}
+	}
 	for _, folder := range []string{layout.program, layout.helpers, layout.resources} {
 		if err := os.MkdirAll(filepath.Join(root, folder), 0o755); err != nil {
 			return fail("the application cannot be staged: %v", err)
+		}
+	}
+
+	var webFiles []string
+	if options.Web {
+		webFiles, err = copyWebAssets(options.Entry, root, layout.program, options.PWA)
+		if err != nil {
+			return fail("Web assets cannot be packaged: %v", err)
 		}
 	}
 
@@ -319,7 +354,7 @@ func Package(options Options) Result {
 		}
 	}
 
-	identity, _ := json.MarshalIndent(appIdentity{Name: options.Name, Icon: iconFile}, "", "  ")
+	identity, _ := json.MarshalIndent(appIdentity{Name: options.Name, Icon: iconFile, Web: options.Web}, "", "  ")
 	writes := map[string][]byte{
 		filepath.Join(layout.identity, identityFile): append(identity, '\n'),
 		filepath.Join(layout.identity, iconFile):     iconBytes,
@@ -343,11 +378,25 @@ func Package(options Options) Result {
 		return fail("%s", err.Error())
 	}
 
-	if problems := leakGate(root, layout, sets, target); len(problems) != 0 {
+	if problems := leakGate(root, layout, sets, target, webFiles...); len(problems) != 0 {
 		return fail("the application was not written, because it would hold files it must not: %s", strings.Join(problems, "; "))
 	}
 
-	final := filepath.Join(options.Output, layout.root)
+	if options.Web {
+		if webArchive != "" {
+			if _, err := writeArchive(filepath.Join(staging, webArchive), root, layout.root, target.OS == "windows"); err != nil {
+				return fail("the Web archive cannot be staged: %v", err)
+			}
+		}
+		if err := publishWeb(root, final, webArchive); err != nil {
+			return fail("the Web package cannot be published locally: %v", err)
+		}
+		result.Application, _ = filepath.Abs(final)
+		if webArchive != "" {
+			result.Archive, _ = filepath.Abs(filepath.Join(options.Output, webArchive))
+		}
+		return result
+	}
 	if err := replace(final, filepath.Join(staging, layout.root)); err != nil {
 		return fail("%s", err.Error())
 	}
@@ -521,6 +570,12 @@ func copyFrom(input io.Reader, destination string, mode os.FileMode) error {
 	if err != nil {
 		return err
 	}
+	success := false
+	defer func() {
+		if !success {
+			_ = os.Remove(destination)
+		}
+	}()
 	if _, err := io.Copy(output, input); err != nil {
 		output.Close()
 		return err
@@ -528,7 +583,11 @@ func copyFrom(input io.Reader, destination string, mode os.FileMode) error {
 	if err := output.Close(); err != nil {
 		return err
 	}
-	return os.Chmod(destination, mode)
+	if err := os.Chmod(destination, mode); err != nil {
+		return err
+	}
+	success = true
+	return nil
 }
 
 // bundleIdentifier is a reverse-DNS identifier made from the name.
@@ -605,18 +664,7 @@ func copyFile(source, destination string, mode os.FileMode) error {
 		return err
 	}
 	defer input.Close()
-	output, err := os.OpenFile(destination, os.O_WRONLY|os.O_CREATE|os.O_EXCL, mode)
-	if err != nil {
-		return err
-	}
-	if _, err := io.Copy(output, input); err != nil {
-		output.Close()
-		return err
-	}
-	if err := output.Close(); err != nil {
-		return err
-	}
-	return os.Chmod(destination, mode)
+	return copyFrom(input, destination, mode)
 }
 
 // copyTree copies a helper folder: regular files and folders only.
@@ -649,10 +697,18 @@ func copyTree(source, destination string) error {
 // is replaced only when it is one `ahdcode package` made: it holds an
 // ahdcode-app.json. Anything else is never removed.
 func replace(final, staged string) error {
-	if _, err := os.Lstat(final); err == nil {
+	if info, err := os.Lstat(final); err == nil {
+		if !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
+			return fmt.Errorf("%s is not a replaceable package directory", final)
+		}
 		marker := false
 		for _, candidate := range []string{filepath.Join(final, "runtime", identityFile), filepath.Join(final, "Contents", "Resources", identityFile)} {
 			if info, err := os.Stat(candidate); err == nil && info.Mode().IsRegular() {
+				data, err := os.ReadFile(candidate)
+				var identity appIdentity
+				if err != nil || json.Unmarshal(data, &identity) != nil || identity.Web {
+					return fmt.Errorf("%s has an invalid identity or is a Web package; choose another --output or --name", final)
+				}
 				marker = true
 			}
 		}
@@ -761,7 +817,7 @@ var secretPatterns = regexp.MustCompile(`(?i)(-----BEGIN [A-Z ]*PRIVATE KEY-----
 // no file has a forbidden name, and the generated metadata holds no secret.
 // It cannot see into the program's own compiled text: a secret written in
 // the program's source is the program's.
-func leakGate(root string, layout layout, sets []helperSet, target build.Target) []string {
+func leakGate(root string, layout layout, sets []helperSet, target build.Target, webFiles ...string) []string {
 	allowed := map[string]bool{
 		filepath.Join(layout.program, layout.executable):       true,
 		filepath.Join(layout.identity, identityFile):           true,
@@ -769,6 +825,9 @@ func leakGate(root string, layout layout, sets []helperSet, target build.Target)
 		filepath.Join("Contents", "Info.plist"):                target.OS == "darwin",
 		filepath.Join("Contents", "PkgInfo"):                   target.OS == "darwin",
 		filepath.Join("Contents", "Resources", "AppIcon.icns"): target.OS == "darwin",
+	}
+	for _, path := range webFiles {
+		allowed[path] = true
 	}
 	folders := map[string]bool{}
 	for _, set := range sets {

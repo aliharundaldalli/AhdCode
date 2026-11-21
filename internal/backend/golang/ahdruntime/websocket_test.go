@@ -490,29 +490,46 @@ func TestWebSocketClockIsImmutablePerConnection(t *testing.T) {
 	t.Cleanup(func() { ahdWebSocketReplaceClock(previous) })
 
 	fast := &recorder{}
-	slow := &recorder{}
+	slowClosed := make(chan int64, 1)
+	echo := func(socket, text string) {
+		AhdWebSocketSend(AhdClassHTTPError, socket, text)
+	}
 	base := startWebSocketServer(t, func(handle string) {
-		AhdHTTPServerWebSocket(AhdClassHTTPError, handle, "/fast", recordingEndpoint(fast, func(string, string) {}))
-		AhdHTTPServerWebSocket(AhdClassHTTPError, handle, "/slow", recordingEndpoint(slow, func(string, string) {}))
+		AhdHTTPServerWebSocket(AhdClassHTTPError, handle, "/fast", recordingEndpoint(fast, echo))
+		slow := AhdHTTPWebSocket(AhdClassHTTPError, echo)
+		slow = AhdWebSocketEndpointWithClose(AhdClassHTTPError, slow, func(_ string, code int64, _ string) {
+			slowClosed <- code
+		})
+		AhdHTTPServerWebSocket(AhdClassHTTPError, handle, "/slow", slow)
 	})
-	dialWebSocket(t, base+"/fast", nil)
+	waitForReadLoop := func(conn *websocket.Conn) {
+		t.Helper()
+		// The read loop can deliver this frame only after the connection
+		// has copied its clock. HTTP 101 alone does not prove that.
+		writeText(t, conn, "clock-ready")
+		if got := readText(t, conn); got != "clock-ready" {
+			t.Fatalf("clock barrier echo = %q", got)
+		}
+	}
+	waitForReadLoop(dialWebSocket(t, base+"/fast", nil))
 	long := previous
 	long.pingInterval = 30 * time.Second
 	long.pongTimeout = 30 * time.Second
 	ahdWebSocketReplaceClock(long)
-	dialWebSocket(t, base+"/slow", nil)
+	waitForReadLoop(dialWebSocket(t, base+"/slow", nil))
 
 	got := fast.waitFor(t, "close")
 	if strings.Join(got, "|") != "open /fast|close 1006 " {
 		t.Fatalf("fast events = %q", got)
 	}
-	deadline := time.Now().Add(400 * time.Millisecond)
-	for time.Now().Before(deadline) {
-		if strings.Contains(strings.Join(slow.snapshot(), "|"), "close") {
-			t.Fatalf("slow connection closed under the long clock: %q", slow.snapshot())
-		}
-		time.Sleep(40 * time.Millisecond)
+	// The slow, unread connection must survive beyond a full short-clock
+	// ping and pong deadline. A close notification fails the test at once.
+	select {
+	case code := <-slowClosed:
+		t.Fatalf("slow connection closed under the long clock: %d", code)
+	case <-time.After(2 * (short.pingInterval + short.pongTimeout)):
 	}
+
 	if running := ahdWebSocketLivePingers.Load(); running != 1 {
 		t.Fatalf("expected only the slow pinger, have %d", running)
 	}

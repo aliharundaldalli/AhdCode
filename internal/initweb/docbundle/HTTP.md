@@ -283,7 +283,7 @@ is not used. If that handler fails, the client receives the plain text
 `Not Found` or `Internal Server Error`, and the other error page is not
 called. The page does not receive the failure text. A missing file inside a
 prefix already claimed by `static` or `managed` stays the existing plain
-404. See [Templates](TEMPLATES.md).
+404. See [Web applications](WEB.md).
 
 ## Static files
 

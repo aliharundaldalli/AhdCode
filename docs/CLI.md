@@ -9,6 +9,7 @@ The current command surface is:
 ```text
 ahdcode
 ahdcode init web [empty|basic|admin|mvc|crud]
+ahdcode pwa init [--name NAME] [--short-name NAME]
 ahdcode databases
 ahdcode databases list
 ahdcode databases add <file.db>
@@ -19,9 +20,9 @@ ahdcode migrate up --db <file> [--dir <directory>] [--driver sqlite]
 ahdcode migrate down --db <file> [--dir <directory>] [--steps <n>] [--driver sqlite]
 ahdcode build <entry.ahd> [-o <output>]
 ahdcode package <entry.ahd> [--name <name>] [--output <folder>] [--icon <icon.png>]
-                [--target <os-arch>] [--helpers <folder>] [--console]
+                [--target <os-arch>] [--helpers <folder>] [--console] [--web [--pwa]]
 ahdcode run <entry.ahd> [-- <args>...]
-ahdcode dev <entry.ahd>
+ahdcode dev [--https [--cert FILE --key FILE]] <entry.ahd>
 ahdcode stop <app.dev|app.run>
 ahdcode kill [--force] <app.dev|app.run>
 ahdcode local status
@@ -34,7 +35,7 @@ ahdcode --version
 
 `ahdcode init web` writes a Web starter into the **current directory**. On a
 TTY it asks Empty, Basic, Admin, MVC, or CRUD. Non-interactive use must pass
-`empty`, `basic`, `admin`, `mvc`, or `crud`. Templates, Bootstrap 5.3.3, and
+`empty`, `basic`, `admin`, `mvc`, or `crud`. Starter sources, Bootstrap 5.3.3, and
 the AhdCode logo are embedded: offline, no package manager, no overwrite.
 Every starter also receives `AHDCODE.md` and an English `Documents/AhdCode/`
 snapshot for this version. Those files are not runtime. Next:
@@ -209,11 +210,6 @@ never part of this graph: editing one never triggers a rebuild, since
 static files are read straight from disk on every request. See
 [`require(...)`](REQUIRE.md) for the composition rules this graph follows.
 
-`dev` also watches regular `.html` files under `templates/` beside the
-entry file. A change rebuilds and restarts, which is what refreshes a
-browser that is already on a development page. The watch does not follow a
-symbolic link and does not rewrite those files, so saving one template does
-not schedule another rebuild by itself. `ahdcode run` does not watch them.
 A program started without `ahdcode dev` does not inject the reload script.
 
 Bundled first-party modules are never watched either. `bring Web` compiles
@@ -291,27 +287,11 @@ If routing cannot be arranged at all, the session still runs and the banner
 says so in one line. A convenience failing is never allowed to fail an
 application that started correctly.
 
-`dev` reads `APP_*` with the application's own precedence — process
-environment first, then the app-root `.env` — and only ever to decide what to
-print. It never exports a variable and never passes one to the child.
-
-It refuses two configurations, before starting anything:
-
-- `APP_ENV=production`. Running a production contract through the development
-  command would mean either treating it as development or rewriting
-  `APP_ENV`.
-- `APP_PROTOCOL=https`. `dev` serves plaintext HTTP, so starting the child
-  would mean serving `http` while the configuration says `https`. AhdCode
-  routes `.test` names over plaintext HTTP and ships no local
-  certificate authority and no certificate management, and `dev` neither
-  downgrades the protocol nor generates an untrusted certificate — see
-  [Web](WEB.md#14-local-https--current-limitation).
-
-In both cases `dev` reports the mismatch, starts no child, opens no listener,
-leaves no `.dev` descriptor, changes neither variable, and exits non-zero.
-
-A program that never wrote `bring Web` is unaffected by all of this, even if
-`APP_ENV` happens to be set in its environment.
+The launcher reads the process environment before the app-root `.env`.
+It refuses `APP_ENV=production` for Web development and explicit HTTPS
+sessions. Plain Web development refuses `APP_PROTOCOL=https`. Use
+[`dev --https`](#local-https) for loopback TLS. That mode sets
+`APP_PROTOCOL=https` for the child only. A refusal is a nonzero exit.
 
 ### `stop`: graceful shutdown
 
@@ -378,8 +358,8 @@ What it does is narrow by design:
 - method, path, query, headers, and body are forwarded unchanged, and the
   application sees the name that was typed rather than the loopback port.
 
-Local development is **plaintext HTTP** in this release. There is no local TLS, no
-certificate authority, and no ACME.
+This router serves plaintext HTTP. Direct local HTTPS uses the application's
+own loopback listener.
 
 ### Which port
 
@@ -485,6 +465,21 @@ for administrator access again the next time the same project runs.
 If you decline, or the platform does not support it, nothing breaks — the
 application stays reachable at its own loopback address, which the banner
 always prints.
+
+## Add PWA files
+
+`ahdcode pwa init [--name NAME] [--short-name NAME]` creates an optional
+manifest, worker, public icons, and an AhdCode integration module in
+`PWA/`. Use it at the application root. The command preserves existing
+project files and refuses to replace an existing `PWA/` path.
+[PWA setup and cache policy](PWA.md).
+
+## Local HTTPS
+
+Use `ahdcode dev --https app.ahd` for direct loopback TLS. Add
+`--cert FILE --key FILE` before the entry to use an existing PEM pair.
+HTTP remains the default. For certificate creation, browser trust,
+renewal, port conflicts, and Secure cookies, see [Local HTTPS in Web](WEB.md#14-local-https).
 
 ## `ahdcode databases`
 

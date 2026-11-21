@@ -495,8 +495,6 @@ const (
 	HTTPServerStart             TypeOperation = "Server.start"
 	HTTPServerNotFound          TypeOperation = "Server.notFound"
 	HTTPServerInternalError     TypeOperation = "Server.internalError"
-	TemplateSetRender           TypeOperation = "TemplateSet.render"
-	TemplateSetLayout           TypeOperation = "TemplateSet.layout"
 	HTTPRequestMethod           TypeOperation = "Request.method"
 	HTTPRequestPath             TypeOperation = "Request.path"
 	HTTPRequestQuery            TypeOperation = "Request.query"

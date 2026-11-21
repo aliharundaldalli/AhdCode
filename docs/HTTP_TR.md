@@ -271,7 +271,7 @@ kullanılmaz. Bu işleyici de başarısız olursa istemci düz `Not Found` veya
 `Internal Server Error` metnini alır ve diğer hata sayfası çağrılmaz. Sayfa,
 başarısızlığın metnini almaz. `static` veya `managed` tarafından zaten
 yanıtlanmış bir önekteki eksik dosya, mevcut düz 404 olarak kalır. Bkz.
-[Templates](TEMPLATES_TR.md).
+[Web uygulamaları](WEB_TR.md).
 
 ## Statik dosyalar
 

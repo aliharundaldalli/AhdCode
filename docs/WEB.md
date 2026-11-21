@@ -34,7 +34,6 @@ v0.15 deliberately does **not** include:
 | ORM, query builder | Use `SQLite` / `MySQL` explicitly. Versioned SQL is [`ahdcode migrate`](CLI.md#ahdcode-migrate) |
 | Forms, validation, old input, error bags | Released in v0.16 (see section 16) |
 | Middleware chains, route groups, auth guards | Planned for v0.17 |
-| Template language inside `Web.document` | `Web.document` is still a shell. File templates, layouts, and partials are [`Templates`](TEMPLATES.md) |
 | Virtual DOM, hydration, reactive state, hooks | Not planned; pages are composed on the server |
 | Frontend bundler, npm, Node, CSS-in-JS | Not planned; assets are files on disk |
 | Browser live reload / HMR | `ahdcode dev` reloads the full page after a successful rebuild, through a same-origin script. Not hot module replacement. `ahdcode run` and a `.env` file do not turn it on |
@@ -601,27 +600,9 @@ Editing `public/app.css` does not, and does not refresh the browser.
   Nothing was started and APP_ENV was not changed.
 ```
 
-It also **refuses** `APP_PROTOCOL=https`:
-
-```
-✗ Local HTTPS is not available in AhdCode v2.1.0.
-  ahdcode dev serves plaintext HTTP, so it cannot honour
-  APP_PROTOCOL=https.
-
-  Configured identity:
-  https://ahdakademi.test
-
-  Set APP_PROTOCOL=http for local development, or terminate
-  HTTPS with an external local proxy in front of 127.0.0.1:8080.
-  Nothing was started and APP_PROTOCOL was not changed.
-```
-
-`ahdcode dev` starts the application, and the application binds a plaintext
-HTTP socket. There is no path in this release by which `APP_PROTOCOL=https` results
-in TLS here, so starting the child would mean serving `http` while the
-configuration says `https`. It refuses instead of downgrading: a silent
-downgrade would hide a secure-cookie or mixed-content problem until
-production.
+Without `--https`, `ahdcode dev` refuses `APP_PROTOCOL=https`. Use the
+[direct local HTTPS mode](#14-local-https), or set `APP_PROTOCOL=http` for
+ordinary HTTP development.
 
 In both refusals nothing is started, no listener is opened, no `.dev`
 descriptor is left behind, `APP_ENV` and `APP_PROTOCOL` are unchanged, and the
@@ -697,26 +678,87 @@ is used (`ahdakademi1.test`). Ownership is decided by the route registry, not
 by the hosts file, so a leftover mapping from a project that is no longer
 running never pushes a new session onto a suffixed name.
 
-## 14. Local HTTPS — current limitation
+## Progressive Web Apps
 
-AhdCode routes `.test` names over **plaintext HTTP**. It still **does not ship**
-a local certificate authority, a certificate manager, or ACME, and there is no
-`ahdcode trust` command.
+Web applications can opt into browser installation and a limited offline
+fallback. The starter files add a manifest and service worker through
+ordinary Web and HTMLNode APIs. [PWA setup and offline policy](PWA.md).
 
-Serving `https://<name>.test` with no visible port needs a certificate
-authority in the system trust store, which is a permanent, machine-wide change
-to what this computer trusts. That is a much larger decision than routing a
-loopback hostname, and it is deferred rather than approximated: AhdCode
-installs no trust artifacts and generates no certificates.
+## 14. Local HTTPS
 
-Because of that, `APP_PROTOCOL=https` makes `ahdcode dev`
-[refuse to start](#refusals) rather than serve the application over plaintext
-http while calling it https. It never silently downgrades `https` to `http`,
-and it never generates an untrusted certificate. A silent downgrade would hide
-a secure-cookie or mixed-content problem until production.
+Ordinary `ahdcode dev app.ahd` uses HTTP. To run the generated Basic starter
+or another Web or HTTP project with direct loopback TLS, run this command
+from the project directory.
 
-For local work today, set `APP_PROTOCOL=http` and use the `.test` name or
-`http://127.0.0.1:SERVER_PORT`, or terminate TLS with a proxy you already run.
+```sh
+ahdcode dev --https app.ahd
+```
+
+Open the HTTPS URL printed by the Web banner. With the Basic defaults it is
+`https://127.0.0.1:8080`. Set `SERVER_HOST` to `localhost`, `127.0.0.1`, or
+`::1` and choose `SERVER_PORT` as usual. `localhost` binds IPv4 loopback
+directly. Use `https://[::1]:PORT` for IPv6. The `.test` router is for HTTP,
+so HTTPS mode uses the direct address and claims no `.test` name. A bare
+HTTP program uses its own loopback `HTTP.server` address.
+
+The dev child receives `APP_PROTOCOL=https` for that session. AhdCode
+leaves `.env` and the parent environment alone. Web's URL helpers use the
+direct HTTPS address during that session. The existing runtime serves both
+native and evaluator HTTP code, but `dev` builds and runs native children.
+
+### Certificates and browser trust
+
+On first use, AhdCode creates a P-256 loopback server certificate and a
+dedicated development CA certificate. The default store is the per-user
+AhdCode configuration directory, under `https/`. This is normally
+`%APPDATA%\ahdcode\https` on Windows, `~/Library/Application Support/ahdcode/https`
+on macOS, and `$XDG_CONFIG_HOME/ahdcode/https` or `~/.config/ahdcode/https` on
+Linux. The launcher prints the path to the public `root-ca.pem`.
+`localhost-key.pem` is the private server key. Keep it outside the project,
+out of `public/`, and out of version control or distribution packages.
+The CA signing key is never saved. The server certificate lasts 30 days
+and the CA certificate lasts 45 days.
+
+An encrypted connection and a trusted browser identity are separate.
+AhdCode does not install trust or modify system stores. Only if you choose
+to trust this CA, use the browser or OS trust UI to import the printed
+**public** `root-ca.pem` for your own development user/profile. Review and
+approve any trust prompt yourself. Do not bypass the certificate warning.
+If the store is expired, incomplete, or corrupt, stop dev, move the store
+to a private backup location, and start again to generate a new pair.
+A newly generated CA has a different identity. Remove old trust entries
+through the same UI when they are no longer needed.
+
+You can also supply a matching pair from a tool such as mkcert.
+
+```sh
+ahdcode dev --https --cert /private/dev/localhost.pem --key /private/dev/localhost-key.pem app.ahd
+```
+
+The PEM server certificate must cover `localhost`, `127.0.0.1`, and `::1`.
+Use a private key file and parent folder outside the project. On Unix,
+owner-only access is required. On Windows, the DACL can grant access only
+to your user, SYSTEM, and Administrators. Files reached through symbolic
+links or junctions are refused. If the certificate is not trusted, check
+the importing profile and the host printed by dev. A port conflict is a
+bind error. Choose a free port and restart. If a rebuild sees invalid
+replacement credentials, the existing child remains running.
+
+### Cookies, WebSockets, and live reload
+
+Secure cookies work over trusted HTTPS. Continue creating persistent
+session stores with `secure: true` where appropriate and keep the existing
+`HttpOnly` and `SameSite` policy. Local HTTPS does not turn ordinary session
+cookies into Secure cookies, and switching between hosts can require a
+fresh sign-in. HTTPS pages must connect to `wss://` endpoints. The existing
+WebSocket transport uses the same HTTP/1.1 listener. With direct TLS the
+default origin check requires an HTTPS Origin and a matching host.
+Shutdown closes upgraded transports while admitted callbacks finish under
+the existing ownership rules.
+
+The live-reload script and probe are same-origin URLs and inherit HTTPS
+from the document. Template and AhdCode source edits use the same rebuild
+and restart pipeline as HTTP mode. [CLI](CLI.md#local-https)
 
 ## 15. Production
 
@@ -756,8 +798,7 @@ Never derive a public URL from `SERVER_PORT`.
 AhdCode is not a production certificate manager: no ACME, no Let's Encrypt
 automation, no DNS challenges, no renewal service. The local router is
 strictly a development convenience -- loopback only, never a deployment
-target. If your `HTTP` primitives
-already support direct TLS, that remains available and unchanged.
+target. Keep development certificates out of production.
 
 ## 16. `.env`
 
@@ -1040,7 +1081,7 @@ On a terminal, `init web` asks Empty, Basic, Admin, MVC, or CRUD. You can
 also run `ahdcode init web empty|basic|admin|mvc|crud`, which generates
 immediately without the wizard.
 
-Templates and [Bootstrap 5.3.3](https://getbootstrap.com/) (MIT) ship inside
+Starter sources and [Bootstrap 5.3.3](https://getbootstrap.com/) (MIT) ship inside
 the CLI. Generated pages load only local files:
 
 - `/assets/vendor/bootstrap/bootstrap.min.css`
@@ -1083,12 +1124,13 @@ A small Turkish-language site on top of the Empty shell, plus
 `MAIL_SECURITY` defaults to `starttls` (SMTP on port 587). Empty
 `MAIL_HOST` still lets the app start. No database and no authentication.
 
-Pages load with [`Templates.files("templates")`](TEMPLATES.md). A shared
-`layouts/site.html` wraps `pages/home.html` and `pages/about.html`;
-`components/nav.html` is a partial. Routes are `/`, `/hakkinda`, and
-`/ornek-hata`. `site.notFound` and `site.internalError` serve custom 404
-and 500 pages from the same layout. Handlers pass Turkish strings through
-`Templates.object({...})` into `pages.layout`, then `Web.markup`.
+`Pages/Home.ahd` and `Pages/About.ahd` build `HTMLNode` values with `Web.UI`.
+`Layouts/Main.ahd` wraps them in the Turkish document, adds shared navigation
+and footer components, and links local Bootstrap, CSS, and JavaScript.
+Routes are `/`, `/hakkinda`, and `/ornek-hata`. `Pages/Errors.ahd` builds
+custom 404 and 500 responses with the same layout.
+
+The [v2.11 upgrade note](UPGRADE_2.11.md) covers migration from the old Templates API.
 
 ### Admin
 

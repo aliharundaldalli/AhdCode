@@ -1,4 +1,4 @@
-# Packaging desktop applications
+# Packaging AhdCode applications
 
 [English] · Türkçe
 
@@ -11,7 +11,7 @@ runs on a computer without AhdCode installed.
 
 ```text
 ahdcode package <entry.ahd> [--name <name>] [--output <folder>] [--icon <icon.png>]
-                [--target <os-arch>] [--helpers <folder>] [--console]
+                [--target <os-arch>] [--helpers <folder>] [--console] [--web [--pwa]]
 ```
 
 ```sh
@@ -26,11 +26,69 @@ ahdcode package examples/v2.0/ledger_app/main.ahd --name Ledger --icon ledger.pn
 | `--target` | The platform to package for (see [Targets](#targets)) | this computer |
 | `--helpers` | A folder holding that platform's AhdCode helpers | this installation's |
 | `--console` | Windows only: keep a console window for a desktop program | no console |
+| `--web` | Include the project's reviewed public assets | off |
+| `--pwa` | Include the PWA assets and check their layout. Requires `--web` | off |
 
 There is no manifest file, package registry, or dependency manager: the
 command line is the whole configuration.
 
-## What an application holds
+## Deploy a Web application
+
+```sh
+ahdcode package app.ahd --web --name Site --output releases/v2.11
+# For an app already wired with ahdcode pwa init:
+ahdcode package app.ahd --web --pwa --name Site --output releases/v2.11-pwa
+```
+
+`--web` copies the reviewed `public/` tree beside the entry module and
+retains its relative paths. `--pwa` additionally copies
+`PWA/app.webmanifest`, `PWA/worker.js`, and `PWA/public/`. It requires
+a valid manifest with local `/ahd-pwa/` icons and a registration script.
+`PWA/Integration.ahd` is compiled from the app's source graph.
+[PWA setup](PWA.md).
+
+The Web package contains the executable and necessary helpers, with
+the runtime assets beside the executable. Serve from that directory.
+On Windows and Linux it is the top-level package directory. On macOS use
+`Name.app/Contents/MacOS` as the working directory when running from a
+terminal or service. For example, on Linux or macOS after changing to
+the executable's directory:
+
+```sh
+APP_NAME=Site APP_ENV=production APP_PROTOCOL=https APP_HOST=example.com \
+  SERVER_HOST=127.0.0.1 SERVER_PORT=8080 ./Site
+```
+
+On Windows the executable is `Site.exe`. Supply those variables through
+the process environment, or create a private `.env` beside the executable
+if the application loads one. For Admin, MVC, and CRUD, set the required
+`DB_*` values and provision or securely move an initialized database
+separately. Set persistent session file paths to writable private storage.
+Supply other mail or application settings the same way. Behind Caddy, keep
+the backend on loopback and pass the app and PWA routes through the same
+HTTPS origin. [Local and production HTTPS](WEB.md#14-local-https).
+
+The packager accepts CSS, JavaScript, static HTML, web manifests, common
+images and fonts, and files named `LICENSE` in the approved public trees.
+It rejects links and junctions, hidden paths, private directory names,
+paths that collide on case-insensitive filesystems, unsupported file types,
+and recognizable PEM private keys. Keep the
+public trees reviewed. The packager cannot identify every secret in
+otherwise valid JavaScript or other public content. It never copies
+project configuration, source modules, or database files automatically.
+Custom asset roots must be deployed separately at their configured paths.
+
+Web builds refuse existing output directories and archive names. Choose
+a fresh destination for each deployment and switch your service to it
+after verification. Relative URLs, existing MIME types, and worker cache
+headers stay under the same application routes. The zip or tar archive
+uses sorted entries and fixed timestamps.
+
+For a manual deployment, `ahdcode build app.ahd -o Site` creates the
+executable alone. Supply the same asset layout and any applicable
+runtime helpers explicitly.
+
+## What a desktop application holds
 
 | Platform | Application |
 | --- | --- |
@@ -104,22 +162,19 @@ dialogs — show the application's name and icon, not AhdCode's:
 
 ## Targets
 
-| Target | Output | Status |
+| Target | Output | Notes |
 | --- | --- | --- |
-| `macos-arm64` | `.app` | live-tested for this release |
-| `windows-x64` | folder and `.zip` | package-tested (structure, executable format, icon resource); not run on Windows for this release |
-| `linux-x64` | folder and `.tar.gz` | package-tested (structure, executable format); not run on Linux for this release |
-| `macos-x64`, `windows-arm64`, `linux-arm64` | as above | compiled only |
+| `macos-arm64`, `windows-x64`, `linux-x64`, `linux-arm64` | native bundle / archive | standard targets (`--target` defaults to the host platform) |
+| `macos-x64`, `windows-arm64` | `.app`, folder, or `.zip` | cross-compiled targets when matching `--helpers` are supplied |
 
 By default, `ahdcode package` packages for the computer it runs on, with this
 installation's helpers. A program is plain Go without C code, so AhdCode can
 compile it for another platform too; the helpers, however, are built for one
 platform each. To package for another platform, pass `--target` with
-`--helpers` naming a folder with that platform's helpers — for example the
-`libexec/ahdcode` folder of the AhdCode download for that platform:
+`--helpers` naming a folder with matching helpers built for that target:
 
 ```sh
-ahdcode package app.ahd --target windows-x64 --helpers ~/Downloads/AhdCode-windows/libexec/ahdcode
+ahdcode package app.ahd --target windows-x64 --helpers ./helpers/windows-x64
 ```
 
 There is no installer, `.msi`, `.deb`, `.rpm`, AppImage, or Flatpak output.

@@ -96,7 +96,6 @@ var (
 	AhdClassMySQLError          = &AhdClass{Name: "MySQLError", Parent: AhdClassError}
 	AhdClassHTTPError           = &AhdClass{Name: "HTTPError", Parent: AhdClassError}
 	AhdClassHTMLError           = &AhdClass{Name: "HTMLError", Parent: AhdClassError}
-	AhdClassTemplateError       = &AhdClass{Name: "TemplateError", Parent: AhdClassError}
 	AhdClassSMTPError           = &AhdClass{Name: "SMTPError", Parent: AhdClassError}
 	AhdClassSecurityError       = &AhdClass{Name: "SecurityError", Parent: AhdClassError}
 	AhdClassIdentityError       = &AhdClass{Name: "IdentityError", Parent: AhdClassError}
