@@ -14,10 +14,12 @@ import (
 )
 
 // A .env file is application configuration loaded after the process starts.
-// It must not be able to turn on the development reload hook, including when
-// Web.start reads it and when a normal HTTP program calls Env.load.
+// It cannot enable the development reload hook or HTTPS, even when Web.start
+// reads it or a normal HTTP program calls Env.load.
 func TestDevReloadEnvFileCannotArmAStandaloneBinary(t *testing.T) {
-	env := "AHDCODE_DEV_SESSION=0123456789abcdef0123456789abcdef\nAHDCODE_DEV_GENERATION=4\nAPP_NAME=Isolation\nAPP_ENV=production\nAPP_HOST=localhost\nAPP_PROTOCOL=http\nSERVER_HOST=127.0.0.1\n"
+	env := "AHDCODE_DEV_SESSION=0123456789abcdef0123456789abcdef\nAHDCODE_DEV_GENERATION=4\n" +
+		"AHDCODE_DEV_TLS_CERT=missing-cert.pem\nAHDCODE_DEV_TLS_KEY=missing-key.pem\n" +
+		"APP_NAME=Isolation\nAPP_ENV=production\nAPP_HOST=localhost\nAPP_PROTOCOL=http\nSERVER_HOST=127.0.0.1\n"
 	httpSource := func(port int) string {
 		return `bring HTTP
 bring Env

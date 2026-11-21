@@ -212,8 +212,6 @@ func (session *Session) builtin(identity ir.CallableID, receiver any, arguments 
 		return session.httpBuiltin(strings.TrimPrefix(name, "builtin:HTTP::"), values(arguments))
 	case strings.HasPrefix(name, "builtin:HTML::"):
 		return session.htmlBuiltin(strings.TrimPrefix(name, "builtin:HTML::"), values(arguments))
-	case strings.HasPrefix(name, "builtin:Templates::"):
-		return session.templatesBuiltin(strings.TrimPrefix(name, "builtin:Templates::"), values(arguments))
 	case strings.HasPrefix(name, "builtin:SMTP::"):
 		return session.smtpBuiltin(strings.TrimPrefix(name, "builtin:SMTP::"), values(arguments))
 	case strings.HasPrefix(name, "builtin:Bits::"):
@@ -419,9 +417,6 @@ func (session *Session) core(name string, receiver any, arguments []any) any {
 		strings.HasPrefix(name, "WebSocket.") || strings.HasPrefix(name, "WebSocketEndpoint.") ||
 		strings.HasPrefix(name, "WebSocketClient.") || strings.HasPrefix(name, "WebSocketConnection.") {
 		return session.httpOperation(name, receiver, arguments)
-	}
-	if strings.HasPrefix(name, "TemplateSet.") {
-		return session.templatesOperation(name, receiver, arguments)
 	}
 	if strings.HasPrefix(name, "HTMLDocument.") || strings.HasPrefix(name, "HTMLElement.") {
 		return session.htmlOperation(name, receiver, arguments)

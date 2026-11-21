@@ -137,11 +137,8 @@ func TestHTTPShutdownClaimsStartedServerBeforeListen(t *testing.T) {
 	if server == nil {
 		t.Fatal("missing server state")
 	}
-	// Simulate the narrow window after owner is claimed in AhdHTTPServerStart
-	// and before listener is bound and stored under server.lifecycle.
-	ahdHTTPLifetimeMu.Lock()
-	server.owner.Store(true)
-	ahdHTTPLifetimeMu.Unlock()
+	// Exercise the real startup transition without advancing to bind yet.
+	httpServer := server.claimStart(AhdClassHTTPError, 0)
 	if !AhdHTTPShutdownAddress("127.0.0.1", port) {
 		t.Fatal("shutdown missed started server before listen")
 	}
@@ -154,6 +151,10 @@ func TestHTTPShutdownClaimsStartedServerBeforeListen(t *testing.T) {
 	if AhdHTTPShutdownAddress("127.0.0.1", port) {
 		t.Fatal("repeated pre-listen shutdown returned true")
 	}
+	server.serve(AhdClassHTTPError, httpServer, func(string, string) (net.Listener, error) {
+		t.Fatal("cancelled start reached the bind step")
+		return nil, nil
+	})
 	assertPortReusable(t, port)
 }
 

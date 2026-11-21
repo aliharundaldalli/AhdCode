@@ -8,9 +8,11 @@ package ahdruntime
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"sync/atomic"
@@ -98,6 +100,21 @@ func ahdWebSocketServe(dispatcher ahdHTTPDispatcher, route *ahdHTTPWebSocketRout
 		return
 	}
 	connection.Store(conn)
+	closeTransport := func() { _ = conn.CloseNow() }
+	if transport, ok := request.Context().Value(ahdHTTPTransportKey{}).(net.Conn); ok {
+		if secure, ok := transport.(*tls.Conn); ok {
+			transport = secure.NetConn()
+		}
+		// Go's server no longer owns a hijacked connection. Close its
+		// transport directly without waiting on peer frames or callbacks.
+		closeTransport = func() { _ = transport.Close() }
+	}
+	if !dispatcher.state.trackUpgrade(socket.id, closeTransport) {
+		closeTransport()
+		socket.markClosed()
+		return
+	}
+	defer dispatcher.state.forgetUpgrade(socket.id)
 	ahdWebSocketRun(dispatcher.state, endpoint, conn, socket)
 }
 
@@ -270,11 +287,10 @@ func ahdWebSocketCall(state *ahdHTTPServerState, callback func()) (failed bool) 
 	entered := false
 	func() {
 		defer state.mutex.Unlock()
-		if state.closing.Load() {
+		if !state.tryEnterCallback() {
 			failed = true
 			return
 		}
-		state.enterCallback()
 		entered = true
 		defer state.leaveCallback()
 		defer func() {

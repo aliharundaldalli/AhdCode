@@ -4797,15 +4797,14 @@ API'yi öğretir; v0.15 API'leri kaynak uyumluluğunu korur.
 adlandırabilirsiniz (`ahdcode init web empty`, `basic`, `admin`):
 
 - **Empty** — bir karşılama sayfası. Veritabanı yok, giriş yok.
-- **Basic** — dosya şablonları, ortak yerleşim, özel 404/500 sayfaları ve
-  `.env` içinde ortak uygulama ve posta yapılandırması olan küçük bir
-  Türkçe site. [Templates](TEMPLATES_TR.md) sayfasına bakın.
+- **Basic** — `.ahd` ve `Web.UI` ile oluşturulan Türkçe sayfalar, ortak
+  yerleşim, özel 404/500 sayfaları ve `.env` ile posta yapılandırması.
 - **Admin** — Home, Login ve bir Dashboard; SQLite ya da MySQL üzerinde tek bir
   yönetici hesabıyla.
 
 Yazdığı her şey okuyup değiştirebileceğiniz sıradan AhdCode'dur: sayfalar,
 yerleşimler, bileşenler ve bir `Config/` klasörü; hepsi 19. bölümdeki gibi
-`require(...)` ile birbirine bağlanmıştır. Şablonlar ve Bootstrap CLI'ın
+`require(...)` ile birbirine bağlanmıştır. Başlangıç proje dosyaları ve Bootstrap CLI'ın
 içindedir; bu yüzden `init` ağ gerektirmez ve hiçbir paket yöneticisi kurmaz.
 Var olan bir dosyanın ya da veritabanının üzerine asla yazmaz.
 

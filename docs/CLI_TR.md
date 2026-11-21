@@ -9,6 +9,7 @@ Mevcut komut yüzeyi (command surface) şudur:
 ```text
 ahdcode
 ahdcode init web [empty|basic|admin|mvc|crud]
+ahdcode pwa init [--name NAME] [--short-name NAME]
 ahdcode databases
 ahdcode databases list
 ahdcode databases add <file.db>
@@ -19,9 +20,9 @@ ahdcode migrate up --db <file> [--dir <directory>] [--driver sqlite]
 ahdcode migrate down --db <file> [--dir <directory>] [--steps <n>] [--driver sqlite]
 ahdcode build <entry.ahd> [-o <output>]
 ahdcode package <entry.ahd> [--name <name>] [--output <folder>] [--icon <icon.png>]
-                [--target <os-arch>] [--helpers <folder>] [--console]
+                [--target <os-arch>] [--helpers <folder>] [--console] [--web [--pwa]]
 ahdcode run <entry.ahd> [-- <args>...]
-ahdcode dev <entry.ahd>
+ahdcode dev [--https [--cert FILE --key FILE]] <entry.ahd>
 ahdcode stop <app.dev|app.run>
 ahdcode kill [--force] <app.dev|app.run>
 ahdcode local status
@@ -219,11 +220,6 @@ yeniden derlemeyi tetiklemez, çünkü statik dosyalar her istekte doğrudan
 diskten okunur. Bu grafiğin izlediği birleştirme kuralları için bkz.
 [`require(...)`](REQUIRE_TR.md).
 
-`dev`, giriş dosyasının yanındaki `templates/` altında düzenli `.html`
-dosyalarını da izler. Bir değişiklik yeniden derler ve yeniden başlatır;
-geliştirme sayfasındaki tarayıcı böyle yenilenir. İzleme sembolik bağ
-izlemez ve bu dosyaları yeniden yazmaz, bu yüzden bir şablonu kaydetmek
-kendi başına ikinci bir derleme planlamaz. `ahdcode run` bunları izlemez.
 `ahdcode dev` olmadan başlayan bir program yenileme betiğini eklemez.
 
 Gömülü birinci taraf modüller de izlenmez. `bring Web`, derleyiciye gömülü
@@ -303,26 +299,13 @@ başarısız kılmaz.
 
 `dev`, `APP_*` değerlerini uygulamanın kendi önceliğiyle okur — önce süreç
 ortamı, sonra uygulama kökündeki `.env` — ve yalnızca ne yazacağına karar
-vermek için. Hiçbir değişkeni dışa aktarmaz ve alt sürece hiçbir şey geçirmez.
+vermek için. Önce süreç ortamı, sonra proje .env dosyası okunur.
 
-Bir şey başlatmadan önce iki yapılandırmayı reddeder:
-
-- `APP_ENV=production`. Bir production sözleşmesini geliştirme komutuyla
-  çalıştırmak, ya onu development saymak ya da `APP_ENV`'i yeniden yazmak
-  olurdu.
-- `APP_PROTOCOL=https`. `dev` düz metin HTTP sunar; alt süreci başlatmak,
-  yapılandırma `https` derken `http` sunmak olurdu. AhdCode `.test` adlarını
-  düz metin HTTP üzerinden yönlendirir; hâlâ yerel bir sertifika otoritesi
-  veya sertifika yönetimi getirmez ve `dev` ne protokolü düşürür ne de
-  güvenilmeyen bir sertifika üretir — bkz.
-  [Web](WEB_TR.md#14-yerel-https--mevcut-sınır).
-
-Her iki durumda da `dev` uyuşmazlığı bildirir, alt süreç başlatmaz, dinleyici
-açmaz, geride `.dev` tanımlayıcısı bırakmaz, iki değişkeni de değiştirmez ve
-sıfırdan farklı bir kodla çıkar.
-
-Hiç `bring Web` yazmamış bir program, ortamında `APP_ENV` bulunsa bile
-bunların hiçbirinden etkilenmez.
+Web geliştirmede ve açık HTTPS oturumlarında `APP_ENV=production`
+reddedilir. Düz HTTP kipinde `APP_PROTOCOL=https` kullanılamaz.
+Geri döngü TLS için [`dev --https`](#yerel-https) kullanın. Bu kip
+`APP_PROTOCOL=https` değerini yalnızca alt süreç için ayarlar.
+Yapılandırma reddedildiğinde çıkış kodu sıfırdan farklıdır.
 
 ### `stop`: nazik kapanış
 
@@ -388,8 +371,8 @@ Yaptığı iş bilinçli olarak dardır:
 - yöntem, yol, sorgu, başlıklar ve gövde değiştirilmeden iletilir; uygulama,
   geri döngü portunu değil yazılan adı görür.
 
-bu sürümde yerel geliştirme **düz metin HTTP**'dir. Yerel TLS, sertifika
-otoritesi ve ACME yoktur.
+Bu yönlendirici düz metin HTTP sunar. Doğrudan yerel HTTPS uygulamanın
+geri döngü dinleyicisini kullanır.
 
 ### Hangi port
 
@@ -494,6 +477,21 @@ sonraki çalıştığında yönetici erişimini yeniden istemek anlamına gelird
 
 Reddederseniz ya da platform desteklemiyorsa hiçbir şey bozulmaz — uygulama,
 başlığın her zaman yazdığı kendi geri döngü adresinden erişilebilir kalır.
+
+## PWA dosyaları ekleme
+
+`ahdcode pwa init [--name NAME] [--short-name NAME]` komutu, uygulama
+kökündeki `PWA/` klasörüne manifest, worker, simgeler ve AhdCode
+entegrasyon modülü ekler. Mevcut proje dosyalarını korur ve mevcut bir
+`PWA/` yolunun üzerine yazmaz. [PWA kurulumu ve önbellek politikası](PWA_TR.md).
+
+## Yerel HTTPS
+
+Doğrudan geri döngü TLS için `ahdcode dev --https app.ahd` komutunu
+kullanın. Hazır bir PEM çifti için giriş dosyasından önce
+`--cert FILE --key FILE` ekleyin. Varsayılan HTTP'dir. Sertifika üretimi,
+tarayıcı güveni, yenileme, port çakışması ve Secure çerezler için
+[Web yerel HTTPS](WEB_TR.md#14-yerel-https) bölümüne bakın.
 
 ## `ahdcode databases`
 

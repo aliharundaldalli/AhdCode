@@ -214,19 +214,13 @@ func checkWebEnvironment(environment webEnvironment) error {
 				"  Nothing was started and APP_ENV was not changed.")
 	}
 	if environment.protocol == "https" {
-		// `ahdcode dev` starts the application, and the application binds a
-		// plaintext HTTP socket. There is no path in v0.15 by which
-		// APP_PROTOCOL=https results in TLS here, so starting the child would
-		// mean serving http while the configuration -- and any URL printed
-		// from it -- says https. Refusing is the honest outcome; downgrading
-		// silently would hide a secure-cookie or mixed-content problem until
-		// production. AhdCode routes .test names over plaintext HTTP and adds
-		// no certificate authority, so this is unchanged.
+		// This check handles the ordinary, plaintext development mode.
+		// Explicit HTTPS is validated by the TLS launch path.
 		identity := "https://" + environment.host
 		if environment.environment == "development" && environment.host != "" {
 			identity = environment.developmentURL()
 		}
-		message := "Local HTTPS is not available in " + version + ".\n" +
+		message := "Local HTTPS is not available without ahdcode dev --https.\n" +
 			"  ahdcode dev serves plaintext HTTP, so it cannot honour\n" +
 			"  APP_PROTOCOL=https.\n"
 		if environment.host != "" {
@@ -234,6 +228,7 @@ func checkWebEnvironment(environment webEnvironment) error {
 		}
 		message += "\n  Set APP_PROTOCOL=http for local development, or terminate\n" +
 			"  HTTPS with an external local proxy in front of " + environment.bindAddress() + ".\n" +
+			"  Use ahdcode dev --https for a direct loopback HTTPS listener.\n" +
 			"  Nothing was started and APP_PROTOCOL was not changed."
 		return fmt.Errorf("%s", message)
 	}
@@ -267,6 +262,8 @@ func announceWebApplication(output io.Writer, environment webEnvironment, local 
 	fmt.Fprintln(output, "  Browser refresh:")
 	fmt.Fprintln(output, "  Open pages reload after a successful rebuild.")
 	fmt.Fprintln(output, "  A failed build keeps the last page.")
-	writeLocalIdentity(output, environment, local)
+	if environment.protocol != "https" {
+		writeLocalIdentity(output, environment, local)
+	}
 	fmt.Fprintln(output)
 }

@@ -44,7 +44,7 @@ func TestExecutablePathIsIdempotent(t *testing.T) {
 // 5: a Windows project directory containing spaces must survive naming. The
 // build and launch APIs take argument slices, so no quoting is involved.
 func TestExecutablePathKeepsSpacesAndDotsIntact(t *testing.T) {
-	windows := `C:\Users\aliha\Downloads\zrd hbv\OneDrive\Belgeler\PROJE\deneme`
+	windows := `C:\Fixture\Downloads\zrd hbv\OneDrive\Belgeler\PROJE\deneme`
 	got := executablePathFor("windows", windows)
 	if got != windows+".exe" {
 		t.Fatalf("path with spaces = %q", got)

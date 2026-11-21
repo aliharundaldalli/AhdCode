@@ -58,18 +58,24 @@ type ahdHTTPServerState struct {
 	// Permitted acquisition order:
 	//   - mutex, then the evaluator session lock (a callback invokes user code)
 	//   - session lock released before any wait on mutex
-	//   - lifecycle alone, and only around listener publication
-	//   - the server registry alone, and only to snapshot or delete
-	// Forbidden: session lock then a blocking mutex lock; lifecycle then mutex.
+	//   - mutex or lifecycle, then the process-wide lifetime lock
+	//   - lifetime, then the server registry for the idle check
+	// The lifetime lock never waits for mutex or lifecycle. Shutdown never
+	// takes mutex, and the evaluator must release its session lock before
+	// blocking on mutex.
 	mutex sync.Mutex
-	// lifecycle guards only listener and httpServer publication. Shutdown
-	// holds it just long enough to copy those pointers, then waits outside
-	// it. Never acquire mutex while holding lifecycle.
+	// lifecycle serializes bind, listener publication and shutdown claim.
+	// Shutdown detaches the listener here and waits for handlers outside it.
+	// Never acquire mutex while holding lifecycle.
 	lifecycle  sync.Mutex
 	listener   net.Listener
 	httpServer *http.Server
 	stopOnce   sync.Once
-	// closing refuses new handler calls as soon as shutdown is claimed.
+	// upgraded is protected by the lifetime lock. Shutdown detaches it
+	// before closing connections outside all locks.
+	upgraded map[string]func()
+	// closing is written under the lifetime lock, which also guards callback
+	// admission. The atomic flag lets dispatch reject early without that lock.
 	// Close does not cancel a handler that is already inside user code.
 	closing atomic.Bool
 	// routesFrozen is set under mutex before the first callback can run.
@@ -405,6 +411,15 @@ func AhdHTTPServerStart(class *AhdClass, handle string) {
 // remain active.
 func AhdHTTPServerStartScoped(class *AhdClass, scopeID uint64, handle string) {
 	server := ahdHTTPLookup(class, handle)
+	httpServer := server.claimStart(class, scopeID)
+	listen := net.Listen
+	if ahdDevTLSCert != "" || ahdDevTLSKey != "" {
+		listen = ahdHTTPDevListen
+	}
+	server.serve(class, httpServer, listen)
+}
+
+func (server *ahdHTTPServerState) claimStart(class *AhdClass, scopeID uint64) *http.Server {
 	ahdHTTPAcquireRoutes(class, server, "HTTP server has already started")
 	server.started = true
 	server.routesFrozen.Store(true)
@@ -419,8 +434,6 @@ func AhdHTTPServerStartScoped(class *AhdClass, scopeID uint64, handle string) {
 		}
 	}
 	ahdHTTPLifetimeMu.Unlock()
-	host := server.host
-	port := server.port
 	readTimeout := server.readTimeout
 	writeTimeout := server.writeTimeout
 	idleTimeout := server.idleTimeout
@@ -438,14 +451,19 @@ func AhdHTTPServerStartScoped(class *AhdClass, scopeID uint64, handle string) {
 	if readTimeout < headerTimeout {
 		headerTimeout = readTimeout
 	}
-	httpServer := &http.Server{
-		Handler:           ahdHTTPDispatcher{class: class, state: server},
+	return &http.Server{
+		Handler: ahdHTTPDispatcher{class: class, state: server},
+		ConnContext: func(ctx context.Context, conn net.Conn) context.Context {
+			return context.WithValue(ctx, ahdHTTPTransportKey{}, conn)
+		},
 		ReadHeaderTimeout: headerTimeout,
 		ReadTimeout:       readTimeout,
 		WriteTimeout:      writeTimeout,
 		IdleTimeout:       idleTimeout,
 	}
+}
 
+func (server *ahdHTTPServerState) serve(class *AhdClass, httpServer *http.Server, listen func(string, string) (net.Listener, error)) {
 	// Listen and publication share lifecycle, so a shutdown that arrives
 	// after the socket exists cannot miss it. The request mutex stays free.
 	server.lifecycle.Lock()
@@ -454,11 +472,21 @@ func AhdHTTPServerStartScoped(class *AhdClass, scopeID uint64, handle string) {
 		server.retire()
 		return
 	}
-	addr := net.JoinHostPort(host, strconv.Itoa(port))
-	listener, err := net.Listen("tcp", addr)
+	addr := net.JoinHostPort(server.host, strconv.Itoa(server.port))
+	listener, err := listen("tcp", addr)
 	if err != nil {
+		// Clear ownership before shutdown can observe the failed bind.
+		// Keep routes frozen until all cleanup for this attempt is complete.
+		ahdHTTPLifetimeMu.Lock()
+		server.dropOwnershipWhileLocked()
 		server.lifecycle.Unlock()
-		ahdHTTPClearStarted(server)
+		ahdHTTPReleasePersistentSessionsWhileLocked()
+		ahdHTTPLifetimeMu.Unlock()
+
+		server.mutex.Lock()
+		server.started = false
+		server.routesFrozen.Store(false)
+		server.mutex.Unlock()
 		AhdRaiseClass(class, "HTTP server could not bind "+addr+": "+err.Error())
 	}
 	server.listener = listener
@@ -488,19 +516,14 @@ func AhdHTTPServerStartScoped(class *AhdClass, scopeID uint64, handle string) {
 // leaves it nil.
 var ahdHTTPTestBeforeServe func()
 
-func ahdHTTPClearStarted(server *ahdHTTPServerState) {
-	server.mutex.Lock()
-	server.started = false
-	server.routesFrozen.Store(false)
-	server.mutex.Unlock()
-	ahdHTTPLifetimeMu.Lock()
+// dropOwnershipWhileLocked clears start ownership and keeps any database
+// handoff alive until the last admitted callback finishes.
+func (server *ahdHTTPServerState) dropOwnershipWhileLocked() {
 	server.owner.Store(false)
 	if server.activeHandlers == 0 {
 		ahdHTTPDetachServerDatabasesWhileLocked(server)
 		ahdHTTPCloseIdleScopedDatabasesWhileLocked()
 	}
-	ahdHTTPReleasePersistentSessionsWhileLocked()
-	ahdHTTPLifetimeMu.Unlock()
 }
 
 func ahdHTTPDetachServerDatabasesWhileLocked(server *ahdHTTPServerState) {
@@ -520,12 +543,19 @@ func ahdHTTPDetachServerDatabasesWhileLocked(server *ahdHTTPServerState) {
 	server.ownedDatabases = nil
 }
 
-func (server *ahdHTTPServerState) enterCallback() {
+// tryEnterCallback runs with mutex held. Admission and lifetime ownership
+// change together so retirement either sees this callback or prevents it.
+func (server *ahdHTTPServerState) tryEnterCallback() bool {
 	ahdHTTPLifetimeMu.Lock()
+	if server.closing.Load() {
+		ahdHTTPLifetimeMu.Unlock()
+		return false
+	}
 	ahdHTTPHandlers.Add(1)
 	server.activeHandlers++
 	ahdHTTPLifetimeMu.Unlock()
 	server.handlerOwner.Store(ahdHTTPGoroutineID())
+	return true
 }
 
 func (server *ahdHTTPServerState) leaveCallback() {
@@ -632,8 +662,8 @@ func ahdHTTPTestShutdown(handle string) {
 // port. It does not stop a handler goroutine blocked inside application code.
 //
 // The boolean is about this call, not about a global "fully idle" state.
-// true means this call claimed an active listener and closed that listener.
-// false means this call did not claim one: there was no matching server, or
+// true means this call claimed a started server and closed its listener if
+// one had been published. false means there was no matching started server, or
 // another call already claimed it. false can therefore arrive while the
 // caller that received true is still inside the graceful wait. It does not
 // mean that wait has finished, and it does not close a different server that
@@ -684,25 +714,27 @@ func ahdHTTPShutdownState(server *ahdHTTPServerState) bool {
 		return false
 	}
 	server.lifecycle.Lock()
+	ahdHTTPLifetimeMu.Lock()
+	if !server.owner.Load() || server.closing.Load() {
+		ahdHTTPLifetimeMu.Unlock()
+		server.lifecycle.Unlock()
+		return false
+	}
+	// Closing and callback admission share the lifetime lock. Detach the
+	// listener while publication is excluded, then wait outside both locks.
+	server.closing.Store(true)
+	upgraded := server.upgraded
+	server.upgraded = nil
+	ahdHTTPLifetimeMu.Unlock()
 	httpServer := server.httpServer
 	listener := server.listener
-	if httpServer == nil && listener == nil {
-		if !server.owner.Load() || server.closing.Load() {
-			server.lifecycle.Unlock()
-			return false
-		}
-		server.closing.Store(true)
-		server.lifecycle.Unlock()
-		server.retire()
-		ahdHTTPReleasePersistentSessionsIfIdle()
-		return true
-	}
-	// Claim before the deadline so a second call is not still "active",
-	// and so ServeHTTP can refuse work without taking the handler mutex.
 	server.httpServer = nil
 	server.listener = nil
-	server.closing.Store(true)
 	server.lifecycle.Unlock()
+
+	for _, closeConnection := range upgraded {
+		closeConnection()
+	}
 
 	// Serve registers the listener only after it starts. Shutdown closes
 	// listeners it knows about, so a published listener must be closed here
@@ -728,19 +760,43 @@ func ahdHTTPShutdownState(server *ahdHTTPServerState) bool {
 	return true
 }
 
+type ahdHTTPTransportKey struct{}
+
+// trackUpgrade shares the admission gate with shutdown. An upgrade that
+// finishes after shutdown claimed the server closes its own transport.
+func (server *ahdHTTPServerState) trackUpgrade(id string, closeConnection func()) bool {
+	ahdHTTPLifetimeMu.Lock()
+	defer ahdHTTPLifetimeMu.Unlock()
+	if server.closing.Load() {
+		return false
+	}
+	if server.upgraded == nil {
+		server.upgraded = make(map[string]func())
+	}
+	server.upgraded[id] = closeConnection
+	return true
+}
+
+func (server *ahdHTTPServerState) forgetUpgrade(id string) {
+	ahdHTTPLifetimeMu.Lock()
+	delete(server.upgraded, id)
+	ahdHTTPLifetimeMu.Unlock()
+}
+
 // retire drops the registry entry and the listener exactly once. Shutdown and
 // a natural Serve return share it, so they cannot delete twice or leave the
 // port registered.
 func (server *ahdHTTPServerState) retire() {
 	server.stopOnce.Do(func() {
 		ahdHTTPLifetimeMu.Lock()
-		server.owner.Store(false)
-		if server.activeHandlers == 0 {
-			ahdHTTPDetachServerDatabasesWhileLocked(server)
-			ahdHTTPCloseIdleScopedDatabasesWhileLocked()
-		}
-		ahdHTTPLifetimeMu.Unlock()
 		server.closing.Store(true)
+		server.dropOwnershipWhileLocked()
+		upgraded := server.upgraded
+		server.upgraded = nil
+		ahdHTTPLifetimeMu.Unlock()
+		for _, closeConnection := range upgraded {
+			closeConnection()
+		}
 		server.lifecycle.Lock()
 		listener := server.listener
 		server.listener = nil
@@ -1584,11 +1640,10 @@ func (dispatcher ahdHTTPDispatcher) ServeHTTP(writer http.ResponseWriter, reques
 	func() {
 		dispatcher.state.mutex.Lock()
 		defer dispatcher.state.mutex.Unlock()
-		if dispatcher.state.closing.Load() {
+		if !dispatcher.state.tryEnterCallback() {
 			rejected = true
 			return
 		}
-		dispatcher.state.enterCallback()
 		tracked = true
 		defer dispatcher.state.leaveCallback()
 		defer func() {
@@ -1849,11 +1904,10 @@ func ahdHTTPServeInstalledPage(state *ahdHTTPServerState, writer http.ResponseWr
 	func() {
 		state.mutex.Lock()
 		defer state.mutex.Unlock()
-		if state.closing.Load() {
+		if !state.tryEnterCallback() {
 			rejected = true
 			return
 		}
-		state.enterCallback()
 		tracked = true
 		defer state.leaveCallback()
 		defer func() {

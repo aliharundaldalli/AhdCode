@@ -71,10 +71,9 @@ adını sorar. `ahdcode init web empty` ve `ahdcode init web basic` ilk
 soruyu atlar. Admin, MVC ve CRUD SQLite veya MySQL ve yönetici hesabı ile
 devam eder.
 
-Empty ve Basic veritabanı sormaz; giriş veya `database/` üretmez. Basic ayrıca
-Türkçe bir `templates/` ağacı (yerleşim, nav, ana sayfa, hakkında, 404 ve
-500) ve [`Templates`](TEMPLATES_TR.md) üzerinden `/`, `/hakkinda` ile
-`/ornek-hata` yollarını yazar. Admin, MVC ve CRUD şemayı ve yöneticiyi hemen
+Empty ve Basic veritabanı sormaz; giriş veya `database/` üretmez. Basic, Türkçe sayfaları, ortak yerleşimi, gezinmeyi ve özel 404/500
+yanıtlarını `.ahd` ve `Web.UI` ile oluşturur. Yollar `/`, `/hakkinda` ve
+`/ornek-hata`'dır. Admin, MVC ve CRUD şemayı ve yöneticiyi hemen
 kurar: `ahdcode dev app.ahd` sonrası uygulama hazırdır. Çıkış POST `/logout`
 ile yapılır ve `/` adresine döner. Her starter ayrıca `AHDCODE.md` ve
 İngilizce `Documents/AhdCode/` kopyasını yazar. Bu dosyalar çalışma zamanı

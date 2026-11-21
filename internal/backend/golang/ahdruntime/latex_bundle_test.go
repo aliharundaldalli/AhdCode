@@ -10,15 +10,15 @@ import "testing"
 func TestLatexBundleURL(t *testing.T) {
 	cases := []struct{ slashed, want string }{
 		// POSIX installations.
-		{"/Users/ahd/go/libexec/ahdcode/latex/ahdcode-latex.ttb", "file:///Users/ahd/go/libexec/ahdcode/latex/ahdcode-latex.ttb"},
+		{"/Users/example/go/libexec/ahdcode/latex/ahdcode-latex.ttb", "file:///Users/example/go/libexec/ahdcode/latex/ahdcode-latex.ttb"},
 		{"/opt/ahdcode/libexec/ahdcode/latex/ahdcode-latex.ttb", "file:///opt/ahdcode/libexec/ahdcode/latex/ahdcode-latex.ttb"},
 		// A Windows path, already converted to forward slashes by the caller.
 		// The leading slash is what stops "C:" from parsing as a scheme.
-		{"C:/Users/aliha/AppData/Local/AhdCode/versions/1.0.0-rc.1/libexec/ahdcode/latex/ahdcode-latex.ttb",
-			"file:///C:/Users/aliha/AppData/Local/AhdCode/versions/1.0.0-rc.1/libexec/ahdcode/latex/ahdcode-latex.ttb"},
+		{"C:/Users/example/AppData/Local/AhdCode/versions/1.0.0-rc.1/libexec/ahdcode/latex/ahdcode-latex.ttb",
+			"file:///C:/Users/example/AppData/Local/AhdCode/versions/1.0.0-rc.1/libexec/ahdcode/latex/ahdcode-latex.ttb"},
 		// Characters that would otherwise change how the URL parses.
-		{"C:/Users/Ali Harun/AhdCode/latex/ahdcode-latex.ttb",
-			"file:///C:/Users/Ali%20Harun/AhdCode/latex/ahdcode-latex.ttb"},
+		{"C:/Users/Example User/AhdCode/latex/ahdcode-latex.ttb",
+			"file:///C:/Users/Example%20User/AhdCode/latex/ahdcode-latex.ttb"},
 		{"C:/Users/a#b/latex/ahdcode-latex.ttb", "file:///C:/Users/a%23b/latex/ahdcode-latex.ttb"},
 		{"C:/Users/a?b/latex/ahdcode-latex.ttb", "file:///C:/Users/a%3Fb/latex/ahdcode-latex.ttb"},
 		{"/tmp/ahd latex space test/zrd hbv/ahdcode-latex.ttb",

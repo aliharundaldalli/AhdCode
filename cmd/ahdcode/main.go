@@ -34,6 +34,8 @@ var usage = version + ` toolchain
 usage:
   ahdcode                                    start the interactive REPL
   ahdcode init  web [empty|basic|admin|mvc|crud]  initialize this directory as a Web app
+  ahdcode pwa init [--name NAME] [--short-name NAME]
+                                             add optional PWA files to a Web app
   ahdcode databases                          start AhdDataStudio at ahddatabasestudio.test
   ahdcode databases list                     list registered local databases
   ahdcode databases add <file.db>            register a SQLite file with AhdDataStudio
@@ -47,10 +49,11 @@ usage:
                                              roll back applied migrations that have a down script
   ahdcode build <entry.ahd> [-o <output>]    compile to a native executable
   ahdcode package <entry.ahd> [--name <name>] [--output <folder>] [--icon <icon.png>]
-                  [--target <os-arch>] [--helpers <folder>] [--console]
-                                             make a self-contained desktop application
+                  [--target <os-arch>] [--helpers <folder>] [--console] [--web [--pwa]]
+                                             make a desktop or Web application package
   ahdcode run   <entry.ahd> [-- <args>...]   compile and run
-  ahdcode dev   <entry.ahd>                  watch, rebuild, and restart on save
+  ahdcode dev   [--https [--cert FILE --key FILE]] <entry.ahd>
+                                            watch, rebuild, and restart on save
   ahdcode stop  <app.dev|app.run>            gracefully stop a dev or run session
   ahdcode kill  [--force] <app.dev|app.run>  forcibly stop a dev or run session
   ahdcode local status                       show local routes and the local router
@@ -92,6 +95,8 @@ func runWithIO(arguments []string, input io.Reader, output, errorOutput io.Write
 	switch arguments[0] {
 	case "init":
 		return runInit(arguments[1:], input, output, errorOutput)
+	case "pwa":
+		return runPWA(arguments[1:], output, errorOutput)
 	case "databases":
 		return runDatabases(arguments[1:], input, output, errorOutput)
 	case "migrate":
@@ -221,6 +226,14 @@ func runPackage(arguments []string, outputWriter, errorOutput io.Writer) int {
 			options.Console = true
 			continue
 		}
+		if argument == "--web" || argument == "--pwa" {
+			if argument == "--web" {
+				options.Web = true
+			} else {
+				options.PWA = true
+			}
+			continue
+		}
 		if target, known := values[argument]; known {
 			if index+1 >= len(arguments) || arguments[index+1] == "" {
 				fmt.Fprintf(errorOutput, "ahdcode package: %s requires a value\n", argument)
@@ -242,6 +255,10 @@ func runPackage(arguments []string, outputWriter, errorOutput io.Writer) int {
 	}
 	if options.Entry == "" {
 		fmt.Fprint(errorOutput, usage)
+		return 2
+	}
+	if options.PWA && !options.Web {
+		fmt.Fprintln(errorOutput, "ahdcode package: --pwa requires --web")
 		return 2
 	}
 	result := packaging.Package(options)

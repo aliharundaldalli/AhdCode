@@ -163,10 +163,10 @@ func TestGeneratedProgramCarriesRuntime(t *testing.T) {
 	want := []string{
 		programFileName, runtimeFileName, excelRuntimeFileName, pdfRuntimeFileName,
 		archiveRuntimeFileName, sqliteRuntimeFileName, httpRuntimeFileName, websocketRuntimeFileName,
-		htmlRuntimeFileName, templateRuntimeFileName, smtpRuntimeFileName, securityRuntimeFileName,
+		htmlRuntimeFileName, smtpRuntimeFileName, securityRuntimeFileName,
 		identityRuntimeFileName, uuidRuntimeFileName, bitsRuntimeFileName, charactersRuntimeFile,
 		cronRuntimeFileName, httpFilesRuntimeFileName, httpSessionsRuntimeFileName, httpDevReloadRuntimeFileName,
-		templateWindowsRuntimeFileName, templateUnixRuntimeFileName, templateOtherRuntimeFileName,
+		devTLSWindowsRuntimeFileName, devTLSUnixRuntimeFileName, devTLSOtherRuntimeFileName,
 		websocketClientRuntimeFile, svgRuntimeFileName, documentRuntimeFileName,
 		terminalRuntimeFileName, terminalDarwinRuntimeFileName, terminalLinuxRuntimeFileName,
 		terminalWindowsRuntimeFileName, terminalOtherRuntimeFileName, graphicsRuntimeFileName,

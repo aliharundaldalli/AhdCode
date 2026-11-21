@@ -65,23 +65,16 @@ var HTTPSessionsSource string
 //go:embed html.go
 var HTMLSource string
 
-// TemplateSource is the HTML template runtime. It uses Go's html/template and
-// joins every generated program, the same way the HTML builder does.
+// Development TLS credential readers preserve the platform-specific no-follow checks.
 //
-//go:embed templates.go
-var TemplateSource string
+//go:embed http_devtls_windows.go
+var DevTLSWindowsSource string
 
-// Template filesystem helpers carry build constraints so only one is compiled
-// into a generated program, the same way Disk and Process platform files are.
-//
-//go:embed templates_fs_windows.go
-var TemplateWindowsSource string
+//go:embed http_devtls_unix.go
+var DevTLSUnixSource string
 
-//go:embed templates_fs_unix.go
-var TemplateUnixSource string
-
-//go:embed templates_fs_other.go
-var TemplateOtherSource string
+//go:embed http_devtls_other.go
+var DevTLSOtherSource string
 
 //go:embed smtp.go
 var SMTPSource string

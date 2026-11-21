@@ -34,7 +34,6 @@ v0.15 bilinçli olarak şunları **içermez**:
 | ORM, sorgu kurucu | `SQLite` / `MySQL` açıkça kullanılır. Sürümlü SQL [`ahdcode migrate`](CLI_TR.md#ahdcode-migrate) komutudur |
 | Form, doğrulama, eski girdi, hata torbaları | v0.16'da yayımlandı (bkz. bölüm 16) |
 | Ara katman zincirleri, rota grupları, yetki bekçileri | v0.17 için planlı |
-| `Web.document` içinde şablon dili | `Web.document` hâlâ bir kabuktur. Dosya şablonları, yerleşimler ve parçalar [`Templates`](TEMPLATES_TR.md) modülündedir |
 | Sanal DOM, hydration, tepkisel durum, hooks | Planlı değil; sayfalar sunucuda kurulur |
 | Ön yüz paketleyici, npm, Node, CSS-in-JS | Planlı değil; varlıklar diskteki dosyalardır |
 | Tarayıcı canlı yenileme / HMR | `ahdcode dev`, başarılı bir yeniden derlemeden sonra sayfanın tamamını aynı kökenden bir betikle yeniler. Sıcak modül değişimi değildir. `ahdcode run` ve bir `.env` dosyası bunu açmaz |
@@ -605,26 +604,9 @@ tarayıcıyı yenilemez.
   Nothing was started and APP_ENV was not changed.
 ```
 
-`APP_PROTOCOL=https`'i de **reddeder**:
-
-```
-✗ Local HTTPS is not available in AhdCode v2.1.0.
-  ahdcode dev serves plaintext HTTP, so it cannot honour
-  APP_PROTOCOL=https.
-
-  Configured identity:
-  https://ahdakademi.test
-
-  Set APP_PROTOCOL=http for local development, or terminate
-  HTTPS with an external local proxy in front of 127.0.0.1:8080.
-  Nothing was started and APP_PROTOCOL was not changed.
-```
-
-`ahdcode dev` uygulamayı başlatır ve uygulama düz metin bir HTTP soketine
-bağlanır. bu sürümde `APP_PROTOCOL=https`'in burada TLS'e dönüştüğü bir yol
-yoktur; alt süreci başlatmak, yapılandırma `https` derken `http` sunmak
-olurdu. Düşürmek yerine reddeder: sessiz bir düşüş, güvenli çerez veya karışık
-içerik sorununu production'a kadar gizlerdi.
+`--https` verilmezse `ahdcode dev`, `APP_PROTOCOL=https` ayarını reddeder.
+[Doğrudan yerel HTTPS](#14-yerel-https) kipini kullanın veya HTTP geliştirme
+için `APP_PROTOCOL=http` ayarlayın.
 
 Her iki rette de hiçbir şey başlatılmaz, hiçbir dinleyici açılmaz, geride
 `.dev` tanımlayıcısı kalmaz, `APP_ENV` ve `APP_PROTOCOL` değişmez ve komut
@@ -704,28 +686,87 @@ Türetilen ada canlı bir AhdCode oturumu zaten sahipse ilk boş sonek kullanıl
 belirlenir; bu yüzden artık çalışmayan bir projeden kalan bir eşleme yeni
 oturumu asla sonekli bir ada itmez.
 
-## 14. Yerel HTTPS — mevcut sınır
+## Progresif Web Uygulamaları
 
-AhdCode, `.test` adlarını **düz metin HTTP** üzerinden yönlendirir. Yerel
-bir sertifika otoritesi, sertifika yöneticisi veya ACME **getirmez** ve
-`ahdcode trust` komutu yoktur.
+Web uygulamaları isteğe bağlı olarak tarayıcıdan kurulabilir ve sınırlı
+çevrimdışı destek sunabilir. Manifest ve service worker, mevcut Web ve
+HTMLNode API'leriyle eklenir. [Kurulum ve çevrimdışı davranış](PWA_TR.md).
 
-Görünür bir port olmadan `https://<ad>.test` sunmak, sistem güven deposunda
-bir sertifika otoritesi gerektirir; bu, bu bilgisayarın neye güvendiğine dair
-kalıcı ve makine geneli bir değişikliktir. Bu, bir geri döngü konak adını
-yönlendirmekten çok daha büyük bir karardır ve yaklaşık olarak taklit
-edilmek yerine ertelenmiştir: AhdCode hiçbir güven bileşeni kurmaz ve
-sertifika üretmez.
+## 14. Yerel HTTPS
 
-Bu nedenle `APP_PROTOCOL=https`, `ahdcode dev`'in uygulamayı düz metin http
-üzerinden sunup ona https demesi yerine
-[başlamayı reddetmesine](#reddedilen-yapılandırmalar) yol açar. `https`'i asla sessizce `http`'ye
-düşürmez ve asla güvenilmeyen bir sertifika üretmez. Sessiz bir düşüş,
-güvenli çerez veya karışık içerik sorununu production'a kadar gizlerdi.
+Normal `ahdcode dev app.ahd` HTTP kullanır. Basic başlangıç projesini veya
+başka bir Web/HTTP uygulamasını HTTPS ile çalıştırmak için proje dizininde
+şu komutu kullanın.
 
-Bugün yerel çalışma için `APP_PROTOCOL=http` ayarlayın ve `.test` adını ya da
-`http://127.0.0.1:SERVER_PORT` adresini kullanın; veya zaten çalıştırdığınız
-bir vekil ile TLS'i sonlandırın.
+```sh
+ahdcode dev --https app.ahd
+```
+
+Web başlığında yazan adresi açın. Basic varsayılanıyla adres
+`https://127.0.0.1:8080` olur. `SERVER_HOST` olarak `localhost`,
+`127.0.0.1` veya `::1`, `SERVER_PORT` olarak boş bir port seçin.
+`localhost` doğrudan IPv4 geri döngüsüne bağlanır. IPv6 adresi
+`https://[::1]:PORT` biçimindedir. `.test` yönlendiricisi HTTP içindir.
+HTTPS doğrudan adrese bağlanır ve `.test` adı ayırmaz. Web kullanmayan
+bir program kendi `HTTP.server` geri döngü adresini kullanır.
+
+Alt süreç bu oturum için `APP_PROTOCOL=https` alır. `.env` ve üst
+süreçteki değerler değiştirilmez. Web URL yardımcıları bu oturumda
+doğrudan HTTPS adresini üretir. Yerel ve değerlendirici HTTP kodu
+aynı çalışma zamanını kullanır. `dev` derleyip yerel süreç başlatır.
+
+### Sertifikalar ve tarayıcı güveni
+
+İlk kullanımda AhdCode bir P-256 sunucu sertifikası ve bu geliştirme
+deposuna ait bir CA sertifikası oluşturur. Depo, kullanıcıya ait
+AhdCode yapılandırma dizininin `https/` altındadır. Windows'ta normal
+konum `%APPDATA%\ahdcode\https`, macOS'ta
+`~/Library/Application Support/ahdcode/https`, Linux'ta
+`$XDG_CONFIG_HOME/ahdcode/https` veya `~/.config/ahdcode/https` olur.
+Başlatıcı, genel `root-ca.pem` dosyasının yolunu yazar.
+`localhost-key.pem` özel anahtardır. Proje ve `public/` dışında tutun.
+Sürüm kontrolüne veya dağıtım paketine eklemeyin. CA imza anahtarı
+dosyaya yazılmaz. Sunucu sertifikası 30 gün, CA sertifikası 45 gün geçerlidir.
+
+Şifreli bağlantı ve tarayıcı güveni ayrı konulardır. AhdCode güven
+depolarını değiştirmez. Bu CA'ya güvenmeyi seçerseniz yalnızca yazılan
+**genel** `root-ca.pem` dosyasını, tarayıcı veya işletim sisteminin
+güven arayüzünden kendi kullanıcı/profiliniz için içe aktarın.
+Sertifika uyarısını atlamayın. Depo bozuk, eksik veya süresi dolmuşsa
+dev sürecini durdurun, depoyu özel bir yedek konuma taşıyın ve yeniden
+başlatın. Yeni CA farklı bir kimliğe sahiptir. Eski güven girdilerini
+artık gerekmiyorsa aynı arayüzden kaldırın.
+
+mkcert gibi bir araçla ürettiğiniz eşleşen dosyaları da kullanabilirsiniz.
+
+```sh
+ahdcode dev --https --cert /ozel/dev/localhost.pem --key /ozel/dev/localhost-key.pem app.ahd
+```
+
+PEM sunucu sertifikası `localhost`, `127.0.0.1` ve `::1` adlarını
+kapsamalıdır. Anahtar dosyası ve üst dizini özel olmalı ve projenin
+dışında bulunmalıdır. Unix'te yalnız dosya sahibi erişebilmelidir.
+Windows DACL yalnız kullanıcıya, SYSTEM'e ve Administrators grubuna
+izin verebilir. Simgesel bağlantı ve junction yolları reddedilir.
+Tarayıcının güvenmediği sertifika için doğru profili ve başlıktaki
+konak adını kontrol edin. Port doluysa boş bir port seçip yeniden
+başlatın. Yeniden derlemede yeni sertifika geçersizse çalışan alt
+süreç devam eder.
+
+### Çerezler, WebSocket ve canlı yenileme
+
+Güvenilen HTTPS üzerinde Secure çerezler çalışır. Gereken yerlerde
+kalıcı oturum deposunu `secure: true` ile oluşturun. `HttpOnly` ve
+`SameSite` ayarları korunur. AhdCode, Secure ayarını kendiliğinden açmaz.
+Konak adı değişirse yeniden giriş gerekebilir. HTTPS sayfalarında
+`wss://` kullanın. WebSocket aynı HTTP/1.1 dinleyicisinden geçer.
+Doğrudan TLS'de varsayılan denetim HTTPS Origin ve aynı konak ister.
+Kapanışta bağlantılar kapatılır, kabul edilmiş geri çağırmalar
+mevcut sahiplik kurallarıyla tamamlanır.
+
+Canlı yenileme betiği ve sorgu adresi sayfanın HTTPS kökenini kullanır.
+Şablon ve AhdCode dosyası değişiklikleri HTTP ile aynı derleme ve
+yeniden başlatma akışından geçer. [CLI](CLI_TR.md#yerel-https)
 
 ## 15. Production
 
@@ -762,10 +803,8 @@ SERVER_PORT=8080            →   127.0.0.1:8080
 
 Genel bir URL'yi asla `SERVER_PORT`'tan türetmeyin.
 
-v0.15 bir production sertifika yöneticisi değildir: ACME yok, Let's Encrypt
-otomasyonu yok, DNS meydan okumaları yok, yenileme servisi yok. `HTTP`
-ilkelleriniz doğrudan TLS'i zaten destekliyorsa, bu kullanılabilir ve
-değişmeden kalır.
+Üretimde TLS sonlandırmayı ters vekile bırakın. Yerel geliştirme
+sertifikalarını genel sunucularda kullanmayın.
 
 ## 16. `.env`
 
@@ -1035,7 +1074,7 @@ Bir terminalde `init web` Empty, Basic, Admin, MVC veya CRUD sorar. Ayrıca
 `ahdcode init web empty|basic|admin|mvc|crud` çalıştırılabilir; bu biçim
 sihirbaz açmadan hemen üretir.
 
-Şablonlar ve [Bootstrap 5.3.3](https://getbootstrap.com/) (MIT) CLI içindedir.
+Başlangıç proje dosyaları ve [Bootstrap 5.3.3](https://getbootstrap.com/) (MIT) CLI içindedir.
 Üretilen sayfalar yalnızca yerel dosyaları yükler. `init web` sırasında CDN,
 npm veya ağ indirmesi yoktur.
 
@@ -1070,12 +1109,13 @@ bu fonksiyonların gerçekten okuduğu `MAIL_*` anahtarları. `MAIL_SECURITY`
 varsayılanı `starttls` (587). Boş `MAIL_HOST` uygulamayı yine başlatır.
 Veritabanı ve kimlik doğrulama yoktur.
 
-Sayfalar [`Templates.files("templates")`](TEMPLATES_TR.md) ile yüklenir.
-Ortak `layouts/site.html`, `pages/home.html` ve `pages/about.html`'i sarar;
-`components/nav.html` bir kısmi şablondur. Yollar `/`, `/hakkinda` ve
-`/ornek-hata`'dır. `site.notFound` ve `site.internalError` aynı yerleşimden
-özel 404 ve 500 sayfaları sunar. İşleyiciler Türkçe dizgileri
-`Templates.object({...})` ile `pages.layout`'a, sonra `Web.markup`'a verir.
+`Pages/Home.ahd` ve `Pages/About.ahd`, `Web.UI` ile `HTMLNode` değerleri
+oluşturur. `Layouts/Main.ahd` bu değerleri Türkçe sayfa kabuğuna yerleştirir,
+gezinme ve alt bilgi bileşenlerini ekler, yerel Bootstrap, CSS ve JavaScript
+dosyalarını bağlar. Yollar `/`, `/hakkinda` ve `/ornek-hata`'dır.
+`Pages/Errors.ahd`, aynı yerleşimle özel 404 ve 500 yanıtları oluşturur.
+
+[2.11 geçiş notu](UPGRADE_2.11_TR.md) eski Templates API'sinden geçişi açıklar.
 
 ### Admin
 

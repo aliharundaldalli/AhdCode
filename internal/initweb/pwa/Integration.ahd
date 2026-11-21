@@ -1,0 +1,29 @@
+bring HTTP
+bring Web
+from Web bring (App, HTMLNode, Request, Response)
+
+ahdPwaManifestResponse: Function := (request: Request) -> Response {
+    file: Local Response := HTTP.file("PWA/app.webmanifest", "application/manifest+json")
+    return file.withHeader("Cache-Control", "no-cache").withHeader("X-Content-Type-Options", "nosniff")
+}
+
+ahdPwaWorkerResponse: Function := (request: Request) -> Response {
+    file: Local Response := HTTP.file("PWA/worker.js", "application/javascript; charset=utf-8")
+    return file.withHeader("Cache-Control", "no-cache").withHeader("X-Content-Type-Options", "nosniff")
+}
+
+ahdPwaMount: Function := (site: App) -> Nothing {
+    site.get("/ahd-pwa.webmanifest", ahdPwaManifestResponse)
+    site.get("/ahdcode-sw.js", ahdPwaWorkerResponse)
+    site.route("HEAD", "/ahd-pwa.webmanifest", ahdPwaManifestResponse)
+    site.route("HEAD", "/ahdcode-sw.js", ahdPwaWorkerResponse)
+    site.assets("/ahd-pwa", "PWA/public")
+}
+
+ahdPwaManifest: Function := () -> HTMLNode {
+    return Web.UI.element("link", {"rel": "manifest", "href": "/ahd-pwa.webmanifest"}, [])
+}
+
+ahdPwaRegistration: Function := () -> HTMLNode {
+    return Web.UI.element("script", {"src": "/ahd-pwa/register.js", "defer": "defer"}, [])
+}

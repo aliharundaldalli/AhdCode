@@ -257,7 +257,13 @@ func ahdWebSocketOriginAllowed(endpoint *ahdWebSocketEndpointState, request *htt
 	if endpoint.origins != nil {
 		return ahdHTTPContains(endpoint.origins, origin)
 	}
-	return origin[strings.Index(origin, "://")+3:] == ahdWebSocketComparableHost(request.Host)
+	schemeEnd := strings.Index(origin, "://")
+	// A direct TLS connection can distinguish the schemes. For plaintext
+	// behind a TLS proxy, keep the established Host-based policy.
+	if request.TLS != nil && origin[:schemeEnd] != "https" {
+		return false
+	}
+	return origin[schemeEnd+3:] == ahdWebSocketComparableHost(request.Host)
 }
 
 // ahdWebSocketComparableHost lowercases a Host header and drops :80 or :443,

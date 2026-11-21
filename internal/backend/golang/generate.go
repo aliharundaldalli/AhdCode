@@ -48,36 +48,35 @@ type GeneratedProgram struct {
 }
 
 const (
-	programFileName                = "ahdcode_program.go"
-	runtimeFileName                = "ahdcode_runtime.go"
-	excelRuntimeFileName           = "ahdcode_excel_runtime.go"
-	pdfRuntimeFileName             = "ahdcode_pdf_runtime.go"
-	archiveRuntimeFileName         = "ahdcode_archive_runtime.go"
-	sqliteRuntimeFileName          = "ahdcode_sqlite_runtime.go"
-	httpRuntimeFileName            = "ahdcode_http_runtime.go"
-	httpFilesRuntimeFileName       = "ahdcode_http_files_runtime.go"
-	httpSessionsRuntimeFileName    = "ahdcode_http_sessions_runtime.go"
-	httpDevReloadRuntimeFileName   = "ahdcode_http_devreload_runtime.go"
-	websocketRuntimeFileName       = "ahdcode_websocket_runtime.go"
-	websocketClientRuntimeFile     = "ahdcode_websocket_client_runtime.go"
-	websocketConnRuntimeFileName   = "ahdcode_websocket_conn_runtime.go"
-	htmlRuntimeFileName            = "ahdcode_html_runtime.go"
-	templateRuntimeFileName        = "ahdcode_template_runtime.go"
-	templateWindowsRuntimeFileName = "ahdcode_template_runtime_windows.go"
-	templateUnixRuntimeFileName    = "ahdcode_template_runtime_unix.go"
-	templateOtherRuntimeFileName   = "ahdcode_template_runtime_other.go"
-	smtpRuntimeFileName            = "ahdcode_smtp_runtime.go"
-	mysqlRuntimeFileName           = "ahdcode_mysql_runtime.go"
-	postgresqlRuntimeFileName      = "ahdcode_postgresql_runtime.go"
-	securityRuntimeFileName        = "ahdcode_security_runtime.go"
-	identityRuntimeFileName        = "ahdcode_identity_runtime.go"
-	uuidRuntimeFileName            = "ahdcode_uuid_runtime.go"
-	bitsRuntimeFileName            = "ahdcode_bits_runtime.go"
-	charactersRuntimeFile          = "ahdcode_characters_runtime.go"
-	cronRuntimeFileName            = "ahdcode_cron_runtime.go"
-	codesRuntimeFileName           = "ahdcode_codes_runtime.go"
-	svgRuntimeFileName             = "ahdcode_svg_runtime.go"
-	documentRuntimeFileName        = "ahdcode_document_runtime.go"
+	programFileName              = "ahdcode_program.go"
+	runtimeFileName              = "ahdcode_runtime.go"
+	excelRuntimeFileName         = "ahdcode_excel_runtime.go"
+	pdfRuntimeFileName           = "ahdcode_pdf_runtime.go"
+	archiveRuntimeFileName       = "ahdcode_archive_runtime.go"
+	sqliteRuntimeFileName        = "ahdcode_sqlite_runtime.go"
+	httpRuntimeFileName          = "ahdcode_http_runtime.go"
+	httpFilesRuntimeFileName     = "ahdcode_http_files_runtime.go"
+	httpSessionsRuntimeFileName  = "ahdcode_http_sessions_runtime.go"
+	httpDevReloadRuntimeFileName = "ahdcode_http_devreload_runtime.go"
+	websocketRuntimeFileName     = "ahdcode_websocket_runtime.go"
+	websocketClientRuntimeFile   = "ahdcode_websocket_client_runtime.go"
+	websocketConnRuntimeFileName = "ahdcode_websocket_conn_runtime.go"
+	htmlRuntimeFileName          = "ahdcode_html_runtime.go"
+	devTLSWindowsRuntimeFileName = "ahdcode_devtls_windows.go"
+	devTLSUnixRuntimeFileName    = "ahdcode_devtls_unix.go"
+	devTLSOtherRuntimeFileName   = "ahdcode_devtls_other.go"
+	smtpRuntimeFileName          = "ahdcode_smtp_runtime.go"
+	mysqlRuntimeFileName         = "ahdcode_mysql_runtime.go"
+	postgresqlRuntimeFileName    = "ahdcode_postgresql_runtime.go"
+	securityRuntimeFileName      = "ahdcode_security_runtime.go"
+	identityRuntimeFileName      = "ahdcode_identity_runtime.go"
+	uuidRuntimeFileName          = "ahdcode_uuid_runtime.go"
+	bitsRuntimeFileName          = "ahdcode_bits_runtime.go"
+	charactersRuntimeFile        = "ahdcode_characters_runtime.go"
+	cronRuntimeFileName          = "ahdcode_cron_runtime.go"
+	codesRuntimeFileName         = "ahdcode_codes_runtime.go"
+	svgRuntimeFileName           = "ahdcode_svg_runtime.go"
+	documentRuntimeFileName      = "ahdcode_document_runtime.go"
 	// The Terminal runtime is one portable file plus one file per operating
 	// system. The operating-system suffix and each file's build constraint let
 	// the Go toolchain compile exactly the platform file for the target.
@@ -219,10 +218,6 @@ func Generate(compilation *ir.Compilation) (*GeneratedProgram, []diagnostics.Dia
 	if err != nil {
 		return nil, append(generator.diagnostics, backendError(CodeFormatFailure, "embedded HTML runtime source is not valid Go: "+err.Error(), source.Span{}, "the HTML backend runtime must remain gofmt-clean"))
 	}
-	templateRuntime, err := format.Source([]byte(templateRuntimeSource()))
-	if err != nil {
-		return nil, append(generator.diagnostics, backendError(CodeFormatFailure, "embedded template runtime source is not valid Go: "+err.Error(), source.Span{}, "the template backend runtime must remain gofmt-clean"))
-	}
 	smtpRuntime, err := format.Source([]byte(smtpRuntimeSource()))
 	if err != nil {
 		return nil, append(generator.diagnostics, backendError(CodeFormatFailure, "embedded SMTP runtime source is not valid Go: "+err.Error(), source.Span{}, "the SMTP backend runtime must remain gofmt-clean"))
@@ -261,7 +256,6 @@ func Generate(compilation *ir.Compilation) (*GeneratedProgram, []diagnostics.Dia
 		{Name: httpRuntimeFileName, Content: string(httpRuntime)},
 		{Name: websocketRuntimeFileName, Content: string(websocketRuntime)},
 		{Name: htmlRuntimeFileName, Content: string(htmlRuntime)},
-		{Name: templateRuntimeFileName, Content: string(templateRuntime)},
 		{Name: smtpRuntimeFileName, Content: string(smtpRuntime)},
 		{Name: securityRuntimeFileName, Content: string(securityRuntime)},
 		{Name: identityRuntimeFileName, Content: string(identityRuntime)},
@@ -274,9 +268,9 @@ func Generate(compilation *ir.Compilation) (*GeneratedProgram, []diagnostics.Dia
 		{httpFilesRuntimeFileName, ahdruntime.HTTPFilesSource, "HTTP file transfer"},
 		{httpSessionsRuntimeFileName, ahdruntime.HTTPSessionsSource, "HTTP persistent sessions"},
 		{httpDevReloadRuntimeFileName, ahdruntime.DevReloadSource, "HTTP development reload"},
-		{templateWindowsRuntimeFileName, ahdruntime.TemplateWindowsSource, "Templates Windows"},
-		{templateUnixRuntimeFileName, ahdruntime.TemplateUnixSource, "Templates Unix"},
-		{templateOtherRuntimeFileName, ahdruntime.TemplateOtherSource, "Templates fallback"},
+		{devTLSWindowsRuntimeFileName, ahdruntime.DevTLSWindowsSource, "development TLS Windows"},
+		{devTLSUnixRuntimeFileName, ahdruntime.DevTLSUnixSource, "development TLS Unix"},
+		{devTLSOtherRuntimeFileName, ahdruntime.DevTLSOtherSource, "development TLS fallback"},
 		{websocketClientRuntimeFile, ahdruntime.WebSocketClientSource, "WebSocket client"},
 		{svgRuntimeFileName, ahdruntime.SVGSource, "SVG"},
 		{documentRuntimeFileName, ahdruntime.DocumentSource, "document"},
@@ -409,10 +403,6 @@ func postgresqlRuntimeSource() string {
 
 func htmlRuntimeSource() string {
 	return strings.Replace(ahdruntime.HTMLSource, "package ahdruntime", "package main", 1)
-}
-
-func templateRuntimeSource() string {
-	return strings.Replace(ahdruntime.TemplateSource, "package ahdruntime", "package main", 1)
 }
 
 func smtpRuntimeSource() string {
@@ -688,7 +678,6 @@ func (generator *generator) emitProgram() string {
 	generator.emitPDFHelpers(writer)
 	generator.emitExcelHelpers(writer)
 	generator.emitJSONValueHelpers(writer)
-	generator.emitTemplateHelpers(writer)
 	generator.emitXMLHelpers(writer)
 	generator.emitSQLiteHelpers(writer)
 	generator.emitMySQLHelpers(writer)

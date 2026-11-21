@@ -98,6 +98,29 @@ webLocalHostname: Function := (host: String) -> String {
 
     return "{name}.test"
 }
+// The dev launcher supplies this URL for its direct HTTPS listener. Check
+// it against the actual socket configuration before using it for links.
+webLocalHTTPSURL: Function := (environment: String, protocol: String, host: String, port: Int) -> String? {
+    if environment == "production" or protocol != "https" {
+        return null
+    }
+
+    bindHost: Local String := host.lower()
+    if bindHost == "::1" {
+        bindHost = "[::1]"
+    }
+
+    if bindHost != "localhost" and bindHost != "127.0.0.1" and bindHost != "[::1]" {
+        return null
+    }
+
+    expected: Local String := "https://{bindHost}:{port}"
+    if Env.get("AHDCODE_DEV_HTTPS_URL") == expected {
+        return expected
+    }
+
+    return null
+}
 // AppConfig is one application's validated configuration. It is produced by
 // load() below, which either returns a complete value or raises -- there is
 // no partially valid AppConfig and no silent default for a required key.
@@ -115,6 +138,11 @@ AppConfig: Class<> := {
     // deliberately independent of serverHost/serverPort, which describe the
     // socket this process actually listens on.
     url: Function := () -> String {
+        direct: Local String? := webLocalHTTPSURL(attribute.environment, attribute.protocol, attribute.serverHost, attribute.serverPort)
+        if direct != null {
+            return direct
+        }
+
         return "{attribute.protocol}://{attribute.host}"
     }
     // developmentHost is the local name this machine routes to the
@@ -128,16 +156,30 @@ AppConfig: Class<> := {
     // so a link built from this value and the name the toolchain actually
     // serves are always the one address.
     developmentHost: Function := () -> String {
+        if webLocalHTTPSURL(attribute.environment, attribute.protocol, attribute.serverHost, attribute.serverPort) != null {
+            return attribute.serverHost
+        }
+
         return webLocalHostname(attribute.host)
     }
     // developmentURL is that same identity with the configured scheme.
     developmentURL: Function := () -> String {
+        direct: Local String? := webLocalHTTPSURL(attribute.environment, attribute.protocol, attribute.serverHost, attribute.serverPort)
+        if direct != null {
+            return direct
+        }
+
         return "{attribute.protocol}://{webLocalHostname(attribute.host)}"
     }
     // effectiveURL is the address to show and to link in this environment:
     // the local name in development, the real public name everywhere else.
     // Production never gains a .test suffix.
     effectiveURL: Function := () -> String {
+        direct: Local String? := webLocalHTTPSURL(attribute.environment, attribute.protocol, attribute.serverHost, attribute.serverPort)
+        if direct != null {
+            return direct
+        }
+
         if attribute.environment == "development" {
             return "{attribute.protocol}://{webLocalHostname(attribute.host)}"
         }

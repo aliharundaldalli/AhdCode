@@ -840,9 +840,6 @@ func (generator *generator) call(value *ir.CallExpr) string {
 	if strings.HasPrefix(string(value.Callable), htmlModulePrefix) {
 		return generator.htmlCall(value)
 	}
-	if strings.HasPrefix(string(value.Callable), templatesModulePrefix) {
-		return generator.templatesCall(value)
-	}
 	if strings.HasPrefix(string(value.Callable), smtpModulePrefix) {
 		return generator.smtpCall(value)
 	}
@@ -1220,9 +1217,6 @@ func (generator *generator) builtinCall(value *ir.CallExpr) string {
 		}
 		if strings.HasPrefix(name, "HTMLDocument.") || strings.HasPrefix(name, "HTMLElement.") {
 			return generator.htmlOperation(name, value)
-		}
-		if strings.HasPrefix(name, "TemplateSet.") {
-			return generator.templatesOperation(name, value)
 		}
 		if strings.HasPrefix(name, "SMTPClient.") || strings.HasPrefix(name, "SMTPMessage.") {
 			return generator.smtpOperation(name, value)

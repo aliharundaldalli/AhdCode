@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, 'release/v2.11.0-rc1' ]
   pull_request:
     branches: [ main ]
 
@@ -21,11 +21,11 @@ jobs:
           cache-dependency-path: go.sum
 
       - name: Run tests
-        # internal/build compiles many native programs and has measured between
-        # 415s and 565s on these runners, which leaves no margin under Go's
-        # default 10m per-package timeout. The race step below already carries an
-        # explicit timeout for the same reason.
-        run: go test -count=1 -timeout 25m ./...
+        # internal/build runs in its own dedicated job below because it
+        # compiles hundreds of native executables and exceeds 25m when
+        # sharing a runner with the rest of the workspace.
+        run: |
+          go list ./... | grep -v '^ahdcode/internal/build$' | xargs go test -count=1 -timeout 25m
 
       - name: Run vet
         run: go vet ./...
@@ -41,6 +41,61 @@ jobs:
 
       - name: Check git diff
         run: git diff --check
+
+      - name: Test PWA worker
+        if: github.ref_name == 'release/v2.11.0-rc1'
+        run: node --test internal/initweb/pwa_worker_test.cjs
+
+  native-build:
+    name: Native build suite
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+
+      - name: Run internal/build tests
+        run: go test -count=1 -timeout 45m ./internal/build
+
+  macos-rc:
+    name: macOS ARM64 release candidate
+    if: github.ref_name == 'release/v2.11.0-rc1'
+    runs-on: macos-15
+    timeout-minutes: 35
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+
+      - name: Build the native CLI and SQLite helper
+        run: |
+          go build -trimpath -o "$RUNNER_TEMP/ahdcode" ./cmd/ahdcode
+          go build -trimpath -o "$RUNNER_TEMP/ahdsqlite" ./cmd/ahdsqlite
+          test "$("$RUNNER_TEMP/ahdcode" version)" = 'AhdCode v2.11.0'
+          echo "AHDCODE_BIN=$RUNNER_TEMP/ahdcode" >> "$GITHUB_ENV"
+          echo "AHDCODE_SQLITE_RUNTIME=$RUNNER_TEMP/ahdsqlite" >> "$GITHUB_ENV"
+
+      - name: Exercise native Web, HTTPS, PWA and deployment
+        run: |
+          go test -count=1 -timeout 20m -run 'Test(BasicStarter|PWA|DevHTTPS|DevReload|HTTPNativeAndEvaluator|HTTPErrorPage|PersistentSession|WebSocket|WebPackage|WebAssets|WebPWA)' \
+            ./cmd/ahdcode ./internal/backend/golang/ahdruntime ./internal/build ./internal/initweb ./internal/packaging
+          node --test internal/initweb/pwa_worker_test.cjs
+
+      - name: Race-test the Web runtime and packager
+        run: |
+          go test -race -count=1 -timeout 20m -run 'Test(DevHTTPS|HTTPShutdown|PersistentSession|WebSocket|WebPackage|WebAssets|WebPWA)' \
+            ./cmd/ahdcode ./internal/backend/golang/ahdruntime ./internal/packaging
 
   nested:
     name: Nested helper modules
@@ -82,6 +137,10 @@ jobs:
         run: |
           go test -race -count=1 -timeout 25m ./internal/backend/golang/ahdruntime/ ./internal/evaluator/
           go test -race -count=1 -timeout 25m -run 'WebSocket|HTTP|SMTP|V210' ./internal/build/
+
+      - name: Race-test packaging and migrations
+        if: github.ref_name == 'release/v2.11.0-rc1'
+        run: go test -race -count=1 -timeout 20m ./internal/packaging ./internal/migrate
 
   postgresql:
     # The PostgreSQL integration suite needs a live server, so it runs here

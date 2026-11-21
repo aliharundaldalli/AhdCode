@@ -3,16 +3,18 @@ package main
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
+	"flag"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
 	"os/signal"
 	"path/filepath"
-	"strings"
 	"syscall"
 	"time"
 
+	"ahdcode/internal/backend/golang/ahdruntime"
 	"ahdcode/internal/build"
 )
 
@@ -66,15 +68,26 @@ type devChild struct {
 	waitErr    error
 }
 
-func startDevChild(binaryPath, session string, generation int, output, errorOutput io.Writer, events chan<- devControllerEvent) (*devChild, error) {
+func startDevChild(binaryPath, session string, generation int, httpsFiles devHTTPSFiles, httpsURL string, output, errorOutput io.Writer, events chan<- devControllerEvent) (*devChild, error) {
 	cmd := exec.Command(binaryPath)
 	cmd.Stdout = output
 	cmd.Stderr = errorOutput
 	cmd.Stdin = os.Stdin
 	// The generation is the browser-refresh identity. Only this child sees
 	// it; ahdcode run and a production process do not.
-	if environ := devReloadEnvironment(session, generation); len(environ) > 0 {
-		cmd.Env = append(os.Environ(), environ...)
+	environ := devReloadEnvironment(session, generation)
+	if httpsFiles.cert != "" && len(environ) == 0 {
+		return nil, fmt.Errorf("local HTTPS could not establish a development identity")
+	}
+	// Clear inherited transport settings in ordinary dev mode.
+	cmd.Env = append(os.Environ(), environ...)
+	cmd.Env = append(cmd.Env,
+		ahdruntime.AhdDevTLSCertEnv+"="+httpsFiles.cert,
+		ahdruntime.AhdDevTLSKeyEnv+"="+httpsFiles.key,
+		devHTTPSURLEnv+"="+httpsURL,
+	)
+	if httpsFiles.cert != "" {
+		cmd.Env = append(cmd.Env, "APP_PROTOCOL=https")
 	}
 	if err := cmd.Start(); err != nil {
 		return nil, err
@@ -203,6 +216,9 @@ type devController struct {
 	// the new process from the one that served the page. It is not derived
 	// from the generation counter, which starts again at 1.
 	reloadSession string
+	httpsFiles    devHTTPSFiles
+	httpsCA       string
+	httpsURL      string
 
 	// exitStatus is the process exit code this session ends with. It stays 0
 	// for every ordinary run, including a failed build, which dev recovers
@@ -268,16 +284,6 @@ func (c *devController) updateWatchSet(result build.Result) {
 		seen[path] = true
 		paths = append(paths, path)
 	}
-	// templates/ beside the entry is watched only by ahdcode dev. The running
-	// program still loads those files once, so a change restarts it. ahdcode
-	// run does not watch them, and this walk does not write any template file.
-	for _, path := range devTemplatePaths(c.entry) {
-		if seen[path] {
-			continue
-		}
-		seen[path] = true
-		paths = append(paths, path)
-	}
 	c.watcher.setPathsAsync(paths)
 }
 
@@ -320,11 +326,31 @@ func (c *devController) run() {
 				return
 			}
 			c.updateWatchSet(event.buildResult)
+			if event.buildOK && c.httpsFiles.cert != "" {
+				if err := c.httpsFiles.check(c.httpsCA); err != nil {
+					// A bad rotation must not replace a working child.
+					fmt.Fprintf(c.errorOut, "✗ %v\n", err)
+					event.buildOK = false
+				}
+			}
 			if event.buildOK {
 				c.printf("✓ Build succeeded\n")
-				if !c.webAnnounced && isWebApplication(event.buildResult) {
+				if (!c.webAnnounced || c.httpsFiles.cert != "") && isWebApplication(event.buildResult) {
 					environment := readWebEnvironment(c.entry)
-					if err := checkWebEnvironment(environment); err != nil {
+					check := checkWebEnvironment
+					if c.httpsFiles.cert != "" {
+						check = func(environment webEnvironment) error {
+							if err := checkWebEnvironment(webEnvironment{environment: environment.environment}); err != nil {
+								return err
+							}
+							url, err := devHTTPSWebURL(environment)
+							if err == nil {
+								c.httpsURL = url
+							}
+							return err
+						}
+					}
+					if err := check(environment); err != nil {
 						// A production configuration reached the development
 						// command. Refuse it rather than run it: this is a
 						// mismatch the user has to resolve, and starting the
@@ -337,6 +363,9 @@ func (c *devController) run() {
 						c.finishShutdown()
 						return
 					}
+					if c.httpsFiles.cert != "" {
+						environment.protocol = "https"
+					}
 					c.webAnnounced = true
 					c.webEnvironment = environment
 				}
@@ -348,7 +377,7 @@ func (c *devController) run() {
 					c.printf("→ Starting...\n")
 				}
 				c.childGeneration++
-				child, err := startDevChild(event.buildPath, c.reloadSession, c.childGeneration, c.output, c.errorOut, c.events)
+				child, err := startDevChild(event.buildPath, c.reloadSession, c.childGeneration, c.httpsFiles, c.httpsURL, c.output, c.errorOut, c.events)
 				if err != nil {
 					c.printf("✗ Could not start the application: %v\n", err)
 					c.child = nil
@@ -365,8 +394,10 @@ func (c *devController) run() {
 						// The route is claimed only now, with a child
 						// actually listening: a local name must never
 						// exist for an application that is not there.
-						c.establishLocalRoute(c.webEnvironment)
-						c.syncLocalHosts()
+						if c.httpsFiles.cert == "" {
+							c.establishLocalRoute(c.webEnvironment)
+							c.syncLocalHosts()
+						}
 						// Republished so the descriptor carries the
 						// logical identity the route registry just granted.
 						c.publishDescriptor()
@@ -481,18 +512,38 @@ func exitCodeText(err error) string {
 	return err.Error()
 }
 
-// runDev implements `ahdcode dev <entry.ahd>`.
+// runDev implements the watch and restart modes of ahdcode dev.
 func runDev(arguments []string, output, errorOutput io.Writer) int {
-	if len(arguments) != 1 || strings.HasPrefix(arguments[0], "-") {
-		fmt.Fprintln(errorOutput, "ahdcode dev: exactly one entry module is expected, as in: ahdcode dev app.ahd")
+	entry, https, httpsFiles, err := parseDevArguments(arguments, errorOutput)
+	if errors.Is(err, flag.ErrHelp) {
+		return 0
+	}
+	if err != nil {
+		fmt.Fprintf(errorOutput, "ahdcode dev: %v\n", err)
 		return 2
 	}
-	entry := arguments[0]
 	absoluteEntry, err := filepath.Abs(entry)
 	if err != nil {
 		absoluteEntry = entry
 	}
 
+	var ca string
+	if https {
+		environment := readWebEnvironment(absoluteEntry)
+		if err := checkWebEnvironment(webEnvironment{environment: environment.environment}); err != nil {
+			fmt.Fprintf(errorOutput, "ahdcode dev: %v\n", err)
+			return 1
+		}
+		httpsFiles, ca, err = prepareDevHTTPS(absoluteEntry, httpsFiles)
+		if err != nil {
+			fmt.Fprintf(errorOutput, "ahdcode dev: %v\n", err)
+			return 1
+		}
+		fmt.Fprintln(output, "Local HTTPS uses loopback only. The browser must trust the issuing CA.")
+		if ca != "" {
+			fmt.Fprintf(output, "Development CA (public certificate): %s\n", ca)
+		}
+	}
 	descriptorPath := devFileFor(entry)
 	if err := claimDevFile(descriptorPath); err != nil {
 		fmt.Fprintf(errorOutput, "ahdcode dev: %v\n", err)
@@ -514,6 +565,8 @@ func runDev(arguments []string, output, errorOutput io.Writer) int {
 	defer control.close()
 
 	controller := newDevController(absoluteEntry, binDir, descriptorPath, output, errorOutput)
+	controller.httpsFiles = httpsFiles
+	controller.httpsCA = ca
 	controller.controlPort = control.port()
 	controller.devToken = control.token
 	control.setOnStop(func(force bool) {
