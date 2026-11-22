@@ -1,5 +1,11 @@
 # Kurulum, yükseltme ve kaldırma
 
+v2.12.0 adayını ayrı bir Windows profili veya Unix kurulum dizininde
+deneyin. Paketi çalıştırmadan önce SHA-256 özetini bildirim dosyasıyla
+karşılaştırın. Test ortamında `ahdcode version` ve `ahdcode check app.ahd`
+komutlarını doğrulayın. Aşağıdaki komutlar yayımlanmış v2.11.0 kurulumu
+içindir. [v2.12 geçiş kılavuzuna](UPGRADE_2.12_TR.md) bakın.
+
 İşletim sisteminiz için yayımlanan AhdCode **v2.11.0** kararlı kurulum paketini
 indirin (macOS `arm64`/`x64`, Windows `x64` veya Linux `amd64`/`arm64`).
 `v2.11.0` araç zinciri paketleri derleyiciyi, tüm yardımcıları (`ahdsqlite`,

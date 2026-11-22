@@ -44,10 +44,10 @@ func FindGoToolchain() (string, error) {
 	}
 	candidates := []string{}
 	if root := os.Getenv("GOROOT"); root != "" {
-		candidates = append(candidates, filepath.Join(root, "bin", "go"))
+		candidates = append(candidates, ExecutablePath(filepath.Join(root, "bin", "go")))
 	}
 	candidates = append(candidates,
-		filepath.Join(runtime.GOROOT(), "bin", "go"),
+		ExecutablePath(filepath.Join(runtime.GOROOT(), "bin", "go")),
 		"/usr/local/go/bin/go",
 		"/opt/homebrew/bin/go",
 		"/usr/lib/go/bin/go",

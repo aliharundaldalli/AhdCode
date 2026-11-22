@@ -10,10 +10,9 @@ import (
 )
 
 // Registry files follow the same publish discipline the run/dev descriptors
-// use: content is written to a fresh 0600 temporary file in the destination's
-// own directory and renamed into place, so a reader never sees a partially
-// written registry and the file is never briefly readable at a wider
-// permission.
+// use: content is written to a fresh temporary file in the destination's
+// own directory and renamed into place. The file uses 0600 on Unix and
+// inherits the directory ACL on Windows.
 func writeAtomic(path string, payload any) error {
 	encoded, err := json.MarshalIndent(payload, "", "  ")
 	if err != nil {

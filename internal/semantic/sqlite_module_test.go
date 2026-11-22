@@ -169,16 +169,17 @@ func TestSQLiteModuleInterfaceExportsExactSurface(t *testing.T) {
 	if module == nil || module.ModuleID != "builtin:SQLite" {
 		t.Fatalf("SQLite is not a registered builtin module: %#v", module)
 	}
-	wantExports := []string{"Database", "SQLiteError", "SQLiteValue", "fromInt", "fromReal", "fromString", "nullValue", "open"}
+	wantExports := []string{"Database", "SQLiteError", "SQLiteValue", "fromInt", "fromReal", "fromString", "nullValue", "open", "openWithOptions"}
 	if strings.Join(module.ExportNames, ",") != strings.Join(wantExports, ",") {
 		t.Fatalf("SQLite exports %v; want %v", module.ExportNames, wantExports)
 	}
 	signatures := map[string]string{
-		"open":       "(path: String) -> Database",
-		"nullValue":  "() -> SQLiteValue",
-		"fromInt":    "(value: Int) -> SQLiteValue",
-		"fromReal":   "(value: Real) -> SQLiteValue",
-		"fromString": "(value: String) -> SQLiteValue",
+		"open":            "(path: String) -> Database",
+		"openWithOptions": "(path: String, readOnly: Bool, busyTimeoutMilliseconds: Int) -> Database",
+		"nullValue":       "() -> SQLiteValue",
+		"fromInt":         "(value: Int) -> SQLiteValue",
+		"fromReal":        "(value: Real) -> SQLiteValue",
+		"fromString":      "(value: String) -> SQLiteValue",
 	}
 	for name, want := range signatures {
 		symbol := module.Exports[name]

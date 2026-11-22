@@ -1,14 +1,16 @@
 package main
 
 import (
-	"ahdcode/internal/ahdversion"
 	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
+	"ahdcode/internal/ahdversion"
+	"ahdcode/internal/build"
 	"ahdcode/internal/diagnostics"
 	"ahdcode/internal/source"
 )
@@ -57,7 +59,7 @@ func TestBuildProducesAnExecutable(t *testing.T) {
 	if code := run([]string{"build", entry, "-o", output}); code != 0 {
 		t.Fatalf("expected build exit 0; received %d", code)
 	}
-	if info, err := os.Stat(output); err != nil || info.Mode()&0o111 == 0 {
+	if info, err := os.Stat(build.ExecutablePath(output)); err != nil || !info.Mode().IsRegular() || (runtime.GOOS != "windows" && info.Mode()&0o111 == 0) {
 		t.Fatalf("no executable was produced: %v", err)
 	}
 }
@@ -81,7 +83,7 @@ func TestRunAndBuildAcceptUnicodePathsWithSpaces(t *testing.T) {
 	if code := runWithIO([]string{"build", entry, "-o", output}, bytes.NewBuffer(nil), &out, &errors); code != 0 {
 		t.Fatalf("build exit=%d stdout=%q stderr=%q", code, out.String(), errors.String())
 	}
-	if info, err := os.Stat(output); err != nil || info.Mode()&0o111 == 0 {
+	if info, err := os.Stat(build.ExecutablePath(output)); err != nil || !info.Mode().IsRegular() || (runtime.GOOS != "windows" && info.Mode()&0o111 == 0) {
 		t.Fatalf("Unicode/space output was not executable: %v", err)
 	}
 }

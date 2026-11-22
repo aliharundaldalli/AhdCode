@@ -2,9 +2,58 @@ package lsp
 
 import (
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
+
+	"ahdcode/internal/analysis"
 )
+
+func TestWorkspaceReferencesAndRenameUseClosedFileUTF16Positions(t *testing.T) {
+	root := t.TempDir()
+	entry, consumer := filepath.Join(root, "Answer.ahd"), filepath.Join(root, "Consumer.ahd")
+	entryText := "answer: Int := 42\r\n"
+	consumerText := "from Answer bring answer\r\nwrite(\"😀{answer}\")\r\n"
+	for path, text := range map[string]string{entry: entryText, consumer: consumerText} {
+		if err := os.WriteFile(path, []byte(text), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	entryURI, consumerURI := PathToURI(entry), PathToURI(analysis.CanonicalPath(consumer))
+	document := textDocumentIdentifier{URI: entryURI}
+	position := Position{Character: 1}
+	want := Range{Start: Position{Line: 1, Character: 10}, End: Position{Line: 1, Character: 16}}
+	client := &testClient{}
+	client.request(1, "initialize", map[string]any{"rootUri": PathToURI(root)})
+	client.notify("textDocument/didOpen", didOpenParams{TextDocument: textDocumentItem{URI: entryURI, Text: entryText}})
+	client.request(2, "textDocument/references", referenceParams{TextDocument: document, Position: position})
+	client.request(3, "textDocument/rename", renameParams{TextDocument: document, Position: position, NewName: "result"})
+	client.notify("exit", nil)
+	messages := runServer(t, client)
+	var locations []lspLocation
+	if err := json.Unmarshal(findResponse(t, messages, 2).Result, &locations); err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, location := range locations {
+		found = found || (location.URI == consumerURI && location.Range == want)
+	}
+	if !found {
+		t.Fatalf("missing UTF-16 reference %v in %v", want, locations)
+	}
+	var edits workspaceEdit
+	if err := json.Unmarshal(findResponse(t, messages, 3).Result, &edits); err != nil {
+		t.Fatal(err)
+	}
+	found = false
+	for _, edit := range edits.Changes[consumerURI] {
+		found = found || (edit.Range == want && edit.NewText == "result")
+	}
+	if !found {
+		t.Fatalf("missing UTF-16 edit %v in %v", want, edits)
+	}
+}
 
 func referencesAt(t *testing.T, text, uri, needle string, offsetWithinNeedle int, includeDeclaration bool) []lspLocation {
 	t.Helper()

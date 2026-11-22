@@ -1,5 +1,9 @@
 # Web
 
+Keep private uploads and session databases outside static and managed
+asset roots. Authorize ownership on the server before creating a file
+response. Set `Cache-Control: no-store` on authorization denials.
+
 [English] · [Türkçe](WEB_TR.md)
 
 [Back to README](../README.md) · [HTTP](HTTP.md) · [HTML](HTML.md) · [Modules](MODULES.md) · [Env](ENV.md) · [require(...)](REQUIRE.md)

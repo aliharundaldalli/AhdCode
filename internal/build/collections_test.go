@@ -20,7 +20,7 @@ func buildRelocateAndRun(t *testing.T, entry, name string) string {
 	if result.HasErrors() {
 		t.Fatalf("compilation failed:\n%s", diagnosticText(result.Diagnostics))
 	}
-	relocated := filepath.Join(t.TempDir(), name)
+	relocated := ExecutablePath(filepath.Join(t.TempDir(), name))
 	if err := os.Rename(path, relocated); err != nil {
 		t.Fatalf("could not relocate the executable: %v", err)
 	}

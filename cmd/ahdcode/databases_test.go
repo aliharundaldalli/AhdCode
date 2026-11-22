@@ -35,19 +35,24 @@ func TestStudioHostsMapsLoopback(t *testing.T) {
 
 func TestStudioEnvBootstrapPreservesExisting(t *testing.T) {
 	dir := t.TempDir()
+	prepareStudioEnvPermissionFixture(t, dir)
 	path := filepath.Join(dir, ".env")
-	if err := os.WriteFile(filepath.Join(dir, ".env.example"), []byte("AHD_DATA_LANG=en\n"), 0600); err != nil {
+	example := []byte("AHD_DATA_LANG=en\n")
+	if err := os.WriteFile(filepath.Join(dir, ".env.example"), example, 0600); err != nil {
 		t.Fatal(err)
 	}
 	if err := ensureStudioEnv(dir); err != nil {
 		t.Fatal(err)
 	}
-	info, err := os.Stat(path)
-	if err != nil {
-		t.Fatal(err)
+	if got, err := os.ReadFile(path); err != nil || !bytes.Equal(got, example) {
+		t.Fatalf("new env did not match the example: %v", err)
 	}
-	if info.Mode().Perm() != 0600 {
-		t.Fatalf("mode %v", info.Mode())
+	private := studioEnvPermissionFingerprint(t, path)
+	if file, err := createStudioEnv(path); !os.IsExist(err) {
+		if file != nil {
+			_ = file.Close()
+		}
+		t.Fatalf("exclusive creation must refuse an existing env: %v", err)
 	}
 	existing := []byte("AHD_DATA_LANG=tr\n")
 	if err := os.WriteFile(path, existing, 0600); err != nil {
@@ -59,6 +64,9 @@ func TestStudioEnvBootstrapPreservesExisting(t *testing.T) {
 	got, err := os.ReadFile(path)
 	if err != nil || string(got) != string(existing) {
 		t.Fatalf("existing env changed: %v", err)
+	}
+	if got := studioEnvPermissionFingerprint(t, path); got != private {
+		t.Fatal("existing env permissions changed")
 	}
 }
 

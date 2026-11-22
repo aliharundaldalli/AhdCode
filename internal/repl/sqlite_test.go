@@ -8,6 +8,8 @@ import (
 	"strings"
 	"sync"
 	"testing"
+
+	"ahdcode/internal/build"
 )
 
 var (
@@ -24,7 +26,7 @@ func sqliteRuntimeForTest(t *testing.T) string {
 		if err != nil {
 			return
 		}
-		path := filepath.Join(dir, "ahdsqlite")
+		path := build.ExecutablePath(filepath.Join(dir, "ahdsqlite"))
 		root, err := filepath.Abs(filepath.Join("..", ".."))
 		if err != nil {
 			return

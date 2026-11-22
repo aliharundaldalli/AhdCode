@@ -16,14 +16,10 @@ modules, GUI, Graphics, interactive Plot viewer, and desktop application
 packaging. It is used in practice by a small community; it is not a
 mainstream language.
 
-This is **v2.11.0**, **Web Deployment & Progressive Web Apps**, the latest
-stable release. Toolchain packages ship for macOS (`arm64` and `x64`, signed
-and Apple-notarized `.pkg`/`.dmg` plus signed `.tar.gz`), Windows (`x64`
-per-user `.exe`), and Linux (`amd64` and `arm64` `.tar.gz`), requiring the Go
-version from `go.mod` on `PATH` for native `ahdcode build` / `package`. Self-contained
-bundles with private Go, offline Tectonic LaTeX, and VSIX remain on v2.7.0
-and return at v3.0. See the [release notes](docs/RELEASE_2.11.0.md) and the
-[upgrade notes](docs/UPGRADE_2.11.md).
+This is **v2.12.0**, the release candidate for the standalone checker,
+SQLite opening options, and platform reliability. See the
+[release notes](docs/RELEASE_2.12.0.md) and [upgrade notes](docs/UPGRADE_2.12.md).
+Version v2.11.0 remains the latest published stable release.
 
 v2.0.0 is a major release, **Desktop Application Completion**: it completes
 the first-party desktop application foundation — ListBox, Select, TextArea,

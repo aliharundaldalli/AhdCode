@@ -28,14 +28,15 @@ type Value struct {
 
 // Operations the helper understands.
 const (
-	OperationOpen         = "open"
-	OperationExecute      = "execute"
-	OperationQuery        = "query"
-	OperationLastInsertID = "lastInsertId"
-	OperationBegin        = "begin"
-	OperationCommit       = "commit"
-	OperationRollback     = "rollback"
-	OperationClose        = "close"
+	OperationOpen            = "open"
+	OperationOpenWithOptions = "openWithOptions"
+	OperationExecute         = "execute"
+	OperationQuery           = "query"
+	OperationLastInsertID    = "lastInsertId"
+	OperationBegin           = "begin"
+	OperationCommit          = "commit"
+	OperationRollback        = "rollback"
+	OperationClose           = "close"
 	// OperationBackup (v2.5.0) writes a consistent snapshot of the Database
 	// to Path with SQLite's online backup API.
 	OperationBackup = "backup"
@@ -43,11 +44,13 @@ const (
 
 // Request is one client instruction.
 type Request struct {
-	Operation  string  `json:"operation"`
-	Database   int64   `json:"database,omitempty"`
-	Path       string  `json:"path,omitempty"`
-	SQL        string  `json:"sql,omitempty"`
-	Parameters []Value `json:"parameters,omitempty"`
+	Operation               string  `json:"operation"`
+	Database                int64   `json:"database,omitempty"`
+	Path                    string  `json:"path,omitempty"`
+	ReadOnly                bool    `json:"readOnly,omitempty"`
+	BusyTimeoutMilliseconds int64   `json:"busyTimeoutMilliseconds,omitempty"`
+	SQL                     string  `json:"sql,omitempty"`
+	Parameters              []Value `json:"parameters,omitempty"`
 }
 
 // Response is the helper's answer to exactly one Request. A non-empty Error

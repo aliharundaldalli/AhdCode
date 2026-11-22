@@ -120,6 +120,8 @@ test('online home always uses the network and no user or session response surviv
   const before = worker.calls.length;
   for (const [route, extras] of [
     ['/admin'], ['/api/private', { mode: 'cors' }], ['/logout', { method: 'POST' }],
+    ['/avatars/1', { mode: 'cors', destination: 'image' }],
+    ['/avatars/2', { mode: 'cors', destination: 'image' }],
     ['/login', { method: 'POST' }], ['/__ahdcode/dev/reload', { mode: 'cors' }],
     ['/__ahdcode/dev/reload.js', { mode: 'cors', destination: 'script' }],
     ['/?session=one'], ['/?'], ['https://other.test/'],
@@ -136,6 +138,8 @@ test('online home always uses the network and no user or session response surviv
   assert.equal(response.status, 503);
   assert.match(fallback, /You are offline/);
   assert.doesNotMatch(fallback, /Ada|Other user/);
+  assert.equal(worker.request('/avatars/1', { mode: 'cors', destination: 'image' }), undefined);
+  assert.equal(worker.request('/avatars/2', { mode: 'cors', destination: 'image' }), undefined);
   assert.equal(await (await worker.request(icon, { destination: 'image' })).text(), 'public');
   assert.deepEqual([...worker.storage.values()].flatMap(items => [...items.keys()]), [origin + icon]);
   worker.setNetwork(async () => new Response('Online again'));

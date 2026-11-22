@@ -99,7 +99,7 @@ func TestPlotOnlyProgramFindsTheInstalledDialogHelperAfterRelocation(t *testing.
 	if err := os.WriteFile(entry, []byte(plotOnlyInstallProgram), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	output := filepath.Join(working, "chart")
+	output := ExecutablePath(filepath.Join(working, "chart"))
 
 	command := exec.Command(ahdcode, "build", entry, "-o", output)
 	command.Dir = working
@@ -135,7 +135,7 @@ func TestPlainProgramStillCarriesNoDialogHelperHintWhenInstalled(t *testing.T) {
 	if err := os.WriteFile(entry, []byte("write(\"no helper\")\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	output := filepath.Join(working, "plain")
+	output := ExecutablePath(filepath.Join(working, "plain"))
 	command := exec.Command(ahdcode, "build", entry, "-o", output)
 	command.Dir = working
 	command.Env = append(environmentWithout(os.Environ(),

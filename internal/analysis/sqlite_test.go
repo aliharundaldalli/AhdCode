@@ -63,14 +63,15 @@ func TestSQLiteNamespaceMembersCarryRealSignatures(t *testing.T) {
 
 	items := store.Completion(path, offsetOf(t, text, "SQLite.")+len("SQLite."))
 	want := map[string]string{
-		"open":        "open: (path: String) -> Database",
-		"nullValue":   "nullValue: () -> SQLiteValue",
-		"fromInt":     "fromInt: (value: Int) -> SQLiteValue",
-		"fromReal":    "fromReal: (value: Real) -> SQLiteValue",
-		"fromString":  "fromString: (value: String) -> SQLiteValue",
-		"Database":    "Class Database",
-		"SQLiteValue": "Class SQLiteValue",
-		"SQLiteError": "Class SQLiteError",
+		"openWithOptions": "openWithOptions: (path: String, readOnly: Bool, busyTimeoutMilliseconds: Int) -> Database",
+		"open":            "open: (path: String) -> Database",
+		"nullValue":       "nullValue: () -> SQLiteValue",
+		"fromInt":         "fromInt: (value: Int) -> SQLiteValue",
+		"fromReal":        "fromReal: (value: Real) -> SQLiteValue",
+		"fromString":      "fromString: (value: String) -> SQLiteValue",
+		"Database":        "Class Database",
+		"SQLiteValue":     "Class SQLiteValue",
+		"SQLiteError":     "Class SQLiteError",
 	}
 	if len(items) != len(want) {
 		t.Fatalf("SQLite exposes %d members; want %d: %#v", len(items), len(want), items)

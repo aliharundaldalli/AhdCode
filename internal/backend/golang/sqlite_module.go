@@ -27,6 +27,11 @@ func (generator *generator) sqliteCall(value *ir.CallExpr) string {
 	case "open":
 		path := generator.value(value.Arguments[0].Value, ir.Type{Kind: ir.StringType}, false)
 		return generator.sqliteValueFrom(sqliteDatabaseClass, "AhdSQLiteOpen("+errorClass+", "+path+")", meta)
+	case "openWithOptions":
+		path := generator.value(value.Arguments[0].Value, ir.Type{Kind: ir.StringType}, false)
+		readOnly := generator.value(value.Arguments[1].Value, ir.Type{Kind: ir.BoolType}, false)
+		busyTimeout := generator.value(value.Arguments[2].Value, ir.Type{Kind: ir.IntType}, false)
+		return generator.sqliteValueFrom(sqliteDatabaseClass, "AhdSQLiteOpenWithOptions("+errorClass+", "+path+", "+readOnly+", "+busyTimeout+")", meta)
 	case "nullValue":
 		return generator.sqliteValueFrom(sqliteValueClass, "AhdSQLiteNullValue()", meta)
 	case "fromInt":

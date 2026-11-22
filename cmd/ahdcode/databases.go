@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -259,5 +260,14 @@ func ensureStudioEnv(dir string) error {
 	if err != nil {
 		return nil
 	}
-	return os.WriteFile(envPath, data, 0o600)
+	file, err := createStudioEnv(envPath)
+	if os.IsExist(err) {
+		// Another launch created the file since the first check.
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	_, writeErr := file.Write(data)
+	return errors.Join(writeErr, file.Close())
 }

@@ -39,8 +39,7 @@ func (server *Server) handleReferences(m message) {
 	for i, location := range locations {
 		targetIndex, ok := indexes[location.Path]
 		if !ok {
-			targetText, _ := server.store.TextFor(path, location.Path)
-			targetIndex = newLineIndex(targetText)
+			targetIndex = newLineIndex(location.SourceText)
 			indexes[location.Path] = targetIndex
 		}
 		converted[i] = lspLocation{

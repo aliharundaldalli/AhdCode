@@ -9,6 +9,23 @@ import (
 	"testing"
 )
 
+func TestFindGoToolchainUsesNativeSuffixInGOROOT(t *testing.T) {
+	root := t.TempDir()
+	bin := filepath.Join(root, "bin")
+	if err := os.Mkdir(bin, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	want := ExecutablePath(filepath.Join(bin, "go"))
+	if err := os.WriteFile(want, []byte("fixture"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", t.TempDir())
+	t.Setenv("GOROOT", root)
+	if got, err := FindGoToolchain(); err != nil || got != want {
+		t.Fatalf("Go executable = %q, %v; want %q", got, err, want)
+	}
+}
+
 // 1 and 6: Windows generated executables carry .exe; Unix naming is unchanged.
 func TestExecutablePathPerPlatform(t *testing.T) {
 	cases := []struct {

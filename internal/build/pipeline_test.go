@@ -52,15 +52,11 @@ func buildAndRun(t *testing.T, entry, stdin string) (string, string, int) {
 	if result.HasErrors() {
 		t.Fatalf("compilation failed:\n%s", diagnosticText(result.Diagnostics))
 	}
-	if path != output {
-		t.Fatalf("expected the executable at %s; received %s", output, path)
+	if path != ExecutablePath(output) {
+		t.Fatalf("expected the executable at %s; received %s", ExecutablePath(output), path)
 	}
-	info, err := os.Stat(path)
-	if err != nil {
-		t.Fatalf("no executable was produced: %v", err)
-	}
-	if info.Mode()&0o111 == 0 {
-		t.Fatal("the produced file is not executable")
+	if !runnableFile(path) {
+		t.Fatalf("no runnable executable was produced at %s", path)
 	}
 	command := exec.Command(path)
 	command.Stdin = strings.NewReader(stdin)

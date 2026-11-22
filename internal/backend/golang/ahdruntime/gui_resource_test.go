@@ -1,10 +1,13 @@
 package ahdruntime
 
 import (
+	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
+	"syscall"
 	"testing"
 )
 
@@ -63,26 +66,13 @@ func TestResourceSymlinkStaysInsideTheCanonicalRoot(t *testing.T) {
 	if err := os.WriteFile(mark, []byte("png"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.Symlink("mark.png", filepath.Join(icons, "alias.png")); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Symlink(mark, filepath.Join(icons, "absolute.png")); err != nil {
-		t.Fatal(err)
-	}
 	nested := filepath.Join(root, "nested")
 	if err := os.Mkdir(nested, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.Symlink(filepath.Join("..", "icons", "mark.png"), filepath.Join(nested, "up.png")); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Symlink(icons, filepath.Join(root, "also")); err != nil {
-		t.Fatal(err)
-	}
+	makeDirectoryAlias(t, icons, filepath.Join(root, "also"))
 	linkedRoot := filepath.Join(t.TempDir(), "resources")
-	if err := os.Symlink(root, linkedRoot); err != nil {
-		t.Fatal(err)
-	}
+	makeDirectoryAlias(t, root, linkedRoot)
 	parent := t.TempDir()
 	real := filepath.Join(parent, "resources")
 	sibling := filepath.Join(parent, "resources-evil", "secret.png")
@@ -98,12 +88,23 @@ func TestResourceSymlinkStaysInsideTheCanonicalRoot(t *testing.T) {
 
 	t.Setenv("AHDCODE_RESOURCE_ROOT", linkedRoot)
 	want := canonicalResource(t, mark)
-	for _, name := range []string{"icons/mark.png", "icons/alias.png", "icons/absolute.png", "nested/up.png", "also/mark.png"} {
+	expect := func(t *testing.T, name string) {
+		t.Helper()
 		got, problem := AhdGUIResource(name)
 		if problem != "" || got != want {
 			t.Fatalf("%s -> %q %s", name, got, problem)
 		}
 	}
+	expect(t, "icons/mark.png")
+	expect(t, "also/mark.png")
+	t.Run("file symlinks", func(t *testing.T) {
+		makeResourceFileAlias(t, "mark.png", filepath.Join(icons, "alias.png"))
+		makeResourceFileAlias(t, mark, filepath.Join(icons, "absolute.png"))
+		makeResourceFileAlias(t, filepath.Join("..", "icons", "mark.png"), filepath.Join(nested, "up.png"))
+		for _, name := range []string{"icons/alias.png", "icons/absolute.png", "nested/up.png"} {
+			expect(t, name)
+		}
+	})
 
 	bundle := t.TempDir()
 	executable := filepath.Join(bundle, "Ledger.app", "Contents", "MacOS", "Ledger")
@@ -146,32 +147,56 @@ func TestResourceSymlinkCannotLeaveTheRoot(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(outside, "folder", "mark.png"), []byte("secret"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.Symlink(secret, filepath.Join(icons, "escape.png")); err != nil {
-		t.Fatal(err)
-	}
 	relativeOutside, err := filepath.Rel(icons, secret)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.Symlink(relativeOutside, filepath.Join(icons, "relative.png")); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Symlink(filepath.Join(outside, "folder"), filepath.Join(root, "linked")); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Symlink("missing-target.png", filepath.Join(icons, "gone.png")); err != nil {
-		t.Fatal(err)
+	makeDirectoryAlias(t, filepath.Join(outside, "folder"), filepath.Join(root, "linked"))
+	if _, err := os.ReadFile(filepath.Join(root, "linked", "mark.png")); err != nil {
+		t.Fatalf("outside-directory fixture did not resolve: %v", err)
 	}
 	t.Setenv("AHDCODE_RESOURCE_ROOT", root)
-	for _, name := range []string{"icons/escape.png", "icons/relative.png", "linked/mark.png"} {
+	expectEscape := func(t *testing.T, name string) {
+		t.Helper()
 		got, problem := AhdGUIResource(name)
 		if got != "" || problem != "the resource path leaves the resource folder" {
 			t.Fatalf("%s -> %q %s", name, got, problem)
 		}
 	}
-	_, problem := AhdGUIResource("icons/gone.png")
-	if problem != "could not read the resource icons/gone.png: the file does not exist" {
-		t.Fatalf("dangling: %s", problem)
+	expectEscape(t, "linked/mark.png")
+	t.Run("file symlinks", func(t *testing.T) {
+		makeResourceFileAlias(t, secret, filepath.Join(icons, "escape.png"))
+		makeResourceFileAlias(t, relativeOutside, filepath.Join(icons, "relative.png"))
+		makeResourceFileAlias(t, "missing-target.png", filepath.Join(icons, "gone.png"))
+		expectEscape(t, "icons/escape.png")
+		expectEscape(t, "icons/relative.png")
+		_, problem := AhdGUIResource("icons/gone.png")
+		if problem != "could not read the resource icons/gone.png: the file does not exist" {
+			t.Fatalf("dangling: %s", problem)
+		}
+	})
+}
+
+func makeDirectoryAlias(t *testing.T, target, link string) {
+	t.Helper()
+	if runtime.GOOS == "windows" {
+		if output, err := exec.Command("cmd", "/c", "mklink", "/J", link, target).CombinedOutput(); err != nil {
+			t.Fatalf("create test junction: %v\n%s", err, output)
+		}
+	} else if err := os.Symlink(target, link); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Remove(link) })
+}
+
+func makeResourceFileAlias(t *testing.T, target, link string) {
+	t.Helper()
+	const windowsPrivilegeNotHeld = syscall.Errno(1314)
+	if err := os.Symlink(target, link); err != nil {
+		if runtime.GOOS == "windows" && errors.Is(err, windowsPrivilegeNotHeld) {
+			t.Skipf("Windows file-symlink privilege unavailable: %v", err)
+		}
+		t.Fatal(err)
 	}
 }
 

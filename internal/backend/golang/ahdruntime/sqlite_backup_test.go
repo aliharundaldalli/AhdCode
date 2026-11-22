@@ -3,6 +3,7 @@ package ahdruntime
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -72,7 +73,7 @@ func TestSQLiteBackupIsAConsistentLiveSnapshot(t *testing.T) {
 	}
 	sqliteBackupExec(t, writer, "INSERT INTO apps (name) VALUES ('uncommitted')")
 
-	backup := filepath.Join(directory, "backups", "panel-1.db")
+	backup := filepath.Join(directory, "backups # %", "panel ü #1%.db")
 	if err := os.Mkdir(filepath.Dir(backup), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -117,7 +118,7 @@ func TestSQLiteBackupIsAConsistentLiveSnapshot(t *testing.T) {
 	if err := SQLiteBackup(db, backup); err == nil || !strings.Contains(err.Error(), "already exists") {
 		t.Fatalf("second backup to the same path: %v", err)
 	}
-	second := filepath.Join(directory, "backups", "panel-2.db")
+	second := filepath.Join(filepath.Dir(backup), "panel-2.db")
 	if err := SQLiteBackup(db, second); err != nil {
 		t.Fatal(err)
 	}
@@ -179,7 +180,11 @@ func TestSQLiteBackupFailuresLeaveNoBackup(t *testing.T) {
 		t.Fatalf("memory backup = %q", got)
 	}
 	// A path with URI-significant characters is a plain file name.
-	odd := filepath.Join(directory, "odd name?#%.db")
+	oddName := "odd name?#%.db"
+	if runtime.GOOS == "windows" {
+		oddName = "odd name#%.db" // NTFS rejects question marks in file names.
+	}
+	odd := filepath.Join(directory, oddName)
 	if err := SQLiteBackup(db, odd); err != nil {
 		t.Fatal(err)
 	}

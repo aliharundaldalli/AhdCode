@@ -2,6 +2,12 @@ package ahdruntime
 
 import _ "embed"
 
+//go:embed canonical_path_windows.go
+var CanonicalPathWindowsSource string
+
+//go:embed canonical_path_other.go
+var CanonicalPathOtherSource string
+
 // Source is the verbatim runtime source emitted into every generated program.
 // The generator rewrites only its package clause.
 //

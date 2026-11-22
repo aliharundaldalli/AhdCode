@@ -173,12 +173,13 @@ write(QR.create("mysql and codes").level())
 	defer workspace.Close()
 	goMod, _ := os.ReadFile(filepath.Join(workspace.Directory, "go.mod"))
 	modules, _ := os.ReadFile(filepath.Join(workspace.Directory, "vendor", "modules.txt"))
+	moduleText := strings.ReplaceAll(string(modules), "\r\n", "\n")
 	for _, want := range []string{"github.com/boombuler/barcode v1.1.0", "github.com/go-sql-driver/mysql v1.10.1", "filippo.io/edwards25519 v1.2.0 // indirect"} {
 		if !strings.Contains(string(goMod), want) {
 			t.Fatalf("composed go.mod lacks %q:\n%s", want, goMod)
 		}
 	}
-	if !strings.HasPrefix(string(modules), "# filippo.io/edwards25519") || !strings.Contains(string(modules), "# github.com/boombuler/barcode v1.1.0\n## explicit\n") {
+	if !strings.HasPrefix(moduleText, "# filippo.io/edwards25519") || !strings.Contains(moduleText, "# github.com/boombuler/barcode v1.1.0\n## explicit\n") {
 		t.Fatalf("composed modules.txt:\n%s", modules)
 	}
 	output := filepath.Join(t.TempDir(), "composed")
@@ -191,7 +192,7 @@ write(QR.create("mysql and codes").level())
 // an unrelated directory, it still writes decodable symbols there.
 func TestCodesNativeExecutableRelocates(t *testing.T) {
 	directory := writeSources(t, map[string]string{"main.ahd": "bring QR\nbring Barcode\nQR.create(\"relocated\").savePNG(\"moved.png\")\nBarcode.code128(\"MOVED-1\").saveSVG(\"moved.svg\")\nwrite(\"ok\")\n"})
-	built := filepath.Join(t.TempDir(), "codes")
+	built := ExecutablePath(filepath.Join(t.TempDir(), "codes"))
 	if _, result := BuildProgram(filepath.Join(directory, "main.ahd"), built); result.HasErrors() {
 		t.Fatalf("compilation failed:\n%s", diagnosticText(result.Diagnostics))
 	}
@@ -199,7 +200,7 @@ func TestCodesNativeExecutableRelocates(t *testing.T) {
 		t.Fatal(err)
 	}
 	elsewhere := t.TempDir()
-	moved := filepath.Join(elsewhere, "relocated-codes")
+	moved := ExecutablePath(filepath.Join(elsewhere, "relocated-codes"))
 	if err := os.Rename(built, moved); err != nil {
 		t.Fatal(err)
 	}

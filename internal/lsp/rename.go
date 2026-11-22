@@ -76,10 +76,14 @@ func (server *Server) handleRename(m message) {
 		return
 	}
 	changes := make(map[string][]textEdit)
+	indexes := make(map[string]*lineIndex)
 	for _, edit := range edits {
 		uri := server.uriFor(edit.Path)
-		targetText, _ := server.store.TextFor(path, edit.Path)
-		targetIndex := newLineIndex(targetText)
+		targetIndex := indexes[edit.Path]
+		if targetIndex == nil {
+			targetIndex = newLineIndex(edit.SourceText)
+			indexes[edit.Path] = targetIndex
+		}
 		changes[uri] = append(changes[uri], textEdit{
 			Range: Range{
 				Start: targetIndex.OffsetToPosition(edit.Span.Start.Offset),

@@ -8,6 +8,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/binary"
 	"errors"
 	"io"
 	"math/big"
@@ -393,14 +394,25 @@ func TestTLSInspectConnectionFailuresAreErrors(t *testing.T) {
 	}
 
 	// A plain-text (non-TLS) server.
-	plain, _ := net.Listen("tcp", "127.0.0.1:0")
+	plain, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
 	go func() {
 		for {
 			conn, err := plain.Accept()
 			if err != nil {
 				return
 			}
-			_, _ = conn.Write([]byte("HTTP/1.1 400 Bad Request\r\nContent-Length: 0\r\n\r\n"))
+			// Let the client finish sending its first TLS record before
+			// closing. Windows can reset a socket with unread input.
+			_ = conn.SetDeadline(time.Now().Add(2 * time.Second))
+			var header [5]byte
+			if _, err := io.ReadFull(conn, header[:]); err == nil {
+				if _, err := io.CopyN(io.Discard, conn, int64(binary.BigEndian.Uint16(header[3:]))); err == nil {
+					_, _ = io.WriteString(conn, "HTTP/1.1 400 Bad Request\r\nContent-Length: 0\r\n\r\n")
+				}
+			}
 			_ = conn.Close()
 		}
 	}()

@@ -13,15 +13,17 @@ import (
 
 // TextEdit replaces one source span with new text.
 type TextEdit struct {
-	Path    string
-	Span    source.Span
-	NewText string
+	Path       string
+	Span       source.Span
+	NewText    string
+	SourceText string
 }
 
 // PrepareRename reports whether the symbol at offset can be renamed and, when
 // ok, the exact span of its name token.
 func (store *Store) PrepareRename(path string, offset int) (source.Span, bool) {
-	symbol, span, ok := store.renameTarget(path, offset)
+	canonical := canonicalPath(path)
+	symbol, span, ok := renameTarget(store.workspaceEntry(canonical), canonical, offset)
 	if !ok || symbol == nil {
 		return source.Span{}, false
 	}
@@ -39,15 +41,10 @@ func (store *Store) Rename(path string, offset int, newName string) ([]TextEdit,
 	if _, isKeyword := token.LookupKeyword(newName); isKeyword {
 		return nil, false
 	}
-	symbol, declarationSpan, ok := store.renameTarget(path, offset)
-	if !ok || symbol == nil {
-		return nil, false
-	}
 	canonical := canonicalPath(path)
-	store.mutex.Lock()
-	cached := store.entries[canonical]
-	store.mutex.Unlock()
-	if cached == nil {
+	cached := store.workspaceEntry(canonical)
+	symbol, declarationSpan, ok := renameTarget(cached, canonical, offset)
+	if !ok || symbol == nil {
 		return nil, false
 	}
 	declaration := cached.declarationSymbol(symbol)
@@ -55,48 +52,32 @@ func (store *Store) Rename(path string, offset int, newName string) ([]TextEdit,
 		return nil, false
 	}
 	targetIdentity := declarationIdentity(cached, declaration)
-	if targetIdentity == "" {
+	if targetIdentity.path == "" {
+		return nil, false
+	}
+	snapshots, complete := store.workspaceEntries(canonical, cached, true)
+	if !complete {
 		return nil, false
 	}
 
-	type occurrence struct {
-		path       string
-		start, end int
-	}
-	seen := make(map[occurrence]bool)
+	seen := make(map[sourceOccurrence]bool)
 	var edits []TextEdit
 
-	addEdit := func(modulePath string, node ast.Node) {
-		nameSpan := renameNameSpan(node, declarationSpan)
-		if nameSpan.Empty() {
-			return
-		}
-		key := occurrence{path: modulePath, start: nameSpan.Start.Offset, end: nameSpan.End.Offset}
-		if seen[key] {
-			return
-		}
-		seen[key] = true
-		edits = append(edits, TextEdit{Path: modulePath, Span: nameSpan, NewText: newName})
-	}
-	addEditSpan := func(modulePath string, span source.Span) {
+	addEditSpan := func(modulePath, text string, span source.Span) {
 		if span.Empty() {
 			return
 		}
-		key := occurrence{path: modulePath, start: span.Start.Offset, end: span.End.Offset}
+		key := sourceOccurrence{path: modulePath, start: span.Start.Offset, end: span.End.Offset}
 		if seen[key] {
 			return
 		}
 		seen[key] = true
-		edits = append(edits, TextEdit{Path: modulePath, Span: span, NewText: newName})
+		edits = append(edits, TextEdit{Path: modulePath, Span: span, NewText: newName, SourceText: text})
 	}
 
-	for _, snapshot := range store.workspaceEntries(canonical) {
+	for _, snapshot := range snapshots {
 		for _, candidateModule := range snapshot.modules {
 			if candidateModule == nil {
-				continue
-			}
-			modulePath, ok := snapshot.fileToPath[candidateModule.File.ID]
-			if !ok {
 				continue
 			}
 			for useNode, useSymbol := range candidateModule.Semantic.ResolvedSymbols {
@@ -104,30 +85,36 @@ func (store *Store) Rename(path string, offset int, newName string) ([]TextEdit,
 				if declarationIdentity(snapshot, resolved) != targetIdentity {
 					continue
 				}
+				path := snapshot.fileToPath[useNode.Span().FileID]
+				if path == "" {
+					continue
+				}
+				text := snapshot.result.Text[path]
 				if declarationOccurrencePredicate(resolved)(useNode) {
-					addEdit(modulePath, useNode)
+					addEditSpan(path, text, renameNameSpan(useNode, declarationSpan))
 					continue
 				}
 				if bring, ok := useNode.(*ast.BringStmt); ok && !bring.Namespace {
-					if span, found := bringImportNameSpan(snapshot.result.Text[modulePath], bring, declaration.Name); found {
-						addEditSpan(modulePath, span)
+					if span, found := bringImportNameSpan(text, bring, declaration.Name); found {
+						addEditSpan(path, text, span)
 					}
 				} else if identifier, ok := useNode.(*ast.IdentifierExpr); ok {
-					addEdit(modulePath, identifier)
+					addEditSpan(path, text, identifier.Span())
 				} else if capture, ok := useNode.(*ast.CaptureRef); ok {
-					addEdit(modulePath, capture)
+					addEditSpan(path, text, captureNameSpan(capture))
 				} else if member, ok := useNode.(*ast.MemberExpr); ok && member.Name == declaration.Name {
-					addEdit(modulePath, member)
+					addEditSpan(path, text, memberNameSpan(member))
 				}
 			}
 		}
 	}
 	if len(edits) == 0 {
-		addEdit(cached.fileToPath[declaration.Span.FileID], nil)
+		declarationPath := cached.fileToPath[declaration.Span.FileID]
+		addEditSpan(declarationPath, cached.result.Text[declarationPath], declarationSpan)
 		if declarationNode := declaration.Declaration; declarationNode != nil {
 			if variableDecl, ok := declarationNode.(*ast.VariableDecl); ok {
 				if identifier, ok := variableDecl.Target.(*ast.IdentifierExpr); ok {
-					addEdit(cached.fileToPath[declaration.Span.FileID], identifier)
+					addEditSpan(declarationPath, cached.result.Text[declarationPath], identifier.Span())
 				}
 			}
 		}
@@ -175,11 +162,7 @@ func isIdentifierByte(value byte) bool {
 	return value == '_' || value >= 'a' && value <= 'z' || value >= 'A' && value <= 'Z' || value >= '0' && value <= '9'
 }
 
-func (store *Store) renameTarget(path string, offset int) (*semantic.Symbol, source.Span, bool) {
-	canonical := canonicalPath(path)
-	store.mutex.Lock()
-	cached := store.entries[canonical]
-	store.mutex.Unlock()
+func renameTarget(cached *entry, canonical string, offset int) (*semantic.Symbol, source.Span, bool) {
 	entryModule := cached.entryModule()
 	if entryModule == nil || entryModule.Parsed.Program == nil {
 		return nil, source.Span{}, false

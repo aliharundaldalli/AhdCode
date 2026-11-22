@@ -2100,8 +2100,9 @@ Kurallar:
 
 1. tam tür eşleşmesi tercih edilir;
 2. `Int -> Real` gibi güvenli genişletme kullanılabilir;
-3. eşit en iyi adaylar => belirsiz aşırı yükleme derleme hatası;
-4. dönüş türü tek başına aşırı yüklemeleri ayırt edemez.
+3. argüman dönüşüm dereceleri eşitse, verilmeyen argümanlar için daha az varsayılan değer gerektiren aday tercih edilir;
+4. eşit en iyi adaylar => belirsiz aşırı yükleme derleme hatası;
+5. dönüş türü tek başına aşırı yüklemeleri ayırt edemez.
 
 ---
 

@@ -129,6 +129,25 @@ func buildSQLiteHelper(t *testing.T) {
 		t.Fatalf("could not build ahdsqlite: %v\n%s", err, output)
 	}
 	t.Setenv("AHDCODE_SQLITE_RUNTIME", helper)
+	// This process-wide client survives closing its last database. Release
+	// the fixture's child before TempDir tries to delete its Windows image.
+	t.Cleanup(func() {
+		session := &ahdSQLiteSession
+		session.mutex.Lock()
+		defer session.mutex.Unlock()
+		if session.command == nil || session.command.Path != helper {
+			return
+		}
+		_ = session.stdin.Close()
+		if err := session.command.Wait(); err != nil {
+			t.Errorf("SQLite helper exit: %v", err)
+		}
+		session.command = nil
+		session.stdin = nil
+		session.encoder = nil
+		session.decoder = nil
+		session.failure = nil
+	})
 }
 
 func TestSQLiteRuntimeDrivesTheHelperEndToEnd(t *testing.T) {

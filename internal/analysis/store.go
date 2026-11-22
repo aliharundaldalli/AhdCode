@@ -30,10 +30,11 @@ type Result struct {
 // declared in an imported module -- not only ones declared in the entry
 // document itself -- without recompiling.
 type entry struct {
-	result     Result
-	entryModID module.ModuleID
-	modules    map[module.ModuleID]*module.Module
-	fileToPath map[source.FileID]string
+	result           Result
+	entryModID       module.ModuleID
+	modules          map[module.ModuleID]*module.Module
+	fileToPath       map[source.FileID]string
+	documentRevision uint64
 }
 
 // entryModule returns the compiled entry document's own module.
@@ -65,10 +66,11 @@ func (e *entry) moduleForFile(fileID source.FileID) *module.Module {
 // real filesystem, and an open document's saved-on-disk bytes are never
 // consulted while it is open.
 type Store struct {
-	mutex          sync.Mutex
-	documents      map[string]string
-	entries        map[string]*entry
-	workspaceRoots []string
+	mutex            sync.Mutex
+	documents        map[string]string
+	entries          map[string]*entry
+	workspaceRoots   []string
+	documentRevision uint64
 }
 
 // NewStore creates an empty document store.
@@ -144,7 +146,10 @@ func (store *Store) Close(path string) []string {
 	canonical := canonicalPath(path)
 	store.mutex.Lock()
 	defer store.mutex.Unlock()
-	delete(store.documents, canonical)
+	if _, open := store.documents[canonical]; open {
+		delete(store.documents, canonical)
+		store.documentRevision++
+	}
 	previous := store.entries[canonical]
 	delete(store.entries, canonical)
 	if previous == nil {
@@ -161,6 +166,7 @@ func (store *Store) set(path, text string) Result {
 	canonical := canonicalPath(path)
 	store.mutex.Lock()
 	store.documents[canonical] = text
+	store.documentRevision++
 	store.mutex.Unlock()
 
 	compiledEntry := store.compileEntry(canonical)
@@ -179,6 +185,9 @@ func (store *Store) set(path, text string) Result {
 // open overlays continue to be supplied by overlay.Load.
 func (store *Store) compileEntry(path string) *entry {
 	canonical := canonicalPath(path)
+	store.mutex.Lock()
+	revision := store.documentRevision
+	store.mutex.Unlock()
 	compiler := module.NewCompiler(overlay{store: store}, overlay{store: store})
 	compilePath := store.discoverRequireEntry(canonical)
 	compiled := compiler.Compile(compilePath)
@@ -199,10 +208,11 @@ func (store *Store) compileEntry(path string) *entry {
 	}
 
 	return &entry{
-		result:     Result{EntryPath: canonical, Diagnostics: grouped, Text: texts},
-		entryModID: compiled.Entry,
-		modules:    compiled.Modules,
-		fileToPath: fileToPath,
+		result:           Result{EntryPath: canonical, Diagnostics: grouped, Text: texts},
+		entryModID:       compiled.Entry,
+		modules:          compiled.Modules,
+		fileToPath:       fileToPath,
+		documentRevision: revision,
 	}
 }
 

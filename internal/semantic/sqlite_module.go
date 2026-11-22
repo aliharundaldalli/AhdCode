@@ -67,6 +67,11 @@ func sqliteModuleInterface() *ModuleInterface {
 	}
 	value := sqliteValueType()
 	addStandardExport(module, standardFunction(sqliteModuleID, "open", sqliteDatabaseType(), types.Parameter{Name: "path", Type: types.String}))
+	addStandardExport(module, standardFunction(sqliteModuleID, "openWithOptions", sqliteDatabaseType(),
+		types.Parameter{Name: "path", Type: types.String},
+		types.Parameter{Name: "readOnly", Type: types.Bool},
+		types.Parameter{Name: "busyTimeoutMilliseconds", Type: types.Int},
+	))
 	// nullValue, not null: `null` is a reserved keyword and cannot appear as a
 	// member name after `.`, the same reason JSON publishes JSON.nullValue().
 	addStandardExport(module, standardFunction(sqliteModuleID, "nullValue", value))
@@ -85,7 +90,7 @@ func sqliteConstructionHint(identity *types.ClassSymbol) (string, bool) {
 	}
 	switch identity.Name {
 	case "Database":
-		return "open a Database with SQLite.open(path)", true
+		return "open a Database with SQLite.open(path) or SQLite.openWithOptions(path, readOnly, busyTimeoutMilliseconds)", true
 	case "SQLiteValue":
 		return "create a SQLiteValue with SQLite.nullValue(), SQLite.fromInt(value), SQLite.fromReal(value), or SQLite.fromString(value)", true
 	}

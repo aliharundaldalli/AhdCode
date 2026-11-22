@@ -17,9 +17,7 @@ import (
 // symbol.
 func (store *Store) References(path string, offset int, includeDeclaration bool) []Location {
 	canonical := canonicalPath(path)
-	store.mutex.Lock()
-	cached := store.entries[canonical]
-	store.mutex.Unlock()
+	cached := store.workspaceEntry(canonical)
 
 	entryModule := cached.entryModule()
 	if entryModule == nil || entryModule.Parsed.Program == nil {
@@ -38,20 +36,17 @@ func (store *Store) References(path string, offset int, includeDeclaration bool)
 		return nil
 	}
 	targetIdentity := declarationIdentity(cached, declaration)
-	if targetIdentity == "" {
+	if targetIdentity.path == "" {
 		return nil
 	}
 
-	seen := make(map[string]bool)
+	seen := make(map[sourceOccurrence]bool)
 	var out []Location
 
-	for _, snapshot := range store.workspaceEntries(canonical) {
+	snapshots, _ := store.workspaceEntries(canonical, cached, false)
+	for _, snapshot := range snapshots {
 		for _, candidateModule := range snapshot.modules {
 			if candidateModule == nil {
-				continue
-			}
-			modulePath, ok := snapshot.fileToPath[candidateModule.File.ID]
-			if !ok {
 				continue
 			}
 			for useNode, useSymbol := range candidateModule.Semantic.ResolvedSymbols {
@@ -59,22 +54,21 @@ func (store *Store) References(path string, offset int, includeDeclaration bool)
 				if declarationIdentity(snapshot, resolved) != targetIdentity {
 					continue
 				}
+				span := useNode.Span()
 				if declarationOccurrencePredicate(resolved)(useNode) {
-					if includeDeclaration {
-						location := Location{Path: modulePath, Span: resolved.Span}
-						key := locationKey(location)
-						if !seen[key] {
-							seen[key] = true
-							out = append(out, location)
-						}
+					if !includeDeclaration {
+						continue
 					}
+					span = resolved.Span
+				}
+				path := snapshot.fileToPath[span.FileID]
+				if path == "" {
 					continue
 				}
-				location := Location{Path: modulePath, Span: useNode.Span()}
-				key := locationKey(location)
+				key := sourceOccurrence{path, span.Start.Offset, span.End.Offset}
 				if !seen[key] {
 					seen[key] = true
-					out = append(out, location)
+					out = append(out, Location{Path: path, Span: span, SourceText: snapshot.result.Text[path]})
 				}
 			}
 		}
@@ -86,10 +80,6 @@ func (store *Store) References(path string, offset int, includeDeclaration bool)
 		return out[i].Span.Start.Offset < out[j].Span.Start.Offset
 	})
 	return out
-}
-
-func locationKey(location Location) string {
-	return location.Path + "\x00" + itoa(location.Span.Start.Offset) + "\x00" + itoa(location.Span.End.Offset)
 }
 
 // declarationOccurrencePredicate returns a function identifying which

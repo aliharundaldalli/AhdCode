@@ -1,5 +1,9 @@
 # SQLite standard module
 
+For v2.12.0, deploy the compiler and SQLite helper together before opting
+into `openWithOptions`. Verify a restored copy of the backup before
+upgrading an application. See the [upgrade checklist](UPGRADE_2.12.md).
+
 [English] · Türkçe
 
 [Back to README](README.md) · [Modules](MODULES.md) · [JSON](JSON.md) · [Student Guide](STUDENT_GUIDE_EN.md#35-sqlite-a-database-that-remembers)
@@ -30,11 +34,12 @@ is not treated as proof that the body was compiled.
 ## Public surface
 
 ```text
-SQLite.open(path: String)         -> Database
-SQLite.nullValue()                -> SQLiteValue
-SQLite.fromInt(value: Int)        -> SQLiteValue
-SQLite.fromReal(value: Real)      -> SQLiteValue
-SQLite.fromString(value: String)  -> SQLiteValue
+SQLite.open(path: String)                                                               -> Database
+SQLite.openWithOptions(path: String, readOnly: Bool, busyTimeoutMilliseconds: Int)      -> Database   // v2.12.0
+SQLite.nullValue()                                                                      -> SQLiteValue
+SQLite.fromInt(value: Int)                                                              -> SQLiteValue
+SQLite.fromReal(value: Real)                                                            -> SQLiteValue
+SQLite.fromString(value: String)                                                        -> SQLiteValue
 
 Database.execute(sql: String, parameters: List<SQLiteValue> = []) -> Int
 Database.query(sql: String, parameters: List<SQLiteValue> = [])   -> List<Pair<String, SQLiteValue>>
@@ -81,6 +86,31 @@ program ends. Ordinary file behavior follows SQLite:
 The path is never interpreted as a URI or DSN; there is no query-string
 syntax. AhdCode does not invent a database directory and never writes a file
 you did not name.
+
+### Explicit opening options (v2.12.0)
+
+Use `SQLite.openWithOptions(path, readOnly, busyTimeoutMilliseconds)` when you
+need read-only access or an explicit lock-wait timeout:
+
+```ahd
+// Open an existing database read-only with a 500 ms lock timeout.
+ro: Database := SQLite.openWithOptions("notes.db", true, 500)
+
+// Open read-write with immediate lock failure (0 ms busy timeout).
+rw: Database := SQLite.openWithOptions("notes.db", false, 0)
+```
+
+Rules for `openWithOptions`:
+
+- `SQLite.open(path)` keeps its existing read-write/create behavior and
+  five-second (`5000` ms) busy timeout.
+- `readOnly = true` opens an existing file in SQLite read-only mode: it never
+  creates a missing file and rejects writes with `SQLiteError`.
+- `readOnly = true` with `":memory:"` raises `SQLiteError`.
+- `busyTimeoutMilliseconds` must be between `0` (no lock wait) and `300000`
+  (five minutes); values outside that range raise `SQLiteError`.
+- `openWithOptions` uses a dedicated helper operation so an outdated
+  `ahdsqlite` helper raises `SQLiteError` instead of silently ignoring options.
 
 ## Storage classes, not declared types
 

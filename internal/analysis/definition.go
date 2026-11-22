@@ -12,6 +12,8 @@ import (
 type Location struct {
 	Path string
 	Span source.Span
+	// SourceText is set for references resolved across workspace snapshots.
+	SourceText string
 }
 
 // Definition answers a go-to-definition request at the given byte offset
@@ -72,7 +74,10 @@ func (store *Store) Definition(path string, offset int) (Location, bool) {
 // declaration symbol" consistent regardless of which one ResolvedSymbols
 // happened to hand back.
 func (e *entry) declarationSymbol(symbol *semantic.Symbol) *semantic.Symbol {
-	if symbol != nil && symbol.CaptureOf != nil {
+	if symbol == nil {
+		return nil
+	}
+	if symbol.CaptureOf != nil {
 		return e.declarationSymbol(symbol.CaptureOf)
 	}
 	if symbol.Span.FileID == 0 {

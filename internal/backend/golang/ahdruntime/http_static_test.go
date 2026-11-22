@@ -185,9 +185,7 @@ func TestHTTPStaticDirectorySymlinkEscapeRejected(t *testing.T) {
 		t.Fatal(err)
 	}
 	link := filepath.Join(staticRoot, "outside")
-	if err := os.Symlink(outsideDir, link); err != nil {
-		t.Skipf("symlinks unavailable in this environment: %v", err)
-	}
+	makeDirectoryAlias(t, outsideDir, link)
 	base, _ := startHTTP(t, ahdHTTPDefaultMaxBody, func(handle string) {
 		AhdHTTPServerStatic(AhdClassHTTPError, handle, "/assets", staticRoot)
 	})
@@ -217,9 +215,7 @@ func TestHTTPStaticSymlinkStayingInsideRootStillWorks(t *testing.T) {
 	}
 	writeStaticFixture(t, root, "images/photo.txt", []byte("a real photo, sort of"))
 	link := filepath.Join(root, "link")
-	if err := os.Symlink(images, link); err != nil {
-		t.Skipf("symlinks unavailable in this environment: %v", err)
-	}
+	makeDirectoryAlias(t, images, link)
 	base, _ := startHTTP(t, ahdHTTPDefaultMaxBody, func(handle string) {
 		AhdHTTPServerStatic(AhdClassHTTPError, handle, "/assets", root)
 	})

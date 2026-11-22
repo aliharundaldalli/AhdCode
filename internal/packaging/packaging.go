@@ -469,8 +469,8 @@ func copyImageResources(entry, destination string) error {
 		}
 		return fmt.Errorf("the resources folder cannot be read: %v", err)
 	}
-	if info.Mode()&os.ModeSymlink != 0 {
-		return fmt.Errorf("resources is a symbolic link and cannot be packaged")
+	if info.Mode()&(os.ModeSymlink|os.ModeIrregular) != 0 {
+		return fmt.Errorf("resources is a symbolic link or reparse point and cannot be packaged")
 	}
 	if !info.IsDir() {
 		return fmt.Errorf("resources next to the program is not a folder")
@@ -480,6 +480,10 @@ func copyImageResources(entry, destination string) error {
 		return fmt.Errorf("the resources folder cannot be read: %v", err)
 	}
 	defer tree.Close()
+	openedRoot, err := tree.Stat(".")
+	if err != nil || !os.SameFile(info, openedRoot) {
+		return fmt.Errorf("the resources folder changed while being opened")
+	}
 	destination, err = filepath.Abs(destination)
 	if err != nil {
 		return fmt.Errorf("the resources folder cannot be written: %v", err)
@@ -498,8 +502,8 @@ func copyImageResources(entry, destination string) error {
 		if err != nil {
 			return err
 		}
-		if linked.Mode()&os.ModeSymlink != 0 {
-			return fmt.Errorf("%s is a symbolic link and cannot be packaged", path)
+		if linked.Mode()&(os.ModeSymlink|os.ModeIrregular) != 0 {
+			return fmt.Errorf("%s is a symbolic link or reparse point and cannot be packaged", path)
 		}
 		if linked.IsDir() {
 			return nil
@@ -517,7 +521,7 @@ func copyImageResources(entry, destination string) error {
 			return fmt.Errorf("%s cannot be packaged: %v", path, err)
 		}
 		opened, err := input.Stat()
-		if err != nil || !opened.Mode().IsRegular() {
+		if err != nil || !opened.Mode().IsRegular() || !os.SameFile(linked, opened) {
 			input.Close()
 			return fmt.Errorf("%s is not a file and cannot be packaged", path)
 		}
