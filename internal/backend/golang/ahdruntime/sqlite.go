@@ -42,11 +42,13 @@ type ahdSQLiteValue struct {
 }
 
 type ahdSQLiteRequest struct {
-	Operation  string           `json:"operation"`
-	Database   int64            `json:"database,omitempty"`
-	Path       string           `json:"path,omitempty"`
-	SQL        string           `json:"sql,omitempty"`
-	Parameters []ahdSQLiteValue `json:"parameters,omitempty"`
+	Operation               string           `json:"operation"`
+	Database                int64            `json:"database,omitempty"`
+	Path                    string           `json:"path,omitempty"`
+	ReadOnly                bool             `json:"readOnly,omitempty"`
+	BusyTimeoutMilliseconds int64            `json:"busyTimeoutMilliseconds,omitempty"`
+	SQL                     string           `json:"sql,omitempty"`
+	Parameters              []ahdSQLiteValue `json:"parameters,omitempty"`
 }
 
 type ahdSQLiteResponse struct {
@@ -320,6 +322,47 @@ func sqliteParameters(encoded []string) ([]ahdSQLiteValue, error) {
 	return parameters, nil
 }
 
+const ahdSQLiteMaxBusyTimeoutMilliseconds = 300000
+
+// SQLiteOpenWithOptions opens a SQLite database with explicit read-only and
+// busy-timeout policies. It uses a dedicated helper operation so an older
+// ahdsqlite helper fails explicitly instead of silently ignoring options.
+func SQLiteOpenWithOptions(path string, readOnly bool, busyTimeoutMilliseconds int64) (string, error) {
+	if path == "" {
+		return "", errors.New("the database path is empty; use \":memory:\" or a file path")
+	}
+	if readOnly && path == ":memory:" {
+		return "", errors.New("SQLite.openWithOptions cannot open \":memory:\" in read-only mode")
+	}
+	if busyTimeoutMilliseconds < 0 || busyTimeoutMilliseconds > ahdSQLiteMaxBusyTimeoutMilliseconds {
+		return "", fmt.Errorf("SQLite.openWithOptions busyTimeoutMilliseconds must be between 0 and %d", ahdSQLiteMaxBusyTimeoutMilliseconds)
+	}
+	if path != ":memory:" {
+		absolute, err := filepath.Abs(path)
+		if err != nil {
+			return "", fmt.Errorf("could not resolve the database path %q: %v", path, err)
+		}
+		path = absolute
+	}
+	response, err := ahdSQLiteSession.call(ahdSQLiteRequest{
+		Operation:               "openWithOptions",
+		Path:                    path,
+		ReadOnly:                readOnly,
+		BusyTimeoutMilliseconds: busyTimeoutMilliseconds,
+	})
+	if err != nil {
+		if strings.Contains(err.Error(), `unknown SQLite helper operation "openWithOptions"`) ||
+			strings.Contains(err.Error(), "unknown Database handle") {
+			return "", errors.New("the SQLite helper (ahdsqlite) does not support SQLite.openWithOptions; rebuild or update the bundled ahdsqlite helper")
+		}
+		return "", err
+	}
+	if response.Database <= 0 {
+		return "", errors.New("the SQLite helper returned an invalid Database handle")
+	}
+	return strconv.FormatInt(response.Database, 10), nil
+}
+
 // SQLiteOpen opens (creating when absent) the database file at path, or a
 // private in-memory database for ":memory:". A relative path is resolved
 // against the current working directory once, here, so the helper never
@@ -475,6 +518,12 @@ func ahdSQLiteRaise(class *AhdClass, err error) {
 
 func AhdSQLiteOpen(class *AhdClass, path string) string {
 	handle, err := SQLiteOpen(path)
+	ahdSQLiteRaise(class, err)
+	return handle
+}
+
+func AhdSQLiteOpenWithOptions(class *AhdClass, path string, readOnly bool, busyTimeoutMilliseconds int64) string {
+	handle, err := SQLiteOpenWithOptions(path, readOnly, busyTimeoutMilliseconds)
 	ahdSQLiteRaise(class, err)
 	return handle
 }

@@ -31,7 +31,10 @@ import (
 // busyTimeout is how long a statement waits for another process's lock before
 // SQLite reports "database is locked". Five seconds matches the common default
 // of other SQLite bindings.
-const busyTimeout = 5 * time.Second
+const (
+	busyTimeout                = 5 * time.Second
+	maxBusyTimeoutMilliseconds = 300000
+)
 
 func main() {
 	if len(os.Args) != 1 {
@@ -90,6 +93,9 @@ func (engine *server) handle(request sqliteproto.Request) (response sqliteproto.
 	if request.Operation == sqliteproto.OperationOpen {
 		return engine.open(request.Path)
 	}
+	if request.Operation == sqliteproto.OperationOpenWithOptions {
+		return engine.openWithOptions(request.Path, request.ReadOnly, request.BusyTimeoutMilliseconds)
+	}
 	entry, known := engine.databases[request.Database]
 	if !known {
 		return failure(errors.New("unknown Database handle"))
@@ -139,16 +145,30 @@ func (engine *server) handle(request sqliteproto.Request) (response sqliteproto.
 }
 
 func (engine *server) open(path string) sqliteproto.Response {
+	return engine.openWithOptions(path, false, int64(busyTimeout/time.Millisecond))
+}
+
+func (engine *server) openWithOptions(path string, readOnly bool, busyTimeoutMilliseconds int64) sqliteproto.Response {
 	if path == "" {
 		return failure(errors.New("the database path is empty; use \":memory:\" or a file path"))
 	}
+	if readOnly && path == ":memory:" {
+		return failure(errors.New("SQLite.openWithOptions cannot open \":memory:\" in read-only mode"))
+	}
+	if busyTimeoutMilliseconds < 0 || busyTimeoutMilliseconds > maxBusyTimeoutMilliseconds {
+		return failure(fmt.Errorf("SQLite.openWithOptions busyTimeoutMilliseconds must be between 0 and %d", maxBusyTimeoutMilliseconds))
+	}
 	// OPEN_URI is deliberately absent: the String is a filesystem path (or
 	// the :memory: marker), never a URI, so no query-string syntax is implied.
-	conn, err := sqlite3.OpenFlags(path, sqlite3.OPEN_READWRITE|sqlite3.OPEN_CREATE)
+	flags := sqlite3.OPEN_READWRITE | sqlite3.OPEN_CREATE
+	if readOnly {
+		flags = sqlite3.OPEN_READONLY
+	}
+	conn, err := sqlite3.OpenFlags(path, flags)
 	if err != nil {
 		return failure(err)
 	}
-	if err := conn.BusyTimeout(busyTimeout); err != nil {
+	if err := conn.BusyTimeout(time.Duration(busyTimeoutMilliseconds) * time.Millisecond); err != nil {
 		_ = conn.Close()
 		return failure(err)
 	}

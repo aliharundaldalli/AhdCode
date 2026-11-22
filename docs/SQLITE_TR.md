@@ -32,11 +32,12 @@ derlendiğinin kanıtı sayılmaz.
 ## Genel yüzey
 
 ```text
-SQLite.open(path: String)         -> Database
-SQLite.nullValue()                -> SQLiteValue
-SQLite.fromInt(value: Int)        -> SQLiteValue
-SQLite.fromReal(value: Real)      -> SQLiteValue
-SQLite.fromString(value: String)  -> SQLiteValue
+SQLite.open(path: String)                                                               -> Database
+SQLite.openWithOptions(path: String, readOnly: Bool, busyTimeoutMilliseconds: Int)      -> Database   // v2.12.0
+SQLite.nullValue()                                                                      -> SQLiteValue
+SQLite.fromInt(value: Int)                                                              -> SQLiteValue
+SQLite.fromReal(value: Real)                                                            -> SQLiteValue
+SQLite.fromString(value: String)                                                        -> SQLiteValue
 
 Database.execute(sql: String, parameters: List<SQLiteValue> = []) -> Int
 Database.query(sql: String, parameters: List<SQLiteValue> = [])   -> List<Pair<String, SQLiteValue>>
@@ -83,6 +84,33 @@ bittiğinde yok olan özel bir bellek içi veritabanı için tam olarak
 Yol asla URI ya da DSN olarak yorumlanmaz; sorgu dizesi sözdizimi yoktur.
 AhdCode bir veritabanı dizini icat etmez ve adını vermediğiniz hiçbir dosyayı
 yazmaz.
+
+### Açık açılış seçenekleri (v2.12.0)
+
+Salt okunur erişim ya da açık bir kilit bekleme süresi gerektiğinde
+`SQLite.openWithOptions(path, readOnly, busyTimeoutMilliseconds)` kullanın:
+
+```ahd
+// Var olan bir veritabanını 500 ms kilit zaman aşımıyla salt okunur açar.
+ro: Database := SQLite.openWithOptions("notlar.db", true, 500)
+
+// Kilit çakışmasında beklemeden hata veren (0 ms) okuma-yazma açılışı.
+rw: Database := SQLite.openWithOptions("notlar.db", false, 0)
+```
+
+`openWithOptions` kuralları:
+
+- `SQLite.open(path)` mevcut okuma-yazma/oluşturma davranışını ve beş saniyelik
+  (`5000` ms) kilit bekleme süresini korur.
+- `readOnly = true`, var olan bir dosyayı SQLite'ın salt okunur kipinde açar:
+  olmayan bir dosyayı asla oluşturmaz ve yazma işlemlerini `SQLiteError` ile
+  reddeder.
+- `":memory:"` üzerinde `readOnly = true` kullanmak `SQLiteError` fırlatır.
+- `busyTimeoutMilliseconds` değeri `0` (bekleme yok) ile `300000` (beş dakika)
+  arasında olmalıdır; bu aralığın dışındaki değerler `SQLiteError` fırlatır.
+- `openWithOptions` ayrı bir yardımcı işlemi kullanır; eski bir `ahdsqlite`
+  yardımcısı seçenekleri sessizce yok saymak yerine açık bir `SQLiteError`
+  döndürür.
 
 ## Bildirilen tipler değil, saklama sınıfları
 

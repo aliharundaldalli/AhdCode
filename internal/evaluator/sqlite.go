@@ -68,12 +68,20 @@ func (session *Session) sqliteBuiltin(name string, args []any) any {
 	switch name {
 	case "open":
 		path := args[0].(string)
-		if path != ":memory:" {
+		if path != ":memory:" && path != "" {
 			// The REPL resolves relative paths against its own session
 			// directory, exactly like File and the other path-taking modules.
 			path = session.sessionPath(path)
 		}
 		handle, err := ahdruntime.SQLiteOpen(path)
+		session.sqliteCheck(err)
+		return session.sqliteDatabase(handle)
+	case "openWithOptions":
+		path := args[0].(string)
+		if path != ":memory:" && path != "" {
+			path = session.sessionPath(path)
+		}
+		handle, err := ahdruntime.SQLiteOpenWithOptions(path, args[1].(bool), args[2].(int64))
 		session.sqliteCheck(err)
 		return session.sqliteDatabase(handle)
 	case "nullValue":
