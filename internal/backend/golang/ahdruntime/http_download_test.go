@@ -245,16 +245,27 @@ func TestHTTPDownloadDestinationRules(t *testing.T) {
 	expectRaise(t, class, func() { AhdHTTPClientDownload(class, handle, server.URL, "") })
 	expectRaise(t, class, func() { AhdHTTPClientDownload(class, handle, server.URL, "  ") })
 
-	// An unwritable directory fails without leaving anything behind.
-	if os.Geteuid() != 0 {
-		locked := filepath.Join(directory, "locked")
-		if err := os.Mkdir(locked, 0o500); err != nil {
-			t.Fatal(err)
-		}
-		t.Cleanup(func() { _ = os.Chmod(locked, 0o700) })
+	t.Run("unwritable directory", func(t *testing.T) {
+		locked := unwritableDownloadDirectory(t, directory)
 		expectRaise(t, class, func() {
 			AhdHTTPClientDownload(class, handle, server.URL, filepath.Join(locked, "out.bin"))
 		})
+		if files, err := os.ReadDir(locked); err != nil || len(files) != 0 {
+			t.Fatalf("denied download left directory entries %v: %v", files, err)
+		}
+	})
+}
+
+func requireDownloadDirectoryDeniesCreation(t *testing.T, directory string) {
+	t.Helper()
+	probePath := filepath.Join(directory, "permission-probe")
+	file, err := os.OpenFile(probePath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+	if err == nil {
+		_ = file.Close()
+		_ = os.Remove(probePath)
+	}
+	if !os.IsPermission(err) {
+		t.Fatalf("fixture must deny file creation: %v", err)
 	}
 }
 

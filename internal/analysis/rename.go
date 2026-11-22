@@ -52,7 +52,7 @@ func (store *Store) Rename(path string, offset int, newName string) ([]TextEdit,
 		return nil, false
 	}
 	targetIdentity := declarationIdentity(cached, declaration)
-	if targetIdentity == "" {
+	if targetIdentity.path == "" {
 		return nil, false
 	}
 	snapshots, complete := store.workspaceEntries(canonical, cached, true)
@@ -60,18 +60,14 @@ func (store *Store) Rename(path string, offset int, newName string) ([]TextEdit,
 		return nil, false
 	}
 
-	type occurrence struct {
-		path       string
-		start, end int
-	}
-	seen := make(map[occurrence]bool)
+	seen := make(map[sourceOccurrence]bool)
 	var edits []TextEdit
 
 	addEditSpan := func(modulePath, text string, span source.Span) {
 		if span.Empty() {
 			return
 		}
-		key := occurrence{path: modulePath, start: span.Start.Offset, end: span.End.Offset}
+		key := sourceOccurrence{path: modulePath, start: span.Start.Offset, end: span.End.Offset}
 		if seen[key] {
 			return
 		}
@@ -84,30 +80,30 @@ func (store *Store) Rename(path string, offset int, newName string) ([]TextEdit,
 			if candidateModule == nil {
 				continue
 			}
-			modulePath, ok := snapshot.fileToPath[candidateModule.File.ID]
-			if !ok {
-				continue
-			}
-			text := snapshot.result.Text[modulePath]
 			for useNode, useSymbol := range candidateModule.Semantic.ResolvedSymbols {
 				resolved := snapshot.declarationSymbol(useSymbol)
 				if declarationIdentity(snapshot, resolved) != targetIdentity {
 					continue
 				}
+				path := snapshot.fileToPath[useNode.Span().FileID]
+				if path == "" {
+					continue
+				}
+				text := snapshot.result.Text[path]
 				if declarationOccurrencePredicate(resolved)(useNode) {
-					addEditSpan(modulePath, text, renameNameSpan(useNode, declarationSpan))
+					addEditSpan(path, text, renameNameSpan(useNode, declarationSpan))
 					continue
 				}
 				if bring, ok := useNode.(*ast.BringStmt); ok && !bring.Namespace {
 					if span, found := bringImportNameSpan(text, bring, declaration.Name); found {
-						addEditSpan(modulePath, text, span)
+						addEditSpan(path, text, span)
 					}
 				} else if identifier, ok := useNode.(*ast.IdentifierExpr); ok {
-					addEditSpan(modulePath, text, identifier.Span())
+					addEditSpan(path, text, identifier.Span())
 				} else if capture, ok := useNode.(*ast.CaptureRef); ok {
-					addEditSpan(modulePath, text, captureNameSpan(capture))
+					addEditSpan(path, text, captureNameSpan(capture))
 				} else if member, ok := useNode.(*ast.MemberExpr); ok && member.Name == declaration.Name {
-					addEditSpan(modulePath, text, memberNameSpan(member))
+					addEditSpan(path, text, memberNameSpan(member))
 				}
 			}
 		}

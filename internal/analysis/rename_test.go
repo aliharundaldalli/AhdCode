@@ -6,6 +6,46 @@ import (
 	"testing"
 )
 
+func TestReferencesAndRenameUseTheRequiredFilesOwnSpans(t *testing.T) {
+	directory := t.TempDir()
+	entry := filepath.Join(directory, "app.ahd")
+	part := filepath.Join(directory, "Part.ahd")
+	const entryText = "shared: Int := 42\r\nrequire(\"Part.ahd\")\r\n"
+	const partText = "write(\"😀 {shared}\")\r\n"
+	if err := os.WriteFile(entry, []byte(entryText), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(part, []byte(partText), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStore()
+	store.Open(entry, entryText)
+	offset := offsetOf(t, entryText, "shared")
+	partOffset := offsetOf(t, partText, "shared")
+	locations := store.References(entry, offset, false)
+	if len(locations) != 1 || locations[0].Path != canonicalPath(part) ||
+		locations[0].SourceText != partText || locations[0].Span.Start.Offset != partOffset {
+		t.Fatalf("reference must use the required file's path, snapshot and offset: %+v", locations)
+	}
+	edits, ok := store.Rename(entry, offset, "answer")
+	if !ok || len(edits) != 2 {
+		t.Fatalf("rename must edit the declaration and required file: %+v, %t", edits, ok)
+	}
+	for _, edit := range edits {
+		switch edit.Path {
+		case canonicalPath(entry):
+			if edit.SourceText == entryText && edit.Span.Start.Offset == offset {
+				continue
+			}
+		case canonicalPath(part):
+			if edit.SourceText == partText && edit.Span.Start.Offset == partOffset {
+				continue
+			}
+		}
+		t.Fatalf("rename edit refers to the wrong source span: %+v", edit)
+	}
+}
+
 func TestRenameUpdatesWorkspaceReferences(t *testing.T) {
 	directory := t.TempDir()
 	mainPath := filepath.Join(directory, "main.ahd")

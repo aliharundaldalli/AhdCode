@@ -511,9 +511,11 @@ Olağan kurulumda `AHDCODE_ROOT` ayarlanmaz.
 materialize etmez. Yalnızca kullanıcıya özel SQLite kayıt defterini okur
 ve yazar.
 
-Başlatılırken `.env` yoksa `.env.example` dosyasından `0600` izinleriyle
-kopyalanır; mevcut `.env` korunur. Sunucu yalnızca `127.0.0.1:8081` adresine
-bağlanır.
+Başlatılırken `.env` yoksa `.env.example` dosyasından kopyalanır. Yeni dosya
+Unix'te `0600` izinleriyle, Windows'ta ise mevcut kullanıcıya, SYSTEM ve
+Administrators gruplarına erişim veren özel bir ACL ile oluşturulur. Mevcut
+`.env` dosyasının içeriği ve izinleri korunur. Sunucu yalnızca
+`127.0.0.1:8081` adresine bağlanır.
 
 Kanonik adresi şudur:
 

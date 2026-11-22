@@ -112,28 +112,7 @@ func BenchmarkPhase1(b *testing.B) {
 				}
 			})
 			b.Run("LSPReferences", func(b *testing.B) {
-				client := newBenchmarkLSP(b, entry, contents)
-				var latencies []time.Duration
-				for index := 2; b.Loop(); index++ {
-					start := time.Now()
-					client.send("textDocument/references", index, map[string]any{
-						"textDocument": map[string]string{"uri": client.uri},
-						"position":     map[string]int{"line": fixture.parts, "character": 1},
-						"context":      map[string]bool{"includeDeclaration": true},
-					})
-					reply := client.wait(index)
-					var locations []json.RawMessage
-					if err := json.Unmarshal(reply, &locations); err != nil || len(locations) < 2 {
-						b.Fatalf("unexpected references result: %s", reply)
-					}
-					latencies = append(latencies, time.Since(start))
-				}
-				slices.Sort(latencies)
-				count := len(latencies)
-				median := (latencies[(count-1)/2] + latencies[count/2]) / 2
-				p95 := latencies[(95*count+99)/100-1]
-				b.ReportMetric(float64(median)/float64(time.Millisecond), "median-ms")
-				b.ReportMetric(float64(p95)/float64(time.Millisecond), "p95-ms")
+				benchmarkLSPReferences(b, entry, contents, fixture.parts)
 			})
 		})
 	}
@@ -178,6 +157,37 @@ func BenchmarkPhase1(b *testing.B) {
 			}
 		})
 	})
+}
+
+func BenchmarkPhase4LargeReferences(b *testing.B) {
+	const parts = 48
+	entry, contents := phase1Fixture(b, parts)
+	benchmarkLSPReferences(b, entry, contents, parts)
+}
+
+func benchmarkLSPReferences(b *testing.B, entry, contents string, parts int) {
+	client := newBenchmarkLSP(b, entry, contents)
+	var latencies []time.Duration
+	for index := 2; b.Loop(); index++ {
+		start := time.Now()
+		client.send("textDocument/references", index, map[string]any{
+			"textDocument": map[string]string{"uri": client.uri},
+			"position":     map[string]int{"line": parts, "character": 1},
+			"context":      map[string]bool{"includeDeclaration": true},
+		})
+		reply := client.wait(index)
+		var locations []json.RawMessage
+		if err := json.Unmarshal(reply, &locations); err != nil || len(locations) < 2 {
+			b.Fatalf("unexpected references result: %s", reply)
+		}
+		latencies = append(latencies, time.Since(start))
+	}
+	slices.Sort(latencies)
+	count := len(latencies)
+	median := (latencies[(count-1)/2] + latencies[count/2]) / 2
+	p95 := latencies[(95*count+99)/100-1]
+	b.ReportMetric(float64(median)/float64(time.Millisecond), "median-ms")
+	b.ReportMetric(float64(p95)/float64(time.Millisecond), "p95-ms")
 }
 
 func phase1Fixture(b *testing.B, parts int) (string, string) {

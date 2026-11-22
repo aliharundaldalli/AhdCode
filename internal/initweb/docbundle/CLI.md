@@ -498,8 +498,10 @@ elsewhere. Ordinary installed use leaves `AHDCODE_ROOT` unset.
 `ahdcode databases list`, `add`, and `remove` never launch or materialize
 Studio. They only read and write the per-user SQLite registry.
 
-On launch, a missing `.env` is copied from `.env.example` with mode `0600`;
-an existing `.env` is preserved. The server binds only to `127.0.0.1:8081`.
+On launch, a missing `.env` is copied from `.env.example`. The new file has
+mode `0600` on Unix and a private ACL on Windows for the current user,
+SYSTEM, and Administrators. An existing `.env` keeps its contents and
+permissions. The server binds only to `127.0.0.1:8081`.
 
 Its canonical URL is:
 

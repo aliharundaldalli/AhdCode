@@ -7,7 +7,6 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
-	"strconv"
 
 	"ahdcode/internal/semantic"
 )
@@ -201,29 +200,31 @@ func isWorkspaceVolumeRoot(path string) bool {
 	return filepath.IsAbs(path) && filepath.Dir(path) == path
 }
 
-// declarationIdentity returns the canonical source identity for a resolved
-// symbol. It lives here so references and rename use exactly the same rule.
-func declarationIdentity(e *entry, symbol *semantic.Symbol) string {
-	if e == nil || symbol == nil {
-		return ""
-	}
-	declaration := e.declarationSymbol(symbol)
+type symbolDeclarationKey struct {
+	path, owner, name string
+	start, end        int
+}
+
+// declarationIdentity joins snapshots by the resolved declaration's source
+// path and offsets. Paths in fileToPath already come from module resolution;
+// there is no reason to resolve each AST occurrence against the disk again.
+func declarationIdentity(e *entry, declaration *semantic.Symbol) symbolDeclarationKey {
 	if declaration == nil {
-		return ""
+		return symbolDeclarationKey{}
 	}
 	path := e.fileToPath[declaration.Span.FileID]
 	if path == "" {
 		// Built-in and interface-only symbols have no source identity.
-		return ""
+		return symbolDeclarationKey{}
 	}
 	owner := ""
 	if declaration.OwnerClass != nil {
 		owner = declaration.OwnerClass.Name
 	}
-	return canonicalPath(path) + "\x00" + owner + "\x00" + declaration.Name + "\x00" +
-		itoa(declaration.Span.Start.Offset) + "\x00" + itoa(declaration.Span.End.Offset)
+	return symbolDeclarationKey{path, owner, declaration.Name, declaration.Span.Start.Offset, declaration.Span.End.Offset}
 }
 
-func itoa(value int) string {
-	return strconv.Itoa(value)
+type sourceOccurrence struct {
+	path       string
+	start, end int
 }

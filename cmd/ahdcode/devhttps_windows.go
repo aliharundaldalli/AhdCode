@@ -8,11 +8,7 @@ import (
 )
 
 func mkdirPrivateDevHTTPS(path string) error {
-	user, err := windows.GetCurrentProcessToken().GetTokenUser()
-	if err != nil {
-		return err
-	}
-	sd, err := windows.SecurityDescriptorFromString("D:P(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;FA;;;" + user.User.Sid.String() + ")")
+	attributes, err := privateWindowsSecurityAttributes("OICI")
 	if err != nil {
 		return err
 	}
@@ -20,9 +16,22 @@ func mkdirPrivateDevHTTPS(path string) error {
 	if err != nil {
 		return err
 	}
-	return windows.CreateDirectory(name, &windows.SecurityAttributes{
+	return windows.CreateDirectory(name, attributes)
+}
+
+func privateWindowsSecurityAttributes(inheritance string) (*windows.SecurityAttributes, error) {
+	user, err := windows.GetCurrentProcessToken().GetTokenUser()
+	if err != nil {
+		return nil, err
+	}
+	rule := "(A;" + inheritance + ";FA;;;"
+	sd, err := windows.SecurityDescriptorFromString("D:P" + rule + "SY)" + rule + "BA)" + rule + user.User.Sid.String() + ")")
+	if err != nil {
+		return nil, err
+	}
+	return &windows.SecurityAttributes{
 		Length: uint32(unsafe.Sizeof(windows.SecurityAttributes{})), SecurityDescriptor: sd,
-	})
+	}, nil
 }
 
 func checkDevHTTPSPrivacy(path string) error {

@@ -36,11 +36,11 @@ func (store *Store) References(path string, offset int, includeDeclaration bool)
 		return nil
 	}
 	targetIdentity := declarationIdentity(cached, declaration)
-	if targetIdentity == "" {
+	if targetIdentity.path == "" {
 		return nil
 	}
 
-	seen := make(map[string]bool)
+	seen := make(map[sourceOccurrence]bool)
 	var out []Location
 
 	snapshots, _ := store.workspaceEntries(canonical, cached, false)
@@ -49,32 +49,26 @@ func (store *Store) References(path string, offset int, includeDeclaration bool)
 			if candidateModule == nil {
 				continue
 			}
-			modulePath, ok := snapshot.fileToPath[candidateModule.File.ID]
-			if !ok {
-				continue
-			}
-			text := snapshot.result.Text[modulePath]
 			for useNode, useSymbol := range candidateModule.Semantic.ResolvedSymbols {
 				resolved := snapshot.declarationSymbol(useSymbol)
 				if declarationIdentity(snapshot, resolved) != targetIdentity {
 					continue
 				}
+				span := useNode.Span()
 				if declarationOccurrencePredicate(resolved)(useNode) {
-					if includeDeclaration {
-						location := Location{Path: modulePath, Span: resolved.Span, SourceText: text}
-						key := locationKey(location)
-						if !seen[key] {
-							seen[key] = true
-							out = append(out, location)
-						}
+					if !includeDeclaration {
+						continue
 					}
+					span = resolved.Span
+				}
+				path := snapshot.fileToPath[span.FileID]
+				if path == "" {
 					continue
 				}
-				location := Location{Path: modulePath, Span: useNode.Span(), SourceText: text}
-				key := locationKey(location)
+				key := sourceOccurrence{path, span.Start.Offset, span.End.Offset}
 				if !seen[key] {
 					seen[key] = true
-					out = append(out, location)
+					out = append(out, Location{Path: path, Span: span, SourceText: snapshot.result.Text[path]})
 				}
 			}
 		}
@@ -86,10 +80,6 @@ func (store *Store) References(path string, offset int, includeDeclaration bool)
 		return out[i].Span.Start.Offset < out[j].Span.Start.Offset
 	})
 	return out
-}
-
-func locationKey(location Location) string {
-	return location.Path + "\x00" + itoa(location.Span.Start.Offset) + "\x00" + itoa(location.Span.End.Offset)
 }
 
 // declarationOccurrencePredicate returns a function identifying which
