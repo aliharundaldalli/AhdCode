@@ -9,6 +9,7 @@ import (
 	"debug/pe"
 	"encoding/binary"
 	"encoding/json"
+	"errors"
 	"image"
 	"image/color"
 	"image/png"
@@ -19,6 +20,7 @@ import (
 	"runtime"
 	"sort"
 	"strings"
+	"syscall"
 	"testing"
 )
 
@@ -480,9 +482,7 @@ func TestResourceCopyRejectsSymlinks(t *testing.T) {
 		project, destination := resourceProject(t)
 		outside := filepath.Join(t.TempDir(), "secret.png")
 		writeFile(t, outside, "secret", 0o644)
-		if err := os.Symlink(outside, filepath.Join(project, "resources", "icons", "escape.png")); err != nil {
-			t.Fatal(err)
-		}
+		resourceTestAlias(t, outside, filepath.Join(project, "resources", "icons", "escape.png"), false)
 		err := copyImageResources(filepath.Join(project, "main.ahd"), destination)
 		if err == nil || !strings.Contains(err.Error(), "escape.png") || !strings.Contains(err.Error(), "symbolic link") {
 			t.Fatalf("file link: %v", err)
@@ -495,9 +495,7 @@ func TestResourceCopyRejectsSymlinks(t *testing.T) {
 		project, destination := resourceProject(t)
 		outside := t.TempDir()
 		writeFile(t, filepath.Join(outside, "mark.png"), "secret", 0o644)
-		if err := os.Symlink(outside, filepath.Join(project, "resources", "linked")); err != nil {
-			t.Fatal(err)
-		}
+		resourceTestAlias(t, outside, filepath.Join(project, "resources", "linked"), true)
 		err := copyImageResources(filepath.Join(project, "main.ahd"), destination)
 		if err == nil || !strings.Contains(err.Error(), "symbolic link") {
 			t.Fatalf("directory link: %v", err)
@@ -508,14 +506,18 @@ func TestResourceCopyRejectsSymlinks(t *testing.T) {
 	})
 	t.Run("link that stays inside", func(t *testing.T) {
 		project, destination := resourceProject(t)
-		if err := os.Symlink("mark.png", filepath.Join(project, "resources", "icons", "alias.png")); err != nil {
-			t.Fatal(err)
+		alias := filepath.Join("icons", "alias.png")
+		if runtime.GOOS == "windows" {
+			alias = "alias"
+			resourceTestAlias(t, filepath.Join(project, "resources", "icons"), filepath.Join(project, "resources", alias), true)
+		} else {
+			resourceTestAlias(t, "mark.png", filepath.Join(project, "resources", alias), false)
 		}
 		err := copyImageResources(filepath.Join(project, "main.ahd"), destination)
-		if err == nil || !strings.Contains(err.Error(), "alias.png") {
+		if err == nil || !strings.Contains(err.Error(), filepath.Base(alias)) || !strings.Contains(err.Error(), "symbolic link") {
 			t.Fatalf("inside link: %v", err)
 		}
-		if _, err := os.Stat(filepath.Join(destination, "icons", "alias.png")); !os.IsNotExist(err) {
+		if _, err := os.Stat(filepath.Join(destination, alias)); !os.IsNotExist(err) {
 			t.Fatal("an inside symbolic link was copied")
 		}
 	})
@@ -523,9 +525,7 @@ func TestResourceCopyRejectsSymlinks(t *testing.T) {
 		project := t.TempDir()
 		real := t.TempDir()
 		writeFile(t, filepath.Join(real, "icons", "mark.png"), "secret", 0o644)
-		if err := os.Symlink(real, filepath.Join(project, "resources")); err != nil {
-			t.Fatal(err)
-		}
+		resourceTestAlias(t, real, filepath.Join(project, "resources"), true)
 		destination := t.TempDir()
 		err := copyImageResources(filepath.Join(project, "main.ahd"), destination)
 		if err == nil || !strings.Contains(err.Error(), "resources is a symbolic link") {
@@ -535,6 +535,22 @@ func TestResourceCopyRejectsSymlinks(t *testing.T) {
 			t.Fatal("a linked resources folder was copied")
 		}
 	})
+}
+
+func resourceTestAlias(t *testing.T, target, path string, directory bool) {
+	t.Helper()
+	if runtime.GOOS == "windows" && directory {
+		if output, err := exec.Command("cmd", "/c", "mklink", "/J", path, target).CombinedOutput(); err != nil {
+			t.Fatalf("create fixture junction: %v\n%s", err, output)
+		}
+	} else if err := os.Symlink(target, path); err != nil {
+		const windowsPrivilegeNotHeld = syscall.Errno(1314)
+		if runtime.GOOS == "windows" && errors.Is(err, windowsPrivilegeNotHeld) {
+			t.Skipf("Windows file-symlink privilege unavailable: %v", err)
+		}
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Remove(path) })
 }
 
 func resourceProject(t *testing.T) (string, string) {

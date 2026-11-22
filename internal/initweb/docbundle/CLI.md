@@ -764,6 +764,9 @@ See `examples/v2.10/migrations`.
 
 ## Check source without building
 
+Use the checker's exit status and JSON report as the source validation step
+when upgrading a project. See the [v2.12 upgrade checklist](UPGRADE_2.12.md).
+
 ```bash
 ahdcode check app.ahd
 ahdcode check "path with spaces/app.ahd" --format json

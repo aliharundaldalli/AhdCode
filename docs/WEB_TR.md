@@ -1,5 +1,10 @@
 # Web
 
+Özel yüklemeleri ve oturum veritabanlarını statik ve yönetilen varlık
+dizinlerinin dışında tutun. Dosya yanıtını oluşturmadan önce sahipliği
+sunucuda denetleyin. Yetki reddi yanıtlarında
+`Cache-Control: no-store` başlığını ayarlayın.
+
 [English](WEB.md) · [Türkçe]
 
 [README'ye dön](../README_TR.md) · [HTTP](HTTP_TR.md) · [HTML](HTML_TR.md) · [Modüller](MODULES_TR.md) · [Env](ENV_TR.md) · [require(...)](REQUIRE_TR.md)

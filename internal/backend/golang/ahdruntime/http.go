@@ -1175,7 +1175,7 @@ func ahdHTTPPublicRoot(root string) (string, os.FileInfo, error) {
 	if err != nil {
 		return "", nil, err
 	}
-	canonical, err := filepath.EvalSymlinks(absolute)
+	canonical, err := ahdCanonicalExistingPath(absolute)
 	if err != nil {
 		return "", nil, err
 	}
@@ -1447,7 +1447,7 @@ func ahdHTTPServePublicFile(writer http.ResponseWriter, request *http.Request, e
 
 func ahdHTTPOpenPublicFile(entry ahdHTTPStaticEntry, relative string) (*os.File, os.FileInfo, error) {
 	candidate := filepath.Join(entry.root, filepath.FromSlash(relative))
-	resolved, err := filepath.EvalSymlinks(candidate)
+	resolved, err := ahdCanonicalExistingPath(candidate)
 	if err != nil || !ahdHTTPWithinRoot(entry.root, resolved) {
 		return nil, nil, os.ErrNotExist
 	}

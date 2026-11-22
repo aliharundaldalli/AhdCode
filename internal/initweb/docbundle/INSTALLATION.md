@@ -1,5 +1,11 @@
 # Installation, upgrade, and removal
 
+For v2.12.0 candidate testing, use a separate Windows profile or Unix
+installation prefix. Compare the candidate artifact against its SHA-256
+manifest before running it, then verify `ahdcode version` and
+`ahdcode check app.ahd` in the test environment. The commands below describe
+the published v2.11.0 installation. See the [v2.12 upgrade guide](UPGRADE_2.12.md).
+
 Download the published AhdCode **v2.11.0** stable package for your operating
 system (macOS `arm64`/`x64`, Windows `x64`, or Linux `amd64`/`arm64`). `v2.11.0`
 toolchain packages include the compiler, all helpers (`ahdsqlite`,

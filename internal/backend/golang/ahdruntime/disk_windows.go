@@ -4,6 +4,8 @@ package ahdruntime
 
 import (
 	"errors"
+	"os"
+	"path/filepath"
 	"syscall"
 	"unsafe"
 )
@@ -14,6 +16,17 @@ var ahdDiskFreeSpace = syscall.NewLazyDLL("kernel32.dll").NewProc("GetDiskFreeSp
 // total and free describe the whole volume; available is what this user may
 // use (it reflects per-user quotas).
 func ahdDiskUsageOf(path string) (ahdDiskUsage, error) {
+	info, err := os.Stat(path)
+	if err != nil {
+		return ahdDiskUsage{}, err
+	}
+	if !info.IsDir() {
+		resolved, err := ahdCanonicalExistingPath(path)
+		if err != nil {
+			return ahdDiskUsage{}, err
+		}
+		path = filepath.Dir(resolved)
+	}
 	pointer, err := syscall.UTF16PtrFromString(path)
 	if err != nil {
 		return ahdDiskUsage{}, errors.New("the path is not valid")

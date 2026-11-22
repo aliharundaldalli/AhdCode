@@ -1,5 +1,9 @@
 # SQLite standart modülü
 
+v2.12.0'da `openWithOptions` kullanmadan önce derleyiciyi ve SQLite
+yardımcısını birlikte dağıtın. Uygulamayı yükseltmeden önce yedeğin geri
+yüklenmiş bir kopyasını doğrulayın. [Geçiş adımlarına](UPGRADE_2.12_TR.md) bakın.
+
 [English](SQLITE.md) · [Türkçe]
 
 [README'ye dön](../README_TR.md) · [Modüller](MODULES_TR.md) · [JSON](JSON_TR.md) · [Öğrenci Rehberi](STUDENT_GUIDE_TR.md#35-sqlite-hatırlayan-bir-veritabanı)

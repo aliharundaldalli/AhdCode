@@ -16,15 +16,11 @@ veritabanı modülleri, GUI'si, Graphics'i, etkileşimli Plot görüntüleyicisi
 masaüstü uygulaması paketlemesiyle gelir. Küçük bir topluluk tarafından
 pratikte kullanılmaktadır; yaygın (mainstream) bir dil değildir.
 
-Bu, en güncel kararlı sürüm olan **v2.11.0**, **Web Dağıtımı ve Progresif Web
-Uygulamaları** sürümüdür. Araç zinciri paketleri macOS (`arm64` ve `x64`,
-imzalı ve Apple noter onaylı `.pkg`/`.dmg` ile imzalı `.tar.gz`), Windows (`x64`
-kullanıcı başına `.exe`) ve Linux (`amd64` ve `arm64` `.tar.gz`) için sunulur;
-yerel `ahdcode build` / `package` için `go.mod` içindeki Go sürümünün `PATH`
-üzerinde bulunması gerekir. Özel Go, çevrimdışı Tectonic LaTeX ve VSIX içeren
-tam paketler v2.7.0'da mevcuttur ve v3.0'da geri döner.
-[Sürüm notlarına](docs/RELEASE_2.11.0_TR.md) ve
-[geçiş notlarına](docs/UPGRADE_2.11_TR.md) bakın.
+Bu, bağımsız denetleyiciyi, SQLite açılış seçeneklerini ve platform
+iyileştirmelerini içeren **v2.12.0** sürüm adayıdır.
+[Sürüm notlarına](docs/RELEASE_2.12.0_TR.md) ve
+[geçiş notlarına](docs/UPGRADE_2.12_TR.md) bakın.
+Yayımlanan en güncel kararlı sürüm v2.11.0'dır.
 
 v2.0.0 bir ana (major) sürümdür, **Masaüstü Uygulamasının Tamamlanması**:
 birinci taraf masaüstü uygulaması temelini tamamlar — GUI'de ListBox, Select,

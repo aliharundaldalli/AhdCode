@@ -1,5 +1,9 @@
 # SQLite standard module
 
+For v2.12.0, deploy the compiler and SQLite helper together before opting
+into `openWithOptions`. Verify a restored copy of the backup before
+upgrading an application. See the [upgrade checklist](UPGRADE_2.12.md).
+
 [English] · [Türkçe](SQLITE_TR.md)
 
 [Back to README](../README.md) · [Modules](MODULES.md) · [JSON](JSON.md) · [Student Guide](STUDENT_GUIDE_EN.md#35-sqlite-a-database-that-remembers)

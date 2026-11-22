@@ -581,7 +581,7 @@ func AhdGUIResource(name string) (string, string) {
 	if err != nil {
 		return "", "the resource folder cannot be found"
 	}
-	canonicalRoot, err = filepath.EvalSymlinks(canonicalRoot)
+	canonicalRoot, err = ahdCanonicalExistingPath(canonicalRoot)
 	if err != nil {
 		return "", "the resource folder cannot be found"
 	}
@@ -589,7 +589,7 @@ func AhdGUIResource(name string) (string, string) {
 	if err != nil || !info.IsDir() {
 		return "", "the resource folder cannot be found"
 	}
-	resolved, err := filepath.EvalSymlinks(filepath.Join(canonicalRoot, filepath.FromSlash(relative)))
+	resolved, err := ahdCanonicalExistingPath(filepath.Join(canonicalRoot, filepath.FromSlash(relative)))
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return "", fmt.Sprintf("could not read the resource %s: the file does not exist", name)

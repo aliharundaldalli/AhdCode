@@ -265,6 +265,8 @@ func Generate(compilation *ir.Compilation) (*GeneratedProgram, []diagnostics.Dia
 		{Name: cronRuntimeFileName, Content: string(cronRuntime)},
 	}
 	for _, shared := range []struct{ name, source, label string }{
+		{"ahdcode_canonical_path_windows.go", ahdruntime.CanonicalPathWindowsSource, "Windows canonical paths"},
+		{"ahdcode_canonical_path_other.go", ahdruntime.CanonicalPathOtherSource, "canonical paths"},
 		{httpFilesRuntimeFileName, ahdruntime.HTTPFilesSource, "HTTP file transfer"},
 		{httpSessionsRuntimeFileName, ahdruntime.HTTPSessionsSource, "HTTP persistent sessions"},
 		{httpDevReloadRuntimeFileName, ahdruntime.DevReloadSource, "HTTP development reload"},

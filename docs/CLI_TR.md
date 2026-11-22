@@ -777,6 +777,9 @@ Bkz. [`examples/v2.10/migrations`](../examples/v2.10/migrations).
 
 ## Derlemeden kaynak kodu denetleme
 
+Proje yükseltmesinde kaynak doğrulaması için denetleyicinin çıkış kodunu ve
+JSON raporunu kullanın. [v2.12 geçiş adımlarına](UPGRADE_2.12_TR.md) bakın.
+
 ```bash
 ahdcode check app.ahd
 ahdcode check "boşluk içeren yol/app.ahd" --format json
