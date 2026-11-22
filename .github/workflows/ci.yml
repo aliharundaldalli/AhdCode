@@ -231,6 +231,40 @@ jobs:
             Pop-Location
           }
 
+  additional-native-targets:
+    name: Native ${{ matrix.target }} acceptance
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: Linux ARM64
+            runner: ubuntu-24.04-arm
+            goarch: arm64
+          - target: macOS x64
+            runner: macos-15-intel
+            goarch: amd64
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+      - name: Verify native architecture and build compiler helpers
+        run: |
+          test "$(go env GOHOSTARCH)" = "${{ matrix.goarch }}"
+          go build -trimpath -o "$RUNNER_TEMP/ahdcode" ./cmd/ahdcode
+          go build -trimpath -o "$RUNNER_TEMP/ahdsqlite" ./cmd/ahdsqlite
+          test "$("$RUNNER_TEMP/ahdcode" version)" = 'AhdCode v2.12.0'
+          echo "AHDCODE_BIN=$RUNNER_TEMP/ahdcode" >> "$GITHUB_ENV"
+          echo "AHDCODE_SQLITE_RUNTIME=$RUNNER_TEMP/ahdsqlite" >> "$GITHUB_ENV"
+      - name: Run native compiler, editor and application regressions
+        run: |
+          go test -count=1 -timeout 18m -run 'Test(Check|PrivateAvatar|BasicStarter|PersistentSession|SQLite|WebPackage|WebAssets|WebPWA|Workspace|References|Rename|ResourceSymlink)' \
+            ./cmd/ahdcode ./cmd/ahdsqlite ./internal/analysis ./internal/lsp ./internal/backend/golang/ahdruntime ./internal/build ./internal/packaging
+          node --test internal/initweb/pwa_worker_test.cjs
+
   nested:
     name: Nested helper modules
     runs-on: ubuntu-latest
