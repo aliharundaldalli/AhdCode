@@ -1849,8 +1849,9 @@ Rules:
 
 1. exact type match preferred;
 2. safe widening such as `Int -> Real` may be used;
-3. equal best candidates => ambiguous overload compile error;
-4. return type alone cannot distinguish overloads.
+3. when argument conversion ranks tie, prefer the candidate that needs fewer default values for omitted arguments;
+4. equal best candidates => ambiguous overload compile error;
+5. return type alone cannot distinguish overloads.
 
 ---
 

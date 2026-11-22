@@ -19,6 +19,7 @@ ahdcode migrate status --db <file> [--dir <directory>] [--driver sqlite]
 ahdcode migrate up --db <file> [--dir <directory>] [--driver sqlite]
 ahdcode migrate down --db <file> [--dir <directory>] [--steps <n>] [--driver sqlite]
 ahdcode build <entry.ahd> [-o <output>]
+ahdcode check <entry.ahd> [--format text|json]
 ahdcode package <entry.ahd> [--name <name>] [--output <folder>] [--icon <icon.png>]
                 [--target <os-arch>] [--helpers <folder>] [--console] [--web [--pwa]]
 ahdcode run <entry.ahd> [-- <args>...]
@@ -32,6 +33,7 @@ ahdcode lsp
 ahdcode --help
 ahdcode --version
 ```
+
 
 `ahdcode init web` writes a Web starter into the **current directory**. On a
 TTY it asks Empty, Basic, Admin, MVC, or CRUD. Non-interactive use must pass
@@ -757,3 +759,59 @@ Ordinary SQLite migrations need no administrator rights and no network.
 The Windows `backupTo` URI path is not used.
 
 See `examples/v2.10/migrations`.
+
+## Check source without building
+
+```bash
+ahdcode check app.ahd
+ahdcode check "path with spaces/app.ahd" --format json
+```
+
+`check` reads the saved entry and its dependencies, resolves modules, parses
+source, and runs the same semantic analysis used by `build` and the
+[language server](LSP.md). The language server can also analyze unsaved
+editor text. `format --check` checks canonical formatting. A successful
+`check` establishes frontend validity. Go generation, linking, and runtime
+behavior are checked by later stages. This command does not need Go on
+`PATH`, run application code or helpers, or write build artifacts.
+
+The default `--format text` prints diagnostics to stdout as
+`path:line:column: severity CODE: message`, followed by any compiler hint.
+Line and column start at 1. Columns count UTF-16 code units. Success without
+diagnostics produces no text.
+
+`--format json` writes one UTF-8 JSON document to stdout for both valid and
+invalid sources. Version 1 has an integer `schemaVersion` and a
+`diagnostics` array, which can be empty. Every diagnostic has `severity`
+(`error` or `warning`), `code` (the compiler code), `message`, `path`,
+and `range`. `hint` appears when the compiler supplies one. Ranges use
+zero-based `line` and `character` values, count UTF-16 code units, and exclude
+the end position. An entry-input error with no source span uses `"range": null`.
+
+Paths use forward slashes and are relative to the resolved entry directory.
+A source on a different volume is identified by its filename. Bundled
+sources use `<ahdcode>/...`. The report omits source excerpts. Diagnostics
+are ordered by path, range (absent ranges first), severity, code, message,
+and hint.
+
+For `x: Int := "bad"` in `app.ahd`:
+
+```json
+{
+  "schemaVersion": 1,
+  "diagnostics": [
+    {
+      "severity": "error",
+      "code": "SEM004",
+      "message": "initializer of x expects Int; received String",
+      "path": "app.ahd",
+      "range": {"start": {"line": 0, "character": 10}, "end": {"line": 0, "character": 15}},
+      "hint": "use a value assignable to the declared type"
+    }
+  ]
+}
+```
+
+Exit status is `0` when there are no errors (including warnings-only results),
+`1` for source or input errors, and `2` for invalid CLI usage. Usage
+messages and output-write failures go to stderr. Usage errors emit no JSON.

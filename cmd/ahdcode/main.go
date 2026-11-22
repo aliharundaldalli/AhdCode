@@ -48,6 +48,7 @@ usage:
   ahdcode migrate down --db <file> [--steps <n>] [--dir <dir>]
                                              roll back applied migrations that have a down script
   ahdcode build <entry.ahd> [-o <output>]    compile to a native executable
+  ahdcode check <entry.ahd> [--format text|json]  check source without building
   ahdcode package <entry.ahd> [--name <name>] [--output <folder>] [--icon <icon.png>]
                   [--target <os-arch>] [--helpers <folder>] [--console] [--web [--pwa]]
                                              make a desktop or Web application package
@@ -103,6 +104,8 @@ func runWithIO(arguments []string, input io.Reader, output, errorOutput io.Write
 		return runMigrate(arguments[1:], output, errorOutput)
 	case "build":
 		return runBuild(arguments[1:], output, errorOutput)
+	case "check":
+		return runCheck(arguments[1:], output, errorOutput)
 	case "package":
 		return runPackage(arguments[1:], output, errorOutput)
 	case "run":

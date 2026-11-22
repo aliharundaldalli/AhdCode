@@ -19,6 +19,7 @@ ahdcode migrate status --db <file> [--dir <directory>] [--driver sqlite]
 ahdcode migrate up --db <file> [--dir <directory>] [--driver sqlite]
 ahdcode migrate down --db <file> [--dir <directory>] [--steps <n>] [--driver sqlite]
 ahdcode build <entry.ahd> [-o <output>]
+ahdcode check <entry.ahd> [--format text|json]
 ahdcode package <entry.ahd> [--name <name>] [--output <folder>] [--icon <icon.png>]
                 [--target <os-arch>] [--helpers <folder>] [--console] [--web [--pwa]]
 ahdcode run <entry.ahd> [-- <args>...]
@@ -32,6 +33,7 @@ ahdcode lsp
 ahdcode --help
 ahdcode --version
 ```
+
 
 `ahdcode init web` **bulunulan dizine** bir Web starter yazar. Bir TTY'de
 Empty, Basic, Admin, MVC veya CRUD sorar. Etkileşimsiz kullanım `empty`,
@@ -770,3 +772,63 @@ Sıradan SQLite migration'ları yönetici hakkı ve ağ istemez. Windows
 `backupTo` URI yolu kullanılmaz.
 
 Bkz. [`examples/v2.10/migrations`](../examples/v2.10/migrations).
+
+## Derlemeden kaynak kodu denetleme
+
+```bash
+ahdcode check app.ahd
+ahdcode check "boşluk içeren yol/app.ahd" --format json
+```
+
+`check`, kaydedilmiş giriş dosyasını ve bağımlılıklarını okur, modülleri
+çözümler, kaynak kodu ayrıştırır ve `build` ile
+[dil sunucusunun](LSP_TR.md) kullandığı anlamsal analizi çalıştırır.
+Dil sunucusu kaydedilmemiş düzenleyici içeriğini de inceleyebilir.
+`format --check` standart biçimi denetler. Başarılı bir `check`, kaynak kodun
+derleyicinin ön yüzünden geçtiğini gösterir. Go kodu üretimi, bağlama ve
+çalışma zamanı davranışı sonraki aşamalarda denetlenir. Bu komut `PATH`
+üzerinde Go gerektirmez, uygulama kodunu veya yardımcı süreçleri çalıştırmaz
+ve derleme çıktısı yazmaz.
+
+Varsayılan `--format text`, tanıları standart çıktıya
+`yol:satır:sütun: önem KOD: ileti` biçiminde yazar. Varsa derleyicinin
+ipucu izleyen satırda yer alır. Satır ve sütun 1’den başlar. Sütun, UTF-16 kod
+birimiyle sayılır. Tanı yoksa metin yazılmaz.
+
+`--format json`, geçerli ve geçersiz kaynaklar için standart çıktıya UTF-8
+kodlamalı tek bir JSON belgesi yazar. Sürüm 1, tamsayı `schemaVersion` ve
+boş olabilen `diagnostics` dizisini içerir. Her tanıda `severity`
+(`error` veya `warning`), `code` (derleyici kodu), `message`, `path` ve
+`range` bulunur. Derleyici ipucu sağladığında `hint` eklenir. Aralığın
+`line` ve `character` değerleri sıfırdan başlar. Karakter konumu UTF-16
+kod birimiyle sayılır ve bitiş konumu aralığa dahil değildir. Kaynakta
+konumu bulunmayan giriş hataları için `"range": null` kullanılır.
+
+Yollar `/` ayırıcısını kullanır ve çözümlenen giriş dizinine görelidir.
+Başka bir disk birimindeki kaynak, dosya adıyla gösterilir. Gömülü
+kaynaklar `<ahdcode>/...` biçimini kullanır. Rapor kaynak kod alıntısı
+içermez. Tanılar yol, aralık (aralığı olmayanlar önce), önem, kod, ileti ve
+ipucuna göre sıralanır.
+
+`app.ahd` içindeki `x: Int := "bad"` için:
+
+```json
+{
+  "schemaVersion": 1,
+  "diagnostics": [
+    {
+      "severity": "error",
+      "code": "SEM004",
+      "message": "initializer of x expects Int; received String",
+      "path": "app.ahd",
+      "range": {"start": {"line": 0, "character": 10}, "end": {"line": 0, "character": 15}},
+      "hint": "use a value assignable to the declared type"
+    }
+  ]
+}
+```
+
+Çıkış kodu hata yoksa (yalnızca uyarı varsa da) `0`, kaynak veya giriş
+hatası varsa `1`, geçersiz komut kullanımı varsa `2` olur. Kullanım ve
+çıktı yazma hataları standart hata akışına gider. Kullanım hatalarında
+JSON belgesi yazılmaz.

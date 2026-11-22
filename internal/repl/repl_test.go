@@ -9,6 +9,8 @@ import (
 	"strings"
 	"sync"
 	"testing"
+
+	"ahdcode/internal/build"
 )
 
 var (
@@ -28,7 +30,7 @@ func plotRuntimeForTest(t *testing.T) string {
 		if err != nil {
 			return
 		}
-		path := filepath.Join(dir, "ahdplot")
+		path := build.ExecutablePath(filepath.Join(dir, "ahdplot"))
 		root, err := filepath.Abs(filepath.Join("..", ".."))
 		if err != nil {
 			return
