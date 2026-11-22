@@ -89,9 +89,13 @@ bulunur. Sabit sembol kataloğu, arka plan izleyici veya kalıcı veritabanı
 yoktur. Aynı ad iki modülde varsa completion ayrı girişler gösterir.
 
 Referans ve rename sorguları, istek sırasında sınırlı bir in-memory taramadır.
-Açık buffer disk dosyasına üstün gelir; ihtiyaç olduğunda açık olmayan
-workspace `.ahd` girişleri compiler ile yeniden derlenir. Kalıcı indeks,
-SQLite veritabanı, arka plan daemon'ı veya watcher yoktur.
+Açık editör içeriği disk dosyasına üstün gelir. Gerektiğinde açık olmayan
+workspace `.ahd` dosyaları derleyici tarafından yeniden işlenir. Özyinelemeli
+tarama disk köklerine, dizin bağlarına ve junction'lara girmez. Bir istek
+en çok 512 dizin, 8.192 dizin girdisi ve 1.024 kaynak dosyası tarar.
+Tarama tamamlanamazsa referanslar mevcut sonuçları döndürebilir. Yeniden
+adlandırma bu durumda düzenleme üretmez. Kalıcı indeks, SQLite veritabanı,
+arka plan daemon'ı veya izleyici yoktur.
 
 ## Bilerek uygulanmayanlar
 

@@ -19,7 +19,6 @@ import (
 	"io"
 	"io/fs"
 	"math"
-	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -280,17 +279,6 @@ func (entry *database) query(sql string, parameters []sqliteproto.Value) sqlitep
 	return sqliteproto.Response{Columns: columns, Rows: rows}
 }
 
-// sqliteFileURI turns an absolute filesystem path into the file: URI the
-// backup API opens its destination with, percent-encoding every character
-// SQLite would otherwise read as URI syntax ('?', '#', '%').
-func sqliteFileURI(path string) string {
-	slashed := filepath.ToSlash(path)
-	if !strings.HasPrefix(slashed, "/") {
-		slashed = "/" + slashed // Windows: C:/dir/file -> /C:/dir/file
-	}
-	return (&url.URL{Scheme: "file", Path: slashed}).String()
-}
-
 // backup writes a consistent snapshot of this connection's main database to
 // path using SQLite's online backup API: the whole copy runs under one read
 // transaction, so concurrent writers (including WAL-mode writers in other
@@ -330,7 +318,10 @@ func (entry *database) backup(path string) error {
 			}
 		}
 	}()
-	if err := entry.conn.Backup("main", sqliteFileURI(temporary)); err != nil {
+	// An absolute native path cannot start with the URI scheme "file:".
+	// Pass it directly so the VFS receives the Windows drive or UNC path
+	// intact and characters such as '#' and '%' stay literal.
+	if err := entry.conn.Backup("main", temporary); err != nil {
 		return fmt.Errorf("backup failed: %s", failure(err).Error)
 	}
 	if err := verifyBackup(temporary); err != nil {

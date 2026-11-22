@@ -17,9 +17,7 @@ import (
 // symbol.
 func (store *Store) References(path string, offset int, includeDeclaration bool) []Location {
 	canonical := canonicalPath(path)
-	store.mutex.Lock()
-	cached := store.entries[canonical]
-	store.mutex.Unlock()
+	cached := store.workspaceEntry(canonical)
 
 	entryModule := cached.entryModule()
 	if entryModule == nil || entryModule.Parsed.Program == nil {
@@ -45,7 +43,8 @@ func (store *Store) References(path string, offset int, includeDeclaration bool)
 	seen := make(map[string]bool)
 	var out []Location
 
-	for _, snapshot := range store.workspaceEntries(canonical) {
+	snapshots, _ := store.workspaceEntries(canonical, cached, false)
+	for _, snapshot := range snapshots {
 		for _, candidateModule := range snapshot.modules {
 			if candidateModule == nil {
 				continue
@@ -54,6 +53,7 @@ func (store *Store) References(path string, offset int, includeDeclaration bool)
 			if !ok {
 				continue
 			}
+			text := snapshot.result.Text[modulePath]
 			for useNode, useSymbol := range candidateModule.Semantic.ResolvedSymbols {
 				resolved := snapshot.declarationSymbol(useSymbol)
 				if declarationIdentity(snapshot, resolved) != targetIdentity {
@@ -61,7 +61,7 @@ func (store *Store) References(path string, offset int, includeDeclaration bool)
 				}
 				if declarationOccurrencePredicate(resolved)(useNode) {
 					if includeDeclaration {
-						location := Location{Path: modulePath, Span: resolved.Span}
+						location := Location{Path: modulePath, Span: resolved.Span, SourceText: text}
 						key := locationKey(location)
 						if !seen[key] {
 							seen[key] = true
@@ -70,7 +70,7 @@ func (store *Store) References(path string, offset int, includeDeclaration bool)
 					}
 					continue
 				}
-				location := Location{Path: modulePath, Span: useNode.Span()}
+				location := Location{Path: modulePath, Span: useNode.Span(), SourceText: text}
 				key := locationKey(location)
 				if !seen[key] {
 					seen[key] = true

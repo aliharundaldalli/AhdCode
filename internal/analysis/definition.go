@@ -12,6 +12,8 @@ import (
 type Location struct {
 	Path string
 	Span source.Span
+	// SourceText is set for references resolved across workspace snapshots.
+	SourceText string
 }
 
 // Definition answers a go-to-definition request at the given byte offset

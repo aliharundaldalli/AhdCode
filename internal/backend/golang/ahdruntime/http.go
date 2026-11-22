@@ -135,6 +135,7 @@ type ahdHTTPServerState struct {
 type ahdHTTPStaticEntry struct {
 	prefix string
 	root   string
+	info   os.FileInfo
 }
 
 type ahdHTTPRequestData struct {
@@ -1110,16 +1111,9 @@ func AhdHTTPServerStatic(class *AhdClass, handle, prefix, root string) {
 	if !strings.HasSuffix(normalizedPrefix, "/") {
 		normalizedPrefix += "/"
 	}
-	info, err := os.Stat(root)
-	if err != nil || !info.IsDir() {
-		AhdRaiseClass(class, "HTTP static root "+ahdHTMLQuote(root)+" is not a directory")
-	}
-	canonicalRoot, err := filepath.Abs(root)
+	canonicalRoot, info, err := ahdHTTPPublicRoot(root)
 	if err != nil {
-		AhdRaiseClass(class, "HTTP static root "+ahdHTMLQuote(root)+" could not be resolved")
-	}
-	if evaluated, evalErr := filepath.EvalSymlinks(canonicalRoot); evalErr == nil {
-		canonicalRoot = evaluated
+		AhdRaiseClass(class, "HTTP static root "+ahdHTMLQuote(root)+" is not an accessible directory")
 	}
 
 	server := ahdHTTPLookup(class, handle)
@@ -1138,7 +1132,7 @@ func AhdHTTPServerStatic(class *AhdClass, handle, prefix, root string) {
 			AhdRaiseClass(class, "HTTP static prefix "+ahdHTMLQuote(prefix)+" overlaps the already-registered prefix "+ahdHTMLQuote(existing.prefix))
 		}
 	}
-	server.staticRoutes = append(server.staticRoutes, ahdHTTPStaticEntry{prefix: normalizedPrefix, root: canonicalRoot})
+	server.staticRoutes = append(server.staticRoutes, ahdHTTPStaticEntry{prefix: normalizedPrefix, root: canonicalRoot, info: info})
 }
 
 // AhdHTTPServerManaged registers a managed asset prefix. Unlike static, a
@@ -1151,16 +1145,9 @@ func AhdHTTPServerManaged(class *AhdClass, handle, prefix, root string) {
 	if !strings.HasSuffix(normalizedPrefix, "/") {
 		normalizedPrefix += "/"
 	}
-	info, err := os.Stat(root)
-	if err != nil || !info.IsDir() {
-		AhdRaiseClass(class, "HTTP managed root "+ahdHTMLQuote(root)+" is not a directory")
-	}
-	canonicalRoot, err := filepath.Abs(root)
+	canonicalRoot, info, err := ahdHTTPPublicRoot(root)
 	if err != nil {
-		AhdRaiseClass(class, "HTTP managed root "+ahdHTMLQuote(root)+" could not be resolved")
-	}
-	if evaluated, evalErr := filepath.EvalSymlinks(canonicalRoot); evalErr == nil {
-		canonicalRoot = evaluated
+		AhdRaiseClass(class, "HTTP managed root "+ahdHTMLQuote(root)+" is not an accessible directory")
 	}
 
 	server := ahdHTTPLookup(class, handle)
@@ -1179,8 +1166,31 @@ func AhdHTTPServerManaged(class *AhdClass, handle, prefix, root string) {
 			AhdRaiseClass(class, "HTTP managed prefix "+ahdHTMLQuote(prefix)+" overlaps the already-registered prefix "+ahdHTMLQuote(existing.prefix))
 		}
 	}
-	server.managedRoutes = append(server.managedRoutes, ahdHTTPStaticEntry{prefix: normalizedPrefix, root: canonicalRoot})
+	server.managedRoutes = append(server.managedRoutes, ahdHTTPStaticEntry{prefix: normalizedPrefix, root: canonicalRoot, info: info})
 	ahdHTMLSetManagedAssetPrefix(normalizedPrefix)
+}
+
+func ahdHTTPPublicRoot(root string) (string, os.FileInfo, error) {
+	absolute, err := filepath.Abs(root)
+	if err != nil {
+		return "", nil, err
+	}
+	canonical, err := filepath.EvalSymlinks(absolute)
+	if err != nil {
+		return "", nil, err
+	}
+	directory, err := os.Open(canonical)
+	if err != nil {
+		return "", nil, err
+	}
+	defer directory.Close()
+	// Stat an open handle so the registered identity is independent of
+	// later path replacements on Windows as well as on Unix.
+	info, err := directory.Stat()
+	if err == nil && !info.IsDir() {
+		err = errors.New("public root is not a directory")
+	}
+	return canonical, info, err
 }
 
 const (
@@ -1370,24 +1380,6 @@ func ahdHTTPParseDuration(key, raw string) (time.Duration, error) {
 // 404 rather than leaking which reason applied -- and returns false without
 // writing anything when no static prefix matches path at all, so the
 // dispatcher's own 404 handles that case instead.
-//
-// Every request-supplied path segment is validated by allowlist before it
-// ever reaches the filesystem: empty, ".", "..", or dotfile/dot-directory
-// segments are refused outright (this also defeats encoded traversal, since
-// net/http has already percent-decoded request.URL.Path by the time this
-// function sees it). The joined candidate is then checked for lexical
-// containment under root as a fast first pass, and -- unconditionally,
-// never only when the leaf itself looks like a symlink -- fully resolved
-// with filepath.EvalSymlinks and checked for containment again on that
-// canonical path before anything is opened. A leaf-only symlink check is
-// not enough: an INTERMEDIATE path component can itself be a symlinked
-// directory (root/outside -> /elsewhere, with an entirely ordinary regular
-// file beneath it), and every filesystem lookup -- Lstat included --
-// transparently resolves intermediate symlinks regardless of the leaf's
-// own type, so a check gated on the leaf's mode alone never sees that
-// escape. Resolving unconditionally, on every request, closes that gap;
-// it also means a symlink whose canonical target stays inside root keeps
-// working normally, matching require(...)'s own containment model.
 func ahdHTTPServeStatic(state *ahdHTTPServerState, writer http.ResponseWriter, request *http.Request, method, path string) bool {
 	if method != http.MethodGet && method != http.MethodHead {
 		return false
@@ -1405,42 +1397,7 @@ func ahdHTTPServeStatic(state *ahdHTTPServerState, writer http.ResponseWriter, r
 			ahdHTTPWritePlain(writer, http.StatusNotFound, "Not Found")
 			return true
 		}
-		candidate := filepath.Join(entry.root, filepath.FromSlash(relative))
-		if !ahdHTTPWithinRoot(entry.root, candidate) {
-			ahdHTTPWritePlain(writer, http.StatusNotFound, "Not Found")
-			return true
-		}
-		// Resolved unconditionally -- never gated on whether the leaf
-		// itself looks like a symlink -- because an intermediate directory
-		// component can be the symlink instead, and Lstat/Stat/Open all
-		// resolve intermediate components transparently no matter what the
-		// leaf is. A candidate that does not exist at all (the ordinary
-		// missing-file case) also surfaces here as an error, since
-		// EvalSymlinks requires every component to resolve.
-		resolved, err := filepath.EvalSymlinks(candidate)
-		if err != nil || !ahdHTTPWithinRoot(entry.root, resolved) {
-			ahdHTTPWritePlain(writer, http.StatusNotFound, "Not Found")
-			return true
-		}
-		info, err := os.Stat(resolved)
-		if err != nil {
-			ahdHTTPWritePlain(writer, http.StatusNotFound, "Not Found")
-			return true
-		}
-		if info.IsDir() {
-			ahdHTTPWritePlain(writer, http.StatusNotFound, "Not Found")
-			return true
-		}
-		file, err := os.Open(resolved)
-		if err != nil {
-			ahdHTTPWritePlain(writer, http.StatusNotFound, "Not Found")
-			return true
-		}
-		defer func() { _ = file.Close() }()
-		if contentType := mime.TypeByExtension(filepath.Ext(resolved)); contentType != "" {
-			writer.Header().Set("Content-Type", contentType)
-		}
-		http.ServeContent(writer, request, filepath.Base(resolved), info.ModTime(), file)
+		ahdHTTPServePublicFile(writer, request, entry, relative)
 		return true
 	}
 	return false
@@ -1466,38 +1423,61 @@ func ahdHTTPServeManaged(state *ahdHTTPServerState, writer http.ResponseWriter, 
 			ahdHTTPWritePlain(writer, http.StatusNotFound, "Not Found")
 			return true
 		}
-		candidate := filepath.Join(entry.root, filepath.FromSlash(relative))
-		if !ahdHTTPWithinRoot(entry.root, candidate) {
-			ahdHTTPWritePlain(writer, http.StatusNotFound, "Not Found")
-			return true
-		}
-		resolved, err := filepath.EvalSymlinks(candidate)
-		if err != nil || !ahdHTTPWithinRoot(entry.root, resolved) {
-			ahdHTTPWritePlain(writer, http.StatusNotFound, "Not Found")
-			return true
-		}
-		info, err := os.Stat(resolved)
-		if err != nil {
-			ahdHTTPWritePlain(writer, http.StatusNotFound, "Not Found")
-			return true
-		}
-		if info.IsDir() {
-			ahdHTTPWritePlain(writer, http.StatusNotFound, "Not Found")
-			return true
-		}
-		file, err := os.Open(resolved)
-		if err != nil {
-			ahdHTTPWritePlain(writer, http.StatusNotFound, "Not Found")
-			return true
-		}
-		defer func() { _ = file.Close() }()
-		if contentType := mime.TypeByExtension(filepath.Ext(resolved)); contentType != "" {
-			writer.Header().Set("Content-Type", contentType)
-		}
-		http.ServeContent(writer, request, filepath.Base(resolved), info.ModTime(), file)
+		ahdHTTPServePublicFile(writer, request, entry, relative)
 		return true
 	}
 	return false
+}
+
+// Open from the registered root so a path change after resolution cannot
+// send a request outside the public directory. A mount whose path now names
+// a different directory is unavailable until it is registered again.
+func ahdHTTPServePublicFile(writer http.ResponseWriter, request *http.Request, entry ahdHTTPStaticEntry, relative string) {
+	file, info, err := ahdHTTPOpenPublicFile(entry, relative)
+	if err != nil {
+		ahdHTTPWritePlain(writer, http.StatusNotFound, "Not Found")
+		return
+	}
+	defer file.Close()
+	if contentType := mime.TypeByExtension(filepath.Ext(info.Name())); contentType != "" {
+		writer.Header().Set("Content-Type", contentType)
+	}
+	http.ServeContent(writer, request, info.Name(), info.ModTime(), file)
+}
+
+func ahdHTTPOpenPublicFile(entry ahdHTTPStaticEntry, relative string) (*os.File, os.FileInfo, error) {
+	candidate := filepath.Join(entry.root, filepath.FromSlash(relative))
+	resolved, err := filepath.EvalSymlinks(candidate)
+	if err != nil || !ahdHTTPWithinRoot(entry.root, resolved) {
+		return nil, nil, os.ErrNotExist
+	}
+	inside, err := filepath.Rel(entry.root, resolved)
+	if err != nil || ahdHTTPStaticSegmentBlocked(filepath.ToSlash(inside)) {
+		return nil, nil, os.ErrNotExist
+	}
+	tree, err := os.OpenRoot(entry.root)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer tree.Close()
+	rootInfo, err := tree.Stat(".")
+	if err != nil || !os.SameFile(entry.info, rootInfo) {
+		return nil, nil, os.ErrNotExist
+	}
+	info, err := tree.Lstat(inside)
+	if err != nil || !info.Mode().IsRegular() {
+		return nil, nil, os.ErrNotExist
+	}
+	file, err := tree.Open(inside)
+	if err != nil {
+		return nil, nil, err
+	}
+	opened, err := file.Stat()
+	if err != nil || !opened.Mode().IsRegular() || !os.SameFile(info, opened) {
+		_ = file.Close()
+		return nil, nil, os.ErrNotExist
+	}
+	return file, opened, nil
 }
 
 // ahdHTTPStaticSegmentBlocked reports whether any "/"-separated segment of a
@@ -1505,6 +1485,9 @@ func ahdHTTPServeManaged(state *ahdHTTPServerState, writer http.ResponseWriter, 
 // (a dotfile or dot-directory anywhere in the path, not only its final
 // component) -- an allowlist check performed before any filesystem access.
 func ahdHTTPStaticSegmentBlocked(relative string) bool {
+	if strings.ContainsRune(relative, '\\') || (runtime.GOOS == "windows" && strings.ContainsRune(relative, ':')) {
+		return true
+	}
 	for _, segment := range strings.Split(relative, "/") {
 		if segment == "" || segment == "." || segment == ".." || strings.HasPrefix(segment, ".") {
 			return true
@@ -2004,12 +1987,13 @@ func ahdHTTPWriteEncoded(writer http.ResponseWriter, request *http.Request, data
 // handling for free; passing a zero modtime keeps Last-Modified/ETag out of
 // scope rather than inventing a cache-validator story.
 func ahdHTTPWriteFile(writer http.ResponseWriter, request *http.Request, response ahdHTTPResponseData) {
+	writer = ahdHTTPFileResponseWriter{writer}
 	file, err := os.Open(response.FilePath)
 	if err != nil {
 		if os.IsNotExist(err) {
 			ahdHTTPWritePlain(writer, http.StatusNotFound, "Not Found")
 		} else {
-			fmt.Fprintf(os.Stderr, "ahdcode: HTTP.file could not open the stored path: %v\n", err)
+			fmt.Fprintln(os.Stderr, "ahdcode: HTTP.file could not open the stored path")
 			ahdHTTPWritePlain(writer, http.StatusInternalServerError, "Internal Server Error")
 		}
 		return
@@ -2017,7 +2001,7 @@ func ahdHTTPWriteFile(writer http.ResponseWriter, request *http.Request, respons
 	defer func() { _ = file.Close() }()
 
 	info, err := file.Stat()
-	if err != nil || info.IsDir() {
+	if err != nil || !info.Mode().IsRegular() {
 		fmt.Fprintf(os.Stderr, "ahdcode: HTTP.file path is not a servable regular file\n")
 		ahdHTTPWritePlain(writer, http.StatusInternalServerError, "Internal Server Error")
 		return
@@ -2036,6 +2020,17 @@ func ahdHTTPWriteFile(writer http.ResponseWriter, request *http.Request, respons
 		writer.Header().Set("Content-Disposition", ahdHTTPContentDisposition(response.FileDownloadName))
 	}
 	http.ServeContent(writer, request, "", time.Time{}, file)
+}
+
+type ahdHTTPFileResponseWriter struct{ http.ResponseWriter }
+
+func (writer ahdHTTPFileResponseWriter) WriteHeader(status int) {
+	// ServeContent can strip cache headers from errors, including malformed
+	// ranges. Apply the safe default at the point headers are written.
+	if writer.Header().Get("Cache-Control") == "" {
+		writer.Header().Set("Cache-Control", "no-store")
+	}
+	writer.ResponseWriter.WriteHeader(status)
 }
 
 // ahdHTTPContentDisposition builds a safe attachment Content-Disposition

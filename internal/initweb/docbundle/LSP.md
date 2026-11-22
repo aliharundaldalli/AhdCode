@@ -131,8 +131,13 @@ entries with module details rather than silently picking one.
 
 Workspace references and rename are an on-demand bounded in-memory scan. Open
 buffers always take precedence over disk files, and the compiler is rerun for
-unopened workspace `.ahd` entries when a query needs them. There is no
-persistent index, SQLite database, background daemon, or asynchronous watcher.
+unopened workspace `.ahd` entries when a query needs them. The recursive
+scan skips volume roots and directory links or junctions. Each request
+can visit 512 directories, inspect 8,192 directory entries, and discover
+1,024 source files across its roots. References can return the available
+locations if discovery stops. Rename refuses to return an edit when the
+workspace search was incomplete. There is no persistent index, SQLite
+database, background daemon, or asynchronous watcher.
 
 ## Not implemented (by design)
 

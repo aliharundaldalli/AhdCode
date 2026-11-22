@@ -313,7 +313,11 @@ containment under `root`, and, if it turns out to be a symlink, checked
 again after resolving it -- a symlink whose target escapes `root` is never
 served, matching `require(...)`'s own containment model; one that resolves
 back inside `root` is served normally. A request that maps to a directory
-is refused (404), never listed.
+is refused (404), never listed. Both static and managed mounts open files
+inside the registered directory and also refuse hidden targets reached
+through an alias. Replacing a root directory requires restarting the app
+to register its new identity. Updating files inside that directory still
+takes effect without a restart.
 
 Files stream through the same binary-safe `http.ServeContent` machinery as
 `HTTP.file`/`HTTP.download`, so Range and conditional-request headers work,
@@ -566,6 +570,14 @@ separate range API.
 `HTTP.file`/`HTTP.download` do not add a static-files root, a URL-to-path
 mapping, directory listing, or any web-root abstraction: they serve exactly
 the one path the application passed, and only that path.
+
+Keep private files outside every public mount. Resolve the current user from
+the server-side session, check ownership or permission against the requested
+record, then pass its trusted stored path to `HTTP.file` or `HTTP.download`.
+Apply the same check to alternate routes and HEAD requests. Use generic denial
+responses and mark them `Cache-Control: no-store`. A file response defaults
+to `Cache-Control: no-store`. Set an explicit cache policy only for content
+approved for that policy. Keep private responses out of the PWA asset list.
 
 ## Cookies
 

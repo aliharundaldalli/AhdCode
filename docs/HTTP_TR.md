@@ -301,7 +301,10 @@ ve bir sembolik bağ olduğu ortaya çıkarsa, çözüldükten sonra tekrar
 denetlenir -- hedefi `root`'un dışına kaçan bir sembolik bağ asla sunulmaz,
 tıpkı `require(...)`'in kendi kapsanma modeli gibi; `root`'un içine geri
 dönen biri normal şekilde sunulur. Bir dizine eşlenen bir istek reddedilir
-(404), asla listelenmez.
+(404), asla listelenmez. Statik ve yönetilen bağlamalar dosyaları kaydedilen
+dizinin içinde açar, gizli bir hedefe yönelen bağları reddeder. Kök dizini
+değiştirirseniz yeni dizini kaydetmek için uygulamayı yeniden başlatın.
+Kök dizinin içindeki dosyaların güncellenmesi yeniden başlatma gerektirmez.
 
 Dosyalar, `HTTP.file`/`HTTP.download` ile aynı ikili-güvenli
 `http.ServeContent` altyapısından akar, böylece Range ve koşullu istek
@@ -538,6 +541,15 @@ bir `500`'dür; hiçbiri panic üretmez.
 `HTTP.file`/`HTTP.download` bir statik dosya kökü, URL-yol eşlemesi, dizin
 listeleme veya herhangi bir web-root soyutlaması eklemez: yalnızca
 uygulamanın verdiği tek yolu sunar.
+
+Özel dosyaları tüm genel bağlamaların dışında saklayın. Kullanıcıyı sunucu
+tarafındaki oturumdan belirleyin, istenen kaydın sahipliğini veya erişim
+iznini doğrulayın ve ardından güvenilir depolama yolunu `HTTP.file` ya da
+`HTTP.download` ile sunun. Aynı denetimi alternatif rotalara ve HEAD
+isteklerine uygulayın. Ret yanıtlarında genel bir mesaj ve
+`Cache-Control: no-store` kullanın. Dosya yanıtlarında varsayılan politika
+`Cache-Control: no-store` değeridir. Özel yanıtları PWA varlık listesine
+eklemeyin.
 
 ## Çerezler
 

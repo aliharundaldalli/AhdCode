@@ -319,7 +319,7 @@ func TestHTTPSessionOnlyProgramDoesNotRequireHelpers(t *testing.T) {
 func TestHTTPSessionNativeRelocatesWithoutToolchain(t *testing.T) {
 	port := freeLoopbackPort(t)
 	executable := buildSQLiteProgram(t, nativeSessionLoginSource(port, false))
-	relocated := filepath.Join(t.TempDir(), "sessionapp")
+	relocated := ExecutablePath(filepath.Join(t.TempDir(), "sessionapp"))
 	data, err := os.ReadFile(executable)
 	if err != nil {
 		t.Fatal(err)

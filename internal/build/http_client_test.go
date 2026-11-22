@@ -71,7 +71,7 @@ if answer != null {
 		}
 	}
 	executable := buildSQLiteProgram(t, source)
-	relocated := filepath.Join(t.TempDir(), "httpclient")
+	relocated := ExecutablePath(filepath.Join(t.TempDir(), "httpclient"))
 	data, err := os.ReadFile(executable)
 	if err != nil {
 		t.Fatal(err)

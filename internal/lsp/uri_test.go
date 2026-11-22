@@ -1,13 +1,16 @@
 package lsp
 
-import "testing"
+import (
+	"path/filepath"
+	"testing"
+)
 
 func TestURIToPathSimple(t *testing.T) {
 	path, err := URIToPath("file:///Users/ali/main.ahd")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if path != "/Users/ali/main.ahd" {
+	if path != filepath.FromSlash("/Users/ali/main.ahd") {
 		t.Fatalf("path = %q", path)
 	}
 }
@@ -17,7 +20,7 @@ func TestURIToPathSpaces(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if path != "/Users/ali/my project/main.ahd" {
+	if path != filepath.FromSlash("/Users/ali/my project/main.ahd") {
 		t.Fatalf("path = %q", path)
 	}
 }
@@ -27,7 +30,7 @@ func TestURIToPathUnicode(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if path != "/Users/ali/İsim/main.ahd" {
+	if path != filepath.FromSlash("/Users/ali/İsim/main.ahd") {
 		t.Fatalf("path = %q", path)
 	}
 }
@@ -96,7 +99,7 @@ func TestURIRoundTrip(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%q: %v", original, err)
 		}
-		if path != original {
+		if path != filepath.FromSlash(original) {
 			t.Fatalf("round trip: %q -> %q -> %q", original, uri, path)
 		}
 	}

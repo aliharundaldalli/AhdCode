@@ -42,7 +42,7 @@ func (store *Store) workspaceRootsFor(entryPath string) []string {
 	var out []string
 	add := func(path string) {
 		path = canonicalPath(path)
-		if path != "" && !seen[path] {
+		if path != "" && !isWorkspaceVolumeRoot(path) && !seen[path] {
 			seen[path] = true
 			out = append(out, path)
 		}
