@@ -16,10 +16,10 @@ modules, GUI, Graphics, interactive Plot viewer, and desktop application
 packaging. It is used in practice by a small community; it is not a
 mainstream language.
 
-This is **v2.12.0**, the release candidate for the standalone checker,
-SQLite opening options, and platform reliability. See the
-[release notes](RELEASE_2.12.0.md) and [upgrade notes](UPGRADE_2.12.md).
-Version v2.11.0 remains the latest published stable release.
+This is **v2.12.0**, featuring the standalone checker (`ahdcode check`),
+SQLite opening options, bounded LSP discovery and edits, HTTP/file isolation
+hardening, and cross-platform reliability. See the
+[release notes](RELEASE_2.12.0.md) and [upgrade guide](UPGRADE_2.12.md).
 
 v2.0.0 is a major release, **Desktop Application Completion**: it completes
 the first-party desktop application foundation — ListBox, Select, TextArea,

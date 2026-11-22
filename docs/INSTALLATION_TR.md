@@ -1,25 +1,21 @@
 # Kurulum, yükseltme ve kaldırma
 
-v2.12.0 adayını ayrı bir Windows profili veya Unix kurulum dizininde
-deneyin. Paketi çalıştırmadan önce SHA-256 özetini bildirim dosyasıyla
-karşılaştırın. Test ortamında `ahdcode version` ve `ahdcode check app.ahd`
-komutlarını doğrulayın. Aşağıdaki komutlar yayımlanmış v2.11.0 kurulumu
-içindir. [v2.12 geçiş kılavuzuna](UPGRADE_2.12_TR.md) bakın.
+Ayrıca [v2.12 sürüm notlarına](RELEASE_2.12.0_TR.md) ve [v2.12 geçiş kılavuzuna](UPGRADE_2.12_TR.md) bakın.
 
-İşletim sisteminiz için yayımlanan AhdCode **v2.11.0** kararlı kurulum paketini
+İşletim sisteminiz için yayımlanan AhdCode **v2.12.0** kararlı kurulum paketini
 indirin (macOS `arm64`/`x64`, Windows `x64` veya Linux `amd64`/`arm64`).
-`v2.11.0` araç zinciri paketleri derleyiciyi, tüm yardımcıları (`ahdsqlite`,
+`v2.12.0` araç zinciri paketleri derleyiciyi, tüm yardımcıları (`ahdsqlite`,
 `ahdnumeric`, `ahdplot`, `ahdgraphics`, `ahdgui`, `ahdplotview`), gömülü
 AhdDataStudio'yu, starter'ları ve İngilizce belgeleri taşır; yerel
 `ahdcode build` ve `ahdcode package` komutları için `PATH` üzerinde `go.mod`
-dosyasındaki Go sürümünü kullanır. `v2.8.0`–`v2.10.0` geçmiş kaynak
+dosyasındaki Go sürümünü kullanır (`ahdcode check` komutu ise Go olmadan çalışır). `v2.8.0`–`v2.10.0` geçmiş kaynak
 sürümleridir. Özel Go 1.27.0, çevrimdışı Tectonic LaTeX motoru ve VS Code
 `.vsix` eklentisini birlikte taşıyan kendi kendine yeten tam paketler
 `v2.7.0` sürümünde kalır ve `v3.0`'da geri döner.
 
 ## macOS (Apple Silicon ve x64 paketleme)
 
-AhdCode `v2.11.0`; Apple Silicon (`arm64` — M1, M2, M3, M4 ve sonraki modeller)
+AhdCode `v2.12.0`; Apple Silicon (`arm64` — M1, M2, M3, M4 ve sonraki modeller)
 ve çapraz derlenen Intel x86-64 (`x64`) için `.pkg`, `.dmg` ve `.tar.gz`
 paketleri sunar:
 
@@ -84,8 +80,8 @@ Apple Developer ID sertifikaları ve `notarytool` profili mevcutsa `--sign-app`,
 
 ## Windows x64
 
-`AhdCode-2.11.0-windows-x64.exe` dosyasına Dosya Gezgini'nde çift tıklayın
-(veya otomatik kurulum için `AhdCode-2.11.0-windows-x64.exe --silent`
+`AhdCode-2.12.0-windows-x64.exe` dosyasına Dosya Gezgini'nde çift tıklayın
+(veya otomatik kurulum için `AhdCode-2.12.0-windows-x64.exe --silent`
 çalıştırın). Kurulum küçük bir grafik programdır: ne kuracağını gösterir,
 gömülü paketi ilerleme penceresiyle açıp doğrular ve bir onay penceresiyle biter.
 Konsol, terminal veya komut yazmak gerekmez.
@@ -95,7 +91,7 @@ bilinmiyor” uyarısı gösterebilir. Sistemin **Daha fazla bilgi → Yine de
 çalıştır** yolunu kullanmadan önce dosyayı yayımlanan SHA-256 değeriyle
 doğrulayın; Windows güvenlik korumalarını kapatmayın.
 
-Dosyalar `%LOCALAPPDATA%\AhdCode\versions\2.11.0` altına kurulur (`2.7.0` gibi
+Dosyalar `%LOCALAPPDATA%\AhdCode\versions\2.12.0` altına kurulur (`2.7.0` gibi
 önceki sürümler korunur). Sabit komut `%LOCALAPPDATA%\AhdCode\bin\ahdcode.exe`'dir
 ve kullanıcı PATH'ine yalnızca bu tek dizin, yalnızca ilk kurulumda eklenir.
 Yönetici izni veya Git gerekmez; kaldırma kaydı Installed Apps içine yazılır.
@@ -114,14 +110,14 @@ PATH girdilerini aynen korur ve eşdeğer tek bir AhdCode girdisi bırakır.
 Kaldırma yalnızca eşdeğer `%LOCALAPPDATA%\AhdCode\bin` girdilerini kaldırır,
 diğer PATH girdilerine ve makine PATH'ine dokunmaz.
 
-`AhdCode-2.11.0-windows-x64.exe --silent` hiçbir pencere açmadan kurar.
+`AhdCode-2.12.0-windows-x64.exe --silent` hiçbir pencere açmadan kurar.
 
 Linux (x86-64 ve arm64): işlemcinize uygun paketi seçin — `uname -m`, `amd64`
 için `x86_64`, `arm64` için `aarch64` yazdırır:
-`AhdCode-2.11.0-linux-amd64.tar.gz` (64 bit Intel/AMD) ya da
-`AhdCode-2.11.0-linux-arm64.tar.gz` (64 bit ARM; örneğin Ampere, AWS Graviton,
+`AhdCode-2.12.0-linux-amd64.tar.gz` (64 bit Intel/AMD) ya da
+`AhdCode-2.12.0-linux-arm64.tar.gz` (64 bit ARM; örneğin Ampere, AWS Graviton,
 64 bit işletim sistemli Raspberry Pi 4/5). Arşivi açın,
-`AhdCode-2.11.0-linux-amd64` dizinine girin ve `sh install.sh --setup-path`
+`AhdCode-2.12.0-linux-amd64` dizinine girin ve `sh install.sh --setup-path`
 çalıştırın. Kurulum programı hiçbir şey kurmadan önce paketin bu makinede
 çalıştığını denetler. Kök `~/.local/share/ahdcode` dizinidir; PATH bloğu
 `~/.profile` dosyasına eklenir.

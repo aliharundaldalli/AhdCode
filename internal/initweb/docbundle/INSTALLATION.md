@@ -1,24 +1,20 @@
 # Installation, upgrade, and removal
 
-For v2.12.0 candidate testing, use a separate Windows profile or Unix
-installation prefix. Compare the candidate artifact against its SHA-256
-manifest before running it, then verify `ahdcode version` and
-`ahdcode check app.ahd` in the test environment. The commands below describe
-the published v2.11.0 installation. See the [v2.12 upgrade guide](UPGRADE_2.12.md).
+See the [v2.12 release notes](RELEASE_2.12.0.md) and [v2.12 upgrade guide](UPGRADE_2.12.md).
 
-Download the published AhdCode **v2.11.0** stable package for your operating
-system (macOS `arm64`/`x64`, Windows `x64`, or Linux `amd64`/`arm64`). `v2.11.0`
+Download the published AhdCode **v2.12.0** stable package for your operating
+system (macOS `arm64`/`x64`, Windows `x64`, or Linux `amd64`/`arm64`). `v2.12.0`
 toolchain packages include the compiler, all helpers (`ahdsqlite`,
 `ahdnumeric`, `ahdplot`, `ahdgraphics`, `ahdgui`, `ahdplotview`), embedded
 AhdDataStudio, starters, and English documentation, and rely on the Go version
 specified in `go.mod` on `PATH` for native `ahdcode build` and `ahdcode package`
-commands. `v2.8.0` through `v2.10.0` are historical source-only releases. Self-contained
+commands (while `ahdcode check` runs without Go). `v2.8.0` through `v2.10.0` are historical source-only releases. Self-contained
 bundles that also embed private Go 1.27.0, the offline Tectonic LaTeX engine,
 and the VS Code `.vsix` remain available on `v2.7.0` and return at `v3.0`.
 
 ## macOS (Apple Silicon and x64 packaging)
 
-AhdCode `v2.11.0` distributes native `.pkg`, `.dmg`, and `.tar.gz` toolchain
+AhdCode `v2.12.0` distributes native `.pkg`, `.dmg`, and `.tar.gz` toolchain
 packages for Apple Silicon (`arm64` — M1, M2, M3, M4 and later) and cross-compiled
 Intel x86-64 (`x64`):
 
@@ -86,8 +82,8 @@ recommended installer.
 
 ## Windows x64
 
-Double-click `AhdCode-2.11.0-windows-x64.exe` in File Explorer (or run
-`AhdCode-2.11.0-windows-x64.exe --silent` for automated setup). Setup is a small
+Double-click `AhdCode-2.12.0-windows-x64.exe` in File Explorer (or run
+`AhdCode-2.12.0-windows-x64.exe --silent` for automated setup). Setup is a small
 graphical per-user program: it shows what it will install, unpacks and checks
 its embedded payload with a progress window, and finishes with a confirmation.
 No console, no terminal, and no typed commands are involved.
@@ -97,7 +93,7 @@ may show an unknown-publisher warning. Verify the file against the published SHA
 the system-provided **More info → Run anyway** path, and do not disable Windows
 security protections.
 
-Files go under `%LOCALAPPDATA%\AhdCode\versions\2.11.0` (with previous
+Files go under `%LOCALAPPDATA%\AhdCode\versions\2.12.0` (with previous
 versions such as `2.7.0` preserved alongside). The stable command
 is `%LOCALAPPDATA%\AhdCode\bin\ahdcode.exe`, and only that one folder is added
 to your user PATH — once, on first installation. Administrator rights and Git
@@ -116,7 +112,7 @@ entries exactly as they are and leaves one equivalent AhdCode entry. Uninstall
 removes only equivalent `%LOCALAPPDATA%\AhdCode\bin` entries and preserves
 unrelated PATH entries; it does not edit the machine PATH.
 
-`AhdCode-2.11.0-windows-x64.exe --silent` installs with no windows at all, for
+`AhdCode-2.12.0-windows-x64.exe --silent` installs with no windows at all, for
 scripted deployment. Because setup is a graphical program, run it from a script
 as `Start-Process -Wait` if you need to block until it finishes.
 
@@ -125,18 +121,18 @@ as `Start-Process -Wait` if you need to block until it finishes.
 Choose the package for your processor — `uname -m` prints `x86_64` for
 `amd64` and `aarch64` for `arm64`:
 
-- `AhdCode-2.11.0-linux-amd64.tar.gz` — 64-bit Intel/AMD
-- `AhdCode-2.11.0-linux-arm64.tar.gz` — 64-bit ARM (for example Ampere,
+- `AhdCode-2.12.0-linux-amd64.tar.gz` — 64-bit Intel/AMD
+- `AhdCode-2.12.0-linux-arm64.tar.gz` — 64-bit ARM (for example Ampere,
   AWS Graviton, Raspberry Pi 4/5 with a 64-bit OS)
 
 ```sh
-tar -xzf AhdCode-2.11.0-linux-amd64.tar.gz
-cd AhdCode-2.11.0-linux-amd64
+tar -xzf AhdCode-2.12.0-linux-amd64.tar.gz
+cd AhdCode-2.12.0-linux-amd64
 sh install.sh --setup-path
 ```
 
 The installer checks that the package runs on this machine before it
-installs anything. Files live under `~/.local/share/ahdcode/versions/2.11.0`. The installer adds
+installs anything. Files live under `~/.local/share/ahdcode/versions/2.12.0`. The installer adds
 one owned PATH block to `~/.profile`. Open a login shell or source that profile.
 
 ## What is included

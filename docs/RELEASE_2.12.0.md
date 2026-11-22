@@ -1,4 +1,4 @@
-# AhdCode v2.12.0 release candidate
+# AhdCode v2.12.0 — Standalone Checker, SQLite Options & Platform Reliability
 
 [Türkçe](RELEASE_2.12.0_TR.md) · [Installation](INSTALLATION.md) · [Upgrade](UPGRADE_2.12.md)
 
@@ -7,6 +7,6 @@
 - LSP workspace discovery is bounded. Rename refuses incomplete discovery and applies edits to the source that owns each span, including `require(...)` files.
 - HTTP public mounts check root and file identity. Explicit file responses default to `Cache-Control: no-store`. Applications supply server-side ownership checks and mark authorization denials uncacheable.
 - Studio creates a missing `.env` with exclusive creation and private permissions. Windows GUI resources and HTTP public mounts resolve directory junctions through the opened handle, and disk inspection accepts existing file paths.
-- Native packaging keeps the v2.11 toolchain layout. Candidate artifacts and release qualification status are recorded in the Phase 5 QA report. Apple signing and notarization apply separately to each new build.
+- Native packaging keeps the v2.11 toolchain layout. macOS `.pkg` and `.dmg` installers are Apple Developer ID signed, Apple-notarized, ticket-stapled, and Gatekeeper-verified; `.tar.gz` archives carry signed Mach-O binaries, and Windows installers and Linux archives are distributed with `SHA256SUMS.txt` verification manifests.
 
 The release pipeline targets Windows x64, Linux amd64/arm64 and macOS arm64/x64. A cross-built artifact still requires native validation on its target. Toolchain-only packages need the Go version in `go.mod` for build and packaging commands. Optional GUI/graphics helpers need their platform display environment.

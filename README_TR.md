@@ -16,11 +16,12 @@ veritabanı modülleri, GUI'si, Graphics'i, etkileşimli Plot görüntüleyicisi
 masaüstü uygulaması paketlemesiyle gelir. Küçük bir topluluk tarafından
 pratikte kullanılmaktadır; yaygın (mainstream) bir dil değildir.
 
-Bu, bağımsız denetleyiciyi, SQLite açılış seçeneklerini ve platform
-iyileştirmelerini içeren **v2.12.0** sürüm adayıdır.
+Bu sürüm, bağımsız denetleyiciyi (`ahdcode check`), SQLite açılış
+seçeneklerini, sınırlı LSP taraması ve güvenli yeniden adlandırmayı,
+HTTP/dosya yalıtım sertleştirmelerini ve platform güvenilirliği
+iyileştirmelerini içeren **v2.12.0** sürümüdür.
 [Sürüm notlarına](docs/RELEASE_2.12.0_TR.md) ve
-[geçiş notlarına](docs/UPGRADE_2.12_TR.md) bakın.
-Yayımlanan en güncel kararlı sürüm v2.11.0'dır.
+[geçiş kılavuzuna](docs/UPGRADE_2.12_TR.md) bakın.
 
 v2.0.0 bir ana (major) sürümdür, **Masaüstü Uygulamasının Tamamlanması**:
 birinci taraf masaüstü uygulaması temelini tamamlar — GUI'de ListBox, Select,

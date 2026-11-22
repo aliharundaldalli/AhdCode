@@ -1,4 +1,4 @@
-# AhdCode v2.12.0 sürüm adayı
+# AhdCode v2.12.0 — Bağımsız Denetleyici, SQLite Seçenekleri ve Platform Güvenilirliği
 
 [English](RELEASE_2.12.0.md) · [Kurulum](INSTALLATION_TR.md) · [Geçiş](UPGRADE_2.12_TR.md)
 
@@ -7,6 +7,6 @@
 - LSP taraması sınırlıdır. Eksik taramada yeniden adlandırma reddedilir. `require(...)` dosyalarındaki düzenlemeler konumun ait olduğu kaynağa uygulanır.
 - Genel HTTP bağlamaları dizin ve dosya kimliğini denetler. Dosya yanıtlarının varsayılanı `Cache-Control: no-store` değeridir. Sahiplik ve ret yanıtlarının önbellek politikası uygulamanın sunucu tarafındaki sorumluluğudur.
 - Studio eksik `.env` dosyasını özel izinlerle ve üzerine yazmayı önleyerek oluşturur. Windows'ta GUI kaynakları ve genel HTTP bağlamaları dizin bağlantılarının hedefini açılan tanıtıcıdan çözer. Disk incelemesi mevcut dosya yollarını da kabul eder.
-- Yerel paketler v2.11 araç zinciri düzenini korur. Aday paketler ve doğrulama durumu Faz 5 QA raporunda kayıtlıdır. Apple imzalama ve noter onayı her yeni derlemeye ayrı uygulanır.
+- Yerel paketler v2.11 araç zinciri düzenini korur. macOS `.pkg` ve `.dmg` kurucuları Apple Developer ID ile imzalanmış, noter onayından geçmiş, bilet zımbalanmış ve Gatekeeper ile doğrulanmıştır; `.tar.gz` arşivleri imzalı Mach-O ikilileri taşır, Windows kurucusu ve Linux arşivleri ise `SHA256SUMS.txt` doğrulama özetleriyle yayımlanır.
 
 Paketleme hedefleri Windows x64, Linux amd64/arm64 ve macOS arm64/x64'tür. Çapraz derlenen paketler hedef sistemde yerel doğrulama gerektirir. Yalnızca araç zinciri içeren paketler için derleme ve paketleme komutları `go.mod` dosyasındaki Go sürümünü gerektirir.
