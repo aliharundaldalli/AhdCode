@@ -1,8 +1,10 @@
 package localdev
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -502,10 +504,13 @@ func TestDatabaseRegistryShape(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, expected := range []string{`"schema": "ahdcode.localdatabases"`, `"driver": "sqlite"`, canonical} {
-		if !strings.Contains(content, expected) {
-			t.Errorf("the registry did not contain %q:\n%s", expected, content)
-		}
+	var registry databaseFile
+	if err := json.Unmarshal(raw, &registry); err != nil {
+		t.Fatal(err)
+	}
+	if registry.Schema != "ahdcode.localdatabases" || registry.Version != 1 || len(registry.Databases) != 1 ||
+		registry.Databases[0].Driver != "sqlite" || registry.Databases[0].Path != canonical {
+		t.Errorf("unexpected registry contents: %s", content)
 	}
 	for _, forbidden := range []string{"password", "token", "secret", "AHD_DATA_MYSQL"} {
 		if strings.Contains(strings.ToLower(content), strings.ToLower(forbidden)) {
@@ -516,7 +521,11 @@ func TestDatabaseRegistryShape(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if info.Mode().Perm() != 0o600 {
+	if !info.Mode().IsRegular() {
+		t.Errorf("registry is not a regular file: %v", info.Mode())
+	}
+	// Windows applies the registry directory's inherited ACL.
+	if runtime.GOOS != "windows" && info.Mode().Perm() != 0o600 {
 		t.Errorf("registry permissions were %v", info.Mode().Perm())
 	}
 }

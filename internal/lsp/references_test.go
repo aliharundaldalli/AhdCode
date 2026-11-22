@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"ahdcode/internal/analysis"
 )
 
 func TestWorkspaceReferencesAndRenameUseClosedFileUTF16Positions(t *testing.T) {
@@ -18,7 +20,7 @@ func TestWorkspaceReferencesAndRenameUseClosedFileUTF16Positions(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	entryURI, consumerURI := PathToURI(entry), PathToURI(consumer)
+	entryURI, consumerURI := PathToURI(entry), PathToURI(analysis.CanonicalPath(consumer))
 	document := textDocumentIdentifier{URI: entryURI}
 	position := Position{Character: 1}
 	want := Range{Start: Position{Line: 1, Character: 10}, End: Position{Line: 1, Character: 16}}

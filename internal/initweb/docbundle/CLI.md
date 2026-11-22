@@ -581,8 +581,9 @@ unchanged. `init web` does not create the Studio `.env`.
 
 Both registries are per-user files under the OS configuration directory
 (`~/.config/ahdcode/` on Linux, `~/Library/Application Support/ahdcode/` on
-macOS), created `0700`, with each file written atomically at `0600`.
-`AHDCODE_LOCAL_HOME` overrides the location. They hold local development
+macOS). On Unix the directory is created with `0700` and files with `0600`.
+On Windows files inherit their directory's ACL. Use a private directory
+when setting `AHDCODE_LOCAL_HOME`. They hold local development
 metadata only — hostnames, loopback ports, file paths — and never a password,
 a token, or any database content. See [Env](ENV.md).
 

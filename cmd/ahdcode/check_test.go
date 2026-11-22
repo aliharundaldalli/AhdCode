@@ -12,6 +12,7 @@ import (
 	"strings"
 	"testing"
 
+	"ahdcode/internal/analysis"
 	"ahdcode/internal/build"
 	"ahdcode/internal/diagnostics"
 	"ahdcode/internal/evaluator"
@@ -199,6 +200,7 @@ func TestCheckWithoutGoOnPATHDoesNotRunOrCreateArtifacts(t *testing.T) {
 
 func checkerLSP(t *testing.T, entry, text string) map[string][]checkDiagnostic {
 	t.Helper()
+	root := filepath.Dir(analysis.CanonicalPath(entry))
 	var input, output, stderr bytes.Buffer
 	message := func(body any) {
 		data, err := json.Marshal(body)
@@ -256,6 +258,7 @@ func checkerLSP(t *testing.T, entry, text string) map[string][]checkDiagnostic {
 			if err != nil {
 				t.Fatal(err)
 			}
+			relative := checkSourcePath(root, analysis.CanonicalPath(path))
 			items := make([]checkDiagnostic, 0, len(params.Diagnostics))
 			for _, item := range params.Diagnostics {
 				severity := "error"
@@ -264,11 +267,11 @@ func checkerLSP(t *testing.T, entry, text string) map[string][]checkDiagnostic {
 				}
 				msg, hint, _ := strings.Cut(item.Message, "\nhint: ")
 				items = append(items, checkDiagnostic{
-					Path: checkSourcePath(filepath.Dir(entry), path), Code: item.Code, Message: msg,
+					Path: relative, Code: item.Code, Message: msg,
 					Severity: severity, Range: item.Range, Hint: hint,
 				})
 			}
-			published[checkSourcePath(filepath.Dir(entry), path)] = items
+			published[relative] = items
 		}
 	}
 	return published

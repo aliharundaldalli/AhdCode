@@ -597,8 +597,9 @@ devam eder. `init web`, Studio `.env` dosyasını oluşturmaz.
 
 Her iki kayıt defteri de işletim sisteminin yapılandırma dizini altındaki
 kullanıcıya özel dosyalardır (Linux'ta `~/.config/ahdcode/`, macOS'ta
-`~/Library/Application Support/ahdcode/`); dizin `0700` oluşturulur, her dosya
-`0600` izinleriyle atomik yazılır. `AHDCODE_LOCAL_HOME` konumu değiştirir.
+`~/Library/Application Support/ahdcode/`). Unix'te dizin `0700`, dosyalar
+`0600` izinleriyle oluşturulur. Windows'ta dosyalar dizinin ACL'sini devralır.
+`AHDCODE_LOCAL_HOME` değerini ayarlarken özel bir dizin kullanın.
 Yalnızca yerel geliştirme meta verisi tutarlar — konak adları, geri döngü
 portları, dosya yolları — asla parola, belirteç veya veritabanı içeriği
 tutmazlar. Bkz. [Env](ENV_TR.md).
